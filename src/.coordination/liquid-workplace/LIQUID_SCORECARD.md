@@ -6348,3 +6348,22 @@ per the enumeration entry above (`b815d159`) — **no cell moved this turn.**
 - Live browser: actual `ReadingCapturesView`, 42 entries read from `lensHistoryList`, existing motion harness on isolated Vite 5198 with Liquid styles; 600px NHK selection changes covered=true to no sheet, inert=false, 18-line passage visible. At 1280px the list stays docked; reopen retains selection.
 - Focused canvas + handoff suites: 14/14. Wide selection is the negative control. Screenshot inspected outside repo; console only favicon 404. Shared server stopped externally, so the first stale-page recheck was discarded.
 - No rubric cell or timeline bullet closed; advances reading cat6. Product files were clean before editing. Other workers own Translate/background-main attribution.
+
+## 2026-09-05 09:53 EDT — codexA: idle main profile; unchanged desktop commits
+
+- Active track: Liquid cat7/translate, following 61ea5898's idle-main finding. No rubric cell closed.
+- Fresh 45 s CPU profile of the existing main pid 41072, with no surface actions by this worker:
+  one 1,221 ms sample gap in renameSync; stack is commitLayout -> persist -> atomicWriteJson.
+  Anki runPoll also active; undici JSON parsing 2,064 ms aggregate, GC 1,151 ms aggregate.
+  These aggregates are NOT individual pauses and do not attribute all cat7 failures.
+- Decision: suppress normalized layout echoes before disk I/O/broadcast; main owns layoutEpoch.
+  Keep real layout edits, names, migrations, and the existing synchronous durability contract.
+- Product: src/main/desktop.ts (this commit). Eight new regression cases; desktop suites 59/59.
+- Live: own hidden Electron pid 31360, actual registerDesktopIpc + debug bridge port 39321,
+  empty scratch profile outside repo. 40 repeated IPC commits: epoch 2 -> 2, bytes identical,
+  mtime unchanged. Negative control: x 10 -> 70 -> 10, both acknowledgements ok, epoch +2.
+  No shared app restart or shared profile mutation. Temporary main inspector closed after capture.
+- Limitation: real desktop edits still use synchronous rename; this suppresses redundant work,
+  not every possible main-loop pause. No absolute timing improvement or cat7 closure claimed.
+- Next: Anki's five-minute poll retains every note's full HTML fields until the final fold;
+  reduce that retained payload while preserving note counts, interval merge and profile cancellation.
