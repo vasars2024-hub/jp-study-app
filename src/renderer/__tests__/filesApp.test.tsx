@@ -601,6 +601,83 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
     await click(bodyRows().find((r) => r.textContent?.includes('JMdict')));
     expect(textOf('.fa-details-location')).toBe('Row in dictionaries (dict.db)');
   });
+
+  /*
+   * The anti-gatekeeper line. `FILES_ROUTE_PARITY` has recorded the route that
+   * survives without the Files app since gate 6, but only a test read it, so the
+   * promise was invisible to the person it is for. These four cases are the four
+   * arms, driven through the real component, and the fourth is the control: an
+   * item with no recorded prior route renders NO row rather than an empty one.
+   */
+  describe('says where else each item is reachable', () => {
+    const withSource = (source: string) => [
+      item({
+        id: 'x:1',
+        name: 'Reachability Fixture',
+        kind: 'video',
+        categoryId: 'sources/video',
+        source,
+      }),
+    ];
+
+    const openFixture = async (source: string) => {
+      filesIndex.mockImplementation(async () => snapshot(withSource(source)));
+      await mount(<FilesApp />);
+      await settle();
+      await click(bodyRows().find((r) => r.textContent?.includes('Reachability Fixture')));
+    };
+
+    it('names the one app a preserved store is still reachable in', async () => {
+      await openFixture('media');
+      expect(hasText('Also reachable in')).toBe(true);
+      // `palette.section.player` — the same app-name family the Start menu uses,
+      // so this cannot drift into a twenty-sixth name for the Media app.
+      expect(textOf('.fa-details-also')).toBe('Media');
+      expect(host?.querySelector('.fa-details-also')?.getAttribute('data-reach'))
+        .toBe('section');
+    });
+
+    it('makes the stronger claim for a store mounted outside the section switch', async () => {
+      await openFixture('lookups');
+      expect(textOf('.fa-details-also')).toBe('Everywhere — this is not only in Files.');
+      expect(host?.querySelector('.fa-details-also')?.getAttribute('data-reach'))
+        .toBe('global');
+    });
+
+    it('admits it when Files really is the only home left', async () => {
+      await openFixture('notebook');
+      expect(textOf('.fa-details-also'))
+        .toBe('Only here. This moved into Files and has no other home.');
+      expect(host?.querySelector('.fa-details-also')?.getAttribute('data-reach'))
+        .toBe('only-here');
+      // The honest arm is the point: it must NOT read as reachable elsewhere.
+      expect(hasText('Also reachable in')).toBe(true);
+    });
+
+    it('CONTROL: a store with no prior route renders no row, not an empty one', async () => {
+      // `transcripts` is a `new` capability — nothing existed before it, so there
+      // is no route to name. A blank `<dd>` here would read as a claim that
+      // failed to load, which is the exact dishonest state this avoids.
+      await openFixture('transcripts');
+      expect(host?.querySelector('.fa-details-also')).toBeNull();
+      expect(hasText('Also reachable in')).toBe(false);
+      // ...and the surrounding details list still rendered, so the absence above
+      // is the line's own decision and not an unmounted inspector.
+      expect(host?.querySelector('.fa-details-title')?.textContent)
+        .toBe('Reachability Fixture');
+    });
+
+    it('CONTROL: a source the table does not carry gets no route either', async () => {
+      // Separate `it` rather than a second `openFixture` inside the one above:
+      // mounting twice in one test orphans the first React root, and an orphaned
+      // FilesApp is still live enough to consume module-level pending scope out
+      // from under the next test. Five gate-5 assertions died that way once.
+      await openFixture('not-a-real-store');
+      expect(host?.querySelector('.fa-details-also')).toBeNull();
+      expect(host?.querySelector('.fa-details-title')?.textContent)
+        .toBe('Reachability Fixture');
+    });
+  });
 });
 
 describe('Files app — honest states', () => {

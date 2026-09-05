@@ -11680,6 +11680,9 @@ export const ru: Catalog = {
   'filesApp.details.label': 'Сведения',
   'filesApp.details.location': 'Расположение',
   'filesApp.details.source': 'Источник индекса',
+  'filesApp.details.alsoIn': 'Также доступно в',
+  'filesApp.details.alsoInGlobal': 'Везде — это доступно не только в «Файлах».',
+  'filesApp.details.onlyHere': 'Только здесь. Перенесено в «Файлы», другого места нет.',
 
   'filesApp.toolbar.label': 'Инструменты файлов',
   'filesApp.search.label': 'Искать везде',

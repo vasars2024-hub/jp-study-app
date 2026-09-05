@@ -79,10 +79,6 @@
       "status": "accepted",
       "note": "Named 'fixtures'. Test data is meant to be test-only."
     },
-    "test-only-module:src/shared/filesApp/routeParity.ts": {
-      "status": "pending",
-      "note": "FILES_APP_PLAN.md gate 6's evidence: one row per Files-app capability naming where it is still reachable WITHOUT the Files app. The test IS the consumer, deliberately and by the same pattern as theme/tokens.ts above — a parity claim nothing re-derives is a comment, and shared/__tests__/filesAppRouteParity.test.ts re-derives every row from AppSection.tsx, both enumerator registries and the named module's own source. Marked 'pending' rather than 'accepted' because it should stop being test-only: the natural app consumer is the per-item 'also reachable in <section>' affordance that gate 10's planForPath open path and gate 12's reveal both want, and when that lands this entry comes out rather than being re-justified."
-    },
     "test-only-module:src/shared/i18n/catalogs/all.ts": {
       "status": "accepted",
       "note": "CLAUDE.md says so explicitly: 'for tooling and tests only; importing it from app code puts every language back in the bundle'."

@@ -507,3 +507,50 @@ export function filesParityViolations(
 export function filesParityRow(capability: string): FilesParityRow | undefined {
   return FILES_ROUTE_PARITY.find((row) => row.capability === capability);
 }
+
+/**
+ * What the Files app must SAY, per item, about the route that still exists
+ * without it.
+ *
+ * The table above is gate 6's evidence and until now only a test read it, so
+ * the anti-gatekeeper promise — "every route that works today keeps working;
+ * a capability that becomes Files-app-only is a REGRESSION" — was true in the
+ * repository and invisible in the product. A user looking at a row in Files
+ * had no way to learn that the same material is one click away in Library, and
+ * the two capabilities that genuinely did move had no way to say so either.
+ * This is the reader that closes that gap; `FilesApp.tsx`'s inspector renders
+ * it beside the item's source.
+ *
+ * Four outcomes, and the distinctions are the point:
+ *
+ * - `section` — preserved, reachable in exactly one app. The caller labels it
+ *   with `palette.section.<id>`, the same app-name family the Start menu and
+ *   the command palette use, so Files cannot invent a twenty-sixth app name.
+ * - `global` — preserved, mounted outside the section switch. A STRONGER claim
+ *   than naming one section (the row doc says so), so it gets its own arm
+ *   rather than being flattened into "reachable somewhere".
+ * - `only-here` — `migrated`. Files IS the only home now. Saying nothing here
+ *   would be the dishonest arm: an item with no line would read exactly like an
+ *   item whose line had not loaded.
+ * - `null` — `new`, or a capability the table does not carry. `new` has no
+ *   prior route to name, and an unknown capability must not be given one; both
+ *   render nothing rather than a claim that cannot be checked.
+ *
+ * `status: 'preserved'` with a null section is impossible by the table's own
+ * invariant (the test pins it), but it is handled as `null` rather than thrown:
+ * an inspector is not the place to discover a data defect, and the test is.
+ */
+export type FilesReachability =
+  | { kind: 'section'; section: DesktopWinSection }
+  | { kind: 'global' }
+  | { kind: 'only-here' };
+
+export function filesReachability(capability: string): FilesReachability | null {
+  const row = filesParityRow(capability);
+  if (!row) return null;
+  if (row.status === 'migrated') return { kind: 'only-here' };
+  if (row.status !== 'preserved') return null;
+  if (row.section === 'global') return { kind: 'global' };
+  if (row.section === null) return null;
+  return { kind: 'section', section: row.section };
+}

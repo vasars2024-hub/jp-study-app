@@ -57,6 +57,7 @@ import {
   type FilesSortColumn,
 } from '../../../shared/filesApp/catalog';
 import { FILES_MINE_MAX_CARDS, mineabilityOf } from '../../../shared/filesApp/mining';
+import { filesReachability } from '../../../shared/filesApp/routeParity';
 // The mine chain moved out of this file for gate 10: the Flashcards Mining
 // surface hosts the same catalogue, and two copies of the walk would drift.
 import { mineFilesItem, type MineState, type SettledMineState } from './filesMineChain';
@@ -1840,6 +1841,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   /* ------------------------- inspector -------------------------- */
 
   const mineability = selected ? mineabilityOf(selected) : null;
+  const reachability = selected ? filesReachability(selected.source) : null;
 
   /**
    * Gate 10's receipt. The `choose` branch is the gate's own requirement, so it
@@ -2047,6 +2049,27 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <dd className="fa-details-location">{describeLocation(selected, t)}</dd>
         <dt>{t('filesApp.details.source')}</dt>
         <dd>{selected.source}</dd>
+        {/* The anti-gatekeeper promise, said per item instead of only in a test.
+            `FILES_ROUTE_PARITY` has carried the route for every store since
+            gate 6; until this line it was evidence nothing in the product read,
+            so a user could not tell an item they can also reach in Library from
+            one that genuinely lives only here. `new` rows and unknown sources
+            render NO row at all rather than an empty one — a `<dt>` with a blank
+            `<dd>` reads as a claim that failed to load. */}
+        {reachability ? (
+          <>
+            <dt>{t('filesApp.details.alsoIn')}</dt>
+            <dd className="fa-details-also" data-reach={reachability.kind}>
+              {reachability.kind === 'section'
+                ? t(`palette.section.${reachability.section}`)
+                : t(
+                    reachability.kind === 'global'
+                      ? 'filesApp.details.alsoInGlobal'
+                      : 'filesApp.details.onlyHere',
+                  )}
+            </dd>
+          </>
+        ) : null}
       </dl>
       {/* Gate 10. Always offered — every row has SOME answer, and where that
           answer is "nothing opens this", the refusal is the honest outcome and

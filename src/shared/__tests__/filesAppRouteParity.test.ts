@@ -28,6 +28,7 @@ import {
   FILES_ROUTE_PARITY,
   filesParityRow,
   filesParityViolations,
+  filesReachability,
   isEnumeratorCapability,
   type FilesParityRow,
 } from '../filesApp/routeParity';
@@ -269,6 +270,85 @@ describe('files app route parity (gate 6)', () => {
       // Without this the spelling decision could silently regress.
       expect(filesParityViolations([{ ...rogue, capability: 'memory' }]))
         .toEqual([{ ...rogue, capability: 'memory' }]);
+    });
+  });
+  /*
+   * `filesReachability` is what turned this table from test-only evidence into
+   * something the product says out loud. Every assertion below re-derives its
+   * expectation from the table or from `FilesApp.tsx`'s own source, never from
+   * a hand-copied list, and the last block is the negative control.
+   */
+  describe('filesReachability — the per-item route the inspector renders', () => {
+    it('answers for every bare enumerator capability, and the arm matches the row', () => {
+      const bare = FILES_ROUTE_PARITY.filter((row) => isEnumeratorCapability(row.capability));
+      expect(bare.length).toBeGreaterThan(15);
+      for (const row of bare) {
+        const reach = filesReachability(row.capability);
+        if (row.status === 'new') {
+          // Nothing existed before, so there is no prior route to name.
+          expect(reach, row.capability).toBeNull();
+        } else if (row.status === 'migrated') {
+          expect(reach, row.capability).toEqual({ kind: 'only-here' });
+        } else if (row.section === 'global') {
+          expect(reach, row.capability).toEqual({ kind: 'global' });
+        } else {
+          expect(reach, row.capability).toEqual({ kind: 'section', section: row.section });
+        }
+      }
+    });
+
+    it('every section it can name has a `palette.section.*` label in the English catalog', () => {
+      // The inspector labels the `section` arm with `palette.section.<id>`, so a
+      // section this function can return but the catalog cannot name would render
+      // a raw key. Re-derived from the catalog file, not from a list here.
+      const en = read('src/shared/i18n/catalogs/en.ts');
+      const named = FILES_ROUTE_PARITY
+        .filter((row) => isEnumeratorCapability(row.capability))
+        .map((row) => filesReachability(row.capability))
+        .filter((r): r is { kind: 'section'; section: string } => r?.kind === 'section');
+      expect(named.length).toBeGreaterThan(10);
+      for (const r of named) {
+        expect(en, r.section).toContain(`'palette.section.${r.section}':`);
+      }
+    });
+
+    it('refuses to invent a route for a capability the table does not carry', () => {
+      expect(filesReachability('not-a-store')).toBeNull();
+      expect(filesReachability('')).toBeNull();
+    });
+
+    it('is actually rendered by the inspector, beside the item source', () => {
+      // Gate 6's promise is only kept if the product SAYS it. This pins the call
+      // site, the three keys and the fact that no row is emitted when the answer
+      // is null -- a `<dt>` with an empty `<dd>` reads as a claim that failed.
+      expect(FILES_APP).toContain('filesReachability(selected.source)');
+      expect(FILES_APP).toContain("t('filesApp.details.alsoIn')");
+      expect(FILES_APP).toContain('filesApp.details.alsoInGlobal');
+      expect(FILES_APP).toContain('filesApp.details.onlyHere');
+      expect(FILES_APP).toContain('`palette.section.${reachability.section}`');
+      expect(FILES_APP).toMatch(/reachability \? \(/);
+    });
+
+    it('NEGATIVE CONTROL: each arm is distinguishable, and a wrong status changes the answer', () => {
+      // Without this, a `filesReachability` that returned one constant would pass
+      // every assertion above that only checks "not null".
+      const kinds = new Set(
+        FILES_ROUTE_PARITY
+          .map((row) => filesReachability(row.capability)?.kind ?? 'none')
+          .values(),
+      );
+      expect(kinds).toEqual(new Set(['section', 'global', 'only-here', 'none']));
+
+      // And the two capabilities that genuinely moved must NOT be reported as
+      // reachable elsewhere -- that is the exact lie this line exists to prevent.
+      for (const moved of FILES_PERMITTED_MIGRATIONS) {
+        const reach = filesReachability(moved);
+        if (reach) expect(reach.kind, moved).toBe('only-here');
+      }
+      expect(filesReachability('notebook')).toEqual({ kind: 'only-here' });
+      expect(filesReachability('library')).toEqual({ kind: 'section', section: 'library' });
+      expect(filesReachability('lookups')).toEqual({ kind: 'global' });
+      expect(filesReachability('transcripts')).toBeNull();
     });
   });
 });
