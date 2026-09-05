@@ -36,6 +36,29 @@ export function snapshotFilters(f: PracticeFilters): PracticeFilters {
   };
 }
 
+/**
+ * Do two filter sets describe the same query?
+ *
+ * Structural, because `setFilters` always produces a fresh object — an
+ * identity check would report "different" on the very render that applied a
+ * preset. Array fields compare element-wise in order: the Explorer builds them
+ * from a fixed taxonomy order, so two equal selections are always equal
+ * sequences, and treating them as sets would need a sort on every keystroke.
+ *
+ * Used to decide whether the preset dropdown may still name a preset (T4).
+ */
+export function sameFilters(a: PracticeFilters, b: PracticeFilters): boolean {
+  const keys = Object.keys(DEFAULT_PRACTICE_FILTERS) as (keyof PracticeFilters)[];
+  return keys.every((key) => {
+    const left = a[key];
+    const right = b[key];
+    if (Array.isArray(left) && Array.isArray(right)) {
+      return left.length === right.length && left.every((item, i) => item === right[i]);
+    }
+    return left === right;
+  });
+}
+
 export interface FilterPreset {
   id: string;
   name: string;

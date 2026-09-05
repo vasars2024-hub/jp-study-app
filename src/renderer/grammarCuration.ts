@@ -194,4 +194,43 @@ export function saveCuration(state: CurationState): void {
   } catch {
     /* storage full or unavailable — the in-memory state still stands */
   }
+  // Announced even when the write failed: the in-memory state still changed,
+  // and a consumer showing the pre-verdict corpus would be wrong either way.
+  emitCurationChanged();
+}
+
+// ---- change notification ---------------------------------------------------
+//
+// Mirrors `grammarFamiliarity.ts`'s notifier deliberately. Both are learner
+// state applied over the generated corpus, both are read by Practice and the
+// Explorer, and both must reach those screens without a reload.
+//
+// This did not exist until 2026-08-04, and neither did the consumers. Verdicts
+// persisted correctly, `applyCuration` computed the right thing, undo and the
+// tests were all in place — and none of it reached the app, because the only
+// production call site was the panel that wrote the data (audit F20). Rejecting
+// all 706 imported-example records moved Practice's ready set by exactly zero.
+
+const CURATION_EVENT = 'grammar-curation-changed';
+
+function emitCurationChanged(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(CURATION_EVENT));
+  } catch {
+    /* no window (e.g. a non-DOM test) — nothing to notify */
+  }
+}
+
+/** Subscribe to curation changes, including from other windows. Returns unsubscribe. */
+export function onCurationChanged(cb: () => void): () => void {
+  const handler = (): void => cb();
+  const storageHandler = (e: Event): void => {
+    if ((e as StorageEvent).key === CURATION_LS_KEY) cb();
+  };
+  window.addEventListener(CURATION_EVENT, handler);
+  window.addEventListener('storage', storageHandler);
+  return () => {
+    window.removeEventListener(CURATION_EVENT, handler);
+    window.removeEventListener('storage', storageHandler);
+  };
 }
