@@ -2232,6 +2232,13 @@ export const zh: Catalog = {
 
 
   'storage.title': '模型与词典',
+  'translator.card.title': '翻译语言',
+  'translator.card.desc': '翻译应用的源语言与目标语言。',
+  'translator.card.note': '在此处修改会同步到翻译应用，反之亦然——这是同一项设置，而不是两份副本。',
+  'translator.source': '源语言',
+  'translator.target': '目标语言',
+  'translator.openApp': '打开翻译',
+
   'storage.dictionaryImport.title': '导入词典',
   'storage.dictionaryImport.desc': '在不中断桌面的情况下添加大型本地词典。关闭设置后导入仍会继续，返回时会恢复上次结果。',
   'storage.dictionaryImport.kind.cedict': 'CC-CEDICT 中英词典',

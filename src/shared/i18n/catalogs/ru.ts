@@ -2411,6 +2411,13 @@ export const ru: Catalog = {
 
 
   'storage.title': 'Модели и словари',
+  'translator.card.title': 'Языки переводчика',
+  'translator.card.desc': 'Языки, с которого и на который переводит приложение «Перевод».',
+  'translator.card.note': 'Изменения здесь применяются и в приложении «Перевод», и наоборот — это одна настройка, а не две её копии.',
+  'translator.source': 'Переводить с',
+  'translator.target': 'Переводить на',
+  'translator.openApp': 'Открыть перевод',
+
   'storage.dictionaryImport.title': 'Импорт словарей',
   'storage.dictionaryImport.desc': 'Добавляйте большие локальные словари без остановки рабочего стола. Импорт продолжается после закрытия настроек, а последний результат восстанавливается при возврате.',
   'storage.dictionaryImport.kind.cedict': 'CC-CEDICT (китайско-английский)',

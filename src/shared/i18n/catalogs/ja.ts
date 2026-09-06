@@ -2244,6 +2244,13 @@ export const ja: Catalog = {
 
 
   'storage.title': 'モデルと辞書',
+  'translator.card.title': '翻訳の言語',
+  'translator.card.desc': '翻訳アプリが翻訳元・翻訳先として使う言語です。',
+  'translator.card.note': 'ここでの変更は翻訳アプリにも反映され、その逆も同様です。設定は一つで、二つの複製ではありません。',
+  'translator.source': '翻訳元',
+  'translator.target': '翻訳先',
+  'translator.openApp': '翻訳を開く',
+
   'storage.dictionaryImport.title': '辞書をインポート',
   'storage.dictionaryImport.desc': 'デスクトップを停止せずに大容量のローカル辞書を追加します。設定を閉じても処理は続き、戻ると直前の結果が復元されます。',
   'storage.dictionaryImport.kind.cedict': 'CC-CEDICT（中英）',

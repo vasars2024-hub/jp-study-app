@@ -1648,6 +1648,26 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'System',
   },
   {
+    // Aero 5.4. Before this entry the Settings app had ZERO translator surface:
+    // searching it for "translator" matched two comments and no card, and the
+    // languages were reachable only from inside the Translate app's toolbar.
+    id: 'translator-languages',
+    titleKey: 'translator.card.title',
+    descKey: 'translator.card.desc',
+    keywords: [
+      'translator',
+      'translate',
+      'translation',
+      'source language',
+      'target language',
+      'language pair',
+      'translate into',
+      'swap languages',
+    ],
+    pageId: 'storage',
+    group: 'System',
+  },
+  {
     id: 'whisper-models',
     titleKey: 'storage.group.whisper',
     descKey: 'settings.transcription.modelsDesc',

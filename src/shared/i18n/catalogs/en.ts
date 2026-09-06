@@ -2393,6 +2393,14 @@ export const en: Catalog = {
   'storage.reading': 'Reading installed models…',
   'storage.removed': '{name} removed. You can download it again at any time.',
 
+  // ---- Translator defaults (aero 5.4) ----
+  'translator.card.title': 'Translator languages',
+  'translator.card.desc': 'The languages the Translate app starts from and translates into.',
+  'translator.card.note': 'Changing these here changes the Translate app, and the other way round — they are one setting, not two copies of it.',
+  'translator.source': 'Translate from',
+  'translator.target': 'Translate into',
+  'translator.openApp': 'Open Translate',
+
   'storage.dictionaryImport.title': 'Import dictionaries',
   'storage.dictionaryImport.desc': 'Add large local dictionaries without pausing the desktop. Imports continue if Settings is closed, and their last result is restored when you return.',
   'storage.dictionaryImport.kind.cedict': 'CC-CEDICT',

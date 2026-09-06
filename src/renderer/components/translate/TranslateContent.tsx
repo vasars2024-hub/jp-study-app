@@ -25,12 +25,11 @@ import {
 import { appendNotebookEvent } from '../../notebookTimeline';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
-import { getTranslateTarget, setTranslateTarget } from '../../translateTarget';
+import { getTranslateTarget, onTranslateTargetChanged, setTranslateTarget } from '../../translateTarget';
+import { getTranslateSource, onTranslateSourceChanged, setTranslateSource } from '../../translateSource';
 
 export type TranslateState = 'idle' | 'loading' | 'translating' | 'done' | 'error';
 export type TranslateTab = 'translate' | 'history';
-
-const SOURCE_KEY = 'jp-study-translate-source';
 
 export const LANG_LABELS: Record<TransLang, string> = {
   ja: '日本語',
@@ -74,10 +73,9 @@ export interface TranslateController {
 export function useTranslate(): TranslateController {
   const { t } = useT();
   const [tab, setTab] = useState<TranslateTab>('translate');
-  const [source, setSource] = useState<TransLang>(() => {
-    const saved = localStorage.getItem(SOURCE_KEY) as TransLang | null;
-    return saved ?? getStudyLang();
-  });
+  const [source, setSource] = useState<TransLang>(
+    () => getTranslateSource(getStudyLang()) as TransLang,
+  );
   const [target, setTarget] = useState<TransLang>(
     () => getTranslateTarget() as TransLang,
   );
@@ -97,6 +95,23 @@ export function useTranslate(): TranslateController {
   }, []);
   useEffect(() => onTranslationHistoryChanged(() => setHistory(loadTranslationHistory())), []);
 
+  // Settings can now change the defaults while this view is mounted (aero 5.4).
+  // Without these two the picker keeps showing the old language until remount,
+  // which is the "I changed it and nothing happened" report the single-owner
+  // modules exist to prevent.
+  //
+  // Each ignores a value equal to the OTHER side. `pickSource`/`pickTarget`
+  // refuse a same-language pair and an external writer must not be able to route
+  // around that — translating ja→ja is not a state this view has an answer for.
+  // The listener also fires for this view's own writes; setting state to the
+  // value it already holds is a no-op, so no guard is needed for that.
+  useEffect(() => onTranslateSourceChanged((code) => {
+    setSource((prev) => (code === target ? prev : (code as TransLang)));
+  }), [target]);
+  useEffect(() => onTranslateTargetChanged((code) => {
+    setTarget((prev) => (code === source ? prev : (code as TransLang)));
+  }), [source]);
+
   useEffect(() => {
     const onHist = () => setTab('history');
     window.addEventListener('translate:open-history', onHist);
@@ -106,7 +121,7 @@ export function useTranslate(): TranslateController {
   function pickSource(l: TransLang) {
     const next = l === target ? source : l;
     setSource(next);
-    localStorage.setItem(SOURCE_KEY, next);
+    setTranslateSource(next);
     if (next === 'ja' || next === 'zh') setStudyLang(next);
   }
 
@@ -119,7 +134,7 @@ export function useTranslate(): TranslateController {
   function swap() {
     setSource(target);
     setTarget(source);
-    localStorage.setItem(SOURCE_KEY, target);
+    setTranslateSource(target);
     setTranslateTarget(source);
     if (target === 'ja' || target === 'zh') setStudyLang(target);
     setInput(output);

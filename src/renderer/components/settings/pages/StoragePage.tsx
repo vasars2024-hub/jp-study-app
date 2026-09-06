@@ -13,6 +13,7 @@ import {
 import { useT } from '../../../i18n';
 import type { TVars } from '../../../../shared/i18n/core';
 import DictionaryImportCard from './DictionaryImportCard';
+import TranslatorDefaultsCard from './TranslatorDefaultsCard';
 
 // The one place that lists every downloadable model and dictionary, with its
 // size, version and a delete button. Download buttons also appear inline on the
@@ -262,6 +263,13 @@ export default function StoragePage() {
       </SettingsCard>
 
       <DictionaryImportCard />
+
+      {/* Aero 5.4 — the translator's languages sit with the models and
+          dictionaries they are configured against. Composed here, not inlined,
+          for the same reason MonitorsPage is composed by DisplayPage
+          (`cf0528f6`): `settingsSearchReachability` derives a page's reachable
+          cards from one component per page id plus its local imports. */}
+      <TranslatorDefaultsCard />
 
       {groups.map((group) => (
         <SettingsCard key={group.key} id={`storage-${group.key}`} title={t(group.key)}>
