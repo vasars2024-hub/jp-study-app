@@ -856,8 +856,52 @@ async function settleUntil(read, pred, tries = 16, everyMs = 400) {
   return last;
 }
 
+/**
+ * CORRECTION 67 — THE DRIVE LEG TAKES ITS FIRST LOOK BEFORE THE SURFACE HAS FINISHED
+ * RE-MOUNTING, and only the `--langs` combination exposes it.
+ *
+ * Measured 2026-09-06 on `anki`, twice in a row: the identical `--drive-click` selector
+ * resolves by hand both before and after the run (`fromAnkiRoot: true`), and refuses
+ * INSIDE the run with `drive-click target not found` — but only when `--langs` ran first.
+ * The language leg's last act is `clickLang(restoreTag)`, whose catalog is a dynamic
+ * import; `.anki-workspace-main`'s children are transiently different while it resolves,
+ * so the first `querySelector` lands in the gap and the whole cell VOIDs on a surface with
+ * no defect. Corrections 49 and 50 replaced two fixed sleeps with polls for exactly this
+ * cause and stopped one leg short of this one.
+ *
+ * Polled, not slept, for the same reason they were: the wait is for the condition, and a
+ * target that is genuinely absent still refuses after the budget with the same message it
+ * always did — so a wrong selector is still caught, it just is not caught by a race.
+ * Only the OPENER is waited for: with `--drive-click` and `--drive-input` together the
+ * input is SUPPOSED to be absent until the opener mounts it, and that check stays exact.
+ */
+async function awaitTarget(sel, tries = 16, everyMs = 400) {
+  let last = false;
+  for (let i = 0; i < tries; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    last = JSON.parse(await ev(
+      `(function(){ var r = ${ROOT_EXPR};`
+      + ` return JSON.stringify({ present: !!(r && r.querySelector(${JSON.stringify(sel)})) }) })()`,
+    )).present;
+    if (last) return { present: true, waitedMs: i * everyMs };
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(everyMs);
+  }
+  return { present: false, waitedMs: tries * everyMs };
+}
+
 async function driveLeg(base) {
   let opener = null;
+  const firstTarget = DRIVE_CLICK || DRIVE_INPUT;
+  const ready = await awaitTarget(firstTarget);
+  if (!ready.present) {
+    return {
+      refuse: `drive-${DRIVE_CLICK ? 'click' : 'input'} target never appeared after `
+        + `${ready.waitedMs} ms: ${firstTarget}`,
+    };
+  }
+  // The witness for correction 67: a non-zero wait says the race was real on this run.
+  if (ready.waitedMs) console.error(`drive target appeared after ${ready.waitedMs} ms of polling`);
   if (DRIVE_CLICK && DRIVE_INPUT) {
     const hit = JSON.parse(await ev(clickEl(DRIVE_CLICK, 'click')));
     if (hit.refuse) return { refuse: `opener: ${hit.refuse}` };
