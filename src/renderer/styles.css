@@ -1659,10 +1659,14 @@ h1 {
   font-size: 13px;
   font-family: var(--font-body);
 }
-.btn:hover:not(:disabled) {
+.btn:hover:not(:disabled):not([aria-disabled='true']) {
   border-color: var(--accent-2);
 }
-.btn:disabled {
+/* `[aria-disabled]` is the keyboard-reachable half of a dead button: it keeps the
+   control focusable so its reason can be announced, and must therefore read as
+   dead to the eye exactly as `:disabled` does. Boss audit F4. */
+.btn:disabled,
+.btn[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }
@@ -6389,6 +6393,16 @@ mark.lookup-mark,
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
+}
+/* The reason a dead Save button gives for itself, rendered rather than hidden in a
+   `title`. `flex-basis: 100%` puts it on its own line under both buttons so it never
+   competes with them for the 134 px this row gets at the window minimum. */
+.fm-action-reason {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
 }
 .anki-check {
   display: flex;
