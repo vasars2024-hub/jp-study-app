@@ -28182,3 +28182,48 @@ mutation control fires — emptying `carriers` reddens exactly the two acquisiti
 leaves the other 70 green. The gate also asks that **cues render in the player**, and that needs
 a real transfer off the swarm against `22d2e2e6` (rank 1) then `45921c38` (20.8 MB). That live
 drive is the next turn's opening slice. Track 9 stays 18 of 20; main-v1 stays 79 of 80.
+
+## 2026-09-06 (primary) — gate 11 clause 1 CLOSES live: Route A's first completed acquisition
+
+**Route A ran end to end for the first time in this plan's history.** Subject `22d2e2e6…`,
+`Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs]`, **5,557,453 bytes**,
+8 seeders, score **105**, `route:sub-pack`, `signal:subs-only`, `language:ja` — **rank 1 of 10**
+by the product's own listing, not a hand-picked subject. `subtitleHarvestNyaaFetch` returned
+**`ok: true`, 26 files, 173 s**, and the files are real: 26 Japanese SRTs of **137–141 KB** each
+with cue text (`（ハンマーをたたく音）`, `（カルタを読む声）`), not a count of empty strings.
+This is `9611596b`'s `.7z` unpacker working off the real swarm, through the real daemon.
+
+**Clause 1 — "taken whole, under the 50 MB ceiling" — MET, on the daemon's own words.**
+`torrents/files` through the mount, 170 polls: **exactly one file**,
+`Detective Conan Movies 01-26 (Subs) [NetflixAsia].7z`, 5,535,182 B, **priority 1 in all 169
+file records, zero at priority 0**, progress 1. Nothing was skipped, no video file exists to
+request. Wire totals: 348 rows — 1 `add`, 1 `filePrio`, 1 `start`, 1 `resume`, 1 `pause`,
+1 `stop`, 171 `info`, 170 `files`; every one upstream **200**. Logs preserved as
+`debug/qbit-basepath-proxy{,-files}.g11f.jsonl`.
+
+**Client verified back at baseline: 11 rows, `jp-study-subtitles` 2 / `jp-study` 3 / none 6.**
+The one new row is the subject itself, in `jp-study-subtitles`, progress 100. Nothing was
+written outside that category and the user's `[PeepoHappy] Kitsunekko Archive` is untouched
+(paused, 100). The completed torrent is left in place — it is the artifact of a *successful*
+acquisition, the same disposition gate 12's subject got; it is not an orphan for gate 15 to
+tidy.
+
+**GATE 11 IS STILL NOT CLOSED, and the blocker has CHANGED — say which one.** Clauses 2–3
+("lands as a `SubtitleRecord`", "cues render in the player") are written only by
+`acceptNyaaCandidate`, i.e. the MEDIA-ITEM route, which needs a library item for the same work.
+Measured today against the user's real library — **39 items, 0 matching "conan"** — and the
+media-item route re-driven on two of them now that `.7z` is supported:
+`The Big O - 02` → *"Of 1 release matching it, 1 is neither a subtitle pack nor a batch with
+separately-fetchable files"*; `JoJo … Ougon no Kaze 38 RAW` → same sentence, **4 of 4**.
+So the old blocker (the fetcher could not open either fetchable `ja` subject) is **gone**, and
+what remains is that **the user owns no video for any title with a fetchable `ja` sub-pack**.
+Still explicitly rejected, unchanged from `08160b62`: attaching Conan cues to a Big O episode
+through `attachSubtitleText` would satisfy the letter of clauses 2–3 by lying about what the
+library holds. Track 9 stays 18 of 20; main-v1 stays 79 of 80.
+
+**Trap.** `subtitleHarvestNyaaList` needs `acquisition` on the request and the shipped-default
+profile carries **`sources.entries: []`** — called without it you get *"No scraper configuration
+was supplied"*, and with a bare profile *"No torrent index is enabled in this profile."* Neither
+is a product defect; `debug/g14-live.cjs` injects a real nyaa index on the request and writes
+nothing to settings. Drive it from **PowerShell** — Git Bash turns the `/qb` base path into
+`C:/Program Files/Git/qb`.
