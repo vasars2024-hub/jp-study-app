@@ -2913,6 +2913,7 @@ export const ja: Catalog = {
   'yt.add.submit': '追加',
   'yt.add.extensionHint': 'リンクで追加（拡張機能は後日対応）。',
   'yt.folder.placeholder': '新しいフォルダ名',
+  'yt.folder.create': 'フォルダーを作成',
   'yt.folder.delete': 'フォルダを削除',
   'yt.folder.unfiled': '未分類',
   'yt.empty': 'プレイリストURLを追加してイマージョン動画の追跡を始めます。',

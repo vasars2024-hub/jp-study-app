@@ -634,7 +634,15 @@ export default function YouTubePlaylistsView() {
                     onKeyDown={(e) => e.key === 'Enter' && void addFolder()}
                     placeholder={t('yt.folder.placeholder')}
                   />
-                  <button type="button" className="btn small" onClick={() => void addFolder()}>
+                  {/* Icon-only, and `Icon` is aria-hidden — without a label the one control
+                      that commits the name beside it announces as a bare "button". */}
+                  <button
+                    type="button"
+                    className="btn small"
+                    aria-label={t('yt.folder.create')}
+                    title={t('yt.folder.create')}
+                    onClick={() => void addFolder()}
+                  >
                     <Icon name="folder" size={14} />
                   </button>
                 </AnchorSurface>

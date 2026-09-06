@@ -2897,6 +2897,7 @@ export const zh: Catalog = {
   'yt.add.submit': '添加',
   'yt.add.extensionHint': '通过链接添加（扩展稍后推出）。',
   'yt.folder.placeholder': '新文件夹名称',
+  'yt.folder.create': '创建文件夹',
   'yt.folder.delete': '删除文件夹',
   'yt.folder.unfiled': '未分类',
   'yt.empty': '添加播放列表链接以开始跟踪沉浸视频。',

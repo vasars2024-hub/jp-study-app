@@ -3116,6 +3116,7 @@ export const ru: Catalog = {
   'yt.add.submit': 'Добавить',
   'yt.add.extensionHint': 'Добавление по ссылке (расширение позже).',
   'yt.folder.placeholder': 'Имя новой папки',
+  'yt.folder.create': 'Создать папку',
   'yt.folder.delete': 'Удалить папку',
   'yt.folder.unfiled': 'Без папки',
   'yt.empty': 'Добавьте URL плейлиста, чтобы отслеживать видео для погружения.',

@@ -2789,6 +2789,7 @@ export const en: Catalog = {
   'yt.add.submit': 'Add',
   'yt.add.extensionHint': 'Add playlist by link (extension coming later).',
   'yt.folder.placeholder': 'New folder name',
+  'yt.folder.create': 'Create folder',
   'yt.folder.delete': 'Delete folder',
   'yt.folder.unfiled': 'Unfiled',
   'yt.empty': 'Add a playlist URL to start tracking immersion videos.',
