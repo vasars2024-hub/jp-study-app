@@ -248,6 +248,40 @@ describe('write', () => {
     expect(store.read().document.revision).toBe(1);
   });
 
+  it('refuses total entry loss without writing, logging or broadcasting, but accepts explicit removal', () => {
+    const source = {
+      ...document('from Kenji'),
+      lists: [{ ...document('from Kenji').lists[0], entries: [
+        { id: 'entry-1', workId: 'work-1', order: 0, addedAt: 1, state: 'wanted' },
+        { id: 'entry-2', workId: 'work-2', order: 1, addedAt: 1, state: 'wanted' },
+      ] }],
+    };
+    store.write(0, source);
+    store.read();
+    const observer = makeWindow(2);
+    const primary = fs.readFileSync(store.filePath, 'utf8');
+    const fallback = fs.readFileSync(store.lastGoodPath, 'utf8');
+    const events = store.events();
+    for (const field of ['id', 'workId'] as const) {
+      const damaged = structuredClone(source);
+      for (const entry of damaged.lists[0].entries) entry[field] = '';
+      expect(invoke<ReadingListsResult>('readingLists:write', { id: 1 }, {
+        baseRevision: 1, document: damaged,
+      })).toEqual({ ok: false, code: 'invalid-request' });
+      expect(fs.readFileSync(store.filePath, 'utf8')).toBe(primary);
+      expect(fs.readFileSync(store.lastGoodPath, 'utf8')).toBe(fallback);
+      expect(store.events()).toEqual(events);
+      expect(observer.sent).toEqual([]);
+    }
+
+    source.lists[0].entries = [];
+    expect(invoke<ReadingListsResult>('readingLists:write', { id: 1 }, {
+      baseRevision: 1, document: source,
+    }).ok).toBe(true);
+    expect(store.read().document.lists[0].entries).toEqual([]);
+    expect(observer.sent).toHaveLength(1);
+  });
+
   it('still accepts a genuinely empty library, which is not malformed', () => {
     // The control on the guard: `{lists: []}` is a user who deleted their last
     // list, and refusing it would make the product unable to reach empty.
