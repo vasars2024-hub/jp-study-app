@@ -137,9 +137,10 @@
       "note": "Ported Blanc-native 2026-07-20; composes MusicContent. Shares playerBus with the FocusMusicBar widget."
     },
     "scraper": {
-      "status": "pending",
+      "status": "covered",
+      "blancToolId": "discover",
       "studyOsView": "ScraperView",
-      "note": "Pillar 2. ScraperApp is an app of its own (own AppChrome, rail, status bar, 17 pages, mock port) — Blanc will not mirror the acquisition shell. The study-relevant slice is the Discover catalogue console (components/discover/DiscoverContent.tsx), which is already extracted hook-plus-blocks precisely so Blanc can compose it. Port that as a Blanc 'discover' tool."
+      "note": "Covered 2026-09-06 by BlancDiscoverPanel (BlancLibraryPanels.tsx), which composes useDiscovery + DiscoveryControls/Tabs/Results/Inspector from components/discover/DiscoverContent.tsx. This entry was 'pending' while the port it prescribes was already built and lazily registered — the drift tool cannot detect that, so it read as an open gap. Verified live on /blanc-harness.html, not from the file existing: the panel renders 'Search the catalogue' with the feed and JLPT-level controls, .ui-app-chrome is 0 and there is exactly one .blanc-tool-detail, so Pillar 0 holds. WHAT IS DELIBERATELY NOT COVERED, so 'covered' is not misread as parity: the acquisition shell (ScraperApp's own AppChrome, rail, status bar and 17 pages) is a Pillar 2 non-goal and Blanc will not mirror it. The study-relevant slice is the discovery console, and that is what this is."
     },
 
     "immersion": {
