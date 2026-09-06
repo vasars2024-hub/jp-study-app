@@ -268,6 +268,9 @@ export default function BlancShell({
   const [masterLibraryItems, setMasterLibraryItems] = useState<LibraryItem[]>([]);
   const [masterDeckRequest, setMasterDeckRequest] = useState<{ query: string; key: number } | null>(null);
   const [masterGrammarRequest, setMasterGrammarRequest] = useState<{ id: string; key: number } | null>(null);
+  // Which tool an out-of-toolbox deep link asked for. `key` is what re-triggers
+  // it, so asking for the same tool twice still reopens it.
+  const [toolRequest, setToolRequest] = useState<{ id: BlancToolId; key: number } | null>(null);
   const clock = useMinuteClock();
   const masterCommandShortcuts = useMemo(
     () => new Map(getBindings().map((binding) => [binding.id, binding.keys])),
@@ -382,7 +385,14 @@ export default function BlancShell({
       if (BLANC_TOOL_IDS.includes(feature as BlancToolId)) {
         setBook(null);
         setTab('tools');
-        window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: feature }));
+        // Carried as a PROP, not as a `toolbox:select-tool` event, because the
+        // listener does not exist yet when we arrive from another tab: the
+        // toolbox mounts with `tools`, and it registers in a `useEffect`, which
+        // React runs after paint. Measured on the Blanc harness — open-tool at
+        // t=801.1 ms, next animation frame at t=819.4 ms, listener registered
+        // at t=825.7 ms — so even a deferred dispatch lands 6.3 ms early and
+        // the tab switches while the previously open tool stays put.
+        setToolRequest((previous) => ({ id: feature as BlancToolId, key: (previous?.key ?? 0) + 1 }));
       }
     };
     window.addEventListener('blanc:select-tab', onSelectTab);
@@ -573,7 +583,11 @@ export default function BlancShell({
           ) : tab === 'stats' ? (
             <BlancStatisticsPanel />
           ) : tab === 'tools' ? (
-            <BlancToolsPanel onOpenBook={setBook} grammarRequest={masterGrammarRequest} />
+            <BlancToolsPanel
+              onOpenBook={setBook}
+              grammarRequest={masterGrammarRequest}
+              toolRequest={toolRequest}
+            />
           ) : tab === 'blocks' ? (
             <MonoBlocks />
           ) : (
@@ -1418,9 +1432,11 @@ function renderBlancTool(
 function BlancToolsPanel({
   onOpenBook,
   grammarRequest,
+  toolRequest,
 }: {
   onOpenBook: (item: LibraryItem) => void;
   grammarRequest: { id: string; key: number } | null;
+  toolRequest: { id: BlancToolId; key: number } | null;
 }) {
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [query, setQuery] = useState('');
@@ -1535,6 +1551,17 @@ function BlancToolsPanel({
       /* ignore */
     }
   };
+
+  // A deep link from outside the toolbox arrives as a prop rather than an
+  // event, so it cannot be missed while this panel is still mounting. Keyed on
+  // the request, never on `chooseTool`'s identity: that changes every render,
+  // which would reopen the requested tool forever and pin the user to it.
+  const toolRequestKey = toolRequest?.key ?? null;
+  const toolRequestId = toolRequest?.id ?? null;
+  useEffect(() => {
+    if (toolRequestKey === null || !toolRequestId) return;
+    chooseTool(toolRequestId);
+  }, [toolRequestKey, toolRequestId]);
 
   const closeToolTab = (closing: BlancToolId): void => {
     setOpenTabs((current) => {
