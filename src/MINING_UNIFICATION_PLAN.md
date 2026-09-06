@@ -298,7 +298,18 @@ An empty result is a FINDING: say so and stop.
 12. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
    `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
    gate here — 327 pre-existing errors on a clean tree; prove "no new" by set-difference.
-   <!-- status: open; evidence: 2026-09-01 6c140279 -- run this turn, after the last slice.
+   <!-- status: closed; evidence: 2026-09-06 66a35fbd -- the blocker cleared and the gate is
+        met. `npx vitest run --testTimeout=60000 --hookTimeout=60000` EXIT 0 on the whole tree:
+        **1,146 files passed / 1 skipped (1,147); 14,678 tests passed / 6 skipped (14,684); 0
+        failed**, 160.55 s. i18n-check EXIT 0, 12,569 English keys all in ja/zh/ru.
+        architecture-audit EXIT 0, 2,711 modules, 23 findings, "Nothing new", 2 known pending.
+        eslint 0 errors on every touched .ts/.tsx (never on .css -- eslint parses it as JS and
+        every path fails). The single 2026-09-01 failure was i18n.test.ts's hardcoded-string
+        ratchet, another track's uncommitted conversion; that conversion has since landed and
+        the suite is green in the shared dirty tree. NOT this plan's own code changing -- the
+        gate was always waiting on that one suite. The paired FILES_APP_PLAN gate 37 was the
+        same blocker and is already recorded closed. -->
+   <!-- superseded: 2026-09-01 6c140279 -- run this turn, after the last slice.
         vitest **995 files passed / 1 FAILED / 1 skipped; 12,883 tests passed / 1 failed / 6
         skipped**. i18n-check exit 0, 12,115 English keys all translated. architecture-audit
         exit 0, "Nothing new", 9 known pending. eslint 0 errors on all 13 touched .ts/.tsx.
