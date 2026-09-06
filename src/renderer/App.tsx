@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import DesktopShell from './components/DesktopShell';
 import { parseDetachTarget } from '../shared/studyDetach';
+import { t as translateStatic, useT } from './i18n';
 import { useExtensionSnapshots } from './analysisActions';
 import BootScreen from './components/BootScreen';
 import ConsentScreen from './components/ConsentScreen';
@@ -12,6 +13,7 @@ import NovelReader from './views/NovelReader';
 import MangaReader from './views/MangaReader';
 import type { LibraryItem } from '../shared/types';
 import type { DesktopWinSection } from '../shared/desktop';
+import { popoutLabel, popoutSectionFromSearch } from './popoutLabels';
 import CompanionHostView from './environment/CompanionHostView';
 import PerfOverlay from './components/PerfOverlay';
 import TourOverlay from './components/onboarding/TourOverlay';
@@ -94,50 +96,10 @@ function MiniMainBridge() {
   return <MiniShell />;
 }
 
-// Sections that may be shown alone in a pop-out window. Mirrors POPOUT_SECTIONS
-// in the main process (src/main.ts). `player`→Media and `city`→Mooncap match the
-// desktop's app labels.
-const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
-  agent: 'Agent',
-  library: 'Library',
-  novels: 'Novels',
-  reading: 'Reading Finder',
-  dictionary: 'Dictionary',
-  grammar: 'Grammar',
-  translate: 'Translate',
-  // Gate 8 deleted the Notebook section, and `notebook: 'Notebook'` went with it —
-  // but this object is also `popoutSection()`'s allow-list, so removing the key
-  // without adding its successor took the pop-out capability away rather than
-  // moving it. `ARGV_OPEN_SECTIONS` (main.ts) already lists 'files', so main would
-  // open `?popout=files` and the renderer would refuse to recognise it.
-  files: 'Files',
-  player: 'Media Center',
-  scraper: 'Scraper',
-  // D89: `youtube` was in main's POPOUT_SECTIONS but not here, and this object is the
-  // renderer's allow-list — so main opened `?popout=youtube`, `popoutSection()` returned
-  // null, and the window rendered the whole desktop again while the original was closed.
-  // Exactly the `files` failure the comment above records. `popoutSectionAllowLists.test.ts`
-  // keeps the two lists from drifting apart a third time.
-  youtube: 'YouTube',
-  video: 'Media Center · Video',
-  music: 'Media Center · Music',
-  musicwidget: '',
-  anki: 'Anki',
-  flashcards: 'Flashcards',
-  games: 'Game Arena',
-  stats: 'Statistics',
-  resources: 'Resources',
-  settings: 'Settings',
-  city: 'Mooncap Garden',
-  immersion: 'Immersion',
-  calendar: 'Calendar',
-};
-
 // Read `?popout=<section>` off the URL of this window. Present only in the
 // borderless second windows opened by createPopoutWindow (main process).
 function popoutSection(): DesktopWinSection | null {
-  const raw = new URLSearchParams(window.location.search).get('popout');
-  return raw && raw in POPOUT_LABELS ? (raw as DesktopWinSection) : null;
+  return popoutSectionFromSearch(window.location.search);
 }
 
 function isCompanionHostWindow(): boolean {
@@ -179,6 +141,7 @@ function secondaryDesktop(): { desktopIndex: number; displayKey: string } | null
 // the window with the reader; closing it returns to the desktop. A pop-out
 // window (?popout=…) instead shows just one app, full-window.
 export default function App() {
+  const { t } = useT();
   const [reading, setReading] = useState<LibraryItem | null>(null);
   const [focusMode, setFocusModeState] = useState(loadFocusMode);
   const [mini, setMini] = useState<MiniModeSettings>(() => loadMiniMode());
@@ -340,7 +303,9 @@ export default function App() {
           const result = await transcribePcm(decodePcmBase64(pcmBase64));
           window.api.replyExtensionTranscribe(id, result.ok
             ? { ok: true, text: result.text ?? '' }
-            : { ok: false, error: result.error ?? 'Transcription failed' });
+            // Not a component scope — the module-level `t` reads the live
+            // language, so a deferred call still answers in the current one.
+            : { ok: false, error: result.error ?? translateStatic('appShell.transcriptionFailed') });
         } catch (err) {
           window.api.replyExtensionTranscribe(id, {
             ok: false,
@@ -773,7 +738,7 @@ export default function App() {
         data-presentation={popoutPresentable ? (popoutLiquid ? 'liquid' : 'standard') : undefined}
       >
         <PopoutChrome
-          label={mooncapWidget ? '' : (POPOUT_LABELS[popout] ?? popout)}
+          label={mooncapWidget ? '' : popoutLabel(t, popout)}
           canMaximize={!mooncapWidget}
           widget={mooncapWidget}
           liquid={popoutLiquid}
@@ -827,7 +792,7 @@ export default function App() {
 }
 
 /**
- * One monitor's desktop, in its own window.
+ * One monitor's desktop, in its own borderless window.
  *
  * Two things differ from the main window. The desktop index is pinned rather
  * than read from `activeDesktopIndex`, and `main/desktopWindows.ts` can retarget
@@ -920,6 +885,7 @@ function PopoutChrome({
   canGoLiquid?: boolean;
   onToggleLiquid?: () => void;
 }) {
+  const { t } = useT();
   return (
     <div className={`popout-bar ${widget ? 'popout-bar-widget' : ''}`}>
       <div className={`popout-drag ${label ? '' : 'popout-drag-icon'}`}>
@@ -942,15 +908,15 @@ function PopoutChrome({
             {liquid ? '◆' : '◇'}
           </button>
         )}
-        <button className="popout-btn" title="Minimize" onClick={() => void window.api.popoutControl('minimize')}>
+        <button className="popout-btn" title={t('appShell.minimize')} onClick={() => void window.api.popoutControl('minimize')}>
           ─
         </button>
         {canMaximize && (
-          <button className="popout-btn" title="Maximize" onClick={() => void window.api.popoutControl('maximize')}>
+          <button className="popout-btn" title={t('appShell.maximize')} onClick={() => void window.api.popoutControl('maximize')}>
             ▢
           </button>
         )}
-        <button className="popout-btn popout-close" title="Close" onClick={() => void window.api.popoutControl('close')}>
+        <button className="popout-btn popout-close" title={t('common.close')} onClick={() => void window.api.popoutControl('close')}>
           ×
         </button>
       </div>
