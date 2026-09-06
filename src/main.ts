@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
-import { loadAfterCacheClear } from './main/bootLoad';
+import { loadAfterCacheClear, loadWithRetry } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
 import { registerReadingListsLateBinding } from './main/readingListsBinding';
 import { registerReadingRemindersIpc } from './main/readingListsReminders';
@@ -791,6 +791,29 @@ const createWindow = (restore?: {
 
   attachNavGuards(mainWindow);
 
+  /**
+   * The first load of the desktop, retried, because a bare `loadURL` that rejects leaves a
+   * created window with `url: ''` for the life of the process and nothing to reload back to.
+   * The rejection is transient — the network service is restarting, not gone — so the retry
+   * is the fix. Reported either way: a silent recovery still says how many attempts it took,
+   * because "booted on attempt 3" is the difference between a healthy machine and one about
+   * to strand a user on a blank window.
+   */
+  const bootLoadMainWindow = async (): Promise<void> => {
+    const r = await loadWithRetry(
+      () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return Promise.resolve();
+        return mainWindow.loadURL(rendererUrl());
+      },
+      { onFailure: (n, e) => console.error(`[main] boot: loadURL attempt ${n} failed: ${e}`) },
+    );
+    if (!r.ok) {
+      console.error(`[main] boot: loadURL FAILED after ${r.attempts} attempts: ${r.lastError}`);
+    } else if (r.attempts > 1) {
+      console.log(`[main] boot: loadURL succeeded on attempt ${r.attempts}`);
+    }
+  };
+
   if (isDevServer()) {
     // The cache clear keeps a stale renderer bundle from surviving a rebuild, but
     // it runs through the network service — and when that crashes mid-boot the
@@ -801,7 +824,7 @@ const createWindow = (restore?: {
     void loadAfterCacheClear(
       () => boot.clearCache(),
       () => {
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(rendererUrl());
+        if (mainWindow && !mainWindow.isDestroyed()) void bootLoadMainWindow();
       },
     ).then((r) => {
       if (r.reason !== 'cleared') {
@@ -811,7 +834,7 @@ const createWindow = (restore?: {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
     forwardRendererConsole(mainWindow);
   } else {
-    mainWindow.loadURL(rendererUrl());
+    void bootLoadMainWindow();
   }
 };
 

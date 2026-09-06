@@ -93,3 +93,62 @@ export function loadAfterCacheClear(
     );
   });
 }
+
+export interface BootLoadRetryResult {
+  ok: boolean;
+  /** How many times `load` was actually invoked, including the one that succeeded. */
+  attempts: number;
+  /** The last failure's message, or `null` when the load eventually succeeded. */
+  lastError: string | null;
+}
+
+/**
+ * Call `load` until it resolves, or until the attempts run out.
+ *
+ * THE SECOND HALF OF THE SAME BOOT DEFECT, and it was still open. `loadAfterCacheClear`
+ * above guarantees `loadURL` is REACHED; nothing guaranteed it SUCCEEDED. Observed live on
+ * 2026-09-06, twice in a row on two clean `npm start` runs of the shared dev app:
+ *
+ *     [main] boot: cache clear clear-timeout after 106377 ms; loading anyway
+ *     [...:ERROR:...network_service_instance_impl.cc:703]
+ *       Network service crashed or was terminated, restarting service.
+ *
+ * and then `/health` reporting `{"title":"jp-study-app","url":"","visible":true}` for the
+ * life of the process — the identical end state the file header describes, reached by a
+ * different route. The window is created, main is healthy, the bridge answers, and there is
+ * no page. `mainWindow.loadURL(...)` was called bare, so its rejection was unhandled and
+ * nothing tried again; the network service restarts a second later and nobody asks it for
+ * anything. `/reload` cannot rescue this either — there is still no URL to reload back to.
+ *
+ * Deliberately a RETRY and not a `catch` that logs: the failure is transient by construction
+ * (the service is restarting, not gone), so one more attempt a moment later is the whole fix.
+ * `sleep` is injected so the test does not spend real seconds proving it.
+ */
+export async function loadWithRetry(
+  load: () => Promise<unknown>,
+  opts: {
+    attempts?: number;
+    delayMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+    onFailure?: (attempt: number, error: string) => void;
+  } = {},
+): Promise<BootLoadRetryResult> {
+  const max = Math.max(1, opts.attempts ?? 4);
+  const delayMs = opts.delayMs ?? 750;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => { setTimeout(r, ms); }));
+  let lastError: string | null = null;
+
+  for (let attempt = 1; attempt <= max; attempt += 1) {
+    try {
+      await load();
+      return { ok: true, attempts: attempt, lastError: null };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      opts.onFailure?.(attempt, lastError);
+      // No sleep after the LAST attempt: the caller is about to be told it failed, and a
+      // trailing wait only delays the diagnostic it needs to print.
+      if (attempt < max) await sleep(delayMs);
+    }
+  }
+  return { ok: false, attempts: max, lastError };
+}
