@@ -47,13 +47,16 @@ import {
   qbitCredentialRef,
   rankSubtitleCandidatesDetailed,
   selectSubtitleFiles,
+  SUBTITLE_SIZE_CEILING_BYTES,
   type NyaaAcquisitionConfig,
   type NyaaUnavailableReason,
   type NyaaArchiveFile,
+  type NyaaFileSelection,
   type NyaaRankDrops,
   type NyaaSelectionReason,
   type NyaaSubtitleCandidate,
 } from '../shared/subtitleNyaa';
+import { extractSubtitlesFromArchive, isExtractableArchive } from './subtitleArchive';
 
 /** A search that never reached the ranker discarded nothing, and says so. */
 export function emptyRankDrops(): NyaaRankDrops {
@@ -510,11 +513,27 @@ const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
  * has no branch for that. Without this the user is told the release "contains
  * no subtitle files", which reads as "the ranker picked a mislabelled release"
  * and sends them looking for another one — when the honest next action is to
- * extract this one. `.zip` could in principle be opened (`adm-zip` is already
- * a dependency) and `.7z` could not, so naming the format is what lets the
- * message stay true for both without promising extraction for either.
+ * extract this one.
+ *
+ * UPDATED 2026-09-06: the app now DOES open `.7z`, `.zip` and `.tar`
+ * (`subtitleArchive.ts`, gate 11's slice). This set is still every container a
+ * release is observed to ship in, because it feeds `noSubtitlesReason`, which
+ * must be able to describe the ones still refused. `EXTRACTABLE_ARCHIVE_EXT` is
+ * the openable subset; the two are deliberately not the same set.
  */
 const ARCHIVE_EXT = new Set(['.zip', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz', '.zst']);
+
+/**
+ * The only members ever decompressed out of a carrier.
+ *
+ * An allow-list, not a deny-list, and it is the whole safety story of the
+ * archive route: a subtitle acquisition that unpacked whatever a release
+ * happened to bundle would be running someone else's payload chooser. Kept in
+ * sync with `TEXT_SUBTITLE_FORMATS` in `subtitleNyaa.ts` — the formats the
+ * record layer can actually store — so nothing is unpacked that could not then
+ * be saved. `.lrc` is included for the same reason it is a record format.
+ */
+const TEXT_SUBTITLE_EXTENSIONS = ['.ass', '.srt', '.ssa', '.vtt', '.lrc'] as const;
 
 /**
  * The same refusal, carrying the file list that justifies it.
@@ -543,31 +562,166 @@ function noSubtitlesReason(files: readonly NyaaArchiveFile[]): string {
   const archives = files.filter((file) => ARCHIVE_EXT.has(path.extname(file.name).toLowerCase()));
   if (archives.length) {
     const kinds = [...new Set(archives.map((file) => path.extname(file.name).toLowerCase()))].sort();
+    // Reached only when NO carrier was usable, so the two ways that happens are
+    // named separately. `.7z`, `.zip` and `.tar` are opened now; getting here
+    // with one of those means it was over the size ceiling, and telling that
+    // user to "extract it yourself" would be advice about the wrong problem.
+    const openable = archives.filter((file) => isExtractableArchive(file.name));
+    if (openable.length === archives.length) {
+      return `This release ships its subtitles inside ${archives.length} archive(s) (${kinds.join(', ')}) that are larger than the ${Math.round(SUBTITLE_SIZE_CEILING_BYTES / (1024 * 1024))} MB this app will download.`;
+    }
     return `This release ships its subtitles inside ${archives.length} compressed archive(s) (${kinds.join(', ')}), which this app cannot open. Extract it yourself and add the subtitle files beside the video.`;
   }
   return `${SELECTION_MESSAGES['no-subtitles']} ${total} file(s), none of them video or subtitles.`;
 }
 
-async function readSubtitleFile(savePath: string, torrentName: string, fileName: string): Promise<string | null> {
-  // qBittorrent reports the save path of the torrent and file names relative to
-  // it. With `contentLayout=Original` a multi-file torrent nests under its own
-  // name, and the file list already carries that prefix — so joining both would
-  // double it. Try the direct join first and fall back to the nested one.
-  const candidates = [
-    path.join(savePath, fileName),
-    path.join(savePath, torrentName, fileName),
-  ];
-  for (const candidate of candidates) {
+/**
+ * Where a downloaded member of a torrent actually landed.
+ *
+ * qBittorrent reports the save path of the torrent and file names relative to
+ * it. With `contentLayout=Original` a multi-file torrent nests under its own
+ * name, and the file list already carries that prefix — so joining both would
+ * double it. Try the direct join first and fall back to the nested one.
+ */
+async function resolveDownloadedPath(
+  savePath: string,
+  torrentName: string,
+  fileName: string,
+): Promise<string | null> {
+  for (const candidate of [path.join(savePath, fileName), path.join(savePath, torrentName, fileName)]) {
     try {
       const stat = await fsp.stat(candidate);
-      if (!stat.isFile()) continue;
-      if (stat.size > MAX_SUBTITLE_BYTES) return null;
-      return await fsp.readFile(candidate, 'utf-8');
+      if (stat.isFile()) return candidate;
     } catch {
       // Try the next shape.
     }
   }
   return null;
+}
+
+async function readSubtitleFile(savePath: string, torrentName: string, fileName: string): Promise<string | null> {
+  const at = await resolveDownloadedPath(savePath, torrentName, fileName);
+  if (!at) return null;
+  try {
+    const stat = await fsp.stat(at);
+    if (stat.size > MAX_SUBTITLE_BYTES) return null;
+    return await fsp.readFile(at, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/** A subtitle with its text in hand, whichever shape it arrived in. */
+interface ReadableSubtitle {
+  /** Path as the selection knew it, so episode and language rules still apply. */
+  name: string;
+  text: string;
+  format: SubtitleRecordFormat;
+}
+
+type ReadableOutcome =
+  | {
+    ok: true;
+    files: ReadableSubtitle[];
+    /**
+     * How many subtitles were SELECTED, which is the denominator of the
+     * shortfall notice. Not `files.length`: a stalled transfer's whole point is
+     * that fewer arrived than were asked for, and reporting "1 of 1" when one
+     * of two landed is the exact shape of a partial result claiming to be
+     * whole.
+     */
+    selected: number;
+  }
+  | { ok: false; reason: string };
+
+/** The loose case, unchanged: every selected file read off qBittorrent's disk. */
+async function readLooseFiles(
+  selection: NyaaFileSelection,
+  completeIndexes: ReadonlySet<number>,
+  info: { savePath: string; name: string },
+): Promise<ReadableOutcome> {
+  const format = selection.format;
+  if (!format) return { ok: false, reason: NOTHING_READABLE };
+  const out: ReadableSubtitle[] = [];
+  for (const file of selection.files) {
+    if (!completeIndexes.has(file.index)) continue;
+    const text = await readSubtitleFile(info.savePath, info.name, file.name);
+    // An unreadable file is skipped rather than failing the release: a pack
+    // where one of twenty-six episodes is truncated still carries twenty-five,
+    // and the caller reports which episodes it got.
+    if (!text || !text.trim()) continue;
+    out.push({ name: file.name, text, format });
+  }
+  return { ok: true, files: out, selected: selection.files.length };
+}
+
+/**
+ * The compressed case: unpack each carrier, then select from what came out.
+ *
+ * `selectSubtitleFiles` is deliberately run a SECOND time, over the archive's
+ * own members. The first run only ever saw one file — the `.7z` — so none of
+ * the rules that matter to a harvest had anything to act on. Running it again
+ * on the unpacked names is what gives the archive route the format-majority
+ * vote, the episode match, the language exclusion and the per-episode dedupe
+ * for free, and it is why a bilingual archive cannot download twice what it
+ * needs the way the first bilingual pack did.
+ *
+ * The title narrowing is dropped for the inner run (`title: null`): the folder
+ * check exists to pick one work out of a whole-site index, and by this point
+ * the carrier IS this work's release. Leaving it on would let an archive whose
+ * internal folder is named differently from the media item read as
+ * `no-title-match` after a completed transfer.
+ */
+async function readCarrierEntries(
+  carriers: readonly NyaaArchiveFile[],
+  completeIndexes: ReadonlySet<number>,
+  info: { savePath: string; name: string },
+  want: { episode?: number | null; languages?: string[]; title?: string | null },
+): Promise<ReadableOutcome> {
+  const members = new Map<string, string>();
+  const entries: NyaaArchiveFile[] = [];
+  let refusal: string | null = null;
+  for (const carrier of carriers) {
+    if (!completeIndexes.has(carrier.index)) continue;
+    const at = await resolveDownloadedPath(info.savePath, info.name, carrier.name);
+    if (!at) continue;
+    const outcome = await extractSubtitlesFromArchive(at, {
+      extensions: TEXT_SUBTITLE_EXTENSIONS,
+      // The gate's own number, and the flat ceiling the release itself was
+      // ranked under. Applied to the DECLARED unpacked total, which the archive
+      // header carries, so an over-large archive is refused before a byte of it
+      // is decompressed.
+      maxUnpackedBytes: SUBTITLE_SIZE_CEILING_BYTES,
+    });
+    if (!outcome.ok) {
+      // One carrier's refusal is remembered but never returned while another
+      // carrier might still succeed — a release shipping two archives should
+      // not be lost to the worse one.
+      refusal ??= outcome.reason;
+      continue;
+    }
+    for (const file of outcome.files) {
+      if (members.has(file.name)) continue;
+      members.set(file.name, file.text);
+      entries.push({ index: entries.length, name: file.name, sizeBytes: file.sizeBytes });
+    }
+  }
+  if (!entries.length) {
+    return { ok: false, reason: refusal ?? 'This archive holds no subtitle files.' };
+  }
+
+  const inner = selectSubtitleFiles(entries, { ...want, title: null });
+  if (inner.reason !== 'ok' || !inner.format) {
+    return { ok: false, reason: SELECTION_MESSAGES[inner.reason] || NOTHING_READABLE };
+  }
+  const format = inner.format;
+  const out: ReadableSubtitle[] = [];
+  for (const file of inner.files) {
+    const text = members.get(file.name);
+    if (!text || !text.trim()) continue;
+    out.push({ name: file.name, text, format });
+  }
+  return { ok: true, files: out, selected: inner.files.length };
 }
 
 /**
@@ -704,15 +858,34 @@ async function acquireAdded(
   });
   if (!files.ok) return { ok: false, reason: files.reason };
 
-  const selection = selectSubtitleFiles(files.value, {
+  const want = {
     episode: token.episode,
     languages: token.languages,
     // Only a `sub-archive` is foldered by title. Passing it on every route would
     // let one work's pack be narrowed away by its own directory naming, which is
     // a way to turn a working fetch into `no-title-match` for nothing.
     title: token.route === 'sub-archive' ? (token.title ?? null) : null,
-  });
-  if (selection.reason !== 'ok' || !selection.format) {
+  };
+  const selection = selectSubtitleFiles(files.value, want);
+
+  // THE COMPRESSED CARRIER. A release whose subtitles are inside a `.7z` has no
+  // loose subtitle file, so `selectSubtitleFiles` correctly says `no-subtitles`
+  // — and that answer used to end the acquisition. Measured driving gate 11 on
+  // 2026-09-06: BOTH ja Route A subjects the product's own listing nominates are
+  // `.7z`, so the whole route was unreachable on this index for want of an
+  // unpacker rather than for want of a release.
+  //
+  // Only reached when there is nothing loose to take, so every release that
+  // works today takes exactly the path it takes today. The size test is on the
+  // *compressed* member here and again on the declared unpacked total inside
+  // `extractSubtitlesFromArchive`, because those are different numbers and only
+  // the second one bounds what actually gets decoded.
+  const carriers = selection.reason === 'no-subtitles'
+    ? files.value.filter(
+      (file) => isExtractableArchive(file.name) && file.sizeBytes <= SUBTITLE_SIZE_CEILING_BYTES,
+    )
+    : [];
+  if (carriers.length === 0 && (selection.reason !== 'ok' || !selection.format)) {
     return {
       ok: false,
       reason:
@@ -721,7 +894,7 @@ async function acquireAdded(
           : SELECTION_MESSAGES[selection.reason],
     };
   }
-  const wanted = selection.files.map((file) => file.index);
+  const wanted = (carriers.length ? carriers : selection.files).map((file) => file.index);
 
   if (preexisting) {
     // The user already had this torrent. Changing its file priorities would
@@ -789,15 +962,21 @@ async function acquireAdded(
   // subtitles under names that say only the episode number, so a `ja` harvest
   // took all 47 of them. Only the text can settle it, and only once it is here.
   const wantsJapanese = (token.languages ?? []).some((lang) => lang.slice(0, 2).toLowerCase() === 'ja');
+
+  // One list for both shapes: a loose file read off disk and a member unpacked
+  // out of a carrier are the same thing to everything below. Doing it this way
+  // is what lets the archive route inherit the format-majority vote, the
+  // episode match, the per-episode dedupe and the language rules rather than
+  // growing a second, subtly different copy of them.
+  const readable = carriers.length
+    ? await readCarrierEntries(carriers, completeIndexes, info.value, want)
+    : await readLooseFiles(selection, completeIndexes, info.value);
+  if (!readable.ok) return { ok: false, reason: readable.reason };
+
   const read: NyaaFetchedFile[] = [];
   let otherLanguage = 0;
-  for (const file of selection.files) {
-    if (!completeIndexes.has(file.index)) continue;
-    const text = await readSubtitleFile(info.value.savePath, info.value.name, file.name);
-    // An unreadable file is skipped rather than failing the release: a pack
-    // where one of twenty-six episodes is truncated still carries twenty-five,
-    // and the caller reports which episodes it got.
-    if (!text || !text.trim()) continue;
+  for (const file of readable.files) {
+    const text = file.text;
     // Per file, not per release, for the same reason: a pack shipping a
     // Japanese and an English track of each episode should yield the Japanese
     // ones rather than be refused whole.
@@ -814,7 +993,7 @@ async function acquireAdded(
     }
     read.push({
       text,
-      format: selection.format,
+      format: file.format,
       fileName: path.basename(file.name),
       episode: episodeFromFileName(file.name),
     });
@@ -831,7 +1010,7 @@ async function acquireAdded(
     'info',
     'torrents',
     stalled
-      ? `Fetched ${read.length} of ${selection.files.length} subtitle file(s) from `
+      ? `Fetched ${read.length} of ${readable.selected} subtitle file(s) from `
         + `${candidate.releaseName} before the transfer stalled.`
       : `Fetched ${read.length} subtitle file(s) from ${candidate.releaseName}.`,
   );
@@ -839,7 +1018,7 @@ async function acquireAdded(
     return {
       ok: true,
       files: read,
-      notice: `Partial result: ${read.length} of ${selection.files.length} subtitle file(s) `
+      notice: `Partial result: ${read.length} of ${readable.selected} subtitle file(s) `
         + `were downloaded and read. ${stalled}`,
     };
   }

@@ -899,21 +899,35 @@ describe('nyaaFetch — route B, selected files out of a batch', () => {
     );
   });
 
-  it('says a subtitle-only pack is compressed rather than empty, and names the format', async () => {
+  it('says a subtitle-only pack is compressed rather than empty, for a format it cannot open', async () => {
     // The shape gate 11 actually met on 2026-09-06: the listing's own top Route
-    // A candidate is one 20.7 MB `.7z`. "Contains no subtitle files" reads as
+    // A candidate is one 20.7 MB archive. "Contains no subtitle files" reads as
     // "the ranker picked a mislabelled release" and sends the user hunting for
-    // another; the release is exactly what it claims and the next action is to
-    // extract it. The format is named because `.zip` is openable in principle
-    // and `.7z` is not.
-    files = [{ name: 'Detective Conan 0001-0520 (Subs) [NetflixAsia].7z', size: 20_712_765, progress: 0, priority: 1 }];
+    // another; the release is exactly what it claims.
+    //
+    // `.rar` since 2026-09-06, not `.7z`: `.7z` is now EXTRACTED (see the
+    // carrier tests below), and this sentence has to keep meaning what it says
+    // for the containers that still are not.
+    files = [{ name: 'Detective Conan 0001-0520 (Subs) [NetflixAsia].rar', size: 20_712_765, progress: 0, priority: 1 }];
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
     expect(result.ok === false && result.reason).toBe(
-      'This release ships its subtitles inside 1 compressed archive(s) (.7z), which this app cannot open.'
+      'This release ships its subtitles inside 1 compressed archive(s) (.rar), which this app cannot open.'
       + ' Extract it yourself and add the subtitle files beside the video.',
     );
     // The refusal is not paid for: no priority was ever set, so nothing was
     // requested from the swarm before the release was turned down.
+    expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+
+  it('refuses an openable archive that is over the ceiling, and says so as a size', async () => {
+    // The other way a carrier fails, and it must not borrow the "cannot open"
+    // wording — the app CAN open this one, it is just too big to download.
+    files = [{ name: 'Everything Ever (Subs).7z', size: 90 * 1024 * 1024, progress: 0, priority: 1 }];
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toBe(
+      'This release ships its subtitles inside 1 archive(s) (.7z) that are larger than the 50 MB this app will download.',
+    );
+    expect(result.ok === false && result.reason).not.toMatch(/cannot open/);
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
   });
 
@@ -1494,4 +1508,120 @@ describe('nyaaFetchAll — a release in another language is its own refusal', ()
     expect(all.ok).toBe(true);
     expect(all.ok && all.files).toHaveLength(1);
   });
+});
+
+// GATE 11's SLICE — a subtitle-only release that arrives compressed.
+//
+// Driven live on 2026-09-06, both ja Route A subjects the product's own listing
+// nominates are `.7z`, and the acquisition ended at selection with "contains no
+// subtitle files". These acquire a REAL `.7z`, built by the same 7-Zip that
+// reads it: a stub archive would prove the plumbing and not the decoding, and
+// the defect was entirely in the decoding.
+describe('nyaaFetchAll — a compressed carrier', () => {
+  /** Builds `<savePath>/<archive>` out of files already written under savePath. */
+  async function packOnDisk(source: string, archive: string): Promise<number> {
+    const { createRequire } = await import('node:module');
+    const fs = await import('node:fs');
+    const req = createRequire(import.meta.url);
+    const factory = req('7z-wasm/7zz.umd.js');
+    const wasmBinary = fs.readFileSync(req.resolve('7z-wasm/7zz.wasm'));
+    const quiet = (): void => { /* 7-Zip chatter is not a test result */ };
+    const sz = await factory({ wasmBinary, print: quiet, printErr: quiet });
+    sz.FS.mkdir('/mnt');
+    sz.FS.mount(sz.NODEFS, { root: savePath }, '/mnt');
+    sz.FS.chdir('/mnt');
+    sz.callMain(['a', '-t7z', '-mx=1', archive, source]);
+    const stat = await fsp.stat(path.join(savePath, archive));
+    await fsp.rm(path.join(savePath, source), { recursive: true, force: true });
+    return stat.size;
+  }
+
+  /**
+   * Enough kana to clear `JAPANESE_KANA_FLOOR` (20). Not padding: the post-fetch
+   * language check reads the TEXT, and a one-line fixture is refused as "not
+   * Japanese" — which is the check doing its job, and it cost a run to see.
+   */
+  const JA_CUES = (episode: number): string => {
+    let out = '';
+    for (let i = 1; i <= 6; i += 1) {
+      out += `${i}\n00:00:0${i},000 --> 00:00:0${i + 1},000\n`
+        + `これはエピソード${episode}のだいじなせりふですよ。\n\n`;
+    }
+    return out;
+  };
+
+  it('takes a .7z pack whole and returns every episode inside it', async () => {
+    await writeOnDisk('pack/Subs/Show - 01.srt', JA_CUES(1));
+    await writeOnDisk('pack/Subs/Show - 02.srt', JA_CUES(2));
+    await writeOnDisk('pack/Subs/Show - 03.srt', JA_CUES(3));
+    await writeOnDisk('pack/readme.nfo', 'release notes');
+    const size = await packOnDisk('pack', 'Show 01-03 (Subs).7z');
+    files = [{ name: 'Show 01-03 (Subs).7z', size, progress: 0, priority: 1 }];
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 8_000 });
+    expect(all.ok).toBe(true);
+    if (!all.ok) return;
+    // Three episodes out of ONE torrent file — which is the whole claim.
+    expect(all.files).toHaveLength(3);
+    expect(all.files.map((file) => file.episode).sort()).toEqual([1, 2, 3]);
+    expect(all.files.map((file) => file.fileName).sort()).toEqual([
+      'Show - 01.srt', 'Show - 02.srt', 'Show - 03.srt',
+    ]);
+    // Real decoded cues, not a filename echo.
+    expect(all.files[0].text).toContain('これはエピソード');
+    // The format comes from the MEMBER, not from the carrier's own extension.
+    expect(all.files.every((file) => file.format === 'srt')).toBe(true);
+    // The `.nfo` inside the archive was never unpacked.
+    expect(all.files.some((file) => file.fileName.endsWith('.nfo'))).toBe(false);
+  }, 120_000);
+
+  it('CONTROL — the same release with the archive left out still refuses', async () => {
+    // Without this the test above could pass on any release at all. The only
+    // difference here is that the `.7z` is not in the file list.
+    files = [{ name: 'readme.nfo', size: 900, progress: 0, priority: 1 }];
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 8_000 });
+    expect(all.ok).toBe(false);
+    expect(all.ok === false && all.reason).toMatch(/no subtitle files/i);
+  }, 60_000);
+
+  it('applies the episode filter to the archive MEMBERS, not to the carrier', async () => {
+    // The reason the archive route re-runs `selectSubtitleFiles` on what came
+    // out: a per-episode discovery fetch asks for one episode, and the carrier
+    // has no episode number of its own to match.
+    await writeOnDisk('pack2/Show - 01.srt', JA_CUES(1));
+    await writeOnDisk('pack2/Show - 02.srt', JA_CUES(2));
+    const size = await packOnDisk('pack2', 'Show 01-02 (Subs).7z');
+    files = [{ name: 'Show 01-02 (Subs).7z', size, progress: 0, priority: 1 }];
+
+    const one = await nyaaFetchAll(candidate('sub-pack', 2), config(), { timeoutMs: 8_000 });
+    expect(one.ok).toBe(true);
+    if (!one.ok) return;
+    expect(one.files).toHaveLength(1);
+    expect(one.files[0].episode).toBe(2);
+
+    // And an episode the archive does not hold is refused by name, rather than
+    // silently returning the other one.
+    const missing = await nyaaFetchAll(candidate('sub-pack', 9), config(), { timeoutMs: 8_000 });
+    expect(missing.ok).toBe(false);
+    expect(missing.ok === false && missing.reason).toMatch(/none for the episode requested/i);
+  }, 120_000);
+
+  it('does not open an archive when the release also ships loose subtitles', async () => {
+    // Precedence, asserted so the carrier branch can never widen: every release
+    // that works today must take exactly the path it takes today.
+    await writeOnDisk('bundle/Show - 05.srt', JA_CUES(5));
+    const size = await packOnDisk('bundle', 'extras.7z');
+    await writeOnDisk('Show - 07.ja.srt', JA_CUES(7));
+    files = [
+      { name: 'extras.7z', size, progress: 0, priority: 1 },
+      { name: 'Show - 07.ja.srt', size: 400, progress: 0, priority: 1 },
+    ];
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 8_000 });
+    expect(all.ok).toBe(true);
+    if (!all.ok) return;
+    expect(all.files.map((file) => file.episode)).toEqual([7]);
+    // The archive was never even requested from the swarm.
+    expect(calls.some((call) => call.startsWith('prio:') && call.includes('extras'))).toBe(false);
+  }, 120_000);
 });
