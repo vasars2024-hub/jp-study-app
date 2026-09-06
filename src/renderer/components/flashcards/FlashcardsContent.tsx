@@ -1878,6 +1878,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
         <button
           type="button"
           className={`flash-tab ${overviewTab === 'epub' ? 'active' : ''}`}
+          aria-pressed={overviewTab === 'epub'}
           onClick={() => state.setOverviewTab('epub')}
         >
           {t('flash.tab.epubDecks', { count: epubCards.length })}
@@ -1885,6 +1886,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
         <button
           type="button"
           className={`flash-tab ${overviewTab === 'dictionary' ? 'active' : ''}`}
+          aria-pressed={overviewTab === 'dictionary'}
           onClick={() => state.setOverviewTab('dictionary')}
         >
           {t('flash.tab.dictionary', { count: saved.length })}
@@ -2063,6 +2065,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 type="button"
                 className={`lib-folder-chip ${folderFilter === 'all' ? 'active' : ''}`}
                 onClick={() => state.setFolderFilter('all')}
+                aria-pressed={folderFilter === 'all'}
               >
                 {t('flash.all')}
                 <span className="lib-chip-count">{epubCards.length}</span>
@@ -2070,6 +2073,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               <button
                 type="button"
                 onClick={() => state.setFolderFilter('unfiled')}
+                aria-pressed={folderFilter === 'unfiled'}
                 onDragOver={(e) => {
                   e.preventDefault();
                   state.setDropHover('unfiled');
@@ -2104,6 +2108,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                   <button
                     type="button"
                     className="flash-folder-chip-select"
+                    aria-pressed={folderFilter === folder}
                     onClick={() => state.setFolderFilter(folder)}
                   >
                     {folder}

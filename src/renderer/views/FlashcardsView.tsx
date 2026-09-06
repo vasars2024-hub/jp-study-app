@@ -232,6 +232,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 <button
                   type="button"
                   className={`aero-flash-source ${overviewTab === 'epub' ? 'active' : ''}`}
+                  aria-pressed={overviewTab === 'epub'}
                   onClick={() => state.setOverviewTab('epub')}
                 >
                   <Icon name="library" size={16} />
@@ -241,6 +242,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 <button
                   type="button"
                   className={`aero-flash-source ${overviewTab === 'dictionary' ? 'active' : ''}`}
+                  aria-pressed={overviewTab === 'dictionary'}
                   onClick={() => state.setOverviewTab('dictionary')}
                 >
                   <Icon name="dictionary" size={16} />
@@ -254,6 +256,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 <button
                   type="button"
                   className={`aero-flash-folder ${folderFilter === 'all' ? 'active' : ''}`}
+                  aria-pressed={folderFilter === 'all'}
                   onClick={() => state.setFolderFilter('all')}
                 >
                   <span>{t('flash.aero.allCards')}</span>
@@ -262,6 +265,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 <button
                   type="button"
                   className={`aero-flash-folder ${folderFilter === 'unfiled' ? 'active' : ''} ${dropHover === 'unfiled' ? 'dragover' : ''}`}
+                  aria-pressed={folderFilter === 'unfiled'}
                   onClick={() => state.setFolderFilter('unfiled')}
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -279,6 +283,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                     type="button"
                     draggable
                     className={`aero-flash-folder ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
+                    aria-pressed={folderFilter === folder}
                     onClick={() => state.setFolderFilter(folder)}
                     onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
                     onDragOver={(e) => {
