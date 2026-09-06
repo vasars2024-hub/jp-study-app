@@ -16,6 +16,7 @@ import {
   revealTargetFor,
   youtubeIdFromFileName,
 } from '../../shared/filesApp/catalog';
+import { classifyForCleanup } from '../../shared/filesApp/cleanup';
 
 let root = '';
 
@@ -929,7 +930,8 @@ describe('files app index — the path the user is shown is canonical', () => {
     // string and not a row that quietly became a broken link.
     expect(row?.flags?.brokenLink).toBeUndefined();
     expect(row?.sizeBytes).toBe('video bytes'.length);
-    expect(revealTargetFor(row!.location)).toBe(real);
+    if (!row) throw new Error('unreachable — asserted defined above');
+    expect(revealTargetFor(row.location)).toBe(real);
   });
 
   it('collapses a doubled separator, which the user also has one of', () => {
@@ -946,5 +948,42 @@ describe('files app index — the path the user is shown is canonical', () => {
     );
     expect(row?.location).toEqual({ store: 'file', path: real });
     expect(row?.flags?.brokenLink).toBeUndefined();
+  });
+});
+
+describe('files app index — a folder is not an empty file', () => {
+  /**
+   * Live on 2026-09-06: Clean up offered **601 empty files**, and 4 of them
+   * were the user's manga — `library/25e40727-…`, a directory holding 3 files —
+   * because `fs.Stats.size` is 0 for a directory on NTFS and
+   * `classifyForCleanup` reads `sizeBytes === 0` as the whole definition of
+   * `empty-files`. The other 597 are genuine 0-byte cover jpgs.
+   */
+  it('a directory-backed row reports no size, so cleanup cannot call it empty', () => {
+    write('library/m1/ch1.jpg', 'page bytes');
+    write(
+      'library.json',
+      JSON.stringify([{ id: 'm1', title: 'One Punch-Man', kind: 'manga', createdAt: 2000 }]),
+    );
+
+    const row = buildFilesIndex(ctx()).items.find((i) => i.name === 'One Punch-Man');
+    expect(row).toBeDefined();
+    expect(row?.location.store).toBe('file');
+    expect(row?.sizeBytes).toBeNull();
+    expect(row?.flags?.brokenLink).toBeUndefined();
+    if (!row) throw new Error('unreachable — asserted defined above');
+    expect(
+      classifyForCleanup(row, ['broken-links', 'partial-downloads', 'empty-files']),
+    ).toBeNull();
+  });
+
+  it('a real zero-byte FILE is still offered, so the class did not become a no-op', () => {
+    write('covers/cover.jpg', '');
+    const row = buildFilesIndex(ctx()).items.find((i) => i.name === 'cover.jpg');
+    expect(row?.sizeBytes).toBe(0);
+    if (!row) throw new Error('unreachable — asserted defined above');
+    expect(
+      classifyForCleanup(row, ['broken-links', 'partial-downloads', 'empty-files']),
+    ).toBe('empty-files');
   });
 });
