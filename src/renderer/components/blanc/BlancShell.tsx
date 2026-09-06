@@ -1849,7 +1849,7 @@ function BlancToolsPanel({
           {toolboxSettings.openToolsInTabs && toolboxSettings.tabPosition === 'top' && tabStrip}
           <div className="blanc-embedded-view">
             <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
-              {renderBlancTool(tool, onOpenBook)}
+              {renderBlancTool(tool, onOpenBook, grammarRequest)}
             </Suspense>
           </div>
           {toolboxSettings.openToolsInTabs && toolboxSettings.tabPosition === 'bottom' && tabStrip}
