@@ -12,7 +12,7 @@ export const SCRAPER_UI_ZH: Catalog = {
   'scraperPage.search.placeholder': '提供方、追踪、字幕、播放器',
 
   // ---- ScraperPage: where the scraper-engine settings went ----
-  'scraperPage.find.engine': 'scraper engine network proxy user agent headers cookie retry timeout concurrency delay redirect ssl browser session fingerprint cache offline robots crawl delay rate limit authentication login extraction selectors episodes profiles preset revision history import export 抓取 网络 代理 请求头 Cookie 重试 超时 并发 缓存 提取 剧集 配置文件 历史 导入 导出',
+  'scraperPage.find.engine': 'scraper engine network proxy user agent headers cookie retry timeout concurrency delay redirect ssl browser session fingerprint cache offline robots crawl delay rate limit authentication login extraction selectors episodes profiles preset revision history import export fast balanced thorough chromium firefox headless viewport javascript scroll script persist compatibility html metadata thumbnail lifetime size requests minute failures pause domain account credential cookie jar manual status version rollback restore change css xpath regex attribute fallback normalize season special ova movie processing natural sort missing merge quality subbed dubbed raw language resolution filler recap rename json backup portable 抓取 网络 代理 请求头 Cookie 重试 超时 并发 缓存 提取 剧集 配置文件 历史 导入 导出',
   'scraperPage.engine.title': '抓取引擎设置',
   'scraperPage.engine.description': '这些设置已移至抓取器应用，与实际运行的任务放在一起。',
   'scraperPage.engine.body': '网络、缓存、反机器人、提取与剧集处理此前在抓取器和本页都能修改。两个界面共同编辑同一份文档，就没有哪一个能说自己是修改设置的地方。因此本页只保留与应用其他部分共享的设置。',

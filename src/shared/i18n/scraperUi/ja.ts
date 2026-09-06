@@ -12,7 +12,7 @@ export const SCRAPER_UI_JA: Catalog = {
   'scraperPage.search.placeholder': 'プロバイダー、視聴記録、字幕、プレイヤー',
 
   // ---- ScraperPage: where the scraper-engine settings went ----
-  'scraperPage.find.engine': 'scraper engine network proxy user agent headers cookie retry timeout concurrency delay redirect ssl browser session fingerprint cache offline robots crawl delay rate limit authentication login extraction selectors episodes profiles preset revision history import export スクレイパー ネットワーク プロキシ ヘッダー クッキー 再試行 タイムアウト 同時実行 キャッシュ 抽出 エピソード プロファイル 履歴 インポート エクスポート',
+  'scraperPage.find.engine': 'scraper engine network proxy user agent headers cookie retry timeout concurrency delay redirect ssl browser session fingerprint cache offline robots crawl delay rate limit authentication login extraction selectors episodes profiles preset revision history import export fast balanced thorough chromium firefox headless viewport javascript scroll script persist compatibility html metadata thumbnail lifetime size requests minute failures pause domain account credential cookie jar manual status version rollback restore change css xpath regex attribute fallback normalize season special ova movie processing natural sort missing merge quality subbed dubbed raw language resolution filler recap rename json backup portable スクレイパー ネットワーク プロキシ ヘッダー クッキー 再試行 タイムアウト 同時実行 キャッシュ 抽出 エピソード プロファイル 履歴 インポート エクスポート',
   'scraperPage.engine.title': 'スクレイパーエンジンの設定',
   'scraperPage.engine.description': 'これらの設定は、実際の実行と同じ場所であるスクレイパーアプリに移動しました。',
   'scraperPage.engine.body': 'ネットワーク、キャッシュ、ボット対策、抽出、エピソード処理は、以前はスクレイパー側とこのページの両方から編集できました。1 つの設定ドキュメントを 2 つの画面が編集する状態では、どちらが正式な変更場所なのか示せません。そのためこのページには、アプリ全体で共有する設定だけを残しています。',

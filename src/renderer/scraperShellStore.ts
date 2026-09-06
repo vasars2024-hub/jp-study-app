@@ -73,6 +73,16 @@ export function onScraperShellChanged(
   const handle = (event: Event) => {
     listener((event as CustomEvent<ScraperShellState>).detail);
   };
+  const storage = (event: StorageEvent) => {
+    if (event.key !== SCRAPER_SHELL_STORAGE_KEY && event.key !== null) return;
+    // Deletion/clear must not resurrect this window's old memory fallback.
+    memoryFallback = null;
+    listener(loadScraperShellState());
+  };
   window.addEventListener(CHANGED_EVENT, handle);
-  return () => window.removeEventListener(CHANGED_EVENT, handle);
+  window.addEventListener('storage', storage);
+  return () => {
+    window.removeEventListener(CHANGED_EVENT, handle);
+    window.removeEventListener('storage', storage);
+  };
 }

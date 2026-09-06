@@ -16,6 +16,7 @@ import { SCRAPER_NAV } from './scraperPages';
 import type { ScraperController } from './types';
 import {
   loadScraperShellState,
+  onScraperShellChanged,
   patchScraperShellState,
   navigateScraperShell,
 } from '../../scraperShellStore';
@@ -100,6 +101,7 @@ export default function ScraperApp() {
   // cache text must take `lang` as a dependency, per CLAUDE.md's i18n rule.
   useT();
   const [shell, setShell] = useState(() => loadScraperShellState());
+  useEffect(() => onScraperShellChanged(setShell), []);
   const [advancedMode, setAdvancedModeState] = useState(readAdvancedMode);
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);
   const [targetUrl, setTargetUrl] = useState('');

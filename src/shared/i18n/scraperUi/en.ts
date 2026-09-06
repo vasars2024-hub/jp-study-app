@@ -28,7 +28,7 @@ export const SCRAPER_UI_EN: Catalog = {
   'scraperPage.search.placeholder': 'Providers, tracking, subtitles, players',
 
   // ---- ScraperPage: where the scraper-engine settings went ----
-  'scraperPage.find.engine': 'scraper engine network proxy user agent headers cookie retry timeout concurrency delay redirect ssl browser session fingerprint cache offline robots crawl delay rate limit authentication login extraction selectors episodes profiles preset revision history import export',
+  'scraperPage.find.engine': 'scraper engine network proxy user agent headers cookie retry timeout concurrency delay redirect ssl browser session fingerprint cache offline robots crawl delay rate limit authentication login extraction selectors episodes profiles preset revision history import export fast balanced thorough chromium firefox headless viewport javascript scroll script persist compatibility html metadata thumbnail lifetime size requests minute failures pause domain account credential cookie jar manual status version rollback restore change css xpath regex attribute fallback normalize season special ova movie processing natural sort missing merge quality subbed dubbed raw language resolution filler recap rename json backup portable',
   'scraperPage.engine.title': 'Scraper engine settings',
   'scraperPage.engine.description': 'These now live in the Scraper app, beside the runs they affect.',
   'scraperPage.engine.body': 'Network, cache, anti-bot, extraction and episode handling used to be editable here as well as in the Scraper. Two screens editing one document meant neither could claim to be the place a setting is changed, so this page kept only what the rest of the app shares.',
