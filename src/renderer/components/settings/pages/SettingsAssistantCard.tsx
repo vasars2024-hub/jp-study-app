@@ -76,7 +76,14 @@ export default function SettingsAssistantCard() {
                     type="button"
                     className="btn small"
                     onClick={() =>
-                      navigate(entry.pageId, entry.id.startsWith('page-') ? undefined : entry.id)
+                      // The assistant answers from the whole registry, advanced
+                      // entries included, so its hits must route guided — an
+                      // answer you cannot follow is worse than no answer.
+                      navigate(
+                        entry.pageId,
+                        entry.id.startsWith('page-') ? undefined : entry.id,
+                        { guided: true },
+                      )
                     }
                   >
                     {t(entry.titleKey)}

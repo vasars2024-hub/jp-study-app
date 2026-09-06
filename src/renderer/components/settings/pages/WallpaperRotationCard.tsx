@@ -43,7 +43,9 @@ export default function WallpaperRotationCard() {
           <button
             type="button"
             className="btn small"
-            onClick={() => navigate('atmosphere', 'living-layer')}
+            // `atmosphere` is an advanced page, so this needs `guided` or the
+            // guard bounces Home and the hint above points at a dead button.
+            onClick={() => navigate('atmosphere', 'living-layer', { guided: true })}
           >
             {t('settings.wallpaper.rotationOpenAtmosphere')}
           </button>
