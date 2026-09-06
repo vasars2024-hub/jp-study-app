@@ -1491,3 +1491,43 @@ is read, and a cancel that stops mid-file).
 - Rewriting app data/services while restyling them unless a proven architecture defect blocks the UI contract.
 - Folding Aero, Wired, or Blanc into one palette.
 - Letting AI rearrange a user’s workspace without explicit approval.
+
+## 14. Plan closure — 2026-09-06 03:15 EDT, `primary`, commit `0f9a4df0`
+
+**This plan is FINISHED.** Both of its own gates close, and the counts below are the method,
+not the claim — re-derive them here rather than trusting this paragraph.
+
+**Gate A — the §11 timeline. 51 of 51 bullets closed.** Counted mechanically over the timeline
+range (L0 at line 476 through the end of L12 at 1389):
+
+    grep -cE '^- '                        53 top-level bullets
+    of those, carrying a RULE A tag       51
+    the 2 untagged                        prose findings that begin '- **The heavy leg's…'
+                                          and '- **A cat 7 gesture number is a property of the
+                                          DESK…' — narrative notes inside L7, not units
+    status: open / status: unknown        0 / 0, whole file
+
+**Gate B — the rubric matrix. 192 of 192 cells.** 24 sections x 8 categories, `files` excluded
+from the denominator by the recorded ruling at the `164 of 192` anchor (its 37 gates are its
+rubric). Counted by walking that anchor's per-turn running-total series forward with no gap:
+164 -> 165 -> 168 (recount) -> 170 -> 171 -> 172 -> 174 -> 175 -> 176 -> 177 -> 184 -> 185 ->
+188 -> 189 -> 190 -> 191 -> 192. Every step is a dated entry in `LIQUID_SCORECARD.md` naming
+the cells it closed and its commit. The last cell was `player` cat7 (`0f9a4df0`), which passed
+10/10 with two negative controls — rate-8 playback dropping 46.8% where the clean arm dropped
+0%, and the instrument REFUSING a paused player rather than scoring a still picture 10/10.
+
+**§12 Definition of done, item by item:** every clause maps onto a closed §11 bullet — the
+80/80 matrix (Gate B), standard-default and reversible transitions (L3), the feature-ledger
+rows (L12, `parity-ledger.json` 45 `both` / 5 `pending` -> closed), the Aero/Wired/Blanc/high-
+contrast/reduced-motion matrices (L9, 16 of 16 cells), the player pilot (L4/L6), and the atlas
+plus remaining-risk report (L12, `17b3d833` + `583195d1`). §12.1's only entry, D1, is FIXED.
+
+**What is deliberately NOT claimed.** "Finished" here means every unit this plan declares for
+itself is closed with committed evidence. It does not mean the Liquid surfaces are free of
+defects the rubric's eight categories cannot see — §12.1 exists precisely because scored cells
+and product defects are different populations, and a category scored 10/10 is a statement about
+the instrument's bars, not a warranty. New Liquid defects belong in the ledger of whichever
+track finds them, not in a reopened bullet here.
+
+**Ladder consequence:** plan (3) closes. The next relay turn takes the next open plan in the
+fixed depth-first order rather than re-deriving liquid.
