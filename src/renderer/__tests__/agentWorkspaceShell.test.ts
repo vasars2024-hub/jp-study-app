@@ -40,6 +40,10 @@ vi.mock('../i18n', () => ({
       if (vars && 'step' in vars) return `${key}:${vars.step}`;
       if (vars && 'operation' in vars) return `${key}:${vars.operation}`;
       if (vars && 'word' in vars) return `${key}:${vars.word}`;
+      // Echoed for D84: the privacy disclosure used to interpolate the raw
+      // `AiProviderId`, and swallowing this var would make "the sentence names
+      // what the picker names" unassertable.
+      if (vars && 'provider' in vars) return `${key}:${vars.provider}`;
       return key;
     },
     lang: 'en',
@@ -649,6 +653,30 @@ describe('Agent workspace shell', () => {
 
     expect(document.activeElement).toBe(composer);
     expect(document.activeElement).not.toBe(suggestion);
+  });
+
+  /**
+   * D84. Both disclosures interpolated `target`, so the app said the prompt was
+   * going to `gemini-2.5-flash` two rows below an option reading its real name.
+   */
+  it('names the cloud model the way the picker names it, not by its id', async () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      version: 1,
+      excludeSensitiveContext: false,
+    }));
+    stored = populated();
+    await mount();
+    await setTextarea('Summarize this');
+
+    const provider = host.querySelector('.agent-composer select') as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+        ?.call(provider, 'gemini-2.5-flash');
+      provider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(text()).toContain('agent.execute.cloudNotice:agent.execute.provider.gemini');
+    expect(text()).not.toContain('gemini-2.5-flash');
   });
 
   // The reusable-prompt route shares this exact callback, and it is verified in

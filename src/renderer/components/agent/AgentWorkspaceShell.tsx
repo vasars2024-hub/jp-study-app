@@ -90,6 +90,7 @@ import {
 import { AgentSpendPanel } from './AgentSpendPanel';
 import {
   AGENT_CLOUD_TARGETS,
+  agentTargetLabel,
   executionErrorKey,
   newAgentConversationId,
   newAgentExecutionId,
@@ -647,7 +648,9 @@ function MessageRow({
           <span className="agent-chip agent-chip-provider">
             <Icon name={provider.cloud ? 'globe' : 'lock'} size={13} />
             {provider.cloud && provider.target.kind === 'cloud'
-              ? t('agent.message.providerCloud', { provider: provider.target.providerId })
+              ? t('agent.message.providerCloud', {
+                provider: agentTargetLabel(provider.target.providerId, t),
+              })
               : t('agent.message.providerLocal')}
           </span>
         ) : null}
@@ -2570,7 +2573,7 @@ export default function AgentWorkspaceShell() {
                 {target !== 'local' ? (
                   <p className="agent-cloud-notice">
                     <Icon name="globe" size={14} />
-                    {t('agent.execute.cloudNotice', { provider: target })}
+                    {t('agent.execute.cloudNotice', { provider: agentTargetLabel(target, t) })}
                   </p>
                 ) : (
                   <p className="agent-cloud-notice">
@@ -2648,7 +2651,9 @@ export default function AgentWorkspaceShell() {
                       onChange={(event) => setCloudSensitiveConsent(event.target.checked)}
                       disabled={blocked || attachmentReading}
                     />
-                    <span>{t('agent.execute.sensitiveConsent', { provider: target })}</span>
+                    <span>
+                      {t('agent.execute.sensitiveConsent', { provider: agentTargetLabel(target, t) })}
+                    </span>
                   </label>
                 ) : null}
 

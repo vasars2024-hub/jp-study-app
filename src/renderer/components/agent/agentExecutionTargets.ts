@@ -32,6 +32,28 @@ export const AGENT_CLOUD_TARGETS: readonly { providerId: AiProviderId; labelKey:
   { providerId: 'deepseek-v4-pro', labelKey: 'agent.execute.provider.deepseekPro' },
 ];
 
+/**
+ * What to CALL a target in a sentence the user reads.
+ *
+ * The picker resolved `labelKey` and the privacy disclosure beneath it did not,
+ * so the app told the user their prompt was going to `deepseek-v4-flash` two
+ * rows under an option reading "DeepSeek V4 Flash". Blanc's copy of the same
+ * sentence had already been written correctly; one resolver is what stops the
+ * two shells naming one destination two ways.
+ *
+ * An unrecognised id falls back to the id itself rather than to a friendly
+ * name for something else: in a disclosure, an ugly true answer beats a tidy
+ * wrong one.
+ */
+export function agentTargetLabel(
+  target: AgentTargetChoice,
+  t: (key: string) => string,
+): string {
+  if (target === 'local') return t('agent.execute.provider.local');
+  const found = AGENT_CLOUD_TARGETS.find((entry) => entry.providerId === target);
+  return found ? t(found.labelKey) : target;
+}
+
 export function executionErrorKey(code: AgentExecutionFailureCode): string {
   if (code === 'busy') return 'agent.execute.error.busy';
   if (code === 'store-failed') return 'agent.execute.error.store';

@@ -66,6 +66,7 @@ import { AgentGovernancePanel } from '../agent/AgentGovernancePanel';
 import { AgentConversationPlanQueue } from '../agent/AgentConversationPlanQueue';
 import {
   AGENT_CLOUD_TARGETS,
+  agentTargetLabel,
   executionErrorKey,
   newAgentConversationId,
   newAgentExecutionId,
@@ -343,12 +344,7 @@ export function BlancCentralAgentPanel() {
         <p className="blanc-agent-note">
           {target === 'local'
             ? t('agent.execute.localNotice')
-            : t('agent.execute.cloudNotice', {
-              provider: t(
-                AGENT_CLOUD_TARGETS.find((entry) => entry.providerId === target)?.labelKey
-                  ?? 'agent.execute.provider.local',
-              ),
-            })}
+            : t('agent.execute.cloudNotice', { provider: agentTargetLabel(target, t) })}
         </p>
 
         <div className="blanc-agent-budgets">
@@ -453,7 +449,7 @@ export function BlancCentralAgentPanel() {
                 <span>
                   {message.provider.target.kind === 'cloud'
                     ? t('agent.message.providerCloud', {
-                      provider: message.provider.target.providerId,
+                      provider: agentTargetLabel(message.provider.target.providerId, t),
                     })
                     : t('agent.message.providerLocal')}
                 </span>
