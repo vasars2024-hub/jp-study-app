@@ -14,7 +14,7 @@
 // function, because the handler map is the seam the renderer actually has and
 // the wiring between the two channels is the thing under test.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,12 +33,27 @@ vi.mock('electron', () => ({
       handlers.set(channel, handler);
     },
   },
-  BrowserWindow: { getAllWindows: () => [] },
+  BrowserWindow: {
+    getAllWindows: () => [{
+      isDestroyed: () => false,
+      webContents: {
+        send: (channel: string, payload: unknown) => { broadcasts.push({ channel, payload }); },
+      },
+    }],
+  },
   net: { request: () => undefined },
   safeStorage: { isEncryptionAvailable: () => false },
 }));
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>();
+/**
+ * Every progress line the accept sent.
+ *
+ * The strip's Cancel button only appears while an unfinished row is in it, so
+ * "the IPC can cancel" and "a person can cancel" are different claims and this
+ * is the second one.
+ */
+let broadcasts: Array<{ channel: string; payload: unknown }> = [];
 
 /**
  * Every `isCancelled` reading the fetch took, in order.
@@ -49,6 +64,8 @@ const handlers = new Map<string, (...args: unknown[]) => unknown>();
 let cancelReadings: boolean[] = [];
 /** Resolved by the test once the fetch is genuinely in flight. */
 let releaseFetch: (() => void) | null = null;
+/** Set by a test that wants the fetch to fail for a reason that is not a cancel. */
+let failNextFetch: string | null = null;
 
 vi.mock('../subtitleNyaaSource', () => ({
   emptyRankDrops: () => ({ titleMatched: 0, seeders: 0, title: 0, muxed: 0, shape: 0, language: 0 }),
@@ -68,6 +85,7 @@ vi.mock('../subtitleNyaaSource', () => ({
     const stopped = options.isCancelled?.() ?? false;
     cancelReadings.push(stopped);
     if (stopped) return { ok: false, reason: 'Cancelled.' };
+    if (failNextFetch) return { ok: false, reason: failNextFetch };
     return { ok: true, value: { text: 'Dialogue: hi', format: 'ass', fileName: 'x.ass' } };
   },
   rememberNyaaCandidates: () => undefined,
@@ -131,10 +149,24 @@ beforeEach(() => {
   cancelReadings = [];
   releaseFetch = null;
   patches = [];
+  broadcasts = [];
+  failNextFetch = null;
   registerSubtitleDiscoveryIpc({
     listItems: () => [ITEM],
     patchItems: (_ids: string[], patch: Record<string, unknown>) => { patches.push(patch); },
   });
+});
+
+// `running` and `cancelled` are module-level in the subject, so a test that
+// throws before releasing its fetch leaves the id registered and every later
+// test in the file reads a state it did not set. That turned one real mutation
+// detection into two, which is a false reading in the flattering direction.
+afterEach(async () => {
+  releaseFetch?.();
+  releaseFetch = null;
+  // Two turns of the loop: one for the fetch to resume, one for its `finally`.
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
 });
 
 describe('subtitleDiscovery:cancel reaches the dialog’s acquisition', () => {
@@ -196,6 +228,47 @@ describe('subtitleDiscovery:cancel reaches the dialog’s acquisition', () => {
     expect(cancelReadings).toEqual([false, false]);
     expect(patches).toHaveLength(1);
     expect(Array.isArray(patches[0].subtitles) && (patches[0].subtitles as unknown[]).length).toBe(1);
+  });
+
+  it('announces itself to the job strip, and ends on cancelled rather than error', async () => {
+    const accept = handler('subtitleDiscovery:nyaaAccept')({}, 'm1', 'c1', ACQUISITION, 'ja');
+    await untilInFlight();
+
+    // Unfinished while it runs, which is the condition the Cancel button
+    // renders on. Without this line the button never appears and the working
+    // IPC behind it is unreachable by a person.
+    const phases = (): string[] => broadcasts
+      .filter((line) => line.channel === 'subtitleDiscovery:progress')
+      .map((line) => (line.payload as { phase: string }).phase);
+    expect(phases()).toEqual(['downloading']);
+
+    await handler('subtitleDiscovery:cancel')({}, undefined);
+    releaseFetch?.();
+    await accept;
+
+    // `cancelled`, not `error`: the row must not report a fault to the person
+    // who stopped it.
+    expect(phases()).toEqual(['downloading', 'cancelled']);
+    const last = broadcasts[broadcasts.length - 1].payload as { mediaId: string; title: string; error?: string };
+    expect(last.mediaId).toBe('m1');
+    expect(last.title).toBe('Show');
+    expect(last.error).toBeUndefined();
+  });
+
+  // CONTROL 3: the terminal phase is chosen, not fixed. A fetch that fails for
+  // an ordinary reason ends on `error` and carries the reason, so `cancelled`
+  // above is the cancel and not the only thing this path can say.
+  it('CONTROL: an ordinary failure ends on error, carrying its reason', async () => {
+    failNextFetch = 'qBittorrent is not enabled.';
+    const accept = handler('subtitleDiscovery:nyaaAccept')({}, 'm1', 'c1', ACQUISITION, 'ja') as
+      Promise<{ ok: boolean }>;
+    await untilInFlight();
+    releaseFetch?.();
+
+    expect((await accept).ok).toBe(false);
+    const last = broadcasts[broadcasts.length - 1].payload as { phase: string; error?: string };
+    expect(last.phase).toBe('error');
+    expect(last.error).toBe('qBittorrent is not enabled.');
   });
 
   // CONTROL 2: a cancel does not outlive the fetch it stopped. Without the

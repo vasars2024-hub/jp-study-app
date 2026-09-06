@@ -46,6 +46,7 @@ import {
   type SubtitleProviderCredentialState,
   type SubtitleProviderExecutionId,
 } from '../shared/subtitleDiscoveryIpc';
+import { QBIT_CANCELLED_REASON } from './scraper/qbittorrent';
 import type { SubtitleRecord, SubtitleSearchFailure } from '../shared/subtitleRecord';
 import {
   SUBTITLE_DISCOVERY_SETTINGS_FILE,
@@ -934,6 +935,17 @@ async function acceptNyaaCandidate(
     running.add(mediaId);
     cancelled.delete(mediaId);
   }
+
+  // Registering is only half of a cancellable job. The strip renders from this
+  // broadcast, and its Cancel button appears only while something in it is
+  // unfinished — so an acquisition that never announced itself was still
+  // uncancellable by a person, however well the IPC behind the button worked.
+  // The sweep's own emit shape, so one row type covers both producers.
+  const title = item.title?.trim() || item.fileName;
+  const emit = (phase: SubtitleDiscoveryPhase, extra: Partial<SubtitleDiscoveryProgress> = {}): void =>
+    broadcast({ mediaId, title, phase, done: 0, total: 1, ...extra });
+
+  emit('downloading');
   const outcome = await nyaaFetch(candidate, config, {
     isCancelled: () => cancelled.has(mediaId),
   }).finally(() => {
@@ -945,7 +957,13 @@ async function acceptNyaaCandidate(
     // guard, and the next reader should not assume a test is holding it.
     cancelled.delete(mediaId);
   });
-  if (!outcome.ok) return { ok: false, message: outcome.reason };
+  if (!outcome.ok) {
+    // A cancel is its own terminal phase, not an error: the row must not tell
+    // the user something went wrong when they are the one who stopped it.
+    if (outcome.reason === QBIT_CANCELLED_REASON) emit('cancelled', { done: 1 });
+    else emit('error', { done: 1, error: outcome.reason });
+    return { ok: false, message: outcome.reason };
+  }
 
   const language = (lang || candidate.language || 'ja').toLowerCase();
   const relative = writeSubtitleFile(
@@ -953,7 +971,11 @@ async function acceptNyaaCandidate(
     `nyaa-${language}-${candidate.providerItemId.replace(/[^a-zA-Z0-9]/g, '')}.${outcome.value.format}`,
     outcome.value.text,
   );
-  if (!relative) return { ok: false, message: 'The subtitle could not be written to disk.' };
+  if (!relative) {
+    const failed = 'The subtitle could not be written to disk.';
+    emit('error', { done: 1, error: failed });
+    return { ok: false, message: failed };
+  }
 
   const record: SubtitleRecord = {
     id: crypto.randomUUID(),
@@ -975,6 +997,7 @@ async function acceptNyaaCandidate(
     subtitles: [...(item.subtitles ?? []), record],
     subtitlesCheckedAt: Date.now(),
   });
+  emit('done', { done: 1, languages: [language] });
   return { ok: true, message: '', lang: language };
 }
 

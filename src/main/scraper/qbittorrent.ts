@@ -886,6 +886,15 @@ export function resetQbitSessions(): void {
 /** Category and tag applied to every torrent added for a subtitle fetch. */
 export const QBIT_SUBTITLE_CATEGORY = 'jp-study-subtitles';
 
+/**
+ * The reason a wait gives when the caller stopped it.
+ *
+ * Exported because a caller has to tell "the user cancelled" apart from "it
+ * failed" to report the right thing, and matching a literal there would break
+ * silently the first time this wording changed.
+ */
+export const QBIT_CANCELLED_REASON = 'Cancelled.';
+
 /** Priority values qBittorrent's `filePrio` takes. */
 export const QBIT_PRIO_SKIP = 0;
 export const QBIT_PRIO_NORMAL = 1;
@@ -1431,7 +1440,7 @@ export async function qbitAwaitMetadata(
   let lastSwarm: QbitSwarmSample | null = null;
 
   for (;;) {
-    if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
+    if (options.isCancelled?.()) return { ok: false, reason: QBIT_CANCELLED_REASON };
 
     const files = await qbitFiles(input, hash);
     if (!files.ok) {
@@ -1718,7 +1727,7 @@ export async function qbitAwaitFiles(
   let sawDownloadRate = false;
 
   for (;;) {
-    if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
+    if (options.isCancelled?.()) return { ok: false, reason: QBIT_CANCELLED_REASON };
 
     const files = await qbitFiles(input, hash);
     // Same tolerance as the metadata wait, and it protects more here: this loop
