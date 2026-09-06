@@ -35,12 +35,31 @@ import { describe, expect, it } from 'vitest';
 const SRC = resolve(__dirname, '../..');
 
 /**
- * The ceiling, measured 2026-09-06 after migrating `displayPrefs`,
- * `motionPrefs` and `focusMode` (nine sites) onto the guarded writer.
- * MOVE THIS DOWN when you migrate more. Never up.
+ * The ceiling, measured 2026-09-06 after migrating nineteen sites across six
+ * stores onto the guarded writer. MOVE THIS DOWN when you migrate more.
+ * Never up.
  */
-const MAX_RAW_SITES = 205;
-const MAX_RAW_FILES = 153;
+const MAX_RAW_SITES = 195;
+const MAX_RAW_FILES = 150;
+
+/**
+ * **Not every site should be migrated, and this is the distinction to make
+ * before touching one.** `writeLocalStorage` raises a user-facing toast. That
+ * is correct where `localStorage` is the durable home for the value, and wrong
+ * where it is a synchronous cache in front of a durable mirror — `clipboardHistory`
+ * and `flashcardDeck` both write through to IndexedDB and say so at the call
+ * site, so a refused write there loses nothing and a toast would be crying wolf.
+ * Those sites want the returned boolean, or nothing at all. The six migrated
+ * below are all stores where `localStorage` IS the home.
+ */
+const MIGRATED = [
+  'renderer/displayPrefs.ts',
+  'renderer/motion/motionPrefs.ts',
+  'renderer/focusMode.ts',
+  'renderer/toolboxSettings.ts',
+  'renderer/blancMode.ts',
+  'renderer/verifiedSitesStore.ts',
+];
 
 /** The one module allowed to call it: the guarded writer itself. */
 const OWNER = join('renderer', 'localStorageWrite.ts');
@@ -88,10 +107,10 @@ describe('raw localStorage.setItem — the ratchet', () => {
     expect(files.length).toBeLessThanOrEqual(MAX_RAW_FILES);
   });
 
-  it('keeps the three migrated preference stores on the guarded writer', () => {
+  it('keeps every migrated store on the guarded writer', () => {
     // By name, not by count: a revert of one of these while some other file
     // loses a site nets to zero and the ceiling alone would never see it.
-    for (const rel of ['renderer/displayPrefs.ts', 'renderer/motion/motionPrefs.ts', 'renderer/focusMode.ts']) {
+    for (const rel of MIGRATED) {
       const source = readFileSync(join(SRC, ...rel.split('/')), 'utf8');
       expect(countSites(source)).toBe(0);
       // Relative depth differs (`./` from renderer, `../` from renderer/motion),

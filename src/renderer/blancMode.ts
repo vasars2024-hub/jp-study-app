@@ -5,6 +5,7 @@ import {
   type BlancModeSettings,
   type BlancTabId,
 } from '../shared/blancMode';
+import { writeLocalStorageJson } from './localStorageWrite';
 import { loadToolboxSettings } from './toolboxSettings';
 
 const KEY = 'jp-blanc-mode-v1';
@@ -56,11 +57,7 @@ export function loadBlancMode(): BlancModeSettings {
 
 export function saveBlancMode(patch: Partial<BlancModeSettings>): BlancModeSettings {
   const next = mergeBlancModeSettings(loadBlancMode(), patch);
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(KEY, next);
   try {
     document.documentElement.classList.toggle('blanc-mode-enabled', next.enabled);
     document.documentElement.classList.toggle('blanc-mode-dark', next.enabled && next.darkMode);
@@ -138,22 +135,19 @@ export function loadBlancMemory(): BlancMemorySettings {
 
 export function saveBlancMemory(patch: Partial<BlancMemorySettings>): BlancMemorySettings {
   const next = sanitizeBlancMemorySettings({ ...loadBlancMemory(), ...patch });
-  try {
-    localStorage.setItem(MEMORY_KEY, JSON.stringify(next));
+  // The event stays behind the write: nothing here holds the value in memory, so
+  // announcing a change that did not persist would tell every listener to read a
+  // key that still says the old thing.
+  if (writeLocalStorageJson(MEMORY_KEY, next)) {
     window.dispatchEvent(new CustomEvent(MEMORY_EVENT, { detail: next }));
-  } catch {
-    /* ignore */
   }
   return next;
 }
 
 export function resetBlancMemory(): BlancMemorySettings {
   const next = { ...DEFAULT_BLANC_MEMORY };
-  try {
-    localStorage.setItem(MEMORY_KEY, JSON.stringify(next));
+  if (writeLocalStorageJson(MEMORY_KEY, next)) {
     window.dispatchEvent(new CustomEvent(MEMORY_EVENT, { detail: next }));
-  } catch {
-    /* ignore */
   }
   return next;
 }

@@ -4,6 +4,7 @@ import {
   type VerifiedSitesDocument,
   type VerifiedSitesValidationResult,
 } from '../shared/verifiedSites';
+import { writeLocalStorageJson } from './localStorageWrite';
 
 export const VERIFIED_SITES_STORAGE_KEY = 'jp-verified-sites-v4';
 export const LEGACY_VERIFIED_SITES_STORAGE_KEYS = ['jp-verified-sites-v3', 'jp-verified-sites-v2', 'jp-verified-sites-v1'] as const;
@@ -27,7 +28,7 @@ export function loadVerifiedSitesDocument(): VerifiedSitesDocument {
     if (raw) {
       const document = normalizeVerifiedSitesDocument(JSON.parse(raw)).value;
       memoryFallback = document;
-      if (legacy) localStorage.setItem(VERIFIED_SITES_STORAGE_KEY, JSON.stringify(document));
+      if (legacy) writeLocalStorageJson(VERIFIED_SITES_STORAGE_KEY, document);
       return document;
     }
   } catch { /* use the last validated value */ }
@@ -37,7 +38,9 @@ export function loadVerifiedSitesDocument(): VerifiedSitesDocument {
 export function saveVerifiedSitesDocument(input: unknown): VerifiedSitesValidationResult {
   const result = normalizeVerifiedSitesDocument(input);
   memoryFallback = result.value;
-  try { localStorage.setItem(VERIFIED_SITES_STORAGE_KEY, JSON.stringify(result.value)); } catch { /* retain in memory */ }
+  // The memory fallback keeps this session working either way; the report is
+  // about the NEXT start, where an unwritten document is simply gone.
+  writeLocalStorageJson(VERIFIED_SITES_STORAGE_KEY, result.value);
   return result;
 }
 
@@ -71,6 +74,6 @@ export function loadFmhyDirectorySnapshot(): FmhyDirectorySnapshot | null {
 export function saveFmhyDirectorySnapshot(html: string, entryCount: number, capturedAt = new Date().toISOString()): FmhyDirectorySnapshot {
   const snapshot: FmhyDirectorySnapshot = { version: 1, sourceUrl: 'https://fmhy.net/video', capturedAt, html, entryCount };
   fmhySnapshotMemory = snapshot;
-  try { localStorage.setItem(FMHY_SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot)); } catch { /* retain the accepted snapshot in memory */ }
+  writeLocalStorageJson(FMHY_SNAPSHOT_STORAGE_KEY, snapshot);
   return snapshot;
 }

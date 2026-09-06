@@ -7,6 +7,7 @@ import {
   type ToolboxSettings,
   type ToolboxSettingsCategory,
 } from '../shared/toolboxSettings';
+import { writeLocalStorageJson } from './localStorageWrite';
 
 const KEY = 'jp-study.toolbox.settings.v1';
 const EVENT = 'toolbox-settings-changed';
@@ -26,20 +27,20 @@ export function loadToolboxSettings(): ToolboxSettings {
 
 export function saveToolboxSettings(patch: Partial<ToolboxSettings>): ToolboxSettings {
   const next = sanitizeToolboxSettings({ ...loadToolboxSettings(), ...patch });
-  window.localStorage.setItem(KEY, JSON.stringify(next));
+  writeLocalStorageJson(KEY, next);
   dispatch(next);
   return next;
 }
 
 export function resetAllToolboxSettings(): ToolboxSettings {
-  window.localStorage.setItem(KEY, JSON.stringify(DEFAULT_TOOLBOX_SETTINGS));
+  writeLocalStorageJson(KEY, DEFAULT_TOOLBOX_SETTINGS);
   dispatch(DEFAULT_TOOLBOX_SETTINGS);
   return DEFAULT_TOOLBOX_SETTINGS;
 }
 
 export function resetToolboxSettingsCategory(category: ToolboxSettingsCategory): ToolboxSettings {
   const next = resetToolboxSettingsSection(loadToolboxSettings(), category);
-  window.localStorage.setItem(KEY, JSON.stringify(next));
+  writeLocalStorageJson(KEY, next);
   dispatch(next);
   return next;
 }
@@ -51,7 +52,7 @@ export function exportCurrentToolboxSettings(): string {
 export function importCurrentToolboxSettings(json: string): { ok: true; settings: ToolboxSettings } | { ok: false; error: string } {
   const result = importToolboxSettings(json);
   if (!result.ok) return result;
-  window.localStorage.setItem(KEY, JSON.stringify(result.settings));
+  writeLocalStorageJson(KEY, result.settings);
   dispatch(result.settings);
   return result;
 }
