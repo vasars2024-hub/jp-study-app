@@ -6,8 +6,15 @@ export interface MooncapMusicSettings {
   volume: number;
 }
 
+// Off by default, deliberately. The garden's ONE primary action — the mushroom
+// hitbox — is also the only route to the dossier that holds this switch, so with
+// `enabled: true` the first click both started the track and was the user's first
+// sight of the control that could stop it. There is no way to decline a sound you
+// have not been told about, and this app talks over its own video player. The
+// stored boolean still wins, so anyone who has turned music on keeps it: only a
+// profile that has never written `jp-mooncap-music-v1` reads this default at all.
 const DEFAULT_SETTINGS: MooncapMusicSettings = {
-  enabled: true,
+  enabled: false,
   volume: 0.35,
 };
 
@@ -114,6 +121,12 @@ class MooncapMusicPlayer {
       this.audio = null;
     }
     this.sourceUrl = null;
+    // The gesture gate has to close with the audio. This singleton outlives the
+    // component, so leaving `unlocked` true meant the NEXT `configure()` — i.e.
+    // merely reopening the City window — fell through `apply()` to `play()` with
+    // no gesture at all. Measured: reopened with zero clicks, `paused` false at
+    // `currentTime` 1.62. Autoplay is a per-visit permission, not a session one.
+    this.unlocked = false;
   }
 
   private apply() {
