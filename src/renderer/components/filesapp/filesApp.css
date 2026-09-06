@@ -784,6 +784,15 @@
   padding: 0;
 }
 
+/* D98 — the selection column's header is the one header that does NOT sort. Every
+   other one is a real button wired to toggleSort; this is a span holding only a
+   visually-hidden label, so the inherited pointer cursor above promised a control
+   that is not there. Found by the scripted keyboard pass, which flagged it as the
+   single clickable-looking thing in the app that Tab cannot reach. */
+.fa-head .fa-cell-select {
+  cursor: default;
+}
+
 .fa-cell {
   overflow: hidden;
   text-overflow: ellipsis;

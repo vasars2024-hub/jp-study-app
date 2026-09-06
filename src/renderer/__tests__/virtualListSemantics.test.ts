@@ -40,6 +40,28 @@ const SRC = resolve(__dirname, '..', '..');
  */
 const OWN_ROW_ROLE = /role="(row|option|treeitem|tab|menuitem|gridcell)"/;
 
+/**
+ * A caller may render its row through a NAMED function rather than inline JSX, and two
+ * call sites may share one. `YouTubePlaylistsView` does both: `renderVideoRow` serves
+ * the News grid and the Playlist grid, and it is where `role="row"` lives — D91, where
+ * the row had to become focusable and selectable and `role="button"` was rejected
+ * because it would have made the row's three action buttons presentational.
+ *
+ * So resolve each tag's ROW SOURCE: `'inline'`, or the same-file function it delegates
+ * to. `null` means the tag declares no row role by either route, which is the defect
+ * this file exists to catch. A widening of the SCAN, not of the rule — a delegated
+ * renderer still has to carry the role; it is looked up instead of read in place.
+ */
+function rowSource(tag: string, source: string): string | null {
+  if (OWN_ROW_ROLE.test(tag)) return 'inline';
+  const name = /renderItem=\{\s*\([^)]*\)\s*=>\s*([A-Za-z_$][\w$]*)\s*\(/.exec(tag)?.[1];
+  if (!name) return null;
+  const at = source.search(new RegExp(`(const|function)\\s+${name}\\b`));
+  if (at < 0) return null;
+  // Bounded slice: enough to hold one renderer, not the whole file.
+  return OWN_ROW_ROLE.test(source.slice(at, at + 4000)) ? name : null;
+}
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     if (name === 'node_modules' || name === '__tests__' || name.startsWith('.')) continue;
@@ -87,14 +109,30 @@ describe('every windowed list declares what it is', () => {
       for (const tag of virtualListTags(source)) {
         const declaresList = /\bitemRole=/.test(tag) && /\blistRole=/.test(tag);
         if (declaresList) continue;
-        // The renderItem arrow lives inside the opening tag's braces, so a row
-        // role written in the row's own JSX is visible here.
-        if (OWN_ROW_ROLE.test(tag)) continue;
+        // The renderItem arrow lives inside the opening tag's braces, so a row role
+        // written in the row's own JSX is visible here — and one written in the named
+        // renderer it delegates to is resolved from the same file.
+        if (rowSource(tag, source)) continue;
         mute.push(`src/${rel}`);
       }
     }
     // Named, not counted: the message has to say which list went mute.
     expect(mute).toEqual([]);
+  });
+
+  it('resolves a DELEGATED row renderer, and does not just wave every tag through', () => {
+    // The widening above is only sound if it still says no. Three checks, on the real
+    // file: the two YouTube grids resolve to `renderVideoRow` by name; a tag whose
+    // renderer has no row role resolves to null; and a tag that delegates to a function
+    // this file does not define resolves to null too.
+    const source = readFileSync(join(SRC, 'renderer/views/YouTubePlaylistsView.tsx'), 'utf8');
+    const resolved = virtualListTags(source).map((tag) => rowSource(tag, source));
+    expect(resolved).toEqual(['renderVideoRow', 'renderVideoRow']);
+
+    const noRole = 'const renderPlain = (v) => <div>{v.t}</div>;';
+    expect(rowSource('<VirtualList renderItem={(v) => renderPlain(v)}', noRole)).toBeNull();
+    expect(rowSource('<VirtualList renderItem={(v) => renderElsewhere(v)}', source)).toBeNull();
+    expect(rowSource('<VirtualList renderItem={(v) => <div>{v.t}</div>}', source)).toBeNull();
   });
 
   it('gives every windowed GRID a rowgroup, so its rows are not orphaned', () => {
@@ -105,9 +143,10 @@ describe('every windowed list declares what it is', () => {
     const orphaned: string[] = [];
     for (const file of files) {
       const rel = relative(SRC, file).replace(/\\/g, '/');
-      for (const tag of virtualListTags(readFileSync(file, 'utf8'))) {
+      const src = readFileSync(file, 'utf8');
+      for (const tag of virtualListTags(src)) {
         if (/\blistRole=/.test(tag)) continue;
-        if (!OWN_ROW_ROLE.test(tag)) continue;
+        if (!rowSource(tag, src)) continue;
         if (!/\bgridRole=/.test(tag)) orphaned.push(`src/${rel}`);
       }
     }
@@ -124,18 +163,27 @@ describe('every windowed list declares what it is', () => {
       const rel = relative(SRC, file).replace(/\\/g, '/');
       const source = readFileSync(file, 'utf8');
       const grids = virtualListTags(source).filter(
-        (tag) => !/\blistRole=/.test(tag) && OWN_ROW_ROLE.test(tag),
+        (tag) => !/\blistRole=/.test(tag) && rowSource(tag, source),
       );
       if (grids.length === 0) continue;
+      // The right denominator for `aria-rowindex` is the number of DISTINCT row
+      // renderers, not of call sites: two grids sharing one `renderVideoRow` need one
+      // definition, and demanding two would be counting the same markup twice.
+      const rowDefs = new Set(grids.map((tag) => rowSource(tag, source)));
       // Per file rather than per tag: the count sits on the table element, which
       // is outside the `<VirtualList` tag this sweep can see.
-      const counts = (source.match(/aria-rowcount=/g) ?? []).length;
+      // `ariaRowCount=` is the same declaration made THROUGH the component, for the
+      // `gridRole="grid"` path where VirtualList itself is the grid and the caller has
+      // no table element to hang the attribute on. The component emits
+      // `aria-rowcount` from it, so the guarantee is identical.
+      const counts =
+        (source.match(/aria-rowcount=/g) ?? []).length + (source.match(/ariaRowCount=/g) ?? []).length;
       const indexes = (source.match(/aria-rowindex=/g) ?? []).length;
       if (counts < grids.length) silent.push(`src/${rel} (aria-rowcount ${counts} < ${grids.length} grids)`);
       // At least the windowed body row, per grid. Not two: `DeckWorkbenchBrowser`
       // keeps its column header OUTSIDE `role="grid"`, so it legitimately has no
       // header row to index and its rows start at 1 rather than 2.
-      if (indexes < grids.length) silent.push(`src/${rel} (aria-rowindex ${indexes} < ${grids.length})`);
+      if (indexes < rowDefs.size) silent.push(`src/${rel} (aria-rowindex ${indexes} < ${rowDefs.size} row renderers)`);
     }
     expect(silent).toEqual([]);
   });

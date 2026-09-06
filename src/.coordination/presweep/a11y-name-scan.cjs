@@ -42,11 +42,14 @@ function parseArgs(argv) {
     else if (a === '--settle') out.settle = Number(argv[++i]);
     else if (a === '--json') out.json = argv[++i];
     else if (a === '--window') out.window = argv[++i];
+    else if (a === '--pass') out.pass = argv[++i];
   }
   return out;
 }
 
 const args = parseArgs(process.argv);
+// `names` (class pass 1: accessible name + state) or `keyboard` (class pass 2).
+const PASS = args.pass || 'names';
 const bridgePath = args.bridge || path.join(process.cwd(), 'debug', 'bridge.json');
 if (!fs.existsSync(bridgePath)) {
   console.error(`no bridge.json at ${bridgePath}`);
@@ -213,6 +216,135 @@ function scanExpression(scope) {
   })()`;
 }
 
+/**
+ * Class pass 2 — keyboard reachability.
+ *
+ * The question this answers is the one that produced D91 (P1): is there anything a user
+ * can CLICK that they cannot reach with Tab? `cursor: pointer` is the honest proxy —
+ * the app paints it on exactly the things it wants clicked — and an element carrying it
+ * that is neither focusable nor inside a focusable ancestor is mouse-only by
+ * construction. On YouTube that was the video row, and because selecting a row is the
+ * only writer of `selectedVideoIds`, two toolbar buttons were dead for a whole
+ * keyboard-only session while telling the user to "Select at least one video first".
+ *
+ * Also flagged: a positive `tabindex`, which jumps the natural order and is a defect
+ * even when every control is reachable.
+ */
+function keyboardExpression(scope) {
+  const sel = JSON.stringify(scope);
+  return `(() => {
+    const root = document.querySelector(${sel});
+    if (!root) return { missing: true };
+
+    // A summary element is natively focusable and operable by Enter/Space. Leaving it out made
+    // every collapsed disclosure on the Media Center rail read as mouse-only.
+    const FOCUSABLE = 'a[href], button, summary, input:not([type=hidden]), select, textarea, [tabindex], [contenteditable=""], [contenteditable=true]';
+    const focusable = (el) => {
+      if (!el.matches(FOCUSABLE)) return false;
+      if (el.hasAttribute('disabled')) return false;
+      const ti = el.getAttribute('tabindex');
+      if (ti !== null && Number(ti) < 0) return roving(el);
+      return true;
+    };
+
+    /**
+     * Roving tabindex: an ARIA composite (tablist, menu, radiogroup, listbox, tree,
+     * toolbar) puts tabIndex 0 on the ACTIVE item and -1 on all the others, and moves
+     * focus between them with the arrow keys. Every inactive item then looks unreachable
+     * to a naive scan while being perfectly operable.
+     *
+     * Measured 2026-09-06: this alone accounted for 6 of the 7 findings on the first
+     * run — the Reading workspace tablist is a textbook implementation
+     * (ReadingWorkspaceView.tsx:215, role=tab + aria-selected + arrow-key handler), and
+     * scoring it would have been a false report against correct code.
+     */
+    const ROVING_ROLES = ['tab', 'menuitem', 'menuitemradio', 'menuitemcheckbox', 'option', 'radio', 'treeitem'];
+    const roving = (el) => {
+      const role = el.getAttribute('role');
+      if (!role || !ROVING_ROLES.includes(role)) return false;
+      const group = el.closest('[role=tablist], [role=menu], [role=menubar], [role=radiogroup], [role=listbox], [role=tree], [role=toolbar]') || el.parentElement;
+      if (!group) return false;
+      // The group is a roving one only if exactly one peer holds the tab stop.
+      return [...group.querySelectorAll('[tabindex="0"]')].some((p) => p.getAttribute('role') === role);
+    };
+
+    const inClosedDetails = (el) => {
+      for (let d = el.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) {
+        if (!d.open) return true;
+      }
+      return false;
+    };
+    const visible = (el) => {
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ checkOpacity: false, checkVisibilityCSS: true })) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+
+    const path = (el) => {
+      const bits = [];
+      for (let n = el; n && n !== root && bits.length < 4; n = n.parentElement) {
+        const cls = String(n.className || '').split(/\\s+/).filter(Boolean).slice(0, 2).join('.');
+        bits.unshift(n.tagName.toLowerCase() + (cls ? '.' + cls : ''));
+      }
+      return bits.join(' > ');
+    };
+
+    const mouseOnly = [];
+    const flagged = [];
+    const positiveTabindex = [];
+    let pointerCount = 0; let focusableCount = 0;
+    const seen = new Set();
+
+    for (const el of root.querySelectorAll('*')) {
+      if (inClosedDetails(el) || !visible(el)) continue;
+      if (focusable(el)) {
+        focusableCount += 1;
+        const ti = Number(el.getAttribute('tabindex'));
+        if (Number.isFinite(ti) && ti > 0) {
+          positiveTabindex.push({ path: path(el), tabindex: ti });
+        }
+      }
+      const cs = getComputedStyle(el);
+      if (cs.cursor !== 'pointer') continue;
+      pointerCount += 1;
+      if (el.getAttribute('aria-hidden') === 'true') continue;
+      // A DISABLED control is not mouse-only — it cannot be operated by either input.
+      // Without this the Media Center transport (correctly disabled with nothing
+      // playing) and the current workspace tab both read as keyboard traps.
+      if (el.hasAttribute('disabled') || el.closest('[disabled]')) continue;
+      // The svg, path and span INSIDE a flagged control inherit its cursor and are not
+      // separate findings. Report the outermost node only.
+      if (flagged.some((f) => f.contains(el))) continue;
+      // Reachable if it or any ancestor inside the surface is focusable.
+      let reach = false;
+      for (let n = el; n && n !== root.parentElement; n = n.parentElement) {
+        if (n.nodeType === 1 && focusable(n)) { reach = true; break; }
+      }
+      if (reach) continue;
+      // A clickable whose own children are focusable is a container, not a control.
+      if ([...el.querySelectorAll(FOCUSABLE)].some((c) => focusable(c))) continue;
+      // A span inside a LABEL is operated through the label's own control, which is
+      // focusable — clicking the text toggles the checkbox and Tab reaches the checkbox.
+      // Without this the Video pane's toggle captions all read as mouse-only.
+      const lab = el.closest('label');
+      if (lab && [...lab.querySelectorAll(FOCUSABLE)].some((c) => focusable(c))) continue;
+      // BEFORE the dedupe: a second identical control is not re-reported, but it must
+      // still suppress its own svg/span children, which are not separate findings.
+      flagged.push(el);
+      const key = path(el) + '|' + String(el.className || '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      mouseOnly.push({
+        path: path(el),
+        text: String(el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60),
+        html: el.outerHTML.slice(0, 140),
+      });
+    }
+
+    return { missing: false, focusableCount, pointerCount, mouseOnly, positiveTabindex };
+  })()`;
+}
+
 const ALL_SURFACES = [
   'agent', 'library', 'novels', 'dictionary', 'grammar', 'translate', 'player', 'video',
   'music', 'anki', 'flashcards', 'games', 'stats', 'resources', 'settings', 'note',
@@ -244,6 +376,28 @@ async function main() {
     }
 
     const scope = `.fwin[data-section="${s}"]`;
+
+    if (PASS === 'keyboard') {
+      let kb;
+      try { kb = await evalJs(keyboardExpression(scope)); } catch (e) { results.push({ surface: s, error: String(e.message) }); continue; }
+      if (kb.missing) {
+        console.log(`${s}: window did not render`);
+        results.push({ surface: s, skipped: 'no window' });
+      } else {
+        results.push({ surface: s, ...kb, opened });
+        console.log(
+          `${s}: ${kb.focusableCount} focusable | ${kb.pointerCount} clickable | MOUSE-ONLY ${kb.mouseOnly.length} | positive tabindex ${kb.positiveTabindex.length}`,
+        );
+        for (const m of kb.mouseOnly) console.log(`    MOUSE-ONLY ${m.path}  "${m.text}"`);
+        for (const p2 of kb.positiveTabindex) console.log(`    TABINDEX ${p2.tabindex}  ${p2.path}`);
+      }
+      if (opened) {
+        await evalJs(`(() => { const b = document.querySelector('.fwin[data-section="${s}"] .fwin-close'); if (b) { b.click(); return 'closed'; } return 'no close button'; })()`);
+        await sleep(400);
+      }
+      continue;
+    }
+
     // First pass, then a settled re-scan: only what is unnamed in BOTH is real.
     let first;
     try { first = await evalJs(scanExpression(scope)); } catch (e) { results.push({ surface: s, error: String(e.message) }); continue; }
@@ -295,6 +449,13 @@ async function main() {
     console.log(`wrote ${args.json}`);
   }
 
+  if (PASS === 'keyboard') {
+    const mo = results.reduce((a, r) => a + (r.mouseOnly ? r.mouseOnly.length : 0), 0);
+    const pt = results.reduce((a, r) => a + (r.positiveTabindex ? r.positiveTabindex.length : 0), 0);
+    console.log(`
+TOTAL: ${mo} mouse-only controls, ${pt} positive tabindex across ${results.length} surfaces`);
+    return;
+  }
   const totUn = results.reduce((a, r) => a + (r.unnamed ? r.unnamed.length : 0), 0);
   const totVo = results.reduce((a, r) => a + (r.visualOnly ? r.visualOnly.length : 0), 0);
   console.log(`\nTOTAL: ${totUn} unnamed controls, ${totVo} visual-only states across ${results.length} surfaces`);
