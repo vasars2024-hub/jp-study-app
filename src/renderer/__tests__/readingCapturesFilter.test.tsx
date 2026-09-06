@@ -149,7 +149,18 @@ describe('Captures index', () => {
 
   it('flips the order without touching identity or selection', async () => {
     const h = await mount(ENTRIES);
-    expect(titles(h)).toEqual(['Screen', 'Clipboard', 'Screen']);
+    // Rows are titled by their CONTENT now, not by their source. This fixture's
+    // `sourceLabel`s are `'Screen'`/`'Clipboard'` — the source kind, which the
+    // meta column already renders — and a title that merely restates the source
+    // told the three rows apart not at all. See
+    // `readingCapturesRowsAreDistinguishable.test.tsx`, where 19 of 20 live rows
+    // read `clipboard` or `screen`. Titles are used here only as row identity, so
+    // this is the same assertion against the same three rows.
+    expect(titles(h)).toEqual([
+      '彼は図書館で本を読んでいた。',
+      'コーヒーを飲みながら待つ。',
+      '駅前の書店に寄った。',
+    ]);
     const before = readerHead(h);
 
     const select = h.container.querySelector<HTMLSelectElement>('.reading-captures-order select');

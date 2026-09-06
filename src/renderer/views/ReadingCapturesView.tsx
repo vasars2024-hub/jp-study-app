@@ -104,10 +104,36 @@ interface PassageRow {
   live: boolean;
 }
 
+/**
+ * What a capture is CALLED in the list, which has to be what tells it apart.
+ *
+ * `sourceLabel` is worth showing when it is a real label — a web capture carries
+ * its page title, e.g. `熊本県 泥棒が…｜NHKやさしいことばニュース`. For a clipboard
+ * or screen capture it arrives as the SOURCE KIND, the literal strings
+ * `'clipboard'` and `'screen'`, which the meta line beside the title already
+ * renders through `settings.lens.history.source.*` as "Clipboard" / "Screen".
+ *
+ * Measured live 2026-09-06 on the user's own history: 42 entries, and **19 of the
+ * 20 rendered rows were titled `clipboard` (x4) or `screen` (x15)** — the same
+ * word repeated down the list, beside a meta column saying it again, while every
+ * entry had real text (69, 24, 26, 2000, 453, 272 chars) that was never shown.
+ * The list could not be read, only counted.
+ *
+ * So a label that merely restates the source is treated as no label at all.
+ */
+function rowTitle(sourceLabel: string, source: string, text: string): string {
+  const label = (sourceLabel ?? '').trim();
+  const kind = (source ?? '').trim();
+  if (label && label.toLowerCase() !== kind.toLowerCase()) return label;
+  // Falling back to the label rather than to '' keeps a nameless row impossible
+  // for a capture whose text is empty — a bad title still beats no title.
+  return (text ?? '').trim().slice(0, 40) || label;
+}
+
 function rowFromHandoff(handoff: ReadingPassageHandoff): PassageRow {
   return {
     captureId: handoff.captureId || `passage:${handoff.stagedAt}`,
-    title: handoff.sourceLabel || handoff.text.slice(0, 40),
+    title: rowTitle(handoff.sourceLabel, handoff.source, handoff.text),
     text: handoff.text,
     lines: handoff.lines,
     source: handoff.source,
@@ -120,7 +146,7 @@ function rowFromHandoff(handoff: ReadingPassageHandoff): PassageRow {
 function rowFromHistory(entry: ReadingLensHistoryEntry): PassageRow {
   return {
     captureId: entry.captureId,
-    title: entry.sourceLabel || entry.text.slice(0, 40),
+    title: rowTitle(entry.sourceLabel, entry.source, entry.text),
     text: entry.text,
     lines: [],
     source: entry.source,
@@ -557,7 +583,16 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
             {selected ? (
               <>
                 <Icon name="scan" size={15} />
-                <h2>{selected.sourceLabel || t('reading.captures.untitled')}</h2>
+                {/*
+                  `selected.title`, not `selected.sourceLabel`: the heading over a
+                  passage had the same defect the list rows did, and for the same
+                  reason — a clipboard capture's `sourceLabel` IS the string
+                  'clipboard', so the reader announced "clipboard" over the text it
+                  was showing. `title` is already the row's own resolved name, so
+                  this also keeps the heading and the row it came from in agreement,
+                  which `readingCapturesCanvas.test.tsx` asserts relationally.
+                */}
+                <h2>{selected.title || t('reading.captures.untitled')}</h2>
                 <span className="reading-captures-reader-meta">
                   {t('reading.captures.lineCount', { count: readerLines.length })}
                 </span>
