@@ -113,12 +113,6 @@
       "studyOsView": "TranslateView",
       "note": "Ported Blanc-native 2026-07-20; composes TranslateContent."
     },
-    "notebook": {
-      "status": "covered",
-      "blancToolId": "notebook",
-      "studyOsView": "NotebookView",
-      "note": "Ported Blanc-native 2026-07-20; composes NotebookContent. quick-notes stays a separate local scratchpad, per plan."
-    },
     "games": {
       "status": "covered",
       "blancToolId": "games",
@@ -159,7 +153,7 @@
     "files": {
       "status": "pending",
       "studyOsView": "FilesApp",
-      "note": "Classified 2026-09-06. New Study OS section (AppSection.tsx:141) that landed with the files-app track and was invisible while the drift parser read 0 sections. Blanc's 'file-search' tool is NOT coverage and must not be recorded as such: it is a filename search over a folder the user picks with toolboxPickSearchFolder, i.e. a DISK browser, and FILES_APP_PLAN.md's Decision 2 is the opposite — the tree is what the app owns, over heterogeneous stores (SQLite rows, localStorage, main JSON, derived state), never real directories. Note also that the Files app ABSORBED the Notebook section, which this manifest still carries as covered under 'notebook' — that entry is now stale, since 'notebook' is no longer in DESKTOP_WIN_SECTIONS, and the drift tool cannot see it because it only iterates live sections."
+      "note": "Classified 2026-09-06. New Study OS section (AppSection.tsx:141) that landed with the files-app track and was invisible while the drift parser read 0 sections. Blanc's 'file-search' tool is NOT coverage and must not be recorded as such: it is a filename search over a folder the user picks with toolboxPickSearchFolder, i.e. a DISK browser, and FILES_APP_PLAN.md's Decision 2 is the opposite — the tree is what the app owns, over heterogeneous stores (SQLite rows, localStorage, main JSON, derived state), never real directories. The Files app ABSORBED the Notebook section: 'notebook' left DESKTOP_WIN_SECTIONS and became a LEGACY_WIN_SECTION_ALIASES entry pointing here, so a persisted desktop window with section 'notebook' now opens THIS surface. Its manifest entry (status covered, blancToolId notebook) was removed on 2026-09-06 because it claimed coverage for a section that no longer exists while the surface those windows actually land on — this one — is pending; the drift tool grew a stale-entry check in the same commit so the next one cannot hide. Blanc's 'notebook' TOOL still exists and is unaffected; it is simply not Study OS section coverage."
     }
   }
 }

@@ -65,6 +65,40 @@ function studyOsSections() {
   return ids;
 }
 
+/**
+ * `LEGACY_WIN_SECTION_ALIASES` — section ids that no longer render anything and
+ * the live section each one now means.
+ *
+ * Needed because every other check here is a `.filter()` over the LIVE section
+ * list, so a manifest entry keyed on a retired id is structurally invisible: it
+ * can claim `covered` forever and no check will ever look at it. `notebook` was
+ * exactly that after the Files app absorbed it.
+ *
+ * Returns `null` (rather than `{}`) when the declaration is absent, so the
+ * caller can say the alias check is disabled instead of reporting a confident
+ * zero — the same distinction the sections parser draws above.
+ */
+function legacyAliases() {
+  const src = read(DESKTOP_PATH);
+  const m = src.match(/LEGACY_WIN_SECTION_ALIASES: Readonly<Record<string, DesktopWinSection>> = \{([\s\S]*?)\};/);
+  if (!m) return null;
+  const pairs = [...m[1].matchAll(/([a-z-]+):\s*'([a-z-]+)'/g)];
+  // Zero aliases is legitimate — a tree where no section has been retired yet.
+  // Zero aliases parsed out of a body that plainly HAS content is not: that is
+  // the declaration having changed shape under the regex, which is exactly how
+  // the sections parser silently returned [] for twelve days. Distinguish the
+  // two by whether anything is actually written between the braces.
+  const body = m[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').trim();
+  if (pairs.length === 0 && body !== '') {
+    throw new Error(
+      'LEGACY_WIN_SECTION_ALIASES has content but parsed to ZERO aliases, so the stale-entry ' +
+        'check would silently pass. Refusing rather than reporting no orphans — this is the ' +
+        'same blind-parser failure that made this tool print "Clean" for twelve days.',
+    );
+  }
+  return Object.fromEntries(pairs.map((x) => [x[1], x[2]]));
+}
+
 /** Ids in the `BLANC_TOOL_IDS` array. */
 function blancToolIds() {
   const src = read(SHELL_PATH);
@@ -165,6 +199,26 @@ function main() {
     return !entry.blancSurface;
   });
 
+  /**
+   * Manifest entries that name no live Study OS section.
+   *
+   * Split by whether the id is a known legacy alias, because the two mean
+   * different things. A NON-alias orphan is simply a stale entry. An alias
+   * orphan is worse when it claims coverage: a persisted desktop window with
+   * that section id still opens, resolves to the alias target, and the manifest
+   * says the surface is covered while the target may not be.
+   */
+  const aliases = legacyAliases();
+  const isCovered = (id) => classified[id]?.status === 'covered';
+  const orphans = Object.keys(classified).filter((id) => !sections.includes(id));
+  const staleEntries = orphans.filter((id) => !aliases || !aliases[id]);
+  const misleadingAliases = orphans
+    .filter((id) => aliases && aliases[id] && isCovered(id) && !isCovered(aliases[id]))
+    .map((id) => `${id} → ${aliases[id]} (claims covered; ${aliases[id]} is ${classified[aliases[id]]?.status ?? 'unclassified'})`);
+  const benignAliases = orphans
+    .filter((id) => aliases && aliases[id] && !misleadingAliases.some((m) => m.startsWith(`${id} `)))
+    .map((id) => `${id} → ${aliases[id]}`);
+
   /** Pillar 0: a render branch that returns a Study OS `*View`. */
   const chromeViolations = [...branches.entries()]
     .filter(([, component]) => /View$/.test(component))
@@ -185,6 +239,10 @@ function main() {
     unclassified,
     pending,
     brokenClaims,
+    staleEntries,
+    misleadingAliases,
+    benignAliases,
+    aliasCheckDisabled: aliases === null,
     chromeViolations,
     bailOuts,
     badImports,
@@ -197,7 +255,12 @@ function main() {
   };
 
   const fatal =
-    unclassified.length + brokenClaims.length + chromeViolations.length + badImports.length;
+    unclassified.length +
+    brokenClaims.length +
+    staleEntries.length +
+    misleadingAliases.length +
+    chromeViolations.length +
+    badImports.length;
 
   if (asJson) {
     console.log(JSON.stringify(report, null, 2));
@@ -222,6 +285,33 @@ function main() {
     console.log(`BROKEN CLAIMS — marked covered but no matching Blanc tool id (${brokenClaims.length}):`);
     for (const s of brokenClaims) console.log(`    ${s}`);
     console.log('');
+  }
+
+  if (staleEntries.length) {
+    console.log(`STALE ENTRIES — classify a section that no longer exists (${staleEntries.length}):`);
+    for (const s of staleEntries) console.log(`    ${s}`);
+    console.log(
+      '  Not in DESKTOP_WIN_SECTIONS and not a legacy alias, so every other check here\n' +
+        '  skips them. Remove the entry, or alias the id if windows still carry it.\n',
+    );
+  }
+
+  if (misleadingAliases.length) {
+    console.log(
+      `STALE ENTRIES — retired section claims coverage its replacement does not have (${misleadingAliases.length}):`,
+    );
+    for (const v of misleadingAliases) console.log(`    ${v}`);
+    console.log(
+      '  A persisted window with the retired id still opens and resolves to the target,\n' +
+        '  so this reads as covered while the surface the user actually lands on is not.\n',
+    );
+  }
+
+  if (aliases === null) {
+    console.log(
+      'NOTE — LEGACY_WIN_SECTION_ALIASES not found in desktop.ts, so the stale-entry check\n' +
+        '  could only look for orphans, not resolve them.\n',
+    );
   }
 
   if (chromeViolations.length) {
