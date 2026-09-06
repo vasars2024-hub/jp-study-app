@@ -714,6 +714,53 @@ describe('nyaaFetch — route B, selected files out of a batch', () => {
       'This release contains no subtitle files. 1 file(s), none of them video or subtitles.',
     );
   });
+
+  it('says a subtitle-only pack is compressed rather than empty, and names the format', async () => {
+    // The shape gate 11 actually met on 2026-09-06: the listing's own top Route
+    // A candidate is one 20.7 MB `.7z`. "Contains no subtitle files" reads as
+    // "the ranker picked a mislabelled release" and sends the user hunting for
+    // another; the release is exactly what it claims and the next action is to
+    // extract it. The format is named because `.zip` is openable in principle
+    // and `.7z` is not.
+    files = [{ name: 'Detective Conan 0001-0520 (Subs) [NetflixAsia].7z', size: 20_712_765, progress: 0, priority: 1 }];
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toBe(
+      'This release ships its subtitles inside 1 compressed archive(s) (.7z), which this app cannot open.'
+      + ' Extract it yourself and add the subtitle files beside the video.',
+    );
+    // The refusal is not paid for: no priority was ever set, so nothing was
+    // requested from the swarm before the release was turned down.
+    expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+
+  it('still says "none of them video or subtitles" when the release carries no archive', async () => {
+    // The control for the test above. Without it, a branch that fired on every
+    // refusal would read identically green — the archive sentence has to be
+    // reachable only by an archive.
+    files = [
+      { name: 'Show/readme.nfo', size: 900, progress: 0, priority: 1 },
+      { name: 'Show/cover.jpg', size: 40_000, progress: 0, priority: 1 },
+    ];
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toBe(
+      'This release contains no subtitle files. 2 file(s), none of them video or subtitles.',
+    );
+    expect(result.ok === false && result.reason).not.toMatch(/compressed archive/i);
+  });
+
+  it('a video release still blames the muxing, not an archive that sits beside it', async () => {
+    // Ordering control: a batch with both an `.rar` and video files must keep
+    // the video sentence, because "your subtitles are inside the video" is the
+    // actionable half and a stray archive does not change it.
+    files = [
+      { name: 'Show/Show - 01.mkv', size: 1_400_000_000, progress: 0, priority: 1 },
+      { name: 'Show/extras.rar', size: 900_000, progress: 0, priority: 1 },
+    ];
+    const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toBe(
+      'This release contains no subtitle files. 2 file(s), 1 of them video — any subtitles it carries are inside the video.',
+    );
+  });
 });
 
 describe('nyaaFetch — a torrent the user already has', () => {

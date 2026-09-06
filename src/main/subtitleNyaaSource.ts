@@ -498,6 +498,24 @@ const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
 };
 
 /**
+ * Compressed containers a subtitle pack ships in. Nothing here can open one.
+ *
+ * Measured 2026-09-06 driving gate 11 against the real index: the ONE Route A
+ * candidate `subtitleHarvestNyaaList` produces on this machine — `Detective
+ * Conan Remastered 0001-0520 (Only subs) [Netflix SEA]`, score 100, the
+ * listing's own top pick — turns out to be a single 20,712,765-byte
+ * `Detective Conan 0001-0520 (Subs) [NetflixAsia].7z`. It is exactly the
+ * release its name claims; it is just compressed, and `selectSubtitleFiles`
+ * has no branch for that. Without this the user is told the release "contains
+ * no subtitle files", which reads as "the ranker picked a mislabelled release"
+ * and sends them looking for another one — when the honest next action is to
+ * extract this one. `.zip` could in principle be opened (`adm-zip` is already
+ * a dependency) and `.7z` could not, so naming the format is what lets the
+ * message stay true for both without promising extraction for either.
+ */
+const ARCHIVE_EXT = new Set(['.zip', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz', '.zst']);
+
+/**
  * The same refusal, carrying the file list that justifies it.
  *
  * Same reasoning as `notJapaneseReason` above, and measured the same way: on
@@ -520,6 +538,11 @@ function noSubtitlesReason(files: readonly NyaaArchiveFile[]): string {
   const video = files.filter((file) => VIDEO_EXT.has(path.extname(file.name).toLowerCase())).length;
   if (video) {
     return `${SELECTION_MESSAGES['no-subtitles']} ${total} file(s), ${video} of them video — any subtitles it carries are inside the video.`;
+  }
+  const archives = files.filter((file) => ARCHIVE_EXT.has(path.extname(file.name).toLowerCase()));
+  if (archives.length) {
+    const kinds = [...new Set(archives.map((file) => path.extname(file.name).toLowerCase()))].sort();
+    return `This release ships its subtitles inside ${archives.length} compressed archive(s) (${kinds.join(', ')}), which this app cannot open. Extract it yourself and add the subtitle files beside the video.`;
   }
   return `${SELECTION_MESSAGES['no-subtitles']} ${total} file(s), none of them video or subtitles.`;
 }
