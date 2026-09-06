@@ -1612,3 +1612,83 @@ holds" are different claims.
 
 **Gate 13 PASSES. Track 9 is 17 of 20** — gate 15 remains agent work, gate 10 owes its scope
 decision, gate 11 is parked on third-party index/library contents.
+
+### GATE 10 was ALREADY CLOSED — reconciled 2026-09-06 (primary). It was never open after 09-03.
+
+Two later lines of this file — the Phase 9.3 close and gate 13's — both say "gate 10 owes its
+scope decision". **They are wrong and are corrected here rather than repeated.** The decision
+was made and recorded on 2026-09-03, in this file, under the heading *"DECISION, 2026-09-03 …
+Gate 10 is NARROWED. Log-reading is a NON-GOAL"*, and its product half landed with it.
+
+Re-derived against the tree this turn, not inherited from that entry:
+`qbitTransportMessage` exists at `src/main/scraper/qbittorrent.ts:127` and is called at **all
+three** transport catch sites (`:394` login, `:470` and `:501` the two `qbitRequest` branches).
+`src/main/__tests__/qbitTransportMessage.test.ts` is present and **7 of 7 pass** at HEAD,
+including the two that assert the *limit* — the message must not name one cause, and it must be
+identical for a dead port and a WebUI-off daemon. Commit `0d289e4a`.
+
+The **RUN 2026-08-30 — FAILS** row in the Phase 9.2 table is left standing: it is a true record
+of the gate as originally worded, and the narrowing entry is the thing that supersedes it.
+
+**Track 9 is 18 of 20.** Open: gate 11 (parked on third-party index/library contents) and
+gate 15.
+
+### GATE 15, 2026-09-06 (primary) — its SUBJECT did not exist. Two defects fixed; the gate stays OPEN.
+
+Gate 15: *"Interrupting an in-flight acquisition leaves no half-registered `SubtitleRecord` and
+no orphaned torrent in the `jp-study-subtitles` category."* Before this turn there was **zero
+cancellation coverage anywhere in the fetch path**, and re-deriving why found the reason: an
+acquisition could not be interrupted at all.
+
+**Defect 1 — the cancel could not reach the fetch.** `cancelSubtitleDiscovery`
+(`subtitleDiscovery.ts:654`) marks only ids it finds in `running`, and `running.add` happened in
+**one place**: the sweep (`:706`). `acceptNyaaCandidate` — the handler behind the dialog — never
+registered, so the per-item call found nothing and the cancel-everything the job strip's button
+sends iterated an **empty set**. The `isCancelled: () => cancelled.has(mediaId)` closure it hands
+`nyaaFetch` could never become true through any product path. Fixed `68e9fd4d`: ownership taken
+for the length of the fetch, and only when nothing else holds the id (a sweep already running for
+that item registered it, and clearing its flags underneath would un-cancel the sweep). 5 cases
+driven through the **registered IPC handlers**, not the function. Mutation `owned = false`
+reproduces the old behaviour → **4 red by name**, untouched-fetch control green.
+
+**Defect 2 — nothing to click.** `MediaJobStrip` draws from `subtitleDiscovery:progress` and
+renders Cancel only while an unfinished row is present; the accept broadcast **nothing**. Fixed
+`fabdac42`: the sweep's own row shape — `downloading`, then one terminal phase, with `cancelled`
+and `error` kept apart so the row does not report a fault to the person who stopped it.
+`QBIT_CANCELLED_REASON` is now exported beside the two waits that produce it, so that distinction
+cannot break on a wording change. Mutations: drop the `downloading` emit → **1 red by name**;
+report a cancel as an error → **1 red by name**.
+
+**Defect 3 — the orphan the gate names.** `qbitReapSubtitleOrphans` is the *next* run's tidy-up:
+it fires only at the top of the next acquisition, which may never happen. So a cancel after
+`qbitStart` left the torrent in `jp-study-subtitles`, **started**, transferring on the user's
+connection for a record nobody would write. Fixed `1a8b94bd`: `qbitDiscardSubtitleTorrent`
+removes exactly one hash and only after asking the client whose torrent it is — any category but
+`jp-study-subtitles` is refused, because only `qbitAddStopped` ever writes that one. Called on
+**cancellation only**: an ordinary failure still leaves the torrent behind on purpose, which is
+what lets the next attempt `adopt` it. 7 cases, 64 in the file. Three mutations: drop the
+`preexisting` guard → 1 red; disarm the cleanup → 2 red; disarm the category check → 1 red.
+
+**CONTROLS, so the greens are not ambient.** An untouched fetch completes and writes its record
+(`cancelReadings [false,false]`, one patch). A fetch that fails *without* being cancelled sends
+**no delete at all**. A torrent that was already the user's is never removed *and never
+complained about* — the delete-body assertion alone does **not** discriminate that guard, because
+the removal's own category check refuses it anyway; the log line is what makes it load-bearing,
+and that is disclosed rather than glossed.
+
+**Why the gate is still OPEN.** All of the above is unit and mutation evidence. There is **no
+live arm**: the app was not restarted this turn, so main still runs a build without any of it,
+and no acquisition was driven or interrupted against the real daemon. The gate asserts what an
+interruption *leaves behind* on a real client, and that has not been observed. What changed is
+that a live drive is now possible at all — before this turn the interrupt could not be issued.
+
+**Exact next slice for gate 15, so the next turn opens on it.** Restart the app onto `fabdac42`
+or later. Drive Route B, the subject gate 12 used —
+`eea983d11588e5eb18be5e969696adf120097fcb` (Bocchi the Rock, `batch-sidecar`), which reached
+`start` on 2026-09-05 — through `subtitleDiscovery:nyaaAccept`, then send
+`subtitleDiscovery:cancel` once `torrents/resume` has gone. Assert: the item gained **no**
+`SubtitleRecord`, and `torrents/info?category=jp-study-subtitles` returns **0 rows** for that
+hash. Baseline first: the real daemon held **10 rows, 6 uncategorised / 3 `jp-study` / 1
+`jp-study-subtitles`** on 2026-09-06 03:43, and it must hold exactly that afterwards.
+
+**Track 9 is 18 of 20.** Gates 11 and 15 open.
