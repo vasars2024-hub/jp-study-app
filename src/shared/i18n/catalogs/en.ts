@@ -3750,6 +3750,18 @@ export const en: Catalog = {
   'tour.outro.body': 'Everything else is discoverable from Start. Companions, themes and the desktop layout are all in Settings — and you can replay this tour from Settings → Help whenever you like.',
   'settings.nav.help': 'Help',
   'settings.nav.help.desc': 'Guided tour and keyboard shortcuts',
+  // ---- Settings ▸ Help: offline assistant (aero 5.6) ----
+  'help.assistant.title': 'Ask about a setting',
+  'help.assistant.desc': 'Describe what you want to change. This searches every setting in the app and works offline — it never sends your question anywhere.',
+  'help.assistant.label': 'Your question',
+  'help.assistant.placeholder': 'How do I change the language I translate into?',
+  'help.assistant.ask': 'Ask',
+  'help.assistant.foundPhrase': 'Settings matching “{query}”:',
+  'help.assistant.foundKeywords': 'Searched for “{query}”, and found:',
+  'help.assistant.foundWidest': 'Nothing matched the whole question. These are related to {query}:',
+  'help.assistant.foundNothing': 'No setting matches “{query}”.',
+  'help.assistant.nothingNext': 'Try one word instead of a sentence, or turn on Advanced to include advanced settings.',
+
   'help.tour.title': 'Guided tour',
   'help.tour.body': 'A short walkthrough of the desktop, the Reading Lens and where study material goes. It runs once on a new profile.',
   'help.tour.replay': 'Replay tour',

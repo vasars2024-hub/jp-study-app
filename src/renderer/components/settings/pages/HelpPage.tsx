@@ -12,6 +12,7 @@ import SettingsCard from '../SettingsCard';
 import { loadOnboarding, onTourStarted, replayTour } from '../../../onboardingStore';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useT } from '../../../i18n';
+import SettingsAssistantCard from './SettingsAssistantCard';
 
 /**
  * `idle` before the button is used; `started` only when an overlay actually
@@ -45,6 +46,11 @@ export default function HelpPage() {
   };
 
   return (
+    <>
+      {/* v1.0 audit 5.6, second half. Above the tour deliberately: a user who
+          opens Help already has a question, and replaying an 8-step tour is the
+          slower answer to "where is X". */}
+      <SettingsAssistantCard />
     <SettingsCard title={t('help.tour.title')} description={t('help.tour.body')}>
       <p className="muted">
         {state.completedAt
@@ -67,5 +73,6 @@ export default function HelpPage() {
         </p>
       )}
     </SettingsCard>
+    </>
   );
 }
