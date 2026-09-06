@@ -8316,3 +8316,137 @@ Single biggest cause, and this turn changes the diagnosis: the previous six turn
 INSTRUMENT cannot score yet, and nobody had checked which.** anki cost one spec, not one
 product fix, and it moved two cells' worth of blockage in under an hour. Reported, not fixed by
 cutting scope.
+
+## 2026-09-05 19:40-20:55 EDT — primary2 — `player` goes 0 of 8 to **7 of 8** in one turn. The blocker was an EMPTY LIBRARY, and it had fabricated two cat4 defects.
+
+**Closed this turn: 7 cells. 177 -> 184 of 192, 8 left.** `sampled-out:` `immersion` (3 open),
+`translate` (1), `anki` (3) — not scored this turn, named so the skip is not silent.
+
+### What `player` actually is, settled and recorded rather than assumed
+
+Two different things were being called `player` and no entry said which the cell belonged to.
+Settled here under standing auto-approval: **the cell's subject is the `player` DESKTOP SECTION**
+— `AppSection.tsx:84` renders `<MediaCenterView initialTab="library" />`, the window titles
+itself `Media` (`DesktopShell.tsx:248`, `player: 'Media Center · Library'`) and its root is
+`.mc-root`. That is the surface cat1-cat6 and cat8 were driven on, via
+`--surface "@.fwin:has(.mc-root)"` and `--app mediaCenter`.
+
+`cat7-perf.cjs`'s `SPECS.player` is a **different host** — `@#media-workspace`,
+`playerFramesOnly` — because frame pacing can only be measured where a decoder runs, and
+correction 37 in that file already says so. The split is deliberate; cat7 is the one open cell.
+
+### The real blocker, and it is the third recorded instance of the same trap
+
+`l6-parity.js` HAS had a `mediaCenter` spec all along — `player` was never missing one. It read
+0 of 8 because **the private profile's media library was empty**, and every category scored on
+an empty library is a measurement of the empty state:
+
+    cat4, empty library     FAIL: horizontal + deadRegion. dead 13.8% / 0.6% / 19.1%
+                            `hiddenOverflowX: div.medialib-shell 129>126` at 260x170
+    cat4, 36 real items     PASS 10/10. dead 6.2% / 0.5% / 8.1%, hiddenOverflowX 0
+
+**Both "defects" were the empty state.** The 3.22px clip was `.medialib-empty__actions` — the
+two buttons of "Your library is empty" refusing to shrink at the window's own 260x170 floor —
+and the 19.1% dead band was the centred empty illustration in a maximized window. Neither
+exists once the library has content. Seeded through the product's own dialog-free IPC,
+`window.api.addMediaPaths([...36 real .mp4 paths from userData/downloads])`, reference in
+place, into `C:\tmp\jp-p2-profile` only.
+
+### Two instrument defects the populated library exposed — `3b00b053`
+
+1. **The cat6 driver was emptying the surface it scored.** The ONLY text input in the Media
+   window is `.mc-global-search input` (enumerated live — one node), so `dirtyField`'s generic
+   "first visible text field" rule typed the round-trip mark into the library's own filter.
+   `librarySearch` and `perItemActions` then read `cards=0` in BOTH presentations and scored
+   `na`: parity `6/6, na 2`, while the control — which runs after the mark is undone — read the
+   same rows `8/8` with `cards=18`. It still printed PASS. Same trap `captures` hit earlier
+   today, third shape, same already-supported answer: `noSafeInput: true`.
+2. **`librarySearch`'s mutation could not falsify.** It detached `.medialib-card[0]`, which was
+   `unarmable` on every empty profile the spec had ever run on, so nobody had ever seen it
+   fire. Armed on 36 items it did nothing: the row reads `cards > 0`, so 18 -> 17 leaves it
+   true (`fellRows: []`, VOID). Detaching every card would falsify it but `perItemActions`
+   counts cards too, so that mutation would fall two rows and prove neither. It now strips the
+   field's `placeholder` — this row's own half, read by nothing else.
+
+### One real product defect — `0dc0c038`
+
+**cat1 `targets32` FAILed on the grid/list segmented toggle.** Both buttons render exactly
+32x32 from `min-width: var(--lq-hit-target)`, and the container's content box is exactly 64px:
+two buttons, zero slack. The FIRST button's left edge therefore coincides with the container's
+1px border, and Chromium gives that boundary sliver to the container.
+
+**Not the `hit-walk-step-caps-at-31-5` ceiling, and I checked before touching CSS.** An
+independent 1/64px `elementFromPoint` scan with the `<details>` forced open read
+`ownedW 31.641` for button 0 (left blocker `DIV.medialib-view-toggle`, right blocker its
+sibling) against `32.969` for button 1, which collects the snap on its own outer side. The
+walk bisects to 0.05; 0.36 is seven times that. Container padding cannot carry the fix — the
+padding area belongs to the container. Only the button's own box can, which is what "real
+headroom above the token" means: `.lq-hit` is `max(100%, 32px)`, a floor and not a margin.
+After `+ 2px`: **33.641 and 34.969 owned**, `belowFloorByHit 0`, `stolenCount 0`.
+
+### The seven cells, each with its control
+
+    cat1  PASS 10/10  belowFloorByHit 0, stolenCount 0, occluded 0, unreachable 0
+                      CONTROL: 6 plants, all six bars moved, backToBaseline, rectDrift 0
+    cat2  PASS 10/10  --both-presentations; liquidTotal 6 = standardTotal 6, deadEnds 0,
+                      modalTraps 0, scrollTraps 0 (4 line-clamped titles excluded by rule 5),
+                      worstRecv 27 ms.  CONTROL: deadEnd/modalTrap/scrollTrap 0,0,0 -> 1,1,1 -> 0,0,0
+    cat3  PASS 10/10  --presentation liquid; 24 regions, eligible 6, liquidTreated 6,
+                      denseWorkOnTranslucent 0.  CONTROL: "category 3 instrument is proven"
+    cat4  PASS 10/10  dead 6.2 / 0.5 / 8.1 %, clipped 0, overlaps 0, hiddenOverflowX 0,
+                      all three sizes, restored
+    cat5  PASS 10/10  --shell-chrome ".mc-sidebar,.mc-topbar,.mc-playerbar"
+                      CONTROL: fired on Q2, Q3, Q4, Q5, Q10
+    cat6  PASS 10/10  parity 8/8 standard = 8/8 liquid, na 0, round trip held,
+                      8 of 8 mutations armed, every one flipped exactly its own row
+    cat8  PASS 10/10  --langs after opening Settings > Appearance in the same OS window;
+                      rawKeys/placeholders/mutePairs/statesNamed/languagesDiffer all true,
+                      statesNamed "1 of 1 observable".  CONTROL: 3 plants, 0,0,0 -> 1,1,1 -> 0,0,0
+
+### cat7/`player` STAYS OPEN, and the reason is a product refusal I will not overrule
+
+`--surface player` is `playerFramesOnly`, so its only leg is `--player-frames` against
+`#media-workspace video`. Drove the whole product path — library card -> Video page ->
+"Open in the media workspace" — and the workspace mounted **no `<video>` at all**. It said why,
+in plain words:
+
+> Playback Error — The media server will not stream this file until it is matched to a series
+> in your library. That is a metadata gap, not a codec problem. (local file has not been
+> matched to a media: C:\...\jp-study-app\downloads\...)
+
+That is an HONEST state, not a defect, and it is the same finding
+`unmatched-file-reads-as-codec-failure` already records. **To close cat7/`player` a library
+item must first be MATCHED to a series** — that is the next worker's opening slice, not a
+CSS or harness problem.
+
+### Traps this turn paid for, so the next worker does not
+
+- **A REFUSING LEG STRANDS APP STATE.** cat2's first attempt navigated to the Video page and
+  its undo then found no rail; a later step left the **media workspace open as a
+  `role=dialog aria-modal=true` fixed overlay at z-index 9999** covering the whole desk. Every
+  subsequent `--surface` run refused `occluded: ... resolves to div.media-workspace-route`.
+  A synthetic `.click()` on its Close button does nothing; a real `/click` at its coordinates
+  closes it.
+- **A SECOND FWIN OCCLUDES THE FIRST.** Opening Settings for cat8's `--langs` leg put it above
+  the Media window and cat2 then refused on every target. Raise the scored window with
+  `os:open` (the product's own path) before driving, and close Settings after.
+- **Git Bash mangles a bare `/route` argument** into `C:/Program Files/Git/route`, and node
+  then throws `ERR_UNESCAPED_CHARACTERS` on a bridge POST. Pass the route without its leading
+  slash and add it inside the script.
+
+### RULE D — liquid. Closed this turn: **7 cells. 184 of 192, 8 left.**
+
+To 2026-09-07 11:00 EDT, measured 20:53: **38 h 07 min = 1.588 days**.
+`8 / 1.588 = 5.04 cells/day` required.
+Trailing, and the honest window is today: the track was **164 of 192 at 09:06 EDT** (the
+`backup` recount above) and is **184 at 20:53** — 20 cells in 11.8 h. Required 5.04 is
+**below** that, so **TARGET AT RISK is NOT declared this turn.**
+
+**The caveat matters more than the headline and is stated first-class:** most of today's 20
+cells came from removing INSTRUMENT blockers, not from building product — a missing `anki`
+spec, an emptied `mediaCenter` surface, an empty media library. That supply is nearly
+exhausted, and the 8 that remain are the ones no instrument fix reaches: `translate` cat7 and
+`immersion` cat7 (both open on the same main-process GC block, `de41fab4`), `player` cat7
+(needs a matched library item), `immersion` cat2/cat8, and `anki` cat5 + cat7 + cat8. Do not
+extrapolate 40 cells/day; the same warning RULE E carries about its own 6 -> 25 jump applies
+here word for word.
