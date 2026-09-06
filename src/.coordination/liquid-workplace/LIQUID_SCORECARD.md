@@ -8480,3 +8480,135 @@ control firing on Q2, Q3, Q4, Q5, Q10. So the turn total is **8 cells, 177 -> 18
 7 left**, and the required rate is `7 / 1.570 = 4.46 cells/day` to 2026-09-07 11:00 EDT
 measured at 21:20. The seven: `player` cat7, `translate` cat7, `immersion` cat7 / cat2 / cat8,
 `anki` cat7 / cat8 — **three of the seven are cat7**, all on the same main-process GC block.
+
+---
+
+## 2026-09-05 21:30-22:40 EDT — primary2. cat7's main-block bar: the mechanism, found and removed
+
+### First, a control the four standing cat7 refusals never ran
+
+`main_max_ms` is `tools/liquid-interaction-probe.ps1:551-575` timing `GET /health` from
+**PowerShell**, at 15 ms cadence, and taking the max. Nothing had ever established that the
+outlier is MAIN blocking rather than the client stalling. So the same loop was re-run from
+**node**, on the same live instance (pid 25124, uptime 10,580 s), 60 s:
+
+    samples 1,941   p50 0.8 ms   p95 8.6   p99 182.7   MAX 521.8   over100 49   over500 1
+    worst at t = 11.8 / 16.2 / 17.1 / 20.2 / 29.1 / 37.3 / 46.3 / 57.3 s
+
+Two independent clients, two different runtimes, the same 450-520 ms outliers at a ~9 s
+cadence. **The instrument is exonerated: main really blocks.** `de41fab4`'s attribution to
+main's own major GC is confirmed rather than inherited.
+
+### Then the mechanism, from main's own allocation profile
+
+`/eval` is renderer-only and `/heap-snapshot` postdated the running main, so main was opened
+another way: `process._debugProcess(<main pid>)` attaches the node inspector to a live
+Electron main on Windows, and `Runtime.evaluate` then runs in main's context
+(`require` is not global there — `process.mainModule.require` is). V8's **sampling heap
+profiler** over 60 s of an idle app:
+
+    TOTAL 340.1 MB / 60 s = 5.67 MB/s
+    335.9 MB  98.8%  parseJSONFromBytes @ undici     <- under runPoll
+      2.0 MB   0.6%  runPoll @ main-*.js
+
+**98.8% of main's allocation, with the app idle, is AnkiConnect JSON.** `runPoll`
+(`src/main/anki/intervals.ts`) walks every profile's `syncQuery`; the default profile's is
+`deck:*` = **155,384 notes**, and `kickPoll` single-flights, so a poll that cannot finish
+inside its 5-minute period simply runs back to back forever. Main was permanently mid-poll.
+
+### The payload, measured against the user's own Anki (84 decks, AnkiConnect 6)
+
+Sampled **evenly across all 155,384 notes**, scaled to one full poll:
+
+    notesInfo      303.5 MB      cardsInfo   6,794.6 MB
+    getIntervals     0.5 MB      areSuspended    1.0 MB      findNotes  2.2 MB
+
+`cardsInfo` averages 45 KB per card because it returns the note type's CSS and the fully
+rendered question and answer for every card. The poll read **two numbers** off it.
+
+**A first pass sampled the oldest 500 note ids and reported 44.8 MB / 160.4 MB.** That is
+wrong by 6.8x and 42x — the oldest notes are the cheapest — and it is published in
+`49e7ed99`'s message. `a36b6ea5` corrects it upward. Sampling bias, named so it is not
+repeated: an id-ordered prefix of an Anki collection is not a sample of it.
+
+### Two product commits
+
+`49e7ed99` — `getIntervals` + `areSuspended` replace `cardsInfo`. Equivalence is MEASURED,
+not argued: over 1,539 cards sampled across the whole collection the clamped interval agreed
+**1,539/1,539** and `areSuspended` agreed with `queue === -1` **1,539/1,539**; the 8 raw
+disagreements are negative learning steps the existing clamp already absorbs. The zip is
+positional and a length mismatch is REFUSED, not guessed; refusal and an unsupported host
+both latch a `cardsInfo` fallback for the process.
+
+`a36b6ea5` — the note projection (fields, note type, tags, card list) is cached by note id
+and only a rotating twelfth is re-read per poll. Scheduling stays fresh for every card on
+every poll. Tradeoff stated in the commit: an expression/tag/card-list edit can be up to an
+hour stale; intervals never are.
+
+Per full poll: **7,098 MB -> ~27 MB**, a 99.6% cut.
+
+### Mutation controls — and two that did NOT fire the first time
+
+Fired: drop the positional length guard; never latch the fallback; pin the thin `suspended`
+projection to false; drop the eviction; drop the rotation; freeze the rotation cursor;
+ignore the epoch; cache the card state.
+
+**Did not fire, and the TEST was wrong, not the code.** `second.length < 24` plus
+`every(sameSlice)` is satisfied by an EMPTY array, so deleting the rotation outright read
+green — the empty-denominator trap, again. It now names both ids exactly. And evicting a
+departed note changes no entry at all, because the fold is rebuilt from the live id list
+either way; the only observable consequence is unbounded cache growth, and that is what the
+test asserts now, through `noteProjectionCount()`.
+
+**Still did not fire, and DISCLOSED rather than papered over:** deleting `Math.max(0, …)`
+from either card-state path leaves every test green, because the fold seeds `maxIvl = 0` and
+takes `Math.max` per card. The clamp is unreachable through this API. It is kept for
+`readCardStates`' own contract and the test file says plainly that nothing earns it.
+
+### LIVE, on the private instance, before and after — same instrument, same routes
+
+The app was restarted onto the rebuilt main (main-process code does not hot-reload) and
+re-profiled. `projectNote` and `refreshNoteProjections` appear in the after-profile, so the
+window did contain a real poll — this is a poll being cheap, not a poll not happening.
+
+    main allocation, V8 sampling heap profiler, app idle
+      before   340.1 MB / 60 s  = 5.67 MB/s   98.8% undici parseJSONFromBytes
+      after     21.5 MB / 200 s = 0.11 MB/s   undici absent from the top 6
+
+    main /health round trip, node client, 15 ms cadence
+      before   1,941 samples   p50 0.8   p99 182.7   MAX 521.8   over100 49   over500 1
+      after    3,421 samples   p50 0.9   p99   2.6   MAX  60.2   over100  0   over500 0
+
+    /mem       externalMb 1,420.4 -> 93.8
+
+**52x less allocation.** At 5.67 MB/s a 1.3 GB old space refills in ~4 minutes, which is the
+~9 s major-GC cadence the first sampler saw; at 0.11 MB/s the same fill takes ~3.3 hours,
+and most of it is short-lived.
+
+**The honest caveat, stated first-class:** the after-latency was taken on a process 5
+minutes old, and a young main would read well regardless. It is corroboration, not the
+proof. The proof is the allocation rate, which is what decides whether old space ever
+reaches V8's major-GC trigger at all.
+
+### What this DOES and DOES NOT close
+
+**It does not close a cell.** No cat7 was scored this turn. What it removes is the blocker
+four cat7 cells share — `player`, `translate`, `immersion`, `anki` — which `de41fab4`
+recorded and no turn since has been able to get past. Those four are RUNNABLE now and were
+not this morning. Scoring them is the next turn's opening slice.
+
+Claiming them here would be exactly the false credit this scorecard has withdrawn before.
+
+### RULE D — liquid. Closed this turn: **0 cells. 185 of 192 stands, 7 left.**
+
+To 2026-09-07 11:00 EDT, measured 22:25: **36.58 h = 1.524 days**.
+`7 / 1.524 = 4.59 cells/day` required.
+Trailing 10-turn, this track: today went **164 (09:06) -> 185 (21:20) -> 185 (22:25)**,
+i.e. 21 cells in 13.3 h = 37.9/day nominal.
+
+Required 4.59 is below trailing, so **TARGET AT RISK is NOT declared** — but read the
+caveat, which is the same one the last two turns wrote and which this turn is evidence for:
+almost all of that 21 came from removing INSTRUMENT blockers, and this turn spent itself
+removing a PRODUCT blocker and closed nothing. A turn that closes 0 cells is what the
+remaining seven look like. The single biggest cause is that four of the seven are cat7 and
+cat7 is the most expensive category in the rubric to run.
