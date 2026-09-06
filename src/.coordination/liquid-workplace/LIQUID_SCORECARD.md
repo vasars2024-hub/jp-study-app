@@ -8612,3 +8612,75 @@ almost all of that 21 came from removing INSTRUMENT blockers, and this turn spen
 removing a PRODUCT blocker and closed nothing. A turn that closes 0 cells is what the
 remaining seven look like. The single biggest cause is that four of the seven are cat7 and
 cat7 is the most expensive category in the rubric to run.
+
+---
+
+## 2026-09-06 00:20 EDT — primary — three cat7 cells CLOSED. 185 -> 188 of 192, 4 left.
+
+The turn opened as interrupted-work recovery (worker `backup` died at 22:52 mid-slice) and
+on the boss audit's four findings, so the liquid half is the second half. Commits:
+`6a06e067` F1, `c0a87c93` F4, `8c728ff5` F2 (on `wt/files-app`), `a4637f37` the anki spec.
+
+### The cat7 blocker really was removed — three surfaces scored, none of them refused
+
+`de41fab4` had four cat7 cells standing off on main's ~500 ms GC blocks, and `a36b6ea5`
+removed the cause. This is the first turn to spend that. All three runs against **pid 2520,
+bridge 39281**, the private instance whose main carries `a36b6ea5` (uptime 5,430 / 5,649 /
+5,811 s, so cat7's 120 s floor is met three times over). Every run carried `--jank`.
+
+    surface     score  ceiling p95/max/o100   drag mainMax  theme max  heavy p50/max
+    translate   10/10   8.5 / 16.7 /  0        4.0 (230.1*)  91.6       1.6 / 36.4
+    immersion   10/10   8.5 / 16.6 /  0        5.2           124.9      2.2 / 19.0
+    anki        10/10   8.5 /  8.6 /  0        4.0           100.0      2.3 /  8.8
+
+`findings []`, `voided []` on all three. **The one number above 100 in the main column is
+230.1 ms** (translate, drag repeat 2) against the harness's own `mainBlockBarMs` of 500 —
+where the four standing refusals were reading 450–520. Every other main reading in the nine
+gesture legs is **3.2–6.0 ms**.
+
+**The sensitivity control fires on all three**, which is what makes the clean numbers a
+reading rather than a dead recorder — the same drag with ten injected 120 ms renderer blocks:
+
+    translate  p95  8.5 -> 108.4   max  16.7 -> 125.0   over100 0 -> 10
+    immersion  p95  8.5 -> 108.4   max  16.7 -> 125.0   over100 0 -> 10
+    anki       p95  8.5 -> 116.7   max  25.0 -> 125.2   over100 0 ->  9
+
+Heavy legs all proved they ran: translate 40 pair swaps across 2 pairs over 16 sense tokens,
+back at 日本語>English with the interlinear recovered in 123 ms; immersion scrolled 21,600 px
+over 91 ticks and restored to 0; anki scrolled `.fwin-body` 1,269 px over 91 ticks, restored
+to its captured 601.
+
+### The disclosure on translate's first run, kept rather than dropped
+
+The FIRST translate run carried an `ENV` note the harness raised itself: the ceiling leg —
+which runs no product code — produced 1 frame over 100 ms and a 208.3 ms longest frame, i.e.
+the machine stalled. The `--jank` re-run had a clean ceiling and the same 10/10. The score is
+taken from the second; the first is recorded because a 10/10 on a stalled machine is exactly
+the kind of pass this scorecard has withdrawn before.
+
+### `anki` cat7 was an INSTRUMENT gap, and that is now twice on this surface
+
+`--surface anki` refused: no SPECS entry. `a4637f37` adds one, and records the three legs it
+REJECTED with the measurement behind each (expanding the sections mounts 61 elements but
+"Deck Workbench" reaches AnkiConnect; changing deck/note type writes the profile; typing is
+cat2's leg). Two of anki's cells have now been unblocked by writing a spec rather than fixing
+a defect — cat6 in `0c683ead`, cat7 here.
+
+### RULE D — liquid. Closed this turn: **3 cells. 185 -> 188 of 192, 4 left.**
+
+To 2026-09-07 11:00 EDT, measured 00:20: **34.67 h = 1.444 days**.
+`4 / 1.444 = 2.77 cells/day` required. Trailing 10-turn on this track: 164 (09-05 09:06) ->
+188 (09-06 00:20), i.e. **24 cells in 15.2 h = 37.9/day** nominal.
+
+Required 2.77 is well below trailing, so **TARGET AT RISK is NOT declared** — and unlike the
+last two turns that said the same, this one closed PRODUCT cells rather than instrument
+blockers, which is the caveat those turns attached to their own numbers.
+
+The four left: **`player` cat7, `immersion` cat2, `immersion` cat8, `anki` cat8.**
+`player` cat7 still needs a MATCHED library item before it can run (Seanime/AniList recipe,
+`src/media/seanimeLibrary.ts:175-200`) — that is the one remaining prerequisite, and it is a
+content prerequisite, not a blocker.
+
+`sampled-out:` `player` (1 open, not scored — no matched library item), and the two cat2/cat8
+cells on `immersion` and the cat8 on `anki`, which are different categories rather than
+skipped surfaces. Named so the skip is not silent.
