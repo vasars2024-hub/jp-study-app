@@ -163,6 +163,59 @@ describe('SeanimeToastHost', () => {
     expect(document.body.textContent).not.toContain('dismiss this error');
   });
 
+  /*
+   * Boss audit F2. The layer is a React root on `document.body`, created outside
+   * the app tree and therefore outside `AppErrorBoundary` — a throw inside it was
+   * supervised by nothing. The assertion that matters is not "the layer is gone",
+   * it is that the SHELL which mounted it is still on screen and still working.
+   */
+  it('a crash inside the notification layer leaves the shell that mounted it alive', async () => {
+    const logRendererError = vi.fn().mockResolvedValue(undefined);
+    (window as unknown as { api?: unknown }).api = { logRendererError };
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.resetModules();
+    vi.doMock('sonner', () => ({
+      Toaster: () => {
+        throw new Error('notification layer exploded');
+      },
+      toast: { dismiss: () => undefined, error: () => undefined },
+    }));
+    try {
+      const { default: SeanimeToastHost } = await import('../SeanimeToastHost');
+      const host = document.createElement('div');
+      document.body.append(host);
+      const root = createRoot(host);
+      roots.push(root);
+      await act(async () => {
+        root.render(createElement('div', null, 'shell content', createElement(SeanimeToastHost)));
+      });
+
+      // The shell rendered and stayed rendered.
+      expect(host.textContent).toContain('shell content');
+      // No crash screen was mounted over it: `AppErrorBoundary`'s full-viewport
+      // recovery page is the wrong shape for a notification layer, so the layer
+      // renders nothing at all instead.
+      expect(document.querySelector('[data-media-notifications]')?.innerHTML).toBe('');
+      expect(toasterCount()).toBe(0);
+      // The host element survives, so the release path can still remove it.
+      expect(document.querySelectorAll('[data-media-notifications]').length).toBe(1);
+      // Honest failure: it is recorded rather than swallowed.
+      expect(logRendererError).toHaveBeenCalledTimes(1);
+      expect(logRendererError.mock.calls[0][0]).toMatchObject({
+        subsystem: 'renderer',
+        operation: 'mediaNotificationLayer',
+      });
+      expect(String(logRendererError.mock.calls[0][0].detail)).toContain(
+        'notification layer exploded',
+      );
+    } finally {
+      vi.doUnmock('sonner');
+      vi.resetModules();
+      consoleError.mockRestore();
+      delete (window as unknown as { api?: unknown }).api;
+    }
+  });
+
   it('keeps one notification layer in the real shell when both sidecars are offline', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline test')));
     const { default: Shell } = await import('../MediaSurfaceShell');
