@@ -1427,3 +1427,58 @@ not do is attach Conan cues to a Big O episode to make three clauses read green.
 a *concurrent* worker's liquid-scorecard commit. Two `primary` sessions share one git index here;
 mine were staged and that worker's `git commit` swept them in. The content is intact and verified
 at HEAD. History was not rewritten — with a live sibling that is the more dangerous option.
+
+#### Gate 11 — 2026-09-06 03:35 EDT (primary). The restart blocker is GONE and the subject is now the LISTING's own top candidate. Still OPEN: the fetch did not run.
+
+The previous entry's exact-next-slice opened "for a turn that owns the app. **Restart**, then…",
+because `971dc4d4`/`70a8941c` live in `src/shared/` and main does not hot-reload. **That
+premise expired before this turn started and no restart was needed.** `debug/bridge.json`
+records main pid **20684** started `1788676502576` = **2026-09-06 02:35:02 EDT**, hours after
+both fixes landed — so the running main was already built from the fixed tree. Checked the
+timestamp instead of assuming, and it saved an app restart that would have cost the shared
+instance's state.
+
+**Verified by the product's own listing, not by reading the source.**
+`window.api.subtitleHarvestNyaaList({ title: 'Detective Conan', … })` through the real IPC:
+
+    ok true, message "", count 1
+    nyaa:45921c38c5c45ae5b0d67116894b1880dd587967
+      route sub-pack   score 100   20,761,805 bytes (19.8 MB)   seeders 10
+      reasons  language:ja · route:sub-pack · signal:subs-only · seeders:10
+      name     Detective Conan Remastered 0001-0520 (Only subs) [Netflix SEA] [Multi-…
+
+Before the fix this same call returned exactly one candidate and it was the **6.1 GB
+`[PeepoHappy] Kitsunekko Archive`, route `sub-archive`** — not Route A. `signal:subs-only`
+firing on `(Only subs)` is `971dc4d4`'s reversed-word-order rule doing its job live, and
+`score 100` beats the archive's measured 39. **Gate 11 now has a subject the product itself
+nominates**, which is a stronger position than the previous entry's hand-picked hash.
+
+**The 5.3 MB row is NOT missing and NOT a defect — the two queries are different.** The
+previous entry pre-checked `22d2e2e6…` (Movies 01-26, 5.3 MB) as the one to take, and it is
+absent from the listing above. Both rows are still live: a raw index search for
+`Detective Conan` returns **75 rows, exactly 2 under 50 MB** — `45921c38…` 19.8 MB / 10
+seeders / `["en","ja"]` and `22d2e2e6…` 5.3 MB / 9 seeders / `["en","ja"]`. But
+`nyaaSearchDetailed` does not send the bare title: it sends
+`buildSubtitleQuery({ title, episode })` (`main/subtitleNyaaSource.ts:340`), a different query
+returning a different row set. Ruled out before concluding this: `minSeeders` defaults to
+**3** (`scraperSourceSettings.ts:308`), so 9 seeders is not the drop, and the row is not
+being ranked and truncated — `nyaaSearchDetailed` maps every ranked candidate through
+(`:369`) with no `slice`. **So the honest subject is the 19.8 MB pack the listing returns,
+not the 5.3 MB one a raw search can see.** Do not hand-feed the smaller hash to `fetch` to
+make the "smallest with healthy seeds" rule read satisfied — that would be driving a
+candidate the product would never offer, which is the failure this gate exists to catch.
+
+**EXACT NEXT SLICE, unchanged in shape and now with no restart in front of it:**
+
+```
+node debug/g14-live.cjs fetch "Detective Conan" 45921c38c5c45ae5b0d67116894b1880dd587967
+```
+
+19.8 MB, 10 seeders, subtitle-only, `["en","ja"]`, under the 50 MB ceiling — the title and
+size stated before the transfer as the standing rule requires. Drive it through
+`debug/qbit-basepath-proxy.cjs` with `G14_RECATEGORIZE=539c0886…`, or
+`qbitReapSubtitleOrphans` deletes the whole `jp-study-subtitles` category minus the in-flight
+hash and takes the user's own Kitsunekko archive with it. Expect `selectSubtitleFiles` to skip
+the non-`ja` files — disclose the skip count; "taken whole" is the release, not every file.
+The `SubtitleRecord` clause still has no subject in this library (no Conan media item,
+`main/subtitleDiscovery.ts:975` refuses), so that clause's scope call is still owed.
