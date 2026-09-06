@@ -291,6 +291,10 @@ export default function AiAnalysisSection() {
         <input
           type="text"
           className="os-input"
+          // The `<span>` beside it is not a `<label>` and the field has no
+          // placeholder, so this read as an unnamed text box. The other rows on
+          // this page are named by their placeholder; this one has none.
+          aria-label={t('settings.analysis.snapshot.folder')}
           style={{ maxWidth: 240 }}
           value={prefs.snapshot.folder}
           onChange={(e) => patch({ snapshot: { ...prefs.snapshot, folder: e.target.value } })}
