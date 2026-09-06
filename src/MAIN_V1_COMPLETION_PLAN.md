@@ -1567,3 +1567,48 @@ closure, and this track does not buy a green cell with a measurement it had to l
 decision; gate 11 is blocked on third-party data and is therefore **parked, not abandoned** —
 re-check the index at the start of a later turn, in one call:
 `node debug/g14-live.cjs search "subs only" 50` and look for a `ja` row with seeders ≥ 3.
+
+### GATE 13 CLOSES 2026-09-06 (primary) — and the refusal is one step EARLIER than the gate assumed
+
+Gate 13: *"A single-file MKV with an interleaved embedded track is refused rather than partially
+fetched."* It is refused **at the listing**, before a torrent is ever added — so it is not
+merely not-partially-fetched, it is never fetched at all, never has metadata requested, and
+never touches the swarm.
+
+**LIVE, on the real index, through the product's own IPC.** Title *Detective Conan*:
+
+- `scraperSearchTorrents` returns **75 rows**. **25 of them carry a video container extension
+  and `isBatch !== true`** — the exact shape the gate names. **17 have ≥3 seeders**, headed by
+  `[SubsPlease] Detective Conan - 1212 (1080p) [5EF3901C].mkv`, `4d92b1e170…`,
+  **1,433.6 MB, 167 seeders** — which would dominate any seeder-weighted ranking.
+- `subtitleHarvestNyaaList({ title: 'Detective Conan' })` on the same title returns
+  **count 1**, and it is the 19.8 MB `.7z` pack. **0 of the 25 were offered.**
+
+`couldCarrySidecarSubtitles` (`subtitleNyaa.ts:687`) is the rule: a name carrying a container
+extension returns false before the batch check, so the row is counted at `dropped.shape` and
+never becomes a candidate.
+
+**NEGATIVE CONTROL 1, live, same call.** The listing is not blanket-empty and not title-blind:
+from those same 75 rows a `sub-pack` WAS offered at score 100, and the same code path offers
+`batch-sidecar` candidates on other titles (*Steins;Gate* 5, *Spy x Family* 8), one of which
+gate 12 fetched for real on 2026-09-05. So the drop is specific to the single-file video shape.
+
+**NEGATIVE CONTROL 2, mutation, against committed code.** Removing the container guard —
+`return row.isBatch === true || true;` — turns **6 tests red BY NAME**, including *"refuses a
+single-file release, whose track is interleaved"*, *"never returns a row that fails both
+routes"* and *"counts a row that is neither muxed nor fetchable as shape, not muxed"*; 126
+green. Source restored and verified **byte-identical by SHA256**, `git status` clean, 132/132
+pass on re-run.
+
+**The fetch-level backstop, and the honest limit of this evidence.** There is no LIVE arm at the
+fetcher, and the reason is structural rather than a gap: `nyaaFetchAll` can only be handed an id
+`rememberNyaaCandidates` stored, and the listing is the only thing that stores one — so no
+product path exists by which a single-file MKV reaches the fetcher. Its backstop is therefore
+unit-covered only: `selectSubtitleFiles` returns `no-subtitles`, `noSubtitlesReason` says
+*"1 file(s), 1 of them video — any subtitles it carries are inside the video"*, and the test
+*"never fetches a video file when no subtitle is present"* asserts **no `prio:` call is ever
+made**. Stated rather than glossed, because "we could not produce the input" and "the rule
+holds" are different claims.
+
+**Gate 13 PASSES. Track 9 is 17 of 20** — gate 15 remains agent work, gate 10 owes its scope
+decision, gate 11 is parked on third-party index/library contents.
