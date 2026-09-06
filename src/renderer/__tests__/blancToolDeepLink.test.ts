@@ -72,6 +72,21 @@ describe('Blanc toolbox deep link survives arriving from another tab', () => {
     // The deep link serves both kinds of id; the fix must not swallow the first.
     const body = onOpenToolBody(code);
     expect(body).toContain('const direct = directTabs[feature]');
-    expect(body).toMatch(/if \(direct\) \{\s*chooseTab\(direct\);\s*return;/);
+    // `chooseTab` then `return`, with whatever the branch does in between. The
+    // assertion used to require the two lines be ADJACENT, which made it fail
+    // the moment the branch grew `markSectionOpenHandled(event)` — a change
+    // that does not touch what this test is about. Pinning the order is the
+    // guard; pinning the line count was an accident of how it was written.
+    expect(body).toMatch(/if \(direct\) \{[\s\S]*?chooseTab\(direct\);[\s\S]*?return;/);
+  });
+
+  it('cancels the event only where it actually took the request', () => {
+    // The claim is what lets a caller tell "Blanc opened this" from "nobody
+    // did" and fall back to a pop-out. Cancelling at the TOP of the handler
+    // would suppress every caller's fallback while opening nothing, so both
+    // claims must sit after the branch has acted.
+    const body = onOpenToolBody(code);
+    expect(body).toMatch(/chooseTab\(direct\);\s*markSectionOpenHandled\(event\);/);
+    expect(body).not.toMatch(/const feature = [^\n]*\n\s*markSectionOpenHandled/);
   });
 });
