@@ -6409,6 +6409,7 @@ export const zh: Catalog = {
   'flash.import.pastePlaceholder': '在此粘贴词汇列表、CSV 或 TSV…',
   'flash.import.autoHint': '粘贴即自动导入。用同一卡组名重新导入会替换该卡组。',
   'flash.import.nothing': '没有可导入的内容。',
+  'flash.import.readFailed': '无法读取此文件。请重新打开或粘贴文件内容。',
   'flash.import.success': {
     other: '已将 {count} 张卡片导入为“{title}”（{id}）。',
   },

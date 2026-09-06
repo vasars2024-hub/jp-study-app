@@ -6498,6 +6498,7 @@ export const en: Catalog = {
   'flash.import.pastePlaceholder': 'Paste vocabulary list, CSV, or TSV here…',
   'flash.import.autoHint': 'Paste auto-imports. Re-importing the same deck name replaces that deck.',
   'flash.import.nothing': 'Nothing to import.',
+  'flash.import.readFailed': 'Could not read this file. Try opening it again or paste its contents.',
   'flash.import.success': {
     one: 'Imported {count} card as “{title}” ({id}).',
     other: 'Imported {count} cards as “{title}” ({id}).',

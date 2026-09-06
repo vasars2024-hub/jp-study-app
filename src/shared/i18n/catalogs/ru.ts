@@ -7087,6 +7087,7 @@ export const ru: Catalog = {
   'flash.import.pastePlaceholder': 'Вставьте список слов, CSV или TSV…',
   'flash.import.autoHint': 'Вставка импортирует автоматически. Повторный импорт с тем же именем колоды заменяет её.',
   'flash.import.nothing': 'Нечего импортировать.',
+  'flash.import.readFailed': 'Не удалось прочитать файл. Попробуйте открыть его ещё раз или вставить содержимое.',
   'flash.import.success': {
     one: 'Импортирована {count} карточка как «{title}» ({id}).',
     few: 'Импортированы {count} карточки как «{title}» ({id}).',

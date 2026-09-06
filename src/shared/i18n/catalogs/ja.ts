@@ -6443,6 +6443,7 @@ export const ja: Catalog = {
   'flash.import.pastePlaceholder': '単語リスト、CSV、またはTSVをここに貼り付け…',
   'flash.import.autoHint': '貼り付けると自動で取り込まれます。同じデッキ名で再インポートするとそのデッキが置き換わります。',
   'flash.import.nothing': 'インポートするものがありません。',
+  'flash.import.readFailed': 'ファイルを読み込めませんでした。もう一度開くか、内容を貼り付けてください。',
   'flash.import.success': {
     other: '「{title}」（{id}）として{count}枚のカードをインポートしました。',
   },
