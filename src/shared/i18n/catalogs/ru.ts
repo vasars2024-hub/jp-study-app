@@ -212,6 +212,8 @@ export const ru: Catalog = {
   'novels.sources.apiKey': 'Ключ API',
   'novels.sources.optional': 'Необязательно',
   'novels.sources.enabled': 'Включён',
+  'novels.sources.name': 'Название источника',
+  'novels.sources.mode': 'Обработка ссылок',
   'novels.sources.modeExternal': 'Только внешние ссылки',
   'novels.sources.modeDirect': 'Прямая загрузка',
   'novels.sources.modeBoth': 'Оба варианта',

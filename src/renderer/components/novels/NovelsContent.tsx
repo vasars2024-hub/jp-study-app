@@ -803,8 +803,16 @@ export function NovelsFilters({ state }: { state: NovelsState }) {
                   />
                   Enabled
                 </label>
-                <input value={profile.name} onChange={(e) => state.patchSource(index, { name: e.target.value })} />
-                <select value={profile.mode} onChange={(e) => state.patchSource(index, { mode: e.target.value as JitenSourceProfile['mode'] })}>
+                <input
+                  value={profile.name}
+                  aria-label={t('novels.sources.name')}
+                  onChange={(e) => state.patchSource(index, { name: e.target.value })}
+                />
+                <select
+                  value={profile.mode}
+                  aria-label={t('novels.sources.mode')}
+                  onChange={(e) => state.patchSource(index, { mode: e.target.value as JitenSourceProfile['mode'] })}
+                >
                   <option value="external">External only</option>
                   <option value="direct">Direct download</option>
                   <option value="both">Both</option>
