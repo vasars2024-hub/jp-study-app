@@ -463,13 +463,22 @@ describe('desktop store schema v3', () => {
   describe('switchDesktop ownership guard (B2)', () => {
     beforeEach(() => writeStore(V2_FIXTURE));
 
+    /*
+     * The secondary is parked on desktop 2, not on the fixture's
+     * `activeDesktopIndex` of 1, because `setAssignment` now re-homes a
+     * secondary off whatever desktop main is showing. Assigning it to 1 here
+     * used to build the collision directly and then assert the refusal; that
+     * state can no longer be created, and the guard's actual subject — moving
+     * main ONTO a desktop someone else owns, which is what every name in this
+     * block says — is unchanged.
+     */
     it('refuses to move the main window onto a desktop a secondary owns', async () => {
       // Two shells on one desktop is the ping-pong this whole design avoids:
       // each would treat the other's commit as an external edit and re-commit.
       const store = await freshStore();
       store.setMainDisplayKey('main-panel');
-      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: true });
-      const res = store.switchDesktop(1);
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 2, enabled: true });
+      const res = store.switchDesktop(2);
       expect(res.ok).toBe(false);
       expect(res.error).toBe('desktop-on-another-display');
     });
@@ -477,9 +486,9 @@ describe('desktop store schema v3', () => {
     it('allows the switch once that display is disabled', async () => {
       const store = await freshStore();
       store.setMainDisplayKey('main-panel');
-      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: true });
-      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: false });
-      expect(store.switchDesktop(1).ok).toBe(true);
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 2, enabled: true });
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 2, enabled: false });
+      expect(store.switchDesktop(2).ok).toBe(true);
     });
 
     it('rejects a non-integer index', async () => {
@@ -496,10 +505,10 @@ describe('desktop store schema v3', () => {
     it('does not let an UNPLUGGED display claim a desktop', async () => {
       const store = await freshStore();
       store.setMainDisplayKey('main-panel');
-      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: true });
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 2, enabled: true });
       // The display service reports: only the main panel is attached now.
       store.syncAssignments([{ key: 'main-panel', primary: true }]);
-      expect(store.switchDesktop(1).ok).toBe(true);
+      expect(store.switchDesktop(2).ok).toBe(true);
     });
 
     // The adverse control for the test above. If presence-checking ever widens
@@ -508,12 +517,12 @@ describe('desktop store schema v3', () => {
     it('still refuses while that display IS attached', async () => {
       const store = await freshStore();
       store.setMainDisplayKey('main-panel');
-      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: true });
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 2, enabled: true });
       store.syncAssignments([
         { key: 'main-panel', primary: true },
         { key: 'second-panel', primary: false },
       ]);
-      const res = store.switchDesktop(1);
+      const res = store.switchDesktop(2);
       expect(res.ok).toBe(false);
       expect(res.error).toBe('desktop-on-another-display');
     });

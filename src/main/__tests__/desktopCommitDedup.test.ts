@@ -85,3 +85,98 @@ describe('desktop layout echo suppression', () => {
     },
   );
 });
+
+/*
+ * The dedup above suppresses byte-identical echoes and nothing else. The defect
+ * it was written against was two shells owning one desktop, and that case never
+ * produces an echo: each shell rescales the shared layout into its own viewport
+ * and commits a genuinely different one. Measured live 2026-09-05 — 27
+ * broadcasts in 6.0 s alternating between authored 1264x773 and 1904x945, epoch
+ * climbing 4.6/s with nobody touching the app, each tick a synchronous rename on
+ * the main loop. So the fix has to be ownership, not comparison.
+ *
+ * Every case here drives TWO authored viewports against ONE store, which the
+ * suite above could not express at all.
+ */
+describe('single-owner desktops', () => {
+  const MAIN = 'panel|1264x773|1';
+  const SECOND = 'display|1920x1080|1';
+
+  it('alternating authored viewports write EVERY time — the echo guard cannot see the loop', async () => {
+    const store = await setup();
+    const base = store.snapshot().viewports[0];
+    const rename = vi.spyOn(fs, 'renameSync');
+    for (let i = 0; i < 6; i += 1) {
+      const wide = i % 2 === 0;
+      store.commitLayout({
+        desktopIndex: 0,
+        layout: {
+          ...structuredClone(base),
+          authoredW: wide ? 1904 : 1264,
+          authoredH: wide ? 945 : 773,
+          windows: [{ ...base.windows[0], w: wide ? 1235 : 820 }],
+        },
+      });
+    }
+    expect(rename).toHaveBeenCalledTimes(6);
+    expect(send).toHaveBeenCalledTimes(6);
+    expect(store.snapshot().viewports[0].layoutEpoch).toBe(base.layoutEpoch + 6);
+  });
+
+  it('re-homes an enabled secondary the user parks on the desktop main is showing', async () => {
+    const store = await setup();
+    store.setMainDisplayKey(MAIN);
+    expect(store.snapshot().activeDesktopIndex).toBe(0);
+    const snapshot = store.setAssignment({ displayKey: SECOND, desktopIndex: 0, enabled: true });
+    const row = (snapshot.assignments ?? []).find((a) => a.displayKey === SECOND);
+    expect(row?.desktopIndex).toBe(1);
+    expect(row?.enabled).toBe(true);
+  });
+
+  it('heals a collision that is already stored — the state measured on the live machine', async () => {
+    const store = await setup();
+    // Written before the guard existed: main's own row and a secondary, both on 0.
+    store.setAssignment({ displayKey: MAIN, desktopIndex: 0, enabled: true });
+    store.setAssignment({ displayKey: SECOND, desktopIndex: 0, enabled: true });
+    store.setMainDisplayKey(MAIN);
+    send.mockClear();
+
+    const first = store.syncAssignments([
+      { key: MAIN, primary: true },
+      { key: SECOND, primary: false },
+    ]);
+    const rows = first.assignments ?? [];
+    expect(rows.find((a) => a.displayKey === MAIN)?.desktopIndex).toBe(0);
+    expect(rows.find((a) => a.displayKey === SECOND)?.desktopIndex).toBe(1);
+    expect(send).toHaveBeenCalledTimes(1);
+
+    // One-shot: a second sync of the same displays finds nothing left to move.
+    send.mockClear();
+    const again = store.syncAssignments([
+      { key: MAIN, primary: true },
+      { key: SECOND, primary: false },
+    ]);
+    expect(again.assignments).toEqual(rows);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a disabled secondary', { displayKey: SECOND, desktopIndex: 0, enabled: false }],
+    ['the main display itself', { displayKey: MAIN, desktopIndex: 0, enabled: true }],
+    ['a display that is not attached', { displayKey: 'unplugged|800x600|1', desktopIndex: 0, enabled: true }],
+  ])('leaves %s on desktop 0', async (_label, patch) => {
+    const store = await setup();
+    store.setMainDisplayKey(MAIN);
+    // Populate the present-display cache so "not attached" means something.
+    store.syncAssignments([{ key: MAIN, primary: true }]);
+    const snapshot = store.setAssignment(patch);
+    const row = (snapshot.assignments ?? []).find((a) => a.displayKey === patch.displayKey);
+    expect(row?.desktopIndex).toBe(0);
+  });
+
+  it('does nothing while the main display is unknown, rather than guessing', async () => {
+    const store = await setup();
+    const snapshot = store.setAssignment({ displayKey: SECOND, desktopIndex: 0, enabled: true });
+    expect((snapshot.assignments ?? []).find((a) => a.displayKey === SECOND)?.desktopIndex).toBe(0);
+  });
+});

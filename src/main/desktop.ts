@@ -617,11 +617,85 @@ class DesktopStore {
       dirty = true;
     }
 
+    /*
+     * Heal a collision that is ALREADY on disk.
+     *
+     * Every guard above only fires while inventing or adopting a row; a stored
+     * row is skipped outright at the top of this loop, so a display that was
+     * handed main's desktop before those guards existed — or by `setAssignment`,
+     * which had none — kept it forever. That is not hypothetical: measured live
+     * 2026-09-05, `display|1920x1080|1` held `desktopIndex: 0, enabled: true`
+     * while `activeDesktopIndex` was also 0, and the two shells had driven
+     * `layoutEpoch` to 199,417. Runs after the loop so freshly created rows are
+     * included, and it is one-shot by construction — once nothing collides,
+     * `rehomeIfDesktopClaimed` returns false for every row.
+     */
+    for (const row of this.schema.assignments) {
+      if (this.rehomeIfDesktopClaimed(row)) dirty = true;
+    }
+
     if (dirty) {
       this.persist();
       this.broadcast();
     }
     return this.snapshot();
+  }
+
+  /**
+   * Enforce single-owner desktops where an assignment is actually written.
+   *
+   * `switchDesktop` refuses to move MAIN onto a secondary's desktop and
+   * `syncAssignments` reserves main's index when it invents a fresh row — but
+   * `setAssignment` wrote whatever it was handed, and it is the path the user
+   * drives: Settings > Monitors has a "Hosts desktop" dropdown listing every
+   * index including main's (`MonitorsPage.tsx:132`, `deskwin:assign`) and an
+   * enable toggle (`deskwin:setOptions`) that can switch on a display already
+   * parked there. Nothing at all healed a row that was already colliding.
+   *
+   * Two shells then own one desktop, and they do not merely race. Each hydrates
+   * the shared layout into its own viewport, `desktopLayoutFit` rescales it
+   * because `authoredW !== viewportWidth`, and the result is committed back with
+   * its own authored size — which the other shell then rescales again. Measured
+   * live 2026-09-05 on this machine: 27 broadcasts in 6.0 s alternating between
+   * authored 1264x773 and 1904x945, `layoutEpoch` climbing 4.6/s with nobody
+   * touching the app, each tick a synchronous `renameSync` on the main loop.
+   * `commitLayout`'s echo suppression cannot see it: every rescaled layout
+   * genuinely differs from the last, so it is never an echo.
+   *
+   * Re-home rather than refuse, exactly as the key-adoption path above does —
+   * the display still turns on, it just gets a desktop of its own. Returns true
+   * when the row moved, so callers know they have something to persist.
+   *
+   * Deliberately inert in two cases, both of which keep prior behaviour: the
+   * main display is unknown (nothing has told us which row is exempt), and the
+   * row's own display is not attached (an absent monitor has no shell, so it
+   * cannot ping-pong, and "the user unplugged a monitor, they did not reset its
+   * configuration" still holds).
+   */
+  private rehomeIfDesktopClaimed(row: DisplayAssignment): boolean {
+    if (!row.enabled) return false;
+    if (this.mainDisplayKey == null || row.displayKey === this.mainDisplayKey) return false;
+    if (!this.isDisplayAttached(row.displayKey)) return false;
+
+    // Main's own row counts as taken even though it spawns no secondary shell
+    // (`syncDesktopWindows`: "The main window already hosts its own display").
+    // Landing on it would not ping-pong, but it duplicates an index that
+    // `syncAssignments` keeps unique, and one desktop with two rows pointing at
+    // it is how this class of bug starts.
+    const taken = new Set<number>([this.schema.activeDesktopIndex]);
+    for (const other of this.schema.assignments) {
+      if (other === row || !other.enabled) continue;
+      if (!this.isDisplayAttached(other.displayKey)) continue;
+      taken.add(other.desktopIndex);
+    }
+    if (!taken.has(row.desktopIndex)) return false;
+
+    let free = 0;
+    while (taken.has(free) && free < MAX_DESKTOPS - 1) free += 1;
+    if (free === row.desktopIndex) return false;
+    row.desktopIndex = free;
+    this.ensureDesktop(free);
+    return true;
   }
 
   setAssignment(patch: Partial<DisplayAssignment> & { displayKey: string }): DesktopLayoutSnapshot {
@@ -638,7 +712,10 @@ class DesktopStore {
       if (created) this.schema.assignments.push(created);
     }
     const target = this.schema.assignments.find((a) => a.displayKey === patch.displayKey);
-    if (target) this.ensureDesktop(target.desktopIndex);
+    if (target) {
+      this.rehomeIfDesktopClaimed(target);
+      this.ensureDesktop(target.desktopIndex);
+    }
     this.persist();
     this.broadcast();
     return this.snapshot();
