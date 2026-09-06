@@ -343,6 +343,152 @@ export interface CardSchedulingState {
 }
 
 /**
+ * Everything the collection-wide fold reads off a note, and nothing else. The note's
+ * field HTML — which is all of `notesInfo`'s weight — is consumed once, here, and
+ * then thrown away.
+ */
+interface NoteProjection {
+  noteId: number;
+  modelName: string;
+  cards: number[];
+  /** Already cleaned and already filtered by the word-study rule; `null` means skip. */
+  expression: string | null;
+  leech: boolean;
+}
+
+const noteProjections = new Map<number, NoteProjection>();
+/** The profile epoch the cache was built under; a switch invalidates every projection. */
+let noteProjectionEpoch: number | null = null;
+/** Rotation cursor: which slice of the cached notes this poll re-reads. */
+let rotationCursor = 0;
+
+/**
+ * How many polls a full re-read of every note is spread across. At the 5-minute
+ * cadence, 12 means every note is re-read within an hour.
+ */
+const ROTATION_SLICES = 12;
+
+/**
+ * Exported for tests only. The cache is the one structure here that can grow without
+ * bound, so its SIZE is the thing a test has to be able to see — dropping a departed
+ * note changes nothing about the entries a poll emits, because those are rebuilt from
+ * the live id list either way.
+ */
+export function noteProjectionCount(): number {
+  return noteProjections.size;
+}
+
+/** Exported for tests only. */
+export function resetNoteProjections(): void {
+  noteProjections.clear();
+  noteProjectionEpoch = null;
+  rotationCursor = 0;
+}
+
+/**
+ * `runPoll` re-read every note's full field HTML on every poll, and `kickPoll`
+ * single-flights, so on a real collection the poll never actually finished before the
+ * next one was due — main was permanently mid-poll, permanently allocating.
+ *
+ * Measured 2026-09-05 against the user's own Anki, sampling evenly across all 155,384
+ * notes of the default profile's `deck:*`: `notesInfo` is 2,048 bytes per note, i.e.
+ * 303.5 MB per poll, forever, parsed in the process that also serves every IPC call.
+ *
+ * A note's fields, note type and tags are near-static; what moves between polls is the
+ * SCHEDULING, and that is read fresh every poll from `getIntervals`/`areSuspended` for
+ * every card. So the projection is cached and only a rotating twelfth of it is re-read
+ * per poll. Steady-state `notesInfo` falls to ~25 MB per poll and every note is refreshed
+ * within an hour.
+ *
+ * THE TRADEOFF, stated rather than hidden: an edit to a note's term field, its tags or
+ * its card list can be up to an hour stale in the expression index. Intervals — the thing
+ * the index exists to report — are never stale. A profile switch (epoch change) and a
+ * process restart both rebuild the cache from scratch. `edited:` was the alternative
+ * considered and rejected for this pass: it would have made staleness shorter but depends
+ * on Anki search syntax the client does not otherwise use, and it does not see a card
+ * added to an existing note at all, which rotation does.
+ */
+async function refreshNoteProjections(
+  noteIds: number[],
+  epoch: number,
+  cfg: IntervalsConfig,
+  opts: { signal?: AbortSignal; beforeChunk: () => void },
+): Promise<NoteProjection[]> {
+  if (noteProjectionEpoch !== epoch) {
+    noteProjections.clear();
+    noteProjectionEpoch = epoch;
+    rotationCursor = 0;
+  }
+
+  // Notes that left the collection stop being projected at all, so a deleted note
+  // cannot keep contributing an expression to the index.
+  const live = new Set(noteIds);
+  for (const id of Array.from(noteProjections.keys())) {
+    if (!live.has(id)) noteProjections.delete(id);
+  }
+
+  const missing: number[] = [];
+  const rotating: number[] = [];
+  for (const id of noteIds) {
+    if (!noteProjections.has(id)) missing.push(id);
+    else if (id % ROTATION_SLICES === rotationCursor) rotating.push(id);
+  }
+  rotationCursor = (rotationCursor + 1) % ROTATION_SLICES;
+
+  const termFieldByModel = new Map<string, string | undefined>();
+  const toFetch = missing.concat(rotating);
+  for (const chunk of chunks(toFetch, CHUNK_SIZE)) {
+    opts.beforeChunk();
+    const batch = (await invoke('notesInfo', { notes: chunk }, opts.signal ? { signal: opts.signal } : undefined)) ?? [];
+    for (const n of batch) {
+      // A deleted note comes back as an EMPTY OBJECT rather than being omitted.
+      if (!n || typeof n.noteId !== 'number') continue;
+      noteProjections.set(n.noteId, projectNote(n, cfg, termFieldByModel));
+    }
+  }
+
+  // Rebuild in the collection's own id order, so the fold — and therefore ENTRY_CAP's
+  // truncation point — does not depend on which notes this poll happened to re-read.
+  const out: NoteProjection[] = [];
+  for (const id of noteIds) {
+    const p = noteProjections.get(id);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+function projectNote(
+  n: AnkiNoteInfo,
+  cfg: IntervalsConfig,
+  termFieldByModel: Map<string, string | undefined>,
+): NoteProjection {
+  const base: NoteProjection = {
+    noteId: n.noteId,
+    modelName: n.modelName,
+    cards: Array.from(n.cards ?? []),
+    expression: null,
+    leech: ankiTagsContainLeech(n.tags),
+  };
+  const fields = n.fields ?? {};
+  const orderedFields = Object.keys(fields).sort((a, b) => fields[a].order - fields[b].order);
+  if (!orderedFields.length) return base;
+
+  let termField: string | undefined;
+  if (termFieldByModel.has(n.modelName)) {
+    termField = termFieldByModel.get(n.modelName);
+  } else {
+    termField = resolveTermFieldName(n.modelName, orderedFields, cfg.getTermOverride(n.modelName));
+    termFieldByModel.set(n.modelName, termField);
+  }
+  if (!termField || !fields[termField]) return base;
+
+  const expression = cleanAnkiField(fields[termField].value ?? '');
+  // Skip empty or sentence-length fields (word-based decks only) — today's rule.
+  if (!expression || expression.length > 24 || /\s/.test(expression)) return base;
+  return { ...base, expression };
+}
+
+/**
  * Set once, for the life of the process, when the thin pair is unusable against
  * this AnkiConnect — an older build without the actions, or a reply that is not
  * positionally aligned with the request. Every later chunk then uses `cardsInfo`,
@@ -479,51 +625,34 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
   }
   const noteIds = Array.from(noteIdSet);
 
-  // 3. notesInfo in sequential chunks of 500.
-  const notes: AnkiNoteInfo[] = [];
-  for (const chunk of chunks(noteIds, CHUNK_SIZE)) {
-    checkEpoch();
-    const batch = (await invoke('notesInfo', { notes: chunk }, { signal })) ?? [];
-    for (const n of batch) notes.push(n);
-  }
+  // 3. notesInfo for the notes this poll does not already have a projection for,
+  //    plus this poll's rotation slice, in sequential chunks of 500.
+  const projections = await refreshNoteProjections(noteIds, epoch, cfg, { signal, beforeChunk: checkEpoch });
 
   // 5. card scheduling state in sequential chunks of 500.
   const cardIdSet = new Set<number>();
-  for (const n of notes) for (const c of n.cards ?? []) cardIdSet.add(c);
+  for (const p of projections) for (const c of p.cards) cardIdSet.add(c);
   const stateByCard = await readCardStates(Array.from(cardIdSet), {
     signal,
     beforeChunk: checkEpoch,
   });
 
   // 4+6. term extraction and max-interval fold.
-  const termFieldByModel = new Map<string, string | undefined>();
   const best = new Map<string, IntervalEntry>();
   let truncated = false;
-  for (const n of notes) {
+  for (const p of projections) {
     if (best.size >= ENTRY_CAP) {
       truncated = true;
       break;
     }
-    const fields = n.fields ?? {};
-    const orderedFields = Object.keys(fields).sort((a, b) => fields[a].order - fields[b].order);
-    if (!orderedFields.length) continue;
-
-    let termField: string | undefined;
-    if (termFieldByModel.has(n.modelName)) {
-      termField = termFieldByModel.get(n.modelName);
-    } else {
-      termField = resolveTermFieldName(n.modelName, orderedFields, cfg.getTermOverride(n.modelName));
-      termFieldByModel.set(n.modelName, termField);
-    }
-    if (!termField || !fields[termField]) continue;
-
-    const expression = cleanAnkiField(fields[termField].value ?? '');
-    // Skip empty or sentence-length fields (word-based decks only) — today's rule.
-    if (!expression || expression.length > 24 || /\s/.test(expression)) continue;
+    // Skip empty or sentence-length fields (word-based decks only) — today's rule,
+    // applied when the projection was built.
+    const expression = p.expression;
+    if (!expression) continue;
 
     let maxIvl = 0;
     let suspended = false;
-    for (const c of n.cards ?? []) {
+    for (const c of p.cards) {
       const state = stateByCard.get(c);
       maxIvl = Math.max(maxIvl, state?.interval ?? 0);
       if (state?.suspended) suspended = true;
@@ -531,9 +660,9 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
     best.set(expression, mergeIntervalEntries(best.get(expression), {
       expression,
       ivlDays: maxIvl,
-      noteId: n.noteId,
-      modelName: n.modelName,
-      ...(ankiTagsContainLeech(n.tags) ? { leech: true } : {}),
+      noteId: p.noteId,
+      modelName: p.modelName,
+      ...(p.leech ? { leech: true } : {}),
       ...(suspended ? { suspended: true } : {}),
     }));
   }
@@ -561,7 +690,7 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
     generatedAt: now,
     sourceQueries: queries,
     entries: withIntervalChangeEvidence(currentSnapshot, Array.from(best.values()), now),
-    noteCount: notes.length + optimisticCount,
+    noteCount: projections.length + optimisticCount,
     truncated,
   };
 
