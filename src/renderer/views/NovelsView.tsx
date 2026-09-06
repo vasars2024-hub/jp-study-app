@@ -87,10 +87,24 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
             {t('novelsView.local')}
           </button>
           <ToolbarSpacer />
-          <button type="button" className={`aero-novels-command ${mode === 'plan' ? 'active' : ''}`} onClick={() => setPlanOnly((v) => !v)}>
+          {/* The highlight has to follow `planOnly`, which is what the table filters on.
+              Reading it off the `mode` prop made it a constant: the button stayed lit while
+              the list showed every book, and stayed unlit in `imports` mode while the list
+              WAS plan-filtered. */}
+          <button
+            type="button"
+            className={`aero-novels-command ${planOnly ? 'active' : ''}`}
+            aria-pressed={planOnly}
+            onClick={() => setPlanOnly((v) => !v)}
+          >
             {t('novelsView.plan')} {store?.plan.length ? `(${store.plan.length})` : ''}
           </button>
-          <button type="button" className="aero-novels-command" onClick={() => setShowSources((v) => !v)}>
+          <button
+            type="button"
+            className={`aero-novels-command ${showSources ? 'active' : ''}`}
+            aria-expanded={showSources}
+            onClick={() => setShowSources((v) => !v)}
+          >
             <Icon name="settings" size={12} />
             {t('novelsView.sources')}
           </button>

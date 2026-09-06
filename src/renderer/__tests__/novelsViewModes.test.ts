@@ -8,6 +8,10 @@ const modeState = vi.hoisted(() => ({
   setPlanOnly: vi.fn(),
   setImportFilter: vi.fn(),
   setShowSources: vi.fn(),
+  // The toolbar's highlight has to follow these two, not the `mode` prop, so they
+  // are readable per test rather than pinned to false.
+  planOnly: false,
+  showSources: false,
 }));
 
 vi.mock('../i18n', () => ({
@@ -31,11 +35,11 @@ vi.mock('../components/novels/NovelsContent', () => ({
   useNovels: () => ({
     query: '',
     setQuery: vi.fn(),
-    planOnly: false,
+    planOnly: modeState.planOnly,
     setPlanOnly: modeState.setPlanOnly,
     importFilter: 'all',
     setImportFilter: modeState.setImportFilter,
-    showSources: false,
+    showSources: modeState.showSources,
     setShowSources: modeState.setShowSources,
     loadingJiten: false,
     refreshingNovels: false,
@@ -62,6 +66,8 @@ beforeEach(() => {
   modeState.setPlanOnly.mockReset();
   modeState.setImportFilter.mockReset();
   modeState.setShowSources.mockReset();
+  modeState.planOnly = false;
+  modeState.showSources = false;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -100,5 +106,45 @@ describe('NovelsView destination modes', () => {
     expect(host.querySelector('[data-content="filters"]')).not.toBeNull();
     expect(host.querySelector('[data-content="table"]')).toBeNull();
     expect(host.querySelector('[data-content="inspector"]')).toBeNull();
+  });
+});
+
+describe('NovelsView toolbar state', () => {
+  function commands() {
+    return Array.from(host.querySelectorAll<HTMLButtonElement>('.aero-novels-command'));
+  }
+  const plan = () => commands().find((b) => b.textContent?.includes('novelsView.plan'));
+  const sources = () => commands().find((b) => b.textContent?.includes('novelsView.sources'));
+
+  it('lights Plan from the filter it controls, not from the window it was opened as', async () => {
+    modeState.planOnly = false;
+    await renderMode('plan');
+    // Opened AS the Plan window, but the user has switched the filter off: the
+    // table shows every book, so the button must not claim otherwise.
+    expect(plan()?.className).not.toContain('active');
+    expect(plan()?.getAttribute('aria-pressed')).toBe('false');
+
+    modeState.planOnly = true;
+    await renderMode('plan');
+    expect(plan()?.className).toContain('active');
+    expect(plan()?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('lights Plan in the Imports window too, where the filter is on and the mode is not plan', async () => {
+    modeState.planOnly = true;
+    await renderMode('imports');
+    expect(plan()?.className).toContain('active');
+    expect(plan()?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('gives Sources an expanded state that tracks the editor it discloses', async () => {
+    await renderMode('plan');
+    expect(sources()?.getAttribute('aria-expanded')).toBe('false');
+    expect(sources()?.className).not.toContain('active');
+
+    modeState.showSources = true;
+    await renderMode('plan');
+    expect(sources()?.getAttribute('aria-expanded')).toBe('true');
+    expect(sources()?.className).toContain('active');
   });
 });
