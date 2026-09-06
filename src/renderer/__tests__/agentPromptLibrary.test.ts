@@ -102,4 +102,26 @@ describe('AgentPromptLibrary', () => {
     expect(stored.prompts).toEqual([]);
     expect(host.textContent).toContain('agent.promptLibrary.empty');
   });
+
+  /**
+   * D82. The confirm button lives inside the row the delete removes, so focus
+   * fell to <body> and keyboard travel restarted at the top of the window.
+   */
+  it('keeps focus inside the panel after the deleted row is removed', async () => {
+    await act(async () => {
+      root.render(createElement(AgentPromptLibrary, { onUse: () => undefined }));
+      await Promise.resolve();
+    });
+    const button = (key: string) => [...host.querySelectorAll('button')]
+      .find((entry) => entry.textContent === key);
+
+    await act(async () => button('agent.promptLibrary.delete')?.click());
+    await act(async () => {
+      button('agent.promptLibrary.confirmDelete')?.click();
+      await Promise.resolve();
+    });
+
+    expect(document.activeElement).toBe(host.querySelector('#agent-prompt-library-title'));
+    expect(document.activeElement).not.toBe(document.body);
+  });
 });

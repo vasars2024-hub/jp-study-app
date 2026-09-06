@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentReusablePrompt, AgentWorkspaceState } from '../../../shared/agentWorkspace';
 import {
   AGENT_PROMPT_LIBRARY_LIMIT,
@@ -39,6 +39,7 @@ export function AgentPromptLibrary({ onUse }: AgentPromptLibraryProps) {
   const [promptText, setPromptText] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -123,13 +124,23 @@ export function AgentPromptLibrary({ onUse }: AgentPromptLibraryProps) {
     setWorkspace(result.state);
     setDeleteId(null);
     if (editingId === promptId) resetEditor();
+    // The confirm button the user just pressed lived inside the row that is now
+    // gone, so focus fell to <body> and keyboard travel restarted at the top of
+    // the window. The panel heading is the nearest thing that always survives a
+    // delete, and landing on it re-announces where the user is.
+    headingRef.current?.focus();
   };
 
   return (
     <section className="agent-prompt-library" aria-labelledby="agent-prompt-library-title">
       <div className="agent-prompt-library-heading">
         <div>
-          <h3 id="agent-prompt-library-title" className="agent-subheading">
+          <h3
+            id="agent-prompt-library-title"
+            className="agent-subheading"
+            ref={headingRef}
+            tabIndex={-1}
+          >
             {t('agent.promptLibrary.title')}
           </h3>
           <p>{t('agent.promptLibrary.description')}</p>
