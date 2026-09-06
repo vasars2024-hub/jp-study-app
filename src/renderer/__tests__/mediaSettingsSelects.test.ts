@@ -72,3 +72,34 @@ describe('every select in a mc-setting-row carries its own accessible name', () 
     expect(unnamed, `selects with no accessible name: ${unnamed.join(' | ')}`).toHaveLength(0);
   });
 });
+
+describe('the diagnostics buttons report what they did', () => {
+  /**
+   * Both were dead. `runPlayerDiagnostics` built a real `PlayerDiagnosticReport` into
+   * `playerDiagnostics` and nothing in the tree rendered it; `diagnosticsOpen` was set by
+   * "View report" and had NO consumer anywhere — `grep -rn diagnosticsOpen src --include=*.tsx`
+   * returned only its own declaration and that setter. Measured live 2026-09-06: clicking
+   * each changed the pane's text length by 0, opened no dialog and raised no toast.
+   */
+  it('renders the report state rather than only setting it', () => {
+    expect(src).toContain('state.playerDiagnostics');
+    expect(src).toContain('mediaCenter.settings.diagnosticsSummary');
+    expect(src).toContain('mediaCenter.settings.noReportYet');
+    // The export already existed and was equally unreachable.
+    expect(src).toContain('state.exportPlayerDiagnostics');
+  });
+
+  it('keeps "View report" focusable while it has nothing to show', () => {
+    // A `disabled` button is not keyboard-focusable, so the sentence explaining why it will
+    // not respond would be unreachable — the same finding the boss audit raised against the
+    // Anki field-template Save button.
+    const at = src.indexOf("mediaCenter.settings.viewReport");
+    const tag = src.lastIndexOf('<button', at);
+    const decl = src.slice(tag, at);
+    expect(decl).toContain('aria-disabled=');
+    expect(decl).toContain('aria-expanded=');
+    // `(?<![-\w])` and not `\b`: a hyphen is a word boundary, so `\bdisabled=` matches
+    // inside `aria-disabled=` and the assertion would fail on the correct code.
+    expect(decl).not.toMatch(/(?<![-\w])disabled=\{/);
+  });
+});

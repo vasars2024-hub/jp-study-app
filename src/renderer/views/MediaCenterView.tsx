@@ -1440,10 +1440,56 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
           <Toggle label={t('mediaCenter.settings.autoPause')} detail={t('mediaCenter.settings.autoPauseDetail')} checked={state.autoPause} onChange={state.setAutoPause} />
           <Toggle label={t('mediaCenter.settings.loopSubtitle')} detail={t('mediaCenter.settings.loopSubtitleDetail')} checked={state.loopLine} onChange={state.setLoopLine} />
           <Toggle label={t('mediaCenter.settings.normalization')} detail={t('mediaCenter.settings.normalizationDetail')} checked={state.volumeNormalization} onChange={(value) => void state.applyVolumeNormalization(value)} />
+          {/* Both of these buttons used to do nothing a user could see. `runPlayerDiagnostics`
+              built a real report into `playerDiagnostics` and NOTHING rendered it;
+              `diagnosticsOpen` had no consumer anywhere in the tree, so "View report" set a
+              boolean and returned. Measured live 2026-09-06: clicking each changed the pane's
+              text length by 0, opened no dialog and raised no toast.
+
+              The result is now reported where it is produced. The per-check list is
+              deliberately NOT rendered yet: `buildPlayerDiagnosticReport` emits 21 English
+              prose strings, and surfacing untranslated sentences would trade one defect for
+              another. The counts are numbers and the export writes the full report to a file,
+              so nothing measured is withheld — see D80 in the pre-sweep register. */}
           <div className="mc-settings-actions">
-            <button type="button" onClick={() => void state.runPlayerDiagnostics()}><Icon name="wrench" size={12} /> {t('mediaCenter.settings.runDiagnostics')}</button>
-            <button type="button" onClick={() => state.setDiagnosticsOpen(true)}><Icon name="info" size={12} /> {t('mediaCenter.settings.viewReport')}</button>
+            <button type="button" onClick={() => void state.runPlayerDiagnostics()} disabled={state.diagnosticsRunning}>
+              <Icon name="wrench" size={12} />
+              {' '}
+              {state.diagnosticsRunning ? t('mediaCenter.settings.diagnosticsRunning') : t('mediaCenter.settings.runDiagnostics')}
+            </button>
+            <button
+              type="button"
+              // `aria-disabled`, not `disabled`: a disabled button is not focusable, so the
+              // reason it will not respond would be unreachable from the keyboard — the
+              // sentence beside it says so, and the status line below repeats it.
+              onClick={() => { if (state.playerDiagnostics) state.setDiagnosticsOpen(!state.diagnosticsOpen); }}
+              aria-expanded={state.diagnosticsOpen}
+              aria-disabled={!state.playerDiagnostics}
+              title={state.playerDiagnostics ? undefined : t('mediaCenter.settings.noReportYet')}
+            >
+              <Icon name="info" size={12} />
+              {' '}
+              {t('mediaCenter.settings.viewReport')}
+            </button>
           </div>
+          <p className="mc-setting-note" role="status">
+            {state.playerDiagnostics
+              ? t('mediaCenter.settings.diagnosticsSummary', {
+                pass: state.playerDiagnostics.passCount,
+                warning: state.playerDiagnostics.warningCount,
+                fail: state.playerDiagnostics.failCount,
+              })
+              : t('mediaCenter.settings.noReportYet')}
+          </p>
+          {state.diagnosticsOpen && state.playerDiagnostics && (
+            <div className="mc-settings-actions">
+              <button type="button" onClick={state.exportPlayerDiagnostics}>
+                <Icon name="download" size={12} />
+                {' '}
+                {t('mediaCenter.settings.exportReport')}
+              </button>
+            </div>
+          )}
         </SettingsSection>
 
         <SettingsSection icon="caption" title={t('mediaCenter.settings.subtitles')} detail={t('mediaCenter.settings.subtitlesDetail')}>

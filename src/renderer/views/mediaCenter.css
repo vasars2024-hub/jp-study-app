@@ -2740,6 +2740,22 @@
   cursor: pointer;
 }
 
+/* The diagnostics result line. It sits under the two action buttons and is the only
+   thing on this pane that reports the outcome of pressing one, so it keeps the same
+   dim-body treatment as a setting's own explanatory text rather than shouting. */
+.mc-setting-note {
+  margin: 8px 0 0;
+  color: var(--mc-dim);
+  font-size: var(--mc-fs-micro, 11px);
+}
+
+/* A control kept focusable so its reason is reachable from the keyboard still has to
+   LOOK unavailable, or the pane promises something it will not do. */
+.mc-settings-actions button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .mc-settings-actions-stack {
   display: grid;
   grid-template-columns: 1fr 1fr;
