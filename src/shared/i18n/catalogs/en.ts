@@ -8579,7 +8579,7 @@ export const en: Catalog = {
   'mediaCenter.video.subtitleLines': 'subtitle lines',
   'mediaCenter.video.vocabulary': 'vocabulary',
   'mediaCenter.video.malScore': 'MAL score',
-  'mediaCenter.video.inspectorEmpty': 'Choose a file from your library or use Open video. The source file stays in place.',
+  'mediaCenter.video.inspectorEmpty': 'Choose a file from your library, or use Select a video or Browse folder. The source file stays in place.',
   'mediaCenter.video.noVideos': 'No videos yet',
   'mediaCenter.video.noVideosDetail': 'Add a file or folder to start building your immersion library.',
   'mediaCenter.study.dictation': 'Dictation mode',

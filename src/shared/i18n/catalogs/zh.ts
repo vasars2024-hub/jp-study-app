@@ -8134,7 +8134,7 @@ export const zh: Catalog = {
   'mediaCenter.video.subtitleLines': '行字幕',
   'mediaCenter.video.vocabulary': '词汇',
   'mediaCenter.video.malScore': 'MAL 评分',
-  'mediaCenter.video.inspectorEmpty': '从媒体库选择文件或使用“打开视频”。源文件会保留在原位置。',
+  'mediaCenter.video.inspectorEmpty': '从媒体库选择文件，或使用“选择视频”或“浏览文件夹”。源文件会保留在原位置。',
   'mediaCenter.video.noVideos': '还没有视频',
   'mediaCenter.video.noVideosDetail': '添加文件或文件夹以建立沉浸式媒体库。',
   'mediaCenter.study.dictation': '听写模式',

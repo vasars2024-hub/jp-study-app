@@ -8175,7 +8175,7 @@ export const ja: Catalog = {
   'mediaCenter.video.subtitleLines': '字幕行',
   'mediaCenter.video.vocabulary': '語彙',
   'mediaCenter.video.malScore': 'MAL評価',
-  'mediaCenter.video.inspectorEmpty': 'ライブラリからファイルを選ぶか、ビデオを開いてください。元ファイルは移動しません。',
+  'mediaCenter.video.inspectorEmpty': 'ライブラリからファイルを選ぶか、「ビデオを選択」または「フォルダーを見る」を使ってください。元ファイルは移動しません。',
   'mediaCenter.video.noVideos': 'ビデオがありません',
   'mediaCenter.video.noVideosDetail': 'ファイルやフォルダーを追加してイマージョンライブラリを作成します。',
   'mediaCenter.study.dictation': 'ディクテーション',

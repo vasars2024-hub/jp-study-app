@@ -8919,7 +8919,7 @@ export const ru: Catalog = {
   'mediaCenter.video.subtitleLines': 'строк субтитров',
   'mediaCenter.video.vocabulary': 'слов',
   'mediaCenter.video.malScore': 'оценка MAL',
-  'mediaCenter.video.inspectorEmpty': 'Выберите файл в медиатеке или откройте видео. Исходный файл останется на месте.',
+  'mediaCenter.video.inspectorEmpty': 'Выберите файл в медиатеке или воспользуйтесь кнопкой «Выбрать видео» или «Открыть папку». Исходный файл останется на месте.',
   'mediaCenter.video.noVideos': 'Видео пока нет',
   'mediaCenter.video.noVideosDetail': 'Добавьте файл или папку, чтобы начать собирать медиатеку погружения.',
   'mediaCenter.study.dictation': 'Режим диктанта',
