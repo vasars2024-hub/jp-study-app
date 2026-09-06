@@ -9029,3 +9029,82 @@ To 2026-09-07 11:00 EDT, measured 02:52: **32 h 08 min = 1.339 days**.
 The one left: **`player` cat7**, which needs a MATCHED library item
 (`src/media/seanimeLibrary.ts:175-200`) — a content prerequisite, not a defect.
 `sampled-out:` nothing; the single remaining cell is named above with its reason.
+
+## 2026-09-06 03:00 EDT — primary — `player` cat7 CLOSES 10/10. **192 of 192. The matrix is FULL.**
+
+**Closed this turn: 1 cell. 191 -> 192 of 192, 0 left.** `sampled-out:` nothing — there was
+one open cell and it is this one.
+
+### The prerequisite was never a library match. It was a LOCAL FILE, and the product has a route for it
+
+Three handoffs in a row named this cell's blocker as "needs a MATCHED library item
+(`seanimeLibrary.ts:175-200`)" and pointed the next worker at seeding AniList ids so Seanime's
+own title matching would stop failing. That was the long way round. `MediaWorkspaceHost`'s
+`bringForward` (`MediaWorkspaceHost.tsx:100-116`) accepts
+`MEDIA_WORKSPACE_OPEN_EVENT` with a bare `{ localFilePath }` and
+`normalizeMediaWorkspaceOpenRequest` (`shared/mediaWorkspace.ts:182`) turns it into a
+`kind:'local'` request that goes to directstream **without consulting the library at all**.
+That is the same event `mc-seanime-link` and the Video destination raise, so it is the
+product's own path, not a back door.
+
+One dispatch with the JoJo *Ougon no Kaze* 38 mp4 already in `listMedia()` (39 rows, 37 video)
+and the surface came up decoding: `#media-workspace video` `readyState 4`, `paused false`,
+`1280x720`, `duration 1420.1 s`, src
+`http://127.0.0.1:52199/api/v1/directstream/stream?id=6a8b9f94…`. Seanime was READY the whole
+time (v3.10.2, pid 17744, port 52199, `simulatedUser: true`, watcher "Library size updated:
+48 GiB") — and the host's own library pane in fact renders five matched shows including this
+one, so the "0 matched" reading the handoff carried was of the wrong thing.
+
+### `player` cat7 — PASS 10/10
+
+`cat7-perf.cjs --surface player --player-frames`, instrument
+`HTMLVideoElement.getVideoPlaybackQuality()` deltas sampled renderer-side at 1000 ms.
+pid **20684**, OS window 1 (`focused-at-start`), 5 floating windows on the desk, 406 root
+elements. Baseline `baselines/cat7-player-frames.json` (untracked, per RULE P).
+
+    scored   1280x720 rate 1, 31 samples, longestSampleGapMs 1004
+             decoded 721 / dropped 0 / corrupted 0 over wall 30.04 s = 0%
+             decodedFps 24, mediaS 30.03 vs wallS 30.04 -> playbackRatio 1.00
+             intervalsRated 30, intervalsWithDrops 0, worst interval 24 decoded / 0 dropped
+             flags elementSwapped false, rateChanged false, pausedAtArm false, pausedDuring false
+    restored present true, rate 1, paused false, currentTime 71.59, readyState 4
+
+**NEGATIVE CONTROL 1 — rate 8, and it FIRED.** Same element, same stream, one variable:
+decoded 1106 / **dropped 518** over 6.07 s = **46.8%**, **85.38 drops per wall-second against
+0** clean, **12 of 12** intervals with drops. `controlFired: true`.
+
+**NEGATIVE CONTROL 2 — the paused player, and the instrument REFUSED rather than scoring it.**
+This is the failure mode the whole `--player-frames` mode exists to avoid: a still picture drops
+nothing and would read 10/10. Paused the element through the product's own `<video>`
+(`paused true`, t=98.84 s) and re-ran the identical command:
+
+    Error: REFUSE - the subject decoded 0 frames across 30.03s. A player that is not playing
+    drops nothing and would score 10/10; there is no measurement here.
+
+Both directions, ~2 minutes apart, same command, same window. A category-7 pass on a decoder is
+worth nothing without this one and it had never been demonstrated on this surface.
+
+### State restored, and the overlay trap paid off rather than re-paid
+
+The media workspace is a `role=dialog aria-modal` at z-index 9999 that occludes every later
+`--surface` run, so it was closed through its own **Close** button with a real `/click` at the
+measured centre (1185,25; `elementFromPoint` resolved to `BUTTON.seanime-host-close` first,
+`delivered:1`, `transport:"cdp"`). After: `#media-workspace` gone, `videoCount` **0**, the same
+**5** floating windows, `/logs?level=error` **0 entries**. Nothing opened, nothing left flipped.
+
+### THE MATRIX IS FULL — 192 of 192, and here is the count's method
+
+24 sections x 8 categories = 192, `files` excluded from the denominator by the ruling at the
+`164 of 192` anchor. Counted by walking that anchor's own per-turn running-total series
+forward: **164 -> 165 -> 168 (recount) -> 170 -> 171 -> 172 -> 174 -> 175 -> 176 -> 177 -> 184
+-> 185 -> 188 -> 189 -> 190 -> 191 -> 192.** Monotone, no gap, every step a dated entry in this
+file that names the cells it closed and carries its commit. The 28 cells closed since that
+anchor are exactly the 28 it enumerated as open: `reading` 8, `player` 8, `anki` 8,
+`translate` cat7, `immersion` cat2/cat7/cat8.
+
+### RULE D — liquid. Closed this turn: **1 cell. 191 -> 192 of 192, 0 left.**
+
+To 2026-09-07 11:00 EDT, measured 03:10: **31 h 49 min = 1.326 days**.
+`0 / 1.326 = 0.00 cells/day` required. Trailing: 164 of 192 at 09-05 09:06 -> 192 at 09-06
+03:10, i.e. **28 cells in 18.07 h = 37.2/day**. **TARGET AT RISK is NOT declared** — the
+liquid rubric matrix has no remaining cell to be at risk.
