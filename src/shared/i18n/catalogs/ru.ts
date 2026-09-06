@@ -2016,6 +2016,21 @@ export const ru: Catalog = {
   'settings.memory.storageUnavailable': 'Оценка хранилища недоступна.',
   'settings.memory.writeFailed':
     'Не удалось сохранить внешний вид или живую среду (память заполнена или недоступна). Освободите место и повторите.',
+  'settings.memory.health.ok': 'Локальное хранилище в порядке',
+  'settings.memory.health.warn': 'На локальное хранилище стоит взглянуть',
+  'settings.memory.health.critical': 'В локальном хранилище есть дефект',
+  'settings.memory.health.footprint': '{bytes} в {count} ключах',
+  'settings.memory.health.overEncoded':
+    'Повторно закодированные значения — они растут при каждом запуске, их нужно починить: {keys}',
+  'settings.memory.health.totalOverBudget':
+    'Всё хранилище превысило порог роста {budget}. Записи пока не отклоняются, но прошлый сбой начинался именно так.',
+  'settings.memory.health.keyOverBudget': 'Отдельные значения больше {budget}: {keys}',
+  'settings.memory.health.lastFailure': 'Запись отклонена в {when}: {key} ({bytes}) — {reason}',
+  'settings.memory.health.kind.quota': 'в хранилище не было места',
+  'settings.memory.health.kind.serialize':
+    'значение не удалось закодировать, само хранилище в порядке',
+  'settings.memory.health.kind.other': 'хранилище было недоступно',
+  'settings.memory.health.dismiss': 'Скрыть',
   'settings.memory.catalogSummary': 'Каталог настроек ≈ {bytes} в {count} активных доменах (частицы, компаньоны, обои, экран, учёба, host…).',
   'settings.memory.catalogSummaryOne': 'Каталог настроек ≈ {bytes} в {count} активном домене (частицы, компаньоны, обои, экран, учёба, host…).',
   'settings.memory.livingLayer': 'Живой слой',

@@ -1849,6 +1849,20 @@ export const ja: Catalog = {
   'settings.memory.storageUnavailable': 'ストレージ見積もりを取得できません。',
   'settings.memory.writeFailed':
     '外観または環境設定を保存できませんでした（容量不足またはアクセス不可）。空き容量を確保して再試行してください。',
+  'settings.memory.health.ok': 'ローカルストアは正常',
+  'settings.memory.health.warn': 'ローカルストアの確認を推奨',
+  'settings.memory.health.critical': 'ローカルストアに不具合あり',
+  'settings.memory.health.footprint': '{count} 個のキーで {bytes}',
+  'settings.memory.health.overEncoded':
+    '二重エンコードされた値 — 起動のたびに肥大化するため修復が必要です：{keys}',
+  'settings.memory.health.totalOverBudget':
+    'ストア全体が {budget} の増加アラームを超えています。まだ書き込みが拒否されているわけではありませんが、前回の不具合はここから始まりました。',
+  'settings.memory.health.keyOverBudget': '{budget} を超える単一の値：{keys}',
+  'settings.memory.health.lastFailure': '{when} に保存が拒否されました：{key}（{bytes}）— {reason}',
+  'settings.memory.health.kind.quota': 'ストアに空きがありませんでした',
+  'settings.memory.health.kind.serialize': '値をエンコードできませんでした（ストア自体は正常です）',
+  'settings.memory.health.kind.other': 'ストレージを利用できませんでした',
+  'settings.memory.health.dismiss': '閉じる',
   'settings.memory.catalogSummary': '設定カタログ ≈ {bytes}（{count} 個のアクティブな領域：パーティクル、コンパニオン、壁紙、表示、学習、ホスト…）',
   'settings.memory.catalogSummaryOne': '設定カタログ ≈ {bytes}（{count} 個のアクティブな領域：パーティクル、コンパニオン、壁紙、表示、学習、ホスト…）',
   'settings.memory.livingLayer': 'リビングレイヤー',

@@ -1987,6 +1987,21 @@ export const en: Catalog = {
   'settings.memory.storageUnavailable': 'Storage estimate unavailable.',
   'settings.memory.writeFailed':
     'Could not save appearance or living-environment settings (storage full or blocked). Free space and try again.',
+  'settings.memory.health.ok': 'Local store healthy',
+  'settings.memory.health.warn': 'Local store worth a look',
+  'settings.memory.health.critical': 'Local store has a defect',
+  'settings.memory.health.footprint': '{bytes} across {count} keys',
+  'settings.memory.health.overEncoded':
+    'Re-encoded values — these grow on every start and must be repaired: {keys}',
+  'settings.memory.health.totalOverBudget':
+    'The whole store is past its {budget} growth alarm. That is not the browser refusing writes yet, but it is how the last fault began.',
+  'settings.memory.health.keyOverBudget': 'Single values past {budget}: {keys}',
+  'settings.memory.health.lastFailure':
+    'A save was refused at {when}: {key} ({bytes}) — {reason}',
+  'settings.memory.health.kind.quota': 'the store had no room',
+  'settings.memory.health.kind.serialize': 'the value could not be encoded, so the store is fine',
+  'settings.memory.health.kind.other': 'storage was unavailable',
+  'settings.memory.health.dismiss': 'Dismiss',
   'settings.memory.catalogSummary': 'Settings catalog ≈ {bytes} across {count} active domains (particles, companions, wallpaper, display, study, host…).',
   'settings.memory.catalogSummaryOne': 'Settings catalog ≈ {bytes} across {count} active domain (particles, companions, wallpaper, display, study, host…).',
   'settings.memory.livingLayer': 'Living layer',

@@ -26,6 +26,15 @@
  *    keys. They were a standing i18n violation on the old page and copying them
  *    forward would have carried it into a brand-new surface.
  *
+ * **One reader was ADDED after the move: `inspectStorageHealth`.** It is not a
+ * gate-8 parity number and is not compared against `gate8-before.json` — it is
+ * audit item 5.7's hardening becoming visible. `storageHealth.ts` measures the
+ * store and `localStorageWrite.ts` records the writes it refuses, and until this
+ * panel read them neither had a consumer: the guard existed and nobody could see
+ * it. It renders INSIDE the existing `storage-usage` card rather than as a tenth
+ * one, because the card ids are gate 8's anchors and the parity test asserts the
+ * rendered set EQUALS the captured set — a new card is a gate-8 failure.
+ *
  * `confirmDialog` is imported from `ui/dialogService` and NOT the `ui` barrel —
  * the barrel re-exports `AppChrome`, and the Files app must not pull the Study
  * OS chrome into its bundle. Same reason `StatsContent` does it.
@@ -43,6 +52,17 @@ import {
   type DomainInventoryItem,
 } from '../../../storage/storage';
 import { formatBytes } from '../../../../shared/assetRegistry';
+import {
+  DEFAULT_STORAGE_BUDGET,
+  inspectStorageHealth,
+  type StorageHealth,
+  type StorageHealthStatus,
+} from '../../../../shared/storageHealth';
+import {
+  clearLastStorageWriteFailure,
+  getLastStorageWriteFailure,
+  type StorageWriteFailure,
+} from '../../../localStorageWrite';
 import { kvClear } from '../../../storage/db';
 import { DEFAULT_TRADITIONAL_MINING_CONFIG } from '../../../../shared/mining';
 import type { AgentMemoryCategory } from '../../../../shared/localAgentMemory';
@@ -109,6 +129,23 @@ const operationLabels = new Map(
   AGENT_TOOL_OPERATIONS.map((definition) => [definition.id, definition.label]),
 );
 
+/**
+ * Status and reasons are resolved by explicit literal, not by building the key
+ * from the union member. A composed `settings.memory.health.${status}` reads as
+ * three missing keys to every tool that scans for `t('…')` call sites.
+ */
+function healthLabel(status: StorageHealthStatus, t: TFn): string {
+  if (status === 'critical') return t('settings.memory.health.critical');
+  if (status === 'warn') return t('settings.memory.health.warn');
+  return t('settings.memory.health.ok');
+}
+
+function failureReason(kind: StorageWriteFailure['kind'], t: TFn): string {
+  if (kind === 'quota') return t('settings.memory.health.kind.quota');
+  if (kind === 'serialize') return t('settings.memory.health.kind.serialize');
+  return t('settings.memory.health.kind.other');
+}
+
 function tierLabel(tier: DomainInventoryItem['tier'], t: TFn): string {
   if (tier === 'host') return t('settings.memory.tier.host');
   if (tier === 'durable') return t('settings.memory.tier.durable');
@@ -125,6 +162,8 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
   const { t, lang } = useT();
   const [domains, setDomains] = useState<DomainInventoryItem[]>([]);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
+  const [health, setHealth] = useState<StorageHealth | null>(null);
+  const [writeFailure, setWriteFailure] = useState<StorageWriteFailure | null>(null);
   const [sys, setSys] = useState<SystemMetrics | null>(null);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -163,6 +202,15 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
     } catch {
       setUsage(null);
     }
+    try {
+      // `navigator.storage.estimate()` above is the whole ORIGIN — IndexedDB,
+      // caches and localStorage together. This is localStorage alone, which is
+      // the store 5.7 filled and the only one whose keys can be named.
+      setHealth(inspectStorageHealth(localStorage));
+    } catch {
+      setHealth(null);
+    }
+    setWriteFailure(getLastStorageWriteFailure());
     // `t` is stable by design; depending on it would never re-fire anyway, and
     // the only string it produces here is an error fallback.
   }, [t]);
@@ -481,6 +529,64 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
             { bytes: formatBytes(totalBytes), count: present.length },
           )}
         </p>
+        {health ? (
+          <div className={`fa-panel-health is-${health.status}`} data-storage-health={health.status}>
+            <p className="fa-panel-note">
+              <strong>{healthLabel(health.status, t)}</strong>
+              <span>
+                {' — '}
+                {t('settings.memory.health.footprint', {
+                  bytes: formatBytes(health.footprint.totalBytes),
+                  count: health.footprint.keyCount,
+                })}
+              </span>
+            </p>
+            {health.overEncoded.length > 0 ? (
+              <p className="fa-panel-status">
+                {t('settings.memory.health.overEncoded', {
+                  keys: health.overEncoded.map((entry) => `${entry.key} ×${entry.layers}`).join(', '),
+                })}
+              </p>
+            ) : null}
+            {health.reasons.includes('total-over-budget') ? (
+              <p className="fa-panel-status">
+                {t('settings.memory.health.totalOverBudget', {
+                  budget: formatBytes(DEFAULT_STORAGE_BUDGET.totalBudgetBytes),
+                })}
+              </p>
+            ) : null}
+            {health.oversizedKeys.length > 0 ? (
+              <p className="fa-panel-status">
+                {t('settings.memory.health.keyOverBudget', {
+                  budget: formatBytes(DEFAULT_STORAGE_BUDGET.keyBudgetBytes),
+                  keys: health.oversizedKeys
+                    .map((entry) => `${entry.key} (${formatBytes(entry.bytes)})`)
+                    .join(', '),
+                })}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {writeFailure ? (
+          <p className="fa-panel-status" data-storage-write-failure={writeFailure.kind}>
+            {t('settings.memory.health.lastFailure', {
+              key: writeFailure.key,
+              bytes: formatBytes(writeFailure.bytes),
+              when: new Date(writeFailure.at).toLocaleTimeString(LANG_TAGS[lang]),
+              reason: failureReason(writeFailure.kind, t),
+            })}{' '}
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                clearLastStorageWriteFailure();
+                setWriteFailure(null);
+              }}
+            >
+              {t('settings.memory.health.dismiss')}
+            </button>
+          </p>
+        ) : null}
         {env ? (
           <p className="fa-panel-env">
             <strong>{t('settings.memory.livingLayer')}</strong>
