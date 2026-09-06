@@ -178,6 +178,19 @@ export const en: Catalog = {
     other: '{count} Jiten',
   },
 
+  // The novel workbench's status banner. `error.message` from Jiten or from an
+  // EPUB import is deliberately NOT routed through here: those are the source's
+  // own words, and inventing a translation for them would hide what failed.
+  'novelsView.status.noJitenMatch': 'No Jiten titles matched this search.',
+  'novelsView.status.removed': 'Removed {title} from the plan.',
+  'novelsView.status.sourcesSaved': 'Source settings saved.',
+  'novelsView.status.imported': 'Imported {title}.',
+  'novelsView.status.chooseEpubLink': 'Choose a direct EPUB link or paste your own EPUB URL.',
+  'novelsView.status.epubImportFailed': 'The EPUB import failed.',
+  'novelsView.status.importEpubFirst': 'Import an EPUB first, then the miner can preselect it.',
+  'novelsView.status.jitenOnly': 'Jiten vocab mining is available for Jiten catalog titles.',
+  'novelsView.status.plannedTitle': 'Planned {title}.',
+
   // Novel finder body. Difficulty levels and genres are NOT here on purpose:
   // they come from data/novels, which CLAUDE.md §4 keeps untranslated along with
   // the rest of the study content.

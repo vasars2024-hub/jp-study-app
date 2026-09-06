@@ -17,6 +17,7 @@ import type { JitenPlanEntry, JitenStore } from '../../shared/jiten';
 import type { LibraryItem } from '../../shared/types';
 import { NOVELS } from '../data/novels';
 import { useNovels } from '../components/novels/NovelsContent';
+import { getUiLang, setUiLang } from '../i18n';
 
 const PLAN_KEY = 'jp-novels-planned';
 
@@ -336,5 +337,94 @@ describe('a planned title no live source offers', () => {
   it('leaves the table alone when the plan is empty', async () => {
     await mountWithPlan([]);
     expect(current().candidates).toHaveLength(0);
+  });
+});
+
+/**
+ * The workbench's status banner is its only channel for "what just happened",
+ * and every message in it was an English literal built inside an event handler
+ * — the shape `tools/i18n-hardcoded-check.cjs` and the JSX census both miss, so
+ * nothing failed while a Japanese user was told "Removed ... from the plan."
+ *
+ * Driven through the real language switch rather than asserting on the source,
+ * because a `t()` call that never reaches a catalog entry renders its key and
+ * would still read as "adopted".
+ */
+describe('the status banner speaks the UI language', () => {
+  afterEach(async () => {
+    await act(async () => {
+      setUiLang('en');
+      for (let i = 0; i < 60 && getUiLang() !== 'en'; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    });
+  });
+
+  it('reports a removal in Japanese when the UI is Japanese', async () => {
+    const entry: JitenPlanEntry = {
+      id: 'local-x',
+      titleJp: '遠野物語',
+      genres: [],
+      tags: [],
+      sourceLinks: [],
+      acquisitionStatus: 'planned',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    (window.api.jitenGetStore as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...emptyStore(),
+      plan: [entry],
+    });
+    (window.api as unknown as Record<string, unknown>).jitenRemovePlan = vi
+      .fn()
+      .mockResolvedValue(emptyStore());
+    await mount();
+
+    // `setUiLang` lands only once the language chunk resolves, so waiting on a
+    // fixed number of microtasks reads as "the switch did not happen".
+    await act(async () => {
+      setUiLang('ja');
+      for (let i = 0; i < 60 && getUiLang() !== 'ja'; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    });
+    expect(getUiLang()).toBe('ja');
+
+    await act(async () => {
+      await current().removeFromPlan(entry);
+    });
+
+    // The exact Japanese the catalog carries, not "some non-English string":
+    // a missing key renders the key itself, which is also not English.
+    expect(current().status).toBe('遠野物語 をプランから削除しました。');
+    expect(current().status).not.toContain('novelsView.status');
+  });
+
+  it('reports the same removal in English when the UI is English', async () => {
+    // The control. Without it, a `t()` that always returned Japanese would pass.
+    const entry: JitenPlanEntry = {
+      id: 'local-x',
+      titleJp: '遠野物語',
+      genres: [],
+      tags: [],
+      sourceLinks: [],
+      acquisitionStatus: 'planned',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    (window.api.jitenGetStore as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...emptyStore(),
+      plan: [entry],
+    });
+    (window.api as unknown as Record<string, unknown>).jitenRemovePlan = vi
+      .fn()
+      .mockResolvedValue(emptyStore());
+    await mount();
+
+    await act(async () => {
+      await current().removeFromPlan(entry);
+    });
+
+    expect(current().status).toBe('Removed 遠野物語 from the plan.');
   });
 });

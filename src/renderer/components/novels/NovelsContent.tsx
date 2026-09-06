@@ -305,6 +305,12 @@ function linkFromEntry(entry: JitenPlanEntry | null, candidate: NovelCandidate |
 }
 
 export function useNovels() {
+  // The status banner is the workbench's only channel for "what just happened",
+  // and every message in it was an English literal — so a Japanese, Chinese or
+  // Russian user got English the moment anything succeeded or refused. The
+  // `error.message` cases stay untranslated on purpose: those are the source's
+  // own words, not ours.
+  const { t } = useT();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<TypeFilter>('All');
   const [diff, setDiff] = useState<DiffFilter>('All');
@@ -362,7 +368,7 @@ export function useNovels() {
           genres: genreId != null ? [String(genreId)] : undefined,
         });
         setJitenDecks(result.decks);
-        if (!result.decks.length) setStatus('No Jiten titles matched this search.');
+        if (!result.decks.length) setStatus(t('novelsView.status.noJitenMatch'));
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       } finally {
@@ -571,7 +577,7 @@ export function useNovels() {
     setBusy(true);
     try {
       applyStore(await window.api.jitenRemovePlan(entry.id));
-      setStatus(`Removed ${entry.titleJp} from the plan.`);
+      setStatus(t('novelsView.status.removed', { title: entry.titleJp }));
     } finally {
       setBusy(false);
     }
@@ -589,7 +595,7 @@ export function useNovels() {
       await window.api.jitenUpdateConfig({ apiBaseUrl: apiBaseDraft, apiKey: apiKeyDraft });
       const next = await window.api.jitenSetSourceProfiles(sourceDrafts);
       applyStore(next);
-      setStatus('Source settings saved.');
+      setStatus(t('novelsView.status.sourcesSaved'));
       setShowSources(false);
       void refreshJiten();
     } catch (error) {
@@ -637,14 +643,14 @@ export function useNovels() {
       acquisitionStatus: 'imported',
       error: undefined,
     });
-    setStatus(`Imported ${imported.title}.`);
+    setStatus(t('novelsView.status.imported', { title: imported.title }));
     return imported.id;
   }
 
   async function importDirect(entry: JitenPlanEntry): Promise<string | null> {
     const url = directCandidateUrl;
     if (!url) {
-      setStatus('Choose a direct EPUB link or paste your own EPUB URL.');
+      setStatus(t('novelsView.status.chooseEpubLink'));
       return null;
     }
     setBusy(true);
@@ -657,10 +663,10 @@ export function useNovels() {
       });
       if (result.store) applyStore(result.store);
       if (!result.ok || !result.item) {
-        setStatus(result.error ?? 'The EPUB import failed.');
+        setStatus(result.error ?? t('novelsView.status.epubImportFailed'));
         return null;
       }
-      setStatus(`Imported ${result.item.title}.`);
+      setStatus(t('novelsView.status.imported', { title: result.item.title }));
       return result.item.id;
     } finally {
       setBusy(false);
@@ -688,7 +694,7 @@ export function useNovels() {
       bookId = directCandidateUrl ? await importDirect(entry) : await importLocalEpub(entry);
     }
     if (!bookId) {
-      setStatus('Import an EPUB first, then the miner can preselect it.');
+      setStatus(t('novelsView.status.importEpubFirst'));
       return;
     }
     setHandoffJson('epubMining', { bookId, ui: 'simple' });
@@ -698,7 +704,7 @@ export function useNovels() {
 
   async function mineJitenSelected(): Promise<void> {
     if (!selectedCandidate?.jitenDeckId) {
-      setStatus('Jiten vocab mining is available for Jiten catalog titles.');
+      setStatus(t('novelsView.status.jitenOnly'));
       return;
     }
     const entry = await ensurePlanned(selectedCandidate);
@@ -713,7 +719,7 @@ export function useNovels() {
   async function planSelected(): Promise<void> {
     if (!selectedCandidate) return;
     const entry = await ensurePlanned(selectedCandidate);
-    if (entry) setStatus(`Planned ${entry.titleJp}.`);
+    if (entry) setStatus(t('novelsView.status.plannedTitle', { title: entry.titleJp }));
   }
 
   async function selectSource(linkId: string): Promise<void> {
