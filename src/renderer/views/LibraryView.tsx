@@ -1649,7 +1649,30 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               <div
                 key={it.id}
                 className="card"
+                // Measured live 2026-09-06 on the user's own library (24 items):
+                // this card was a bare `div` with an `onClick`, so the Covers
+                // grid held exactly TWO focusable elements per item — Remove and
+                // File — and NONE of them opened the book. The primary action of
+                // the whole surface was mouse-only, and a screen reader was told
+                // the card was a group of decorations.
+                //
+                // The shape is the one already used by `aero-library-tile`
+                // further down this same file, so the two library grids now
+                // answer the keyboard identically.
+                role="button"
+                tabIndex={0}
+                aria-label={it.title}
                 onClick={() => onOpen(it)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  // The nested Remove / File / Set-cover buttons handle their own
+                  // keys. Without this guard, Enter on Remove would delete the
+                  // item AND open it, because the keydown bubbles to the card.
+                  if (e.target !== e.currentTarget) return;
+                  // Space would scroll the grid out from under the card just picked.
+                  e.preventDefault();
+                  onOpen(it);
+                }}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.setData('app/lib-item', it.id);
