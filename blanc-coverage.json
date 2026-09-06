@@ -147,6 +147,18 @@
       "blancToolId": "immersion",
       "studyOsView": "ImmersionView",
       "note": "Ported Blanc-native 2026-07-21 (Stream B); composes ImmersionContent (useImmersion + toolbar/stage/rail/popups). ImmersionView is 1027 → 330 lines. The read-only 'immersion-tracker' tool stays alongside it. Verified live: toolbar, sites rail, reader mode, and Live mode mounting a real <webview> guest in the Blanc window — 0 .ui-app-chrome."
+    },
+
+    "agent": {
+      "status": "pending",
+      "studyOsView": "AgentWorkspaceShell",
+      "note": "Classified 2026-09-06, after tools/blanc-drift.cjs stopped reading 0 sections. NOT covered, and the near-miss is why this entry exists: Blanc ships a real Blanc-native 'local-agent' tool (LocalAgentPanel, BlancReadyToolPanels.tsx:320) with objectives, a task queue, automations, profiles and model selection — so a coverage claim would look plausible and would be false. AppSection.tsx:72 renders <AgentWorkspaceShell />, which is the CENTRAL agent (main-v1 Track 3): provider targeting local/remote, allowLocalFallback, a pricing table, input/output budgets, a plan queue and confirmation gating. LocalAgentPanel has none of those; it is the local-runtime half. The gap to port is the provider/execution seam, not the runtime panel — reuse the local-agent panel and add target + budget + plan-queue blocks beside it."
+    },
+
+    "files": {
+      "status": "pending",
+      "studyOsView": "FilesApp",
+      "note": "Classified 2026-09-06. New Study OS section (AppSection.tsx:141) that landed with the files-app track and was invisible while the drift parser read 0 sections. Blanc's 'file-search' tool is NOT coverage and must not be recorded as such: it is a filename search over a folder the user picks with toolboxPickSearchFolder, i.e. a DISK browser, and FILES_APP_PLAN.md's Decision 2 is the opposite — the tree is what the app owns, over heterogeneous stores (SQLite rows, localStorage, main JSON, derived state), never real directories. Note also that the Files app ABSORBED the Notebook section, which this manifest still carries as covered under 'notebook' — that entry is now stale, since 'notebook' is no longer in DESKTOP_WIN_SECTIONS, and the drift tool cannot see it because it only iterates live sections."
     }
   }
 }
