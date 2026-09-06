@@ -154,6 +154,12 @@
 
 .reading-workspace-loading {
   min-height: 100%;
+  /* It reserves the panel, so the word has to sit where the eye already is
+     rather than pinned to the top-left corner of an otherwise blank surface. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 
 /* Was `@media (max-width: 680px)`, which asks the desktop. Below a pane this narrow eight tabs

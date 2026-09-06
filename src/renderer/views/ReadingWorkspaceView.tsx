@@ -235,7 +235,21 @@ export default function ReadingWorkspaceView({
         role="tabpanel"
         aria-labelledby={`reading-workspace-tab-${section}`}
       >
-        <Suspense fallback={<div className="reading-workspace-loading muted" aria-live="polite" />}>
+        {/*
+          The fallback used to be an EMPTY div with `min-height: 100%` — it
+          reserved the whole panel and painted nothing, so switching to a tab
+          whose chunk was still cold showed a blank surface with no indication
+          anything was happening, and `aria-live` had no text to announce.
+          Measured live 2026-09-06: the Library tab read 0 controls and no text
+          at all on arrival, then 109 controls once its chunk landed.
+        */}
+        <Suspense
+          fallback={
+            <div className="reading-workspace-loading muted" aria-live="polite">
+              {t('common.loading')}
+            </div>
+          }
+        >
           {surface === 'library' ? (
             <LibraryView onOpen={onOpenBook} revealItemId={reveal?.itemId ?? null} />
           ) : null}
