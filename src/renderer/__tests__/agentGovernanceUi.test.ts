@@ -27,6 +27,11 @@ import {
   saveLocalAgentProfiles,
 } from '../localAgentProfilesStore';
 import { loadLocalAgentSettings } from '../localAgentSettingsStore';
+import { buildAgentCapabilityDirectory } from '../agentCapabilityDirectory';
+import {
+  agentToolCapabilityMatrix,
+  createCentralAgentToolRegistry,
+} from '../agentToolRegistry';
 import {
   getActiveAgentProfile,
   normalizeAgentProfiles,
@@ -102,6 +107,8 @@ async function mountPanel(): Promise<{
   toggle: (testId: string) => Promise<void>;
   select: (testId: string, value: string) => Promise<void>;
   text: (testId: string) => string;
+  checked: (testId: string) => boolean;
+  disabled: (testId: string) => boolean;
   options: () => string[];
   settings: () => LocalAgentSettings;
   store: () => AgentProfileStore;
@@ -144,6 +151,8 @@ async function mountPanel(): Promise<{
       });
     },
     text: (testId) => node(testId).textContent ?? '',
+    checked: (testId) => node<HTMLInputElement>(testId).checked,
+    disabled: (testId) => node<HTMLInputElement>(testId).disabled,
     options: () => [...node<HTMLSelectElement>('agent-governance-profile').options].map((o) => o.textContent ?? ''),
     settings: () => currentSettings,
     store: () => currentStore,
@@ -307,5 +316,49 @@ describe('AgentGovernancePanel writes the authority the main app could only read
       .toBe(false);
     expect(panel.text('agent-governance-sensitive-exclusion-note'))
       .toContain('requires explicit consent');
+  });
+
+  /**
+   * D85. `agent-disabled` was the last capability reason with no route to
+   * resolve it in this shell — the exact gap this file's header describes for
+   * `permission-insufficient`. The assertion is deliberately made against the
+   * DIRECTORY the user is reading, not against the stored flag: the flag moving
+   * is only interesting if the 56 rows that named it stop naming it.
+   */
+  it('turns on the switch the capability directory blames, and the rows stop blaming it', async () => {
+    // The shared seed omits `backend`, which the normalizer reads as `disabled`
+    // — and a disabled backend pins `enabled` to false however it is written.
+    // The shipped default is `local-gguf`, so that is the state a user is in.
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, backend: 'local-gguf' }));
+    const panel = await mountPanel();
+    const capabilities = agentToolCapabilityMatrix(createCentralAgentToolRegistry((key) => key));
+    const activeProfile = getActiveAgentProfile(loadLocalAgentProfiles());
+    const directory = () => buildAgentCapabilityDirectory(
+      capabilities,
+      loadLocalAgentSettings(),
+      activeProfile,
+    );
+
+    expect(loadLocalAgentSettings().enabled).toBe(false);
+    const blamed = directory().filter((row) => row.reason === 'agent-disabled').length;
+    expect(blamed).toBeGreaterThan(0);
+
+    await panel.toggle('agent-governance-enabled');
+
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').enabled).toBe(true);
+    expect(directory().some((row) => row.reason === 'agent-disabled')).toBe(false);
+
+    await panel.toggle('agent-governance-enabled');
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').enabled).toBe(false);
+    expect(directory().filter((row) => row.reason === 'agent-disabled')).toHaveLength(blamed);
+  });
+
+  it('refuses visibly rather than silently when no backend is selected', async () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, backend: 'disabled' }));
+    const panel = await mountPanel();
+
+    expect(panel.checked('agent-governance-enabled')).toBe(false);
+    expect(panel.disabled('agent-governance-enabled')).toBe(true);
+    expect(panel.text('agent-governance-enabled-note')).toContain('No local model backend');
   });
 });

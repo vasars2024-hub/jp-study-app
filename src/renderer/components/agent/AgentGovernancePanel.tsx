@@ -109,6 +109,7 @@ export function AgentGovernancePanel({
   };
 
   const scopeEmpty = settings.memoryScope.length === 0;
+  const backendOff = settings.backend === 'disabled';
 
   return (
     <section className="agent-governance" aria-labelledby="agent-governance-title">
@@ -116,6 +117,39 @@ export function AgentGovernancePanel({
         {t('agent.governance.title')}
       </h3>
       <p className="agent-governance-intro">{t('agent.governance.intro')}</p>
+
+      {/*
+        First, because it gates every control below it and every row of the
+        capability list above. Until this shipped, `settings.enabled` had no
+        switch anywhere in Study OS — only in Blanc — so the directory told the
+        user "The local Agent is disabled" 56 times with nothing to press. It
+        defaults to false, so that was every user's first run.
+      */}
+      <div className="agent-governance-field">
+        <label className="agent-governance-switch">
+          <input
+            type="checkbox"
+            data-testid="agent-governance-enabled"
+            /*
+              `normalizeLocalAgentSettings` forces `enabled` back to false while
+              the backend is `disabled`, so a live checkbox here would be a
+              control that reads as switched, writes, and comes back off. Refuse
+              visibly and name the reason instead.
+            */
+            disabled={backendOff}
+            checked={settings.enabled}
+            onChange={(event) => writeSettings({ enabled: event.target.checked })}
+          />
+          <span>{t('agent.governance.enabled.label')}</span>
+        </label>
+        <p className="agent-governance-note" data-testid="agent-governance-enabled-note">
+          {backendOff
+            ? t('agent.governance.enabled.backendNote')
+            : settings.enabled
+              ? t('agent.governance.enabled.onNote')
+              : t('agent.governance.enabled.offNote')}
+        </p>
+      </div>
 
       <div className="agent-governance-field">
         <span className="agent-governance-label" id="agent-governance-permission-label">
