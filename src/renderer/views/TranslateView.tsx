@@ -19,7 +19,7 @@ import {
   TranslateHistoryList,
   useTranslate,
 } from '../components/translate/TranslateContent';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
 import {
@@ -90,6 +90,13 @@ export default function TranslateView() {
   const state = useTranslate();
   const { tab, source, target, input, output, msg, error, busy, run, swap } = state;
   const acceptingHandoffRef = useRef(false);
+  // Register row D14. Both pane captions were `<label>` elements with no `for`, so
+  // the input's only accessible name was its placeholder and the output pane had
+  // none at all. The captions already carry the right words; they just needed to be
+  // attached to the things they caption.
+  const paneId = useId();
+  const sourceLabelId = `${paneId}-tr-source-label`;
+  const targetLabelId = `${paneId}-tr-target-label`;
   // Read from `onSelect` rather than from the element at click time: focusing the
   // button is a `focusout` on the textarea in React's synthetic model, and reading
   // the range there has already produced stale spans elsewhere in this repo.
@@ -424,8 +431,11 @@ export default function TranslateView() {
           <>
             <div className="tr-panes">
               <div className="tr-pane">
-                <label className="tr-label">{LANG_LABELS[source]}</label>
+                <label className="tr-label" id={sourceLabelId} htmlFor={`${paneId}-tr-source`}>
+                  {LANG_LABELS[source]}
+                </label>
                 <textarea
+                  id={`${paneId}-tr-source`}
                   className="tr-textarea"
                   lang={source}
                   value={input}
@@ -441,8 +451,22 @@ export default function TranslateView() {
                 />
               </div>
               <div className="tr-pane">
-                <label className="tr-label">{LANG_LABELS[target]}</label>
-                <div className="tr-output" lang={target} aria-live="polite" aria-atomic="true">
+                {/*
+                  * The output is a `<div>`, not a form control, so `htmlFor` cannot
+                  * reach it — it gets `role="group"` + `aria-labelledby` instead, which
+                  * is what gives the announced result a name rather than arriving bare.
+                  */}
+                <span className="tr-label" id={targetLabelId}>
+                  {LANG_LABELS[target]}
+                </span>
+                <div
+                  className="tr-output"
+                  role="group"
+                  aria-labelledby={targetLabelId}
+                  lang={target}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
                   {output || <span className="muted">{t('translate.outputPlaceholder')}</span>}
                 </div>
               </div>

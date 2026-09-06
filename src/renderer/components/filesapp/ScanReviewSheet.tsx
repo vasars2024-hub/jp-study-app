@@ -829,7 +829,21 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
         ) : null}
 
         <div className="fa-review-actions">
-          <button type="button" className="fa-action fa-review-close" onClick={onClose}>
+          {/*
+            * Register row D11. `b31facb6` made Escape refuse while `importing` and
+            * deliberately left this button alone; the result was that the reflex key
+            * was safe and the visible control was not — one click took the sheet away
+            * while the import loop at :258-:320 kept moving files with nothing on
+            * screen admitting it existed. Same condition, same reason. The `importing`
+            * progress line two elements up is the explanation, so this needs no string
+            * of its own, and it is the same shape as the Paste/Scan buttons above.
+            */}
+          <button
+            type="button"
+            className="fa-action fa-review-close"
+            disabled={state.status === 'importing'}
+            onClick={onClose}
+          >
             {t('common.close')}
           </button>
           {state.status === 'imported' && state.receipts.length > 0 ? (
