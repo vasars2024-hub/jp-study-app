@@ -27,12 +27,42 @@ const MANIFEST_PATH = path.join(ROOT, 'blanc-coverage.json');
 
 const read = (p) => fs.readFileSync(p, 'utf8');
 
-/** Members of the `DesktopWinSection` union — the canonical Study OS surface list. */
+/**
+ * The canonical Study OS surface list.
+ *
+ * Read from the `DESKTOP_WIN_SECTIONS` const array, NOT from the
+ * `DesktopWinSection` type. `6b490fc3` (2026-08-24) changed that type to
+ * `(typeof DESKTOP_WIN_SECTIONS)[number]`, which still matched the old
+ * `export type DesktopWinSection =([\s\S]*?);` regex but contains no string
+ * literals — so this returned `[]` for twelve days and every check below,
+ * being a `.filter()` over it, found nothing and printed "Clean".
+ *
+ * A parser that cannot find its subject must REFUSE, never report zero. The
+ * union form is still accepted so the tool works on a tree from before that
+ * commit, but an empty result is fatal either way.
+ */
 function studyOsSections() {
   const src = read(DESKTOP_PATH);
-  const m = src.match(/export type DesktopWinSection =([\s\S]*?);/);
-  if (!m) throw new Error('Could not find the DesktopWinSection union in src/shared/desktop.ts');
-  return [...m[1].matchAll(/'([a-z-]+)'/g)].map((x) => x[1]);
+  const constArray = src.match(/export const DESKTOP_WIN_SECTIONS = \[([\s\S]*?)\] as const;/);
+  const union = src.match(/export type DesktopWinSection =\s*(?!\()([\s\S]*?);/);
+  const body = constArray?.[1] ?? union?.[1];
+  if (body === undefined) {
+    throw new Error(
+      'Could not find DESKTOP_WIN_SECTIONS (or a literal DesktopWinSection union) in ' +
+        'src/shared/desktop.ts. The Study OS surface list is this tool\'s denominator; ' +
+        'without it every check below is vacuous.',
+    );
+  }
+  const ids = [...body.matchAll(/'([a-z-]+)'/g)].map((x) => x[1]);
+  if (ids.length === 0) {
+    throw new Error(
+      'DESKTOP_WIN_SECTIONS parsed to ZERO sections. This is the failure mode that made this ' +
+        'tool report "Clean" from 2026-08-24 to 2026-09-06: with no sections, unclassified, ' +
+        'pending and brokenClaims are all filters over an empty array. Refusing rather than ' +
+        'passing — fix the parser, do not trust the all-clear.',
+    );
+  }
+  return ids;
 }
 
 /** Ids in the `BLANC_TOOL_IDS` array. */
