@@ -8849,3 +8849,107 @@ better-aimed question than "bisect the rail's stylesheet", which is what this en
 
 `sampled-out:` no surface was scored this turn beyond the two cat8 cells above; `immersion`
 cat2 is measured and deliberately NOT banked, and `player` cat7 still needs a matched item.
+
+## 2026-09-06 01:05 EDT — primary — `immersion` cat2: SEVEN more candidates dead, and the bisect is now over
+
+**Closed this turn: 0 cells. 190 of 192, 2 left — unchanged.** This turn spent itself killing
+the last handoff's sharpened candidate and every neighbour of it, then built the instrument
+that should have been built three turns ago. Nothing is banked and nothing is claimed.
+
+### The sharpened candidate is DEAD, and so is the whole `resetScrollKey` path
+
+Implemented the fix the last handoff named — skip the reset when the scroller is already at
+the top, tracked in a ref so the `scrollTop` STATE's one-frame lag cannot lie. Re-ran the
+identical cat2 task, same window, same surface:
+
+    before (00:40 turn)  120.0 / 138.2 / 119.9    worst 138.2   overBar100 3 of 3
+    with the guard       ...                      worst 123.8   overBar100 3 of 3
+
+Then the stronger form of the same question: `resetScrollKey={undefined}`, i.e. the effect
+never runs at all. **Still 103.9 / 109.6 against a paired 17.2 / 18.1.** The candidate is not
+merely small, it is absent. The guard was reverted rather than shipped — an unmeasurable
+change against a deadline is churn, and `VirtualList.tsx` is back at HEAD byte-for-byte.
+
+### A cheaper instrument than the harness, and the six results it produced
+
+`/type` costs a bridge round trip per character. Driving React's own discrete-event path
+instead — native value setter + `dispatchEvent(new Event('input'))` — flushes render AND
+commit synchronously, so `performance.now()` either side is the surface's own cost with no
+transport in it. A candidate now costs ~20 s instead of a turn. Every row below is that
+measurement, `.immersion-site-search input` (Q) against `.immersion-url` (U, same component,
+same window, no rail):
+
+| candidate | what was changed | Q on 'r' | verdict |
+| - | - | - | - |
+| 3 `resetScrollKey` write | guarded, then removed entirely | 123.8 / 109.6 | DEAD |
+| 4 row identity churn | `getKey={(_,i)=>i}` — rows update in place | 130.6 | DEAD |
+| 5 row body cost | stripped to one `<span>{s.title}</span>` | 114.5 | DEAD |
+| 6 spacer height | `totalHeight` pinned constant | 122.3 | DEAD |
+| 7 the filter itself | both memos instrumented in place | filter **0.1–0.2 ms**, haystack **0 re-runs** | DEAD |
+| 8 the rail's items | `items={sites}` — the list never changes at all | 97.9 | DEAD |
+| 9 forced layout | `body.offsetHeight` timed separately after the dispatch | **1.2–1.6 ms** | DEAD |
+| 10 extra renders | render counters in `useImmersion` and `ImmersionSiteList` | **2 / 2 for BOTH fields** | DEAD |
+
+Read 8 and 10 together: with the rail's `items` frozen, its rows stripped to a title, its
+spacer constant and `resetScrollKey` gone, at an IDENTICAL render count, the filter field
+still costs 4x the control field. Whatever this is, it is not the rail.
+
+### The ratio survives, measured the way the pin asks for
+
+Ambient load moved the absolutes ~2.5x within single runs, so the two fields were driven
+ALTERNATELY inside one loop rather than in separate passes:
+
+    Q  84.8  94.3  36.4  48.8  65.3  79.8  30.9  43.9    median 65.3
+    U  14.9  17.4  17.4  18.0   3.1   2.5   2.4  19.0    median 17.4
+
+**3.8x**, against 4.5x last turn and 5x on 09-05, at very different absolutes. Three sessions
+now agree on the ratio. Do not quote the absolutes.
+
+### `eda66be3` — `/cpu-profile`, because ten candidates is what blind bisecting costs
+
+The bridge could time a 100 ms keystroke and structurally could not say where it went, so
+every candidate had to be killed by deleting a product subtree and re-measuring. CDP has had
+the answer all along. `POST /cpu-profile {window, js, sampleIntervalUs, top}` starts a V8
+sampling profile, drives `js` inside it, stops, and returns self-time by function. Default
+interval 100 µs, not V8's 1000 — a 100 ms input is only ~100 samples at the default, too
+coarse to separate a commit from a style recalc. Reduction is exported and unit-tested (7
+tests) because it is the half that returns a plausible WRONG answer: `samples` holds node
+**IDs**, not indices into `nodes`, and the ids are neither equal to their position nor sorted.
+Mutation control: keying the map on the index turns **5 of 7 red**.
+
+### TRAP — a restart can come back with NO PAGE, and `/reload` cannot fix it
+
+Restarting the shared app to pick up the main-process route booted main fine (bridge up,
+`/health` ok, two windows) with **`url: ''` on both**. The renderer never loaded: the network
+service crashed at `loadURL` time. `19e8259c`'s guard did its job and said so —
+`boot: cache clear clear-timeout after 106377 ms; loading anyway` — but the page still never
+came up, and **`/reload` returns `{ok:true}` on a webContents that never had a URL**, which
+reads exactly like a successful reload. Tell: `title` is `jp-study-app`, not `日本語 Study`.
+The recovery is a second `npm start`, not a reload.
+
+`sampled-out:` no surface was scored this turn. `immersion` cat2 and `player` cat7 stay open.
+
+### `0eba0c2a` — the boot defect above is FIXED, and the fix was verified by the failure itself
+
+Three consecutive `npm start` runs reproduced it. The third had the retry in, and the log is
+the whole proof:
+
+    [main] boot: cache clear clear-timeout after 255029 ms; loading anyway
+    [...:ERROR:...network_service_instance_impl.cc:703] Network service crashed ... restarting
+    [main] boot: loadURL attempt 1 failed: ERR_FAILED (-2) loading 'http://localhost:5173'
+    [renderer] [vite] connecting...        <- the retry
+    [renderer] [vite] connected.
+
+`/health` then reported `日本語 Study` at `http://localhost:5173/`. Attempt 1 failed exactly
+as it had on the two boots that stayed blank; the difference is that something asked again.
+**All 51 localStorage keys survived all three restarts** (`jp-scraper-settings-v1` among them,
+which carries the working qBittorrent apiKey config) — the 09-03 loss did not repeat, and a
+backup was taken first at `~\.claude-runs\ls-backup-0906.json` either way.
+
+### `/cpu-profile` proven live, with its negative control
+
+    js: a deliberate 120 ms busy loop     spin 137.2 ms self / 16.6%, now 11.3 ms, 87 samples
+    js: `1` (idle)                        NO spin frame at all — (program) + (idle), 3 samples
+
+`(program)` holding 82% is the CDP round trip, not a product cost: the profile spans the whole
+bridge call, so read SELF time on named frames and ignore the `(program)` share.
