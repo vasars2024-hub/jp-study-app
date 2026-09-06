@@ -267,15 +267,15 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   // ------------------------------------------------------------- sources ---
   { path: 'sources.mode', group: 'sources', kind: 'select', label: 'Source Mode', options: opts(SCRAPER_SOURCE_MODES, { streaming: 'Streaming only', torrent: 'Torrents only', both: 'Streaming and torrents' }), keywords: ['mode', 'switch'] },
   { path: 'sources.stopAfterFirstSuccess', group: 'sources', kind: 'toggle', label: 'Stop After First Success', hint: 'Off means every enabled source is tried, even after one works.' },
-  { path: 'sources.maxFallbackDepth', group: 'sources', kind: 'number', label: 'Max Fallback Depth', min: 0, max: 10 },
+  { path: 'sources.maxFallbackDepth', group: 'sources', kind: 'number', label: 'Max Fallback Depth', min: 0, max: 10, hint: 'Stored for a future fallback limit. Sources are tried in order and the chain is bounded by Stop After First Success and the per-source timeout, not by a depth.', inert: true },
   { path: 'sources.perSourceTimeoutMs', group: 'sources', kind: 'number', label: 'Per-Source Timeout', min: 1_000, max: 300_000, step: 1_000, unit: 'ms' },
-  { path: 'sources.skipUnhealthy', group: 'sources', kind: 'toggle', label: 'Skip Unhealthy Sources' },
+  { path: 'sources.skipUnhealthy', group: 'sources', kind: 'toggle', label: 'Skip Unhealthy Sources', hint: 'Stored for a future pre-filter. Health is probed and shown in Source Manager, but a run still tries every enabled source and lets it fail.', inert: true },
   { path: 'sources.requireSubtitleAvailability', group: 'sources', kind: 'toggle', label: 'Require Subtitles', hint: 'Only accept a source that actually offers your subtitle languages.' },
   { path: 'sources.entries', group: 'sources', kind: 'counted', label: 'Sources', action: 'sources' },
 
   // ------------------------------------------------------------- torrent ---
   { path: 'torrents.enabled', group: 'torrent', kind: 'toggle', label: 'Enable Torrent Sources' },
-  { path: 'torrents.protocols', group: 'torrent', kind: 'select', label: 'Protocols', options: opts(SCRAPER_TORRENT_PROTOCOLS, { magnet: 'Magnet links', 'torrent-file': '.torrent files', both: 'Both' }) },
+  { path: 'torrents.protocols', group: 'torrent', kind: 'select', label: 'Protocols', options: opts(SCRAPER_TORRENT_PROTOCOLS, { magnet: 'Magnet links', 'torrent-file': '.torrent files', both: 'Both' }), hint: 'Stored for a future protocol filter. A result is taken in whichever form the indexer offers it, whatever this says.', inert: true },
   { path: 'torrents.minSeeders', group: 'torrent', kind: 'number', label: 'Minimum Seeders', min: 0, max: 100_000 },
   { path: 'torrents.maxSizeMb', group: 'torrent', kind: 'number', label: 'Maximum Size', min: 0, max: 1_048_576, step: 100, unit: 'MB', hint: '0 means no limit.' },
   { path: 'torrents.preferredReleaseGroups', group: 'torrent', kind: 'tags', label: 'Preferred Release Groups', hint: 'Ordered. Ranked above anything not listed.' },
@@ -285,7 +285,7 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'torrents.resolutionPriority', group: 'torrent', kind: 'tags', label: 'Resolution Priority' },
   { path: 'torrents.preferBatches', group: 'torrent', kind: 'toggle', label: 'Prefer Batch Releases' },
   { path: 'torrents.dedupeByInfoHash', group: 'torrent', kind: 'toggle', label: 'De-duplicate by Info Hash' },
-  { path: 'torrents.verifyInfoHash', group: 'torrent', kind: 'toggle', label: 'Verify Info Hash' },
+  { path: 'torrents.verifyInfoHash', group: 'torrent', kind: 'toggle', label: 'Verify Info Hash', hint: 'Stored for a future integrity check. De-duplicate by Info Hash above does compare hashes; nothing yet re-verifies one against the fetched data.', inert: true },
   { path: 'torrents.extraTrackers', group: 'torrent', kind: 'counted', label: 'Extra Trackers', action: 'trackers', advanced: true },
 
   // --------------------------------------------------------- qbittorrent ---
@@ -358,12 +358,12 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   // cadence; the other five have no consumer to wire them to. Re-derived per
   // field 2026-08-04 — see the `inert` flag's own note.
   { path: 'performance.maxParallelJobs', group: 'performance', kind: 'number', label: 'Parallel Jobs', min: 1, max: 16 },
-  { path: 'performance.maxParallelDownloads', group: 'performance', kind: 'number', label: 'Parallel Downloads', min: 1, max: 32, inert: true },
-  { path: 'performance.memoryBudgetMb', group: 'performance', kind: 'number', label: 'Memory Budget', min: 128, max: 32_768, step: 128, unit: 'MB', inert: true },
-  { path: 'performance.cpuThrottlePercent', group: 'performance', kind: 'number', label: 'CPU Ceiling', min: 10, max: 100, unit: '%', inert: true },
+  { path: 'performance.maxParallelDownloads', group: 'performance', kind: 'number', label: 'Parallel Downloads', min: 1, max: 32, hint: 'Stored for a future download pool. Parallel Jobs above is the limit that acts; downloads inherit it rather than having their own.', inert: true },
+  { path: 'performance.memoryBudgetMb', group: 'performance', kind: 'number', label: 'Memory Budget', min: 128, max: 32_768, step: 128, unit: 'MB', hint: 'Stored for a future memory ceiling. Nothing measures or caps the scraper’s memory, so raising or lowering this changes nothing.', inert: true },
+  { path: 'performance.cpuThrottlePercent', group: 'performance', kind: 'number', label: 'CPU Ceiling', min: 10, max: 100, unit: '%', hint: 'Stored for a future CPU cap. No work is throttled against it; Parallel Jobs is the only thing that bounds load today.', inert: true },
   { path: 'performance.batchSize', group: 'performance', kind: 'number', label: 'Batch Size', min: 1, max: 500 },
-  { path: 'performance.reuseBrowserContext', group: 'performance', kind: 'toggle', label: 'Reuse Browser Context', inert: true },
-  { path: 'performance.prefetchNextPage', group: 'performance', kind: 'toggle', label: 'Prefetch Next Page', inert: true },
+  { path: 'performance.reuseBrowserContext', group: 'performance', kind: 'toggle', label: 'Reuse Browser Context', hint: 'Stored for a future headless browser. Fetching is done over plain HTTP, so there is no browser context to reuse or discard.', inert: true },
+  { path: 'performance.prefetchNextPage', group: 'performance', kind: 'toggle', label: 'Prefetch Next Page', hint: 'Stored for a future look-ahead. Paged listings are fetched one page at a time, on demand, whatever this is set to.', inert: true },
 
   // ------------------------------------------------------------- logging ---
   // 2026-08-05: was nine fields, EVERY one inert. Five act now, read by
@@ -386,10 +386,10 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
 
   // ---------------------------------------------------------- validation ---
   { path: 'validation.requirePlayableStream', group: 'validation', kind: 'toggle', label: 'Require a Playable Stream' },
-  { path: 'validation.verifyEpisodeCount', group: 'validation', kind: 'toggle', label: 'Verify Episode Count' },
+  { path: 'validation.verifyEpisodeCount', group: 'validation', kind: 'toggle', label: 'Verify Episode Count', hint: 'Stored for a future cross-check against the catalogue episode total. Nothing compares the two yet, so On Failure below never fires for this reason.', inert: true },
   { path: 'validation.verifySubtitlePresence', group: 'validation', kind: 'toggle', label: 'Verify Subtitles Present' },
   { path: 'validation.rejectPlaceholderTitles', group: 'validation', kind: 'toggle', label: 'Reject Placeholder Titles' },
-  { path: 'validation.rejectDuplicateHashes', group: 'validation', kind: 'toggle', label: 'Reject Duplicate Files' },
+  { path: 'validation.rejectDuplicateHashes', group: 'validation', kind: 'toggle', label: 'Reject Duplicate Files', hint: 'Stored for a future content-hash check. Torrent results are already de-duplicated by info hash under Torrents; downloaded files are not hashed.', inert: true },
   { path: 'validation.minEpisodeDurationSec', group: 'validation', kind: 'number', label: 'Minimum Episode Length', min: 0, max: 86_400, unit: 's' },
   { path: 'validation.maxTitleLength', group: 'validation', kind: 'number', label: 'Maximum Title Length', min: 16, max: 512 },
   { path: 'validation.onFailure', group: 'validation', kind: 'select', label: 'On Failure', options: opts(SCRAPER_VALIDATION_FAILURE_MODES, { warn: 'Warn and keep', skip: 'Skip the item', abort: 'Abort the job' }) },
@@ -432,10 +432,14 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
 
   // ----------------------------------------------------------- developer ---
   { path: 'developer.mockMode', group: 'developer', kind: 'toggle', label: 'Sample Data Mode', hint: 'On, because there is no scraping backend yet. Every figure you see is illustrative.' },
-  { path: 'developer.showRawHtml', group: 'developer', kind: 'toggle', label: 'Show Raw HTML' },
-  { path: 'developer.showSelectorOverlay', group: 'developer', kind: 'toggle', label: 'Selector Overlay' },
-  { path: 'developer.recordNetworkTrace', group: 'developer', kind: 'toggle', label: 'Record Network Trace' },
-  { path: 'developer.verboseTimings', group: 'developer', kind: 'toggle', label: 'Verbose Timings' },
+  // The four below are the diagnostics half of this group and none of them is read.
+  // They are marked rather than removed: they name real, wanted capabilities, and a
+  // control that vanishes is as confusing as one that lies. Unlock Script Console and
+  // Sample Data Mode around them DO act, which is why they carry no marker.
+  { path: 'developer.showRawHtml', group: 'developer', kind: 'toggle', label: 'Show Raw HTML', hint: 'Stored for a future raw-response view. The HTTP Inspector page shows request and response metadata; no surface renders the fetched document.', inert: true },
+  { path: 'developer.showSelectorOverlay', group: 'developer', kind: 'toggle', label: 'Selector Overlay', hint: 'Stored for a future in-page overlay. The Selector Tester matches against an editable HTML fixture rather than a live page, so there is nothing to overlay yet.', inert: true },
+  { path: 'developer.recordNetworkTrace', group: 'developer', kind: 'toggle', label: 'Record Network Trace', hint: 'Stored for a future HAR capture. The Logging group writes scraper log lines; no request/response trace is recorded whatever this is set to.', inert: true },
+  { path: 'developer.verboseTimings', group: 'developer', kind: 'toggle', label: 'Verbose Timings', hint: 'Stored for a future per-stage timing breakdown. Job duration is recorded either way; the per-stage split does not exist yet.', inert: true },
   // The old hint read "Scripts run against live pages", which was never true and
   // is now emphatically not: the console evaluates nothing. This toggle gates
   // the fixed allow-list of read-only inspection commands in ToolPages.tsx's
