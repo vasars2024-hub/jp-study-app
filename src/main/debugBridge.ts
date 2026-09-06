@@ -285,6 +285,80 @@ export function heapSnapshotPath(tempDir: string, rawName: unknown, now: Date): 
   return path.join(tempDir, `jp-main-heap-${safe ? `${safe}-` : ''}${stamp}.heapsnapshot`);
 }
 
+/** One frame of a CDP `Profiler.Profile`, reduced to what a latency question needs. */
+export interface CpuProfileFrame {
+  fn: string;
+  url: string;
+  line: number;
+  selfMs: number;
+  selfPct: number;
+  samples: number;
+}
+
+/**
+ * Fold a CDP sampling profile into the functions that actually held the CPU.
+ *
+ * Exported for its test, and separated from the route for a reason this repo has already
+ * paid for: every "where did the 100 ms go" question so far has been answered by BISECTING
+ * the product — delete a subtree, re-measure, put it back. That costs a turn per candidate
+ * and it killed four candidates on `immersion` cat2 without naming the cost once. A sampling
+ * profile answers it in one call, but only if it is reduced correctly, and the reduction is
+ * where the mistakes are:
+ *
+ *  - `samples` holds NODE IDS, not indices. `nodes[i].id` is not `i` — V8 emits ids in
+ *    call-tree discovery order and the array is not sorted by them. Indexing `nodes` with a
+ *    sample value reads a different function, and the answer looks plausible.
+ *  - `timeDeltas[i]` is the interval BEFORE `samples[i]`, in MICROseconds, and both arrays
+ *    have the same length. Summing deltas without pairing them bills the wrong frame.
+ *  - This is SELF time. A parent that never runs its own code (`(root)`, `(program)`) can
+ *    hold most of the wall clock and name nothing; the caller gets those rows too rather than
+ *    having them filtered away, because "(garbage collector) 60 %" is itself the finding.
+ */
+export function summarizeCpuProfile(
+  profile: {
+    nodes?: Array<{ id: number; callFrame: { functionName?: string; url?: string; lineNumber?: number } }>;
+    samples?: number[];
+    timeDeltas?: number[];
+    startTime?: number;
+    endTime?: number;
+  },
+  top = 12,
+): { durationMs: number; totalSamples: number; frames: CpuProfileFrame[] } {
+  const nodes = profile.nodes ?? [];
+  const samples = profile.samples ?? [];
+  const deltas = profile.timeDeltas ?? [];
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const selfUs = new Map<number, { us: number; n: number }>();
+  for (let i = 0; i < samples.length; i += 1) {
+    const id = samples[i];
+    const dt = Math.max(0, deltas[i] ?? 0);
+    const cur = selfUs.get(id) ?? { us: 0, n: 0 };
+    cur.us += dt;
+    cur.n += 1;
+    selfUs.set(id, cur);
+  }
+  const totalUs = [...selfUs.values()].reduce((a, b) => a + b.us, 0) || 1;
+  const frames: CpuProfileFrame[] = [...selfUs.entries()]
+    .map(([id, v]) => {
+      const cf = byId.get(id)?.callFrame;
+      return {
+        fn: cf?.functionName || '(anonymous)',
+        url: cf?.url || '',
+        line: (cf?.lineNumber ?? -1) + 1,
+        selfMs: Math.round((v.us / 1000) * 10) / 10,
+        selfPct: Math.round((v.us / totalUs) * 1000) / 10,
+        samples: v.n,
+      };
+    })
+    .sort((a, b) => b.selfMs - a.selfMs)
+    .slice(0, Math.max(1, top));
+  const durationMs =
+    profile.startTime != null && profile.endTime != null
+      ? Math.round(((profile.endTime - profile.startTime) / 1000) * 10) / 10
+      : Math.round((totalUs / 1000) * 10) / 10;
+  return { durationMs, totalSamples: samples.length, frames };
+}
+
 async function handle(
   route: string,
   url: URL,
@@ -606,6 +680,76 @@ async function handle(
             // nothing, and that is a finding about the instrument, not about the product.
             ...after,
             beforeGc: before,
+          },
+        };
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: String(err) } };
+      } finally {
+        if (weAttached && !emulatedMedia.has(win.webContents.id)) {
+          try { dbg.detach(); } catch { /* another owner took it mid-call; nothing to restore */ }
+        }
+      }
+    }
+
+    /**
+     * A CPU sampling profile of ONE renderer, around a driver expression the caller supplies.
+     *
+     * The gap this closes: `/eval` can time a keystroke and say it cost 100 ms; nothing in this
+     * bridge could say WHERE. Four `immersion` cat2 candidates were killed by deleting product
+     * subtrees and re-measuring — one turn each — and the cost was in none of them, so the cell
+     * still has no cause. CDP has had the answer all along (`Profiler.start` / `Profiler.stop`)
+     * and `/rmem` already proves this bridge reaches CDP through the same debugger session.
+     *
+     * Body: `{ window?, js, sampleIntervalUs?, top? }`. `js` is driven with `executeJavaScript`
+     * BETWEEN start and stop, so the profile covers the drive and nothing else — profiling an
+     * idle window returns `(program)` and is the negative control for this route.
+     *
+     * `sampleIntervalUs` defaults to 100 µs rather than V8's 1000: a 100 ms input costs ~100
+     * samples at the default, which is too coarse to separate a React commit from a style
+     * recalc. Anything below ~50 µs distorts what it measures.
+     */
+    case '/cpu-profile': {
+      const win = resolveWindow(body.window);
+      if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      const code = String(body.js ?? '');
+      if (!code) return { code: 400, body: { ok: false, error: 'missing js' } };
+      const intervalUs = Math.max(20, Math.min(10000, Number(body.sampleIntervalUs ?? 100) || 100));
+      const dbg = win.webContents.debugger;
+      const weAttached = !dbg.isAttached();
+      try {
+        if (weAttached) dbg.attach('1.3');
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: `debugger attach failed: ${String(err)}` } };
+      }
+      try {
+        await dbg.sendCommand('Profiler.enable');
+        await dbg.sendCommand('Profiler.setSamplingInterval', { interval: intervalUs });
+        await dbg.sendCommand('Profiler.start');
+        let jsResult: unknown = null;
+        let jsError: string | null = null;
+        try {
+          jsResult = await win.webContents.executeJavaScript(
+            `(() => { try { const __r = (${code}); return JSON.parse(JSON.stringify(__r ?? null)); }
+              catch (e) { return { __error: String(e) }; } })()`,
+            true,
+          );
+        } catch (err) {
+          // The drive failing is not the route failing: the profile still covers whatever ran
+          // before the throw, and hiding it would turn a broken driver into a silent empty result.
+          jsError = String(err);
+        }
+        const stopped = (await dbg.sendCommand('Profiler.stop')) as { profile: Parameters<typeof summarizeCpuProfile>[0] };
+        await dbg.sendCommand('Profiler.disable');
+        const summary = summarizeCpuProfile(stopped.profile, Number(body.top ?? 12) || 12);
+        return {
+          code: 200,
+          body: {
+            ok: true,
+            webContentsId: win.webContents.id,
+            sampleIntervalUs: intervalUs,
+            jsResult,
+            jsError,
+            ...summary,
           },
         };
       } catch (err) {
