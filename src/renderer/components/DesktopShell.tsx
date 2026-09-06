@@ -4040,8 +4040,17 @@ const FloatingWindow = memo(function FloatingWindow({
             <span className="fwin-title-text">{title}</span>
           </span>
           <span className="fwin-btns">
+            {/* `title` alone does not name these: a button's own text content
+                outranks it in the accessible-name computation, so a screen reader
+                announced the glyph. Their `◇`/`▢`/`×` siblings already carry the
+                label; these two were simply missed. */}
             {canPopOut && (
-              <button className="fwin-b lq-hit" title={t('desktop.popOut')} onClick={onPopOut}>
+              <button
+                className="fwin-b lq-hit"
+                title={t('desktop.popOut')}
+                aria-label={t('desktop.popOut')}
+                onClick={onPopOut}
+              >
                 ⧉
               </button>
             )}
@@ -4061,6 +4070,7 @@ const FloatingWindow = memo(function FloatingWindow({
               <button
                 className="fwin-b lq-hit"
                 title={t('desktop.minimize')}
+                aria-label={t('desktop.minimize')}
                 onClick={onMinimize}
               >
                 ─
@@ -4111,7 +4121,12 @@ const FloatingWindow = memo(function FloatingWindow({
               it was never applied to it. */}
           <div className="fwin-frameless-controls">
             {canPopOut && (
-              <button className="fwin-b lq-hit" title={t('desktop.popOut')} onClick={onPopOut}>
+              <button
+                className="fwin-b lq-hit"
+                title={t('desktop.popOut')}
+                aria-label={t('desktop.popOut')}
+                onClick={onPopOut}
+              >
                 ⧉
               </button>
             )}
@@ -4132,7 +4147,12 @@ const FloatingWindow = memo(function FloatingWindow({
                 {liquid ? '◆' : '◇'}
               </button>
             )}
-            <button className="fwin-b lq-hit" title={t('desktop.minimize')} onClick={onMinimize}>
+            <button
+              className="fwin-b lq-hit"
+              title={t('desktop.minimize')}
+              aria-label={t('desktop.minimize')}
+              onClick={onMinimize}
+            >
               ─
             </button>
             <button
