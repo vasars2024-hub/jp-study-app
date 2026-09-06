@@ -206,17 +206,7 @@ export async function intervalsForNotes(
 
   const cardIdSet = new Set<number>();
   for (const n of notes) for (const c of n.cards ?? []) cardIdSet.add(c);
-  const stateByCard = new Map<number, { interval: number; suspended: boolean }>();
-  for (const chunk of chunks(Array.from(cardIdSet), CHUNK_SIZE)) {
-    const batch = (await invoke('cardsInfo', { cards: chunk })) ?? [];
-    for (const c of batch) {
-      // Negative intervals are learning steps in seconds — clamp to 0 days, as the poll does.
-      stateByCard.set(c.cardId, {
-        interval: typeof c.interval === 'number' ? Math.max(0, c.interval) : 0,
-        suspended: ankiCardIsSuspended(c.queue),
-      });
-    }
-  }
+  const stateByCard = await readCardStates(Array.from(cardIdSet));
 
   const termFieldByModel = new Map<string, string | undefined>();
   const entries: IntervalEntry[] = [];
@@ -347,6 +337,84 @@ function chunks<T>(items: T[], size: number): T[][] {
   return out;
 }
 
+export interface CardSchedulingState {
+  interval: number;
+  suspended: boolean;
+}
+
+/**
+ * Set once, for the life of the process, when the thin pair is unusable against
+ * this AnkiConnect — an older build without the actions, or a reply that is not
+ * positionally aligned with the request. Every later chunk then uses `cardsInfo`,
+ * so an incompatible host costs one failed chunk rather than a dead poll.
+ */
+let thinCardReadUnavailable = false;
+
+/** Exported for tests only; a real process learns this from the host. */
+export function resetThinCardReadProbe(): void {
+  thinCardReadUnavailable = false;
+}
+
+/**
+ * The poll only ever reads two fields off a card — its interval and whether it is
+ * suspended — and `cardsInfo` charges the rendered question, answer and CSS for
+ * every one. Measured against the user's own collection on 2026-09-05: 0.516 MB
+ * per 500 cards versus 0.005 MB for `getIntervals` + `areSuspended`, i.e. 160.4 MB
+ * versus 1.55 MB for a full poll over 155,384 cards, parsed in MAIN, every five
+ * minutes. That garbage — not any single operation — is what drives main's major
+ * GCs, and those block the event loop long enough to fail the perf bar.
+ *
+ * Equivalence was measured over 1,539 cards sampled across the whole collection:
+ * clamped interval 1,539/1,539, suspended 1,539/1,539. See `getIntervals` in
+ * `client.ts` for the raw numbers.
+ */
+async function readCardStates(
+  cardIds: number[],
+  opts?: { signal?: AbortSignal; beforeChunk?: () => void },
+): Promise<Map<number, CardSchedulingState>> {
+  const out = new Map<number, CardSchedulingState>();
+  const invokeOpts = opts?.signal ? { signal: opts.signal } : undefined;
+  for (const chunk of chunks(cardIds, CHUNK_SIZE)) {
+    opts?.beforeChunk?.();
+    if (!thinCardReadUnavailable) {
+      try {
+        const [intervals, suspended] = await Promise.all([
+          invoke('getIntervals', { cards: chunk }, invokeOpts),
+          invoke('areSuspended', { cards: chunk }, invokeOpts),
+        ]);
+        // Positional replies. A length that does not match the request cannot be
+        // zipped, and guessing which card each value belongs to would silently
+        // assign one card's interval to another.
+        if (!Array.isArray(intervals) || !Array.isArray(suspended)
+          || intervals.length !== chunk.length || suspended.length !== chunk.length) {
+          throw new Error(`anki: getIntervals/areSuspended returned ${Array.isArray(intervals) ? intervals.length : 'non-array'}/${Array.isArray(suspended) ? suspended.length : 'non-array'} for ${chunk.length} cards`);
+        }
+        for (let i = 0; i < chunk.length; i += 1) {
+          const raw = intervals[i];
+          out.set(chunk[i], {
+            // Negative intervals are learning steps in seconds — clamp to 0 days.
+            interval: typeof raw === 'number' ? Math.max(0, raw) : 0,
+            suspended: suspended[i] === true,
+          });
+        }
+        continue;
+      } catch (err) {
+        if (opts?.signal?.aborted) throw err;
+        thinCardReadUnavailable = true;
+        console.warn('[anki] getIntervals/areSuspended unavailable, falling back to cardsInfo:', err);
+      }
+    }
+    const batch = (await invoke('cardsInfo', { cards: chunk }, invokeOpts)) ?? [];
+    for (const c of batch) {
+      out.set(c.cardId, {
+        interval: typeof c.interval === 'number' ? Math.max(0, c.interval) : 0,
+        suspended: ankiCardIsSuspended(c.queue),
+      });
+    }
+  }
+  return out;
+}
+
 /** Data-only fingerprint (order-independent, generatedAt excluded). */
 function hashEntries(entries: IntervalEntry[]): string {
   const parts = entries
@@ -419,21 +487,13 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
     for (const n of batch) notes.push(n);
   }
 
-  // 5. cardsInfo in sequential chunks of 500.
+  // 5. card scheduling state in sequential chunks of 500.
   const cardIdSet = new Set<number>();
   for (const n of notes) for (const c of n.cards ?? []) cardIdSet.add(c);
-  const stateByCard = new Map<number, { interval: number; suspended: boolean }>();
-  for (const chunk of chunks(Array.from(cardIdSet), CHUNK_SIZE)) {
-    checkEpoch();
-    const batch = (await invoke('cardsInfo', { cards: chunk }, { signal })) ?? [];
-    for (const c of batch) {
-      // Negative intervals are learning steps in seconds — clamp to 0 days.
-      stateByCard.set(c.cardId, {
-        interval: typeof c.interval === 'number' ? Math.max(0, c.interval) : 0,
-        suspended: ankiCardIsSuspended(c.queue),
-      });
-    }
-  }
+  const stateByCard = await readCardStates(Array.from(cardIdSet), {
+    signal,
+    beforeChunk: checkEpoch,
+  });
 
   // 4+6. term extraction and max-interval fold.
   const termFieldByModel = new Map<string, string | undefined>();
