@@ -856,7 +856,15 @@ function VideoPanel({
       {state.error && (
         <div className="mc-inline-error" role="alert">
           <span>{state.error}</span>
-          <button type="button" onClick={() => state.setError('')}><Icon name="close" size={12} /></button>
+          {/* The only control inside a `role="alert"`, and its icon is aria-hidden — with no
+              label a screen reader reads the error and then an unidentified "button". */}
+          <button
+            type="button"
+            aria-label={t('mediaCenter.video.dismissError')}
+            onClick={() => state.setError('')}
+          >
+            <Icon name="close" size={12} />
+          </button>
         </div>
       )}
 

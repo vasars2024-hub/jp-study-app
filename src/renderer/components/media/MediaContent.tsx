@@ -727,10 +727,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       setShadowError(
         recordingError instanceof Error
           ? recordingError.message
-          : 'Could not start microphone recording.',
+          : t('media.error.microphoneStartFailed'),
       );
     }
-  }, [clearShadowRecording]);
+  }, [clearShadowRecording, lang, t]);
 
   useEffect(() => {
     stopShadowRecording();
@@ -968,9 +968,11 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         loadOpened(r);
         openMediaWorkspace({ localFilePath: r.item.path });
       }
-      else setError('That file has moved or been deleted.');
+      else setError(t('media.error.fileMoved'));
     },
-    [loadOpened],
+    // `lang`, never `t` — see downloadYouTube below: `t`'s identity is stable, so a
+    // callback that depends on it keeps resolving in the language it was created in.
+    [loadOpened, lang, t],
   );
 
   /**
@@ -1024,7 +1026,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     loadOpened(r);
     if (!r.subtitle) {
       if (ytSubLang !== 'none')
-        setSubStatus('No matching existing subtitles found. Generating subtitles instead.');
+        setSubStatus(t('media.subs.noneFoundGenerating'));
       void runGeneration(r.url);
     }
     // `lang`, never `t` — `t`'s identity is stable by design, so depending on it
@@ -1044,7 +1046,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const applyStudyContext = useCallback(async (context: StudyContextRef): Promise<void> => {
     const opened = await window.api.openMedia(context.mediaId);
     if (!opened) {
-      setError('The source media has moved or been deleted.');
+      setError(t('media.error.sourceMoved'));
       return;
     }
     loadOpened(opened);
@@ -1084,7 +1086,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     window.setTimeout(() => {
       if (videoRef.current) videoRef.current.currentTime = seekPosition;
     }, 160);
-  }, [applySubtitleFile, loadOpened, stopShadowRecording]);
+  }, [applySubtitleFile, loadOpened, stopShadowRecording, lang, t]);
 
   useEffect(() => {
     if (!showPlayer) return;
@@ -1289,9 +1291,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       if (document.fullscreenElement) await document.exitFullscreen();
       else await target.requestFullscreen();
     } catch (fullscreenError) {
-      setError(fullscreenError instanceof Error ? fullscreenError.message : 'Fullscreen failed.');
+      setError(fullscreenError instanceof Error ? fullscreenError.message : t('media.error.fullscreenFailed'));
     }
-  }, []);
+  }, [lang, t]);
 
   const togglePictureInPicture = useCallback(async () => {
     const video = videoRef.current as HTMLVideoElement & {
@@ -1307,10 +1309,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       else await video.requestPictureInPicture();
     } catch (pictureError) {
       setError(
-        pictureError instanceof Error ? pictureError.message : 'Picture-in-picture failed.',
+        pictureError instanceof Error ? pictureError.message : t('media.error.pictureInPictureFailed'),
       );
     }
-  }, []);
+  }, [lang, t]);
 
   const refreshAudioTracks = useCallback(() => {
     const video = videoRef.current as HTMLVideoElement & {
@@ -1411,10 +1413,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       setError(
         normalizationError instanceof Error
           ? normalizationError.message
-          : 'Volume normalization failed.',
+          : t('media.error.volumeNormalizationFailed'),
       );
     }
-  }, []);
+  }, [lang, t]);
 
   useEffect(() => () => {
     void audioContextRef.current?.close();
@@ -1435,11 +1437,11 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     const position = videoRef.current?.currentTime;
     if (position == null || abStartRef.current == null) return;
     if (position <= abStartRef.current + 0.05) {
-      setError('B must be after A.');
+      setError(t('media.error.loopEndBeforeStart'));
       return;
     }
     setAbEnd(position);
-  }, []);
+  }, [lang, t]);
 
   const clearAbRepeat = useCallback(() => {
     setAbStart(null);
