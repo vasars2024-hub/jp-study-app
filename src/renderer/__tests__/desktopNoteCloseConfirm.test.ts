@@ -134,3 +134,46 @@ describe('controls — so the scan cannot pass vacuously', () => {
     expect(guardsRepeatConfirm(fixture)).toBe(false);
   });
 });
+
+/**
+ * D65 — the note's textarea IS the surface, and its only name was a placeholder, which the
+ * browser stops exposing the moment there is a note to read. Driven live 2026-09-06: with
+ * `backup probe note 15:50` typed into a fresh note, `aria-label` was null and `labels.length`
+ * was 0, so the whole window announced as an unnamed edit box.
+ *
+ * Same source-scan reasoning as the block above — `DesktopShell.tsx` pulls the shell tree at
+ * module eval — and the same mutation control: the attribute stripped from a copy of the real
+ * source must make the real assertion fail.
+ */
+describe('the sticky note textarea carries a name that survives being typed into', () => {
+  const NAME = "aria-label={t('desktop.stickyNote')}";
+
+  function namesTheNote(source: string): boolean {
+    const start = source.indexOf('className="desk-note-text"');
+    if (start < 0) return false;
+    const block = source.slice(start, start + 700);
+    return block.includes(NAME);
+  }
+
+  it('names it from the window title key, so no new string was needed', () => {
+    expect(namesTheNote(shellSource())).toBe(true);
+  });
+
+  it('MUTATION CONTROL: without the attribute the assertion fails', () => {
+    const mutated = shellSource().replace(NAME, '');
+    expect(mutated).not.toBe(shellSource());
+    expect(namesTheNote(mutated)).toBe(false);
+  });
+
+  it('MUTATION CONTROL: an aria-label somewhere else in the file would not count', () => {
+    const fixture = [
+      "aria-label={t('desktop.stickyNote')}",
+      ...Array.from({ length: 40 }, (_, i) => `  const filler${i} = ${i};`),
+      '<textarea',
+      '  className="desk-note-text"',
+      '  placeholder={t("desktop.notePlaceholder")}',
+      '/>',
+    ].join('\n');
+    expect(namesTheNote(fixture)).toBe(false);
+  });
+});

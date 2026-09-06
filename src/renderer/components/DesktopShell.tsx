@@ -2622,6 +2622,11 @@ export default function DesktopShell({
         <textarea
           className="desk-note-text"
           style={{ background: note?.color ?? NOTE_COLORS[0] }}
+          // The placeholder is the whole surface's only name, and it disappears the
+          // moment there is a note to read - so the control is anonymous exactly when
+          // it has content. `desktop.stickyNote` is the window's own already-translated
+          // title, so this needs no new key.
+          aria-label={t('desktop.stickyNote')}
           placeholder={t('desktop.notePlaceholder')}
           value={note?.text ?? ''}
           onChange={(e) =>
