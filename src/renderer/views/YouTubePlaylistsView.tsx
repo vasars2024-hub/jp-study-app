@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icons';
 import VirtualList from '../components/VirtualList';
-import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { AppChrome, StatusBarField, StatusBarSpacer, confirmDialog, type MenuBarMenu } from '../components/ui';
 import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
 import { setStudyLang } from '../studyEnvironment';
@@ -276,7 +276,12 @@ export default function YouTubePlaylistsView() {
       .filter((v) => v.playlistId === playlist.id && !v.downloaded)
       .map((v) => v.id);
     if (!ids.length) return;
-    if (!window.confirm(t('yt.confirm.downloadAll', { count: ids.length }))) return;
+    const ok = await confirmDialog({
+      title: t('yt.action.downloadAll'),
+      message: t('yt.confirm.downloadAll', { count: ids.length }),
+      confirmLabel: t('yt.action.downloadAll'),
+    });
+    if (!ok) return;
     await downloadIds(ids);
   };
 
@@ -362,7 +367,13 @@ export default function YouTubePlaylistsView() {
 
   const removePlaylist = async (): Promise<void> => {
     if (!playlist) return;
-    if (!window.confirm(t('yt.confirm.removePlaylist'))) return;
+    const ok = await confirmDialog({
+      title: t('yt.action.remove'),
+      message: t('yt.confirm.removePlaylist'),
+      confirmLabel: t('yt.action.remove'),
+      danger: true,
+    });
+    if (!ok) return;
     const r = await window.api.ytRemovePlaylist(playlist.id);
     applyStore(r);
     const first = r.playlists.find(isImmersionPlaylist);
