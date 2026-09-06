@@ -8746,3 +8746,48 @@ instrument blockers, and this cell is another of those rather than a product rep
 The three left: **`player` cat7, `immersion` cat2, `immersion` cat8.**
 `sampled-out:` `player` (cat7 only, still needs a MATCHED library item), and `immersion`
 cat2/cat8, which are different categories rather than skipped surfaces.
+
+## 2026-09-06 00:30 EDT — primary — `immersion` cat8 CLOSES 10/10. The rail held still.
+
+### `immersion` cat8 — PASS 10/10, five bars in ONE run, with its control
+
+    rawKeys 0 in all four languages · placeholders 0 · mutePairs 0
+    statesNamed "1 of 1 observable" · languagesDiffer true
+    CONTROL: 3 plants, 0,0,0 -> 1,1,1 -> 0,0,0, backToBaseline true
+    surface 820x580, 76 painted text runs, pinned section `immersion`
+
+Drive: `--drive-input ".immersion-site-search input"`, original value `""` -> the adverse
+query -> back. `surfaceChanged true`, **`restored true` with `restoredAfterEscape: null`** —
+the round trip came back on its own and Escape was never needed. The driven state is the
+message the bar exists to find, quoted rather than counted:
+
+> "No saved sites match. Clear the search to show all sites."
+
+### The historical blocker is GONE, and that is measured rather than assumed
+
+The 2026-09-05 entry closed this cell as unmeasurable for a reason outside the harness:
+`.immersion-site-card` moved **13 -> 19 during a single turn** because every page another
+worker browsed is saved into that rail, which moved `baseHash` under the restore check and
+VOIDed a round trip the product was performing correctly. This turn the rail read **19 before
+the run and 19 after it** — the only relay dispatch running was my own. The cell needed a
+quiet app, exactly as that entry predicted, and it got one.
+
+### The contrast that validates the `anki` caveat one entry above
+
+`immersion` renders **76 runs in all four languages** — en/ja/zh/ru identical — with
+`diffRuns 49` each. `anki` rendered 54/18/18/18. So where the surface does NOT re-mount on a
+language change, the run count holds and `diffRuns` is a true count of runs that MOVED. That
+is the control for correction 68: anki's 48 was inflated by absence, immersion's 49 is not,
+and the same instrument produced both.
+
+### RULE D — liquid. Closed this turn: **2 cells. 188 -> 190 of 192, 2 left.**
+
+To 2026-09-07 11:00 EDT, measured 00:30: **34 h 30 min = 1.438 days**.
+`2 / 1.438 = 1.39 cells/day` required. Trailing: 164 of 192 at 09-05 09:06 -> 190 at 09-06
+00:30, i.e. **26 cells in 15.4 h = 40.5/day**. **TARGET AT RISK is NOT declared.**
+
+The two left: **`player` cat7** (needs a MATCHED library item — a content prerequisite, not a
+defect) and **`immersion` cat2** (a real product cost: 105.7 ms keystroke latency against a
+100 ms bar, three prior turns, seven candidate causes measured dead, and CORRECTION 66 says
+the absolute number is not stable).
+`sampled-out:` nothing — both remaining cells are named above with the reason each is open.
