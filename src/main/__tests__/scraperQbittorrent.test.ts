@@ -374,7 +374,21 @@ afterAll(async () => {
   });
   setScraperStoreRoot(null);
   setCredentialVaultRoot(null);
-  await fsp.rm(tempRoot, { recursive: true, force: true });
+  /*
+   * Both halves, because this suite failed a FULL `vitest run` on 2026-09-06 with
+   *   ENOTEMPTY: directory not empty, rmdir '...\scraper-qbit-DVKqAp\scraper\logs'
+   * while all 131 of its assertions passed — the run reported `14698 passed` and one
+   * FAILED FILE, and the same file passed alone (131/131).
+   *
+   * `flushScraperLogWrites` is the cause: `beforeEach` below already awaits it before its
+   * own `rm` for exactly this reason, and `afterAll` did not, so a log write could still be
+   * in flight when the walk started. `maxRetries` is the residual Windows race that
+   * `fea9e13c` measured on the sibling suite — `force: true` only swallows ENOENT, and a
+   * write landing between the recursive walk and the `rmdir` is the case Node documents
+   * `maxRetries`/`retryDelay` for.
+   */
+  await flushScraperLogWrites();
+  await fsp.rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 beforeEach(async () => {
@@ -395,7 +409,12 @@ beforeEach(async () => {
   torrentInfoHook = null;
   resetQbitSessions();
   await flushScraperLogWrites();
-  await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
+  await fsp.rm(path.join(tempRoot, 'scraper'), {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 50,
+  });
   await fsp.rm(path.join(tempRoot, 'credentials.dat'), { force: true });
   await setScraperSecret('test/qbit', GOOD_PASS);
 });
