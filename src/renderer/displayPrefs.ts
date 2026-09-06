@@ -1,4 +1,5 @@
 import { setWindowChromeMode, type WindowChromeMode, parseWindowChromeMode } from './windowChrome';
+import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
 
 export type ContrastId = 'normal' | 'medium' | 'high';
 export type LetterSpacingId = 'tight' | 'normal' | 'loose';
@@ -227,11 +228,7 @@ function applyDisplayPrefsInternal(s: DisplayPrefs, persistMotionMirror: boolean
   const reduce = n.animationLevel === 'reduced' || n.animationLevel === 'none';
   root.classList.toggle('reduce-motion', reduce);
   if (persistMotionMirror) {
-    try {
-      localStorage.setItem(MOTION_KEY, reduce ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
+    writeLocalStorage(MOTION_KEY, reduce ? '1' : '0');
   }
 
   // Smooth scroll on the scrolling document / panes
@@ -263,11 +260,7 @@ function focusAlpha(id: FocusRingId): string {
 export function saveDisplayPrefs(partial: Partial<DisplayPrefs>): DisplayPrefs {
   const prev = loadDisplayPrefs();
   const next = normalize({ ...prev, ...partial });
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(KEY, next);
   applyDisplayPrefs(next);
   if (prev.windowChromeMode !== next.windowChromeMode) {
     void setWindowChromeMode(next.windowChromeMode);
@@ -344,11 +337,7 @@ export function resetDisplayPrefs(): DisplayPrefs {
   if (prev.windowChromeMode !== next.windowChromeMode) {
     void setWindowChromeMode(next.windowChromeMode);
   }
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(KEY, next);
   window.dispatchEvent(new CustomEvent<DisplayPrefs>(EVENT, { detail: next }));
   return next;
 }

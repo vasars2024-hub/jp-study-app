@@ -21,6 +21,7 @@ import {
   saveDisplayPrefs,
   type AnimationLevelId,
 } from '../displayPrefs';
+import { writeLocalStorageJson } from '../localStorageWrite';
 import { clampVelocity, DURATION, VELOCITY_MAX, VELOCITY_MIN } from './tokens';
 
 export type MotionModeId = 'normal' | 'performance' | 'disabled';
@@ -181,11 +182,7 @@ function saveAnimationLevel(level: AnimationLevelId): void {
 export function saveMotionPrefs(partial: Partial<MotionPrefs>): MotionPrefs {
   const prev = loadMotionPrefs();
   const next = normalizeMotionPrefs({ ...prev, ...partial });
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(KEY, next);
   // Keep the one underlying animation switch in sync.
   if (next.motionMode !== prev.motionMode) {
     saveAnimationLevel(modeToAnimationLevel(next.motionMode));
@@ -202,7 +199,7 @@ export function bootMotionPrefs(): void {
   // agree immediately rather than after the first edit.
   try {
     if (localStorage.getItem(KEY) === null) {
-      localStorage.setItem(KEY, JSON.stringify(p));
+      writeLocalStorageJson(KEY, p);
       if (p.motionMode !== 'normal') {
         saveAnimationLevel(modeToAnimationLevel(p.motionMode));
       }
@@ -215,11 +212,7 @@ export function bootMotionPrefs(): void {
     onDisplayPrefsChanged(() => {
       if (writingAnimationLevel) return;
       const next = loadMotionPrefs();
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
+      writeLocalStorageJson(KEY, next);
       applyMotionPrefs(next);
       window.dispatchEvent(new CustomEvent<MotionPrefs>(EVENT, { detail: next }));
     });

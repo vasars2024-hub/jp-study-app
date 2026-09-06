@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
 
 export type FocusTabId = 'library' | 'dictionary' | 'anki';
 export type FocusLockMinutes = 0 | 5 | 15 | 25 | 45 | 60;
@@ -69,11 +70,7 @@ export function saveFocusSettings(patch: Partial<FocusModeSettings>): FocusModeS
   const next = { ...loadFocusSettings(), ...patch };
   next.lockMinutes = parseLockMinutes(next.lockMinutes);
   next.defaultTab = parseTab(next.defaultTab);
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(SETTINGS_KEY, next);
   window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: next }));
   return next;
 }
@@ -191,11 +188,7 @@ export function setFocusMode(on: boolean): boolean {
     return true;
   }
 
-  try {
-    localStorage.setItem(ACTIVE_KEY, on ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorage(ACTIVE_KEY, on ? '1' : '0');
 
   if (on && !wasOn) {
     armFocusLock();
@@ -219,11 +212,7 @@ export function setFocusMode(on: boolean): boolean {
 }
 
 export function disableFocusModeForShellSwitch(): void {
-  try {
-    localStorage.setItem(ACTIVE_KEY, '0');
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorage(ACTIVE_KEY, '0');
   clearFocusLock();
   try {
     window.dispatchEvent(new CustomEvent(EVENT, { detail: { on: false } }));
