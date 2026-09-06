@@ -58,11 +58,36 @@ describe('grammar explorer virtualisation', () => {
     expect(decls).toContain('height: 100%');
   });
 
-  it('only the explorer mode gets the bounding class', () => {
-    // The other three Grammar modes were built for natural block flow; bounding
-    // them would clip prose rather than window a list.
-    expect(grammarView).toContain("`gram-view${mode === 'grammar' ? ' gram-view--explorer' : ''}`");
+  it('every mode that windows the corpus gets the bounding class', () => {
+    // Both modes that mount a `VirtualList` over the 2,410-point corpus, and only
+    // those. Guides and Review render prose and a small due-set, so bounding them
+    // would clip rather than window.
+    //
+    // `practice` was missing here until 2026-09-06 and the defect this whole file
+    // guards was still live one tab over: `.gx-practice-virtual` measured 125,322 px
+    // with `clientHeight === scrollHeight`, 2,410 checkboxes, 13,544 DOM nodes.
+    // Asserting only `grammar` is what let that survive, so the assertion is now on
+    // the SET of bounded modes rather than on the one that was fixed first.
+    expect(grammarView).toContain(
+      "`gram-view${mode === 'grammar' || mode === 'practice' ? ' gram-view--explorer' : ''}`",
+    );
     expect(grammarView).not.toContain('className="gram-view"');
+  });
+
+  it('the practice panel is already written to pass a bound down to its list', () => {
+    // The mode class alone fixed it live, which is only true because every step
+    // between the host and the scroller already forwards the bound. Any one of
+    // these silently restores the defect while the class stays in place.
+    expect(block(css, '.gx-practice')).toEqual(
+      expect.arrayContaining(['display: flex', 'flex-direction: column', 'min-height: 0', 'height: 100%']),
+    );
+    expect(block(css, '.gx-practice-layout')).toEqual(
+      expect.arrayContaining(['min-height: 0', 'flex: 1']),
+    );
+    expect(block(css, '.gx-practice-list')).toEqual(
+      expect.arrayContaining(['display: flex', 'flex-direction: column', 'min-height: 0']),
+    );
+    expect(block(css, '.gx-practice-virtual')).toEqual(expect.arrayContaining(['flex: 1']));
   });
 
   it('makes the list column the scroller instead of its overflowing child', () => {

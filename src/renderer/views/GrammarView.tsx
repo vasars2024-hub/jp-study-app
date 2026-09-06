@@ -147,12 +147,25 @@ export default function GrammarView() {
 
   return (
     <AppChrome status={classicStatus} className="gram-chrome">
-    {/* `gram-view--explorer` bounds the view to its host for the explorer mode
-        only. `GrammarExplorer` windows its 2,400-row catalogue, but a windowed
-        list can only window what it can measure, and on a plain block host the
-        list's own viewport measured the whole content — so every row rendered.
-        The other three modes keep the natural block flow they were built for. */}
-    <div className={`gram-view${mode === 'grammar' ? ' gram-view--explorer' : ''}`}>
+    {/* `gram-view--explorer` bounds the view to its host. A windowed list can only
+        window what it can MEASURE, and on a plain block host the list's own viewport
+        measures the whole content — so every row renders and the windowing is inert.
+        Guides and Review keep the natural block flow they were built for; they render
+        prose and a small due-set, so bounding them would clip rather than window.
+
+        `practice` was added 2026-09-06. It carries a second `VirtualList` over the
+        SAME 2,410-point corpus and had never been bounded, so the defect this class
+        was created to fix was still live one tab over. Measured in an 820x580 window:
+        `.gx-practice-virtual` 125,322 px tall with `clientHeight === scrollHeight`
+        (not a scroller at all), 2,410 checkboxes, 13,544 DOM nodes — and with the
+        class, 302 px over a 125,320 px scroll range, 22 checkboxes, 365 nodes.
+        No CSS was needed: `.gx-practice` already declares `height: 100%; min-height: 0`
+        and the layout/list/virtual chain below it is already written to be bounded.
+        The class name is kept rather than generalised so the existing rules, their
+        comment and `grammarExplorerVirtualisation.test.ts` all keep one subject. */}
+    <div
+      className={`gram-view${mode === 'grammar' || mode === 'practice' ? ' gram-view--explorer' : ''}`}
+    >
       {/* L5 — contextual, not dense work: one intro line and the mode switch. The
           four mode panels below stay conventional Work; a grammar point's prose and
           its practice form are exactly what §2 keeps off translucent material.
