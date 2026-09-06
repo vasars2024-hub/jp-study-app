@@ -35,8 +35,10 @@ export type SettingsPageId =
   | 'transcription'
   | 'visualizer'
   | 'special'
-  // Note the neighbour: `display` below is *visual accessibility* (contrast,
-  // zoom, scrollbars), not monitors. `monitors` is the physical-display page.
+  // v1.0 audit 5.2 — `monitors` and `display` MERGED. Kept as a historical
+  // coordinate only: it has no `SETTINGS_NAV` row and no branch in the page
+  // switch, and `SettingsApp.navigate` redirects it to `display`, which now
+  // renders the monitor cards above the visual-accessibility ones.
   | 'monitors'
   | 'file-drops'
   // Phase 0 credentials vault — every API key in the app, one page.

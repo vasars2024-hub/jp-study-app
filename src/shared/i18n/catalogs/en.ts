@@ -1251,11 +1251,13 @@ export const en: Catalog = {
   'settings.nav.visualizer.desc': 'Music visuals and lyrics',
   'settings.nav.special': 'Special',
   'settings.nav.special.desc': 'WIRED and Aero secret modules',
-  'settings.nav.display': 'Display',
-  'settings.nav.display.desc': 'Zoom and motion',
+  'settings.nav.display': 'Display & monitors',
+  'settings.nav.display.desc': 'Screens, desktops, zoom and motion',
 
-  // ----- Monitors (multi-monitor desktops). Distinct from "Display" above,
-  // which is visual accessibility, not physical screens. -----
+  // ----- Monitors (multi-monitor desktops). v1.0 audit 5.2 MERGED this page
+  // into "Display" above, so these strings title cards on that page now.
+  // `settings.nav.monitors(.desc)` are kept: the id is still a real
+  // coordinate that `SettingsApp.navigate` redirects. -----
   'settings.nav.monitors': 'Monitors',
   'settings.nav.monitors.desc': 'Desktops across your screens',
   'settings.monitors.displays': 'Connected displays',

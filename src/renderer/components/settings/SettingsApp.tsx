@@ -66,7 +66,6 @@ import ScraperPage from './pages/ScraperPage';
 import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
-import MonitorsPage from './pages/MonitorsPage';
 import FileDropsPage from './pages/FileDropsPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import MotionPage from './pages/MotionPage';
@@ -176,14 +175,27 @@ export default function SettingsApp(props: SettingsWallProps) {
       if (!(settingId && openFilesAppForSystemCard(settingId))) openFilesAppForMemory();
       return;
     }
+    /**
+     * v1.0 audit 5.2. `monitors` merged INTO `display` — same reasoning as the
+     * redirect above, and deliberately the same place: all four callers reach
+     * this function, so redirecting anywhere else would leave three of them
+     * dead-ending on a page that renders nothing.
+     *
+     * The id stays a real coordinate rather than being deleted, because a
+     * stored recent-pages entry, a deep link or the agent's index may still
+     * carry it. `settingId` is passed through untouched, so a hit for
+     * "simulated displays" still lands on the `monitors-simulated` card, which
+     * now lives further down the Display page.
+     */
+    const target: SettingsPageId = next === 'monitors' ? 'display' : next;
     // An explicit cross-surface route is allowed to land on an advanced page without
     // changing the user's global Advanced preference. Keep that destination guided until
     // they navigate away; otherwise the guard below immediately bounces a valid deep link
     // back Home and the originating control is functionally dead.
-    setGuidedPage(options?.guided ? next : null);
+    setGuidedPage(options?.guided ? target : null);
     setGuidedControlId(options?.guided ? settingId ?? null : null);
-    setPage(next);
-    pushRecentPage(next);
+    setPage(target);
+    pushRecentPage(target);
     setFocusSettingId(settingId ?? null);
     contentRef.current?.scrollTo({ top: 0 });
   }, []);
@@ -642,7 +654,6 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'scraper' && <ScraperPage />}
               {page === 'visualizer' && <VisualizerPage />}
               {page === 'special' && <SpecialPage />}
-              {page === 'monitors' && <MonitorsPage />}
               {page === 'file-drops' && <FileDropsPage />}
               {page === 'api-keys' && <ApiKeysPage />}
               {page === 'display' && <DisplayPage />}

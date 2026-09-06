@@ -232,10 +232,14 @@ describe('agent navigation index — the controls the settings registry had miss
     ['why are the special modules locked', 'special', 'special-locked'],
     ['open the wired games', 'special', 'wired-arcade'],
     ['aero games', 'special', 'aero-arcade'],
-    ['set up my second monitor', 'monitors', 'monitors-list'],
-    ['remap the layout', 'monitors', 'monitors-layout-remap'],
-    ['add a simulated display', 'monitors', 'monitors-simulated'],
-    ['reset display setup', 'monitors', 'monitors-reset'],
+    // v1.0 audit 5.2 — these four cards moved to the Display page with the
+    // Monitors/Display merge. The PHRASES are unchanged on purpose: a user
+    // still asks for "my second monitor", and it still has to land on the
+    // card, not merely on a page.
+    ['set up my second monitor', 'display', 'monitors-list'],
+    ['remap the layout', 'display', 'monitors-layout-remap'],
+    ['add a simulated display', 'display', 'monitors-simulated'],
+    ['reset display setup', 'display', 'monitors-reset'],
     ['turn off automatic routing', 'file-drops', 'filedrop-auto'],
     ['pin a destination for a file type', 'file-drops', 'filedrop-overrides'],
     ['how long is the undo history', 'file-drops', 'filedrop-undo'],

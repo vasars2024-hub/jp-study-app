@@ -1144,8 +1144,8 @@ export const ja: Catalog = {
   'settings.nav.visualizer.desc': '音楽ビジュアルと歌詞',
   'settings.nav.special': 'スペシャル',
   'settings.nav.special.desc': 'WIRED と Aero の隠しモジュール',
-  'settings.nav.display': '画面表示',
-  'settings.nav.display.desc': 'ズームとモーション',
+  'settings.nav.display': '画面表示とモニター',
+  'settings.nav.display.desc': 'スクリーン、デスクトップ、ズームとモーション',
 
   // モニター（マルチモニターのデスクトップ）。上の「ディスプレイ」は
   // 視認性の設定であり、物理的な画面の設定ではない。

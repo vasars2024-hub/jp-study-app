@@ -158,10 +158,13 @@ const PAGE_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'scraper', titleKey: 'settings.nav.scraper', terms: ['scraper', 'providers', 'tracking', 'players', 'subtitles'] },
   { section: 'settings', page: 'visualizer', titleKey: 'settings.nav.visualizer', terms: ['visualizer', 'music visuals', 'lyrics'] },
   { section: 'settings', page: 'special', titleKey: 'settings.nav.special', terms: ['special', 'wired', 'aero', 'secret modules'] },
-  { section: 'settings', page: 'monitors', titleKey: 'settings.nav.monitors', terms: ['monitors', 'screens', 'desktops'] },
-  { section: 'settings', page: 'file-drops', titleKey: 'settings.nav.fileDrops', terms: ['file drops', 'dropped files'] },
+    { section: 'settings', page: 'file-drops', titleKey: 'settings.nav.fileDrops', terms: ['file drops', 'dropped files'] },
   { section: 'settings', page: 'api-keys', titleKey: 'settings.nav.apiKeys', terms: ['api keys', 'keys'] },
-  { section: 'settings', page: 'display', titleKey: 'settings.nav.display', terms: ['display', 'zoom', 'motion'] },
+  // v1.0 audit 5.2 — `monitors` merged into `display`, so this one row answers
+  // for both. The monitor terms are kept rather than dropped: they are how a
+  // user asks for this page, and `settings.nav.display(.desc)` names screens and
+  // desktops so the mirror test's "words the destination already uses" holds.
+  { section: 'settings', page: 'display', titleKey: 'settings.nav.display', terms: ['display', 'zoom', 'motion', 'monitors', 'screens', 'desktops'] },
   { section: 'settings', page: 'motion', titleKey: 'settings.nav.motion', terms: ['motion', 'animation speed', 'effects'] },
   { section: 'settings', page: 'storage', titleKey: 'settings.nav.storage', terms: ['models dictionaries', 'download', 'update', 'remove models'] },
   { section: 'settings', page: 'memory', titleKey: 'settings.nav.memory', terms: ['memory storage', 'usage', 'inventory', 'backups'] },
@@ -265,12 +268,12 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'special', controlId: 'wired-arcade', titleKey: 'search.wiredArcade', terms: ['wired games', 'wired arcade'] },
   { section: 'settings', page: 'special', controlId: 'aero-gadget-lab', titleKey: 'search.aeroGadgets', terms: ['aero gadget lab', 'xp', 'vista', 'windows media player', 'msn', 'cmd', 'legacy'] },
   { section: 'settings', page: 'special', controlId: 'aero-arcade', titleKey: 'search.aeroArcade', terms: ['aero games', 'aero arcade'] },
-  // `monitors` itself resolves to the page, which is where three of these four
-  // live side by side; each control is named by the phrase only it uses.
-  { section: 'settings', page: 'monitors', controlId: 'monitors-list', titleKey: 'settings.monitors.displays', terms: ['connected displays', 'second monitor'] },
-  { section: 'settings', page: 'monitors', controlId: 'monitors-layout-remap', titleKey: 'settings.monitors.remap', terms: ['remap', 'other screens'] },
-  { section: 'settings', page: 'monitors', controlId: 'monitors-simulated', titleKey: 'settings.monitors.simulated', terms: ['simulated displays', 'simulated', 'fake screens'] },
-  { section: 'settings', page: 'monitors', controlId: 'monitors-reset', titleKey: 'settings.monitors.reset', terms: ['reset display setup', 'forget screens'] },
+  // `monitors` itself resolves to the Display page (audit 5.2), which is where
+  // all four of these now live; each control is named by the phrase only it uses.
+  { section: 'settings', page: 'display', controlId: 'monitors-list', titleKey: 'settings.monitors.displays', terms: ['connected displays', 'second monitor'] },
+  { section: 'settings', page: 'display', controlId: 'monitors-layout-remap', titleKey: 'settings.monitors.remap', terms: ['remap', 'other screens'] },
+  { section: 'settings', page: 'display', controlId: 'monitors-simulated', titleKey: 'settings.monitors.simulated', terms: ['simulated displays', 'simulated', 'fake screens'] },
+  { section: 'settings', page: 'display', controlId: 'monitors-reset', titleKey: 'settings.monitors.reset', terms: ['reset display setup', 'forget screens'] },
   // `dropped files` stays with the File drops page: it names the page, not the
   // one card on it that decides where they go.
   { section: 'settings', page: 'file-drops', controlId: 'filedrop-auto', titleKey: 'settings.fileDrops.auto', terms: ['automatic routing', 'routing'] },

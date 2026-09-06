@@ -1142,8 +1142,8 @@ export const zh: Catalog = {
   'settings.nav.visualizer.desc': '音乐可视化与歌词',
   'settings.nav.special': '特殊',
   'settings.nav.special.desc': 'WIRED 与 Aero 隐藏模块',
-  'settings.nav.display': '显示',
-  'settings.nav.display.desc': '缩放与动效',
+  'settings.nav.display': '显示与显示器',
+  'settings.nav.display.desc': '屏幕、桌面、缩放与动效',
 
   // 显示器（多显示器桌面）。上面的"显示"是视觉无障碍设置，不是物理屏幕设置。
   'settings.nav.monitors': '显示器',

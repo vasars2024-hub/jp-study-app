@@ -205,29 +205,56 @@ describe('FileDropsPage', () => {
 describe('settings wiring', () => {
   it('both pages are in the nav registry under System', async () => {
     const { SETTINGS_NAV } = await import('../components/settings/settingsRegistry');
-    for (const id of ['monitors', 'file-drops']) {
+    // v1.0 audit 5.2 merged Monitors INTO Display, so `display` is the row that
+    // now answers for the monitor cards. `monitors` is asserted ABSENT below
+    // rather than simply dropped from this loop: a reappearing row would mean
+    // the two near-identical System entries are back.
+    for (const id of ['display', 'file-drops']) {
       const entry = SETTINGS_NAV.find((p) => p.id === id);
       expect(entry, `${id} missing from SETTINGS_NAV`).toBeDefined();
       expect(entry?.group).toBe('System');
       expect(entry?.labelKey).toBeTruthy();
     }
+    expect(
+      SETTINGS_NAV.find((p) => p.id === 'monitors'),
+      'monitors is back in SETTINGS_NAV — audit 5.2 merged it into display',
+    ).toBeUndefined();
   });
 
   it('their nav labels resolve in the catalog', async () => {
     const { SETTINGS_NAV } = await import('../components/settings/settingsRegistry');
     const { en } = await import('../../shared/i18n/catalogs/en');
-    for (const id of ['monitors', 'file-drops']) {
+    for (const id of ['display', 'file-drops']) {
       const entry = SETTINGS_NAV.find((p) => p.id === id);
       expect(entry?.labelKey && entry.labelKey in en).toBe(true);
       expect(entry?.descKey && entry.descKey in en).toBe(true);
+    }
+    // The merged page has to SAY it holds monitors, or the only way to find them
+    // is to already know they moved. This is also what lets the agent index keep
+    // matching 'monitors'/'screens'/'desktops' on this destination — its mirror
+    // test allows only words the destination's own label and description use.
+    const label = `${en['settings.nav.display']} ${en['settings.nav.display.desc']}`.toLowerCase();
+    for (const word of ['monitors', 'screens', 'desktops']) {
+      expect(label, `"${word}" is not a word of the merged Display page`).toContain(word);
     }
   });
 
   it('a nav entry without a render branch is a dead page — both are routed', async () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/renderer/components/settings/SettingsApp.tsx', 'utf8');
-    expect(src).toContain("page === 'monitors'");
     expect(src).toContain("page === 'file-drops'");
+    // `monitors` must NOT have a branch — but it must still resolve, or every
+    // stored recent page, deep link and agent route carrying it dead-ends.
+    expect(src).not.toContain("page === 'monitors'");
+    expect(src).toContain("next === 'monitors' ? 'display'");
+    // ...and the cards themselves have to actually be on that page. DisplayPage
+    // composing MonitorsPage is what makes the redirect land on something.
+    const display = fs.readFileSync(
+      'src/renderer/components/settings/pages/DisplayPage.tsx',
+      'utf8',
+    );
+    expect(display).toContain("from './MonitorsPage'");
+    expect(display).toContain('<MonitorsPage />');
   });
 
   it('the new prefs key is registered for backup', async () => {

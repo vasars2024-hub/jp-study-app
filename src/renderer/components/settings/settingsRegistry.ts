@@ -157,13 +157,15 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     // already carry, so it showed in the normal study view.
     advanced: true,
   },
-  {
-    id: 'monitors',
-    labelKey: 'settings.nav.monitors',
-    icon: 'monitor',
-    group: 'System',
-    descKey: 'settings.nav.monitors.desc',
-  },
+  // NO `monitors` PAGE. v1.0 audit 5.2: Monitors and Display were two System
+  // pages with near-identical names, and the rail put File drops and API keys
+  // between them, so the rail itself could not tell you which held what. The
+  // monitor cards render at the TOP of `display` now — physical screens first,
+  // then how the app draws onto them, which is the order Windows' own
+  // System > Display uses. `SettingsPageId` keeps `'monitors'` as a historical
+  // coordinate and `SettingsApp.navigate` redirects it, so a stored recent
+  // page, a deep link or the agent index still resolves. The four `monitors-*`
+  // search entries below carry `pageId: 'display'` and keep their own card ids.
   {
     id: 'file-drops',
     labelKey: 'settings.nav.fileDrops',
@@ -1407,7 +1409,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     titleKey: 'settings.monitors.displays',
     descKey: 'settings.monitors.displays.desc',
     keywords: ['connected displays', 'displays', 'screens', 'monitors', 'second monitor', 'per screen'],
-    pageId: 'monitors',
+    pageId: 'display',
     group: 'System',
   },
   {
@@ -1415,7 +1417,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     titleKey: 'settings.monitors.remap',
     descKey: 'settings.monitors.remap.desc',
     keywords: ['remap', 'other screens', 'layouts on other screens', 'rescale', 'resize'],
-    pageId: 'monitors',
+    pageId: 'display',
     group: 'System',
   },
   {
@@ -1423,7 +1425,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     titleKey: 'settings.monitors.simulated',
     descKey: 'settings.monitors.simulated.desc',
     keywords: ['simulated displays', 'simulated', 'fake screens', 'virtual display', 'test'],
-    pageId: 'monitors',
+    pageId: 'display',
     group: 'System',
   },
   {
@@ -1431,7 +1433,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     titleKey: 'settings.monitors.reset',
     descKey: 'settings.monitors.reset.desc',
     keywords: ['reset display setup', 'forget screens', 'reset', 'clear screen settings'],
-    pageId: 'monitors',
+    pageId: 'display',
     group: 'System',
   },
   {

@@ -1279,8 +1279,8 @@ export const ru: Catalog = {
   'settings.nav.visualizer.desc': 'Визуализация музыки и текст песен',
   'settings.nav.special': 'Особое',
   'settings.nav.special.desc': 'Скрытые модули WIRED и Aero',
-  'settings.nav.display': 'Экран',
-  'settings.nav.display.desc': 'Масштаб и анимация',
+  'settings.nav.display': 'Экран и мониторы',
+  'settings.nav.display.desc': 'Экраны, рабочие столы, масштаб и анимация',
 
   // Мониторы (рабочие столы на нескольких экранах). Страница «Экран» выше —
   // это доступность зрения, а не физические мониторы.

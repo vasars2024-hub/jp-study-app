@@ -122,10 +122,15 @@ export const AGENT_SETTINGS_GUIDED_TARGETS = {
     'blanc-mode', 'secret-os-leave', 'special-locked', 'wired-archive',
     'wired-finding-terminal', 'wired-arcade', 'aero-gadget-lab', 'aero-arcade',
   ],
-  monitors: ['monitors-list', 'monitors-layout-remap', 'monitors-simulated', 'monitors-reset'],
   'file-drops': ['filedrop-auto', 'filedrop-overrides', 'filedrop-undo', 'filedrop-reset'],
   'api-keys': [],
+  // v1.0 audit 5.2 — the four `monitors-*` controls lead this list because the
+  // Monitors page merged into Display and its cards render first there. There
+  // is deliberately no `monitors` key any more: this map's keys are pages that
+  // exist, and a key for a page with no nav row and no render branch would let
+  // the agent guide a user to nothing.
   display: [
+    'monitors-list', 'monitors-layout-remap', 'monitors-simulated', 'monitors-reset',
     'window-chrome', 'borderless', 'zoom', 'base-font', 'contrast', 'night-light',
     'brightness-sat', 'color-filter', 'transparency', 'focus-ring', 'scrollbars',
     'pointer', 'animation-level', 'reduce-motion',

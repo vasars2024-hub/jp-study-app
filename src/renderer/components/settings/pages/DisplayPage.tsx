@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import MonitorsPage from './MonitorsPage';
 import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from '../../../appZoom';
@@ -43,6 +44,20 @@ export default function DisplayPage() {
 
   return (
     <>
+      {/*
+       * v1.0 audit 5.2 — Monitors and Display were two System pages with
+       * near-identical names, separated in the rail by File drops and API keys,
+       * so neither name told you which one held what you wanted. They are one
+       * page now, ordered the way Windows' own System > Display orders it:
+       * the physical screens first, then how this app renders onto them.
+       *
+       * MonitorsPage stays its own module and is composed here rather than
+       * inlined — `settingsSearchReachability` derives a page's reachable cards
+       * by following DisplayPage's local imports, so this import is what keeps
+       * the four `monitors-*` registry entries routable.
+       */}
+      <MonitorsPage />
+
       <SettingsCard
         id="window-chrome"
         title={t('settings.display.chrome.title')}
