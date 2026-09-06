@@ -43,6 +43,7 @@ import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
 import JitenMiningPanel from '../JitenMiningPanel';
 import MiningCataloguePanel from '../MiningCataloguePanel';
 import DeckActionMenu from '../DeckActionMenu';
+import FlashcardFileMenu from './FlashcardFileMenu';
 import AiCardStudio from '../AiCardStudio';
 import CsvEditorPanel from '../CsvEditorPanel';
 import DeckImportPanel from '../DeckImportPanel';
@@ -2303,32 +2304,12 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 {card.folder && <span className="flash-row-folder muted">{card.folder}</span>}
                               </div>
                               <div className="flash-row-actions">
-                                <button
-                                  type="button"
-                                  className="btn small"
-                                  onClick={() => state.setFileMenu(fileMenu === card.id ? null : card.id)}
-                                >
-                                  {t('flash.file')}
-                                </button>
-                                {fileMenu === card.id && (
-                                  <div className="flash-file-menu">
-                                    <button type="button" onClick={() => { state.setDeck(setDeckCardFolder(card.id, null)); state.setFileMenu(null); }}>
-                                      {t('flash.unfiled')}
-                                    </button>
-                                    {folders.map((folder) => (
-                                      <button
-                                        key={folder}
-                                        type="button"
-                                        onClick={() => {
-                                          state.setDeck(setDeckCardFolder(card.id, folder));
-                                          state.setFileMenu(null);
-                                        }}
-                                      >
-                                        {folder}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                                <FlashcardFileMenu
+                                  open={fileMenu === card.id}
+                                  folders={folders}
+                                  onOpenChange={(open) => state.setFileMenu(open ? card.id : null)}
+                                  onMove={(folder) => state.setDeck(setDeckCardFolder(card.id, folder))}
+                                />
                                 <button
                                   className="flash-row-x"
                                   title={t('common.remove')}

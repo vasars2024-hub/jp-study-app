@@ -11,6 +11,7 @@ import {
 import Icon from '../components/Icons';
 import DeckActionMenu from '../components/DeckActionMenu';
 import DeckImportPanel from '../components/DeckImportPanel';
+import FlashcardFileMenu from '../components/flashcards/FlashcardFileMenu';
 import {
   BookCoverThumb,
   FlashcardAiMode,
@@ -462,31 +463,12 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                     </span>
                                     <span className="aero-flash-meaning">{card.meaning || card.back || '-'}</span>
                                     <span className="aero-flash-row-actions">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => state.setFileMenu(fileMenu === card.id ? null : card.id)}
-                                      >
-                                        {t('flash.file')}
-                                      </Button>
-                                      {fileMenu === card.id && (
-                                        <div className="flash-file-menu aero-flash-file-menu">
-                                          <button type="button" onClick={() => { state.setDeck(setDeckCardFolder(card.id, null)); state.setFileMenu(null); }}>
-                                            {t('flash.unfiled')}
-                                          </button>
-                                          {folders.map((folder) => (
-                                            <button
-                                              key={folder}
-                                              type="button"
-                                              onClick={() => {
-                                                state.setDeck(setDeckCardFolder(card.id, folder));
-                                                state.setFileMenu(null);
-                                              }}
-                                            >
-                                              {folder}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
+                                      <FlashcardFileMenu
+                                        open={fileMenu === card.id}
+                                        folders={folders}
+                                        onOpenChange={(open) => state.setFileMenu(open ? card.id : null)}
+                                        onMove={(folder) => state.setDeck(setDeckCardFolder(card.id, folder))}
+                                      />
                                       <button
                                         type="button"
                                         className="aero-flash-row-x"
