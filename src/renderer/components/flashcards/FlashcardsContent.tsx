@@ -33,6 +33,7 @@ import {
   useState,
   type CSSProperties,
   type DragEvent,
+  type RefObject,
 } from 'react';
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import { ContextualSurface } from '../liquid/LiquidSurface';
@@ -214,6 +215,7 @@ export interface FlashcardsState {
   collapsedBooks: Record<string, boolean>;
   toggleBookGroup: (key: string) => void;
   creatingFolder: boolean;
+  folderTriggerRef: RefObject<HTMLButtonElement | null>;
   setCreatingFolder: (v: boolean) => void;
   newFolderName: string;
   setNewFolderName: (v: string) => void;
@@ -312,6 +314,14 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [search, setSearch] = useState('');
   const [collapsedBooks, setCollapsedBooks] = useState<Record<string, boolean>>({});
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const folderTriggerRef = useRef<HTMLButtonElement>(null);
+  const wasCreatingFolder = useRef(false);
+  useEffect(() => {
+    if (wasCreatingFolder.current && !creatingFolder) {
+      folderTriggerRef.current?.focus({ preventScroll: true });
+    }
+    wasCreatingFolder.current = creatingFolder;
+  }, [creatingFolder]);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderErr, setFolderErr] = useState('');
   const [dropHover, setDropHover] = useState<string | null>(null);
@@ -1029,6 +1039,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     toggleBookGroup,
     creatingFolder,
     setCreatingFolder,
+    folderTriggerRef,
     newFolderName,
     setNewFolderName,
     folderErr,
@@ -2144,6 +2155,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                       }
                     }}
                     placeholder={t('flash.folderNamePlaceholder')}
+                    aria-label={t('flash.folderNamePlaceholder')}
                     autoFocus
                   />
                   <button type="button" className="btn small" onClick={state.createFolder}>
@@ -2151,7 +2163,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                   </button>
                 </span>
               ) : (
-                <button type="button" className="lib-folder-chip lib-folder-new" onClick={() => state.setCreatingFolder(true)}>
+                <button ref={state.folderTriggerRef} type="button" className="lib-folder-chip lib-folder-new" onClick={() => state.setCreatingFolder(true)}>
                   {t('flash.newFolder')}
                 </button>
               )}

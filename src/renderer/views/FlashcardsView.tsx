@@ -337,6 +337,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                         }
                       }}
                       placeholder={t('flash.folderNamePlaceholder')}
+                      aria-label={t('flash.folderNamePlaceholder')}
                       autoFocus
                     />
                     <Button size="sm" onClick={state.createFolder}>
@@ -347,6 +348,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                   <Button
                     size="sm"
                     className="aero-flash-folder-add"
+                    ref={state.folderTriggerRef}
                     leftIcon={<Icon name="plus" size={13} />}
                     onClick={() => state.setCreatingFolder(true)}
                   >
