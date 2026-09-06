@@ -4333,6 +4333,23 @@
       titleRe: /Media|メディア|媒体|Медиа/i,
       rootSel: '.mc-root',
       notSel: '.mc-video-page',
+      /*
+       * THE `captures` TRAP, THIRD SHAPE — and this surface is the one that proves the
+       * flag was not a one-off. Measured 2026-09-05 on a 36-item library: the ONLY text
+       * input anywhere in this window is `.mc-global-search input` (enumerated live —
+       * one node), so `dirtyField`'s generic "first visible text field" rule types the
+       * round-trip mark into the library's own filter and the grid goes to ZERO. Both
+       * card-counting rows then read `cards=0` in BOTH presentations and score `na`:
+       * parity came back `6/6, na 2` while the control, which runs after the mark is
+       * undone, read the same rows `8/8` with `cards=18`. The driver had emptied the
+       * surface it was scoring, and the run still said PASS.
+       *
+       * There is nowhere safe to redirect the mark to, so `probeInput` cannot answer it.
+       * `noSafeInput` is the honest report: this app's round trip carries no user-entered
+       * field state, the shell half (geometry, scroll, presentation) still round-trips,
+       * and the two rows become real scores instead of quiet `na`s.
+       */
+      noSafeInput: true,
       features: [
         {
           // Exactly one active rail entry, and the active one AGREES with the breadcrumb.
@@ -4547,9 +4564,23 @@
             .filter((i) => i.getAttribute('aria-current') === 'false')[0],
           'aria-current', 'true', 'no non-current shelf to falsify — library page is not up',
         ),
-        librarySearch: (w) => detach(
-          qa(w, '.medialib-card')[0],
-          'the media library is empty on this profile — nothing to remove from the grid',
+        /*
+         * MEASURED 2026-09-05, and the first version was WRONG in a way only a populated
+         * profile could reveal. It detached `.medialib-card[0]`, which was `unarmable` on
+         * every empty profile this spec had ever run on — so nobody had seen it fire. On a
+         * 36-item library it armed and did NOT falsify: the row reads `cards > 0`, so
+         * 18 -> 17 leaves it true (`fellRows: []`, verdict VOID). Removing ALL the cards
+         * would falsify it, but `perItemActions` also counts cards, so that mutation would
+         * fall two rows and prove neither.
+         *
+         * The placeholder is this row's OWN half — the field states which library it
+         * searches, and that string is what separates a real search from a decorative box.
+         * Nothing else in the spec reads it, so exactly one row falls.
+         */
+        librarySearch: (w) => stripAttr(
+          q(w, '.mc-global-search input'),
+          'placeholder',
+          'the library page is not the mounted tab — no global search field',
         ),
         sortAndViewMode: (w) => setAttr(
           qa(w, '.medialib-view-toggle [aria-pressed]')
