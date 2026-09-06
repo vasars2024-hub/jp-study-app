@@ -143,6 +143,38 @@ function listDir(dir: string): fs.Dirent[] {
  * a record pointing at a missing file is a real condition in this app today
  * (gate 34), and hiding it makes it undiagnosable.
  */
+/**
+ * The one separator form the user is shown, and the one every path-keyed
+ * comparison uses.
+ *
+ * Measured live 2026-09-06: 3 of the user's 39 media rows are stored as
+ * `C:\Users\…\Downloads\jp-study/[Anime Land] … .mp4` — backslashes for the
+ * folder, a forward slash before the file — and one more carries doubled
+ * separators. Windows opens all of them, so nothing failed; the Files app
+ * simply printed the malformed string verbatim in the details Location.
+ *
+ * Normalised HERE rather than at the point of display because `location.path`
+ * is not only shown: `revealTargetFor` hands it to `shell.showItemInFolder`
+ * and the deletion path hands it to `shell.trashItem`, and those are Win32
+ * shell APIs that take a path rather than a POSIX-ish string. One canonical
+ * form at the only place file-backed items are built fixes the display and
+ * every consumer at once, and cannot drift from them.
+ *
+ * NOT a dedup fix, stated so nobody credits it with one: `filesItemPathKey`
+ * already flips separators and lowercases, so `buildFilesIndex` deduped these
+ * rows correctly before this change and still does. The raw-string compare
+ * that a stray separator DOES defeat is `media.ts`'s rescan set, which is a
+ * different module and untouched here.
+ *
+ * `path.normalize` and not a hand-rolled replace: it collapses repeats and
+ * flips separators while preserving a UNC prefix, which `replace(/\//g, '\\')`
+ * does not.
+ */
+function canonicalFilePath(filePath: string): string {
+  const raw = String(filePath ?? '');
+  return raw ? path.normalize(raw) : raw;
+}
+
 function fileItem(args: {
   id: string;
   name: string;
@@ -154,7 +186,8 @@ function fileItem(args: {
   lastUsedAt?: number | null;
   flags?: FilesItem['flags'];
 }): FilesItem {
-  const stat = statOf(args.filePath);
+  const filePath = canonicalFilePath(args.filePath);
+  const stat = statOf(filePath);
   return {
     id: args.id,
     name: args.name,
@@ -165,7 +198,7 @@ function fileItem(args: {
     createdAt: args.createdAt ?? (stat ? Math.round(stat.birthtimeMs || stat.ctimeMs) : null),
     modifiedAt: stat ? Math.round(stat.mtimeMs) : null,
     lastUsedAt: args.lastUsedAt ?? null,
-    location: { store: 'file', path: args.filePath },
+    location: { store: 'file', path: filePath },
     flags: { ...args.flags, ...(stat ? {} : { brokenLink: true }) },
     source: args.source,
   };

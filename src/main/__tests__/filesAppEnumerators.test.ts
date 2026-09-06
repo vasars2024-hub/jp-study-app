@@ -900,3 +900,51 @@ describe('youtubeIdFromFileName', () => {
     expect(youtubeIdFromFileName('x [abcdefghijkl].mp4')).toBeNull();
   });
 });
+
+describe('files app index — the path the user is shown is canonical', () => {
+  /**
+   * Live on 2026-09-06: 3 of the user's 39 media rows are stored as
+   * `C:\Users\…\Downloads\jp-study/[Anime Land] … .mp4` — backslashes for the
+   * folder and a forward slash before the file — and the Files app details
+   * pane printed that string verbatim. Windows opens it, so nothing failed
+   * loudly; the user simply sees a path that looks broken, and
+   * `shell.showItemInFolder` / `shell.trashItem` are handed it as-is.
+   */
+  it('flips a mixed separator to one form without losing the file behind it', () => {
+    const real = write('outside/ep1.mkv', 'video bytes');
+    const mixed = `${path.dirname(real)}/${path.basename(real)}`;
+    expect(mixed).not.toBe(real);
+
+    write(
+      'media.json',
+      JSON.stringify({ items: [{ id: 'v1', title: 'Episode 1', path: mixed, kind: 'video', addedAt: 500 }] }),
+    );
+
+    const row = buildFilesIndex(ctx()).items.find(
+      (i) => i.location.store === 'file' && i.location.path.endsWith('ep1.mkv'),
+    );
+    expect(row).toBeDefined();
+    expect(row?.location).toEqual({ store: 'file', path: real });
+    // The stat still ran against a real file, so this is a rewrite of the
+    // string and not a row that quietly became a broken link.
+    expect(row?.flags?.brokenLink).toBeUndefined();
+    expect(row?.sizeBytes).toBe('video bytes'.length);
+    expect(revealTargetFor(row!.location)).toBe(real);
+  });
+
+  it('collapses a doubled separator, which the user also has one of', () => {
+    const real = write('outside/ep2.mkv', 'video bytes');
+    const doubled = real.split(path.sep).join(path.sep + path.sep);
+    expect(doubled).not.toBe(real);
+    write(
+      'media.json',
+      JSON.stringify({ items: [{ id: 'v2', title: 'Episode 2', path: doubled, kind: 'video', addedAt: 500 }] }),
+    );
+
+    const row = buildFilesIndex(ctx()).items.find(
+      (i) => i.location.store === 'file' && i.location.path.endsWith('ep2.mkv'),
+    );
+    expect(row?.location).toEqual({ store: 'file', path: real });
+    expect(row?.flags?.brokenLink).toBeUndefined();
+  });
+});
