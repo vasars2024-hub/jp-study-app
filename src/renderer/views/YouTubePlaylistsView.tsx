@@ -882,7 +882,7 @@ export default function YouTubePlaylistsView() {
                           title={whyBusy}
                           onClick={() => void refreshChannel()}
                         >
-                          <Icon name="refresh" size={14} /> Channel
+                          <Icon name="refresh" size={14} /> {t('yt.channel.refresh')}
                         </button>
                       ) : null}
                       <button
@@ -934,11 +934,11 @@ export default function YouTubePlaylistsView() {
                       <div className="yt-prefs-body">
                     {playlist.channelId ? (
                       <div className="yt-pref yt-channel-card">
-                        <span>Channel tracking</span>
+                        <span>{t('yt.channel.tracking')}</span>
                         <div className="yt-channel-card-body">
                           <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
-                          <div>{playlist.subscriptionStatus}</div>
-                          <div>{channelById.get(playlist.channelId)?.videoCount ?? 0} videos tracked</div>
+                          <div>{t(`yt.subStatus.${playlist.subscriptionStatus}`)}</div>
+                          <div>{t('yt.channel.videosTracked', { count: channelById.get(playlist.channelId)?.videoCount ?? 0 })}</div>
                         </div>
                       </div>
                     ) : null}
@@ -980,7 +980,7 @@ export default function YouTubePlaylistsView() {
                       {t('yt.pref.autoUpdate')}
                     </label>
                     <label className="yt-pref">
-                      <span>Channel id</span>
+                      <span>{t('yt.pref.channelId')}</span>
                       <input
                         value={playlist.channelId ?? ''}
                         onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
@@ -988,15 +988,15 @@ export default function YouTubePlaylistsView() {
                       />
                     </label>
                     <label className="yt-pref">
-                      <span>Channel title</span>
+                      <span>{t('yt.pref.channelTitle')}</span>
                       <input
                         value={playlist.channelTitle ?? ''}
                         onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
-                        placeholder="Channel name"
+                        placeholder={t('yt.pref.channelNamePlaceholder')}
                       />
                     </label>
                     <label className="yt-pref">
-                      <span>Channel icon URL</span>
+                      <span>{t('yt.pref.channelIcon')}</span>
                       <input
                         value={playlist.channelIconUrl ?? ''}
                         onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
@@ -1004,7 +1004,7 @@ export default function YouTubePlaylistsView() {
                       />
                     </label>
                     <label className="yt-pref">
-                      <span>Subscription status</span>
+                      <span>{t('yt.pref.subStatus')}</span>
                       <select
                         value={playlist.subscriptionStatus}
                         onChange={(e) =>
@@ -1015,13 +1015,13 @@ export default function YouTubePlaylistsView() {
                       >
                         {SUB_STATUS_OPTS.map((status) => (
                           <option key={status} value={status}>
-                            {status}
+                            {t(`yt.subStatus.${status}`)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label className="yt-pref">
-                      <span>Update frequency (hours)</span>
+                      <span>{t('yt.pref.updateFreq')}</span>
                       <input
                         type="number"
                         min="1"
