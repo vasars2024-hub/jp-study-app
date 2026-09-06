@@ -16,6 +16,7 @@ import {
   revealTargetFor,
   youtubeIdFromFileName,
 } from '../../shared/filesApp/catalog';
+import { classifyForCleanup } from '../../shared/filesApp/cleanup';
 
 let root = '';
 
@@ -898,5 +899,91 @@ describe('youtubeIdFromFileName', () => {
     // Eleven characters exactly — ten and twelve are not YouTube ids.
     expect(youtubeIdFromFileName('x [abcdefghij].mp4')).toBeNull();
     expect(youtubeIdFromFileName('x [abcdefghijkl].mp4')).toBeNull();
+  });
+});
+
+describe('files app index — the path the user is shown is canonical', () => {
+  /**
+   * Live on 2026-09-06: 3 of the user's 39 media rows are stored as
+   * `C:\Users\…\Downloads\jp-study/[Anime Land] … .mp4` — backslashes for the
+   * folder and a forward slash before the file — and the Files app details
+   * pane printed that string verbatim. Windows opens it, so nothing failed
+   * loudly; the user simply sees a path that looks broken, and
+   * `shell.showItemInFolder` / `shell.trashItem` are handed it as-is.
+   */
+  it('flips a mixed separator to one form without losing the file behind it', () => {
+    const real = write('outside/ep1.mkv', 'video bytes');
+    const mixed = `${path.dirname(real)}/${path.basename(real)}`;
+    expect(mixed).not.toBe(real);
+
+    write(
+      'media.json',
+      JSON.stringify({ items: [{ id: 'v1', title: 'Episode 1', path: mixed, kind: 'video', addedAt: 500 }] }),
+    );
+
+    const row = buildFilesIndex(ctx()).items.find(
+      (i) => i.location.store === 'file' && i.location.path.endsWith('ep1.mkv'),
+    );
+    expect(row).toBeDefined();
+    expect(row?.location).toEqual({ store: 'file', path: real });
+    // The stat still ran against a real file, so this is a rewrite of the
+    // string and not a row that quietly became a broken link.
+    expect(row?.flags?.brokenLink).toBeUndefined();
+    expect(row?.sizeBytes).toBe('video bytes'.length);
+    if (!row) throw new Error('unreachable — asserted defined above');
+    expect(revealTargetFor(row.location)).toBe(real);
+  });
+
+  it('collapses a doubled separator, which the user also has one of', () => {
+    const real = write('outside/ep2.mkv', 'video bytes');
+    const doubled = real.split(path.sep).join(path.sep + path.sep);
+    expect(doubled).not.toBe(real);
+    write(
+      'media.json',
+      JSON.stringify({ items: [{ id: 'v2', title: 'Episode 2', path: doubled, kind: 'video', addedAt: 500 }] }),
+    );
+
+    const row = buildFilesIndex(ctx()).items.find(
+      (i) => i.location.store === 'file' && i.location.path.endsWith('ep2.mkv'),
+    );
+    expect(row?.location).toEqual({ store: 'file', path: real });
+    expect(row?.flags?.brokenLink).toBeUndefined();
+  });
+});
+
+describe('files app index — a folder is not an empty file', () => {
+  /**
+   * Live on 2026-09-06: Clean up offered **601 empty files**, and 4 of them
+   * were the user's manga — `library/25e40727-…`, a directory holding 3 files —
+   * because `fs.Stats.size` is 0 for a directory on NTFS and
+   * `classifyForCleanup` reads `sizeBytes === 0` as the whole definition of
+   * `empty-files`. The other 597 are genuine 0-byte cover jpgs.
+   */
+  it('a directory-backed row reports no size, so cleanup cannot call it empty', () => {
+    write('library/m1/ch1.jpg', 'page bytes');
+    write(
+      'library.json',
+      JSON.stringify([{ id: 'm1', title: 'One Punch-Man', kind: 'manga', createdAt: 2000 }]),
+    );
+
+    const row = buildFilesIndex(ctx()).items.find((i) => i.name === 'One Punch-Man');
+    expect(row).toBeDefined();
+    expect(row?.location.store).toBe('file');
+    expect(row?.sizeBytes).toBeNull();
+    expect(row?.flags?.brokenLink).toBeUndefined();
+    if (!row) throw new Error('unreachable — asserted defined above');
+    expect(
+      classifyForCleanup(row, ['broken-links', 'partial-downloads', 'empty-files']),
+    ).toBeNull();
+  });
+
+  it('a real zero-byte FILE is still offered, so the class did not become a no-op', () => {
+    write('covers/cover.jpg', '');
+    const row = buildFilesIndex(ctx()).items.find((i) => i.name === 'cover.jpg');
+    expect(row?.sizeBytes).toBe(0);
+    if (!row) throw new Error('unreachable — asserted defined above');
+    expect(
+      classifyForCleanup(row, ['broken-links', 'partial-downloads', 'empty-files']),
+    ).toBe('empty-files');
   });
 });
