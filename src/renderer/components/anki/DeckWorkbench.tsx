@@ -817,11 +817,22 @@ export default function DeckWorkbench() {
                           total: p.totalNotes ?? '?',
                         })}
                       </span>
+                      {/* Every button in this list carried only its own verb, so a
+                          screen reader heard "Discard" once per session with nothing
+                          to tell them apart — measured live at 24 rows / 58 buttons /
+                          **5 distinct names**. The visible label stays the verb: a
+                          sighted user reads the file from the row it sits in. Composed
+                          from the already-translated verb plus the session's own label
+                          rather than a new key, because all four catalogs are dirty
+                          with another track. Same shape as `ace53602` on Translate. */}
                       {p.resumable && (
                         <button
                           type="button"
                           className="btn"
                           disabled={busy !== null}
+                          aria-label={`${t('ankiWorkbench.sessions.resume', {
+                            offset: p.resumeOffset ?? 0,
+                          })} — ${session.label}`}
                           onClick={() => void resumeSession(session.id)}
                         >
                           {t('ankiWorkbench.sessions.resume', {
@@ -838,6 +849,7 @@ export default function DeckWorkbench() {
                           type="button"
                           className="btn"
                           disabled={busy !== null}
+                          aria-label={`${t('ankiWorkbench.sessions.reopen')} — ${session.label}`}
                           onClick={() => void reopenSession(session.id)}
                         >
                           {t('ankiWorkbench.sessions.reopen')}
@@ -846,6 +858,7 @@ export default function DeckWorkbench() {
                       <button
                         type="button"
                         className="btn"
+                        aria-label={`${t('ankiWorkbench.sessions.discard')} — ${session.label}`}
                         onClick={() => void discardSession(session.id)}
                       >
                         {t('ankiWorkbench.sessions.discard')}
