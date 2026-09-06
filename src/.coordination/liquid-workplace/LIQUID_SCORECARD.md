@@ -6681,6 +6681,16 @@ per the enumeration entry above (`b815d159`) — **no cell moved this turn.**
   No shared app restart or shared profile mutation. Temporary main inspector closed after capture.
 - Limitation: real desktop edits still use synchronous rename; this suppresses redundant work,
   not every possible main-loop pause. No absolute timing improvement or cat7 closure claimed.
+- AMENDED 2026-09-06 (primary, `fd4a9363`), boss audit F4: "suppresses redundant work" reads as
+  closing the profiled stall and does not. It suppresses **byte-identical echoes only** — which
+  the audit confirmed live, 8 for 8 — while the DOMINANT producer of that same
+  `commitLayout -> persist -> atomicWriteJson` stack on this machine was two shells owning one
+  desktop, each rescaling the other's layout into its own viewport and committing a genuinely
+  different one. Measured live: 27 broadcasts in 6.0 s, `layoutEpoch` climbing 4.6/s idle. The
+  comparison seam structurally cannot see that, because it is never an echo. Fixed at
+  `fd4a9363` by ownership (`setAssignment` re-homes, and `syncAssignments` heals a collision
+  already on disk); the stored collision on this machine was still present today with desktop
+  0's epoch at **224,526**, up 25,109 from the audit's 199,417 the day before.
 - Next: Anki's five-minute poll retains every note's full HTML fields until the final fold;
   reduce that retained payload while preserving note counts, interval merge and profile cancellation.
 
