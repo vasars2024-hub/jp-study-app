@@ -32,7 +32,47 @@ does not move**: item 1 was re-probed live this turn and is still open (see belo
 
 ---
 
-## 1. qBittorrent WebUI credential — gate 7
+# 2026-09-06 (primary) — THIS FILE HAS NO USER BLOCKERS LEFT. All six are dead.
+
+Everything below this line is kept as the record of how each one died. **Nothing in it is
+owed by the user.** Re-derived live this turn against a freshly restarted main (pid 29960,
+04:47:56 EDT), not inherited from any handoff or pin:
+
+    window.api.scraperQbitTest -> { status: "connected", version: "5.2.3",
+                                    message: "Connected to localhost:8080.",
+                                    latencyMs: 3, authMode: "apiKey" }
+    live profile `balanced`   -> enabled true, authMode 'apiKey', apiKeyRef 'qbittorent'
+    scraperHasCredential      -> qbittorent true, qbit/apikey true,
+                                 qbit/webui false, qbittorrent false, qbittorrent/webui false
+
+**Item 1 is dead, and its premise was wrong rather than merely stale.** It asks the user for a
+WebUI *password*. They never needed to supply one: qBittorrent 5.2.3 authenticates a
+`Authorization: Bearer <APIKey>`, the key is in the vault, and the app is connected through it
+right now. The ask was filed twice (2026-08-18, 2026-09-03) and was the wrong ask both times.
+`qbit/webui` still reads `false` — that is a ref nothing uses, not a missing credential.
+Password mode remains unexercised live, and that is a **coverage gap in `c7fa2df7`**, not a
+user blocker: it is unit-covered (5 cases, mutation control fires) and no product path needs it.
+
+**The five acquisition gates are dead as blockers too.** Attendance was lifted by the user on
+2026-09-03. Gates 12, 13 and 14 closed 2026-09-05; **gate 15 closed 2026-09-06** (see
+`MAIN_V1_COMPLETION_PLAN.md`, "GATE 15 CLOSES 2026-09-06"). Only **gate 11** is open, and it is
+parked on what the nyaa index carries for Route A — which the user cannot change either, so it
+was never a `needs-user` item under this file's own bar. The operating limits below still bind
+whenever an acquisition gate is driven; they are limits, not blockers.
+
+**Header arithmetic, re-derived this turn from each track's own bullets:** main-v1 is
+**68 of 80**. T1 5/5, T2 15/15, T3 6/6, T4 9/9, T5 8/8, T6 3/7, T7 3/3, T8 0/7, T9 19/20.
+The 12 open are T6's 4 + T8's 7 — both owned by `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` by
+the plan's own text — plus gate 11. **`items below` is now 0**, so the old
+"11 liquid + 6 items + 0 agent" split is superseded by "11 liquid + 1 parked gate".
+
+*Standing bar, from the relay pin: an entry belongs in this file only if no agent could do it
+with the tools it has. "Needs a machine state", "needs a scope call" and "the plan says
+attended" are not blockers. Re-derive before filing one and before inheriting one.*
+
+---
+
+## ~~1. qBittorrent WebUI credential — gate 7~~ — DEAD 2026-09-06, see the block above
 
 Blocks gate 7 directly, and blocks gate 14 transitively (see below). Until it is
 supplied, the nyaa provider stays **default-disabled**.
@@ -145,7 +185,13 @@ half and the "distinct from *not running*" half is a recorded **non-goal**, with
 (`qbitTransportMessage`). Gate 10 needs nothing from the user and nothing further from an
 agent.
 
-## The five attended acquisition gates — 11, 12, 13, 14, 15
+## ~~The five attended acquisition gates — 11, 12, 13, 14, 15~~ — NOT BLOCKERS since 2026-09-03
+
+**Attendance lifted by the user 2026-09-03. 12, 13 and 14 closed 2026-09-05; 15 closed
+2026-09-06.** Only gate 11 is open and it is parked on index contents, which no human here can
+change either. Kept below because the numbered gate texts are still the definitions the plan
+scores against, and because points 1–4 of the operating limits are limits on how an agent
+drives them, not reasons to wait for a person.
 
 *(Headed "3–7" until 2026-08-30. The numbering was dropped rather than renumbered when item 2
 left the list: these are five of the six remaining items, and the gate numbers below are the
