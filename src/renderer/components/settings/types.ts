@@ -149,7 +149,18 @@ export interface SettingsWallProps {
 
 export interface SettingsController extends SettingsWallProps {
   page: SettingsPageId;
-  navigate: (page: SettingsPageId, focusSettingId?: string) => void;
+  /**
+   * `options.guided` marks the destination as an explicit cross-surface route,
+   * which exempts it from `SettingsApp`'s "bounce home off an advanced page"
+   * guard. Without it in this type, a consumer could not pass the flag at all —
+   * which is exactly how the API keys page's Manage button ended up dead for
+   * anyone who had not unlocked expert options.
+   */
+  navigate: (
+    page: SettingsPageId,
+    focusSettingId?: string,
+    options?: { guided?: boolean },
+  ) => void;
   focusSettingId: string | null;
   clearFocusSetting: () => void;
 

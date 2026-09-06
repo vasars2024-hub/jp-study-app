@@ -318,7 +318,18 @@ export default function ApiKeysPage() {
             </button>
           )}
           {spec.managedOnPage && (
-            <button type="button" onClick={() => navigate(spec.managedOnPage as 'study' | 'scraper')}>
+            <button
+              type="button"
+              onClick={() =>
+                // `guided` because the page this lands on may be advanced-only.
+                // Without it `SettingsApp`'s guard bounces straight back Home and
+                // the button is functionally dead — which is what a default-mode
+                // user got, while the row above still told them to "Use Manage".
+                navigate(spec.managedOnPage as 'study' | 'scraper', spec.managedSettingId, {
+                  guided: true,
+                })
+              }
+            >
               {t('credential.manage')}
             </button>
           )}
