@@ -291,50 +291,91 @@ export function TranslateHistoryList({
         </button>
       </div>
       <ul className="tr-history-list">
-        {state.history.map((e) => (
-          <li key={e.id} className="tr-history-item">
-            <div className="tr-history-meta muted">
-              {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString()} · {e.origin}
-            </div>
-            <p className="tr-history-src">{e.sourceText}</p>
-            <p className="tr-history-dst muted">{e.resultText}</p>
-            <div className="tr-history-item-actions">
-              <button type="button" className="btn ghost" onClick={() => void copyText(e.resultText)}>
-                {t('translate.history.copy')}
-              </button>
-              <button type="button" className="btn ghost" onClick={() => state.rerunEntry(e)}>
-                {t('translate.history.rerun')}
-              </button>
-              <button type="button" className="btn ghost" onClick={() => state.mineEntry(e)}>
-                {t('translate.history.mine')}
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => {
-                  appendNotebookEvent({
-                    stream: 'translations',
-                    title: e.sourceText.slice(0, 80),
-                    detail: e.resultText.slice(0, 120),
-                    folder: 'Translations',
-                    origin: e.origin,
-                    href: 'files',
-                  });
-                  onOpenNotebook();
-                }}
-              >
-                {t('translate.history.toNotebook')}
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => removeTranslationHistory(e.id)}
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          </li>
-        ))}
+        {state.history.map((e) => {
+          /*
+           * Every row's five buttons carried the same five words as every other
+           * row's. Measured live 2026-09-06 on the user's own 52-entry history:
+           * **52 buttons named exactly "Copy"**, and the same for Re-run, Mine
+           * sentence, Send to Notebook and Remove — 260 controls, five distinct
+           * names between them. A screen reader user hears "Copy button" 52
+           * times with nothing to tell them apart.
+           *
+           * The visible label stays as it is: sighted users read it from the
+           * row it sits in. `aria-label` is what needs the row's own subject,
+           * and it is composed from the translated verb plus the user's own
+           * sentence rather than a new catalog key.
+           */
+          const subject = e.sourceText.replace(/\s+/g, ' ').trim().slice(0, 40);
+          const named = (key: string): string => `${t(key)} — ${subject}`;
+          return (
+            <li key={e.id} className="tr-history-item">
+              <div className="tr-history-meta muted">
+                {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString()} · {e.origin}
+              </div>
+              <p className="tr-history-src">{e.sourceText}</p>
+              <p className="tr-history-dst muted">{e.resultText}</p>
+              <div className="tr-history-item-actions">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={named('translate.history.copy')}
+                  onClick={() => void copyText(e.resultText)}
+                >
+                  {t('translate.history.copy')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={named('translate.history.rerun')}
+                  onClick={() => state.rerunEntry(e)}
+                >
+                  {t('translate.history.rerun')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={named('translate.history.mine')}
+                  onClick={() => state.mineEntry(e)}
+                >
+                  {t('translate.history.mine')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={named('translate.history.toNotebook')}
+                  onClick={() => {
+                    appendNotebookEvent({
+                      stream: 'translations',
+                      title: e.sourceText.slice(0, 80),
+                      detail: e.resultText.slice(0, 120),
+                      folder: 'Translations',
+                      origin: e.origin,
+                      href: 'files',
+                    });
+                    onOpenNotebook();
+                  }}
+                >
+                  {t('translate.history.toNotebook')}
+                </button>
+                {/*
+                 * This said "Close" and called `removeTranslationHistory`. It
+                 * does not close anything — it deletes the entry, permanently
+                 * and with no undo. `common.remove` already exists in all four
+                 * catalogs, so the label can say what the button does without
+                 * adding a key to catalogs another track holds dirty.
+                 */}
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-label={named('common.remove')}
+                  onClick={() => removeTranslationHistory(e.id)}
+                >
+                  {t('common.remove')}
+                </button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </>
   );

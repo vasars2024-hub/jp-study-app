@@ -287,8 +287,13 @@ export default function TranslateView() {
 
                 <section className="aero-translate-pane">
                   <header>{LANG_LABELS[target]} output</header>
-                  <div className="aero-translate-output" lang={target}>
-                    {output || <span className="muted">Translation appears here.</span>}
+                  {/* `aria-live`: the result arrives asynchronously into a div
+                      nothing announces, so with a screen reader the translation
+                      simply appears and the user is never told. `polite` because
+                      it must not interrupt, `atomic` because a partial re-read of
+                      a sentence is worse than none. */}
+                  <div className="aero-translate-output" lang={target} aria-live="polite" aria-atomic="true">
+                    {output || <span className="muted">{t('translate.outputPlaceholder')}</span>}
                   </div>
                 </section>
               </div>
@@ -437,7 +442,7 @@ export default function TranslateView() {
               </div>
               <div className="tr-pane">
                 <label className="tr-label">{LANG_LABELS[target]}</label>
-                <div className="tr-output" lang={target}>
+                <div className="tr-output" lang={target} aria-live="polite" aria-atomic="true">
                   {output || <span className="muted">{t('translate.outputPlaceholder')}</span>}
                 </div>
               </div>
