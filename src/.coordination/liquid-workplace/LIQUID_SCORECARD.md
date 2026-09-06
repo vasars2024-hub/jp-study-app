@@ -8254,3 +8254,65 @@ retains and structurally cannot say by what. Take one on an idle instance and fi
 ~640 MB of live old_space in MAIN. Two traps already paid for: the route is **inert until the
 app restarts** (main-process change), and it **blocks main for seconds** — the response calls
 that `blockedMs`, so do not sample a surface across your own snapshot.
+
+## 2026-09-05 21:10 EDT — primary2 — `anki` cat6 CLOSES. The blocker was a MISSING SPEC, not a defect.
+
+**Closed this turn: 1 cell. 176 -> 177 of 192, 15 left.** `sampled-out:` `player` (8, still
+open), `immersion` (3), `translate` (1) — not scored this turn, named so the skip is not silent.
+
+### Why anki had never scored, and it is not what seven turns assumed
+
+The pin cleared anki's human blocker at 02:20 today (AnkiConnect answers, 84 decks). Nobody
+scored it after. Re-derived live rather than inherited: the surface is **`Connected — 84 decks,
+35 note types.`**, deck `<select>` carries **84 options**, note type `JP Study App::JA-EN Classic`.
+
+The instrument was the blocker. `cat6-feature-parity.cjs --list` installs **30 app specs and
+`anki` is not one of them**, so cat6 REFUSED outright — and cat5's Q7/Q8/Q9 are MEASURE
+questions that read the cat6 baseline, so they came back **VOID for want of a file**, not
+answered. One missing spec was holding two cells.
+
+`0c683ead` adds it. Four rows, each a cross-check between two regions that must agree rather
+than a presence check, because this surface's whole job is speaking for a process the app does
+not own: banner deck-count vs deck-select option count (**84 == 84**), bound deck vs the options
+actually offered (`index=53`, operable), bound note type vs the name the field-mapping card
+claims to edit (`namesIt=true`), one operable action per flush card while connected (`cards=3
+buttonsPerCard=1,1,1 disabledWhileConnected=0`).
+
+**cat6 anki = PASS 10/10**, `allRowsReachable` / `parityEqual` / `roundTripHeld` all true,
+standard and liquid identical, round trip held a dirtied `fm-input`. **CONTROL: 4 declared, 4
+armed, each flipped ONLY its own row and returned** — "CONTROL FAILED AS REQUIRED".
+
+### The harness bug the control found, and the false defect it nearly produced
+
+`setAttr(node,'disabled','true')` on a node with no `disabled` attribute **cannot be undone**.
+The restore sweep stores `getAttribute(attr) || ''` and ends with `setAttribute(attr, value)` —
+it never removes — so restoring wrote `disabled=""`, which is **still disabled**. The arm
+reported `restored: ["disabled"]` and the row stayed down.
+
+**That stranded 3 dead controls on the live Anki window, one of them the deck select**, and the
+next scored run read them back as `operable=false` and `disabledWhileConnected=1` — i.e. as two
+PRODUCT defects. They were mine. Cleared them (`cleared:3`), re-measured, and the surface then
+scored 10/10; final state verified `residue 0, deadBtns 0, selDisabled false`. **Do not file
+those two as anki defects — they do not exist.** Absence is now recorded explicitly
+(`data-lqp-absent-<attr>`) and the sweep removes rather than blanks; every spec that mutates a
+boolean attribute inherits the fix.
+
+### cat5 anki is now ANSWERABLE and reads 7/10 — three real findings, NOT closed
+
+With the cat6 baseline present, Q7/Q8/Q9 resolve instead of VOIDing. **`7/10 — 3 questions
+answer NO`: Q1 dominant task immediately obvious, Q3 primary actions visible without hunting,
+Q5 every readable surface has stable contrast.** The rubric says fix and re-measure, not report
+— I did not fix them and the cell stays OPEN. This is the first number anki cat5 has ever
+produced. Its control ran separately and fired on Q2/Q3/Q4/Q5/Q10.
+
+### RULE D — liquid. Closed this turn: **1 cell. 177 of 192, 15 left.**
+
+To 2026-09-07 11:00 EDT from 21:10: 37.8h = **1.575 days**. `15 / 1.575 = 9.52 cells/day`
+required, against a trailing rate of **~6 cells per 10 liquid turns**. Required > trailing for
+the **SEVENTH** consecutive turn: **TARGET AT RISK.**
+
+Single biggest cause, and this turn changes the diagnosis: the previous six turns blamed
+"turns keep going into ONE cell". That is a symptom. **The remaining cells sit on surfaces the
+INSTRUMENT cannot score yet, and nobody had checked which.** anki cost one spec, not one
+product fix, and it moved two cells' worth of blockage in under an hour. Reported, not fixed by
+cutting scope.
