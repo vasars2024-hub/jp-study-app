@@ -516,6 +516,51 @@ const FRAME_READ = `JSON.stringify(window.__lqFrames || null)`;
 const FRAME_STOP = `(window.__lqFramesGen = (window.__lqFramesGen || 0) + 1, window.__lqFrames = null, 'stopped')`;
 
 const SPECS = {
+  anki: {
+    title: 'Anki',
+    root: '.anki-view',
+    heavy: {
+      /*
+       * ADDED 2026-09-06. `anki` had no entry here, so `--surface anki` REFUSED and the cell
+       * was unscoreable — the same shape as the missing cat6 spec that had been holding two
+       * anki cells until `0c683ead`. A surface with no spec is an instrument gap, not a
+       * product result, and it must never be reported as one.
+       *
+       * THIS SURFACE HAS NO HEAVY WORK, and saying so is the honest answer rather than a
+       * reason to leave it unscored. Measured live 2026-09-06 on pid 2520: `.anki-view` is
+       * **235 elements**, its one scroller is `.fwin-body` at scrollHeight **1,814** against
+       * clientHeight **545**, and five of its six `collapse-section`s are closed, so most of
+       * the surface is not even mounted. It is a form, and scrolling that form is the
+       * heaviest thing a user can repeat on it.
+       *
+       * EXPANDING THE SECTIONS WAS THE OTHER CANDIDATE AND IT WAS MEASURED, NOT ASSUMED.
+       * Opening "Variable palette" takes the root from 235 to **296 elements** (61 mounted,
+       * 44 of them buttons). That is real, but it is a one-off mount smaller than a full
+       * scroll of the whole form, and — the disqualifier — the other four closed sections
+       * include "Deck Workbench", whose mount reaches AnkiConnect. The rubric's "heaviest
+       * real operation" never means "cause a side effect the score does not need", which is
+       * the same judgement `immersion` records for its site cards.
+       *
+       * CHANGING THE BOUND DECK OR NOTE TYPE is the genuinely expensive operation on this
+       * surface (84 deck options, and a note-type change remounts FieldMappingEditor through
+       * its `key`). It is excluded for the same reason: it WRITES the user's profile. A
+       * category-7 leg does not get to alter the thing it is measuring.
+       *
+       * TYPING INTO `.fm-input` is excluded on precedent, not preference: `grammar` above
+       * already records that typing is category 2's `/type` leg, and the bridge cannot carry
+       * Japanese anyway.
+       *
+       * So the leg is the shared `scrollAll` helper — no new probe code (RULE 1), and
+       * `scrollProof` refuses unless the scroller actually moved AND came back to 0.
+       */
+      label: 'scroll the whole 1,814 px Anki form',
+      durationMs: 2500,
+      js: scrollAll('.anki-view'),
+      progress: scrollProgress,
+      proof: scrollProof,
+    },
+    collection: { container: '.anki-workspace-main', row: '.anki-card' },
+  },
   agent: {
     title: 'Agent',
     root: '.agent-root',
