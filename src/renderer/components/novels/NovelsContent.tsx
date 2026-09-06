@@ -210,6 +210,47 @@ function jitenCandidate(deck: JitenDeck, profiles: JitenSourceProfile[]): NovelC
   };
 }
 
+/**
+ * A row built from a plan entry alone, for the case where nothing else can
+ * produce one.
+ *
+ * The table is assembled from the LIVE sources — the bundled/remote local
+ * catalogue and whatever Jiten search returned this session — and the plan was
+ * then used only as a lookup to decorate them. So a planned title that no live
+ * source happens to offer right now simply did not exist: with the Plan filter
+ * on, the chip counted it (`store.plan.length`) while the table silently left
+ * it out. On this machine that was two of six — both Jiten-planned, one already
+ * `mined` — invisible for as long as the session had not searched Jiten, which
+ * is the state the app starts in.
+ *
+ * A plan entry carries its own title, difficulty, genres, description and
+ * source links, so it can stand alone. The row is deliberately built from what
+ * was stored rather than refetched: the point is that the user's plan is never
+ * hidden by a source being unavailable.
+ */
+function planCandidate(entry: JitenPlanEntry, profiles: JitenSourceProfile[]): NovelCandidate {
+  const rawDifficulty = entry.difficultyRaw;
+  return {
+    id: entry.id,
+    kind: entry.jitenDeckId != null ? 'jiten' : 'local',
+    titleJp: entry.titleJp,
+    englishTitle: entry.englishTitle,
+    author: entry.author,
+    type: entry.jitenDeckId == null ? 'Local' : entry.mediaType === 8 ? 'WebNovel' : 'Novel',
+    difficultyRaw: rawDifficulty,
+    difficultyLabel: entry.difficultyLabel ?? difficultyLabel(rawDifficulty),
+    genres: entry.genres ?? [],
+    tags: entry.tags ?? [],
+    coverUrl: entry.coverUrl,
+    description: entry.description,
+    sourceLinks: dedupeLinks([
+      ...(entry.sourceLinks ?? []),
+      ...buildSourceLinks(entry, profiles),
+    ]),
+    jitenDeckId: entry.jitenDeckId,
+  };
+}
+
 function dedupeLinks(links: JitenSourceLink[]): JitenSourceLink[] {
   const seen = new Set<string>();
   return links.filter((link) => {
@@ -417,9 +458,25 @@ export function useNovels() {
     return map;
   }, [store]);
 
+  // Plan entries no live source produced this session. See `planCandidate`:
+  // without these the Plan chip counts rows the table cannot show.
+  const orphanPlanCandidates = useMemo(() => {
+    const known = new Set<string>();
+    for (const candidate of localCandidates) known.add(candidate.id);
+    for (const candidate of jitenCandidates) known.add(candidate.id);
+    const out: NovelCandidate[] = [];
+    for (const entry of store?.plan ?? []) {
+      if (known.has(entry.id)) continue;
+      known.add(entry.id);
+      out.push(planCandidate(entry, profiles));
+    }
+    return out;
+  }, [jitenCandidates, localCandidates, profiles, store]);
+
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const combined = type === 'Local' || !jitenCandidates.length ? localCandidates : [...jitenCandidates, ...localCandidates];
+    const live = type === 'Local' || !jitenCandidates.length ? localCandidates : [...jitenCandidates, ...localCandidates];
+    const combined = orphanPlanCandidates.length ? [...live, ...orphanPlanCandidates] : live;
     const filtered = combined.filter((candidate) => {
       const plan = candidatePlan.get(candidate.id) ?? null;
       const links = linkFromEntry(plan, candidate);
@@ -464,6 +521,7 @@ export function useNovels() {
     importFilter,
     jitenCandidates,
     localCandidates,
+    orphanPlanCandidates,
     planOnly,
     query,
     sort,
@@ -481,12 +539,12 @@ export function useNovels() {
 
   const genreOptions = useMemo(() => {
     const set = new Set<string>([...GENRES, ...Object.values(JITEN_GENRES)]);
-    for (const candidate of [...jitenCandidates, ...localCandidates]) {
+    for (const candidate of [...jitenCandidates, ...localCandidates, ...orphanPlanCandidates]) {
       candidate.genres.forEach((item) => set.add(item));
       candidate.tags.forEach((item) => set.add(item));
     }
     return ['All', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [jitenCandidates, localCandidates]);
+  }, [jitenCandidates, localCandidates, orphanPlanCandidates]);
 
   async function ensurePlanned(candidate: NovelCandidate): Promise<JitenPlanEntry | null> {
     const existing = candidatePlan.get(candidate.id);

@@ -263,3 +263,78 @@ describe('plan import linking', () => {
     expect(jitenUpdatePlan).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The Plan chip counts `store.plan.length`; the table was assembled only from
+ * the LIVE sources (the local catalogue, plus whatever a Jiten search returned
+ * this session) with the plan used as decoration. So a planned title no live
+ * source happened to offer was counted and not listed.
+ *
+ * Measured on the user's own profile 2026-09-06: the chip read "Plan (6)" and
+ * the table had 4 rows. The two missing ones were Jiten-planned — one already
+ * `mined` — and they were missing purely because the session had not searched
+ * Jiten, which is the state the app starts in.
+ */
+describe('a planned title no live source offers', () => {
+  function planEntry(id: string, titleJp: string, extra: Partial<JitenPlanEntry> = {}): JitenPlanEntry {
+    return {
+      id,
+      titleJp,
+      genres: [],
+      tags: [],
+      sourceLinks: [],
+      acquisitionStatus: 'planned',
+      createdAt: 1,
+      updatedAt: 1,
+      ...extra,
+    };
+  }
+
+  async function mountWithPlan(plan: JitenPlanEntry[]) {
+    (window.api.jitenGetStore as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...emptyStore(),
+      plan,
+    });
+    await mount();
+    await act(async () => {
+      current().setPlanOnly(true);
+    });
+  }
+
+  it('still gets a row of its own, from the plan entry alone', async () => {
+    await mountWithPlan([
+      planEntry('jiten-107642', '星のカービィ　ディスカバリー', {
+        jitenDeckId: 107642,
+        acquisitionStatus: 'mined',
+        difficultyRaw: 1.5,
+        genres: ['Adventure'],
+        englishTitle: 'Kirby and the Forgotten Land',
+      }),
+    ]);
+
+    const row = current().candidates.find((candidate) => candidate.id === 'jiten-107642');
+    expect(row).toBeDefined();
+    expect(row?.titleJp).toBe('星のカービィ　ディスカバリー');
+    expect(row?.englishTitle).toBe('Kirby and the Forgotten Land');
+    expect(row?.difficultyLabel).toBe('Easy');
+    expect(row?.genres).toEqual(['Adventure']);
+  });
+
+  it('is not duplicated when a live source does offer it', async () => {
+    // The control: without it, "every plan entry becomes a row" would pass the
+    // test above by appending a second copy of every already-visible book.
+    const novel = NOVELS[0];
+    await mountWithPlan([planEntry(`local-${novel.id}`, novel.titleJp)]);
+
+    const rows = current().candidates.filter((candidate) => candidate.id === `local-${novel.id}`);
+    expect(rows).toHaveLength(1);
+    // ...and it is the LIVE row, which carries the catalogue's own synopsis and
+    // links, not the bare stored copy.
+    expect(rows[0].localNovel?.id).toBe(novel.id);
+  });
+
+  it('leaves the table alone when the plan is empty', async () => {
+    await mountWithPlan([]);
+    expect(current().candidates).toHaveLength(0);
+  });
+});
