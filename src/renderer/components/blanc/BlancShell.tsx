@@ -8,6 +8,7 @@ import {
 import { AUTOMATION_BUILDER } from '../../../shared/automationBuilder';
 import { getToolboxModule, listBlancToolboxModules, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
 import { isRegistryGovernedTool, isToolLaunchable, mergeFavoriteTools } from './blancToolVisibility';
+import { markSectionOpenHandled } from '../../sectionSurface';
 import {
   TOOLBOX_UNITS,
   calculateToolboxExpression,
@@ -176,6 +177,9 @@ const BlancReadingFinderPanel = lazy(() =>
 // four surfaces are new Blanc-only tool ids registered below.
 const BlancNovelsPanel = lazy(() =>
   import('./BlancLibraryPanels').then((m) => ({ default: m.BlancNovelsPanel })),
+);
+const BlancFilesPanel = lazy(() =>
+  import('./BlancFilesPanel').then((m) => ({ default: m.BlancFilesPanel })),
 );
 const BlancDiscoverPanel = lazy(() =>
   import('./BlancLibraryPanels').then((m) => ({ default: m.BlancDiscoverPanel })),
@@ -381,11 +385,17 @@ export default function BlancShell({
       const direct = directTabs[feature];
       if (direct) {
         chooseTab(direct);
+        markSectionOpenHandled(event);
         return;
       }
       if (BLANC_TOOL_IDS.includes(feature as BlancToolId)) {
         setBook(null);
         setTab('tools');
+        // Cancelled only where Blanc actually took the request, never at the
+        // top of the handler: a caller that falls back when nobody claims the
+        // event must not have its fallback suppressed by a host that did
+        // nothing. Same contract as `os:open`; see sectionSurface.ts.
+        markSectionOpenHandled(event);
         // Carried as a PROP, not as a `toolbox:select-tool` event, because the
         // listener does not exist yet when we arrive from another tab: the
         // toolbox mounts with `tools`, and it registers in a `useEffect`, which
@@ -1111,7 +1121,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
  * does not model. `coverage` established this pattern; Pillar 2 ports reuse it
  * rather than adding entries to `TOOLBOX_MODULES`, which Study OS also reads.
  */
-type BlancOnlyToolId = 'coverage' | 'notebook' | 'translate' | 'music' | 'novels' | 'discover' | 'games' | 'immersion' | 'visualizer' | 'local-agent';
+type BlancOnlyToolId = 'coverage' | 'files' | 'notebook' | 'translate' | 'music' | 'novels' | 'discover' | 'games' | 'immersion' | 'visualizer' | 'local-agent';
 
 type BlancToolId =
   | BlancOnlyToolId
@@ -1171,6 +1181,7 @@ function readComputedToken(token: string): string {
 }
 
 const BLANC_TOOL_IDS: BlancToolId[] = [
+  'files',
   'furigana',
   'counter-reader',
   'conjugation-drill',
@@ -1216,6 +1227,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
 ];
 
 const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
+  files: 'folder-open',
   furigana: 'note',
   'counter-reader': 'app',
   'conjugation-drill': 'dice',
@@ -1289,6 +1301,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
   'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
   coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
+  files: { category: 'system', description: 'Everything the app stores, filed by what it is — books, decks, transcripts, dictionaries — with the real location of each.' },
   notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
   translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
   music: { category: 'language', description: 'Song library, karaoke lyrics, and click-to-look-up — shares the app-wide player.' },
@@ -1328,6 +1341,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
 /** Labels for the Blanc-only ids, which have no `TOOLBOX_MODULES` entry to read. */
 const BLANC_ONLY_LABELS: Record<BlancOnlyToolId, string> = {
   coverage: 'Coverage',
+  files: 'Files',
   notebook: 'Notebook',
   translate: 'Translate',
   music: 'Music',
@@ -1397,6 +1411,7 @@ function renderBlancTool(
   grammarRequest: { id: string; key: number } | null,
 ): JSX.Element {
   if (tool === 'coverage') return <ToolboxCoveragePanel />;
+  if (tool === 'files') return <BlancFilesPanel />;
   if (tool === 'furigana') return <BlancFuriganaPanel />;
   if (tool === 'counter-reader') return <BlancCounterPanel />;
   if (tool === 'conjugation-drill') return <BlancConjugationPanel />;

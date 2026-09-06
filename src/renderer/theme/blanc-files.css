@@ -1,0 +1,177 @@
+/*
+ * Blanc's Files tool.
+ *
+ * A three-column workbench — derived category rail, item list, inspector —
+ * built from Blanc's own tokens rather than the Study OS `fa-*` classes, so
+ * this surface owns no Study OS look to be re-skinned later. Its own file for
+ * the reason blanc.css states: the parallel Blanc streams must never append to
+ * one shared sheet at the same time.
+ *
+ * The list is a plain scroller and not a virtualiser: this tool is the FIND
+ * surface, and the index it renders is already filtered by a category and a
+ * query before it arrives. The Study OS Files app keeps the VirtualList for the
+ * unfiltered "Everything" case, which is the one that needs it.
+ */
+
+.blanc-files-workbench {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 3fr) minmax(180px, 1.4fr);
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+
+/* A narrow window has no room for three columns; the rail and inspector stack
+   above and below the list rather than being dropped, because losing the rail
+   would lose the only way to change scope. */
+@media (max-width: 900px) {
+  .blanc-files-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.blanc-files-rail,
+.blanc-files-inspector,
+.blanc-files-main {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-md);
+  background: var(--blanc-panel-soft);
+  padding: 6px;
+}
+
+.blanc-files-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  /* 32px is the app-wide pointer floor; `min-height` rather than `height` so a
+     wrapped label grows the row instead of overflowing it. */
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.blanc-files-node.is-leaf > span {
+  padding-inline-start: 12px;
+}
+
+.blanc-files-node:hover {
+  background: var(--blanc-hover);
+}
+
+.blanc-files-node.active {
+  border-color: var(--blanc-accent);
+  background: var(--blanc-hover);
+}
+
+.blanc-files-node > em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.blanc-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.blanc-files-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) 90px minmax(0, 1.4fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.blanc-files-row:hover {
+  background: var(--blanc-hover);
+}
+
+.blanc-files-row.active {
+  border-color: var(--blanc-accent);
+  background: var(--blanc-hover);
+}
+
+.blanc-files-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blanc-files-kind,
+.blanc-files-size,
+.blanc-files-date {
+  opacity: 0.75;
+  font-size: 0.92em;
+}
+
+.blanc-files-size {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Narrow: the two least load-bearing columns go, name and kind stay. Nothing
+   is hidden that the inspector does not also state. */
+@media (max-width: 700px) {
+  .blanc-files-row {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  }
+
+  .blanc-files-size,
+  .blanc-files-date {
+    display: none;
+  }
+}
+
+.blanc-files-sort-dir {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.blanc-files-inspector h4 {
+  margin: 4px 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.blanc-files-inspector dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 10px;
+  margin: 0 0 10px;
+}
+
+.blanc-files-inspector dt {
+  opacity: 0.7;
+}
+
+.blanc-files-inspector dd {
+  margin: 0;
+  /* A Windows path has no spaces to break at, and a location that overflows its
+     column silently is the value the user most often came here to read. */
+  overflow-wrap: anywhere;
+}
+
+.blanc-files-warning,
+.blanc-files-error {
+  border-inline-start: 3px solid var(--blanc-accent);
+  padding-inline-start: 8px;
+}
