@@ -844,7 +844,7 @@ mining-rules containers — `.set-select` is used across the whole app and its 2
 correct everywhere it is not inside one of these grids.
 
 | 5.6 | Help tour + offline assistant | **DONE 2026-09-06** (`1a6dc53b`) — tour half was already done; the assistant is now built | `jp-study.onboarding.v1` | **The tour's state machine is NOT broken** — verified live while doing 1.1. Profile read `{"completedAt":null,"replays":8,"lastStepId":null}`, which looks like a broken tour but is not: clicking `Next` persisted `lastStepId:"start"`, and `Skip tour` persisted `completedAt`. Both writes work. `replays:8` with no completion just means the tour was replayed and abandoned 8 times. **Whatever "broken" means in the audit doc, it is not lost state — re-diagnose before writing code.** The tour also auto-shows on renderer reload while `completedAt` is null. Decided for the assistant: search-and-answer over `searchSettings()`, no model. | |
-| 5.7 | Scraper memory persistence | **ROOT CAUSE FIXED** (hardening outstanding) | total `localStorage` size; a non-destructive 64 KB-chunk quota probe; all four `jp-scraper-*` keys | The four scraper keys are structurally **healthy** — `settings` 20,840 chars / 1 layer / 4 fields, `shell` 592 / 1 / 15, `recent-queries` and `advanced` absent (never written). Nothing is wrong with the scraper's own store. What was wrong is that it had nowhere to write: `localStorage` held **51.62 MB**, 49 MB of it the two over-encoded keys from 6.A. After the repair, **1.35 MB** across the same 73 keys, and a probe wrote **12.8 MB** of scratch with no `QuotaExceededError`. | — |
+| 5.7 | Scraper memory persistence | **DONE 2026-09-06** (`bd9c276e`, `b7b789a3`, `e9c778cd`) — root cause fixed 2026-08-07, hardening now landed | total `localStorage` size; a non-destructive 64 KB-chunk quota probe; all four `jp-scraper-*` keys | The four scraper keys are structurally **healthy** — `settings` 20,840 chars / 1 layer / 4 fields, `shell` 592 / 1 / 15, `recent-queries` and `advanced` absent (never written). Nothing is wrong with the scraper's own store. What was wrong is that it had nowhere to write: `localStorage` held **51.62 MB**, 49 MB of it the two over-encoded keys from 6.A. After the repair, **1.35 MB** across the same 73 keys, and a probe wrote **12.8 MB** of scratch with no `QuotaExceededError`. The hardening is three things, not one: the store is now *measured* (`shared/storageHealth.ts`), a refused write is *reported* instead of dropped (`renderer/localStorageWrite.ts`), and both are *visible* in Files ▸ System ▸ Memory. The residual 205-site migration is explicitly NOT closed — see the row below. | — |
 | 5.8 | Mining Rules tab visual error | **DONE** | `.os-set-card[data-setting-id="profile-rules"]` `scrollWidth` vs `clientWidth`, plus every descendant rect against the card rect | The defect the source doc did not name: **the card overflows horizontally**. Before: `scrollWidth` **701** vs `clientWidth` **680**, **5** elements past the right edge, worst a `.set-select` at **+21 px** (the "Page category" control, visibly clipped in the shot). After: `scrollWidth` **680** = `clientWidth`, **0** overflowing elements. | `5.8-before-mining-rules.png`, `5.8-after-mining-rules.png` |
 
 ### What Section 5 still owes — measured 2026-08-08
@@ -861,7 +861,7 @@ unspecified. Re-derived item by item; full evidence in `docs/ACTIVE/V1_AUDIT_SEC
 | 5.2 | **DONE 2026-09-06 (`cf0528f6`)** | Blocker cleared: the multi-monitor track landed, so `MonitorsPage.tsx` is tracked. Display and Monitors are one page. |
 | 5.4 | **DONE 2026-09-06 (`a58b86f5`)** | Decided reading (c): add the missing translator card to `storage`, leave both nav pages alone. Reasoning in `TranslatorDefaultsCard.tsx`. |
 | 5.6 | **DONE 2026-09-06 (`1a6dc53b`)** | `SettingsAssistantCard` on Settings ▸ Help, above the tour. Search-and-answer over `searchSettings()`, no model, per the design decided in the row. It never composes prose and never claims to have answered: it reports the settings found, the query it used, and HOW it got there. **The defect that made this non-trivial:** `searchSettings` scores each query word by SUBSTRING, so `a` matches nearly every haystack and `print` matches `fingerprint` — "how do I print a fax to my toaster" returned six settings. A phrase pass over a raw question can never come back empty. Fixed with stopword stripping plus a word-BOUNDARY re-check of every hit. **A mutation control that did not fire, and the input that fixed it:** replacing the boundary regex with `hay.includes(term)` left all eight tests green, so the load-bearing filter was unproven; "where do I recycle paper" (paper ⊂ wallpaper) is the case that distinguishes them, and with the mutant exactly that one test goes red. |
-| 5.7 | **ROOT CAUSE FIXED; hardening not started** | Re-measured: **198** non-test `localStorage.setItem` sites across **144** files, and **zero** quota-guard identifiers anywhere in non-test source. |
+| 5.7 | **DONE 2026-09-06 (`bd9c276e`, `b7b789a3`, `e9c778cd`)** | The hardening landed in three parts, and one number is deliberately left open rather than declared closed. **(1) The store measures itself** — `shared/storageHealth.ts` reports the UTF-16 footprint, any over-encoded key (the 6.A signature, a defect at any size and therefore `critical` regardless of size), and two growth alarms chosen against the measured healthy baseline of 1.35 MB. Its own note says these are a *growth alarm, not a quota*: 12.8 MB of scratch wrote fine, so where writes actually start failing on this profile is still unknown and is not claimed. **(2) A refused write is reported** — `renderer/localStorageWrite.ts` returns false and leaves a toast, a `logBlanc` entry carrying the whole-store footprint measured at failure time, and a readable last-failure record. **(3) It is visible** — Files ▸ System ▸ Memory renders all of it inside the existing `storage-usage` card (not a new card: the card ids are files-app gate 8's search anchors and its parity test asserts the rendered set EQUALS the captured set). Before (3) the guard had **no consumer at all**, which is 5.7's own finding one level up. **What is NOT closed, with the number that proves it:** the silent call sites. Re-measured with comments stripped — **214** raw `localStorage.setItem` sites before this pass, against 198 in August and 194 at the audit. It is *growing*. Nine were migrated (`displayPrefs`, `motionPrefs`, `focusMode` — preference stores where a dropped write IS the reported symptom), leaving **205 across 153 files**, and `rawLocalStorageWriteRatchet.test.ts` now fails when that count rises. So the remaining migration has an owner and a moving number instead of a sentence. |
 
 **Two scope facts this pass recovered, both of which the rows had lost.**
 
@@ -1232,6 +1232,24 @@ silent. The root cause is gone, so the symptom is gone, but the *class* recurs t
 storage fills again. The hardening — routing quota failures to `logBlanc` / a user-visible
 notice instead of `/* ignore */` — is a 158-site change that should be its own pass, not a
 rider on this one.
+
+**Landed 2026-09-06 — `bd9c276e`, `b7b789a3`, `e9c778cd`.** The pass above happened, in the
+order the finding implies rather than site-by-site. The store now *measures itself*
+(`shared/storageHealth.ts`), a refused write is *reported* rather than dropped
+(`renderer/localStorageWrite.ts` — toast, `logBlanc` entry carrying the whole-store footprint
+taken at failure time, and a last-failure record), and Files ▸ System ▸ Memory *shows* both.
+That third part is not decoration: until it existed neither module had a single consumer
+outside its own tests, which is this item's own finding repeated one level up — a guard nobody
+reads measures nothing.
+
+**And the number that was left as a sentence is now a number that moves.** Re-measured with
+comments stripped: **214** raw sites, against 198 in August and 194 here. The backlog was
+*growing*, roughly ten sites a month, because every new feature writes another
+`localStorage.setItem` inside a `catch {}`. Nine are migrated (`displayPrefs`, `motionPrefs`,
+`focusMode`), leaving **205 across 153 files**, and `rawLocalStorageWriteRatchet.test.ts` fails
+if that rises — ceiling set exactly at the measurement, because a ratchet with slack lets the
+next one through. The remaining 205 are **not** claimed as done; they now have an owner, a
+number, and a test that will not let them grow while nobody is looking.
 
 ### What Section 6 still owes
 
