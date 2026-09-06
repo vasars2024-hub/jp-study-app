@@ -162,14 +162,21 @@ describe('D93 — deleting a YouTube folder asks first', () => {
   const src = fs.readFileSync('src/renderer/views/YouTubePlaylistsView.tsx', 'utf8');
 
   it('guards ytDeleteFolder with a confirm that names the folder and the fallout', () => {
-    const call = src.slice(src.indexOf('ytDeleteFolder') - 600, src.indexOf('ytDeleteFolder') + 120);
-    expect(call).toContain("window.confirm(t('yt.confirm.deleteFolder'");
+    const call = src.slice(src.indexOf('ytDeleteFolder') - 900, src.indexOf('ytDeleteFolder') + 120);
+    expect(call).toContain('await confirmDialog({');
+    expect(call).toContain("t('yt.confirm.deleteFolder'");
     expect(call).toContain('name: f.name');
     expect(call).toContain('count: affected');
+    // It destroys organisation, so it is styled as destructive, not merely consequential.
+    expect(call).toContain('danger: true');
+    expect(call).toContain('if (!ok) return;');
   });
 
-  it('leaves the two destructive siblings that were already guarded alone', () => {
-    expect(src).toContain("window.confirm(t('yt.confirm.removePlaylist'))");
-    expect(src).toContain("window.confirm(t('yt.confirm.downloadAll'");
+  it('uses the same confirm mechanism as the file two destructive siblings', () => {
+    // This started as `window.confirm`, matching the siblings at the time. A concurrent
+    // fix then moved BOTH siblings to `confirmDialog`, so the folder delete followed —
+    // one mechanism per file, or the odd one out is the one nobody maintains.
+    expect(src).not.toContain('window.confirm(');
+    expect((src.match(/await confirmDialog\(\{/g) ?? []).length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -98,6 +98,12 @@ export interface CredentialSpec {
    * link. Only set when a richer surface exists than a key field.
    */
   managedOnPage?: 'study' | 'scraper';
+  /**
+   * The `SettingsCard` id of that panel, so the Manage link scrolls to and
+   * highlights the panel rather than the top of a long page. Same contract the
+   * settings-search results already use.
+   */
+  managedSettingId?: string;
 }
 
 /**
@@ -233,6 +239,12 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     // so the row's Manage button navigated to a page that does not contain the
     // panel — the same wrong-page routing the settings search had.
     managedOnPage: 'scraper',
+    // …and `scraper` is an ADVANCED page, so pointing at it was only half the
+    // fix: `SettingsApp`'s bounce-home guard sent a default-mode user straight
+    // back to Home. The Manage button routes `{ guided: true }` for that
+    // reason; this id is what it then scrolls to. It matches the card in
+    // `ScraperPage.tsx` and the `mal-sync` settings-registry entry.
+    managedSettingId: 'mal-sync',
   },
 ];
 

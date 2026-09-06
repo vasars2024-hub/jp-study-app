@@ -334,8 +334,14 @@ export function DictionarySettingsSection() {
           {dicts.map((d, i) => (
             <li className={`dict-manage-row ${d.enabled === false ? 'off' : ''}`} key={d.id}>
               <label className="dict-manage-toggle" title={t('settings.study.dict.useTitle')}>
+                {/* The label wraps the box and carries no text, and a `title` on
+                    an ancestor does not name the control — so every one of these
+                    read as a bare "checkbox". Naming them all "Use this
+                    dictionary" would still leave a list of identical controls,
+                    so the title goes in too. */}
                 <input
                   type="checkbox"
+                  aria-label={`${t('settings.study.dict.useTitle')}: ${d.title}`}
                   checked={d.enabled !== false}
                   onChange={(e) => void onToggle(d.id, e.target.checked)}
                 />
@@ -452,7 +458,7 @@ export function DictionarySettingsSection() {
           {sources.map((source, index) => (
             <li className={`dict-manage-row ${source.enabled ? '' : 'off'}`} key={source.id}>
               <label className="dict-manage-toggle" title={t('settings.study.dict.useTitle')}>
-                <input type="checkbox" checked={source.enabled} onChange={(event) => void updateSource(window.api.dictSetSourceEnabled(source.id, event.target.checked))} />
+                <input type="checkbox" aria-label={`${t('settings.study.dict.useTitle')}: ${source.title}`} checked={source.enabled} onChange={(event) => void updateSource(window.api.dictSetSourceEnabled(source.id, event.target.checked))} />
               </label>
               <div className="dict-manage-info">
                 <div className="set-row-title">{source.title}</div>

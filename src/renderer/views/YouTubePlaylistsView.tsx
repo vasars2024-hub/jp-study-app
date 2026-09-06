@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icons';
 import VirtualList from '../components/VirtualList';
-import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { AppChrome, StatusBarField, StatusBarSpacer, confirmDialog, type MenuBarMenu } from '../components/ui';
 import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
 import { setStudyLang } from '../studyEnvironment';
@@ -291,7 +291,12 @@ export default function YouTubePlaylistsView() {
       .filter((v) => v.playlistId === playlist.id && !v.downloaded)
       .map((v) => v.id);
     if (!ids.length) return;
-    if (!window.confirm(t('yt.confirm.downloadAll', { count: ids.length }))) return;
+    const ok = await confirmDialog({
+      title: t('yt.action.downloadAll'),
+      message: t('yt.confirm.downloadAll', { count: ids.length }),
+      confirmLabel: t('yt.action.downloadAll'),
+    });
+    if (!ok) return;
     await downloadIds(ids);
   };
 
@@ -377,7 +382,13 @@ export default function YouTubePlaylistsView() {
 
   const removePlaylist = async (): Promise<void> => {
     if (!playlist) return;
-    if (!window.confirm(t('yt.confirm.removePlaylist'))) return;
+    const ok = await confirmDialog({
+      title: t('yt.action.remove'),
+      message: t('yt.confirm.removePlaylist'),
+      confirmLabel: t('yt.action.remove'),
+      danger: true,
+    });
+    if (!ok) return;
     const r = await window.api.ytRemovePlaylist(playlist.id);
     applyStore(r);
     const first = r.playlists.find(isImmersionPlaylist);
@@ -719,13 +730,22 @@ export default function YouTubePlaylistsView() {
                       title={t('yt.folder.delete')}
                       // D93: this deleted the folder — and every folder nested inside it,
                       // which `ytPlaylists.ts:536` does silently — on a single click with
-                      // no confirm and no undo. Its two destructive siblings in this file
-                      // (`removePlaylist`, `downloadAll`) both guard with `window.confirm`,
-                      // so this uses the same idiom and names what will be lost.
+                      // no confirm and no undo. It now guards in the same shape as this
+                      // file's two other destructive actions, `removePlaylist` and
+                      // `downloadAll`, and names what will be lost. `danger` because this
+                      // one destroys organisation rather than only spending network.
                       onClick={() => {
                         const affected = (playlistsByFolder.byFolder.get(f.id) ?? []).length;
-                        if (!window.confirm(t('yt.confirm.deleteFolder', { name: f.name, count: affected }))) return;
-                        void window.api.ytDeleteFolder(f.id).then(applyStore);
+                        void (async () => {
+                          const ok = await confirmDialog({
+                            title: t('yt.folder.delete'),
+                            message: t('yt.confirm.deleteFolder', { name: f.name, count: affected }),
+                            confirmLabel: t('yt.folder.delete'),
+                            danger: true,
+                          });
+                          if (!ok) return;
+                          applyStore(await window.api.ytDeleteFolder(f.id));
+                        })();
                       }}
                     >
                       <Icon name="close" size={12} />

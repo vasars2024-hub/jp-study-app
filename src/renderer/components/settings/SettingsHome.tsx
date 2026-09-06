@@ -160,7 +160,12 @@ export default function SettingsHome() {
               key={q.labelKey}
               type="button"
               className="os-set-quick-card"
-              onClick={() => s.navigate(q.page, q.settingId)}
+              // D96: two of these target advanced pages — Blanc Mode (`special`)
+              // and Particles & atmosphere (`atmosphere`) — and without `guided`
+              // SettingsApp's bounce-home guard sent every default-mode user
+              // straight back to the page they clicked from. A quick action is
+              // an explicit user route, which is exactly what the flag is for.
+              onClick={() => s.navigate(q.page, q.settingId, { guided: true })}
             >
               <Icon name={q.icon} size={20} />
               <span>{t(q.labelKey)}</span>
@@ -178,7 +183,15 @@ export default function SettingsHome() {
               if (!meta) return null;
               return (
                 <li key={id}>
-                  <button type="button" className="os-set-recent-item" onClick={() => s.navigate(id)}>
+                  {/* Same as the quick actions above: this list is BUILT from where
+                      the user has been, so it can and does contain advanced pages —
+                      offering a one-click return and then refusing it is worse than
+                      not listing it. */}
+                  <button
+                    type="button"
+                    className="os-set-recent-item"
+                    onClick={() => s.navigate(id, undefined, { guided: true })}
+                  >
                     <Icon name={meta.icon} size={15} />
                     <span>
                       {meta.group ? `${t(groupLabelKey(meta.group))} · ` : ''}
