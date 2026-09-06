@@ -411,5 +411,13 @@ export default function VisualizerCanvas({ settings, className, idleBaseline }: 
     // Settings object identity changes on every save; stringify for stability.
   }, [JSON.stringify(settings), idleBaseline]);
 
-  return <canvas ref={canvasRef} className={className} />;
+  /*
+    Decoration, in all four of its hosts - the Visualizer window, the mini player, the
+    Blanc panel and the desktop wallpaper. It paints an audio waveform and carries no
+    information the surrounding controls do not already state in words, and it has no
+    fallback content, so without this it is an unnamed graphic a screen reader still
+    stops on. `aria-hidden` is the correct treatment for decoration; a label would be
+    worse, because it would promise something to read.
+  */
+  return <canvas ref={canvasRef} className={className} aria-hidden="true" />;
 }

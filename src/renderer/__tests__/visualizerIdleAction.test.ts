@@ -130,3 +130,30 @@ describe('Visualizer idle recovery action', () => {
     }
   });
 });
+
+/**
+ * D68 — the visualiser canvas is decoration in all four of its hosts (the Visualizer window,
+ * the mini player, the Blanc panel, the desktop wallpaper), and it shipped with no
+ * `aria-hidden`, no label and no fallback content. Measured live 2026-09-06 in the Visualizer
+ * window: `aria-hidden` null, `aria-label` null, `role` null, `textContent` empty — an
+ * unnamed graphic a screen reader still stops on.
+ */
+describe('the visualiser canvas is marked as the decoration it is', () => {
+  const canvas = readFileSync(
+    resolve(__dirname, '..', 'components', 'VisualizerCanvas.tsx'),
+    'utf8',
+  );
+
+  it('hides the one canvas every host renders', () => {
+    expect(canvas).toContain('<canvas ref={canvasRef} className={className} aria-hidden="true" />');
+  });
+
+  it('does not label it instead, which would promise something to read', () => {
+    expect(canvas).not.toMatch(/<canvas[^>]*aria-label/);
+    expect(canvas).not.toMatch(/<canvas[^>]*role=/);
+  });
+
+  it('leaves exactly one canvas element, so the four hosts cannot diverge', () => {
+    expect(canvas.match(/<canvas/g)?.length).toBe(1);
+  });
+});
