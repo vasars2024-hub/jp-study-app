@@ -67,6 +67,51 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+describe('total entry corruption preserves the restore point', () => {
+  it.each(['id', 'workId'] as const)('recovers when every entry loses %s, across repeated reads', (field) => {
+    const store = createReadingListsStore(root);
+    const source = fixture();
+    source.lists[0].entries.push({ ...source.lists[0].entries[0], id: 'entry-2' });
+    store.write(0, source);
+    const healthy = store.read().document;
+    const restorePoint = fs.readFileSync(store.lastGoodPath, 'utf8');
+    const damaged = structuredClone(healthy);
+    for (const entry of damaged.lists[0].entries) entry[field] = '';
+    fs.writeFileSync(store.filePath, JSON.stringify(damaged));
+
+    for (let read = 0; read < 2; read++) {
+      const reopened = createReadingListsStore(root).read();
+      expect(reopened.health.state).toBe('recovered');
+      expect(reopened.document).toEqual(healthy);
+      expect(reopened.document.lists[0].entries).toHaveLength(2);
+      expect(fs.readFileSync(store.lastGoodPath, 'utf8')).toBe(restorePoint);
+    }
+  });
+
+  it('accepts an intentional deletion of the last entry and promotes the empty list', () => {
+    const store = createReadingListsStore(root);
+    store.write(0, fixture());
+    const document = store.read().document;
+    document.lists[0].entries = [];
+    expect(store.write(document.revision, document).applied).toBe(true);
+    const reopened = createReadingListsStore(root).read();
+    expect(reopened.health.state).toBe('ok');
+    expect(reopened.document.lists[0].entries).toEqual([]);
+    expect(JSON.parse(fs.readFileSync(store.lastGoodPath, 'utf8')).lists[0].entries).toEqual([]);
+  });
+
+  it('still repairs a partially damaged collection when another list retains an entry', () => {
+    const source = fixture();
+    source.lists.push({ ...structuredClone(source.lists[0]), id: 'list-2' });
+    source.lists[0].entries[0].workId = '';
+    const store = createReadingListsStore(root);
+    fs.writeFileSync(store.filePath, JSON.stringify(source));
+    const result = store.read();
+    expect(result.health.state).toBe('ok');
+    expect(result.document.lists.map((list) => list.entries.length)).toEqual([0, 1]);
+  });
+});
+
 describe('the document survives a restart', () => {
   it('reads back exactly what was written, from a store with no shared memory', () => {
     const before: ReadingListsStore = createReadingListsStore(root);

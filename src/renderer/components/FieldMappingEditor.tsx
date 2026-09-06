@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   EXAMPLE_COUNT_LANGS,
   MINING_VARS,
@@ -156,6 +156,10 @@ export default function FieldMappingEditor({
   }
 
   async function save() {
+    // `aria-disabled` leaves the button clickable, which is the whole point (a
+    // `disabled` button is not focusable, so its reason never reaches a keyboard
+    // or screen-reader user). The refusal therefore has to live here.
+    if (saving || !dirty) return;
     setSaving(true);
     const mergedFallback: Record<string, string> = {};
     if (exampleFallback) {
@@ -194,6 +198,12 @@ export default function FieldMappingEditor({
   }
 
   const mappedCount = fields.filter((f) => (templates[f] ?? '').trim()).length;
+  const saveReasonId = `${useId()}-fm-save-reason`;
+  const saveDisabledReason = saving
+    ? t('anki.fieldMapping.saveDisabled.saving')
+    : dirty
+      ? undefined
+      : t('anki.fieldMapping.saveDisabled.clean');
 
   return (
     <div className="fm-editor">
@@ -233,26 +243,32 @@ export default function FieldMappingEditor({
           {/* Rubric category 8 measured this as the surface's one mute pair: a disabled
               control whose only account of itself is its own label. "Saved" says what
               happened, not why the button will not respond, and the harness ignores a
-              control's own text for exactly that reason. The title carries the reason
-              instead, for both ways this button goes dead. */}
+              control's own text for exactly that reason.
+
+              Boss audit F4: carrying that reason in `title` alone made it mouse-only. A
+              `disabled` button is not keyboard-focusable and `title` is not reliably
+              announced, so a keyboard or screen-reader user still got the bare word
+              "Saved". The button now stays focusable with `aria-disabled`, the reason is
+              rendered as visible text beside it, and `aria-describedby` binds the two.
+              `title` is kept for the hover affordance it already had. */}
           <button
             className="btn primary"
             type="button"
             onClick={save}
-            disabled={saving || !dirty}
-            title={
-              saving
-                ? t('anki.fieldMapping.saveDisabled.saving')
-                : dirty
-                  ? undefined
-                  : t('anki.fieldMapping.saveDisabled.clean')
-            }
+            aria-disabled={saving || !dirty}
+            aria-describedby={saveDisabledReason ? saveReasonId : undefined}
+            title={saveDisabledReason}
           >
             {saving ? 'Saving…' : dirty ? 'Save mapping' : 'Saved'}
           </button>
           <button className="btn" type="button" onClick={resetToAuto} disabled={saving}>
             Reset to automatic
           </button>
+          {saveDisabledReason ? (
+            <p className="fm-action-reason" id={saveReasonId}>
+              {saveDisabledReason}
+            </p>
+          ) : null}
         </div>
       </CollapsibleSection>
 

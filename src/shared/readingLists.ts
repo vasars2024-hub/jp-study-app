@@ -651,7 +651,7 @@ export function isReadingListsDocumentShape(value: unknown): value is Partial<Re
 }
 
 /**
- * Whether normalizing `value` would destroy every list it claims to carry.
+ * Whether normalizing `value` would destroy every list or every entry it claims.
  *
  * `isReadingListsDocumentShape` answers the question at the DOCUMENT level and
  * stops there, so `{lists:[{name:'from Kenji'},{name:'B'}]}` — document-shaped,
@@ -668,8 +668,15 @@ export function isReadingListsDocumentShape(value: unknown): value is Partial<Re
  */
 export function readingListsNormalizationWipes(value: unknown): boolean {
   if (!isRecord(value)) return false;
-  if (arr(value.lists).length === 0) return false;
-  return normalizeReadingListsDocument(value).lists.length === 0;
+  const lists = arr(value.lists);
+  if (lists.length === 0) return false;
+  const normalized = normalizeReadingListsDocument(value);
+  if (normalized.lists.length === 0) return true;
+  // List shells can survive while every entry loses its id/workId. Promoting
+  // that document would erase the restore point just as total list loss does.
+  // Explicit empty lists and partial repairs remain valid.
+  return lists.some((list) => isRecord(list) && arr(list.entries).length > 0)
+    && normalized.lists.every((list) => list.entries.length === 0);
 }
 
 export function normalizeReadingListsDocument(value: unknown): ReadingListsDocument {
