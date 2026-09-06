@@ -1551,13 +1551,19 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
         <span><strong>{currentMeta?.title ?? t('mediaCenter.player.nothing')}</strong><small>{currentMeta?.artist ?? t('mediaCenter.player.chooseMusic')}</small></span>
       </button>
       <div className="mc-player-transport lq-hit-scope">
-        <button type="button" onClick={player.toggleShuffle} className={ps.shuffle ? 'is-active' : ''} title={t('mediaCenter.player.shuffle')}><Icon name="shuffle" size={14} /></button>
+        {/*
+          Same contract `MusicWidget` already documents for the same transport: a real
+          toggle keeps a CONSTANT name and puts its state in `aria-pressed`, and a
+          three-way cycle states its mode in its name instead. `is-active` alone reaches
+          nobody, and the Like button two lines down was already doing it right.
+        */}
+        <button type="button" onClick={player.toggleShuffle} className={ps.shuffle ? 'is-active' : ''} aria-pressed={ps.shuffle} title={t('mediaCenter.player.shuffle')}><Icon name="shuffle" size={14} /></button>
         <button type="button" onClick={player.prev} disabled={!ps.current} title={t('mediaCenter.player.previous')}><Icon name="skip-back" size={15} /></button>
         <button type="button" className="mc-player-play" onClick={player.toggle} disabled={!ps.current} title={ps.playing ? t('mediaCenter.player.pause') : t('mediaCenter.player.play')}>
           <Icon name={ps.playing ? 'pause' : 'player'} size={15} />
         </button>
         <button type="button" onClick={player.next} disabled={!ps.current} title={t('mediaCenter.player.next')}><Icon name="skip-forward" size={15} /></button>
-        <button type="button" onClick={player.cycleRepeat} className={ps.repeat !== 'off' ? 'is-active' : ''} title={`Repeat: ${ps.repeat}`}><Icon name="repeat" size={14} /></button>
+        <button type="button" onClick={player.cycleRepeat} className={ps.repeat !== 'off' ? 'is-active' : ''} title={t('music.controls.repeatTitle', { mode: t(`music.repeat.${ps.repeat}`) })}><Icon name="repeat" size={14} /></button>
         {/*
           Like is the one thing the page's now-deleted inline transport could do that this
           bar could not, so it moves here rather than disappearing. `likedTick` is read (not
@@ -1704,6 +1710,11 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         type="button"
         key={item.id}
         className={tab === item.id ? 'is-active' : ''}
+        // These sit inside the `mc-nav` landmark and choose the destination the shell is
+        // showing, so the state is `aria-current="page"`, not a pressed toggle. Without it
+        // all eight destinations announce identically and the rail's only account of where
+        // you are is a class name.
+        aria-current={tab === item.id ? 'page' : undefined}
         onClick={() => navigate(item.id)}
         title={`${item.hint} (Ctrl+${shortcut})`}
       >
