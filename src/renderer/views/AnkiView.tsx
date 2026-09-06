@@ -12,6 +12,7 @@ import {
 import { ProfileSettingsSection } from './SettingsView';
 import DeckWorkbench from '../components/anki/DeckWorkbench';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
+import { stripTrailingTerminator } from '../../shared/sentenceJoin';
 import { useT } from '../i18n';
 
 export default function AnkiView() {
@@ -80,7 +81,13 @@ export default function AnkiView() {
               <h2>{t('anki.deckNoteType.title')}</h2>
               <p className="muted anki-sub">
                 {t('anki.boundTo')} <b>{active.label}</b>
-                {active.description ? ` — ${active.description}` : ''}
+                {/* `subTail` OPENS with the sentence terminator that closes this clause
+                    ('. ' in en/ru, '。' in ja/zh), because without a description the label
+                    is the last thing said. All 28 seed descriptions already end in '.', so
+                    appending one verbatim renders 'background.. Switch profiles' in en/ru
+                    and 'background.。デッキ' in ja/zh. Drop the description's own terminator
+                    and let the localised one close the sentence. */}
+                {active.description ? ` — ${stripTrailingTerminator(active.description)}` : ''}
                 {t('anki.deckNoteType.subTail')}
               </p>
               <AnkiDeckNoteType state={state} />
