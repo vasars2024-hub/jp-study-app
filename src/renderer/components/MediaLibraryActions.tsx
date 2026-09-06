@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { confirmDialog } from './ui';
+import { useT } from '../i18n';
 import type { MediaItem } from '../../shared/types';
 import { clearArtCache } from '../albumArt';
 import { clearAllLiked } from '../likedSongs';
@@ -26,6 +27,7 @@ async function pruneMissingLibrary(): Promise<{ removed: number; items: MediaIte
 }
 
 export default function MediaLibraryActions({ onItemsChange, onCleared, className }: Props) {
+  const { t, lang } = useT();
   const [status, setStatus] = useState('');
   const [statusError, setStatusError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,28 +47,29 @@ export default function MediaLibraryActions({ onItemsChange, onCleared, classNam
       if (removed > 0) resetPlayback();
       setStatus(
         removed > 0
-          ? `Removed ${removed} missing ${removed === 1 ? 'entry' : 'entries'}.`
-          : 'No missing files — library is up to date.',
+          ? t('mediaLib.prune.removed', { count: removed })
+          : t('mediaLib.prune.none'),
       );
     } catch (e) {
       setStatusError(true);
-      setStatus(`Could not remove missing files: ${msg(e)}`);
+      setStatus(t('mediaLib.prune.failed', { error: msg(e) }));
     } finally {
       setBusy(false);
     }
-  }, [onItemsChange, resetPlayback]);
+    // `lang` and not `t`: t's identity is stable by design, so a callback that
+    // omits it keeps resolving in the language it was created in.
+  }, [onItemsChange, resetPlayback, t, lang]);
 
   const clearAll = useCallback(async () => {
     const ok = await confirmDialog({
-      title: 'Clear media library',
-      message:
-        'Clear the entire media library?\n\nThis removes all saved videos and songs from the app, cached YouTube downloads, converted copies, and lyrics/likes. Your original files on disk are not deleted.',
-      confirmLabel: 'Clear',
+      title: t('mediaLib.clear.title'),
+      message: t('mediaLib.clear.message'),
+      confirmLabel: t('mediaLib.clear.confirm'),
       danger: true,
     });
     if (!ok) return;
     setBusy(true);
-    setStatus('Clearing…');
+    setStatus(t('mediaLib.clearing'));
     setStatusError(false);
     try {
       const before = (await window.api.listMedia()).length;
@@ -78,17 +81,21 @@ export default function MediaLibraryActions({ onItemsChange, onCleared, classNam
       onCleared?.();
       if (next.length > 0) {
         setStatusError(true);
-        setStatus(`Could not clear everything — ${next.length} of ${before} entries remain. Restart the app and try again.`);
+        setStatus(t('mediaLib.clear.partial', { remaining: next.length, before }));
       } else {
-        setStatus(before > 0 ? `Library cleared (${before} removed).` : 'Library is already empty.');
+        setStatus(
+          before > 0
+            ? t('mediaLib.clear.done', { count: before })
+            : t('mediaLib.clear.alreadyEmpty'),
+        );
       }
     } catch (e) {
       setStatusError(true);
-      setStatus(`Could not clear library: ${msg(e)}`);
+      setStatus(t('mediaLib.clear.failed', { error: msg(e) }));
     } finally {
       setBusy(false);
     }
-  }, [onCleared, onItemsChange, resetPlayback]);
+  }, [onCleared, onItemsChange, resetPlayback, t, lang]);
 
   return (
     <div className={`media-lib-actions ${className ?? ''}`}>
@@ -100,9 +107,9 @@ export default function MediaLibraryActions({ onItemsChange, onCleared, classNam
           e.stopPropagation();
           void pruneMissing();
         }}
-        title="Remove entries whose files moved or were deleted"
+        title={t('mediaLib.pruneTitle')}
       >
-        {busy ? 'Working…' : 'Remove missing'}
+        {busy ? t('mediaLib.working') : t('mediaLib.pruneBtn')}
       </button>
       <button
         className="btn small media-lib-clear"
@@ -112,9 +119,9 @@ export default function MediaLibraryActions({ onItemsChange, onCleared, classNam
           e.stopPropagation();
           void clearAll();
         }}
-        title="Clear all media library data"
+        title={t('mediaLib.clearTitle')}
       >
-        {busy ? 'Clearing…' : 'Clear library'}
+        {busy ? t('mediaLib.clearing') : t('mediaLib.clearBtn')}
       </button>
       {status && (
         <span className={`media-lib-actions-status ${statusError ? 'media-lib-actions-err' : 'muted'}`}>

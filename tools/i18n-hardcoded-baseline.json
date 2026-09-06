@@ -12,7 +12,6 @@
   "src/renderer/components/media/MediaLanguageProfileCard.tsx": 6,
   "src/renderer/components/media/MediaStudyAssistantPanel.tsx": 19,
   "src/renderer/components/media/MediaTrackingSources.tsx": 26,
-  "src/renderer/components/MediaLibraryActions.tsx": 10,
   "src/renderer/components/NoteCssEditor.tsx": 9,
   "src/renderer/components/PerfOverlay.tsx": 8,
   "src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx": 19,

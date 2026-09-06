@@ -4044,6 +4044,42 @@ export const zh: Catalog = {
   'desktop.dialog.restartShellTitle': '重启外壳',
   'desktop.dialog.restartShellMessage': '重启 GrammarX 外壳？输入框中未保存的文字可能丢失。',
 
+  // Media library actions (Remove missing / Clear library)
+  'mediaLib.pruneBtn': '移除缺失项',
+  'mediaLib.pruneTitle': '移除文件已被移动或删除的条目',
+  'mediaLib.clearBtn': '清空媒体库',
+  'mediaLib.clearTitle': '清除全部媒体库数据',
+  'mediaLib.working': '处理中…',
+  'mediaLib.clearing': '正在清空…',
+  'mediaLib.prune.removed': {
+    other: '已移除 {count} 个缺失条目。',
+  },
+  'mediaLib.prune.none': '没有缺失的文件 — 媒体库已是最新。',
+  'mediaLib.prune.failed': '无法移除缺失的文件：{error}',
+  'mediaLib.clear.title': '清空媒体库',
+  'mediaLib.clear.message':
+    '要清空整个媒体库吗？\n\n这将删除应用中保存的所有视频和歌曲、缓存的 YouTube 下载、转换后的副本以及歌词与喜欢记录。磁盘上的原始文件不会被删除。',
+  'mediaLib.clear.confirm': '清空',
+  'mediaLib.clear.partial':
+    '未能全部清空 — {before} 个条目中仍有 {remaining} 个。请重启应用后重试。',
+  'mediaLib.clear.done': {
+    other: '媒体库已清空（移除 {count} 个）。',
+  },
+  'mediaLib.clear.alreadyEmpty': '媒体库已经是空的。',
+  'mediaLib.clear.failed': '无法清空媒体库：{error}',
+
+  // Wallpaper playlist editor dialogs
+  'playlistEditor.new.title': '新建播放列表',
+  'playlistEditor.new.message': '新播放列表名称：',
+  'playlistEditor.cannotDelete.title': '无法删除',
+  'playlistEditor.cannotDelete.message': '默认的 Day cycle 播放列表无法删除，请改为重置它。',
+  'playlistEditor.delete.title': '删除播放列表',
+  'playlistEditor.delete.message': '删除播放列表“{name}”？',
+  'playlistEditor.delete.confirm': '删除',
+  'playlistEditor.reset.title': '重置 Day cycle',
+  'playlistEditor.reset.message': '重置 Day cycle 播放列表和默认时间规则？',
+  'playlistEditor.reset.confirm': '重置',
+
   // Grammar view
   'grammar.intro': 'JLPT N5–N1 与 HSK 1–10 语法，含练习构建器、测试与指南。',
   'grammar.mode.legend': '语法板块',

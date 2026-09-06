@@ -3989,6 +3989,44 @@ export const en: Catalog = {
   'desktop.dialog.restartShellTitle': 'Restart shell',
   'desktop.dialog.restartShellMessage': 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
 
+  // Media library actions (Remove missing / Clear library)
+  'mediaLib.pruneBtn': 'Remove missing',
+  'mediaLib.pruneTitle': 'Remove entries whose files moved or were deleted',
+  'mediaLib.clearBtn': 'Clear library',
+  'mediaLib.clearTitle': 'Clear all media library data',
+  'mediaLib.working': 'Working…',
+  'mediaLib.clearing': 'Clearing…',
+  'mediaLib.prune.removed': {
+    one: 'Removed {count} missing entry.',
+    other: 'Removed {count} missing entries.',
+  },
+  'mediaLib.prune.none': 'No missing files — library is up to date.',
+  'mediaLib.prune.failed': 'Could not remove missing files: {error}',
+  'mediaLib.clear.title': 'Clear media library',
+  'mediaLib.clear.message':
+    'Clear the entire media library?\n\nThis removes all saved videos and songs from the app, cached YouTube downloads, converted copies, and lyrics/likes. Your original files on disk are not deleted.',
+  'mediaLib.clear.confirm': 'Clear',
+  'mediaLib.clear.partial':
+    'Could not clear everything — {remaining} of {before} entries remain. Restart the app and try again.',
+  'mediaLib.clear.done': {
+    one: 'Library cleared ({count} removed).',
+    other: 'Library cleared ({count} removed).',
+  },
+  'mediaLib.clear.alreadyEmpty': 'Library is already empty.',
+  'mediaLib.clear.failed': 'Could not clear library: {error}',
+
+  // Wallpaper playlist editor dialogs
+  'playlistEditor.new.title': 'New playlist',
+  'playlistEditor.new.message': 'New playlist name:',
+  'playlistEditor.cannotDelete.title': 'Cannot delete',
+  'playlistEditor.cannotDelete.message': 'The default Day cycle playlist cannot be deleted. Reset it instead.',
+  'playlistEditor.delete.title': 'Delete playlist',
+  'playlistEditor.delete.message': 'Delete playlist “{name}”?',
+  'playlistEditor.delete.confirm': 'Delete',
+  'playlistEditor.reset.title': 'Reset Day cycle',
+  'playlistEditor.reset.message': 'Reset Day cycle playlist and default time rules?',
+  'playlistEditor.reset.confirm': 'Reset',
+
   // Grammar view
   'grammar.intro':
     'JLPT N5–N1 and HSK 1–10 grammar, plus Practice builder, tests, and guides.',

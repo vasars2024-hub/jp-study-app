@@ -4373,6 +4373,48 @@ export const ru: Catalog = {
   'desktop.dialog.restartShellTitle': 'Перезапустить оболочку',
   'desktop.dialog.restartShellMessage': 'Перезапустить оболочку GrammarX? Несохранённый текст в полях может быть потерян.',
 
+  // Media library actions (Remove missing / Clear library)
+  'mediaLib.pruneBtn': 'Убрать отсутствующие',
+  'mediaLib.pruneTitle': 'Убрать записи, файлы которых перемещены или удалены',
+  'mediaLib.clearBtn': 'Очистить медиатеку',
+  'mediaLib.clearTitle': 'Удалить все данные медиатеки',
+  'mediaLib.working': 'Обработка…',
+  'mediaLib.clearing': 'Очистка…',
+  'mediaLib.prune.removed': {
+    one: 'Убрана {count} отсутствующая запись.',
+    few: 'Убраны {count} отсутствующие записи.',
+    many: 'Убрано {count} отсутствующих записей.',
+    other: 'Убрано {count} отсутствующих записей.',
+  },
+  'mediaLib.prune.none': 'Отсутствующих файлов нет — медиатека актуальна.',
+  'mediaLib.prune.failed': 'Не удалось убрать отсутствующие файлы: {error}',
+  'mediaLib.clear.title': 'Очистить медиатеку',
+  'mediaLib.clear.message':
+    'Очистить всю медиатеку?\n\nБудут удалены все сохранённые в приложении видео и песни, кешированные загрузки YouTube, сконвертированные копии, а также тексты песен и отметки «нравится». Исходные файлы на диске не удаляются.',
+  'mediaLib.clear.confirm': 'Очистить',
+  'mediaLib.clear.partial':
+    'Не удалось очистить всё — осталось {remaining} из {before} записей. Перезапустите приложение и попробуйте снова.',
+  'mediaLib.clear.done': {
+    one: 'Медиатека очищена (удалена {count}).',
+    few: 'Медиатека очищена (удалено {count}).',
+    many: 'Медиатека очищена (удалено {count}).',
+    other: 'Медиатека очищена (удалено {count}).',
+  },
+  'mediaLib.clear.alreadyEmpty': 'Медиатека уже пуста.',
+  'mediaLib.clear.failed': 'Не удалось очистить медиатеку: {error}',
+
+  // Wallpaper playlist editor dialogs
+  'playlistEditor.new.title': 'Новый плейлист',
+  'playlistEditor.new.message': 'Название нового плейлиста:',
+  'playlistEditor.cannotDelete.title': 'Нельзя удалить',
+  'playlistEditor.cannotDelete.message': 'Стандартный плейлист Day cycle нельзя удалить. Сбросьте его вместо этого.',
+  'playlistEditor.delete.title': 'Удалить плейлист',
+  'playlistEditor.delete.message': 'Удалить плейлист «{name}»?',
+  'playlistEditor.delete.confirm': 'Удалить',
+  'playlistEditor.reset.title': 'Сбросить Day cycle',
+  'playlistEditor.reset.message': 'Сбросить плейлист Day cycle и стандартные правила по времени?',
+  'playlistEditor.reset.confirm': 'Сбросить',
+
   // Grammar view
   'grammar.intro': 'Грамматика JLPT N5–N1 и HSK 1–10, конструктор практики, тесты и гайды.',
   'grammar.mode.legend': 'Разделы грамматики',

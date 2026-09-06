@@ -145,8 +145,10 @@ export default function PlaylistEditor({
 
   const createPlaylist = async () => {
     const name = await promptDialog({
-      title: 'New playlist',
-      message: 'New playlist name:',
+      title: t('playlistEditor.new.title'),
+      message: t('playlistEditor.new.message'),
+      // Not translated on purpose: a seed value the user immediately renames,
+      // which the repo's i18n scope rule keeps out of the catalogs.
       defaultValue: 'My playlist',
     });
     if (!name?.trim()) return;
@@ -163,15 +165,15 @@ export default function PlaylistEditor({
   const deletePlaylist = async () => {
     if (active.id === DAY_CYCLE_PLAYLIST_ID) {
       await alertDialog({
-        title: 'Cannot delete',
-        message: 'The default Day cycle playlist cannot be deleted. Reset it instead.',
+        title: t('playlistEditor.cannotDelete.title'),
+        message: t('playlistEditor.cannotDelete.message'),
       });
       return;
     }
     const ok = await confirmDialog({
-      title: 'Delete playlist',
-      message: `Delete playlist “${active.name}”?`,
-      confirmLabel: 'Delete',
+      title: t('playlistEditor.delete.title'),
+      message: t('playlistEditor.delete.message', { name: active.name }),
+      confirmLabel: t('playlistEditor.delete.confirm'),
       danger: true,
     });
     if (!ok) return;
@@ -184,9 +186,9 @@ export default function PlaylistEditor({
 
   const resetDayCycle = async () => {
     const ok = await confirmDialog({
-      title: 'Reset Day cycle',
-      message: 'Reset Day cycle playlist and default time rules?',
-      confirmLabel: 'Reset',
+      title: t('playlistEditor.reset.title'),
+      message: t('playlistEditor.reset.message'),
+      confirmLabel: t('playlistEditor.reset.confirm'),
       danger: true,
     });
     if (!ok) return;

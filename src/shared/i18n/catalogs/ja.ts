@@ -4065,6 +4065,42 @@ export const ja: Catalog = {
   'desktop.dialog.restartShellTitle': 'シェルを再起動',
   'desktop.dialog.restartShellMessage': 'GrammarX のシェルを再起動しますか？入力欄の未保存のテキストは失われる場合があります。',
 
+  // Media library actions (Remove missing / Clear library)
+  'mediaLib.pruneBtn': '見つからない項目を削除',
+  'mediaLib.pruneTitle': 'ファイルが移動または削除された項目を取り除きます',
+  'mediaLib.clearBtn': 'ライブラリを消去',
+  'mediaLib.clearTitle': 'メディアライブラリのデータをすべて消去します',
+  'mediaLib.working': '処理中…',
+  'mediaLib.clearing': '消去中…',
+  'mediaLib.prune.removed': {
+    other: '見つからない項目を {count} 件削除しました。',
+  },
+  'mediaLib.prune.none': '見つからないファイルはありません — ライブラリは最新です。',
+  'mediaLib.prune.failed': '見つからないファイルを削除できませんでした: {error}',
+  'mediaLib.clear.title': 'メディアライブラリを消去',
+  'mediaLib.clear.message':
+    'メディアライブラリ全体を消去しますか？\n\nアプリに保存されたすべての動画と曲、キャッシュされた YouTube のダウンロード、変換済みのコピー、歌詞と「いいね」が削除されます。ディスク上の元のファイルは削除されません。',
+  'mediaLib.clear.confirm': '消去',
+  'mediaLib.clear.partial':
+    'すべてを消去できませんでした — {before} 件中 {remaining} 件が残っています。アプリを再起動してもう一度お試しください。',
+  'mediaLib.clear.done': {
+    other: 'ライブラリを消去しました（{count} 件削除）。',
+  },
+  'mediaLib.clear.alreadyEmpty': 'ライブラリはすでに空です。',
+  'mediaLib.clear.failed': 'ライブラリを消去できませんでした: {error}',
+
+  // Wallpaper playlist editor dialogs
+  'playlistEditor.new.title': '新しいプレイリスト',
+  'playlistEditor.new.message': '新しいプレイリスト名:',
+  'playlistEditor.cannotDelete.title': '削除できません',
+  'playlistEditor.cannotDelete.message': '既定の「Day cycle」プレイリストは削除できません。代わりにリセットしてください。',
+  'playlistEditor.delete.title': 'プレイリストを削除',
+  'playlistEditor.delete.message': 'プレイリスト「{name}」を削除しますか？',
+  'playlistEditor.delete.confirm': '削除',
+  'playlistEditor.reset.title': 'Day cycle をリセット',
+  'playlistEditor.reset.message': 'Day cycle プレイリストと既定の時間ルールをリセットしますか？',
+  'playlistEditor.reset.confirm': 'リセット',
+
   // Grammar view
   'grammar.intro': 'JLPT N5〜N1 と HSK 1〜10 の文法、練習ビルダー、テスト、ガイド。',
   'grammar.mode.legend': '文法セクション',
