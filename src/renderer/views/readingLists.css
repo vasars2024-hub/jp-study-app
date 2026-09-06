@@ -28,6 +28,26 @@
   flex: 1 1 auto;
 }
 
+/*
+  `.ui-select` is a form-COLUMN primitive and carries `width: 100%` (ui.css:263).
+  Dropped into this wrapping toolbar row, each select then demanded the full
+  748px of the container, so no two controls could share a line: the title, the
+  two selects and the New list button each took one, and the header stood 155px
+  tall at the DEFAULT 820px window — a quarter of the 470px panel, before a
+  single list is on screen.
+
+  Measured live 2026-09-06 by injecting exactly this rule into the running
+  renderer and taking it out again: head 748x155 -> 748x40 -> 748x155, with the
+  selects going 748x39 on rows y188/y231 -> 124x39 and 155x39 both on y160.
+
+  Scoped to this header on purpose. `.ui-select` is shared by every form in the
+  app and is right as it stands; it is the toolbar USE of it that needs a width.
+*/
+.rlv__head > .ui-select {
+  width: auto;
+  flex: 0 1 auto;
+}
+
 .rlv__title {
   margin: 0;
   font-size: 1.15rem;
