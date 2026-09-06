@@ -7,6 +7,7 @@ import {
 } from '../../../shared/blancMode';
 import { AUTOMATION_BUILDER } from '../../../shared/automationBuilder';
 import { getToolboxModule, listBlancToolboxModules, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
+import { isRegistryGovernedTool, isToolLaunchable, mergeFavoriteTools } from './blancToolVisibility';
 import {
   TOOLBOX_UNITS,
   calculateToolboxExpression,
@@ -1372,6 +1373,16 @@ function readToolList(key: string): BlancToolId[] {
   }
 }
 
+/**
+ * The pinned tools, reassembled from settings (registry-governed ids) and
+ * Blanc's own list (which is the only store able to hold a Blanc-only id).
+ */
+function readFavorites(fromSettings: readonly string[]): BlancToolId[] {
+  return mergeFavoriteTools(fromSettings, readToolList(BLANC_FAVORITE_TOOLS_KEY)).filter(
+    (id): id is BlancToolId => BLANC_TOOL_IDS.includes(id as BlancToolId),
+  );
+}
+
 function writeToolList(key: string, value: BlancToolId[]): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
@@ -1441,11 +1452,9 @@ function BlancToolsPanel({
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(() => loadToolboxSettings().sidebarExpanded);
-  const [favorites, setFavorites] = useState<BlancToolId[]>(() => {
-    const saved = loadToolboxSettings();
-    const configured = saved.favoriteTools.filter((id): id is BlancToolId => BLANC_TOOL_IDS.includes(id as BlancToolId));
-    return configured.length ? configured : readToolList(BLANC_FAVORITE_TOOLS_KEY);
-  });
+  const [favorites, setFavorites] = useState<BlancToolId[]>(() =>
+    readFavorites(loadToolboxSettings().favoriteTools),
+  );
   const [recent, setRecent] = useState<BlancToolId[]>(() => readToolList(BLANC_RECENT_TOOLS_KEY));
   const [tool, setTool] = useState<BlancToolId>(() => {
     try {
@@ -1479,13 +1488,11 @@ function BlancToolsPanel({
       : haystack.toLowerCase().includes(normalizedQuery);
   const activeTool = BLANC_TOOLS.find((item) => item.id === tool) ?? BLANC_TOOLS[0];
   const matchingTools = BLANC_TOOLS.filter((item) => {
-    if (item.id !== 'coverage') {
-      const moduleId = item.id as ToolboxModuleId;
-      if (!toolboxSettings.enabledTools.includes(moduleId)) return false;
-      if (toolboxSettings.hiddenTools.includes(moduleId) && !(normalizedQuery && toolboxSettings.showHiddenToolsInSearch)) {
-        return false;
-      }
-    }
+    // The enabled/hidden lists are `ToolboxModuleId[]` and are re-sanitised
+    // against TOOLBOX_MODULES on every load, so a Blanc-only id can never be a
+    // member of one. Gating on them by name hid all nine Pillar 2 ports; see
+    // blancToolVisibility.ts for the measurement and the negative control.
+    if (!isToolLaunchable(item.id, toolboxSettings, Boolean(normalizedQuery))) return false;
     if (!normalizedQuery) return true;
     const haystack = [
       toolboxSettings.searchToolsByTitle ? item.label : '',
@@ -1531,7 +1538,7 @@ function BlancToolsPanel({
   }, [openTabs, toolboxSettings.restoreTabs]);
 
   useEffect(() => {
-    setFavorites(toolboxSettings.favoriteTools.filter((id): id is BlancToolId => BLANC_TOOL_IDS.includes(id as BlancToolId)));
+    setFavorites(readFavorites(toolboxSettings.favoriteTools));
     if (!toolboxSettings.rememberSidebarState) setSidebarOpen(toolboxSettings.sidebarExpanded);
   }, [toolboxSettings]);
 
@@ -1580,14 +1587,20 @@ function BlancToolsPanel({
     });
   };
 
+  // Pinning a Blanc-only tool is no longer refused: `favoriteTools` cannot
+  // name one, so Blanc's own list carries it and `mergeFavoriteTools` puts the
+  // two back together on read. Only the ids the settings schema can represent
+  // are written to settings; sending the rest would be sanitised away and the
+  // resulting change event would undo the pin a tick after the click.
   const toggleFavorite = (id: BlancToolId): void => {
-    if (id === 'coverage') return;
     const next = favorites.includes(id)
       ? favorites.filter((item) => item !== id)
       : [id, ...favorites].slice(0, 8);
     setFavorites(next);
     writeToolList(BLANC_FAVORITE_TOOLS_KEY, next);
-    saveToolboxSettings({ favoriteTools: next.filter((item): item is ToolboxModuleId => item !== 'coverage') });
+    saveToolboxSettings({
+      favoriteTools: next.filter((item): item is ToolboxModuleId => isRegistryGovernedTool(item)),
+    });
   };
 
   const setSidebar = (open: boolean): void => {
