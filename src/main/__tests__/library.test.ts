@@ -246,3 +246,133 @@ describe('importProviderMangaChapter', () => {
     expect(result.item.title).toBe('Berserk — Chapter 1');
   });
 });
+
+/**
+ * Re-capturing a url must update the chapter it already made, not add another.
+ *
+ * Found live 2026-09-06 in the user's own library, from the Reading workspace's
+ * Home tab: Continue reading listed **One Punch-Man : The Koi Pond | Chapter 229**
+ * twice, at **47%** and **29%**. `listLibrary()` had THREE rows for it —
+ * `25e40727`, `7138778b`, `f303fe4c` — created 89 s and 158 s apart on
+ * 2026-07-17, all with the identical `sourcePath`
+ * `https://cubari.moe/read/gist/cmF0L0tva2lLb2k...`, and each carrying its own
+ * `ocrMeta` (17/18/18 pages OCR'd). One chapter, captured three times, downloaded
+ * and OCR'd three times, with the reader's position split across the copies so
+ * "continue reading" could not say where they actually were.
+ *
+ * `importEpubBufferToLibrary` had always keyed on `sourcePath` (library.ts:443).
+ * `importMangaFromImageUrls` called `crypto.randomUUID()` unconditionally.
+ *
+ * What is pinned is the pair of properties that make the fix worth anything: the
+ * row count does not grow, AND the user's half of the record survives the update.
+ * A dedupe that overwrote progress would satisfy the first and fail the second.
+ */
+describe('importMangaFromImageUrls — a re-captured url updates its chapter', () => {
+  const dbFile = (): string => path.join(tmpRoot, 'library.json');
+  const rowsFor = (url: string): Array<Record<string, unknown>> => {
+    const all = JSON.parse(fs.readFileSync(dbFile(), 'utf-8')) as Array<Record<string, unknown>>;
+    return all.filter((row) => row.sourcePath === url);
+  };
+  /** Stand in for the reader having written a bookmark, which is IPC-only here. */
+  const setProgressOn = (id: string, progress: Record<string, unknown>): void => {
+    const all = JSON.parse(fs.readFileSync(dbFile(), 'utf-8')) as Array<Record<string, unknown>>;
+    const row = all.find((entry) => entry.id === id);
+    if (row) {
+      row.progress = progress;
+      row.folder = 'Shelf the user chose';
+    }
+    fs.writeFileSync(dbFile(), JSON.stringify(all, null, 2), 'utf-8');
+  };
+  const capture = async (url: string, pages: number) => {
+    vi.stubGlobal('fetch', vi.fn(async () => fakeImageResponse()));
+    return importMangaFromImageUrls({
+      url,
+      images: Array.from({ length: pages }, (_, i) => `https://cdn.example.com/${i + 1}.jpg`),
+    });
+  };
+
+  // The regression itself. Before the fix this was 2 rows with 2 different ids.
+  it('keeps one row and one id across a second capture of the same url', async () => {
+    const url = 'https://cubari.example/read/gist/dedupe-one';
+    const first = await capture(url, 3);
+    const second = await capture(url, 3);
+
+    expect(first.ok && second.ok).toBe(true);
+    expect(second.id).toBe(first.id);
+    expect(rowsFor(url)).toHaveLength(1);
+  });
+
+  it('keeps the reader\'s position and shelf, which is what the duplicates were losing', async () => {
+    const url = 'https://cubari.example/read/gist/dedupe-progress';
+    const first = await capture(url, 4);
+    setProgressOn(String(first.id), { page: 2, percent: 2 / 3 });
+
+    await capture(url, 4);
+
+    const [row] = rowsFor(url);
+    expect(row.folder).toBe('Shelf the user chose');
+    expect((row.progress as { page: number }).page).toBe(2);
+    expect((row.progress as { percent: number }).percent).toBeCloseTo(2 / 3, 10);
+  });
+
+  it('clamps a bookmark that a shorter re-capture would strand past the last page', async () => {
+    const url = 'https://cubari.example/read/gist/dedupe-shrink';
+    const first = await capture(url, 5);
+    setProgressOn(String(first.id), { page: 4, percent: 1 });
+
+    const second = await capture(url, 3);
+
+    const [row] = rowsFor(url);
+    expect(second.pageCount).toBe(3);
+    expect(row.pageCount).toBe(3);
+    // Last page of the new capture, on the reader's own formula idx/(len-1).
+    expect((row.progress as { page: number }).page).toBe(2);
+    expect((row.progress as { percent: number }).percent).toBe(1);
+  });
+
+  it('sweeps pages the shorter re-capture did not overwrite', async () => {
+    const url = 'https://cubari.example/read/gist/dedupe-sweep';
+    const first = await capture(url, 5);
+    const pagesDir = path.join(tmpRoot, 'library', String(first.id), 'pages');
+    expect(fs.readdirSync(pagesDir)).toHaveLength(5);
+
+    await capture(url, 2);
+
+    const left = fs.readdirSync(pagesDir);
+    expect(left).toHaveLength(2);
+    expect(left).toContain('0001.jpg');
+    expect(left).not.toContain('0005.jpg');
+  });
+
+  it('drops OCR boxes only when the page count moved under them', async () => {
+    const sameUrl = 'https://cubari.example/read/gist/dedupe-ocr-same';
+    const sameFirst = await capture(sameUrl, 3);
+    const stamp = (id: string): void => {
+      const all = JSON.parse(fs.readFileSync(dbFile(), 'utf-8')) as Array<Record<string, unknown>>;
+      const row = all.find((entry) => entry.id === id);
+      if (row) row.ocrMeta = { ocrPages: 3, translatedPages: 3, updatedAt: 1, targetLang: 'en' };
+      fs.writeFileSync(dbFile(), JSON.stringify(all, null, 2), 'utf-8');
+    };
+    stamp(String(sameFirst.id));
+    await capture(sameUrl, 3);
+    expect(rowsFor(sameUrl)[0].ocrMeta, 'an identical re-capture must not throw the OCR away').toBeTruthy();
+
+    const movedUrl = 'https://cubari.example/read/gist/dedupe-ocr-moved';
+    const movedFirst = await capture(movedUrl, 3);
+    stamp(String(movedFirst.id));
+    await capture(movedUrl, 2);
+    expect(rowsFor(movedUrl)[0].ocrMeta ?? null, 'boxes measured on other pages must not survive').toBeNull();
+  });
+
+  // The control: a DIFFERENT url is a different chapter and must still add a row.
+  it('still adds a row for a url it has not seen', async () => {
+    const a = 'https://cubari.example/read/gist/distinct-a';
+    const b = 'https://cubari.example/read/gist/distinct-b';
+    const first = await capture(a, 2);
+    const second = await capture(b, 2);
+
+    expect(second.id).not.toBe(first.id);
+    expect(rowsFor(a)).toHaveLength(1);
+    expect(rowsFor(b)).toHaveLength(1);
+  });
+});

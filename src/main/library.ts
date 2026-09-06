@@ -1106,7 +1106,20 @@ export async function importMangaFromImageUrls(payload: {
 
   ensureMangaFolder();
 
-  const id = crypto.randomUUID();
+  // Re-capturing the SAME url is the same chapter, so it updates the item it
+  // already made instead of minting another one. Without this every capture of a
+  // url added a whole new row: the user's library carried three copies of one
+  // Cubari chapter (2026-07-17, ids 25e40727/7138778b/f303fe4c, identical
+  // `sourcePath`), Continue reading listed the same chapter twice with 47% and
+  // 29%, and its pages were downloaded and OCR'd three times over.
+  // `importEpubBufferToLibrary` has always keyed on `sourcePath` this way (:443);
+  // this path was the one that did not.
+  const dbBefore = readDb();
+  const existing = sourceUrl
+    ? dbBefore.find((entry) => entry.kind === 'manga' && entry.sourcePath === sourceUrl)
+    : undefined;
+
+  const id = existing?.id ?? crypto.randomUUID();
   const dir = itemDir(id);
   const pagesDir = path.join(dir, 'pages');
   fs.mkdirSync(pagesDir, { recursive: true });
@@ -1116,6 +1129,19 @@ export async function importMangaFromImageUrls(payload: {
     fs.writeFileSync(path.join(pagesDir, outName), r.buf);
     names.push(outName);
   });
+
+  if (existing) {
+    // The new pages are written BEFORE the old ones are swept, so a re-import can
+    // never leave the item page-less. Only files this capture did not overwrite
+    // go — a shorter chapter would otherwise keep the previous run's tail.
+    try {
+      for (const stale of fs.readdirSync(pagesDir)) {
+        if (!names.includes(stale)) fs.rmSync(path.join(pagesDir, stale), { force: true });
+      }
+    } catch {
+      /* a page that cannot be swept is stale, not fatal — pageCount governs reads */
+    }
+  }
 
   const coverName = pickCoverPage(pagesDir, names) || names[0];
   let coverPath: string | undefined;
@@ -1134,17 +1160,47 @@ export async function importMangaFromImageUrls(payload: {
   const title =
     String(payload.title ?? '').trim().slice(0, 120) || titleFromFile(sourceUrl || 'Imported manga');
   const items = readDb();
-  const item: LibraryItem = {
-    id,
-    title,
-    kind: 'manga',
-    createdAt: Date.now(),
-    sourcePath: sourceUrl || undefined,
-    pageCount: names.length,
-    coverPath,
-    folder: MANGA_FOLDER,
-  };
-  items.unshift(item);
+  const prior = existing ? items.find((entry) => entry.id === id) : undefined;
+
+  if (prior) {
+    // Read BEFORE the assignment below overwrites it; the OCR check needs the old
+    // count and must not depend on `existing` happening to be a different parse.
+    const previousPageCount = prior.pageCount;
+    // Everything the re-capture actually re-measured is replaced; everything that
+    // is the USER's — where they filed it, how far they read, when — is kept.
+    prior.title = title;
+    prior.pageCount = names.length;
+    prior.coverPath = coverPath;
+    if (prior.progress) {
+      // A shorter re-capture must not strand the bookmark past the last page.
+      // The percent is recomputed on the same formula the reader writes with,
+      // `idx / (pages.length - 1)` (MangaReader.tsx:973), so the two agree.
+      const page = Math.min(Math.max(0, prior.progress.page ?? 0), Math.max(0, names.length - 1));
+      prior.progress = {
+        ...prior.progress,
+        page,
+        percent: names.length > 1 ? page / (names.length - 1) : 1,
+      };
+    }
+    // The OCR was measured against the pages that were here before. If the page
+    // count moved, those boxes no longer map and keeping them would draw someone
+    // else's text over this capture; an unchanged count keeps the work.
+    if (prior.ocrMeta && previousPageCount !== names.length) {
+      prior.ocrMeta = undefined;
+    }
+  } else {
+    const item: LibraryItem = {
+      id,
+      title,
+      kind: 'manga',
+      createdAt: Date.now(),
+      sourcePath: sourceUrl || undefined,
+      pageCount: names.length,
+      coverPath,
+      folder: MANGA_FOLDER,
+    };
+    items.unshift(item);
+  }
   writeDb(items);
   broadcastLibrary(items);
 
