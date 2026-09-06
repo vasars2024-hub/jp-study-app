@@ -1205,6 +1205,10 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                     <button
                       key={code}
                       type="button"
+                      // Register row D6: a multi-select filter set, so the
+                      // switched-on ones must announce as pressed rather than
+                      // relying on the `active` class, which is only paint.
+                      aria-pressed={exLangs.includes(code)}
                       className={`gram-level-btn ${exLangs.includes(code) ? 'active' : ''}`}
                       onClick={() => toggleExLang(code)}
                     >

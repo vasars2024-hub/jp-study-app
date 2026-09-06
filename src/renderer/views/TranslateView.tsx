@@ -145,10 +145,22 @@ export default function TranslateView() {
     },
   ];
 
+  /*
+   * Register row D6. These two carried the `active` class and nothing else, so
+   * a screen reader announced the open tab exactly as it announced the shut one.
+   *
+   * `aria-pressed` rather than the `role="tab"` set `GrammarView` uses with the
+   * same class: this bar is rendered into BOTH the Aero and the classic branch,
+   * and in the classic one the content it switches is two sibling regions
+   * (`tr-dir` and the history panel), not one element — so there is no single
+   * node a `tabpanel`/`aria-controls` pair could honestly point at. The language
+   * pickers below are a genuine `radiogroup` and already say so.
+   */
   const tabBar = (
     <div className="gram-mode-toggle tr-tabs">
       <button
         type="button"
+        aria-pressed={tab === 'translate'}
         className={`gram-mode-btn ${tab === 'translate' ? 'active' : ''}`}
         onClick={() => state.setTab('translate')}
       >
@@ -156,6 +168,7 @@ export default function TranslateView() {
       </button>
       <button
         type="button"
+        aria-pressed={tab === 'history'}
         className={`gram-mode-btn ${tab === 'history' ? 'active' : ''}`}
         onClick={() => state.setTab('history')}
       >
