@@ -919,8 +919,31 @@ async function acceptNyaaCandidate(
     return { ok: false, message: 'That release is no longer in this session’s listing. Search again.' };
   }
 
+  // The dialog's acquisition is a job like any other, and until this it was the
+  // only one absent from `running`. `cancelSubtitleDiscovery` marks only ids it
+  // finds there — both forms of it, the per-item and the cancel-everything the
+  // job strip's button sends — so the closure below could never become true
+  // through any product path. The IPC answered, the fetch ran on to its full
+  // budget, and the torrent kept transferring.
+  //
+  // Ownership is taken only when nothing else holds the id: a sweep already
+  // running for this item registered it, and clearing its flags underneath it
+  // would un-cancel the sweep instead of this fetch.
+  const owned = !running.has(mediaId);
+  if (owned) {
+    running.add(mediaId);
+    cancelled.delete(mediaId);
+  }
   const outcome = await nyaaFetch(candidate, config, {
     isCancelled: () => cancelled.has(mediaId),
+  }).finally(() => {
+    if (!owned) return;
+    running.delete(mediaId);
+    // Released with the registration rather than left for the next caller.
+    // Measured as redundant, and kept anyway: the acquire above clears the same
+    // flag, so removing this line reddens nothing — it is symmetry, not a
+    // guard, and the next reader should not assume a test is holding it.
+    cancelled.delete(mediaId);
   });
   if (!outcome.ok) return { ok: false, message: outcome.reason };
 
