@@ -15,7 +15,11 @@ function load(): RecentStore {
     if (!raw) return { pages: [], queries: [] };
     const p = JSON.parse(raw) as Partial<RecentStore>;
     return {
-      pages: Array.isArray(p.pages) ? (p.pages.filter(Boolean) as SettingsPageId[]) : [],
+      // Keep history reachable after Monitors merged into Display, without
+      // showing the same destination twice or rewriting storage during a read.
+      pages: Array.isArray(p.pages)
+        ? [...new Set(p.pages.filter(Boolean).map((id) => id === 'monitors' ? 'display' : id))]
+        : [],
       queries: Array.isArray(p.queries) ? p.queries.filter((q) => typeof q === 'string') : [],
     };
   } catch {
@@ -41,6 +45,7 @@ export function getRecentQueries(): string[] {
 
 export function pushRecentPage(id: SettingsPageId): void {
   if (id === 'home') return;
+  if (id === 'monitors') id = 'display';
   const s = load();
   s.pages = [id, ...s.pages.filter((p) => p !== id)].slice(0, MAX_PAGES);
   save(s);

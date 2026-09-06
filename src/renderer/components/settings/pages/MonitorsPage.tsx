@@ -1,9 +1,6 @@
 /**
- * Settings → Monitors.
- *
- * Not to be confused with the neighbouring **Display** page, which is visual
- * accessibility (contrast, zoom, scrollbars). This one is about physical
- * screens: which desktop each monitor hosts, and how that monitor renders it.
+ * Physical-screen controls composed into Settings → Display & monitors:
+ * which desktop each monitor hosts, and how that monitor renders it.
  *
  * The simulated-display control is the reason multi-monitor could be built and
  * checked on a one-monitor machine at all, so it is a first-class setting here
@@ -22,7 +19,12 @@ import {
   getDesktopName,
   onDesktopChanged,
 } from '../../../desktopState';
-import { loadDisplayPrefs, saveDisplayPrefs, type DisplayPrefs } from '../../../displayPrefs';
+import {
+  loadDisplayPrefs,
+  onDisplayPrefsChanged,
+  saveDisplayPrefs,
+  type DisplayPrefs,
+} from '../../../displayPrefs';
 
 const MAX_SIMULATED = 3;
 
@@ -34,6 +36,9 @@ export default function MonitorsPage() {
   const [desktopCount, setDesktopCount] = useState(getDesktopCount);
   const [virtualCount, setVirtualCount] = useState(0);
   const [prefs, setPrefs] = useState<DisplayPrefs>(loadDisplayPrefs);
+
+  // DisplayPage's reset and edits in another window update this same store.
+  useEffect(() => onDisplayPrefsChanged(setPrefs), []);
 
   useEffect(() => {
     const refresh = (): void => {
