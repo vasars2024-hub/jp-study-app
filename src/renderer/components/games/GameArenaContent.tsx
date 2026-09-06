@@ -480,6 +480,28 @@ export function GameArena() {
                   </ContextualSurface>
                 </div>
               )}
+              {/*
+                The new question, spoken. `RoundPanel` is keyed on the round id
+                and therefore REMOUNTS on every question, so a live region
+                inside it would be brand new each time and announce nothing — a
+                region has to already exist for its text to count as a change.
+                This one sits outside the key and simply retitles itself, which
+                is what a screen-reader player hears after the verdict.
+              */}
+              <p className="sr-only" role="status" aria-live="polite">
+                {currentRound && session
+                  ? 'speak' in currentRound && currentRound.speak
+                    ? t('games.a11y.roundAudio', {
+                        current: session.index + 1,
+                        total: session.rounds.length,
+                      })
+                    : t('games.a11y.roundPrompt', {
+                        current: session.index + 1,
+                        total: session.rounds.length,
+                        prompt: currentRound.prompt,
+                      })
+                  : ''}
+              </p>
               {currentRound && (
                 <RoundPanel
                   key={currentRound.id}
@@ -720,6 +742,10 @@ function TypeRoundPanel({
       <textarea
         lang={round.inputLang === 'ja' ? 'ja' : round.inputLang === 'zh' ? 'zh' : undefined}
         className="game-answer-box"
+        // The one unnamed control on the surface: no label, no placeholder and
+        // no id to point a label at, so it announced as a bare edit field while
+        // the question it belongs to sat in an unrelated div.
+        aria-label={t('games.a11y.answer')}
         value={value}
         disabled={locked}
         rows={3}
@@ -882,6 +908,10 @@ function MatchRoundPanel({
                 className={`game-match-btn ${selected === pairItem.jp ? 'active' : ''} ${
                   paired ? 'paired' : ''
                 } ${verdict}`.replace(/\s+/g, ' ').trim()}
+                // `active` was the ONLY signal that this word is the one the
+                // meaning buttons will pair with, so the selection existed in
+                // colour and nowhere else.
+                aria-pressed={selected === pairItem.jp}
                 style={{ '--i': i } as CSSProperties}
                 onClick={() => (paired ? clear(pairItem.jp) : setSelected(pairItem.jp))}
               >
@@ -901,6 +931,8 @@ function MatchRoundPanel({
               key={meaning}
               type="button"
               className={`game-match-btn ${Object.values(matches).includes(meaning) ? 'chosen' : ''}`}
+              // Same as the Japanese side: `chosen` was a tint and nothing else.
+              aria-pressed={Object.values(matches).includes(meaning)}
               style={{ '--i': i } as CSSProperties}
               disabled={locked || !selected}
               onClick={() => pair(meaning)}
