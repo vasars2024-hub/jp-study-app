@@ -3645,6 +3645,115 @@
      * one row falls. Same reason `folderRail` attacks the Unfiled chip's count while
      * `bookGroups` measures itself against the All chip.
      */
+    /*
+     * ANKI. The surface's whole job is to speak for a process this app does not own, so
+     * every row here is a CROSS-CHECK between two regions that must agree, never a
+     * presence check. The banner is the one thing a disconnected build still renders
+     * cheerfully, so `connectionCounts` makes it prove its number against the deck list
+     * it claims to have loaded; a stale or fabricated banner survives "is it there?" and
+     * dies here. Added 2026-09-05: anki had no spec at all, which is why its cat6 cell
+     * (and cat5's Q7/Q8/Q9, which MEASURE against the cat6 baseline) had never scored.
+     */
+    anki: {
+      titleRe: /^Anki$|アンキ|Анки/i,
+      rootSel: '.anki-view',
+      features: [
+        {
+          // The banner's own deck count must equal the deck <select>'s option count.
+          // Two independent renders of the same AnkiConnect reply; disagreement means one
+          // of them is decorative.
+          id: 'connectionCounts',
+          f: (w) => {
+            const banner = q(w, '.status-banner');
+            if (!banner) return { ok: false, ev: 'no status banner' };
+            const label = txt(banner);
+            const m = /(\d+)\s*decks?/.exec(label);
+            const sel = qa(w, 'select').filter((s) => s.options.length > 2)[0];
+            const opts = sel ? sel.options.length : 0;
+            const connected = /ok/.test(String(banner.className));
+            return {
+              ok: !!m && connected && opts > 0 && Number(m[1]) === opts,
+              ev: `banner="${label.slice(0, 46)}" claimed=${m ? m[1] : 'none'} deckOptions=${opts} bannerOk=${connected}`,
+            };
+          },
+        },
+        {
+          // The deck the app says it is bound to must be a deck the collection actually
+          // offers, and must be the selected one. A binding to a deck that no longer
+          // exists is the failure this catches.
+          id: 'deckBinding',
+          f: (w) => {
+            const sel = qa(w, 'select').filter((s) => s.options.length > 2)[0];
+            if (!sel) return { ok: false, ev: 'no deck select' };
+            const value = sel.value;
+            const known = Array.from(sel.options).some((o) => o.value === value);
+            return {
+              ok: !!value && known && sel.selectedIndex >= 0 && !sel.disabled,
+              ev: `deck="${String(value).slice(0, 40)}" isKnownOption=${known} index=${sel.selectedIndex} operable=${!sel.disabled}`,
+            };
+          },
+        },
+        {
+          // The note type named in the binding header and the note type the field-mapping
+          // card claims to be editing must be the SAME string. They are rendered by
+          // different regions from different state; a drift here means the mapping editor
+          // is writing into fields of a note type the user is not bound to.
+          id: 'noteTypeAgreement',
+          f: (w) => {
+            const name = txt(q(w, '.anki-note-type-name'));
+            if (!name) return { ok: false, ev: 'no bound note type rendered' };
+            const cards = qa(w, '.anki-card');
+            const mapping = cards.filter((c) => /field mapping/i.test(txt(c).slice(0, 60)))[0];
+            const body = mapping ? txt(mapping) : '';
+            return {
+              ok: !!mapping && body.indexOf(name) >= 0,
+              ev: `bound="${name}" mappingCard=${mapping ? 'yes' : 'no'} namesIt=${body.indexOf(name) >= 0}`,
+            };
+          },
+        },
+        {
+          // Every flush action card offers exactly one action, and while the banner reads
+          // connected none of them is disabled. A card that renders its pitch and then
+          // hands back a dead button is the "honest surface, dead control" defect.
+          id: 'actionCards',
+          f: (w) => {
+            const flush = qa(w, '.anki-card-flush');
+            if (!flush.length) return { ok: false, ev: 'no action cards' };
+            const connected = /ok/.test(String((q(w, '.status-banner') || {}).className || ''));
+            const counts = flush.map((c) => qa(c, 'button').length);
+            const dead = flush.filter((c) => qa(c, 'button').some((b) => b.disabled)).length;
+            return {
+              ok: counts.every((n) => n === 1) && (!connected || dead === 0),
+              ev: `cards=${flush.length} buttonsPerCard=${counts.join(',')} disabledWhileConnected=${dead} connected=${connected}`,
+            };
+          },
+        },
+      ],
+      /*
+       * Each mutation LIES rather than deletes, for the reason `setAttr`'s comment gives:
+       * detaching the deck select would fall `connectionCounts` and `deckBinding` together
+       * and prove neither. Note `connectionCounts` drops the banner's ok class, which
+       * `actionCards` also reads — deliberately harmless there, because with the banner not
+       * claiming a connection a disabled action is honest, so that row still passes.
+       */
+      mutations: {
+        connectionCounts: (w) => {
+          const banner = q(w, '.status-banner');
+          if (!banner) return { refused: 'no status banner' };
+          return removeClassAll([banner], 'ok', 'banner was not in the ok state');
+        },
+        deckBinding: (w) => {
+          const sel = qa(w, 'select').filter((s) => s.options.length > 2)[0];
+          return setAttr(sel, 'disabled', 'true', 'no deck select');
+        },
+        noteTypeAgreement: (w) => detach(q(w, '.anki-note-type-name'), 'no bound note type'),
+        actionCards: (w) => {
+          const btn = qa(w, '.anki-card-flush button')[0];
+          return setAttr(btn, 'disabled', 'true', 'no action-card button');
+        },
+      },
+    },
+
     flashcards: {
       titleRe: /Flashcards|フラッシュカード|闪卡|Карточк/i,
       rootSel: '.flash-view',
@@ -6969,6 +7078,7 @@
   }
   function stripAttr(node, attr, refusal) {
     if (!node) return { refused: refusal };
+    rememberAbsence(node, attr);
     node.setAttribute(`data-lqp-was-${attr}`, node.getAttribute(attr) || '');
     node.removeAttribute(attr);
     return { mutated: `${attr} stripped` };
@@ -6983,9 +7093,28 @@
    */
   function setAttr(node, attr, value, refusal) {
     if (!node) return { refused: refusal };
+    rememberAbsence(node, attr);
     node.setAttribute(`data-lqp-was-${attr}`, node.getAttribute(attr) || '');
     node.setAttribute(attr, value);
     return { mutated: `${attr} set to "${value}"` };
+  }
+
+  /**
+   * ABSENT IS NOT EMPTY, and the restore sweep could not tell them apart until
+   * 2026-09-05. `data-lqp-was-<attr>` stores `getAttribute(attr) || ''`, and the sweep
+   * ends with `setAttribute(attr, thatValue)` — it never removes. For a string attribute
+   * that is harmless. For a BOOLEAN one it is not: `setAttr(btn, 'disabled', 'true')` on a
+   * button that had no `disabled` attribute restores it to `disabled=""`, which is STILL
+   * DISABLED. Measured on the new anki spec's `actionCards` row: the mutation flipped its
+   * row correctly, the sweep reported `restored: ["disabled"]`, and the row stayed down
+   * with `disabledWhileConnected=1` — a VOID that reads like a bad mutation and is really
+   * a dead control left behind on the user's surface.
+   *
+   * So absence is recorded explicitly and the sweep removes rather than blanks. Any spec
+   * that mutates a boolean attribute inherits the fix; none has to know about it.
+   */
+  function rememberAbsence(node, attr) {
+    if (!node.hasAttribute(attr)) node.setAttribute(`data-lqp-absent-${attr}`, '1');
   }
 
   // --------------------------------------------------------------- engine
@@ -7315,12 +7444,20 @@
      * over a list somebody has to remember to extend.
      */
     const WAS = 'data-lqp-was-';
+    // See `rememberAbsence`: an attribute the surface never had is REMOVED, not blanked.
+    // Blanking it restored `disabled=""` — still disabled — and left a dead control behind.
+    const ABSENT = 'data-lqp-absent-';
     qa(scope, '*').forEach((n) => {
       [].slice.call(n.attributes)
         .filter((a) => a.name.indexOf(WAS) === 0)
         .forEach((a) => {
           const attr = a.name.slice(WAS.length);
-          n.setAttribute(attr, a.value);
+          if (n.hasAttribute(ABSENT + attr)) {
+            n.removeAttribute(attr);
+            n.removeAttribute(ABSENT + attr);
+          } else {
+            n.setAttribute(attr, a.value);
+          }
           n.removeAttribute(a.name);
           undone.push(attr);
         });
