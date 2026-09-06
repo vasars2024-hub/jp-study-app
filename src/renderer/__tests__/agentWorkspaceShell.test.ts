@@ -623,6 +623,38 @@ describe('Agent workspace shell', () => {
     expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
   });
 
+  /**
+   * D81. Both "place it in the composer" routes were a bare `setDraft(text)`,
+   * so a half-written prompt was destroyed with no undo — and the composer is
+   * off-screen above the button that was clicked, so the click read as inert.
+   */
+  it('adds a suggestion to a half-written prompt instead of overwriting it', async () => {
+    stored = populated();
+    await mount();
+    await setTextarea('what I had already typed');
+
+    await click(host.querySelector('.agent-context-suggestion') as HTMLButtonElement);
+
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value)
+      .toBe('what I had already typed\n\nagent.suggestions.prompt.reading');
+  });
+
+  it('moves the caret and the focus to the composer, so the insertion is visible', async () => {
+    stored = populated();
+    await mount();
+    const composer = host.querySelector('textarea') as HTMLTextAreaElement;
+
+    const suggestion = host.querySelector('.agent-context-suggestion') as HTMLButtonElement;
+    await click(suggestion);
+
+    expect(document.activeElement).toBe(composer);
+    expect(document.activeElement).not.toBe(suggestion);
+  });
+
+  // The reusable-prompt route shares this exact callback, and it is verified in
+  // the running app rather than here: mounting the Full inspector in jsdom hangs
+  // on the capability directory's own hydration, which is not what D81 is about.
+
   it('defaults to a clean Simple view and reveals advanced controls in Full view', async () => {
     stored = populated();
     await mount();

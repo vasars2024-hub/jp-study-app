@@ -1461,6 +1461,7 @@ export default function AgentWorkspaceShell() {
     useState<AgentExecutionFailureCode | null>(null);
   const railRef = useRef<HTMLUListElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const contextItemRefs = useRef(new Map<string, HTMLLIElement>());
   const [openedContext, setOpenedContext] = useState<{
     conversationId: string;
@@ -1769,6 +1770,34 @@ export default function AgentWorkspaceShell() {
     setAttachmentFailure(null);
     setCloudSensitiveConsent(false);
   }, []);
+
+  /**
+   * "Place them back in the composer" is what both the prompt library and the
+   * context suggestions promise, and both used to be a bare `setDraft(text)`.
+   * That overwrote whatever the user had already typed, with no undo — and on a
+   * narrow window the composer is hundreds of pixels above the button that was
+   * clicked (measured live at 820x580: button +400, textarea -745), so the only
+   * visible result of the click was nothing at all. Append instead of replace,
+   * then bring the composer to the user rather than leaving them to find it.
+   */
+  const placeInComposer = useCallback((text: string) => {
+    const insert = text.trim();
+    if (!insert) return;
+    const kept = draft.replace(/\s+$/, '');
+    const next = kept ? `${kept}\n\n${insert}` : insert;
+    setDraft(next);
+    const field = composerRef.current;
+    if (!field) return;
+    field.scrollIntoView?.({ block: 'nearest' });
+    field.focus();
+    // React has not rendered `next` yet, so the caret has to be placed once it
+    // has — otherwise it lands at the end of the OLD text and the next keystroke
+    // types into the middle of what was just inserted.
+    requestAnimationFrame(() => {
+      if (composerRef.current !== field) return;
+      field.setSelectionRange(next.length, next.length);
+    });
+  }, [draft]);
 
   const submitPrompt = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2629,11 +2658,12 @@ export default function AgentWorkspaceShell() {
                   </p>
                 ) : null}
 
-                <AgentContextSuggestions conversation={selected} onUse={(text) => setDraft(text)} />
+                <AgentContextSuggestions conversation={selected} onUse={placeInComposer} />
 
                 <label className="agent-prompt-label">
                   <span className="sr-only">{t('agent.execute.prompt')}</span>
                   <textarea
+                    ref={composerRef}
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     placeholder={t('agent.execute.placeholder')}
@@ -2779,7 +2809,7 @@ export default function AgentWorkspaceShell() {
                         {t('agent.promptLibrary.title')}
                       </button>
                       {promptLibraryExpanded ? (
-                        <AgentPromptLibrary onUse={(text) => setDraft(text)} />
+                        <AgentPromptLibrary onUse={placeInComposer} />
                       ) : null}
                       <button
                         type="button"
