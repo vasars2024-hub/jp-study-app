@@ -1482,3 +1482,88 @@ hash and takes the user's own Kitsunekko archive with it. Expect `selectSubtitle
 the non-`ja` files — disclose the skip count; "taken whole" is the release, not every file.
 The `SubtitleRecord` clause still has no subject in this library (no Conan media item,
 `main/subtitleDiscovery.ts:975` refuses), so that clause's scope call is still owed.
+
+#### Gate 11 — 2026-09-06 07:27–07:55 UTC (primary). THREE live acquisitions driven. Still OPEN, and the blocker is now MEASURED, not inferred: every fetchable Route A subject on this index is a `.7z`.
+
+The previous entry said the fetch was one command away. It was, and it ran — three times, on
+three different releases, each one nominated by the product's **own** listing. None reached
+"taken whole", and the two reasons are different from each other and both correct.
+
+| # | subject (the listing's own pick) | bytes | seeds | verdict |
+| --- | --- | --- | --- | --- |
+| A | `Detective Conan Remastered 0001-0520 (Only subs) [Netflix SEA]` `45921c38…`, score **100** for title *Detective Conan* | 20,761,805 | 10 | payload is **one `.7z`** — `Detective Conan 0001-0520 (Subs) [NetflixAsia].7z`, 20,712,765 B |
+| B | `Zombieland Saga the Movie Yumeginga Paradise Subtitles` `25aacbeda4…`, score **61**, the only candidate for its title | 275,866 | 11 | payload is 2 loose `.ass` — but `…_track4_[eng].ass` and `…_track5_[spa].ass`. `wrong-language`, correctly |
+| C | `Detective Conan Movies 01-26 (Only subs) [Netflix SEA]` `22d2e2e6…`, score **105**, `language:ja`, **rank 1 of 9** for title *Detective Conan Movies* | 5,557,453 | 9 | payload is **one `.7z`** — `Detective Conan Movies 01-26 (Subs) [NetflixAsia].7z`, 5,535,182 B |
+
+**C is the hash the previous entry ruled out, and it is now reachable honestly.** That entry was
+right that `subtitleHarvestNyaaList('Detective Conan')` does not return it — but
+`subtitleHarvestNyaaList('Detective Conan Movies')` returns it **first of nine**, with
+`carriesTargetHash: true`. A user looking for the movies gets it as their top pick, so it is a
+candidate the product genuinely offers and not a hand-fed hash. Prefer widening the *title* over
+reaching past the listing; the rule was never "one query only".
+
+**THE FINDING, and it is decisive rather than incidental.** Capped index sweeps through the
+product's own search — `"Subtitles"`, `"字幕"`, `"Japanese subtitles"`, `"subs only"`,
+`"sub pack"`, `"SRT batch"`, 75 rows each, filtered to ≤50 MB — return **exactly two** rows that
+declare `ja` and have ≥3 seeders, and **both are the Netflix SEA `.7z` packs above**. The only
+other `ja` rows under the ceiling are three `[Yaoi801 Fansub] Grendizer U` `.ass` files at
+0.05 MB each with **0 seeders**, which `minSeeders: 3` drops and which are unfetchable anyway.
+So: **2 of 2 fetchable Japanese Route A subjects on this index ship as `.7z`.** Route A is not
+blocked by the acquisition code; it is blocked by what the index holds.
+
+**Product defect this found, FIXED `08160b62`.** `selectSubtitleFiles` has no branch for a
+compressed payload, so both `.7z` packs refused with *"This release contains no subtitle files.
+1 file(s), none of them video or subtitles."* — which reads as *the ranker picked a mislabelled
+release* and sends the user hunting for another. The release is exactly what it claims. The
+refusal now names the archive count and the formats, and points at `attachSubtitleFile`
+(`preload.ts:1774`), which exists. 57 tests pass; mutation control turned exactly 1 red by name;
+two negative controls ship with it (no-archive release keeps the old sentence, a video batch
+carrying an `.rar` still blames the muxing).
+
+**Correction to a claim this turn nearly made.** Route A does **not** skip `filePrio` — the
+wire logs above show zero only because all three refused at selection, one step earlier.
+`acquireAll` sets unselected files to skip on **both** routes and the code says why (a pack can
+now be ~100 MB; `[DBD-Raws] JOJO … 简繁外挂字幕` is 78 files where a harvest wants 39). So the
+three runs prove the path up to selection and prove **nothing** about "taken whole". Stated
+because inferring it from the wire log alone was one keystroke away.
+
+**Safety, unchanged and verified after every run.** Mount refuses `torrents/delete` by default;
+`G14_RECATEGORIZE=539c0886…` hides the user's Kitsunekko archive from the reap's own
+category filter; `G12_ALLOW_DELETE_HASH` forwards a delete only when it names exactly one
+expected hash. Each run's orphan was removed by the product's **own** `qbitReapSubtitleOrphans`
+on the next run, logged as `delete-allowed-exact`, and the last pass ran with
+`G14_REFUSE_EXTRA=/api/v2/torrents/add` so nothing new could land — wire shows
+`add refused-destructive`. **Client verified afterwards at the real daemon with no mount: 10
+rows, 6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`, byte-identical to the baseline
+this turn opened on.** No video file was ever requested on any run; no `filePrio` and no `start`
+was ever issued; the user's own torrents were never written to.
+
+**Trap that cost two runs: Git Bash mangles an argument or env value beginning with `/`.**
+`/qb` became `C:/Program Files/Git/qb` in the base path (the fetch died on
+`Not a usable URL: http://127.0.0.1:8781C:/Program Files/Git/qb/api/v2/…`) and
+`G14_REFUSE_EXTRA=/api/v2/torrents/add` silently fenced nothing, so a cleanup pass re-added the
+torrent it was meant to remove. **Drive this mount from PowerShell.**
+
+#### SCOPE DECISION for gate 11, made under the standing auto-approval and recorded here as required
+
+**Gate 11 stays OPEN and is NOT amended down.** Its clauses split as the 2026-09-05 entry
+predicted, but the blocker moved and the honest record is:
+
+- *"a subtitle-only release under the 50 MB ceiling is taken whole"* — **blocked on INDEX
+  contents.** Both fetchable `ja` subjects are `.7z`. What closes it is one Japanese loose-file
+  sub pack, ≥3 seeders, under the ceiling. Nothing an agent writes produces one.
+- *"lands as a `SubtitleRecord` / its cues render in the player"* — **blocked on LIBRARY
+  contents**, unchanged: `listMedia()` has no Conan item and `subtitleDiscovery.ts:975` refuses
+  by name rather than guessing an owner.
+
+Rejected, explicitly, so nobody re-proposes them: (a) re-driving subject B with
+`languages: ['en']` would take a real pack whole and satisfy the clause's words — but
+`listNyaaSubtitleCandidates` hardcodes `languages: ['ja']` (`subtitleHarvest.ts:459,510`), so
+that is a path the product never takes, which is the exact failure this gate exists to catch;
+(b) attaching Conan cues to an unrelated library item to green clauses 2–3. Neither is a
+closure, and this track does not buy a green cell with a measurement it had to look away from.
+
+**Track 9 is 16 of 20.** Gates 13 and 15 remain agent work; gate 10 still owes its scope
+decision; gate 11 is blocked on third-party data and is therefore **parked, not abandoned** —
+re-check the index at the start of a later turn, in one call:
+`node debug/g14-live.cjs search "subs only" 50` and look for a `ja` row with seeders ≥ 3.

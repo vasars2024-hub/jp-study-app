@@ -27990,3 +27990,48 @@ its own commit `971dc4d4` at 14:17:18 proves it. A restart would have destroyed 
    in two tool calls: between them the sibling committed, and my two files rode into its
    liquid-scorecard commit `971dc4d4`. Content verified intact at HEAD; history NOT rewritten,
    which with a live sibling is the more dangerous option. Stage and commit in one call.
+
+## 2026-09-06 (primary) — Track 9 gate 11: three live acquisitions, and Route A's real blocker
+
+**`08160b62`** `fix(subtitles): a sub pack shipped as a .7z is compressed, not empty`.
+`noSubtitlesReason` gains an archive branch that names the count and the formats and points at
+`attachSubtitleFile` (`preload.ts:1774`). Video still outranks archive: "your subtitles are
+inside the video" stays the actionable half when a stray `.rar` sits beside the episodes.
+57 tests pass. **Mutation control** — `if (archives.length && false)` turned exactly **1 red by
+name**, 56 green; source restored and verified byte-identical by SHA256. Two negative controls
+ship with the rule: a no-archive release still reads "none of them video or subtitles", and a
+video batch carrying an `.rar` still blames the muxing. eslint EXIT 0 on both paths.
+
+**Why it exists — measured, not anticipated.** Gate 11 was driven three times against the real
+index and daemon, on three releases the product's own listing nominated:
+`45921c38…` (20.8 MB, score 100) → one `.7z`; `25aacbeda4…` (0.28 MB, score 61) → two loose
+`.ass` but `[eng]`/`[spa]`, refused `wrong-language`, correctly; `22d2e2e6…` (5.6 MB, score
+**105**, `language:ja`, rank 1 of 9 for the title *Detective Conan Movies*) → one `.7z`. Six
+capped index sweeps (75 rows each, ≤50 MB) return **exactly two** `ja` rows with ≥3 seeders and
+**both are those `.7z` packs**; the only other `ja` rows are three 0.05 MB `Grendizer U` `.ass`
+files at **0 seeders**. So **2 of 2 fetchable Japanese Route A subjects on this index are
+archives**, and the misleading refusal was on the path of every one of them.
+
+**Tradeoff taken:** name the format rather than extract it. `adm-zip` is already a dependency so
+`.zip` could be opened, `.7z` could not — supporting one and not the other would make the
+product's behaviour depend on an invisible property of the payload. Naming it keeps the sentence
+true for both. Reversible: extraction can be added later without changing this message's shape.
+
+**Gate 11 stays OPEN, not amended.** Blocked on index contents (clause 1) and library contents
+(clauses 2–3), both third-party. Explicitly rejected: re-driving subject B with `languages:
+['en']` — `subtitleHarvest.ts:459,510` hardcodes `['ja']`, so that is a path the product never
+takes; and attaching Conan cues to an unrelated library item.
+
+**Correction, made before it shipped:** the three wire logs show zero `filePrio` and zero
+`start`, which looks like proof that Route A "takes the release whole". It is not — all three
+refused at *selection*, one step earlier, and `acquireAll` sets unselected files to skip on
+**both** routes (its own comment says why). The runs prove the path up to selection and nothing
+past it.
+
+**Traps for the next worker.** (1) Git Bash mangles any argument or env value starting with `/`:
+`/qb` became `C:/Program Files/Git/qb`, and `G14_REFUSE_EXTRA=/api/v2/torrents/add` fenced
+nothing, so a cleanup pass re-added the torrent it was meant to remove. **Drive the mount from
+PowerShell.** (2) The reap runs *before* the add, holds out the in-flight hash, and therefore
+cannot clean up the torrent you are currently fetching — clean an orphan by fetching a
+*different* candidate with `G12_ALLOW_DELETE_HASH=<orphan>` and `add` fenced.
+**Client verified back at baseline afterwards, real daemon, no mount: 10 rows, 6 / 3 / 1.**
