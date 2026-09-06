@@ -115,7 +115,7 @@ let filesRefuseStatus = 0;
  * answers a category query with everything — some builds ignore the parameter —
  * and the sweep still touching only its own.
  */
-let clientTorrents: Array<{ hash: string; category: string }> = [];
+let clientTorrents: Array<{ hash: string; category: string; progress?: number }> = [];
 /**
  * qBittorrent's own `connection_status`, which decides whose silence it is.
  *
@@ -475,6 +475,57 @@ describe('nyaaFetch — what an interrupted run left in the client', () => {
     expect(result.ok).toBe(true);
     expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe('e'.repeat(40));
     expect(clientTorrents.map((row) => row.hash)).toEqual([HASH]);
+  });
+
+  /**
+   * The case the proxy guard has been standing in for since 2026-09-05.
+   *
+   * The user's own client holds `539c0886…`, a FINISHED 6.1 GB subtitle archive,
+   * in `jp-study-subtitles`. The sweep's premise — "only `qbitAddStopped` ever
+   * writes this category" — is true of this build and false of the client, and
+   * every live gate run had to hide that row behind a proxy rewrite to keep it.
+   */
+  it('leaves a FINISHED subtitle torrent alone, and says so', async () => {
+    clientTorrents = [{ hash: 'f'.repeat(40), category: 'jp-study-subtitles', progress: 1 }];
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(deleteBodies).toEqual([]);
+    expect(clientTorrents).toHaveLength(1);
+    // Left, not silently skipped: a finished pack nobody points at is still
+    // something the next reader has to be able to find.
+    expect(recentScraperLogs().some((entry) => entry.message.includes('Left 1 finished subtitle fetch'))).toBe(true);
+  });
+
+  // The control for the rule above. Without it "never deletes anything" would
+  // pass the test above just as well.
+  it('still clears an UNFINISHED one in the same sweep', async () => {
+    clientTorrents = [
+      { hash: 'f'.repeat(40), category: 'jp-study-subtitles', progress: 1 },
+      { hash: 'a'.repeat(40), category: 'jp-study-subtitles', progress: 0.4 },
+    ];
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(deleteBodies).toHaveLength(1);
+    expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe('a'.repeat(40));
+    expect(clientTorrents.map((row) => row.hash)).toEqual(['f'.repeat(40)]);
+  });
+
+  // A build whose `torrents/info` omits `progress` must not turn the whole
+  // sweep into a no-op — the abandoned-fetch leak is the thing it exists for.
+  it('treats a missing progress field as unfinished', async () => {
+    clientTorrents = [{ hash: 'a'.repeat(40), category: 'jp-study-subtitles' }];
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe('a'.repeat(40));
   });
 
   it('sends no delete at all when the category is empty', async () => {

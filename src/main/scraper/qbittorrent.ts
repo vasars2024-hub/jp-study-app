@@ -1119,6 +1119,22 @@ export async function qbitAddStopped(
  * acquisition is never swept out from under itself. Two app instances sharing
  * one client is the case this cannot see; it is not a case the product
  * supports.
+ *
+ * A **COMPLETE** torrent is never reaped, and that guard is not defensive
+ * decoration — it is the one measured case. "Only `qbitAddStopped` ever writes
+ * this category" is true of this build and false of the client in front of it:
+ * on 2026-09-06 the user's own qBittorrent held `539c0886…`, a finished 6.1 GB
+ * subtitle archive, sitting in `jp-study-subtitles` at progress 1. The sweep
+ * above would have deleted it, with `deleteFiles`, at the top of the next
+ * acquisition — and every gate run since 2026-09-05 had to hide that row behind
+ * a proxy rewrite to survive, which is a workaround standing in for this fix.
+ *
+ * The rule follows the reason the sweep exists. What it is here to stop is a
+ * torrent *transferring* on the user's connection for a record nobody will
+ * write; a finished one costs no bandwidth, its bytes may be the very subtitles
+ * a record points at, and a retry can `adopt` it. So an incomplete leftover is
+ * still cleared exactly as before, and a complete one is left and named in the
+ * log rather than silently skipped.
  */
 export async function qbitReapSubtitleOrphans(
   input: ScraperQbitInput,
@@ -1142,11 +1158,27 @@ export async function qbitReapSubtitleOrphans(
   // Filtering on the category again rather than trusting the query parameter:
   // a build that ignores it would answer with the whole transfer list, and
   // this function deletes what it is handed.
-  const orphans = rows
-    .map((row) => (row.hash ?? '').toLowerCase())
-    .filter((hash, index) => Boolean(hash)
-      && rows[index].category === QBIT_SUBTITLE_CATEGORY
-      && !keep.has(hash));
+  const mine = rows.filter((row) => Boolean(row.hash)
+    && row.category === QBIT_SUBTITLE_CATEGORY
+    && !keep.has((row.hash ?? '').toLowerCase()));
+  // `progress` is a fraction of the SELECTED files, so a subtitle fetch that
+  // skipped 154 video files still reads 1 once its twelve `.ass` are in. That
+  // is the intended reading: those are exactly the bytes worth keeping.
+  // Undefined progress is treated as incomplete — a build that omits the field
+  // must not turn the whole sweep into a no-op.
+  const complete = mine.filter((row) => (row.progress ?? 0) >= 1);
+  const orphans = mine
+    .filter((row) => (row.progress ?? 0) < 1)
+    .map((row) => (row.hash ?? '').toLowerCase());
+  if (complete.length) {
+    scraperLog(
+      'info',
+      'qbit',
+      `Left ${complete.length} finished subtitle fetch(es) in place: ${complete
+        .map((row) => (row.hash ?? '').slice(0, 8))
+        .join(', ')}.`,
+    );
+  }
   if (!orphans.length) return { ok: true, value: [] };
 
   const response = await authed(input, '/api/v2/torrents/delete', {
