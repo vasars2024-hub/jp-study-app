@@ -113,6 +113,12 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   files: 'Files',
   player: 'Media Center',
   scraper: 'Scraper',
+  // D89: `youtube` was in main's POPOUT_SECTIONS but not here, and this object is the
+  // renderer's allow-list — so main opened `?popout=youtube`, `popoutSection()` returned
+  // null, and the window rendered the whole desktop again while the original was closed.
+  // Exactly the `files` failure the comment above records. `popoutSectionAllowLists.test.ts`
+  // keeps the two lists from drifting apart a third time.
+  youtube: 'YouTube',
   video: 'Media Center · Video',
   music: 'Media Center · Music',
   musicwidget: '',
