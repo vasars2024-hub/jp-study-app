@@ -28138,3 +28138,47 @@ opening a liquid cell**; the same shape is already in memory as `next-slice-alre
 that the Media shell or any Liquid surface has no defect the eight categories cannot see; the
 scorecard says the same thing about its cells. New defects go to the finding track, not to a
 reopened bullet.
+
+## 2026-09-06 (primary) — gate 11's real blocker was a missing UNPACKER, not the index
+
+`9611596b`. The 2026-09-06 07:27–07:55 entry above parked gate 11 as "blocked on third-party
+index contents" because both fetchable ja Route A subjects are `.7z`. Re-derived against the
+gate's own words (plan L910 — *"a subtitle-only release under the 50 MB ceiling is taken whole,
+lands as a `SubtitleRecord`, and its cues render in the player"*), that is the wrong diagnosis:
+the gate never said *loose files*. `22d2e2e6` (5.6 MB, `language:ja`, rank 1 of 9,
+`carriesTargetHash`) IS a subtitle-only release under 50 MB. The fetcher refusing it at
+selection was a fetcher limitation. **The park is withdrawn.**
+
+**Decision, under the standing auto-approval — `7z-wasm`, not `7zip-bin` + `node-7z.`** No 7z
+binary exists on this machine so the dep must bring its own decoder. `7zip-bin` ships a
+per-platform NATIVE executable (~11 MB each) needing chmod and runtime location, i.e. packaging
+work on three platforms. `7z-wasm` is one 1.8 MB `.wasm` plus a loader, identical everywhere,
+and the repo has the precedent: `sql.js` is already external in `vite.main.config.ts` for
+exactly this reason and `forge.config.ts` sets `asar: false`, so `require.resolve` finds the
+payload in a packaged build. **Build wiring is one entry in the externals list** — the minimal,
+reversible change the policy asks for.
+
+**Decision — a worker thread, not the main loop.** `callMain` is synchronous WASM. Measured on
+a 520-file / 20,271,680-byte fixture: init 7 ms, `l -slt` 37 ms, extract-all **702 ms**. That
+would be 702 ms of frozen main process. The worker is created with `eval: true` and its source
+inlined, which is what keeps it from costing a fourth `forge.config.ts` build entry. Through
+the worker: 883 ms wall, main loop free.
+
+Safety, all tested with controls: members come out by ALLOW-LIST (`.ass .srt .ssa .vtt .lrc`,
+the formats the record layer can store) so a bundled `.exe` is never decompressed — the control
+widens the list and proves it was reachable; the 50 MB ceiling is applied to the DECLARED
+unpacked total from the archive header **before** a byte is decoded, and again to the compressed
+member before download — the control lifts the ceiling on the same archive; nothing is written
+to the user's disk (NODEFS in, MEMFS out); the carrier branch fires ONLY when nothing loose
+exists, asserted, so every release that works today is untouched.
+
+`selectSubtitleFiles` runs a SECOND time over the archive's own members, so the route inherits
+the format-majority vote, episode match, language exclusion and per-episode dedupe rather than
+growing a second copy of them.
+
+**GATE 11 IS NOT CLOSED.** This is the fetcher half only: 12 tests (8 unit against real `.7z`
+files built by the same 7-Zip that reads them, 4 end-to-end through the stand-in qBittorrent),
+mutation control fires — emptying `carriers` reddens exactly the two acquisition tests and
+leaves the other 70 green. The gate also asks that **cues render in the player**, and that needs
+a real transfer off the swarm against `22d2e2e6` (rank 1) then `45921c38` (20.8 MB). That live
+drive is the next turn's opening slice. Track 9 stays 18 of 20; main-v1 stays 79 of 80.
