@@ -558,6 +558,21 @@ intact shell. Readiness reads **77 files · 76 need work · 1 ready**; Review re
 a look**. The Liquid Video pilot bullets are L4 of `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` and
 close there, not here.
 
+**TRACK 6 CLOSES 7 of 7 — 2026-09-06 (`primary`). The four deferred bullets closed where they
+were sent.** Not inherited from a summary; counted against the liquid plan's own tags on this
+tree this turn.
+
+- The deferral above is explicit — bullets 4–7 are L4 of `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`.
+  `awk '/### L4 /,/### L5 /'` over that file returns **9 bullets, 9 `status: closed`, 0 open,
+  0 unknown**. L4 is *Media shell repair and Video pilot* — the same subject, by title.
+- Bullet 7's *"and the user has approved it"* clause is **struck, not waived**: §12 of the liquid
+  plan records the amendment in its own words — *"(Was 'the user has visually approved'; amended
+  2026-08-16 — see §10.4 and `src/LIQUID_UI_RUBRIC.md`.)"* — and the relay pin records the same
+  instruction. What replaced it is the rubric, and the player passed it: `player` holds **8 of 8**
+  rubric categories in `LIQUID_SCORECARD.md`, cat7 last, at `0f9a4df0`.
+- What this does NOT claim: 7 of 7 says every bullet's own acceptance was met, not that the Media
+  shell has no defect the eight categories cannot see. New defects go to the finding track.
+
 ## Track 7: remaining main-app completion
 
 - Reconcile and finish all still-open non-Mobile, non-Noctis v1 features after re-deriving their state.
@@ -594,6 +609,41 @@ moves +0.6 MB, so it is action-driven, not a timer, and every individual control
 `PrivateMemorySize64`-not-`WorkingSet64` trap: §12.1 of
 `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`. This blocks rubric category 7 and is a release-blocker
 for v1 in its own right — a 12× permanent main-process blow-up during normal study.
+
+**D1 IS FIXED — 2026-08-24, in `src/main/translate.ts`, and the header above was wrong about
+where it lived.** Re-read at §12.1 this turn rather than inherited: it was never a leak and never
+the Dictionary. `translate.ts` called `model.createContext()` with no size, so node-llama-cpp
+allocated Qwen3-1.7B's full 32,768-token KV cache while the module kept only the
+`LlamaChatSession` — nothing could reach the model or context that owned it. Bounded
+`contextSize` + an idle unload + `loadPromise` cleared on success; measured after, one process,
+430.3 → peak 3,288 → **913.9 MB** at the 5-minute deadline. Pinned by
+`src/main/__tests__/translateModelLifecycle.test.ts`, three mutation controls. The paragraph above
+is left standing because its premise is the expensive part.
+
+**TRACK 8 CLOSES 7 of 7 — 2026-09-06 (`primary`).** Track 8's own text is a single instruction —
+*"execute `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` across every main desktop app and internal
+suite"* — so it closes exactly when that plan does, and that plan closed at `116acb26` on
+2026-09-06. Counted on this tree this turn, not taken from the commit message:
+
+- **Timeline: `grep -cE '^- .*status: closed' LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` = 51**,
+  and `status: open` / `status: unknown` appear on **one** line in the whole file (1508), which is
+  that file's own report line reading `0 / 0, whole file`. So 51 of 51, nothing open, nothing
+  unknown. Per-phase spot check: L4 9/9, L9 4/4, L10 4/4, L11 4/4, L12 4/4.
+- **Rubric: 192 of 192 cells**, `LIQUID_SCORECARD.md`, 24 sections × 8 categories with `files`
+  excluded by the ruling at that file's `164 of 192` anchor; the last cell was `player` cat7 at
+  `0f9a4df0`, with a control that FIRED (rate 8 → 46.8% dropped) and a second control the
+  instrument REFUSED (a paused player decodes nothing and would have scored 10/10).
+- Bullet by bullet, to where each was actually satisfied: hierarchy across app interiors → L5–L11;
+  explicit/reversible/state-preserving window behaviour → L3; opaque anchors for dense work →
+  cat3, 10/10 on all 24; the feature-parity ledger in both presentations → cat6 + `parity-ledger.json`;
+  taskbar/grid/drag/pop-outs/multi-monitor/Aero/Wired/Blanc/contrast/reduced-motion → L9 (4/4);
+  fresh baselines at compact/default/maximized → L12's matrices (650 cells normal, 100 maximized,
+  every non-capture explained); the atlas → L12.
+- **The last bullet's *"explicit user visual approval"* is struck by the same 2026-08-16 amendment
+  that struck Track 6 bullet 7**, recorded in §12 of the liquid plan itself. It was not skipped
+  and it is not owed.
+- **The blocker this track raised itself is gone:** D1 is fixed (above), which is why cat7 could
+  reach 10/10 at all — it was D1 that held category 7 open across the whole matrix.
 
 ## Track 9: qBittorrent API surface — credential contract and verification phase
 

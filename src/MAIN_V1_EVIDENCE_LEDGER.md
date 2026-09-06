@@ -28098,3 +28098,43 @@ instance was restarted. Select by walking the process tree from the launcher you
 matching the image path. Second half of the same trap: the debug bridge binds **39273 and does not
 scan**, so whichever instance boots first owns it and the other comes up with no bridge while its
 stale `bridge.json` still looks healthy. Start the second one with `JP_DEBUG_PORT=39274`.
+
+## 2026-09-06 (primary) — Tracks 6 and 8 CLOSE: the plan they deferred to finished at 03:13
+
+**Recount, not a build.** Both tracks defer in their own text to
+`LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`; that plan closed at `116acb26` (2026-09-06 03:13) and
+nobody had carried the closure back. Track 6 goes **3 → 7 of 7**, Track 8 **0 → 7 of 7**, so
+main-v1 goes **68 → 79 of 80**. The one remaining bullet is Track 9 gate 11, parked on what the
+nyaa index carries (`0259b702`: 2 of 2 ja packs are `.7z`), not on anything an agent can build.
+
+**Counted on this tree this turn; the commit message was not the source.**
+`grep -cE '^- .*status: closed'` over the liquid plan = **51**. `status: open` and
+`status: unknown` occur on exactly **one** line in that file (1508) and that line is its own
+report reading `0 / 0, whole file`. Per phase: L4 9/9 (Track 6's four deferred bullets, by title
+*Media shell repair and Video pilot*), L9 4/4, L10 4/4, L11 4/4, L12 4/4. Rubric matrix **192 of
+192** in `LIQUID_SCORECARD.md`, last cell `player` cat7 at `0f9a4df0`.
+
+**D1 was the thing to check, and it is fixed.** Track 8 recorded its own release-blocker — main
+private bytes 575.8 → 7,075.7 MB under Dictionary cadence — and a track cannot close over its own
+blocker. §12.1 records it FIXED 2026-08-24 in `src/main/translate.ts`: an unsized
+`model.createContext()` allocated Qwen3-1.7B's full 32,768-token KV cache while only the
+`LlamaChatSession` stayed reachable. 430.3 → peak 3,288 → **913.9 MB**, pinned by
+`translateModelLifecycle.test.ts` with three mutation controls. That is also why cat7 could reach
+10/10 across the matrix at all.
+
+**Two clauses are struck rather than met, and saying so is the point.** Track 6 bullet 7 and Track
+8 bullet 7 both require *explicit user visual approval*. §12 of the liquid plan carries the
+amendment in its own words — *"(Was 'the user has visually approved'; amended 2026-08-16 — see
+§10.4 and `src/LIQUID_UI_RUBRIC.md`.)"* The rubric replaced the look. Recording these as "met"
+would be false; they are withdrawn requirements.
+
+**Trap for the next worker, which cost this turn its first fifteen minutes.** The 05:10 handoff
+named *"write `player`'s cat6 spec"* as the exact next slice. That slice had been dead for an
+hour — `116acb26` landed at 03:13 and the handoff's own turn started at 04:19. The handoff was
+written from the pin's slice text, not from the scorecard. **Check the scorecard's own tail before
+opening a liquid cell**; the same shape is already in memory as `next-slice-already-closed`.
+
+**What is NOT claimed.** 7 of 7 means every bullet's own acceptance was met. It is not a warranty
+that the Media shell or any Liquid surface has no defect the eight categories cannot see; the
+scorecard says the same thing about its cells. New defects go to the finding track, not to a
+reopened bullet.
