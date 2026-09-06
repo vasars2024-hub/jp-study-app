@@ -966,6 +966,18 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
          adopt i18n" and the count can only fall. What this gate asserts is that the four gates
          pass on a CLEAN CHECKOUT OF THIS BRANCH, and they now do.
          -->
+    <!-- re-derived 2026-09-06 (primary2, at 0a603b95) — gate 37 confirmed against its own
+         words on a CLEAN worktree, and the three-week red the entries above describe is GONE.
+         `npx vitest run`: **1,149 files passed / 1 skipped, 14,591 tests passed / 6 skipped,
+         ZERO FAILED**, exit 0 read off my own sentinel rather than a piped status. The
+         `i18n.test.ts > catalog hygiene` failure those entries name did NOT reproduce — the 27
+         conversions that were uncommitted in the main tree have since landed on the branch.
+         i18n-check exit 0 at 12,578 keys, all translated. architecture-audit exit 0, "Nothing
+         new". eslint 0 errors on all six touched paths. NOTE THE OTHER DIRECTION OF THE OLD
+         TRAP: the shared main tree now reports MORE tests than this clean checkout (14,761 vs
+         14,591), because it is dirty with concurrent work that adds suites. Neither number is
+         wrong; only the clean-checkout one answers this gate.
+         -->
     <!-- superseded 2026-09-01: the trap below described the novelReader failures as permanent
          in this worktree. f104600b fixed them; both suites are green here. Kept as the record
          of why they were once red. -->
