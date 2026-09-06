@@ -282,6 +282,13 @@ export function GameArena() {
     setSession(makeSession(selected, settings, level, content));
   };
 
+  // Both call sites are `setSession` updaters, and a React updater must be
+  // PURE — React is free to run it more than once for the same transition, and
+  // StrictMode does exactly that on every development render. Banking the round
+  // from in here therefore banked it twice: measured live 2026-09-06, one
+  // Word Match session left TWO identical entries in `recent` 1 ms apart and
+  // paid 10 XP for a 5 XP session. So this only computes; the write is an
+  // effect below, keyed on the session and guarded by a ref.
   const finishSession = (next: Session, finishedAt = Date.now()): Session => {
     const elapsedMs = Math.min(next.timeLimitMs, Math.max(0, finishedAt - next.startedAt));
     const { score, accuracy } = completionScore({
@@ -291,16 +298,26 @@ export function GameArena() {
       elapsedMs,
       timeLimitMs: next.timeLimitMs,
     });
-    recordGameResult({
-      gameId: next.gameId,
-      level,
-      sourceLang: settings.sourceLang,
-      score,
-      accuracy,
-      mistakes: next.mistakes,
-    });
     return { ...next, complete: true, elapsedMs, score, accuracy };
   };
+
+  // `startedAt` is the session's identity — makeSession stamps a fresh one per
+  // round, so replaying the same game banks again while a re-run of the same
+  // effect does not.
+  const bankedSessionRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!session?.complete) return;
+    if (bankedSessionRef.current === session.startedAt) return;
+    bankedSessionRef.current = session.startedAt;
+    recordGameResult({
+      gameId: session.gameId,
+      level,
+      sourceLang: settings.sourceLang,
+      score: session.score ?? 0,
+      accuracy: session.accuracy ?? 0,
+      mistakes: session.mistakes,
+    });
+  }, [session?.complete, session?.startedAt]);
 
   // Scoring lands immediately; advancing waits for REVEAL_MS so the player
   // actually sees the correct/wrong state before the next round replaces it.

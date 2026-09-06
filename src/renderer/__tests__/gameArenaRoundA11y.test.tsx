@@ -16,7 +16,7 @@
  * the DOM rather than the source text. Each `it` has a mutation control noted in
  * its comment: reverting the named line must turn exactly that case red.
  */
-import { act } from 'react';
+import { StrictMode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,9 +39,9 @@ import { GameArena } from '../components/games/GameArenaContent';
 let host: HTMLDivElement;
 let root: Root;
 
-const render = async (): Promise<void> => {
+const render = async (strict = false): Promise<void> => {
   await act(async () => {
-    root.render(<GameArena />);
+    root.render(strict ? <StrictMode><GameArena /></StrictMode> : <GameArena />);
   });
 };
 
@@ -171,5 +171,46 @@ describe('Word Match Rush reports the pair it is building', () => {
     });
 
     expect(meanings().filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
+  });
+});
+
+describe('a finished session is banked exactly once', () => {
+  /**
+   * `finishSession` used to call `recordGameResult` from inside a `setSession`
+   * updater. React updaters must be pure — React may run one more than once for
+   * the same transition, and StrictMode does so on every development render —
+   * so every finished round was written to the player's progress TWICE.
+   *
+   * Measured live on 2026-09-06: one Word Match session left two entries in
+   * `recent` with identical gameId/level/score/accuracy and `createdAt` 1 ms
+   * apart, and `xp` read 10 where `recordGameResult` pays `max(5, …)` per
+   * round. This renders under a real `<StrictMode>` for that reason: without
+   * it, the impure updater looks fine.
+   *
+   * Mutation control: move the `recordGameResult({...})` call back inside
+   * `finishSession` and this case goes red with `recent` at 2.
+   */
+  it('records one entry per session, under StrictMode', async () => {
+    vi.useFakeTimers();
+    try {
+      await render(true);
+      await startGame('games.def.word-match.title');
+      expect(host.querySelector('.game-match-btn'), 'no match round').not.toBeNull();
+
+      // Run the clock past the session limit (gameLength * 12 s) so the
+      // expiry effect finishes the session the same way it did live.
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 12_000 + 2_000);
+      });
+
+      const stored = JSON.parse(localStorage.getItem('jp-game-progress-v1') ?? '{}');
+      expect(stored.recent, 'the session was never banked at all').toBeDefined();
+      expect(stored.recent).toHaveLength(1);
+      // The XP arithmetic is the same fact from the other side: a double bank
+      // pays twice, and `recordGameResult` never pays less than 5.
+      expect(stored.xp).toBeLessThanOrEqual(Math.max(5, Math.round(stored.recent[0].score + stored.recent[0].accuracy * 25)));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
