@@ -211,9 +211,15 @@ export function GuidesBrowser() {
     <>
       <div className="gram-controls">
         <div className="gram-levels">
+          {/* `aria-pressed`, not just the `active` class: the class is paint, and a
+              screen reader announced all seven category filters identically whichever
+              one was on. Measured live 2026-09-06 across four open windows — six
+              controls carried `active` and exposed no state at all. */}
           {(['All', ...GUIDE_CATEGORIES] as CatFilter[]).map((c) => (
             <button
               key={c}
+              type="button"
+              aria-pressed={cat === c}
               className={`gram-level-btn ${cat === c ? 'active' : ''}`}
               onClick={() => setCat(c)}
             >
@@ -235,9 +241,13 @@ export function GuidesBrowser() {
       <div className="gram-body">
         <div className="gram-list guide-list">
           {list.length === 0 && <div className="gram-empty muted">{t('grammar.guidesEmpty')}</div>}
+          {/* `aria-current`, not `aria-pressed`: opening a guide is navigation within a
+              list of 19, not a toggle — nothing is "un-pressed" by choosing another. */}
           {list.map((g) => (
             <button
               key={g.id}
+              type="button"
+              aria-current={selected?.id === g.id ? true : undefined}
               className={`guide-item ${selected?.id === g.id ? 'active' : ''}`}
               onClick={() => setSelectedId(g.id)}
             >
