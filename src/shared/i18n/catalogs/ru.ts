@@ -6064,6 +6064,12 @@ export const ru: Catalog = {
   'media.browser.filter': 'Фильтр по типу',
   'media.browser.add': 'Добавить',
   'media.browser.noMatch': 'Ничего не подходит под текущий фильтр.',
+  'media.shelfEmpty.favorites.title': 'В избранном пока ничего нет',
+  'media.shelfEmpty.favorites.hint': 'Откройте любой тайтл и выберите «Добавить в избранное», чтобы он остался здесь.',
+  'media.shelfEmpty.queue.title': 'Очередь изучения пуста',
+  'media.shelfEmpty.queue.hint': 'Откройте любой тайтл и выберите «Добавить в очередь изучения», чтобы поставить его в план.',
+  'media.shelfEmpty.continue.title': 'Ничего не начато',
+  'media.shelfEmpty.continue.hint': 'Тайтл, который вы начали и не досмотрели, появится здесь, чтобы продолжить с того же места.',
 
   'media.chip.all': 'Все',
   'media.chip.episode': 'Сериалы',

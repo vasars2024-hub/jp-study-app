@@ -5539,6 +5539,12 @@ export const en: Catalog = {
   'media.browser.filter': 'Filter by type',
   'media.browser.add': 'Add',
   'media.browser.noMatch': 'Nothing here matches the current filter.',
+  'media.shelfEmpty.favorites.title': 'Nothing is in Favorites yet',
+  'media.shelfEmpty.favorites.hint': 'Open any title and choose Add to favorites to keep it here.',
+  'media.shelfEmpty.queue.title': 'Your study queue is empty',
+  'media.shelfEmpty.queue.hint': 'Open any title and choose Add to study queue to line it up for a study session.',
+  'media.shelfEmpty.continue.title': 'Nothing is part-watched',
+  'media.shelfEmpty.continue.hint': 'A title you start and leave unfinished appears here, ready to pick up again.',
 
   'media.chip.all': 'All',
   'media.chip.episode': 'Series',

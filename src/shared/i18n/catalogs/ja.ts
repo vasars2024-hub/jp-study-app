@@ -5524,6 +5524,12 @@ export const ja: Catalog = {
   'media.browser.filter': '種類で絞り込む',
   'media.browser.add': '追加',
   'media.browser.noMatch': '現在の絞り込みに一致するものはありません。',
+  'media.shelfEmpty.favorites.title': 'お気に入りはまだありません',
+  'media.shelfEmpty.favorites.hint': 'タイトルを開いて「お気に入りに追加」を選ぶと、ここに残ります。',
+  'media.shelfEmpty.queue.title': '学習キューは空です',
+  'media.shelfEmpty.queue.hint': 'タイトルを開いて「学習キューに追加」を選ぶと、学習用に並びます。',
+  'media.shelfEmpty.continue.title': '途中まで見た作品はありません',
+  'media.shelfEmpty.continue.hint': '再生を途中でやめた作品がここに表示され、続きから再開できます。',
 
   'media.chip.all': 'すべて',
   'media.chip.episode': 'シリーズ',

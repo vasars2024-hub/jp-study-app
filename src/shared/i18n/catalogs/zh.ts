@@ -5494,6 +5494,12 @@ export const zh: Catalog = {
   'media.browser.filter': '按类型筛选',
   'media.browser.add': '添加',
   'media.browser.noMatch': '没有符合当前筛选条件的内容。',
+  'media.shelfEmpty.favorites.title': '收藏夹里还没有内容',
+  'media.shelfEmpty.favorites.hint': '打开任意作品并选择「添加到收藏」，就会保留在这里。',
+  'media.shelfEmpty.queue.title': '学习队列是空的',
+  'media.shelfEmpty.queue.hint': '打开任意作品并选择「加入学习队列」，就会排入学习安排。',
+  'media.shelfEmpty.continue.title': '还没有看到一半的内容',
+  'media.shelfEmpty.continue.hint': '开始播放但没有看完的作品会显示在这里，方便你接着看。',
 
   'media.chip.all': '全部',
   'media.chip.episode': '剧集',

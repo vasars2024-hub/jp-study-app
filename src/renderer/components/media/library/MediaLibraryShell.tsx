@@ -89,6 +89,36 @@ export interface MediaLibraryShellProps {
   activeSubtitleName?: string;
 }
 
+/** The three shelves that can be legitimately empty while the library is not. */
+export type EmptyShelfId = 'favorites' | 'queue' | 'continue';
+
+/**
+ * Which shelf is empty *of its own accord*, as opposed to a search or a type chip having
+ * emptied it — or `null` when the browser's "nothing matches the current filter" is the
+ * honest answer.
+ *
+ * The distinction is the whole defect. `MediaLibraryBrowser` has one message for every
+ * zero-result case, so "you have never favourited anything" and "your search matched none
+ * of your favourites" rendered the byte-identical sentence, and the first of them told the
+ * user to go and clear a filter they had not set. `scopedCount` is measured BEFORE the
+ * search and the chip are applied, which is what separates them.
+ *
+ * Only these three shelves qualify: categories and collections are listed in the rail only
+ * once something is in them, `home` and `recent` show everything, and `tracking` renders a
+ * dashboard instead of the grid. An empty LIBRARY keeps its own richer empty state, which
+ * offers the two import buttons this one deliberately has no equivalent of.
+ */
+export function pickEmptyShelf(
+  scope: LibraryScope,
+  scopedCount: number,
+  itemCount: number,
+): EmptyShelfId | null {
+  if (itemCount === 0 || scopedCount > 0 || scope.kind !== 'shelf') return null;
+  return scope.id === 'favorites' || scope.id === 'queue' || scope.id === 'continue'
+    ? scope.id
+    : null;
+}
+
 export default function MediaLibraryShell({
   items,
   query,
@@ -359,6 +389,8 @@ export default function MediaLibraryShell({
   const emptyLibrary = items.length === 0;
   const tracking = scope.kind === 'shelf' && scope.id === 'tracking';
 
+  const emptyShelf = pickEmptyShelf(scope, scoped.length, items.length);
+
   return (
     <div className="medialib-root">
       <MediaJobStrip />
@@ -395,7 +427,7 @@ export default function MediaLibraryShell({
           onMenu={menu}
           onAdd={onImportFiles}
           empty={emptyLibrary ? (
-            <div className="medialib-empty">
+            <div className="medialib-empty" role="status">
               <Icon name="video" size={40} className="medialib-empty__icon" />
               <span className="medialib-empty__title">{t('media.empty.title')}</span>
               <span className="medialib-empty__hint">{t('media.empty.hint')}</span>
@@ -403,6 +435,12 @@ export default function MediaLibraryShell({
                 <Button variant="primary" onClick={onImportFiles}>{t('media.openFile')}</Button>
                 <Button onClick={onImportFolder}>{t('media.openFolder')}</Button>
               </div>
+            </div>
+          ) : emptyShelf ? (
+            <div className="medialib-empty" role="status">
+              <Icon name={emptyShelf === 'favorites' ? 'heart' : emptyShelf === 'queue' ? 'library' : 'player'} size={40} className="medialib-empty__icon" />
+              <span className="medialib-empty__title">{t(`media.shelfEmpty.${emptyShelf}.title`)}</span>
+              <span className="medialib-empty__hint">{t(`media.shelfEmpty.${emptyShelf}.hint`)}</span>
             </div>
           ) : undefined}
         />

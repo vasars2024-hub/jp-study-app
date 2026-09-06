@@ -302,7 +302,10 @@ export default function MediaLibraryBrowser({
 
       <div className="medialib-browser__body">
         {entries.length === 0 ? (
-          empty ?? <div className="medialib-empty"><span>{t('media.browser.noMatch')}</span></div>
+          // `role="status"` because this div REPLACES the grid: the cards vanish and the
+          // only feedback that a search matched nothing was visual. The Readiness pane in
+          // the same shell already does this (`SeanimeStudyLibraryPanel.tsx:422`).
+          empty ?? <div className="medialib-empty" role="status"><span>{t('media.browser.noMatch')}</span></div>
         ) : entries.length === 1 && view === 'grid' ? (
           // A single card in a pane sized for a library is a void, not a layout —
           // 284x602 of it at maximized. The surplus goes to the same title.
