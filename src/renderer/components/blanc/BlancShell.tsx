@@ -181,6 +181,9 @@ const BlancNovelsPanel = lazy(() =>
 const BlancFilesPanel = lazy(() =>
   import('./BlancFilesPanel').then((m) => ({ default: m.BlancFilesPanel })),
 );
+const BlancCentralAgentPanel = lazy(() =>
+  import('./BlancCentralAgentPanel').then((m) => ({ default: m.BlancCentralAgentPanel })),
+);
 const BlancDiscoverPanel = lazy(() =>
   import('./BlancLibraryPanels').then((m) => ({ default: m.BlancDiscoverPanel })),
 );
@@ -1121,7 +1124,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
  * does not model. `coverage` established this pattern; Pillar 2 ports reuse it
  * rather than adding entries to `TOOLBOX_MODULES`, which Study OS also reads.
  */
-type BlancOnlyToolId = 'coverage' | 'files' | 'notebook' | 'translate' | 'music' | 'novels' | 'discover' | 'games' | 'immersion' | 'visualizer' | 'local-agent';
+type BlancOnlyToolId = 'coverage' | 'agent' | 'files' | 'notebook' | 'translate' | 'music' | 'novels' | 'discover' | 'games' | 'immersion' | 'visualizer' | 'local-agent';
 
 type BlancToolId =
   | BlancOnlyToolId
@@ -1181,6 +1184,7 @@ function readComputedToken(token: string): string {
 }
 
 const BLANC_TOOL_IDS: BlancToolId[] = [
+  'agent',
   'files',
   'furigana',
   'counter-reader',
@@ -1227,6 +1231,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
 ];
 
 const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
+  agent: 'sparkle',
   files: 'folder-open',
   furigana: 'note',
   'counter-reader': 'app',
@@ -1301,6 +1306,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
   'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
   coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
+  agent: { category: 'system', description: 'Aim a request at local Qwen or a named cloud provider, bound its input and output, and see what it charged against the monthly ceiling.' },
   files: { category: 'system', description: 'Everything the app stores, filed by what it is — books, decks, transcripts, dictionaries — with the real location of each.' },
   notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
   translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
@@ -1341,6 +1347,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
 /** Labels for the Blanc-only ids, which have no `TOOLBOX_MODULES` entry to read. */
 const BLANC_ONLY_LABELS: Record<BlancOnlyToolId, string> = {
   coverage: 'Coverage',
+  agent: 'Agent',
   files: 'Files',
   notebook: 'Notebook',
   translate: 'Translate',
@@ -1411,6 +1418,7 @@ function renderBlancTool(
   grammarRequest: { id: string; key: number } | null,
 ): JSX.Element {
   if (tool === 'coverage') return <ToolboxCoveragePanel />;
+  if (tool === 'agent') return <BlancCentralAgentPanel />;
   if (tool === 'files') return <BlancFilesPanel />;
   if (tool === 'furigana') return <BlancFuriganaPanel />;
   if (tool === 'counter-reader') return <BlancCounterPanel />;

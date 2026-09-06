@@ -89,6 +89,13 @@ import {
 } from '../../agentProviderPricingStore';
 import { AgentSpendPanel } from './AgentSpendPanel';
 import {
+  AGENT_CLOUD_TARGETS,
+  executionErrorKey,
+  newAgentConversationId,
+  newAgentExecutionId,
+  type AgentTargetChoice,
+} from './agentExecutionTargets';
+import {
   AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT,
   createAgentConversationPlan,
   type AgentConversationPlanFailureCode,
@@ -201,21 +208,6 @@ import './agent.css';
  */
 
 const VISIBLE_MESSAGE_LIMIT = 200;
-type AgentTargetChoice = 'local' | AiProviderId;
-
-/**
- * The cloud rows of the target picker, in the order they are offered.
- *
- * Translation *keys*, resolved during render — a module-level registry that
- * stored the rendered strings would keep an English picker after a language
- * switch. Listed here rather than derived from `AI_PROVIDERS` because the
- * Agent's own labels are shorter than the catalog's marketing ones.
- */
-const AGENT_CLOUD_TARGETS: readonly { providerId: AiProviderId; labelKey: string }[] = [
-  { providerId: 'gemini-2.5-flash', labelKey: 'agent.execute.provider.gemini' },
-  { providerId: 'deepseek-v4-flash', labelKey: 'agent.execute.provider.deepseekFlash' },
-  { providerId: 'deepseek-v4-pro', labelKey: 'agent.execute.provider.deepseekPro' },
-];
 
 const EXECUTION_ERROR_CODES = new Set<AgentExecutionFailureCode>([
   'invalid-request',
@@ -240,60 +232,12 @@ const EXECUTION_ERROR_CODES = new Set<AgentExecutionFailureCode>([
   'bridge-unavailable',
 ]);
 
-function executionErrorKey(code: AgentExecutionFailureCode): string {
-  if (code === 'busy') return 'agent.execute.error.busy';
-  if (code === 'store-failed') return 'agent.execute.error.store';
-  if (code === 'cancelled') return 'agent.execute.error.cancelled';
-  if (code === 'missing-credential') return 'agent.execute.error.credential';
-  if (code === 'authentication') return 'agent.execute.error.authentication';
-  if (code === 'bridge-unavailable') return 'agent.execute.error.bridge';
-  // Deliberately not folded into `privacy`: this is a capability of the chosen
-  // model, and the fix is to switch target rather than to grant consent.
-  if (code === 'vision-unsupported') return 'agent.attachment.visionUnsupported';
-  // Split out of `privacy` now that a cost cap can actually be set: the generic
-  // "privacy or budget policy" wording names no control the user can reach, and
-  // this refusal has exactly one remedy.
-  if (code === 'cost-budget') return 'agent.execute.error.costBudget';
-  // Separate from `costBudget` for the same reason that one was separated from
-  // `privacy`: the control is a different one, in a different place, and telling
-  // someone their request was too expensive when the truth is that their month
-  // is spent sends them to shrink a prompt that was never the problem.
-  if (code === 'spend-budget') return 'agent.execute.error.spendBudget';
-  if (
-    code === 'cloud-disabled'
-    || code === 'sensitive-context'
-    || code === 'input-budget'
-    || code === 'persistent-cache-unavailable'
-  ) {
-    return 'agent.execute.error.privacy';
-  }
-  if (code === 'timeout' || code === 'rate-limit' || code === 'upstream' || code === 'network') {
-    return 'agent.execute.error.transient';
-  }
-  if (code === 'invalid-response' || code === 'provider-failed') {
-    return 'agent.execute.error.provider';
-  }
-  return 'agent.execute.error.request';
-}
-
 function planFailureKey(code: AgentConversationPlanFailureCode): string {
   return `agent.plan.error.${code}`;
 }
 
 function attachmentErrorKey(code: AgentAttachmentReadFailureCode): string {
   return `agent.attachment.error.${code}`;
-}
-
-function newConversationId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.();
-  if (uuid) return `agent-${uuid}`;
-  return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function newExecutionId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.();
-  if (uuid) return `run-${uuid}`;
-  return `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 type PendingConfirmation =
@@ -1706,7 +1650,11 @@ export default function AgentWorkspaceShell() {
     void window.api
       .aiProviderHealth()
       .then((report) => {
-        if (alive) setProviderHealth(report);
+        // Same guard, same reason, as `BlancCentralAgentPanel`: a resolve with
+        // anything but an array makes `providerHealth.some(...)` throw during
+        // render. Measured there rather than here, but the shape is identical
+        // and a typed signature is not a runtime promise.
+        if (alive) setProviderHealth(Array.isArray(report) ? report : []);
       })
       .catch(() => {
         if (alive) setProviderHealth([]);
@@ -1834,7 +1782,7 @@ export default function AgentWorkspaceShell() {
       || visionUnsupported
       || (sensitiveConsentRequired && !cloudSensitiveConsent)
     ) return;
-    const requestId = newExecutionId();
+    const requestId = newAgentExecutionId();
     const basePolicy = defaultAgentExecutionPolicy(target);
     // Read at submit rather than held in state: this is the policy the user had
     // set when they pressed send, and it cannot go stale behind a governance
@@ -1934,7 +1882,7 @@ export default function AgentWorkspaceShell() {
   const createConversation = useCallback(() => {
     const base = state ?? emptyAgentWorkspaceState();
     const input = {
-      id: newConversationId(),
+      id: newAgentConversationId(),
       title: t('agent.conversation.untitled'),
       now: Date.now(),
     };

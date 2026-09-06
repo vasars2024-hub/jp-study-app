@@ -1,0 +1,166 @@
+/*
+ * Blanc's central-Agent tool.
+ *
+ * Its own file for the reason blanc.css states: the parallel Blanc streams must
+ * never append to one shared sheet at the same time.
+ *
+ * This surface hosts three components written for the Study OS Agent
+ * (AgentSpendPanel, AgentGovernancePanel, AgentConversationPlanQueue), which
+ * carry their own `agent-*` / `agent-governance-*` classes and their own
+ * stylesheets. Nothing here re-skins them: a Blanc-only override of a shared
+ * component's class would follow that component back into the Study OS app,
+ * where it is not wanted. Only the wrapper is styled, and the shared panels
+ * inherit Blanc's tokens through normal cascade.
+ *
+ * A single scrolling column rather than the Files tool's three-column grid: this
+ * is a form followed by a transcript, and a form split across columns loses the
+ * reading order that makes a policy legible before it is sent.
+ */
+
+.blanc-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.blanc-agent-lead {
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.blanc-agent-note {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.blanc-agent-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--blanc-danger, #b3261e);
+}
+
+.blanc-agent-conversations,
+.blanc-agent-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--blanc-border, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+}
+
+.blanc-agent-conversations {
+  /* The picker and its New button read as one control pair; the count wraps
+     beneath them rather than being squeezed onto the same row at narrow widths. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.blanc-agent-conversations > .blanc-agent-note {
+  grid-column: 1 / -1;
+}
+
+.blanc-agent-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.blanc-agent-field > select,
+.blanc-agent-field > input,
+.blanc-agent-field > textarea {
+  /* 32px is the pointer floor this repo scores against, and a select that
+     inherits a shorter shell default is the recurring failure. Stated here so
+     the tool does not depend on whatever a host sheet happens to set. */
+  min-height: 32px;
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--blanc-border, rgba(0, 0, 0, 0.2));
+  background: var(--blanc-surface, #fff);
+  color: inherit;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.blanc-agent-field > textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.blanc-agent-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.blanc-agent-budgets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.blanc-agent-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.blanc-agent-actions > button {
+  min-height: 32px;
+  padding: 0 14px;
+}
+
+.blanc-agent-conversations > button {
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.blanc-agent-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blanc-agent-streaming {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
+  white-space: pre-wrap;
+}
+
+.blanc-agent-message {
+  border: 1px solid var(--blanc-border, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.blanc-agent-message-head {
+  margin: 0 0 4px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.blanc-agent-message-text {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
