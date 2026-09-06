@@ -396,8 +396,8 @@ describe('the status banner speaks the UI language', () => {
 
     // The exact Japanese the catalog carries, not "some non-English string":
     // a missing key renders the key itself, which is also not English.
-    expect(current().status).toBe('遠野物語 をプランから削除しました。');
-    expect(current().status).not.toContain('novelsView.status');
+    expect(current().status).toBe('遠野物語 を予定から削除しました。');
+    expect(current().status).not.toContain('novels.msg');
   });
 
   it('reports the same removal in English when the UI is English', async () => {

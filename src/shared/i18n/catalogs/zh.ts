@@ -151,18 +151,6 @@ export const zh: Catalog = {
   'novelsView.status.planned': '计划 {count} 部',
   'novelsView.status.jiten': 'Jiten {count} 个',
 
-  // 小说工作台的状态栏。Jiten 或 EPUB 导入的 error.message 保持原样，
-  // 翻译它会掩盖真正的失败原因。
-  'novelsView.status.noJitenMatch': '没有符合此搜索的 Jiten 作品。',
-  'novelsView.status.removed': '已将《{title}》从计划中移除。',
-  'novelsView.status.sourcesSaved': '来源设置已保存。',
-  'novelsView.status.imported': '已导入《{title}》。',
-  'novelsView.status.chooseEpubLink': '请选择 EPUB 直链，或粘贴你自己的 EPUB 网址。',
-  'novelsView.status.epubImportFailed': 'EPUB 导入失败。',
-  'novelsView.status.importEpubFirst': '请先导入 EPUB，挖掘器才能预先选中它。',
-  'novelsView.status.jitenOnly': 'Jiten 词汇挖掘仅适用于 Jiten 目录中的作品。',
-  'novelsView.status.plannedTitle': '已将《{title}》加入计划。',
-
   // 小说查找器主体。难度与类型来自 data/novels，属于学习内容，不翻译。
   'novels.filter.type': '类型',
   'novels.filter.all': '全部',
@@ -200,6 +188,13 @@ export const zh: Catalog = {
   'novels.sources.searchUrlPlaceholder': '包含 {token} 的搜索 URL',
   'novels.sources.directUrlPlaceholder': 'EPUB 直链模板（可选）',
   'novels.sources.save': '保存来源',
+  // 让来源行说出自己的名字：没有这些，名称框只是一个无名输入框，
+  // 每个删除按钮的读屏播报也完全相同。
+  'novels.sources.name': '来源名称',
+  'novels.sources.mode': '链接方式',
+  'novels.sources.remove': '删除',
+  'novels.sources.removeNamed': '删除 {name}',
+  'novels.action.remove': '移除',
   'novels.table.title': '标题',
   'novels.table.source': '来源',
   'novels.table.difficulty': '难度',

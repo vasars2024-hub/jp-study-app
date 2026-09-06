@@ -153,18 +153,6 @@ export const ja: Catalog = {
   'novelsView.status.planned': '予定 {count} 件',
   'novelsView.status.jiten': 'Jiten {count} 件',
 
-  // 小説ワークベンチのステータスバー。Jiten や EPUB 取り込みの error.message は
-  // 元のメッセージのまま出す（訳すと何が失敗したのか分からなくなる）。
-  'novelsView.status.noJitenMatch': 'この検索に一致する Jiten の作品はありません。',
-  'novelsView.status.removed': '{title} をプランから削除しました。',
-  'novelsView.status.sourcesSaved': 'ソース設定を保存しました。',
-  'novelsView.status.imported': '{title} を取り込みました。',
-  'novelsView.status.chooseEpubLink': 'EPUB の直接リンクを選ぶか、EPUB の URL を貼り付けてください。',
-  'novelsView.status.epubImportFailed': 'EPUB の取り込みに失敗しました。',
-  'novelsView.status.importEpubFirst': '先に EPUB を取り込むと、マイナーがそれを選択できます。',
-  'novelsView.status.jitenOnly': 'Jiten の語彙マイニングは Jiten カタログの作品でのみ使えます。',
-  'novelsView.status.plannedTitle': '{title} をプランに追加しました。',
-
   // 小説ファインダーの本体。難易度とジャンルは data/novels 由来のため訳さない。
   'novels.filter.type': '種類',
   'novels.filter.all': 'すべて',
@@ -202,6 +190,13 @@ export const ja: Catalog = {
   'novels.sources.searchUrlPlaceholder': '{token} を含む検索 URL',
   'novels.sources.directUrlPlaceholder': 'EPUB 直リンクのテンプレート（任意）',
   'novels.sources.save': '取得元を保存',
+  // 取得元の行が自分の名前を持つためのキー。これが無いと名前欄は無名の入力欄、
+  // 削除ボタンはどれも同じ読み上げになる。
+  'novels.sources.name': '取得元の名前',
+  'novels.sources.mode': 'リンクの種類',
+  'novels.sources.remove': '削除',
+  'novels.sources.removeNamed': '{name} を削除',
+  'novels.action.remove': '削除',
   'novels.table.title': 'タイトル',
   'novels.table.source': '取得元',
   'novels.table.difficulty': '難易度',

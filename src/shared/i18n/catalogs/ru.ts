@@ -180,18 +180,6 @@ export const ru: Catalog = {
     other: '{count} колоды Jiten',
   },
 
-  // Строка состояния верстака романов. `error.message` от Jiten или от импорта
-  // EPUB намеренно не переводится: это слова самого источника.
-  'novelsView.status.noJitenMatch': 'По этому запросу в Jiten ничего не найдено.',
-  'novelsView.status.removed': '{title} удалён из плана.',
-  'novelsView.status.sourcesSaved': 'Настройки источников сохранены.',
-  'novelsView.status.imported': '{title} импортирован.',
-  'novelsView.status.chooseEpubLink': 'Выберите прямую ссылку на EPUB или вставьте свой URL EPUB.',
-  'novelsView.status.epubImportFailed': 'Не удалось импортировать EPUB.',
-  'novelsView.status.importEpubFirst': 'Сначала импортируйте EPUB — тогда майнер сможет выбрать его заранее.',
-  'novelsView.status.jitenOnly': 'Добыча слов через Jiten доступна только для произведений из каталога Jiten.',
-  'novelsView.status.plannedTitle': '{title} добавлен в план.',
-
   // Поиск новелл, тело экрана. Уровни сложности и жанры приходят из
   // data/novels — это учебный материал, он не переводится.
   'novels.filter.type': 'Тип',
@@ -230,6 +218,13 @@ export const ru: Catalog = {
   'novels.sources.searchUrlPlaceholder': 'URL поиска с {token}',
   'novels.sources.directUrlPlaceholder': 'Шаблон прямой ссылки на EPUB (необязательно)',
   'novels.sources.save': 'Сохранить источники',
+  // Чтобы строка источника называла себя: без этого поле имени озвучивается как
+  // безымянное, а все кнопки удаления звучат одинаково.
+  'novels.sources.name': 'Название источника',
+  'novels.sources.mode': 'Режим ссылки',
+  'novels.sources.remove': 'Удалить',
+  'novels.sources.removeNamed': 'Удалить {name}',
+  'novels.action.remove': 'Убрать',
   'novels.table.title': 'Название',
   'novels.table.source': 'Источник',
   'novels.table.difficulty': 'Сложность',

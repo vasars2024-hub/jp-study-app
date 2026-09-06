@@ -368,7 +368,7 @@ export function useNovels() {
           genres: genreId != null ? [String(genreId)] : undefined,
         });
         setJitenDecks(result.decks);
-        if (!result.decks.length) setStatus(t('novelsView.status.noJitenMatch'));
+        if (!result.decks.length) setStatus(t('novels.msg.noJitenMatch'));
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       } finally {
@@ -577,7 +577,7 @@ export function useNovels() {
     setBusy(true);
     try {
       applyStore(await window.api.jitenRemovePlan(entry.id));
-      setStatus(t('novelsView.status.removed', { title: entry.titleJp }));
+      setStatus(t('novels.msg.removedFromPlan', { title: entry.titleJp }));
     } finally {
       setBusy(false);
     }
@@ -595,7 +595,7 @@ export function useNovels() {
       await window.api.jitenUpdateConfig({ apiBaseUrl: apiBaseDraft, apiKey: apiKeyDraft });
       const next = await window.api.jitenSetSourceProfiles(sourceDrafts);
       applyStore(next);
-      setStatus(t('novelsView.status.sourcesSaved'));
+      setStatus(t('novels.msg.sourcesSaved'));
       setShowSources(false);
       void refreshJiten();
     } catch (error) {
@@ -643,14 +643,14 @@ export function useNovels() {
       acquisitionStatus: 'imported',
       error: undefined,
     });
-    setStatus(t('novelsView.status.imported', { title: imported.title }));
+    setStatus(t('novels.msg.imported', { title: imported.title }));
     return imported.id;
   }
 
   async function importDirect(entry: JitenPlanEntry): Promise<string | null> {
     const url = directCandidateUrl;
     if (!url) {
-      setStatus(t('novelsView.status.chooseEpubLink'));
+      setStatus(t('novels.msg.chooseDirect'));
       return null;
     }
     setBusy(true);
@@ -663,10 +663,10 @@ export function useNovels() {
       });
       if (result.store) applyStore(result.store);
       if (!result.ok || !result.item) {
-        setStatus(result.error ?? t('novelsView.status.epubImportFailed'));
+        setStatus(result.error ?? t('novels.msg.epubImportFailed'));
         return null;
       }
-      setStatus(t('novelsView.status.imported', { title: result.item.title }));
+      setStatus(t('novels.msg.imported', { title: result.item.title }));
       return result.item.id;
     } finally {
       setBusy(false);
@@ -694,7 +694,7 @@ export function useNovels() {
       bookId = directCandidateUrl ? await importDirect(entry) : await importLocalEpub(entry);
     }
     if (!bookId) {
-      setStatus(t('novelsView.status.importEpubFirst'));
+      setStatus(t('novels.msg.importFirst'));
       return;
     }
     setHandoffJson('epubMining', { bookId, ui: 'simple' });
@@ -704,7 +704,7 @@ export function useNovels() {
 
   async function mineJitenSelected(): Promise<void> {
     if (!selectedCandidate?.jitenDeckId) {
-      setStatus(t('novelsView.status.jitenOnly'));
+      setStatus(t('novels.msg.jitenOnly'));
       return;
     }
     const entry = await ensurePlanned(selectedCandidate);
@@ -719,7 +719,7 @@ export function useNovels() {
   async function planSelected(): Promise<void> {
     if (!selectedCandidate) return;
     const entry = await ensurePlanned(selectedCandidate);
-    if (entry) setStatus(t('novelsView.status.plannedTitle', { title: entry.titleJp }));
+    if (entry) setStatus(t('novels.msg.planned', { title: entry.titleJp }));
   }
 
   async function selectSource(linkId: string): Promise<void> {
@@ -772,21 +772,22 @@ export type NovelsState = ReturnType<typeof useNovels>;
 
 /** The filter rail (`<aside className="jiten-filters">` body) plus source manager. */
 export function NovelsFilters({ state }: { state: NovelsState }) {
+  const { t } = useT();
   return (
     <>
       <label>
-        Type
+        {t('novels.filter.type')}
         <select value={state.type} onChange={(e) => state.setType(e.target.value as TypeFilter)}>
-          <option value="All">All</option>
-          <option value="Novel">Jiten novels</option>
-          <option value="WebNovel">Jiten web novels</option>
-          <option value="Local">Local catalogue</option>
+          <option value="All">{t('novels.filter.all')}</option>
+          <option value="Novel">{t('novels.filter.jitenNovels')}</option>
+          <option value="WebNovel">{t('novels.filter.jitenWebNovels')}</option>
+          <option value="Local">{t('novels.filter.localCatalogue')}</option>
         </select>
       </label>
       <label>
-        Difficulty
+        {t('novels.filter.difficulty')}
         <select value={state.diff} onChange={(e) => state.setDiff(e.target.value as DiffFilter)}>
-          <option value="All">All</option>
+          <option value="All">{t('novels.filter.all')}</option>
           {[...DIFFICULTY_ORDER, 'Unknown'].map((level) => (
             <option key={level} value={level}>
               {level}
@@ -795,66 +796,69 @@ export function NovelsFilters({ state }: { state: NovelsState }) {
         </select>
       </label>
       <label>
-        Genre or tag
+        {t('novels.filter.genreOrTag')}
         <select value={state.genre} onChange={(e) => state.changeGenre(e.target.value)}>
+          {/* The genre NAMES come from data/novels and Jiten and stay
+              untranslated (CLAUDE.md i18n rule 4 -- study content, not chrome).
+              The 'All' sentinel is chrome and is the one entry that must move. */}
           {state.genreOptions.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {item === 'All' ? t('novels.filter.all') : item}
             </option>
           ))}
         </select>
       </label>
       <label>
-        Source
+        {t('novels.filter.source')}
         <select value={state.availability} onChange={(e) => state.setAvailability(e.target.value as AvailabilityFilter)}>
-          <option value="all">Any</option>
-          <option value="with-source">Has link</option>
-          <option value="direct">Direct EPUB link</option>
+          <option value="all">{t('novels.filter.any')}</option>
+          <option value="with-source">{t('novels.filter.hasLink')}</option>
+          <option value="direct">{t('novels.filter.directEpub')}</option>
         </select>
       </label>
       <label>
-        Import
+        {t('novels.filter.import')}
         <select value={state.importFilter} onChange={(e) => state.setImportFilter(e.target.value as ImportFilter)}>
-          <option value="all">Any</option>
-          <option value="imported">Imported</option>
-          <option value="not-imported">Not imported</option>
+          <option value="all">{t('novels.filter.any')}</option>
+          <option value="imported">{t('novels.filter.imported')}</option>
+          <option value="not-imported">{t('novels.filter.notImported')}</option>
         </select>
       </label>
       <label>
-        Mining
+        {t('novels.filter.mining')}
         <select value={state.analysisFilter} onChange={(e) => state.setAnalysisFilter(e.target.value as AnalysisFilter)}>
-          <option value="all">Any</option>
-          <option value="analyzed">Analyzed or mined</option>
-          <option value="not-analyzed">Not analyzed</option>
+          <option value="all">{t('novels.filter.any')}</option>
+          <option value="analyzed">{t('novels.filter.analyzed')}</option>
+          <option value="not-analyzed">{t('novels.filter.notAnalyzed')}</option>
         </select>
       </label>
       <label>
-        Sort
+        {t('novels.filter.sort')}
         <select value={state.sort} onChange={(e) => state.setSort(e.target.value as SortKey)}>
-          <option value="difficulty">Difficulty</option>
-          <option value="title">Title</option>
-          <option value="author">Author</option>
-          <option value="source">Source</option>
-          <option value="status">Plan status</option>
+          <option value="difficulty">{t('novels.sort.difficulty')}</option>
+          <option value="title">{t('novels.sort.title')}</option>
+          <option value="author">{t('novels.sort.author')}</option>
+          <option value="source">{t('novels.sort.source')}</option>
+          <option value="status">{t('novels.sort.status')}</option>
         </select>
       </label>
 
       {state.showSources && (
         <section className="jiten-source-manager">
           <div className="jiten-source-manager-head">
-            <b>Sources</b>
+            <b>{t('novels.sources.heading')}</b>
             <button type="button" className="btn small" onClick={state.addSource}>
               <Icon name="plus" size={12} />
-              Add
+              {t('novels.sources.add')}
             </button>
           </div>
           <label>
-            Jiten API
+            {t('novels.sources.jitenApi')}
             <input value={state.apiBaseDraft} onChange={(e) => state.setApiBaseDraft(e.target.value)} placeholder="https://api.jiten.moe/api" />
           </label>
           <label>
-            API key
-            <input value={state.apiKeyDraft} onChange={(e) => state.setApiKeyDraft(e.target.value)} type="password" placeholder="Optional" />
+            {t('novels.sources.apiKey')}
+            <input value={state.apiKeyDraft} onChange={(e) => state.setApiKeyDraft(e.target.value)} type="password" placeholder={t('novels.sources.optional')} />
           </label>
           <div className="jiten-source-list">
             {state.sourceDrafts.map((profile, index) => (
@@ -865,32 +869,50 @@ export function NovelsFilters({ state }: { state: NovelsState }) {
                     checked={profile.enabled}
                     onChange={(e) => state.patchSource(index, { enabled: e.target.checked })}
                   />
-                  Enabled
+                  {t('novels.sources.enabled')}
                 </label>
-                <input value={profile.name} onChange={(e) => state.patchSource(index, { name: e.target.value })} />
-                <select value={profile.mode} onChange={(e) => state.patchSource(index, { mode: e.target.value as JitenSourceProfile['mode'] })}>
-                  <option value="external">External only</option>
-                  <option value="direct">Direct download</option>
-                  <option value="both">Both</option>
+                {/* The row's own name. It had no label, no placeholder and no
+                    aria-label, so it announced as a bare edit field -- and the
+                    three Remove buttons beside it announced identically, with
+                    nothing in the row to tell them apart. */}
+                <input
+                  value={profile.name}
+                  onChange={(e) => state.patchSource(index, { name: e.target.value })}
+                  aria-label={t('novels.sources.name')}
+                  placeholder={t('novels.sources.name')}
+                />
+                <select
+                  value={profile.mode}
+                  aria-label={t('novels.sources.mode')}
+                  onChange={(e) => state.patchSource(index, { mode: e.target.value as JitenSourceProfile['mode'] })}
+                >
+                  <option value="external">{t('novels.sources.modeExternal')}</option>
+                  <option value="direct">{t('novels.sources.modeDirect')}</option>
+                  <option value="both">{t('novels.sources.modeBoth')}</option>
                 </select>
                 <input
                   value={profile.searchUrlTemplate}
                   onChange={(e) => state.patchSource(index, { searchUrlTemplate: e.target.value })}
-                  placeholder="Search URL with {titleJp}"
+                  placeholder={t('novels.sources.searchUrlPlaceholder', { token: '{titleJp}' })}
                 />
                 <input
                   value={profile.directUrlTemplate ?? ''}
                   onChange={(e) => state.patchSource(index, { directUrlTemplate: e.target.value })}
-                  placeholder="Optional direct EPUB URL template"
+                  placeholder={t('novels.sources.directUrlPlaceholder')}
                 />
-                <button type="button" className="btn small subtle" onClick={() => state.removeSource(index)}>
-                  Remove
+                <button
+                  type="button"
+                  className="btn small subtle"
+                  aria-label={t('novels.sources.removeNamed', { name: profile.name || t('novels.sources.name') })}
+                  onClick={() => state.removeSource(index)}
+                >
+                  {t('novels.sources.remove')}
                 </button>
               </div>
             ))}
           </div>
           <button type="button" className="btn primary" disabled={state.busy} onClick={() => void state.saveSources()}>
-            Save sources
+            {t('novels.sources.save')}
           </button>
         </section>
       )}
@@ -900,18 +922,19 @@ export function NovelsFilters({ state }: { state: NovelsState }) {
 
 /** The candidate table (`<main className="jiten-table-wrap">` body). */
 export function NovelsTable({ state }: { state: NovelsState }) {
+  const { t } = useT();
   return (
     <>
       <div className="jiten-table-head">
         <span aria-hidden="true" />
-        <span>Title</span>
-        <span>Source</span>
-        <span>Difficulty</span>
-        <span>Status</span>
-        <span>Links</span>
+        <span>{t('novels.table.title')}</span>
+        <span>{t('novels.table.source')}</span>
+        <span>{t('novels.table.difficulty')}</span>
+        <span>{t('novels.table.status')}</span>
+        <span>{t('novels.table.links')}</span>
       </div>
       {state.candidates.length === 0 ? (
-        <div className="jiten-empty">No titles match the current filters.</div>
+        <div className="jiten-empty">{t('novels.table.empty')}</div>
       ) : (
         state.candidates.map((candidate) => {
           const plan = state.candidatePlan.get(candidate.id);
@@ -930,11 +953,11 @@ export function NovelsTable({ state }: { state: NovelsState }) {
                 <b lang="ja">{candidate.titleJp}</b>
                 <small>{candidate.englishTitle || candidate.author || candidate.tags.slice(0, 2).join(', ')}</small>
               </span>
-              <span>{candidate.kind === 'jiten' ? 'Jiten' : 'Local'}</span>
+              <span>{candidate.kind === 'jiten' ? 'Jiten' : t('novels.kind.local')}</span>
               <span className={`nov-diff ${DIFFICULTY_CLASS[candidate.difficultyLabel as Difficulty | 'Unknown'] ?? 'd-unknown'}`}>
                 {candidate.difficultyLabel}
               </span>
-              <span>{plan?.acquisitionStatus ?? 'unplanned'}</span>
+              <span>{plan?.acquisitionStatus ?? t('novels.plan.unplanned')}</span>
               <span>{links.length}</span>
             </button>
           );
@@ -949,7 +972,7 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
   const { t } = useT();
   const { selectedCandidate, selectedPlan, selectedLinks, selectedLink, busy, directCandidateUrl } = state;
   if (!selectedCandidate) {
-    return <div className="jiten-empty">Select a title to inspect it.</div>;
+    return <div className="jiten-empty">{t('novels.inspector.selectPrompt')}</div>;
   }
   // Category 8: `disabled` is DERIVED from the reason, never asserted beside it, so a button
   // that is grey with nothing saying why cannot be written here by accident.
@@ -980,13 +1003,13 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
         <p className="muted">{selectedCandidate.englishTitle || selectedCandidate.author || selectedCandidate.type}</p>
       </div>
       <dl className="jiten-meta">
-        <div><dt>Type</dt><dd>{selectedCandidate.type}</dd></div>
-        <div><dt>Difficulty</dt><dd>{selectedCandidate.difficultyLabel}</dd></div>
-        <div><dt>Plan</dt><dd>{selectedPlan?.acquisitionStatus ?? 'unplanned'}</dd></div>
-        {selectedCandidate.jitenDeckId && <div><dt>Jiten deck</dt><dd>{selectedCandidate.jitenDeckId}</dd></div>}
-        {selectedCandidate.wordCount != null && <div><dt>Words</dt><dd>{selectedCandidate.wordCount.toLocaleString()}</dd></div>}
-        {selectedCandidate.uniqueWordCount != null && <div><dt>Unique</dt><dd>{selectedCandidate.uniqueWordCount.toLocaleString()}</dd></div>}
-        {selectedCandidate.sentenceCount != null && <div><dt>Sentences</dt><dd>{selectedCandidate.sentenceCount.toLocaleString()}</dd></div>}
+        <div><dt>{t('novels.meta.type')}</dt><dd>{selectedCandidate.type}</dd></div>
+        <div><dt>{t('novels.meta.difficulty')}</dt><dd>{selectedCandidate.difficultyLabel}</dd></div>
+        <div><dt>{t('novels.meta.plan')}</dt><dd>{selectedPlan?.acquisitionStatus ?? t('novels.plan.unplanned')}</dd></div>
+        {selectedCandidate.jitenDeckId && <div><dt>{t('novels.meta.jitenDeck')}</dt><dd>{selectedCandidate.jitenDeckId}</dd></div>}
+        {selectedCandidate.wordCount != null && <div><dt>{t('novels.meta.words')}</dt><dd>{selectedCandidate.wordCount.toLocaleString()}</dd></div>}
+        {selectedCandidate.uniqueWordCount != null && <div><dt>{t('novels.meta.unique')}</dt><dd>{selectedCandidate.uniqueWordCount.toLocaleString()}</dd></div>}
+        {selectedCandidate.sentenceCount != null && <div><dt>{t('novels.meta.sentences')}</dt><dd>{selectedCandidate.sentenceCount.toLocaleString()}</dd></div>}
       </dl>
       <div className="jiten-tags">
         {[...selectedCandidate.genres, ...selectedCandidate.tags].slice(0, 10).map((tag) => (
@@ -999,40 +1022,40 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
         {selectedPlan ? (
           <button type="button" className="btn subtle" disabled={!!planWhy} title={planWhy ? t(planWhy) : undefined} onClick={() => void state.removeFromPlan(selectedPlan)}>
             <Icon name="close" size={14} />
-            Remove
+            {t('novels.action.remove')}
           </button>
         ) : (
           <button type="button" className="btn primary" disabled={!!planWhy} title={planWhy ? t(planWhy) : undefined} onClick={() => void state.planSelected()}>
             <Icon name="star" size={14} />
-            Plan
+            {t('novels.action.plan')}
           </button>
         )}
         <button type="button" className="btn" disabled={!!openSourceWhy} title={openSourceWhy ? t(openSourceWhy) : undefined} onClick={() => selectedLink && openLink(selectedLink.url)}>
           <Icon name="external" size={14} />
-          Open source
+          {t('novels.action.openSource')}
         </button>
         <button type="button" className="btn" disabled={!!importFileWhy} title={importFileWhy ? t(importFileWhy) : undefined} onClick={() => void state.importLocalSelected()}>
           <Icon name="library" size={14} />
-          Import file
+          {t('novels.action.importFile')}
         </button>
         <button type="button" className="btn" disabled={!!downloadEpubWhy} title={downloadEpubWhy ? t(downloadEpubWhy) : undefined} onClick={() => void state.importDirectSelected()}>
           <Icon name="download" size={14} />
-          Download/import EPUB
+          {t('novels.action.downloadEpub')}
         </button>
         <button type="button" className="btn primary" disabled={!!analyzeEpubWhy} title={analyzeEpubWhy ? t(analyzeEpubWhy) : undefined} onClick={() => void state.analyzeSelected()}>
           <Icon name="scan" size={14} />
-          Analyze EPUB
+          {t('novels.action.analyzeEpub')}
         </button>
         <button type="button" className="btn" disabled={!!jitenMineWhy} title={jitenMineWhy ? t(jitenMineWhy) : undefined} onClick={() => void state.mineJitenSelected()}>
           <Icon name="flashcards" size={14} />
-          Jiten vocab mine
+          {t('novels.action.jitenMine')}
         </button>
       </div>
 
       <section className="jiten-source-pick">
-        <b>Source links</b>
+        <b>{t('novels.sourceLinks')}</b>
         {selectedLinks.length === 0 ? (
-          <p className="muted">Add a source template to generate links for this title.</p>
+          <p className="muted">{t('novels.noSourceTemplate')}</p>
         ) : (
           <div className="jiten-source-buttons lq-hit-scope">
             {selectedLinks.map((link) => (
@@ -1049,7 +1072,7 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
           </div>
         )}
         <label>
-          Direct EPUB URL
+          {t('novels.directEpubUrl')}
           <input
             value={state.directUrl}
             onChange={(e) => state.setDirectUrl(e.target.value)}
@@ -1060,13 +1083,13 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
 
       {selectedPlan && (
         <label className="jiten-notes">
-          Notes
+          {t('novels.notes')}
           <textarea
             key={selectedPlan.id}
             defaultValue={selectedPlan.notes ?? ''}
             onBlur={(e) => void state.updatePlan(selectedPlan.id, { notes: e.target.value })}
             rows={3}
-            placeholder="Reading plan, edition notes, source reminders"
+            placeholder={t('novels.notesPlaceholder')}
           />
         </label>
       )}
