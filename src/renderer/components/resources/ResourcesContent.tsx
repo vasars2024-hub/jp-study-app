@@ -408,7 +408,19 @@ export function ResourceMyTools({ state }: { state: ResourcesState }) {
                   }}
                   placeholder={t('resources.myTools.notePlaceholder')}
                 />
-                <button onClick={() => void saveNote(tool.id)}>
+                {/*
+                  * Register row D16. This was the one control on the surface with
+                  * NO accessible name at all — no text, no `title`, no
+                  * `aria-label`, just an SVG. `.mytool-remove` beside it at least
+                  * carries a `title`. Measured live: `textContent` "",
+                  * `aria-label` null, `title` "". `common.save` already exists in
+                  * all four catalogs, so this needs no catalog edit.
+                  */}
+                <button
+                  aria-label={t('common.save')}
+                  title={t('common.save')}
+                  onClick={() => void saveNote(tool.id)}
+                >
                   <Icon name="check" size={12} />
                 </button>
               </div>
