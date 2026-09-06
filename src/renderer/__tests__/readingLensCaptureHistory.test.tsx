@@ -20,6 +20,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
 
+/**
+ * D109 put a danger confirm in front of "Clear all", so the panel now asks before it
+ * wipes the store. `importOriginal` keeps the rest of the `ui` module real — the panel's
+ * subtree pulls other things from it, and a bare `{ confirmDialog }` factory would fail
+ * the render for an unrelated reason and read as this test's own bug.
+ */
+const confirmAnswer = { value: true };
+vi.mock('../components/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../components/ui')>()),
+  confirmDialog: vi.fn(async () => confirmAnswer.value),
+}));
+
 const entry = (patch: Partial<ReadingLensHistoryEntry> = {}): ReadingLensHistoryEntry => ({
   captureId: 'cap-1',
   source: 'screen',
@@ -265,6 +277,7 @@ describe('Reading Lens capture history panel', () => {
   });
 
   it('clears everything and lands on the empty state', async () => {
+    confirmAnswer.value = true;
     await render();
 
     await act(async () => buttonWith('Clear all').click());
@@ -273,6 +286,25 @@ describe('Reading Lens capture history panel', () => {
     expect(calls.clear).toBe(1);
     expect(rows()).toHaveLength(0);
     expect(host.textContent).toContain('Nothing captured yet');
+  });
+
+  /**
+   * D109's whole point. "Clear all" wipes the entire store — not the filtered view, and
+   * pinned captures with it — and there is no undo route on that store, so declining the
+   * confirm has to leave every row where it was. Without this the confirm could be
+   * deleted and only the case above would notice, which is the wrong way round: that one
+   * still passes if the dialog never appears at all.
+   */
+  it('declining the confirm leaves the history untouched', async () => {
+    confirmAnswer.value = false;
+    await render();
+
+    await act(async () => buttonWith('Clear all').click());
+    await settle();
+
+    expect(calls.clear).toBe(0);
+    expect(rows()).toHaveLength(2);
+    expect(host.textContent).not.toContain('Nothing captured yet');
   });
 
   it('distinguishes an empty history from a search that matched nothing', async () => {
