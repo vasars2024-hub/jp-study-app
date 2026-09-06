@@ -17,6 +17,7 @@ let tempRoot = '';
 const { SOURCE_CATALOGUE, catalogueEntries, classifyProbe, listSources, probeSource, resetSourceHealthCache } =
   await import('../scraper/sources');
 const { setScraperStoreRoot, readScraperJson } = await import('../scraper/store');
+const { flushScraperLogWrites } = await import('../scraper/logBus');
 
 // A local server stands in for a source host: `probeSource` builds its URL from
 // the entry's `host`, so the entry points at 127.0.0.1 and the catalogue's own
@@ -77,6 +78,7 @@ afterAll(async () => {
    * that lands between the recursive walk and the `rmdir`, which is the exact case
    * Node documents `maxRetries`/`retryDelay` for on Windows.
    */
+  await flushScraperLogWrites();
   await fsp.rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
@@ -86,7 +88,26 @@ beforeEach(() => {
 
 afterEach(async () => {
   resetSourceHealthCache();
-  await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
+  /*
+   * `fea9e13c` hardened `afterAll` and this hook got neither half, so on 2026-09-06
+   * the branch exited 1 again on the SAME directory from the OTHER hook:
+   *   ENOTEMPTY: directory not empty, rmdir '...\scraper-sources-FJC5EM\scraper\logs'
+   * reported against `probeSource > caps the stored history so it cannot grow
+   * forever`, with 14,706 tests passed and 0 test failures. Naming a test is the
+   * tell that it is `afterEach` and not `afterAll`.
+   *
+   * Same two causes `99d56428` closed in the sibling suite, in the same order: a
+   * scraper log write can still be in flight when the recursive walk starts, and
+   * `force: true` swallows only ENOENT, so a write landing between the walk and the
+   * `rmdir` needs the `maxRetries` Node documents for exactly this on Windows.
+   */
+  await flushScraperLogWrites();
+  await fsp.rm(path.join(tempRoot, 'scraper'), {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 50,
+  });
 });
 
 function entry(overrides: Partial<ScraperSourceEntry> = {}): ScraperSourceEntry {

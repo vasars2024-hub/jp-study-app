@@ -12,8 +12,10 @@
  * (8 floating windows before and after — the shell also closes on Escape, hence
  * `stopPropagation`), and focus returns to the trigger.
  *
- * Six of this app's nineteen `aria-modal` surfaces had no Escape handler when
- * this was measured; the other five are filed in row D9 of
+ * Counted at the time: **7 of this app's 19 `aria-modal` surfaces had no Escape
+ * handler**, this one among them. With it fixed the split is 13 / 6, and of those
+ * six `Lockscreen` is correct to have none — a lock screen must not dismiss on
+ * Escape. The remaining five are filed with their paths in row D9 of
  * docs/ACTIVE/LIVE_DEFECTS_PRESWEEP.md.
  */
 import { act } from 'react';
@@ -86,7 +88,7 @@ const escape = (): void => {
 
 describe('the grammar test dialog honours the dialog contract it declares', () => {
   it('moves focus into itself when it opens', () => {
-    const dialog = open(() => {});
+    const dialog = open(vi.fn());
     // Not merely "something is focused" — it must be inside the overlay that
     // `aria-modal` just hid the rest of the window behind.
     expect(dialog.contains(document.activeElement)).toBe(true);
@@ -107,7 +109,7 @@ describe('the grammar test dialog honours the dialog contract it declares', () =
     const shell = vi.fn();
     document.addEventListener('keydown', shell);
     try {
-      open(() => {});
+      open(vi.fn());
       escape();
       expect(shell).not.toHaveBeenCalled();
     } finally {
@@ -116,7 +118,7 @@ describe('the grammar test dialog honours the dialog contract it declares', () =
   });
 
   it('gives focus back to whatever opened it', () => {
-    open(() => {});
+    open(vi.fn());
     expect(document.activeElement).not.toBe(trigger);
     act(() => root?.unmount());
     root = null;
