@@ -164,3 +164,45 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The per-tool crash guard (BlancToolErrorBoundary).
+   ---------------------------------------------------------------------------
+   Housed here rather than in blanc.css for the same parallel-stream reason the
+   rest of this file is. It is deliberately plain and high-contrast: a surface
+   that has already failed is the wrong place for a translucent material, and
+   the one control on it must be unmissable. */
+
+.blanc-tool-crash {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  max-width: 520px;
+  border: 1px solid var(--blanc-border, rgba(0, 0, 0, 0.2));
+  border-radius: 10px;
+}
+
+.blanc-tool-crash-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.blanc-tool-crash-body {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
+.blanc-tool-crash-retry {
+  min-height: 32px;
+  padding: 0 16px;
+  font: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--blanc-border, rgba(0, 0, 0, 0.3));
+  background: var(--blanc-surface, #fff);
+  color: inherit;
+  cursor: pointer;
+}

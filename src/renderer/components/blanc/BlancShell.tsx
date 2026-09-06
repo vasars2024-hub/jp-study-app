@@ -9,6 +9,7 @@ import { AUTOMATION_BUILDER } from '../../../shared/automationBuilder';
 import { getToolboxModule, listBlancToolboxModules, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
 import { isRegistryGovernedTool, isToolLaunchable, mergeFavoriteTools } from './blancToolVisibility';
 import { markSectionOpenHandled } from '../../sectionSurface';
+import { BlancToolErrorBoundary } from './BlancToolErrorBoundary';
 import {
   TOOLBOX_UNITS,
   calculateToolboxExpression,
@@ -1884,9 +1885,20 @@ function BlancToolsPanel({
           </header>
           {toolboxSettings.openToolsInTabs && toolboxSettings.tabPosition === 'top' && tabStrip}
           <div className="blanc-embedded-view">
-            <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
-              {renderBlancTool(tool, onOpenBook, grammarRequest)}
-            </Suspense>
+            {/*
+              The boundary is INSIDE the tool detail and keyed on the tool, so a
+              panel that throws loses only itself: the rail, the tabs and the
+              other 43 tools survive, and switching tools mounts a fresh
+              boundary rather than showing the previous tool's failure. It sits
+              OUTSIDE `Suspense` on purpose — a lazy chunk that fails to load
+              throws during render of the boundary's child, and a boundary
+              nested under the fallback would never see it.
+            */}
+            <BlancToolErrorBoundary key={tool} toolId={tool} label={activeTool.label}>
+              <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
+                {renderBlancTool(tool, onOpenBook, grammarRequest)}
+              </Suspense>
+            </BlancToolErrorBoundary>
           </div>
           {toolboxSettings.openToolsInTabs && toolboxSettings.tabPosition === 'bottom' && tabStrip}
         </section>
