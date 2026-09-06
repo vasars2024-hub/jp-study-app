@@ -232,8 +232,14 @@ export default function ResourcesView() {
 
         <div className="res-controls">
           <div className="res-filter">
+            {/*
+              * Register row D6, the resources third. A visual `active` class is
+              * paint; `aria-pressed` is the state. Same toggle-set idiom the
+              * grammar category row got in `bac1ff77`, so the two announce alike.
+              */}
             <button
               className={`gram-level-btn ${filter === 'All' ? 'active' : ''}`}
+              aria-pressed={filter === 'All'}
               onClick={() => setFilter('All')}
             >
               {t('resources.filter.all')}
@@ -242,6 +248,7 @@ export default function ResourcesView() {
               <button
                 key={cat.id}
                 className={`gram-level-btn ${filter === cat.id ? 'active' : ''}`}
+                aria-pressed={filter === cat.id}
                 onClick={() => setFilter(cat.id)}
                 title={cat.title}
               >
@@ -254,7 +261,6 @@ export default function ResourcesView() {
               className="gram-level-btn res-refresh"
               onClick={() => void doRefresh()}
               disabled={refreshState === 'refreshing'}
-              title="Fetch the latest catalogue"
             >
               <Icon name="refresh" size={12} />
               {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
@@ -265,6 +271,7 @@ export default function ResourcesView() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('resources.search.placeholder')}
+              aria-label={t('resources.search.placeholder')}
             />
           </div>
         </div>
