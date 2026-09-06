@@ -87,6 +87,13 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.action.listen': 'Listen',
   'games.action.check': 'Check',
   'games.audioPrompt': 'Audio prompt',
+  // The typed round's field had no name at all, and the prompt sat in a plain
+  // div that no screen reader ever revisited. `a11y.roundPrompt` is read out of
+  // a live region that OUTLIVES the round, because the panel is keyed on the
+  // round id and remounts on every question.
+  'games.a11y.answer': 'Your answer',
+  'games.a11y.roundPrompt': 'Question {current} of {total}: {prompt}',
+  'games.a11y.roundAudio': 'Question {current} of {total}: listen, then answer',
   'games.verdict.correct': 'Correct',
   'games.verdict.answer': 'Answer:',
   'games.match.pick': 'Pick a meaning',
