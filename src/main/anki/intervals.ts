@@ -361,6 +361,15 @@ const noteProjections = new Map<number, NoteProjection>();
 let noteProjectionEpoch: number | null = null;
 /** Rotation cursor: which slice of the cached notes this poll re-reads. */
 let rotationCursor = 0;
+/**
+ * The term-field override each model's cached projections were built under.
+ *
+ * A projection's `expression` is derived from that override, and the app-side path that
+ * edits it — `updateProfile` writing `anki.fieldMap.term` — does NOT bump the profile
+ * epoch, so nothing invalidated the cache when the user remapped a field. Only
+ * `switchProfile` and deleting the active profile bump it. Boss audit F2.
+ */
+const projectedTermOverride = new Map<string, string | undefined>();
 
 /**
  * How many polls a full re-read of every note is spread across. At the 5-minute
@@ -381,8 +390,33 @@ export function noteProjectionCount(): number {
 /** Exported for tests only. */
 export function resetNoteProjections(): void {
   noteProjections.clear();
+  projectedTermOverride.clear();
   noteProjectionEpoch = null;
   rotationCursor = 0;
+}
+
+/**
+ * Drop every projection whose model's term-field override has moved since it was built.
+ *
+ * Boss audit F2: without this, a field-mapping edit reached the expression index only as
+ * each note's `id % ROTATION_SLICES` slice came round — up to twelve polls, about an
+ * hour, and staggered by note id, so the index sat in a mixed old/new state for the whole
+ * of it. Before the cache existed the change took effect on the next poll.
+ *
+ * Deliberately narrower than the audit's suggested repair (reset the whole cache from the
+ * profile-store event handler). This costs no AnkiConnect traffic, invalidates only the
+ * models that actually moved rather than all 155,384 notes, and does not care WHICH code
+ * path changed the override — it compares the value the projection was built from against
+ * the value in force now, so a future settings path gets the same invalidation for free.
+ */
+function dropProjectionsWithStaleTermOverride(cfg: IntervalsConfig): void {
+  for (const [model, was] of Array.from(projectedTermOverride)) {
+    if (cfg.getTermOverride(model) === was) continue;
+    projectedTermOverride.delete(model);
+    for (const [id, projection] of Array.from(noteProjections)) {
+      if (projection.modelName === model) noteProjections.delete(id);
+    }
+  }
 }
 
 /**
@@ -400,10 +434,16 @@ export function resetNoteProjections(): void {
  * per poll. Steady-state `notesInfo` falls to ~25 MB per poll and every note is refreshed
  * within an hour.
  *
- * THE TRADEOFF, stated rather than hidden: an edit to a note's term field, its tags or
- * its card list can be up to an hour stale in the expression index. Intervals — the thing
- * the index exists to report — are never stale. A profile switch (epoch change) and a
- * process restart both rebuild the cache from scratch. `edited:` was the alternative
+ * THE TRADEOFF, stated rather than hidden: an edit made IN ANKI to a note's term field,
+ * its tags or its card list can be up to an hour stale in the expression index. Intervals
+ * — the thing the index exists to report — are never stale. A profile switch (epoch
+ * change) and a process restart both rebuild the cache from scratch.
+ *
+ * An edit made in THIS app is not covered by that tradeoff and never was: boss audit F2
+ * found the field-mapping change (`anki.fieldMap.term`) inheriting the same hour without
+ * being disclosed, because `updateProfile` does not bump the epoch. It is now invalidated
+ * per model on the next poll — see `dropProjectionsWithStaleTermOverride`. `edited:` was
+ * the alternative
  * considered and rejected for this pass: it would have made staleness shorter but depends
  * on Anki search syntax the client does not otherwise use, and it does not see a card
  * added to an existing note at all, which rotation does.
@@ -416,9 +456,11 @@ async function refreshNoteProjections(
 ): Promise<NoteProjection[]> {
   if (noteProjectionEpoch !== epoch) {
     noteProjections.clear();
+    projectedTermOverride.clear();
     noteProjectionEpoch = epoch;
     rotationCursor = 0;
   }
+  dropProjectionsWithStaleTermOverride(cfg);
 
   // Notes that left the collection stop being projected at all, so a deleted note
   // cannot keep contributing an expression to the index.
@@ -477,7 +519,11 @@ function projectNote(
   if (termFieldByModel.has(n.modelName)) {
     termField = termFieldByModel.get(n.modelName);
   } else {
-    termField = resolveTermFieldName(n.modelName, orderedFields, cfg.getTermOverride(n.modelName));
+    const override = cfg.getTermOverride(n.modelName);
+    // Recorded, not just used: this is the value the next poll compares against to
+    // notice a field-mapping edit (`dropProjectionsWithStaleTermOverride`).
+    projectedTermOverride.set(n.modelName, override);
+    termField = resolveTermFieldName(n.modelName, orderedFields, override);
     termFieldByModel.set(n.modelName, termField);
   }
   if (!termField || !fields[termField]) return base;
@@ -697,6 +743,17 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
   // 7-8. persist atomically, diff by fingerprint, push only real changes.
   commitSnapshot(snapshot);
   return snapshot;
+}
+
+/**
+ * Exported for tests only. `persistSnapshot` is fire-and-forget, so a suite that removes
+ * its temp userData in `afterAll` races the last write: the write then fails ENOENT and
+ * its `console.error` lands after the worker's rpc has closed, which vitest reports as an
+ * unhandled `EnvironmentTeardownError` and which makes the FILE exit 1 while every test
+ * in it passes. Await this before deleting the directory.
+ */
+export function flushSnapshotWrites(): Promise<void> {
+  return writeChain;
 }
 
 /** Atomic write (tmp + rename), serialized so writes never interleave (P-1 style). */

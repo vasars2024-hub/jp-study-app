@@ -45,16 +45,18 @@ vi.mock('../anki/client', () => ({
 
 const {
   configureIntervals, kickPoll, resetNoteProjections, resetThinCardReadProbe,
-  noteProjectionCount,
+  noteProjectionCount, flushSnapshotWrites,
 } = await import('../anki/intervals');
 
 let epoch = 1;
+/** The app-side field mapping (`profile.anki.fieldMap.term`), per model. Boss audit F2. */
+let termOverride = new Map<string, string | undefined>();
 
 configureIntervals({
   getQueries: () => ['deck:*'],
   getEpoch: () => epoch,
   isConnected: () => true,
-  getTermOverride: () => undefined,
+  getTermOverride: (model) => termOverride.get(model),
 });
 
 /** `id` doubles as the card id, so a fixture reads as one row. */
@@ -64,6 +66,24 @@ const note = (id: number, term: string, tags: string[] = []): FakeNote => ({
   tags,
   cards: [id],
   fields: { Term: { value: term, order: 0 } },
+});
+
+/**
+ * Two fields, so a term-field override has somewhere else to point. With no override
+ * `resolveTermFieldName` takes `Term` (the `ROLE_SYNONYMS.term` hit); with
+ * `override: 'Alt'` it takes `Alt` verbatim.
+ */
+const twoFieldNote = (
+  id: number,
+  term: string,
+  alt: string,
+  modelName = 'm',
+): FakeNote => ({
+  noteId: id,
+  modelName,
+  tags: [],
+  cards: [id],
+  fields: { Term: { value: term, order: 0 }, Alt: { value: alt, order: 1 } },
 });
 
 const notesInfoIds = () => calls
@@ -83,11 +103,17 @@ beforeEach(() => {
   collection = [];
   intervalByCard = new Map();
   suspendedCards = new Set();
+  termOverride = new Map();
   resetNoteProjections();
   resetThinCardReadProbe();
 });
 
-afterAll(() => {
+afterAll(async () => {
+  // The poll persists fire-and-forget. Deleting the directory out from under the last
+  // write made it fail ENOENT and log after the worker's rpc had closed, which vitest
+  // reported as an unhandled EnvironmentTeardownError — this file exited 1 with every
+  // test in it green.
+  await flushSnapshotWrites();
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
 
@@ -199,6 +225,70 @@ describe('interval poll — note projections', () => {
 
     expect(notesInfoIds()).toEqual([600]);
     expect(snapshot.entries[0].expression).toBe('し');
+  });
+
+  /**
+   * Boss audit F2 (`audit-20260905-183822-04a7d2a3`). A projection's `expression` is
+   * derived from the term-field override in force when it was built, and `updateProfile`
+   * — the app's own path for editing `anki.fieldMap.term` — does not bump the profile
+   * epoch. So nothing invalidated the cache: the change reached each note only as its
+   * `id % 12` rotation slice came round, up to an hour later and staggered by note id,
+   * leaving the index in a mixed old/new state for the whole of it. Before the cache
+   * existed it took effect on the next poll, and that is the bar restored here.
+   */
+  describe('a field-mapping change is not left to the rotation', () => {
+    it('re-reads the remapped model on the very next poll, with the rotation as the control', async () => {
+      for (let i = 0; i < 24; i += 1) {
+        collection.push(twoFieldNote(800 + i, `旧${i}`, `新${i}`));
+        intervalByCard.set(800 + i, 1);
+      }
+      const first = await poll();
+      expect(first.entries[0].expression).toBe('旧0');
+
+      // CONTROL: the very same second poll, with the mapping untouched, re-reads only
+      // the rotation slice. Without it "re-read everything" would look like a pass on a
+      // poll that simply re-reads everything anyway.
+      calls.length = 0;
+      const unchanged = await poll();
+      // Ids 800-823, cursor 1 after the first poll: 805 and 817 are the whole slice.
+      expect(notesInfoIds()).toEqual([805, 817]);
+      expect(unchanged.entries[0].expression).toBe('旧0');
+
+      // The user remaps the term field in this app. Nothing else moves — same epoch,
+      // same collection, same notes.
+      calls.length = 0;
+      termOverride.set('m', 'Alt');
+      const remapped = await poll();
+
+      expect(new Set(notesInfoIds())).toEqual(new Set(collection.map((n) => n.noteId)));
+      expect(remapped.entries.map((e) => e.expression))
+        .toEqual(collection.map((_n, i) => `新${i}`));
+    });
+
+    it('drops only the model that moved, and settles back to the rotation afterwards', async () => {
+      collection.push(twoFieldNote(900, '旧A', '新A', 'moved'));
+      collection.push(twoFieldNote(902, '旧B', '新B', 'untouched'));
+      intervalByCard.set(900, 1);
+      intervalByCard.set(902, 1);
+      await poll();
+
+      calls.length = 0;
+      termOverride.set('moved', 'Alt');
+      const after = await poll();
+      // 902 belongs to a model whose mapping did not change, and with the cursor at 1
+      // after the first poll `902 % 12 === 2` is not this poll's slice either — so a
+      // correct invalidation leaves it cached and it is not re-read for any reason.
+      expect(notesInfoIds()).toEqual([900]);
+      expect(after.entries.find((e) => e.noteId === 900)?.expression).toBe('新A');
+      expect(after.entries.find((e) => e.noteId === 902)?.expression).toBe('旧B');
+
+      // And the new value is now the recorded one, so 900 is not dropped a second time:
+      // the third poll re-reads only 902, which the cursor has now reached.
+      calls.length = 0;
+      const settled = await poll();
+      expect(notesInfoIds()).toEqual([902]);
+      expect(settled.entries.find((e) => e.noteId === 900)?.expression).toBe('新A');
+    });
   });
 
   it('produces the same entries as a poll that caches nothing', async () => {
