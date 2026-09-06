@@ -8791,3 +8791,61 @@ defect) and **`immersion` cat2** (a real product cost: 105.7 ms keystroke latenc
 100 ms bar, three prior turns, seven candidate causes measured dead, and CORRECTION 66 says
 the absolute number is not stable).
 `sampled-out:` nothing — both remaining cells are named above with the reason each is open.
+
+## 2026-09-06 00:40 EDT — primary — `immersion` cat2 REPRODUCES. Not banked; two candidates killed, one sharpened.
+
+CORRECTION 66 closed the last attempt with "this cell's absolute number is not stable, and that
+is why nothing was banked". This turn had the condition that entry asked for — **the only relay
+dispatch running was my own**, and the saved-sites rail read **19 cards before the run and 19
+after** — so the reading is worth recording even though the cell does not close.
+
+### It FAILS, and this time the undo is clean
+
+    task    type:.immersion-site-search input=r >> wait:220 >> ...=e >> wait:220 >> ...=d
+    inputRecv   120.0 / 138.2 / 119.9 ms   worst 138.2   overBar100 **3 of 3**
+    deadEnds 0 · modalTraps 0 · scrollTraps 0 · stepsDriven 3
+    undo    clear:.immersion-site-search input — restored true, s1efy0 -> s1efy0
+    framesObserved 3, sharedPaintSamples 0, busiestFrame 1 — nothing UNSCOREABLE
+    CONTROL (harness): 3 plants, 0,0,0 -> 1,1,1 -> 0,0,0, backToBaseline, inertClickRecv 0.4 ms
+    verdict FAIL on `latency` alone; `costParity` UNMEASURED (no --both-presentations leg)
+
+### The paired in-process control, and the RATIO is what survives
+
+`.immersion-url` — the other `useState` text field in the same component, same window, same
+`/type`, same 220 ms spacing, and it drives no VirtualList:
+
+    .immersion-site-search input   120.0 / 138.2 / 119.9    3 of 3 over the bar
+    .immersion-url  (CONTROL)       26.7 /  29.1 /  28.7    0 of 3 over the bar
+
+**4.5x.** The 2026-09-05 session read 105.7 vs 17-22, i.e. **5x** — the absolutes moved 105.7
+-> 126 and 19 -> 28 between sessions while the ratio held, exactly as the pin says to expect.
+Two independent sessions now agree on the ratio, which is the claim; the absolute is not.
+
+### CANDIDATE KILLED 1 — `transition: all` on all 114 rail nodes is a DEFAULT, not a defect
+
+A computed-style walk reports `transition: all` on `.immersion-site-list`, every
+`.immersion-site-row`, every `.immersion-site-card`, both spans, the `svg` AND the `path` —
+114 elements, which looks precisely like a style-recalc cost that scales with row count. It is
+not: `transition-duration` is **0s** and `grep -c "transition: all" styles.css` is **0**. `all`
+is the INITIAL value of `transition-property`, so a walk that filters out `none`/`auto`/`0px`
+surfaces it on every element in the app. No rule sets it and no transition ever runs.
+
+### CANDIDATE KILLED 2 — the rows are not re-created, so selector matching is not the cost
+
+~1.1 ms per rail element suggested freshly-inserted DOM paying full selector matching against a
+27k-line stylesheet. `ImmersionSiteList` passes `getKey={(s) => s.id}` (`ImmersionContent.tsx`),
+so React reconciles stable rows rather than re-creating them. Dead.
+
+### THE SHARPENED CANDIDATE, for the next turn — it is cheaper than the stylesheet bisect
+
+`resetScrollKey={siteQuery.trim().normalize('NFKC').toLowerCase()}` changes on EVERY keystroke,
+and `VirtualList.tsx:118-122` responds with `el.scrollTop = 0` plus `setScrollTop(0)` — a
+layout-flushing write on a scroller whose `scrollHeight` is **82,696 px**, once per character,
+even when the rail is already at the top. The control field drives no VirtualList at all, which
+is consistent with the whole 4.5x gap. **The experiment is one line:** hold `resetScrollKey`
+constant for one measurement and re-run the identical task. If the ramp drops toward the
+control's 28 ms, the fix is to reset only when the offset is non-zero. That is a smaller and
+better-aimed question than "bisect the rail's stylesheet", which is what this entry supersedes.
+
+`sampled-out:` no surface was scored this turn beyond the two cat8 cells above; `immersion`
+cat2 is measured and deliberately NOT banked, and `player` cat7 still needs a matched item.
