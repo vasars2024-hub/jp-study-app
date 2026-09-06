@@ -87,10 +87,26 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
             {t('novelsView.local')}
           </button>
           <ToolbarSpacer />
-          <button type="button" className={`aero-novels-command ${mode === 'plan' ? 'active' : ''}`} onClick={() => setPlanOnly((v) => !v)}>
+          {/* Both of these highlight the state they TOGGLE, not the tab you
+              arrived on. Plan was bound to `mode === 'plan'`, so on the Import
+              tab it sat un-highlighted while plan-only filtering was on, and
+              clicking it took the list from 1 row to 205 with nothing about the
+              button changing. Sources was bound to nothing at all. Blanc's copy
+              of the same pair (BlancLibraryPanels) always did this correctly. */}
+          <button
+            type="button"
+            className={`aero-novels-command ${planOnly ? 'active' : ''}`}
+            aria-pressed={planOnly}
+            onClick={() => setPlanOnly((v) => !v)}
+          >
             {t('novelsView.plan')} {store?.plan.length ? `(${store.plan.length})` : ''}
           </button>
-          <button type="button" className="aero-novels-command" onClick={() => setShowSources((v) => !v)}>
+          <button
+            type="button"
+            className={`aero-novels-command ${showSources ? 'active' : ''}`}
+            aria-pressed={showSources}
+            onClick={() => setShowSources((v) => !v)}
+          >
             <Icon name="settings" size={12} />
             {t('novelsView.sources')}
           </button>

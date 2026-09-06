@@ -91,10 +91,10 @@ export function BlancNovelsPanel() {
         <div className="blanc-status-row">
           <span>{candidates.length} titles</span>
           <span>{jitenDecks.length} from Jiten</span>
-          <button type="button" className={planOnly ? 'active' : ''} onClick={() => setPlanOnly((v) => !v)}>
+          <button type="button" className={planOnly ? 'active' : ''} aria-pressed={planOnly} onClick={() => setPlanOnly((v) => !v)}>
             Plan {store?.plan.length ? `(${store.plan.length})` : ''}
           </button>
-          <button type="button" className={showSources ? 'active' : ''} onClick={() => setShowSources((v) => !v)}>
+          <button type="button" className={showSources ? 'active' : ''} aria-pressed={showSources} onClick={() => setShowSources((v) => !v)}>
             <Icon name="settings" size={12} />
             Sources
           </button>

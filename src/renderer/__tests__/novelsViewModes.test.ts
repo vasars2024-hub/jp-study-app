@@ -8,6 +8,10 @@ const modeState = vi.hoisted(() => ({
   setPlanOnly: vi.fn(),
   setImportFilter: vi.fn(),
   setShowSources: vi.fn(),
+  // The two toggles' own state, so a test can put the view in the combination
+  // the defect lived in: `mode === 'imports'` while plan-only filtering is ON.
+  planOnly: false,
+  showSources: false,
 }));
 
 vi.mock('../i18n', () => ({
@@ -31,11 +35,11 @@ vi.mock('../components/novels/NovelsContent', () => ({
   useNovels: () => ({
     query: '',
     setQuery: vi.fn(),
-    planOnly: false,
+    planOnly: modeState.planOnly,
     setPlanOnly: modeState.setPlanOnly,
     importFilter: 'all',
     setImportFilter: modeState.setImportFilter,
-    showSources: false,
+    showSources: modeState.showSources,
     setShowSources: modeState.setShowSources,
     loadingJiten: false,
     refreshingNovels: false,
@@ -59,6 +63,8 @@ let root: Root;
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  modeState.planOnly = false;
+  modeState.showSources = false;
   modeState.setPlanOnly.mockReset();
   modeState.setImportFilter.mockReset();
   modeState.setShowSources.mockReset();
@@ -100,5 +106,53 @@ describe('NovelsView destination modes', () => {
     expect(host.querySelector('[data-content="filters"]')).not.toBeNull();
     expect(host.querySelector('[data-content="table"]')).toBeNull();
     expect(host.querySelector('[data-content="inspector"]')).toBeNull();
+  });
+});
+
+/**
+ * Both toolbar toggles reported the wrong state.
+ *
+ * `Plan` was highlighted from `mode === 'plan'` rather than from `planOnly`,
+ * the thing it toggles. Measured live 2026-09-06 on the Import tab: the button
+ * sat un-highlighted while plan-only filtering was on, and one click took the
+ * list from **1 row to 205** without changing a single thing about the button.
+ * `Sources` was bound to nothing at all, so it never highlighted anywhere.
+ *
+ * Blanc's copy of the same pair (`BlancLibraryPanels`) always bound to the
+ * state, which is why this only ever showed in Study OS.
+ */
+describe('the toolbar toggles report their own state', () => {
+  const chip = (label: string) =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent?.trim().startsWith(label));
+
+  it('highlights Plan whenever plan-only filtering is on, including on the Import tab', async () => {
+    modeState.planOnly = true;
+    await renderMode('imports');
+
+    const plan = chip('novelsView.plan');
+    expect(plan).toBeDefined();
+    expect(plan?.className).toContain('active');
+    expect(plan?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('leaves Plan un-highlighted when plan-only filtering is off, on the Plan tab', async () => {
+    // The control: binding to `mode === 'plan'` would ALSO pass the test above
+    // on the Plan tab, so the reading has to be wrong here for the fix to mean
+    // anything. `planOnly` false while `mode` is 'plan' is exactly that case.
+    modeState.planOnly = false;
+    await renderMode('plan');
+
+    const plan = chip('novelsView.plan');
+    expect(plan?.className).not.toContain('active');
+    expect(plan?.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('highlights Sources when the source editor is open', async () => {
+    modeState.showSources = true;
+    await renderMode('imports');
+
+    const sources = chip('novelsView.sources');
+    expect(sources?.className).toContain('active');
+    expect(sources?.getAttribute('aria-pressed')).toBe('true');
   });
 });
