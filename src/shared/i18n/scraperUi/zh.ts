@@ -1368,4 +1368,9 @@ export const SCRAPER_UI_ZH: Catalog = {
   'scrApp.mediaType.manga': '漫画',
   'scrApp.torrent.authViaApiKey': '通过 API 密钥认证',
   'scrApp.torrent.authViaPassword': '通过用户名和密码认证',
+  'scrApp.torrent.statusNotConfigured': '未配置',
+  'scrApp.torrent.statusConnected': '已连接',
+  'scrApp.torrent.statusUnauthorized': '凭据被拒绝',
+  'scrApp.torrent.statusUnreachable': '无法访问',
+  'scrApp.torrent.statusUnknown': '尚未测试',
 };

@@ -564,6 +564,43 @@ export function cloneScraperQbittorrentSettings(
   return { ...value, tags: [...value.tags] };
 }
 
+/**
+ * Has the user actually filled this block in? Read from the settings themselves,
+ * never from `connectionStatus` — that field records the outcome of the last
+ * manual test and says nothing about whether a connection was ever set up.
+ *
+ * Only the credential for the mode ACTUALLY IN FORCE counts. A profile in
+ * `apiKey` mode with a leftover `passwordRef` is not configured, and the drawer
+ * hides the row that would tell the user so.
+ */
+export function isScraperQbitConfigured(
+  qbit: ScraperQbittorrentSettings,
+): boolean {
+  if (!qbit.enabled) return false;
+  if (!qbit.host.trim() || !qbit.port) return false;
+  return qbit.authMode === 'apiKey'
+    ? qbit.apiKeyRef.trim() !== ''
+    : qbit.passwordRef.trim() !== '';
+}
+
+/**
+ * What the connection pill should say when no test has run yet this session.
+ *
+ * `connectionStatus` defaults to `not-configured` and is written ONLY by an
+ * explicit Test Connection, so a working, enabled, key-authenticated client was
+ * being greeted with "not configured" beside its own stored key and address
+ * until the user happened to press the button. `unknown` is already in the enum
+ * for precisely this: configured, but not checked. It is the honest answer, and
+ * it costs no network call — the alternative, testing on mount, would put a
+ * request on the wire every time the page is opened.
+ */
+export function scraperQbitIdleStatus(
+  qbit: ScraperQbittorrentSettings,
+): ScraperQbitStatus {
+  if (qbit.connectionStatus !== 'not-configured') return qbit.connectionStatus;
+  return isScraperQbitConfigured(qbit) ? 'unknown' : 'not-configured';
+}
+
 export function mergeScraperQbittorrentSettings(
   base: ScraperQbittorrentSettings,
   patch: Partial<ScraperQbittorrentSettings> | undefined,

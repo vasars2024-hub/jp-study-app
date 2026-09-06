@@ -1372,4 +1372,9 @@ export const SCRAPER_UI_JA: Catalog = {
   'scrApp.mediaType.manga': '漫画',
   'scrApp.torrent.authViaApiKey': 'API キーで認証',
   'scrApp.torrent.authViaPassword': 'ユーザー名とパスワードで認証',
+  'scrApp.torrent.statusNotConfigured': '未設定',
+  'scrApp.torrent.statusConnected': '接続済み',
+  'scrApp.torrent.statusUnauthorized': '認証情報が拒否されました',
+  'scrApp.torrent.statusUnreachable': '到達できません',
+  'scrApp.torrent.statusUnknown': '未テスト',
 };

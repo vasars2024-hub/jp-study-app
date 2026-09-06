@@ -32,12 +32,29 @@ import {
   updateActiveScraperSettings,
 } from '../../../scraperSettingsStore';
 import { resolveScraperSettings } from '../../../../shared/scraperSettings';
+import {
+  scraperQbitIdleStatus,
+  type ScraperQbitStatus,
+} from '../../../../shared/scraperSourceSettings';
 import type {
   QbitSendReport,
   QbitStatusReport,
   QbitTransferRow,
   TorrentRow,
 } from '../../../../shared/scraperResults';
+
+/**
+ * One key per status, so a new enum member is a compile error here rather than a
+ * silently untranslated pill. `unknown` deliberately reads "not tested yet" — it
+ * is a statement about this session, not about the user's configuration.
+ */
+const QBIT_STATUS_TEXT = {
+  'not-configured': 'torrent.statusNotConfigured',
+  connected: 'torrent.statusConnected',
+  unauthorized: 'torrent.statusUnauthorized',
+  unreachable: 'torrent.statusUnreachable',
+  unknown: 'torrent.statusUnknown',
+} as const satisfies Record<ScraperQbitStatus, string>;
 import type {
   AcquisitionAction,
   AcquisitionActionResult,
@@ -237,8 +254,19 @@ export default function TorrentManagerPage() {
     [transfers],
   );
 
+  // The pill's subject: a live test result if one has been run, otherwise what
+  // the SETTINGS say. `qbit.connectionStatus` alone was the bug — it defaults to
+  // `not-configured` and only a manual test ever writes it, so a working client
+  // was announced as unconfigured beside its own stored key and address.
+  const connStatus: ScraperQbitStatus = status
+    ? status.status
+    : scraperQbitIdleStatus(qbit);
   const connTone =
-    status?.status === 'connected' ? 'good' : status?.status ? 'bad' : 'neutral';
+    connStatus === 'connected'
+      ? 'good'
+      : connStatus === 'unknown' || connStatus === 'not-configured'
+        ? 'neutral'
+        : 'bad';
   const activeTransfer = transfers.find((transfer) => transfer.hash === activeTransferHash) ?? null;
 
   const patchTransfer = (hash: string, patch: Partial<QbitTransferRow>) => {
@@ -361,9 +389,7 @@ export default function TorrentManagerPage() {
         }
       >
         <div className="scr-conn-row">
-          <Pill tone={connTone}>
-            {status ? status.status.replace(/-/g, ' ') : qbit.connectionStatus.replace(/-/g, ' ')}
-          </Pill>
+          <Pill tone={connTone}>{sx(QBIT_STATUS_TEXT[connStatus])}</Pill>
           <span className="scr-muted">
             {qbit.scheme}://{qbit.host}:{qbit.port}
             {qbit.basePath}

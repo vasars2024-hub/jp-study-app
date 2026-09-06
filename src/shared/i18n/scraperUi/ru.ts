@@ -1448,4 +1448,9 @@ export const SCRAPER_UI_RU: Catalog = {
   'scrApp.mediaType.manga': 'Манга',
   'scrApp.torrent.authViaApiKey': 'аутентификация по ключу API',
   'scrApp.torrent.authViaPassword': 'аутентификация по имени и паролю',
+  'scrApp.torrent.statusNotConfigured': 'не настроено',
+  'scrApp.torrent.statusConnected': 'подключено',
+  'scrApp.torrent.statusUnauthorized': 'учётные данные отклонены',
+  'scrApp.torrent.statusUnreachable': 'недоступно',
+  'scrApp.torrent.statusUnknown': 'ещё не проверено',
 };

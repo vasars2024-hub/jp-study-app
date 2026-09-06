@@ -417,6 +417,14 @@ const TEXT = {
   // one that was never consulted.
   'torrent.authViaApiKey': 'via API key',
   'torrent.authViaPassword': 'via username and password',
+  // The connection pill. These used to be the raw enum member with its dashes
+  // swapped for spaces, which meant the one word on that card that reports a
+  // RESULT was also the only one that never translated.
+  'torrent.statusNotConfigured': 'not set up',
+  'torrent.statusConnected': 'connected',
+  'torrent.statusUnauthorized': 'rejected the credential',
+  'torrent.statusUnreachable': 'unreachable',
+  'torrent.statusUnknown': 'not tested yet',
   'torrent.search': 'Indexer search',
   'torrent.searchDesc': 'Results across every enabled torrent source.',
   'torrent.searchPlaceholder': 'Search releases…',
