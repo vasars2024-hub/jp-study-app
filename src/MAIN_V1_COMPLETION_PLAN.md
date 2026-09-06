@@ -1757,3 +1757,40 @@ requested, because no priority was ever set.
 
 **Track 9 is 19 of 20.** The only open gate is **11**, parked on what the nyaa index carries for
 Route A — not on anything an agent can build.
+
+### The orphan sweep would have deleted a finished 6.1 GB archive of the user's — fixed `093e0cf1`, proved live
+
+Found while closing gate 15, and it is the reason every live acquisition gate since 2026-09-05
+had to be driven through a proxy that hid one row. `qbitReapSubtitleOrphans` deletes **everything**
+in `jp-study-subtitles`, with `deleteFiles`, at the top of every acquisition, on the premise that
+"only `qbitAddStopped` ever writes this category". That premise is true of this build and **false
+of the client in front of it**: the user's own qBittorrent holds `539c0886…`, a **complete 6.1 GB**
+subtitle archive, wearing that category at **progress 1**. `G14_RECATEGORIZE` was a workaround
+standing in for this fix, and nobody had written the fix.
+
+**The rule, and why it is this one.** A complete torrent is skipped and named in the log; an
+incomplete leftover is cleared exactly as before. That follows the sweep's own stated purpose — it
+exists to stop a torrent **transferring** on the user's connection for a record nobody will write.
+A finished one costs no bandwidth, its bytes may be the very subtitles a record points at, and a
+retry can `adopt` it. A missing `progress` field counts as unfinished, so a build that omits it
+cannot quietly turn the whole sweep into a no-op.
+
+**Unit + mutation.** 3 cases, 67 in `subtitleNyaaFetch.test.ts`. Mutation restoring the old filter
+(`complete → []`, `orphans → all`): **2 red by name**, 65 green — every pre-existing sweep test
+still passes, so the new rule is guarded by the new tests rather than restating them. Source
+restored and verified **byte-identical by SHA256**.
+
+**LIVE, and this time with the instrument's guard REMOVED.** App restarted onto `093e0cf1`
+(main 29960, 04:47:56). Mount run with **no `G14_RECATEGORIZE`** — the archive fully visible to the
+reap — and `G12_ALLOW_DELETE_HASH=e953e84b…` as a pure backstop, so a wrong delete would have been
+refused 403 rather than lost. Wire for the whole run: `info?category=jp-study-subtitles` **200**
+(the reap's own query, which returned the archive), and **no delete follows it**. The only delete
+is the cancellation's, naming exactly `e953e84b…`. Scraper log, in order:
+
+    Left 1 finished subtitle fetch(es) in place: 539c0886.
+    Added a subtitle fetch stopped (e953e84b).
+    Removed an interrupted subtitle fetch (e953e84b).
+
+Client afterwards: **10 rows, 6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`**, the
+archive still there. Gate 15 re-derived on the fixed build in the same run, same numbers —
+`ok:false / "Cancelled."`, subtitles `1 → 1`, phases `["downloading","cancelled"]`, zero errors.

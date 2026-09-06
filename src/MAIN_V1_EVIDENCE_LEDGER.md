@@ -28075,3 +28075,26 @@ the cancellation, not to failure in general.
    Do that before every restart — the working qBittorrent config lives only there.
 5. `Start-Process -ArgumentList` splits an unquoted argument on spaces; `"The Big O - 01"` must
    carry its own quotes inside the array element or the harness looks up a title called `The`.
+
+## 2026-09-06 (primary) — the reap would have eaten the user's archive; `093e0cf1`
+
+**Decision and tradeoff.** `qbitReapSubtitleOrphans` now skips a torrent at `progress >= 1` and
+logs it. The tradeoff is explicit: a *completed* subtitle fetch whose record was never written is
+no longer removed automatically, so a finished pack can accumulate as a storage leak instead of a
+bandwidth leak. That is the right side to err on — the sweep's own purpose is to stop a transfer,
+and the alternative destroys 6.1 GB of the user's data with `deleteFiles` on the first acquisition
+they ever run. Undefined `progress` counts as unfinished so the sweep cannot be silently disarmed.
+
+**Numbers.** 3 cases / 67 in file; mutation restoring the old filter → 2 red by name, 65 green;
+SHA256-identical after restore. Live on `093e0cf1` with the proxy's `G14_RECATEGORIZE` **removed**:
+the reap's `info?category` query returns the archive and **no delete follows**; log reads
+`Left 1 finished subtitle fetch(es) in place: 539c0886.`; client ends at its 10-row baseline with
+the archive intact.
+
+**Trap, and it cost this turn twice.** `jp-wt-filesapp` junctions `node_modules` to the main tree,
+so its Electron and forge processes report a **`jp-study-app\node_modules\…` command line**. A
+kill selected by command line takes out the other worktree's app as well — it did here, and the
+instance was restarted. Select by walking the process tree from the launcher you started, not by
+matching the image path. Second half of the same trap: the debug bridge binds **39273 and does not
+scan**, so whichever instance boots first owns it and the other comes up with no bridge while its
+stale `bridge.json` still looks healthy. Start the second one with `JP_DEBUG_PORT=39274`.
