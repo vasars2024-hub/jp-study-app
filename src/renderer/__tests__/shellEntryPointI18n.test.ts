@@ -30,11 +30,21 @@ describe('shared shell entry-point localization', () => {
     for (const key of keys.slice(0, 5)) {
       expect(desktopSource).toContain(`t('${key}')`);
     }
-    expect(desktopSource.match(/t\('quickSettings\.title'\)/g)).toHaveLength(2);
+    // A FLOOR, not a census. This was `toHaveLength(2)` and went red on D107, which
+    // routed the Secret start menu's Quick settings tool through the very same shared
+    // key — i.e. it failed for doing exactly what the test exists to require. The rule
+    // is "every entry point resolves through the key and none is a literal", so the
+    // count guards against the key being dropped, and the two matchers below guard
+    // against a new literal being added.
+    expect(desktopSource.match(/t\('quickSettings\.title'\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(paletteSource).toContain("t('palette.toolboxPlaceholder')");
 
     expect(desktopSource).not.toMatch(/label:\s*['"](?:New sticky note|New app shortcut|Widgets…|Personalize…|Desktop & display settings)/);
     expect(desktopSource).not.toMatch(/(?:title|aria-label)="Quick settings"/);
+    // The text-child form, which the attribute matcher above cannot see. D107's third
+    // entry point was a `<span>Quick settings</span>`, so a ban on attributes alone
+    // would have let the next one in silently.
+    expect(desktopSource).not.toMatch(/>\s*Quick settings\s*</);
     expect(paletteSource).not.toContain("? 'Search Toolbox commands'");
   });
 
