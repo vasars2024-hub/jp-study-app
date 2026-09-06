@@ -394,9 +394,28 @@
   /* Was "6px + 14px icon + 6px = 26px, clear of the 24px minimum target
      height" — 24px is WCAG 2.5.8, and this repo's rubric asks for 32. Measured
      30x26 rendered, 30x26.5 by pointer. The min-* pair floors both axes without
-     touching the padding, so a wider future label still fits. */
-  min-width: var(--lq-hit-target);
-  min-height: var(--lq-hit-target);
+     touching the padding, so a wider future label still fits.
+
+     `+ 2px`, and it is not padding taste — it is the only axis that can carry
+     the fix. Sized at exactly `--lq-hit-target` these two buttons filled the
+     container's 64px content box edge to edge with ZERO slack, and the FIRST
+     one's left edge then coincided with the 1px border. Chromium gives that
+     boundary sliver to the container, so the button OWNED 31.64px against a
+     32px floor (measured 2026-09-05 by an independent 1/64px elementFromPoint
+     scan, not just by the walk: `ownedW 31.641`, left blocker
+     `DIV.medialib-view-toggle`, right blocker its sibling; the second button
+     read 32.97 because it collects the snap on its own outer side).
+
+     Container padding cannot fix this — the padding area belongs to the
+     container, so the button's owned region is unchanged. Only the button's own
+     box can carry it, which is what `lq-hit-gives-nothing-at-exactly-32` means
+     by "give the control real headroom above the token": `.lq-hit` is
+     `max(100%, 32px)`, a floor rather than a margin, so a control sized FROM
+     that token gets no expansion. The pair still owns its own half each, so
+     nothing is stolen from a neighbour — the failure mode
+     `hit-walk-step-caps-at-31-5` records from inflating a control into one. */
+  min-width: calc(var(--lq-hit-target) + 2px);
+  min-height: calc(var(--lq-hit-target) + 2px);
   padding: 6px var(--space-sm);
   background: transparent;
   border: none;
