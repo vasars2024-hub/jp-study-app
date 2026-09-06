@@ -8450,3 +8450,33 @@ exhausted, and the 8 that remain are the ones no instrument fix reaches: `transl
 (needs a matched library item), `immersion` cat2/cat8, and `anki` cat5 + cat7 + cat8. Do not
 extrapolate 40 cells/day; the same warning RULE E carries about its own 6 -> 25 jump applies
 here word for word.
+
+### GATES at `ec1b850a` — and the one failure is the known flake, named and re-run
+
+    npx vitest run                1111 files: 1109 passed / 1 failed / 1 skipped
+                                  14,253 tests: 14,246 passed / 1 failed / 6 skipped
+    node tools/i18n-check.cjs     EXIT 0 — 12,539 English keys, all translated in ja/zh/ru
+    node tools/architecture-audit.cjs  EXIT 0 — "Nothing new", 2 known pending
+    npx eslint src/renderer/views/AnkiView.tsx   EXIT 0
+
+The single failure is
+`src/shared/__tests__/extensionPopup.test.ts > transcription pill > renders the cue count for a
+video already transcribed`, and it is a **20 s TIMEOUT, not an assertion**. Re-run alone
+immediately afterwards: **14 of 14 passed.** None of this turn's five commits touches the
+extension popup, the transcription path or anything either imports; the touched set is
+`l6-parity.js`, `mediaLibrary.css`, `styles.css`, `AnkiView.tsx` and this file.
+
+Disclosed rather than rounded to green, with its own caveat: this run happened in the
+**live-app worktree with the private Electron instance and its Vite dev server up**, which
+`vitest-in-the-live-app-worktree` records as inflating exactly this kind of timing-sensitive
+suite. So "1 failed" is a real reading of a loaded machine, and "14 of 14 alone" is a real
+reading of an idle one. Neither is a regression.
+
+### Correction to my own count above: **8 cells this turn, not 7. 185 of 192, 7 left.**
+
+`anki` cat5 CLOSED after that section was written (`ba3370fa` fixed its Q5 light-theme
+contrast, `ec1b850a` its Q1/Q3 entry point), and cat5 re-measured **PASS 10/10** with its
+control firing on Q2, Q3, Q4, Q5, Q10. So the turn total is **8 cells, 177 -> 185 of 192,
+7 left**, and the required rate is `7 / 1.570 = 4.46 cells/day` to 2026-09-07 11:00 EDT
+measured at 21:20. The seven: `player` cat7, `translate` cat7, `immersion` cat7 / cat2 / cat8,
+`anki` cat7 / cat8 — **three of the seven are cat7**, all on the same main-process GC block.
