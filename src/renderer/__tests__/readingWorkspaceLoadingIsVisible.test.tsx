@@ -54,7 +54,7 @@ afterEach(async () => {
 describe('Reading workspace — a tab that is still loading says so', () => {
   /** A child that never resolves holds the boundary in exactly the cold-chunk state. */
   const Never = (): null => {
-    use(new Promise<void>(() => {}));
+    use(new Promise<void>(() => undefined));
     return null;
   };
 
@@ -63,7 +63,7 @@ describe('Reading workspace — a tab that is still loading says so', () => {
   // and the fallback is what is on screen — the same frame the live drive caught.
   it('renders text in the panel fallback, not an empty reserved box', async () => {
     await act(async () => {
-      root.render(<ReadingWorkspaceView initialSection="library" onOpenBook={() => {}} />);
+      root.render(<ReadingWorkspaceView initialSection="library" onOpenBook={() => undefined} />);
     });
 
     const fallback = container.querySelector('.reading-workspace-loading');

@@ -81,7 +81,7 @@ beforeEach(async () => {
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => {
-    root.render(<ReadingFinderView onOpenBook={() => {}} mode="discover" />);
+    root.render(<ReadingFinderView onOpenBook={() => undefined} mode="discover" />);
   });
   await flush();
 });
