@@ -106,6 +106,44 @@ and confirm against a fresh boot before believing it.
 
 | D39 | note | **A sticky note's colour can only be changed in Liquid.** On the ordinary window — which is the DEFAULT presentation — there is no colour control at all; new notes just cycle through five colours by creation order and the user cannot pick. Switch that same note to Liquid and five named swatches appear. | Desktop ▸ New note ▸ count `.desk-note-color`. Driven live on one note, standard → Liquid → standard: **0 buttons → 5 → 0**. In Liquid all five are correctly named (*Highlight in yellow/orange/red/green/blue*) with `aria-pressed` tracking the current one, so the control is well built — it is only unreachable. Gate: `DesktopShell.tsx:4169`, `{isNote && liquid && (`. | P2 | open, NOT fixed — and the reason is measured, not an excuse. Removing `liquid &&` is one token, but the styling is scoped `.fwin.fwin-liquid.fwin-note .desk-note-palette` / `.desk-note-color` (`theme/liquid-window.css:101,115,124`), so the standard note would render **five unstyled buttons**. It needs a standard-presentation rule, and **this worktree cannot see the result**: the shared dev server serves the MAIN tree, so I could measure the defect but could not verify a chrome fix. Filed for a worker in the main tree. Worth doing: the transformation plan's own non-negotiable is that Liquid is *"reversible without losing geometry, state, focus or features"* and that no feature is obscured because it is absent from the concept image — this is the one place measured so far where **Liquid is the gatekeeper**, the exact inverse of the Files-app rule. |
 
+### LEAD for the next workers, not a defect row - the detector that found 3 of 5 fixes on 2026-09-06
+
+D33/D34/D37 were all the same shape: **a catalog key that exists, is translated in ja/zh/ru, and no
+app code calls it, while the surface beside it renders an English literal.** Neither guard sees it -
+`tools/i18n-check.cjs` only compares the catalogs to each other, and the JSX census in `i18n.test.ts`
+scores *added* hardcoded text against a baseline, so a file that was ALWAYS English stays inside its
+allowance forever. **Run this for the surface you claim, before you drive anything:**
+
+```
+git grep -hoE "[A-Za-z0-9_][A-Za-z0-9_.]*" -- src/ ':!src/shared/i18n/catalogs/'
+```
+set-differenced against the keys in `en.ts`. App-wide it reports **1,574 of 9,851 English keys
+unreferenced**.
+
+**READ THE CAVEAT BEFORE QUOTING THAT NUMBER: it is an UPPER BOUND, not a defect count.** A key
+reached by a computed template is invisible to the grep. `commands.*` reads **106 of 110 unused** and
+is a FALSE POSITIVE - `commandI18n.ts:7` builds `` `commands.${id}` ``. `music.repeat.off` was the
+same shape. So treat a high ratio as a place to look, and confirm each prefix by hand.
+
+Ranked by unused count, with the ones I checked marked:
+
+| prefix | unused / total | note |
+|---|---|---|
+| `ankiWorkbench` | 179 / 617 (29%) | unchecked - biggest absolute lead |
+| `vnPanel` | 121 / 141 (86%) | prefix appears in 4 files, so partly real |
+| `commands` | 106 / 110 (96%) | **FALSE POSITIVE**, computed lookup |
+| `settings` | 72 / 1200 (6%) | unchecked |
+| `media` / `agent` | 69 / 68 | unchecked |
+| `grammar` | 62 / 197 (31%) | grammar is marked done - so these are likely computed or genuinely dead |
+| `filesApp` | 61 / 425 (14%) | unchecked |
+| `trackingSources` | 33 / 33 (100%) | **prefix appears in ZERO files** - dead section |
+| `vnMeta` | 33 / 33 (100%) | **prefix appears in ZERO files** - dead section |
+| `vnImport` | 21 / 21 (100%) | **prefix appears in ZERO files** - dead section |
+
+The three at 100% with zero prefix references are dead keys, not user-visible defects: nothing
+renders them, so nobody sees English. They cost bundle size and mislead the next reader. Worth a
+tidy-up **after** the release, not before.
+
 ## Coverage - the user starts THEIR sweep when this table is full
 
 They are waiting on this. Claim a surface by putting your worker name in `by` BEFORE you start,
