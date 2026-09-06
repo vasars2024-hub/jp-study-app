@@ -158,12 +158,14 @@ export default function DictionaryView() {
         <div className="dict-lang-toggle">
           <button
             className={`gram-level-btn ${!isZh ? 'active' : ''}`}
+            aria-pressed={!isZh}
             onClick={() => pickLang('ja')}
           >
             日本語
           </button>
           <button
             className={`gram-level-btn ${isZh ? 'active' : ''}`}
+            aria-pressed={isZh}
             onClick={() => pickLang('zh')}
           >
             中文

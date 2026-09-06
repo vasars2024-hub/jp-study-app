@@ -216,6 +216,7 @@ export function ReadingFinderControls({ state }: { state: ReadingFinderState }) 
           <button
             key={lv}
             className={`gram-level-btn ${levels.has(lv) ? 'active' : ''}`}
+            aria-pressed={levels.has(lv)}
             onClick={() => toggleLevel(lv)}
             title={tierName('ja', lv)}
           >
@@ -281,12 +282,14 @@ export function ReadingFinderControls({ state }: { state: ReadingFinderState }) 
         </label>
         <button
           className={`gram-level-btn ${furiganaOnly ? 'active' : ''}`}
+          aria-pressed={furiganaOnly}
           onClick={() => setFuriganaOnly((v) => !v)}
         >
           {t('reading.controls.furiganaOnly')}
         </button>
         <button
           className={`gram-level-btn ${showAdult ? 'active' : ''}`}
+          aria-pressed={showAdult}
           onClick={() => setShowAdult((v) => !v)}
           title={t('reading.controls.adultToggle')}
         >
