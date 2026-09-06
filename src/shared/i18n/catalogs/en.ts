@@ -5770,6 +5770,8 @@ export const en: Catalog = {
   'immersion.sites': 'Sites',
   'immersion.rail.empty': 'Saved sites appear here. Bookmark any page.',
   'immersion.rail.destinations': 'Destinations',
+  'immersion.refreshSites': 'Refresh sites',
+  'immersion.status.readerIssue': 'Reader issue',
   'immersion.visitsCount': {
     one: '{count} visit',
     other: '{count} visits',

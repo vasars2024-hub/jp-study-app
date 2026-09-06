@@ -5749,6 +5749,8 @@ export const ja: Catalog = {
   'immersion.sites': 'サイト',
   'immersion.rail.empty': '保存したサイトがここに表示されます。どのページもブックマークできます。',
   'immersion.rail.destinations': 'おすすめのサイト',
+  'immersion.refreshSites': 'サイトを再読み込み',
+  'immersion.status.readerIssue': 'リーダーの問題',
   'immersion.visitsCount': {
     other: '訪問{count}回',
   },

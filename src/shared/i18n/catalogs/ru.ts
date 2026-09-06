@@ -6302,6 +6302,8 @@ export const ru: Catalog = {
   'immersion.sites': 'Сайты',
   'immersion.rail.empty': 'Сохранённые сайты появятся здесь. Добавьте в закладки любую страницу.',
   'immersion.rail.destinations': 'Куда пойти читать',
+  'immersion.refreshSites': 'Обновить сайты',
+  'immersion.status.readerIssue': 'Ошибка режима чтения',
   'immersion.visitsCount': {
     one: '{count} посещение',
     few: '{count} посещения',

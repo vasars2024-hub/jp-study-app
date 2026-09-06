@@ -5718,6 +5718,8 @@ export const zh: Catalog = {
   'immersion.sites': '站点',
   'immersion.rail.empty': '已保存的站点会显示在这里。为任意页面添加书签即可。',
   'immersion.rail.destinations': '推荐站点',
+  'immersion.refreshSites': '刷新站点',
+  'immersion.status.readerIssue': '阅读器问题',
   'immersion.visitsCount': {
     other: '访问 {count} 次',
   },
