@@ -28035,3 +28035,43 @@ PowerShell.** (2) The reap runs *before* the add, holds out the in-flight hash, 
 cannot clean up the torrent you are currently fetching — clean an orphan by fetching a
 *different* candidate with `G12_ALLOW_DELETE_HASH=<orphan>` and `add` fenced.
 **Client verified back at baseline afterwards, real daemon, no mount: 10 rows, 6 / 3 / 1.**
+
+## 2026-09-06 (primary) — Track 9 gate 15 CLOSES live; the control arrived unasked
+
+**Gate 15 is closed against its own words** — see `MAIN_V1_COMPLETION_PLAN.md`, "GATE 15 CLOSES
+2026-09-06". Track 9 is **19 of 20**; only gate 11 remains, and it is parked on index contents.
+
+**Decision, and its tradeoff.** The interrupt was issued in `awaiting-metadata` rather than after
+`qbitStart`, because on this library no product path reaches `start` through the media-item route:
+the one candidate `listNyaaSubtitles` produces is a batch whose file list holds 26 video files and
+no subtitles, so the fetch refuses before the priority step. Waiting for `start` would have been
+waiting on a third-party swarm forever. The orphan the gate names exists from `qbitAddStopped`
+onward, so the earlier interrupt tests the same two assertions on the same object; the weaker
+phase is stated in the plan rather than rounded away.
+
+**Numbers.** accept `ok:false / "Cancelled."`; subtitles `1 → 1`; `jp-study-subtitles` holds
+exactly `539c0886…` (the user's); client back at **10 rows / same 10 hashes / 6-3-1** with the
+mount out of the path; wire `delete-allowed-exact → 200`; phases `["downloading","cancelled"]`,
+zero progress errors.
+
+**The control was not manufactured.** Two runs of the same acquisition failed on their own
+(`no-subtitles`) and left the torrent: **11 rows, 2 in `jp-study-subtitles`, no `delete` anywhere
+on the wire**, phases `["downloading","error"]`. That is the discriminator — the delete belongs to
+the cancellation, not to failure in general.
+
+**Traps for the next worker.**
+1. **An out-of-band poller cannot interrupt a one-second fetch.** Once qBittorrent has the file
+   list cached the whole acquisition resolves in ~1 s, and two runs were spent losing that race
+   and measuring the poller. `debug/g14-live.cjs cancel … -1` sends the cancel from the *same
+   renderer statement* as the accept; main handles the two invokes in order and
+   `acceptNyaaCandidate` registers in `running` synchronously before its first `await`, so it is
+   ordering, not timing.
+2. **On the adopt path there is no `torrents/add` on the wire at all.** A trigger that watches for
+   `add` never fires against a torrent the app already left behind; watch `info?hashes=<ours>` too.
+3. **`/health` on the debug bridge needs the Bearer token now** — a bare GET answers
+   `{"ok":false,"error":"bad token"}`, which reads exactly like a dead bridge.
+4. **The restart did not eat localStorage this time** (`jp-scraper-settings-v1`, 33,591 bytes
+   before and after), but it was captured to `~\.claude-runs\g15-scraper-settings.bak.json` first.
+   Do that before every restart — the working qBittorrent config lives only there.
+5. `Start-Process -ArgumentList` splits an unquoted argument on spaces; `"The Big O - 01"` must
+   carry its own quotes inside the array element or the harness looks up a title called `The`.

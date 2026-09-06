@@ -1692,3 +1692,68 @@ hash. Baseline first: the real daemon held **10 rows, 6 uncategorised / 3 `jp-st
 `jp-study-subtitles`** on 2026-09-06 03:43, and it must hold exactly that afterwards.
 
 **Track 9 is 18 of 20.** Gates 11 and 15 open.
+
+### GATE 15 CLOSES 2026-09-06 (primary), live, against the user's own daemon
+
+Gate 15: *"Interrupting an in-flight acquisition leaves no half-registered `SubtitleRecord` and
+no orphaned torrent in the `jp-study-subtitles` category."* Both halves measured, plus a control
+that discriminates them. App restarted onto `0d2812ca` first — main does not hot-reload, and the
+three fixes this gate rests on landed at 04:12–04:16 while the running build was from 02:34.
+
+**Subject, found through the product's own listing.** Media item `The Big O - 01`
+(`7b984295…`, one pre-existing `ja` sidecar). `listNyaaSubtitles` returns exactly **1**
+candidate: `[NanaOne-Yamayurikai] The Big O 01-26 (GerSub Hi10P BD 576p) [v2]`,
+`e953e84bf2ef796f5ae6b42af4316fe64320ea37`, 6.4 GB, 3 seeders, route **`batch-sidecar`**.
+Nothing else in the 39-item library produces a candidate at all — JoJo 38, Date a Live and
+The Big O 13 all answer "no release … carries subtitle files".
+
+**THE GATE — `debug/g14-live.cjs cancel "The Big O - 01" e953e84b… 127.0.0.1 8781 /qb -1`.**
+- `acceptNyaaSubtitle` resolved **`ok: false, message: "Cancelled."`** — `QBIT_CANCELLED_REASON`,
+  not an error.
+- **`gainedRecord: false`** — subtitles `1 → 1`. No half-registered `SubtitleRecord`.
+- **`jp-study-subtitles` holds exactly `539c0886…`**, the user's own Kitsunekko archive. The
+  acquisition's torrent is gone.
+- Client back at its **exact** baseline with the mount removed from the path: **10 rows, the same
+  10 hashes, 6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`**, Kitsunekko still paused at
+  progress 1.
+- Wire: `info?category` (the reap — nothing to take), `info?hashes` ×2 (the adopt check, then the
+  discard's own category check), `delete` **`delete-allowed-exact` → 200**. That is `1a8b94bd`
+  running against a real client.
+- **`progressPhases: ["downloading", "cancelled"]`, `progressErrors: []`.** `fabdac42` live: the
+  row the Cancel button renders from exists, and the terminal phase is `cancelled`, so the person
+  who stopped it is not told something went wrong.
+
+**NEGATIVE CONTROL, unforced — the same subject, the same daemon, ninety seconds earlier.** Two
+runs of the identical acquisition were left to fail on their own: `selectSubtitleFiles` answered
+`no-subtitles` (*"26 file(s), 26 of them video — any subtitles it carries are inside the video"*).
+**No `delete` appears anywhere on their wire**, and the client afterwards read **11 rows, 2 in
+`jp-study-subtitles`** — the torrent deliberately left for `adopt`. Phases were
+`["downloading", "error"]` with the reason on the row. So the delete in the gate run is
+attributable to the *cancellation* and not to "any failure tidies up", and `cancelled` and
+`error` are genuinely kept apart.
+
+**Disclosed rather than glossed: the interrupt landed in `awaiting-metadata`, not after
+`qbitStart`.** On this library no product path reaches `start` through the media-item route — the
+only candidate's file list holds no subtitles, so the fetch refuses before the priority step. The
+orphan the gate names exists from `qbitAddStopped` onward, which is what was interrupted and what
+was removed. An earlier run at 04:32 interrupted a genuine 150-second metadata wait (the swarm had
+not yet answered) and produced the identical `delete → 200` and the identical baseline
+restoration, so the result is not an artifact of a client-cached file list.
+
+**Instrument, and why the interrupt is not a race.** `startWaitSec -1` sends
+`cancelSubtitleDiscovery` from the same renderer statement as the accept. Both are
+`ipcRenderer.invoke`, main handles them in order, and `acceptNyaaCandidate` does its `running.add`
+synchronously before its first `await` — so the cancel is always recorded against a registered
+job, and `qbitAwaitMetadata` checks `isCancelled` as the first statement of its poll loop. An
+out-of-band poller loses to a one-second fetch and would have measured itself; that happened twice
+before this mode existed and both runs are in the record above as the control.
+
+**Safety.** Driven through `debug/qbit-basepath-proxy.cjs` with
+`G14_RECATEGORIZE=539c0886…` (the Kitsunekko archive hidden from the reap's own filter — verified
+live: through the mount `jp-study-subtitles` reads **0** rows and the archive reads category `''`)
+and `G12_ALLOW_DELETE_HASH=e953e84b…` (a delete naming anything else is refused 403). Both guards
+had to hold for a file of the user's to be lost. Subtitle-only throughout; no video file was ever
+requested, because no priority was ever set.
+
+**Track 9 is 19 of 20.** The only open gate is **11**, parked on what the nyaa index carries for
+Route A — not on anything an agent can build.
