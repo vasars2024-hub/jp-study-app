@@ -437,6 +437,9 @@ export default function YouTubePlaylistsView() {
       key={p.id}
       type="button"
       className={`yt-pl-item${side?.kind === 'playlist' && side.id === p.id ? ' active' : ''}`}
+      // The rail entry selects what the main pane shows, so it is `aria-current`
+      // rather than `aria-pressed` — the same idiom as the games rail.
+      aria-current={side?.kind === 'playlist' && side.id === p.id ? 'true' : undefined}
       onClick={() => {
         setSide({ kind: 'playlist', id: p.id });
         setMainTab('playlist');
@@ -465,7 +468,10 @@ export default function YouTubePlaylistsView() {
   const whyAdd = firstReason([!!busy, busy], [!addUrl.trim(), t('yt.why.needUrl')]);
   const whyBatch = firstReason([!!busy, busy], [selectedVideoIds.size === 0, t('yt.why.needSelection')]);
 
-  const renderVideoRow = (v: YtVideo, opts?: { showPlaylist?: boolean; planMode?: boolean }) => {
+  const renderVideoRow = (
+    v: YtVideo,
+    opts?: { showPlaylist?: boolean; planMode?: boolean; index?: number },
+  ) => {
     const selected = selectedVideoIds.has(v.id);
     const inPlan = planToWatchIds.includes(v.id);
     const planLabel = opts?.planMode || inPlan ? t('yt.plan.remove') : t('yt.plan.add');
@@ -479,7 +485,27 @@ export default function YouTubePlaylistsView() {
     return (
       <div
         className={`yt-row${selected ? ' selected' : ''}${isVideoUnlogged(v) ? ' unlogged' : ''}${highlightId === v.id ? ' yt-row-highlight' : ''}`}
+        // D91: this row was the only interactive thing on the surface that Tab could
+        // not reach, and selecting a video is the ONLY writer of `selectedVideoIds` —
+        // so `Log` and `Add to Plan to watch` were permanently disabled for a
+        // keyboard-only user while telling them to "Select at least one video first".
+        // `row` rather than `button`: the row contains three real action buttons, and a
+        // `button` makes its children presentational, which would trade this defect for
+        // three newly-unreachable controls. The list is a `grid` for the same reason.
+        role="row"
+        tabIndex={0}
+        aria-selected={selected}
+        aria-rowindex={opts?.index === undefined ? undefined : opts.index + 1}
         onClick={(e) => {
+          if (e.shiftKey || e.metaKey || e.ctrlKey) toggleSelect(v.id, true);
+          else onRowActivate(v);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          // Only when the row itself has focus — otherwise Enter on a nested action
+          // button would fire the button AND activate the row.
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
           if (e.shiftKey || e.metaKey || e.ctrlKey) toggleSelect(v.id, true);
           else onRowActivate(v);
         }}
@@ -653,6 +679,7 @@ export default function YouTubePlaylistsView() {
               <button
                 type="button"
                 className={`yt-pl-item yt-plan-item${side?.kind === 'plan' ? ' active' : ''}`}
+                aria-current={side?.kind === 'plan' ? 'true' : undefined}
                 onClick={() => {
                   setSide({ kind: 'plan' });
                   setMainTab('playlist');
@@ -672,7 +699,16 @@ export default function YouTubePlaylistsView() {
                       type="button"
                       className="btn ghost small"
                       title={t('yt.folder.delete')}
-                      onClick={() => void window.api.ytDeleteFolder(f.id).then(applyStore)}
+                      // D93: this deleted the folder — and every folder nested inside it,
+                      // which `ytPlaylists.ts:536` does silently — on a single click with
+                      // no confirm and no undo. Its two destructive siblings in this file
+                      // (`removePlaylist`, `downloadAll`) both guard with `window.confirm`,
+                      // so this uses the same idiom and names what will be lost.
+                      onClick={() => {
+                        const affected = (playlistsByFolder.byFolder.get(f.id) ?? []).length;
+                        if (!window.confirm(t('yt.confirm.deleteFolder', { name: f.name, count: affected }))) return;
+                        void window.api.ytDeleteFolder(f.id).then(applyStore);
+                      }}
                     >
                       <Icon name="close" size={12} />
                     </button>
@@ -694,6 +730,7 @@ export default function YouTubePlaylistsView() {
               <button
                 type="button"
                 className={`yt-tab${mainTab === 'news' ? ' active' : ''}`}
+                aria-pressed={mainTab === 'news'}
                 onClick={() => setMainTab('news')}
               >
                 {t('yt.tab.news')}
@@ -701,6 +738,7 @@ export default function YouTubePlaylistsView() {
               <button
                 type="button"
                 className={`yt-tab${mainTab === 'playlist' ? ' active' : ''}`}
+                aria-pressed={mainTab === 'playlist'}
                 onClick={() => setMainTab('playlist')}
               >
                 {side?.kind === 'plan' ? t('yt.plan.title') : t('yt.tab.playlist')}
@@ -802,10 +840,10 @@ export default function YouTubePlaylistsView() {
                   items={displayedNews}
                   itemHeight={ROW_H}
                   getKey={(v) => v.id}
-                  listRole="list"
-                  itemRole="listitem"
+                  gridRole="grid"
+                  ariaRowCount={displayedNews.length}
                   emptyState={<div className="yt-empty">{t('yt.news.empty')}</div>}
-                  renderItem={(v) => renderVideoRow(v, { showPlaylist: true })}
+                  renderItem={(v, index) => renderVideoRow(v, { showPlaylist: true, index })}
                 />
               </>
             ) : showEmptyPlaylist ? (
@@ -925,6 +963,7 @@ export default function YouTubePlaylistsView() {
                             key={s}
                             type="button"
                             className={`yt-chip${(playlist.preferSubs ?? []).includes(s) ? ' active' : ''}`}
+                            aria-pressed={(playlist.preferSubs ?? []).includes(s)}
                             onClick={() => void toggleSub(s)}
                           >
                             {s.toUpperCase()}
@@ -1038,17 +1077,18 @@ export default function YouTubePlaylistsView() {
                   items={listVideos}
                   itemHeight={ROW_H}
                   getKey={(v) => v.id}
-                  listRole="list"
-                  itemRole="listitem"
+                  gridRole="grid"
+                  ariaRowCount={listVideos.length}
                   emptyState={
                     <div className="yt-empty">
                       {side?.kind === 'plan' ? t('yt.plan.empty') : t('yt.list.empty')}
                     </div>
                   }
-                  renderItem={(v) =>
+                  renderItem={(v, index) =>
                     renderVideoRow(v, {
                       planMode: side?.kind === 'plan',
                       showPlaylist: side?.kind === 'plan',
+                      index,
                     })
                   }
                 />

@@ -2950,6 +2950,9 @@ export const ja: Catalog = {
   'yt.status.progress': '{current}/{total} · {percent}%',
   'yt.confirm.downloadAll': { other: '未ダウンロードの動画 {count} 件をダウンロードしますか？' },
   'yt.confirm.removePlaylist': 'このプレイリストをトラッカーから削除しますか？ローカルのダウンロードはメディアに残ります。',
+  'yt.confirm.deleteFolder': {
+    other: 'フォルダー「{name}」を削除しますか？中のプレイリスト {count} 件は未分類に移動し、内側のフォルダーも削除されます。この操作は元に戻せません。',
+  },
   'yt.tab.news': 'ニュース',
   'yt.tab.playlist': 'プレイリスト',
   'yt.news.empty': '前回の確認以降の新しい動画はありません。',

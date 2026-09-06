@@ -2829,6 +2829,10 @@ export const en: Catalog = {
     other: 'Download {count} videos that are not yet downloaded?',
   },
   'yt.confirm.removePlaylist': 'Remove this playlist from the tracker? Local downloads stay in Media.',
+  'yt.confirm.deleteFolder': {
+    one: 'Delete the folder “{name}”? {count} playlist in it moves to Unfiled, and any folder inside it is deleted too. This cannot be undone.',
+    other: 'Delete the folder “{name}”? {count} playlists in it move to Unfiled, and any folder inside it is deleted too. This cannot be undone.',
+  },
   'yt.tab.news': 'News',
   'yt.tab.playlist': 'Playlist',
   'yt.news.empty': 'No new videos since last check.',

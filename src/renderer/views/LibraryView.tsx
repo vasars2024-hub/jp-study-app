@@ -994,6 +994,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 <button
                   key={c.labelKey}
                   className={`lib-folder-chip ${wikiCat === i ? 'active' : ''}`}
+                  aria-pressed={wikiCat === i}
                   disabled={wikiBusy}
                   onClick={() => setWikiCat(i)}
                 >
@@ -1076,6 +1077,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
             <button
               type="button"
               className={`aero-library-tree-row ${active === 'all' ? 'active' : ''} ${dropHover === '__all__' ? 'dragover' : ''}`}
+              aria-pressed={active === 'all'}
               onClick={() => setActive('all')}
               {...chipDropProps(null, false)}
             >
@@ -1088,6 +1090,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 key={f}
                 type="button"
                 className={`aero-library-tree-row ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
+                aria-pressed={active === f}
                 onClick={() => setActive(f)}
                 draggable
                 onDragStart={(e) => {
@@ -1105,6 +1108,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               <button
                 type="button"
                 className={`aero-library-tree-row ${active === 'unfiled' ? 'active' : ''}`}
+                aria-pressed={active === 'unfiled'}
                 onClick={() => setActive('unfiled')}
                 {...chipDropProps(null, false)}
               >
@@ -1230,6 +1234,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                     key={lang}
                     type="button"
                     className={`lib-folder-chip${langFilter === lang ? ' active' : ''}`}
+                    aria-pressed={langFilter === lang}
                     onClick={() => setLangFilter(lang)}
                   >
                     {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
@@ -1240,6 +1245,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                     key={lv}
                     type="button"
                     className={`lib-folder-chip${levelFilter === lv ? ' active' : ''}`}
+                    aria-pressed={levelFilter === lv}
                     onClick={() => setLevelFilter(lv)}
                   >
                     {lv === 'all' ? t('library.filter.all') : `L${lv}`}
@@ -1312,6 +1318,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       key={it.id}
                       type="button"
                       className={`aero-library-row ${selected ? 'active' : ''}`}
+                      aria-pressed={selected}
                       onClick={() => setSelectedId(it.id)}
                       onDoubleClick={() => onOpen(it)}
                       draggable
@@ -1399,6 +1406,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       <div className="lib-folders lq-hit-scope">
         <button
           className={`lib-folder-chip ${active === 'all' ? 'active' : ''} ${dropHover === '__all__' ? 'dragover' : ''}`}
+          aria-pressed={active === 'all'}
           onClick={() => setActive('all')}
           title={t('library.chip.allTitle')}
           {...chipDropProps(null, false)}
@@ -1409,6 +1417,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           <button
             key={f}
             className={`lib-folder-chip ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
+            aria-pressed={active === f}
             onClick={() => setActive(f)}
             title={t('library.chip.folderTitle', { name: f })}
             draggable
@@ -1437,6 +1446,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
         {counts.unfiled > 0 && folders.length > 0 && (
           <button
             className={`lib-folder-chip ${active === 'unfiled' ? 'active' : ''} ${dropHover === '__all__' ? '' : ''}`}
+            aria-pressed={active === 'unfiled'}
             onClick={() => setActive('unfiled')}
             {...chipDropProps(null, false)}
           >
@@ -1550,6 +1560,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 key={lang}
                 type="button"
                 className={`lib-folder-chip${langFilter === lang ? ' active' : ''}`}
+                aria-pressed={langFilter === lang}
                 onClick={() => setLangFilter(lang)}
               >
                 {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
@@ -1563,6 +1574,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 key={lv}
                 type="button"
                 className={`lib-folder-chip${levelFilter === lv ? ' active' : ''}`}
+                aria-pressed={levelFilter === lv}
                 onClick={() => setLevelFilter(lv)}
               >
                 {lv === 'all' ? t('library.filter.all') : `L${lv}`}
@@ -1763,6 +1775,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                         <button
                           key={f}
                           className={`card-file-opt ${it.folder === f ? 'active' : ''}`}
+                          aria-pressed={it.folder === f}
                           onClick={(e) => fileInto(e, it.id, f)}
                         >
                           <Icon name="folder" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />

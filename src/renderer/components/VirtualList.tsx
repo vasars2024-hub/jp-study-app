@@ -72,7 +72,14 @@ export interface VirtualListProps<T> {
    * `aria-rowindex` on each row, both of which the caller renders. Without
    * them a 4,000-row table windowed to 20 announces twenty rows.
    */
-  gridRole?: 'rowgroup';
+  gridRole?: 'rowgroup' | 'grid';
+  /**
+   * `aria-rowcount` for the `gridRole="grid"` path, where this component IS the
+   * grid and the caller has no element to hang the count on. Windowing makes this
+   * load-bearing: without it a 4,000-row grid windowed to 20 announces twenty rows.
+   * Pass the FULL collection length, never the rendered count.
+   */
+  ariaRowCount?: number;
 }
 
 export default function VirtualList<T>({
@@ -89,6 +96,7 @@ export default function VirtualList<T>({
   listRole,
   itemRole,
   gridRole,
+  ariaRowCount,
 }: VirtualListProps<T>) {
   // HEIGHT ONLY, and it is a performance fix, not a tidy-up: the window count below reads
   // `size.height` and nothing here reads `size.width`, so observing width meant a full
@@ -150,7 +158,14 @@ export default function VirtualList<T>({
   const structural = listRole || gridRole ? ('presentation' as const) : undefined;
 
   return (
-    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll} role={listRole ?? gridRole}>
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ overflowY: 'auto', position: 'relative', ...style }}
+      onScroll={onScroll}
+      role={listRole ?? gridRole}
+      aria-rowcount={gridRole === 'grid' ? ariaRowCount ?? total : undefined}
+    >
       {total === 0
         ? emptyState ?? null
         : (

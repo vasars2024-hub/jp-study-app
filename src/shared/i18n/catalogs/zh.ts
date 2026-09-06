@@ -2934,6 +2934,9 @@ export const zh: Catalog = {
   'yt.status.progress': '{current}/{total} · {percent}%',
   'yt.confirm.downloadAll': { other: '下载尚未下载的 {count} 个视频？' },
   'yt.confirm.removePlaylist': '从跟踪器中移除此播放列表？本地下载仍会保留在媒体库中。',
+  'yt.confirm.deleteFolder': {
+    other: '删除文件夹“{name}”？其中的 {count} 个播放列表将移至“未分类”，其内部的文件夹也会一并删除。此操作无法撤销。',
+  },
   'yt.tab.news': '动态',
   'yt.tab.playlist': '播放列表',
   'yt.news.empty': '自上次检查以来没有新视频。',

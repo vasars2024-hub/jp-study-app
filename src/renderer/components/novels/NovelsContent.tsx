@@ -944,6 +944,7 @@ export function NovelsTable({ state }: { state: NovelsState }) {
               key={candidate.id}
               type="button"
               className={`jiten-row ${state.selectedCandidate?.id === candidate.id ? 'active' : ''}`}
+              aria-pressed={state.selectedCandidate?.id === candidate.id}
               onClick={() => state.selectCandidate(candidate.id)}
             >
               <span className="jiten-row-cover" style={!candidate.coverUrl ? coverStyle(candidate.id) : undefined}>
@@ -1063,6 +1064,7 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
                 key={link.id}
                 type="button"
                 className={link.id === selectedLink?.id ? 'active' : ''}
+                aria-pressed={link.id === selectedLink?.id}
                 onClick={() => void state.selectSource(link.id)}
               >
                 {link.label}
