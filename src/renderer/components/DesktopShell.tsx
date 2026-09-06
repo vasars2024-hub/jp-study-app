@@ -2622,6 +2622,11 @@ export default function DesktopShell({
         <textarea
           className="desk-note-text"
           style={{ background: note?.color ?? NOTE_COLORS[0] }}
+          // The placeholder is the whole surface's only name, and it disappears the
+          // moment there is a note to read - so the control is anonymous exactly when
+          // it has content. `desktop.stickyNote` is the window's own already-translated
+          // title, so this needs no new key.
+          aria-label={t('desktop.stickyNote')}
           placeholder={t('desktop.notePlaceholder')}
           value={note?.text ?? ''}
           onChange={(e) =>
@@ -3342,6 +3347,18 @@ export default function DesktopShell({
                   : w.section === 'visualizer' ? t('settings.nav.visualizer')
                     : w.section === 'musicwidget' ? ''
                       : app ? t(app.labelKey) : w.section;
+            /*
+              The mini player deliberately renders no wordmark on its taskbar button - it is
+              the one icon-only entry. That is a VISIBLE choice and it must not take the
+              button's NAME with it: with `label` empty the button had `title=""` and no
+              accessible name at all, so the only thing on it was its own `×`, and the close
+              affordance fell through to `w.section` and offered "Close musicwidget" - an
+              internal id, in every language. `settings.mini.app.musicwidget` is already
+              translated in all four catalogues.
+            */
+            const taskName = label || (w.section === 'musicwidget'
+              ? t('settings.mini.app.musicwidget')
+              : app ? t(app.labelKey) : w.section);
             const glyph: IconName =
               w.section === 'note' ? 'note'
                 : w.section === 'visualizer' || w.section === 'musicwidget' ? 'music'
@@ -3350,7 +3367,8 @@ export default function DesktopShell({
               <button
                 key={w.id}
                 className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''} ${winAnim[w.id] ? `anim-${winAnim[w.id]}` : ''}`}
-                title={wired ? wiredModuleLabel(w.section) : label}
+                title={wired ? wiredModuleLabel(w.section) : taskName}
+                aria-label={wired ? wiredModuleLabel(w.section) : taskName}
                 // Drag a taskbar button up and off the bar to give that app a
                 // desktop of its own. Pointer events rather than HTML5 drag:
                 // the shell already drives every other drag this way, and HTML5
@@ -3404,8 +3422,8 @@ export default function DesktopShell({
                   className="os-task-close"
                   role="button"
                   tabIndex={-1}
-                  aria-label={t('desktop.task.close', { name: label || w.section })}
-                  title={t('desktop.task.close', { name: label || w.section })}
+                  aria-label={t('desktop.task.close', { name: taskName })}
+                  title={t('desktop.task.close', { name: taskName })}
                   onClick={(e) => {
                     e.stopPropagation();
                     close(w.id);

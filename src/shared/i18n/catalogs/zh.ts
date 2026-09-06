@@ -182,6 +182,8 @@ export const zh: Catalog = {
   'novels.sources.apiKey': 'API 密钥',
   'novels.sources.optional': '可选',
   'novels.sources.enabled': '启用',
+  'novels.sources.name': '来源名称',
+  'novels.sources.mode': '链接处理方式',
   'novels.sources.modeExternal': '仅外部链接',
   'novels.sources.modeDirect': '直接下载',
   'novels.sources.modeBoth': '两者',
@@ -5723,6 +5725,8 @@ export const zh: Catalog = {
   'immersion.sites': '站点',
   'immersion.rail.empty': '已保存的站点会显示在这里。为任意页面添加书签即可。',
   'immersion.rail.destinations': '推荐站点',
+  'immersion.refreshSites': '刷新站点',
+  'immersion.status.readerIssue': '阅读器问题',
   'immersion.visitsCount': {
     other: '访问 {count} 次',
   },
@@ -6416,6 +6420,7 @@ export const zh: Catalog = {
   'flash.import.pastePlaceholder': '在此粘贴词汇列表、CSV 或 TSV…',
   'flash.import.autoHint': '粘贴即自动导入。用同一卡组名重新导入会替换该卡组。',
   'flash.import.nothing': '没有可导入的内容。',
+  'flash.import.readFailed': '无法读取此文件。请重新打开或粘贴文件内容。',
   'flash.import.success': {
     other: '已将 {count} 张卡片导入为“{title}”（{id}）。',
   },

@@ -87,12 +87,10 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
             {t('novelsView.local')}
           </button>
           <ToolbarSpacer />
-          {/* Both of these highlight the state they TOGGLE, not the tab you
-              arrived on. Plan was bound to `mode === 'plan'`, so on the Import
-              tab it sat un-highlighted while plan-only filtering was on, and
-              clicking it took the list from 1 row to 205 with nothing about the
-              button changing. Sources was bound to nothing at all. Blanc's copy
-              of the same pair (BlancLibraryPanels) always did this correctly. */}
+          {/* The highlight has to follow `planOnly`, which is what the table filters on.
+              Reading it off the `mode` prop made it a constant: the button stayed lit while
+              the list showed every book, and stayed unlit in `imports` mode while the list
+              WAS plan-filtered. */}
           <button
             type="button"
             className={`aero-novels-command ${planOnly ? 'active' : ''}`}
@@ -104,7 +102,7 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
           <button
             type="button"
             className={`aero-novels-command ${showSources ? 'active' : ''}`}
-            aria-pressed={showSources}
+            aria-expanded={showSources}
             onClick={() => setShowSources((v) => !v)}
           >
             <Icon name="settings" size={12} />

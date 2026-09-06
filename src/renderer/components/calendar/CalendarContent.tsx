@@ -421,7 +421,13 @@ export function CalendarNav({ state }: { state: CalendarState }) {
     <ContextualSurface className="cal-toolbar cal-context-toolbar">
       <div className="cal-modes">
         {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
-          <button key={m} type="button" className={`cal-mode-btn ${mode === m ? 'active' : ''}`} onClick={() => setMode(m)}>
+          <button
+            key={m}
+            type="button"
+            className={`cal-mode-btn ${mode === m ? 'active' : ''}`}
+            aria-pressed={mode === m}
+            onClick={() => setMode(m)}
+          >
             {modeLabels[m]}
           </button>
         ))}

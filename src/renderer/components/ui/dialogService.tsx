@@ -35,16 +35,8 @@ function ConfirmDialog({ opts, onDone }: { opts: ConfirmOptions; onDone: (ok: bo
     (opts.danger ? cancelRef : confirmRef).current?.focus();
   }, [opts.danger]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      e.stopPropagation();
-      onDone(true);
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [onDone]);
+  // Native button activation honors the focused choice. A window-level Enter
+  // handler confirmed even when Cancel held focus, defeating the danger default.
 
   return (
     <Dialog

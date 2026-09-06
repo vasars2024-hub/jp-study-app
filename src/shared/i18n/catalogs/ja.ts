@@ -184,6 +184,8 @@ export const ja: Catalog = {
   'novels.sources.apiKey': 'API キー',
   'novels.sources.optional': '任意',
   'novels.sources.enabled': '有効',
+  'novels.sources.name': 'ソース名',
+  'novels.sources.mode': 'リンクの扱い',
   'novels.sources.modeExternal': '外部リンクのみ',
   'novels.sources.modeDirect': '直接ダウンロード',
   'novels.sources.modeBoth': '両方',
@@ -5754,6 +5756,8 @@ export const ja: Catalog = {
   'immersion.sites': 'サイト',
   'immersion.rail.empty': '保存したサイトがここに表示されます。どのページもブックマークできます。',
   'immersion.rail.destinations': 'おすすめのサイト',
+  'immersion.refreshSites': 'サイトを再読み込み',
+  'immersion.status.readerIssue': 'リーダーの問題',
   'immersion.visitsCount': {
     other: '訪問{count}回',
   },
@@ -6450,6 +6454,7 @@ export const ja: Catalog = {
   'flash.import.pastePlaceholder': '単語リスト、CSV、またはTSVをここに貼り付け…',
   'flash.import.autoHint': '貼り付けると自動で取り込まれます。同じデッキ名で再インポートするとそのデッキが置き換わります。',
   'flash.import.nothing': 'インポートするものがありません。',
+  'flash.import.readFailed': 'ファイルを読み込めませんでした。もう一度開くか、内容を貼り付けてください。',
   'flash.import.success': {
     other: '「{title}」（{id}）として{count}枚のカードをインポートしました。',
   },

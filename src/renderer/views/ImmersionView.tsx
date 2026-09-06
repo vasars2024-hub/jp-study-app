@@ -108,10 +108,8 @@ export default function ImmersionView() {
         ...IMMERSION_STARTERS.map((starter) => ({
           id: starter.url,
           label: starter.label,
-          onSelect: () => {
-            state.setMode('reader');
-            state.navigate(starter.url, { mode: 'reader' });
-          },
+          /* Keep the mode the user chose - see ImmersionContent's starterButton. */
+          onSelect: () => state.navigate(starter.url),
         })),
         { id: 'sep-sites', separator: true, label: '' },
         { id: 'refresh-sites', label: 'Refresh saved sites', onSelect: () => void state.refreshSites() },
@@ -122,7 +120,7 @@ export default function ImmersionView() {
     <>
       <StatusBarField>{MODE_LABELS[mode]}</StatusBarField>
       <StatusBarField>{loading ? 'Loading' : currentUrl ? title : 'Ready'}</StatusBarField>
-      {error && <StatusBarField>Reader issue</StatusBarField>}
+      {error && <StatusBarField>{t('immersion.status.readerIssue')}</StatusBarField>}
       <StatusBarSpacer />
       <StatusBarField>{sites.length} sites</StatusBarField>
       {currentUrl && <StatusBarField live>{currentUrl}</StatusBarField>}
@@ -146,13 +144,13 @@ export default function ImmersionView() {
       <AppChrome menus={immersionMenus} status={immersionStatus} className="aero-immersion-chrome">
         <div className={`aero-immersion aero-immersion-mode-${mode}`}>
           <Toolbar className="aero-immersion-toolbar">
-            <Button size="sm" className="aero-immersion-icon-btn" title="Back" onClick={state.goBack} disabled={histIdx <= 0}>
+            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.back')} onClick={state.goBack} disabled={histIdx <= 0}>
               <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
             </Button>
             <Button
               size="sm"
               className="aero-immersion-icon-btn"
-              title="Forward"
+              title={t('immersion.forward')}
               onClick={state.goForward}
               disabled={histIdx < 0 || histIdx >= history.length - 1}
             >
@@ -161,7 +159,7 @@ export default function ImmersionView() {
             <Button
               size="sm"
               className="aero-immersion-icon-btn"
-              title="Reload"
+              title={t('immersion.reload')}
               onClick={state.reload}
               disabled={!currentUrl}
             >
@@ -192,17 +190,19 @@ export default function ImmersionView() {
                 className="aero-immersion-url"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="Enter URL or search..."
+                aria-label={t('immersion.urlPlaceholder')}
+                placeholder={t('immersion.urlPlaceholder')}
                 spellCheck={false}
                 autoComplete="off"
               />
             </form>
-            <div className="aero-immersion-mode-seg" role="group" aria-label="View mode">
+            <div className="aero-immersion-mode-seg" role="group" aria-label={t('immersion.viewMode.ariaLabel')}>
               {IMMERSION_MODE_CYCLE.map((m) => (
                 <button
                   key={m}
                   type="button"
                   className={`aero-immersion-mode-btn ${mode === m ? 'active' : ''}`}
+                  aria-pressed={mode === m}
                   onClick={() => state.applyMode(m)}
                 >
                   {MODE_LABELS[m]}
@@ -222,25 +222,25 @@ export default function ImmersionView() {
             >
               <Icon name="dictionary" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title="Save site" onClick={() => void state.saveCurrentSite()}>
+            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.saveSite')} onClick={() => void state.saveCurrentSite()}>
               <Icon name="bookmark" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title="Save as tool" onClick={() => void state.saveCurrentAsTool()}>
+            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.saveAsTool')} onClick={() => void state.saveCurrentAsTool()}>
               <Icon name="star" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title="Export to Library" onClick={() => void state.exportToLibrary()}>
+            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.exportToLibrary')} onClick={() => void state.exportToLibrary()}>
               <Icon name="download" size={14} />
             </Button>
             <Button
               size="sm"
               className="aero-immersion-icon-btn"
-              title="Capture video to Media"
+              title={t('immersion.captureVideo')}
               disabled={captureBusy}
               onClick={() => void state.captureVideo()}
             >
               <Icon name="video" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title="Open in system browser" onClick={state.openExternal}>
+            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.openInSystemBrowser')} onClick={state.openExternal}>
               <Icon name="external" size={14} />
             </Button>
             <Button
@@ -275,7 +275,7 @@ export default function ImmersionView() {
                 {!currentUrl && !loading && (
                   <div className="aero-immersion-empty">
                     <Icon name="globe" size={36} />
-                    <p>Open a page to begin immersion reading.</p>
+                    <p>{t('immersion.openPageToBegin')}</p>
                     <div className="aero-immersion-starters">
                       {IMMERSION_STARTERS.map((s) => (
                         <Button
@@ -315,7 +315,7 @@ export default function ImmersionView() {
               <aside className="aero-immersion-rail">
                 <div className="aero-immersion-rail-head">
                   <span>Sites</span>
-                  <Button size="sm" className="aero-immersion-icon-btn" title="Refresh sites" onClick={() => void state.refreshSites()}>
+                  <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.refreshSites')} onClick={() => void state.refreshSites()}>
                     <Icon name="refresh" size={13} />
                   </Button>
                 </div>
@@ -345,7 +345,8 @@ export default function ImmersionView() {
                       <button
                         type="button"
                         className="aero-immersion-site-remove"
-                        title="Remove"
+                        title={t('immersion.remove')}
+                        aria-label={`${t('immersion.remove')} — ${s.title}`}
                         onClick={() => void window.api.immersionRemoveSite(s.id)}
                       >
                         <Icon name="close" size={12} />

@@ -208,3 +208,47 @@ describe('the Media Center sidebar carries both study destinations', () => {
     }
   });
 });
+
+/**
+ * D63/D64 — the same sidebar and the same transport, driven live 2026-09-06 in the Music
+ * window: the active destination carried only an `is-active` class across all eight
+ * entries, Shuffle carried only that class beside a Like button that already had
+ * `aria-pressed`, and Repeat's ONLY name was a raw `Repeat: ${ps.repeat}` template that
+ * stayed English in every language.
+ *
+ * Asserted against the source the way this file's sidebar block already does — rendering
+ * the whole shell would drag the orchestrator, the media store and the player in for two
+ * attributes — plus a real four-catalogue resolution of the keys the fix reuses.
+ */
+describe('the Media Center rail and transport say which state they are in', () => {
+  const source = read('renderer/views/MediaCenterView.tsx');
+
+  it('marks the showing destination on the nav button, not only in its class', () => {
+    expect(source).toContain("aria-current={tab === item.id ? 'page' : undefined}");
+  });
+
+  it('gives Shuffle a pressed state, the way the Like button beside it already has one', () => {
+    expect(source).toContain('aria-pressed={ps.shuffle}');
+  });
+
+  it('names Repeat through the catalogue template the other two hosts use', () => {
+    expect(source).toContain(
+      "title={t('music.controls.repeatTitle', { mode: t(`music.repeat.${ps.repeat}`) })}",
+    );
+    expect(source, 'the raw English template is back').not.toContain('title={`Repeat: ');
+  });
+
+  it('resolves every string that fix depends on in all four catalogues', () => {
+    for (const key of [
+      'music.controls.repeatTitle',
+      'music.repeat.off',
+      'music.repeat.all',
+      'music.repeat.one',
+      'mediaCenter.player.shuffle',
+    ] as const) {
+      for (const [name, catalog] of [['en', en], ['ja', ja], ['zh', zh], ['ru', ru]] as const) {
+        expect(catalog[key], `${key} missing from ${name}`).toBeTruthy();
+      }
+    }
+  });
+});

@@ -19904,6 +19904,10 @@ html[data-taskbar-size='large'] .os-tray-btn {
   padding-bottom: 4px;
 }
 .cal-month-cell {
+  /* The cell takes a click (select the day) and a double click (new event),
+     so it has to look like it does. It was `cursor: auto` — indistinguishable
+     from the dead space around it. */
+  cursor: pointer;
   min-height: 92px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

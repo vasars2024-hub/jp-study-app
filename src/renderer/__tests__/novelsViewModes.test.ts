@@ -8,8 +8,8 @@ const modeState = vi.hoisted(() => ({
   setPlanOnly: vi.fn(),
   setImportFilter: vi.fn(),
   setShowSources: vi.fn(),
-  // The two toggles' own state, so a test can put the view in the combination
-  // the defect lived in: `mode === 'imports'` while plan-only filtering is ON.
+  // The toolbar's highlight has to follow these two, not the `mode` prop, so they
+  // are readable per test rather than pinned to false.
   planOnly: false,
   showSources: false,
 }));
@@ -68,6 +68,8 @@ beforeEach(() => {
   modeState.setPlanOnly.mockReset();
   modeState.setImportFilter.mockReset();
   modeState.setShowSources.mockReset();
+  modeState.planOnly = false;
+  modeState.showSources = false;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -109,50 +111,42 @@ describe('NovelsView destination modes', () => {
   });
 });
 
-/**
- * Both toolbar toggles reported the wrong state.
- *
- * `Plan` was highlighted from `mode === 'plan'` rather than from `planOnly`,
- * the thing it toggles. Measured live 2026-09-06 on the Import tab: the button
- * sat un-highlighted while plan-only filtering was on, and one click took the
- * list from **1 row to 205** without changing a single thing about the button.
- * `Sources` was bound to nothing at all, so it never highlighted anywhere.
- *
- * Blanc's copy of the same pair (`BlancLibraryPanels`) always bound to the
- * state, which is why this only ever showed in Study OS.
- */
-describe('the toolbar toggles report their own state', () => {
-  const chip = (label: string) =>
-    [...host.querySelectorAll('button')].find((button) => button.textContent?.trim().startsWith(label));
+describe('NovelsView toolbar state', () => {
+  function commands() {
+    return Array.from(host.querySelectorAll<HTMLButtonElement>('.aero-novels-command'));
+  }
+  const plan = () => commands().find((b) => b.textContent?.includes('novelsView.plan'));
+  const sources = () => commands().find((b) => b.textContent?.includes('novelsView.sources'));
 
-  it('highlights Plan whenever plan-only filtering is on, including on the Import tab', async () => {
-    modeState.planOnly = true;
-    await renderMode('imports');
-
-    const plan = chip('novelsView.plan');
-    expect(plan).toBeDefined();
-    expect(plan?.className).toContain('active');
-    expect(plan?.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('leaves Plan un-highlighted when plan-only filtering is off, on the Plan tab', async () => {
-    // The control: binding to `mode === 'plan'` would ALSO pass the test above
-    // on the Plan tab, so the reading has to be wrong here for the fix to mean
-    // anything. `planOnly` false while `mode` is 'plan' is exactly that case.
+  it('lights Plan from the filter it controls, not from the window it was opened as', async () => {
     modeState.planOnly = false;
     await renderMode('plan');
+    // Opened AS the Plan window, but the user has switched the filter off: the
+    // table shows every book, so the button must not claim otherwise.
+    expect(plan()?.className).not.toContain('active');
+    expect(plan()?.getAttribute('aria-pressed')).toBe('false');
 
-    const plan = chip('novelsView.plan');
-    expect(plan?.className).not.toContain('active');
-    expect(plan?.getAttribute('aria-pressed')).toBe('false');
+    modeState.planOnly = true;
+    await renderMode('plan');
+    expect(plan()?.className).toContain('active');
+    expect(plan()?.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('highlights Sources when the source editor is open', async () => {
-    modeState.showSources = true;
+  it('lights Plan in the Imports window too, where the filter is on and the mode is not plan', async () => {
+    modeState.planOnly = true;
     await renderMode('imports');
+    expect(plan()?.className).toContain('active');
+    expect(plan()?.getAttribute('aria-pressed')).toBe('true');
+  });
 
-    const sources = chip('novelsView.sources');
-    expect(sources?.className).toContain('active');
-    expect(sources?.getAttribute('aria-pressed')).toBe('true');
+  it('gives Sources an expanded state that tracks the editor it discloses', async () => {
+    await renderMode('plan');
+    expect(sources()?.getAttribute('aria-expanded')).toBe('false');
+    expect(sources()?.className).not.toContain('active');
+
+    modeState.showSources = true;
+    await renderMode('plan');
+    expect(sources()?.getAttribute('aria-expanded')).toBe('true');
+    expect(sources()?.className).toContain('active');
   });
 });

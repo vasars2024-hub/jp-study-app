@@ -212,6 +212,8 @@ export const ru: Catalog = {
   'novels.sources.apiKey': 'Ключ API',
   'novels.sources.optional': 'Необязательно',
   'novels.sources.enabled': 'Включён',
+  'novels.sources.name': 'Название источника',
+  'novels.sources.mode': 'Обработка ссылок',
   'novels.sources.modeExternal': 'Только внешние ссылки',
   'novels.sources.modeDirect': 'Прямая загрузка',
   'novels.sources.modeBoth': 'Оба варианта',
@@ -6307,6 +6309,8 @@ export const ru: Catalog = {
   'immersion.sites': 'Сайты',
   'immersion.rail.empty': 'Сохранённые сайты появятся здесь. Добавьте в закладки любую страницу.',
   'immersion.rail.destinations': 'Куда пойти читать',
+  'immersion.refreshSites': 'Обновить сайты',
+  'immersion.status.readerIssue': 'Ошибка режима чтения',
   'immersion.visitsCount': {
     one: '{count} посещение',
     few: '{count} посещения',
@@ -7094,6 +7098,7 @@ export const ru: Catalog = {
   'flash.import.pastePlaceholder': 'Вставьте список слов, CSV или TSV…',
   'flash.import.autoHint': 'Вставка импортирует автоматически. Повторный импорт с тем же именем колоды заменяет её.',
   'flash.import.nothing': 'Нечего импортировать.',
+  'flash.import.readFailed': 'Не удалось прочитать файл. Попробуйте открыть его ещё раз или вставить содержимое.',
   'flash.import.success': {
     one: 'Импортирована {count} карточка как «{title}» ({id}).',
     few: 'Импортированы {count} карточки как «{title}» ({id}).',

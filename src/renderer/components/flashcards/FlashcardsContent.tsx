@@ -33,6 +33,7 @@ import {
   useState,
   type CSSProperties,
   type DragEvent,
+  type RefObject,
 } from 'react';
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import { ContextualSurface } from '../liquid/LiquidSurface';
@@ -43,6 +44,7 @@ import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
 import JitenMiningPanel from '../JitenMiningPanel';
 import MiningCataloguePanel from '../MiningCataloguePanel';
 import DeckActionMenu from '../DeckActionMenu';
+import FlashcardFileMenu from './FlashcardFileMenu';
 import AiCardStudio from '../AiCardStudio';
 import CsvEditorPanel from '../CsvEditorPanel';
 import DeckImportPanel from '../DeckImportPanel';
@@ -213,6 +215,7 @@ export interface FlashcardsState {
   collapsedBooks: Record<string, boolean>;
   toggleBookGroup: (key: string) => void;
   creatingFolder: boolean;
+  folderTriggerRef: RefObject<HTMLButtonElement | null>;
   setCreatingFolder: (v: boolean) => void;
   newFolderName: string;
   setNewFolderName: (v: string) => void;
@@ -311,6 +314,14 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [search, setSearch] = useState('');
   const [collapsedBooks, setCollapsedBooks] = useState<Record<string, boolean>>({});
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const folderTriggerRef = useRef<HTMLButtonElement>(null);
+  const wasCreatingFolder = useRef(false);
+  useEffect(() => {
+    if (wasCreatingFolder.current && !creatingFolder) {
+      folderTriggerRef.current?.focus({ preventScroll: true });
+    }
+    wasCreatingFolder.current = creatingFolder;
+  }, [creatingFolder]);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderErr, setFolderErr] = useState('');
   const [dropHover, setDropHover] = useState<string | null>(null);
@@ -1028,6 +1039,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     toggleBookGroup,
     creatingFolder,
     setCreatingFolder,
+    folderTriggerRef,
     newFolderName,
     setNewFolderName,
     folderErr,
@@ -2143,6 +2155,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                       }
                     }}
                     placeholder={t('flash.folderNamePlaceholder')}
+                    aria-label={t('flash.folderNamePlaceholder')}
                     autoFocus
                   />
                   <button type="button" className="btn small" onClick={state.createFolder}>
@@ -2150,7 +2163,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                   </button>
                 </span>
               ) : (
-                <button type="button" className="lib-folder-chip lib-folder-new" onClick={() => state.setCreatingFolder(true)}>
+                <button ref={state.folderTriggerRef} type="button" className="lib-folder-chip lib-folder-new" onClick={() => state.setCreatingFolder(true)}>
                   {t('flash.newFolder')}
                 </button>
               )}
@@ -2303,32 +2316,12 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 {card.folder && <span className="flash-row-folder muted">{card.folder}</span>}
                               </div>
                               <div className="flash-row-actions">
-                                <button
-                                  type="button"
-                                  className="btn small"
-                                  onClick={() => state.setFileMenu(fileMenu === card.id ? null : card.id)}
-                                >
-                                  {t('flash.file')}
-                                </button>
-                                {fileMenu === card.id && (
-                                  <div className="flash-file-menu">
-                                    <button type="button" onClick={() => { state.setDeck(setDeckCardFolder(card.id, null)); state.setFileMenu(null); }}>
-                                      {t('flash.unfiled')}
-                                    </button>
-                                    {folders.map((folder) => (
-                                      <button
-                                        key={folder}
-                                        type="button"
-                                        onClick={() => {
-                                          state.setDeck(setDeckCardFolder(card.id, folder));
-                                          state.setFileMenu(null);
-                                        }}
-                                      >
-                                        {folder}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                                <FlashcardFileMenu
+                                  open={fileMenu === card.id}
+                                  folders={folders}
+                                  onOpenChange={(open) => state.setFileMenu(open ? card.id : null)}
+                                  onMove={(folder) => state.setDeck(setDeckCardFolder(card.id, folder))}
+                                />
                                 <button
                                   className="flash-row-x"
                                   title={t('common.remove')}

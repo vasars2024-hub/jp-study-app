@@ -202,6 +202,15 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   const [coverMenuPages, setCoverMenuPages] = useState<string[]>([]);
   /** Inline "new folder" creator (window.prompt doesn't exist in Electron). */
   const [creating, setCreating] = useState(false);
+  /** Escape/commit swaps the editor back for its trigger; send focus with it. */
+  const folderTriggerRef = useRef<HTMLButtonElement>(null);
+  const wasCreatingFolder = useRef(false);
+  useEffect(() => {
+    if (wasCreatingFolder.current && !creating) {
+      folderTriggerRef.current?.focus({ preventScroll: true });
+    }
+    wasCreatingFolder.current = creating;
+  }, [creating]);
   const [newName, setNewName] = useState('');
   const [folderErr, setFolderErr] = useState('');
   /** Folder chip currently hovered by a drag, for the drop highlight. */
@@ -1113,6 +1122,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                     type="text"
                     value={newName}
                     placeholder={t('library.folderName')}
+                    aria-label={t('library.folderName')}
                     onChange={(e) => {
                       setNewName(e.target.value);
                       setFolderErr('');
@@ -1131,7 +1141,12 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                   </Button>
                 </>
               ) : (
-                <Button size="sm" leftIcon={<Icon name="plus" size={13} />} onClick={() => setCreating(true)}>
+                <Button
+                  size="sm"
+                  ref={folderTriggerRef}
+                  leftIcon={<Icon name="plus" size={13} />}
+                  onClick={() => setCreating(true)}
+                >
                   {t('library.newFolder')}
                 </Button>
               )}
@@ -1436,6 +1451,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               type="text"
               value={newName}
               placeholder={t('library.folderNameEllipsis')}
+              aria-label={t('library.folderName')}
               onChange={(e) => {
                 setNewName(e.target.value);
                 setFolderErr('');
@@ -1454,7 +1470,11 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
             </span>
           </span>
         ) : (
-          <button className="lib-folder-chip lib-folder-new" onClick={() => setCreating(true)}>
+          <button
+            ref={folderTriggerRef}
+            className="lib-folder-chip lib-folder-new"
+            onClick={() => setCreating(true)}
+          >
             {t('library.newFolderPlus')}
           </button>
         )}

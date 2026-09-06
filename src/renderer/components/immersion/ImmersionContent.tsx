@@ -924,6 +924,7 @@ export function ImmersionToolbar({ state, overflow }: { state: ImmersionState; o
         <input
           ref={state.urlBarRef}
           className="immersion-url"
+          aria-label={t('immersion.urlPlaceholder')}
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
           placeholder={t('immersion.urlPlaceholder')}
@@ -937,6 +938,7 @@ export function ImmersionToolbar({ state, overflow }: { state: ImmersionState; o
             key={m}
             type="button"
             className={`immersion-mode-btn immersion-mode-btn-${m}${mode === m ? ' active' : ''}`}
+            aria-pressed={mode === m}
             title={`${MODE_LABELS[m]}${m === 'focus' ? t('immersion.mode.titleSuffix.focus') : ''}${t(`immersion.mode.titleDesc.${m}`)}`}
             onClick={() => state.applyMode(m)}
           >
@@ -1057,10 +1059,10 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
       key={s.url}
       type="button"
       className="btn small"
-      onClick={() => {
-        state.setMode('reader');
-        state.navigate(s.url, { mode: 'reader' });
-      }}
+      /* `navigate` already defaults to the CURRENT mode, and the hook's initial mode is
+         'reader' — so pinning it here changed nothing for a new user and silently threw
+         away an explicit Live or Focus choice for everyone else. */
+      onClick={() => state.navigate(s.url)}
     >
       {s.label}
     </button>
@@ -1230,6 +1232,11 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
               type="button"
               className="immersion-site-remove"
               title={t('immersion.remove')}
+              /* Every row's visible control is the same glyph, so the title alone makes
+                 all ~1,200 of them announce one word. The name is composed rather than
+                 given a new key: the verb is already translated and the site title is
+                 the user's own text. */
+              aria-label={`${t('immersion.remove')} — ${s.title}`}
               onClick={() => void window.api.immersionRemoveSite(s.id)}
             >
               <Icon name="close" size={12} />
@@ -1265,10 +1272,8 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
                   type="button"
                   className="immersion-rail-destination"
                   title={s.url}
-                  onClick={() => {
-                    state.setMode('reader');
-                    state.navigate(s.url, { mode: 'reader' });
-                  }}
+                  /* Same as the empty state's starters: keep the mode the user chose. */
+                  onClick={() => state.navigate(s.url)}
                 >
                   <span className="immersion-rail-destination-label">{s.label}</span>
                   {s.lang !== 'auto' && (
