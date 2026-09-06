@@ -15,7 +15,7 @@
  * modal early is the most likely way to hit it.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
@@ -94,6 +94,7 @@ export default function GrammarTestModal({
   onClose: () => void;
 }) {
   const { t, lang } = useT();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>('setup');
   const [options, setOptions] = useState<SessionOptions>(() => loadSessionOptions());
   const [custom, setCustom] = useState(() => String(loadSessionOptions().count));
@@ -226,12 +227,69 @@ export default function GrammarTestModal({
     [lang],
   );
 
+  /*
+   * This declares `role="dialog" aria-modal="true"` and, until 2026-09-06, did
+   * nothing whatever with the keyboard. Measured live: Escape left it open, and
+   * `document.activeElement` after opening was still the "Grammar Test" button
+   * BEHIND the overlay — so a screen-reader user was told a modal had taken over
+   * the window and then left standing outside it, with `aria-modal` hiding the
+   * rest of the page they were still in.
+   *
+   * Closing early is safe by design here: familiarity is persisted per ANSWER,
+   * not at the end (see the file header), so Escape cannot discard a
+   * half-finished session. That is why Escape closes unconditionally rather than
+   * confirming, unlike `MalDownloadDialog`, which refuses Escape mid-send.
+   *
+   * Modelled on `components/ui/Dialog.tsx`, which already does exactly this;
+   * inlined rather than adopted wholesale because swapping the render tree two
+   * days before release risks the layout for no accessibility gain.
+   */
+  useEffect(() => {
+    const restoreTo = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        // Stop it here: the desktop shell also listens for Escape, and an
+        // unstopped one closes the Grammar window out from under the dialog.
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      // Put focus back where it came from, or the user lands at the top of the
+      // document and has to Tab through the whole window to get back.
+      restoreTo?.focus?.();
+    };
+  }, [onClose]);
+
   return (
     <div
       className="gx-test-overlay"
       role="dialog"
       aria-modal="true"
       aria-label={t('grammar.test.title')}
+      ref={panelRef}
+      // The panel itself is the initial focus target rather than a control inside
+      // it: focusing the first button would read that button's label instead of
+      // the dialog's, and the setup screen's first control is a preset count.
+      tabIndex={-1}
     >
       <div className="gx-test-modal">
         <header className="gx-test-head">
