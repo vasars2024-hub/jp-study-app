@@ -141,6 +141,7 @@ export default function AppearancePage() {
               type="button"
               lang={LANG_TAGS[id]}
               className={`sp-seg-btn ${lang === id ? 'active' : ''}`}
+              aria-pressed={lang === id}
               onClick={() => setUiLang(id)}
             >
               {LANG_LABELS[id]}

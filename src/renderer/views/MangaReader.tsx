@@ -1690,6 +1690,7 @@ export default function MangaReader({ item, onClose }: Props) {
                 <div className="sp-seg" role="group" aria-label={t('manga.ocr.direction')}>
                   <button
                     className={`sp-seg-btn ${ocrLang === 'jpn_vert' ? 'active' : ''}`}
+                    aria-pressed={ocrLang === 'jpn_vert'}
                     onClick={() => {
                       setOcrLang('jpn_vert');
                       void scanWithTesseract('jpn_vert');
@@ -1699,6 +1700,7 @@ export default function MangaReader({ item, onClose }: Props) {
                   </button>
                   <button
                     className={`sp-seg-btn ${ocrLang === 'jpn' ? 'active' : ''}`}
+                    aria-pressed={ocrLang === 'jpn'}
                     onClick={() => {
                       setOcrLang('jpn');
                       void scanWithTesseract('jpn');

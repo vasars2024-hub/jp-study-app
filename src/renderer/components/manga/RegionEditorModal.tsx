@@ -159,6 +159,7 @@ export default function RegionEditorModal({
         <div className="sp-seg region-editor-orientation">
           <button
             className={`sp-seg-btn ${block.vertical ? 'active' : ''}`}
+            aria-pressed={block.vertical}
             disabled={busy}
             onClick={() => onSetVertical(true)}
           >
@@ -166,6 +167,7 @@ export default function RegionEditorModal({
           </button>
           <button
             className={`sp-seg-btn ${!block.vertical ? 'active' : ''}`}
+            aria-pressed={!block.vertical}
             disabled={busy}
             onClick={() => onSetVertical(false)}
           >
@@ -178,6 +180,7 @@ export default function RegionEditorModal({
             <button
               key={k}
               className={`sp-seg-btn ${(block.kind ?? 'text') === k ? 'active' : ''}`}
+              aria-pressed={(block.kind ?? 'text') === k}
               disabled={busy}
               onClick={() => onSetKind(k)}
             >
@@ -215,12 +218,14 @@ export default function RegionEditorModal({
             <div className="sp-seg">
               <button
                 className={`sp-seg-btn ${splitAxis === 'x' ? 'active' : ''}`}
+                aria-pressed={splitAxis === 'x'}
                 onClick={() => onSplitAxisChange('x')}
               >
                 {t('manga.regionEditor.splitVertical')}
               </button>
               <button
                 className={`sp-seg-btn ${splitAxis === 'y' ? 'active' : ''}`}
+                aria-pressed={splitAxis === 'y'}
                 onClick={() => onSplitAxisChange('y')}
               >
                 {t('manga.regionEditor.splitHorizontal')}

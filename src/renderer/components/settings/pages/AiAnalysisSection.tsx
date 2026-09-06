@@ -113,6 +113,7 @@ export default function AiAnalysisSection() {
               role="radio"
               aria-checked={prefs.depth === depth}
               className={`sp-seg-btn ${prefs.depth === depth ? 'active' : ''}`}
+              aria-pressed={prefs.depth === depth}
               onClick={() => patch({ depth })}
             >
               {t(`settings.analysis.depth.${depth}`)}
@@ -223,6 +224,7 @@ export default function AiAnalysisSection() {
               role="radio"
               aria-checked={prefs.anki.cardKind === kind}
               className={`sp-seg-btn ${prefs.anki.cardKind === kind ? 'active' : ''}`}
+              aria-pressed={prefs.anki.cardKind === kind}
               onClick={() => patch({ anki: { ...prefs.anki, cardKind: kind } })}
             >
               {t(`settings.analysis.anki.cardKind.${kind}`)}

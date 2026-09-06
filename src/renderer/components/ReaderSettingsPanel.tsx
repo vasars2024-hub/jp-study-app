@@ -124,6 +124,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
             <button
               key={f.id}
               className={`sp-seg-btn ${s.flow === f.id ? 'active' : ''}`}
+              aria-pressed={s.flow === f.id}
               onClick={() => set({ flow: f.id })}
             >
               {t(f.labelKey)}
@@ -139,6 +140,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
             <button
               key={w.id}
               className={`sp-seg-btn ${s.writingMode === w.id ? 'active' : ''}`}
+              aria-pressed={s.writingMode === w.id}
               onClick={() => set({ writingMode: w.id })}
               lang="ja"
             >
@@ -155,6 +157,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
             <button
               key={opt.id}
               className={`sp-seg-btn ${s.theme === opt.id ? 'active' : ''}`}
+              aria-pressed={s.theme === opt.id}
               onClick={() => set({ theme: opt.id })}
             >
               {t(opt.labelKey)}

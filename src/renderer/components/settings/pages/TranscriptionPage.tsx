@@ -79,6 +79,7 @@ export default function TranscriptionPage() {
           <button
             type="button"
             className={`sp-seg-btn ${whisperDevice === 'auto' ? 'active' : ''}`}
+            aria-pressed={whisperDevice === 'auto'}
             onClick={() => chooseWhisperDevice('auto')}
             title={t('settings.transcription.gpuTitle')}
           >
@@ -87,6 +88,7 @@ export default function TranscriptionPage() {
           <button
             type="button"
             className={`sp-seg-btn ${whisperDevice === 'cpu' ? 'active' : ''}`}
+            aria-pressed={whisperDevice === 'cpu'}
             onClick={() => chooseWhisperDevice('cpu')}
             title={t('settings.transcription.cpuTitle')}
           >

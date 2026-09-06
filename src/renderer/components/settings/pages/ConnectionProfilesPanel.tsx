@@ -135,6 +135,7 @@ export default function ConnectionProfilesPanel() {
               key={preset}
               type="button"
               className={`sp-seg-btn ${active.preset === preset ? 'active' : ''}`}
+              aria-pressed={active.preset === preset}
               onClick={() => guard(
                 () => applyConnectionPreset(document, active.id, preset, {
                   now: nowIso(),

@@ -1836,6 +1836,7 @@ export function MediaTranscriptionControls({ state }: { state: MediaState }) {
       <div className="sp-seg media-modelseg" role="group" aria-label={t('media.lang.ariaLabel')}>
         <button
           className={`sp-seg-btn ${state.subLang === 'ja' ? 'active' : ''}`}
+          aria-pressed={state.subLang === 'ja'}
           onClick={() => {
             state.setSubLang('ja');
             setStudyLang('ja');
@@ -1847,6 +1848,7 @@ export function MediaTranscriptionControls({ state }: { state: MediaState }) {
         </button>
         <button
           className={`sp-seg-btn ${state.subLang === 'zh' ? 'active' : ''}`}
+          aria-pressed={state.subLang === 'zh'}
           onClick={() => {
             state.setSubLang('zh');
             setStudyLang('zh');
@@ -2189,6 +2191,7 @@ export function MediaKindFilter({ state }: { state: MediaState }) {
           key={k}
           type="button"
           className={`sp-seg-btn ${state.kindFilter === k ? 'active' : ''}`}
+          aria-pressed={state.kindFilter === k}
           onClick={() => state.setKindFilter(k)}
         >
           {t(`media.kind.${k}`)}

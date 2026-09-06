@@ -83,18 +83,21 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                 <div className="sp-seg">
                   <button
                     className={`sp-seg-btn ${settings.spreadPageCount === 1 ? 'active' : ''}`}
+                    aria-pressed={settings.spreadPageCount === 1}
                     onClick={() => onChange({ spreadPageCount: 1, spreadPageOffset: 0 })}
                   >
                     {t('manga.settings.spread.single')}
                   </button>
                   <button
                     className={`sp-seg-btn ${settings.spreadPageCount === 2 && settings.spreadPageOffset === 0 ? 'active' : ''}`}
+                    aria-pressed={settings.spreadPageCount === 2 && settings.spreadPageOffset === 0}
                     onClick={() => onChange({ spreadPageCount: 2, spreadPageOffset: 0 })}
                   >
                     {t('manga.settings.spread.double')}
                   </button>
                   <button
                     className={`sp-seg-btn ${settings.spreadPageCount === 2 && settings.spreadPageOffset === 1 ? 'active' : ''}`}
+                    aria-pressed={settings.spreadPageCount === 2 && settings.spreadPageOffset === 1}
                     onClick={() => onChange({ spreadPageCount: 2, spreadPageOffset: 1 })}
                   >
                     {t('manga.settings.spread.doubleOdd')}
@@ -142,18 +145,21 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                 <div className="sp-seg">
                   <button
                     className={`sp-seg-btn ${settings.readerLayout === 'ltr' ? 'active' : ''}`}
+                    aria-pressed={settings.readerLayout === 'ltr'}
                     onClick={() => onChange({ readerLayout: 'ltr' })}
                   >
                     {t('manga.settings.layout.ltr')}
                   </button>
                   <button
                     className={`sp-seg-btn ${settings.readerLayout === 'ttb' ? 'active' : ''}`}
+                    aria-pressed={settings.readerLayout === 'ttb'}
                     onClick={() => onChange({ readerLayout: 'ttb' })}
                   >
                     {t('manga.settings.layout.ttb')}
                   </button>
                   <button
                     className={`sp-seg-btn ${settings.readerLayout === 'rtl' ? 'active' : ''}`}
+                    aria-pressed={settings.readerLayout === 'rtl'}
                     onClick={() => onChange({ readerLayout: 'rtl' })}
                   >
                     {t('manga.settings.layout.rtl')}
@@ -253,12 +259,14 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                 <div className="sp-seg">
                   <button
                     className={`sp-seg-btn ${settings.pageSelectorPosition === 'left' ? 'active' : ''}`}
+                    aria-pressed={settings.pageSelectorPosition === 'left'}
                     onClick={() => onChange({ pageSelectorPosition: 'left' })}
                   >
                     {t('manga.settings.pageSelectorPosition.left')}
                   </button>
                   <button
                     className={`sp-seg-btn ${settings.pageSelectorPosition === 'bottom' ? 'active' : ''}`}
+                    aria-pressed={settings.pageSelectorPosition === 'bottom'}
                     onClick={() => onChange({ pageSelectorPosition: 'bottom' })}
                   >
                     {t('manga.settings.pageSelectorPosition.bottom')}
