@@ -32,12 +32,15 @@ import { useStudyReadiness } from '../renderer/useStudyReadiness';
 import { useSeanimeConnection } from './useSeanimeConnection';
 // The adopted surface's in-host location, owned by `vendor/seanime-web/lib/navigation.ts`.
 //
-// RELATIVE, not the `@/` alias, and that is load-bearing: the alias exists only in
-// `vite.renderer.config.ts`, and `vitest.config.ts` declares none — so `@/lib/navigation`
-// here took out 25 tests across four suites that mount this component
-// (mediaWorkspaceHostReview, mediaWorkspaceHostRecovery, readerResumeHandoff,
-// resumeLastShellHandoff) with "Failed to resolve import". Both spellings resolve to the
-// same absolute file, so this is still exactly one module and one store.
+// RELATIVE, not the `@/` alias. When this was written `vitest.config.ts` declared no
+// alias at all, so `@/lib/navigation` here took out 25 tests across four suites that mount
+// this component (mediaWorkspaceHostReview, mediaWorkspaceHostRecovery, readerResumeHandoff,
+// resumeLastShellHandoff) with "Failed to resolve import".
+//
+// That reason EXPIRED at `36e29661`, which added `'@': vendor/seanime-web` to
+// `vitest.config.ts` (boss audit F3 — a workaround left behind, unmarked, by its own fix).
+// Both spellings now resolve to the same absolute file either way, so this is still exactly
+// one module and one store, and the relative form is kept only because it is unambiguous.
 import { resetHostLocation } from '../../vendor/seanime-web/lib/navigation';
 
 const MediaWorkspace = React.lazy(() => import('./MediaWorkspace'));
