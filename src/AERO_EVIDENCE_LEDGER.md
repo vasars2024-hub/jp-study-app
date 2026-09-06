@@ -36,3 +36,14 @@ This ledger records current evidence without staging or undoing that relocation.
   `6a06e067`, `8c728ff5`, merged ancestors, `c0a87c93`). F4 is already amended
   in the scorecard at fd4a9363 despite the stale handoff. F3's comment repair is
   foreign-dirty and was preserved. No new audit-driven product work is owed.
+
+## 2026-09-06 codexB — clean-tip gate correction after 70464e9e
+
+- Detached `70464e9e`: full Vitest 14,409 passed / 1 failed / 6 skipped;
+  1,121 passed files / 1 failed / 1 skipped. Failure: visualizerIdleAction pinned
+  `setGuidedPage(options?.guided ? next : null)` while cf0528f6 renamed the
+  resolved page to `target`. Updated the guard to require the exemption and
+  `setPage` to use the same value, regardless of its spelling.
+- Detached i18n exits 0 (12,539 keys); architecture exits 0 (23 known findings,
+  2 pending, none new). Shared catalogs have two additional foreign Immersion
+  keys, which are intentionally not part of the committed snapshot.

@@ -54,7 +54,12 @@ describe('Visualizer idle recovery action', () => {
     // is bounced straight back Home when Advanced mode is off, so the route must carry the
     // same temporary guided exemption as the Agent's explicit settings handoff.
     expect(settingsApp).toContain("navigate(d.page, d.settingId, { guided: true })");
-    expect(settingsApp).toContain('setGuidedPage(options?.guided ? next : null)');
+    // The redirect may canonicalize the requested page (Monitors → Display).
+    // Pin the relationship, not the local variable's spelling: the exemption
+    // must name the page actually displayed or Advanced-off navigation bounces.
+    const guidedPage = settingsApp.match(/setGuidedPage\(options\?\.guided \? (\w+) : null\)/)?.[1];
+    expect(guidedPage).toBeTruthy();
+    expect(settingsApp).toContain(`setPage(${guidedPage})`);
   });
 
   it('anchors the dock to the stage against the shared role class it shares an element with', () => {
