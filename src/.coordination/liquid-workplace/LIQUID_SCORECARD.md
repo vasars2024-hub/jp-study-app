@@ -8684,3 +8684,65 @@ content prerequisite, not a blocker.
 `sampled-out:` `player` (1 open, not scored — no matched library item), and the two cat2/cat8
 cells on `immersion` and the cat8 on `anki`, which are different categories rather than
 skipped surfaces. Named so the skip is not silent.
+
+## 2026-09-06 00:20 EDT — primary — `anki` cat8 CLOSES 10/10, and the blocker was a RACE, not a defect
+
+### `anki` cat8 — PASS 10/10, `6006b3aa`, all five bars measured in ONE run
+
+    rawKeys 0 in all four languages (basis 10,508 catalog keys / 110 namespaces)
+    placeholders 0 · mutePairs 0 · statesNamed "1 of 1 observable" · languagesDiffer true
+    CONTROL: 3 plants, 0,0,0 -> 1,1,1 -> 0,0,0, backToBaseline true
+
+The drive is `--drive-click` on "Add a card by hand", the surface's own disclosure:
+`surfaceChanged true`, `restored true`, undo label read back as "Add a card by hand".
+Expanding it mounts a form whose five inputs are EMPTY, so their placeholders become
+painted `emptyFormPrompts` — `empty.hosts 5`, messages including "study; diligence" and
+"毎日日本語を勉強します。" That is why the cell could never score at rest: `.anki-view` at
+rest has **zero** elements matching any of cat8's four state-class patterns, painted or not
+(`unpaintedHosts 0` as well), because this surface's own states are `.status-banner ok|warn|bad`
+and `div.banner`, none of which the vocabulary contains.
+
+### CORRECTION 67 — the drive leg looked for its target before the surface came back
+
+The identical `--drive-click` selector resolved BY HAND both before and after a run
+(`fromAnkiRoot: true`, `fromDoc: true`) and refused INSIDE it — twice, reproducibly — but
+only when `--langs` ran first. `clickLang(restoreTag)`'s catalog is a dynamic import, so
+`.anki-workspace-main`'s children are transiently different while it resolves. Corrections 49
+and 50 replaced two fixed sleeps with polls for this exact cause and stopped one leg short of
+this one. Now polled, 6.4 s budget, same refusal after it, with a stderr witness when the wait
+was non-zero. A wrong selector is still caught; it is no longer caught by a race.
+
+### DISCLOSED — `languagesDiffer` is TRUE on real strings, and its COUNT overstates the case
+
+`diffRuns 48` for each of ja/zh/ru, against 54 English runs — but the per-language reading is
+**18 runs, not 54**, so ~36 of those 48 are runs that were ABSENT, not runs that moved.
+Position 7 says why: `was "Recheck"` -> `now "確認中…"`, and position 8 `was "Connected — 84
+decks…"` -> `now "Ankiとの接続を確認中…"`. The language switch re-runs the connection check, so
+the workspace is unmounted and the surface was measured in its CHECKING state in all three
+non-English legs. The bar is still earned — every one of the six sampled positions in every
+language is genuinely translated, and rawKeys is 0 in each — but `48` is not 48 translated
+runs and must not be quoted as one. **Correction 68, for the next turn:** `settleLang` polls
+for `<html lang>` landing, not for the surface returning, so any surface that re-fetches on a
+language change is compared against a different state of itself.
+
+### THE TRAP THAT COST THIS TURN'S FIRST HOUR — `cat8` IGNORES YOUR CWD
+
+The last handoff says to run probes as `cd jp-wt-filesapp && node <main-tree>/probe.cjs` so the
+right `debug/bridge.json` is read. **That is true of `cat7-perf.cjs` and FALSE of
+`cat8-honest-states.cjs`**, which resolves the bridge from `__dirname` + `../../../../debug`
+— i.e. always the tree the SCRIPT lives in. Every cat8 run went to the shared app (39273,
+pid 26992) while I was setting up pid 2520. Symptom to recognise: the surface reads values you
+did not put there. Mine read `fm-input` `{expression:zh}` where the instance I was driving held
+`{expression}` — two different profiles, and I nearly filed a spontaneous-value defect.
+
+### RULE D — liquid. Closed this turn: **1 cell. 188 -> 189 of 192, 3 left.**
+
+To 2026-09-07 11:00 EDT, measured 00:20: **34 h 40 min = 1.444 days**.
+`3 / 1.444 = 2.08 cells/day` required. Trailing: 164 of 192 at 09-05 09:06 -> 189 at 09-06
+00:20, i.e. **25 cells in 15.2 h = 39.5/day**. Required is far below trailing, so **TARGET AT
+RISK is NOT declared** — with the standing caveat that much of that 25 came from removing
+instrument blockers, and this cell is another of those rather than a product repair.
+
+The three left: **`player` cat7, `immersion` cat2, `immersion` cat8.**
+`sampled-out:` `player` (cat7 only, still needs a MATCHED library item), and `immersion`
+cat2/cat8, which are different categories rather than skipped surfaces.
