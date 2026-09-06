@@ -67,6 +67,7 @@ import {
   qbitAddStopped,
   qbitAwaitFiles,
   qbitAwaitMetadata,
+  qbitDiscardSubtitleTorrent,
   qbitReapSubtitleOrphans,
   qbitSetFilePriorities,
   qbitStart,
@@ -654,6 +655,44 @@ async function acquireAll(
   // what makes a failed fetch retryable at all.
   const preexisting = added.value === 'already-present';
 
+  const outcome = await acquireAdded(candidate, options, qbit, token, hash, preexisting);
+
+  // Cancellation, and only cancellation, tidies up after itself. An ordinary
+  // failure deliberately leaves the torrent behind so the next attempt can
+  // `adopt` it and the sweep at the top of the next acquisition can clear it —
+  // but a cancel may be the last thing this app ever asks of the client, and by
+  // then the torrent has usually been *started*. Left alone it keeps
+  // transferring on the user's connection for a record nobody will write.
+  //
+  // Checked on `isCancelled` rather than on the reason string so a later change
+  // to that wording cannot silently disarm the cleanup, and skipped entirely
+  // when the torrent was the user's: `preexisting` was never started by us and
+  // never wore our category, so there is nothing of ours to withdraw.
+  if (!outcome.ok && !preexisting && options.isCancelled?.()) {
+    const discarded = await qbitDiscardSubtitleTorrent(qbit, hash);
+    // A failed tidy-up is reported, never promoted over the cancellation: the
+    // caller asked to stop, and telling them the delete failed instead of that
+    // they stopped would be the wrong answer to the question they asked.
+    if (!discarded.ok) {
+      scraperLog(
+        'warn',
+        'torrents',
+        `A cancelled subtitle fetch could not be removed from qBittorrent: ${discarded.reason}`,
+      );
+    }
+  }
+  return outcome;
+}
+
+/** The post-add half of `acquireAll`, split out so cancellation has one hook. */
+async function acquireAdded(
+  candidate: ProviderSubtitleCandidate,
+  options: { isCancelled?: () => boolean; timeoutMs?: number },
+  qbit: { config: NyaaAcquisitionConfig['qbittorrent'] },
+  token: NyaaFetchToken,
+  hash: string,
+  preexisting: boolean,
+): Promise<NyaaFetchAllOutcome> {
   // Not `qbitFiles`: a magnet has no file list yet at this point, and reading it
   // once returned an empty array that every route then read as "no subtitles".
   const files = await qbitAwaitMetadata(qbit, hash, {

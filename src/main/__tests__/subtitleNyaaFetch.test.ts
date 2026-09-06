@@ -32,7 +32,8 @@ vi.mock('electron', () => ({
 }));
 
 const { nyaaAvailability, nyaaFetch, nyaaFetchAll, METADATA_TIMEOUT_MS } = await import('../subtitleNyaaSource');
-const { resetQbitSessions } = await import('../scraper/qbittorrent');
+const { qbitDiscardSubtitleTorrent, resetQbitSessions } = await import('../scraper/qbittorrent');
+const { recentScraperLogs, resetScraperLogs } = await import('../scraper/logBus');
 const { setScraperStoreRoot } = await import('../scraper/store');
 const { setScraperSecret } = await import('../scraper/credentials');
 
@@ -482,6 +483,138 @@ describe('nyaaFetch — what an interrupted run left in the client', () => {
 
     expect((await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 })).ok).toBe(true);
     expect(calls).not.toContain('/api/v2/torrents/delete');
+  });
+});
+
+// Track 9 gate 15: interrupting an in-flight acquisition leaves no
+// half-registered record and no orphaned torrent in `jp-study-subtitles`.
+//
+// The sweep above is the *next* run's tidy-up and cannot help the run being
+// interrupted: it fires only at the top of the next acquisition, which may
+// never happen. Everything here is about the cancelled run cleaning up after
+// itself, and the two controls are what keep that from becoming a licence to
+// delete.
+describe('nyaaFetch — a run the user interrupted', () => {
+  /** Cancels once the torrent has actually been started, not before. */
+  function cancelAfterStart(): () => boolean {
+    return () => calls.includes('/api/v2/torrents/resume');
+  }
+
+  it('removes the torrent it added, with its data, once it is cancelled mid-transfer', async () => {
+    // Started and transferring: the expensive case, and the one where leaving
+    // it behind costs the user bandwidth for a record nobody will write.
+    stallOnStart = true;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetchAll(candidate('sub-pack'), config(), {
+      timeoutMs: 5_000,
+      isCancelled: cancelAfterStart(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toBe('Cancelled.');
+    expect(calls).toContain('/api/v2/torrents/resume');
+    expect(deleteBodies).toHaveLength(1);
+    expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe(HASH);
+    expect(new URLSearchParams(deleteBodies[0]).get('deleteFiles')).toBe('true');
+  });
+
+  it('returns no files at all, so nothing downstream can write a half record', async () => {
+    // The record is written from `outcome.files` at the discovery seam, so a
+    // cancelled fetch that returned even one file would be a half record. It
+    // returns none even though a complete, readable file is sitting there.
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 1, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetchAll(candidate('sub-pack'), config(), {
+      timeoutMs: 5_000,
+      isCancelled: () => true,
+    });
+
+    expect(result.ok).toBe(false);
+    expect('files' in result).toBe(false);
+  });
+
+  it('removes a torrent it adopted from its own earlier run', async () => {
+    // `adopted` is this app's own leftover, so cancelling still withdraws it —
+    // the only thing `preexisting` protects is a torrent that was never ours.
+    present = true;
+    presentCategory = 'jp-study-subtitles';
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetchAll(candidate('sub-pack'), config(), {
+      timeoutMs: 5_000,
+      isCancelled: () => true,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(deleteBodies).toHaveLength(1);
+    expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe(HASH);
+  });
+
+  // CONTROL 1, and the one that makes this safe: a torrent the user already
+  // had is never removed, however the run ends.
+  //
+  // The `deleteBodies` half alone does NOT discriminate the `preexisting`
+  // guard — the removal's own category check would refuse this torrent too, so
+  // dropping the guard still sends no delete. What it would do is ask the
+  // client about the user's torrent and then log a failed tidy-up naming it,
+  // which is a false alarm about something we never touched. That log is the
+  // assertion that makes the guard load-bearing.
+  it('CONTROL: never removes a torrent that was already the user’s, or complains about one', async () => {
+    present = true;
+    presentCategory = '';
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 1, priority: 1 }];
+    resetScraperLogs();
+
+    const result = await nyaaFetchAll(candidate('sub-pack'), config(), {
+      timeoutMs: 5_000,
+      isCancelled: () => true,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(deleteBodies).toEqual([]);
+    expect(calls).not.toContain('/api/v2/torrents/delete');
+    expect(recentScraperLogs().filter((line) => line.message.includes('could not be removed')))
+      .toEqual([]);
+  });
+
+  // CONTROL 2: the cleanup is cancellation-specific. An ordinary failure still
+  // leaves the torrent behind on purpose, because that is what makes the next
+  // attempt able to `adopt` it instead of answering "already in qBittorrent".
+  it('CONTROL: a fetch that fails without being cancelled leaves its torrent alone', async () => {
+    stallOnStart = true;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetchAll(candidate('sub-pack'), config(), { timeoutMs: 400 });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).not.toBe('Cancelled.');
+    expect(deleteBodies).toEqual([]);
+  });
+
+  // The guard inside the removal itself, tested directly because nothing in the
+  // acquisition can reach it: it asks the client whose torrent this is rather
+  // than trusting the caller, so a category that changed under us still refuses.
+  it('the removal refuses any torrent not wearing this app’s own category', async () => {
+    present = true;
+    presentCategory = 'jp-study';
+
+    const result = await qbitDiscardSubtitleTorrent({ config: qbitConfig }, HASH);
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/not one of this app’s subtitle fetches/);
+    expect(deleteBodies).toEqual([]);
+  });
+
+  it('the removal reports nothing-to-do rather than failing when the torrent is gone', async () => {
+    present = false;
+
+    const result = await qbitDiscardSubtitleTorrent({ config: qbitConfig }, HASH);
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value).toBe(false);
+    expect(deleteBodies).toEqual([]);
   });
 });
 
