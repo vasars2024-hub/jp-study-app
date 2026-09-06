@@ -4027,6 +4027,10 @@ export const en: Catalog = {
   'playlistEditor.reset.message': 'Reset Day cycle playlist and default time rules?',
   'playlistEditor.reset.confirm': 'Reset',
 
+  'credential.removeConfirm.title': 'Remove this credential?',
+  'credential.removeConfirm.message':
+    'Remove the stored {name} credential? The app keeps the only copy, so you will have to get it from the provider again to reconnect. This cannot be undone.',
+
   // Grammar view
   'grammar.intro':
     'JLPT N5–N1 and HSK 1–10 grammar, plus Practice builder, tests, and guides.',

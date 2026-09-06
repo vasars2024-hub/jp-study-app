@@ -4101,6 +4101,10 @@ export const ja: Catalog = {
   'playlistEditor.reset.message': 'Day cycle プレイリストと既定の時間ルールをリセットしますか？',
   'playlistEditor.reset.confirm': 'リセット',
 
+  'credential.removeConfirm.title': 'この認証情報を削除しますか？',
+  'credential.removeConfirm.message':
+    '保存されている {name} の認証情報を削除しますか？コピーはこのアプリにしかないため、再接続するには提供元から取得し直す必要があります。この操作は取り消せません。',
+
   // Grammar view
   'grammar.intro': 'JLPT N5〜N1 と HSK 1〜10 の文法、練習ビルダー、テスト、ガイド。',
   'grammar.mode.legend': '文法セクション',

@@ -140,15 +140,11 @@ describe('dialog text — every string a confirm shows is translated', () => {
       "alertDialog({\n  title: 'Wallpaper',\n  message: t(1),\n})",
     ];
     for (const src of preFix) {
-      const found: string[] = [];
       DIALOG_CALL.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = DIALOG_CALL.exec(src))) {
-        for (const field of USER_READ_FIELDS) {
-          const re = new RegExp('(^|[{,\\s])' + field + ':\\s*([' + "'" + '"' + BACKTICK + '])');
-          if (re.test(src)) found.push(field);
-        }
-      }
+      expect(DIALOG_CALL.test(src), src).toBe(true);
+      const found = USER_READ_FIELDS.filter((field) =>
+        new RegExp('(^|[{,\\s])' + field + ':\\s*([' + "'" + '"' + BACKTICK + '])').test(src),
+      );
       expect(found.length, src).toBeGreaterThan(0);
     }
   });

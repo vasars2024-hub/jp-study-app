@@ -4415,6 +4415,10 @@ export const ru: Catalog = {
   'playlistEditor.reset.message': 'Сбросить плейлист Day cycle и стандартные правила по времени?',
   'playlistEditor.reset.confirm': 'Сбросить',
 
+  'credential.removeConfirm.title': 'Удалить эти учётные данные?',
+  'credential.removeConfirm.message':
+    'Удалить сохранённые учётные данные {name}? В приложении хранится единственная копия, поэтому для повторного подключения их придётся снова получить у поставщика. Это действие нельзя отменить.',
+
   // Grammar view
   'grammar.intro': 'Грамматика JLPT N5–N1 и HSK 1–10, конструктор практики, тесты и гайды.',
   'grammar.mode.legend': 'Разделы грамматики',

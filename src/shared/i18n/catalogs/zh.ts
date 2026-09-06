@@ -4080,6 +4080,10 @@ export const zh: Catalog = {
   'playlistEditor.reset.message': '重置 Day cycle 播放列表和默认时间规则？',
   'playlistEditor.reset.confirm': '重置',
 
+  'credential.removeConfirm.title': '要移除此凭据吗？',
+  'credential.removeConfirm.message':
+    '移除已保存的 {name} 凭据？应用中保存的是唯一副本，要重新连接就必须再次从服务方获取。此操作无法撤销。',
+
   // Grammar view
   'grammar.intro': 'JLPT N5–N1 与 HSK 1–10 语法，含练习构建器、测试与指南。',
   'grammar.mode.legend': '语法板块',

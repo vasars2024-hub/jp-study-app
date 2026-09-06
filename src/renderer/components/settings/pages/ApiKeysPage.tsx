@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../ui';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useSettings } from '../SettingsContext';
 import SettingsCard from '../SettingsCard';
@@ -151,6 +152,16 @@ export default function ApiKeysPage() {
   };
 
   const remove = async (spec: CredentialSpec): Promise<void> => {
+    // The vault holds the only copy. Deleting one means going back to the provider to
+    // issue or re-copy a key, and this button sits beside Test, so a misclick is cheap
+    // to make and expensive to undo.
+    const ok = await confirmDialog({
+      title: t('credential.removeConfirm.title'),
+      message: t('credential.removeConfirm.message', { name: spec.label }),
+      confirmLabel: t('credential.remove'),
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(spec.id);
     try {
       switch (spec.store) {
