@@ -333,10 +333,35 @@ export function ContinueReadingRow({
 
 export function ReadingSiteGrid({ state }: { state: ReadingFinderState }) {
   const { t } = useT();
-  const { list, setSelected } = state;
+  const { list, setSelected, genre, length, furiganaOnly, pricing, levels, resetFilters } = state;
 
   if (list.length === 0) {
-    return <div className="res-empty muted">{t('reading.noMatches')}</div>;
+    // `resetFilters` used to be reachable ONLY from the View menu, and `AppChrome`
+    // renders its children bare — no menu bar at all — on every theme except the
+    // secret Aero/wired material sets. So on the default theme this empty state was
+    // a dead end: Genre=Classics alone reaches it, and nothing on screen undoes it.
+    // The escape belongs in the empty state itself, where the user already is.
+    // An EMPTY `levels` set filters nothing (see `list`'s `levels.size === 0 ||`),
+    // so it is not a narrowing and must not offer a reset that changes nothing.
+    const narrowed =
+      genre !== 'All' ||
+      length !== 'All' ||
+      furiganaOnly ||
+      pricing !== 'All' ||
+      (levels.size !== 0 && levels.size !== ALL_LEVELS.length);
+    return (
+      <div className="res-empty muted">
+        {t('reading.noMatches')}
+        {narrowed && (
+          <>
+            {' '}
+            <button type="button" className="rf-empty-reset" onClick={resetFilters}>
+              {t('reading.menu.showAll')}
+            </button>
+          </>
+        )}
+      </div>
+    );
   }
 
   return (

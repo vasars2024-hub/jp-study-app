@@ -24239,6 +24239,30 @@ html.lockscreen-widget-root #root {
   border: 1px solid rgba(95, 210, 154, 0.3);
 }
 
+/* The way out of an over-narrowed catalogue. Sized as a real target rather than
+   an inline link, because on the default theme it is the ONLY reset there is. */
+.rf-empty-reset {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-left: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rf-empty-reset:hover {
+  border-color: var(--accent);
+}
+.rf-empty-reset:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .rf-modal {
   width: min(620px, 100%);
 }
