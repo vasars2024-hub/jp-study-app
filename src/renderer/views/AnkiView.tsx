@@ -46,7 +46,15 @@ export default function AnkiView() {
       <ContextualSurface className="view-head">
         <p className="muted">{t('anki.intro')}</p>
         <div className="actions">
-          <button className="btn" onClick={state.check} disabled={loading}>
+          {/* DECLARED primary, and the declaration is the point rather than the colour.
+              cat5 Q1 read `entryPoints 0` and Q3 read `primaryAction: button.btn
+              (Save mapping), insideBodyViewport false` — the first control this surface
+              marks primary sat 856px down a 545px body, so the instrument answered "the
+              dominant task is the field-template save", which is not true of this
+              surface at all. Everything under this head is gated on `status?.connected`;
+              this button is the one control that is always present and the one that
+              unlocks the rest, so it is the entry point in fact and now says so. */}
+          <button className="btn primary" onClick={state.check} disabled={loading}>
             {loading ? t('anki.checking') : t('anki.recheck')}
           </button>
         </div>

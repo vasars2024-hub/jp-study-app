@@ -6469,13 +6469,31 @@ mark.lookup-mark,
   line-height: 1.5;
 }
 
+/* The far stop used to be the literal `#14141a`, and only a THEME-SPLIT contrast
+   walk finds that: measured 2026-09-05 by `cat5-ui-clarity.cjs` on `anki`, the
+   default dark palette read 0 failing at min 5.35:1 while `classic-light` read
+   **6 failing, worst 1.10:1** — `p.card-preview-label` on "gradient layer 1 of 1
+   on aside.lq-contextual". `--panel` is `#ffffff` in that theme, so the card
+   faded from white into near-black under `--text: #1e1e1e`, and every label in
+   the lower half of the card went invisible. Six of this app's themes are light.
+
+   Derived rather than re-hardcoded, the same move `--lq-anchor-bg` made for
+   `.lexicon-interlinear`: the far stop is now the theme's own panel pulled
+   toward the theme's own background, so it is darker than the near stop in a
+   dark palette and flat white in a light one. The dark reading cannot regress —
+   the mix resolves marginally LIGHTER than `#14141a` (~`#17151f`), which can
+   only raise contrast against light text. */
 .card-preview {
   position: sticky;
   top: 16px;
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 18px;
-  background: linear-gradient(165deg, var(--panel) 0%, #14141a 100%);
+  background: linear-gradient(
+    165deg,
+    var(--lq-anchor-bg, var(--panel)) 0%,
+    color-mix(in srgb, var(--lq-anchor-bg, var(--panel)) 78%, var(--bg)) 100%
+  );
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 .card-preview-empty {
@@ -6528,11 +6546,15 @@ mark.lookup-mark,
   color: var(--muted);
   margin-bottom: 6px;
 }
+/* Same defect, one element over, and fixed in the same pass rather than left to
+   surface later: `#121218` and a white hairline are both dark-palette literals,
+   so in a light theme the rendered card sat in a near-black plate the walk does
+   not reach (the faces are an `<iframe>`, whose runs it cannot measure). */
 .card-preview-frame {
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #121218;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
 }
 .card-preview-iframe {
   display: block;

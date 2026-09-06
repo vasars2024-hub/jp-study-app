@@ -8316,3 +8316,371 @@ Single biggest cause, and this turn changes the diagnosis: the previous six turn
 INSTRUMENT cannot score yet, and nobody had checked which.** anki cost one spec, not one
 product fix, and it moved two cells' worth of blockage in under an hour. Reported, not fixed by
 cutting scope.
+
+## 2026-09-05 19:40-20:55 EDT — primary2 — `player` goes 0 of 8 to **7 of 8** in one turn. The blocker was an EMPTY LIBRARY, and it had fabricated two cat4 defects.
+
+**Closed this turn: 7 cells. 177 -> 184 of 192, 8 left.** `sampled-out:` `immersion` (3 open),
+`translate` (1), `anki` (3) — not scored this turn, named so the skip is not silent.
+
+### What `player` actually is, settled and recorded rather than assumed
+
+Two different things were being called `player` and no entry said which the cell belonged to.
+Settled here under standing auto-approval: **the cell's subject is the `player` DESKTOP SECTION**
+— `AppSection.tsx:84` renders `<MediaCenterView initialTab="library" />`, the window titles
+itself `Media` (`DesktopShell.tsx:248`, `player: 'Media Center · Library'`) and its root is
+`.mc-root`. That is the surface cat1-cat6 and cat8 were driven on, via
+`--surface "@.fwin:has(.mc-root)"` and `--app mediaCenter`.
+
+`cat7-perf.cjs`'s `SPECS.player` is a **different host** — `@#media-workspace`,
+`playerFramesOnly` — because frame pacing can only be measured where a decoder runs, and
+correction 37 in that file already says so. The split is deliberate; cat7 is the one open cell.
+
+### The real blocker, and it is the third recorded instance of the same trap
+
+`l6-parity.js` HAS had a `mediaCenter` spec all along — `player` was never missing one. It read
+0 of 8 because **the private profile's media library was empty**, and every category scored on
+an empty library is a measurement of the empty state:
+
+    cat4, empty library     FAIL: horizontal + deadRegion. dead 13.8% / 0.6% / 19.1%
+                            `hiddenOverflowX: div.medialib-shell 129>126` at 260x170
+    cat4, 36 real items     PASS 10/10. dead 6.2% / 0.5% / 8.1%, hiddenOverflowX 0
+
+**Both "defects" were the empty state.** The 3.22px clip was `.medialib-empty__actions` — the
+two buttons of "Your library is empty" refusing to shrink at the window's own 260x170 floor —
+and the 19.1% dead band was the centred empty illustration in a maximized window. Neither
+exists once the library has content. Seeded through the product's own dialog-free IPC,
+`window.api.addMediaPaths([...36 real .mp4 paths from userData/downloads])`, reference in
+place, into `C:\tmp\jp-p2-profile` only.
+
+### Two instrument defects the populated library exposed — `3b00b053`
+
+1. **The cat6 driver was emptying the surface it scored.** The ONLY text input in the Media
+   window is `.mc-global-search input` (enumerated live — one node), so `dirtyField`'s generic
+   "first visible text field" rule typed the round-trip mark into the library's own filter.
+   `librarySearch` and `perItemActions` then read `cards=0` in BOTH presentations and scored
+   `na`: parity `6/6, na 2`, while the control — which runs after the mark is undone — read the
+   same rows `8/8` with `cards=18`. It still printed PASS. Same trap `captures` hit earlier
+   today, third shape, same already-supported answer: `noSafeInput: true`.
+2. **`librarySearch`'s mutation could not falsify.** It detached `.medialib-card[0]`, which was
+   `unarmable` on every empty profile the spec had ever run on, so nobody had ever seen it
+   fire. Armed on 36 items it did nothing: the row reads `cards > 0`, so 18 -> 17 leaves it
+   true (`fellRows: []`, VOID). Detaching every card would falsify it but `perItemActions`
+   counts cards too, so that mutation would fall two rows and prove neither. It now strips the
+   field's `placeholder` — this row's own half, read by nothing else.
+
+### One real product defect — `0dc0c038`
+
+**cat1 `targets32` FAILed on the grid/list segmented toggle.** Both buttons render exactly
+32x32 from `min-width: var(--lq-hit-target)`, and the container's content box is exactly 64px:
+two buttons, zero slack. The FIRST button's left edge therefore coincides with the container's
+1px border, and Chromium gives that boundary sliver to the container.
+
+**Not the `hit-walk-step-caps-at-31-5` ceiling, and I checked before touching CSS.** An
+independent 1/64px `elementFromPoint` scan with the `<details>` forced open read
+`ownedW 31.641` for button 0 (left blocker `DIV.medialib-view-toggle`, right blocker its
+sibling) against `32.969` for button 1, which collects the snap on its own outer side. The
+walk bisects to 0.05; 0.36 is seven times that. Container padding cannot carry the fix — the
+padding area belongs to the container. Only the button's own box can, which is what "real
+headroom above the token" means: `.lq-hit` is `max(100%, 32px)`, a floor and not a margin.
+After `+ 2px`: **33.641 and 34.969 owned**, `belowFloorByHit 0`, `stolenCount 0`.
+
+### The seven cells, each with its control
+
+    cat1  PASS 10/10  belowFloorByHit 0, stolenCount 0, occluded 0, unreachable 0
+                      CONTROL: 6 plants, all six bars moved, backToBaseline, rectDrift 0
+    cat2  PASS 10/10  --both-presentations; liquidTotal 6 = standardTotal 6, deadEnds 0,
+                      modalTraps 0, scrollTraps 0 (4 line-clamped titles excluded by rule 5),
+                      worstRecv 27 ms.  CONTROL: deadEnd/modalTrap/scrollTrap 0,0,0 -> 1,1,1 -> 0,0,0
+    cat3  PASS 10/10  --presentation liquid; 24 regions, eligible 6, liquidTreated 6,
+                      denseWorkOnTranslucent 0.  CONTROL: "category 3 instrument is proven"
+    cat4  PASS 10/10  dead 6.2 / 0.5 / 8.1 %, clipped 0, overlaps 0, hiddenOverflowX 0,
+                      all three sizes, restored
+    cat5  PASS 10/10  --shell-chrome ".mc-sidebar,.mc-topbar,.mc-playerbar"
+                      CONTROL: fired on Q2, Q3, Q4, Q5, Q10
+    cat6  PASS 10/10  parity 8/8 standard = 8/8 liquid, na 0, round trip held,
+                      8 of 8 mutations armed, every one flipped exactly its own row
+    cat8  PASS 10/10  --langs after opening Settings > Appearance in the same OS window;
+                      rawKeys/placeholders/mutePairs/statesNamed/languagesDiffer all true,
+                      statesNamed "1 of 1 observable".  CONTROL: 3 plants, 0,0,0 -> 1,1,1 -> 0,0,0
+
+### cat7/`player` STAYS OPEN, and the reason is a product refusal I will not overrule
+
+`--surface player` is `playerFramesOnly`, so its only leg is `--player-frames` against
+`#media-workspace video`. Drove the whole product path — library card -> Video page ->
+"Open in the media workspace" — and the workspace mounted **no `<video>` at all**. It said why,
+in plain words:
+
+> Playback Error — The media server will not stream this file until it is matched to a series
+> in your library. That is a metadata gap, not a codec problem. (local file has not been
+> matched to a media: C:\...\jp-study-app\downloads\...)
+
+That is an HONEST state, not a defect, and it is the same finding
+`unmatched-file-reads-as-codec-failure` already records. **To close cat7/`player` a library
+item must first be MATCHED to a series** — that is the next worker's opening slice, not a
+CSS or harness problem.
+
+### Traps this turn paid for, so the next worker does not
+
+- **A REFUSING LEG STRANDS APP STATE.** cat2's first attempt navigated to the Video page and
+  its undo then found no rail; a later step left the **media workspace open as a
+  `role=dialog aria-modal=true` fixed overlay at z-index 9999** covering the whole desk. Every
+  subsequent `--surface` run refused `occluded: ... resolves to div.media-workspace-route`.
+  A synthetic `.click()` on its Close button does nothing; a real `/click` at its coordinates
+  closes it.
+- **A SECOND FWIN OCCLUDES THE FIRST.** Opening Settings for cat8's `--langs` leg put it above
+  the Media window and cat2 then refused on every target. Raise the scored window with
+  `os:open` (the product's own path) before driving, and close Settings after.
+- **Git Bash mangles a bare `/route` argument** into `C:/Program Files/Git/route`, and node
+  then throws `ERR_UNESCAPED_CHARACTERS` on a bridge POST. Pass the route without its leading
+  slash and add it inside the script.
+
+### RULE D — liquid. Closed this turn: **7 cells. 184 of 192, 8 left.**
+
+To 2026-09-07 11:00 EDT, measured 20:53: **38 h 07 min = 1.588 days**.
+`8 / 1.588 = 5.04 cells/day` required.
+Trailing, and the honest window is today: the track was **164 of 192 at 09:06 EDT** (the
+`backup` recount above) and is **184 at 20:53** — 20 cells in 11.8 h. Required 5.04 is
+**below** that, so **TARGET AT RISK is NOT declared this turn.**
+
+**The caveat matters more than the headline and is stated first-class:** most of today's 20
+cells came from removing INSTRUMENT blockers, not from building product — a missing `anki`
+spec, an emptied `mediaCenter` surface, an empty media library. That supply is nearly
+exhausted, and the 8 that remain are the ones no instrument fix reaches: `translate` cat7 and
+`immersion` cat7 (both open on the same main-process GC block, `de41fab4`), `player` cat7
+(needs a matched library item), `immersion` cat2/cat8, and `anki` cat5 + cat7 + cat8. Do not
+extrapolate 40 cells/day; the same warning RULE E carries about its own 6 -> 25 jump applies
+here word for word.
+
+### GATES at `ec1b850a` — and the one failure is the known flake, named and re-run
+
+    npx vitest run                1111 files: 1109 passed / 1 failed / 1 skipped
+                                  14,253 tests: 14,246 passed / 1 failed / 6 skipped
+    node tools/i18n-check.cjs     EXIT 0 — 12,539 English keys, all translated in ja/zh/ru
+    node tools/architecture-audit.cjs  EXIT 0 — "Nothing new", 2 known pending
+    npx eslint src/renderer/views/AnkiView.tsx   EXIT 0
+
+The single failure is
+`src/shared/__tests__/extensionPopup.test.ts > transcription pill > renders the cue count for a
+video already transcribed`, and it is a **20 s TIMEOUT, not an assertion**. Re-run alone
+immediately afterwards: **14 of 14 passed.** None of this turn's five commits touches the
+extension popup, the transcription path or anything either imports; the touched set is
+`l6-parity.js`, `mediaLibrary.css`, `styles.css`, `AnkiView.tsx` and this file.
+
+Disclosed rather than rounded to green, with its own caveat: this run happened in the
+**live-app worktree with the private Electron instance and its Vite dev server up**, which
+`vitest-in-the-live-app-worktree` records as inflating exactly this kind of timing-sensitive
+suite. So "1 failed" is a real reading of a loaded machine, and "14 of 14 alone" is a real
+reading of an idle one. Neither is a regression.
+
+### Correction to my own count above: **8 cells this turn, not 7. 185 of 192, 7 left.**
+
+`anki` cat5 CLOSED after that section was written (`ba3370fa` fixed its Q5 light-theme
+contrast, `ec1b850a` its Q1/Q3 entry point), and cat5 re-measured **PASS 10/10** with its
+control firing on Q2, Q3, Q4, Q5, Q10. So the turn total is **8 cells, 177 -> 185 of 192,
+7 left**, and the required rate is `7 / 1.570 = 4.46 cells/day` to 2026-09-07 11:00 EDT
+measured at 21:20. The seven: `player` cat7, `translate` cat7, `immersion` cat7 / cat2 / cat8,
+`anki` cat7 / cat8 — **three of the seven are cat7**, all on the same main-process GC block.
+
+---
+
+## 2026-09-05 21:30-22:40 EDT — primary2. cat7's main-block bar: the mechanism, found and removed
+
+### First, a control the four standing cat7 refusals never ran
+
+`main_max_ms` is `tools/liquid-interaction-probe.ps1:551-575` timing `GET /health` from
+**PowerShell**, at 15 ms cadence, and taking the max. Nothing had ever established that the
+outlier is MAIN blocking rather than the client stalling. So the same loop was re-run from
+**node**, on the same live instance (pid 25124, uptime 10,580 s), 60 s:
+
+    samples 1,941   p50 0.8 ms   p95 8.6   p99 182.7   MAX 521.8   over100 49   over500 1
+    worst at t = 11.8 / 16.2 / 17.1 / 20.2 / 29.1 / 37.3 / 46.3 / 57.3 s
+
+Two independent clients, two different runtimes, the same 450-520 ms outliers at a ~9 s
+cadence. **The instrument is exonerated: main really blocks.** `de41fab4`'s attribution to
+main's own major GC is confirmed rather than inherited.
+
+### Then the mechanism, from main's own allocation profile
+
+`/eval` is renderer-only and `/heap-snapshot` postdated the running main, so main was opened
+another way: `process._debugProcess(<main pid>)` attaches the node inspector to a live
+Electron main on Windows, and `Runtime.evaluate` then runs in main's context
+(`require` is not global there — `process.mainModule.require` is). V8's **sampling heap
+profiler** over 60 s of an idle app:
+
+    TOTAL 340.1 MB / 60 s = 5.67 MB/s
+    335.9 MB  98.8%  parseJSONFromBytes @ undici     <- under runPoll
+      2.0 MB   0.6%  runPoll @ main-*.js
+
+**98.8% of main's allocation, with the app idle, is AnkiConnect JSON.** `runPoll`
+(`src/main/anki/intervals.ts`) walks every profile's `syncQuery`; the default profile's is
+`deck:*` = **155,384 notes**, and `kickPoll` single-flights, so a poll that cannot finish
+inside its 5-minute period simply runs back to back forever. Main was permanently mid-poll.
+
+### The payload, measured against the user's own Anki (84 decks, AnkiConnect 6)
+
+Sampled **evenly across all 155,384 notes**, scaled to one full poll:
+
+    notesInfo      303.5 MB      cardsInfo   6,794.6 MB
+    getIntervals     0.5 MB      areSuspended    1.0 MB      findNotes  2.2 MB
+
+`cardsInfo` averages 45 KB per card because it returns the note type's CSS and the fully
+rendered question and answer for every card. The poll read **two numbers** off it.
+
+**A first pass sampled the oldest 500 note ids and reported 44.8 MB / 160.4 MB.** That is
+wrong by 6.8x and 42x — the oldest notes are the cheapest — and it is published in
+`49e7ed99`'s message. `a36b6ea5` corrects it upward. Sampling bias, named so it is not
+repeated: an id-ordered prefix of an Anki collection is not a sample of it.
+
+### Two product commits
+
+`49e7ed99` — `getIntervals` + `areSuspended` replace `cardsInfo`. Equivalence is MEASURED,
+not argued: over 1,539 cards sampled across the whole collection the clamped interval agreed
+**1,539/1,539** and `areSuspended` agreed with `queue === -1` **1,539/1,539**; the 8 raw
+disagreements are negative learning steps the existing clamp already absorbs. The zip is
+positional and a length mismatch is REFUSED, not guessed; refusal and an unsupported host
+both latch a `cardsInfo` fallback for the process.
+
+`a36b6ea5` — the note projection (fields, note type, tags, card list) is cached by note id
+and only a rotating twelfth is re-read per poll. Scheduling stays fresh for every card on
+every poll. Tradeoff stated in the commit: an expression/tag/card-list edit can be up to an
+hour stale; intervals never are.
+
+Per full poll: **7,098 MB -> ~27 MB**, a 99.6% cut.
+
+### Mutation controls — and two that did NOT fire the first time
+
+Fired: drop the positional length guard; never latch the fallback; pin the thin `suspended`
+projection to false; drop the eviction; drop the rotation; freeze the rotation cursor;
+ignore the epoch; cache the card state.
+
+**Did not fire, and the TEST was wrong, not the code.** `second.length < 24` plus
+`every(sameSlice)` is satisfied by an EMPTY array, so deleting the rotation outright read
+green — the empty-denominator trap, again. It now names both ids exactly. And evicting a
+departed note changes no entry at all, because the fold is rebuilt from the live id list
+either way; the only observable consequence is unbounded cache growth, and that is what the
+test asserts now, through `noteProjectionCount()`.
+
+**Still did not fire, and DISCLOSED rather than papered over:** deleting `Math.max(0, …)`
+from either card-state path leaves every test green, because the fold seeds `maxIvl = 0` and
+takes `Math.max` per card. The clamp is unreachable through this API. It is kept for
+`readCardStates`' own contract and the test file says plainly that nothing earns it.
+
+### LIVE, on the private instance, before and after — same instrument, same routes
+
+The app was restarted onto the rebuilt main (main-process code does not hot-reload) and
+re-profiled. `projectNote` and `refreshNoteProjections` appear in the after-profile, so the
+window did contain a real poll — this is a poll being cheap, not a poll not happening.
+
+    main allocation, V8 sampling heap profiler, app idle
+      before   340.1 MB / 60 s  = 5.67 MB/s   98.8% undici parseJSONFromBytes
+      after     21.5 MB / 200 s = 0.11 MB/s   undici absent from the top 6
+
+    main /health round trip, node client, 15 ms cadence
+      before   1,941 samples   p50 0.8   p99 182.7   MAX 521.8   over100 49   over500 1
+      after    3,421 samples   p50 0.9   p99   2.6   MAX  60.2   over100  0   over500 0
+
+    /mem       externalMb 1,420.4 -> 93.8
+
+**52x less allocation.** At 5.67 MB/s a 1.3 GB old space refills in ~4 minutes, which is the
+~9 s major-GC cadence the first sampler saw; at 0.11 MB/s the same fill takes ~3.3 hours,
+and most of it is short-lived.
+
+**The honest caveat, stated first-class:** the after-latency was taken on a process 5
+minutes old, and a young main would read well regardless. It is corroboration, not the
+proof. The proof is the allocation rate, which is what decides whether old space ever
+reaches V8's major-GC trigger at all.
+
+### What this DOES and DOES NOT close
+
+**It does not close a cell.** No cat7 was scored this turn. What it removes is the blocker
+four cat7 cells share — `player`, `translate`, `immersion`, `anki` — which `de41fab4`
+recorded and no turn since has been able to get past. Those four are RUNNABLE now and were
+not this morning. Scoring them is the next turn's opening slice.
+
+Claiming them here would be exactly the false credit this scorecard has withdrawn before.
+
+### RULE D — liquid. Closed this turn: **0 cells. 185 of 192 stands, 7 left.**
+
+To 2026-09-07 11:00 EDT, measured 22:25: **36.58 h = 1.524 days**.
+`7 / 1.524 = 4.59 cells/day` required.
+Trailing 10-turn, this track: today went **164 (09:06) -> 185 (21:20) -> 185 (22:25)**,
+i.e. 21 cells in 13.3 h = 37.9/day nominal.
+
+Required 4.59 is below trailing, so **TARGET AT RISK is NOT declared** — but read the
+caveat, which is the same one the last two turns wrote and which this turn is evidence for:
+almost all of that 21 came from removing INSTRUMENT blockers, and this turn spent itself
+removing a PRODUCT blocker and closed nothing. A turn that closes 0 cells is what the
+remaining seven look like. The single biggest cause is that four of the seven are cat7 and
+cat7 is the most expensive category in the rubric to run.
+
+---
+
+## 2026-09-06 00:20 EDT — primary — three cat7 cells CLOSED. 185 -> 188 of 192, 4 left.
+
+The turn opened as interrupted-work recovery (worker `backup` died at 22:52 mid-slice) and
+on the boss audit's four findings, so the liquid half is the second half. Commits:
+`6a06e067` F1, `c0a87c93` F4, `8c728ff5` F2 (on `wt/files-app`), `a4637f37` the anki spec.
+
+### The cat7 blocker really was removed — three surfaces scored, none of them refused
+
+`de41fab4` had four cat7 cells standing off on main's ~500 ms GC blocks, and `a36b6ea5`
+removed the cause. This is the first turn to spend that. All three runs against **pid 2520,
+bridge 39281**, the private instance whose main carries `a36b6ea5` (uptime 5,430 / 5,649 /
+5,811 s, so cat7's 120 s floor is met three times over). Every run carried `--jank`.
+
+    surface     score  ceiling p95/max/o100   drag mainMax  theme max  heavy p50/max
+    translate   10/10   8.5 / 16.7 /  0        4.0 (230.1*)  91.6       1.6 / 36.4
+    immersion   10/10   8.5 / 16.6 /  0        5.2           124.9      2.2 / 19.0
+    anki        10/10   8.5 /  8.6 /  0        4.0           100.0      2.3 /  8.8
+
+`findings []`, `voided []` on all three. **The one number above 100 in the main column is
+230.1 ms** (translate, drag repeat 2) against the harness's own `mainBlockBarMs` of 500 —
+where the four standing refusals were reading 450–520. Every other main reading in the nine
+gesture legs is **3.2–6.0 ms**.
+
+**The sensitivity control fires on all three**, which is what makes the clean numbers a
+reading rather than a dead recorder — the same drag with ten injected 120 ms renderer blocks:
+
+    translate  p95  8.5 -> 108.4   max  16.7 -> 125.0   over100 0 -> 10
+    immersion  p95  8.5 -> 108.4   max  16.7 -> 125.0   over100 0 -> 10
+    anki       p95  8.5 -> 116.7   max  25.0 -> 125.2   over100 0 ->  9
+
+Heavy legs all proved they ran: translate 40 pair swaps across 2 pairs over 16 sense tokens,
+back at 日本語>English with the interlinear recovered in 123 ms; immersion scrolled 21,600 px
+over 91 ticks and restored to 0; anki scrolled `.fwin-body` 1,269 px over 91 ticks, restored
+to its captured 601.
+
+### The disclosure on translate's first run, kept rather than dropped
+
+The FIRST translate run carried an `ENV` note the harness raised itself: the ceiling leg —
+which runs no product code — produced 1 frame over 100 ms and a 208.3 ms longest frame, i.e.
+the machine stalled. The `--jank` re-run had a clean ceiling and the same 10/10. The score is
+taken from the second; the first is recorded because a 10/10 on a stalled machine is exactly
+the kind of pass this scorecard has withdrawn before.
+
+### `anki` cat7 was an INSTRUMENT gap, and that is now twice on this surface
+
+`--surface anki` refused: no SPECS entry. `a4637f37` adds one, and records the three legs it
+REJECTED with the measurement behind each (expanding the sections mounts 61 elements but
+"Deck Workbench" reaches AnkiConnect; changing deck/note type writes the profile; typing is
+cat2's leg). Two of anki's cells have now been unblocked by writing a spec rather than fixing
+a defect — cat6 in `0c683ead`, cat7 here.
+
+### RULE D — liquid. Closed this turn: **3 cells. 185 -> 188 of 192, 4 left.**
+
+To 2026-09-07 11:00 EDT, measured 00:20: **34.67 h = 1.444 days**.
+`4 / 1.444 = 2.77 cells/day` required. Trailing 10-turn on this track: 164 (09-05 09:06) ->
+188 (09-06 00:20), i.e. **24 cells in 15.2 h = 37.9/day** nominal.
+
+Required 2.77 is well below trailing, so **TARGET AT RISK is NOT declared** — and unlike the
+last two turns that said the same, this one closed PRODUCT cells rather than instrument
+blockers, which is the caveat those turns attached to their own numbers.
+
+The four left: **`player` cat7, `immersion` cat2, `immersion` cat8, `anki` cat8.**
+`player` cat7 still needs a MATCHED library item before it can run (Seanime/AniList recipe,
+`src/media/seanimeLibrary.ts:175-200`) — that is the one remaining prerequisite, and it is a
+content prerequisite, not a blocker.
+
+`sampled-out:` `player` (1 open, not scored — no matched library item), and the two cat2/cat8
+cells on `immersion` and the cat8 on `anki`, which are different categories rather than
+skipped surfaces. Named so the skip is not silent.

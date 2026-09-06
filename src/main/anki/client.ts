@@ -74,6 +74,25 @@ export interface AnkiActionMap {
   findCards: { params: { query: string }; result: number[] };
   notesInfo: { params: { notes: number[] }; result: AnkiNoteInfo[] };
   cardsInfo: { params: { cards: number[] }; result: AnkiCardInfo[] };
+  /**
+   * Scheduling interval per card, positionally aligned with `cards`, in days —
+   * negative values are learning steps in seconds, exactly as `cardsInfo.interval`
+   * reports them, and both callers clamp with the same `Math.max(0, …)`.
+   *
+   * This exists because `cardsInfo` is 100x the wire size for the two fields the
+   * interval poll actually reads. Measured 2026-09-05 against the user's own
+   * collection (155,384 notes, 84 decks): `cardsInfo` 0.516 MB per 500 cards
+   * versus `getIntervals` 0.002 MB + `areSuspended` 0.003 MB — 160.4 MB versus
+   * 1.55 MB for one full poll, every five minutes, parsed in MAIN.
+   *
+   * Equivalence is measured, not assumed: over 1,539 cards sampled across the
+   * whole collection the clamped interval agreed 1,539/1,539 and `areSuspended`
+   * agreed with `queue === -1` 1,539/1,539. A card AnkiConnect cannot resolve
+   * yields `null`, which folds to 0 like an unseen card's `ivl`.
+   */
+  getIntervals: { params: { cards: number[] }; result: (number | null)[] };
+  /** `queue === -1` per card, positionally aligned with `cards`. See `getIntervals`. */
+  areSuspended: { params: { cards: number[] }; result: (boolean | null)[] };
   // ----- workbench draft reads (ANKI_DECK_WORKBENCH_PLAN.md adapter 2) -----
   /** Deck name to deck id. `deckNames` alone cannot key a card's deck. */
   deckNamesAndIds: { params: undefined; result: Record<string, number> };
@@ -181,6 +200,8 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   findCards: BULK_TIMEOUT_MS,
   notesInfo: BULK_TIMEOUT_MS,
   cardsInfo: BULK_TIMEOUT_MS,
+  getIntervals: BULK_TIMEOUT_MS,
+  areSuspended: BULK_TIMEOUT_MS,
   deckNamesAndIds: FAST_TIMEOUT_MS,
   getDeckConfig: FAST_TIMEOUT_MS,
   updateNoteFields: MUTATE_TIMEOUT_MS,
