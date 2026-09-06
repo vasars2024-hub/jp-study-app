@@ -4105,6 +4105,11 @@ export const ja: Catalog = {
   'credential.removeConfirm.message':
     '保存されている {name} の認証情報を削除しますか？コピーはこのアプリにしかないため、再接続するには提供元から取得し直す必要があります。この操作は取り消せません。',
 
+  'settings.lens.history.clearConfirm.title': 'レンズ履歴をすべて消去しますか？',
+  'settings.lens.history.clearConfirm.message': {
+    other: '保存済みのキャプチャ {count} 件を、ピン留めしたものも含めて削除しますか？現在のフィルターの表示だけでなくすべてが消去され、この操作は取り消せません。',
+  },
+
   // Grammar view
   'grammar.intro': 'JLPT N5〜N1 と HSK 1〜10 の文法、練習ビルダー、テスト、ガイド。',
   'grammar.mode.legend': '文法セクション',

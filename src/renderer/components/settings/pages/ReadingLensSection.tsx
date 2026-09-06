@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../ui';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
 import type { ReadingLensSource } from '../../../../shared/readingLens';
@@ -161,9 +162,20 @@ function LensCaptureHistory() {
   );
 
   const clear = useCallback(async () => {
+    // "Clear all" means all of it, not the filtered view, and pinned captures go too.
+    // There is no undo route on this store, so the question is the only protection.
+    const ok = await confirmDialog({
+      title: t('settings.lens.history.clearConfirm.title'),
+      message: t('settings.lens.history.clearConfirm.message', { count: entries.length }),
+      confirmLabel: t('settings.lens.history.clear'),
+      danger: true,
+    });
+    if (!ok) return;
     await window.api.lensHistoryClear();
     await refresh(query, source, pinnedOnly);
-  }, [query, source, pinnedOnly, refresh]);
+    // `lang`, not `t`: t's identity is stable, so a callback that omits it keeps
+    // resolving in the language it was created in.
+  }, [query, source, pinnedOnly, refresh, entries.length, t, lang]);
 
   const formatWhen = useMemo(
     () => (at: number) => new Date(at).toLocaleString(LANG_TAGS[lang]),

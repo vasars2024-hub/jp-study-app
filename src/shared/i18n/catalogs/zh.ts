@@ -4084,6 +4084,11 @@ export const zh: Catalog = {
   'credential.removeConfirm.message':
     '移除已保存的 {name} 凭据？应用中保存的是唯一副本，要重新连接就必须再次从服务方获取。此操作无法撤销。',
 
+  'settings.lens.history.clearConfirm.title': '要清空整个取词历史吗？',
+  'settings.lens.history.clearConfirm.message': {
+    other: '删除全部 {count} 条已保存的取词记录（包括已固定的）？这会清空全部内容，而不仅是当前筛选显示的部分，且无法撤销。',
+  },
+
   // Grammar view
   'grammar.intro': 'JLPT N5–N1 与 HSK 1–10 语法，含练习构建器、测试与指南。',
   'grammar.mode.legend': '语法板块',

@@ -4031,6 +4031,12 @@ export const en: Catalog = {
   'credential.removeConfirm.message':
     'Remove the stored {name} credential? The app keeps the only copy, so you will have to get it from the provider again to reconnect. This cannot be undone.',
 
+  'settings.lens.history.clearConfirm.title': 'Clear the whole lens history?',
+  'settings.lens.history.clearConfirm.message': {
+    one: 'Delete {count} saved capture, including any you pinned? This clears everything, not just what the current filter shows, and it cannot be undone.',
+    other: 'Delete all {count} saved captures, including any you pinned? This clears everything, not just what the current filter shows, and it cannot be undone.',
+  },
+
   // Grammar view
   'grammar.intro':
     'JLPT N5–N1 and HSK 1–10 grammar, plus Practice builder, tests, and guides.',
