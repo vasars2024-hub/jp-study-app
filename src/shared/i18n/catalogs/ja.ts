@@ -184,8 +184,6 @@ export const ja: Catalog = {
   'novels.sources.apiKey': 'API キー',
   'novels.sources.optional': '任意',
   'novels.sources.enabled': '有効',
-  'novels.sources.name': 'ソース名',
-  'novels.sources.mode': 'リンクの扱い',
   'novels.sources.modeExternal': '外部リンクのみ',
   'novels.sources.modeDirect': '直接ダウンロード',
   'novels.sources.modeBoth': '両方',
