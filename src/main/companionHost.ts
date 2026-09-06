@@ -5,6 +5,7 @@
  */
 import { BrowserWindow, ipcMain, screen, app, powerMonitor } from 'electron';
 import path from 'node:path';
+import { loadWindowWithRetry } from './bootLoad';
 import { listDisplays, onDisplaysChanged, unionDisplayBounds } from './displays';
 
 let host: BrowserWindow | null = null;
@@ -123,7 +124,7 @@ function createHostWindow(): BrowserWindow {
   });
 
   if (isDev && forwardConsole) forwardConsole(win);
-  void win.loadURL(getRendererUrl('companionHost=1'));
+  void loadWindowWithRetry(win, getRendererUrl('companionHost=1'), 'companion-host');
 
   // One subscription against the shared display service, rather than this
   // module's own three `screen.on(...)` listeners — same teardown discipline.

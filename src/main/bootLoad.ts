@@ -152,3 +152,57 @@ export async function loadWithRetry(
   }
   return { ok: false, attempts: max, lastError };
 }
+
+/** Structural so this module stays electron-free and directly testable. */
+export interface LoadableWindow {
+  isDestroyed(): boolean;
+  loadURL(url: string): Promise<unknown>;
+}
+
+/**
+ * The same retry for every OTHER window in the app.
+ *
+ * The boot path was fixed first because it was the one reproduced; every other
+ * window still loaded the way it used to — `void win.loadURL(...)`, rejection
+ * unhandled, and on a transient network-service failure a created window left at
+ * `url: ''` for the life of the process. That state is not merely blank, it is
+ * unrecoverable and it lies: `/reload` answers `ok: true` on a webContents that
+ * never had a URL, and main reports the window as healthy and visible.
+ *
+ * Not hypothetical for the secondary desk in particular — measured on the live
+ * instance 2026-09-06, window 2 ("Study OS — Display") was sitting at `url: ''`
+ * with main perfectly healthy, which is also why that desk's two-shell layout
+ * ping-pong had gone quiet: the second shell had no page to run in.
+ *
+ * `label` is what the log line names, so a failure says WHICH window died rather
+ * than "loadURL failed". Fire-and-forget by design: every caller is a window
+ * factory that returns the window synchronously, so the promise is returned only
+ * for tests and for a caller that wants to wait.
+ */
+export function loadWindowWithRetry(
+  win: LoadableWindow,
+  url: string,
+  label: string,
+  opts: { attempts?: number; delayMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<BootLoadRetryResult> {
+  return loadWithRetry(
+    // A window destroyed mid-retry is not a failure to report — there is nothing
+    // left to load into, and retrying it would log a diagnostic about a window
+    // the user already closed.
+    () => (win.isDestroyed() ? Promise.resolve() : win.loadURL(url)),
+    {
+      ...opts,
+      onFailure: (attempt, error) =>
+        console.error(`[main] ${label}: loadURL attempt ${attempt} failed: ${error}`),
+    },
+  ).then((result) => {
+    if (!result.ok) {
+      console.error(
+        `[main] ${label}: loadURL FAILED after ${result.attempts} attempts: ${result.lastError}`,
+      );
+    } else if (result.attempts > 1) {
+      console.log(`[main] ${label}: loadURL succeeded on attempt ${result.attempts}`);
+    }
+    return result;
+  });
+}

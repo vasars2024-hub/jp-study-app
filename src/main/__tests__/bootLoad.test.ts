@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { loadAfterCacheClear, loadWithRetry } from '../bootLoad';
+import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from '../bootLoad';
 
 /*
  * The case this file exists for is the THIRD one — a cache clear that never
@@ -201,5 +201,86 @@ describe('loadWithRetry', () => {
     const r = await loadWithRetry(load, { attempts: 1, sleep: async () => { /* the wait is asserted in its own case; do not spend it here */ } });
     expect(load).toHaveBeenCalledTimes(1);
     expect(r).toEqual({ ok: false, attempts: 1, lastError: 'once' });
+  });
+});
+
+/*
+ * The boot window was fixed first because it was the one reproduced. Every OTHER
+ * window still loaded bare, and the end state is the same and worse to diagnose:
+ * a created window at `url: ''` that main reports as healthy and visible, with
+ * `/reload` answering `ok: true` on a webContents that never had a URL. Measured
+ * on the live instance 2026-09-06, window 2 ("Study OS — Display") was in exactly
+ * that state.
+ */
+describe('loadWindowWithRetry', () => {
+  const nap = async (): Promise<void> => { /* asserted in loadWithRetry's own cases */ };
+
+  it('retries a transient failure and loads the window', async () => {
+    let n = 0;
+    const win = {
+      isDestroyed: () => false,
+      loadURL: vi.fn(() => {
+        n += 1;
+        return n < 3 ? Promise.reject(new Error('ERR_FAILED (-2)')) : Promise.resolve();
+      }),
+    };
+    const r = await loadWindowWithRetry(win, 'http://localhost:5173/?popout=anki', 'popout:anki', {
+      sleep: nap,
+    });
+    expect(r).toEqual({ ok: true, attempts: 3, lastError: null });
+    expect(win.loadURL).toHaveBeenCalledTimes(3);
+    expect(win.loadURL).toHaveBeenLastCalledWith('http://localhost:5173/?popout=anki');
+  });
+
+  it('names the window in every diagnostic, so a failure says WHICH one died', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const win = { isDestroyed: () => false, loadURL: () => Promise.reject(new Error('boom')) };
+      const r = await loadWindowWithRetry(win, 'x', 'desk-display:display|1920x1080|1', {
+        attempts: 2,
+        sleep: nap,
+      });
+      expect(r.ok).toBe(false);
+      const lines = error.mock.calls.map((c) => String(c[0]));
+      expect(lines).toHaveLength(3); // two attempts, then the summary
+      expect(lines.every((l) => l.includes('desk-display:display|1920x1080|1'))).toBe(true);
+      expect(lines[2]).toContain('FAILED after 2 attempts: boom');
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it('says nothing at all when the first attempt works', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const win = { isDestroyed: () => false, loadURL: () => Promise.resolve() };
+      expect(await loadWindowWithRetry(win, 'x', 'blanc', { sleep: nap })).toEqual({
+        ok: true, attempts: 1, lastError: null,
+      });
+      expect(error).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+      log.mockRestore();
+    }
+  });
+
+  it('stops retrying a window the user closed, and does not report it as a failure', async () => {
+    // A window destroyed mid-retry has nothing left to load into. Retrying would
+    // log a diagnostic about a window that is already gone.
+    let destroyed = false;
+    const loadURL = vi.fn(() => {
+      destroyed = true;
+      return Promise.reject(new Error('gone'));
+    });
+    const r = await loadWindowWithRetry(
+      { isDestroyed: () => destroyed, loadURL },
+      'x',
+      'mini-widget',
+      { sleep: nap },
+    );
+    expect(loadURL).toHaveBeenCalledTimes(1);
+    expect(r.ok).toBe(true);
   });
 });

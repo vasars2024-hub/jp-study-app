@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
-import { loadAfterCacheClear, loadWithRetry } from './main/bootLoad';
+import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
 import { registerReadingListsLateBinding } from './main/readingListsBinding';
 import { registerReadingRemindersIpc } from './main/readingListsReminders';
@@ -945,7 +945,7 @@ function createBlancWindow(size?: { width?: number; height?: number }): void {
     blancWindow = null;
   });
 
-  void win.loadURL(blancUrl());
+  void loadWindowWithRetry(win, blancUrl(), 'blanc');
 }
 
 function closeBlancWindow(): void {
@@ -1218,7 +1218,7 @@ function createMiniWidgetWindow(size?: { width?: number; height?: number }): voi
     }
   });
 
-  void win.loadURL(rendererUrl('miniWidget=1'));
+  void loadWindowWithRetry(win, rendererUrl('miniWidget=1'), 'mini-widget');
 
   // Hide the large desktop shell while the floating widget is active.
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1361,7 +1361,7 @@ function createLockscreenWindow(size?: { width?: number; height?: number }): voi
     }
   });
 
-  void win.loadURL(rendererUrl('lockscreen=1'));
+  void loadWindowWithRetry(win, rendererUrl('lockscreen=1'), 'lockscreen');
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.hide();
@@ -1510,7 +1510,7 @@ function createPopoutWindow(requested: string): boolean {
     broadcastPopoutState();
   });
   if (isDevServer()) forwardRendererConsole(win);
-  void win.loadURL(rendererUrl(`popout=${encodeURIComponent(section)}`));
+  void loadWindowWithRetry(win, rendererUrl(`popout=${encodeURIComponent(section)}`), `popout:${section}`);
   broadcastPopoutState();
   return true;
 }

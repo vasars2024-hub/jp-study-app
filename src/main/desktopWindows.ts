@@ -14,6 +14,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import type { DesktopIndex, DisplayAssignment } from '../shared/desktop';
+import { loadWindowWithRetry } from './bootLoad';
 import { desktopStore } from './desktop';
 import {
   displayForKey,
@@ -173,7 +174,7 @@ function createDesktopWindow(assignment: DisplayAssignment, display: DisplaySumm
   if (isDev && forwardConsole) forwardConsole(win);
 
   const query = `desk=${assignment.desktopIndex}&displayKey=${encodeURIComponent(assignment.displayKey)}`;
-  void win.loadURL(getRendererUrl(query));
+  void loadWindowWithRetry(win, getRendererUrl(query), `desk-display:${assignment.displayKey}`);
   return win;
 }
 
@@ -244,7 +245,7 @@ export function openSpawnedDesktop(index: DesktopIndex): boolean {
   if (isDev && forwardConsole) forwardConsole(win);
 
   // `spawned=1` marks this shell as owning a desktop with no display behind it.
-  void win.loadURL(getRendererUrl(`desk=${index}&spawned=1`));
+  void loadWindowWithRetry(win, getRendererUrl(`desk=${index}&spawned=1`), `desk-spawned:${index}`);
   return true;
 }
 
