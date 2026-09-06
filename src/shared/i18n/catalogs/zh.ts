@@ -182,8 +182,6 @@ export const zh: Catalog = {
   'novels.sources.apiKey': 'API 密钥',
   'novels.sources.optional': '可选',
   'novels.sources.enabled': '启用',
-  'novels.sources.name': '来源名称',
-  'novels.sources.mode': '链接处理方式',
   'novels.sources.modeExternal': '仅外部链接',
   'novels.sources.modeDirect': '直接下载',
   'novels.sources.modeBoth': '两者',

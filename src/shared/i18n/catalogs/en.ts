@@ -213,8 +213,6 @@ export const en: Catalog = {
   'novels.sources.apiKey': 'API key',
   'novels.sources.optional': 'Optional',
   'novels.sources.enabled': 'Enabled',
-  'novels.sources.name': 'Source name',
-  'novels.sources.mode': 'Link handling',
   'novels.sources.modeExternal': 'External only',
   'novels.sources.modeDirect': 'Direct download',
   'novels.sources.modeBoth': 'Both',
