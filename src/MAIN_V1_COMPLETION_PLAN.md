@@ -1844,3 +1844,47 @@ is the cancellation's, naming exactly `e953e84b…`. Scraper log, in order:
 Client afterwards: **10 rows, 6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`**, the
 archive still there. Gate 15 re-derived on the fixed build in the same run, same numbers —
 `ok:false / "Cancelled."`, subtitles `1 → 1`, phases `["downloading","cancelled"]`, zero errors.
+
+### GATE 11 clause 1 CLOSES 2026-09-06 (primary2), live — the `.7z` scope decision is SUPERSEDED
+
+The 2026-09-06 03:40 scope decision recorded clause 1 as *"blocked on INDEX contents … what closes
+it is one Japanese loose-file sub pack. Nothing an agent writes produces one."* **That premise
+expired at 08:40 the same day**, when `9611596b` gave Route A a 7-Zip reader. Nobody had re-driven
+the gate against it; this turn did.
+
+**LIVE, through the product's own IPC, against the user's own daemon via the logging mount**
+(`127.0.0.1:8781/qb`), on the subject the product's **own listing** nominates rank 1 of 9:
+
+    subtitleHarvestNyaaList("Detective Conan Movies")  ->  9 candidates
+    target  nyaa:22d2e2e6…  route sub-pack  5,557,453 B (5.3 MB, under the 50 MB ceiling)
+    subtitleHarvestNyaaFetch(target)  ->  ok TRUE, 26 files, message ""
+
+**Payload, read off the result rather than inferred: 26 × `.srt`, 26 of 26 carrying Japanese,
+2,950,060 characters.** Heads are real Netflix Asia ja-sdh cues —
+`Detective Conan M19 (ja-sdh) [NetflixAsia].srt`, 141,122 chars, `（ハンマーをたたく音）`.
+
+**"Taken whole", scored off `torrents/files` as the daemon answered it** (6 replies banked in
+`debug/qbit-basepath-proxy-files.jsonl`): the release is **1 file** — the 5,535,182 B `.7z` — at
+**priority 1** and **progress 1**. Nothing was deselected, and no video file exists in the release
+to request.
+
+**Wire log, whole run: 11 legs, and there is NO `torrents/delete` in it.** `filePrio` 200,
+`pause` 404 → `stop` 200, `resume` 404 → `start` 200 (the v5 rename fallback), 3 × `info`,
+2 × `files`. The mount was run with `G12_ALLOW_DELETE_HASH` **unset**, so any delete would have
+been refused 403 and logged — so this is also the first live re-proof of `093e0cf1`: both rows in
+`jp-study-subtitles` are complete (`22d2e2e6…`, and the user's 6.1 GB `539c0886…` Kitsunekko
+archive) and the reap **skipped both**. No swarm traffic: `torrents/add` was never called because
+the client already held the pack at progress 100.
+
+**NEGATIVE CONTROL, mutation against committed source.** `EXTRACTABLE_ARCHIVE_EXT` minus `'.7z'`
+turns **4 tests red BY NAME** — *"takes a .7z pack whole and returns every episode inside it"*,
+*"applies the episode filter to the archive MEMBERS, not to the carrier"*, *"accepts the containers
+7-Zip is wired for and refuses the rest"*, *"refuses an openable archive that is over the ceiling"*
+— 76 green. Source restored, `git status` clean, 80/80 on re-run.
+
+**Clauses 2–3 stay blocked on LIBRARY contents, re-derived live this turn and not inherited:**
+`listMedia()` returns **39 items (37 video, 2 audio), 0 matching conan/コナン**. Attaching Conan
+cues to a JoJo episode remains rejected. **Gate 11 is 1 of 3 clauses and stays OPEN; Track 9 stays
+19 of 20.** What closes it is now precisely one thing: a `sub-pack` candidate — archive or loose —
+for a title this library actually holds. Re-check in one call:
+`node debug/g14-live.cjs fetch "<a library title>" <hash> 127.0.0.1 8781 /qb`.
