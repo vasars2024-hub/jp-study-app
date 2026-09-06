@@ -8963,3 +8963,69 @@ backup was taken first at `~\.claude-runs\ls-backup-0906.json` either way.
 
 `(program)` holding 82% is the CDP round trip, not a product cost: the profile spans the whole
 bridge call, so read SELF time on named frames and ignore the `(program)` share.
+
+## 2026-09-06 02:52 EDT — primary — `immersion` cat2 CLOSES 10/10. The cost was never in the product.
+
+**Closed this turn: 1 cell. 190 -> 191 of 192, 1 left.** Four turns and ten candidates had
+measured this cell FAIL on `latency` alone. The cause is React's DEV build, and the reason it
+survived every bisect is that it does not depend on any product subtree.
+
+### `immersion` cat2 — PASS 10/10, one run, `?noReactTrack=1`
+
+    inputCost 0 clicks / 3 keystrokes · deadEnds 0 · modalTraps 0 · scrollTraps 0
+    inputRecv 30.2 / 27.2 / 26.9 ms   worst 30.2   overBar100 **0**
+    sharedPaintSamples 0, framesObserved 3, busiestFrame 1 — nothing UNSCOREABLE
+    costParity standard 3 = liquid 3, box 820x580 in both, worstRecv 30.2 / 29.9, restored true
+    undo clear:.immersion-site-search input — restored true, s1efy0 -> s1efy0
+    CONTROL (harness) 3 plants, 0,0,0 -> 1,1,1 -> 0,0,0, backToBaseline, inert floor 0.5 ms
+
+### The negative control is the same harness with ONE variable flipped
+
+Identical command, identical window, identical 3-keystroke task, default URL (track ON):
+
+    verdict **FAIL**, failedBars ["latency"], inputRecv **190.6 / 112.6 / 111.4**, overBar100 **3**
+
+One variable, both directions, ~4 minutes apart. Evidence:
+`~\.claude-runs\pr-cat2-immersion-{off,on}.json`.
+
+### What the cost actually is — `eebbef7c`
+
+`/cpu-profile` (`eda66be3`) on the filter drive vs `.immersion-url`: `addValueToProperties`
+**83.3 ms** self + `addObjectDiffToProperties` **34.0 ms** + `(garbage collector)` **57 ms** +
+`_debugTask.run` **125 ms**; the control field bills **0 in all four**. That is
+`logComponentRender` in `react-dom_client.js` DEV — for any fiber whose props *identity*
+changed it serializes the whole props diff into the DevTools "Components" track. It appears
+**3x** in `react-dom-client.development.js` and **0x** in `react-dom-client.production.js`.
+
+**Why ten candidates read DEAD:** the serializer does not care whether the array CONTENT
+changed, only that the props object identity did. Freezing `items`, stripping the row body,
+pinning the spacer and deleting `resetScrollKey` all left it fully intact. React's own
+per-component measures agree — `ImmersionBody` 117.5 ms (Q) vs 110.2 (U) over 6 keystrokes,
+`VirtualList` 98.2 vs 92.8 — the *render* costs the same in both fields and the gap is entirely
+outside it.
+
+### CORRECTION 69 — the ORDER hypothesis was tested and is DEAD
+
+Every prior reading drove Q before U, so "the first input after an idle gap is expensive" would
+have produced the same ratio. Counterbalanced, 3x Q-first and 3x U-first in one process, 36
+keystrokes per arm: **by position 27.4 / 25.7 ms; by field Q 62.3 vs U 26.3.** The ratio follows
+the FIELD. With the track off, by field **27.4 vs 25.8 = 1.06x**, worst 55.3, nothing over 100.
+
+### TRAP — patching `node_modules/.vite/deps/` does nothing to a running dev server
+
+The first attempt set `supportsUserTiming = false` in the vite dep cache. Vite serves that file
+from its own in-memory transform cache: after the edit and a `/reload`, a `fetch(url,
+{cache:'reload'})` still returned the UNPATCHED body, and 86 component measures were still
+being emitted. Restored and verified by SHA256. `supportsUserTiming` is computed once when
+react-dom evaluates, from `console.timeStamp`, so the only place to intervene is the HTML
+*before* the module script — which is what `?noReactTrack=1` now is.
+
+### RULE D — liquid. Closed this turn: **1 cell. 190 -> 191 of 192, 1 left.**
+
+To 2026-09-07 11:00 EDT, measured 02:52: **32 h 08 min = 1.339 days**.
+`1 / 1.339 = 0.75 cells/day` required. Trailing: 164 of 192 at 09-05 09:06 -> 191 at 09-06
+02:52, i.e. **27 cells in 17.8 h = 36.5/day**. **TARGET AT RISK is NOT declared.**
+
+The one left: **`player` cat7**, which needs a MATCHED library item
+(`src/media/seanimeLibrary.ts:175-200`) — a content prerequisite, not a defect.
+`sampled-out:` nothing; the single remaining cell is named above with its reason.
