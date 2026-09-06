@@ -3960,6 +3960,35 @@ export const en: Catalog = {
   'desktop.sectionUnavailable.body':
     'This window was restored from a saved layout that points at “{section}”, which is not an app in this version. Close the window to remove it from your desktop.',
 
+  // Secret / Aero start menu and desktop shell dialogs
+  'desktop.aero.search': 'Search',
+  'desktop.aero.subtitle': 'Personal study desktop',
+  'desktop.aero.programs': 'Study programs',
+  'desktop.aero.allPrograms': 'All programs',
+  'desktop.aero.sideRegion': 'Places and tools',
+  'desktop.aero.places': 'Places',
+  'desktop.aero.tools': 'Tools',
+  'desktop.aero.controlPanel': 'Control panel',
+  'desktop.aero.power': 'Secret OS power',
+  'desktop.aero.sleep': 'Sleep Secret OS',
+  'desktop.aero.restart': 'Restart Secret OS',
+  'desktop.aero.shutdown': 'Shut down Secret OS',
+  'desktop.dialog.wallpaper': 'Wallpaper',
+  'desktop.dialog.wallpaperImageFailed': 'Could not open that image. It may have been moved or deleted.',
+  'desktop.dialog.wallpaperVideoFailed': 'Could not open that video. It may have been moved or deleted.',
+  'desktop.dialog.slideshow': 'Slideshow',
+  'desktop.dialog.slideshowEmpty': 'No images found in that folder (.jpg, .png, .webp, .gif).',
+  'desktop.dialog.openFailed': 'Could not open',
+  'desktop.dialog.resetTitle': 'Reset desktop',
+  'desktop.dialog.resetMessage': 'Reset the desktop — close all windows, clear icons and wallpaper?',
+  'desktop.dialog.resetConfirm': 'Reset',
+  'desktop.dialog.restartOsMessage': 'Restart the Secret OS desktop sequence? Open apps and desktop layout stay in place.',
+  'desktop.dialog.restartConfirm': 'Restart',
+  'desktop.dialog.shutdownMessage': 'Return to the previous GrammarX theme and restore the pre-Aero desktop atmosphere?',
+  'desktop.dialog.shutdownConfirm': 'Shut down',
+  'desktop.dialog.restartShellTitle': 'Restart shell',
+  'desktop.dialog.restartShellMessage': 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
+
   // Grammar view
   'grammar.intro':
     'JLPT N5–N1 and HSK 1–10 grammar, plus Practice builder, tests, and guides.',
