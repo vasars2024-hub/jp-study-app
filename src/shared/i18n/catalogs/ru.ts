@@ -3128,6 +3128,8 @@ export const ru: Catalog = {
   'yt.action.remove': 'Удалить плейлист',
   'yt.action.open': 'Открыть в Video',
   'yt.action.transcribe': 'Расшифровать в Video',
+  'yt.sort.noData.views': 'Сортировка по просмотрам, но ни у одного из этих видео пока нет счётчика просмотров — порядок не изменился.',
+  'yt.sort.noData.date': 'Сортировка по дате, но ни у одного из этих видео пока нет даты публикации — порядок не изменился.',
   'yt.pref.channelId': 'ID канала',
   'yt.pref.channelTitle': 'Название канала',
   'yt.pref.channelNamePlaceholder': 'Название канала',

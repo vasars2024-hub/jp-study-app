@@ -379,6 +379,33 @@ export function trackedChannels(store: YtPlaylistsStore): YtChannel[] {
   return [...(store.channels ?? [])].sort((a, b) => a.title.localeCompare(b.title));
 }
 
+/**
+ * D94 — which of the two data-backed sorts has nothing to sort ON, if either.
+ *
+ * `views` and `date` read `viewCount` / `publishedAt`, and `syncPlaylist` runs yt-dlp
+ * with `--flat-playlist`, which returns neither for most channels. The comparator then
+ * ranks every video at 0 and the list does not move, while the chosen sort persists —
+ * so the user sees a setting that sticks and does nothing. Returning the offending sort
+ * lets the surface SAY so; the alternative, dropping `--flat-playlist`, would make every
+ * refresh fetch each video individually.
+ *
+ * An empty list is not a gap: there is nothing to sort either way, and the surface
+ * already has an empty state for that.
+ */
+export function sortFieldIsAbsent(
+  videos: YtVideo[],
+  sort: YtPlaylistSort,
+): 'views' | 'date' | null {
+  if (sort !== 'views' && sort !== 'date') return null;
+  if (videos.length === 0) return null;
+  const field = sort === 'views' ? 'viewCount' : 'publishedAt';
+  const has = videos.some((v) => {
+    const n = v[field];
+    return typeof n === 'number' && Number.isFinite(n);
+  });
+  return has ? null : sort;
+}
+
 export function sortYtVideos(videos: YtVideo[], sort: YtPlaylistSort): YtVideo[] {
   const list = [...videos];
   switch (sort) {

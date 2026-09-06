@@ -2801,6 +2801,8 @@ export const en: Catalog = {
   'yt.action.remove': 'Remove playlist',
   'yt.action.open': 'Open in Video',
   'yt.action.transcribe': 'Transcribe in Video',
+  'yt.sort.noData.views': 'Sorted by views, but none of these videos has a view count yet — the order is unchanged.',
+  'yt.sort.noData.date': 'Sorted by date, but none of these videos has a publish date yet — the order is unchanged.',
   'yt.pref.channelId': 'Channel id',
   'yt.pref.channelTitle': 'Channel title',
   'yt.pref.channelNamePlaceholder': 'Channel name',

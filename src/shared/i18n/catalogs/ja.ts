@@ -2925,6 +2925,8 @@ export const ja: Catalog = {
   'yt.action.remove': 'プレイリストを削除',
   'yt.action.open': '動画プレイヤーで開く',
   'yt.action.transcribe': '動画プレイヤーで文字起こし',
+  'yt.sort.noData.views': '再生回数で並べ替えましたが、これらの動画にはまだ再生回数がないため、順序は変わりません。',
+  'yt.sort.noData.date': '公開日で並べ替えましたが、これらの動画にはまだ公開日がないため、順序は変わりません。',
   'yt.pref.channelId': 'チャンネルID',
   'yt.pref.channelTitle': 'チャンネル名',
   'yt.pref.channelNamePlaceholder': 'チャンネル名',

@@ -2909,6 +2909,8 @@ export const zh: Catalog = {
   'yt.action.remove': '移除播放列表',
   'yt.action.open': '在视频播放器中打开',
   'yt.action.transcribe': '在视频播放器中转写',
+  'yt.sort.noData.views': '已按观看次数排序，但这些视频尚无观看次数，因此顺序未变。',
+  'yt.sort.noData.date': '已按日期排序，但这些视频尚无发布日期，因此顺序未变。',
   'yt.pref.channelId': '频道 ID',
   'yt.pref.channelTitle': '频道名称',
   'yt.pref.channelNamePlaceholder': '频道名称',

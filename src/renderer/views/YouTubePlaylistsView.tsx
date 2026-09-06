@@ -19,6 +19,7 @@ import {
   normalizeYtStore,
   pickSurpriseVideo,
   planToWatchVideos,
+  sortFieldIsAbsent,
   sortYtVideos,
   type YtPlaylist,
   type YtChannel,
@@ -208,6 +209,20 @@ export default function YouTubePlaylistsView() {
     const list = videos.filter((v) => v.playlistId === playlist.id);
     return sortYtVideos(filterUnlogged(list, onlyUnlogged), sort);
   }, [videos, playlist, onlyUnlogged, sort, side, planVideos]);
+
+  /**
+   * D94 — "Views" and "Date" persist your choice and move nothing.
+   *
+   * The comparator is fine; the DATA is absent. `syncPlaylist` runs yt-dlp with
+   * `--flat-playlist` (`main/ytPlaylists.ts:234`), which returns neither `view_count`
+   * nor `timestamp` for these channels, so of the user's 19 videos exactly 3 carry
+   * either — and all 3 are on the extension-capture playlist. Dropping
+   * `--flat-playlist` would make every refresh fetch each video individually, so the
+   * honest fix is to SAY the sort has nothing to work with rather than to leave the
+   * user deciding whether the sort ran. Returns a discriminator, not a sentence: `t()`
+   * is called at render, so this memo does not need `lang` in its deps.
+   */
+  const sortDataGap = useMemo(() => sortFieldIsAbsent(listVideos, sort), [sort, listVideos]);
 
   const unloggedCount = useMemo(() => {
     if (side?.kind === 'plan') return planVideos.filter(isVideoUnlogged).length;
@@ -578,6 +593,9 @@ export default function YouTubePlaylistsView() {
           ) : null}
           {mainTab === 'news' ? (
             <StatusBarField>{t('yt.news.summary', { count: displayedNews.length })}</StatusBarField>
+          ) : null}
+          {sortDataGap ? (
+            <StatusBarField>{t(`yt.sort.noData.${sortDataGap}`)}</StatusBarField>
           ) : null}
           <StatusBarSpacer />
           {error ? <StatusBarField className="yt-status-err">{error}</StatusBarField> : null}
