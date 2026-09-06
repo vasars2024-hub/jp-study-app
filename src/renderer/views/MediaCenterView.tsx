@@ -1425,7 +1425,15 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
         <SettingsSection icon="player" title={t('mediaCenter.settings.playback')} detail={t('mediaCenter.settings.playbackDetail')}>
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.defaultSpeed')}</strong><small>{t('mediaCenter.settings.defaultSpeedDetail')}</small></span>
-            <select value={currentRate} onChange={(event) => state.setPlaybackRate(Number(event.target.value))}>
+            {/* Every `mc-setting-row` select needs its own `aria-label`: the visible label
+                lives in a sibling `<span>`, so it is not a `<label>` and the control
+                announces only its value. The range input two sections down already did
+                this and was the control that proved the omission. */}
+            <select
+              value={currentRate}
+              aria-label={t('mediaCenter.settings.defaultSpeed')}
+              onChange={(event) => state.setPlaybackRate(Number(event.target.value))}
+            >
               {[0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
             </select>
           </div>
@@ -1449,9 +1457,20 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
           </div>
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.subtitlePosition')}</strong><small>{t('mediaCenter.settings.subtitlePositionDetail')}</small></span>
-            <select value={state.subtitlePosition} onChange={(event) => state.setSubtitlePosition(event.target.value as typeof state.subtitlePosition)}>
+            {/* `center`, not `middle`. `SubtitleVerticalPosition` is
+                `'top' | 'center' | 'bottom'` and `center` is the DEFAULT
+                (`playerPreferences.ts:34`), so the mismatch broke this control in both
+                directions: writing `middle` was rejected by `normalizePlayerPreferences`
+                and persisted nothing, and a stored `center` matched no option, so the
+                select silently showed `Bottom` — a position the user never chose — to
+                everyone who had not changed it. */}
+            <select
+              value={state.subtitlePosition}
+              aria-label={t('mediaCenter.settings.subtitlePosition')}
+              onChange={(event) => state.setSubtitlePosition(event.target.value as typeof state.subtitlePosition)}
+            >
               <option value="bottom">{t('mediaCenter.settings.bottom')}</option>
-              <option value="middle">{t('mediaCenter.settings.middle')}</option>
+              <option value="center">{t('mediaCenter.settings.middle')}</option>
               <option value="top">{t('mediaCenter.settings.top')}</option>
             </select>
           </div>
@@ -1503,14 +1522,22 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
           <Toggle label={t('mediaCenter.study.shadowing')} detail={t('mediaCenter.settings.shadowingDetail')} checked={state.shadowingMode} onChange={state.setShadowingMode} />
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.transcriptionLanguage')}</strong><small>{t('mediaCenter.settings.transcriptionLanguageDetail')}</small></span>
-            <select value={state.subLang} onChange={(event) => state.setSubLang(event.target.value as 'ja' | 'zh')}>
+            <select
+              value={state.subLang}
+              aria-label={t('mediaCenter.settings.transcriptionLanguage')}
+              onChange={(event) => state.setSubLang(event.target.value as 'ja' | 'zh')}
+            >
               <option value="ja">{t('mediaCenter.settings.japanese')}</option>
               <option value="zh">{t('mediaCenter.settings.chinese')}</option>
             </select>
           </div>
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.whisperModel')}</strong><small>{t('mediaCenter.settings.whisperModelDetail')}</small></span>
-            <select value={state.modelTier} onChange={(event) => state.setModelTier(event.target.value as typeof state.modelTier)}>
+            <select
+              value={state.modelTier}
+              aria-label={t('mediaCenter.settings.whisperModel')}
+              onChange={(event) => state.setModelTier(event.target.value as typeof state.modelTier)}
+            >
               <option value="tiny">Tiny</option>
               <option value="base">Base</option>
               <option value="small">Small</option>
