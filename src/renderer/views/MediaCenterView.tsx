@@ -1557,7 +1557,12 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
           <Icon name={ps.playing ? 'pause' : 'player'} size={15} />
         </button>
         <button type="button" onClick={player.next} disabled={!ps.current} title={t('mediaCenter.player.next')}><Icon name="skip-forward" size={15} /></button>
-        <button type="button" onClick={player.cycleRepeat} className={ps.repeat !== 'off' ? 'is-active' : ''} title={`Repeat: ${ps.repeat}`}><Icon name="repeat" size={14} /></button>
+        {/* Icon-only, so this `title` IS the button's accessible name. It was
+            the one raw literal left in this bar, and the same control in
+            MusicContent.tsx:816 and MusicWidget.tsx:155 already resolved the
+            mode through the catalog — so the Music window said "Repeat: off"
+            in Japanese while the mini-player said リピート：オフ. */}
+        <button type="button" onClick={player.cycleRepeat} className={ps.repeat !== 'off' ? 'is-active' : ''} title={t('music.controls.repeatTitle', { mode: t(`music.repeat.${ps.repeat}`) })}><Icon name="repeat" size={14} /></button>
         {/*
           Like is the one thing the page's now-deleted inline transport could do that this
           bar could not, so it moves here rather than disappearing. `likedTick` is read (not
