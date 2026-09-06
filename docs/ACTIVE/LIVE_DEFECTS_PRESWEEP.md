@@ -292,3 +292,8 @@ Cross-cutting passes, after the 25:
 
 **When every row has `done`, say so plainly in the handoff** - "AI sweep complete, N surfaces,
 M defects, K fixed" - so the user knows their pass can start.
+
+### 2026-09-06 19:43 EDT — codexB claim and live findings
+D100 Start-menu chrome and confirmation text, D98 Settings commands, and D25 Appearance Blanc launcher are claimed by codexB. Window 1 is reserved; primary2 retains window 2. Gate 11 recheck through live listMedia: 39 items, zero Conan matches; no acquisition or attachment attempted. Boss F1/F2/F4 already fixed by 6a06e067/8c728ff5/c0a87c93.
+
+| D107 | shared dialogs | In Japanese, a translated restart question still offers an English **Cancel** button. The same shared defaults leave confirmation, notice and text-entry dialogs in English unless each caller supplies its own labels. | Window 1, pid 14128: switch language with Settings Appearance 日本語; open Aero Start menu through the per-window AppChrome material seam; press Restart. Live text is `Secret OS を再起動` / Japanese question / **Cancel** / `再起動`. Cancel was pressed; no restart performed. Source: `components/ui/dialogService.tsx` has literal defaults for all three dialog kinds. | P2 | open — claimed codexB; fix the shared defaults with the real language subscription and preserve caller labels. |
