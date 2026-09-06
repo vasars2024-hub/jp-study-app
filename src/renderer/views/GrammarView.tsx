@@ -150,21 +150,27 @@ export default function GrammarView() {
     {/* `gram-view--explorer` bounds the view to its host. A windowed list can only
         window what it can MEASURE, and on a plain block host the list's own viewport
         measures the whole content — so every row renders and the windowing is inert.
-        Guides and Review keep the natural block flow they were built for; they render
-        prose and a small due-set, so bounding them would clip rather than window.
+        `practice` and `review` were added 2026-09-06. BOTH carry their own
+        `VirtualList` and neither had ever been bounded, so the defect this class was
+        created to fix was still live in two of the four tabs. Measured in an 820x580
+        window, before → after the class:
+          practice  `.gx-practice-virtual` 125,322 px with clientHeight === scrollHeight
+                    (not a scroller at all), 2,410 checkboxes, 13,544 nodes
+                    → 302 px over a 125,320 px range, 22 checkboxes, 365 nodes
+          review    706 `.gram-cur-row`s, 93,192 px, 11,343 nodes
+                    → 15 rows, a real 289 px scroller over 93,192 px, 292 nodes
+        No CSS was needed for either: both panels already declare the height/min-height
+        chain that forwards a bound; only the host was missing. Established by a runtime
+        control each time — adding the class to the live element produced the second
+        number and removing it put the first one back.
 
-        `practice` was added 2026-09-06. It carries a second `VirtualList` over the
-        SAME 2,410-point corpus and had never been bounded, so the defect this class
-        was created to fix was still live one tab over. Measured in an 820x580 window:
-        `.gx-practice-virtual` 125,322 px tall with `clientHeight === scrollHeight`
-        (not a scroller at all), 2,410 checkboxes, 13,544 DOM nodes — and with the
-        class, 302 px over a 125,320 px scroll range, 22 checkboxes, 365 nodes.
-        No CSS was needed: `.gx-practice` already declares `height: 100%; min-height: 0`
-        and the layout/list/virtual chain below it is already written to be bounded.
+        `guides` is the one mode that stays unbounded, and deliberately: it renders one
+        prose article, 181 nodes, so a bound would clip rather than window.
+
         The class name is kept rather than generalised so the existing rules, their
         comment and `grammarExplorerVirtualisation.test.ts` all keep one subject. */}
     <div
-      className={`gram-view${mode === 'grammar' || mode === 'practice' ? ' gram-view--explorer' : ''}`}
+      className={`gram-view${mode === 'guides' ? '' : ' gram-view--explorer'}`}
     >
       {/* L5 — contextual, not dense work: one intro line and the mode switch. The
           four mode panels below stay conventional Work; a grammar point's prose and

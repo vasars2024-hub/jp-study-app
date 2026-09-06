@@ -58,24 +58,23 @@ describe('grammar explorer virtualisation', () => {
     expect(decls).toContain('height: 100%');
   });
 
-  it('every mode that windows the corpus gets the bounding class', () => {
-    // Both modes that mount a `VirtualList` over the 2,410-point corpus, and only
-    // those. Guides and Review render prose and a small due-set, so bounding them
-    // would clip rather than window.
+  it('bounding is the DEFAULT, and only the prose mode opts out', () => {
+    // Until 2026-09-06 this asserted `mode === 'grammar' ? ...` — the one mode that
+    // had been fixed — and the same defect was live in TWO of the other three the
+    // whole time. Both `practice` and `review` mount their own `VirtualList`:
+    //   practice  125,322 px, clientHeight === scrollHeight, 2,410 boxes, 13,544 nodes
+    //   review       93,192 px, 706 rows,                                 11,343 nodes
     //
-    // `practice` was missing here until 2026-09-06 and the defect this whole file
-    // guards was still live one tab over: `.gx-practice-virtual` measured 125,322 px
-    // with `clientHeight === scrollHeight`, 2,410 checkboxes, 13,544 DOM nodes.
-    // Asserting only `grammar` is what let that survive, so the assertion is now on
-    // the SET of bounded modes rather than on the one that was fixed first.
-    expect(grammarView).toContain(
-      "`gram-view${mode === 'grammar' || mode === 'practice' ? ' gram-view--explorer' : ''}`",
-    );
+    // So the condition is inverted rather than extended. An allowlist has to be
+    // remembered every time a tab is added, and three times running it was not;
+    // making the bound the default means a new list-bearing tab is correct on
+    // arrival and only a deliberate prose tab opts out.
+    expect(grammarView).toContain("`gram-view${mode === 'guides' ? '' : ' gram-view--explorer'}`");
     expect(grammarView).not.toContain('className="gram-view"');
   });
 
-  it('the practice panel is already written to pass a bound down to its list', () => {
-    // The mode class alone fixed it live, which is only true because every step
+  it('the practice and review panels already pass a bound down to their lists', () => {
+    // The mode class alone fixed both live, which is only true because every step
     // between the host and the scroller already forwards the bound. Any one of
     // these silently restores the defect while the class stays in place.
     expect(block(css, '.gx-practice')).toEqual(
@@ -88,6 +87,23 @@ describe('grammar explorer virtualisation', () => {
       expect.arrayContaining(['display: flex', 'flex-direction: column', 'min-height: 0']),
     );
     expect(block(css, '.gx-practice-virtual')).toEqual(expect.arrayContaining(['flex: 1']));
+
+    expect(block(css, '.gram-cur')).toEqual(
+      expect.arrayContaining(['display: flex', 'flex-direction: column', 'min-height: 0']),
+    );
+  });
+
+  it('every grammar panel that windows a list actually mounts VirtualList', () => {
+    // The three bounded modes are bounded because each has a windowed list. If one
+    // ever drops `VirtualList` for a plain `.map`, the bound is no longer the thing
+    // keeping the DOM small and this file's numbers stop meaning anything.
+    for (const rel of [
+      'components/grammar/GrammarExplorer.tsx',
+      'components/grammar/GrammarPracticePanel.tsx',
+      'components/grammar/GrammarCurationPanel.tsx',
+    ]) {
+      expect(read(rel), `${rel} no longer windows its list`).toContain('VirtualList');
+    }
   });
 
   it('makes the list column the scroller instead of its overflowing child', () => {
