@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DropPlan } from '../../main/fileRouter';
 import type { DropTargetId } from '../../shared/fileRouting';
 import { extOf } from '../../shared/mediaKind';
+import { useModalKeyboard } from './ui/useModalKeyboard';
 import { useT } from '../i18n';
 import { loadFileDropPrefs, onFileDropPrefsChanged, type FileDropPrefs } from '../fileDropPrefs';
 import { announceFilesIndexChanged } from '../filesIndexBus';
@@ -63,8 +64,21 @@ export default function DropRouter({
   // Nested dragenter/dragleave fire per element; count them so the affordance
   // does not flicker as the cursor crosses child nodes.
   const dragDepth = useRef(0);
+  const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => onFileDropPrefsChanged(setPrefs), []);
+
+  /*
+   * The triage sheet declares `aria-modal` and, until 2026-09-06, had no
+   * keyboard code at all (register row D9). Escape now cancels it, which is the
+   * same thing the visible Cancel button does — and, like that button, is
+   * refused while the import is running rather than abandoning it half-done.
+   */
+  useModalKeyboard({
+    panelRef: sheetRef,
+    onEscape: busy ? null : () => setTriage(null),
+    enabled: triage != null,
+  });
 
   const execute = useCallback(
     async (plan: DropPlan, target: DropTargetId): Promise<UndoEntry | null> => {
@@ -238,6 +252,8 @@ export default function DropRouter({
       {triage && (
         <div className="dropr-sheet-scrim" role="presentation">
           <div
+            ref={sheetRef}
+            tabIndex={-1}
             className="dropr-sheet"
             role="dialog"
             aria-modal="true"

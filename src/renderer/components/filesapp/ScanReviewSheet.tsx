@@ -25,7 +25,8 @@
  * its own effect would be adjustable in name only. They persist per profile,
  * so the panel is a view onto the document, never a copy of it.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useModalKeyboard } from '../ui/useModalKeyboard';
 import { useT } from '../../i18n';
 import {
   INGEST_CONFIDENCE_POLICIES,
@@ -107,6 +108,7 @@ function readLastRoot(): string {
 
 export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewSheetProps) {
   const { t } = useT();
+  const sheetRef = useRef<HTMLDivElement>(null);
   const [root, setRoot] = useState<string>(readLastRoot);
   const [state, setState] = useState<SheetState>({ status: 'idle' });
   /** Per-review-row decision: a destination, or SKIP. */
@@ -518,9 +520,23 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
         plan.review.filter((i) => (picks[i.entry.path] ?? SKIP) !== SKIP).length
       : 0;
 
+  /*
+   * Register row D9. Escape is refused while `importing`, and only then: that
+   * status is the window in which files are actually being moved on disk, and
+   * a reflex Escape must not take the only progress readout off screen. Every
+   * other status — including `scanning`, which writes nothing — dismisses, the
+   * same as the Close button beneath.
+   */
+  useModalKeyboard({
+    panelRef: sheetRef,
+    onEscape: state.status === 'importing' ? null : onClose,
+  });
+
   return (
     <div className="fa-review-scrim" role="presentation">
       <div
+        ref={sheetRef}
+        tabIndex={-1}
         className="fa-review-sheet"
         role="dialog"
         aria-modal="true"

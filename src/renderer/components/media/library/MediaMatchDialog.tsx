@@ -7,9 +7,10 @@
  * to the right answer.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Input } from '../../ui';
 import Icon from '../../Icons';
+import { useModalKeyboard } from '../../ui/useModalKeyboard';
 import { useT } from '../../../i18n';
 import type { MediaMetadataSearchHit } from '../../../../shared/mediaMetadataIpc';
 
@@ -22,6 +23,7 @@ export interface MediaMatchDialogProps {
 
 export default function MediaMatchDialog({ initialQuery, onCancel, onPick }: MediaMatchDialogProps) {
   const { t } = useT();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState(initialQuery);
   const [hits, setHits] = useState<MediaMetadataSearchHit[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,8 +50,19 @@ export default function MediaMatchDialog({ initialQuery, onCancel, onPick }: Med
     void search(initialQuery);
   }, [initialQuery, search]);
 
+  // Escape closes unconditionally: nothing here is written until a hit is
+  // picked, so there is no in-flight state an abandoned search could lose.
+  useModalKeyboard({ panelRef, onEscape: onCancel });
+
   return (
-    <div className="medialib-match" role="dialog" aria-modal="true" aria-label={t('media.match.title')}>
+    <div
+      ref={panelRef}
+      tabIndex={-1}
+      className="medialib-match"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('media.match.title')}
+    >
       <div className="medialib-match__head">
         <strong>{t('media.match.title')}</strong>
         <button type="button" className="medialib-drawer__close" onClick={onCancel} aria-label={t('common.close')}>

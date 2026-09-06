@@ -5,9 +5,10 @@
 // the Settings app's copy of the same document stays in step; writing to
 // localStorage directly here would desync both the UI and the change event.
 
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Toggle } from '../../ui';
+import { useModalKeyboard } from '../../ui/useModalKeyboard';
 import { AnchorSurface, ContextualSurface } from '../../liquid/LiquidSurface';
 import StatusDot from '../StatusDot';
 import FieldRow from './FieldRow';
@@ -79,6 +80,31 @@ export default function ScraperSettingsDrawer() {
   const [pairEditor, setPairEditor] = useState<PairEditorState | null>(null);
   const [listEditor, setListEditor] = useState<ListEditorState | null>(null);
   const [credentialEditor, setCredentialEditor] = useState<CredentialEditorState | null>(null);
+  const pairEditorRef = useRef<HTMLElement>(null);
+  const listEditorRef = useRef<HTMLElement>(null);
+  const credentialEditorRef = useRef<HTMLElement>(null);
+
+  /*
+   * Three nested `aria-modal` editors that, until 2026-09-06, had no keyboard
+   * code at all (register row D9). Escape discards the same way their own Close
+   * button does — these are drafts held in local state and nothing is written
+   * until Save. Only one can be open at a time, so the traps cannot overlap.
+   */
+  useModalKeyboard({
+    panelRef: pairEditorRef,
+    onEscape: () => setPairEditor(null),
+    enabled: pairEditor != null,
+  });
+  useModalKeyboard({
+    panelRef: listEditorRef,
+    onEscape: () => setListEditor(null),
+    enabled: listEditor != null,
+  });
+  useModalKeyboard({
+    panelRef: credentialEditorRef,
+    onEscape: () => setCredentialEditor(null),
+    enabled: credentialEditor != null,
+  });
 
   // The Settings app edits the same document. Subscribing keeps the drawer from
   // showing a stale value after a change made in the other window.
@@ -446,6 +472,8 @@ export default function ScraperSettingsDrawer() {
       {pairEditor && (
         <div className="scr-pair-editor-backdrop">
           <section
+            ref={pairEditorRef}
+            tabIndex={-1}
             className="scr-pair-editor"
             role="dialog"
             aria-modal="true"
@@ -539,6 +567,8 @@ export default function ScraperSettingsDrawer() {
       {listEditor && (
         <div className="scr-pair-editor-backdrop">
           <section
+            ref={listEditorRef}
+            tabIndex={-1}
             className="scr-pair-editor"
             role="dialog"
             aria-modal="true"
@@ -614,6 +644,8 @@ export default function ScraperSettingsDrawer() {
       {credentialEditor && (
         <div className="scr-pair-editor-backdrop">
           <section
+            ref={credentialEditorRef}
+            tabIndex={-1}
             className="scr-pair-editor"
             role="dialog"
             aria-modal="true"

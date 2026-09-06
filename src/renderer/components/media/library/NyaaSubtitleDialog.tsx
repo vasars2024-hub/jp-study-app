@@ -17,9 +17,10 @@
  * second dialog style — same shape, same CSS, nothing new to keep in sync.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../../ui';
 import Icon from '../../Icons';
+import { useModalKeyboard } from '../../ui/useModalKeyboard';
 import { useT } from '../../../i18n';
 import { getActiveScraperSettings } from '../../../scraperSettingsStore';
 import { acquisitionConfigFrom } from '../../../../shared/subtitleNyaa';
@@ -49,6 +50,7 @@ export default function NyaaSubtitleDialog({
   onAttached,
 }: NyaaSubtitleDialogProps) {
   const { t, lang } = useT();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [candidates, setCandidates] = useState<NyaaSubtitleCandidateView[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [accepting, setAccepting] = useState('');
@@ -97,8 +99,19 @@ export default function NyaaSubtitleDialog({
     }
   }, [mediaId, languages, onAttached]);
 
+  /*
+   * Escape is REFUSED while a release is being accepted. Accepting one adds a
+   * torrent to the user's own qBittorrent, and dismissing the dialog mid-add
+   * would leave that transfer running with nothing on screen that admits it
+   * exists. The key is still swallowed rather than passed on, because the
+   * desktop shell closes the focused window on Escape and that would be worse.
+   */
+  useModalKeyboard({ panelRef, onEscape: accepting ? null : onCancel });
+
   return (
     <div
+      ref={panelRef}
+      tabIndex={-1}
       className="medialib-match"
       role="dialog"
       aria-modal="true"
