@@ -2045,7 +2045,7 @@ export function MediaSearchBox({ state }: { state: MediaState }) {
         <button
           className="media-search-clear"
           onClick={() => state.setQuery('')}
-          title={t('media.search.clear')}
+          title={t('media.search.clear')} aria-label={t('media.search.clear')}
         >
           ×
         </button>

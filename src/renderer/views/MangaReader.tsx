@@ -1923,11 +1923,21 @@ export default function MangaReader({ item, onClose }: Props) {
             </summary>
             <div className="lq-overflow-body">
               <div className="sp-stepper">
-                <button className="btn small" onClick={() => bumpZoom(-0.15)} disabled={zoom <= ZOOM_MIN}>
+                <button
+                  className="btn small"
+                  aria-label={t('common.zoomOut')}
+                  onClick={() => bumpZoom(-0.15)}
+                  disabled={zoom <= ZOOM_MIN}
+                >
                   −
                 </button>
                 <span className="sp-value">{Math.round(zoom * 100)}%</span>
-                <button className="btn small" onClick={() => bumpZoom(0.15)} disabled={zoom >= ZOOM_MAX}>
+                <button
+                  className="btn small"
+                  aria-label={t('common.zoomIn')}
+                  onClick={() => bumpZoom(0.15)}
+                  disabled={zoom >= ZOOM_MAX}
+                >
                   +
                 </button>
               </div>

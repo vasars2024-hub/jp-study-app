@@ -120,9 +120,9 @@ export function CalendarWidget() {
   return (
     <div className="wgt wgt-cal" onClick={openFull} role="button" tabIndex={0} title={t('widgets.calendarWidget.openTitle')}>
       <div className="wgt-cal-head">
-        <button className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title={t('widgets.calendarWidget.prevMonth')}>‹</button>
+        <button className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title={t('widgets.calendarWidget.prevMonth')} aria-label={t('widgets.calendarWidget.prevMonth')}>‹</button>
         <span>{monthLabel}</span>
-        <button className="wgt-btn-icon" onClick={(e) => shift(1, e)} title={t('widgets.calendarWidget.nextMonth')}>›</button>
+        <button className="wgt-btn-icon" onClick={(e) => shift(1, e)} title={t('widgets.calendarWidget.nextMonth')} aria-label={t('widgets.calendarWidget.nextMonth')}>›</button>
       </div>
       <div className="wgt-cal-grid">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
@@ -309,7 +309,7 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
         />
-        <button className="wgt-btn-icon" onClick={add} title={t('common.add')}>+</button>
+        <button className="wgt-btn-icon" onClick={add} title={t('common.add')} aria-label={t('common.add')}>+</button>
       </div>
       <ul className="wgt-todo-list">
         {items.length === 0 && <li className="wgt-empty">{t('widgets.todo.emptyHint')}</li>}
@@ -323,7 +323,7 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
               />
               <span>{it.text}</span>
             </label>
-            <button className="wgt-btn-icon" title={t('common.remove')} onClick={() => write(items.filter((x) => x.id !== it.id))}>×</button>
+            <button className="wgt-btn-icon" title={t('common.remove')} aria-label={t('common.remove')} onClick={() => write(items.filter((x) => x.id !== it.id))}>×</button>
           </li>
         ))}
       </ul>

@@ -68,7 +68,7 @@ export default function WidgetFrame({
       >
         <div className="widget-bar">
           <span className="widget-title">{t('widgetFrame.unknownWidget')}</span>
-          <button className="widget-b" title={t('common.remove')} onClick={onRemove}>×</button>
+          <button className="widget-b" title={t('common.remove')} aria-label={t('common.remove')} onClick={onRemove}>×</button>
         </div>
         <div className="widget-body">{t('widgetFrame.notAvailable')}</div>
       </section>
@@ -179,7 +179,7 @@ export default function WidgetFrame({
           {locked && <span className="widget-lock" title={t('widgetFrame.locked')} aria-hidden>⌧</span>}
           <button
             className="widget-b"
-            title={t('widgetFrame.options')}
+            title={t('widgetFrame.options')} aria-label={t('widgetFrame.options')}
             onClick={(ev) => { ev.stopPropagation(); setMenuOpen((o) => !o); }}
           >
             ⋯

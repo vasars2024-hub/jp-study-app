@@ -55,7 +55,7 @@ export function LevelProgressWidget() {
               <div className="wgt-level-top">
                 <span className="wgt-level-label">{l.label}</span>
                 <span className="wgt-level-count">{p.learned}/{p.total}</span>
-                <button className="wgt-btn-icon sm" title={t('widgets.levels.removeList')} onClick={() => setLists(removeLevelList(l.id))}>×</button>
+                <button className="wgt-btn-icon sm" title={t('widgets.levels.removeList')} aria-label={t('widgets.levels.removeList')} onClick={() => setLists(removeLevelList(l.id))}>×</button>
               </div>
               <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${p.pct}%` }} /></div>
             </li>

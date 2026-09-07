@@ -89,7 +89,13 @@ export default function DisplayPage() {
         highlight={focusSettingId === 'zoom'}
       >
         <div className="os-zoom-row">
-          <button type="button" className="btn small" onClick={() => bumpZoomBy(-0.1)} disabled={zoom <= ZOOM_MIN}>
+          <button
+            type="button"
+            className="btn small"
+            aria-label={t('settings.a11y.zoom.decrease')}
+            onClick={() => bumpZoomBy(-0.1)}
+            disabled={zoom <= ZOOM_MIN}
+          >
             −
           </button>
           <input
@@ -101,7 +107,13 @@ export default function DisplayPage() {
             onChange={(e) => setZoomValue(Number(e.target.value))}
             aria-label={t('settings.a11y.zoom.aria')}
           />
-          <button type="button" className="btn small" onClick={() => bumpZoomBy(0.1)} disabled={zoom >= ZOOM_MAX}>
+          <button
+            type="button"
+            className="btn small"
+            aria-label={t('settings.a11y.zoom.increase')}
+            onClick={() => bumpZoomBy(0.1)}
+            disabled={zoom >= ZOOM_MAX}
+          >
             +
           </button>
           <span className="muted os-zoom-val">{Math.round(zoom * 100)}%</span>

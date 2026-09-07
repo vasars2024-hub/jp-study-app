@@ -168,7 +168,7 @@ export default function WidgetGallery({
             autoFocus
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="widget-b" title={t('common.close')} onClick={onClose}>×</button>
+          <button className="widget-b" title={t('common.close')} aria-label={t('common.close')} onClick={onClose}>×</button>
         </div>
         <div className="widget-gallery-tabs">
           {tabs.map((tb) => (

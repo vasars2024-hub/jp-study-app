@@ -2930,6 +2930,7 @@ export default function DesktopShell({
           <button
             className="os-desk-icon-x"
             title={t('desktop.removeFromDesktop')}
+            aria-label={t('desktop.removeFromDesktop')}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();

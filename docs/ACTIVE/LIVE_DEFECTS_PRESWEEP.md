@@ -486,3 +486,99 @@ D-number range was read off the other branch too - but only the NUMBERS were rea
 branch's cross-cutting table, and class 5 is a cross-cutting pass rather than a surface. **Before
 claiming a cross-cutting CLASS, read `wt/files-app`'s cross-cutting table, not just its coverage
 table and its highest D number.**
+
+## 2026-09-07 00:41 EDT — codexA, boss audit A6-F1
+
+| D121 | pop-out chrome | Minimize, Maximize and Close announce drawing glyphs rather than their functions. | Open Settings as a pop-out; inspect the titlebar controls (audit A6-F1). | P2 | Fixed in this slice; live window 9 at integration HEAD plus edit: Make Liquid / Minimize / Maximize / Close. Removing Close aria-label restores ×; restoring returns Close. No Vite error overlay. |
+| D122 | desktop shortcuts | Remove from desktop has only a glyph as its accessible name. | DesktopShell.tsx shortcut remove button has a title but no aria-label. | P2 | Source-confirmed and repaired in this slice; current desktops contain zero shortcuts, so the fix is unit-verified only. The JSX parser now detects callbacks containing => instead of skipping the button. |
+
+The chrome regression scans both DesktopShell and App.tsx with TypeScript JSX parsing: 7/7 tests. A6-F3 was already recovered at 7bc4eb31. A6-F2 product commits are integrated through 55c74450; the two remaining worktree commits are documentation only. Shared app was not restarted; codexA owns only its newly opened Settings pop-out (window 9).
+
+## 2026-09-07 00:45 EDT — primary, class 1 (accessible name) beyond window chrome + a new class
+
+**CLAIM, so codexA and I do not collide.** codexA owns `App.tsx`, `DesktopShell.tsx` and
+`desktopChromeButtonNames.test.ts` (D121/D122, commit `cd503890`). I own **every other
+glyph-only button in `src/renderer`** — a disjoint set of 20 files — and the repo-wide gate,
+which lands as its own test file rather than an edit to codexA's.
+
+| D123 | app-wide (Settings, three widgets) | **Eight characters the user reads were committed mojibake** — UTF-8 bytes decoded as CP1252 and re-encoded. Settings > Dictionaries drew three Latin letters where each priority arrow belongs; the zoom-out button drew three where a minus belongs; World Clock, Daily Goals and Habit Tracker each drew two on their close buttons, and World Clock's time-unavailable fallback drew three instead of an em dash. | Found by scanning `src/` for the CP1252 lead artefact (U+00C2 / U+00C3 / U+00E2), which no existing gate looks for: the files parse, the types check, the suite passes and `i18n-check` only compares catalog keys, so a corrupt literal inside JSX is outside every check. 13 lines in 3 files, all present at HEAD, 5 of them preload comments. | P2 | fixed `be81bd88`. Gated by `sourceMojibake.test.ts`, which builds the three lead code points numerically so the test file is inside its own population rather than exempt — and it proved that on arrival by failing on two lines of its own header prose. |
+| D124 | 20 surfaces (mini mode, manga, calendar, flashcards, media, music, lens, widgets, Blanc, reader, display settings) | **45 more glyph-only buttons announce as their glyph.** The same defect as D121/D122 and a strictly larger population: the chrome gate scans two files, and the class is app-wide. | The existing gate could not have seen these two ways over: it reads one hardcoded path, and its regex took the first `>` after `<button`, which inside `onClick={() => …}` is the arrow's — so a button with a callback was skipped even in the file it did scan. With a JSX-aware parser: **113 glyph-only buttons in `src/renderer`, 52 with no accessible name.** | P2 | see the next section |
+
+**Method note, and it is the reusable part.** 32 of the 45 already carry a `title` that says the
+right words, so those are a mechanical copy — `title` does not name a button that has its own
+text, but the string was never the missing thing. The other 13 have no words anywhere and needed
+a label written. Splitting the class that way is what made it one turn instead of twenty.
+
+## 2026-09-07 00:49 EDT — codexA, Statistics mode parity / classes 4–5
+
+D10 retracted as **not-reproducible at cd503890**: toolbar Reset and File → Reset statistics BOTH show the shared irreversible-reset warning. Both cancelled; all jp-study-stats* localStorage strings are byte-identical before/after. The original row inspected the caller but missed useStats.resetAllStats confirmation.
+
+| D123 | stats (Aero) | Switching to Aero hides all watching activity: total time, per-show history and watch segments disappear. | Statistics pop-out window 10, per-window Aero material seam. Live store contains 7,173.3 watch seconds and 6 shows; Aero renders no watch totals, show rows or watch bars. | P2 | open — claimed codexA; reuse shared StatsChart and StatsShows and add the existing watch summary labels to Aero. Standard/Wired and Blanc already consume the shared components. |
+
+### 2026-09-07 00:50 EDT — primary, D124 closed. Numbers, and the two ways the instrument was blind.
+
+**D124 fixed at `e1985518`.** 45 sites across 20 files; `glyphButtonNames.test.ts` now derives
+the population from `src/renderer` + `src/media` instead of listing paths, and asserts zero.
+Verified at the commit in a **detached worktree**, not the shared tree: i18n-check exit 0
+(12,732 keys, all translated), i18n-dupe-keys clean (10,691 per catalog), architecture-audit
+"Nothing new", the three name/encoding gates 12/12.
+
+**Negative control:** deleting the `aria-label` from `widgets/levels.tsx` fails the gate at
+`levels.tsx:58 × (has a title, which cannot name it)` — the exact file, line and reason — and
+restoring it passes. Without that the "0 unnamed" reading would be worth nothing.
+
+**Both blindnesses were in the instrument, and this is the reusable part.**
+1. *One hardcoded path.* `desktopChromeButtonNames.test.ts` read
+   `const SHELL = 'src/renderer/components/DesktopShell.tsx'`, so 45 sites in 20 other files
+   were outside its universe while it reported green.
+2. *The regex took the wrong `>`.* `text.indexOf('>', match.index)` finds the arrow of
+   `onClick={() => …}` before the end of the opening tag, so **any button with a callback was
+   skipped — including one in the file it *was* scanning** (`DesktopShell.tsx`'s Remove from
+   desktop, which codexA fixed as D122). Switching to a TSX parse moved the count from 45 to 52.
+
+**Method that made it one turn rather than twenty:** 32 of 45 already carried a `title` saying
+the right words, so those are a scripted copy — the string was never the missing thing, only its
+attribute. The remaining 13 had no words anywhere and were hand-written, which is where the 9
+new keys went. Move/remove in a list now name the row they act on (`Move {name} up`) rather than
+repeating "Move up" six times down a column.
+
+**One offender is left in the tree and it is a decision, not a miss:**
+`__devharness__/videoStudyHarness.tsx:167`. The harness directory is slated for deletion; the
+gate excludes it by name, and that exclusion line is what to delete if it ever ships.
+
+D123 verification, 2026-09-07 00:49 EDT: Aero window 10 now renders **1h 59m watched, 6 shows, 4 nonzero watch segments**; raw days sum **7,173.3 seconds**, read sum **31,408.916 seconds / 542,290 chars** agrees with 8h 43m and 542,290. No new API/store: standard, Wired, Files and Blanc keep their shared StatsChart/StatsShows path. At 520×580, show-list width/scrollWidth is **320/320** after fixing shared readout flex shrink (before **320/402**). Existing book table remains horizontally scrollable; screenshot inspected, main scroller reaches the show rows. Console error log total **0**. Tests: isolated checkout old Aero fails **1/6**, other modes and empty controls pass **5/6**; corrected view passes **26/26 across 4 suites**. Statistics surface remains partial: Anki sync and full per-row journeys are still owed.
+
+## 2026-09-07 00:52 EDT — codexA claims Library D2
+
+Live library pop-out window 11: **24 real rows**. Focus 悪の教典 02 → bridge Enter delivered **1/1** → row selected, Read inspector action appears, reader remains absent. The inspector is a keyboard escape, so this is P2 discoverability rather than a keyboard dead end. Decision: Enter opens the focused row through existing onOpen; Space and single click retain selection. Apply to standard/Wired and Aero list branches; Blanc shares LibraryView. No new navigation path.
+
+## 2026-09-07 00:55 EDT — primary, D125. The same class, one layer down, and it is WORSE.
+
+| D125 | 17 surfaces (Media Center, Library, novel + manga readers, YouTube, Resources, Reading captures, Widget gallery, music widget, mini mode) | **54 icon-only buttons have NO accessible name at all.** Not a wrong name — an empty one. A screen reader announces "button" and nothing else: no shuffle, no skip, no favourite, no delete. | `src/renderer/components/Icons.tsx:241` renders every icon `aria-hidden="true"`, which is correct for a decorative SVG — so a `<button><Icon name="heart" /></button>` has an empty accessible name unless the button itself carries one. Counted with a TSX parse over `src/renderer`: **130 icon-only buttons, 54 with neither `aria-label` nor `aria-labelledby`.** 53 of the 54 carry a `title`, which cannot name a button (D121's rule) but does mean the words already exist; exactly one, `MiniShell.tsx:816` (Icon close), has no words anywhere. `src/media` has none — it is 0 of 0. | P2 | **OPEN — next turn's opening slice.** Strictly worse than D121/D124: a glyph at least announces something. |
+
+**Why this was not fixed in the same turn, stated rather than left to look like an oversight.**
+`glyphButtonNames.test.ts` matches a *text* child, so it is structurally blind to this shape and
+extending it is not a one-line change — the gate has to reach inside the element and understand
+that `<Icon>` contributes nothing. 53 of the 54 are the same mechanical `title` → `aria-label`
+copy the D124 codemod already does, so the fix is short; the gate is the part that needs care,
+and starting it with a full suite already running was the wrong order.
+
+**Do not "fix" this by removing `aria-hidden` from `Icons.tsx`.** That would name every button
+after its icon id (`heart`, `skip-back`), which is a worse name than none and would silently
+change 130 controls at once. The name belongs on the button.
+
+D2 verification, 2026-09-07 00:54 EDT: delivered Enter **1/1** opens **悪の教典 02** with its real Japanese text through the existing reader, from BOTH standard and Aero lists (24 rows → 0 list rows + novel-scroller). Reader Library button returns to the shelf. Unit controls keep single-click selection, Space, unrelated keys and double click; held Enter opens once. Isolated old view fails **3/13** Enter cases, all **10 controls pass**; corrected view passes **13/13**; shared tree Library suites **21/21**. Console errors **0**. Library remains partial; this closes D2 rather than claiming its whole inventory.
+
+## 2026-09-07 00:56 EDT — codexA claims live Statistics updates
+
+| D124 | stats / reader integration | Statistics stops updating after opening, even while another window records real study time. | Open Statistics, then read 悪の教典 02 in a separate Library pop-out. Window 12 keeps Read today at **1m** after its localStorage reaches **136.351 seconds (2m)**; per-book time also stays at the earlier snapshot. No fake data injected. | P2 | open — claimed codexA; useStats memo depends only on manual refresh/reset and subscribes to no reading/watch/storage/language changes. Share an event subscription with study widgets; preserve independent read/watch totals. |
+
+**Gate footnote for D123/D124, 2026-09-07 01:00.** The first full run at `e1985518` came back
+**1 failed / 14,751 passed** and the failure was **my own new gate**, not the product: reading
+3,500 files timed out at vitest's 20s default under parallel load while passing in ~1s alone.
+Fixed at `24182319` — one regex per file instead of a per-character walk of every line, plus an
+explicit 120s budget on both new gates, because file I/O at that scale is not a statement about
+the code under test. Re-run at `24182319` in the detached worktree: **1,172 files passed /
+1 skipped, 14,758 tests passed / 6 skipped, zero failed, exit 0.** Worth carrying: a source-scan
+gate that walks the whole tree is fast alone and slow inside `npx vitest run`, and the default
+timeout is the thing that bites.

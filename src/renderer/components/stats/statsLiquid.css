@@ -237,3 +237,12 @@
     flex-direction: column;
   }
 }
+.stats-by-show .stats-book-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.stats-by-show .stats-book-title {
+  flex: 1;
+  min-width: 0;
+}

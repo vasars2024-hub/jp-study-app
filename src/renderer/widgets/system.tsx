@@ -178,7 +178,7 @@ export function RecentLookupsWidget(_props: WidgetProps) {
       <div className="wgt-recent-head">
         <span className="muted">{t('widgets.recentLookups.title')}</span>
         {list.length > 0 && (
-          <button type="button" className="wgt-btn-icon sm" title={t('widgets.recentLookups.clear')} onClick={() => clearLookupHistory()}>
+          <button type="button" className="wgt-btn-icon sm" title={t('widgets.recentLookups.clear')} aria-label={t('widgets.recentLookups.clear')} onClick={() => clearLookupHistory()}>
             ×
           </button>
         )}
@@ -213,7 +213,7 @@ export function ClipboardWidget(_props: WidgetProps) {
     <div className="wgt wgt-clip">
       <div className="wgt-recent-head">
         <span className="muted">{t('widgets.clipboardWidget.title')}</span>
-        <button type="button" className="wgt-btn-icon sm" title={t('widgets.clipboardWidget.open')} onClick={openFull}>
+        <button type="button" className="wgt-btn-icon sm" title={t('widgets.clipboardWidget.open')} aria-label={t('widgets.clipboardWidget.open')} onClick={openFull}>
           ⤢
         </button>
       </div>

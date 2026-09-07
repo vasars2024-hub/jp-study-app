@@ -471,7 +471,7 @@ export function MusicSearchBox({ state }: { state: MusicState }) {
         <button
           className="music-search-clear"
           onClick={clearDraft}
-          title={t('music.search.clear')}
+          title={t('music.search.clear')} aria-label={t('music.search.clear')}
         >
           ×
         </button>

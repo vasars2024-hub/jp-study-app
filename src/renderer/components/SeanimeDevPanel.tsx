@@ -193,7 +193,7 @@ export default function SeanimeDevPanel() {
           onClick={() => setOpen((v) => !v)}
           style={btn}
           aria-expanded={open}
-          title={t(open ? 'seanimeDev.collapse' : 'seanimeDev.expand')}
+          title={t(open ? 'seanimeDev.collapse' : 'seanimeDev.expand')} aria-label={t(open ? 'seanimeDev.collapse' : 'seanimeDev.expand')}
         >
           {open ? '–' : '+'}
         </button>

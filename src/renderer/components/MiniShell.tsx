@@ -893,6 +893,7 @@ export default function MiniShell({
                         <button
                           type="button"
                           className="mini-chip"
+                          aria-label={t('common.moveItemUp', { name: def ? def.name : id })}
                           disabled={i === 0}
                           onClick={() =>
                             setCfg(saveMiniMode({ routines: moveMiniRoutine(cfg.routines, id, -1) }))
@@ -903,6 +904,7 @@ export default function MiniShell({
                         <button
                           type="button"
                           className="mini-chip"
+                          aria-label={t('common.moveItemDown', { name: def ? def.name : id })}
                           disabled={i === cfg.routines.length - 1}
                           onClick={() =>
                             setCfg(saveMiniMode({ routines: moveMiniRoutine(cfg.routines, id, 1) }))
@@ -913,6 +915,7 @@ export default function MiniShell({
                         <button
                           type="button"
                           className="mini-chip"
+                          aria-label={t('common.removeItem', { name: def ? def.name : id })}
                           onClick={() => doRemoveRoutine(id)}
                         >
                           ✕
@@ -1066,7 +1069,13 @@ export default function MiniShell({
                         </option>
                       ))}
                     </select>
-                    <button type="button" className="mini-chip is-on" disabled={!addPick} onClick={() => doAddApp()}>
+                    <button
+                      type="button"
+                      className="mini-chip is-on"
+                      aria-label={t('common.add')}
+                      disabled={!addPick}
+                      onClick={() => doAddApp()}
+                    >
                       +
                     </button>
                   </div>
@@ -1090,6 +1099,7 @@ export default function MiniShell({
                       <button
                         type="button"
                         className="mini-chip"
+                        aria-label={t('common.moveItemUp', { name: miniAppLabel(id) })}
                         disabled={i === 0}
                         onClick={() => setCfg(saveMiniMode({ apps: moveMiniApp(cfg.apps, id, -1) }))}
                       >
@@ -1098,6 +1108,7 @@ export default function MiniShell({
                       <button
                         type="button"
                         className="mini-chip"
+                        aria-label={t('common.moveItemDown', { name: miniAppLabel(id) })}
                         disabled={i === cfg.apps.length - 1}
                         onClick={() => setCfg(saveMiniMode({ apps: moveMiniApp(cfg.apps, id, 1) }))}
                       >
@@ -1106,6 +1117,7 @@ export default function MiniShell({
                       <button
                         type="button"
                         className="mini-chip"
+                        aria-label={t('common.removeItem', { name: miniAppLabel(id) })}
                         disabled={cfg.apps.length <= MINI_MIN_APPS}
                         onClick={() => doRemove(id)}
                       >

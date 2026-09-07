@@ -593,7 +593,7 @@ export function BlancTranslatePanel() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={state.swap} title="Swap languages">
+          <button type="button" onClick={state.swap} title="Swap languages" aria-label="Swap languages">
             ⇄
           </button>
           <select
