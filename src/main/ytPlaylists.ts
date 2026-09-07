@@ -413,6 +413,21 @@ export async function addPlaylistByUrl(url: string): Promise<{ ok: true; playlis
 const EXTENSION_PLAYLIST_KEY = '__extension__';
 
 /** Upsert a single YouTube watch URL into the Extension captures playlist (metadata only). */
+/**
+ * True when a stored row still carries the placeholder identity `addVideoByUrl`
+ * writes when `ytDlpJson` does not answer: the raw 11-character video id as the
+ * title, and no duration.
+ *
+ * Without this the failure was permanent. The row was pushed anyway (which is
+ * right — the extension capture must not be lost because a subprocess was busy),
+ * but the next save of the same URL matched `existing` and returned
+ * `duplicate: true` without ever re-asking, so a momentary yt-dlp outage renamed
+ * the video to `dQw4w9WgXcQ` for good.
+ */
+function needsMetadataRefetch(video: YtVideo): boolean {
+  return video.title === video.youtubeId && video.durationSec === undefined;
+}
+
 export async function addVideoByUrl(
   url: string,
 ): Promise<
@@ -448,7 +463,7 @@ export async function addVideoByUrl(
 
   const playlistIdResolved = pl.id;
   const existing = store.videos.find((v) => v.playlistId === playlistIdResolved && v.youtubeId === youtubeId);
-  if (existing) {
+  if (existing && !needsMetadataRefetch(existing)) {
     saveAndBroadcast(store);
     return { ok: true, playlistId: playlistIdResolved, videoId: existing.id, youtubeId, duplicate: true };
   }
@@ -481,6 +496,23 @@ export async function addVideoByUrl(
     }
   }
 
+  if (existing) {
+    // Second visit to a row this function stored hollow the first time, because
+    // yt-dlp did not answer. Patch what we now know and leave the rest alone —
+    // the id, the position and any `downloaded`/`transcribed` progress the user
+    // has since earned on it all stay.
+    existing.title = title;
+    existing.thumbUrl = thumbUrl;
+    if (durationSec !== undefined) existing.durationSec = durationSec;
+    if (viewCount !== undefined) existing.viewCount = viewCount;
+    if (channelTitle) existing.channelTitle = channelTitle;
+    if (publishedAt !== undefined) existing.publishedAt = publishedAt;
+    if (channelTitle) pl.channelTitle = channelTitle;
+    store = touchChannelFromPlaylist(store, pl);
+    saveAndBroadcast(store);
+    return { ok: true, playlistId: playlistIdResolved, videoId: existing.id, youtubeId, duplicate: true };
+  }
+
   const video: YtVideo = {
     id: `ytv-${playlistIdResolved}-${youtubeId}`,
     playlistId: playlistIdResolved,
@@ -504,6 +536,77 @@ export async function addVideoByUrl(
   store = touchChannelFromPlaylist(store, pl);
   saveAndBroadcast(store);
   return { ok: true, playlistId: playlistIdResolved, videoId: video.id, youtubeId };
+}
+
+const AUTO_UPDATE_TICK_MS = 60 * 60 * 1000;
+/** First tick is delayed so app start is not competing with a yt-dlp spawn. */
+const AUTO_UPDATE_FIRST_TICK_MS = 5 * 60 * 1000;
+let autoUpdateTimer: ReturnType<typeof setInterval> | null = null;
+let autoUpdateFirstTimer: ReturnType<typeof setTimeout> | null = null;
+let autoUpdateRunning = false;
+
+function isDue(lastCheckedAt: number | undefined, frequencyHours: number, now: number): boolean {
+  if (!lastCheckedAt) return true;
+  return now - lastCheckedAt >= frequencyHours * 60 * 60 * 1000;
+}
+
+/**
+ * Sync every immersion playlist whose auto-update clock has come round.
+ *
+ * Selection is on the playlist's OWN clock and nothing else. The previous shape
+ * also excluded any playlist whose channel was due — and `normalizeYtStore`
+ * copies a playlist's `lastCheckedAt` and `updateFrequencyHours` onto its channel
+ * on every read, so "channel is due" evaluated to the same boolean as "playlist
+ * is due". The filter read `p is due && !(p is due)` and selected nothing: no
+ * playlist belonging to a tracked channel was ever swept.
+ */
+export async function runAutoUpdateDue(): Promise<YtPlaylistsStore> {
+  let store = readStore();
+  const now = Date.now();
+  const due = store.playlists.filter(
+    (p) => isImmersionPlaylist(p) && p.autoUpdate && isDue(p.lastCheckedAt, p.updateFrequencyHours, now),
+  );
+  for (const pl of due) {
+    const result = await syncPlaylistFromUrl(store, pl.url, pl);
+    if (!('error' in result)) store = result.store;
+  }
+  if (due.length) saveAndBroadcast(store);
+  return store;
+}
+
+async function autoUpdateTick(): Promise<void> {
+  if (autoUpdateRunning) return;
+  autoUpdateRunning = true;
+  try {
+    await runAutoUpdateDue();
+  } catch {
+    /* a sweep that throws must not kill the timer */
+  } finally {
+    autoUpdateRunning = false;
+  }
+}
+
+/**
+ * The auto-update setting had no actor. `yt:autoUpdateDue` was bound in
+ * `preload.ts` and declared in `window.d.ts`, and no renderer file ever invoked
+ * it — so the "Update automatically" checkbox and its frequency select persisted
+ * a preference that nothing read. Main owns the clock now, which is also the only
+ * place it can survive the window being closed.
+ */
+export function startYtAutoUpdateTimer(): void {
+  if (autoUpdateTimer || autoUpdateFirstTimer) return;
+  autoUpdateFirstTimer = setTimeout(() => {
+    autoUpdateFirstTimer = null;
+    void autoUpdateTick();
+    autoUpdateTimer = setInterval(() => void autoUpdateTick(), AUTO_UPDATE_TICK_MS);
+  }, AUTO_UPDATE_FIRST_TICK_MS);
+}
+
+export function stopYtAutoUpdateTimer(): void {
+  if (autoUpdateFirstTimer) clearTimeout(autoUpdateFirstTimer);
+  if (autoUpdateTimer) clearInterval(autoUpdateTimer);
+  autoUpdateFirstTimer = null;
+  autoUpdateTimer = null;
 }
 
 export function registerYtPlaylistsIpc(): void {
@@ -721,13 +824,12 @@ export function registerYtPlaylistsIpc(): void {
         store = result.store;
         refreshedPlaylistIds.push(pl.id);
       }
-      const now = Date.now();
+      // A sync that failed is not a check. `syncPlaylistFromUrl` already stamps
+      // `lastCheckedAt` on each playlist it actually refreshed; stamping the rest
+      // here made `yt:autoUpdateDue` skip them for a whole `updateFrequencyHours`
+      // window on the strength of a request that never answered.
       const nextChannel = store.channels.find((c) => c.channelId === channelId);
-      if (nextChannel) nextChannel.lastCheckedAt = now;
-      for (const pl of store.playlists) {
-        if (pl.channelId !== channelId) continue;
-        pl.lastCheckedAt = now;
-      }
+      if (nextChannel && !errors.length) nextChannel.lastCheckedAt = Date.now();
       saveAndBroadcast(store);
       return { store, channel: nextChannel ?? channel, refreshedPlaylistIds, errors };
     },
@@ -803,28 +905,7 @@ export function registerYtPlaylistsIpc(): void {
     },
   );
 
-  ipcMain.handle('yt:autoUpdateDue', async (): Promise<YtPlaylistsStore> => {
-    let store = readStore();
-    const now = Date.now();
-    const dueChannels = new Set(
-      store.channels
-        .filter((c) => !c.lastCheckedAt || now - c.lastCheckedAt >= c.updateFrequencyHours * 60 * 60 * 1000)
-        .map((c) => c.channelId),
-    );
-    const due = store.playlists.filter(
-      (p) =>
-        isImmersionPlaylist(p) &&
-        p.autoUpdate &&
-        !dueChannels.has(p.channelId ?? '') &&
-        (!p.lastCheckedAt || now - p.lastCheckedAt >= p.updateFrequencyHours * 60 * 60 * 1000),
-    );
-    for (const pl of due) {
-      const result = await syncPlaylistFromUrl(store, pl.url, pl);
-      if (!('error' in result)) store = result.store;
-    }
-    if (due.length) saveAndBroadcast(store);
-    return store;
-  });
+  ipcMain.handle('yt:autoUpdateDue', async (): Promise<YtPlaylistsStore> => runAutoUpdateDue());
 
   ipcMain.handle(
     'yt:refreshAll',
