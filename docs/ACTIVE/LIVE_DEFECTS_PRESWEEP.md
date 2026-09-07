@@ -2065,3 +2065,21 @@ through `flash.aero.menu.*`, so `resources` may not be the only one.
 the whole new key block**, because the file also carried this turn's uncommitted work. Mutation
 controls on a file you are mid-edit on must be restored from a `cp` backup taken before the
 mutation, never from the index.
+
+### D187's lead, followed: every view with an `AppChrome` theme branch, scanned
+
+Eleven views call `useAeroMaterials()` / `useWiredMaterials()`. Scanned all of them with
+`i18n-partial-check --file` rather than guessing:
+
+| view | untranslated | verdict |
+|---|---|---|
+| `ResourcesView` | 20 | **D187, fixed this turn** |
+| `ImmersionView` | 13 flagged, ~20 real | **D188 below — open, and it is the exact next slice** |
+| `NovelReader` | 16 | pre-existing baseline, not an Aero-shell defect; its own row |
+| `FlashcardsView` | 1 | `Jiten vocab mining` — a product name, leave literal |
+| `GrammarView`, `StatisticsView`, `TranslateView` | 1 each | **DECIDED: leave literal.** `SYN / PARSE UNIT READY`, `TEL / METRICS LIVE`, `TRN / CHANNEL READY` are gated `{wired && …}` and are deliberate terminal fiction for the WIRED material — the comment above the Grammar one says so, and says the gate exists precisely so the fiction does not leak into a Vista glass window. Legitimately literal, same class as a code sample. They are already baselined; do not "fix" them. |
+| `CalendarView`, `LibraryView`, `NovelsView`, `ReadingFinderView` | 0 | clean |
+
+| id | surface | what is wrong | evidence | sev | status |
+|---|---------|--------------|----------|-----|--------|
+| D188 | immersion — Aero shell | Same shape as D187 and the second confirmed instance: the Aero shell's **entire menu bar** is English in every language. `File` (+ `Open location`, `Save site`, `Export reader page`, `Capture video`, `Open in system browser`), `View` (+ `Live`, `Live Reader`, `Focus`, `Reload`, `Hide/Show Sites rail`), `Sites` (+ `Refresh saved sites`) — and three of those menus already carry a `t()` item beside the literals (`immersion.visualNovelLibrary`, `immersion.liveLookupMenu`, `immersion.closePage`), so the bar renders half-translated, which reads worse than wholly English. Also the status bar's `Loading` / `Ready` / `{n} sites`, the surface's `Loading...` banner, the rail heading `Sites`, and the rail empty state `Saved sites appear here. Bookmark any page.` | `node tools/i18n-partial-check.cjs --file renderer/views/ImmersionView.tsx` → 13. The scanner cannot see the four template-literal menu labels (`` `${mode === 'live' ? '[x] ' : ''}Live` ``) or the two ternary ones, so the real count is ~20 — read the file, not the number. | P2 | **open — exact next slice.** ~20 new `immersion.aero.*` keys in all four catalogs; `{n} sites` needs the four Russian CLDR arms. Follow `resourcesAeroLocale.test.tsx` exactly: set `data-materials="aero"` before the mount, assert the Aero container exists so the test cannot silently score the standard shell, and assert every English literal PRESENT in en before asserting it absent in ja/zh/ru. |
