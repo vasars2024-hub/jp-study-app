@@ -793,3 +793,16 @@ to walk. D137 found it, D143 shows a fix *creating* it eight hours later. So the
 "check both hosts"; it is **grep every call site of the channel before writing the guard, and put
 the guard where they all meet.** `grep -rn "window.api.<name>(" src/` costs seconds and would
 have prevented D143 entirely.
+
+**Two more leads read at 04:50, recorded so the next turn opens on the real one:**
+`visualNovelRemoveCapture` is **guarded and should be ruled out** — `VisualNovelSentenceAssist`'s
+`remove()` uses a two-step `confirmDelete` arm, which the scanner cannot see because it is not a
+`confirmDialog`. But **`removeAudio` twelve lines below it (`:157`) is NOT guarded**: it deletes
+an attached voice clip with no confirm and no undo, and re-attaching means the native picker
+again. Same tell as D136 — the smaller destruction asks, the larger-effort one does not. Not
+filed here only because the turn ended; it is the next slice, and it is real.
+
+**That is now THREE guard shapes the scan structurally cannot see**, and they should be checked by
+hand every time a lead reads unguarded: one frame up behind a prop (D137), delegated to a shared
+helper (D143), and a two-step arm in local state (here). The scanner's "UNGUARDED" column is a
+list of questions, never a list of defects — 5 of the 8 leads read this turn were false.
