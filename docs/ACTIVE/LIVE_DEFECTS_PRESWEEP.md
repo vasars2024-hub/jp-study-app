@@ -641,3 +641,45 @@ of "English" and would contradict CLAUDE.md i18n rule 4. Do not "fix" it.
 `Anti-Bot`, `Extraction`, +33 more) and `agent`'s context-chip section labels (`Dictionary`,
 `Grammar`, `Translate`, which ARE translated in the taskbar and not here). Both were read this
 turn and are real; neither was reached before the turn ended.
+
+### 2026-09-07 01:50 EDT — primary2, D128 CLOSED. The gate exists now, and one commit that lied.
+
+**D128 fixed at `367cf19a` + `a2e4423a`.** `partial-i18n-scan.cjs` moved to
+`tools/i18n-partial-check.cjs` (git-detected rename, 100% similarity) and given
+`tools/i18n-partial-baseline.json`, an exit code and a per-file ratchet, modelled on
+`i18n-locale-arg-check.cjs`. `--report` keeps the old ranked summary, `--file` the per-file
+list, `--update-baseline` re-locks after a conversion. **Baseline: 44 files / 340 strings.**
+
+**It is a ratchet, not a hard zero, and that is the design decision.** A real share of the 340
+are legitimately literal — proper nouns, units, format examples. A hard zero that produces false
+positives gets baselined away wholesale and then protects nothing, which is exactly what D120
+found `i18n-locale-arg-check` had already done to itself. Only growth fails.
+
+**Controls, all three run at the real tip:**
+- planting the same 7 English literals that defeated `i18n-hardcoded-check` takes this one to
+  **exit 1** and names all 7 by line and kind; restoring returns **exit 0**;
+- deleting the baseline returns **exit 1** with the create instruction — a missing baseline is
+  a hard failure, not an implicit accept-all, because an absent baseline is precisely how a
+  ratchet silently stops ratcheting.
+
+`VerifiedSitesManager` is baselined at **1**, not 0: its `ja, en` placeholder is a format
+example. That is the tolerated case the ratchet exists for, and it is the shape of entry a
+future worker should be suspicious of if it starts growing.
+
+**A commit of mine that read as complete and was not — worth more than the gate.** `367cf19a`
+shipped the rename and the baseline but **none of the 99 lines that make it a gate.**
+`git add` aborts the WHOLE command on one missing pathspec; I had listed the file's
+*pre-rename* path, and `2>/dev/null` swallowed the error. A second `git add` in the same line
+then staged the baseline, so the commit succeeded, and `git show --stat` showed a plausible
+rename plus a new JSON. The tell was `git status` still listing the tool as ` M` afterwards.
+**Repaired in `a2e4423a`, disclosed rather than amended.** The rule that would have caught it
+is already in this repo's guidance and I under-applied it: read `git diff --cached --name-only`
+*and* confirm each path's content is what you think, not just that the names look right.
+
+**Gates at `a2e4423a`, in a DETACHED worktree** (`Temp\jp-p2-verify-a2e4423a`, junctioned
+node_modules, removed afterwards — never the shared tree):
+full `npx vitest run` **1,172 files passed / 1 skipped, 14,767 tests passed / 6 skipped,
+0 failed, exit 0**; i18n-check **exit 0** (12,789 keys, all translated); i18n-dupe-keys 4/4
+clean at 10,823 each; i18n-missing-key **exit 0**; i18n-locale-arg **exit 0**;
+i18n-hardcoded **exit 0** (29 files / 663 strings, down from 30 / 768);
+i18n-partial **exit 0**; architecture-audit **"Nothing new"**.
