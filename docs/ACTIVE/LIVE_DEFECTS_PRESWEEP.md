@@ -1007,3 +1007,7 @@ values.**
 **Litter sweep, since one piece of it turned up:** all 66 `localStorage` keys scanned for
 `zzprobe|zzqqxx|probe-|__probe|PLANT|headerless|test-fixture`. **2 hits, both the same deck.**
 Nothing else an agent ran this month is sitting in the user's profile.
+
+## 2026-09-07 05:58 EDT — codexA claims Statistics class 4 and related state paths
+
+Window **12** (`?popout=stats`), primary2 retains window 2. Ownership: `StatsContent.tsx`, focused Statistics tests, scoped catalog additions only if needed. Main-v1 gate 11 re-derived through live IPC: **39 media items, 0 Conan matches**; clauses 2–3 remain unproven and no attachment/acquisition attempted. A6-F2 cannot be landed while primary2 is actively writing its branch (39 ahead); A6-F1/A6-F3 fixes re-derived in committed source. New findings use D210 onward.
