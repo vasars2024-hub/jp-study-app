@@ -5616,7 +5616,7 @@ export const zh: Catalog = {
   'media.collection.placeholder': '收藏夹名称',
   'media.remove.title': '要从媒体库中移除吗？',
   'media.remove.message': {
-    other: '要从媒体库中移除 {title} 及其 {count} 个文件吗？文件本身仍保留在磁盘上。',
+    other: '要从媒体库中移除 {title} 及其 {count} 个文件吗？文件本身仍保留在磁盘上，但为其下载或转写的字幕会被删除。',
   },
   'media.remove.confirm': '移除',
   'media.toast.addedToCollection': '已添加到 {name}。',

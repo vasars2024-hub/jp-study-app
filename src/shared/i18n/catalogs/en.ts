@@ -5664,8 +5664,8 @@ export const en: Catalog = {
   'media.collection.placeholder': 'Collection name',
   'media.remove.title': 'Remove from library?',
   'media.remove.message': {
-    one: 'Remove {title} from your library? The file itself is left on disk.',
-    other: 'Remove {title} and its {count} files from your library? The files themselves are left on disk.',
+    one: 'Remove {title} from your library? The file itself is left on disk, but any subtitles downloaded or transcribed for it are deleted.',
+    other: 'Remove {title} and its {count} files from your library? The files themselves are left on disk, but any subtitles downloaded or transcribed for them are deleted.',
   },
   'media.remove.confirm': 'Remove',
   'media.toast.addedToCollection': 'Added to {name}.',

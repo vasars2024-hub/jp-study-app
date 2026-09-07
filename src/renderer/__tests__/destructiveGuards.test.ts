@@ -31,6 +31,12 @@ const CASES = [
   // sentence mined from it. The sibling panel already guarded deleting ONE capture,
   // so the smaller destruction asked and the larger one did not.
   { file: 'src/renderer/components/immersion/VisualNovelPanel.tsx', api: 'visualNovelRemove' },
+  // A MODE GAP rather than a second opinion. Study OS reaches `media:remove`
+  // through `MediaLibraryShell.removeEntry`, which confirms; Blanc renders the
+  // same `MediaGrid` (`BlancMediaPanels.tsx:175`) whose per-card × called this
+  // helper directly. The handler `rmSync`s the item's userData `subtitles/`
+  // directory, where Whisper output and harvested records both live.
+  { file: 'src/renderer/components/media/MediaContent.tsx', api: 'removeMedia' },
 ] as const;
 
 /** The Nth enclosing brace block around `index`, 0 = innermost. */

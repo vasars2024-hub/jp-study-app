@@ -64,6 +64,7 @@ import {
 } from '../../mediaLibrary';
 import { lookupWordFromMouseUp, isLookupClick } from '../../wordLookup';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../ui/dialogService';
 import { mediaHubBackupFilename } from '../../mediaHubStoragePanel';
 import {
   endMediaStudySession,
@@ -995,6 +996,24 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const removeItem = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
+      // `MediaGrid`'s per-card × is a live control in Blanc
+      // (`BlancMediaPanels.tsx:175`), and it went straight to `media:remove` —
+      // which drops the row, the covers, the artwork, and `rmSync`s that item's
+      // whole directory under userData `subtitles/`. Whisper transcriptions and
+      // harvested subtitle records both live there, so one stray click on a 12px
+      // glyph destroyed acquisition and compute with no Recycle Bin and no undo.
+      // Study OS confirms this same action in `MediaLibraryShell.removeEntry`;
+      // Blanc did not, which is the mode gap rather than a second opinion. The
+      // guard sits on the shared state helper so every host of `MediaGrid` gets
+      // it and it cannot drift per-surface again. Same keys as Study OS, count 1.
+      const item = items.find((candidate) => candidate.id === id);
+      const ok = await confirmDialog({
+        title: t('media.remove.title'),
+        message: t('media.remove.message', { title: item?.title ?? item?.fileName ?? '', count: 1 }),
+        confirmLabel: t('media.remove.confirm'),
+        danger: true,
+      });
+      if (!ok) return;
       const next = await window.api.removeMedia(id);
       setItems(next);
       if (current?.id === id) {
@@ -1002,7 +1021,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         setCurrent(null);
       }
     },
-    [current],
+    [current, items, t],
   );
 
   const downloadYouTube = useCallback(async (override?: string) => {

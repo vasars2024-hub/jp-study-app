@@ -5646,7 +5646,7 @@ export const ja: Catalog = {
   'media.collection.placeholder': 'コレクション名',
   'media.remove.title': 'ライブラリから削除しますか？',
   'media.remove.message': {
-    other: '{title} と {count} 件のファイルをライブラリから削除しますか？ ファイル自体はディスクに残ります。',
+    other: '{title} と {count} 件のファイルをライブラリから削除しますか？ ファイル自体はディスクに残りますが、この作品のためにダウンロード・文字起こしした字幕は削除されます。',
   },
   'media.remove.confirm': '削除',
   'media.toast.addedToCollection': '{name} に追加しました。',
