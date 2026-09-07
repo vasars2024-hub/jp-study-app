@@ -13,7 +13,7 @@
 
 import type { ArenaMistake, GameId, SourceLang } from './games/types';
 import type { LevelTier } from '../shared/levelScale';
-import { getStudyLang, type StudyLang } from './studyEnvironment';
+import { getStudyLang, STUDY_LANG_EVENT, STUDY_LANG_KEY, type StudyLang } from './studyEnvironment';
 
 export const LEGACY_STATS_KEY = 'jp-study-stats-v1';
 const GAME_KEY = 'jp-game-progress-v1';
@@ -123,7 +123,34 @@ export const READING_RECORDED_EVENT = 'jp-reading-recorded';
  * both activities subscribe to both, which is one line and says what it means.
  */
 export const WATCH_RECORDED_EVENT = 'jp-watch-recorded';
+export const STATS_RESET_EVENT = 'jp-study-stats-reset';
 export const GAME_PROGRESS_EVENT = 'jp-game-progress-changed';
+
+/** Keep every statistics host current, including separate reader/player windows. */
+export function onStatsChanged(refresh: () => void): () => void {
+  const events = [READING_RECORDED_EVENT, WATCH_RECORDED_EVENT, STATS_RESET_EVENT, STUDY_LANG_EVENT];
+  const onStorage = (event: StorageEvent): void => {
+    if (event.storageArea && event.storageArea !== localStorage) return;
+    if (event.key === null || event.key === statsKey() || event.key === STUDY_LANG_KEY) refresh();
+  };
+  let day = todayDayKey();
+  const clock = window.setInterval(() => {
+    const next = todayDayKey();
+    if (next !== day) {
+      day = next;
+      refresh();
+    }
+  }, 60_000);
+  events.forEach((event) => window.addEventListener(event, refresh));
+  window.addEventListener('storage', onStorage);
+  window.addEventListener('focus', refresh);
+  return () => {
+    events.forEach((event) => window.removeEventListener(event, refresh));
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener('focus', refresh);
+    window.clearInterval(clock);
+  };
+}
 
 export interface ReadingDelta {
   bookId: string;
@@ -519,6 +546,7 @@ export function getSyncPayload(): StatsSyncPayload {
 export function resetStats(): void {
   try {
     localStorage.removeItem(statsKey());
+    window.dispatchEvent(new CustomEvent(STATS_RESET_EVENT));
   } catch {
     /* ignore */
   }
