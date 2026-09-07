@@ -29,6 +29,18 @@ export type MiniAppId =
 
 export type MiniDensity = 'compact' | 'comfortable' | 'spacious';
 
+/**
+ * Density -> i18n key, on the same rule as `MINI_TINT_KEY` below and for the
+ * same reason: Settings > Mini View held a private copy while the Mini View
+ * window's own drawer drew bare `S` / `M` / `L` letters with no accessible name
+ * at all. Two of the three names are shared with Appearance.
+ */
+export const MINI_DENSITY_KEY: Record<MiniDensity, string> = {
+  compact: 'settings.appearance.density.compact',
+  comfortable: 'settings.mini.density.comfortable',
+  spacious: 'settings.appearance.density.spacious',
+};
+
 export const MINI_THEME_TINTS = [
   'neutral',
   'ember',
@@ -41,6 +53,33 @@ export const MINI_THEME_TINTS = [
   'frost',
 ] as const;
 export type MiniThemeTint = (typeof MINI_THEME_TINTS)[number];
+
+/**
+ * Tint -> i18n key. A module-level record cannot call useT(), so per CLAUDE.md
+ * "i18n workflow" §7 this holds the key and each consumer resolves it with t()
+ * at render time.
+ *
+ * It lives here, beside the tint list, because BOTH surfaces that draw these
+ * chips need it: Settings > Mini View had a private copy while the Mini View
+ * window's own drawer had none and fell back to the first letter of the raw id.
+ * Four of the nine names are shared with the lock screen and keep their
+ * `settings.lock.tint.*` keys — the same English word, translated once.
+ *
+ * `Record`, not `Partial<Record>`: a tenth tint added to the list above with no
+ * key here is now a type error rather than a chip that silently prints its own
+ * internal id.
+ */
+export const MINI_TINT_KEY: Record<MiniThemeTint, string> = {
+  neutral: 'settings.lock.tint.neutral',
+  ember: 'settings.lock.tint.ember',
+  slate: 'settings.lock.tint.slate',
+  moss: 'settings.lock.tint.moss',
+  ocean: 'settings.mini.tint.ocean',
+  violet: 'settings.mini.tint.violet',
+  sand: 'settings.mini.tint.sand',
+  crimson: 'settings.mini.tint.crimson',
+  frost: 'settings.mini.tint.frost',
+};
 
 /** Backdrop behind the craft frame. */
 export type MiniWallpaperMode = 'none' | 'image' | 'icons' | 'desktop';

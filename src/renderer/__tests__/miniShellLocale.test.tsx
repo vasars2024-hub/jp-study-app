@@ -258,3 +258,165 @@ describe('MiniShell renders in the interface language', () => {
     }
   });
 });
+
+/**
+ * D232 — the drawer's Look block draws its density and tint chips as single
+ * Latin initials. `S M L` for density and `N E S M O V S C F` for the nine
+ * tints, with `title={id}` — the raw internal id — as the tint chips' only
+ * accessible name and the density chips carrying no name at all.
+ *
+ * Three defects in one block, and the first is the one a screen-reader user
+ * cannot work around: `slate` and `sand` both render `S`, as do `compact` and
+ * `spacious` against `S`/`L`... so within one 12-chip row there are two pairs
+ * that are indistinguishable by their visible label.
+ *
+ * And it needed NOT ONE NEW KEY. All twelve names were already translated in
+ * all four catalogs and already being resolved four rows away in
+ * Settings > Mini View, which kept private copies of both maps. The maps moved
+ * to `renderer/miniMode.ts` beside the lists they key, so the two surfaces can
+ * no longer drift, and they are total `Record`s rather than `Partial` ones — a
+ * tenth tint with no key is now a type error instead of a chip printing its own
+ * internal id through a fallback.
+ */
+describe('the Look chips have real names, not initials', () => {
+  let host: HTMLDivElement;
+  let root: Root | null = null;
+
+  afterEach(async () => {
+    await act(async () => root?.unmount());
+    root = null;
+    document.body.replaceChildren();
+    setUiLang('en');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  });
+
+  async function openLookBlock(lang: Lang): Promise<HTMLElement[]> {
+    await ensureCatalog(lang);
+    setUiLang(lang);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    host = document.createElement('div');
+    document.body.append(host);
+    const mounted = createRoot(host);
+    root = mounted;
+    await act(async () => {
+      mounted.render(<MiniShell />);
+    });
+    const gear = host.querySelector('header')?.querySelectorAll<HTMLButtonElement>('.mini-ico-btn')[1];
+    await act(async () => {
+      gear?.click();
+    });
+    // `[aria-label]` is the scope, not a convenience: the drawer's other two
+    // `.mini-seg` rows are the wallpaper-mode chips and the pick/clear pair,
+    // which carry their full translated text and need no label. Selecting on it
+    // also means a regression that DROPS a label shrinks this list and fails the
+    // count below, rather than quietly narrowing what the suite examines.
+    const chips = Array.from(host.querySelectorAll<HTMLElement>('.mini-seg .mini-chip[aria-label]'));
+    expect(chips.length, 'the Look chips never rendered, or lost their labels').toBe(12);
+    return chips;
+  }
+
+  it.each(LANGS)('names all twelve, and never with the raw id, in %s', async (lang) => {
+    const chips = await openLookBlock(lang);
+    const catalog = catalogFor(lang);
+    const RAW_IDS = [
+      'compact',
+      'comfortable',
+      'spacious',
+      'neutral',
+      'ember',
+      'slate',
+      'moss',
+      'ocean',
+      'violet',
+      'sand',
+      'crimson',
+      'frost',
+    ];
+    for (const chip of chips) {
+      const name = (chip.getAttribute('aria-label') ?? '').trim();
+      expect(name.length, `a Look chip has no accessible name in ${lang}`).toBeGreaterThan(0);
+      // The title must agree — it was the ONLY name before, and a half-fixed
+      // control that names itself twice, differently, is its own defect.
+      expect(chip.getAttribute('title'), `title and aria-label disagree in ${lang}`).toBe(name);
+      expect(name.length, `"${name}" is still just an initial in ${lang}`).toBeGreaterThan(1);
+      expect(RAW_IDS, `a chip is still labelled with its raw wire id in ${lang}`).not.toContain(name);
+      expect(Object.values(catalog), `"${name}" is not a catalog value in ${lang}`).toContain(name);
+    }
+  });
+
+  it.each(LANGS)('gives every chip a distinct name in %s, which the initials did not', async (lang) => {
+    const chips = await openLookBlock(lang);
+    const names = chips.map((c) => (c.getAttribute('aria-label') ?? '').trim());
+    // The control that makes this meaningful: in en and ru the VISIBLE glyphs
+    // still collide exactly as they did before the fix — slate/sand both show
+    // S — so the assertion below is testing the accessible name and nothing
+    // else. It does NOT hold in ja/zh, where the twelve names begin with twelve
+    // distinct CJK characters and the initial happens to be unambiguous. That
+    // is a property of those translations, not of the fix, and asserting it
+    // everywhere failed honestly the first time this suite ran.
+    const glyphs = chips.map((c) => (c.textContent ?? '').trim());
+    if (lang === 'en' || lang === 'ru') {
+      expect(
+        new Set(glyphs).size,
+        `the visible initials no longer collide in ${lang} — re-check what this asserts`,
+      ).toBeLessThan(glyphs.length);
+    }
+    expect(new Set(names).size, `two chips share an accessible name in ${lang}`).toBe(names.length);
+  });
+
+  it.each(LANGS)('reports its pressed state in %s, so the selection is not colour-only', async (lang) => {
+    const chips = await openLookBlock(lang);
+    for (const chip of chips) {
+      expect(chip.getAttribute('aria-pressed'), 'a Look chip has no pressed state').toMatch(/^(true|false)$/);
+    }
+    // Exactly one density chip and one tint chip are on. `is-on` is the class
+    // the stylesheet uses, so this also proves the two agree.
+    const on = chips.filter((c) => c.getAttribute('aria-pressed') === 'true');
+    expect(on.length, 'the pressed state disagrees with the selection').toBe(2);
+    // The wallpaper-mode row had the same colour-only selection and no state.
+    const wallpaper = Array.from(
+      host.querySelectorAll<HTMLElement>('.mini-seg .mini-chip:not([aria-label])'),
+    ).filter((c) => c.getAttribute('aria-pressed') !== null);
+    expect(wallpaper.length, 'the wallpaper mode chips report no pressed state').toBe(4);
+    expect(
+      wallpaper.filter((c) => c.getAttribute('aria-pressed') === 'true').length,
+      'exactly one wallpaper mode is selected',
+    ).toBe(1);
+    for (const chip of on) {
+      expect(chip.className, 'aria-pressed says on but the class says off').toContain('is-on');
+    }
+  });
+
+  it.each(['ja', 'zh', 'ru'] as const)('drops the English chip names in %s', async (lang) => {
+    const chips = await openLookBlock(lang);
+    const names = chips.map((c) => (c.getAttribute('aria-label') ?? '').trim());
+    const en = catalogFor('en');
+    const english = [
+      en['settings.appearance.density.compact'],
+      en['settings.lock.tint.neutral'],
+      en['settings.mini.tint.ocean'],
+      en['settings.mini.tint.crimson'],
+    ] as string[];
+    for (const word of english) {
+      expect(names, `"${word}" survived the switch to ${lang}`).not.toContain(word);
+    }
+  });
+
+  it('paints those same English names in English — the control for the above', async () => {
+    const chips = await openLookBlock('en');
+    const names = chips.map((c) => (c.getAttribute('aria-label') ?? '').trim());
+    const en = catalogFor('en');
+    for (const key of [
+      'settings.appearance.density.compact',
+      'settings.lock.tint.neutral',
+      'settings.mini.tint.ocean',
+      'settings.mini.tint.crimson',
+    ]) {
+      expect(names, `en never rendered ${key} — the negative above is vacuous`).toContain(en[key] as string);
+    }
+  });
+});

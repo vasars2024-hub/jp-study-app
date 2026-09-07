@@ -24,6 +24,8 @@ import {
   resolveMiniDesktopWallpaper,
   onMiniDesktopWallpaperChanged,
   MINI_THEME_TINTS,
+  MINI_TINT_KEY,
+  MINI_DENSITY_KEY,
   MINI_MAX_ROUTINES,
   addMiniRoutine,
   removeMiniRoutine,
@@ -936,35 +938,48 @@ export default function MiniShell({
             <section className="mini-panel-block">
               <h3 className="mini-panel-title">{t('miniShell.look')}</h3>
               <div className="mini-seg">
-                {(
-                  [
-                    ['compact', 'S'],
-                    ['comfortable', 'M'],
-                    ['spacious', 'L'],
-                  ] as [MiniDensity, string][]
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`mini-chip${cfg.density === id ? ' is-on' : ''}`}
-                    onClick={() => setCfg(saveMiniMode({ density: id }))}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {(Object.entries(MINI_DENSITY_KEY) as [MiniDensity, string][]).map(([id, key]) => {
+                  // Same fix as the tint chips below: S/M/L were hardcoded
+                  // English initials with no accessible name and no pressed
+                  // state. The letter stays as the visible glyph, decorative.
+                  const name = t(key);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`mini-chip${cfg.density === id ? ' is-on' : ''}`}
+                      onClick={() => setCfg(saveMiniMode({ density: id }))}
+                      title={name}
+                      aria-label={name}
+                      aria-pressed={cfg.density === id}
+                    >
+                      <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+                    </button>
+                  );
+                })}
               </div>
               <div className="mini-seg mini-seg-wrap">
-                {MINI_THEME_TINTS.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`mini-chip${cfg.tint === id ? ' is-on' : ''}`}
-                    onClick={() => setCfg(saveMiniMode({ tint: id }))}
-                    title={id}
-                  >
-                    {id.slice(0, 1).toUpperCase()}
-                  </button>
-                ))}
+                {MINI_THEME_TINTS.map((id) => {
+                  // The chip shows one letter because the drawer is 3 columns
+                  // wide, so the letter cannot be the accessible name: two of
+                  // the nine share an S and all nine were untranslated. The
+                  // full name is the label; Settings > Mini View resolves the
+                  // same map, so the two can no longer drift apart.
+                  const name = t(MINI_TINT_KEY[id]);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`mini-chip${cfg.tint === id ? ' is-on' : ''}`}
+                      onClick={() => setCfg(saveMiniMode({ tint: id }))}
+                      title={name}
+                      aria-label={name}
+                      aria-pressed={cfg.tint === id}
+                    >
+                      <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+                    </button>
+                  );
+                })}
               </div>
               <label className="mini-check">
                 <input
@@ -1010,6 +1025,10 @@ export default function MiniShell({
                     type="button"
                     className={`mini-chip${cfg.wallpaperMode === id ? ' is-on' : ''}`}
                     onClick={() => setCfg(saveMiniMode({ wallpaperMode: id }))}
+                    // These four carry their full translated text, so they have
+                    // a name — what they lacked is the same thing the density
+                    // and tint chips lacked: the selection was colour-only.
+                    aria-pressed={cfg.wallpaperMode === id}
                   >
                     {t(label)}
                   </button>

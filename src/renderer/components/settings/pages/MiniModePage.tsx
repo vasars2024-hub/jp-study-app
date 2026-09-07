@@ -9,6 +9,8 @@ import {
   MINI_MIN_APPS,
   MINI_MAX_ROUTINES,
   MINI_THEME_TINTS,
+  MINI_TINT_KEY,
+  MINI_DENSITY_KEY,
   setMiniModeEnabled,
   addMiniApp,
   removeMiniApp,
@@ -24,18 +26,6 @@ import {
 import { offerableMiniRoutines, resolveMiniRoutines } from '../../../miniRoutines';
 import { loadEnvironment } from '../../../environment/environmentStore';
 import { useT } from '../../../i18n';
-
-const TINT_KEY: Partial<Record<MiniThemeTint, string>> = {
-  neutral: 'settings.lock.tint.neutral',
-  ember: 'settings.lock.tint.ember',
-  slate: 'settings.lock.tint.slate',
-  moss: 'settings.lock.tint.moss',
-  ocean: 'settings.mini.tint.ocean',
-  violet: 'settings.mini.tint.violet',
-  sand: 'settings.mini.tint.sand',
-  crimson: 'settings.mini.tint.crimson',
-  frost: 'settings.mini.tint.frost',
-};
 
 
 export default function MiniModePage() {
@@ -121,10 +111,7 @@ export default function MiniModePage() {
     flash(t('settings.mini.msg.removed', { name: def ? def.name : id }));
   };
 
-  const tintLabel = (id: MiniThemeTint) => {
-    const key = TINT_KEY[id];
-    return key ? t(key) : id.charAt(0).toUpperCase() + id.slice(1);
-  };
+  const tintLabel = (id: MiniThemeTint) => t(MINI_TINT_KEY[id]);
 
   return (
     <>
@@ -360,13 +347,7 @@ export default function MiniModePage() {
       >
         <div className="os-viz-row">
           <span className="os-viz-label muted">{t('settings.mini.label.density')}</span>
-          {(
-            [
-              ['compact', 'settings.appearance.density.compact'],
-              ['comfortable', 'settings.mini.density.comfortable'],
-              ['spacious', 'settings.appearance.density.spacious'],
-            ] as [MiniDensity, string][]
-          ).map(([id, labelKey]) => (
+          {(Object.entries(MINI_DENSITY_KEY) as [MiniDensity, string][]).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
