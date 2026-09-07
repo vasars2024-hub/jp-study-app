@@ -674,11 +674,11 @@ async function handle(
      *   `widgets/system.tsx` and anything else keyed on that signal actually watch. Its cost in
      *   a DEV build is that it also blocks loopback, so Vite's HMR socket drops for the duration
      *   and reconnects on restore — expected, and not a product finding.
-     * - `blackhole: true` points the window's session at a dead proxy with `<-loopback>` bypassed.
-     *   That is the faithful shape of a real outage: everything off-machine fails at the
-     *   transport, while the dev server, the Anki connector, the qBittorrent WebUI and the
-     *   Seanime sidecar all keep answering. It reaches every Chromium-stack request including
-     *   main's `net.fetch`.
+     * - `blackhole: true` points the window's session at a dead proxy, leaving Chromium's
+     *   implicit loopback bypass in place. That is the faithful shape of a real outage:
+     *   everything off-machine fails at the transport, while the dev server, the Anki connector,
+     *   the qBittorrent WebUI and the Seanime sidecar all keep answering. It reaches every
+     *   Chromium-stack request including main's `net.fetch`.
      *
      * **Neither lever reaches Node's global `fetch`**, which is undici on its own socket, and
      * most of `src/main/` uses exactly that. So a main-process request that succeeds under this
@@ -714,10 +714,13 @@ async function handle(
         }
         if (plan.touchProxy) {
           if (blackhole) {
-            await ses.setProxy({
-              proxyRules: 'http=127.0.0.1:9;https=127.0.0.1:9;socks=127.0.0.1:9',
-              proxyBypassRules: '<-loopback>',
-            });
+            // NO `proxyBypassRules`, deliberately. Chromium bypasses loopback implicitly, which
+            // is exactly the shape wanted, and the rule that looks like it says so —
+            // `<-loopback>` — means the OPPOSITE: it REMOVES that implicit bypass and sends
+            // localhost through the proxy too. Measured 2026-09-07 with `<-loopback>` set:
+            // the dev server on 127.0.0.1:5173 and AnkiConnect on :8765 both failed alongside
+            // the two remote hosts, i.e. the lever was a total block rather than an outage.
+            await ses.setProxy({ proxyRules: 'http=127.0.0.1:9;https=127.0.0.1:9;socks=127.0.0.1:9' });
             applied.push('blackhole-proxy');
           } else {
             // `mode: 'system'` is Electron's own default and nothing in `src/main/` calls
