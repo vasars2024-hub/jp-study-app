@@ -5,21 +5,31 @@ import {
   type MediaStudyAssistantResult,
 } from '../../../shared/mediaStudyAssistant';
 import { appendNotebookEvent } from '../../notebookTimeline';
+import { useT } from '../../i18n';
+import type { TVars } from '../../../shared/i18n/core';
 
-const LABELS: Record<MediaStudyAssistantMode, string> = {
-  'explain-dialogue': 'Explain dialogue',
-  'explain-grammar': 'Explain grammar',
-  'simplify-japanese': 'Simplify Japanese',
-  'generate-examples': 'Generate examples',
-  'create-study-notes': 'Create study notes',
-};
+type Translate = (key: string, vars?: TVars) => string;
 
-function resultAsNote(result: MediaStudyAssistantResult, sentence: string): string {
+/**
+ * The mode token IS the key suffix, so there is no label table to keep in sync —
+ * `MEDIA_STUDY_ASSISTANT_MODES` and `mediaAssistant.mode.*` cannot drift apart
+ * the way a module-level `Record<Mode, string>` of English strings did (D178).
+ */
+function modeLabel(mode: MediaStudyAssistantMode, t: Translate): string {
+  return t(`mediaAssistant.mode.${mode}`);
+}
+
+function resultAsNote(
+  result: MediaStudyAssistantResult,
+  sentence: string,
+  t: Translate,
+): string {
   return [
     sentence,
     result.summary,
-    result.translation && `Translation: ${result.translation}`,
-    result.simplifiedJapanese && `Simplified: ${result.simplifiedJapanese}`,
+    result.translation && t('mediaAssistant.note.translation', { text: result.translation }),
+    result.simplifiedJapanese
+      && t('mediaAssistant.note.simplified', { text: result.simplifiedJapanese }),
     ...result.grammar.map((entry) => `${entry.pattern}${entry.level ? ` (${entry.level})` : ''}: ${entry.explanation}`),
     ...result.vocabulary.map((entry) => `${entry.word}${entry.reading ? ` [${entry.reading}]` : ''}: ${entry.meaning}`),
     ...result.examples.map((entry) => `${entry.japanese} — ${entry.translation}`),
@@ -40,6 +50,7 @@ export default function MediaStudyAssistantPanel({
   sentence,
   jlptLevel,
 }: MediaStudyAssistantPanelProps) {
+  const { t } = useT();
   const [mode, setMode] = useState<MediaStudyAssistantMode>('explain-dialogue');
   const [result, setResult] = useState<MediaStudyAssistantResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,11 +77,11 @@ export default function MediaStudyAssistantPanel({
         jlptLevel,
       });
       if (!response.ok || !response.result) {
-        setError(response.error ?? 'The assistant could not analyze this sentence.');
+        setError(response.error ?? t('mediaAssistant.failed'));
         return;
       }
       setResult(response.result);
-      if (response.cached) setStatus('Loaded a saved explanation.');
+      if (response.cached) setStatus(t('mediaAssistant.cached'));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -82,20 +93,20 @@ export default function MediaStudyAssistantPanel({
     if (!result) return;
     appendNotebookEvent({
       stream: 'media',
-      title: `${mediaTitle}: ${LABELS[result.mode]}`,
-      detail: resultAsNote(result, sentence),
+      title: `${mediaTitle}: ${modeLabel(result.mode, t)}`,
+      detail: resultAsNote(result, sentence, t),
       folder: 'Media study',
       href: 'video',
       meta: { mediaId, assistantMode: result.mode },
     });
-    setStatus('Saved to Notebook.');
+    setStatus(t('mediaAssistant.saved'));
   };
 
   if (!sentence.trim()) return null;
   return (
-    <section className="media-study-assistant" aria-label="Optional AI learning assistant">
+    <section className="media-study-assistant" aria-label={t('mediaAssistant.aria')}>
       <div>
-        <span className="media-study-mode-kicker">Optional AI assistant</span>
+        <span className="media-study-mode-kicker">{t('mediaAssistant.kicker')}</span>
         <p>{sentence}</p>
       </div>
       <div className="media-study-assistant-actions">
@@ -107,30 +118,30 @@ export default function MediaStudyAssistantPanel({
             disabled={busy}
             onClick={() => void run(assistantMode)}
           >
-            {LABELS[assistantMode]}
+            {modeLabel(assistantMode, t)}
           </button>
         ))}
       </div>
-      {busy && <p className="muted" role="status">Requesting an on-demand explanation…</p>}
+      {busy && <p className="muted" role="status">{t('mediaAssistant.busy')}</p>}
       {error && <p className="media-error" role="alert">{error}</p>}
       {result && (
         <div className="media-study-assistant-result">
           {result.summary && <p>{result.summary}</p>}
-          {result.translation && <p><strong>Translation</strong><span>{result.translation}</span></p>}
-          {result.simplifiedJapanese && <p><strong>Simplified Japanese</strong><span>{result.simplifiedJapanese}</span></p>}
+          {result.translation && <p><strong>{t('mediaAssistant.translation')}</strong><span>{result.translation}</span></p>}
+          {result.simplifiedJapanese && <p><strong>{t('mediaAssistant.simplified')}</strong><span>{result.simplifiedJapanese}</span></p>}
           {result.grammar.length > 0 && (
-            <div><strong>Grammar</strong><ul>{result.grammar.map((entry, index) => <li key={`${entry.pattern}-${index}`}>{entry.pattern}{entry.level ? ` · ${entry.level}` : ''} — {entry.explanation}</li>)}</ul></div>
+            <div><strong>{t('mediaAssistant.grammar')}</strong><ul>{result.grammar.map((entry, index) => <li key={`${entry.pattern}-${index}`}>{entry.pattern}{entry.level ? ` · ${entry.level}` : ''} — {entry.explanation}</li>)}</ul></div>
           )}
           {result.vocabulary.length > 0 && (
-            <div><strong>Vocabulary</strong><ul>{result.vocabulary.map((entry, index) => <li key={`${entry.word}-${index}`}>{entry.word}{entry.reading ? ` · ${entry.reading}` : ''} — {entry.meaning}</li>)}</ul></div>
+            <div><strong>{t('mediaAssistant.vocabulary')}</strong><ul>{result.vocabulary.map((entry, index) => <li key={`${entry.word}-${index}`}>{entry.word}{entry.reading ? ` · ${entry.reading}` : ''} — {entry.meaning}</li>)}</ul></div>
           )}
           {result.examples.length > 0 && (
-            <div><strong>Examples</strong><ul>{result.examples.map((entry, index) => <li key={`${entry.japanese}-${index}`}>{entry.japanese} — {entry.translation}</li>)}</ul></div>
+            <div><strong>{t('mediaAssistant.examples')}</strong><ul>{result.examples.map((entry, index) => <li key={`${entry.japanese}-${index}`}>{entry.japanese} — {entry.translation}</li>)}</ul></div>
           )}
           {result.notes.length > 0 && (
-            <div><strong>Study notes</strong><ul>{result.notes.map((note, index) => <li key={`${note}-${index}`}>{note}</li>)}</ul></div>
+            <div><strong>{t('mediaAssistant.studyNotes')}</strong><ul>{result.notes.map((note, index) => <li key={`${note}-${index}`}>{note}</li>)}</ul></div>
           )}
-          <button type="button" onClick={saveNote}>Save to Notebook</button>
+          <button type="button" onClick={saveNote}>{t('mediaAssistant.saveToNotebook')}</button>
         </div>
       )}
       {status && <p className="muted" role="status">{status}</p>}
