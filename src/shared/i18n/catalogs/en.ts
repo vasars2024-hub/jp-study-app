@@ -610,6 +610,12 @@ export const en: Catalog = {
   'vnPanel.msg.sentenceSaved': 'Saved the selected sentence to the Media folder.',
   'vnPanel.msg.sentenceExists': 'That sentence is already saved.',
   'vnPanel.remove': 'Remove',
+  'vnPanel.confirm.remove.title': 'Remove this visual novel?',
+  'vnPanel.confirm.remove.message': {
+    one: 'Remove {title} from the local library? The {count} sentence you captured from it is deleted too, and this cannot be undone.',
+    other: 'Remove {title} from the local library? The {count} sentences you captured from it are deleted too, and this cannot be undone.',
+  },
+  'vnPanel.confirm.remove.messageEmpty': 'Remove {title} from the local library? This cannot be undone.',
   'vnPanel.compat.supported': 'Supported',
   'vnPanel.compat.partial': 'Partial',
   'vnPanel.compat.manual': 'Manual',

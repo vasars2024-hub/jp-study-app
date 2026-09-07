@@ -25,6 +25,12 @@ const CASES = [
   { file: 'src/renderer/components/settings/pages/ReadingLensSection.tsx', api: 'lensHistoryClear' },
   { file: 'src/renderer/components/settings/pages/MonitorsPage.tsx', api: 'desktopResetAssignments' },
   { file: 'src/renderer/components/settings/pages/ApiKeysPage.tsx', api: 'clearCredential' },
+  // Added by the manual half of the class. The scan reported this one as a bare
+  // unguarded call and it was worse than the label suggested: `visual-novel:remove`
+  // also filters `captures` by `visualNovelId`, so removing a novel deleted every
+  // sentence mined from it. The sibling panel already guarded deleting ONE capture,
+  // so the smaller destruction asked and the larger one did not.
+  { file: 'src/renderer/components/immersion/VisualNovelPanel.tsx', api: 'visualNovelRemove' },
 ] as const;
 
 /** The Nth enclosing brace block around `index`, 0 = innermost. */
