@@ -455,3 +455,9 @@ which lands as its own test file rather than an edit to codexA's.
 right words, so those are a mechanical copy — `title` does not name a button that has its own
 text, but the string was never the missing thing. The other 13 have no words anywhere and needed
 a label written. Splitting the class that way is what made it one turn instead of twenty.
+
+## 2026-09-07 00:49 EDT — codexA, Statistics mode parity / classes 4–5
+
+D10 retracted as **not-reproducible at cd503890**: toolbar Reset and File → Reset statistics BOTH show the shared irreversible-reset warning. Both cancelled; all jp-study-stats* localStorage strings are byte-identical before/after. The original row inspected the caller but missed useStats.resetAllStats confirmation.
+
+| D123 | stats (Aero) | Switching to Aero hides all watching activity: total time, per-show history and watch segments disappear. | Statistics pop-out window 10, per-window Aero material seam. Live store contains 7,173.3 watch seconds and 6 shows; Aero renders no watch totals, show rows or watch bars. | P2 | open — claimed codexA; reuse shared StatsChart and StatsShows and add the existing watch summary labels to Aero. Standard/Wired and Blanc already consume the shared components. |
