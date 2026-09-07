@@ -1,6 +1,20 @@
 #!/usr/bin/env node
 /**
- * Pre-sweep class 3 — half-translated surfaces.
+ * i18n gate — half-translated surfaces.
+ *
+ * Was `src/.coordination/presweep/partial-i18n-scan.cjs`, a lead list. Promoted to a
+ * ratcheted gate on 2026-09-07 because the check it complements CANNOT FAIL on this
+ * shape (pre-sweep D128): `i18n-hardcoded-check.cjs` asks only whether a file adopts
+ * i18n AT ALL, so `VerifiedSitesManager.tsx` passed it for as long as it carried 105
+ * English strings alongside 30 `t()` calls. Measured, not reasoned: after that file was
+ * converted and its baseline entry removed, planting 1 and then 7 English literals back
+ * left the other check at exit 0 both times.
+ *
+ * It is a RATCHET, not a hard zero, and deliberately so. 340 of the hits below are leads,
+ * and a real share of them are legitimately literal — proper nouns, units, code samples.
+ * A hard zero that produces false positives gets baselined away wholesale and then
+ * protects nothing; that is the lesson `i18n-locale-arg-check.cjs` was rebuilt on. So the
+ * current population is frozen per file and only GROWTH fails.
  *
  * `tools/i18n-hardcoded-check.cjs` asks whether a component ADOPTS i18n at all: does it
  * call `t()` anywhere. That is the right question for a surface nobody has converted, and
@@ -23,16 +37,18 @@
  * separators, ellipses).
  *
  * Usage:
- *   node src/.coordination/presweep/partial-i18n-scan.cjs                 # ranked summary
- *   node src/.coordination/presweep/partial-i18n-scan.cjs --file <path>   # one file, every hit
- *   node src/.coordination/presweep/partial-i18n-scan.cjs --top 20
+ *   node tools/i18n-partial-check.cjs                  # gate: exit 1 if any file grew
+ *   node tools/i18n-partial-check.cjs --report         # ranked summary, always exit 0
+ *   node tools/i18n-partial-check.cjs --file <path>    # one file, every hit
+ *   node tools/i18n-partial-check.cjs --update-baseline
  */
 'use strict';
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const SRC = path.resolve(__dirname, '..', '..');
+const SRC = path.resolve(__dirname, '..', 'src');
+const BASELINE = path.join(__dirname, 'i18n-partial-baseline.json');
 
 /** Surfaces whose chrome is deliberately plain English until a whole-surface pass. */
 const EXEMPT = [
@@ -145,17 +161,87 @@ function main() {
   }
 
   const total = results.reduce((n, r) => n + r.hits.length, 0);
-  process.stdout.write(
-    `${files.length} .tsx scanned, ${results.length} of them call t() AND still render an ` +
-      `untranslated user-facing string.\n${total} strings in total. Top ${top}:\n\n`,
-  );
-  for (const r of results.slice(0, top)) {
-    process.stdout.write(`  ${String(r.hits.length).padStart(4)}  ${r.file}\n`);
+  const counts = Object.fromEntries(results.map((r) => [r.file, r.hits.length]));
+
+  if (argv.includes('--update-baseline')) {
+    fs.writeFileSync(BASELINE, `${JSON.stringify(counts, null, 2)}\n`);
+    process.stdout.write(
+      `i18n-partial: baseline re-locked at ${results.length} file(s), ${total} string(s).\n`,
+    );
+    return;
   }
+
+  if (argv.includes('--report')) {
+    process.stdout.write(
+      `${files.length} .tsx scanned, ${results.length} of them call t() AND still render an ` +
+        `untranslated user-facing string.\n${total} strings in total. Top ${top}:\n\n`,
+    );
+    for (const r of results.slice(0, top)) {
+      process.stdout.write(`  ${String(r.hits.length).padStart(4)}  ${r.file}\n`);
+    }
+    process.stdout.write(
+      '\nA hit is a LEAD. Proper nouns, code samples and units are legitimately literal — ' +
+        'read the\nline before filing. Re-run with --file <path> for the list.\n',
+    );
+    return;
+  }
+
+  // Gate mode. A missing baseline is a hard failure rather than an implicit
+  // "accept everything" — an absent file is exactly how a ratchet silently stops
+  // ratcheting.
+  if (!fs.existsSync(BASELINE)) {
+    process.stderr.write(
+      `i18n-partial: ${path.relative(process.cwd(), BASELINE)} is missing. ` +
+        'Run with --update-baseline to create it.\n',
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const base = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+
+  const grew = [];
+  for (const r of results) {
+    const allowed = base[r.file] ?? 0;
+    if (r.hits.length > allowed) grew.push({ ...r, allowed });
+  }
+  const shrank = results.filter((r) => (base[r.file] ?? 0) > r.hits.length);
+  const cleared = Object.keys(base).filter((f) => !counts[f]);
+
+  if (grew.length) {
+    process.stderr.write(
+      'i18n-partial: a file that already calls t() gained untranslated user-facing ' +
+        'string(s).\nThis is the class i18n-hardcoded-check cannot see, so it is the only ' +
+        'thing standing\nbetween a converted panel and a slow drift back to English.\n\n',
+    );
+    for (const r of grew) {
+      process.stderr.write(`  ${r.file} — ${r.allowed} baselined, ${r.hits.length} now\n`);
+      for (const h of r.hits.slice(0, 8)) {
+        process.stderr.write(`      :${String(h.line).padEnd(5)} ${h.kind.padEnd(12)} ${h.value}\n`);
+      }
+    }
+    process.stderr.write(
+      '\nTranslate them through the existing seam. Raise the baseline ONLY for a string ' +
+        'that is\nlegitimately literal (a proper noun, a unit, a code sample) and say which ' +
+        'in the commit.\n',
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   process.stdout.write(
-    '\nA hit is a LEAD. Proper nouns, code samples and units are legitimately literal — ' +
-      'read the\nline before filing. Re-run with --file <path> for the list.\n',
+    `i18n-partial: no converted component gained an untranslated string. ` +
+      `${results.length} file(s) baselined, ${total} string(s).\n`,
   );
+  if (shrank.length || cleared.length) {
+    process.stdout.write(
+      `\n${shrank.length + cleared.length} file(s) improved — re-lock with ` +
+        '--update-baseline:\n',
+    );
+    for (const r of shrank) {
+      process.stdout.write(`  ${r.file} — ${base[r.file]} baselined, ${r.hits.length} now\n`);
+    }
+    for (const f of cleared) process.stdout.write(`  ${f} — now fully translated\n`);
+  }
 }
 
 main();

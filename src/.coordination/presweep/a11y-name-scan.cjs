@@ -639,7 +639,7 @@ function midloadReadExpression() {
 /* ------------------------------------------------------------------ *
  * Cross-cutting pass: UI LANGUAGE SWITCH, live half.
  *
- * The source scans (`partial-i18n-scan.cjs`, `i18n-hardcoded-check.cjs`)
+ * The source scans (`tools/i18n-partial-check.cjs`, `tools/i18n-hardcoded-check.cjs`)
  * answer "is this string routed through t()". They cannot answer the two
  * questions that actually reach the user, and both have already produced a
  * real defect here:

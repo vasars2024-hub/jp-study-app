@@ -11,7 +11,7 @@
  * Neither existing guard could see this class:
  *   - `tools/i18n-hardcoded-check.cjs` asks whether a file ADOPTS i18n at all, and
  *     DesktopShell.tsx and PlaylistEditor.tsx both call `t()` hundreds of times.
- *   - `src/.coordination/presweep/partial-i18n-scan.cjs` scores `label:` / `hint:` /
+ *   - `tools/i18n-partial-check.cjs` scores `label:` / `hint:` /
  *     `description:` object properties, not `title:` / `message:` / `confirmLabel:`.
  *
  * So the rule is pinned here instead, repo-wide rather than as a list of the twelve: any
