@@ -142,7 +142,11 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
           label: t('flash.aero.menu.advancedMining'),
           onSelect: () => state.openEpubMining('advanced'),
         },
-        { id: 'mine-jiten', label: 'Jiten vocab mining', onSelect: () => state.openEpubMining('jiten') },
+        // Was left literal on 2026-09-07 as "a product name". That was decided
+        // while `jiten.mining.title` was an orphan; D235 wired it, so the panel
+        // this item opens now renders that exact heading translated and the menu
+        // item that leads to it should not disagree with it.
+        { id: 'mine-jiten', label: t('jiten.mining.title'), onSelect: () => state.openEpubMining('jiten') },
         { separator: true, label: '' },
         { id: 'csv-tool', label: t('flash.csvTool'), onSelect: () => state.setMode('csv-tool') },
         ...(hideAiStudio

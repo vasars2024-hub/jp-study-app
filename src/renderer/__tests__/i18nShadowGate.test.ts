@@ -123,8 +123,11 @@ describe('the baseline is a real file and covers the known population', () => {
    * named in the tool's own header: a noisy gate gets baselined away WHOLESALE.
    * So: a ceiling that only moves down, and a non-empty floor of 1.
    */
-  const CEILING_FILES = 10;
-  const CEILING_STRINGS = 24;
+  // Lowered 2026-09-07 by D239, which cleared SettingsApp's 4 and
+  // FlashcardsView's 1. Only ever moves down, and only when work removed
+  // entries — see the note above.
+  const CEILING_FILES = 8;
+  const CEILING_STRINGS = 19;
 
   it('shrinks and never grows, and is never emptied wholesale', () => {
     const baseline = JSON.parse(

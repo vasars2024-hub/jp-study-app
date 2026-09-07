@@ -424,32 +424,32 @@ export default function SettingsApp(props: SettingsWallProps) {
   const settingsMenus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('settings.menu.file'),
       items: [
         {
           id: 'home',
-          label: 'Control Center Home',
+          label: t('settings.menu.home'),
           icon: <Icon name="settings" size={14} />,
           disabled: page === 'home',
           onSelect: () => navigate('home'),
         },
         {
           id: 'find-setting',
-          label: 'Find a setting',
+          label: t('settings.menu.findSetting'),
           icon: <Icon name="search" size={14} />,
           onSelect: focusSearch,
         },
         { id: 'file-sep-1', separator: true, label: '' },
         {
           id: 'display',
-          label: 'Open Display',
+          label: t('settings.menu.openDisplay'),
           icon: <Icon name="monitor" size={14} />,
           disabled: page === 'display',
           onSelect: () => navigate('display'),
         },
         {
           id: 'lockscreen',
-          label: 'Open Lockscreen',
+          label: t('settings.menu.openLockscreen'),
           icon: <Icon name="lock" size={14} />,
           disabled: page === 'lockscreen',
           onSelect: () => navigate('lockscreen'),
@@ -458,24 +458,24 @@ export default function SettingsApp(props: SettingsWallProps) {
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('settings.menu.view'),
       items: [
         {
           id: 'standard',
-          label: advancedMode ? 'Hide advanced pages' : 'Show advanced pages',
+          label: t(advancedMode ? 'settings.menu.hideAdvanced' : 'settings.menu.showAdvanced'),
           icon: <Icon name="wrench" size={14} />,
           onSelect: toggleAdvanced,
         },
         {
           id: 'desktop-layout',
-          label: 'Desktop layout',
+          label: t('settings.nav.desktopLayout'),
           icon: <Icon name="app" size={14} />,
           disabled: page === 'desktop-layout',
           onSelect: () => navigate('desktop-layout'),
         },
         {
           id: 'shortcuts',
-          label: 'Keyboard shortcuts',
+          label: t('search.shortcuts'),
           icon: <Icon name="keyboard" size={14} />,
           disabled: page === 'shortcuts',
           onSelect: () => navigate('shortcuts'),
@@ -484,25 +484,25 @@ export default function SettingsApp(props: SettingsWallProps) {
     },
     {
       id: 'page',
-      label: 'Page',
+      label: t('settings.menu.page'),
       items: [
         {
           id: 'appearance',
-          label: 'Appearance',
+          label: t('settings.nav.appearance'),
           icon: <Icon name="brush" size={14} />,
           disabled: page === 'appearance',
           onSelect: () => navigate('appearance'),
         },
         {
           id: 'reading',
-          label: 'Reading',
+          label: t('settings.nav.reading'),
           icon: <Icon name="novels" size={14} />,
           disabled: page === 'reading',
           onSelect: () => navigate('reading'),
         },
         {
           id: 'transcription',
-          label: 'Transcription',
+          label: t('settings.nav.transcription'),
           icon: <Icon name="caption" size={14} />,
           disabled: page === 'transcription',
           onSelect: () => navigate('transcription'),
@@ -511,13 +511,13 @@ export default function SettingsApp(props: SettingsWallProps) {
           // Gate 8: the destination is the Files app now, so this can never be
           // the page you are already on — `navigate` redirects it there.
           id: 'memory',
-          label: 'Memory and storage',
+          label: t('settings.nav.memory'),
           icon: <Icon name="folder" size={14} />,
           onSelect: () => navigate('memory'),
         },
         {
           id: 'special',
-          label: 'Special modules',
+          label: t('search.special'),
           icon: <Icon name="sparkle" size={14} />,
           disabled: page === 'special',
           onSelect: () => navigate('special'),
@@ -563,7 +563,7 @@ export default function SettingsApp(props: SettingsWallProps) {
               {t('settings.action.askAgent')}
             </Button>
             {aero && (
-              <Toolbar className="aero-settings-commandbar" aria-label="Settings commands">
+              <Toolbar className="aero-settings-commandbar" aria-label={t('settings.menu.commandsAria')}>
                 <Button
                   size="sm"
                   disabled={page === 'home'}
@@ -632,7 +632,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                       </>
                     ) : null}
                     <span>{t(meta.labelKey)}</span>
-                    {meta.advanced && <span className="os-set-adv-badge">Advanced</span>}
+                    {meta.advanced && <span className="os-set-adv-badge">{t('settings.card.advancedBadge')}</span>}
                   </p>
                   <h2 className="os-set-page-title">{t(meta.labelKey)}</h2>
                   {meta.descKey && <p className="os-set-page-intro muted">{t(meta.descKey)}</p>}

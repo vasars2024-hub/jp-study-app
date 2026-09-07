@@ -1,7 +1,6 @@
 {
   "renderer/components/DesktopShell.tsx": 28,
   "renderer/components/PlaylistEditor.tsx": 21,
-  "renderer/components/settings/SettingsApp.tsx": 16,
   "renderer/views/NovelReader.tsx": 16,
   "renderer/components/media/MediaStudyMode.tsx": 15,
   "renderer/components/settings/pages/SpecialPage.tsx": 8,
@@ -31,7 +30,6 @@
   "renderer/components/settings/pages/VerifiedSitesManager.tsx": 1,
   "renderer/components/visualizer/VisualizerContent.tsx": 1,
   "renderer/views/DictionaryView.tsx": 1,
-  "renderer/views/FlashcardsView.tsx": 1,
   "renderer/views/GrammarView.tsx": 1,
   "renderer/views/StatisticsView.tsx": 1,
   "renderer/views/TranslateView.tsx": 1,

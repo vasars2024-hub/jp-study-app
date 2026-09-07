@@ -778,6 +778,19 @@ export const en: Catalog = {
   'settings.group.study': 'Study',
   'settings.group.media': 'Media',
   'settings.group.system': 'System',
+  // The Settings window's own menu bar. The four pages it can reach reuse
+  // `settings.nav.*` / `search.*`, which already carry those exact words.
+  'settings.menu.file': 'File',
+  'settings.menu.home': 'Control Center Home',
+  'settings.menu.findSetting': 'Find a setting',
+  'settings.menu.openDisplay': 'Open Display',
+  'settings.menu.openLockscreen': 'Open Lockscreen',
+  'settings.menu.view': 'View',
+  'settings.menu.hideAdvanced': 'Hide advanced pages',
+  'settings.menu.showAdvanced': 'Show advanced pages',
+  'settings.menu.page': 'Page',
+  'settings.menu.commandsAria': 'Settings commands',
+
   'settings.nav.ariaCategories': 'Settings categories',
   'settings.nav.home': 'Home',
   'settings.nav.home.desc': 'Quick actions and status',
