@@ -15,7 +15,7 @@ import type { ArenaMistake, GameId, SourceLang } from './games/types';
 import type { LevelTier } from '../shared/levelScale';
 import { getStudyLang, STUDY_LANG_EVENT, STUDY_LANG_KEY, type StudyLang } from './studyEnvironment';
 import { LANG_TAGS } from '../shared/i18n/core';
-import { getUiLang } from './i18n';
+import { getUiLang, t } from './i18n';
 
 export const LEGACY_STATS_KEY = 'jp-study-stats-v1';
 const GAME_KEY = 'jp-game-progress-v1';
@@ -554,14 +554,26 @@ export function resetStats(): void {
   }
 }
 
-/** "1h 23m", "12m", "45s" — compact human duration. */
+/**
+ * "1h 23m", "12m", "45s" — compact human duration, in the interface language.
+ *
+ * The unit letters used to be `s`/`m`/`h` literals, so a Russian tooltip read
+ * `чтение 20m` and a Japanese one `読書20m` (D155). They now come from
+ * `stats.duration.{s,m,hm}`, following `vnPanel.duration.*`: the abbreviated
+ * unit is invariant in all four languages, so no CLDR plural arm is needed —
+ * Russian writes `20 мин` for every count.
+ *
+ * Reads the language rather than taking it as an argument, for the same reason
+ * `formatNumber` below does: ~25 call sites across Statistics, Blanc and the
+ * scraper pages, every one of which already re-renders on a language switch.
+ */
 export function formatDuration(totalSeconds: number): string {
   const s = Math.round(totalSeconds);
-  if (s < 60) return `${s}s`;
+  if (s < 60) return t('stats.duration.s', { seconds: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
+  if (m < 60) return t('stats.duration.m', { minutes: m });
   const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
+  return t('stats.duration.hm', { hours: h, minutes: m % 60 });
 }
 
 /**
