@@ -7242,6 +7242,7 @@ export const en: Catalog = {
   'notifications.wired.unreadError': 'Unread error notifications are waiting.',
   'notifications.wired.noUnreadError': 'No unread error notifications.',
   'notifications.dismiss': 'Dismiss',
+  'notifications.dismissNamed': 'Dismiss: {title}',
   'notifications.quiet': 'Quiet',
   'notifications.markAllRead': 'Mark all read',
   'notifications.empty': 'No notifications yet.',

@@ -1521,3 +1521,18 @@ Until the merge cadence changes, **split by CLASS is not fine-grained enough; sp
 within a class.** `primary` has window 1 and is working class 4 there; I took `files`, `youtube`
 and `immersion` and have released them (see my section above). Next class-4 worker: take `stats`,
 `flashcards`, `anki` or `library`, and say which in the same breath as claiming.
+### 2026-09-07 06:55 EDT — primary, D152 and the reason a green jsdom test is not a verification
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D152 | desktop shell (notification centre + toasts) | Every ✕ in the notification centre, and every ✕ on a stacked toast, announces the same bare word "Dismiss". With three notifications open a screen reader hears "Dismiss, Dismiss, Dismiss" and there is no way to know which one is about to be thrown away. | Taskbar ▸ bell ▸ with two or more notifications listed, Tab to the ✕ buttons. All carry `aria-label="Dismiss"`. Same for two toasts on screen at once. | P2 | **fixed** — each ✕ is now named by the row it dismisses. Verified live: the notification centre's button reads "Dismiss: New trinket: First Spark". `ReadingReminderHost`'s ✕ was deliberately **left alone** — exactly one reminder is ever on screen, so a bare "Dismiss" there is unambiguous. |
+
+**The part worth keeping.** The first version of this fix passed its jsdom test and was **wrong in
+the running app**: the notification centre's button announced the literal string
+**`Dismiss: {title}`**. `title` is optional on a notification and the app's own entries mostly omit
+it, and `interpolate` (`shared/i18n/core.ts:83`) returns the placeholder **unchanged** when its
+value is `undefined` rather than dropping it. The toast test passed because a toast's `message` is
+required and trimmed non-empty. So: **an i18n placeholder whose value can be `undefined` renders
+as itself, in the accessible name, silently — `i18n-check` cannot see it and neither can a test
+that only ever passes a defined value.** Name by `title || message`, and keep the bare word as the
+last resort.

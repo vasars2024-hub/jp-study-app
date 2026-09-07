@@ -7164,6 +7164,7 @@ export const ja: Catalog = {
   'notifications.wired.unreadError': '未読のエラー通知があります。',
   'notifications.wired.noUnreadError': '未読のエラー通知はありません。',
   'notifications.dismiss': '閉じる',
+  'notifications.dismissNamed': '閉じる: {title}',
   'notifications.quiet': '取り込み中',
   'notifications.markAllRead': 'すべて既読にする',
   'notifications.empty': '通知はまだありません。',

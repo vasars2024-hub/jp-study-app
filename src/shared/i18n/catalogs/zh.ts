@@ -7123,6 +7123,7 @@ export const zh: Catalog = {
   'notifications.wired.unreadError': '有未读错误通知。',
   'notifications.wired.noUnreadError': '没有未读错误通知。',
   'notifications.dismiss': '关闭',
+  'notifications.dismissNamed': '关闭：{title}',
   'notifications.quiet': '免打扰',
   'notifications.markAllRead': '全部标为已读',
   'notifications.empty': '暂无通知。',
