@@ -191,9 +191,15 @@ export async function nyaaAvailability(config?: NyaaAcquisitionConfig): Promise<
   if (!config) {
     return { ok: false, reason: 'not-configured', detail: 'No scraper configuration was supplied.' };
   }
-  const indexers = (config.indexers ?? []).filter((entry) => entry.enabled && entry.kind === 'torrent');
+  const torrentSources = (config.indexers ?? []).filter((entry) => entry.kind === 'torrent');
+  const indexers = torrentSources.filter((entry) => entry.enabled);
   if (!indexers.length) {
-    return { ok: false, reason: 'no-indexer', detail: 'No torrent index is enabled in this profile.' };
+    // Split, because "turn one on" is useless advice to a profile that has none
+    // to turn on — and the app ships with `sources.entries: []`, so that is the
+    // out-of-the-box state, not an edge case.
+    return torrentSources.length
+      ? { ok: false, reason: 'no-indexer', detail: 'Every torrent index in this profile is turned off.' }
+      : { ok: false, reason: 'no-torrent-source', detail: 'This profile has no torrent index to search.' };
   }
   if (!config.qbittorrent?.enabled) {
     return {

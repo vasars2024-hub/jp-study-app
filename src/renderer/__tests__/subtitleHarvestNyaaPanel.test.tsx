@@ -280,14 +280,66 @@ describe('SubtitleHarvestPanel — the nyaa fallback', () => {
 
   it('offers no search button when the fallback cannot run, and says why', async () => {
     harvestList.mockResolvedValue(jimakuEmpty({
-      available: false, reason: 'no-indexer', detail: 'No torrent index is enabled in this profile.',
+      available: false, reason: 'no-indexer', detail: 'Every torrent index in this profile is turned off.',
     }));
     await mount([1]);
 
-    expect(host.textContent).toContain('subHarvest.nyaa.unavailable:No torrent index is enabled in this profile.');
+    // The reason is TRANSLATED, not main's own English sentence: `detail` is
+    // built in the main process, so no catalog carries it and a Japanese user
+    // was answered in English (D171).
+    expect(host.textContent).toContain('subHarvest.nyaa.unavailable:subHarvest.nyaa.cannot.noIndexer');
+    expect(host.textContent).not.toContain('Every torrent index in this profile is turned off.');
     // A button that would report a misconfiguration only after starting a
     // transfer is worse than no button.
     expect(button('subHarvest.nyaa.search')).toBeNull();
+  });
+
+  // D171. The two causes were one reason, so the app told a user with no
+  // torrent source at all to "enable one" — hunting for a toggle that does not
+  // exist. `TorrentManagerPage` had already split them; this path had not.
+  it('tells a profile with NO torrent source to add one, not to enable one', async () => {
+    harvestList.mockResolvedValue(jimakuEmpty({
+      available: false, reason: 'no-torrent-source', detail: 'This profile has no torrent index to search.',
+    }));
+    await mount([1]);
+
+    expect(host.textContent).toContain('subHarvest.nyaa.cannot.noTorrentSource');
+    expect(host.textContent).not.toContain('subHarvest.nyaa.cannot.noIndexer');
+  });
+
+  // The listing half of the same defect: `findNyaa` set main's raw `message`
+  // straight into the panel, with no translated frame at all.
+  it('translates the LISTING refusal too, and does not print main’s English', async () => {
+    harvestList.mockResolvedValue(jimakuEmpty({ available: true, reason: null, detail: '' }));
+    nyaaList.mockResolvedValue({
+      ok: false,
+      candidates: [],
+      message: 'This profile has no torrent index to search.',
+      searchedAs: null,
+      reason: 'no-torrent-source',
+    });
+    await mount([1]);
+    await click('subHarvest.nyaa.search');
+
+    expect(host.textContent).toContain('subHarvest.nyaa.cannot.noTorrentSource');
+    expect(host.textContent).not.toContain('This profile has no torrent index to search.');
+  });
+
+  // A refusal that is NOT an availability question carries no reason, and main's
+  // text is the only account of it there is — it must still reach the user.
+  it('still shows main’s own words for a refusal that carries no reason', async () => {
+    harvestList.mockResolvedValue(jimakuEmpty({ available: true, reason: null, detail: '' }));
+    nyaaList.mockResolvedValue({
+      ok: false,
+      candidates: [],
+      message: 'The index did not answer.',
+      searchedAs: null,
+      reason: null,
+    });
+    await mount([1]);
+    await click('subHarvest.nyaa.search');
+
+    expect(host.textContent).toContain('The index did not answer.');
   });
 });
 

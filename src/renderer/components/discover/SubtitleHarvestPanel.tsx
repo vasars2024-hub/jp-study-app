@@ -44,7 +44,7 @@ import {
 } from '../../mediaStudyWorkflow';
 import { getLevel } from '../../knownWords';
 import { showToast } from '../ui/Toast';
-import { acquisitionConfigFrom } from '../../../shared/subtitleNyaa';
+import { acquisitionConfigFrom, type NyaaUnavailableReason } from '../../../shared/subtitleNyaa';
 import { planSubtitleAttach } from '../../../shared/subtitleAttachPlan';
 import { ipcErrorText } from '../../../shared/ipcErrorText';
 import { getActiveScraperSettings } from '../../scraperSettingsStore';
@@ -124,6 +124,50 @@ const MINE_BATCH = 30;
 
 /** Same reason as the download dialog: the channel name is not a sentence. */
 const errorText = ipcErrorText;
+
+/**
+ * `nyaaAvailability`'s refusal, in the user's own language and naming the fix.
+ *
+ * Main's `detail` is an English sentence built in the main process, so
+ * `i18n-check` cannot see it and no catalog carries it: rendering it raw
+ * answered a Japanese user's subtitle search in English. It also named no
+ * remedy, while the *download* half of this very dialog already said "Enable
+ * one on the Sources page first" (`malDownload.error.noIndexers`) for the same
+ * condition.
+ *
+ * One function, used by both the offer and the listing, because those two are
+ * the pair that drifted: the offer wrapped `detail` in a translated frame and
+ * the listing printed it bare.
+ *
+ * The two machine-specific reasons keep `detail` inside the translated
+ * sentence — it carries the save path or the sign-in mode, which is the fact
+ * that makes them actionable and which no catalog can hold.
+ */
+function nyaaCannotText(
+  t: (key: string, vars?: Record<string, unknown>) => string,
+  reason: NyaaUnavailableReason | null,
+  detail: string,
+): string {
+  switch (reason) {
+    case 'not-configured':
+      return t('subHarvest.nyaa.cannot.notConfigured');
+    case 'no-torrent-source':
+      return t('subHarvest.nyaa.cannot.noTorrentSource');
+    case 'no-indexer':
+      return t('subHarvest.nyaa.cannot.noIndexer');
+    case 'qbit-disabled':
+      return t('subHarvest.nyaa.cannot.qbitDisabled');
+    case 'qbit-remote':
+      return t('subHarvest.nyaa.cannot.qbitRemote', { detail });
+    case 'qbit-no-credential':
+      return t('subHarvest.nyaa.cannot.qbitNoCredential', { detail });
+    // Not an availability refusal — an empty title, or the index itself
+    // failing. Those carry no reason and main's text is the only account of
+    // them there is.
+    default:
+      return detail;
+  }
+}
 
 export default function SubtitleHarvestPanel({
   anilistId,
@@ -381,13 +425,17 @@ export default function SubtitleHarvestPanel({
       });
       setNyaaCandidates(result.candidates);
       setNyaaSearchedAs(result.searchedAs);
-      setMessage(result.message);
+      // Not `result.message`: that is main's English, and for an availability
+      // refusal it is also silent about the one thing the user can do next.
+      setMessage(nyaaCannotText(t, result.reason, result.message));
       setPhase(result.ok ? 'listed' : 'error');
     } catch (error) {
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [title, altTitles, malId, clearHarvested]);
+    // `lang`, not `t` — `t`'s identity is stable by design, so depending on it
+    // would leave this callback holding the old language after a switch.
+  }, [title, altTitles, malId, clearHarvested, lang, t]);
 
   /**
    * Acquire one release and study whatever of the requested range it holds.
@@ -756,7 +804,9 @@ export default function SubtitleHarvestPanel({
                 which during a rate limit is a claim nobody measured. */}
             {source.nyaa.available
               ? (source.jimakuDown ? t('subHarvest.nyaa.offeredDown') : t('subHarvest.nyaa.offered'))
-              : t('subHarvest.nyaa.unavailable', { detail: source.nyaa.detail })}
+              : t('subHarvest.nyaa.unavailable', {
+                  detail: nyaaCannotText(t, source.nyaa.reason, source.nyaa.detail),
+                })}
           </p>
           {source.nyaa.available && !nyaaCandidates.length ? (
             <button type="button" className="scr-btn" onClick={findNyaa} disabled={busy}>

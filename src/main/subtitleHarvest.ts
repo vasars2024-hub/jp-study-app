@@ -408,7 +408,13 @@ export async function listNyaaHarvest(
     ...stored.aliases,
   ]);
   if (!aliases.length) {
-    return { ok: false, candidates: [], message: 'No title to search the index with.', searchedAs: null };
+    return {
+      ok: false,
+      candidates: [],
+      message: 'No title to search the index with.',
+      searchedAs: null,
+      reason: null,
+    };
   }
 
   const config = asNyaaAcquisitionConfig(input?.acquisition);
@@ -416,7 +422,16 @@ export async function listNyaaHarvest(
   // Its own four refusals, not a shrug: "your indexer is off" and "this show has
   // no subtitle releases" are different problems and only one is actionable.
   if (!available.ok || !config) {
-    return { ok: false, candidates: [], message: available.ok ? '' : available.detail, searchedAs: null };
+    return {
+      ok: false,
+      candidates: [],
+      message: available.ok ? '' : available.detail,
+      searchedAs: null,
+      // `!config` reaches here with `available.ok` true, and that IS the
+      // not-configured case — say so rather than sending a null the renderer
+      // would fall back to an empty English string for.
+      reason: available.ok ? 'not-configured' : available.reason,
+    };
   }
 
   const season = Number.isFinite(input?.season) ? Number(input?.season) : null;
@@ -533,6 +548,7 @@ export async function listNyaaHarvest(
       })),
       message: found.length ? '' : describeEmptyNyaaListing(drops),
       searchedAs,
+      reason: null,
     };
   } catch (error) {
     return {
@@ -540,6 +556,7 @@ export async function listNyaaHarvest(
       candidates: [],
       message: error instanceof Error ? error.message : String(error),
       searchedAs: null,
+      reason: null,
     };
   }
 }

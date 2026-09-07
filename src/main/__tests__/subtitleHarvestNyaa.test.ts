@@ -255,8 +255,28 @@ describe('listNyaaHarvest', () => {
     const result = await listNyaaHarvest({ title: 'The Big O', acquisition: acquisition() });
     expect(result.ok).toBe(false);
     expect(result.message).toBe('No torrent index is enabled in this profile.');
+    // ...and the CODE with it, so the renderer can say this in the user's own
+    // language instead of printing main's English (D171). `message` alone is
+    // untranslatable: it is built here, not in a catalog.
+    expect(result.reason).toBe('no-indexer');
     // Negative control for the whole refusal branch: it must not have searched.
     expect(searchInput).toBeNull();
+  });
+
+  // A refusal that is not an availability question carries no reason, so the
+  // renderer knows to fall back to these words rather than mistranslating them.
+  it('carries no reason for a refusal availability never made', async () => {
+    const result = await listNyaaHarvest({ title: '   ', acquisition: acquisition() });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBeNull();
+    expect(searchInput).toBeNull();
+  });
+
+  it('carries no reason on a successful listing', async () => {
+    searchResult = [candidateRow('nyaa:ccc')];
+    const result = await listNyaaHarvest({ title: 'The Big O', acquisition: acquisition() });
+    expect(result.ok).toBe(true);
+    expect(result.reason).toBeNull();
   });
 
   it('says an empty listing is empty, distinctly from a misconfiguration', async () => {

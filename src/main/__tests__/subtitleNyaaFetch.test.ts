@@ -385,6 +385,35 @@ describe('nyaaAvailability', () => {
     expect(result.ok === false && result.reason).toBe('not-configured');
   });
 
+  // D171. These were ONE reason until 2026-09-07, so a profile with nothing to
+  // enable was told to enable something. Measured on the user's own machine:
+  // all three of their scraper profiles carry zero torrent sources, because the
+  // app ships `sources.entries: []` — so this is the out-of-the-box state.
+  it('separates a profile with NO torrent source from one whose indexes are all off', async () => {
+    const none = await nyaaAvailability({ ...config(), indexers: [] });
+    expect(none.ok === false && none.reason).toBe('no-torrent-source');
+
+    const allOff = await nyaaAvailability({
+      ...config(),
+      indexers: config().indexers.map((entry) => ({ ...entry, enabled: false })),
+    });
+    expect(allOff.ok === false && allOff.reason).toBe('no-indexer');
+
+    // The two must not merely differ in the code — the sentences differ too,
+    // because "add one" and "turn one on" are different instructions.
+    expect(none.ok === false && allOff.ok === false && none.detail).not.toBe(allOff.detail);
+  });
+
+  // A non-torrent source is not a torrent index, so a profile carrying only
+  // those has nothing to enable either.
+  it('does not count a streaming source as a torrent index to turn on', async () => {
+    const streamingOnly = await nyaaAvailability({
+      ...config(),
+      indexers: config().indexers.map((entry) => ({ ...entry, kind: 'streaming' as const })),
+    });
+    expect(streamingOnly.ok === false && streamingOnly.reason).toBe('no-torrent-source');
+  });
+
   // Phase 9.4 gate 16: the clean profile. Before this the check passed, the
   // provider searched an index, resolved a magnet and only then refused —
   // reading as a broken download rather than a missing password.

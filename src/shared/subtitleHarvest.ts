@@ -202,6 +202,18 @@ export interface HarvestNyaaListResult {
   /** Why the list is empty when it is, in nyaa's own words. Never "no results". */
   message: string;
   /**
+   * Which availability check refused, when one did — `null` otherwise, and
+   * `null` too for a refusal that is not an availability question at all (an
+   * empty title, a network error).
+   *
+   * Carried for the same reason `HarvestNyaaOffer` carries it: `message` is
+   * main's own English sentence and the panel rendered it raw, so a Japanese
+   * user asking for subtitles was answered in English by a string
+   * `i18n-check` cannot see. With the reason in hand the renderer says it in
+   * the user's language AND names the remedy, which the raw sentence never did.
+   */
+  reason: NyaaUnavailableReason | null;
+  /**
    * The name the listed releases were actually found under, when it is not the
    * title the user is looking at. Null when the primary title found them.
    *

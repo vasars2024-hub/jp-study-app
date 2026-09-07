@@ -49,6 +49,14 @@ export interface NyaaAcquisitionConfig {
  */
 export type NyaaUnavailableReason =
   | 'not-configured'
+  // Two causes, two different fixes, and they were one reason until 2026-09-07.
+  // `TorrentManagerPage` had already split them with a comment saying why —
+  // collapsing them "would send a user with no sources at all hunting for a
+  // toggle that does not exist" — and this path told the user to *enable* an
+  // index on a machine whose three profiles carry zero torrent sources between
+  // them. `no-torrent-source` is "there is nothing to turn on"; `no-indexer`
+  // keeps its old meaning, "they exist and are all off".
+  | 'no-torrent-source'
   | 'no-indexer'
   | 'qbit-disabled'
   | 'qbit-remote'
