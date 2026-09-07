@@ -77,6 +77,9 @@ afterEach(() => {
   root?.unmount();
   root = null;
   removeCalls = [];
+  // `replaceChildren` also clears any confirm root left behind by a case that
+  // deliberately does not answer its dialog — otherwise the next mount finds two
+  // `[role="dialog"]` nodes and `dialogButton` answers the stale one.
   document.body.replaceChildren();
 });
 
@@ -98,16 +101,71 @@ const removeButton = (): HTMLButtonElement => {
   return found;
 };
 
+/**
+ * `confirmDialog` mounts its own detached React root on `document.body`, so the
+ * dialog is a sibling of `host` and is deliberately looked up there rather than
+ * inside it. Nothing reaches `visual-novel:remove` until this is answered — that
+ * guard is the subject of the first two cases below.
+ */
+const confirmDialogEl = (): HTMLElement | null =>
+  document.body.querySelector<HTMLElement>('[role="dialog"]');
+const dialogButton = (label: string): HTMLButtonElement => {
+  const dialog = confirmDialogEl();
+  if (!dialog) throw new Error('no confirm dialog on document.body');
+  const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>('.ui-dialog__foot button'));
+  const found = buttons.find((b) => (b.textContent ?? '').trim() === label);
+  if (!found) throw new Error(`no ${label} among [${buttons.map((b) => b.textContent).join(', ')}]`);
+  return found;
+};
+
+/** Click Remove and answer the confirm, so the existing cases keep their subject. */
+async function removeAndConfirm(): Promise<void> {
+  await act(async () => { removeButton().click(); });
+  await act(async () => { dialogButton('Remove').click(); });
+}
+
 describe('removing a visual novel reports what happened', () => {
   it('says nothing before anything is done', async () => {
     await mount();
     expect(status()).toBe('');
   });
 
-  it('names the entry it removed, and empties the workspace', async () => {
+  it('ASKS FIRST, and names the novel and the sentences that go with it', async () => {
+    // The guard, from the user's side. `visual-novel:remove` filters `captures`
+    // by `visualNovelId` as well as dropping the entry, so this button destroys
+    // every sentence mined from the novel — the confirm has to say so.
+    await mount();
+    await act(async () => { removeButton().click(); });
+    const dialog = confirmDialogEl();
+    expect(dialog, 'Remove fired with no confirmation').not.toBeNull();
+    expect(dialog?.textContent).toContain('Sample Visual Novel');
+    expect(dialog?.textContent).toContain('cannot be undone');
+    // Nothing has reached the handler yet. If this were non-empty the dialog
+    // would be decorative.
+    expect(removeCalls).toEqual([]);
+  });
+
+  it('CANCEL leaves the novel alone — the confirm is not decorative', async () => {
     removeAnswer = emptied;
     await mount();
     await act(async () => { removeButton().click(); });
+    await act(async () => { dialogButton('Cancel').click(); });
+    expect(removeCalls).toEqual([]);
+    // `confirmDialog` unmounts on a `setTimeout(0)`, deliberately outside the
+    // event cycle that resolved it — a microtask flush is not enough and the
+    // dialog is still in the DOM at this point. The answer arrives immediately;
+    // only the teardown is deferred.
+    await act(async () => { await new Promise((done) => { setTimeout(done, 0); }); });
+    expect(confirmDialogEl()).toBeNull();
+    expect(status()).toBe('');
+    // Still on screen, because nothing happened.
+    expect(host.querySelector('.visual-novel-summary-actions')).not.toBeNull();
+  });
+
+  it('names the entry it removed, and empties the workspace', async () => {
+    removeAnswer = emptied;
+    await mount();
+    await removeAndConfirm();
     expect(removeCalls).toEqual(['vn-1']);
     expect(status()).toBe('Removed Sample Visual Novel from the local library.');
     // The announcement is not the evidence: the surface itself has to have moved.
@@ -119,7 +177,7 @@ describe('removing a visual novel reports what happened', () => {
     // The handler answers with a database either way. This is that database unchanged.
     removeAnswer = seed;
     await mount();
-    await act(async () => { removeButton().click(); });
+    await removeAndConfirm();
     expect(removeCalls).toEqual(['vn-1']);
     expect(status()).toBe('Sample Visual Novel is still in the local library.');
     expect(host.querySelector('.media-error')).not.toBeNull();
