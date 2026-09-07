@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../ui';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
 import type { ReadingLensSource } from '../../../../shared/readingLens';
@@ -161,9 +162,21 @@ function LensCaptureHistory() {
   );
 
   const clear = useCallback(async () => {
+    // `lens:history:clear` is `entries = []` in main — the whole store, not the filtered
+    // page on screen, and PINNED captures go with it. Neither fact is visible from the
+    // button, and there is no undo and no backup of userData, so it has to be asked.
+    // The message deliberately quotes no count: this component holds a filtered page of
+    // 50, so any number it named would be a guess about the store.
+    const ok = await confirmDialog({
+      title: t('settings.lens.history.clearTitle'),
+      message: t('settings.lens.history.clearMessage'),
+      confirmLabel: t('settings.lens.history.clearConfirm'),
+      danger: true,
+    });
+    if (!ok) return;
     await window.api.lensHistoryClear();
     await refresh(query, source, pinnedOnly);
-  }, [query, source, pinnedOnly, refresh]);
+  }, [lang, query, source, pinnedOnly, refresh]);
 
   const formatWhen = useMemo(
     () => (at: number) => new Date(at).toLocaleString(LANG_TAGS[lang]),

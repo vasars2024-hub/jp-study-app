@@ -12189,4 +12189,11 @@ export const en: Catalog = {
   'desktop.restartWiredMessage': "Restart the WIRED ARCHIVE boot sequence? Open modules and desktop layout stay in place.",
   'desktop.shutdownSecretMessage': "Return to the previous GrammarX theme and restore the pre-Aero desktop atmosphere?",
   'desktop.restartShellMessage': "Restart the GrammarX shell? Unsaved text in fields may be lost.",
+  'settings.lens.history.clearTitle': 'Clear capture history',
+  'settings.lens.history.clearMessage': 'Delete every Reading Lens capture? Pinned captures are deleted too, and this cannot be undone.',
+  'settings.lens.history.clearConfirm': 'Delete all',
+  'settings.monitors.reset.confirm': 'Forget every per-screen setting? Desktops and everything on them are kept, but each desktop returns to no assigned display and this cannot be undone.',
+  'credential.remove.title': 'Remove stored key',
+  'credential.remove.message': 'Remove the stored credential for {name}? Providers usually show a key only once, so you may have to create a new one.',
+  'credential.remove.confirm': 'Remove',
 };

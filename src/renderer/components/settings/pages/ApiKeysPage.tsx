@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../ui';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useSettings } from '../SettingsContext';
 import SettingsCard from '../SettingsCard';
@@ -151,6 +152,17 @@ export default function ApiKeysPage() {
   };
 
   const remove = async (spec: CredentialSpec): Promise<void> => {
+    // A stored key is often the only copy the user has: providers show a secret once, at
+    // creation, and will not show it again. Removing one asked nothing, and the row's
+    // Remove sits directly beside Save. One guard covers all four stores because every
+    // branch below destroys a secret.
+    const ok = await confirmDialog({
+      title: t('credential.remove.title'),
+      message: t('credential.remove.message', { name: spec.label }),
+      confirmLabel: t('credential.remove.confirm'),
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(spec.id);
     try {
       switch (spec.store) {

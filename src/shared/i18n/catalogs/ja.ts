@@ -11654,4 +11654,11 @@ export const ja: Catalog = {
   'desktop.restartWiredMessage': "WIRED ARCHIVE の起動シーケンスを再実行しますか？開いているモジュールとデスクトップの配置は維持されます。",
   'desktop.shutdownSecretMessage': "以前の GrammarX テーマに戻り、Aero に切り替える前のデスクトップ環境を復元しますか？",
   'desktop.restartShellMessage': "GrammarX シェルを再起動しますか？入力欄の未保存テキストが失われる可能性があります。",
+  'settings.lens.history.clearTitle': 'キャプチャ履歴を消去',
+  'settings.lens.history.clearMessage': 'リーディングレンズのキャプチャをすべて削除しますか？ピン留めしたキャプチャも削除され、元に戻せません。',
+  'settings.lens.history.clearConfirm': 'すべて削除',
+  'settings.monitors.reset.confirm': '画面ごとの設定をすべて破棄しますか？デスクトップとその内容は保持されますが、各デスクトップの表示先の割り当ては解除され、元に戻せません。',
+  'credential.remove.title': '保存されたキーを削除',
+  'credential.remove.message': '{name} の保存済み認証情報を削除しますか？多くのサービスはキーを一度しか表示しないため、新しく作成し直す必要があるかもしれません。',
+  'credential.remove.confirm': '削除',
 };

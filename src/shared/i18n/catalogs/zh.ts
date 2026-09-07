@@ -11528,4 +11528,11 @@ export const zh: Catalog = {
   'desktop.restartWiredMessage': "重新运行 WIRED ARCHIVE 启动流程？已打开的模块和桌面布局会保留。",
   'desktop.shutdownSecretMessage': "返回之前的 GrammarX 主题并恢复启用 Aero 前的桌面氛围？",
   'desktop.restartShellMessage': "重启 GrammarX 桌面外壳？输入框中未保存的文字可能丢失。",
+  'settings.lens.history.clearTitle': '清除捕获历史',
+  'settings.lens.history.clearMessage': '删除所有阅读透镜捕获？置顶的捕获也会被删除，且无法撤销。',
+  'settings.lens.history.clearConfirm': '全部删除',
+  'settings.monitors.reset.confirm': '忘记所有按屏幕的设置？桌面及其内容会保留，但每个桌面将不再分配显示器，且无法撤销。',
+  'credential.remove.title': '移除已保存的密钥',
+  'credential.remove.message': '移除 {name} 的已保存凭据？服务商通常只显示一次密钥，你可能需要重新创建。',
+  'credential.remove.confirm': '移除',
 };

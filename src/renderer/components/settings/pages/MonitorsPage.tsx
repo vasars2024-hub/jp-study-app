@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../ui';
 import type { DisplaySummary } from '../../../../main/displays';
 import type { DisplayAssignment, TaskbarMode } from '../../../../shared/desktop';
 import { MAX_DESKTOPS } from '../../../../shared/desktop';
@@ -247,9 +248,20 @@ export default function MonitorsPage() {
           type="button"
           className="os-btn"
           onClick={() => {
-            void window.api.desktopResetAssignments().then(() => {
-              void window.api.deskwinSync();
-            });
+            // Throws away every desktop→monitor assignment the user has made, for every
+            // display, in one click — and there is no undo. It sat next to two harmless
+            // buttons with nothing to distinguish it.
+            void (async () => {
+              const ok = await confirmDialog({
+                title: t('settings.monitors.reset'),
+                message: t('settings.monitors.reset.confirm'),
+                confirmLabel: t('settings.monitors.reset.action'),
+                danger: true,
+              });
+              if (!ok) return;
+              await window.api.desktopResetAssignments();
+              await window.api.deskwinSync();
+            })();
           }}
         >
           {t('settings.monitors.reset.action')}

@@ -12671,4 +12671,11 @@ export const ru: Catalog = {
   'desktop.restartWiredMessage': "Перезапустить загрузку WIRED ARCHIVE? Открытые модули и расположение окон сохранятся.",
   'desktop.shutdownSecretMessage': "Вернуться к предыдущей теме GrammarX и восстановить оформление рабочего стола до Aero?",
   'desktop.restartShellMessage': "Перезапустить оболочку GrammarX? Несохранённый текст в полях может быть потерян.",
+  'settings.lens.history.clearTitle': 'Очистить историю захватов',
+  'settings.lens.history.clearMessage': 'Удалить все захваты «Линзы чтения»? Закреплённые захваты тоже будут удалены, и это нельзя отменить.',
+  'settings.lens.history.clearConfirm': 'Удалить всё',
+  'settings.monitors.reset.confirm': 'Забыть все настройки для каждого экрана? Рабочие столы и всё на них сохранятся, но у каждого стола не останется назначенного дисплея, и это нельзя отменить.',
+  'credential.remove.title': 'Удалить сохранённый ключ',
+  'credential.remove.message': 'Удалить сохранённые учётные данные для {name}? Провайдеры обычно показывают ключ только один раз, поэтому может понадобиться создать новый.',
+  'credential.remove.confirm': 'Удалить',
 };
