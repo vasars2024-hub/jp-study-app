@@ -2,6 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 
 const SIZE = 180;
+const CJK = /[\u4e00-\u9fff々〆ヵヶ]/;
+
+/**
+ * The one glyph the reader drew, or nothing.
+ *
+ * The model is an OCR pass over a 180px square and answers with whatever it
+ * believes it read. Recognizing an EMPTY square returned a four-character
+ * phrase, and the old `?? value` fallback printed it verbatim under a heading
+ * that says "Draw a character". A CJK character wins; a lone non-CJK character
+ * is kept so drawing kana still works; anything longer is not a hand-drawn
+ * glyph and is reported as nothing recognized rather than shown as one.
+ */
+function recognizedGlyph(value: string): string | null {
+  const cjk = [...value].find((char) => CJK.test(char));
+  if (cjk) return cjk;
+  return [...value].length === 1 ? value : null;
+}
 
 export default function CharacterWritingPractice({
   target,
@@ -36,11 +53,11 @@ export default function CharacterWritingPractice({
   };
   const recognize = async () => {
     const canvas = canvasRef.current;
-    if (!canvas || busy) return;
+    if (!canvas || busy || strokeCount === 0) return;
     setBusy(true);
     try {
       const value = (await window.api.mangaOcrRecognizeImage(canvas.toDataURL('image/png'))).trim();
-      setResult(value ? [...value].find((char) => /[\u4e00-\u9fff々〆ヵヶ]/.test(char)) ?? value : t('manga.hw.noChar'));
+      setResult(recognizedGlyph(value) ?? t('manga.hw.noChar'));
     } catch {
       setResult(t('manga.hw.failed'));
     } finally {
@@ -66,7 +83,15 @@ export default function CharacterWritingPractice({
         onPointerCancel={(event) => { drawing.current = false; moved.current = false; if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture?.(event.pointerId); }} />
       <div className="lexicon-character-practice-actions">
         <button type="button" className="btn small" onClick={clear}>{t('manga.hw.clear')}</button>
-        <button type="button" className="btn small" onClick={() => void recognize()} disabled={busy}>{busy ? t('manga.hw.recognizing') : t('manga.hw.recognize')}</button>
+        <button
+          type="button"
+          className="btn small"
+          onClick={() => void recognize()}
+          disabled={busy || strokeCount === 0}
+          title={strokeCount === 0 ? t('lexicon.character.drawFirst') : undefined}
+        >
+          {busy ? t('manga.hw.recognizing') : t('manga.hw.recognize')}
+        </button>
       </div>
       {result && <output className="lexicon-character-practice-result" lang="ja">{result}</output>}
     </div>

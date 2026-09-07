@@ -66,21 +66,41 @@ describe('CharacterMetadataPanel', () => {
     expect(host.textContent).not.toContain('undefined');
   });
 
-  it('submits a bounded canvas image and recovers from recognition failure', async () => {
-    recognizeImage.mockResolvedValueOnce('noise 猫 trailing').mockRejectedValueOnce(new Error('offline'));
+  /** One completed pen stroke, which the Recognize button now requires. */
+  async function drawOneStroke(host: HTMLElement): Promise<void> {
+    const canvas = host.querySelector('canvas');
+    if (!canvas) throw new Error('Expected the handwriting canvas to render.');
+    Object.assign(canvas, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
+    await act(async () => {
+      canvas.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      canvas.dispatchEvent(new Event('pointermove', { bubbles: true }));
+      canvas.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    });
+  }
+
+  async function mountPractice(): Promise<HTMLElement> {
     const host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
     await act(async () => root?.render(<CharacterMetadataPanel character={{
       lang: 'ja', char: '猫', components: [], readings: [], meanings: [], sources: [],
     }} />));
+    return host;
+  }
 
-    const buttons = [...host.querySelectorAll('button')];
-    const recognize = buttons.find((button) => button.textContent === 'manga.hw.recognize');
-    const clear = buttons.find((button) => button.textContent === 'manga.hw.clear');
+  const recognizeButton = (host: HTMLElement): HTMLButtonElement | undefined =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'manga.hw.recognize');
+
+  it('submits a bounded canvas image and recovers from recognition failure', async () => {
+    recognizeImage.mockResolvedValueOnce('noise 猫 trailing').mockRejectedValueOnce(new Error('offline'));
+    const host = await mountPractice();
+
+    const recognize = recognizeButton(host);
+    const clear = [...host.querySelectorAll('button')].find((button) => button.textContent === 'manga.hw.clear');
     expect(host.querySelector('canvas')?.getAttribute('width')).toBe('180');
     expect(recognize).toBeTruthy();
 
+    await drawOneStroke(host);
     await act(async () => recognize?.click());
     expect(recognizeImage).toHaveBeenCalledWith('data:image/png;base64,practice');
     expect(host.querySelector('output')?.textContent).toBe('猫');
@@ -90,6 +110,52 @@ describe('CharacterMetadataPanel', () => {
     await act(async () => clear?.click());
     expect(clearRect).toHaveBeenCalledWith(0, 0, 180, 180);
     expect(host.querySelector('output')).toBeNull();
+  });
+
+  /**
+   * Measured live 2026-09-07: Recognize on an untouched canvas ran a real model
+   * pass and printed `それは、` — a four-character phrase — as the glyph the
+   * reader had "drawn". Two halves, and both are asserted, because either alone
+   * still leaves a lie on screen: the button must not fire at all, and a
+   * multi-character answer must not be shown as a character.
+   */
+  it('refuses to recognize an untouched canvas, and says why', async () => {
+    const host = await mountPractice();
+
+    const recognize = recognizeButton(host);
+    expect(recognize?.disabled).toBe(true);
+    expect(recognize?.getAttribute('title')).toBe('lexicon.character.drawFirst');
+
+    await act(async () => recognize?.click());
+
+    expect(recognizeImage).not.toHaveBeenCalled();
+    expect(host.querySelector('output')).toBeNull();
+
+    await drawOneStroke(host);
+    expect(recognizeButton(host)?.disabled).toBe(false);
+    expect(recognizeButton(host)?.getAttribute('title')).toBeNull();
+  });
+
+  it('reports a multi-character answer as nothing recognized, not as the character', async () => {
+    recognizeImage.mockResolvedValueOnce('それは、');
+    const host = await mountPractice();
+    await drawOneStroke(host);
+
+    await act(async () => recognizeButton(host)?.click());
+
+    expect(host.querySelector('output')?.textContent).toBe('manga.hw.noChar');
+  });
+
+  it('NEGATIVE CONTROL: a single drawn kana is still reported', async () => {
+    // The CJK filter does not match kana, so the "not a glyph" rule has to be
+    // about LENGTH. A one-character answer is a glyph whatever script it is in.
+    recognizeImage.mockResolvedValueOnce('ぬ');
+    const host = await mountPractice();
+    await drawOneStroke(host);
+
+    await act(async () => recognizeButton(host)?.click());
+
+    expect(host.querySelector('output')?.textContent).toBe('ぬ');
   });
 
   it('counts completed pen strokes against the grounded total and resets them', async () => {

@@ -9758,6 +9758,7 @@ export const ja: Catalog = {
   'lexicon.character.title': '文字情報',
   'lexicon.character.grounded': '有効な辞書ソースに基づく情報',
   'lexicon.character.strokes': '画数',
+  'lexicon.character.drawFirst': 'まず文字を書いてください。',
   'lexicon.character.radical': '部首',
   'lexicon.character.components': '構成要素',
   'lexicon.character.jlpt': '日本語能力試験',

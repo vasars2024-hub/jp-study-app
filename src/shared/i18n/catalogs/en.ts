@@ -10222,6 +10222,7 @@ export const en: Catalog = {
   'lexicon.character.title': 'Character facts',
   'lexicon.character.grounded': 'Grounded in enabled dictionary sources',
   'lexicon.character.strokes': 'Strokes',
+  'lexicon.character.drawFirst': 'Draw the character first.',
   'lexicon.character.radical': 'Radical',
   'lexicon.character.components': 'Components',
   'lexicon.character.jlpt': 'JLPT',
