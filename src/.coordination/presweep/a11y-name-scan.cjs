@@ -44,6 +44,9 @@ function parseArgs(argv) {
     else if (a === '--window') out.window = argv[++i];
     else if (a === '--pass') out.pass = argv[++i];
     else if (a === '--narrow') out.narrow = argv[++i];
+    else if (a === '--delays') out.delays = String(argv[++i]).split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n));
+    else if (a === '--reload') out.reload = true;
+    else if (a === '--plant') out.plant = true;
   }
   return out;
 }
@@ -501,6 +504,154 @@ const ALL_SURFACES = [
   'scraper', 'files',
 ];
 
+/* ------------------------------------------------------------------ *
+ * Cross-cutting pass: CLOSE A WINDOW MID-LOAD.
+ *
+ * A surface is opened and its own close button clicked again after `delay`
+ * ms — inside the window between "the frame exists" and "the content and its
+ * data have arrived". What that is looking for is the abort path: a fetch or
+ * an IPC round-trip that resolves into a component that is no longer mounted,
+ * a listener that is never removed, a spinner state promoted to the store, or
+ * a later reopen that comes back broken because the aborted one poisoned it.
+ *
+ * Three things make this honest rather than theatre, all learned here:
+ *  - The close must be PROVEN to have happened while the body was still
+ *    loading. `armed.atClose` records the body's own text length and whether a
+ *    Suspense fallback was still on screen; a run where the body was already
+ *    full is reported as `late` and its silence proves nothing.
+ *  - The collectors must catch what React and the platform actually emit:
+ *    `unhandledrejection` (an aborted IPC promise), `error`, and
+ *    `console.error` (React's unmounted-update and act warnings never throw).
+ *  - Closing is not enough. Each surface is REOPENED afterwards and read for
+ *    content, because the defect this pass exists to find is usually not a
+ *    crash at close time but a surface that is dead the second time.
+ * ------------------------------------------------------------------ */
+
+/** Install the collectors once, on `window`, so they survive between /eval calls. */
+function midloadInstallExpression() {
+  return `(() => {
+    if (window.__p2ml) return 'already installed';
+    const state = { errs: [], rejs: [], cons: [] };
+    state.onErr = (e) => { state.errs.push(String((e && e.message) || e)); };
+    state.onRej = (e) => {
+      const r = e && e.reason;
+      state.rejs.push(String((r && (r.stack || r.message)) || r));
+    };
+    state.origConsoleError = console.error;
+    console.error = function (...a) {
+      try { state.cons.push(a.map((x) => String((x && x.message) || x)).join(' ').slice(0, 400)); } catch (_) {}
+      return state.origConsoleError.apply(console, a);
+    };
+    window.addEventListener('error', state.onErr);
+    window.addEventListener('unhandledrejection', state.onRej);
+    window.__p2ml = state;
+    return 'installed';
+  })()`;
+}
+
+function midloadUninstallExpression() {
+  return `(() => {
+    const s = window.__p2ml;
+    if (!s) return 'not installed';
+    window.removeEventListener('error', s.onErr);
+    window.removeEventListener('unhandledrejection', s.onRej);
+    if (s.origConsoleError) console.error = s.origConsoleError;
+    delete window.__p2ml;
+    return 'uninstalled';
+  })()`;
+}
+
+/**
+ * Open `surface` and schedule its own close button `delay` ms later, recording
+ * what the body looked like at the instant of the click. Both halves run in the
+ * renderer: doing the close from a second /eval would let React flush the whole
+ * mount first, and the pass would only ever measure a settled window.
+ */
+function midloadArmExpression(surface, delay) {
+  const s = JSON.stringify(surface);
+  return `(() => {
+    const st = window.__p2ml;
+    st.errs.length = 0; st.rejs.length = 0; st.cons.length = 0;
+    st.done = false; st.atClose = null; st.closed = null;
+    const sel = '.fwin[data-section=' + JSON.stringify(${s}) + ']';
+    const fire = () => {
+      const w = document.querySelector(sel);
+      const body = w && w.querySelector('.fwin-body');
+      const loader = w ? w.querySelector('.lq-loading, .liquid-loading, [class*="loading"], [class*="skeleton"], [aria-busy="true"]') : null;
+      st.atClose = {
+        hadWindow: !!w,
+        bodyChars: body ? (body.textContent || '').trim().length : -1,
+        bodyNodes: body ? body.querySelectorAll('*').length : -1,
+        loaderOnScreen: !!loader,
+        loaderClass: loader ? String(loader.className).slice(0, 80) : null,
+        atMs: Math.round(performance.now() - st.t0),
+      };
+      const b = w && w.querySelector('.fwin-close');
+      st.closed = b ? 'clicked' : (w ? 'no close button' : 'no window ever appeared');
+      if (b) b.click();
+      st.done = true;
+    };
+    st.t0 = performance.now();
+    window.dispatchEvent(new CustomEvent('os:open', { detail: ${s} }));
+    // delay 0 means "the very first frame the window exists" — a bare
+    // setTimeout(0) runs BEFORE React has committed the window and closes
+    // nothing, which is how the first version of this pass left four windows
+    // on the desk and reported them as clean.
+    const deadlineMs = ${Number(delay)};
+    const spin = () => {
+      const late = performance.now() - st.t0 >= deadlineMs;
+      const there = !!document.querySelector(sel);
+      if (late && there) { fire(); return; }
+      if (performance.now() - st.t0 > deadlineMs + 3000) { fire(); return; }
+      requestAnimationFrame(spin);
+    };
+    requestAnimationFrame(spin);
+    ${args.plant ? `
+    // POSITIVE CONTROL. Fires AFTER the close, which is exactly when a real
+    // aborted IPC would land: a promise nobody is left to catch, plus the
+    // console.error React uses for an update on an unmounted component.
+    // A run with --plant that still reports 0 is measuring nothing.
+    setTimeout(() => {
+      Promise.reject(new Error('PLANT: rejection after unmount'));
+      console.error('PLANT: Warning: Cannot update a component while unmounted');
+    }, ${Number(delay)} + 250);` : ''}
+    return 'armed';
+  })()`;
+}
+
+/** Read the collectors plus the desk, and reopen the surface to see if it survived. */
+function midloadReadExpression() {
+  return `(() => {
+    const s = window.__p2ml;
+    return {
+      done: !!s.done,
+      atClose: s.atClose,
+      closed: s.closed,
+      errs: s.errs.slice(0, 8),
+      rejs: s.rejs.slice(0, 8),
+      cons: s.cons.slice(0, 8),
+      fwins: [...document.querySelectorAll('.fwin')].map((w) => w.getAttribute('data-section')),
+      taskbar: document.querySelectorAll('.os-task, .taskbar-item, [data-taskbar-item]').length,
+    };
+  })()`;
+}
+
+function midloadReopenExpression(surface) {
+  const s = JSON.stringify(surface);
+  return `(() => {
+    const w = document.querySelector('.fwin[data-section=' + JSON.stringify(${s}) + ']');
+    if (!w) return { reopened: false };
+    const body = w.querySelector('.fwin-body');
+    return {
+      reopened: true,
+      bodyChars: body ? (body.textContent || '').trim().length : -1,
+      bodyNodes: body ? body.querySelectorAll('*').length : -1,
+      controls: w.querySelectorAll('button, a, input, select, textarea, [role="button"]').length,
+      errorBoundary: !!w.querySelector('.app-error-boundary, [data-error-boundary]'),
+    };
+  })()`;
+}
+
 async function openSections() {
   return evalJs(`[...document.querySelectorAll('.fwin')].map(w => w.getAttribute('data-section'))`);
 }
@@ -579,12 +730,102 @@ async function reflowSurface(surface, scope) {
   return { surface, states, original, finalStyle, restoredCleanly: restored };
 }
 
+const MIDLOAD_DELAYS = args.delays && args.delays.length ? args.delays : [0, 60, 200, 600];
+// `note` opens by CREATING a note and its close raises a delete confirm; `city` is
+// out of scope by the pin. Neither may be opened-and-closed by a script.
+const MIDLOAD_SKIP = new Set(['note', 'city']);
+
+async function midloadSurface(surface) {
+  const rows = [];
+  for (const delay of MIDLOAD_DELAYS) {
+    await evalJs(midloadArmExpression(surface, delay));
+    await sleep(delay + 900);
+    const r = await evalJs(midloadReadExpression());
+    // Reopen and read it: the defect this pass hunts is usually the SECOND open.
+    await evalJs(`(window.dispatchEvent(new CustomEvent('os:open', { detail: ${JSON.stringify(surface)} })), 'sent')`);
+    await sleep(args.settle);
+    const again = await evalJs(midloadReopenExpression(surface));
+    const post = await evalJs(midloadReadExpression());
+    await evalJs(`(() => { const b = document.querySelector('.fwin[data-section="${surface}"] .fwin-close'); if (b) { b.click(); return 'closed'; } return 'no close button'; })()`);
+    await sleep(400);
+    rows.push({
+      delay,
+      atClose: r.atClose,
+      closed: r.closed,
+      // Anything the reopen itself produced counts too — `post` is cumulative
+      // because the collector is only cleared when the next delay is armed.
+      errs: post.errs, rejs: post.rejs, cons: post.cons,
+      leftOnDesk: r.fwins,
+      reopen: again,
+    });
+  }
+  return { surface, rows };
+}
+
 async function main() {
   const surfaces = args.all ? ALL_SURFACES : args.surfaces;
   if (!surfaces.length) { console.error('give --surfaces a,b or --all'); process.exit(2); }
 
   const before = await openSections();
   console.log(`desk at start: ${before.length} windows [${before.join(', ')}]`);
+
+  if (PASS === 'midload') {
+    // A warm renderer renders `library` in full inside 60 ms, so every delay lands
+    // AFTER the load and the pass measures nothing. `--reload` makes the FIRST open
+    // of each surface a genuinely cold one: the lazy chunk is refetched and the data
+    // IPC has not run. Only ever pass it for a window whose desk is empty and yours.
+    if (args.reload) {
+      if (before.length) { console.error(`refusing --reload: the desk has ${before.length} window(s) on it`); process.exit(2); }
+      await post('/reload', args.window ? { window: Number(args.window) } : {});
+      for (let i = 0; i < 60; i += 1) {
+        await sleep(1000);
+        try { if (await evalJs(`!!document.querySelector('.os-taskbar, .taskbar, [class*="taskbar"]')`)) break; } catch { /* still navigating */ }
+      }
+      console.log('reloaded — every first open below is a COLD chunk');
+    }
+    console.log(await evalJs(midloadInstallExpression()));
+    const results = [];
+    let noisy = 0; let late = 0; let dead = 0;
+    for (const s of surfaces) {
+      if (MIDLOAD_SKIP.has(s)) { console.log(`${s}: SKIPPED by list (destructive to open/close from a script)`); results.push({ surface: s, skipped: 'skip list' }); continue; }
+      const openNow = await openSections();
+      if (openNow.includes(s)) { console.log(`${s}: SKIPPED — already on the desk, and closing it would be someone else's window`); results.push({ surface: s, skipped: 'already open' }); continue; }
+      let row;
+      try { row = await midloadSurface(s); } catch (e) { results.push({ surface: s, error: String(e.message) }); console.log(`${s}: ERROR ${e.message}`); continue; }
+      results.push(row);
+      for (const r of row.rows) {
+        const ac = r.atClose || {};
+        // Three outcomes, and only the first two are evidence:
+        //   MID-LOAD    a Suspense fallback was on screen, or the body was empty.
+        //   FIRST-FRAME the surface renders its shell synchronously, so there is no
+        //               loading state to catch and this is as early as it gets.
+        //   LATE        a non-zero delay landed after the load; silence proves nothing.
+        let kind = 'MID-LOAD';
+        if (!ac.hadWindow) kind = 'NO WINDOW';
+        else if (!(ac.loaderOnScreen || ac.bodyChars < 40)) kind = r.delay === 0 ? 'FIRST-FRAME' : 'LATE';
+        if (kind === 'LATE' || kind === 'NO WINDOW') late += 1;
+        const n = r.errs.length + r.rejs.length + r.cons.length;
+        if (n) noisy += 1;
+        const reopenDead = r.reopen && r.reopen.reopened && r.reopen.errorBoundary;
+        if (reopenDead) dead += 1;
+        console.log(
+          `  ${s} @ +${r.delay}ms: close=${r.closed} @${ac.atMs}ms [${kind}${ac.loaderOnScreen ? ' loader' : ''}] | at close ${ac.bodyChars} chars / ${ac.bodyNodes} nodes | errors ${r.errs.length} rejections ${r.rejs.length} console.error ${r.cons.length} | left on desk [${r.leftOnDesk.join(', ')}] | reopen ${r.reopen.reopened ? `${r.reopen.bodyChars} chars / ${r.reopen.controls} controls${r.reopen.errorBoundary ? ' ERROR BOUNDARY' : ''}` : 'DID NOT REOPEN'}`,
+        );
+        for (const e of r.rejs) console.log(`      UNHANDLED REJECTION: ${e.slice(0, 220)}`);
+        for (const e of r.errs) console.log(`      ERROR: ${e.slice(0, 220)}`);
+        for (const e of r.cons) console.log(`      console.error: ${e.slice(0, 220)}`);
+      }
+    }
+    console.log(await evalJs(midloadUninstallExpression()));
+    const after2 = await openSections();
+    console.log(`desk at end: ${after2.length} windows [${after2.join(', ')}]`);
+    console.log(`\nTOTAL: ${noisy} noisy close/reopen cycles, ${dead} reopens into an error boundary, ${late} cycles that landed after the load (those prove nothing)`);
+    if (args.json) {
+      fs.writeFileSync(args.json, JSON.stringify({ at: new Date().toISOString(), pass: 'midload', delays: MIDLOAD_DELAYS, before, after: after2, results }, null, 2));
+      console.log(`wrote ${args.json}`);
+    }
+    return;
+  }
 
   const results = [];
   for (const s of surfaces) {
