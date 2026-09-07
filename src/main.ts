@@ -11,7 +11,7 @@ import { registerReadingListsLateBinding } from './main/readingListsBinding';
 import { registerReadingRemindersIpc } from './main/readingListsReminders';
 import { registerDictionaryIpc, initYomitan } from './main/dictionary';
 import { registerMediaIpc } from './main/media';
-import { registerYtPlaylistsIpc } from './main/ytPlaylists';
+import { registerYtPlaylistsIpc, startYtAutoUpdateTimer, stopYtAutoUpdateTimer } from './main/ytPlaylists';
 import { registerProfileIpc } from './main/profiles';
 import { registerAnkiIpc } from './main/anki';
 import { registerProfileRulesIpc } from './main/profileRules';
@@ -1759,6 +1759,9 @@ app.whenReady().then(async () => {
   registerMediaIpc();
   registerFlashcardAudioIpc();
   registerYtPlaylistsIpc();
+  // The playlist auto-update clock. Started here rather than inside the register
+  // call so importing the module in a test does not arm a real timer.
+  startYtAutoUpdateTimer();
   registerProfileIpc();
   registerAnkiIpc();
   registerProfileRulesIpc();
@@ -1903,6 +1906,7 @@ app.on('will-quit', () => {
   stopLocalAgentRuntime();
   stopLocalAgentScheduler();
   stopBuddyScheduler();
+  stopYtAutoUpdateTimer();
   stopExtensionServer();
   stopSystemDictionary();
   stopReadingLens();
