@@ -16,23 +16,26 @@
  * "never a gatekeeper" constraint forbids. Nothing failed; the window just came up
  * wrong, and no test in the repo compared the two lists.
  *
- * Read from source rather than imported: `App.tsx` pulls in the entire renderer at
- * module-evaluation time, which is not something a parity assertion should need.
+ * The renderer half used to be read out of App.tsx with a regex, for the reason this
+ * comment gave: importing `App.tsx` evaluates the entire renderer, which a parity
+ * assertion should not need. That reason is gone — the table now lives in
+ * `renderer/popoutLabels.ts`, a leaf module with one type import, moved there so it could
+ * be unit-tested (`popoutLabels.test.ts`). Reading it as a VALUE also removes the failure
+ * mode the regex had: it went red on the rename to `POPOUT_LABEL_KEYS`, and a scraper that
+ * stops matching reports an empty set, which is how a parity check passes vacuously.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { DESKTOP_WIN_SECTIONS } from '../../shared/desktop';
+import { POPOUT_LABEL_KEYS } from '../popoutLabels';
 
 const SRC = resolve(__dirname, '../..');
 
-/** The keys of the `POPOUT_LABEL*` object literal in App.tsx. */
+/** The keys of the renderer's pop-out allow-list. */
 function rendererPopoutSections(): string[] {
-  const source = readFileSync(resolve(SRC, 'renderer/App.tsx'), 'utf8');
-  const body = /const POPOUT_LABELS?(?:_KEYS)?:[^=]*=\s*\{([\s\S]*?)\n\};/.exec(source)?.[1];
-  if (!body) throw new Error('could not find the POPOUT_LABELS object in App.tsx');
-  return [...body.matchAll(/^\s{2}([A-Za-z][A-Za-z0-9]*)\s*:/gm)].map((m) => m[1]);
+  return Object.keys(POPOUT_LABEL_KEYS);
 }
 
 /** The members of `ARGV_OPEN_SECTIONS` in main.ts. */

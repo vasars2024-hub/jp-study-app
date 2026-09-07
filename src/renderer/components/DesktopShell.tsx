@@ -2789,13 +2789,11 @@ export default function DesktopShell({
 
   const restartSecretOs = async () => {
     const ok = await confirmDialog({
-      // WIRED's two strings are deliberately untranslated in-fiction copy - see
-      // the theme note beside WIRED_MODULES. Only the plain Secret OS branch is chrome.
-      title: wired ? 'Restart WIRED ARCHIVE' : t('desktop.aero.restart'),
+      title: wired ? t('desktop.startMenu.wired.restart') : t('desktop.startMenu.restart'),
       message: wired
-        ? 'Restart the WIRED ARCHIVE boot sequence? Open modules and desktop layout stay in place.'
-        : t('desktop.dialog.restartOsMessage'),
-      confirmLabel: t('desktop.dialog.restartConfirm'),
+        ? t('desktop.restartWiredMessage')
+        : t('desktop.restartSecretMessage'),
+      confirmLabel: t('desktop.restartConfirm'),
     });
     if (!ok) return;
     setStartOpen(false);
@@ -2813,9 +2811,9 @@ export default function DesktopShell({
       return;
     }
     const ok = await confirmDialog({
-      title: t('desktop.aero.shutdown'),
-      message: t('desktop.dialog.shutdownMessage'),
-      confirmLabel: t('desktop.dialog.shutdownConfirm'),
+      title: t('desktop.startMenu.shutdown'),
+      message: t('desktop.shutdownSecretMessage'),
+      confirmLabel: t('desktop.shutdownConfirm'),
     });
     if (!ok) return;
     setStartOpen(false);
@@ -3131,9 +3129,9 @@ export default function DesktopShell({
                   aria-label={t('desktop.restartShell')}
                   onClick={async () => {
                     const ok = await confirmDialog({
-                      title: t('desktop.dialog.restartShellTitle'),
-                      message: t('desktop.dialog.restartShellMessage'),
-                      confirmLabel: t('desktop.dialog.restartConfirm'),
+                      title: t('desktop.restartShell'),
+                      message: t('desktop.restartShellMessage'),
+                      confirmLabel: t('desktop.restartConfirm'),
                     });
                     if (ok) window.location.reload();
                   }}
@@ -3168,16 +3166,16 @@ export default function DesktopShell({
                   <div className="os-start-aero-sub">
                     {wired
                       ? startAppDragging
-                        ? 'PATCH MODULE INTO LOCAL DESKTOP'
-                        : 'LAYER-09 / ROUTER INDEX'
-                      : startAppDragging ? t('desktop.dropToPlace') : t('desktop.aero.subtitle')}
+                        ? t('desktop.startMenu.wired.drop')
+                        : t('desktop.startMenu.wired.index')
+                      : startAppDragging ? t('desktop.dropToPlace') : t('desktop.startMenu.personal')}
                   </div>
                 </div>
                 <button
                   type="button"
                   className="os-start-aero-search"
-                  title={t('desktop.aero.search')}
-                  aria-label={t('desktop.aero.search')}
+                  title={t('desktop.startMenu.search')}
+                  aria-label={t('desktop.startMenu.search')}
                   onClick={() => {
                     setStartOpen(false);
                     window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
@@ -3188,8 +3186,8 @@ export default function DesktopShell({
               </div>
 
               <div className="os-start-aero-columns">
-                <section className="os-start-aero-main" aria-label={t('desktop.aero.programs')}>
-                  <div className="os-start-aero-label">{wired ? 'NODE INDEX' : t('desktop.aero.programs')}</div>
+                <section className="os-start-aero-main" aria-label={t('desktop.startMenu.programs')}>
+                  <div className="os-start-aero-label">{wired ? t('desktop.startMenu.wired.nodes') : t('desktop.startMenu.programs')}</div>
                   <div className="os-start-aero-programs">
                     {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
                   </div>
@@ -3201,17 +3199,17 @@ export default function DesktopShell({
                       window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
                     }}
                   >
-                    <span>{wired ? 'LOCATE MODULE' : t('desktop.aero.allPrograms')}</span>
+                    <span>{wired ? t('desktop.startMenu.wired.locate') : t('desktop.startMenu.allPrograms')}</span>
                     <Icon name="chevron" size={14} />
                   </button>
                 </section>
 
-                <aside className="os-start-aero-side" aria-label={t('desktop.aero.sideRegion')}>
-                  <div className="os-start-aero-label">{wired ? 'CHANNELS' : t('desktop.aero.places')}</div>
+                <aside className="os-start-aero-side" aria-label={t('desktop.startMenu.placesAndTools')}>
+                  <div className="os-start-aero-label">{wired ? t('desktop.startMenu.wired.channels') : t('desktop.startMenu.places')}</div>
                   <div className="os-start-aero-places">
                     {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
                   </div>
-                  <div className="os-start-aero-label">{wired ? 'SERVICE PORTS' : t('desktop.aero.tools')}</div>
+                  <div className="os-start-aero-label">{wired ? t('desktop.startMenu.wired.ports') : t('desktop.startMenu.tools')}</div>
                   <div className="os-start-aero-tools">
                     <button
                       type="button"
@@ -3219,15 +3217,15 @@ export default function DesktopShell({
                       onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
                     >
                       <Icon name="widgets" size={17} />
-                      <span>{wired ? 'Module rack' : t('desktop.widgets')}</span>
+                      <span>{wired ? t('desktop.startMenu.wired.widgets') : t('desktop.widgets')}</span>
                     </button>
                     <button type="button" className="os-start-aero-tool" onClick={openNote}>
                       <Icon name="note" size={17} />
-                      <span>{wired ? 'Field note' : t('desktop.stickyNote')}</span>
+                      <span>{wired ? t('desktop.startMenu.wired.note') : t('desktop.stickyNote')}</span>
                     </button>
                     <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
                       <Icon name="plus" size={17} />
-                      <span>{wired ? 'Mount module...' : t('desktop.addApp')}</span>
+                      <span>{wired ? t('desktop.startMenu.wired.add') : t('desktop.addApp')}</span>
                     </button>
                     <button
                       type="button"
@@ -3238,7 +3236,7 @@ export default function DesktopShell({
                       }}
                     >
                       <Icon name="wrench" size={17} />
-                      <span>{wired ? 'Relay panel' : t('quickSettings.title')}</span>
+                      <span>{wired ? t('desktop.startMenu.wired.quick') : t('quickSettings.title')}</span>
                     </button>
                   </div>
                 </aside>
@@ -3247,14 +3245,14 @@ export default function DesktopShell({
               <div className="os-start-aero-footer">
                 <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
                   <Icon name="settings" size={16} />
-                  <span>{wired ? 'SYS / Service Panel' : t('desktop.aero.controlPanel')}</span>
+                  <span>{wired ? t('desktop.startMenu.wired.control') : t('desktop.startMenu.controlPanel')}</span>
                 </button>
-                <div className="os-start-aero-power-cluster" aria-label={t('desktop.aero.power')}>
+                <div className="os-start-aero-power-cluster" aria-label={t('desktop.startMenu.power')}>
                   <button
                     type="button"
                     className="os-start-aero-power"
-                    title={t('desktop.aero.sleep')}
-                    aria-label={t('desktop.aero.sleep')}
+                    title={t('desktop.startMenu.sleep')}
+                    aria-label={t('desktop.startMenu.sleep')}
                     onClick={sleepSecretOs}
                   >
                     <Icon name="pause" size={15} />
@@ -3262,8 +3260,8 @@ export default function DesktopShell({
                   <button
                     type="button"
                     className="os-start-aero-power"
-                    title={t('desktop.aero.restart')}
-                    aria-label={t('desktop.aero.restart')}
+                    title={t('desktop.startMenu.restart')}
+                    aria-label={t('desktop.startMenu.restart')}
                     onClick={() => void restartSecretOs()}
                   >
                     <Icon name="refresh" size={15} />
@@ -3271,8 +3269,8 @@ export default function DesktopShell({
                   <button
                     type="button"
                     className="os-start-aero-power shutdown"
-                    title={t('desktop.aero.shutdown')}
-                    aria-label={t('desktop.aero.shutdown')}
+                    title={t('desktop.startMenu.shutdown')}
+                    aria-label={t('desktop.startMenu.shutdown')}
                     onClick={() => void shutdownSecretOs()}
                   >
                     <Icon name="power" size={15} />

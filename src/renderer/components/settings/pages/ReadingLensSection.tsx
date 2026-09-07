@@ -162,12 +162,15 @@ function LensCaptureHistory() {
   );
 
   const clear = useCallback(async () => {
-    // "Clear all" means all of it, not the filtered view, and pinned captures go too.
-    // There is no undo route on this store, so the question is the only protection.
+    // `lens:history:clear` is `entries = []` in main — the whole store, not the filtered
+    // page on screen, and PINNED captures go with it. Neither fact is visible from the
+    // button, and there is no undo and no backup of userData, so it has to be asked.
+    // The message deliberately quotes no count: this component holds a filtered page of
+    // 50, so any number it named would be a guess about the store.
     const ok = await confirmDialog({
-      title: t('settings.lens.history.clearConfirm.title'),
-      message: t('settings.lens.history.clearConfirm.message', { count: entries.length }),
-      confirmLabel: t('settings.lens.history.clear'),
+      title: t('settings.lens.history.clearTitle'),
+      message: t('settings.lens.history.clearMessage'),
+      confirmLabel: t('settings.lens.history.clearConfirm'),
       danger: true,
     });
     if (!ok) return;
@@ -175,7 +178,7 @@ function LensCaptureHistory() {
     await refresh(query, source, pinnedOnly);
     // `lang`, not `t`: t's identity is stable, so a callback that omits it keeps
     // resolving in the language it was created in.
-  }, [query, source, pinnedOnly, refresh, entries.length, t, lang]);
+  }, [lang, query, source, pinnedOnly, refresh]);
 
   const formatWhen = useMemo(
     () => (at: number) => new Date(at).toLocaleString(LANG_TAGS[lang]),

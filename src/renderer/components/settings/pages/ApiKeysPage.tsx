@@ -152,13 +152,14 @@ export default function ApiKeysPage() {
   };
 
   const remove = async (spec: CredentialSpec): Promise<void> => {
-    // The vault holds the only copy. Deleting one means going back to the provider to
-    // issue or re-copy a key, and this button sits beside Test, so a misclick is cheap
-    // to make and expensive to undo.
+    // A stored key is often the only copy the user has: providers show a secret once, at
+    // creation, and will not show it again. Removing one asked nothing, and the row's
+    // Remove sits directly beside Save AND Test. One guard covers all four stores because
+    // every branch below destroys a secret.
     const ok = await confirmDialog({
-      title: t('credential.removeConfirm.title'),
-      message: t('credential.removeConfirm.message', { name: spec.label }),
-      confirmLabel: t('credential.remove'),
+      title: t('credential.remove.title'),
+      message: t('credential.remove.message', { name: spec.label }),
+      confirmLabel: t('credential.remove.confirm'),
       danger: true,
     });
     if (!ok) return;

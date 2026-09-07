@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { POPOUT_LABEL_KEYS } from '../popoutLabels';
 
 const ROOT = resolve(__dirname, '..', '..', '..');
 const MAIN = readFileSync(resolve(ROOT, 'src', 'main.ts'), 'utf8');
-const APP = readFileSync(resolve(ROOT, 'src', 'renderer', 'App.tsx'), 'utf8');
 const SHELL = readFileSync(
   resolve(ROOT, 'src', 'renderer', 'components', 'DesktopShell.tsx'),
   'utf8',
@@ -43,20 +43,16 @@ const mainSections = (): string[] =>
   setMembers(MAIN, /const POPOUT_SECTIONS = new Set\(\[([\s\S]*?)\]\);/);
 
 /**
- * The keys of the renderer's allow-list in App.tsx — comments hold quoted words, so keys
- * only. The object is matched by SHAPE, not by name: a concurrent track is mid-rename from
- * `POPOUT_LABELS` (raw English) to `POPOUT_LABEL_KEYS` (catalog keys), and a gate that names
- * one of them would go red on whichever side of that rename it did not expect. The contract
- * is the membership, which survives the rename.
+ * The renderer's allow-list, read as a VALUE rather than scraped out of App.tsx.
+ *
+ * It used to be a regex over App.tsx's source, matched by shape because the table was
+ * mid-rename from `POPOUT_LABELS` (raw English) to `POPOUT_LABEL_KEYS` (catalog keys).
+ * The table now lives in `renderer/popoutLabels.ts` — a leaf module with one type import —
+ * precisely so it can be imported here and unit-tested in `popoutLabels.test.ts`, instead of
+ * being parsed out of a 900-line component nothing can load under vitest.
  */
 function rendererSections(): string[] {
-  const body = /const POPOUT_LABELS?(?:_KEYS)?: Partial<Record<DesktopWinSection, string>> = \{([\s\S]*?)\n\};/
-    .exec(APP)?.[1];
-  if (body === undefined) throw new Error("App.tsx's pop-out allow-list object not found");
-  return body
-    .split('\n')
-    .map((line) => /^\s{2}([a-z]+):\s/.exec(line)?.[1])
-    .filter((k): k is string => Boolean(k));
+  return Object.keys(POPOUT_LABEL_KEYS);
 }
 
 describe('the two pop-out allow-lists agree', () => {

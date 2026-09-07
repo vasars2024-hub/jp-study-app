@@ -30,12 +30,12 @@ describe('shared shell entry-point localization', () => {
     for (const key of keys.slice(0, 5)) {
       expect(desktopSource).toContain(`t('${key}')`);
     }
-    // A FLOOR, not a census. This was `toHaveLength(2)` and went red on D107, which
-    // routed the Secret start menu's Quick settings tool through the very same shared
-    // key — i.e. it failed for doing exactly what the test exists to require. The rule
-    // is "every entry point resolves through the key and none is a literal", so the
-    // count guards against the key being dropped, and the two matchers below guard
-    // against a new literal being added.
+    // A FLOOR, not a census. This was `toHaveLength(2)` and went red twice in one hour, on
+    // D107 and again on D100's Start-menu slice - both of which routed a THIRD Quick settings
+    // entry point through the very same shared key, i.e. it failed for doing exactly what the
+    // test exists to require. The rule is "every entry point resolves through the key and none
+    // is a literal", so the count guards against the key being dropped, and the two matchers
+    // below guard against a new literal being added.
     expect(desktopSource.match(/t\('quickSettings\.title'\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(paletteSource).toContain("t('palette.toolboxPlaceholder')");
 
