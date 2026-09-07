@@ -172,16 +172,36 @@ async function backfillEpisodes(group: TitleGroup, malId: number): Promise<boole
   return Object.keys(titles).length > 0 || perEpisode.length > 0;
 }
 
-async function searchProviders(title: string): Promise<ProviderWork[]> {
+/**
+ * Candidates for a title, and whether the empty ones mean anything.
+ *
+ * `down` exists because the caller's response to an empty list is *permanent*:
+ * it stamps `metadataSource: 'unmatched'`, `alreadyFetched` then returns true
+ * forever, `needsEpisodeBackfill` explicitly excludes `'unmatched'`, and unlike
+ * subtitle discovery there is no `retryAfterDays` here at all. So a minute of
+ * provider outage would have cost the title its AniList id for good — and with
+ * no AniList id, Jimaku drops from an exact id match to a title match on every
+ * later subtitle search, silently, forever. That is the most expensive form of
+ * this mistake in the whole chain, which is why it gets its own flag rather
+ * than a comment saying it does not matter.
+ */
+async function searchProviders(title: string): Promise<{ candidates: ProviderWork[]; down: boolean }> {
   // Jikan first: it is the MyAnimeList data the user asked for, and it carries
   // per-episode titles. AniList only fills in when Jikan returns nothing, so the
   // common path costs one provider, not two.
-  // `null` from either provider means it never answered; here that is the same
-  // as having nothing to offer, because this path only ever patches fields it
-  // actually received.
+  //
+  // `null` versus `[]` is a contract the clients already keep and this function
+  // used to throw away — `jikanSearch`'s own doc records it being measured live
+  // on 2026-08-16 with Jikan at 504 and AniList at 403, where collapsing the two
+  // told the user their query had no results.
   const primary = await jikanSearch(title);
-  if (primary && primary.length > 0) return primary;
-  return (await anilistSearch(title)) ?? [];
+  if (primary && primary.length > 0) return { candidates: primary, down: false };
+  const secondary = await anilistSearch(title);
+  if (secondary && secondary.length > 0) return { candidates: secondary, down: false };
+  // Empty. It only counts as evidence if *both* providers actually answered:
+  // Jikan saying "nothing" while AniList is unreachable is not a settled answer,
+  // because AniList is precisely the fallback that would have carried the match.
+  return { candidates: [], down: primary === null || secondary === null };
 }
 
 /** Turns an applied provider answer into the fields persisted on every file. */
@@ -336,6 +356,9 @@ async function sweep(request: MediaMetadataRequest): Promise<MediaMetadataResult
         emit('searching');
         let work: ProviderWork | null = null;
         let confidence = 1;
+        // Set when the providers never answered, so the empty result below is not
+        // written down as a fact about the title.
+        let providersDown = false;
 
         if (request.override) {
           // A manual correction is the user's decision, so it is applied at full
@@ -344,7 +367,8 @@ async function sweep(request: MediaMetadataRequest): Promise<MediaMetadataResult
             ? await anilistById(request.override.id)
             : await jikanById(request.override.id);
         } else {
-          const candidates = await searchProviders(group.title);
+          const search = await searchProviders(group.title);
+          providersDown = search.down;
           if (cancelled.has(group.seriesKey)) {
             emit('cancelled');
             continue;
@@ -357,7 +381,7 @@ async function sweep(request: MediaMetadataRequest): Promise<MediaMetadataResult
               episodeCount: group.episodeCount,
               format: group.format,
             },
-            candidates,
+            search.candidates,
           );
           if (best) {
             work = best.candidate;
@@ -369,11 +393,19 @@ async function sweep(request: MediaMetadataRequest): Promise<MediaMetadataResult
           unmatched += 1;
           // Stamped so a later non-forced sweep does not re-ask a title that has
           // no answer — that is the "store failures" requirement.
-          host.patchItems(group.ids, {
-            metadataSource: 'unmatched',
-            metadataUpdatedAt: Date.now(),
-            metadataConfidence: 0,
-          });
+          //
+          // Not stamped when the providers never answered. The stamp is permanent
+          // (there is no retry window on this path at all), and an outage is not
+          // an answer about the title — the same rule the backfill pass above
+          // already follows in its own catch: "Still down: nothing is stamped, so
+          // the next sweep tries again."
+          if (!providersDown) {
+            host.patchItems(group.ids, {
+              metadataSource: 'unmatched',
+              metadataUpdatedAt: Date.now(),
+              metadataConfidence: 0,
+            });
+          }
           done += 1;
           emit('done', { confidence: 0 });
           continue;
