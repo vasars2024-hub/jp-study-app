@@ -1893,3 +1893,42 @@ the key — `REGRESSION mediaAssistant.grammar: 1 orphaned, baseline allows 0`. 
 | D178 | media study — AI assistant panel | `MediaStudyAssistantPanel` renders **20 English literals in all four languages**, including its `aria-label`, all five mode buttons, the busy/error/cached/saved status lines, every result heading and `Save to Notebook` — while `mediaAssistant.*`, exactly 20 keys, sits complete in en/ja/zh/ru with zero consumers. The saved Notebook note is built in English too, so the English escapes into the user's stored notes. | The component had no `useT()`. `node tools/i18n-orphan-key-check.cjs --list mediaAssistant.` returned **20 of 20** orphaned. Rendered at `VisualNovelPanel.tsx:949`. | P2 | **fixed — this commit.** All 20 wired; the module-level `LABELS: Record<Mode, string>` table of English strings is gone, replaced by `` t(`mediaAssistant.mode.${mode}`) `` so `MEDIA_STUDY_ASSISTANT_MODES` and the catalog can no longer drift apart. `--list` now returns 0. **One literal left on purpose:** `folder: 'Media study'` is a Notebook folder NAME — stored data the user can rename, which the repo's scope rule keeps untranslated. |
 | D179 | immersion — visual novels | **The Visual Novel panel is largely untranslated and its own complete translation exists.** `vnPanel.*` has **119 orphaned keys** — `vnPanel.kicker`, `vnPanel.title`, `vnPanel.backToBrowser`, `vnPanel.titlePlaceholder`, `vnPanel.aria.title`, `vnPanel.executablePlaceholder` and so on — all present and translated in all four catalogs, none reached. The panel calls `t()` only **17** times and renders at least **32** raw English JSX runs (`Back to browser`, `Add route`, `Capture screen text`, `Create study deck cards`, `Current chapter`, `Launch`, `Stop timer`, …), several of which map one-to-one onto an orphaned key by name. | `node tools/i18n-orphan-key-check.cjs --list vnPanel.` → 119. `grep -c "vnPanel\." VisualNovelPanel.tsx` → 17. `grep -coE ">[A-Z][a-z]+( [a-z]+)*<"` → 32 raw runs, before counting placeholders, titles and aria labels. | P2 | **open — this is the EXACT NEXT SLICE and it is deliberately not started at the tail of a turn.** It is a ~1,100-line file and ~119 keys; done badly it produces a half-converted panel, which is worse than a wholly English one because the mixture reads as a rendering bug. Two things make it cheap for whoever takes it: the keys already exist, translated, so this is wiring and not translation; and `--list vnPanel.` is the work-list, ticking down to 0 as the gate. **Do it in a worktree that owns the catalogs** — it may need a handful of new keys and the main tree holds all four permanently dirty. The three sibling blocks are the same job and probably the same session: `vnMeta` 33, `vnCommunity` 32, `vnImport` 21, `vnRelease` 14, `vnSource` 13, `vnScript` 11. |
 | D180 | i18n, repo-wide — the queue this opened | **1,077 English keys have no consumer**, i.e. ~8.5% of the catalog is translated into four languages and shipped in every bundle while nothing renders it. The largest blocks are not evenly spread — they cluster on whole surfaces that were never wired. | `node tools/i18n-orphan-key-check.cjs`. Top namespaces after the false 602 were removed: `scraperPage` 189 (legitimately dead — removed cards' search keywords), **`vnPanel` 119**, `videoServer` 68, `grammar` 62, `arcade` 55, `verifiedSites` 41, `mediaCenter` 38, `fm` 36, `trackingMgmt` 34, `trackingSources` 33, `vnMeta` 33, `jiten` 33, `vnCommunity` 32. | P3 | **open, and correctly a queue rather than a defect.** Each namespace must be OPENED before it is filed: `scraperPage`'s 189 are genuinely dead and should eventually be deleted, `vnPanel`'s 119 are D179, and some will be keys held for a surface not yet built. **Do not "fix" this by deleting keys in bulk** — a key whose consumer is one refactor away is not dead weight, and the two categories look identical from the outside. Work it namespace by namespace, opening the component each time, exactly as `mediaAssistant.` and `mediaProfile.` were done. |
+
+### 2026-09-07 07:15 EDT — primary2: the check's own first two false readings, and D181
+
+Two more instrument corrections, both found by USING the check rather than by reading it, and
+both of which had already produced a wrong answer:
+
+**1. A comment is not a consumer.** `mediaLibActions.working` read as USED on the first baseline
+because a doc comment in `.coordination/liquid-workplace/probes/l8-states-video.cjs` listed it as
+an example. Every other key in that block was correctly reported dead, so **one comment was all
+it took to keep a dead key alive indefinitely** — the exact failure `destructive-guard-scan.cjs`
+shipped with and had to repair, now repeated in a second instrument. Comments are masked
+length-preservingly; string bodies deliberately are **not**, because a key IS a string literal.
+`.coordination/` is exempt entirely for the same reason `__tests__` is: measurement scaffolding
+naming a key does not make the product render it.
+
+That one change exposed **7 more genuinely dead keys** that had been credited by comments alone:
+`settings.home.quick.memory`, `assetError.httpFailed`, `assetError.emptyResponse`,
+`library.open`, and the four `verifiedSites.source.*` that became D181.
+
+**2. A multi-line plural entry is not one line, and this one broke the branch.** Deleting the 16
+`mediaLibActions.*` keys with a line filter anchored on `^\s+'mediaLibActions\.` removed the KEY
+line of `removedCount` in `ru.ts` and left its four CLDR arms and closing brace dangling inside
+the previous entry. `ru.ts` stopped parsing; esbuild said
+`Expected identifier but found "'declension.title'"` — pointing at the **next** key, six lines
+past the damage. Only ru had the multi-line form, so en/ja/zh parsed fine and a spot check would
+have missed it. Repaired, and `i18n-check` re-run to zero (12,839 keys, all translated) and
+`i18n-dupe-keys` to 10,872 in each of the four. **Run `i18n-check` after any scripted catalog
+edit — it is the only thing here that actually parses the file.**
+
+| id | surface | what is wrong | evidence | sev | status |
+|---|---------|--------------|----------|-----|--------|
+| D181 | settings — Verified Sites | The site's provenance renders as its **machine token** in every language: `Source: user-imported`, `Source: built-in`. Three call sites pass `site.source` straight into a translated sentence, so the sentence is Russian and the value inside it is not. | `VerifiedSitesManager.tsx:176/246/249`. `verifiedSites.source.{built-in,user-imported,community,fmhy}` exist and are translated in all four catalogs; the orphan check reported all four dead **only after comments were masked** — until then a comment was crediting the block. | P3 | **fixed — this commit.** A `sourceLabel()` helper resolves `verifiedSites.source.${source}`, falling back to the raw token rather than to the key, so a source this panel has not met yet shows its own name instead of `verifiedSites.source.whatever`. |
+| — | i18n bookkeeping | 16 dead `mediaLibActions.*` keys, left behind by the 2026-09-07 00:23 land when the duplicate component version was dropped in favour of the committed `mediaLib.*` one. | The land note itself asked for this ("either delete them or point the component back"). Confirmed independently: `grep -rn mediaLibActions src/` outside the catalogs returns **nothing but a probe comment**, and every concept has a live `mediaLib.*` counterpart (20 keys, all consumed). | — | **deleted from all four catalogs — this commit.** Not a defect row; it is the land note's own follow-up, closed. |
+
+**Baseline after this turn: 1,066 orphan keys in 477 namespaces** (from 1,743 on the first,
+broken run). The four newly-exposed dead keys other than D181's — `settings.home.quick.memory`
+(its own comment says it is byte-for-byte `settings.nav.memory`), `assetError.httpFailed`,
+`assetError.emptyResponse` and `library.open` — are recorded as accepted debt, **not** fixed, and
+are the cheapest four leads in the queue for whoever wants a five-minute start.

@@ -81,6 +81,22 @@ const PROMOTION_KEY: Record<string, string> = {
   ineligible: 'verifiedSites.promotion.ineligible',
 };
 
+/**
+ * `site.source` is a machine token — `built-in`, `user-imported`, `community`,
+ * `fmhy` — and three call sites printed it raw, so the panel read
+ * `Source: user-imported` in every language. `verifiedSites.source.*` had been
+ * written and translated in all four catalogs and was reached by nothing (D181).
+ *
+ * Falls back to the token itself rather than to the key, because a source this
+ * panel has not met yet is better shown as its raw name than as
+ * `verifiedSites.source.whatever`.
+ */
+function sourceLabel(source: string, t: (key: string) => string): string {
+  const key = `verifiedSites.source.${source}`;
+  const label = t(key);
+  return label === key ? source : label;
+}
+
 type Draft = Omit<VerifiedSiteRecord, 'createdAt' | 'updatedAt'> & Partial<Pick<VerifiedSiteRecord, 'createdAt' | 'updatedAt'>>;
 
 function blankDraft(): Draft {
@@ -173,7 +189,7 @@ export default function VerifiedSitesManager() {
               <strong>{site.name}</strong>
               <a href={site.baseUrl} onClick={(event) => event.preventDefault()}>{site.baseUrl}</a>
               <span className="muted">{site.source === 'fmhy' ? `FMHY · ${site.sourceCategory ?? t('verifiedSites.uncategorized')}` : t(CATEGORY_KEY[site.category] ?? 'verifiedSites.category.mixed')} · {site.languages.join(', ') || t('verifiedSites.noLanguages')} · {t('verifiedSites.reliability', { score: site.reliabilityScore })}</span>
-              <span className="muted">{t('verifiedSites.rowMeta', { source: site.source, promotion: t(PROMOTION_KEY[site.promotionEligibility] ?? 'verifiedSites.promotion.notReviewed') })}</span>
+              <span className="muted">{t('verifiedSites.rowMeta', { source: sourceLabel(site.source, t), promotion: t(PROMOTION_KEY[site.promotionEligibility] ?? 'verifiedSites.promotion.notReviewed') })}</span>
             </div>
             <span className={`verified-site-status status-${site.status}`}>{t(STATUS_KEY[site.status] ?? 'verifiedSites.status.unverified')}</span>
             <button type="button" className="btn small" onClick={() => startEdit(site)}>{t('verifiedSites.edit')}</button>
@@ -243,10 +259,10 @@ export default function VerifiedSitesManager() {
         {duplicateGroups.map((group) => <div key={group.origin} className="verified-site-editor">
           <strong>{group.origin}</strong>
           {group.sites.map((site) => <div key={site.id} className="verified-sites-actions">
-            <span>{site.name} · {site.source} · {site.baseUrl}</span>
+            <span>{site.name} · {sourceLabel(site.source, t)} · {site.baseUrl}</span>
             <button type="button" className="btn small" onClick={() => {
               const next = reconcileVerifiedSiteDuplicates(document, site.id, group.sites.filter((item) => item.id !== site.id).map((item) => item.id));
-              persist(next); setMessage(t('verifiedSites.msg.reconciled', { name: site.name, source: site.source }));
+              persist(next); setMessage(t('verifiedSites.msg.reconciled', { name: site.name, source: sourceLabel(site.source, t) }));
             }}>{t('verifiedSites.dupes.keep')}</button>
           </div>)}
         </div>)}

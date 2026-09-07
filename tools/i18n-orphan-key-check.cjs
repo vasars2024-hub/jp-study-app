@@ -55,7 +55,25 @@ const BASELINE_PATH = path.join(__dirname, 'i18n-orphan-key-baseline.json');
  * counting it would let a component be deleted while its keys still read as
  * live. `__devharness__` never ships.
  */
-const EXEMPT_DIRS = ['node_modules', 'dist', '.vite', 'out', '__devharness__'];
+const EXEMPT_DIRS = ['node_modules', 'dist', '.vite', 'out', '__devharness__', '.coordination'];
+
+/**
+ * Comments are not consumers, and this is not a hypothetical.
+ * `mediaLibActions.working` read as USED on the first baseline because a doc
+ * comment in `.coordination/liquid-workplace/probes/l8-states-video.cjs` listed
+ * it as an example. Every other key in that block was correctly reported dead,
+ * so one comment was all it took to keep a dead key alive indefinitely — the
+ * exact failure `destructive-guard-scan.cjs` shipped with and had to repair.
+ *
+ * Blanked length-preservingly so nothing downstream shifts. Strings are
+ * deliberately left intact: a key IS a string literal, so masking them would
+ * blind the check entirely.
+ */
+function maskComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:\w])\/\/[^\n]*/g, (m, lead) => lead + ' '.repeat(m.length - lead.length));
+}
 
 /** A path under here declares keys; it never consumes them. */
 function isCatalogSource(file) {
@@ -145,7 +163,7 @@ function main() {
   const dynamicPrefixes = new Set();
   const haystack = [];
   for (const file of consumers) {
-    const text = fs.readFileSync(file, 'utf8');
+    const text = maskComments(fs.readFileSync(file, 'utf8'));
     collectDynamicPrefixes(text, dynamicPrefixes);
     haystack.push(text);
   }
