@@ -98,12 +98,36 @@ describe('the shell taskbar declares its popups', () => {
     expect(source).toContain("'notifications.wired.noUnreadError'");
   });
 
+  // This asserted `switchDesktop(0)` and `switchDesktop(1)` as literals until
+  // 2026-09-07, when D149 replaced the two hardcoded buttons with a map over
+  // `switchableDesktops` — so anything the user put on desktop 3 or beyond
+  // finally got a button. The old anchor then matched nothing and the test went
+  // red against a product that had got BETTER. Anchored on the mapped button
+  // instead, which is the shape that survives adding a desktop.
   it('the desktop switches carry their selected-ness programmatically, not only as a class', () => {
     const source = read(SHELL);
-    for (const n of [0, 1]) {
-      const tag = buttonTag(source, `switchDesktop(${n})`);
-      expect(tag).toContain(`aria-pressed={activeDesktop === ${n}}`);
-    }
+    const tag = buttonTag(source, 'switchDesktop(index)');
+    expect(tag).toContain('aria-pressed={activeDesktop === index}');
+    // ...and there is exactly one such button, i.e. it is generated rather than
+    // written out per desktop. A second literal `switchDesktop(0)` button would
+    // mean the hardcoded row had come back and desktop 3+ lost its way in again.
+    expect(source).not.toContain('switchDesktop(0)');
+    expect(source).not.toContain('switchDesktop(1)');
+  });
+
+  // D149's own property, guarded here because the assertion above would still
+  // pass if the row were mapped over a two-element constant.
+  it('the switch row is built from every reachable desktop, not a fixed pair', () => {
+    const source = read(SHELL);
+    expect(source).toContain('switchableDesktops.map(');
+    // The set has to be DERIVED, and from what actually holds windows — a
+    // literal pair behind the map is the D149 defect wearing a map. Both halves
+    // are named, because `switchableDesktopIndexes` called without `windowsOn`
+    // would strand a window on desktop 3 exactly as before.
+    // `windowsOn` must be INSIDE that call, not merely somewhere in the file:
+    // the shell mentions it twice, so a whole-file `toContain` stayed green
+    // when the argument was deleted — measured, which is why this is anchored.
+    expect(source).toMatch(/switchableDesktopIndexes\(\{[^}]*windowsOn:/);
   });
 
 });
