@@ -18,7 +18,7 @@ import {
   type ReadingSite,
 } from '../../data/readingSites';
 import { getUserLevel } from '../../levelService';
-import { tierName, type LevelTier } from '../../../shared/levelScale';
+import { tierLabel, type LevelTier } from '../../../shared/levelScale';
 import {
   knownPercent,
   scoreTextComprehensibility,
@@ -42,10 +42,12 @@ function isWebSourced(item: LibraryItem): boolean {
   return !!item.sourcePath && /^https?:\/\//i.test(item.sourcePath);
 }
 
-export function levelRangeLabel(levels: LevelTier[]): string {
-  const min = Math.min(...levels);
-  const max = Math.max(...levels);
-  return min === max ? tierName('ja', min) : `${tierName('ja', min)}–${tierName('ja', max)}`;
+export function levelRangeLabel(t: (key: string) => string, levels: LevelTier[]): string {
+  const min = Math.min(...levels) as LevelTier;
+  const max = Math.max(...levels) as LevelTier;
+  return min === max
+    ? tierLabel(t, 'ja', min)
+    : `${tierLabel(t, 'ja', min)}–${tierLabel(t, 'ja', max)}`;
 }
 
 function genreLabel(t: (key: string) => string, genre: ReadingGenre): string {
@@ -218,9 +220,9 @@ export function ReadingFinderControls({ state }: { state: ReadingFinderState }) 
             className={`gram-level-btn ${levels.has(lv) ? 'active' : ''}`}
             aria-pressed={levels.has(lv)}
             onClick={() => toggleLevel(lv)}
-            title={tierName('ja', lv)}
+            title={tierLabel(t, 'ja', lv)}
           >
-            {tierName('ja', lv)}
+            {tierLabel(t, 'ja', lv)}
           </button>
         ))}
         <button
@@ -378,7 +380,7 @@ export function ReadingSiteGrid({ state }: { state: ReadingFinderState }) {
           </span>
           <span className="res-desc">{s.notes}</span>
           <span className="rf-card-badges">
-            <span className="rf-level-badge">{levelRangeLabel(s.levels)}</span>
+            <span className="rf-level-badge">{levelRangeLabel(t, s.levels)}</span>
             {s.furigana && (
               <span className="rf-furigana-badge">
                 <Icon name="check" size={10} style={{ marginRight: 3, verticalAlign: '-1px' }} />
@@ -510,7 +512,7 @@ export function ReadingSiteDetail({
 
           <div className="nov-meta">
             <span>
-              <b>{t('reading.meta.level')}</b> {levelRangeLabel(site.levels)}
+              <b>{t('reading.meta.level')}</b> {levelRangeLabel(t, site.levels)}
             </span>
             <span>
               <b>{t('reading.meta.pricing')}</b> {pricingLabel(t, site.pricing)}

@@ -22,6 +22,7 @@ import {
   JITEN_GENRES,
   jitenGenreId,
   jitenGenreName,
+  type JitenAcquisitionStatus,
   type JitenDeck,
   type JitenPlanEntry,
   type JitenSourceLink,
@@ -89,6 +90,30 @@ export const DIFFICULTY_CLASS: Record<Difficulty | 'Unknown', string> = {
   Hard: 'd-hard',
   'Very Hard': 'd-veryhard',
   Unknown: 'd-unknown',
+};
+
+// The stored value stays the stable English enum -- it is what `difficultyLabel()`
+// writes into a plan entry and what the filter compares against, so translating
+// the DATA would break both. Only the display moves (CLAUDE.md i18n rule 7).
+export const DIFFICULTY_KEY: Record<Difficulty | 'Unknown', string> = {
+  Beginner: 'novels.difficulty.beginner',
+  Easy: 'novels.difficulty.easy',
+  Moderate: 'novels.difficulty.moderate',
+  Hard: 'novels.difficulty.hard',
+  'Very Hard': 'novels.difficulty.veryHard',
+  Unknown: 'novels.difficulty.unknown',
+};
+
+// Same rule for the acquisition status, which was printed as its raw lowercase
+// enum value ("analyzed", "mined") in every language.
+export const PLAN_STATUS_KEY: Record<JitenAcquisitionStatus, string> = {
+  planned: 'novels.status.planned',
+  linked: 'novels.status.linked',
+  downloaded: 'novels.status.downloaded',
+  imported: 'novels.status.imported',
+  analyzed: 'novels.status.analyzed',
+  mined: 'novels.status.mined',
+  error: 'novels.status.error',
 };
 
 const NOVEL_TYPE_SET = new Set<string>(NOVEL_TYPES);
@@ -788,9 +813,9 @@ export function NovelsFilters({ state }: { state: NovelsState }) {
         {t('novels.filter.difficulty')}
         <select value={state.diff} onChange={(e) => state.setDiff(e.target.value as DiffFilter)}>
           <option value="All">{t('novels.filter.all')}</option>
-          {[...DIFFICULTY_ORDER, 'Unknown'].map((level) => (
+          {[...DIFFICULTY_ORDER, 'Unknown' as const].map((level) => (
             <option key={level} value={level}>
-              {level}
+              {t(DIFFICULTY_KEY[level] ?? 'novels.difficulty.unknown')}
             </option>
           ))}
         </select>
@@ -956,9 +981,11 @@ export function NovelsTable({ state }: { state: NovelsState }) {
               </span>
               <span>{candidate.kind === 'jiten' ? 'Jiten' : t('novels.kind.local')}</span>
               <span className={`nov-diff ${DIFFICULTY_CLASS[candidate.difficultyLabel as Difficulty | 'Unknown'] ?? 'd-unknown'}`}>
-                {candidate.difficultyLabel}
+                {t(DIFFICULTY_KEY[candidate.difficultyLabel as Difficulty | 'Unknown'] ?? 'novels.difficulty.unknown')}
               </span>
-              <span>{plan?.acquisitionStatus ?? t('novels.plan.unplanned')}</span>
+              <span>
+                {plan ? t(PLAN_STATUS_KEY[plan.acquisitionStatus] ?? 'novels.status.planned') : t('novels.plan.unplanned')}
+              </span>
               <span>{links.length}</span>
             </button>
           );
@@ -1005,8 +1032,8 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
       </div>
       <dl className="jiten-meta">
         <div><dt>{t('novels.meta.type')}</dt><dd>{selectedCandidate.type}</dd></div>
-        <div><dt>{t('novels.meta.difficulty')}</dt><dd>{selectedCandidate.difficultyLabel}</dd></div>
-        <div><dt>{t('novels.meta.plan')}</dt><dd>{selectedPlan?.acquisitionStatus ?? t('novels.plan.unplanned')}</dd></div>
+        <div><dt>{t('novels.meta.difficulty')}</dt><dd>{t(DIFFICULTY_KEY[selectedCandidate.difficultyLabel as Difficulty | 'Unknown'] ?? 'novels.difficulty.unknown')}</dd></div>
+        <div><dt>{t('novels.meta.plan')}</dt><dd>{selectedPlan ? t(PLAN_STATUS_KEY[selectedPlan.acquisitionStatus] ?? 'novels.status.planned') : t('novels.plan.unplanned')}</dd></div>
         {selectedCandidate.jitenDeckId && <div><dt>{t('novels.meta.jitenDeck')}</dt><dd>{selectedCandidate.jitenDeckId}</dd></div>}
         {selectedCandidate.wordCount != null && <div><dt>{t('novels.meta.words')}</dt><dd>{selectedCandidate.wordCount.toLocaleString()}</dd></div>}
         {selectedCandidate.uniqueWordCount != null && <div><dt>{t('novels.meta.unique')}</dt><dd>{selectedCandidate.uniqueWordCount.toLocaleString()}</dd></div>}

@@ -92,7 +92,7 @@ export default function ReadingFinderView({
       )}
       <StatusBarSpacer />
       {mode === 'discover' && (
-        <StatusBarField>{t('reading.meta.level')}: {levelRangeLabel([...levels].length ? [...levels] : ALL_LEVELS)}</StatusBarField>
+        <StatusBarField>{t('reading.meta.level')}: {levelRangeLabel(t, [...levels].length ? [...levels] : ALL_LEVELS)}</StatusBarField>
       )}
     </>
   );

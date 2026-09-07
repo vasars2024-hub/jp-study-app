@@ -106,6 +106,32 @@ export function tierName(lang: StudyLang, tier: LevelTier): string {
   return tiersForLang(lang).find((t) => t.tier === tier)?.name ?? String(tier);
 }
 
+/**
+ * i18n key for a tier name, or `null` when the name is a proper noun that must
+ * NOT be translated (`N5`, `HSK 3` — CLAUDE.md i18n rule 4). Only two tier names
+ * are ordinary English words: tier 1 on the JLPT scale ("Beginner") and tier 7
+ * on both ("Advanced"). This module is pure shared math with no `t()` of its
+ * own, so it hands back the key and the consumer resolves it (i18n rule 7).
+ */
+export function tierNameKey(lang: StudyLang, tier: LevelTier): string | null {
+  if (tier === 7) return 'level.tier.advanced';
+  if (tier === 1 && lang === 'ja') return 'level.tier.beginner';
+  return null;
+}
+
+/**
+ * The tier name a user should SEE. Takes `t` as an argument rather than calling
+ * a hook, so this module stays pure shared math that main can import too.
+ */
+export function tierLabel(
+  t: (key: string) => string,
+  lang: StudyLang,
+  tier: LevelTier,
+): string {
+  const key = tierNameKey(lang, tier);
+  return key ? t(key) : tierName(lang, tier);
+}
+
 export interface DeriveLevelInput {
   /** Coverage 0..1 for each slot that has a list; missing = no list. */
   coverageBySlot: Partial<Record<LevelSlotId, number>>;

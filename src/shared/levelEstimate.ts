@@ -21,6 +21,7 @@ import {
   deriveUserLevel,
   slotsForLang,
   tierName,
+  tierNameKey,
   type DeriveLevelInput,
   type LevelSlotId,
   type LevelTier,
@@ -63,6 +64,30 @@ export function levelLabel(lang: StudyLang, tier: LevelTier): string {
   if (slot) return slot.label;
   if (lang === 'ja' && tier === 1) return 'JLPT Beginner';
   return tierName(lang, tier);
+}
+
+/**
+ * i18n key for `badgeForTier`'s output, or `null` when that output is a proper
+ * noun (`N3`, `HSK 4`). Only tier 7's "Advanced" is an English word.
+ */
+export function badgeKeyForTier(lang: StudyLang, tier: LevelTier): string | null {
+  if (tier === 7) return tierNameKey(lang, 7);
+  const slot = slotsForLang(lang).find((s) => s.tier === tier);
+  if (slot) return null;
+  return tierNameKey(lang, tier);
+}
+
+/**
+ * i18n key for `levelLabel`'s output, or `null` when it is a proper noun
+ * (`JLPT N3`, `HSK 4`). The scheme name stays Latin inside the translation —
+ * "JLPT" is the exam's own name in every language.
+ */
+export function levelLabelKey(lang: StudyLang, tier: LevelTier): string | null {
+  if (tier === 7) return lang === 'zh' ? 'level.tier.advanced' : 'level.label.jlptAdvanced';
+  const slot = slotsForLang(lang).find((s) => s.tier === tier);
+  if (slot) return null;
+  if (lang === 'ja' && tier === 1) return 'level.label.jlptBeginner';
+  return tierNameKey(lang, tier);
 }
 
 function toEstimate(lang: StudyLang, tier: LevelTier): LevelEstimate {

@@ -19,7 +19,7 @@ import {
   upsertSlotList,
 } from '../levelLists';
 import { importApkgWords } from '../apkgImport';
-import { slotsForLang, tierName, type LevelSlot, type StudyLang } from '../../shared/levelScale';
+import { slotsForLang, tierLabel, type LevelSlot, type StudyLang } from '../../shared/levelScale';
 import { onStudyLangChanged, setStudyLang } from '../studyEnvironment';
 import { useT } from '../i18n';
 
@@ -50,7 +50,7 @@ export function LevelMeter({
         <span className="level-meter-num">
           {t('settings.study.level.meterLabel', { level: report.level })}
         </span>
-        <span className="level-meter-name muted">{tierName(lang, report.level)}</span>
+        <span className="level-meter-name muted">{tierLabel(t, lang, report.level)}</span>
       </div>
       <div
         className="level-meter-track"

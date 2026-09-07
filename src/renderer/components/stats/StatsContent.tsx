@@ -35,7 +35,7 @@ import { knowledgeCounts, onKnowledgeChanged } from '../../knownWords';
 import { syncKnowledgeFromAnki } from '../../ankiSync';
 import { LevelMeter } from '../LevelMeter';
 import { getLevelEstimate, onLevelChange } from '../../levelService';
-import type { LevelEstimate } from '../../../shared/levelEstimate';
+import { badgeKeyForTier, type LevelEstimate } from '../../../shared/levelEstimate';
 import { useT } from '../../i18n';
 
 /**
@@ -102,13 +102,18 @@ export function EstimatedLevelBadge() {
     return onLevelChange(refresh);
   }, []);
 
+  // "N3"/"HSK 4" are proper nouns and stay; tier 7's "Advanced" is an ordinary
+  // English word, so badgeKeyForTier hands back a key for that case alone.
+  const badgeKey = badgeKeyForTier(estimate.lang, estimate.tier);
+  const badgeText = badgeKey ? t(badgeKey) : estimate.short;
+
   return (
     <div
       className="stats-level-estimate"
       role="status"
-      aria-label={t('stats.level.aria', { level: estimate.short })}
+      aria-label={t('stats.level.aria', { level: badgeText })}
     >
-      <span className="stats-level-badge">{estimate.short}</span>
+      <span className="stats-level-badge">{badgeText}</span>
       <div className="stats-level-copy">
         <span className="stats-level-title">{t('stats.level.title')}</span>
         <span className="stats-level-hint muted">{t('stats.level.hint')}</span>

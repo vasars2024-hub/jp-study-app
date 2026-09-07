@@ -28,6 +28,7 @@ import {
   levelRangeLabel,
   useReadingFinder,
 } from '../reading/ReadingFinderContent';
+import { useT } from '../../i18n';
 import {
   ResourceBundleDetail,
   ResourceBundles,
@@ -316,6 +317,11 @@ export function BlancReadingFinderPanel({
 }: {
   onOpenBook: (item: LibraryItem) => void;
 }) {
+  // Blanc's own panel prose is outside the app-chrome i18n sweep by decision
+  // (see EXEMPT_DIRS in tools/i18n-hardcoded-check.cjs), but the level range is
+  // NOT Blanc prose -- it is the shared tier vocabulary Study OS renders too, so
+  // it follows the UI language here as well.
+  const { t } = useT();
   const state = useReadingFinder();
 
   return (
@@ -334,7 +340,7 @@ export function BlancReadingFinderPanel({
           <span>{state.list.length} sites</span>
           <span>
             Level:{' '}
-            {levelRangeLabel(state.levels.size ? [...state.levels] : ALL_LEVELS)}
+            {levelRangeLabel(t, state.levels.size ? [...state.levels] : ALL_LEVELS)}
           </span>
           <button type="button" onClick={state.resetFilters}>
             Reset filters
