@@ -494,3 +494,7 @@ repeating "Move up" six times down a column.
 gate excludes it by name, and that exclusion line is what to delete if it ever ships.
 
 D123 verification, 2026-09-07 00:49 EDT: Aero window 10 now renders **1h 59m watched, 6 shows, 4 nonzero watch segments**; raw days sum **7,173.3 seconds**, read sum **31,408.916 seconds / 542,290 chars** agrees with 8h 43m and 542,290. No new API/store: standard, Wired, Files and Blanc keep their shared StatsChart/StatsShows path. At 520×580, show-list width/scrollWidth is **320/320** after fixing shared readout flex shrink (before **320/402**). Existing book table remains horizontally scrollable; screenshot inspected, main scroller reaches the show rows. Console error log total **0**. Tests: isolated checkout old Aero fails **1/6**, other modes and empty controls pass **5/6**; corrected view passes **26/26 across 4 suites**. Statistics surface remains partial: Anki sync and full per-row journeys are still owed.
+
+## 2026-09-07 00:52 EDT — codexA claims Library D2
+
+Live library pop-out window 11: **24 real rows**. Focus 悪の教典 02 → bridge Enter delivered **1/1** → row selected, Read inspector action appears, reader remains absent. The inspector is a keyboard escape, so this is P2 discoverability rather than a keyboard dead end. Decision: Enter opens the focused row through existing onOpen; Space and single click retain selection. Apply to standard/Wired and Aero list branches; Blanc shares LibraryView. No new navigation path.
