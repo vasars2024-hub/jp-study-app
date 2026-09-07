@@ -120,7 +120,12 @@ export function deleteEvent(id: string): CalendarEvent[] {
   return list;
 }
 
-function toDateKey(d: Date): string {
+/**
+ * A local-time `YYYY-MM-DD` key. Exported because `occurrenceDate` is one of
+ * these, so a caller that wants "not today" has to compare against the same
+ * shape — `new Date().toISOString()` would be UTC and wrong past 19:00 here.
+ */
+export function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
