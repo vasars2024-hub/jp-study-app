@@ -492,3 +492,5 @@ repeating "Move up" six times down a column.
 **One offender is left in the tree and it is a decision, not a miss:**
 `__devharness__/videoStudyHarness.tsx:167`. The harness directory is slated for deletion; the
 gate excludes it by name, and that exclusion line is what to delete if it ever ships.
+
+D123 verification, 2026-09-07 00:49 EDT: Aero window 10 now renders **1h 59m watched, 6 shows, 4 nonzero watch segments**; raw days sum **7,173.3 seconds**, read sum **31,408.916 seconds / 542,290 chars** agrees with 8h 43m and 542,290. No new API/store: standard, Wired, Files and Blanc keep their shared StatsChart/StatsShows path. At 520×580, show-list width/scrollWidth is **320/320** after fixing shared readout flex shrink (before **320/402**). Existing book table remains horizontally scrollable; screenshot inspected, main scroller reaches the show rows. Console error log total **0**. Tests: isolated checkout old Aero fails **1/6**, other modes and empty controls pass **5/6**; corrected view passes **26/26 across 4 suites**. Statistics surface remains partial: Anki sync and full per-row journeys are still owed.

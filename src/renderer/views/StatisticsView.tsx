@@ -17,7 +17,6 @@ import {
   StatsChart,
   StatsShows,
   WordKnowledge,
-  weekdayInitial,
   useStats,
 } from '../components/stats/StatsContent';
 import { useT } from '../i18n';
@@ -28,7 +27,7 @@ export default function StatisticsView() {
   const { t } = useT();
   const aero = useAeroMaterials();
   const state = useStats();
-  const { summary: s, peak, hasData, refresh, resetAllStats } = state;
+  const { summary: s, hasData, refresh, resetAllStats } = state;
   const recentActivityRef = useRef<HTMLElement>(null);
   // The Reset disclosure's panel is positioned out of flow and lands on top of the Word
   // Knowledge "Sync from Anki" button one row below it, so without a light dismiss the only
@@ -105,6 +104,22 @@ export default function StatisticsView() {
                   <dt>{t('stats.totalChars')}</dt>
                   <dd>{formatNumber(s.totalChars)}</dd>
                 </div>
+                {s.totalWatchSeconds > 0 && (
+                  <>
+                    <div>
+                      <dt>{t('stats.card.watchedToday')}</dt>
+                      <dd>{formatDuration(s.todayWatchSeconds)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('stats.card.totalWatched')}</dt>
+                      <dd>{formatDuration(s.totalWatchSeconds)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('stats.card.showsWatched')}</dt>
+                      <dd>{s.shows.length}</dd>
+                    </div>
+                  </>
+                )}
               </dl>
             </aside>
 
@@ -112,14 +127,7 @@ export default function StatisticsView() {
               <section className="aero-stats-panel">
                 <header>{t('stats.last14Days')}</header>
                 {hasData ? (
-                  <div className="aero-stats-chart">
-                    {s.recent.map((d) => (
-                      <div key={d.date} className="aero-stats-bar" title={t('stats.barTooltip', { date: d.date, duration: formatDuration(d.seconds), chars: formatNumber(d.chars) })}>
-                        <span style={{ height: `${Math.round((d.seconds / peak) * 100)}%` }} />
-                        <b>{weekdayInitial(d.date)}</b>
-                      </div>
-                    ))}
-                  </div>
+                  <StatsChart state={state} />
                 ) : (
                   <div className="aero-stats-empty">{t('stats.noSamples')}</div>
                 )}
@@ -146,6 +154,12 @@ export default function StatisticsView() {
                   <div className="aero-stats-empty">{t('stats.noBookTotals')}</div>
                 )}
               </section>
+              {s.shows.length > 0 && (
+                <section className="aero-stats-panel stats-by-show">
+                  <header>{t('stats.byShow')}</header>
+                  <StatsShows state={state} />
+                </section>
+              )}
             </main>
 
             <aside className="aero-stats-knowledge">
