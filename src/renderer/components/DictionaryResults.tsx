@@ -1006,8 +1006,12 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                 >
                   <Icon name="clipboard" size={14} />
                 </button>
+                {/* A toggle, so it says so: the `on` class, the filled star and
+                    the swapped title are all sighted-only signals, and a title
+                    that changes in place is not announced. */}
                 <button
                   className={`dict-star lq-hit ${saved ? 'on' : ''}`}
+                  aria-pressed={saved}
                   title={saved ? t('dict.results.savedFlashcards') : t('dict.results.saveFlashcards')}
                   onClick={() => toggleSave(entry)}
                 >
