@@ -18,6 +18,7 @@ import MediaStatusPill from './MediaStatusPill';
 import MediaMatchDialog from './MediaMatchDialog';
 import NyaaSubtitleDialog from './NyaaSubtitleDialog';
 import { useMediaJobs } from './useMediaJobs';
+import { openFilesAppForMedia } from '../../filesapp/filesAppScope';
 import {
   TranscriptionCardDeckStatus,
   TranscriptionCardOptionsControl,
@@ -323,6 +324,19 @@ export default function MediaDetailPanel({
             onClick={() => void toggle(!queued, setPendingQueue, onToggleStudyQueue)}
           >
             <Icon name="library" size={15} />
+          </IconButton>
+          {/*
+            D260. `openFilesAppForMedia` is one of ten context-entry helpers
+            `filesAppScope.ts` calls "the callers' vocabulary", each named after
+            the surface meant to call it — and this one had no caller anywhere,
+            so the reader's Show in Files gesture existed nowhere else. The id is
+            `media.json`'s row id, which is exactly what the helper scopes on.
+          */}
+          <IconButton
+            label={t('filesApp.entry.showInFiles')}
+            onClick={() => { openFilesAppForMedia(entry.primary.id); }}
+          >
+            <Icon name="folder" size={15} />
           </IconButton>
         </div>
 
