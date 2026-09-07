@@ -612,7 +612,7 @@ export default function MiniShell({
             : { width: frameW, height: frameH, ['--mini-scale' as string]: scale }
         }
         role="dialog"
-        aria-label="Mini view"
+        aria-label={t('miniShell.a11y.view')}
       >
         {/* Wallpaper inside the rounded frame (widget + non-widget when image/icons). */}
         {(showImageWall || cfg.wallpaperMode === 'icons' || showPresetWall) && (
@@ -673,7 +673,7 @@ export default function MiniShell({
               type="button"
               className={`mini-ico-btn${canAdd ? '' : ' is-disabled'}`}
               disabled={!canAdd}
-              title="Add app"
+              title={t('settings.mini.addApp')}
               onClick={() => {
                 setAddOpen(true);
                 setPanelOpen(true);
@@ -684,7 +684,7 @@ export default function MiniShell({
             <button
               type="button"
               className={`mini-ico-btn${panelOpen ? ' is-on' : ''}`}
-              title="Settings"
+              title={t('miniShell.settings')}
               onClick={() => {
                 setPanelOpen((o) => !o);
                 if (panelOpen) setAddOpen(false);
@@ -692,7 +692,7 @@ export default function MiniShell({
             >
               <Icon name="settings" size={13} />
             </button>
-            <button type="button" className="mini-ico-btn" title="Full desktop" onClick={exitToFull}>
+            <button type="button" className="mini-ico-btn" title={t('miniShell.fullDesktop')} onClick={exitToFull}>
               <Icon name="external" size={13} />
             </button>
           </div>
@@ -705,7 +705,7 @@ export default function MiniShell({
         )}
 
         {/* Crafting-table 3×3 slot grid */}
-        <div className="mini-craft mini-no-drag" aria-label="App slots">
+        <div className="mini-craft mini-no-drag" aria-label={t('miniShell.a11y.appSlots')}>
           <div className="mini-craft-grid">
             {slots.map((id, i) => {
               if (!id) {
@@ -715,7 +715,7 @@ export default function MiniShell({
                     type="button"
                     className="mini-slot is-empty"
                     disabled={!canAdd}
-                    title={canAdd ? 'Add app' : 'Empty'}
+                    title={canAdd ? t('settings.mini.addApp') : t('miniShell.slotEmpty')}
                     onClick={() => {
                       if (!canAdd) return;
                       setAddOpen(true);
@@ -774,13 +774,14 @@ export default function MiniShell({
         )}
 
         {activeInline === 'clipboard' && (
-          <section className="mini-stage mini-no-drag" aria-label="Clipboard">
+          <section className="mini-stage mini-no-drag" aria-label={t('miniShell.clipboard')}>
             <div className="mini-stage-bar">
-              <span className="mini-stage-title">Clipboard</span>
+              <span className="mini-stage-title">{t('miniShell.clipboard')}</span>
               <button
                 type="button"
                 className="mini-ico-btn"
-                title="Close"
+                title={t('common.close')}
+                aria-label={t('common.close')}
                 onClick={() => setActiveInline(null)}
               >
                 <Icon name="close" size={12} />
@@ -804,17 +805,17 @@ export default function MiniShell({
         <button
           type="button"
           className="mini-size-grip mini-no-drag"
-          title="Resize (scale)"
-          aria-label="Resize mini window size"
+          title={t('miniShell.resizeScale')}
+          aria-label={t('miniShell.a11y.resize')}
           onPointerDown={startResize}
         />
         <div className="mini-size-hint muted mini-no-drag">{Math.round(scale * 100)}%</div>
 
         {/* Settings drawer (inside frame) */}
         {panelOpen && (
-          <aside className="mini-panel mini-no-drag" aria-label="Mini settings">
+          <aside className="mini-panel mini-no-drag" aria-label={t('miniShell.a11y.settingsPanel')}>
             <div className="mini-panel-head">
-              <span>Settings</span>
+              <span>{t('miniShell.settings')}</span>
               <button
                 type="button"
                 className="mini-ico-btn"
@@ -829,12 +830,12 @@ export default function MiniShell({
 
             <section className="mini-panel-block">
               <button type="button" className="btn small primary mini-panel-full" onClick={exitToFull}>
-                Full desktop
+                {t('miniShell.fullDesktop')}
               </button>
             </section>
 
             <section className="mini-panel-block">
-              <h3 className="mini-panel-title">Size</h3>
+              <h3 className="mini-panel-title">{t('miniShell.size')}</h3>
               <input
                 type="range"
                 min={SCALE_MIN}
@@ -849,7 +850,7 @@ export default function MiniShell({
                 }}
                 aria-label={t('a11y.slider.miniWindowSize')}
               />
-              <p className="muted mini-panel-note">Scale only — width and height stay locked together.</p>
+              <p className="muted mini-panel-note">{t('miniShell.scaleNote')}</p>
             </section>
 
             {/* v1.0 audit 3.5 — pinned here as well as in Settings › Mini View, so a
@@ -933,7 +934,7 @@ export default function MiniShell({
             </section>
 
             <section className="mini-panel-block">
-              <h3 className="mini-panel-title">Look</h3>
+              <h3 className="mini-panel-title">{t('miniShell.look')}</h3>
               <div className="mini-seg">
                 {(
                   [
@@ -971,7 +972,7 @@ export default function MiniShell({
                   checked={cfg.showClock}
                   onChange={(e) => setCfg(saveMiniMode({ showClock: e.target.checked }))}
                 />
-                <span>Clock</span>
+                <span>{t('miniShell.clock')}</span>
               </label>
               <label className="mini-check">
                 <input
@@ -979,7 +980,7 @@ export default function MiniShell({
                   checked={cfg.autoOpenFirst}
                   onChange={(e) => setCfg(saveMiniMode({ autoOpenFirst: e.target.checked }))}
                 />
-                <span>Auto-open first</span>
+                <span>{t('miniShell.autoOpenFirst')}</span>
               </label>
               {!aeroMini && !wiredMini && (
                 <label className="mini-check">
@@ -988,20 +989,20 @@ export default function MiniShell({
                     checked={cfg.monoMode}
                     onChange={(e) => setCfg(saveMiniMode({ monoMode: e.target.checked }))}
                   />
-                  <span>Dark mono (B&amp;W)</span>
+                  <span>{t('miniShell.darkMono')}</span>
                 </label>
               )}
             </section>
 
             <section className="mini-panel-block">
-              <h3 className="mini-panel-title">Wallpaper</h3>
+              <h3 className="mini-panel-title">{t('miniShell.wallpaper')}</h3>
               <div className="mini-seg">
                 {(
                   [
-                    ['none', 'Off'],
-                    ['icons', 'Icons'],
-                    ['image', 'Image'],
-                    ['desktop', 'Desktop'],
+                    ['none', 'settings.mini.wall.off'],
+                    ['icons', 'settings.mini.wall.icons'],
+                    ['image', 'settings.mini.wall.image'],
+                    ['desktop', 'settings.mini.wall.desktop'],
                   ] as [MiniWallpaperMode, string][]
                 ).map(([id, label]) => (
                   <button
@@ -1010,25 +1011,23 @@ export default function MiniShell({
                     className={`mini-chip${cfg.wallpaperMode === id ? ' is-on' : ''}`}
                     onClick={() => setCfg(saveMiniMode({ wallpaperMode: id }))}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
-              <p className="muted mini-panel-note">
-                Icons = mosaic of pinned apps. Image = custom photo. Desktop = match Study wallpaper.
-              </p>
+              <p className="muted mini-panel-note">{t('miniShell.wall.note')}</p>
               <div className="mini-seg" style={{ marginTop: 6 }}>
                 <button type="button" className="mini-chip" onClick={() => void pickWallpaper()}>
-                  Pick image
+                  {t('settings.mini.wall.pick')}
                 </button>
                 {(cfg.wallpaperUrl || cfg.wallpaperMode === 'image') && (
                   <button type="button" className="mini-chip" onClick={clearWallpaper}>
-                    Clear
+                    {t('settings.mini.wall.clear')}
                   </button>
                 )}
               </div>
               <label className="mini-panel-title" style={{ display: 'block', marginTop: 8 }}>
-                Blur {wallBlur}px
+                {t('settings.mini.wall.blur', { px: wallBlur })}
               </label>
               <input
                 type="range"
@@ -1045,7 +1044,7 @@ export default function MiniShell({
             <section className="mini-panel-block">
               <div className="mini-panel-row">
                 <h3 className="mini-panel-title">
-                  Apps {cfg.apps.length}/{MINI_MAX_APPS}
+                  {t('settings.mini.pinnedTitle', { count: cfg.apps.length, max: MINI_MAX_APPS })}
                 </h3>
                 <button
                   type="button"
@@ -1053,7 +1052,7 @@ export default function MiniShell({
                   disabled={!canAdd}
                   onClick={() => setAddOpen((o) => !o)}
                 >
-                  Add
+                  {t('common.add')}
                 </button>
               </div>
 
