@@ -4,6 +4,7 @@ import {
   capturesForVisualNovel,
   createEmptyVisualNovelDatabase,
   type VisualNovelDatabase,
+  type VisualNovelEntry,
   type VisualNovelRoute,
   type VisualNovelRouteStatus,
   type VisualNovelStatus,
@@ -15,7 +16,10 @@ import {
   buildVisualNovelCaptureTarget,
   LENS_CAPTURE_TARGET_KEY,
 } from '../../../shared/lensCaptureTarget';
-import { analyzeVisualNovelCharacterSpeech } from '../../../shared/visualNovelLanguage';
+import {
+  analyzeVisualNovelCharacterSpeech,
+  type VisualNovelCharacterSpeechProfile,
+} from '../../../shared/visualNovelLanguage';
 import { rankVisualNovelEntries } from '../../../shared/visualNovelRecommendations';
 import {
   vnAddCapturedLineReason,
@@ -61,6 +65,82 @@ interface ProgressDraft {
 }
 
 type MiningScope = 'all' | 'route' | 'chapter' | 'scenes';
+
+/**
+ * Wire-value -> catalog-key maps.
+ *
+ * Every one of these is a union whose members are kebab-case or otherwise not a
+ * legal key suffix (`not-started`, `feminine-coded endings`), so a template key
+ * cannot resolve them — the same reason `captureKindKeys.ts` exists next door.
+ * They hold KEYS rather than labels because module-level data cannot call
+ * `useT()` at declaration time (CLAUDE.md i18n rule 7); consumers resolve with
+ * `t()` at render time.
+ */
+export const SCOPE_KEYS: Record<MiningScope, string> = {
+  all: 'vnPanel.scope.all',
+  route: 'vnPanel.scope.route',
+  chapter: 'vnPanel.scope.chapter',
+  scenes: 'vnPanel.scope.scenes',
+};
+
+export const STATUS_KEYS: Record<VisualNovelStatus, string> = {
+  planned: 'vnPanel.status.planned',
+  reading: 'vnPanel.status.reading',
+  completed: 'vnPanel.status.completed',
+  dropped: 'vnPanel.status.dropped',
+  replaying: 'vnPanel.status.replaying',
+};
+
+export const ROUTE_STATUS_KEYS: Record<VisualNovelRouteStatus, string> = {
+  'not-started': 'vnPanel.routeStatus.notStarted',
+  reading: 'vnPanel.routeStatus.reading',
+  completed: 'vnPanel.routeStatus.completed',
+};
+
+export const COMPAT_KEYS: Record<VisualNovelEntry['engineCompatibility'], string> = {
+  supported: 'vnPanel.compat.supported',
+  partial: 'vnPanel.compat.partial',
+  manual: 'vnPanel.compat.manual',
+  unknown: 'vnPanel.compat.unknown',
+};
+
+export const POLITENESS_KEYS: Record<VisualNovelCharacterSpeechProfile['politeness'], string> = {
+  formal: 'vnPanel.politeness.formal',
+  mixed: 'vnPanel.politeness.mixed',
+  casual: 'vnPanel.politeness.casual',
+};
+
+export const REGISTER_KEYS: Record<VisualNovelCharacterSpeechProfile['politeness'], string> = {
+  formal: 'vnPanel.speech.register.formal',
+  mixed: 'vnPanel.speech.register.mixed',
+  casual: 'vnPanel.speech.register.casual',
+};
+
+/**
+ * `analyzeVisualNovelCharacterSpeech` is a SHARED module — it cannot call `t()`,
+ * so it emits English marker tokens and an English `summary` for its non-UI
+ * callers. The panel therefore recomposes the summary from the structured
+ * fields beside it rather than rendering `profile.summary`, which is the shape
+ * `vnPanel.speech.*` was written for. An unrecognised marker falls back to its
+ * own token, so a marker added to the analyzer shows its name instead of a key.
+ */
+export const MARKER_KEYS: Record<string, string> = {
+  assertive: 'vnPanel.marker.assertive',
+  'feminine-coded endings': 'vnPanel.marker.feminineEndings',
+  'informal polite speech': 'vnPanel.marker.informalPolite',
+  'expressive elongation': 'vnPanel.marker.expressiveElongation',
+};
+
+export function speechSummary(
+  profile: VisualNovelCharacterSpeechProfile,
+  t: (key: string, vars?: TVars) => string,
+): string {
+  return [
+    t(REGISTER_KEYS[profile.politeness]),
+    profile.pronouns.length ? t('vnPanel.speech.uses', { pronouns: profile.pronouns.join('・') }) : '',
+    profile.markers.map((marker) => MARKER_KEYS[marker] ? t(MARKER_KEYS[marker]) : marker).join(', '),
+  ].filter(Boolean).join('; ');
+}
 
 const emptyProgress = (): ProgressDraft => ({
   status: 'planned',
@@ -341,7 +421,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           });
           if (active && response.ok && response.database) {
             setDatabase(response.database);
-            setStatus('Captured new Japanese text from the clipboard.');
+            setStatus(t('vnPanel.msg.clipboardCaptured'));
           }
         }
       } finally {
@@ -383,7 +463,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       language: 'ja',
     });
     if (!response.ok || !response.database) {
-      setError(response.error ?? 'The visual novel could not be added.');
+      setError(response.error ?? t('vnPanel.msg.addFailed'));
       return;
     }
     setDatabase(response.database);
@@ -391,7 +471,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     setTitle('');
     setJapaneseTitle('');
     setExecutablePath('');
-    setStatus('Visual novel added to the local library.');
+    setStatus(t('vnPanel.msg.added'));
   };
 
   /**
@@ -440,18 +520,18 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       completionPct: Number(progress.completion),
     });
     setDatabase(next);
-    setStatus('Reading progress saved.');
+    setStatus(t('vnPanel.msg.progressSaved'));
   };
 
   const launchVisualNovel = async (): Promise<void> => {
     if (!selected) return;
     const result = await window.api.visualNovelLaunch(selected.id);
     if (!result.ok) {
-      reportStatus(result.error ?? 'Launch failed.', true);
+      reportStatus(result.error ?? t('vnPanel.msg.launchFailed'), true);
       return;
     }
     setSessionStartedAt(result.startedAt ?? Date.now());
-    reportStatus('Visual novel launched and reading time started.');
+    reportStatus(t('vnPanel.msg.launched'));
   };
 
   const stopReadingTimer = async (): Promise<void> => {
@@ -459,7 +539,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     const result = await window.api.visualNovelStopSession(selected.id);
     setDatabase(result.database);
     setSessionStartedAt(null);
-    reportStatus(result.stopped ? 'Reading time saved.' : 'No active reading timer was found.');
+    reportStatus(result.stopped ? t('vnPanel.msg.timeSaved') : t('vnPanel.msg.noTimer'));
   };
 
   const captureLine = async (): Promise<void> => {
@@ -476,13 +556,13 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       source: 'manual',
     });
     if (!response.ok || !response.database) {
-      setError(response.error ?? 'The line could not be captured.');
+      setError(response.error ?? t('vnPanel.msg.captureFailed'));
       return;
     }
     setDatabase(response.database);
     setCaptureText('');
     setCaptureTranslation('');
-    setStatus('Japanese text added to the reading overlay.');
+    setStatus(t('vnPanel.msg.textAdded'));
   };
 
   const captureScreenText = async (): Promise<void> => {
@@ -495,35 +575,35 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       scene: progress.scene,
     })));
     await window.api.lensOpen('select');
-    reportStatus(`Select Japanese text for ${selected.title} in Reading Lens.`);
+    reportStatus(t('vnPanel.msg.ocrPrompt', { title: selected.title }));
   };
 
   const toggleHookRelay = async (): Promise<void> => {
     if (!selected) return;
     if (hookState?.active) {
       setHookState(await window.api.visualNovelStopHook(selected.id));
-      reportStatus('Text hook relay stopped.');
+      reportStatus(t('vnPanel.msg.hookStopped'));
       return;
     }
     const response = await window.api.visualNovelStartHook(selected.id);
     if (response.canceled) return;
     if (!response.ok || !response.state) {
-      reportStatus(response.error ?? 'The text hook relay could not be started.', true);
+      reportStatus(response.error ?? t('vnPanel.msg.hookStartFailed'), true);
       return;
     }
     setHookState(response.state);
-    reportStatus('Text hook relay is listening for new Japanese lines.');
+    reportStatus(t('vnPanel.msg.hookStarted'));
   };
 
   const saveRoutes = async (routes: VisualNovelRoute[]): Promise<void> => {
     if (!selected) return;
     const response = await window.api.visualNovelUpdateRoutes(selected.id, routes);
     if (!response.ok || !response.database) {
-      setError(response.error ?? 'Routes could not be saved.');
+      setError(response.error ?? t('vnPanel.msg.routesSaveFailed'));
       return;
     }
     setDatabase(response.database);
-    setStatus('Route and ending progress saved.');
+    setStatus(t('vnPanel.msg.routesSaved'));
   };
 
   const addRoute = async (): Promise<void> => {
@@ -591,7 +671,10 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       });
       addMediaStudySessionProgress(sessionId, { vocabularyMined: value.vocabulary.length });
       setAnalysis(value);
-      setStatus(`Analyzed ${value.sentences.length} ${miningScope === 'all' ? 'captured' : miningScope} lines.`);
+      setStatus(t('vnPanel.msg.analyzed', {
+        count: value.sentences.length,
+        scope: t(SCOPE_KEYS[miningScope]),
+      }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -627,8 +710,14 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       sceneReferences,
     );
     setStatus(added.total
-      ? `Added ${added.total} cards: ${added.counts.vocabulary} vocabulary, ${added.counts.sentence} sentences, ${added.counts.kanji} kanji, ${added.counts.grammar} grammar.`
-      : 'No new cards were needed.');
+      ? t('vnPanel.msg.cardsAdded', {
+        total: added.total,
+        vocab: added.counts.vocabulary,
+        sentences: added.counts.sentence,
+        kanji: added.counts.kanji,
+        grammar: added.counts.grammar,
+      })
+      : t('vnPanel.msg.noNewCards'));
   };
 
   const saveSelectedSentence = (): void => {
@@ -644,7 +733,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       selectedCapture.screenshotPath,
       selectedCapture.audioPath,
     );
-    setStatus(added ? 'Saved the selected sentence to the Media folder.' : 'That sentence is already saved.');
+    setStatus(added ? t('vnPanel.msg.sentenceSaved') : t('vnPanel.msg.sentenceExists'));
   };
 
   const onTextMouseUp = (event: React.MouseEvent): void => {
@@ -689,11 +778,11 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
         <details className="visual-novel-add-disclosure">
           <summary>{t('vnPanel.addToLibrary')}</summary>
           <div className="visual-novel-add">
-            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="English or display title" aria-label="Visual novel title" />
-            <input value={japaneseTitle} onChange={(event) => setJapaneseTitle(event.target.value)} placeholder="Japanese title" aria-label="Japanese title" />
+            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('vnPanel.titlePlaceholder')} aria-label={t('vnPanel.aria.title')} />
+            <input value={japaneseTitle} onChange={(event) => setJapaneseTitle(event.target.value)} placeholder={t('vnPanel.japaneseTitlePlaceholder')} aria-label={t('vnPanel.aria.japaneseTitle')} />
             <div>
-              <input value={executablePath} onChange={(event) => setExecutablePath(event.target.value)} placeholder="Executable path" aria-label="Executable path" />
-              <button type="button" onClick={() => void chooseExecutable()}>Browse</button>
+              <input value={executablePath} onChange={(event) => setExecutablePath(event.target.value)} placeholder={t('vnPanel.executablePlaceholder')} aria-label={t('vnPanel.aria.executable')} />
+              <button type="button" onClick={() => void chooseExecutable()}>{t('vnPanel.browse')}</button>
             </div>
             <button
               type="button"
@@ -701,7 +790,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
               title={!title.trim() ? t('vnPanel.reason.needTitle') : undefined}
               onClick={() => void addEntry()}
             >
-              Add to library
+              {t('vnPanel.addToLibrary')}
             </button>
           </div>
           <VisualNovelImportPanel
@@ -731,7 +820,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 onClick={() => setSelectedId(entry.id)}
               >
                 <strong>{entry.title}</strong>
-                <span>{entry.engine} · {entry.status} · {Math.round(entry.completionPct)}%</span>
+                <span>{entry.engine} · {t(STATUS_KEYS[entry.status])} · {Math.round(entry.completionPct)}%</span>
               </button>
             </li>
           ))}
@@ -749,8 +838,8 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           existing class keeps the conventional pixels; `.fwin-liquid` supplies the material. */}
       <ContextualSurface as="header" className="visual-novel-panel-head">
         <div>
-          <span className="media-study-mode-kicker">Immersion library</span>
-          <strong>Visual Novels</strong>
+          <span className="media-study-mode-kicker">{t('vnPanel.kicker')}</span>
+          <strong>{t('vnPanel.title')}</strong>
         </div>
         {/* §10.4 Q1 and Q3 both measured ZERO on this surface: no entry point and no declared
             primary action anywhere in the panel's top third, which on the shipped 820x580
@@ -781,7 +870,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           >
             {libraryOpen ? t('immersion.hideLibrary') : t('immersion.showLibrary')}
           </button>
-          <button type="button" onClick={onClose}>Back to browser</button>
+          <button type="button" onClick={onClose}>{t('vnPanel.backToBrowser')}</button>
         </div>
       </ContextualSurface>
       {(status || error) && <p className={error ? 'media-error' : 'muted'} role="status">{error || status}</p>}
@@ -796,7 +885,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
               Without it the surface's one honest empty message is invisible to every consumer
               that looks for one - a test, a theme, the category-8 state sweep - and the panel
               reads as a surface with no empty state at all rather than one that names it. */}
-          {!selected && <p className="muted visual-novel-empty">Add a local visual novel to begin capturing Japanese dialogue.</p>}
+          {!selected && <p className="muted visual-novel-empty">{t('vnPanel.emptyPrompt')}</p>}
           {selected && (
             <>
               <div className="visual-novel-column visual-novel-column--primary">
@@ -806,21 +895,24 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   <strong>{selected.title}</strong>
                   <span>{selected.japaneseTitle}</span>
                   {selected.communityRating != null && (
-                    <small>{selected.communityRating}/10 · {selected.communityVoteCount} votes</small>
+                    <small>{t('vnPanel.votes', {
+                      rating: selected.communityRating,
+                      votes: selected.communityVoteCount,
+                    })}</small>
                   )}
                 </div>
                 <span>
-                  {selected.engine} · {selected.engineCompatibility} · {formatDuration(
+                  {selected.engine} · {t(COMPAT_KEYS[selected.engineCompatibility])} · {formatDuration(
                     selected.totalPlaytimeSec
                     + (sessionStartedAt ? Math.max(0, (clockNow - sessionStartedAt) / 1000) : 0),
                     t,
                   )}
-                  {sessionStartedAt ? ' · timing' : ''}
+                  {sessionStartedAt ? ` · ${t('vnPanel.timing')}` : ''}
                 </span>
                 <div className="visual-novel-summary-actions">
-                  <button type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>Launch</button>
-                  {sessionStartedAt && <button type="button" onClick={() => void stopReadingTimer()}>Stop timer</button>}
-                  <button type="button" onClick={() => void removeEntry(selected.id, selected.title)}>Remove</button>
+                  <button type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>{t('vnPanel.launch')}</button>
+                  {sessionStartedAt && <button type="button" onClick={() => void stopReadingTimer()}>{t('vnPanel.stopTimer')}</button>}
+                  <button type="button" onClick={() => void removeEntry(selected.id, selected.title)}>{t('vnPanel.remove')}</button>
                 </div>
               </div>
               {/* Screen capture is the path a reader actually uses while a novel is running;
@@ -834,7 +926,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   descendant of the element that row reads. */}
               <div className="visual-novel-capture">
                 <div className="visual-novel-capture-actions">
-                  <button type="button" onClick={() => void captureScreenText()}>Capture screen text</button>
+                  <button type="button" onClick={() => void captureScreenText()}>{t('vnPanel.captureScreenText')}</button>
                   <details className="visual-novel-capture-manual">
                     {/* The text hook and the clipboard watcher keep running while this is shut,
                         and a running relay the user cannot see is exactly the dishonest state
@@ -845,28 +937,30 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                     </summary>
                     <div className="visual-novel-capture-manual-fields">
                       <div className="visual-novel-capture-manual-head">
-                        <select value={captureKind} onChange={(event) => setCaptureKind(event.target.value as VisualNovelTextKind)} aria-label="Captured text kind">
-                          <option value="dialogue">Dialogue</option><option value="narration">Narration</option><option value="choice">Choice</option><option value="character-name">Character name</option><option value="system">System text</option>
+                        <select value={captureKind} onChange={(event) => setCaptureKind(event.target.value as VisualNovelTextKind)} aria-label={t('vnPanel.aria.captureKind')}>
+                          {(Object.keys(CAPTURE_KIND_KEYS) as VisualNovelTextKind[]).map((kind) => (
+                            <option key={kind} value={kind}>{t(CAPTURE_KIND_KEYS[kind])}</option>
+                          ))}
                         </select>
-                        <input value={speaker} onChange={(event) => setSpeaker(event.target.value)} placeholder="Speaker" aria-label="Speaker" />
+                        <input value={speaker} onChange={(event) => setSpeaker(event.target.value)} placeholder={t('vnPanel.speakerPlaceholder')} aria-label={t('vnPanel.aria.speaker')} />
                       </div>
-                      <textarea value={captureText} onChange={(event) => setCaptureText(event.target.value)} placeholder="Paste captured Japanese dialogue or narration" />
-                      <textarea value={captureTranslation} onChange={(event) => setCaptureTranslation(event.target.value)} placeholder="Translation (optional)" />
+                      <textarea value={captureText} onChange={(event) => setCaptureText(event.target.value)} placeholder={t('vnPanel.capturePlaceholder')} />
+                      <textarea value={captureTranslation} onChange={(event) => setCaptureTranslation(event.target.value)} placeholder={t('vnPanel.captureTranslationPlaceholder')} />
                       <div className="visual-novel-capture-manual-actions">
-                        <button type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>Add captured line</button>
+                        <button type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>{t('vnPanel.addCapturedLine')}</button>
                         <button type="button" className={hookState?.active ? 'is-active' : ''} onClick={() => void toggleHookRelay()}>
-                          {hookState?.active ? 'Stop text hook' : 'Start text hook'}
+                          {hookState?.active ? t('vnPanel.stopHook') : t('vnPanel.startHook')}
                         </button>
                         <label>
                           <input type="checkbox" checked={clipboardCapture} onChange={(event) => {
                             lastClipboardText.current = '';
                             setClipboardCapture(event.target.checked);
                           }} />
-                          Live clipboard capture
+                          {t('vnPanel.clipboardCapture')}
                         </label>
                         {hookState?.active && (
                           <small title={hookState.filePath}>
-                            Hook listening · {hookState.capturedLines} new lines
+                            {t('vnPanel.hookListening', { count: hookState.capturedLines })}
                             {hookState.lastError ? ` · ${hookState.lastError}` : ''}
                           </small>
                         )}
@@ -876,25 +970,28 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
               <div className="visual-novel-analysis-actions">
-                <select value={miningScope} onChange={(event) => setMiningScope(event.target.value as MiningScope)} aria-label="Mining scope">
-                  <option value="all">Entire visual novel</option>
-                  <option value="route" disabled={!progress.route}>Current route</option>
-                  <option value="chapter" disabled={!progress.chapter.trim()}>Current chapter</option>
-                  <option value="scenes" disabled={!sceneOptions.length}>Selected scenes</option>
+                <select value={miningScope} onChange={(event) => setMiningScope(event.target.value as MiningScope)} aria-label={t('vnPanel.aria.miningScope')}>
+                  <option value="all">{t('vnPanel.scope.all')}</option>
+                  <option value="route" disabled={!progress.route}>{t('vnPanel.scope.route')}</option>
+                  <option value="chapter" disabled={!progress.chapter.trim()}>{t('vnPanel.scope.chapter')}</option>
+                  <option value="scenes" disabled={!sceneOptions.length}>{t('vnPanel.scope.scenes')}</option>
                 </select>
-                <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? 'Analyzing…' : `Analyze ${miningScope}`}</button>
-                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={createCards}>Create study deck cards</button>
-                <button type="button" onClick={() => setCollectionOpen(true)}>Open VN study deck</button>
+                <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? t('vnPanel.analyzing') : t('vnPanel.analyzeScope', { scope: t(SCOPE_KEYS[miningScope]) })}</button>
+                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={createCards}>{t('vnPanel.createCards')}</button>
+                <button type="button" onClick={() => setCollectionOpen(true)}>{t('vnPanel.openDeck')}</button>
               </div>
               {miningScope === 'scenes' && (
                 <details className="visual-novel-scene-picker" open>
                   <summary>
-                    Selected scenes · {selectedSceneKeys.size} · {scopedCaptures.length} lines
+                    {t('vnPanel.scenePickerSummary', {
+                      selected: selectedSceneKeys.size,
+                      lines: scopedCaptures.length,
+                    })}
                   </summary>
                   <div className="visual-novel-scene-picker-actions">
-                    <button type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>Current scene</button>
-                    <button type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>All scenes</button>
-                    <button type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>Clear</button>
+                    <button type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>{t('vnPanel.currentScene')}</button>
+                    <button type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>{t('vnPanel.allScenes')}</button>
+                    <button type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>{t('vnPanel.clear')}</button>
                   </div>
                   <div className="visual-novel-scene-options">
                     {sceneOptions.map((option) => (
@@ -905,14 +1002,14 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                           onChange={() => toggleScene(option.key)}
                         />
                         <span>{[option.chapter, option.scene].filter(Boolean).join(' · ')}</span>
-                        <small>{option.count} lines</small>
+                        <small>{t('vnPanel.lines', { count: option.count })}</small>
                       </label>
                     ))}
                   </div>
                 </details>
               )}
-              <section className="visual-novel-reading-overlay" aria-label="Visual novel reading overlay">
-                <div className="visual-novel-reading-head"><strong>Reading overlay</strong><span>{captures.length} lines</span></div>
+              <section className="visual-novel-reading-overlay" aria-label={t('vnPanel.aria.overlay')}>
+                <div className="visual-novel-reading-head"><strong>{t('vnPanel.overlayHead')}</strong><span>{t('vnPanel.lines', { count: captures.length })}</span></div>
                 <div className="visual-novel-capture-list wk-on" data-dict-owner="" onPointerDown={noteLookupPointerDown} onMouseUp={onTextMouseUp}>
                   {captures.map((capture) => (
                     <button
@@ -940,21 +1037,21 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
               )}
               {analysis && (
                 <div className="visual-novel-analysis-summary">
-                  <span>{analysis.level?.label ?? 'Unrated'} difficulty</span>
-                  <span>{analysis.vocabulary.length} words</span>
-                  <span>{analysis.kanji.length} kanji</span>
-                  <span>{Math.round(analysis.comprehensibility.knownRatio * 100)}% known coverage</span>
+                  <span>{t('vnPanel.difficulty', { level: analysis.level?.label ?? t('vnPanel.unrated') })}</span>
+                  <span>{t('vnPanel.words', { count: analysis.vocabulary.length })}</span>
+                  <span>{t('vnPanel.kanji', { count: analysis.kanji.length })}</span>
+                  <span>{t('vnPanel.knownCoverage', { percent: Math.round(analysis.comprehensibility.knownRatio * 100) })}</span>
                 </div>
               )}
               {characterProfiles.length > 0 && (
-                <section className="visual-novel-character-profiles" aria-label="Character speech profiles">
-                  <div className="visual-novel-reading-head"><strong>Character speech</strong><span>{characterProfiles.length} speakers</span></div>
+                <section className="visual-novel-character-profiles" aria-label={t('vnPanel.aria.characters')}>
+                  <div className="visual-novel-reading-head"><strong>{t('vnPanel.charactersHead')}</strong><span>{t('vnPanel.speakers', { count: characterProfiles.length })}</span></div>
                   <div>
                     {characterProfiles.map((profile) => (
                       <article key={profile.speaker}>
-                        <div><strong>{profile.speaker}</strong><span>{profile.lineCount} lines · {profile.politeness}</span></div>
-                        <p>{profile.summary}</p>
-                        {profile.sentenceEndings.length > 0 && <small>Common signals: {profile.sentenceEndings.join(' · ')}</small>}
+                        <div><strong>{profile.speaker}</strong><span>{t('vnPanel.lines', { count: profile.lineCount })} · {t(POLITENESS_KEYS[profile.politeness])}</span></div>
+                        <p>{speechSummary(profile, t)}</p>
+                        {profile.sentenceEndings.length > 0 && <small>{t('vnPanel.commonSignals', { signals: profile.sentenceEndings.join(' · ') })}</small>}
                       </article>
                     ))}
                   </div>
@@ -996,26 +1093,29 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
               <details className="visual-novel-progress-disclosure">
                 <summary>{t('vnPanel.progressHead')}</summary>
               <div className="visual-novel-progress">
-                <label>Status<select value={progress.status} onChange={(event) => setProgress((current) => ({ ...current, status: event.target.value as VisualNovelStatus }))}><option value="planned">Planned</option><option value="reading">Reading</option><option value="completed">Completed</option><option value="dropped">Dropped</option><option value="replaying">Replaying</option></select></label>
-                <label>Route<select value={progress.route} onChange={(event) => setProgress((current) => ({ ...current, route: event.target.value }))}><option value="">No route selected</option>{selected.routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}</select></label>
-                <label>Chapter<input value={progress.chapter} onChange={(event) => setProgress((current) => ({ ...current, chapter: event.target.value }))} /></label>
-                <label>Scene<input value={progress.scene} onChange={(event) => setProgress((current) => ({ ...current, scene: event.target.value }))} /></label>
-                <label>Completion<input type="number" min="0" max="100" value={progress.completion} onChange={(event) => setProgress((current) => ({ ...current, completion: event.target.value }))} /></label>
-                <button type="button" onClick={() => void saveProgress()}>Save progress</button>
+                <label>{t('vnPanel.statusLabel')}<select value={progress.status} onChange={(event) => setProgress((current) => ({ ...current, status: event.target.value as VisualNovelStatus }))}>{(Object.keys(STATUS_KEYS) as VisualNovelStatus[]).map((value) => <option key={value} value={value}>{t(STATUS_KEYS[value])}</option>)}</select></label>
+                <label>{t('vnPanel.route')}<select value={progress.route} onChange={(event) => setProgress((current) => ({ ...current, route: event.target.value }))}><option value="">{t('vnPanel.noRoute')}</option>{selected.routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}</select></label>
+                <label>{t('vnPanel.chapter')}<input value={progress.chapter} onChange={(event) => setProgress((current) => ({ ...current, chapter: event.target.value }))} /></label>
+                <label>{t('vnPanel.scene')}<input value={progress.scene} onChange={(event) => setProgress((current) => ({ ...current, scene: event.target.value }))} /></label>
+                <label>{t('vnPanel.completion')}<input type="number" min="0" max="100" value={progress.completion} onChange={(event) => setProgress((current) => ({ ...current, completion: event.target.value }))} /></label>
+                <button type="button" onClick={() => void saveProgress()}>{t('vnPanel.saveProgress')}</button>
               </div>
               </details>
-              <section className="visual-novel-routes" aria-label="Route and ending tracker">
-                <div className="visual-novel-reading-head"><strong>Routes and endings</strong><span>{selected.routes.filter((route) => route.status === 'completed').length}/{selected.routes.length} routes</span></div>
+              <section className="visual-novel-routes" aria-label={t('vnPanel.aria.routes')}>
+                <div className="visual-novel-reading-head"><strong>{t('vnPanel.routesHead')}</strong><span>{t('vnPanel.routesCount', {
+                  done: selected.routes.filter((route) => route.status === 'completed').length,
+                  total: selected.routes.length,
+                })}</span></div>
                 {/* Same reasoning as the progress editor: routes are declared once and read
                     many times, so the three-field add form goes behind a disclosure and the
                     route LIST below stays open. */}
                 <details className="visual-novel-route-disclosure">
                   <summary>{t('vnPanel.addRoute')}</summary>
                   <div className="visual-novel-route-add">
-                    <input value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder="Route name" aria-label="Route name" />
-                    <input value={routeCharacter} onChange={(event) => setRouteCharacter(event.target.value)} placeholder="Character" aria-label="Route character" />
-                    <input value={endingName} onChange={(event) => setEndingName(event.target.value)} placeholder="First ending (optional)" aria-label="Ending name" />
-                    <button type="button" disabled={!!addRouteWhy} title={addRouteWhy ? t(addRouteWhy) : undefined} onClick={() => void addRoute()}>Add route</button>
+                    <input value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder={t('vnPanel.routeNamePlaceholder')} aria-label={t('vnPanel.aria.routeName')} />
+                    <input value={routeCharacter} onChange={(event) => setRouteCharacter(event.target.value)} placeholder={t('vnPanel.characterPlaceholder')} aria-label={t('vnPanel.aria.routeCharacter')} />
+                    <input value={endingName} onChange={(event) => setEndingName(event.target.value)} placeholder={t('vnPanel.firstEndingPlaceholder')} aria-label={t('vnPanel.aria.endingName')} />
+                    <button type="button" disabled={!!addRouteWhy} title={addRouteWhy ? t(addRouteWhy) : undefined} onClick={() => void addRoute()}>{t('vnPanel.addRoute')}</button>
                   </div>
                 </details>
                 <div className="visual-novel-route-list">
@@ -1023,18 +1123,18 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                     <article key={route.id}>
                       <div>
                         <strong>{route.name}</strong>
-                        <span>{route.character || 'General route'}</span>
+                        <span>{route.character || t('vnPanel.generalRoute')}</span>
                         <select
                           value={route.status}
-                          aria-label={`${route.name} status`}
+                          aria-label={t('vnPanel.aria.routeStatus', { name: route.name })}
                           onChange={(event) => void updateRoute(route.id, (current) => ({
                             ...current,
                             status: event.target.value as VisualNovelRouteStatus,
                           }))}
                         >
-                          <option value="not-started">Not started</option>
-                          <option value="reading">Reading</option>
-                          <option value="completed">Completed</option>
+                          {(Object.keys(ROUTE_STATUS_KEYS) as VisualNovelRouteStatus[]).map((value) => (
+                            <option key={value} value={value}>{t(ROUTE_STATUS_KEYS[value])}</option>
+                          ))}
                         </select>
                         <button type="button" onClick={() => {
                           if (routePendingRemoveId !== route.id) {
@@ -1044,15 +1144,15 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                           setRoutePendingRemoveId('');
                           void saveRoutes(selected.routes.filter((candidate) => candidate.id !== route.id));
                         }}>
-                          {routePendingRemoveId === route.id ? 'Confirm remove' : 'Remove route'}
+                          {routePendingRemoveId === route.id ? t('vnPanel.confirmRemoveRoute') : t('vnPanel.removeRoute')}
                         </button>
                       </div>
                       <label className="visual-novel-route-guide">
-                        Route guide notes
+                        {t('vnPanel.routeGuideNotes')}
                         <textarea
                           key={`${route.id}:${route.guideNotes}`}
                           defaultValue={route.guideNotes}
-                          placeholder="Choice order, prerequisites, spoiler-safe reminders"
+                          placeholder={t('vnPanel.routeGuidePlaceholder')}
                           onBlur={(event) => {
                             if (event.target.value !== route.guideNotes) {
                               void updateRoute(route.id, (current) => ({
@@ -1081,8 +1181,8 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                           <input
                             key={`${ending.id}:${ending.notes}`}
                             defaultValue={ending.notes}
-                            placeholder="Ending notes"
-                            aria-label={`${ending.name} notes`}
+                            placeholder={t('vnPanel.endingNotesPlaceholder')}
+                            aria-label={t('vnPanel.aria.endingNotes', { name: ending.name })}
                             onBlur={(event) => {
                               if (event.target.value !== ending.notes) {
                                 void updateRoute(route.id, (current) => ({
@@ -1097,7 +1197,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                           <button type="button" onClick={() => void updateRoute(route.id, (current) => ({
                             ...current,
                             endings: current.endings.filter((candidate) => candidate.id !== ending.id),
-                          }))}>Remove</button>
+                          }))}>{t('vnPanel.remove')}</button>
                         </div>
                       ))}
                       <div className="visual-novel-ending-add">
@@ -1107,10 +1207,10 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                             ...current,
                             [route.id]: event.target.value,
                           }))}
-                          placeholder="Add ending"
-                          aria-label={`Add ending to ${route.name}`}
+                          placeholder={t('vnPanel.addEndingPlaceholder')}
+                          aria-label={t('vnPanel.aria.addEnding', { name: route.name })}
                         />
-                        <button type="button" {...endingReasonProps(endingDrafts[route.id])} onClick={() => void addEnding(route.id)}>Add ending</button>
+                        <button type="button" {...endingReasonProps(endingDrafts[route.id])} onClick={() => void addEnding(route.id)}>{t('vnPanel.addEnding')}</button>
                       </div>
                     </article>
                   ))}
