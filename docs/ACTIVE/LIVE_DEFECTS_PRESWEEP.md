@@ -756,6 +756,7 @@ other branch's max before minting, every time — that reservation lasted about 
 | D142 | player / video (Media Hub + Media library actions) | **"Remove missing entries" deleted library rows in bulk with no confirm — and an unplugged drive is what makes them look missing.** Notes, watch position, the language profile, cover art and the cached transcode all went, for every entry at once. | `media:pruneMissing` (`main/media.ts:475`) keeps only items whose `path` passes `fs.existsSync`, writes the database back, then `removeCoverFiles` and `pruneOrphanCache` `rmSync` the covers and every cached `.mp4` the surviving paths no longer hash to. Two hosts reached it and neither asked: `MediaContent.tsx:2350` (a bare `onClick`) and `MediaLibraryActions.pruneMissing` — three lines above a `clearAll` that *does* confirm. A disconnected external drive, an unmounted share or a renamed folder turns `existsSync` false for every item on it at once, so the moment a user is most likely to see a large "Missing files" count is exactly the moment the entries are still fine. It does NOT touch `subtitles/` — that is `media:remove` only (D137), checked rather than carried over. | P1 | fixed `3fa7052c` — one guarded helper both hosts import, message names what is destroyed *and* the offline-drive trap. Same block also rendered raw English in all four languages ("Duplicate paths:", "Missing files:", the button); 7 keys × 4 locales. Control: deleting the guard turns 3 of 4 cases red. |
 | D143 | resources + blanc (app drawer) | **The same saved-tool delete asked on one surface and not the other — and the asymmetry was two hours old.** Blanc's app drawer removed a collected tool, with whatever note the user wrote on it, on one click. | `tools:remove` has exactly two call sites. D17 (`cd57a7b3`, 01:51 the same night) put a confirm on `ResourcesContent.removeTool`; `BlancAppDrawerPanel.removeItem` kept calling the channel bare. Same store, same tool, same note, no undo. **The gap was created BY a fix** — D17 guarded the surface it was walking rather than the action. That is the D137 lesson turned on its own author, and the second time in one night this shape produced a P1. | P1 | fixed `606c889b` — the confirm moved to `collectedToolsActions`, both hosts call it, Resources' behaviour unchanged. Reuses `resources.myTools.*`, no new keys. Control: deleting the Blanc guard fails exactly the source-ratchet case. |
 | D144 | novels (Jiten plan) | **Removing a title from the reading plan silently destroyed the note written on it**, plus the chosen source and the acquisition progress. | `removePlan` (`main/jiten.ts`) filters the row out and writes. `JitenPlanEntry` carries `notes` — a real textarea at `NovelsContent.tsx:1097`, saved on blur — plus `selectedSourceId` and `acquisitionStatus`. The book itself survives: `removePlan` does not cascade into the library, checked not assumed. | P2 | fixed `999a0d36` — a **conditional** confirm. A title you merely queued stays one click, because a modal there is friction the user did not ask for; an entry asks only once it carries a note, a library link, or an acquisition past `planned`. `error` counts. Predicate is `planEntryCarriesWork` in `shared/jiten.ts` so the decision is testable in both directions. |
+| D147 | immersion (visual novels — sentence assist) | **"Remove voice clip" detached an attached recording on ONE click, while the button beside it — the bigger destruction of the whole capture — already asked twice.** | `removeAudio` (`VisualNovelSentenceAssist.tsx:157`) called `visual-novel:removeCaptureAudio` bare. The handler (`main/immersion/visualNovels.ts:1079`) sets `audioPath: ''` and saves; it does **not** delete the managed copy, so the loss is the *reference*, not the bytes — checked in the handler, not assumed. That is still unrecoverable from the UI: the orphaned copy sits unnamed under userData and re-attaching means the native picker plus finding the original clip again (`attachCaptureAudio` copies through `saveCaptureAudio`, so the source file does survive at its own path). `remove()` eleven lines above uses a two-step `confirmDelete` arm for a strictly larger destruction. Fifth sighting of the D136 tell: the smaller destruction asks, the larger-effort one does not. | P2 | fixed `4d4251f2` — a two-step arm, matching `remove()` in the same component rather than importing a modal into a dense action row. Reaching for **Replace voice clip** disarms it, and so does selecting a different sentence, so a half-abandoned intent cannot fire on the next click. **Zero new i18n keys** — `vnAssist.confirmRemove` already existed. Ratchet is behavioural (`visualNovelRemoveClipGuard.test.tsx`, 5 cases) because the source ratchet `destructiveGuards.test.ts` asserts a `confirmDialog`/`danger: true` shape this guard deliberately does not have. Control: deleting the arm turns 4 of 5 cases red. |
 
 **D144's fix is not the one I would have preferred, and the better one is recorded rather than
 lost.** The pin is right that a soft delete with undo beats a modal, and `removeFromPlan` already
@@ -806,3 +807,71 @@ filed here only because the turn ended; it is the next slice, and it is real.
 hand every time a lead reads unguarded: one frame up behind a prop (D137), delegated to a shared
 helper (D143), and a two-step arm in local state (here). The scanner's "UNGUARDED" column is a
 list of questions, never a list of defects — 5 of the 8 leads read this turn were false.
+
+### 2026-09-07 05:10 EDT — backup, class 5: D147, and the scanner stops manufacturing false leads
+
+**D147 filed and fixed** — `removeAudio` in `VisualNovelSentenceAssist`, exactly as the previous
+turn predicted. Its row carries the detail; the one correction to that prediction is worth
+keeping: the handler does **not** delete the file, it clears `audioPath`. The clip's managed copy
+is orphaned rather than destroyed. So P2, not P1 — but still one click, still no undo, and still
+recoverable only by hunting the original through a native picker.
+
+**Minted from D147, not D145.** `wt/files-app` had already reached **D146** by 04:20, and its
+D142–D144 are *different defects* from this branch's D142–D144. Whoever merges has to reconcile
+that; nothing new should be minted below D147 on either side.
+
+**The durable half of this turn: three of the four invisible guard shapes are now mechanical.**
+The register has been telling every worker for three turns to check leads by hand because the scan
+"structurally cannot see" certain guards. Two of those were fixable in the instrument, and each
+false lead was costing a worker a read:
+
+  - **comment masking** — cherry-picked from `wt/files-app` `e513d56d` (`e94bf0de` here) rather
+    than reimplemented, so the eventual merge of that file is trivial instead of a conflict. It
+    removed one phantom `pruneMedia` site: a doc comment in `pruneMissingMedia.ts` that *quotes*
+    `window.api.pruneMedia()` while telling hosts how to call it.
+  - **the two-step arm** (new) — `if (!flag) { setFlag(true); return; }`, where `flag` is real
+    `useState` **and** drives a render branch. Condition 3 is what makes it a guard rather than a
+    bug: an arm nothing renders swallows the first click with no visible reason.
+  - **the delegated confirm module** (new) — `if (!await confirmSomething(...)) return;` where the
+    imported module is *resolved and read* and must actually reach `confirmDialog`. The name alone
+    proves nothing. This shape was created by D142 and D143's own fixes: moving a dialog into a
+    shared helper is the correct repair — it is the only thing that stops a guard drifting between
+    two hosts — and it made the scanner report the app's four newest guards as bare calls.
+
+**Still needs a human read: D137's shape** — a guard one frame up, behind a prop — because the
+scanner cannot follow a callback across a component boundary. And note the `confirmDialog` walk is
+**three levels**, so `clearCredential` (`ApiKeysPage.tsx:170`) reads unguarded here while
+`destructiveGuards.test.ts` proves it guarded four levels out. That one is a known false lead; do
+not re-file it.
+
+**Controls, and the first one found a real defect in my own predicate — worth more than the row
+it was checking.** With the arm searched three levels out like the `confirmDialog` walk,
+`removeAudio` still came back GUARDED after its render branch was deleted, because `remove()` —
+a different handler forty lines up — has an arm of its own and the component body is a shared
+enclosing block. **One armed button would have absolved every destructive call in its component.**
+The arm is now asked at the innermost block only. Re-run controls, each restored and re-verified
+byte-identical to HEAD afterwards:
+
+  - delete the arm's render branch → `visualNovelRemoveCaptureAudio` flips back to UNGUARDED;
+  - rename `confirmDialog` in `collectedToolsActions.ts` → both `toolsRemove` sites flip back.
+
+**Numbers, and the delta is accounted for row by row.** Before: `43 sites / 19 guarded / 24
+unguarded`. After: **`42 / 24 / 18`**. −1 site is the masked comment phantom. +5 guarded, all five
+named by `--all` with the mechanism that recognised them: `visualNovelRemoveCaptureAudio`
+(D147's own fix), `visualNovelRemoveCapture` (the false lead the last turn struck by hand),
+`toolsRemove` ×2 (D143), `pruneMedia` (D142). **Nothing else moved**, so the new predicates did
+not quietly absolve anything.
+
+**Class 5 is 24 of 42 guarded.** Of the 18 still reported, **13 are genuinely unrun**:
+`removeMedia` ×3 (`agentToolRegistry.ts:315`, `fileImportExecute.ts:204`,
+`MediaCenterView.tsx:703`), `immersionRemoveSite` ×2, `ankiDeleteNotes` ×2,
+`ytRemoveFromPlanToWatch`, `ankiDraftSessionDelete`, `filesCleanupRun`, `clearMediaWatchFolder`,
+`profileDelete`, `removeItem`.
+
+The other **5 are known false leads the scanner still cannot strike** — do not re-derive any of
+them: `toolsRemoveFolder` (reparents, destroys nothing), `assetsRemove` (a passthrough in a hook's
+return object, not a call site), `dictExplanationClear` ("forget this" IS the user declining it),
+`resetChineseDictCache` (a `useEffect` on install, not a user action) — all four struck in the
+04:20 section — plus `clearCredential`, guarded four levels out and beyond this scan's three-level
+walk, proven by `destructiveGuards.test.ts`. `visualNovelRemoveCapture` was the sixth and is now
+struck mechanically, which is the point of this turn's instrument work.
