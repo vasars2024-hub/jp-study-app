@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useT } from '../../i18n';
 import type { VisualNovelDatabase, VisualNovelEntry } from '../../../shared/visualNovel';
 import type { VisualNovelScriptLine } from '../../../shared/visualNovelScriptExtraction';
 
@@ -11,6 +12,7 @@ export default function VisualNovelScriptImportPanel({
   onImported: (database: VisualNovelDatabase) => void;
   onStatus: (message: string, error?: boolean) => void;
 }) {
+  const { t } = useT();
   const [lines, setLines] = useState<VisualNovelScriptLine[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -25,15 +27,15 @@ export default function VisualNovelScriptImportPanel({
     setBusy(false);
     if (response.canceled) return;
     if (!response.ok) {
-      onStatus(response.error ?? 'Script extraction failed.', true);
+      onStatus(response.error ?? t('vnScript.msg.extractFailed'), true);
       return;
     }
     const next = response.lines ?? [];
     setLines(next);
     setSelected(new Set(next.map((line) => line.id)));
     onStatus(next.length
-      ? `Extracted ${next.length} Japanese lines for review.`
-      : 'No Japanese dialogue was found in the selected scripts.');
+      ? t('vnScript.msg.extracted', { count: next.length })
+      : t('vnScript.msg.noneFound'));
   };
 
   const importLines = async (): Promise<void> => {
@@ -42,31 +44,31 @@ export default function VisualNovelScriptImportPanel({
     const response = await window.api.visualNovelImportScriptLines(entry.id, selectedLines);
     setBusy(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'Script lines could not be imported.', true);
+      onStatus(response.error ?? t('vnScript.msg.importFailed'), true);
       return;
     }
     onImported(response.database);
     setLines([]);
     setSelected(new Set());
-    onStatus(`Imported ${response.imported ?? 0} new script lines into the reading overlay.`);
+    onStatus(t('vnScript.msg.imported', { count: response.imported ?? 0 }));
   };
 
   return (
     <details className="visual-novel-script-import">
-      <summary>Script extraction</summary>
+      <summary>{t('vnScript.head')}</summary>
       <div className="visual-novel-script-actions">
         <button type="button" disabled={busy} onClick={() => void chooseScripts()}>
-          {busy ? 'Working…' : 'Choose scripts'}
+          {busy ? t('vnScript.working') : t('vnScript.chooseScripts')}
         </button>
         {lines.length > 0 && (
           <>
             <button type="button" disabled={busy || !selectedLines.length} onClick={() => void importLines()}>
-              Import selected ({selectedLines.length})
+              {t('vnScript.importSelected', { count: selectedLines.length })}
             </button>
             <button type="button" disabled={busy} onClick={() => {
               setLines([]);
               setSelected(new Set());
-            }}>Clear preview</button>
+            }}>{t('vnScript.clearPreview')}</button>
           </>
         )}
       </div>
@@ -90,7 +92,7 @@ export default function VisualNovelScriptImportPanel({
               </span>
             </label>
           ))}
-          {lines.length > 200 && <p className="muted">Showing the first 200 of {lines.length} extracted lines.</p>}
+          {lines.length > 200 && <p className="muted">{t('vnScript.truncated', { total: lines.length })}</p>}
         </div>
       )}
     </details>

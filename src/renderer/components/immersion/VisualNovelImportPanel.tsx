@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useT } from '../../i18n';
 import type { VisualNovelDatabase, VisualNovelDiscoveryCandidate } from '../../../shared/visualNovel';
 
 export default function VisualNovelImportPanel({
@@ -8,6 +9,7 @@ export default function VisualNovelImportPanel({
   onImported: (database: VisualNovelDatabase) => void;
   onStatus: (message: string, error?: boolean) => void;
 }) {
+  const { t } = useT();
   const [candidates, setCandidates] = useState<VisualNovelDiscoveryCandidate[]>([]);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -18,7 +20,7 @@ export default function VisualNovelImportPanel({
 
   const scan = async (): Promise<void> => {
     setBusy(true);
-    onStatus('Scanning the selected folder…');
+    onStatus(t('vnImport.msg.scanning'));
     try {
       const found = await window.api.visualNovelDiscoverFolder();
       setCandidates(found);
@@ -26,8 +28,8 @@ export default function VisualNovelImportPanel({
         found.filter((candidate) => !candidate.alreadyImported).map((candidate) => candidate.installPath),
       ));
       onStatus(found.length
-        ? `Found ${found.length} possible visual novel installation${found.length === 1 ? '' : 's'}.`
-        : 'No visual novel installations were detected in that folder.');
+        ? t('vnImport.msg.found', { count: found.length })
+        : t('vnImport.msg.noneFound'));
     } catch (reason) {
       onStatus(reason instanceof Error ? reason.message : String(reason), true);
     } finally {
@@ -59,7 +61,7 @@ export default function VisualNovelImportPanel({
     })));
     setBusy(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'The selected installations could not be imported.', true);
+      onStatus(response.error ?? t('vnImport.msg.importFailed'), true);
       return;
     }
     onImported(response.database);
@@ -67,7 +69,7 @@ export default function VisualNovelImportPanel({
       selectedPaths.has(candidate.installPath) ? { ...candidate, alreadyImported: true } : candidate
     )));
     setSelectedPaths(new Set());
-    onStatus(`Imported ${response.imported ?? 0} visual novel${response.imported === 1 ? '' : 's'}.`);
+    onStatus(t('vnImport.msg.imported', { count: response.imported ?? 0 }));
   };
 
   const exportLibrary = async (): Promise<void> => {
@@ -75,8 +77,13 @@ export default function VisualNovelImportPanel({
     const response = await window.api.visualNovelExportLibrary();
     setBusy(false);
     if (response.canceled) return;
+    // `response.path` is absent on some success branches, and the template
+    // literal this replaces printed "exported to undefined." there.
+    const exported = response.path
+      ? t('vnImport.msg.exported', { path: response.path })
+      : t('vnImport.msg.exportedOk');
     onStatus(
-      response.ok ? `Library exported to ${response.path}.` : response.error ?? 'Library export failed.',
+      response.ok ? exported : response.error ?? t('vnImport.msg.exportFailed'),
       !response.ok,
     );
   };
@@ -87,24 +94,25 @@ export default function VisualNovelImportPanel({
     setBusy(false);
     if (response.canceled) return;
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'Library import failed.', true);
+      onStatus(response.error ?? t('vnImport.msg.libraryImportFailed'), true);
       return;
     }
     onImported(response.database);
-    onStatus(
-      `Imported ${response.addedEntries ?? 0} new entries and ${response.addedCaptures ?? 0} captured lines.`,
-    );
+    onStatus(t('vnImport.msg.libraryImported', {
+      entries: response.addedEntries ?? 0,
+      captures: response.addedCaptures ?? 0,
+    }));
   };
 
   return (
-    <section className="visual-novel-import" aria-label="Local visual novel discovery">
+    <section className="visual-novel-import" aria-label={t('vnImport.aria.section')}>
       <div className="visual-novel-reading-head">
-        <strong>Local discovery</strong>
+        <strong>{t('vnImport.head')}</strong>
         <div>
-          <button type="button" disabled={busy} onClick={() => void importLibrary()}>Import JSON</button>
-          <button type="button" disabled={busy} onClick={() => void exportLibrary()}>Export JSON</button>
+          <button type="button" disabled={busy} onClick={() => void importLibrary()}>{t('vnImport.importJson')}</button>
+          <button type="button" disabled={busy} onClick={() => void exportLibrary()}>{t('vnImport.exportJson')}</button>
           <button type="button" disabled={busy} onClick={() => void scan()}>
-            {busy ? 'Working…' : 'Scan folder'}
+            {busy ? t('vnImport.working') : t('vnImport.scanFolder')}
           </button>
         </div>
       </div>
@@ -115,7 +123,7 @@ export default function VisualNovelImportPanel({
               <article key={candidate.installPath} className={candidate.alreadyImported ? 'is-imported' : ''}>
                 <input
                   type="checkbox"
-                  aria-label={`Import ${candidate.title}`}
+                  aria-label={t('vnImport.aria.import', { title: candidate.title })}
                   checked={selectedPaths.has(candidate.installPath)}
                   disabled={candidate.alreadyImported || busy}
                   onChange={(event) => setSelectedPaths((current) => {
@@ -129,17 +137,17 @@ export default function VisualNovelImportPanel({
                   <input
                     value={candidate.title}
                     disabled={candidate.alreadyImported || busy}
-                    aria-label={`Title for ${candidate.installPath}`}
+                    aria-label={t('vnImport.aria.titleFor', { path: candidate.installPath })}
                     onChange={(event) => updateCandidate(candidate.installPath, { title: event.target.value })}
                   />
                   <small>{candidate.engine} · {candidate.executablePath}</small>
                 </div>
-                <span>{candidate.alreadyImported ? 'In library' : 'Ready'}</span>
+                <span>{candidate.alreadyImported ? t('vnImport.inLibrary') : t('vnImport.ready')}</span>
               </article>
             ))}
           </div>
           <button type="button" disabled={!selectedCount || busy} onClick={() => void importSelected()}>
-            Import selected ({selectedCount})
+            {t('vnImport.importSelected', { count: selectedCount })}
           </button>
         </>
       )}

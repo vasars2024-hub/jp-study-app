@@ -80,40 +80,51 @@ beforeAll(async () => {
 });
 
 /**
- * The usage gate, and the one that generalises: the panel is the ONLY consumer
- * of `vnPanel.*`, so any key the catalogs define must be reachable from this
- * file (or from `vnActionReason.ts`, which owns the disabled-reason strings, and
- * `VisualNovelSentenceAssist`/`VisualNovelCommunityPanel`, which share a few).
+ * The usage gate, and the one that generalises: the visual-novel surface is the
+ * ONLY consumer of these seven namespaces, so any key the catalogs define must
+ * be reachable from one of its files (`vnActionReason.ts` owns the
+ * disabled-reason strings; `captureKindKeys.ts` owns the five capture kinds).
+ *
+ * The floors are the block sizes measured when they were wired. A floor, not an
+ * equality — new keys are welcome, quietly deleting a block is not.
  */
-describe('every vnPanel key has a consumer', () => {
+describe('every vn* key has a consumer', () => {
   const files = [
     'renderer/components/immersion/VisualNovelPanel.tsx',
     'renderer/components/immersion/VisualNovelSentenceAssist.tsx',
     'renderer/components/immersion/VisualNovelCommunityPanel.tsx',
+    'renderer/components/immersion/VisualNovelMetadataEditor.tsx',
+    'renderer/components/immersion/VisualNovelImportPanel.tsx',
+    'renderer/components/immersion/VisualNovelReleaseCatalog.tsx',
+    'renderer/components/immersion/VisualNovelSourcePanel.tsx',
+    'renderer/components/immersion/VisualNovelScriptImportPanel.tsx',
     'renderer/components/immersion/captureKindKeys.ts',
     'shared/vnActionReason.ts',
   ].map((rel) => readFileSync(join(SRC, rel), 'utf8')).join('\n');
 
   const en = readFileSync(join(SRC, 'shared/i18n/catalogs/en.ts'), 'utf8');
 
-  const keys = [...new Set(
-    en.split('\n')
-      .map((line) => /^\s*'(vnPanel\.[\w.]+)'\s*:/.exec(line)?.[1])
-      .filter((key): key is string => !!key),
-  )];
+  function keysFor(prefix: string): string[] {
+    return [...new Set(
+      en.split('\n')
+        .map((line) => /^\s*'((?:vn[A-Z]\w*)\.[\w.-]+)'\s*:/.exec(line)?.[1])
+        .filter((key): key is string => !!key && key.startsWith(prefix)),
+    )];
+  }
 
-  it('has not lost the block it is guarding', () => {
-    // 119 were orphaned; the block is larger than that because 17 were already
-    // wired. A floor, not an equality — new keys are welcome, deletions are not.
-    expect(keys.length).toBeGreaterThanOrEqual(130);
-  });
-
-  it('is reachable from the components that own it', () => {
-    const orphans = keys.filter((key) => {
-      if (files.includes(`'${key}'`) || files.includes(`\`${key}\``)) return false;
-      return true;
-    });
-    expect(orphans, 'vnPanel keys with no consumer').toEqual([]);
+  it.each([
+    ['vnPanel.', 130],
+    ['vnMeta.', 33],
+    ['vnCommunity.', 38],
+    ['vnImport.', 21],
+    ['vnRelease.', 14],
+    ['vnSource.', 13],
+    ['vnScript.', 11],
+  ])('%s is reachable from the components that own it', (prefix, floor) => {
+    const keys = keysFor(prefix);
+    expect(keys.length, `${prefix} lost its keys`).toBeGreaterThanOrEqual(floor);
+    const orphans = keys.filter((key) => !files.includes(`'${key}'`) && !files.includes(`\`${key}\``));
+    expect(orphans, `${prefix} keys with no consumer`).toEqual([]);
   });
 });
 
@@ -260,16 +271,49 @@ describe('VisualNovelPanel renders in the interface language', () => {
     return host.textContent ?? '';
   }
 
-  it('is English by default', async () => {
+  /**
+   * Every string a `not.toContain` will later assert is GONE.
+   *
+   * The English case asserts all of them PRESENT first, which is the control
+   * that makes the negative half mean anything: a string this mount never
+   * renders — the library rail's add form does not, because `ReadingCanvas`
+   * measures before it lays a tool out and jsdom reports width 0 — passes
+   * `not.toContain` in all three languages while proving nothing. `Local
+   * discovery` was in this list until that control caught it, and it is covered
+   * by its own mount below instead.
+   */
+  const ENGLISH_LITERALS = [
+    'Immersion library',
+    'Visual Novels',
+    'Back to browser',
+    'Capture screen text',
+    'Add captured line',
+    'Entire visual novel',
+    'Create study deck cards',
+    'Open VN study deck',
+    'Reading overlay',
+    'Reading progress',
+    'Save progress',
+    'Routes and endings',
+    'Route guide notes',
+    'Remove route',
+    // The sibling panels the panel composes, all of which were English-only in
+    // every language until this turn.
+    'Library metadata',
+    'Display title',
+    'Save metadata',
+    'Metadata sources',
+    'Search VNDB',
+    'Community and study sharing',
+    'Language report',
+    'Export study bundle',
+    'Script extraction',
+    'Choose scripts',
+  ];
+
+  it('is English by default, and renders every literal the other cases assert is gone', async () => {
     const text = await render('en');
-    for (const expected of [
-      'Immersion library',
-      'Visual Novels',
-      'Back to browser',
-      'Reading overlay',
-      'Routes and endings',
-      'Create study deck cards',
-    ]) {
+    for (const expected of ENGLISH_LITERALS) {
       expect(text, `missing "${expected}"`).toContain(expected);
     }
   });
@@ -280,23 +324,34 @@ describe('VisualNovelPanel renders in the interface language', () => {
    */
   it.each(['ja', 'zh', 'ru'] as const)('drops every English literal in %s', async (lang) => {
     const text = await render(lang);
-    for (const gone of [
-      'Immersion library',
-      'Back to browser',
-      'Reading overlay',
-      'Routes and endings',
-      'Create study deck cards',
-      'Open VN study deck',
-      'Capture screen text',
-      'Add to library',
-      'Entire visual novel',
-    ]) {
+    for (const gone of ENGLISH_LITERALS) {
       expect(text, `"${gone}" survived the switch to ${lang}`).not.toContain(gone);
     }
     const catalog = catalogFor(lang);
     expect(text, 'the kicker did not translate').toContain(catalog['vnPanel.kicker'] as string);
     expect(text, 'the overlay heading did not translate').toContain(catalog['vnPanel.overlayHead'] as string);
     expect(text, 'the routes heading did not translate').toContain(catalog['vnPanel.routesHead'] as string);
+    expect(text, 'the metadata editor did not translate').toContain(catalog['vnMeta.summary'] as string);
+    expect(text, 'the community panel did not translate').toContain(catalog['vnCommunity.summary'] as string);
+    expect(text, 'the source panel did not translate').toContain(catalog['vnSource.head'] as string);
+    expect(text, 'the script panel did not translate').toContain(catalog['vnScript.head'] as string);
+  });
+
+  /**
+   * The engine picker is the one place the scope rule cuts both ways in a
+   * single control: `Custom` and `Unknown` are chrome and translate, while
+   * Ren'Py, KiriKiri, NScripter, Unity, RPG Maker and TyranoBuilder are product
+   * names and must survive untranslated. `i18n-partial-check` baselines the
+   * last three as legitimately-literal; this proves they are still rendered.
+   */
+  it('translates the engine picker\'s two labels and none of its product names', async () => {
+    const text = await render('ru');
+    const catalog = catalogFor('ru');
+    expect(text).toContain(catalog['vnMeta.engineCustom'] as string);
+    expect(text).toContain(catalog['vnMeta.engineUnknown'] as string);
+    for (const name of ["Ren'Py", 'KiriKiri', 'NScripter', 'Unity', 'RPG Maker', 'TyranoBuilder']) {
+      expect(text, `the engine name "${name}" was translated away`).toContain(name);
+    }
   });
 
   /**
@@ -316,5 +371,76 @@ describe('VisualNovelPanel renders in the interface language', () => {
     // `reading` also appears inside `Reading overlay`, so anchor on the token
     // in its own separator context rather than on the bare word.
     expect(text).not.toContain('· supported ·');
+  });
+});
+
+/**
+ * `VisualNovelImportPanel` lives inside the library rail's add-form disclosure,
+ * and `ReadingCanvas` lays a tool out only after it measures — in jsdom that
+ * measurement is 0, so the rail never renders and nothing about `vnImport.*`
+ * can be read off the composed panel. Mount it on its own instead. This is the
+ * whole reason `ENGLISH_LITERALS` doubles as a presence control up there.
+ */
+describe('VisualNovelImportPanel renders in the interface language', () => {
+  let host: HTMLDivElement;
+  let root: Root | null = null;
+  let ImportPanel: typeof import('../components/immersion/VisualNovelImportPanel').default;
+
+  beforeAll(async () => {
+    ImportPanel = (await import('../components/immersion/VisualNovelImportPanel')).default;
+  });
+
+  afterEach(async () => {
+    await act(async () => root?.unmount());
+    root = null;
+    document.body.replaceChildren();
+    setUiLang('en');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  });
+
+  async function render(lang: Lang): Promise<string> {
+    await ensureCatalog(lang);
+    setUiLang(lang);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    host = document.createElement('div');
+    document.body.append(host);
+    const mounted = createRoot(host);
+    root = mounted;
+    await act(async () => {
+      mounted.render(
+        <ImportPanel onImported={(): undefined => undefined} onStatus={(): undefined => undefined} />,
+      );
+    });
+    return host.textContent ?? '';
+  }
+
+  const LITERALS = ['Local discovery', 'Import JSON', 'Export JSON', 'Scan folder'];
+
+  it('is English by default', async () => {
+    const text = await render('en');
+    for (const expected of LITERALS) expect(text, `missing "${expected}"`).toContain(expected);
+  });
+
+  it.each(['ja', 'zh', 'ru'] as const)('drops every English literal in %s', async (lang) => {
+    const text = await render(lang);
+    for (const gone of LITERALS) {
+      expect(text, `"${gone}" survived the switch to ${lang}`).not.toContain(gone);
+    }
+    expect(text).toContain(catalogFor(lang)['vnImport.head'] as string);
+  });
+
+  /**
+   * The section's accessible name is the only `vnImport` string that is not
+   * visible text, so `textContent` cannot see it — and an aria-label left in
+   * English is exactly the defect class the accessible-name pass hunts.
+   */
+  it('translates the section\'s accessible name too', async () => {
+    await render('ja');
+    const section = host.querySelector('section.visual-novel-import');
+    expect(section?.getAttribute('aria-label')).toBe(catalogFor('ja')['vnImport.aria.section']);
   });
 });

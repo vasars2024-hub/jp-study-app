@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
 import type {
   VisualNovelDatabase,
   VisualNovelEntry,
@@ -41,6 +42,7 @@ export default function VisualNovelSourcePanel({
   onApplied: (database: VisualNovelDatabase) => void;
   onStatus: (message: string, error?: boolean) => void;
 }) {
+  const { t } = useT();
   const [query, setQuery] = useState(entry.japaneseTitle || entry.title);
   const [results, setResults] = useState<VisualNovelSourceResult[]>([]);
   const [busy, setBusy] = useState(false);
@@ -57,11 +59,11 @@ export default function VisualNovelSourcePanel({
     const response = await window.api.visualNovelSearchSource(query);
     setBusy(false);
     if (!response.ok) {
-      onStatus(response.error ?? 'VNDB search failed.', true);
+      onStatus(response.error ?? t('vnSource.msg.searchFailed'), true);
       return;
     }
     setResults(response.results ?? []);
-    onStatus(`Found ${response.results?.length ?? 0} VNDB matches.`);
+    onStatus(t('vnSource.msg.found', { count: response.results?.length ?? 0 }));
   };
 
   const apply = async (result: VisualNovelSourceResult): Promise<void> => {
@@ -99,24 +101,24 @@ export default function VisualNovelSourcePanel({
     const response = await window.api.visualNovelUpdateMetadata(entry.id, patch);
     setBusy(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'VNDB metadata could not be applied.', true);
+      onStatus(response.error ?? t('vnSource.msg.applyFailed'), true);
       return;
     }
     onApplied(response.database);
     onStatus(
       detailsResponse.ok
-        ? `Applied VNDB metadata and ${releases.length} releases from ${result.providerId}.`
-        : `Applied VNDB metadata from ${result.providerId}; release details were unavailable.`,
+        ? t('vnSource.msg.applied', { count: releases.length, provider: result.providerId })
+        : t('vnSource.msg.appliedNoDetails', { provider: result.providerId }),
     );
   };
 
   return (
     <details className="visual-novel-sources">
-      <summary>Metadata sources</summary>
+      <summary>{t('vnSource.head')}</summary>
       <div className="visual-novel-source-search">
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search VNDB" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('vnSource.searchPlaceholder')} />
         <button type="button" disabled={busy || query.trim().length < 2} onClick={() => void search()}>
-          {busy ? 'Searching…' : 'Search VNDB'}
+          {busy ? t('vnSource.searching') : t('vnSource.search')}
         </button>
       </div>
       <div className="visual-novel-source-results">
@@ -131,13 +133,13 @@ export default function VisualNovelSourcePanel({
                   ? ''
                   : `${result.communityRating}/10`].filter(Boolean).join(' · ')}
               </small>
-              <small>Study match {score} · {reasons.slice(0, 2).join(' · ')}</small>
-              {result.characters.length > 0 && <small>{result.characters.length} source characters</small>}
+              <small>{t('vnSource.studyMatch', { score })} · {reasons.slice(0, 2).join(' · ')}</small>
+              {result.characters.length > 0 && <small>{t('vnSource.sourceCharacters', { count: result.characters.length })}</small>}
               <p>{result.synopsis.slice(0, 220)}</p>
             </div>
             <div>
-              <button type="button" onClick={() => void window.api.openExternal(result.sourceUrl)}>View</button>
-              <button type="button" disabled={busy} onClick={() => void apply(result)}>Apply</button>
+              <button type="button" onClick={() => void window.api.openExternal(result.sourceUrl)}>{t('vnSource.view')}</button>
+              <button type="button" disabled={busy} onClick={() => void apply(result)}>{t('vnSource.apply')}</button>
             </div>
           </article>
         ))}

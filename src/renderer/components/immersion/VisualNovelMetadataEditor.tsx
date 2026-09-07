@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
 import type {
   VisualNovelDatabase,
   VisualNovelEngine,
@@ -74,6 +75,7 @@ export default function VisualNovelMetadataEditor({
   onSaved: (database: VisualNovelDatabase) => void;
   onStatus: (message: string, error?: boolean) => void;
 }) {
+  const { t } = useT();
   const [draft, setDraft] = useState<MetadataDraft>(() => draftFromEntry(entry));
   const [saving, setSaving] = useState(false);
 
@@ -114,44 +116,44 @@ export default function VisualNovelMetadataEditor({
     const response = await window.api.visualNovelUpdateMetadata(entry.id, patch);
     setSaving(false);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'Metadata could not be saved.', true);
+      onStatus(response.error ?? t('vnMeta.msg.saveFailed'), true);
       return;
     }
     onSaved(response.database);
-    onStatus('Visual novel metadata saved.');
+    onStatus(t('vnMeta.msg.saved'));
   };
 
   return (
     <details className="visual-novel-metadata">
-      <summary>Library metadata</summary>
+      <summary>{t('vnMeta.summary')}</summary>
       <div className="visual-novel-metadata-grid">
-        <label>Display title<input value={draft.title} onChange={(event) => field('title', event.target.value)} /></label>
-        <label>Japanese title<input value={draft.japaneseTitle} onChange={(event) => field('japaneseTitle', event.target.value)} /></label>
-        <label>English title<input value={draft.englishTitle} onChange={(event) => field('englishTitle', event.target.value)} /></label>
-        <label>Alternative titles<input value={draft.alternativeTitles} onChange={(event) => field('alternativeTitles', event.target.value)} placeholder="Comma separated" /></label>
-        <label>Developer<input value={draft.developer} onChange={(event) => field('developer', event.target.value)} /></label>
-        <label>Publisher<input value={draft.publisher} onChange={(event) => field('publisher', event.target.value)} /></label>
-        <label>Release date<input type="date" value={draft.releaseDate} onChange={(event) => field('releaseDate', event.target.value)} /></label>
-        <label>Original platform<input value={draft.originalPlatform} onChange={(event) => field('originalPlatform', event.target.value)} /></label>
-        <label>Version<input value={draft.version} onChange={(event) => field('version', event.target.value)} /></label>
-        <label>Platforms<input value={draft.platforms} onChange={(event) => field('platforms', event.target.value)} placeholder="Windows, Linux" /></label>
-        <label>Genres<input value={draft.genres} onChange={(event) => field('genres', event.target.value)} placeholder="Mystery, Science fiction" /></label>
-        <label>Tags<input value={draft.tags} onChange={(event) => field('tags', event.target.value)} placeholder="Comma separated" /></label>
-        <label>Themes<input value={draft.themes} onChange={(event) => field('themes', event.target.value)} placeholder="Comma separated" /></label>
-        <label>Characters<input value={draft.characters} onChange={(event) => field('characters', event.target.value)} placeholder="Comma separated" /></label>
-        <label>Chapters<input value={draft.chapters} onChange={(event) => field('chapters', event.target.value)} placeholder="Comma separated" /></label>
-        <label>Estimated hours<input type="number" min="0" value={draft.estimatedPlaytimeHours} onChange={(event) => field('estimatedPlaytimeHours', event.target.value)} /></label>
-        <label>Language<input value={draft.language} onChange={(event) => field('language', event.target.value)} /></label>
-        <label>Engine<select value={draft.engine} onChange={(event) => field('engine', event.target.value as VisualNovelEngine)}><option value="renpy">Ren'Py</option><option value="kirikiri">KiriKiri</option><option value="nscripter">NScripter</option><option value="unity">Unity</option><option value="rpg-maker">RPG Maker</option><option value="tyrano">TyranoBuilder</option><option value="custom">Custom</option><option value="unknown">Unknown</option></select></label>
-        <label className="is-wide">Install path<input value={draft.installPath} onChange={(event) => field('installPath', event.target.value)} /></label>
-        <label className="is-wide">Executable path<input value={draft.executablePath} onChange={(event) => field('executablePath', event.target.value)} /></label>
-        <label className="is-wide">Cover image URL<input value={draft.coverImageUrl} onChange={(event) => field('coverImageUrl', event.target.value)} /></label>
-        <label className="is-wide">Background image URLs<input value={draft.backgroundImageUrls} onChange={(event) => field('backgroundImageUrls', event.target.value)} placeholder="Comma separated" /></label>
-        <label className="is-wide">Screenshot URLs<input value={draft.screenshotUrls} onChange={(event) => field('screenshotUrls', event.target.value)} placeholder="Comma separated" /></label>
-        <label className="is-wide">Synopsis<textarea value={draft.synopsis} onChange={(event) => field('synopsis', event.target.value)} /></label>
+        <label>{t('vnMeta.displayTitle')}<input value={draft.title} onChange={(event) => field('title', event.target.value)} /></label>
+        <label>{t('vnMeta.japaneseTitle')}<input value={draft.japaneseTitle} onChange={(event) => field('japaneseTitle', event.target.value)} /></label>
+        <label>{t('vnMeta.englishTitle')}<input value={draft.englishTitle} onChange={(event) => field('englishTitle', event.target.value)} /></label>
+        <label>{t('vnMeta.alternativeTitles')}<input value={draft.alternativeTitles} onChange={(event) => field('alternativeTitles', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label>{t('vnMeta.developer')}<input value={draft.developer} onChange={(event) => field('developer', event.target.value)} /></label>
+        <label>{t('vnMeta.publisher')}<input value={draft.publisher} onChange={(event) => field('publisher', event.target.value)} /></label>
+        <label>{t('vnMeta.releaseDate')}<input type="date" value={draft.releaseDate} onChange={(event) => field('releaseDate', event.target.value)} /></label>
+        <label>{t('vnMeta.originalPlatform')}<input value={draft.originalPlatform} onChange={(event) => field('originalPlatform', event.target.value)} /></label>
+        <label>{t('vnMeta.version')}<input value={draft.version} onChange={(event) => field('version', event.target.value)} /></label>
+        <label>{t('vnMeta.platforms')}<input value={draft.platforms} onChange={(event) => field('platforms', event.target.value)} placeholder="Windows, Linux" /></label>
+        <label>{t('vnMeta.genres')}<input value={draft.genres} onChange={(event) => field('genres', event.target.value)} placeholder={t('vnMeta.genresPlaceholder')} /></label>
+        <label>{t('vnMeta.tags')}<input value={draft.tags} onChange={(event) => field('tags', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label>{t('vnMeta.themes')}<input value={draft.themes} onChange={(event) => field('themes', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label>{t('vnMeta.characters')}<input value={draft.characters} onChange={(event) => field('characters', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label>{t('vnMeta.chapters')}<input value={draft.chapters} onChange={(event) => field('chapters', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label>{t('vnMeta.estimatedHours')}<input type="number" min="0" value={draft.estimatedPlaytimeHours} onChange={(event) => field('estimatedPlaytimeHours', event.target.value)} /></label>
+        <label>{t('vnMeta.language')}<input value={draft.language} onChange={(event) => field('language', event.target.value)} /></label>
+        <label>{t('vnMeta.engine')}<select value={draft.engine} onChange={(event) => field('engine', event.target.value as VisualNovelEngine)}><option value="renpy">Ren'Py</option><option value="kirikiri">KiriKiri</option><option value="nscripter">NScripter</option><option value="unity">Unity</option><option value="rpg-maker">RPG Maker</option><option value="tyrano">TyranoBuilder</option><option value="custom">{t('vnMeta.engineCustom')}</option><option value="unknown">{t('vnMeta.engineUnknown')}</option></select></label>
+        <label className="is-wide">{t('vnMeta.installPath')}<input value={draft.installPath} onChange={(event) => field('installPath', event.target.value)} /></label>
+        <label className="is-wide">{t('vnMeta.executablePath')}<input value={draft.executablePath} onChange={(event) => field('executablePath', event.target.value)} /></label>
+        <label className="is-wide">{t('vnMeta.coverImageUrl')}<input value={draft.coverImageUrl} onChange={(event) => field('coverImageUrl', event.target.value)} /></label>
+        <label className="is-wide">{t('vnMeta.backgroundImageUrls')}<input value={draft.backgroundImageUrls} onChange={(event) => field('backgroundImageUrls', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label className="is-wide">{t('vnMeta.screenshotUrls')}<input value={draft.screenshotUrls} onChange={(event) => field('screenshotUrls', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
+        <label className="is-wide">{t('vnMeta.synopsis')}<textarea value={draft.synopsis} onChange={(event) => field('synopsis', event.target.value)} /></label>
       </div>
       <button type="button" disabled={saving || !draft.title.trim()} onClick={() => void save()}>
-        {saving ? 'Saving…' : 'Save metadata'}
+        {saving ? t('vnMeta.saving') : t('vnMeta.saveMetadata')}
       </button>
     </details>
   );

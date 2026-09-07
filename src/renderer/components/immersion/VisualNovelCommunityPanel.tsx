@@ -103,7 +103,7 @@ export default function VisualNovelCommunityPanel({
     if (!hasDraftContent) return null;
     return {
       id: globalThis.crypto.randomUUID(),
-      author: draft.author.trim() || 'Anonymous learner',
+      author: draft.author.trim() || t('vnCommunity.anonymous'),
       rating: draft.rating ? Number(draft.rating) : null,
       difficultyRating: draft.difficultyRating ? Number(draft.difficultyRating) : null,
       jlptLevel: draft.jlptLevel,
@@ -119,7 +119,7 @@ export default function VisualNovelCommunityPanel({
       communityReports: [...entry.communityReports, report],
     });
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'The community report could not be saved.', true);
+      onStatus(response.error ?? t('vnCommunity.msg.saveFailed'), true);
       return null;
     }
     onDatabase(response.database);
@@ -130,7 +130,7 @@ export default function VisualNovelCommunityPanel({
   const saveReport = async (): Promise<void> => {
     const report = createReport();
     if (!report) return;
-    if (await persistReport(report)) onStatus('Language difficulty report saved.');
+    if (await persistReport(report)) onStatus(t('vnCommunity.msg.saved'));
   };
 
   const exportBundle = async (): Promise<void> => {
@@ -161,7 +161,9 @@ export default function VisualNovelCommunityPanel({
     setBusy(false);
     if (response.canceled) return;
     onStatus(
-      response.ok ? `Study bundle exported to ${response.path}.` : response.error ?? 'Bundle export failed.',
+      response.ok
+        ? t('vnCommunity.msg.exported', { path: response.path })
+        : response.error ?? t('vnCommunity.msg.exportFailed'),
       !response.ok,
     );
   };
@@ -172,15 +174,15 @@ export default function VisualNovelCommunityPanel({
     setBusy(false);
     if (response.canceled) return;
     if (!response.ok || !response.content) {
-      onStatus(response.error ?? 'Bundle import failed.', true);
+      onStatus(response.error ?? t('vnCommunity.msg.importFailed'), true);
       return;
     }
     try {
       const bundle = normalizeVisualNovelCommunityBundle(JSON.parse(response.content));
-      if (!bundle) throw new Error('This is not a valid Visual Novel study bundle.');
+      if (!bundle) throw new Error(t('vnCommunity.msg.notValid'));
       setPreview(bundle);
       setMismatchConfirmed(false);
-      onStatus('Study bundle loaded for review.');
+      onStatus(t('vnCommunity.msg.loaded'));
     } catch (reason) {
       onStatus(reason instanceof Error ? reason.message : String(reason), true);
     }
@@ -199,13 +201,13 @@ export default function VisualNovelCommunityPanel({
     });
     if (!metadataResponse.ok || !metadataResponse.database) {
       setBusy(false);
-      onStatus(metadataResponse.error ?? 'Community reports could not be imported.', true);
+      onStatus(metadataResponse.error ?? t('vnCommunity.msg.reportsImportFailed'), true);
       return;
     }
     const routeResponse = await window.api.visualNovelUpdateRoutes(entry.id, merged.routes);
     if (!routeResponse.ok || !routeResponse.database) {
       setBusy(false);
-      onStatus(routeResponse.error ?? 'Route guides could not be imported.', true);
+      onStatus(routeResponse.error ?? t('vnCommunity.msg.routesImportFailed'), true);
       return;
     }
     const bookId = `vn:${entry.id}`;
@@ -231,29 +233,29 @@ export default function VisualNovelCommunityPanel({
     onDatabase(routeResponse.database);
     setPreview(null);
     setMismatchConfirmed(false);
-    onStatus(`Imported ${cards.length} study cards and community guide data.`);
+    onStatus(t('vnCommunity.msg.imported', { count: cards.length }));
   };
 
   return (
     <details className="visual-novel-community">
-      <summary>Community and study sharing</summary>
+      <summary>{t('vnCommunity.summary')}</summary>
       <div className="visual-novel-community-summary">
-        <span>{entry.communityReports.length} reports</span>
+        <span>{t('vnCommunity.reports', { count: entry.communityReports.length })}</span>
         <span>{reportSummary.rating == null ? t('vnCommunity.noRating') : t('vnCommunity.ratingValue', { value: Math.round(reportSummary.rating * 10) / 10 })}</span>
         <span>{reportSummary.difficulty == null ? t('vnCommunity.noDifficulty') : t('vnCommunity.difficultyValue', { value: Math.round(reportSummary.difficulty * 10) / 10 })}</span>
       </div>
       <div className="visual-novel-community-form">
-        <label>Author<input value={draft.author} onChange={(event) => field('author', event.target.value)} placeholder="Anonymous learner" /></label>
-        <label>Rating<input type="number" min="0" max="10" step="0.5" value={draft.rating} onChange={(event) => field('rating', event.target.value)} /></label>
-        <label>Difficulty<input type="number" min="0" max="5" step="0.5" value={draft.difficultyRating} onChange={(event) => field('difficultyRating', event.target.value)} /></label>
-        <label>JLPT<select value={draft.jlptLevel} onChange={(event) => field('jlptLevel', event.target.value)}><option value="">Unrated</option><option value="N5">N5</option><option value="N4">N4</option><option value="N3">N3</option><option value="N2">N2</option><option value="N1">N1</option><option value="N0">Beyond N1</option></select></label>
-        <label className="is-wide">Review<textarea value={draft.review} onChange={(event) => field('review', event.target.value)} /></label>
-        <label className="is-wide">Language report<textarea value={draft.languageNotes} onChange={(event) => field('languageNotes', event.target.value)} placeholder="Vocabulary, grammar, dialect, and reading observations" /></label>
+        <label>{t('vnCommunity.author')}<input value={draft.author} onChange={(event) => field('author', event.target.value)} placeholder={t('vnCommunity.anonymous')} /></label>
+        <label>{t('vnCommunity.ratingLabel')}<input type="number" min="0" max="10" step="0.5" value={draft.rating} onChange={(event) => field('rating', event.target.value)} /></label>
+        <label>{t('vnCommunity.difficultyLabel')}<input type="number" min="0" max="5" step="0.5" value={draft.difficultyRating} onChange={(event) => field('difficultyRating', event.target.value)} /></label>
+        <label>{t('vnCommunity.jlpt')}<select value={draft.jlptLevel} onChange={(event) => field('jlptLevel', event.target.value)}><option value="">{t('vnCommunity.unrated')}</option><option value="N5">N5</option><option value="N4">N4</option><option value="N3">N3</option><option value="N2">N2</option><option value="N1">N1</option><option value="N0">{t('vnCommunity.beyondN1')}</option></select></label>
+        <label className="is-wide">{t('vnCommunity.review')}<textarea value={draft.review} onChange={(event) => field('review', event.target.value)} /></label>
+        <label className="is-wide">{t('vnCommunity.languageReport')}<textarea value={draft.languageNotes} onChange={(event) => field('languageNotes', event.target.value)} placeholder={t('vnCommunity.languagePlaceholder')} /></label>
       </div>
       <div className="visual-novel-community-actions">
-        <button type="button" disabled={!!saveReportWhy} title={saveReportWhy ? t(saveReportWhy) : undefined} onClick={() => void saveReport()}>Save report</button>
-        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void exportBundle()}>Export study bundle</button>
-        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void chooseBundle()}>Import study bundle</button>
+        <button type="button" disabled={!!saveReportWhy} title={saveReportWhy ? t(saveReportWhy) : undefined} onClick={() => void saveReport()}>{t('vnCommunity.saveReport')}</button>
+        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void exportBundle()}>{t('vnCommunity.exportBundle')}</button>
+        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void chooseBundle()}>{t('vnCommunity.importBundle')}</button>
       </div>
       {preview && (
         <article className="visual-novel-community-preview">
@@ -262,14 +264,17 @@ export default function VisualNovelCommunityPanel({
             <span>{preview.visualNovel.japaneseTitle}</span>
           </div>
           <p>
-            {preview.report ? `Report by ${preview.report.author}. ` : ''}
-            {preview.routeGuides.length} route guides and {preview.deckCards.length} study cards.
+            {preview.report ? t('vnCommunity.reportBy', { author: preview.report.author }) : ''}
+            {t('vnCommunity.bundleCounts', {
+              routes: preview.routeGuides.length,
+              cards: preview.deckCards.length,
+            })}
           </p>
-          {!identityMatches && <p className="media-error">The bundle title or provider ID does not match this library entry.</p>}
+          {!identityMatches && <p className="media-error">{t('vnCommunity.mismatch')}</p>}
           <div>
-            <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => setPreview(null)}>Cancel</button>
+            <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => setPreview(null)}>{t('common.cancel')}</button>
             <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void applyBundle()}>
-              {!identityMatches && !mismatchConfirmed ? 'Review title mismatch' : 'Apply bundle'}
+              {!identityMatches && !mismatchConfirmed ? t('vnCommunity.reviewMismatch') : t('vnCommunity.applyBundle')}
             </button>
           </div>
         </article>
@@ -280,7 +285,15 @@ export default function VisualNovelCommunityPanel({
             <article key={report.id}>
               <div>
                 <strong>{report.author}</strong>
-                <span>{[report.rating == null ? '' : `${report.rating}/10`, report.difficultyRating == null ? '' : `${report.difficultyRating}/5 difficulty`, report.jlptLevel].filter(Boolean).join(' · ')}</span>
+                <span>{[
+                  report.rating == null ? '' : t('vnCommunity.reportRating', { value: report.rating }),
+                  report.difficultyRating == null ? '' : t('vnCommunity.reportDifficulty', { value: report.difficultyRating }),
+                  // D182: the picker offers "Beyond N1" and stores the sentinel
+                  // `N0`, so every report saved at that level listed a JLPT
+                  // level that does not exist. The other five are real names and
+                  // are data, so they pass through untranslated.
+                  report.jlptLevel === 'N0' ? t('vnCommunity.beyondN1') : report.jlptLevel,
+                ].filter(Boolean).join(' · ')}</span>
               </div>
               {report.review && <p>{report.review}</p>}
               {report.languageNotes && <small>{report.languageNotes}</small>}
