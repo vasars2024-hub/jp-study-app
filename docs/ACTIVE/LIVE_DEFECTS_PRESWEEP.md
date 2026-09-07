@@ -1997,3 +1997,50 @@ sharing. The served-module read answers the same question — *can the running r
 these keys, in Japanese* — without touching anything of the user's. The renderer was confirmed
 healthy at the same time: `#root` has 2 children and there is no `vite-error-overlay`, so the
 59-file land did not blank it (the D115 failure mode).
+
+## 2026-09-07 08:15 EDT — primary2 (worktree `wt/files-app`): the visual-novel surface, class-major on i18n
+
+Continues the class the 06:30 section opened: **translations that were written, translated into
+ja/zh/ru, and never wired to a consumer.** `primary2`'s previous turn found four such blocks;
+this turn found the whole visual-novel surface was one, across **seven** files and **243** keys.
+
+**Orphan keys app-wide: 1,066 → 823.** All seven `vn*` namespaces are now 0.
+
+### What made it invisible, and it is worth repeating once
+
+The panel that opened this — `VisualNovelPanel.tsx` — is the ONE file of the seven that already
+called `t()` (17 times). That is what makes it the interesting case: it was PARTIALLY converted,
+so `i18n-hardcoded-check` sees an adopting file and passes, `i18n-check` sees translated keys and
+passes, and `i18n-partial-check` **ratchets** — a file that has always been bad stays baselined
+at its own badness. Its baseline was **67**. Only `i18n-orphan-key-check.cjs`, added yesterday in
+`d00b8c06`, could see it, and only from the CATALOG side.
+
+The six siblings are the simpler shape: five of them called `t()` **zero** times.
+
+### The defects
+
+| id | surface | what is wrong | evidence | sev | status |
+|---|---------|--------------|----------|-----|--------|
+| D179 | immersion — Visual Novels | The panel renders 67 English literals in every language, beside its own 119-key `vnPanel.*` block that is complete and translated in all four catalogs and reaches nothing. Status, route status, engine compatibility, mining scope, politeness and speech markers all render as raw wire values. | `node tools/i18n-orphan-key-check.cjs --list vnPanel.` → 119. `i18n-partial-check` baselined the file at 67 untranslated strings against 17 `t()` calls. | P2 | **fixed — `719b0d13`.** Seven wire-value→key maps; the character-speech line is recomposed from the analyzer's structured fields through `vnPanel.speech.*` because the analyzer is a SHARED module and cannot call `t()`. Orphans 119 → 0, partial baseline 67 → 0. New suite, 13 tests, 3 mutation controls. |
+| D182 | immersion — VN library metadata | `VisualNovelMetadataEditor` calls `t()` **zero** times: 24 field labels, 5 placeholders and both status messages are English literals, against a complete 33-key `vnMeta.*` block. Second half: the JLPT picker offers **Beyond N1** and stores the sentinel `N0`, so every saved report's summary row listed `N0` — a level that does not exist. | Live ja render of the mounted panel: `ライブラリのメタデータ` absent, `Library metadata`/`Display title`/`Save metadata` present. | P2 | **fixed — `62a03d9f`.** `N0` now resolves to `vnCommunity.beyondN1` in the report row; N5–N1 pass through as data. |
+| D183 | immersion — VN community sharing | `VisualNovelCommunityPanel` renders the whole report form and both bundle-transfer paths in English (32 orphaned `vnCommunity.*`), including every error message on a failed import. | Same render: `Community and study sharing`, `Language report`, `Export study bundle` all survive a switch to ja/zh/ru. | P2 | **fixed — `62a03d9f`.** |
+| D184 | immersion — VN local discovery | `VisualNovelImportPanel` calls `t()` zero times (21 orphaned `vnImport.*`), **and** its success message printed `Library exported to undefined.` — the main process reports a successful export without a path on some branches and the template literal interpolated it anyway. The catalogs already carried `vnImport.msg.exportedOk` with a comment naming this defect; nobody had wired the fix. | The key's own comment in `catalogs/en.ts`, plus the template literal at the export handler. | P2 | **fixed — `62a03d9f`.** Path checked before interpolation. |
+| D185 | immersion — VN metadata sources | `VisualNovelSourcePanel` renders the VNDB search, its results and all four status messages in English (13 orphaned `vnSource.*`). | Same render: `Metadata sources`, `Search VNDB` survive the switch. | P2 | **fixed — `62a03d9f`.** |
+| D186 | immersion — VN script extraction / release catalog | `VisualNovelScriptImportPanel` (11 orphaned `vnScript.*`) English-only. `VisualNovelReleaseCatalog`'s `VOICE_LABELS` held the five English SENTENCES in a module-level map — which is *why* `vnRelease.voice.*` was translated and dead (14 orphans). | Same render: `Script extraction`, `Choose scripts` survive. | P2 | **fixed — `62a03d9f`.** The map holds KEYS now, per CLAUDE.md i18n rule 7. |
+
+### Two traps this turn, both cheap to inherit and expensive to rediscover
+
+**1. A `not.toContain` on a string that never renders passes in every language and proves
+nothing.** Three languages of negative assertions were green on `Local discovery` — which the
+composed panel does not render AT ALL, because `ReadingCanvas` lays a tool out only after it
+measures and jsdom measures 0, so the whole library rail is absent from the mount. The fix is
+structural and belongs in any i18n render test: **assert the same list PRESENT in English
+first**, in the same test file, from the same mount. `VisualNovelImportPanel` then needs its own
+mount, which is also the only way to reach its `aria-label` — `textContent` cannot see one.
+
+**2. The scope rule cuts both ways inside a single control, and the partial-check baseline is
+where that gets recorded.** The engine picker's `Custom` and `Unknown` are chrome and translate;
+`Ren'Py`, `KiriKiri`, `NScripter`, `Unity`, `RPG Maker`, `TyranoBuilder` are product names and
+must not. Three of those are baselined in `tools/i18n-partial-baseline.json` as legitimately
+literal — and a test asserts all six still RENDER in Russian, so the baseline cannot quietly
+become cover for a real regression later.
