@@ -7809,6 +7809,7 @@ export const ru: Catalog = {
   'notifications.wired.unreadError': 'Есть непрочитанные уведомления об ошибках.',
   'notifications.wired.noUnreadError': 'Непрочитанных уведомлений об ошибках нет.',
   'notifications.dismiss': 'Скрыть',
+  'notifications.dismissNamed': 'Скрыть: {title}',
   'notifications.quiet': 'Тихий режим',
   'notifications.markAllRead': 'Отметить всё как прочитанное',
   'notifications.empty': 'Уведомлений пока нет.',

@@ -74,3 +74,27 @@ describe('ToastHost mounts both toast buses', () => {
     expect(host.querySelector('.ui-toast-host')?.textContent).toContain('ui side');
   });
 });
+
+/**
+ * D152 — every toast's ✕ announced the same bare word.
+ *
+ * Toasts stack: three were on screen at once while this was measured live, and
+ * a screen reader walking them heard "Dismiss", "Dismiss", "Dismiss" with no
+ * way to tell which sentence each button would throw away. The visible message
+ * is a toast's only identity, so it is the button's name.
+ */
+describe('a stacked toast names its own dismiss button', () => {
+  it('gives each ✕ the message it dismisses, not one shared word', () => {
+    act(() => {
+      showOsToast('Desktop 2 is already showing on another monitor.');
+      showOsToast('Could not show Desktop 5.');
+    });
+    const names = Array.from(host.querySelectorAll('.os-toast-close')).map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+    expect(names.some((n) => n?.includes('Desktop 2 is already showing on another monitor.'))).toBe(true);
+    expect(names.some((n) => n?.includes('Could not show Desktop 5.'))).toBe(true);
+  });
+});

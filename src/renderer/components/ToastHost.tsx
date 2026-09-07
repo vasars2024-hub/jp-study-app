@@ -164,8 +164,14 @@ export default function ToastHost() {
                 <button
                   type="button"
                   className="os-toast-close"
+                  // Several toasts stack at once — three were on screen while
+                  // this was measured — and every one of their ✕ buttons
+                  // announced the bare word "Dismiss" (D152). The visible
+                  // sentence is the toast's only identity, so it is its name.
+                  // `title` stays the short word: it is a hover tooltip on a
+                  // control whose own message is already two lines above it.
                   title={t('notifications.dismiss')}
-                  aria-label={t('notifications.dismiss')}
+                  aria-label={t('notifications.dismissNamed', { title: toast.message })}
                   onClick={() => dismiss(toast.id)}
                 >
                   ×

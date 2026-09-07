@@ -139,7 +139,23 @@ export default function NotificationCenter() {
               <Notification
                 title={n.title}
                 kind={uiKind(n.kind)}
-                dismissLabel={t('notifications.dismiss')}
+                // Named by what it dismisses. Every row's ✕ announced the bare
+                // word "Dismiss", so a screen reader walking a list of five
+                // notifications heard the same button five times and had no way
+                // to tell which one it was about to throw away (D152). Same
+                // idiom the taskbar already uses for `desktop.task.close`.
+                //
+                // `title` is OPTIONAL on a notification and the app's own
+                // entries mostly omit it — the first live check of this fix read
+                // the accessible name as the literal "Dismiss: {title}", because
+                // `interpolate` leaves a placeholder standing when its value is
+                // undefined (`i18n/core.ts:83`). The message is the row's real
+                // identity; the bare word is the last resort, not the first.
+                dismissLabel={
+                  n.title || n.message
+                    ? t('notifications.dismissNamed', { title: n.title || n.message })
+                    : t('notifications.dismiss')
+                }
                 onClose={() => dismissEntry(n.id)}
               >
                 {wired && (
