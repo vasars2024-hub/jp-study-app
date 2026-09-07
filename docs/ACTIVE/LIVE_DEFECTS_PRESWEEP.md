@@ -1815,3 +1815,38 @@ the discarded file is in the backup dir. **This is what produced D157.**
 | D159 | blanc (app drawer) | **`BlancAppDrawerPanel.tsx` imports `useT` twice**, landed that way in the merge. eslint reports it (`import/no-duplicates`, ×2) and it is a redeclaration TypeScript rejects. | `git show wt/files-app:...BlancAppDrawerPanel.tsx` has `import { useT } from '../../i18n';` at **both line 21 and line 30**; `feat/nyaa-subtitles` before the land had exactly one, at line 28. Almost certainly a merge artifact on the worktree side. **Downgraded from the P0 I first assumed after actually testing it:** esbuild — which is what Vite transforms this file with — accepts and dedupes it, so the panel is not broken at runtime. | P3 | **resolved in the working tree, deliberately NOT committed.** The duplicate sat inside the conflict hunk I had to resolve anyway, so the working copy now reads `import { alertDialog, confirmDialog, showToast } from '../ui';` with a single `useT` — that keeps files-app's D142 confirm guard AND another track's uncommitted `window.alert` → `alertDialog` change. The file is dirty with that track's hunk, so committing it would absorb their work; the fix ships when they commit theirs. eslint on the resolved file: **0 problems**. |
 
 | D160 | settings ▸ Verified Sites | **Deleting a site from the user's local database went through a native `window.confirm`** — OS chrome drawn on top of a desktop that is pretending to be an operating system, and on the one action that removes their data. `nativeDialogGate.test.ts` exists precisely to ban this and had been RED on this file; it was the **full suite's only remaining failure** after D157 cleared the other four. | `VerifiedSitesManager.tsx:186`, `if (!window.confirm(t('verifiedSites.confirmDelete', …)))`. **Pre-existing, not introduced by today's land, and measured at both ends:** at `409e8977` the same line read `window.confirm` with a raw English literal; D127 translated the string and left the native call, so the land carried the defect forward with better copy on it. Full run before: 2 files / 5 tests failed (4 `catalogDuplicateKeys` + this 1). After D157: 1 file / 1 test — this one. | P2 | **fixed `92895fdf`** — `confirmDialog` from `components/ui`, the same idiom as `ApiKeysPage`, `AppearancePage` and `CompanionsPage`, with `danger: true` so the confirm button is red and **Cancel takes initial focus**, which is what a delete should do. Keeps D127's committed keys, verified present in all four catalogs (`verifiedSites.delete`, `verifiedSites.confirmDelete` — 1/1/1/1). **The fix is lifted from the copy of this file I discarded during the land**, which had already converted this call — recorded that way rather than quietly reinvented, because it is the one respect in which the discarded version was better and a reader should be able to see the discard was not free. Gates: `nativeDialogGate` + `destructiveGuards` + `dialogTextTranslated` **22/22**, eslint clean. |
+
+### D107's owed live re-verification — DONE, and the key names in its row are stale
+
+D107's status line says *"Source- and gate-verified, NOT live … the new keys do not exist in the
+running renderer's catalogs … Re-verify after the mergeback."* **The mergeback is this turn's
+land, so that is now closed — but not by the keys D107 names.**
+
+Chasing `desktop.aero.*` cost me two steps and would cost the next reader the same, so: those 27
+keys **no longer exist anywhere**, and neither do their call sites. `90b5f002` IS in history
+(`git merge-base --is-ancestor` says so), but another track's later conversion superseded that
+naming with **`desktop.startMenu.*`**. It is a CLEAN supersession, not a regression, and it was
+checked in both directions before saying so: **0** `desktop.aero.` matches in any of the five
+catalog files, **0** in `DesktopShell.tsx`, so there are no orphaned keys and no dangling `t()`
+calls. The replacement family is **24 keys, present in all four catalogs** (en/ja/zh/ru = 24/24/24/24).
+
+**Verified against the RUNNING dev server**, not the tree — the register's actual claim was about
+what the renderer can resolve, and until this land the server was serving a branch without these
+commits. Fetched `http://localhost:5173/src/shared/i18n/catalogs/ja.ts` (200, 2,291,980 bytes)
+and read the values out of the served module:
+
+    desktop.startMenu.shutdown  ->  "Secret OS を終了"
+    desktop.shutdownConfirm     ->  "終了"
+    mediaLib.clear.title        ->  "メディアライブラリを消去"
+
+The third is the sharpest of D107's four destructive dialogs — the Clear media library confirm,
+whose message is the only place the app says the original files on disk are NOT deleted.
+
+**Deliberately NOT done, and the reason is a cost the verification did not need to pay:** I did
+not switch the live UI to ja and read the start menu by hand. That writes the user's own
+`ui-lang` (the setting an earlier worker already left on `ja` once, costing the next turn a
+restore) and needs a window reload to defeat the HMR catalog cache, on a desk another worker is
+sharing. The served-module read answers the same question — *can the running renderer resolve
+these keys, in Japanese* — without touching anything of the user's. The renderer was confirmed
+healthy at the same time: `#root` has 2 children and there is no `vite-error-overlay`, so the
+59-file land did not blank it (the D115 failure mode).
