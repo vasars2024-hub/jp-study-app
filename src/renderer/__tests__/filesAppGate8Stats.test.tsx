@@ -45,6 +45,11 @@ vi.mock('../stats', () => ({
   resetStats: () => undefined,
   formatDuration: (s: number) => `${Math.round(s)}s`,
   formatNumber: (n: number) => String(n),
+  // `useStats` subscribes on mount; a factory mock replaces the module WHOLE,
+  // so an absent export is a throw inside the effect, not a silent undefined.
+  // Returns a disposer for the same reason `onKnowledgeChanged` below does —
+  // React calls it on unmount and a bare `undefined` would be its own failure.
+  onStatsChanged: () => () => undefined,
 }));
 
 // `knowledgeCounts()` is INDEXED BY LEVEL (counts[1..3]), not keyed by name —
