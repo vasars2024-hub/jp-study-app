@@ -402,6 +402,28 @@ RECOVERY 2026-09-06 19:45-20:00, primary: `8a9d2319` landed HALF a slice and lef
 | D119 | files (dock) | **At a narrow window the status line "2,134 items · 50.2 GB total" is squeezed to 22 pixels** — a sliced fragment of a single glyph, with nothing to say the rest was cut. | Open **files** ▸ narrow the window to ~420px ▸ read `.fa-status`: `clientWidth` **22**, `scrollWidth` **183**, `text-overflow: clip`. | P3 | fixed 8a5a32f5 — and **not** by making the status unshrinkable: `liquid-controls.css` records that `flex: none` here pinned the dock wider than its container and squeezed `.lq-dock-routes` to zero, so the navigation vanished. That fix is correct and stays. `text-overflow: ellipsis` cannot help either, because `.fa-status` is a flex ROW of two spans, not a text box. It is hidden below the same 700px container breakpoint instead: absent is the honest state, both numbers are already on the tree badges, and the 22px goes back to the routes (342 → 364). |
 | D120 | youtube, translate, settings, scraper, clipboard | **Every date and time the app prints outside the calendar is formatted in the WINDOWS locale, not the language the app is set to.** With the UI in Russian the YouTube news header reads *"Последняя проверка 9/7/2026, 12:10:56 AM"* — a Russian sentence ending in a US date and a 12-hour clock — and **all 52 rows of the user's Translate history** are stamped `9/6/2026, 10:05:11 AM`. Same in Japanese, where it should read `2026/9/7 0:16:55`. | Settings ▸ language ▸ Русский, then **YouTube** ▸ read the line under "Новости"; and **Translate ▸ История** ▸ read any row's meta line. Measured live on pid 14128 window 2 with `ui-lang=ru`: the same instant renders **`9/7/2026, 12:16:55 AM`** from a bare `toLocaleString()` and **`07.09.2026, 00:16:55`** from `toLocaleString('ru-RU')`. | P2 | **fixed 264cf30b→this commit — 7 call sites in 7 files**, each given `LANG_TAGS[lang]`: `YouTubePlaylistsView.tsx:849`, `TranslateContent.tsx:313`, `ConnectionProfilesPanel.tsx` ×4, `VerifiedSitesManager.tsx:248`, `ManagementPages.tsx:566` (a module-level helper, so `lang` became a parameter and 7 callers plus `describeCron` were threaded), `ClipboardHistoryPanel.tsx:78`, `NotebookContent.tsx:276`. **The finding that matters more than the seven fixes: the gate for this class already existed and was reporting CLEAN.** `tools/i18n-locale-arg-check.cjs` holds `toLocaleDateString`/`toLocaleTimeString` at a hard zero but treats `toLocaleString` as "overwhelmingly number formatting" and ratchets it over a baseline — so `new Date(x).toLocaleString()` was counted as a thousands-separator site, **baselined as accepted debt, and printed the line "no date/time formatting follows the OS locale" while six user-visible stamps did exactly that.** The check now promotes any `toLocaleString` whose receiver is a literal `new Date(...)` into the strict tier and excludes it from the ratchet, so a file can no longer pay its debt down on a separator while the date beside it stays broken. Deliberately under-reaching: `d.toLocaleString()` where `d` is a Date *variable* is still ratcheted, because a hard zero that produces false positives gets baselined away and then protects nothing. **Controls:** promoting the rule turned up **4 more sites the old classifier had hidden** (clipboard, notebook, scraper scheduling, verified sites) — all four fixed here. Reverting one fix (`YouTubePlaylistsView`) takes the check to **exit 1** naming that exact line; restoring it returns **exit 0**. Baseline re-locked at 48 sites in 16 files (was 52 in 19). **VERIFIED LIVE after the merge-back served it** (pid 14128, window 2, `ui-lang=ru`): the YouTube header went `Последняя проверка 9/7/2026, 12:10:56 AM` → **`Последняя проверка 07.09.2026, 00:25:59`**, and all **52** Translate history rows went `ja → en · 9/6/2026, 10:05:11 AM · app` → **`ja → en · 06.09.2026, 10:05:11 · app`**. |
 
+### 2026-09-07 00:30 EDT - THE APP WAS LEFT IN RUSSIAN, AND IT IS BACK IN ENGLISH
+
+Housekeeping, said out loud because it is a change to one of the user's own settings.
+
+The app was sitting in **Russian** at the start of this turn (`ui-lang=ru`, taskbar reading
+`Пуск`) - residue from the language-switch pass, which D114's row records as "left by an earlier
+pass". Every surface the user opens for their own sweep would have been in Russian.
+
+Two things came of it before it was put back, so it was not pure cost: the live i18n pass was run
+for free in a genuinely switched app (the leads are in the cross-cutting row), and **D120** was
+found - which is a defect that is only visible in a non-English UI.
+
+**Restored to English through the app's own control** (Settings ▸ the `sp-seg-btn` language row),
+not by writing `localStorage`: a dynamic `import()` of `i18n.ts` from the bridge mutates a
+DUPLICATE module instance and flips `documentElement.lang` while the app stays where it was.
+Controls that had to move, and did: `ui-lang` `ru → en`, the taskbar `Пуск → Start`, and the
+settings rail `Внешний вид → Appearance`.
+
+**If Russian was actually the user's own choice rather than agent residue, this is one click to
+put back** - Settings ▸ Русский. It was changed because the app's default is `en`, every prior
+surface walk in this register reads English, and a worker recorded setting it.
+
 ### 2026-09-07 00:25 EDT - THE MERGE-BACK LEFT CONFLICT MARKERS IN THE MAIN TREE AND BROKE THE APP
 
 Not a product defect, but it cost this turn twenty minutes and it will happen again, so it is
