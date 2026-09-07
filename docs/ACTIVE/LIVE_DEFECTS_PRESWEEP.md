@@ -513,3 +513,5 @@ and starting it with a full suite already running was the wrong order.
 **Do not "fix" this by removing `aria-hidden` from `Icons.tsx`.** That would name every button
 after its icon id (`heart`, `skip-back`), which is a worse name than none and would silently
 change 130 controls at once. The name belongs on the button.
+
+D2 verification, 2026-09-07 00:54 EDT: delivered Enter **1/1** opens **悪の教典 02** with its real Japanese text through the existing reader, from BOTH standard and Aero lists (24 rows → 0 list rows + novel-scroller). Reader Library button returns to the shelf. Unit controls keep single-click selection, Space, unrelated keys and double click; held Enter opens once. Isolated old view fails **3/13** Enter cases, all **10 controls pass**; corrected view passes **13/13**; shared tree Library suites **21/21**. Console errors **0**. Library remains partial; this closes D2 rather than claiming its whole inventory.

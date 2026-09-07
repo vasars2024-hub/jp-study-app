@@ -1321,6 +1321,12 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       aria-pressed={selected}
                       onClick={() => setSelectedId(it.id)}
                       onDoubleClick={() => onOpen(it)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!e.repeat) onOpen(it);
+                      }}
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData('app/lib-item', it.id);
@@ -1642,6 +1648,12 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                         data-library-row={it.id}
                         onClick={() => setSelectedId(it.id)}
                         onDoubleClick={() => onOpen(it)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!e.repeat) onOpen(it);
+                        }}
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData('app/lib-item', it.id);

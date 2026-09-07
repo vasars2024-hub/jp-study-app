@@ -46,6 +46,45 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  document.documentElement.removeAttribute('data-materials');
+});
+
+describe.each(['', 'aero', 'wired'])('Library list keyboard activation, material %s', (material) => {
+  async function listRow() {
+    if (material) document.documentElement.setAttribute('data-materials', material);
+    await render();
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-library-layout="list"]')!.click();
+    });
+    const rows = [...host.querySelectorAll<HTMLButtonElement>('button.lib-list-row, button.aero-library-row')];
+    expect(rows).toHaveLength(2);
+    return rows.find((row) => row.textContent?.includes('コンビニ人間'))!;
+  }
+
+  it('opens the focused row on Enter exactly once, including when the key is held', async () => {
+    const row = await listRow();
+    row.focus();
+    await press(row, 'Enter');
+    await act(async () => {
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }));
+    });
+    expect(opened).toEqual(['li_ja']);
+  });
+
+  it('keeps single click and Space as selection and ignores unrelated keys', async () => {
+    const row = await listRow();
+    await act(async () => { row.click(); });
+    expect(row.getAttribute('aria-pressed')).toBe('true');
+    await press(row, ' ');
+    await press(row, 'a');
+    expect(opened).toEqual([]);
+  });
+
+  it('preserves double-click opening', async () => {
+    const row = await listRow();
+    await act(async () => { row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+    expect(opened).toEqual(['li_ja']);
+  });
 });
 
 async function render(): Promise<void> {
