@@ -21,6 +21,7 @@ export const zh: Catalog = {
   'common.download': '下载',
   'common.downloadSize': '下载（{size}）',
   'common.remove': '删除',
+  'common.moreNotShown': { other: '另有 {count} 项未显示' },
   'common.add': '添加',
   'common.reset': '重置',
   'common.start': '开始',

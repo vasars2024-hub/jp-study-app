@@ -24,6 +24,12 @@ interface ReportDraft {
   languageNotes: string;
 }
 
+/**
+ * Report cap. The header renders `{entry.communityReports.length} reports`, so a silent
+ * cap here made the two numbers disagree on screen — D137.
+ */
+const REPORT_ROWS = 8;
+
 const emptyDraft = (): ReportDraft => ({
   author: '',
   rating: '',
@@ -270,7 +276,7 @@ export default function VisualNovelCommunityPanel({
       )}
       {entry.communityReports.length > 0 && (
         <div className="visual-novel-community-reports">
-          {entry.communityReports.slice().reverse().slice(0, 8).map((report) => (
+          {entry.communityReports.slice().reverse().slice(0, REPORT_ROWS).map((report) => (
             <article key={report.id}>
               <div>
                 <strong>{report.author}</strong>
@@ -280,6 +286,9 @@ export default function VisualNovelCommunityPanel({
               {report.languageNotes && <small>{report.languageNotes}</small>}
             </article>
           ))}
+          {entry.communityReports.length > REPORT_ROWS && (
+            <small>{t('common.moreNotShown', { count: entry.communityReports.length - REPORT_ROWS })}</small>
+          )}
         </div>
       )}
     </details>

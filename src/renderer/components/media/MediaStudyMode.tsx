@@ -28,6 +28,14 @@ import MediaLanguageProfileCard from './MediaLanguageProfileCard';
 import MediaStudyAssistantPanel from './MediaStudyAssistantPanel';
 import { clearHandoff, peekHandoff } from '../../pendingHandoff';
 
+/**
+ * Result-list caps. Both headings above these lists print the FULL length
+ * ("486 vocabulary candidates", "1,204 Japanese subtitle sentences"), so the overflow is
+ * disclosed beneath each one rather than left to contradict the heading — D137.
+ */
+const VOCAB_ROWS = 40;
+const SENTENCE_ROWS = 80;
+
 function pendingRequest(): MediaStudyRequest | null {
   try {
     return parseMediaStudyRequest(JSON.parse(peekHandoff('studyMediaRequest') ?? 'null'));
@@ -348,7 +356,7 @@ export default function MediaStudyMode({
             <button type="button" onClick={createFlashcards}>Create up to 30 flashcards</button>
           </div>
           <ol className="media-study-vocabulary">
-            {analysis.vocabulary.slice(0, 40).map((entry) => (
+            {analysis.vocabulary.slice(0, VOCAB_ROWS).map((entry) => (
               <li key={entry.word}>
                 <button type="button" onClick={() => openSentence(entry.firstSeenAt)}>
                   <strong>{entry.word}</strong>
@@ -359,13 +367,18 @@ export default function MediaStudyMode({
               </li>
             ))}
           </ol>
+          {analysis.vocabulary.length > VOCAB_ROWS && (
+            <p className="muted">
+              {t('common.moreNotShown', { count: analysis.vocabulary.length - VOCAB_ROWS })}
+            </p>
+          )}
         </div>
       )}
       {analysis && request.action === 'review-sentences' && (
         <div className="media-study-results">
           <strong>{analysis.sentences.length} Japanese subtitle sentences</strong>
           <ol className="media-study-sentences">
-            {analysis.sentences.slice(0, 80).map((sentence, index) => (
+            {analysis.sentences.slice(0, SENTENCE_ROWS).map((sentence, index) => (
               <li key={`${sentence.start}-${index}`}>
                 <button type="button" onClick={() => openSentence(sentence.start)}>
                   <time>{formatCueTime(sentence.start)}</time>
@@ -383,6 +396,11 @@ export default function MediaStudyMode({
               </li>
             ))}
           </ol>
+          {analysis.sentences.length > SENTENCE_ROWS && (
+            <p className="muted">
+              {t('common.moreNotShown', { count: analysis.sentences.length - SENTENCE_ROWS })}
+            </p>
+          )}
         </div>
       )}
       {analysis && request.action === 'analyze-japanese' && (

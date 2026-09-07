@@ -134,6 +134,9 @@ function formatYtDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Row cap for the notifications table. The overflow is disclosed beneath it — see D137. */
+const NOTIFICATION_ROWS = 50;
+
 function notificationTime(ts: number, t: (key: string, vars?: TVars) => string): string {
   const elapsed = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (elapsed < 60) return t('notifications.time.justNow');
@@ -243,7 +246,7 @@ export function NotificationCenterPanel() {
                 </tr>
               </thead>
               <tbody>
-                {items.slice(0, 50).map((item: ShellNotification) => (
+                {items.slice(0, NOTIFICATION_ROWS).map((item: ShellNotification) => (
                   <tr key={item.id}>
                     <td>{timeAgo(item.ts)}</td>
                     <td>
@@ -259,6 +262,11 @@ export function NotificationCenterPanel() {
                 ))}
               </tbody>
             </table>
+            {items.length > NOTIFICATION_ROWS && (
+              <p className="blanc-note">
+                {t('common.moreNotShown', { count: items.length - NOTIFICATION_ROWS })}
+              </p>
+            )}
           </div>
         )}
       </fieldset>

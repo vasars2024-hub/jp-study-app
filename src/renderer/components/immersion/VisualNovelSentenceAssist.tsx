@@ -12,6 +12,12 @@ import { analyzeMediaStudyCues, type MediaStudyAnalysis } from '../../mediaStudy
 import VisualNovelAgentHandoffButton from './VisualNovelAgentHandoffButton';
 import { openGrammarPractice } from '../../extensionBridgeUi';
 
+/**
+ * Kanji-link cap. `vnAssist.kanjiCount` two lines above reads the full length, so the
+ * overflow is disclosed rather than left to contradict it — D137.
+ */
+const KANJI_LINKS = 24;
+
 function draftFromCapture(capture: VisualNovelTextCapture): Required<VisualNovelCapturePatch> {
   return {
     kind: capture.kind,
@@ -228,11 +234,14 @@ export default function VisualNovelSentenceAssist({
           <span>{t('vnAssist.kanjiCount', { count: analysis.kanji.length })}</span>
           {analysis.kanji.length > 0 && (
             <div className="visual-novel-kanji-links" aria-label={t('vnAssist.aria.kanjiLinks')}>
-              {analysis.kanji.slice(0, 24).map((item) => (
+              {analysis.kanji.slice(0, KANJI_LINKS).map((item) => (
                 <button key={item.character} type="button" onClick={() => lookupKanji(item.character)}>
                   {item.character}
                 </button>
               ))}
+              {analysis.kanji.length > KANJI_LINKS && (
+                <small>{t('common.moreNotShown', { count: analysis.kanji.length - KANJI_LINKS })}</small>
+              )}
             </div>
           )}
           {analysis.grammar.length > 0 && (

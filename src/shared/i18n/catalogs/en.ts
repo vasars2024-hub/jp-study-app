@@ -22,6 +22,10 @@ export const en: Catalog = {
   'common.download': 'Download',
   'common.downloadSize': 'Download ({size})',
   'common.remove': 'Remove',
+  // Shared disclosure for a list rendered with a row cap. A capped list under a label that
+  // reads the full length is D137 — the screen says 120 and shows 50, and the user reads the
+  // difference as lost data rather than as a cap.
+  'common.moreNotShown': { one: '+{count} more not shown', other: '+{count} more not shown' },
   'common.add': 'Add',
   'common.reset': 'Reset',
   'common.start': 'Start',

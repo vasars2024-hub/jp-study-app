@@ -21,6 +21,10 @@ export const ru: Catalog = {
   'common.download': 'Скачать',
   'common.downloadSize': 'Скачать ({size})',
   'common.remove': 'Удалить',
+  'common.moreNotShown': {
+    one: 'ещё {count} элемент не показан', few: 'ещё {count} элемента не показаны',
+    many: 'ещё {count} элементов не показано', other: 'ещё {count} элемента не показаны',
+  },
   'common.add': 'Добавить',
   'common.reset': 'Сбросить',
   'common.start': 'Старт',

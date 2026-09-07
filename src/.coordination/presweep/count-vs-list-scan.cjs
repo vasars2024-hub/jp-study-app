@@ -275,6 +275,13 @@ function truncatedRenders(text) {
         if (/\.length\s*[-]/.test(l)) { disclosed = true; break; }
         if (/\.length\s*[><]/.test(l)) { disclosed = true; break; }
         if (!/^-?\d+$/.test(capText) && l.includes(capText.replace(/^-/, '')) && !l.includes('.slice')) {
+          // The cap's OWN declaration or import is not a disclosure. Without this every cap
+          // written as a named constant read as disclosed whenever its `const` line happened
+          // to sit within the window — which is most of them, and it is how the first version
+          // of this pass scored `GameArenaContent` clean over a real defect.
+          const bare = capText.replace(/^-/, '');
+          const decl = new RegExp(`\\b(const|let|var|import|from)\\b[^\\n]*\\b${bare}\\b|\\b${bare}\\s*[:=][^=]`);
+          if (decl.test(l)) continue;
           disclosed = true;
           break;
         }
@@ -289,21 +296,31 @@ if (args.includes('--truncation')) {
   const all = walk(path.join(SRC, 'renderer'))
     .concat(fs.existsSync(path.join(SRC, 'media')) ? walk(path.join(SRC, 'media')) : [])
     .filter((f) => (only ? f.includes(only) : true));
-  let silent = 0;
+  const asJson = args.includes('--json');
   let total = 0;
+  const sites = [];
   for (const file of all) {
     const hits = truncatedRenders(stripComments(fs.readFileSync(file, 'utf8')));
     if (!hits.length) continue;
     total += hits.length;
-    const leads = hits.filter((h) => !h.disclosed);
-    if (!leads.length) continue;
-    console.log(`\n${path.relative(SRC, file).replace(/\\/g, '/')}`);
-    for (const h of leads) {
-      silent += 1;
-      console.log(`  :${h.line}  ${h.base} capped at ${h.cap}  ${h.text.slice(0, 130)}`);
+    const rel = path.relative(SRC, file).replace(/\\/g, '/');
+    for (const h of hits.filter((x) => !x.disclosed)) {
+      sites.push({ file: rel, line: h.line, base: h.base, cap: h.cap });
     }
   }
-  console.log(`\n${all.length} files · ${total} truncated renders · ${silent} with NO disclosure nearby`);
+  if (asJson) {
+    console.log(JSON.stringify({ filesScanned: all.length, truncated: total, silent: sites.length, sites }));
+    process.exit(0);
+  }
+  let shown = null;
+  for (const s of sites) {
+    if (s.file !== shown) {
+      console.log(`\n${s.file}`);
+      shown = s.file;
+    }
+    console.log(`  :${s.line}  ${s.base} capped at ${s.cap}`);
+  }
+  console.log(`\n${all.length} files · ${total} truncated renders · ${sites.length} with NO disclosure nearby`);
   process.exit(0);
 }
 

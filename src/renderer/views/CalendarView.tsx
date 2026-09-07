@@ -23,6 +23,14 @@ import { LANG_TAGS } from '../../shared/i18n/core';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import '../components/calendar/calendarLiquid.css';
 
+/**
+ * Aero inspector row caps. The nav rail above prints `agendaToday.length` and
+ * `agendaOverdue.length` in full, so a silent cap made the rail and the list beside it
+ * disagree — "Overdue 12" over five rows. D137.
+ */
+const AGENDA_ROWS = 5;
+const AGENDA_UPCOMING_ROWS = 8;
+
 export default function CalendarView() {
   const { t, lang } = useT();
   const aero = useAeroMaterials();
@@ -145,11 +153,14 @@ export default function CalendarView() {
             <p className="muted">Nothing today.</p>
           ) : (
             <ul className="aero-cal-list">
-              {agendaToday.slice(0, 5).map((ev) => (
+              {agendaToday.slice(0, AGENDA_ROWS).map((ev) => (
                 <li key={`today-${ev.id}-${ev.occurrenceDate}`}>
                   <EventChip ev={ev} onClick={() => openEdit(ev)} />
                 </li>
               ))}
+              {agendaToday.length > AGENDA_ROWS && (
+                <li className="muted">{t('common.moreNotShown', { count: agendaToday.length - AGENDA_ROWS })}</li>
+              )}
             </ul>
           )}
           <div className="aero-cal-pane-title">Upcoming</div>
@@ -157,12 +168,17 @@ export default function CalendarView() {
             <p className="muted">Nothing scheduled.</p>
           ) : (
             <ul className="aero-cal-list">
-              {agendaUpcoming.slice(0, 8).map((ev) => (
+              {agendaUpcoming.slice(0, AGENDA_UPCOMING_ROWS).map((ev) => (
                 <li key={`upcoming-${ev.id}-${ev.occurrenceDate}`}>
                   <span className="aero-cal-date">{new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
                   <EventChip ev={ev} onClick={() => openEdit(ev)} />
                 </li>
               ))}
+              {agendaUpcoming.length > AGENDA_UPCOMING_ROWS && (
+                <li className="muted">
+                  {t('common.moreNotShown', { count: agendaUpcoming.length - AGENDA_UPCOMING_ROWS })}
+                </li>
+              )}
             </ul>
           )}
           <div className="aero-cal-pane-title">Overdue</div>
@@ -170,11 +186,14 @@ export default function CalendarView() {
             <p className="muted">None.</p>
           ) : (
             <ul className="aero-cal-list">
-              {agendaOverdue.slice(0, 5).map((ev) => (
+              {agendaOverdue.slice(0, AGENDA_ROWS).map((ev) => (
                 <li key={`overdue-${ev.id}-${ev.occurrenceDate}`}>
                   <EventChip ev={ev} onClick={() => openEdit(ev)} />
                 </li>
               ))}
+              {agendaOverdue.length > AGENDA_ROWS && (
+                <li className="muted">{t('common.moreNotShown', { count: agendaOverdue.length - AGENDA_ROWS })}</li>
+              )}
             </ul>
           )}
         </aside>

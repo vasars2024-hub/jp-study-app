@@ -21,6 +21,7 @@ export const ja: Catalog = {
   'common.download': 'ダウンロード',
   'common.downloadSize': 'ダウンロード（{size}）',
   'common.remove': '削除',
+  'common.moreNotShown': { other: '他 {count} 件は非表示' },
   'common.add': '追加',
   'common.reset': 'リセット',
   'common.start': '開始',

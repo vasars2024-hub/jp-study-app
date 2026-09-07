@@ -96,6 +96,12 @@ interface Session extends ArenaSessionState {
 /** How long an answered round stays on screen before the next one loads. */
 const REVEAL_MS = 900;
 
+/**
+ * Badge wall cap. The header's own `games.badgeCount` reads the FULL length, so the overflow
+ * has to be disclosed or the two numbers contradict each other on screen — D137.
+ */
+const BADGE_ROWS = 8;
+
 function activeLevel(settings: GameArenaSettings, serviceLevel: number): 1 | 2 | 3 | 4 | 5 | 6 | 7 {
   if (settings.levelOverride !== 'auto') return settings.levelOverride;
   return Math.min(7, Math.max(1, serviceLevel)) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -547,7 +553,7 @@ export function GameArena() {
 
       {!!progress.badges.length && (
         <section className="game-badges" aria-label={t('games.badges')}>
-          {progress.badges.slice(0, 8).map((badge) => (
+          {progress.badges.slice(0, BADGE_ROWS).map((badge) => (
             // Badge reveal choreography (Phase 4.5): 3D flip + radial glow.
             // Both collapse to a plain card under Disabled/reduced motion.
             <div key={badge.id} className="game-badge motion-badge">
@@ -561,6 +567,11 @@ export function GameArena() {
               </div>
             </div>
           ))}
+          {progress.badges.length > BADGE_ROWS && (
+            <p className="muted">
+              {t('common.moreNotShown', { count: progress.badges.length - BADGE_ROWS })}
+            </p>
+          )}
         </section>
       )}
     </div>
