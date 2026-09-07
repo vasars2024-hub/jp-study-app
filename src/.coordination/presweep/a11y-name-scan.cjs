@@ -43,6 +43,7 @@ function parseArgs(argv) {
     else if (a === '--json') out.json = argv[++i];
     else if (a === '--window') out.window = argv[++i];
     else if (a === '--pass') out.pass = argv[++i];
+    else if (a === '--narrow') out.narrow = argv[++i];
   }
   return out;
 }
@@ -345,6 +346,154 @@ function keyboardExpression(scope) {
   })()`;
 }
 
+/**
+ * Pass 3 — reflow. The cross-cutting "resize narrow + maximize" pass that ~20 surface
+ * rows in LIVE_DEFECTS_PRESWEEP.md defer to by name.
+ *
+ * What it looks for, and why this shape rather than "does it look bad":
+ *   Every view renders inside a `.fwin` in ONE full-size renderer, so a
+ *   `@media (max-width: N)` rule inside a view asks about the 1904px DESKTOP viewport,
+ *   not the 420px window — it can never fire where it was meant to. The observable
+ *   consequence is content wider than its box inside an ancestor that clips it, which
+ *   makes a CONTROL unreachable by mouse. That is the finding; a stacked layout that
+ *   merely looks cramped is not.
+ *
+ * Two exclusions, without which this fabricates findings on correct code:
+ *   - `text-overflow: ellipsis` + `overflow: hidden` is the app's deliberate truncation
+ *     idiom on ~every list row. Clipping there is the design, not a defect.
+ *   - a clipping ancestor that CAN scroll horizontally (`overflow-x: auto|scroll` with
+ *     real scrollWidth) still reaches its content. Only an unscrollable clip hides it.
+ *
+ * And one trap that voids the whole pass: an unfocused renderer delivers no
+ * ResizeObserver callbacks, so a bridge-driven resize moves the box while every
+ * observer-driven layout stays frozen at its old width — which reads exactly like a
+ * layout defect. The driver focuses the window first and asserts the body width really
+ * moved before it believes a single measurement.
+ */
+function reflowExpression(scope) {
+  const sel = JSON.stringify(scope);
+  return `(() => {
+    const w = document.querySelector(${sel});
+    if (!w) return { missing: true };
+    const body = w.querySelector('.fwin-body') || w;
+    const br = body.getBoundingClientRect();
+
+    const path = (el) => {
+      const bits = [];
+      for (let n = el; n && n !== body && bits.length < 4; n = n.parentElement) {
+        const cls = String(n.className || '').split(/\\s+/).filter(Boolean).slice(0, 2).join('.');
+        bits.unshift(n.tagName.toLowerCase() + (cls ? '.' + cls : ''));
+      }
+      return bits.join(' > ');
+    };
+    const visible = (el) => {
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ checkOpacity: false, checkVisibilityCSS: true })) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+    const canScrollX = (el) => {
+      const ox = getComputedStyle(el).overflowX;
+      return (ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth + 1;
+    };
+    const clips = (el) => {
+      const ox = getComputedStyle(el).overflowX;
+      return ox === 'hidden' || ox === 'clip';
+    };
+
+    const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=link], [role=checkbox], [role=switch], [role=menuitem], [role=option], [role=radio], [tabindex]:not([tabindex="-1"])';
+
+    // 1. A control painted outside a clipping ancestor that cannot scroll to it.
+    //
+    // Two degrees, because the first version of this only had the second and it
+    // reported "0 unreachable" on the Media Center player bar while 18 of the 26px
+    // of "Add to Liked" sat past the clip edge — the control was still nominally
+    // hit-testable on its surviving 8px sliver, so a wholly-outside test missed the
+    // defect entirely. A control the user can see cut in half is a finding.
+    const unreachable = [];
+    const partiallyCut = [];
+    let controls = 0;
+    for (const el of body.querySelectorAll(SEL)) {
+      if (!visible(el)) continue;
+      controls += 1;
+      const r = el.getBoundingClientRect();
+      for (let n = el.parentElement; n && n !== body.parentElement; n = n.parentElement) {
+        if (canScrollX(n)) break;               // reachable by scrolling
+        if (!clips(n)) continue;
+        const nr = n.getBoundingClientRect();
+        const edgeR = nr.left + n.clientWidth;
+        const outRight = r.left - edgeR;
+        const outLeft = nr.left - r.right;
+        if (outRight > -2 || outLeft > -2) {
+          unreachable.push({
+            path: path(el),
+            text: String(el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 50),
+            clipper: path(n),
+            byPx: Math.round(Math.max(outRight, outLeft) + 2),
+          });
+          break;
+        }
+        // Partly clipped: more than a quarter of the control is past an edge.
+        const lost = Math.max(r.right - edgeR, nr.left - r.left, 0);
+        if (r.width > 0 && lost / r.width > 0.25) {
+          partiallyCut.push({
+            path: path(el),
+            text: String(el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 50)
+              || (el.getAttribute('aria-label') || el.getAttribute('title') || '').slice(0, 50),
+            clipper: path(n),
+            lostPx: Math.round(lost),
+            ofPx: Math.round(r.width),
+          });
+          break;
+        }
+      }
+    }
+
+    // 2. Text clipped with no ellipsis and no scroll route — readable content lost.
+    const textClipped = [];
+    const flaggedBoxes = [];
+    for (const el of body.querySelectorAll('*')) {
+      const over = el.scrollWidth - el.clientWidth;
+      if (over <= 4) continue;
+      if (!visible(el)) continue;
+      // A 1px box is the visually-hidden idiom (position:absolute; width:1px;
+      // clip-path: inset(50%)), which this app uses heavily and DELIBERATELY - the
+      // Media Center rail collapses its labels that way at narrow width precisely so
+      // the accessible name survives. 14 of the first run's 22 hits were this.
+      if (el.clientWidth <= 1 || el.clientHeight <= 1) continue;
+      const cs = getComputedStyle(el);
+      if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') continue;
+      if (cs.overflowX === 'visible') continue;
+      if (cs.textOverflow === 'ellipsis') continue;
+      // Report the outermost clipper only; its descendants share the cause.
+      if (flaggedBoxes.some((f) => f.contains(el))) continue;
+      let anyScrollableAncestor = false;
+      for (let n = el.parentElement; n && n !== body.parentElement; n = n.parentElement) {
+        if (canScrollX(n)) { anyScrollableAncestor = true; break; }
+      }
+      if (anyScrollableAncestor) continue;
+      flaggedBoxes.push(el);
+      textClipped.push({
+        path: path(el),
+        box: el.clientWidth,
+        content: el.scrollWidth,
+        over,
+        text: String(el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60),
+      });
+    }
+
+    return {
+      missing: false,
+      bodyW: Math.round(br.width),
+      bodyH: Math.round(br.height),
+      winW: Math.round(w.getBoundingClientRect().width),
+      controls,
+      unreachable,
+      partiallyCut,
+      textClipped,
+    };
+  })()`;
+}
+
 const ALL_SURFACES = [
   'agent', 'library', 'novels', 'dictionary', 'grammar', 'translate', 'player', 'video',
   'music', 'anki', 'flashcards', 'games', 'stats', 'resources', 'settings', 'note',
@@ -354,6 +503,80 @@ const ALL_SURFACES = [
 
 async function openSections() {
   return evalJs(`[...document.querySelectorAll('.fwin')].map(w => w.getAttribute('data-section'))`);
+}
+
+const NARROW_PX = Number(args.narrow || 420);
+
+/**
+ * Drive one surface through rest -> narrow -> restore -> maximized -> restore, measuring
+ * at each stop. Geometry is put back by writing the ORIGINAL style attribute verbatim:
+ * `removeProperty('width')` deletes the app's own persisted value, not the override.
+ */
+async function reflowSurface(surface, scope) {
+  // An unfocused renderer runs no ResizeObserver, so the resize would move the box while
+  // every observer-driven layout stayed frozen. Focus first, always.
+  if (args.window) { try { await post('/focus', { window: Number(args.window) }); } catch { /* best effort */ } }
+
+  const original = await evalJs(`(() => { const w = document.querySelector(${JSON.stringify(scope)}); return w ? w.getAttribute('style') : null; })()`);
+  if (original == null) return { surface, skipped: 'no window' };
+
+  const states = [];
+  const measure = async (label) => {
+    const m = await evalJs(reflowExpression(scope));
+    if (m.missing) { states.push({ label, skipped: 'window vanished' }); return null; }
+    states.push({ label, ...m });
+    return m;
+  };
+
+  const rest = await measure('rest');
+  if (!rest) return { surface, states, original };
+
+  // NARROW
+  await evalJs(`(() => { const w = document.querySelector(${JSON.stringify(scope)}); w.style.width = '${NARROW_PX}px'; return w.style.width; })()`);
+  await sleep(700);
+  const narrow = await measure(`narrow ${NARROW_PX}px`);
+  // The resize is only believable if the body actually moved. If it did not, the
+  // renderer never laid out and any finding here would be an instrument artifact.
+  if (narrow && narrow.bodyW >= rest.bodyW) {
+    narrow.suspect = `body did not shrink (${rest.bodyW} -> ${narrow.bodyW}) — resize did not take, findings VOID`;
+    narrow.unreachable = [];
+    narrow.partiallyCut = [];
+    narrow.textClipped = [];
+  }
+  await evalJs(`(() => { const w = document.querySelector(${JSON.stringify(scope)}); w.setAttribute('style', ${JSON.stringify(original)}); return w.getAttribute('style'); })()`);
+  await sleep(400);
+
+  // MAXIMIZED — through the window's own control, which is the only route that writes
+  // the restore point. The maximize button is the one aria-pressed button that is not
+  // the Liquid toggle; keying on the label would break in ja/zh/ru.
+  const maxSel = `${scope} .fwin-bar button[aria-pressed]:not(.fwin-b-liquid)`;
+  const hasMax = await evalJs(`!!document.querySelector(${JSON.stringify(maxSel)})`);
+  if (!hasMax) {
+    states.push({ label: 'maximized', skipped: 'surface renders no maximize control' });
+  } else {
+    await evalJs(`(() => { document.querySelector(${JSON.stringify(maxSel)}).click(); return 'clicked'; })()`);
+    await sleep(800);
+    const max = await measure('maximized');
+    if (max && max.bodyW <= rest.bodyW) {
+      max.suspect = `body did not grow (${rest.bodyW} -> ${max.bodyW}) — maximize did not take, findings VOID`;
+      max.unreachable = [];
+      max.partiallyCut = [];
+      max.textClipped = [];
+    }
+    await evalJs(`(() => { const b = document.querySelector(${JSON.stringify(maxSel)}); if (b) b.click(); return 'restored'; })()`);
+    await sleep(600);
+  }
+
+  await sleep(300);
+  const finalStyle = await evalJs(`(() => { const w = document.querySelector(${JSON.stringify(scope)}); return w ? w.getAttribute('style') : null; })()`);
+  // Compare GEOMETRY only. `z-index` is restacked by every raise and differing on it
+  // would report a forced restore on every surface while nothing had actually moved.
+  const geom = (s) => String(s || '').replace(/z-index:[^;]*;?/g, '').replace(/\s+/g, ' ').trim();
+  const restored = geom(finalStyle) === geom(original);
+  if (!restored) {
+    await evalJs(`(() => { const w = document.querySelector(${JSON.stringify(scope)}); if (w) w.setAttribute('style', ${JSON.stringify(original)}); return 'forced'; })()`);
+  }
+  return { surface, states, original, finalStyle, restoredCleanly: restored };
 }
 
 async function main() {
@@ -376,6 +599,31 @@ async function main() {
     }
 
     const scope = `.fwin[data-section="${s}"]`;
+
+    if (PASS === 'reflow') {
+      let row;
+      try { row = await reflowSurface(s, scope); } catch (e) { results.push({ surface: s, error: String(e.message) }); continue; }
+      row.opened = opened;
+      results.push(row);
+      if (row.skipped) {
+        console.log(`${s}: SKIPPED — ${row.skipped}`);
+      } else {
+        for (const st of row.states) {
+          if (st.skipped) { console.log(`  ${s} @ ${st.label}: SKIPPED — ${st.skipped}`); continue; }
+          console.log(
+            `  ${s} @ ${st.label} (body ${st.bodyW}px): ${st.controls} controls | UNREACHABLE ${st.unreachable.length} | part-cut ${(st.partiallyCut || []).length} | text clipped ${st.textClipped.length}`,
+          );
+          for (const u of st.unreachable) console.log(`      UNREACHABLE "${u.text}" ${u.byPx}px past ${u.clipper}  <- ${u.path}`);
+          for (const c of st.partiallyCut || []) console.log(`      PART-CUT "${c.text}" loses ${c.lostPx} of ${c.ofPx}px at ${c.clipper}  <- ${c.path}`);
+          for (const t2 of st.textClipped) console.log(`      CLIPPED ${t2.box}px box / ${t2.content}px content  ${t2.path}  "${t2.text}"`);
+        }
+      }
+      if (opened) {
+        await evalJs(`(() => { const b = document.querySelector('.fwin[data-section="${s}"] .fwin-close'); if (b) { b.click(); return 'closed'; } return 'no close button'; })()`);
+        await sleep(400);
+      }
+      continue;
+    }
 
     if (PASS === 'keyboard') {
       let kb;
@@ -449,6 +697,20 @@ async function main() {
     console.log(`wrote ${args.json}`);
   }
 
+  if (PASS === 'reflow') {
+    let un = 0; let pc = 0; let tc = 0; let voided = 0; let noRestore = 0;
+    for (const r of results) {
+      for (const st of r.states || []) {
+        if (st.suspect) { voided += 1; continue; }
+        un += (st.unreachable || []).length;
+        pc += (st.partiallyCut || []).length;
+        tc += (st.textClipped || []).length;
+      }
+      if (r.states && r.restoredCleanly === false) noRestore += 1;
+    }
+    console.log(`\nTOTAL: ${un} unreachable controls, ${pc} partly-cut controls, ${tc} clipped text boxes across ${results.length} surfaces (${voided} states VOID, ${noRestore} needed a forced geometry restore)`);
+    return;
+  }
   if (PASS === 'keyboard') {
     const mo = results.reduce((a, r) => a + (r.mouseOnly ? r.mouseOnly.length : 0), 0);
     const pt = results.reduce((a, r) => a + (r.positiveTabindex ? r.positiveTabindex.length : 0), 0);

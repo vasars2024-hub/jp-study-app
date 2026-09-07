@@ -3498,8 +3498,21 @@
     min-height: 430px;
   }
 
+  /* `minmax(120px, …)` is a FLOOR, and next to an `auto` track it is the whole
+     defect. The transport's `auto` track is its 200px min-content — six 26px
+     controls and their gaps, which cannot compress — so the pair demands
+     120 + 10 + 200 = 330px of a bar that has only 300px of content box at a
+     382px container. The overflow lands on `.mc-root`, which is `overflow-x:
+     hidden` with no scroll route, so the last control ("Add to Liked", 487→513
+     against a 495px clip edge) is sliced: 18 of its 26px are unclickable and the
+     icon is drawn cut in half. The band is real and reachable by dragging one
+     edge — any container from 361px (where the 360px tier below would have
+     rescued it) up to 412px. Measured live 2026-09-06 at 420px on `player` and
+     `video`; `minmax(0, …)` gives the info column 90px, `scrollWidth` drops
+     403 → 382 and the transport sits 12px inside. Removing this line again puts
+     it straight back to 403/18. */
   .mc-playerbar {
-    grid-template-columns: minmax(120px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .mc-player-progress {
