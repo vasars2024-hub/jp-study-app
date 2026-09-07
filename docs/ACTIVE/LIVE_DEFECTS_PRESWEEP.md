@@ -937,8 +937,9 @@ for 2, 3 and 4** — the same call, succeeding on the reachable pair, which is t
 
 | # | surface | what the USER sees | repro (exact) | sev | status |
 |---|---------|--------------------|---------------|-----|--------|
-| D149 | desktop shell | **An app you tear off onto a desktop of its own can never be got back.** The taskbar shows two desktop buttons, "Desktop 1" and "Desktop 2", and that is all there is — no third button appears however many desktops exist, and the keyboard shortcut only flips between the same two. Right now two maximized Scraper windows are sitting on desktops 3 and 5 with no way to reach either. The buttons also ignore the desktops' own names: this user's are called "Study" and "City" and both buttons say "Desktop N". | Taskbar ▸ drag any app button upward ~56px to tear it off ▸ it opens on a new desktop in its own window ▸ close that window ▸ the app is gone. It is not on Desktop 1 or Desktop 2 and no button leads to it. | P1 | open |
-| D150 | desktop shell | With "show all windows" turned on, a window listed under another desktop's badge clicks to **silence** if nothing is currently showing that desktop — no window, no error, no toast. It is the one case the badge exists for. | Settings ▸ taskbar ▸ show all windows ▸ tear an app off to a new desktop ▸ close that desktop's window ▸ click the app's badged entry in the taskbar. Nothing happens. | P2 | open |
+| D149 | desktop shell | **A window on any desktop past the second can never be reached.** The taskbar shows two desktop buttons, "Desktop 1" and "Desktop 2", and that is all there is — no third button appears however many desktops exist, and the keyboard shortcut only flips between the same two. Two maximized Scraper windows were sitting on desktops 3 and 5 with no way to reach either. | Taskbar ▸ drag any app button upward ~56px to tear it off ▸ it opens on a new desktop in its own window ▸ close that window ▸ the app is gone. It is not on Desktop 1 or Desktop 2 and no button leads to it. Also reproduces from a display assignment: every extra display claims a desktop index, and this machine's store held eight. | P1 | **fixed** — the switcher and the shortcut now cover 0, 1, the active desktop, and every desktop holding a visible window. Verified live: the row went 2 → 4 buttons ("Desktop 1/2/3/5", the four occupied indices and none of the four empty ones), and a real click on the new "Desktop 3" put the stranded maximized Scraper window on screen. |
+| D150 | desktop shell | With "show all windows" turned on, a window listed under another desktop's badge clicks to **silence** if nothing is currently showing that desktop — no window, no error, no toast. It is the one case the badge exists for. | Settings ▸ taskbar ▸ show all windows ▸ tear an app off to a new desktop ▸ close that desktop's window ▸ click the app's badged entry in the taskbar. Nothing happens. | P2 | **fixed** — both call sites go through `desktopState.focusOrOpenDesktop`, and a failure toasts. Source-ratcheted: the suite fails if any caller in the shell reaches for `window.api.deskwinFocusDesktop` directly again. |
+| D151 | desktop shell | Clicking a desktop button that the app refuses to switch to does **nothing at all** — no movement, no message. It happens whenever that desktop is already open on a second monitor, which is the normal state on a two-screen setup. | Two displays, the second showing Desktop 2 ▸ on the first display click "Desktop 2". Nothing happens; the refusal only reached the developer console. | P2 | **fixed** — found while verifying D149's own fix. Verified live: the click now raises "Desktop 2 is already showing on another monitor." and the shell correctly stays where it was. The toast names the button the user clicked, not the store's internal label for it. |
 
 **Why both, and why they are one shape:** `DesktopShell.tsx:1353` already carries the correct
 helper — `deskwinFocusDesktop`, and `deskwinOpenDesktop` when nothing is showing that desktop —
@@ -946,3 +947,23 @@ with a comment saying focus alone "has a real hole". The taskbar's own foreign-w
 (`:3456`) calls the raise-only half and `void`s the answer. **A fix applied at one call site and
 not its sibling**, which is D137's and D143's shape for the third time. Grep every call site of
 the channel before writing the fix.
+
+**Two corrections to my own filing, made before the fix landed rather than after:**
+
+1. The first version of D149 said the buttons "ignore the desktops' own names — this user's are
+   called Study and City". **False.** `main/desktop.ts:68-69` hardcodes `'Study'` for index 0 and
+   `'City'` for index 1, and `desktopRename` has **zero renderer call sites** — there is no rename
+   UI, so there is no user name being ignored. The claim is struck. The translated
+   `desktop.desktopN` label is correct and stays.
+2. The first version blamed the tear-off gesture alone. The store's own `assignments` say
+   otherwise: **every extra display claims a desktop index** (this machine has nine assignments
+   across indices 1-7), and `allocateDesktop` grows past them. Both routes reach the same stranded
+   state; the fix covers both because it keys off "does this desktop hold a window", not off how
+   it came to exist.
+
+**TRAP that silently voids a parallel worker's window claim — `/eval` ignores `?win=`.**
+`debugBridge.ts:543` resolves the target from **`body.window`**. A `?win=11` query string is not
+read and not rejected: every such call lands on whichever window is FOCUSED. The pin tells workers
+to claim a window and pass it on every call; a worker passing it as a query param has been driving
+someone else's window while believing otherwise, and read-only probes make that invisible. Body
+key, or nothing. `debug/pri-eval-stdin.cjs` sends it correctly and takes the JS on stdin.

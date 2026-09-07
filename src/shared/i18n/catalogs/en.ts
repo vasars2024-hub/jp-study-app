@@ -3941,6 +3941,8 @@ export const en: Catalog = {
   'desktop.context.displaySettings': 'Desktop & display settings',
   'desktop.tearOff.noneFree': 'Every desktop is already in use, so this app has nowhere to move to.',
   'desktop.tearOff.failed': 'Could not give this app its own desktop.',
+  'desktop.switch.onAnotherDisplay': '{desktop} is already showing on another monitor.',
+  'desktop.switch.failed': 'Could not show {desktop}.',
   'desktop.task.close': 'Close {name}',
   'desktop.task.closeThis': 'Close',
   'desktop.task.closeOthers': 'Close all others',

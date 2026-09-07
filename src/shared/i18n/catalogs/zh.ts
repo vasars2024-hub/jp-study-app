@@ -3993,6 +3993,8 @@ export const zh: Catalog = {
   'desktop.context.displaySettings': '桌面与显示设置',
   'desktop.tearOff.noneFree': '所有桌面都已在使用中，此应用无处可移。',
   'desktop.tearOff.failed': '无法为此应用创建独立桌面。',
+  'desktop.switch.onAnotherDisplay': '{desktop} 已显示在另一台显示器上。',
+  'desktop.switch.failed': '无法显示 {desktop}。',
   'desktop.task.close': '关闭{name}',
   'desktop.task.closeThis': '关闭',
   'desktop.task.closeOthers': '关闭其他全部',
