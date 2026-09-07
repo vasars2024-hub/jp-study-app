@@ -25,6 +25,7 @@ import {
 import { appendNotebookEvent } from '../../notebookTimeline';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getTranslateTarget, onTranslateTargetChanged, setTranslateTarget } from '../../translateTarget';
 import { getTranslateSource, onTranslateSourceChanged, setTranslateSource } from '../../translateSource';
 
@@ -272,7 +273,7 @@ export function TranslateHistoryList({
   state: TranslateController;
   onOpenNotebook: () => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
 
   if (state.history.length === 0) {
     return (
@@ -310,7 +311,9 @@ export function TranslateHistoryList({
           return (
             <li key={e.id} className="tr-history-item">
               <div className="tr-history-meta muted">
-                {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString()} · {e.origin}
+                {/* A bare toLocaleString() follows the OS locale, not the UI language,
+                    so every one of these history stamps read US-style in a ru desktop. */}
+                {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString(LANG_TAGS[lang])} · {e.origin}
               </div>
               <p className="tr-history-src">{e.sourceText}</p>
               <p className="tr-history-dst muted">{e.resultText}</p>

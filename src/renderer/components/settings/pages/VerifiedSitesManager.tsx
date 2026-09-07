@@ -28,6 +28,8 @@ import {
   type FmhyDirectoryReconciliation,
 } from '../../../../shared/fmhyDirectoryImport';
 import SettingsCard from '../SettingsCard';
+import { useT } from '../../../i18n';
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 
 const COMPATIBILITY: { key: keyof VerifiedSiteCompatibility; label: string }[] = [
   { key: 'episodeLists', label: 'Episode lists' }, { key: 'metadata', label: 'Metadata' },
@@ -67,6 +69,10 @@ function localDate(value: string | null): string {
 }
 
 export default function VerifiedSitesManager() {
+  // Only `lang` is taken here. This panel's own prose is still English literals
+  // (D100's class, filed separately) — but a date stamp reading US-style inside
+  // a Russian UI is a different, measured defect and is fixed on its own.
+  const { lang } = useT();
   const [document, setDocument] = useState<VerifiedSitesDocument>(loadVerifiedSitesDocument);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [query, setQuery] = useState('');
@@ -245,7 +251,7 @@ export default function VerifiedSitesManager() {
             setMessage('Cached source snapshot loaded for review.');
           }}>Review cached snapshot</button>
         </div>
-        {fmhySnapshot && <p className="muted">Cached snapshot: {new Date(fmhySnapshot.capturedAt).toLocaleString()} · {fmhySnapshot.entryCount} direct entries.</p>}
+        {fmhySnapshot && <p className="muted">Cached snapshot: {new Date(fmhySnapshot.capturedAt).toLocaleString(LANG_TAGS[lang])} · {fmhySnapshot.entryCount} direct entries.</p>}
         {fmhyReview && (
           <div className="verified-site-editor" aria-label="FMHY refresh reconciliation preview">
             <strong>Reconciliation preview</strong>

@@ -7,6 +7,7 @@ import VirtualList from '../components/VirtualList';
 import { AppChrome, StatusBarField, StatusBarSpacer, confirmDialog, type MenuBarMenu } from '../components/ui';
 import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import { setStudyLang } from '../studyEnvironment';
 import { openExtensionSettings, openLibraryInbox } from '../extensionBridgeUi';
 import { firstReason } from '../../shared/disabledReason';
@@ -846,7 +847,10 @@ export default function YouTubePlaylistsView() {
                       <div className="yt-header-channel">
                         {store.lastNewsCheckedAt
                           ? t('yt.news.lastChecked', {
-                              time: new Date(store.lastNewsCheckedAt).toLocaleString(),
+                              // A bare toLocaleString() formats in the OS locale, not the
+                              // UI language: measured live in a ru desktop it read
+                              // "Последняя проверка 9/7/2026, 12:10:56 AM".
+                              time: new Date(store.lastNewsCheckedAt).toLocaleString(LANG_TAGS[lang]),
                             })
                           : t('yt.news.neverChecked')}
                       </div>

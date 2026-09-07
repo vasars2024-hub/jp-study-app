@@ -14,6 +14,7 @@
  */
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import {
   aggregateNotebook,
   loadNotebookSources,
@@ -248,7 +249,7 @@ export function NotebookTimeline({
   state: NotebookState;
   onOpen: (href?: string) => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
 
   if (state.visible.length === 0) {
     return (
@@ -273,7 +274,7 @@ export function NotebookTimeline({
               {e.detail ? <p className="muted gx-notebook-item-detail">{e.detail}</p> : null}
               <div className="gx-notebook-item-meta muted">
                 {e.folder ? <span>{e.folder}</span> : null}
-                <span>{new Date(e.ts).toLocaleString()}</span>
+                <span>{new Date(e.ts).toLocaleString(LANG_TAGS[lang])}</span>
               </div>
             </button>
             {chain.length > 0 ? (

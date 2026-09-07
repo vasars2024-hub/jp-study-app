@@ -560,11 +560,14 @@ const HELD_KEY: Record<ScraperSchedulerState['heldBy'], string> = {
   'nothing-due': 'scraperMgmt.held.armed',
 };
 
-function formatRunAt(iso: string | null, empty: string): string {
+// `lang` is a parameter because a module-level helper cannot call a hook.
+// `toLocaleString([])` is the host locale, so every scheduled-run stamp on this
+// page read US-style in a ru desktop.
+function formatRunAt(iso: string | null, empty: string, lang: UiLang): string {
   if (!iso) return empty;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return empty;
-  return new Date(ms).toLocaleString([], {
+  return new Date(ms).toLocaleString(LANG_TAGS[lang], {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -577,13 +580,13 @@ function formatRunAt(iso: string | null, empty: string): string {
  * firings rather than trying to translate the expression back into prose —
  * concrete dates are what people actually check the field against.
  */
-function describeCron(expression: string, t: Translate): string {
+function describeCron(expression: string, t: Translate, lang: UiLang): string {
   const parsed = parseCron(expression);
   if (!parsed.ok) return t('scraperMgmt.cron.invalid', { error: parsed.error });
   const first = nextCronRun(expression, Date.now());
   if (first === null) return t('scraperMgmt.cron.never');
   const second = nextCronRun(expression, first);
-  const show = (ms: number) => formatRunAt(new Date(ms).toISOString(), '—');
+  const show = (ms: number) => formatRunAt(new Date(ms).toISOString(), '—', lang);
   return second === null
     ? t('scraperMgmt.cron.next', { first: show(first) })
     : t('scraperMgmt.cron.nextThen', { first: show(first), second: show(second) });
@@ -682,7 +685,7 @@ export function ScheduledPage() {
       return best === null || ms < best ? ms : best;
     }, null);
     if (soonest === null) return t('scraperMgmt.sched.none');
-    return formatRunAt(new Date(soonest).toISOString(), t('scraperMgmt.sched.none'));
+    return formatRunAt(new Date(soonest).toISOString(), t('scraperMgmt.sched.none'), lang);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runState, lang]);
 
@@ -843,7 +846,7 @@ export function ScheduledPage() {
                       ? t('scraperMgmt.sched.paused')
                       : !isValidCron(entry.cron)
                         ? t('scraperMgmt.sched.invalidCron')
-                        : formatRunAt(recordFor(entry.id)?.nextRunAt ?? null, t('scraperMgmt.sched.notScheduled'))}
+                        : formatRunAt(recordFor(entry.id)?.nextRunAt ?? null, t('scraperMgmt.sched.notScheduled'), lang)}
                   </span>
                 </button>
               </div>
@@ -876,7 +879,7 @@ export function ScheduledPage() {
                     value={selected.cron}
                     onChange={(event) => patchSelected({ cron: event.target.value })}
                   />
-                  <span className="scr-field-hint">{describeCron(selected.cron, t)}</span>
+                  <span className="scr-field-hint">{describeCron(selected.cron, t, lang)}</span>
                 </label>
                 <label className="scr-field">
                   <span className="scr-field-label">{t('scraperMgmt.sched.field.profile')}</span>
@@ -890,11 +893,11 @@ export function ScheduledPage() {
               <div className="scr-schedule-timing">
                 <span>
                   <small>{t('scraperMgmt.sched.lastRun')}</small>
-                  <b>{formatRunAt(recordFor(selected.id)?.lastRunAt ?? null, t('scraperMgmt.sched.never'))}</b>
+                  <b>{formatRunAt(recordFor(selected.id)?.lastRunAt ?? null, t('scraperMgmt.sched.never'), lang)}</b>
                 </span>
                 <span>
                   <small>{t('scraperMgmt.sched.nextRun')}</small>
-                  <b>{formatRunAt(recordFor(selected.id)?.nextRunAt ?? null, t('scraperMgmt.sched.notScheduled'))}</b>
+                  <b>{formatRunAt(recordFor(selected.id)?.nextRunAt ?? null, t('scraperMgmt.sched.notScheduled'), lang)}</b>
                 </span>
                 <span>
                   <small>{t('scraperMgmt.sched.lastJob')}</small>
@@ -1139,7 +1142,7 @@ export function SiteRulesPage() {
                       {rule.lastValidatedAt
                         ? t('scraperMgmt.rules.matchedAt', {
                             count: rule.lastMatchCount,
-                            when: formatRunAt(rule.lastValidatedAt, ''),
+                            when: formatRunAt(rule.lastValidatedAt, '', lang),
                           })
                         : t('scraperMgmt.rules.neverValidated')}
                     </small>
@@ -1236,7 +1239,7 @@ export function SiteRulesPage() {
           )}
           <p className="scr-muted">
             {selected?.lastValidatedAt
-              ? t('scraperMgmt.report.lastValidated', { when: formatRunAt(selected.lastValidatedAt, '') })
+              ? t('scraperMgmt.report.lastValidated', { when: formatRunAt(selected.lastValidatedAt, '', lang) })
               : t('scraperMgmt.rules.neverValidated')}
           </p>
         </ScrCard>

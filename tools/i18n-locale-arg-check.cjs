@@ -76,6 +76,23 @@ function bareCallRegex(method) {
 }
 
 /**
+ * `new Date(x).toLocaleString()` is a DATE site wearing the number tier's name,
+ * and that misclassification is why this check printed "no date/time formatting
+ * follows the OS locale" on 2026-09-07 while six user-visible stamps did exactly
+ * that. Measured live in a `ru` desktop the same instant renders
+ * `9/7/2026, 12:16:55 AM` bare and `07.09.2026, 00:16:55` with `LANG_TAGS[lang]`;
+ * the YouTube news header and all 52 Translate history rows were showing the
+ * former. Those belong in the STRICT tier with the other two methods.
+ *
+ * Keyed on the literal `new Date(...)` receiver rather than on inferred types:
+ * `d.toLocaleString()` where `d` is a Date variable is still counted as a number
+ * site and still ratcheted. That is a deliberate under-reach — this check may
+ * not have false positives, because a hard zero that cries wolf gets baselined
+ * away and then it protects nothing.
+ */
+const DATE_RECEIVER_RE = /new\s+Date\((?:[^()]|\([^()]*\))*\)\s*\.toLocaleString\(\s*(?:\[\s*\]|undefined)?\s*[,)]/g;
+
+/**
  * Opt-out marker, placed on the call's own line or the line above it:
  *
  *   // i18n-locale-arg-ignore: <reason>
@@ -157,8 +174,19 @@ function scan() {
         else strict.push(hit);
       }
     }
+    // Date-receiver hits are promoted OUT of the ratchet and into the strict
+    // tier: counting them in both would let a file pay its debt down by fixing
+    // a thousands separator while the date stamp beside it stayed broken.
+    const dateReceiverLines = new Set();
+    for (const m of src.matchAll(DATE_RECEIVER_RE)) {
+      const line = lineOf(m.index);
+      dateReceiverLines.add(line);
+      const hit = { file: rel, line, method: 'toLocaleString', dateReceiver: true, text: m[0].replace(/\s+/g, ' ') };
+      if (isIgnored(line)) ignored.push(hit);
+      else strict.push(hit);
+    }
     for (const method of RATCHET_METHODS) {
-      const n = [...src.matchAll(bareCallRegex(method))].length;
+      const n = [...src.matchAll(bareCallRegex(method))].filter((m) => !dateReceiverLines.has(lineOf(m.index))).length;
       if (n > 0) ratchet.set(rel, (ratchet.get(rel) ?? 0) + n);
     }
   }

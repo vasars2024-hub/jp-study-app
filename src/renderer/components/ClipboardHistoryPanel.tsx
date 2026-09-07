@@ -24,6 +24,7 @@ import {
 } from '../clipboardHistory';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 
 type FilterKey = 'all' | 'word' | 'sentence' | 'dictionary' | 'reader' | 'manual';
 
@@ -50,7 +51,7 @@ function EntryCard({
   onToggleSelect: () => void;
   onChanged: () => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [expanded, setExpanded] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
   const isLong = entry.text.length > COLLAPSE_LEN;
@@ -75,7 +76,7 @@ function EntryCard({
             <Icon name="pin" size={11} />
           </span>
         )}
-        <span className="cbh-time muted">{new Date(entry.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+        <span className="cbh-time muted">{new Date(entry.createdAt).toLocaleString(LANG_TAGS[lang], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
       </div>
 
       {entry.dictMeta ? (

@@ -636,6 +636,69 @@ function midloadReadExpression() {
   })()`;
 }
 
+/* ------------------------------------------------------------------ *
+ * Cross-cutting pass: UI LANGUAGE SWITCH, live half.
+ *
+ * The source scans (`partial-i18n-scan.cjs`, `i18n-hardcoded-check.cjs`)
+ * answer "is this string routed through t()". They cannot answer the two
+ * questions that actually reach the user, and both have already produced a
+ * real defect here:
+ *   - a string that IS translated but is rendered in the wrong LOCALE
+ *     (D114: `toLocaleTimeString(LANG_TAGS[lang], { hour12: true })` — the tag
+ *     is right there in the source and reads correct);
+ *   - a string that is simply still English on screen in a non-en UI.
+ *
+ * So this reads the rendered text of a surface with the app genuinely switched,
+ * and flags two things: Latin-script runs, and locale-format tells. Content is
+ * NOT chrome — deck names, book titles and mined sentences are deliberately not
+ * translated — so every hit is a LEAD to read, never a defect on its own.
+ * ------------------------------------------------------------------ */
+function i18nLiveExpression(scope) {
+  const sel = JSON.stringify(scope);
+  return `(() => {
+    const root = document.querySelector(${sel});
+    if (!root) return { missing: true };
+    // Proper nouns, brands, file formats and units: translating these would be
+    // the defect. Kept explicit so the list is arguable rather than magic.
+    const ALLOW = /^(anki|ankiconnect|youtube|epub|pdf|srt|ass|vtt|mkv|mp3|mp4|json|csv|html|css|url|uri|api|ai|ui|os|id|ok|mal|myanimelist|qbittorrent|nyaa|jimaku|kitsunekko|jp|en|ja|zh|ru|gb|mb|kb|tb|px|ms|fps|cpu|gpu|ram|http|https|localhost|whisper|openai|anthropic|claude|gpt|gemini|ollama|blanc|aero|liquid|jlpt|n1|n2|n3|n4|n5|srs|ocr|tts|asr|vn|cd|dvd|rss|xml|sqlite|leveldb|electron|vite|seanime|textractor|tatoeba|kanjidic|jmdict|kaikki|wanikani|bunpro|discord|github|reddit|nhk|wikipedia)$/i;
+    const out = [];
+    const seen = new Set();
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walker.nextNode())) {
+      const raw = (n.nodeValue || '').trim();
+      if (!raw || raw.length < 3) continue;
+      const el = n.parentElement;
+      if (!el) continue;
+      // Only what is actually on screen.
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ checkOpacity: false, checkVisibilityCSS: true })) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      if (el.closest('input, textarea, script, style')) continue;
+      if (seen.has(raw)) continue;
+      seen.add(raw);
+      const path = (() => {
+        const p = [];
+        let e = el;
+        for (let i = 0; e && i < 3; i += 1, e = e.parentElement) p.unshift(e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\\s+/).slice(0, 2).join('.') : ''));
+        return p.join(' > ');
+      })();
+      // (1) Latin-script run with no CJK and no Cyrillic — a candidate English string.
+      const hasCyr = /[\\u0400-\\u04FF]/.test(raw);
+      const hasCjk = /[\\u3040-\\u30ff\\u3400-\\u9fff\\uf900-\\ufaff]/.test(raw);
+      const latinWords = raw.match(/[A-Za-z][A-Za-z'’\\-]{2,}/g) || [];
+      if (!hasCyr && !hasCjk && latinWords.length && latinWords.some((w) => !ALLOW.test(w))) {
+        out.push({ kind: 'latin', text: raw.slice(0, 120), path });
+      }
+      // (2) Locale-format tells that survive translation, which is D114's class.
+      if (/\\b(AM|PM)\\b/.test(raw)) out.push({ kind: 'clock-12h', text: raw.slice(0, 120), path });
+      if (/\\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\b/.test(raw)) out.push({ kind: 'month-en', text: raw.slice(0, 120), path });
+      if (/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\b/.test(raw)) out.push({ kind: 'weekday-en', text: raw.slice(0, 120), path });
+    }
+    return { counted: seen.size, hits: out.slice(0, 60) };
+  })()`;
+}
+
 function midloadReopenExpression(surface) {
   const s = JSON.stringify(surface);
   return `(() => {
@@ -866,6 +929,25 @@ async function main() {
       continue;
     }
 
+    if (PASS === 'i18nlive') {
+      let r;
+      try { r = await evalJs(i18nLiveExpression(scope)); } catch (e) { results.push({ surface: s, error: String(e.message) }); continue; }
+      if (r.missing) {
+        console.log(`${s}: window did not render`);
+        results.push({ surface: s, skipped: 'no window' });
+      } else {
+        results.push({ surface: s, ...r, opened });
+        const byKind = r.hits.reduce((a, h) => { a[h.kind] = (a[h.kind] || 0) + 1; return a; }, {});
+        console.log(`${s}: ${r.counted} distinct text runs | ${r.hits.length} leads ${JSON.stringify(byKind)}`);
+        for (const h of r.hits) console.log(`    ${h.kind.toUpperCase().padEnd(11)} "${h.text}"   <- ${h.path}`);
+      }
+      if (opened) {
+        await evalJs(`(() => { const b = document.querySelector('.fwin[data-section="${s}"] .fwin-close'); if (b) { b.click(); return 'closed'; } return 'no close button'; })()`);
+        await sleep(400);
+      }
+      continue;
+    }
+
     if (PASS === 'keyboard') {
       let kb;
       try { kb = await evalJs(keyboardExpression(scope)); } catch (e) { results.push({ surface: s, error: String(e.message) }); continue; }
@@ -950,6 +1032,13 @@ async function main() {
       if (r.states && r.restoredCleanly === false) noRestore += 1;
     }
     console.log(`\nTOTAL: ${un} unreachable controls, ${pc} partly-cut controls, ${tc} clipped text boxes across ${results.length} surfaces (${voided} states VOID, ${noRestore} needed a forced geometry restore)`);
+    return;
+  }
+  if (PASS === 'i18nlive') {
+    const tot = results.reduce((a, r) => a + (r.hits ? r.hits.length : 0), 0);
+    const kinds = {};
+    for (const r of results) for (const h of r.hits || []) kinds[h.kind] = (kinds[h.kind] || 0) + 1;
+    console.log(`\nTOTAL: ${tot} leads across ${results.length} surfaces ${JSON.stringify(kinds)} — every one is a LEAD to read, not a defect: study CONTENT is deliberately untranslated.`);
     return;
   }
   if (PASS === 'keyboard') {

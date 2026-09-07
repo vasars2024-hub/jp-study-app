@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 import SettingsCard from '../SettingsCard';
 import {
   CONNECTION_ERROR_CATEGORIES,
@@ -53,7 +54,7 @@ function percent(value: number): string {
 }
 
 export default function ConnectionProfilesPanel() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [document, setDocument] = useState<ConnectionProfilesDocument>(loadConnectionProfilesDocument);
   const [message, setMessage] = useState<string | null>(null);
   const [cloneName, setCloneName] = useState('');
@@ -337,7 +338,7 @@ export default function ConnectionProfilesPanel() {
           <span><strong>{t('connection.lastSuccess')}</strong></span>
           <span>
             {performance.lastSuccessAt
-              ? new Date(performance.lastSuccessAt).toLocaleString()
+              ? new Date(performance.lastSuccessAt).toLocaleString(LANG_TAGS[lang])
               : t('connection.never')}
           </span>
         </div>
@@ -359,7 +360,7 @@ export default function ConnectionProfilesPanel() {
             <span>
               <strong>{entry.site || t('connection.unknownSite')}</strong>
               <small className="muted">
-                {new Date(entry.startedAt).toLocaleString()} · {entry.durationMs} ms
+                {new Date(entry.startedAt).toLocaleString(LANG_TAGS[lang])} · {entry.durationMs} ms
                 {entry.fromCache ? ` · ${t('connection.cached')}` : ''}
               </small>
             </span>
@@ -583,7 +584,7 @@ export default function ConnectionProfilesPanel() {
             <span>
               <strong>{entry.code}</strong>
               <small className="muted">
-                {new Date(entry.at).toLocaleString()} · {t(`connection.logChannel.${entry.channel}`)}
+                {new Date(entry.at).toLocaleString(LANG_TAGS[lang])} · {t(`connection.logChannel.${entry.channel}`)}
                 {entry.durationMs !== null ? ` · ${entry.durationMs} ms` : ''}
               </small>
             </span>
@@ -618,7 +619,7 @@ export default function ConnectionProfilesPanel() {
             <span>
               <strong>{t(`connection.reason.${version.reason}`)}</strong>
               <small className="muted">
-                {new Date(version.createdAt).toLocaleString()} · {presetLabel(version.preset)}
+                {new Date(version.createdAt).toLocaleString(LANG_TAGS[lang])} · {presetLabel(version.preset)}
               </small>
             </span>
             <button
