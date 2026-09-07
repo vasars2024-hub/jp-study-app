@@ -5195,7 +5195,6 @@ export const en: Catalog = {
   'resources.noMatches': 'No resources match your search.',
   'resources.refresh': 'Refresh',
   'resources.refreshing': 'Refreshing…',
-  'resources.updated': 'Updated {when}',
   'resources.cached': 'Showing saved copy',
   'resources.offline': 'Offline — showing saved copy',
   'resources.builtin': 'Built-in catalogue',
@@ -5220,6 +5219,42 @@ export const en: Catalog = {
   },
   'resources.heatmap.countryCount': '{country}: {count}',
   'resources.heatmap.empty': 'Learner map data isn’t available yet.',
+  // Aero shell for the resources catalogue - menu bar, three-pane workbench and
+  // status bar. The STANDARD shell of the same view was fully translated and
+  // this one was not, so `resources` read in the interface language on one
+  // presentation and in English on the other (D187).
+  'resources.aero.menu.file': 'File',
+  'resources.aero.menu.refresh': 'Refresh catalogue',
+  'resources.aero.menu.clearSearch': 'Clear search',
+  'resources.aero.menu.showAll': 'Show all resources',
+  'resources.aero.menu.view': 'View',
+  'resources.aero.menu.allCategories': 'All categories',
+  'resources.aero.status.visible': '{count} visible',
+  'resources.aero.status.indexed': '{count} indexed',
+  'resources.aero.status.bundles': {
+    one: '{count} bundle',
+    other: '{count} bundles',
+  },
+  'resources.aero.toolbar.aria': 'Resource catalogue commands',
+  'resources.aero.search.placeholder': 'Find resource…',
+  'resources.aero.tree.aria': 'Resource categories',
+  'resources.aero.allResources': 'All resources',
+  'resources.aero.empty': 'No resources match the current search.',
+  'resources.aero.col.name': 'Name',
+  'resources.aero.col.cost': 'Cost',
+  'resources.aero.col.host': 'Host',
+  'resources.aero.col.description': 'Description',
+  'resources.aero.inspector.aria': 'Resource details',
+  'resources.aero.inspector.title': 'Study directory',
+  'resources.aero.inspector.blurb': 'A living catalogue of Japanese study links, bundles, and tools.',
+  'resources.aero.inspector.visible': 'Visible',
+  'resources.aero.inspector.bundles': 'Bundles',
+  'resources.aero.inspector.mode': 'Mode',
+  'resources.aero.mode.filtered': 'Filtered',
+  'resources.aero.mode.browsing': 'Browsing',
+  // `Updated {when}` with no time to name. Both shells built this by blanking
+  // the slot and trimming, then falling back to a hardcoded English 'Updated'.
+  'resources.updatedRecently': 'Updated',
   'resources.heatmap.unconfigured': 'Community map backend isn’t connected yet. Your country still appears here after you opt in.',
 
   // Statistics view

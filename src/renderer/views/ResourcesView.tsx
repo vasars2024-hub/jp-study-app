@@ -50,30 +50,34 @@ export default function ResourcesView() {
     showLanding,
   } = state;
 
+  // `resources.updated` is 'Updated {when}' and there is no {when} here. This
+  // used to blank the slot, strip a leftover `{when}` and trim, then fall back
+  // to a hardcoded English 'Updated' — three pieces of string surgery and one
+  // untranslated literal standing in for a key that simply had to exist.
   const refreshLabel =
     refreshState === 'refreshing'
       ? t('resources.refreshing')
       : refreshState === 'offline'
         ? t('resources.offline')
         : refreshState === 'updated'
-          ? t('resources.updated', { when: '' }).replace('{when}', '').trim() || 'Updated'
+          ? t('resources.updatedRecently')
           : '';
 
   const menus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('resources.aero.menu.file'),
       items: [
-        { id: 'refresh', label: 'Refresh catalogue', onSelect: () => void doRefresh() },
-        { id: 'clear-search', label: 'Clear search', disabled: !query, onSelect: () => setQuery('') },
-        { id: 'all', label: 'Show all resources', onSelect: () => setFilter('All') },
+        { id: 'refresh', label: t('resources.aero.menu.refresh'), onSelect: () => void doRefresh() },
+        { id: 'clear-search', label: t('resources.aero.menu.clearSearch'), disabled: !query, onSelect: () => setQuery('') },
+        { id: 'all', label: t('resources.aero.menu.showAll'), onSelect: () => setFilter('All') },
       ],
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('resources.aero.menu.view'),
       items: [
-        { id: 'all-view', label: 'All categories', onSelect: () => setFilter('All') },
+        { id: 'all-view', label: t('resources.aero.menu.allCategories'), onSelect: () => setFilter('All') },
         ...allCategories.map((cat) => ({
           id: `cat-${cat.id}`,
           label: cat.title,
@@ -91,21 +95,23 @@ export default function ResourcesView() {
         menus={menus}
         status={
           <>
-            <StatusBarField>{total} visible</StatusBarField>
-            <StatusBarField>{allTotal} indexed</StatusBarField>
-            <StatusBarField>{bundles.length} bundles</StatusBarField>
+            <StatusBarField>{t('resources.aero.status.visible', { count: total })}</StatusBarField>
+            <StatusBarField>{t('resources.aero.status.indexed', { count: allTotal })}</StatusBarField>
+            <StatusBarField>{t('resources.aero.status.bundles', { count: bundles.length })}</StatusBarField>
             <StatusBarSpacer />
             <StatusBarField>
-              {selectedBundle ? selectedBundle.gem : activeCategory?.title ?? 'All categories'}
+              {selectedBundle
+                ? selectedBundle.gem
+                : activeCategory?.title ?? t('resources.aero.menu.allCategories')}
             </StatusBarField>
           </>
         }
         className="aero-resources-chrome"
       >
         <div className="aero-resources">
-          <Toolbar className="aero-resources-toolbar" aria-label="Resource catalogue commands">
+          <Toolbar className="aero-resources-toolbar" aria-label={t('resources.aero.toolbar.aria')}>
             <button className={`aero-resource-filter ${filter === 'All' ? 'active' : ''}`} onClick={() => { setFilter('All'); closeBundle(); }}>
-              All
+              {t('resources.filter.all')}
             </button>
             {allCategories.map((cat) => (
               <button
@@ -118,7 +124,7 @@ export default function ResourcesView() {
               </button>
             ))}
             <ToolbarSpacer />
-            <button className="aero-resource-filter" onClick={() => void doRefresh()} disabled={refreshState === 'refreshing'} title="Refresh catalogue">
+            <button className="aero-resource-filter" onClick={() => void doRefresh()} disabled={refreshState === 'refreshing'} title={t('resources.aero.menu.refresh')}>
               <Icon name="refresh" size={12} /> {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
             </button>
             <input
@@ -126,7 +132,8 @@ export default function ResourcesView() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find resource..."
+              placeholder={t('resources.aero.search.placeholder')}
+              aria-label={t('resources.aero.search.placeholder')}
             />
           </Toolbar>
 
@@ -136,9 +143,9 @@ export default function ResourcesView() {
             </div>
           ) : (
             <div className="aero-resources-workbench">
-              <aside className="aero-resources-tree" aria-label="Resource categories">
+              <aside className="aero-resources-tree" aria-label={t('resources.aero.tree.aria')}>
                 <button className={`aero-resources-node ${filter === 'All' ? 'active' : ''}`} onClick={() => setFilter('All')}>
-                  <span>All resources</span>
+                  <span>{t('resources.aero.allResources')}</span>
                   <b>{allTotal}</b>
                 </button>
                 {allCategories.map((cat) => (
@@ -159,7 +166,7 @@ export default function ResourcesView() {
                 {showLanding ? <ResourceMyTools state={state} /> : null}
                 {showLanding ? <ResourceNewSection state={state} /> : null}
                 {groups.length === 0 ? (
-                  <div className="aero-resources-empty">No resources match the current search.</div>
+                  <div className="aero-resources-empty">{t('resources.aero.empty')}</div>
                 ) : (
                   groups.map((cat) => (
                     <section className="aero-resource-group" key={cat.id}>
@@ -169,10 +176,10 @@ export default function ResourcesView() {
                       </div>
                       <div className="aero-resource-table" role="table" aria-label={cat.title}>
                         <div className="aero-resource-row aero-resource-row-head" role="row">
-                          <span>Name</span>
-                          <span>Cost</span>
-                          <span>Host</span>
-                          <span>Description</span>
+                          <span>{t('resources.aero.col.name')}</span>
+                          <span>{t('resources.aero.col.cost')}</span>
+                          <span>{t('resources.aero.col.host')}</span>
+                          <span>{t('resources.aero.col.description')}</span>
                         </div>
                         {cat.items.map((r) => (
                           <button key={r.url} className="aero-resource-row" role="row" onClick={() => openLink(r.url)}>
@@ -188,21 +195,21 @@ export default function ResourcesView() {
                 )}
               </main>
 
-              <aside className="aero-resources-inspector" aria-label="Resource details">
-                <h2>{activeCategory?.title ?? 'Study directory'}</h2>
-                <p>{activeCategory?.blurb ?? 'A living catalogue of Japanese study links, bundles, and tools.'}</p>
+              <aside className="aero-resources-inspector" aria-label={t('resources.aero.inspector.aria')}>
+                <h2>{activeCategory?.title ?? t('resources.aero.inspector.title')}</h2>
+                <p>{activeCategory?.blurb ?? t('resources.aero.inspector.blurb')}</p>
                 <dl>
                   <div>
-                    <dt>Visible</dt>
+                    <dt>{t('resources.aero.inspector.visible')}</dt>
                     <dd>{total}</dd>
                   </div>
                   <div>
-                    <dt>Bundles</dt>
+                    <dt>{t('resources.aero.inspector.bundles')}</dt>
                     <dd>{bundles.length}</dd>
                   </div>
                   <div>
-                    <dt>Mode</dt>
-                    <dd>{query ? 'Filtered' : 'Browsing'}</dd>
+                    <dt>{t('resources.aero.inspector.mode')}</dt>
+                    <dd>{query ? t('resources.aero.mode.filtered') : t('resources.aero.mode.browsing')}</dd>
                   </div>
                 </dl>
               </aside>
