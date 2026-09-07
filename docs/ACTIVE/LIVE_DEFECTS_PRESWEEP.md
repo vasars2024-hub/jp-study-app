@@ -310,3 +310,35 @@ RECOVERY 2026-09-06 19:45-20:00, primary: `8a9d2319` landed HALF a slice and lef
 | D111 | settings (Reading Lens, Monitors, API keys) | **Three actions destroyed user data with no confirmation and no undo.** (a) Settings > Reading Lens > **Clear all** - main's handler is `entries = []`, so it wipes the whole capture store, not the filtered page on screen, and **PINNED captures go with it**; the button sits directly beside the search box. (b) Settings > Monitors > **Reset** - one click throws away every desktop-to-display assignment, sitting between two harmless buttons with nothing to distinguish it. (c) Settings > API keys > **Remove**, beside Save - providers show a secret once at creation, so the stored copy can be the last copy the user has. | Scripted class-5 pass, `src/.coordination/presweep/destructive-guard-scan.cjs`: **42 destructive `window.api.*` call sites, 12 guarded**. The other 27 were read and accepted (`ankiDeleteNotes` is an undo path in both places; single-row removes; helpers whose callers confirm). Source for (a): `main/readingLensHistory.ts:191` `clearCaptures()` is `entries = []; persist();` and `setCapturePinned` exists, so pinned rows are in that array. | P2 | fixed a96badce - all three now `confirmDialog({ danger: true })`, 7 keys x 4 locales. The lens message deliberately quotes **no count**: that component holds a filtered page of 50, so any number would be a guess about the store. Gate `destructiveGuards.test.ts` reads the enclosing FUNCTION BODY, not the file - all three components call `confirmDialog` elsewhere. Mutation control, one guard removed at a time: 1/4, 1/4 and 2/4 red; each file restored byte-identical. |
 
 | D113 | player (Media Hub) | **An entire Media Hub dashboard is built, persists its own state, and is rendered by nothing.** `MediaHubDashboard` (`components/media/MediaContent.tsx:2239`, ~190 lines) has 8 shelves - Favorites, Study queue, Recently added, Continue watching, Recently studied, Recently listened, Recommended, Unorganized files - plus per-item study actions, a series panel and a path-diagnostics panel. It reads and WRITES `loadMediaHubState`/`saveMediaHubState`, so it is a feature, not a sketch. Inside it, three strings are raw English in a file that otherwise calls `t()` (`Duplicate paths:`, `Missing files:`, `Remove missing entries`, plus all 8 shelf labels and `aria-label="Media Hub dashboard"`), and the **Remove missing entries** button is `onClick={() => void window.api.pruneMedia()}` - it discards the `{removed, items}` the call returns and the component has no setter for `items`, so the list and the missing-count beside it never change and the button reads as doing nothing. | `grep -rn 'MediaHubDashboard\|MediaHubStoragePanel' src --include=*.ts --include=*.tsx` returns **only the declarations**. `MediaHubSeriesPanel` is referenced once, at `:2326`, from inside the dead dashboard. So none of it is reachable from the running app - which is also why nobody saw the untranslated strings. | P3 | open - **deliberately not fixed this turn and this is the honest reason**: the choice is to wire it or delete it, and both are more than a defect fix. Wiring it ships 12 untranslated strings and a `pruneMedia` button that visibly does nothing; deleting it destroys a built feature. It needs the product call the integration audit is for. What is NOT in doubt: it is unreachable today, so this is a missing-integration finding, not a live user-facing break. |
+
+### 2026-09-06 20:35 EDT - COLLISION NOTE, read this before merging wt/files-app
+
+`primary` (main tree) and `primary2` (`wt/files-app`) ran the class-5 destructive-guard pass in
+the SAME HOUR without seeing each other, and **two of the three fixes are the same fix**. Nothing
+is lost and neither side is wrong; the merge needs one decision per file, and this note is so
+nobody has to re-derive it.
+
+| action | main tree | wt/files-app |
+|---|---|---|
+| lens `Clear all` | D111(a), `a96badce` | D109, `45a1aa5a` + `46ac1ab2` |
+| API keys `Remove` | D111(c), `a96badce` | D108, `f7993ef2` |
+| Monitors `Reset` | D111(b), `a96badce` | **not fixed - main tree only** |
+| the scanner | `src/.coordination/presweep/destructive-guard-scan.cjs` | **same path**, 187 lines, different code |
+
+**Keep ONE guard per action.** Two `confirmDialog` calls in one handler asks twice. The key names
+differ on the two sides, so after picking a side, delete the loser's keys from all four catalogs -
+`i18n-check` stays green with dead keys and will not catch them.
+
+**On the lens message, take the wt/files-app WORDING and the main-tree COUNT.** Their prose is
+better ("This clears everything, not just what the current filter shows"), but their
+`{ count: entries.length }` is **the filtered page, not the store** - `lensHistoryList` is called
+with a limit, so a user with 200 captures and a filter showing 12 is asked to "Delete all 12 saved
+captures" and loses 200. That is a count-vs-truth defect inside a class-5 fix. Either drop the
+count or add a real total from main; do not ship `entries.length`.
+
+**Root cause, and it is fixable.** The 16:20 pin says to check `rev-list --count
+feat/nyaa-subtitles..wt/files-app` before claiming a surface. That was done (10 commits) and the
+D-number range was read off the other branch too - but only the NUMBERS were read, not the other
+branch's cross-cutting table, and class 5 is a cross-cutting pass rather than a surface. **Before
+claiming a cross-cutting CLASS, read `wt/files-app`'s cross-cutting table, not just its coverage
+table and its highest D number.**
