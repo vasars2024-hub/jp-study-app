@@ -630,7 +630,8 @@ export function useImmersion() {
       }
       setPopup({ kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `lang`, never `t`:
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. `lang`, never `t`:
     // `t`'s identity is stable by design, so depending on it goes silently
     // stale after a language switch instead of erroring (CLAUDE.md §6).
     [lang, noteGuestAbuse],

@@ -312,7 +312,9 @@ export default function MiniShell({
       }
     },
     // `lang`, never `t` — `t`'s identity is stable, so this would go stale.
-    [lang], // eslint-disable-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error.
+    [lang],
   );
 
   // The status a routine last set is the only sign in Mini that a mood-only

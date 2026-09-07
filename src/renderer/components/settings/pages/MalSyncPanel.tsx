@@ -78,7 +78,9 @@ export default function MalSyncPanel() {
   const describe = useCallback((code?: string, fallback?: string): string => {
     const known = (ERROR_KEYS as readonly string[]).includes(code ?? '');
     return known ? t(`malSync.error.${code}`) : (fallback ?? t('malSync.error.request-failed'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
   }, [lang]);
 
   const refresh = useCallback(async (): Promise<void> => {

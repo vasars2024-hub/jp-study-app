@@ -676,7 +676,9 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     if (langFilter !== 'all') parts.push(t(`library.inbox.lang.${langFilter}`));
     if (levelFilter !== 'all') parts.push(`L${levelFilter}`);
     return parts.join(' · ');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
   }, [langFilter, levelFilter, lang]);
   // Deliberately not backfilled with the first visible item — see
   // resolveSelection. A drawer that re-selects something the moment you close

@@ -151,7 +151,9 @@ export function ProfilesPage() {
         [t('scraperMgmt.compare.parallelJobs'), (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.performance.maxParallelJobs],
         [t('scraperMgmt.compare.batchSize'), (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.performance.batchSize],
       ] as const,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
     [lang],
   );
 
@@ -686,12 +688,16 @@ export function ScheduledPage() {
     }, null);
     if (soonest === null) return t('scraperMgmt.sched.none');
     return formatRunAt(new Date(soonest).toISOString(), t('scraperMgmt.sched.none'), lang);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
   }, [runState, lang]);
 
   const upcomingWeek = useMemo(
     () => buildUpcomingWeek(schedules, schedulerEnabled, Date.now(), t, lang),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
     [schedules, schedulerEnabled, lang],
   );
 
@@ -1001,7 +1007,9 @@ export function SiteRulesPage() {
         [t('scraperMgmt.rule.numberCell'), 'numberSelector', 'th', true],
         [t('scraperMgmt.rule.numberPattern'), 'numberPattern', 'E(\\d+)', true],
       ] as const,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
     [lang],
   );
 
@@ -1292,7 +1300,9 @@ export function PluginsPage() {
         ['updates', t('scraperMgmt.plugins.filter.updates')],
         ['incompatible', t('scraperMgmt.plugins.filter.incompatible')],
       ] as const,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
     [lang],
   );
 

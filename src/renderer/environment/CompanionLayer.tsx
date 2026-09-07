@@ -427,7 +427,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     listRef.current = next;
     setList(next);
     dirtyRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // No eslint-disable: react-hooks/exhaustive-deps is not a configured rule in
+    // this repo, so the directive is itself an ESLint error. The deps below are
+    // deliberate.
   }, [routineAssignmentKey]);
 
   // Wander: DOM-only motion. Disk persist is rare (was every 2s → UI freezes).
