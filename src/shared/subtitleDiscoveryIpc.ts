@@ -12,6 +12,7 @@
 // A leaf module (it imports nothing), so naming the record's format union here
 // cannot put this file in a cycle.
 import type { SubtitleRecordFormat } from './subtitleRecord';
+import type { NyaaUnavailableReason } from './subtitleNyaa';
 
 export type SubtitleDiscoveryPhase =
   | 'queued'
@@ -220,6 +221,17 @@ export interface NyaaSubtitleListResult {
    * "nothing found".
    */
   message: string;
+  /**
+   * Which availability check refused, when one did — `null` otherwise, and
+   * `null` too for a refusal that is not an availability question (a media row
+   * that has left the library, the index failing).
+   *
+   * `message` alone is untranslatable: it is built in main, so no catalog
+   * carries it and every i18n gate in this repo is blind to it. With the code
+   * in hand the dialog says it in the user's language and names the remedy
+   * (D172, and D171 for the same defect on the harvest panel).
+   */
+  reason?: NyaaUnavailableReason | null;
 }
 
 /**

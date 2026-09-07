@@ -115,6 +115,57 @@ describe('NyaaSubtitleDialog', () => {
     expect(alert?.textContent).toBe(NO_KEY);
   });
 
+  // D172. `message` is built in the MAIN process, so no catalog carries it and
+  // every i18n gate in this repo is blind to it — this dialog printed English
+  // into a Japanese UI, and told a user whose profile has no torrent source at
+  // all to go "enable" one. With the reason code it says it in the user's own
+  // language and names the remedy.
+  it('translates an availability refusal instead of printing main’s English', async () => {
+    stubApi({
+      listNyaaSubtitles: vi.fn(async () => ({
+        ok: false,
+        candidates: [],
+        message: 'This profile has no torrent index to search.',
+        reason: 'no-torrent-source',
+      })),
+    });
+    await open();
+    // The real catalog, not a stub: this is the string the user reads.
+    expect(text()).toContain('Add one on the Sources page');
+    expect(text()).not.toContain('This profile has no torrent index to search.');
+  });
+
+  // "Add one" and "turn one on" are different instructions, and the app used to
+  // give the second to users who needed the first.
+  it('does not tell a profile with no torrent source to enable one', async () => {
+    stubApi({
+      listNyaaSubtitles: vi.fn(async () => ({
+        ok: false,
+        candidates: [],
+        message: 'Every torrent index in this profile is turned off.',
+        reason: 'no-indexer',
+      })),
+    });
+    await open();
+    expect(text()).toContain('Enable one on the Sources page');
+    expect(text()).not.toContain('Add one on the Sources page');
+  });
+
+  // A refusal that is not an availability question carries no reason, and main's
+  // words are the only account of it — the fallback must still reach the user.
+  // (This is also what keeps every pre-D172 caller working.)
+  it('still shows main’s own words when no reason is carried', async () => {
+    stubApi({
+      listNyaaSubtitles: vi.fn(async () => ({
+        ok: false,
+        candidates: [],
+        message: 'That media item is no longer in the library.',
+      })),
+    });
+    await open();
+    expect(text()).toContain('That media item is no longer in the library.');
+  });
+
   // The negative control, and the reason the above is not simply "show any
   // message": a real listing must render its releases and raise no alert.
   it('renders the releases and no alert when the search succeeds', async () => {

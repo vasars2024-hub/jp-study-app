@@ -24,6 +24,7 @@ import { useModalKeyboard } from '../../ui/useModalKeyboard';
 import { useT } from '../../../i18n';
 import { getActiveScraperSettings } from '../../../scraperSettingsStore';
 import { acquisitionConfigFrom } from '../../../../shared/subtitleNyaa';
+import { nyaaCannotText } from '../../../nyaaUnavailableText';
 import type { NyaaSubtitleCandidateView } from '../../../../shared/subtitleDiscoveryIpc';
 
 export interface NyaaSubtitleDialogProps {
@@ -67,16 +68,20 @@ export default function NyaaSubtitleDialog({
       );
       setCandidates(result.candidates);
       // A misconfiguration and a title with no subtitle releases are different
-      // problems, and main already distinguishes them — pass its message
-      // through rather than flattening both to "nothing found".
-      setMessage(result.message);
+      // problems, and main already distinguishes them — so its account is kept
+      // rather than flattened to "nothing found". But main's sentence is
+      // English and names no remedy, so an availability refusal is said in the
+      // user's own language from its code instead (D172).
+      setMessage(nyaaCannotText(t, result.reason, result.message));
     } catch (error) {
       setCandidates([]);
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
-  }, [mediaId, languages]);
+    // `lang`, not `t` — `t`'s identity is stable by design, so depending on it
+    // would leave this callback answering in the language it mounted in.
+  }, [mediaId, languages, lang, t]);
 
   useEffect(() => { void search(); }, [search]);
 

@@ -812,11 +812,19 @@ async function listNyaaCandidates(
   languages?: string[],
 ): Promise<NyaaSubtitleListResult> {
   const item = host?.listItems().find((entry) => entry.id === mediaId);
-  if (!item) return { ok: false, candidates: [], message: 'That media item is no longer in the library.' };
+  if (!item) {
+    // No `reason`: this is not an availability question, so the dialog must
+    // fall back to these words rather than mistranslate them.
+    return { ok: false, candidates: [], message: 'That media item is no longer in the library.', reason: null };
+  }
 
   const config = asAcquisitionConfig(acquisition);
   const available = await nyaaAvailability(config);
-  if (!available.ok) return { ok: false, candidates: [], message: available.detail };
+  if (!available.ok) {
+    // The CODE travels with the sentence: `detail` is built here, so the
+    // renderer cannot translate it and printed it raw in every language (D172).
+    return { ok: false, candidates: [], message: available.detail, reason: available.reason };
+  }
 
   const wanted = languages?.length ? languages : loadDiscoverySettings().autoDownloadLanguages;
   /**
