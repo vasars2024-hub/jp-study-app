@@ -65,7 +65,9 @@ export function pluralSlotDrift(source: string): { entries: number; arms: number
   const drift: Drift[] = [];
   let entries = 0;
   let arms = 0;
-  for (const entry of source.matchAll(/^\s*'([A-Za-z0-9_][A-Za-z0-9_.\-]*)'\s*:\s*\{([\s\S]*?)\},?\s*$/gm)) {
+  // `-` last in the class, unescaped: `\-` is `no-useless-escape` under this
+  // config, and the `.cjs` scans this was lifted from are not linted as TS.
+  for (const entry of source.matchAll(/^\s*'([A-Za-z0-9_][A-Za-z0-9_.-]*)'\s*:\s*\{([\s\S]*?)\},?\s*$/gm)) {
     const found = [
       ...entry[2].matchAll(new RegExp(`\\b(${CATEGORIES})\\s*:\\s*'((?:[^'\\\\]|\\\\.)*)'`, 'g')),
     ];
