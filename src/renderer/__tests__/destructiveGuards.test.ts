@@ -37,6 +37,10 @@ const CASES = [
   // helper directly. The handler `rmSync`s the item's userData `subtitles/`
   // directory, where Whisper output and harvested records both live.
   { file: 'src/renderer/components/media/MediaContent.tsx', api: 'removeMedia' },
+  // D17, open since the resources walk. The tool and any note written on it went
+  // on one click, and the `catch { /* ignore */ }` meant a FAILED removal looked
+  // identical to a dead button.
+  { file: 'src/renderer/components/resources/ResourcesContent.tsx', api: 'toolsRemove' },
 ] as const;
 
 /** The Nth enclosing brace block around `index`, 0 = innermost. */

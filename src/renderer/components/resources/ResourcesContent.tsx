@@ -21,6 +21,7 @@ import type {
 } from '../../../shared/resourcesCatalog';
 import type { CollectedTool } from '../../../shared/collectedTools';
 import { useT } from '../../i18n';
+import { confirmDialog, showToast } from '../ui';
 
 export type Filter = 'All' | string;
 export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'offline';
@@ -149,30 +150,57 @@ export function useResources() {
     void reloadTools();
   }, [reloadTools]);
 
+  // D17, both halves. The ✕ removed a tool the user collected themselves — with
+  // whatever note they wrote on it — on one click, with no confirm and no undo.
+  // And the `catch { /* ignore */ }` was followed by an unconditional
+  // `reloadTools()`, so a removal that FAILED left the row exactly where it was
+  // and read as "the button did nothing". Silence is the worse half: it is
+  // indistinguishable from a dead control.
   const removeTool = useCallback(
     async (id: string) => {
+      const tool = tools.find((candidate) => candidate.id === id);
+      const ok = await confirmDialog({
+        title: t('resources.myTools.removeConfirm.title'),
+        message: t('resources.myTools.removeConfirm.message', { name: tool?.name ?? tool?.url ?? '' }),
+        confirmLabel: t('resources.myTools.remove'),
+        danger: true,
+      });
+      if (!ok) return;
       try {
         await window.api.toolsRemove(id);
-      } catch {
-        /* ignore */
+      } catch (error) {
+        showToast({
+          message: t('resources.myTools.removeFailed', {
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+          kind: 'error',
+        });
       }
       await reloadTools();
     },
-    [reloadTools],
+    [reloadTools, t, tools],
   );
 
   const saveNote = useCallback(
     async (id: string) => {
       try {
         await window.api.toolsUpdate(id, { note: noteDraft });
-      } catch {
-        /* ignore */
+      } catch (error) {
+        // Same silence, and here it costs the note itself: the editor closes and
+        // the draft is dropped either way, so a swallowed failure looks exactly
+        // like a save.
+        showToast({
+          message: t('resources.myTools.noteSaveFailed', {
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+          kind: 'error',
+        });
       }
       setEditingTool(null);
       setNoteDraft('');
       await reloadTools();
     },
-    [noteDraft, reloadTools],
+    [noteDraft, reloadTools, t],
   );
 
   // Load checklist ticks once.
