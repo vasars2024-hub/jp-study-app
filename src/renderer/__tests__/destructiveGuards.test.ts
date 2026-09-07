@@ -41,6 +41,12 @@ const CASES = [
   // on one click, and the `catch { /* ignore */ }` meant a FAILED removal looked
   // identical to a dead button.
   { file: 'src/renderer/components/resources/ResourcesContent.tsx', api: 'toolsRemove' },
+  // D142 — the SAME store and the SAME action as the line above, on Blanc's own
+  // host. `BlancAppDrawerPanel` reuses `shared/collectedTools.ts` rather than
+  // adding a third store, so D17's fix in Resources left Blanc's ✕ destructive
+  // and silent. Both hosts are pinned so neither can regress alone.
+  { file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx', api: 'toolsRemove' },
+  { file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx', api: 'toolsRemoveFolder' },
 ] as const;
 
 /** The Nth enclosing brace block around `index`, 0 = innermost. */
@@ -89,7 +95,11 @@ function guardingBody(text: string, index: number): string {
 }
 
 describe('destructive actions confirm before they destroy', () => {
-  it.each(CASES)('$api asks first', ({ file, api }) => {
+  // The file is in the title because `toolsRemove` now has two hosts, and a bare
+  // `$api` title would leave a failure naming neither of them.
+  it.each(CASES.map((c) => ({ ...c, where: c.file.split('/').pop() })))(
+    '$api asks first in $where',
+    ({ file, api }) => {
     const text = readFileSync(resolve(ROOT, file), 'utf8');
     const at = text.indexOf(`window.api.${api}(`);
     expect(at, `${api} call site not found in ${file}`).toBeGreaterThan(-1);
@@ -98,9 +108,12 @@ describe('destructive actions confirm before they destroy', () => {
     expect(guard, `${api} runs with no confirmDialog in its own function`).toBeGreaterThan(-1);
     // Before the call, and the result is honoured: an unread promise is not a guard.
     expect(guard).toBeLessThan(body.indexOf(`window.api.${api}(`));
-    expect(body).toMatch(/if\s*\(!ok\)\s*return;/);
-    expect(body).toMatch(/danger:\s*true/);
-  });
+    // `return;` or `return false;` — a guard that reports its own refusal to the
+    // caller (so the surface can stay open on Cancel) is still a guard.
+    expect(body).toMatch(/if\s*\(!ok\)\s*return(\s+[^;]+)?;/);
+      expect(body).toMatch(/danger:\s*true/);
+    },
+  );
 
   it('reads a real body, not an empty string', () => {
     const text = readFileSync(resolve(ROOT, CASES[0].file), 'utf8');

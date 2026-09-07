@@ -7669,6 +7669,13 @@ export const ja: Catalog = {
   'wired.widget.network.desc': 'ピンググラフとパケットステータス。',
 
   // ---- Blanc Toolbox settings ----
+  'blancDrawer.deleteFolder.title': 'このフォルダーを削除しますか？',
+  'blancDrawer.deleteFolder.message': {
+    other: '{name} を削除しますか？中の {count} 件のショートカットは削除されず、ドロワーのルートに移動します。',
+  },
+  'blancDrawer.deleteFolder.messageEmpty': '{name} を削除しますか？中は空なので、他に削除されるものはありません。',
+  'blancDrawer.deleteFolder.confirm': 'フォルダーを削除',
+  'blancDrawer.deleteFolder.failed': 'フォルダーを削除できませんでした：{reason}',
   'blanc.masterSearch.dialog': 'Blanc を検索',
   'blanc.masterSearch.scope.all': 'すべて',
   'blanc.masterSearch.placeholder': 'ツール、学習コンテンツ、ライブラリを検索',

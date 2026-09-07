@@ -17,6 +17,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
+import { confirmDialog, showToast } from '../ui';
+import { useT } from '../../i18n';
 import { listBlancToolboxModules } from '../../../shared/toolboxRegistry';
 import type {
   CollectedFolder,
@@ -68,6 +70,7 @@ function openTool(toolId: string): void {
 }
 
 function useAppDrawer() {
+  const { t } = useT();
   const [tools, setTools] = useState<CollectedTool[]>([]);
   const [folders, setFolders] = useState<CollectedFolder[]>([]);
   const [status, setStatus] = useState('');
@@ -141,13 +144,42 @@ function useAppDrawer() {
     [reload],
   );
 
+  // Part of D142. The folder itself is the only thing destroyed —
+  // `collectedTools.removeFolder` re-parents every shortcut to the drawer root
+  // rather than deleting it. That is exactly what the confirm has to SAY (D138:
+  // a guard that exists and does not name what survives is still not honest),
+  // so the message carries the count and the reassurance, and the empty case
+  // gets its own sentence so it never reads "0 shortcuts".
   const deleteFolder = useCallback(
     async (id: string) => {
-      await window.api.toolsRemoveFolder(id);
+      const folder = folders.find((candidate) => candidate.id === id);
+      const contained = tools.filter((tool) => tool.folderId === id).length;
+      const ok = await confirmDialog({
+        title: t('blancDrawer.deleteFolder.title'),
+        message: contained > 0
+          ? t('blancDrawer.deleteFolder.message', { name: folder?.name ?? '', count: contained })
+          : t('blancDrawer.deleteFolder.messageEmpty', { name: folder?.name ?? '' }),
+        confirmLabel: t('blancDrawer.deleteFolder.confirm'),
+        danger: true,
+      });
+      if (!ok) return false;
+      try {
+        await window.api.toolsRemoveFolder(id);
+      } catch (error) {
+        showToast({
+          message: t('blancDrawer.deleteFolder.failed', {
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+          kind: 'error',
+        });
+        await reload();
+        return false;
+      }
       setStatus('Folder deleted; its shortcuts moved to the drawer root.');
       await reload();
+      return true;
     },
-    [reload],
+    [folders, reload, t, tools],
   );
 
   const addLink = useCallback(
@@ -227,12 +259,36 @@ function useAppDrawer() {
     [reload],
   );
 
+  // D142 — a MODE GAP, the same shape as D137. This store is the Resources app's
+  // "My tools" store, and Study OS has guarded this exact call since D17: a confirm
+  // that names the tool and says the note written on it goes too, plus a toast when
+  // the removal FAILS. Blanc rendered its own drawer over the same store and had
+  // neither, so the identical ✕ was destructive-and-silent here and guarded there.
+  // The keys are reused rather than re-minted, so the two hosts cannot drift apart
+  // in wording either.
   const removeItem = useCallback(
     async (id: string) => {
-      await window.api.toolsRemove(id);
+      const tool = tools.find((candidate) => candidate.id === id);
+      const ok = await confirmDialog({
+        title: t('resources.myTools.removeConfirm.title'),
+        message: t('resources.myTools.removeConfirm.message', { name: tool?.name ?? tool?.url ?? '' }),
+        confirmLabel: t('resources.myTools.remove'),
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await window.api.toolsRemove(id);
+      } catch (error) {
+        showToast({
+          message: t('resources.myTools.removeFailed', {
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+          kind: 'error',
+        });
+      }
       await reload();
     },
-    [reload],
+    [reload, t, tools],
   );
 
   const moveItem = useCallback(
@@ -522,9 +578,12 @@ export default function BlancAppDrawerPanel() {
             )}
             <button
               type="button"
+              /* The folder view closes only if the delete actually happened —
+                 closing it first made Cancel look like it had worked. */
               onClick={() => {
-                setOpenFolderId(null);
-                void state.deleteFolder(openFolder.id);
+                void (async () => {
+                  if (await state.deleteFolder(openFolder.id)) setOpenFolderId(null);
+                })();
               }}
             >
               Delete folder

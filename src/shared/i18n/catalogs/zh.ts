@@ -7628,6 +7628,13 @@ export const zh: Catalog = {
   'wired.widget.network.desc': 'Ping 图与数据包状态。',
 
   // ---- Blanc Toolbox settings ----
+  'blancDrawer.deleteFolder.title': '删除这个文件夹？',
+  'blancDrawer.deleteFolder.message': {
+    other: '要删除 {name} 吗？其中的 {count} 个快捷方式会被保留，并移动到抽屉根目录。',
+  },
+  'blancDrawer.deleteFolder.messageEmpty': '要删除 {name} 吗？它是空的，不会有其他内容被删除。',
+  'blancDrawer.deleteFolder.confirm': '删除文件夹',
+  'blancDrawer.deleteFolder.failed': '无法删除该文件夹：{reason}',
   'blanc.masterSearch.dialog': '搜索 Blanc',
   'blanc.masterSearch.scope.all': '全部',
   'blanc.masterSearch.placeholder': '搜索工具、学习内容和资料库',

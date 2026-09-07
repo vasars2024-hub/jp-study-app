@@ -8400,6 +8400,16 @@ export const ru: Catalog = {
   'wired.widget.network.desc': 'График пинга и статус пакетов.',
 
   // ---- Blanc Toolbox settings ----
+  'blancDrawer.deleteFolder.title': 'Удалить эту папку?',
+  'blancDrawer.deleteFolder.message': {
+    one: 'Удалить {name}? {count} ярлык внутри сохранится и переместится в корень ящика.',
+    few: 'Удалить {name}? {count} ярлыка внутри сохранятся и переместятся в корень ящика.',
+    many: 'Удалить {name}? {count} ярлыков внутри сохранятся и переместятся в корень ящика.',
+    other: 'Удалить {name}? {count} ярлыка внутри сохранятся и переместятся в корень ящика.',
+  },
+  'blancDrawer.deleteFolder.messageEmpty': 'Удалить {name}? Она пуста, поэтому больше ничего не будет удалено.',
+  'blancDrawer.deleteFolder.confirm': 'Удалить папку',
+  'blancDrawer.deleteFolder.failed': 'Не удалось удалить папку: {reason}',
   'blanc.masterSearch.dialog': 'Поиск в Blanc',
   'blanc.masterSearch.scope.all': 'Все',
   'blanc.masterSearch.placeholder': 'Поиск инструментов, учебных материалов и библиотеки',
