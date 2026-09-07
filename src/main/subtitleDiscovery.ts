@@ -20,7 +20,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { createEmptySubtitleQualityRatings } from '../shared/subtitleQuality';
-import { matchSubtitleTracks } from '../shared/subtitleMatching';
+import { matchSubtitleTracks, mismatchedAutoSubtitleIds } from '../shared/subtitleMatching';
 import {
   normalizeSubtitleIdentityId,
   type SubtitleProvidersDocument,
@@ -682,6 +682,22 @@ export async function runSubtitleDiscovery(
   if (languages.length === 0) return { ok: true, attached: 0, empty: 0, files: 0 };
 
   const only = request.mediaIds?.length ? new Set(request.mediaIds) : undefined;
+  // Repair BEFORE selecting, not inside the per-item pass, because a wrong track
+  // satisfies the language filter exactly as well as a right one: an item holding
+  // episode 1's script would be skipped by the filter below and never revisited.
+  // Dropping it here both removes the wrong cues and puts the item back in the
+  // sweep, so it can get the correct track or an honest none.
+  for (const item of host.listItems()) {
+    if (only && !only.has(item.id)) continue;
+    const stale = mismatchedAutoSubtitleIds(item);
+    if (stale.length === 0) continue;
+    // The cached file is left on disk. Removing the record is the repair; deleting
+    // bytes the user might still want is a separate, unaskable decision.
+    host.patchItems([item.id], {
+      subtitles: (item.subtitles ?? []).filter((record) => !stale.includes(record.id)),
+    });
+  }
+
   const items = host.listItems().filter((item) => {
     if (only && !only.has(item.id)) return false;
     if (!eligible(item)) return false;
