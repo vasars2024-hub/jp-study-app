@@ -1584,3 +1584,57 @@ exactly **1 red** (16 green). 128 green across the three suites.
 MAIN tree, so a `jp-wt-filesapp` edit cannot hot-reload into it, and the main half needs a restart
 regardless. The **before** state above is live and exact; the after rests on the tests and the two
 mutations. Whoever next restarts that app should re-run the repro and confirm the translated key.
+
+### 2026-09-07 08:05 EDT — primary2, D172 fixed and a NEW cross-cutting class opened (class 7)
+
+## CLASS 7 — a sentence built in MAIN, rendered raw in the renderer
+
+**Every i18n instrument in this repo is blind to this.** `tools/i18n-check.cjs`,
+`tools/i18n-hardcoded-check.cjs` and the `i18n.test.ts` catalog-hygiene block all read the
+**catalogs** and the **renderer**. A string that is born in `src/main/**` and travels to the screen
+through a `message` / `error` / `detail` field passes all three, is in no catalog, and appears in
+English no matter what language the user chose. **This is why D171 and D172 survived a full i18n
+class pass that was marked `done`.**
+
+**Claimed and released by primary2:** the nyaa/subtitle producers only (D171, D172). **The rest of
+the list below is UNCLAIMED and is the next worker's work-list.** Split it by FILE, not by class —
+that is what the last five collisions taught.
+
+**The scan (reusable, and a LEAD not a verdict):** for each `setX(v.field)` in `src/renderer`,
+walk back ≤25 lines to `v`'s assignment and check whether it is a `window.api.*` call.
+**36 leads, 30 resolved to `window.api`, in 15 files:**
+
+| file | sites | triaged? |
+|------|-------|----------|
+| `views/YouTubePlaylistsView.tsx` | **9** | **YES — real, D173 below** |
+| `components/anki/DeckWorkbench.tsx` | 4 | no |
+| `components/discover/SubtitleHarvestPanel.tsx` | 3 (fetch/attach paths) | no — D171 fixed only the LISTING half |
+| `components/blanc/BlancReadyToolPanels.tsx` | 3 | no |
+| `components/settings/pages/MalSyncPanel.tsx` | 2 (`.summary`) | no |
+| `anki/DeckWorkbenchGlossary`, `DictionaryResults`, `discover/MalDownloadDialog`, `grammar/GrammarContent`, `immersion/ImmersionContent`, `media/library/NyaaSubtitleDialog` (accept path), `media/StudyOrchestratorWorkspace`, `music/MusicContent`, `SeanimeDevPanel` | 1 each | no |
+
+**Triage rule, and it matters — do not file 30 rows.** A `.error` that is a caught exception
+(`e.message`, a yt-dlp stderr line, an HTTP status) is technical text and showing it raw is
+defensible. What is a defect is a **designed product refusal**: a sentence someone wrote for a
+person to read, which therefore belongs in a catalog. Read the producer before filing.
+
+### D173 — the whole YouTube surface refuses in English
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D173 | youtube (Playlists view) | Every refusal on this surface is an English sentence, in all four UI languages: "Not a valid YouTube playlist URL (missing list=…).", "Playlist not found.", "Channel not found.", "Not a valid YouTube video URL.", "Video not found.", "yt-dlp was not found on your PATH." The surface's *own* labels are translated, so a Japanese user gets a Japanese screen with an English error in it. | LIVE through the product's own IPC on the running app (pid 14128): `ytAddPlaylist('https://example.com/nope')` → `{error:"Not a valid YouTube playlist URL (missing list=…)."}`; `ytRefreshPlaylist('no-such-playlist-id')` → `{error:"Playlist not found."}`. Rendered by `YouTubePlaylistsView.tsx:248` and 8 sibling `setError(r.error)` sites; produced by `main/ytPlaylists.ts:230, 324, 367, 425, 583, 623, 675`. | P2 | **open — deliberately not started** |
+
+**Why D173 is left open rather than half-done.** It is not one string: it is ~7 designed refusals
+across 9 call sites, and doing it right means giving each a code (as D171/D172 did for nyaa),
+adding keys in four catalogs, and a mutation control per branch. That does not fit the tail of this
+turn, and a half-converted surface where three refusals are translated and four are not is worse
+than an honestly English one. **This is the opening slice for the next turn**, and the shape is
+already proven twice — copy `renderer/nyaaUnavailableText.ts`.
+
+**One caveat that is NOT a defect and must not be filed as one:** `'yt-dlp exited with code N'` and
+`proc.on('error', e => … e.message)` are process output, not product sentences. Translate the frame
+if anything, never the payload.
+
+**Also noted while scanning, unclaimed:** `SubtitleHarvestPanel` still has 3 raw `reply.message`
+sites on its **fetch** and **attach** paths. D171 fixed the listing refusal only, and says so; the
+fetch-side messages come from `nyaaFetch`, are a different producer, and were not triaged.
