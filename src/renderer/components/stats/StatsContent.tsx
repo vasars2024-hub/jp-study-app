@@ -21,6 +21,7 @@ import {
   getSummary,
   onStatsChanged,
   resetStats,
+  type DayStat,
   type StatsSummary,
 } from '../../stats';
 import {
@@ -313,6 +314,20 @@ export function StatsCards({ state }: { state: StatsState }) {
 export function StatsChart({ state }: { state: StatsState }) {
   const { t, lang } = useT();
   const anyWatch = state.summary.totalWatchSeconds > 0;
+  /** One day's figures as a sentence — the same string the tooltip carries. */
+  const dayLabel = (d: DayStat): string =>
+    anyWatch
+      ? t('stats.barTooltipWithWatch', {
+        date: chartDayLabel(d.date, lang),
+        duration: formatDuration(d.seconds),
+        chars: formatNumber(d.chars),
+        watched: formatDuration(d.watchSeconds),
+      })
+      : t('stats.barTooltip', {
+        date: chartDayLabel(d.date, lang),
+        duration: formatDuration(d.seconds),
+        chars: formatNumber(d.chars),
+      });
 
   return (
     <>
@@ -321,20 +336,14 @@ export function StatsChart({ state }: { state: StatsState }) {
           <div
             key={d.date}
             className="stats-bar-col"
-            title={
-              anyWatch
-                ? t('stats.barTooltipWithWatch', {
-                    date: chartDayLabel(d.date, lang),
-                    duration: formatDuration(d.seconds),
-                    chars: formatNumber(d.chars),
-                    watched: formatDuration(d.watchSeconds),
-                  })
-                : t('stats.barTooltip', {
-                    date: chartDayLabel(d.date, lang),
-                    duration: formatDuration(d.seconds),
-                    chars: formatNumber(d.chars),
-                  })
-            }
+            /* The bar heights are the only OTHER representation of this series,
+               so a title alone put every per-day figure behind a mouse hover: a
+               plain div takes no accessible name from `title` and has no focus
+               stop to reveal it from. `role="img"` names the column without
+               adding fourteen tab stops to a chart nobody navigates through. */
+            role="img"
+            aria-label={dayLabel(d)}
+            title={dayLabel(d)}
           >
             <div className="stats-bar-track">
               <div className="stats-bar-stack">
