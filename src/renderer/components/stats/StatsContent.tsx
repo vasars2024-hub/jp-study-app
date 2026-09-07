@@ -38,16 +38,40 @@ import { LevelMeter } from '../LevelMeter';
 import { getLevelEstimate, onLevelChange } from '../../levelService';
 import { badgeKeyForTier, type LevelEstimate } from '../../../shared/levelEstimate';
 import { useT } from '../../i18n';
+import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 
 /**
- * YYYY-MM-DD → single weekday initial (M T W …) for the bar-chart axis.
+ * YYYY-MM-DD → single weekday initial (M T W … / 月 火 水 … / П В С …) for the
+ * bar-chart axis, in the interface language.
+ *
+ * `weekday: 'narrow'` is the one CLDR field that is a single character in every
+ * language we ship, so the axis keeps its one-glyph shape rather than needing a
+ * per-language layout. In English it returns exactly the S M T W T F S the
+ * hardcoded array used to. Ambiguity (two S in English, two В in Russian) is
+ * inherent to a one-letter axis and is what the tooltip's full date is for.
+ *
  * Not `dayLabel`: shared/reviewForecast exports a different function under that
  * name (offset days → "Today"/"Tomorrow"/short weekday), and the collision made
  * it possible to import the wrong one.
  */
-export function weekdayInitial(isoDate: string): string {
+export function weekdayInitial(isoDate: string, lang: UiLang = 'en'): string {
   const d = new Date(`${isoDate}T00:00:00`);
-  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
+  return new Intl.DateTimeFormat(LANG_TAGS[lang], { weekday: 'narrow' }).format(d);
+}
+
+/**
+ * YYYY-MM-DD → the full day as the tooltip says it, in the interface language.
+ * The axis is one ambiguous glyph by design, so this is where the reader
+ * actually finds out which day a bar is; a bare ISO string is language-neutral
+ * but nobody's native way of writing a date.
+ */
+export function chartDayLabel(isoDate: string, lang: UiLang = 'en'): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  return d.toLocaleDateString(LANG_TAGS[lang], {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export interface StatsState {
@@ -287,7 +311,7 @@ export function StatsCards({ state }: { state: StatsState }) {
  * separate them for most people and for nobody in greyscale.
  */
 export function StatsChart({ state }: { state: StatsState }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const anyWatch = state.summary.totalWatchSeconds > 0;
 
   return (
@@ -300,13 +324,13 @@ export function StatsChart({ state }: { state: StatsState }) {
             title={
               anyWatch
                 ? t('stats.barTooltipWithWatch', {
-                    date: d.date,
+                    date: chartDayLabel(d.date, lang),
                     duration: formatDuration(d.seconds),
                     chars: formatNumber(d.chars),
                     watched: formatDuration(d.watchSeconds),
                   })
                 : t('stats.barTooltip', {
-                    date: d.date,
+                    date: chartDayLabel(d.date, lang),
                     duration: formatDuration(d.seconds),
                     chars: formatNumber(d.chars),
                   })
@@ -328,7 +352,7 @@ export function StatsChart({ state }: { state: StatsState }) {
                 )}
               </div>
             </div>
-            <span className="stats-bar-lbl">{weekdayInitial(d.date)}</span>
+            <span className="stats-bar-lbl">{weekdayInitial(d.date, lang)}</span>
           </div>
         ))}
       </div>

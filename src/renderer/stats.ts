@@ -14,6 +14,8 @@
 import type { ArenaMistake, GameId, SourceLang } from './games/types';
 import type { LevelTier } from '../shared/levelScale';
 import { getStudyLang, STUDY_LANG_EVENT, STUDY_LANG_KEY, type StudyLang } from './studyEnvironment';
+import { LANG_TAGS } from '../shared/i18n/core';
+import { getUiLang } from './i18n';
 
 export const LEGACY_STATS_KEY = 'jp-study-stats-v1';
 const GAME_KEY = 'jp-game-progress-v1';
@@ -562,7 +564,15 @@ export function formatDuration(totalSeconds: number): string {
   return `${h}h ${m % 60}m`;
 }
 
-/** "12,345" grouped thousands. */
+/**
+ * "12,345" grouped thousands — grouped the way the interface language groups
+ * them, so Russian reads `13 200` rather than the `13,200` a pinned `'en-US'`
+ * produced on every surface (D211).
+ *
+ * Reads the language rather than taking it as an argument: these are ~60 call
+ * sites across widgets, scraper panels and both shells, and every one of them
+ * already re-renders on a language switch through `useT()`.
+ */
 export function formatNumber(n: number): string {
-  return Math.round(n).toLocaleString('en-US');
+  return Math.round(n).toLocaleString(LANG_TAGS[getUiLang()]);
 }
