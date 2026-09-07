@@ -16,12 +16,15 @@
  */
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import Icon from '../Icons';
+// Direct path, not the `components/ui` barrel — see the note above about Blanc's bundle.
+import { confirmDialog } from '../ui/dialogService';
 import {
   buildSourceLinks,
   difficultyLabel,
   JITEN_GENRES,
   jitenGenreId,
   jitenGenreName,
+  planEntryCarriesWork,
   type JitenDeck,
   type JitenPlanEntry,
   type JitenSourceLink,
@@ -573,7 +576,29 @@ export function useNovels() {
     }
   }
 
+  /**
+   * D144. `removePlan` filters the row out of the store and writes — the note the
+   * user typed into the plan panel, the source they picked and how far the
+   * acquisition got all go with it, and there is no undo.
+   *
+   * The guard is CONDITIONAL on purpose. Removing a title you merely planned is
+   * a list edit and a modal on it would be friction the user did not ask for, so
+   * that case still goes in one click. An entry only asks once it carries work
+   * that cannot be re-derived by searching for the title again: a note, or an
+   * acquisition that has moved past `planned`. The right long-term answer here
+   * is an undo affordance rather than a modal, but `showToast` has no action
+   * slot and giving the shared primitive one is its own slice.
+   */
   async function removeFromPlan(entry: JitenPlanEntry): Promise<void> {
+    if (planEntryCarriesWork(entry)) {
+      const ok = await confirmDialog({
+        title: t('novels.removePlan.confirm.title'),
+        message: t('novels.removePlan.confirm.message', { title: entry.titleJp }),
+        confirmLabel: t('novels.removePlan.confirm.action'),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     try {
       applyStore(await window.api.jitenRemovePlan(entry.id));
