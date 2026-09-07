@@ -1,0 +1,12 @@
+{
+  "renderer/components/settings/pages/SpecialPage.tsx": 5,
+  "renderer/components/settings/SettingsApp.tsx": 4,
+  "renderer/components/PlaylistEditor.tsx": 3,
+  "renderer/views/MediaCenterView.tsx": 3,
+  "renderer/components/DictionaryPopup.tsx": 2,
+  "renderer/components/media/MediaStudyMode.tsx": 2,
+  "renderer/components/settings/pages/AppearancePage.tsx": 2,
+  "renderer/components/Lockscreen.tsx": 1,
+  "renderer/components/shell/WiredArchiveBootOverlay.tsx": 1,
+  "renderer/views/FlashcardsView.tsx": 1
+}

@@ -178,9 +178,9 @@ export default function FieldMappingEditor({
     setSaving(false);
     if (res.ok) {
       setDirty(false);
-      onMessage?.({ kind: 'ok', text: 'Field mapping saved.' });
+      onMessage?.({ kind: 'ok', text: t('fm.msg.saved') });
     } else {
-      onMessage?.({ kind: 'err', text: res.error ?? 'Could not save the field mapping.' });
+      onMessage?.({ kind: 'err', text: res.error ?? t('fm.msg.saveFailed') });
     }
   }
 
@@ -191,9 +191,9 @@ export default function FieldMappingEditor({
     if (res.ok) {
       setTemplates(seedTemplates(profile, fields));
       setDirty(false);
-      onMessage?.({ kind: 'ok', text: 'Reverted to automatic mapping.' });
+      onMessage?.({ kind: 'ok', text: t('fm.msg.reverted') });
     } else {
-      onMessage?.({ kind: 'err', text: res.error ?? 'Could not reset the field mapping.' });
+      onMessage?.({ kind: 'err', text: res.error ?? t('fm.msg.resetFailed') });
     }
   }
 
@@ -208,14 +208,11 @@ export default function FieldMappingEditor({
   return (
     <div className="fm-editor">
       <CollapsibleSection
-        title="Field templates"
-        summary={`${mappedCount} of ${fields.length} fields mapped`}
+        title={t('fm.section.templates')}
+        summary={t('fm.summary.mapped', { mapped: mappedCount, total: fields.length })}
         defaultOpen
       >
-        <p className="muted collapse-lead">
-          Each Anki field gets a template of variables. Click a field, then pick a variable from
-          the palette below.
-        </p>
+        <p className="muted collapse-lead">{t('fm.lead.templates')}</p>
         <div className="fm-rows">
           {fields.map((field) => (
             <label className="fm-row" key={field}>
@@ -226,7 +223,7 @@ export default function FieldMappingEditor({
                 className="fm-input"
                 value={templates[field] ?? ''}
                 spellCheck={false}
-                placeholder="Leave blank for automatic mapping"
+                placeholder={t('fm.placeholder.auto')}
                 ref={(el) => {
                   if (el) inputRefs.current.set(field, el);
                   else inputRefs.current.delete(field);
@@ -259,10 +256,10 @@ export default function FieldMappingEditor({
             aria-describedby={saveDisabledReason ? saveReasonId : undefined}
             title={saveDisabledReason}
           >
-            {saving ? 'Saving…' : dirty ? 'Save mapping' : 'Saved'}
+            {saving ? t('fm.btn.saving') : dirty ? t('fm.btn.save') : t('fm.btn.saved')}
           </button>
           <button className="btn" type="button" onClick={resetToAuto} disabled={saving}>
-            Reset to automatic
+            {t('fm.btn.reset')}
           </button>
           {saveDisabledReason ? (
             <p className="fm-action-reason" id={saveReasonId}>
@@ -272,13 +269,13 @@ export default function FieldMappingEditor({
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Variable palette" summary="Insert {placeholders} into fields">
+      <CollapsibleSection title={t('fm.section.palette')} summary={t('fm.summary.palette')}>
         <p className="muted collapse-lead">
-          Focus a field above, then click a tag. Language suffixes like <code>{'{expression:ru}'}</code> pick
-          which translation fills that Anki field — separate from language direction above.
+          {t('fm.lead.palette.before')} <code>{'{expression:ru}'}</code>{' '}
+          {t('fm.lead.palette.after')}
         </p>
-        <div className="fm-palette lq-hit-scope" aria-label="Insert a variable">
-          <span className="fm-palette-label">Base</span>
+        <div className="fm-palette lq-hit-scope" aria-label={t('fm.aria.insertVar')}>
+          <span className="fm-palette-label">{t('fm.label.base')}</span>
           {MINING_VARS.map((v) => (
             <button
               key={v.key}
@@ -292,8 +289,8 @@ export default function FieldMappingEditor({
           ))}
         </div>
 
-        <div className="fm-translated lq-hit-scope" aria-label="Insert a translated variable">
-          <span className="fm-palette-label">Translated</span>
+        <div className="fm-translated lq-hit-scope" aria-label={t('fm.aria.insertTranslated')}>
+          <span className="fm-palette-label">{t('fm.label.translated')}</span>
           <div className="fm-translated-grid">
             {MINING_LANGS.map((lang) => (
               <div key={lang.code} className="fm-lang-col">
@@ -306,7 +303,7 @@ export default function FieldMappingEditor({
                     key={`${base}:${lang.code}`}
                     type="button"
                     className="fm-chip fm-chip-lang"
-                    title={`${base} translated to ${lang.label}`}
+                    title={t('fm.title.translatedTo', { base, lang: lang.label })}
                     onClick={() => insertVar(`${base}:${lang.code}`)}
                   >
                     {`{${base}:${lang.code}}`}
@@ -317,12 +314,12 @@ export default function FieldMappingEditor({
           </div>
         </div>
 
-        <div className="fm-palette lq-hit-scope" aria-label="Insert a pair variable">
-          <span className="fm-palette-label">Pairs</span>
+        <div className="fm-palette lq-hit-scope" aria-label={t('fm.aria.insertPair')}>
+          <span className="fm-palette-label">{t('fm.label.pairs')}</span>
           <button
             type="button"
             className="fm-chip"
-            title="Russian example 1, then Japanese example 1, then pair 2…"
+            title={t('fm.title.pairs.ru')}
             onClick={() => insertVar('example-pairs:ru:ja')}
           >
             {`{example-pairs:ru:ja}`}
@@ -330,7 +327,7 @@ export default function FieldMappingEditor({
           <button
             type="button"
             className="fm-chip"
-            title="English example 1, then Japanese example 1, then pair 2…"
+            title={t('fm.title.pairs.en')}
             onClick={() => insertVar('example-pairs:en:ja')}
           >
             {`{example-pairs:en:ja}`}
@@ -338,7 +335,7 @@ export default function FieldMappingEditor({
           <button
             type="button"
             className="fm-chip"
-            title="Chinese example 1, then Japanese example 1, then pair 2…"
+            title={t('fm.title.pairs.zh')}
             onClick={() => insertVar('example-pairs:zh:ja')}
           >
             {`{example-pairs:zh:ja}`}
@@ -348,16 +345,13 @@ export default function FieldMappingEditor({
 
       {!hideExamplesFallback && (
       <CollapsibleSection
-        title="Examples & fallback"
+        title={t('fm.section.examples')}
         summary={
-          exampleFallback ? 'Auto-fetch Tatoeba + expression fallback' : 'Expression fallback off'
+          exampleFallback ? t('fm.summary.examplesOn') : t('fm.summary.examplesOff')
         }
       >
-        <div className="fm-example-counts" aria-label="Auto example counts per language">
-          <p className="muted collapse-lead">
-            When mining without hand-picked examples, fetch this many Tatoeba sentences per
-            language. Selected examples in the dictionary override these counts.
-          </p>
+        <div className="fm-example-counts" aria-label={t('fm.aria.exampleCounts')}>
+          <p className="muted collapse-lead">{t('fm.lead.examples')}</p>
           <div className="fm-example-count-grid">
             {EXAMPLE_COUNT_LANGS.map(({ code, label }) => (
               <label className="fm-example-count" key={code}>
@@ -384,24 +378,25 @@ export default function FieldMappingEditor({
                 setDirty(true);
               }}
             />
-            Expression fallback when examples are missing
+            {t('fm.toggle.fallback')}
           </label>
           <p className="muted collapse-lead">
-            If Tatoeba has no examples, mine with fallback templates — e.g.{' '}
-            <code>{'{expression:ru}'}</code> instead of <code>{'{example-sentence:ru}'}</code>.
+            {t('fm.lead.fallback.before')}{' '}
+            <code>{'{expression:ru}'}</code> {t('fm.lead.fallback.middle')}{' '}
+            <code>{'{example-sentence:ru}'}</code>.
           </p>
           {exampleFallback && (
             <div className="fm-rows fm-fallback-rows">
               {fields.map((field) => (
                 <label className="fm-row" key={`fb-${field}`}>
                   <span className="fm-field-name" lang="ja">
-                    {field} (fallback)
+                    {t('fm.field.fallbackSuffix', { field })}
                   </span>
                   <input
                     className="fm-input"
                     value={fallbackTemplates[field] ?? ''}
                     spellCheck={false}
-                    placeholder={`e.g. {expression:ru}`}
+                    placeholder={t('fm.placeholder.fallbackEg')}
                     onChange={(e) => {
                       setFallbackTemplates((prev) => ({ ...prev, [field]: e.target.value }));
                       setDirty(true);

@@ -251,4 +251,13 @@ function main() {
   }
 }
 
-main();
+/*
+ * `scan` and `walk` are the only literal extractor in this repo, and
+ * `i18n-shadow-check.cjs` asks a different question of the SAME hits — is this
+ * literal's exact text already a value in the catalog? Exporting them keeps
+ * one set of position rules and one `looksHuman`, rather than a second
+ * scanner that drifts from this one. RULE 1: no new single-use extractor.
+ */
+module.exports = { scan, walk, looksHuman, SRC };
+
+if (require.main === module) main();
