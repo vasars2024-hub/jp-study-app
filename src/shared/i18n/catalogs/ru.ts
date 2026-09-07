@@ -4342,6 +4342,8 @@ export const ru: Catalog = {
   'desktop.context.displaySettings': 'Настройки рабочего стола и экрана',
   'desktop.tearOff.noneFree': 'Все рабочие столы заняты, этому приложению некуда переместиться.',
   'desktop.tearOff.failed': 'Не удалось выделить приложению отдельный рабочий стол.',
+  'desktop.switch.onAnotherDisplay': '{desktop} уже открыт на другом мониторе.',
+  'desktop.switch.failed': 'Не удалось показать {desktop}.',
   'desktop.task.close': 'Закрыть {name}',
   'desktop.task.closeThis': 'Закрыть',
   'desktop.task.closeOthers': 'Закрыть все остальные',

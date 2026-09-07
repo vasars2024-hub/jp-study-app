@@ -1,5 +1,6 @@
 import {
   memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -36,7 +37,7 @@ import {
   maximizedGeometry,
   restorePoint,
 } from '../desktopWindowGeometry';
-import { collectForeignWindows } from '../foreignWindows';
+import { collectForeignWindows, switchableDesktopIndexes } from '../foreignWindows';
 import { createRenderIdentityCache } from '../renderIdentityCache';
 import { markSectionOpenHandled } from '../sectionSurface';
 import {
@@ -86,6 +87,7 @@ import {
   getDesktopCount,
   getDesktopLayout,
   getDesktopName,
+  focusOrOpenDesktop,
   onDesktopChanged,
   switchDesktop as switchDesktopState,
 } from '../desktopState';
@@ -725,6 +727,10 @@ export default function DesktopShell({
   const notesRef = useRef<Record<string, NoteData>>({});
   const openRef = useRef<(section: WinSection) => void>(() => undefined);
   const activeDesktopRef = useRef<DesktopIndex>(pinnedDesktop ?? getActiveDesktopIndex());
+  // The switcher's own ring, mirrored for the keyboard shortcut. Its effect
+  // binds once with no deps, so reading the state directly would step through
+  // whatever set existed on first render.
+  const switchableRef = useRef<DesktopIndex[]>([0, 1]);
   // Ring buffer of the last few layout signatures WE committed. commitLayout
   // round-trips through the main process and echoes back to us; every such
   // echo must be recognized as our own and ignored. Remembering only the
@@ -1349,11 +1355,13 @@ export default function DesktopShell({
      * already focuses an existing spawned window before creating one, so this
      * is the same two handlers the shell has always had — no new IPC, and the
      * result is answered rather than discarded.
+     *
+     * Now `desktopState.focusOrOpenDesktop`, because the taskbar's badged
+     * foreign-window button needs the identical pairing and had only the
+     * raise-only half (D150). A guard that lives inside one caller's effect is
+     * a guard the next call site cannot find.
      */
-    const showDesktop = async (target: DesktopIndex): Promise<boolean> => {
-      if ((await window.api.deskwinFocusDesktop(target)).ok) return true;
-      return (await window.api.deskwinOpenDesktop(target)).ok;
-    };
+    const showDesktop = focusOrOpenDesktop;
 
     const onMove = (e: Event): void => {
       const dir = (e as CustomEvent<number>).detail ?? 1;
@@ -1423,6 +1431,38 @@ export default function DesktopShell({
       }),
     [myAssignment?.showAllWindows, activeDesktop, deskPrefs, layoutRevision],
   );
+
+  /**
+   * The desktops the switcher offers a button for.
+   *
+   * Deliberately NOT hung off `layoutRevision`: that counter is only subscribed
+   * when `showAllWindows` is on, and the switcher is always rendered, so a
+   * desktop that gained a window while this taskbar was showing another one
+   * would never grow its button. It subscribes on its own instead, and stores
+   * the result rather than recomputing in a memo, so the always-on broadcast
+   * only costs a re-render when the SET actually changes — which is the answer
+   * to the cost the `layoutRevision` comment above is guarding against.
+   */
+  const readSwitchable = useCallback(
+    () =>
+      switchableDesktopIndexes({
+        desktopCount: getDesktopCount(),
+        activeDesktop,
+        windowsOn: (index) => getDesktopLayout(index).windows,
+      }),
+    [activeDesktop],
+  );
+  const [switchableDesktops, setSwitchableDesktops] = useState<DesktopIndex[]>(readSwitchable);
+  switchableRef.current = switchableDesktops;
+  useEffect(() => {
+    const apply = (): void =>
+      setSwitchableDesktops((prev) => {
+        const next = readSwitchable();
+        return prev.join(',') === next.join(',') ? prev : next;
+      });
+    apply();
+    return onDesktopChanged(apply);
+  }, [readSwitchable]);
 
   /** Ghost shown on the receiving desktop while an item hovers over it. */
   const [dragGhost, setDragGhost] = useState<{ kind: DeskDragKind; x: number; y: number } | null>(null);
@@ -1878,7 +1918,16 @@ export default function DesktopShell({
     const onSwitchDesktop = (e: Event) => {
       const dir = ((e as CustomEvent<number>).detail ?? 1) >= 0 ? 1 : -1;
       const current = activeDesktopRef.current;
-      const target = (dir >= 0 ? (current === 0 ? 1 : 0) : current === 1 ? 0 : 1) as DesktopIndex;
+      // Steps through the same desktops the switcher shows, wrapping at both
+      // ends. It used to be a hardcoded flip between the first two indices — a
+      // two-desktop toggle that could not reach a torn-off desktop even though
+      // the shortcut is the one route a keyboard user has (D149). The ratchet
+      // below bans the old expression, so do not quote it back into a comment.
+      const ring = switchableRef.current;
+      const at = ring.indexOf(current);
+      if (ring.length < 2) return;
+      const target = ring[(((at < 0 ? 0 : at) + dir) % ring.length + ring.length) % ring.length];
+      if (target === current) return;
       void switchDesktopRef.current(target);
     };
     const onCycleAppFullscreen = (e: Event) => {
@@ -2724,10 +2773,27 @@ export default function DesktopShell({
       rememberSignature(layoutSignature(outgoing));
       await commitLayout(activeDesktop, outgoing);
       const res = await switchDesktopState(target);
-      if (!res.ok) throw new Error(res.error ?? 'Failed to switch desktop.');
+      if (!res.ok) {
+        // A refusal is a real product state, not an internal error: main answers
+        // `desktop-on-another-display` whenever the desktop you clicked is
+        // already being shown on a second monitor. It used to reach a
+        // `console.error` and nothing else, so the button read as dead (D151).
+        showOsToast(
+          res.error === 'desktop-on-another-display'
+            ? t('desktop.switch.onAnotherDisplay', { desktop: t('desktop.desktopN', { n: target + 1 }) })
+            : t('desktop.switch.failed', { desktop: t('desktop.desktopN', { n: target + 1 }) }),
+        );
+        hydrating.current = false;
+        return;
+      }
       setStartOpen(false);
     } catch (err) {
       console.error('[desktopState] switch failed:', err);
+      // Named the way the BUTTON is named. `getDesktopName` returns the store's
+      // own label — "City" for index 1 — and telling a user who clicked
+      // "Desktop 2" about "City" names something they cannot see. Measured live
+      // before this line was written.
+      showOsToast(t('desktop.switch.failed', { desktop: t('desktop.desktopN', { n: target + 1 }) }));
       hydrating.current = false;
     }
   };
@@ -3329,13 +3395,25 @@ export default function DesktopShell({
             {!secondary && (
               <div className="os-desktop-switches">
                 {/* `active` was a class and nothing else: which desktop you are on was
-                    carried only in paint. `aria-pressed` states it programmatically. */}
-                <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} aria-pressed={activeDesktop === 0} onClick={() => void switchDesktop(0)}>
-                  {wired ? 'LOCAL NODE' : t('desktop.desktopN', { n: 1 })}
-                </button>
-                <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} aria-pressed={activeDesktop === 1} onClick={() => void switchDesktop(1)}>
-                  {wired ? 'REMOTE FEED' : t('desktop.desktopN', { n: 2 })}
-                </button>
+                    carried only in paint. `aria-pressed` states it programmatically.
+
+                    The row used to be exactly two hardcoded buttons while the layout
+                    store grows a desktop per display assignment and one more for every
+                    taskbar tear-off — so anything the user put on desktop 3 or beyond
+                    had no button and no shortcut leading to it (D149). It is now every
+                    desktop that is 0, 1, active, or carrying a visible window. */}
+                {switchableDesktops.map((index) => (
+                  <button
+                    key={index}
+                    className={`os-desktop-switch ${activeDesktop === index ? 'active' : ''}`}
+                    aria-pressed={activeDesktop === index}
+                    onClick={() => void switchDesktop(index)}
+                  >
+                    {wired
+                      ? index === 0 ? 'LOCAL NODE' : index === 1 ? 'REMOTE FEED' : `NODE ${index + 1}`
+                      : t('desktop.desktopN', { n: index + 1 })}
+                  </button>
+                ))}
               </div>
             )}
           </>
@@ -3453,7 +3531,16 @@ export default function DesktopShell({
                 key={`foreign-${desktopIndex}-${fw.id}`}
                 className={`os-task-win os-task-win-foreign app-${fw.section}`}
                 title={t('desktop.task.onDesktop', { name: label, desktop: desktopName })}
-                onClick={() => void window.api.deskwinFocusDesktop(desktopIndex)}
+                // `deskwinFocusDesktop` raises a window that already shows this
+                // desktop and answers `{ok:false}` when none does — which is the
+                // one case the badge exists for, and the answer was discarded, so
+                // the click landed on silence (D150). Same helper the shell's own
+                // monitor-ring route uses, and it says so when it still fails.
+                onClick={() => {
+                  void focusOrOpenDesktop(desktopIndex).then((ok) => {
+                    if (!ok) showOsToast(t('desktop.switch.failed', { desktop: desktopName }));
+                  });
+                }}
               >
                 <Icon name={app?.glyph ?? 'app'} size={18} />
                 <span>{label}</span>

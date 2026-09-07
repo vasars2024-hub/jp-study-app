@@ -96,6 +96,23 @@ export async function switchDesktop(target: DesktopIndex): Promise<{ ok: boolean
   return { ok: res.ok, error: res.error };
 }
 
+/**
+ * Put a desktop on screen: raise the window already showing it, and open one
+ * when nothing does.
+ *
+ * `deskwin:focusDesktop` only raises what exists — it answers `{ok:false}` for a
+ * desktop no window is showing, which is exactly the case a user hits after
+ * closing a torn-off desktop's window. This pairing lived inline in one of
+ * `DesktopShell`'s effects while the taskbar's own foreign-window button called
+ * the raise-only half and `void`ed the answer, so that button clicked to silence
+ * (D150). One helper, both call sites, and the answer is returned rather than
+ * discarded so the caller can say something when it is `false`.
+ */
+export async function focusOrOpenDesktop(target: DesktopIndex): Promise<boolean> {
+  if ((await window.api.deskwinFocusDesktop(target)).ok) return true;
+  return (await window.api.deskwinOpenDesktop(target)).ok;
+}
+
 export async function commitLayout(index: DesktopIndex, layout: DesktopLayout): Promise<void> {
   const res = await window.api.desktopCommitLayout(index, layout);
   if (!res.ok) throw new Error(res.error ?? 'Failed to commit desktop layout.');

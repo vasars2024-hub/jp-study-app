@@ -22,11 +22,10 @@ const REGISTER = resolve(__dirname, '../../../docs/ACTIVE/LIVE_DEFECTS_PRESWEEP.
  * number and a merge never needs to renumber. Add a worker here before it files.
  */
 export const MINTING_RANGES: Record<string, { from: number; to: number }> = {
-  primary: { from: 200, to: 299 },
-  primary2: { from: 300, to: 399 },
-  backup: { from: 400, to: 499 },
-  codexA: { from: 500, to: 599 },
-  codexB: { from: 600, to: 699 },
+  primary: { from: 149, to: 169 },
+  primary2: { from: 170, to: 189 },
+  backup: { from: 190, to: 209 },
+  codex: { from: 210, to: 229 },
 };
 
 /**
@@ -34,7 +33,7 @@ export const MINTING_RANGES: Record<string, { from: number; to: number }> = {
  * counter and are grandfathered: they are still checked for uniqueness, just not
  * for range membership.
  */
-const LEGACY_CEILING = 149;
+const LEGACY_CEILING = 148;
 
 function readRegister(): string {
   return readFileSync(REGISTER, 'utf8');
@@ -104,18 +103,20 @@ describe('live defect register', () => {
   });
 
   it('catches an id minted outside every range', () => {
-    const md = ['| D150 | files | a | b | P2 | open |', '| D700 | note | c | d | P3 | open |'].join('\n');
-    expect(outOfRangeIds(parseRowIds(md))).toEqual([150, 700]);
+    // D230 sits one step past codex's ceiling — the realistic mistake is landing just
+    // outside a range, not a wild number.
+    const md = ['| D230 | files | a | b | P2 | open |', '| D700 | note | c | d | P3 | open |'].join('\n');
+    expect(outOfRangeIds(parseRowIds(md))).toEqual([230, 700]);
   });
 
   it('grandfathers the pre-range ids and does not match prose mentioning one', () => {
     const md = [
-      '| D149 | files | a | b | P2 | open |',
-      'Prose that names D300 and D9999 in a sentence is not a row.',
-      '  | D301 | note | c | d | P3 | open |',
+      '| D148 | files | a | b | P2 | open |',
+      'Prose that names D700 and D9999 in a sentence is not a row.',
+      '  | D701 | note | c | d | P3 | open |',
     ].join('\n');
     // The indented line is not a row: rows start the line.
-    expect(parseRowIds(md)).toEqual([149]);
+    expect(parseRowIds(md)).toEqual([148]);
     expect(outOfRangeIds(parseRowIds(md))).toEqual([]);
   });
 });

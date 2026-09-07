@@ -58,3 +58,46 @@ export function collectForeignWindows(sources: ForeignWindowSources): ForeignWin
   }
   return out;
 }
+
+export interface SwitchableDesktopSources {
+  /** How many desktops the layout store actually holds. */
+  desktopCount: number;
+  /** The desktop this shell is currently showing. */
+  activeDesktop: DesktopIndex;
+  windowsOn: (index: DesktopIndex) => readonly WindowSnapshot[];
+}
+
+/**
+ * Which desktops the taskbar switcher must offer a button for.
+ *
+ * The switcher used to be two hardcoded buttons, indices 0 and 1, and the
+ * keyboard shortcut flipped between the same pair — while the layout store
+ * grows a desktop per display assignment and one more for every taskbar
+ * tear-off, up to `MAX_DESKTOPS`. Measured on the user's own machine: eight
+ * desktops, two switches, and two maximized Scraper windows sitting on desktops
+ * 3 and 5 with no route back to either (D149).
+ *
+ * The rules, and why each is a rule:
+ *
+ * - **0 and 1 always.** They are the two the shell has always shown and the two
+ *   the seed layout creates; dropping one when it happens to be empty would
+ *   make the taskbar's shape depend on what is open.
+ * - **The active desktop always**, even if empty — a shell must be able to show
+ *   which desktop it is on.
+ * - **Any other desktop that holds a visible window.** That is the whole point:
+ *   a desktop with something on it is somewhere the user can need to get to. A
+ *   minimised-only desktop is skipped for the same reason the foreign-window
+ *   list skips minimised windows — there is nothing to raise.
+ * - **Empty extra desktops are omitted**, so a machine that has assigned six
+ *   displays does not grow six dead buttons.
+ * - **Ascending, deduplicated**, so the row is stable across renders.
+ */
+export function switchableDesktopIndexes(sources: SwitchableDesktopSources): DesktopIndex[] {
+  const out = new Set<number>([0, 1, sources.activeDesktop]);
+  for (let index = 0; index < sources.desktopCount; index += 1) {
+    if (sources.windowsOn(index).some((win) => win.visible)) out.add(index);
+  }
+  return [...out]
+    .filter((index) => index >= 0 && index < Math.max(2, sources.desktopCount))
+    .sort((a, b) => a - b) as DesktopIndex[];
+}

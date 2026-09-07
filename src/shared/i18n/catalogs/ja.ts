@@ -4028,6 +4028,8 @@ export const ja: Catalog = {
   'desktop.context.displaySettings': 'デスクトップと画面表示の設定',
   'desktop.tearOff.noneFree': 'すべてのデスクトップが使用中のため、このアプリの移動先がありません。',
   'desktop.tearOff.failed': 'このアプリ専用のデスクトップを作成できませんでした。',
+  'desktop.switch.onAnotherDisplay': '{desktop} は別のモニターに表示されています。',
+  'desktop.switch.failed': '{desktop} を表示できませんでした。',
   'desktop.task.close': '{name}を閉じる',
   'desktop.task.closeThis': '閉じる',
   'desktop.task.closeOthers': '他をすべて閉じる',

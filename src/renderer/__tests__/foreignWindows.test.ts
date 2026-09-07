@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { WindowSnapshot } from '../../shared/desktop';
-import { collectForeignWindows } from '../foreignWindows';
+import { collectForeignWindows, switchableDesktopIndexes } from '../foreignWindows';
 
 /**
  * The cross-monitor "show windows from all desktops" taskbar list.
@@ -134,5 +134,100 @@ describe('DesktopShell subscribes the list to the store it reads', () => {
     const memo = src.indexOf('collectForeignWindows(');
     expect(memo).toBeGreaterThan(-1);
     expect(src.slice(memo, memo + 500)).toContain('layoutRevision');
+  });
+});
+
+/**
+ * The switcher's own selection.
+ *
+ * The row was two hardcoded buttons, indices 0 and 1, while the layout store
+ * grows a desktop per display assignment and one more for every taskbar
+ * tear-off. Measured on the user's machine: eight desktops, two buttons, and
+ * two maximized Scraper windows stranded on desktops 3 and 5 (D149).
+ */
+describe('switchableDesktopIndexes', () => {
+  const w = (layouts: Record<number, WindowSnapshot[]>, count = 8) => ({
+    desktopCount: count,
+    windowsOn: (index: number) => layouts[index] ?? [],
+  });
+
+  it('offers a button for a desktop that holds a window, however far out it is', () => {
+    // The measured case, reduced: windows on 1, 2 and 4 of eight desktops.
+    const out = switchableDesktopIndexes({
+      activeDesktop: 0,
+      ...w({ 1: [win('files')], 2: [win('scraper', { maximized: true })], 4: [win('scraper', { maximized: true })] }),
+    });
+    expect(out).toEqual([0, 1, 2, 4]);
+  });
+
+  it('still shows 0 and 1 when both are empty, so the row never changes shape', () => {
+    expect(switchableDesktopIndexes({ activeDesktop: 0, ...w({}) })).toEqual([0, 1]);
+  });
+
+  it('omits empty extra desktops, so six assigned displays do not grow six dead buttons', () => {
+    const out = switchableDesktopIndexes({ activeDesktop: 0, ...w({ 5: [] }) });
+    expect(out).not.toContain(5);
+    expect(out).toEqual([0, 1]);
+  });
+
+  it('includes the active desktop even when it is empty and far out', () => {
+    expect(switchableDesktopIndexes({ activeDesktop: 6, ...w({}) })).toEqual([0, 1, 6]);
+  });
+
+  it('skips a desktop whose only windows are hidden — there is nothing to raise', () => {
+    const out = switchableDesktopIndexes({ activeDesktop: 0, ...w({ 3: [win('note', { visible: false })] }) });
+    expect(out).toEqual([0, 1]);
+  });
+
+  it('never returns an index the store does not have', () => {
+    // A one-desktop store still yields the pair, because the shell always
+    // renders both; nothing beyond `desktopCount` may appear.
+    const out = switchableDesktopIndexes({ activeDesktop: 0, ...w({}, 1) });
+    expect(out).toEqual([0, 1]);
+    expect(switchableDesktopIndexes({ activeDesktop: 0, ...w({ 2: [win('x')] }, 2) })).toEqual([0, 1]);
+  });
+});
+
+/**
+ * The two call sites of the "put this desktop on screen" pairing.
+ *
+ * `deskwinFocusDesktop` only raises a window that already shows the desktop and
+ * answers `{ok:false}` when none does. The shell's monitor-ring route paired it
+ * with `deskwinOpenDesktop`; the taskbar's badged button called the raise-only
+ * half and `void`ed the answer, so it clicked to silence (D150). Source-read for
+ * the same reason as the block above — `DesktopShell.tsx` cannot be imported
+ * under vitest.
+ */
+describe('every desktop-showing route opens when nothing is showing it', () => {
+  it('routes both call sites through the shared helper and says so on failure', async () => {
+    const fs = await import('node:fs');
+    const shell = fs.readFileSync('src/renderer/components/DesktopShell.tsx', 'utf8');
+    const state = fs.readFileSync('src/renderer/desktopState.ts', 'utf8');
+
+    // The helper exists and is the pairing, not just a rename of the raise.
+    const helper = state.indexOf('export async function focusOrOpenDesktop');
+    expect(helper).toBeGreaterThan(-1);
+    const body = state.slice(helper, helper + 400);
+    expect(body).toContain('deskwinFocusDesktop');
+    expect(body).toContain('deskwinOpenDesktop');
+
+    // And no caller in the shell reaches for the raise-only half on its own.
+    expect(shell).not.toContain('window.api.deskwinFocusDesktop');
+    expect(shell).toContain('focusOrOpenDesktop');
+
+    // A refusal reaches the user rather than only the console.
+    expect(shell).toContain("t('desktop.switch.onAnotherDisplay'");
+    expect(shell).toContain("t('desktop.switch.failed'");
+  });
+
+  it('steps the keyboard shortcut through the same ring the switcher shows', async () => {
+    const fs = await import('node:fs');
+    const shell = fs.readFileSync('src/renderer/components/DesktopShell.tsx', 'utf8');
+    const at = shell.indexOf('const onSwitchDesktop =');
+    expect(at).toBeGreaterThan(-1);
+    const body = shell.slice(at, at + 900);
+    expect(body).toContain('switchableRef.current');
+    // The old two-desktop toggle, which could not reach a torn-off desktop.
+    expect(body).not.toContain('current === 0 ? 1 : 0');
   });
 });

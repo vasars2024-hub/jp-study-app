@@ -40,13 +40,12 @@ three subtitle defects the user found by watching a video for ten seconds surviv
 
    | worker | range |
    |--------|-------|
-   | `primary` | D200–D299 |
-   | `primary2` | D300–D399 |
-   | `backup` | D400–D499 |
-   | `codexA` | D500–D599 |
-   | `codexB` | D600–D699 |
+   | `primary` | D149–D169 |
+   | `primary2` | D170–D189 |
+   | `backup` | D190–D209 |
+   | codex | D210–D229 |
 
-   D1–D149 are the pre-range ids: grandfathered, still unique, never reused.
+   D1–D148 are the pre-range ids: grandfathered, still unique, never reused.
    `src/shared/__tests__/presweepRegisterGate.test.ts` enforces both properties in the suite —
    the `uniq -d` check that caught all four collisions is hand-run, so it catches without
    preventing. Add a worker to `MINTING_RANGES` before it files its first row.
@@ -1092,8 +1091,8 @@ other branch's max before minting, every time — that reservation lasted about 
 | D142 | player / video (Media Hub + Media library actions) | **"Remove missing entries" deleted library rows in bulk with no confirm — and an unplugged drive is what makes them look missing.** Notes, watch position, the language profile, cover art and the cached transcode all went, for every entry at once. | `media:pruneMissing` (`main/media.ts:475`) keeps only items whose `path` passes `fs.existsSync`, writes the database back, then `removeCoverFiles` and `pruneOrphanCache` `rmSync` the covers and every cached `.mp4` the surviving paths no longer hash to. Two hosts reached it and neither asked: `MediaContent.tsx:2350` (a bare `onClick`) and `MediaLibraryActions.pruneMissing` — three lines above a `clearAll` that *does* confirm. A disconnected external drive, an unmounted share or a renamed folder turns `existsSync` false for every item on it at once, so the moment a user is most likely to see a large "Missing files" count is exactly the moment the entries are still fine. It does NOT touch `subtitles/` — that is `media:remove` only (D137), checked rather than carried over. | P1 | fixed `3fa7052c` — one guarded helper both hosts import, message names what is destroyed *and* the offline-drive trap. Same block also rendered raw English in all four languages ("Duplicate paths:", "Missing files:", the button); 7 keys × 4 locales. Control: deleting the guard turns 3 of 4 cases red. |
 | D143 | resources + blanc (app drawer) | **The same saved-tool delete asked on one surface and not the other — and the asymmetry was two hours old.** Blanc's app drawer removed a collected tool, with whatever note the user wrote on it, on one click. | `tools:remove` has exactly two call sites. D17 (`cd57a7b3`, 01:51 the same night) put a confirm on `ResourcesContent.removeTool`; `BlancAppDrawerPanel.removeItem` kept calling the channel bare. Same store, same tool, same note, no undo. **The gap was created BY a fix** — D17 guarded the surface it was walking rather than the action. That is the D137 lesson turned on its own author, and the second time in one night this shape produced a P1. | P1 | fixed `606c889b` — the confirm moved to `collectedToolsActions`, both hosts call it, Resources' behaviour unchanged. Reuses `resources.myTools.*`, no new keys. Control: deleting the Blanc guard fails exactly the source-ratchet case. |
 | D144 | novels (Jiten plan) | **Removing a title from the reading plan silently destroyed the note written on it**, plus the chosen source and the acquisition progress. | `removePlan` (`main/jiten.ts`) filters the row out and writes. `JitenPlanEntry` carries `notes` — a real textarea at `NovelsContent.tsx:1097`, saved on blur — plus `selectedSourceId` and `acquisitionStatus`. The book itself survives: `removePlan` does not cascade into the library, checked not assumed. | P2 | fixed `999a0d36` — a **conditional** confirm. A title you merely queued stays one click, because a modal there is friction the user did not ask for; an entry asks only once it carries a note, a library link, or an acquisition past `planned`. `error` counts. Predicate is `planEntryCarriesWork` in `shared/jiten.ts` so the decision is testable in both directions. |
-| D149 | immersion (visual novels — sentence assist) | **"Remove voice clip" detached an attached recording on ONE click, while the button beside it — the bigger destruction of the whole capture — already asked twice.** | `removeAudio` (`VisualNovelSentenceAssist.tsx:157`) called `visual-novel:removeCaptureAudio` bare. The handler (`main/immersion/visualNovels.ts:1079`) sets `audioPath: ''` and saves; it does **not** delete the managed copy, so the loss is the *reference*, not the bytes — checked in the handler, not assumed. That is still unrecoverable from the UI: the orphaned copy sits unnamed under userData and re-attaching means the native picker plus finding the original clip again (`attachCaptureAudio` copies through `saveCaptureAudio`, so the source file does survive at its own path). `remove()` eleven lines above uses a two-step `confirmDelete` arm for a strictly larger destruction. Fifth sighting of the D136 tell: the smaller destruction asks, the larger-effort one does not. | P2 | fixed `4d4251f2` — a two-step arm, matching `remove()` in the same component rather than importing a modal into a dense action row. Reaching for **Replace voice clip** disarms it, and so does selecting a different sentence, so a half-abandoned intent cannot fire on the next click. **Zero new i18n keys** — `vnAssist.confirmRemove` already existed. Ratchet is behavioural (`visualNovelRemoveClipGuard.test.tsx`, 5 cases) because the source ratchet `destructiveGuards.test.ts` asserts a `confirmDialog`/`danger: true` shape this guard deliberately does not have. Control: deleting the arm turns 4 of 5 cases red. |
-| D300 | youtube | **The "Channel tracking" card never appeared — for the only channel the user is subscribed to.** Open YouTube, select the one playlist in the tree (`オノマトペ`), open **Playlist settings**: the block naming the channel, its subscription status and how many of its videos are tracked is simply absent, while the channel's name is printed right there in the tree two inches away as the playlist's subtitle. | `channelId` and `channelTitle` are **independent optionals** on `YtPlaylist` (`shared/ytPlaylists.ts:37`, `:61`) and `syncPlaylist`'s `--flat-playlist` fills the title far more often than the id. `YouTubePlaylistsView.tsx:977` guarded the card on `playlist.channelId` alone. Measured live on pid 14128: the store holds `オノマトペ` (16 videos, `channelTitle: ゆる言語学ラジオ`, **no `channelId`**), `Extension` (which HAS the id) and channel `ゆる言語学ラジオ` (subscribed, `videoCount` 3) — and `isImmersionPlaylist` deliberately keeps `Extension` out of the tree (D94), so the only *reachable* playlist was the one with no id. `/eval` on the live DOM read `NO CHANNEL CARD RENDERED`. | P3 | fixed `9d702238` — `resolveTrackedChannel(playlist, channels)` in `shared/ytPlaylists.ts`, id first (the stable key, so a duplicate title can never override a real id match) then title. **A miss returns `undefined` rather than a guess**, and the view renders the tracked-count line only when a record resolved — relaxing the guard without that would print a confident "0 videos tracked" for every channel the app has no record of, which is worse than the blank. 6 cases in `ytTrackedChannel.test.ts`; deleting the title fallback turns exactly 3 of them red. **Fix is unit-verified, NOT live-verified:** the running instance is served from the main tree, so a worktree edit cannot hot-reload into it. What IS live-verified is the defect and the fix's premise — the same resolution rule run against the live store returns `ゆる言語学ラジオ / videoCount 3 / subscribed` for the playlist that currently renders no card. |
+| D190 | immersion (visual novels — sentence assist) | **"Remove voice clip" detached an attached recording on ONE click, while the button beside it — the bigger destruction of the whole capture — already asked twice.** | `removeAudio` (`VisualNovelSentenceAssist.tsx:157`) called `visual-novel:removeCaptureAudio` bare. The handler (`main/immersion/visualNovels.ts:1079`) sets `audioPath: ''` and saves; it does **not** delete the managed copy, so the loss is the *reference*, not the bytes — checked in the handler, not assumed. That is still unrecoverable from the UI: the orphaned copy sits unnamed under userData and re-attaching means the native picker plus finding the original clip again (`attachCaptureAudio` copies through `saveCaptureAudio`, so the source file does survive at its own path). `remove()` eleven lines above uses a two-step `confirmDelete` arm for a strictly larger destruction. Fifth sighting of the D136 tell: the smaller destruction asks, the larger-effort one does not. | P2 | fixed `4d4251f2` (minted D147, renumbered D149 then D190 on merge) — a two-step arm, matching `remove()` in the same component rather than importing a modal into a dense action row. Reaching for **Replace voice clip** disarms it, and so does selecting a different sentence, so a half-abandoned intent cannot fire on the next click. **Zero new i18n keys** — `vnAssist.confirmRemove` already existed. Ratchet is behavioural (`visualNovelRemoveClipGuard.test.tsx`, 5 cases) because the source ratchet `destructiveGuards.test.ts` asserts a `confirmDialog`/`danger: true` shape this guard deliberately does not have. Control: deleting the arm turns 4 of 5 cases red. |
+| D170 | youtube | **The "Channel tracking" card never appeared — for the only channel the user is subscribed to.** Open YouTube, select the one playlist in the tree (`オノマトペ`), open **Playlist settings**: the block naming the channel, its subscription status and how many of its videos are tracked is simply absent, while the channel's name is printed right there in the tree two inches away as the playlist's subtitle. | `channelId` and `channelTitle` are **independent optionals** on `YtPlaylist` (`shared/ytPlaylists.ts:37`, `:61`) and `syncPlaylist`'s `--flat-playlist` fills the title far more often than the id. `YouTubePlaylistsView.tsx:977` guarded the card on `playlist.channelId` alone. Measured live on pid 14128: the store holds `オノマトペ` (16 videos, `channelTitle: ゆる言語学ラジオ`, **no `channelId`**), `Extension` (which HAS the id) and channel `ゆる言語学ラジオ` (subscribed, `videoCount` 3) — and `isImmersionPlaylist` deliberately keeps `Extension` out of the tree (D94), so the only *reachable* playlist was the one with no id. `/eval` on the live DOM read `NO CHANNEL CARD RENDERED`. | P3 | fixed `9d702238` — `resolveTrackedChannel(playlist, channels)` in `shared/ytPlaylists.ts`, id first (the stable key, so a duplicate title can never override a real id match) then title. **A miss returns `undefined` rather than a guess**, and the view renders the tracked-count line only when a record resolved — relaxing the guard without that would print a confident "0 videos tracked" for every channel the app has no record of, which is worse than the blank. 6 cases in `ytTrackedChannel.test.ts`; deleting the title fallback turns exactly 3 of them red. **Fix is unit-verified, NOT live-verified:** the running instance is served from the main tree, so a worktree edit cannot hot-reload into it. What IS live-verified is the defect and the fix's premise — the same resolution rule run against the live store returns `ゆる言語学ラジオ / videoCount 3 / subscribed` for the playlist that currently renders no card. |
 
 **D144's fix is not the one I would have preferred, and the better one is recorded rather than
 lost.** The pin is right that a soft delete with undo beats a modal, and `removeFromPlan` already
@@ -1371,12 +1370,12 @@ other branch and found the same zero). What is left is the shape neither can jud
 *source* disagrees with the store, and a count rendered in a different component from its list.
 
 Method: read the rendered figure off the live surface, then read the store through the app's own
-`window.api` on the same instance, and compare. **Ids minted from D300** (primary2's range).
+`window.api` on the same instance, and compare. **Ids minted from D170** (primary2's range).
 Driving window 2 (`?desk=1`), pid 14128, so it cannot collide with a worker on window 1.
 
 ### 2026-09-07 05:05 EDT — primary2, class 4's MANUAL half: the densest counting surface in the app, checked against its store
 
-**D300 filed and fixed.** The rest of this section is the negative result, which is the larger
+**D170 filed and fixed.** The rest of this section is the negative result, which is the larger
 half and the part worth not re-deriving: **`files` and `youtube` were walked number-by-number
 against the stores behind them and every single count agreed.**
 
@@ -1419,7 +1418,7 @@ be read against.
 item where the store holds 2 playlists + 1 channel, which is `isImmersionPlaylist` deliberately
 excluding the extension-owned playlist (already recorded as D94, not a defect); and the playlist
 list rendered **16 rows for the store's 16 videos**, `Plan to watch 0` for a store `planToWatchIds`
-of 0. The one real finding on this surface was not a count at all — it was D300, found only
+of 0. The one real finding on this surface was not a count at all — it was D170, found only
 because cross-checking the counts meant reading the channel record.
 
 **`immersion` — nothing to check.** 1,560 sites in the store and the surface renders **no
@@ -1432,3 +1431,93 @@ untouched — `stats` (every figure is derived), `flashcards` (per-deck due/new 
 confirmed the app-owned figure against AnkiConnect), and `library`/`player` (24 library items vs
 39 media items). Those are where the next class-4 turn should go. **Do not re-derive `files`,
 `youtube` or `immersion` — they are done for this class.**
+
+### 2026-09-07 06:00 EDT — primary CLAIMS class 4 manual half, and the id ranges that stop the collisions
+
+**CLAIMED: class 4 (count-vs-truth), the MANUAL half.** Live app pid 14128, **window 1**. No other
+worker should take a class-4 lead until this line says released.
+
+**ID RANGES, effective now.** Four ids collided in one night (D142/D143 fixed twice; D147 minted
+twice) because two workers mint from "max + 1" on two branches that merge every 15 minutes. Max on
+`feat/nyaa-subtitles` is D147, on `wt/files-app` D148. So:
+
+| worker | range |
+|---|---|
+| `primary` | **D149-D169** |
+| `primary2` | **D170-D189** |
+| `backup` | **D190-D209** |
+| codex | **D210-D229** |
+
+Mint inside your own range and the merge cannot collide, whichever branch you are on. This costs
+nothing and the alternative has now cost four duplicated fixes.
+
+### 2026-09-07 06:20 EDT — primary, class 4 manual: two windows the user cannot get back to
+
+Measured live through the app's own IPC on pid 14128 window 1, not read off source. The layout
+store holds **8 desktops**; three carry windows — index 1 "City" (files), **index 2 "Desktop 3"
+(scraper, maximized)** and **index 4 "Desktop 5" (scraper, maximized)**. The taskbar renders
+**2** desktop switches. `deskwinFocusDesktop` answered `{ok:true}` for 0 and 1 and **`{ok:false}`
+for 2, 3 and 4** — the same call, succeeding on the reachable pair, which is the control.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D149 | desktop shell | **A window on any desktop past the second can never be reached.** The taskbar shows two desktop buttons, "Desktop 1" and "Desktop 2", and that is all there is — no third button appears however many desktops exist, and the keyboard shortcut only flips between the same two. Two maximized Scraper windows were sitting on desktops 3 and 5 with no way to reach either. | Taskbar ▸ drag any app button upward ~56px to tear it off ▸ it opens on a new desktop in its own window ▸ close that window ▸ the app is gone. It is not on Desktop 1 or Desktop 2 and no button leads to it. Also reproduces from a display assignment: every extra display claims a desktop index, and this machine's store held eight. | P1 | **fixed** — the switcher and the shortcut now cover 0, 1, the active desktop, and every desktop holding a visible window. Verified live: the row went 2 → 4 buttons ("Desktop 1/2/3/5", the four occupied indices and none of the four empty ones), and a real click on the new "Desktop 3" put the stranded maximized Scraper window on screen. |
+| D150 | desktop shell | With "show all windows" turned on, a window listed under another desktop's badge clicks to **silence** if nothing is currently showing that desktop — no window, no error, no toast. It is the one case the badge exists for. | Settings ▸ taskbar ▸ show all windows ▸ tear an app off to a new desktop ▸ close that desktop's window ▸ click the app's badged entry in the taskbar. Nothing happens. | P2 | **fixed** — both call sites go through `desktopState.focusOrOpenDesktop`, and a failure toasts. Source-ratcheted: the suite fails if any caller in the shell reaches for `window.api.deskwinFocusDesktop` directly again. |
+| D151 | desktop shell | Clicking a desktop button that the app refuses to switch to does **nothing at all** — no movement, no message. It happens whenever that desktop is already open on a second monitor, which is the normal state on a two-screen setup. | Two displays, the second showing Desktop 2 ▸ on the first display click "Desktop 2". Nothing happens; the refusal only reached the developer console. | P2 | **fixed** — found while verifying D149's own fix. Verified live: the click now raises "Desktop 2 is already showing on another monitor." and the shell correctly stays where it was. The toast names the button the user clicked, not the store's internal label for it. |
+
+**Why both, and why they are one shape:** `DesktopShell.tsx:1353` already carries the correct
+helper — `deskwinFocusDesktop`, and `deskwinOpenDesktop` when nothing is showing that desktop —
+with a comment saying focus alone "has a real hole". The taskbar's own foreign-window button
+(`:3456`) calls the raise-only half and `void`s the answer. **A fix applied at one call site and
+not its sibling**, which is D137's and D143's shape for the third time. Grep every call site of
+the channel before writing the fix.
+
+**Two corrections to my own filing, made before the fix landed rather than after:**
+
+1. The first version of D149 said the buttons "ignore the desktops' own names — this user's are
+   called Study and City". **False.** `main/desktop.ts:68-69` hardcodes `'Study'` for index 0 and
+   `'City'` for index 1, and `desktopRename` has **zero renderer call sites** — there is no rename
+   UI, so there is no user name being ignored. The claim is struck. The translated
+   `desktop.desktopN` label is correct and stays.
+2. The first version blamed the tear-off gesture alone. The store's own `assignments` say
+   otherwise: **every extra display claims a desktop index** (this machine has nine assignments
+   across indices 1-7), and `allocateDesktop` grows past them. Both routes reach the same stranded
+   state; the fix covers both because it keys off "does this desktop hold a window", not off how
+   it came to exist.
+
+**TRAP that silently voids a parallel worker's window claim — `/eval` ignores `?win=`.**
+`debugBridge.ts:543` resolves the target from **`body.window`**. A `?win=11` query string is not
+read and not rejected: every such call lands on whichever window is FOCUSED. The pin tells workers
+to claim a window and pass it on every call; a worker passing it as a query param has been driving
+someone else's window while believing otherwise, and read-only probes make that invisible. Body
+key, or nothing. `debug/pri-eval-stdin.cjs` sends it correctly and takes the JS on stdin.
+
+### 2026-09-07 06:20 EDT — primary2: the FIFTH convergence, and it landed on the fix for convergence
+
+Both sections above are real and both were written in the same hour: `primary` and I each claimed
+class 4's manual half, and each independently designed a per-worker id range to stop exactly this.
+**The collision-prevention work collided.** That is the fifth time in one night, and it is the
+strongest evidence yet that the arrangement — not the workers — is the cause.
+
+**Resolved in favour of `primary`'s ranges, which are the ones on the integration branch and
+already carry landed ids (D149/D150/D151 in `fe18a2cd`).** Mine were wider (D200-D299 etc.) but
+nothing had minted from them except my own D300, so moving mine is one renumber and moving theirs
+would orphan three commit messages. **My D300 is now D170**; `backup`'s voice-clip row, which I
+renumbered to D149 earlier this turn, moves again to **D190** — inside `backup`'s own range, where
+it can never collide again.
+
+**What I keep from my side, because `primary`'s version does not have it: the ranges are now
+ENFORCED, not just documented.** `src/shared/__tests__/presweepRegisterGate.test.ts` asserts
+uniqueness and range-membership against the real register on every suite run, with a row floor so
+a parser that silently stops matching cannot make "no duplicates" true of an empty list. Controls:
+planting a duplicate and an out-of-range id in the real file turns exactly those two checks red.
+**A documented convention is what we already had four collisions ago.** `MINTING_RANGES` in that
+file now holds `primary`'s numbers and is the single place to change them.
+
+**The claim rule does not work either, and this proves it.** Both claims were committed edits, as
+rule 6 asks — and they still collided, because each was committed to a branch the other could not
+see for fifteen minutes. A claim is only a claim if the other worker can read it before starting.
+Until the merge cadence changes, **split by CLASS is not fine-grained enough; split by SURFACE
+within a class.** `primary` has window 1 and is working class 4 there; I took `files`, `youtube`
+and `immersion` and have released them (see my section above). Next class-4 worker: take `stats`,
+`flashcards`, `anki` or `library`, and say which in the same breath as claiming.
