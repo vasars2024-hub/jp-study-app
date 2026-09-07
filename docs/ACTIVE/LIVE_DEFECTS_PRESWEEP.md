@@ -1665,3 +1665,35 @@ Nothing else an agent ran this month is sitting in the user's profile.
 ## 2026-09-07 05:58 EDT — codexA claims Statistics class 4 and related state paths
 
 Window **12** (`?popout=stats`), primary2 retains window 2. Ownership: `StatsContent.tsx`, focused Statistics tests, scoped catalog additions only if needed. Main-v1 gate 11 re-derived through live IPC: **39 media items, 0 Conan matches**; clauses 2–3 remain unproven and no attachment/acquisition attempted. A6-F2 cannot be landed while primary2 is actively writing its branch (39 ahead); A6-F1/A6-F3 fixes re-derived in committed source. New findings use D210 onward.
+
+### 2026-09-07 08:40 EDT — primary2: a SIXTH convergence, and this time the union is the answer
+
+`primary` (`35d54725`, main tree) and I (`30ba69e8`, worktree) repaired
+**`shellPopupSemantics.test.ts` independently, within an hour**, both for the same cause — D149
+replaced the two hardcoded desktop switches with a map, so a source ratchet pinning
+`switchDesktop(0)` failed against a product that had got better.
+
+**Resolved as the UNION, not by picking a winner, because each caught what the other missed:**
+- `primary`'s: also asserts `os-desktop-switch` is still on the tag — the class must not vanish
+  when `aria-pressed` arrives.
+- mine: also asserts no `switchDesktop(0)`/`(1)` literal came back, and adds a second case pinning
+  the SET as derived — `primary`'s `switchableDesktops.map(` alone stays green if the row is mapped
+  over a two-element constant, which is D149's defect wearing a map.
+
+Control on the merged file: deleting `aria-pressed` fails exactly the first case, 7 green.
+
+**Why it happened is not "two workers were careless".** I merged `feat/nyaa-subtitles` at 06:45 and
+got `fe18a2cd` (which BROKE the test) but not `35d54725` (which fixed it, 05:23 by their clock,
+pushed after my merge point). **So I inherited the red without the repair, ran the full suite,
+found it red, and fixed it — correctly, and for the second time.** No claim rule can prevent this:
+the collision is in the MERGE CADENCE, not in the claiming. The cheap mitigation, which cost me
+nothing here: before repairing an inherited failure, run
+`git log feat/nyaa-subtitles..HEAD --oneline` **and** `git log HEAD..feat/nyaa-subtitles --oneline`
+and grep the far side for the file you are about to touch.
+
+**Also worth carrying: TWO of my own instrument errors, both caught only by running the control.**
+`expect(source).toContain('windowsOn:')` stayed GREEN with the argument deleted, because the shell
+says `windowsOn` twice — a whole-file `toContain` is not a guard on a term the file repeats. And my
+first attempt at that mutation deleted the OTHER `windowsOn` (line 1429, a different call) and read
+green because the target was never touched. **A control that passes is only evidence once you have
+checked it attacked the right line.**
