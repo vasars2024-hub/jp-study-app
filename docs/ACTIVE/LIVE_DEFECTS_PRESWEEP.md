@@ -440,3 +440,18 @@ table and its highest D number.**
 | D122 | desktop shortcuts | Remove from desktop has only a glyph as its accessible name. | DesktopShell.tsx shortcut remove button has a title but no aria-label. | P2 | Source-confirmed and repaired in this slice; current desktops contain zero shortcuts, so the fix is unit-verified only. The JSX parser now detects callbacks containing => instead of skipping the button. |
 
 The chrome regression scans both DesktopShell and App.tsx with TypeScript JSX parsing: 7/7 tests. A6-F3 was already recovered at 7bc4eb31. A6-F2 product commits are integrated through 55c74450; the two remaining worktree commits are documentation only. Shared app was not restarted; codexA owns only its newly opened Settings pop-out (window 9).
+
+## 2026-09-07 00:45 EDT — primary, class 1 (accessible name) beyond window chrome + a new class
+
+**CLAIM, so codexA and I do not collide.** codexA owns `App.tsx`, `DesktopShell.tsx` and
+`desktopChromeButtonNames.test.ts` (D121/D122, commit `cd503890`). I own **every other
+glyph-only button in `src/renderer`** — a disjoint set of 20 files — and the repo-wide gate,
+which lands as its own test file rather than an edit to codexA's.
+
+| D123 | app-wide (Settings, three widgets) | **Eight characters the user reads were committed mojibake** — UTF-8 bytes decoded as CP1252 and re-encoded. Settings > Dictionaries drew three Latin letters where each priority arrow belongs; the zoom-out button drew three where a minus belongs; World Clock, Daily Goals and Habit Tracker each drew two on their close buttons, and World Clock's time-unavailable fallback drew three instead of an em dash. | Found by scanning `src/` for the CP1252 lead artefact (U+00C2 / U+00C3 / U+00E2), which no existing gate looks for: the files parse, the types check, the suite passes and `i18n-check` only compares catalog keys, so a corrupt literal inside JSX is outside every check. 13 lines in 3 files, all present at HEAD, 5 of them preload comments. | P2 | fixed `be81bd88`. Gated by `sourceMojibake.test.ts`, which builds the three lead code points numerically so the test file is inside its own population rather than exempt — and it proved that on arrival by failing on two lines of its own header prose. |
+| D124 | 20 surfaces (mini mode, manga, calendar, flashcards, media, music, lens, widgets, Blanc, reader, display settings) | **45 more glyph-only buttons announce as their glyph.** The same defect as D121/D122 and a strictly larger population: the chrome gate scans two files, and the class is app-wide. | The existing gate could not have seen these two ways over: it reads one hardcoded path, and its regex took the first `>` after `<button`, which inside `onClick={() => …}` is the arrow's — so a button with a callback was skipped even in the file it did scan. With a JSX-aware parser: **113 glyph-only buttons in `src/renderer`, 52 with no accessible name.** | P2 | see the next section |
+
+**Method note, and it is the reusable part.** 32 of the 45 already carry a `title` that says the
+right words, so those are a mechanical copy — `title` does not name a button that has its own
+text, but the string was never the missing thing. The other 13 have no words anywhere and needed
+a label written. Splitting the class that way is what made it one turn instead of twenty.
