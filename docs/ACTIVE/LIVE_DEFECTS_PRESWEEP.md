@@ -582,3 +582,40 @@ the code under test. Re-run at `24182319` in the detached worktree: **1,172 file
 1 skipped, 14,758 tests passed / 6 skipped, zero failed, exit 0.** Worth carrying: a source-scan
 gate that walks the whole tree is fast alone and slow inside `npx vitest run`, and the default
 timeout is the thing that bites.
+
+## 2026-09-07 01:05 EDT — primary2 claims the MACHINE-VOCABULARY class (D126–D129)
+
+**Claimed before touching anything, per the collision rule.** `primary` named D125 (54 icon-only
+buttons with an empty accessible name) as its opening slice; I am deliberately NOT taking it.
+Mine is the disjoint class the cross-cutting UI-language row left as measured-but-unfixed leads:
+**vocabulary the app computes and prints in English no matter what language the UI is set to.**
+Working in `wt/files-app`, where the four catalogs are CLEAN — which is the window these rows
+have been waiting for, since every one of them needs all four catalogs edited.
+
+Sites already read and confirmed in source this turn:
+
+- `src/shared/jiten.ts:372` `difficultyLabel()` returns `Unknown|Beginner|Easy|Moderate|Hard|Very
+  Hard`, rendered raw at `NovelsContent.tsx:959` (the `.nov-diff` badge), `:1008` (the detail
+  list) and `:791` (every `<option>` of the difficulty filter).
+- `NovelsContent.tsx:961` / `:1009` print `acquisitionStatus` **raw**: `planned`, `analyzed`,
+  `mined`, `linked`, `imported` — lowercase machine enum values, in every language.
+- `src/shared/levelScale.ts:77,84` — `JA_TIERS` tier 1 is `Beginner` and tier 7 `Advanced`;
+  `ZH_TIERS` tier 7 is `Advanced`. Rendered by `tierName()` at `ReadingFinderContent.tsx:220`
+  (both the button and its `title`) and reached by `stats-level-badge`.
+- `VerifiedSitesManager.tsx` — English literals end to end (the module-level `COMPATIBILITY`
+  array and the rest). Note the 2026-09-07 00:23 land: the in-flight `verifiedSites.*` conversion
+  named in that entry is **not in the tree** — `grep -c 'verifiedSites\.'` is **0** in the
+  component and **0** in all four catalogs. Whatever was restored did not survive; re-derived,
+  not inherited.
+
+**A lead I am recording as NOT a defect so nobody "fixes" it:** the same row lists
+"`translate`'s direction toggle rendering `English`". `TranslateContent.tsx:35`'s own
+`LANG_LABELS` is `{ja:'日本語', zh:'中文', en:'English', ru:'Русский'}` — endonyms, the standard
+convention for a language picker and the same shape `shared/i18n/core.ts` uses for the UI-language
+selector. Translating it would make the Russian UI offer "Английский" instead of "English" and
+would contradict CLAUDE.md i18n rule 4. Struck from the leads list.
+
+**Bookkeeping defect noticed in passing, not mine to renumber:** `D123` and `D124` are each used
+by two different findings — `primary`'s mojibake/glyph-button rows and `codexA`'s Aero-statistics
+and statistics-not-updating rows. Four rows, two ids. Whoever reconciles the register should
+renumber the later pair; I am starting at **D126** so I do not deepen it.
