@@ -2376,3 +2376,34 @@ for the first 39 seconds. Same shape as D242 (every layer correct, no layer star
 layer is correct, and one of them answers before it knows.
 
 Defect ids: **D258** from `primary`'s round-2 range 250–269. **259–269 remain.**
+
+## 2026-09-07 17:35 EDT — primary, main tree: D245's triage, and the one that is not merely dead
+
+Took the handoff's exact next slice — D245's remaining routes — and asked its one question of
+each of the eight highest-suspicion names: *is there a control on a surface whose promise
+depends on this?* **Six are ordinary dead code and belong to the open-work sweep, not here.
+Recorded by name so nobody re-derives them:**
+
+- `miningSaveEpubDeckCsv` — **superseded, not missing.** `CsvEditorPanel.tsx:418` calls
+  `miningSaveEpubDeckFile`, which does the same job with an extension argument.
+- `miningBuildEpubDeck` — **superseded.** `EpubMiningPanel.tsx` builds the deck in the renderer
+  with `buildEpubDeckExport` from `shared/epubDeck`, so the main-process twin is redundant.
+- `ankiKnownWords` — **superseded.** The renderer owns `renderer/knownWords.ts`, which
+  `DeckWorkbench`, `DeckWorkbenchBrowser` and `DeckWorkbenchTray` all import.
+- `ankiAddNote` — no control promises a bare add; mining goes through `mineNote`.
+- `getWindowBorderless` / `setWindowBorderless` — `borderless` in the renderer is a computed
+  `chromeMode` for pop-outs and the mini widget (`App.tsx:173`), not a user setting. No control
+  offers it, so there is no promise to break.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D259 | immersion | **The immersion browser counts what the user does and shows it nowhere, and it can persist their open tabs but never does.** Every page exported and every video captured increments a per-day counter that is written to userData and has no reader; and the tab session — urls, titles, per-tab mode, scroll position, active tab — has a complete save/load path that nothing calls, so every tab is gone on restart. | `grep -rn immersionBumpMetrics src/renderer` → 3 live call sites in `ImmersionContent.tsx` (708, 724, 743). `grep -rn immersionGetMetrics src/renderer` → **0**. Same for `immersionGetSession` / `immersionSetSession`: handled (`main/immersion/index.ts:286-300`), bound (`preload.ts:2603-2606`), typed (`window.d.ts`), **called by nothing**; `ImmersionSession` appears in `src/renderer` only inside `window.d.ts`. Also note `ImmersionDayMetrics` declares five counters and only two are ever bumped — `seconds`, `chars` and `wordsMined` are written by nobody either. | P3 | **open, and deliberately not fixed this turn — the fix is a product decision, not a repair.** Two honest resolutions and they go opposite ways: surface the metrics (a new panel — by the pin's own test that is a *wish*, since immersion does not fail its stated purpose without a daily counter) or stop writing them. The session half is the stronger of the two and points the other way: a browser that loses every tab on restart while carrying a complete, tested restore path is a missing connection, not a wish. Whoever takes it should take the **session** half first and leave the metrics alone until something asks to read them. Do not "fix" this by deleting the main-process handlers — that throws away the half that is already correct. |
+
+**Why this one is worth a row when six siblings are not:** class 6b asks whether a route has a
+caller. All eight of these have none. Seven are *symmetric* — no writer and no reader, so
+nothing accumulates. `immersionBumpMetrics` is **asymmetric**: the write path is live and
+shipping, the read path is dead, so the store has been filling up with the user's activity since
+the surface shipped and no code path can ever show it back to them. **An unread store is worse
+than an uncalled route, and the two look identical to a caller scan.**
+
+Defect ids: **D258–D259** from `primary`'s round-2 range 250–269. **260–269 remain.**
