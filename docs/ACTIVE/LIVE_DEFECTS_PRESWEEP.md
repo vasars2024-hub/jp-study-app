@@ -498,3 +498,18 @@ D123 verification, 2026-09-07 00:49 EDT: Aero window 10 now renders **1h 59m wat
 ## 2026-09-07 00:52 EDT — codexA claims Library D2
 
 Live library pop-out window 11: **24 real rows**. Focus 悪の教典 02 → bridge Enter delivered **1/1** → row selected, Read inspector action appears, reader remains absent. The inspector is a keyboard escape, so this is P2 discoverability rather than a keyboard dead end. Decision: Enter opens the focused row through existing onOpen; Space and single click retain selection. Apply to standard/Wired and Aero list branches; Blanc shares LibraryView. No new navigation path.
+
+## 2026-09-07 00:55 EDT — primary, D125. The same class, one layer down, and it is WORSE.
+
+| D125 | 17 surfaces (Media Center, Library, novel + manga readers, YouTube, Resources, Reading captures, Widget gallery, music widget, mini mode) | **54 icon-only buttons have NO accessible name at all.** Not a wrong name — an empty one. A screen reader announces "button" and nothing else: no shuffle, no skip, no favourite, no delete. | `src/renderer/components/Icons.tsx:241` renders every icon `aria-hidden="true"`, which is correct for a decorative SVG — so a `<button><Icon name="heart" /></button>` has an empty accessible name unless the button itself carries one. Counted with a TSX parse over `src/renderer`: **130 icon-only buttons, 54 with neither `aria-label` nor `aria-labelledby`.** 53 of the 54 carry a `title`, which cannot name a button (D121's rule) but does mean the words already exist; exactly one, `MiniShell.tsx:816` (Icon close), has no words anywhere. `src/media` has none — it is 0 of 0. | P2 | **OPEN — next turn's opening slice.** Strictly worse than D121/D124: a glyph at least announces something. |
+
+**Why this was not fixed in the same turn, stated rather than left to look like an oversight.**
+`glyphButtonNames.test.ts` matches a *text* child, so it is structurally blind to this shape and
+extending it is not a one-line change — the gate has to reach inside the element and understand
+that `<Icon>` contributes nothing. 53 of the 54 are the same mechanical `title` → `aria-label`
+copy the D124 codemod already does, so the fix is short; the gate is the part that needs care,
+and starting it with a full suite already running was the wrong order.
+
+**Do not "fix" this by removing `aria-hidden` from `Icons.tsx`.** That would name every button
+after its icon id (`heart`, `skip-back`), which is a worse name than none and would silently
+change 130 controls at once. The name belongs on the button.
