@@ -4066,6 +4066,13 @@ export const ja: Catalog = {
   },
   'mediaLib.prune.none': '見つからないファイルはありません — ライブラリは最新です。',
   'mediaLib.prune.failed': '見つからないファイルを削除できませんでした: {error}',
+  'mediaLib.prune.confirm.title': '見つからない項目を削除しますか？',
+  'mediaLib.prune.confirm.message': {
+    one: 'ファイルが見つからない {count} 件の項目を削除しますか？メモ、再生位置、アートワーク、キャッシュされたコピーが削除され、元に戻せません。ドライブが接続されていない場合も「見つからない」と表示されます。心当たりがあれば先に接続してください。',
+    other: 'ファイルが見つからない {count} 件の項目を削除しますか？メモ、再生位置、アートワーク、キャッシュされたコピーが削除され、元に戻せません。ドライブが接続されていない場合も「見つからない」と表示されます。心当たりがあれば先に接続してください。',
+  },
+  'mediaLib.prune.confirm.messageUnknown': 'ファイルが見つからない項目をすべて削除しますか？メモ、再生位置、アートワーク、キャッシュされたコピーが削除され、元に戻せません。ドライブが接続されていない場合も「見つからない」と表示されます。心当たりがあれば先に接続してください。',
+  'mediaLib.prune.confirm.action': '項目を削除',
   'mediaLib.clear.title': 'メディアライブラリを消去',
   'mediaLib.clear.message':
     'メディアライブラリ全体を消去しますか？\n\nアプリに保存されたすべての動画と曲、キャッシュされた YouTube のダウンロード、変換済みのコピー、歌詞と「いいね」が削除されます。ディスク上の元のファイルは削除されません。',
@@ -5476,6 +5483,15 @@ export const ja: Catalog = {
   'media.relationships.note': 'メモ',
   'media.relationships.flashcard': 'フラッシュカード',
   'media.relationships.add': '関連を追加',
+  'mediaHub.diagnostics.duplicates': {
+    one: '重複したパス: {count}',
+    other: '重複したパス: {count}',
+  },
+  'mediaHub.diagnostics.missing': {
+    one: '見つからないファイル: {count}',
+    other: '見つからないファイル: {count}',
+  },
+  'mediaHub.diagnostics.pruneAction': '見つからない項目を削除',
   'mediaHub.series.title': 'ライブラリ内のシリーズ',
   'mediaHub.series.episodeCount': {
     other: '{count} 話',

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { confirmDialog } from './ui';
+import { confirmPruneMissingMedia } from './media/pruneMissingMedia';
 import { useT } from '../i18n';
 import type { MediaItem } from '../../shared/types';
 import { clearArtCache } from '../albumArt';
@@ -38,6 +39,12 @@ export default function MediaLibraryActions({ onItemsChange, onCleared, classNam
   }, []);
 
   const pruneMissing = useCallback(async () => {
+    // Ask BEFORE going busy. Setting it first parks the row on "Working…" for as
+    // long as the dialog is open and then flickers back on Cancel, which reads
+    // like the action ran. A declined confirm must leave the surface untouched.
+    // The prune itself stays inside the try so a rejection still reaches the
+    // error branch below.
+    if (!await confirmPruneMissingMedia(t)) return;
     setBusy(true);
     setStatus('');
     setStatusError(false);

@@ -3994,6 +3994,13 @@ export const en: Catalog = {
   },
   'mediaLib.prune.none': 'No missing files — library is up to date.',
   'mediaLib.prune.failed': 'Could not remove missing files: {error}',
+  'mediaLib.prune.confirm.title': 'Remove missing entries?',
+  'mediaLib.prune.confirm.message': {
+    one: 'Remove {count} entry whose file cannot be found? Its notes, watch position, artwork and cached copy are deleted and cannot be restored. A disconnected drive also reads as missing — reconnect it first if that could be the cause.',
+    other: 'Remove {count} entries whose files cannot be found? Their notes, watch positions, artwork and cached copies are deleted and cannot be restored. A disconnected drive also reads as missing — reconnect it first if that could be the cause.',
+  },
+  'mediaLib.prune.confirm.messageUnknown': 'Remove every entry whose file cannot be found? Their notes, watch positions, artwork and cached copies are deleted and cannot be restored. A disconnected drive also reads as missing — reconnect it first if that could be the cause.',
+  'mediaLib.prune.confirm.action': 'Remove entries',
   'mediaLib.clear.title': 'Clear media library',
   'mediaLib.clear.message':
     'Clear the entire media library?\n\nThis removes all saved videos and songs from the app, cached YouTube downloads, converted copies, and lyrics/likes. Your original files on disk are not deleted.',
@@ -5488,6 +5495,15 @@ export const en: Catalog = {
   'media.relationships.note': 'Note',
   'media.relationships.flashcard': 'Flashcard',
   'media.relationships.add': 'Add relationship',
+  'mediaHub.diagnostics.duplicates': {
+    one: 'Duplicate paths: {count}',
+    other: 'Duplicate paths: {count}',
+  },
+  'mediaHub.diagnostics.missing': {
+    one: 'Missing files: {count}',
+    other: 'Missing files: {count}',
+  },
+  'mediaHub.diagnostics.pruneAction': 'Remove missing entries',
   'mediaHub.series.title': 'Series in your library',
   'mediaHub.series.episodeCount': {
     one: '{count} episode',

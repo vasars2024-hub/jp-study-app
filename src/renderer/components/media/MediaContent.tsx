@@ -65,6 +65,7 @@ import {
 import { lookupWordFromMouseUp, isLookupClick } from '../../wordLookup';
 import { useT } from '../../i18n';
 import { confirmDialog } from '../ui/dialogService';
+import { confirmAndPruneMissingMedia } from './pruneMissingMedia';
 import { mediaHubBackupFilename } from '../../mediaHubStoragePanel';
 import {
   endMediaStudySession,
@@ -2237,6 +2238,7 @@ export function MediaCategoryFilter({ state }: { state: MediaState }) {
 
 /** Small dashboard shelves shared by the full Media Hub and library entry points. */
 export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpen: (id: string) => void }) {
+  const { t } = useT();
   const shelves = buildMediaHubSections(items);
   const [state, setState] = useState(loadMediaHubState);
   const [studyDatabase, setStudyDatabase] = useState(loadMediaStudyDatabase);
@@ -2326,9 +2328,16 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
       <MediaHubSeriesPanel items={items} />
       {(diagnostics.duplicates.length > 0 || diagnostics.missing.length > 0) && (
         <div className="media-hub-diagnostics" role="status">
-          {diagnostics.duplicates.length > 0 && <span>Duplicate paths: {diagnostics.duplicates.length}</span>}
-          {diagnostics.missing.length > 0 && <span>Missing files: {diagnostics.missing.length}</span>}
-          {diagnostics.missing.length > 0 && <button type="button" onClick={() => void window.api.pruneMedia()}>Remove missing entries</button>}
+          {diagnostics.duplicates.length > 0 && <span>{t('mediaHub.diagnostics.duplicates', { count: diagnostics.duplicates.length })}</span>}
+          {diagnostics.missing.length > 0 && <span>{t('mediaHub.diagnostics.missing', { count: diagnostics.missing.length })}</span>}
+          {diagnostics.missing.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { void confirmAndPruneMissingMedia(t, diagnostics.missing.length); }}
+            >
+              {t('mediaHub.diagnostics.pruneAction')}
+            </button>
+          )}
         </div>
       )}
     </section>
