@@ -63,6 +63,51 @@ let logStream: fs.WriteStream | null = null;
 const ring: DebugLogEntry[] = [];
 /** What `/emulate` is currently overriding, per webContents — so `/health` can say so. */
 const emulatedMedia = new Map<number, { name: string; value: string }[]>();
+/**
+ * What `/network` is currently overriding, per webContents — so `/health` can say so and a
+ * caller can prove the restore rather than assume it. An emulation that outlives its probe is
+ * the worst failure this route has: the next worker measures a healthy app as a dead one.
+ */
+const networkEmulation = new Map<number, { offline: boolean; blackhole: boolean }>();
+
+export interface NetworkEmulationState {
+  offline: boolean;
+  blackhole: boolean;
+}
+
+export interface NetworkEmulationPlan extends NetworkEmulationState {
+  /** Whether CDP has to be driven at all — false when nothing is on and nothing is asked for. */
+  touchCdp: boolean;
+  /** Whether the session proxy has to be written — false when it is already where it belongs. */
+  touchProxy: boolean;
+  /** What the map should hold afterwards; `null` means the entry is removed. */
+  next: NetworkEmulationState | null;
+}
+
+/**
+ * What `/network` must actually do, given what the caller asked for and what is already on.
+ *
+ * Split out from the route because the route needs a live window and CDP, while the mistake that
+ * matters is pure and invisible: a RESTORE that decides it has nothing to do. `clear` on a window
+ * that is offline has to reach CDP precisely because the flag is currently set — an
+ * "is anything requested? no? then skip" reading leaks the emulation past the probe, and the next
+ * worker measures a healthy app as one that cannot reach the network.
+ */
+export function planNetworkEmulation(
+  request: { clear?: boolean; offline?: boolean; blackhole?: boolean },
+  current: NetworkEmulationState | undefined,
+): NetworkEmulationPlan {
+  const clear = request.clear === true;
+  const offline = !clear && request.offline === true;
+  const blackhole = !clear && request.blackhole === true;
+  return {
+    offline,
+    blackhole,
+    touchCdp: offline || current?.offline === true,
+    touchProxy: blackhole || current?.blackhole === true || clear,
+    next: offline || blackhole ? { offline, blackhole } : null,
+  };
+}
 
 /** Project root in dev — where `debug/` lives. */
 function debugRoot(): string {
@@ -375,6 +420,9 @@ async function handle(
           // A leaked media override makes every later measurement wrong in a way that looks
           // like a product change, so it is reported where every run already looks.
           emulated: [...emulatedMedia.entries()].map(([id, features]) => ({ webContentsId: id, features })),
+          // Same reasoning as `emulated`, one layer down: a leaked offline emulation reads as a
+          // product that cannot reach the network at all.
+          network: [...networkEmulation.entries()].map(([id, state]) => ({ webContentsId: id, ...state })),
         },
       };
 
@@ -606,6 +654,94 @@ async function handle(
       } catch (err) {
         return { code: 200, body: { ok: false, error: String(err) } };
       }
+    }
+
+    /**
+     * Take the app's network away, reversibly, so "what does this surface do offline" can be
+     * driven instead of reasoned about.
+     *
+     * There was no route for this and the two obvious substitutes are both wrong. Stubbing
+     * `fetch` from `/eval` answers a different question — it makes the RENDERER's own calls fail
+     * while every main-process request still succeeds, so an IPC-backed surface reads as fully
+     * online. Disabling the machine's adapter is out of the question: it is not scoped to this
+     * app and nothing restores it if the probe dies.
+     *
+     * Two levers, because the app loses its network in two distinguishable ways and no single
+     * lever produces both:
+     *
+     * - `offline: true` drives CDP `Network.emulateNetworkConditions` on ONE window. This is the
+     *   only thing that flips `navigator.onLine` and fires the `offline` event, which is what
+     *   `widgets/system.tsx` and anything else keyed on that signal actually watch. Its cost in
+     *   a DEV build is that it also blocks loopback, so Vite's HMR socket drops for the duration
+     *   and reconnects on restore — expected, and not a product finding.
+     * - `blackhole: true` points the window's session at a dead proxy with `<-loopback>` bypassed.
+     *   That is the faithful shape of a real outage: everything off-machine fails at the
+     *   transport, while the dev server, the Anki connector, the qBittorrent WebUI and the
+     *   Seanime sidecar all keep answering. It reaches every Chromium-stack request including
+     *   main's `net.fetch`.
+     *
+     * **Neither lever reaches Node's global `fetch`**, which is undici on its own socket, and
+     * most of `src/main/` uses exactly that. So a main-process request that succeeds under this
+     * route has NOT been proven offline-safe — say so rather than crediting it.
+     *
+     * Body: `{ window?, offline?, blackhole?, clear? }`. The response echoes the resulting state
+     * and `/health` reports it, so a restore is provable.
+     */
+    case '/network': {
+      const win = resolveWindow(body.window);
+      if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      const dbg = win.webContents.debugger;
+      const ses = win.webContents.session;
+      const plan = planNetworkEmulation(body, networkEmulation.get(win.webContents.id));
+      const { offline, blackhole } = plan;
+      const applied: string[] = [];
+      try {
+        if (plan.touchCdp) {
+          if (!dbg.isAttached()) dbg.attach('1.3');
+          await dbg.sendCommand('Network.enable');
+          await dbg.sendCommand('Network.emulateNetworkConditions', {
+            offline,
+            latency: 0,
+            downloadThroughput: offline ? 0 : -1,
+            uploadThroughput: offline ? 0 : -1,
+          });
+          applied.push(offline ? 'cdp-offline' : 'cdp-online');
+          // Only let go of a session this route opened, and only once nothing else here needs
+          // it — `/emulate` may be holding the same one for a media override.
+          if (!offline && !emulatedMedia.has(win.webContents.id)) {
+            try { dbg.detach(); } catch { /* another owner holds it; the reset above already landed */ }
+          }
+        }
+        if (plan.touchProxy) {
+          if (blackhole) {
+            await ses.setProxy({
+              proxyRules: 'http=127.0.0.1:9;https=127.0.0.1:9;socks=127.0.0.1:9',
+              proxyBypassRules: '<-loopback>',
+            });
+            applied.push('blackhole-proxy');
+          } else {
+            // `mode: 'system'` is Electron's own default and nothing in `src/main/` calls
+            // `setProxy`, so this restores the app to the configuration it boots with.
+            await ses.setProxy({ mode: 'system' });
+            applied.push('proxy-restored');
+          }
+        }
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: String(err), applied } };
+      }
+      if (plan.next) networkEmulation.set(win.webContents.id, plan.next);
+      else networkEmulation.delete(win.webContents.id);
+      return {
+        code: 200,
+        body: {
+          ok: true,
+          webContentsId: win.webContents.id,
+          offline,
+          blackhole,
+          applied,
+          attached: dbg.isAttached(),
+        },
+      };
     }
 
     /**
