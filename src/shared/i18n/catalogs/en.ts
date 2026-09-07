@@ -5580,6 +5580,31 @@ export const en: Catalog = {
   'media.gen.subtitleFailed': 'Subtitle generation failed: {detail}',
   'media.gen.transcriberStartFailed': 'Could not start the transcriber: {detail}',
   'media.category.inProgress': 'In progress',
+  'media.category.all': 'All categories',
+  'media.category.filterLabel': 'Media category',
+  'mediaHub.dashboard.label': 'Media Hub dashboard',
+  'mediaHub.shelf.favorites': 'Favorites',
+  'mediaHub.shelf.studyQueue': 'Study queue',
+  'mediaHub.shelf.recentlyAdded': 'Recently added',
+  'mediaHub.shelf.continueWatching': 'Continue watching',
+  'mediaHub.shelf.recentlyStudied': 'Recently studied',
+  'mediaHub.shelf.recentlyListened': 'Recently listened',
+  'mediaHub.shelf.recommended': 'Recommended',
+  'mediaHub.shelf.unorganized': 'Unorganized files',
+  'mediaHub.note.label': 'Note for {title}',
+  'mediaHub.note.placeholder': 'Add note',
+  'mediaHub.diagnostics.duplicates': {
+    one: 'Duplicate paths: {count}', other: 'Duplicate paths: {count}',
+  },
+  'mediaHub.diagnostics.missing': {
+    one: 'Missing files: {count}', other: 'Missing files: {count}',
+  },
+  'mediaHub.diagnostics.prune': 'Remove missing entries',
+  'mediaHub.prune.confirm.title': 'Remove entries whose files are missing?',
+  'mediaHub.prune.confirm.message': {
+    one: 'Remove {count} library entry whose file is not on disk right now? Your files are never touched — but if the file is only missing because a drive is unplugged, re-adding it later creates a new entry, and this one’s watch position, note and study profile do not come back.',
+    other: 'Remove {count} library entries whose files are not on disk right now? Your files are never touched — but if they are only missing because a drive is unplugged, re-adding them later creates new entries, and these ones’ watch positions, notes and study profiles do not come back.',
+  },
 
   // ---- media library: rail, browser, cards, detail drawer ----
   'media.jobs.label': 'Background media jobs',

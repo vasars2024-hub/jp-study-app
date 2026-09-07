@@ -47,6 +47,12 @@ const CASES = [
   // and silent. Both hosts are pinned so neither can regress alone.
   { file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx', api: 'toolsRemove' },
   { file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx', api: 'toolsRemoveFolder' },
+  // D143. "Remove missing entries" is a bulk delete wearing a tidy-up label:
+  // "missing" is `!existsSync(path)`, so one unplugged drive makes every title on
+  // it missing at once, and a media id is a random UUID — so re-importing after
+  // the drive comes back cannot restore the entry's watch position, note or study
+  // profile.
+  { file: 'src/renderer/components/media/MediaContent.tsx', api: 'pruneMedia' },
 ] as const;
 
 /** The Nth enclosing brace block around `index`, 0 = innermost. */

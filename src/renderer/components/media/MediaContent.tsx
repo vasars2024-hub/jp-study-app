@@ -2226,17 +2226,18 @@ export function MediaCategoryFilter({ state }: { state: MediaState }) {
   const { t } = useT();
   const categories: MediaCategoryFilterValue[] = ['all', 'in-progress', 'anime', 'drama', 'movie', 'tv', 'music', 'podcast', 'audiobook', 'learning', 'personal', 'inbox'];
   const label = (category: MediaCategoryFilterValue): string => {
-    if (category === 'all') return 'All categories';
+    if (category === 'all') return t('media.category.all');
     if (category === 'in-progress') return t('media.category.inProgress');
     return category[0].toUpperCase() + category.slice(1);
   };
-  return <select aria-label="Media category" value={state.categoryFilter} onChange={(event) => state.setCategoryFilter(event.target.value as MediaCategoryFilterValue)}>
+  return <select aria-label={t('media.category.filterLabel')} value={state.categoryFilter} onChange={(event) => state.setCategoryFilter(event.target.value as MediaCategoryFilterValue)}>
     {categories.map((category) => <option key={category} value={category}>{label(category)}</option>)}
   </select>;
 }
 
 /** Small dashboard shelves shared by the full Media Hub and library entry points. */
 export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpen: (id: string) => void }) {
+  const { t } = useT();
   const shelves = buildMediaHubSections(items);
   const [state, setState] = useState(loadMediaHubState);
   const [studyDatabase, setStudyDatabase] = useState(loadMediaStudyDatabase);
@@ -2249,20 +2250,51 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
       .then((checks) => { if (active) setDiagnostics(diagnoseMediaPaths(items, (path) => checks.find(([p]) => p === path)?.[1] ?? false)); });
     return () => { active = false; };
   }, [items]);
+  // The FIRST element is the persisted id, not the label. `MediaCollapsibleSection`
+  // stores each shelf's open/closed state under `shelf:<id>`, so translating the id
+  // would reset every shelf the moment the UI language changed — and would store a
+  // different key per language. The id stays the stable English slug; only the
+  // rendered title goes through `t()`.
   const rows = [
-    ['Favorites', items.filter((item) => state[item.id]?.favorite)],
-    ['Study queue', items.filter((item) => state[item.id]?.studyQueue)],
-    ['Recently added', shelves.recentlyAdded],
-    ['Continue watching', shelves.continueWatching],
-    ['Recently studied', shelves.recentlyStudied],
-    ['Recently listened', shelves.recentlyListened],
-    ['Recommended', shelves.recommended],
-    ['Unorganized files', shelves.unorganized],
+    ['Favorites', 'mediaHub.shelf.favorites', items.filter((item) => state[item.id]?.favorite)],
+    ['Study queue', 'mediaHub.shelf.studyQueue', items.filter((item) => state[item.id]?.studyQueue)],
+    ['Recently added', 'mediaHub.shelf.recentlyAdded', shelves.recentlyAdded],
+    ['Continue watching', 'mediaHub.shelf.continueWatching', shelves.continueWatching],
+    ['Recently studied', 'mediaHub.shelf.recentlyStudied', shelves.recentlyStudied],
+    ['Recently listened', 'mediaHub.shelf.recentlyListened', shelves.recentlyListened],
+    ['Recommended', 'mediaHub.shelf.recommended', shelves.recommended],
+    ['Unorganized files', 'mediaHub.shelf.unorganized', shelves.unorganized],
   ] as const;
+
+  /**
+   * D143. "Remove missing entries" dropped every library row whose file was not
+   * on disk, on one click, with no question asked.
+   *
+   * Two things make that worse than the label suggests. "Missing" is
+   * `!fs.existsSync(item.path)` (`main/media.ts:475`), so ONE unplugged external
+   * drive or unmounted share makes every title on it missing at the same moment.
+   * And a media id is `crypto.randomUUID()`, not a hash of the path — so
+   * re-importing the file once the drive is back mints a NEW id, and the watch
+   * position, the note, the subtitle offset and the whole
+   * `studyDatabase.profiles[item.id]` entry are keyed to the old one and are gone.
+   * The files themselves are never touched, which is exactly the reassurance the
+   * confirm has to give at the same time as the warning (D138).
+   */
+  const pruneMissing = async (): Promise<void> => {
+    const ok = await confirmDialog({
+      title: t('mediaHub.prune.confirm.title'),
+      message: t('mediaHub.prune.confirm.message', { count: diagnostics.missing.length }),
+      confirmLabel: t('mediaHub.diagnostics.prune'),
+      danger: true,
+    });
+    if (!ok) return;
+    await window.api.pruneMedia();
+  };
+
   return (
-    <section className="media-hub-dashboard" aria-label="Media Hub dashboard">
-      {rows.map(([label, shelf]) => shelf.length > 0 && (
-        <MediaCollapsibleSection id={`shelf:${label}`} key={label} title={label} className="media-hub-shelf">
+    <section className="media-hub-dashboard" aria-label={t('mediaHub.dashboard.label')}>
+      {rows.map(([id, titleKey, shelf]) => shelf.length > 0 && (
+        <MediaCollapsibleSection id={`shelf:${id}`} key={id} title={t(titleKey)} className="media-hub-shelf">
           <div className="media-hub-shelf-row">
             {shelf.map((item) => (
               <div className="media-hub-shelf-item" key={item.id}>
@@ -2310,8 +2342,8 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
                 </small>
                 <input
                   className="media-hub-note"
-                  aria-label={`Note for ${item.title}`}
-                  placeholder="Add note"
+                  aria-label={t('mediaHub.note.label', { title: item.title })}
+                  placeholder={t('mediaHub.note.placeholder')}
                   value={state[item.id]?.note ?? ''}
                   onChange={(event) => setState((prev) => ({
                     ...prev,
@@ -2326,9 +2358,13 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
       <MediaHubSeriesPanel items={items} />
       {(diagnostics.duplicates.length > 0 || diagnostics.missing.length > 0) && (
         <div className="media-hub-diagnostics" role="status">
-          {diagnostics.duplicates.length > 0 && <span>Duplicate paths: {diagnostics.duplicates.length}</span>}
-          {diagnostics.missing.length > 0 && <span>Missing files: {diagnostics.missing.length}</span>}
-          {diagnostics.missing.length > 0 && <button type="button" onClick={() => void window.api.pruneMedia()}>Remove missing entries</button>}
+          {diagnostics.duplicates.length > 0 && <span>{t('mediaHub.diagnostics.duplicates', { count: diagnostics.duplicates.length })}</span>}
+          {diagnostics.missing.length > 0 && <span>{t('mediaHub.diagnostics.missing', { count: diagnostics.missing.length })}</span>}
+          {diagnostics.missing.length > 0 && (
+            <button type="button" onClick={() => void pruneMissing()}>
+              {t('mediaHub.diagnostics.prune')}
+            </button>
+          )}
         </div>
       )}
     </section>
