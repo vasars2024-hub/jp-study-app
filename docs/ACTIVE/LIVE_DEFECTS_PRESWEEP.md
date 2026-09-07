@@ -519,3 +519,13 @@ D2 verification, 2026-09-07 00:54 EDT: delivered Enter **1/1** opens **悪の教
 ## 2026-09-07 00:56 EDT — codexA claims live Statistics updates
 
 | D124 | stats / reader integration | Statistics stops updating after opening, even while another window records real study time. | Open Statistics, then read 悪の教典 02 in a separate Library pop-out. Window 12 keeps Read today at **1m** after its localStorage reaches **136.351 seconds (2m)**; per-book time also stays at the earlier snapshot. No fake data injected. | P2 | open — claimed codexA; useStats memo depends only on manual refresh/reset and subscribes to no reading/watch/storage/language changes. Share an event subscription with study widgets; preserve independent read/watch totals. |
+
+**Gate footnote for D123/D124, 2026-09-07 01:00.** The first full run at `e1985518` came back
+**1 failed / 14,751 passed** and the failure was **my own new gate**, not the product: reading
+3,500 files timed out at vitest's 20s default under parallel load while passing in ~1s alone.
+Fixed at `24182319` — one regex per file instead of a per-character walk of every line, plus an
+explicit 120s budget on both new gates, because file I/O at that scale is not a statement about
+the code under test. Re-run at `24182319` in the detached worktree: **1,172 files passed /
+1 skipped, 14,758 tests passed / 6 skipped, zero failed, exit 0.** Worth carrying: a source-scan
+gate that walks the whole tree is fast alone and slow inside `npx vitest run`, and the default
+timeout is the thing that bites.
