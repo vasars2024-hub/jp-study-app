@@ -1932,3 +1932,68 @@ broken run). The four newly-exposed dead keys other than D181's — `settings.ho
 (its own comment says it is byte-for-byte `settings.nav.memory`), `assetError.httpFailed`,
 `assetError.emptyResponse` and `library.open` — are recorded as accepted debt, **not** fixed, and
 are the cheapest four leads in the queue for whoever wants a five-minute start.
+## 2026-09-07 06:18–07:05 EDT — `primary`, main tree: landing `wt/files-app`, and the three defects the land exposed
+
+**The land itself: `feat/nyaa-subtitles` fast-forwarded `409e8977 → e6153b1b`**, 42 commits,
+59 files, +3533/−267. Forecast measured first rather than trusted: the script's header predicted
+"11/12 clean, one conflict in App.tsx" from 2026-09-01, and the real answer today was **14 of 16
+clean, two conflicts, neither in App.tsx**. 354 other-track dirty paths before, all 354 still
+dirty after — none disturbed. Literal backups in `~\.claude-runs\land-backup-20260907-062219`.
+
+**A relay-infra fix that was blocking this:** `land-files-app.ps1`'s quiet guard counted the
+CALLER's own dispatch as "a live editor", so the one worker positioned to take the window was the
+one worker it refused. Now ancestor-scoped, the same shape as the 2026-09-05 `Test-AccountBusy`
+fix — a script invoked by a dispatch is its descendant, so the spawning dispatch is always an
+ancestor and a genuinely concurrent one never is. **Control run:** with the `primary2` name
+exclusion removed, the ancestor rule alone still caught `primary2` and still exempted only my own
+dispatch, so the guard discriminates rather than being switched off.
+
+**The `VerifiedSitesManager.tsx` conflict was resolved by DISCARDING the main tree's uncommitted
+copy, and that call was made on an incomplete reading — corrected here before it misleads anyone.**
+Both sides were the same conversion done twice, with different key names. I took the landed one
+because the local copy's keys resolved to **0** in `catalogs/en.ts` — but I never looked in
+`scraperUi/en.ts`, which is where that track had put them, committed, in all four languages. The
+decision still stands (the landed component is committed, tested and baselined; the local one was
+not), but it stands for a different reason than the one I first wrote down. Byte-for-byte copy of
+the discarded file is in the backup dir. **This is what produced D157.**
+
+| D157 | app-wide i18n (Verified Sites) | **Landing files-app defined the entire `verifiedSites.*` family a second time — 75 keys per language, 300 entries in all.** D127 converted `VerifiedSitesManager` and put 115 keys in `catalogs/{en,ja,zh,ru}.ts`, unable to see that another track had already committed 121 keys for the same component to `i18n/scraperUi/`, whose own header comment names that component as its owner. | Counted at both ends: at `409e8977` `catalogs` held **0** `verifiedSites.*` and `scraperUi` held **121**; at `e6153b1b` `catalogs` held **115** and `scraperUi` still **121**, overlapping on **75**. `catalogDuplicateKeys.test.ts` was RED in all four languages — 2 test files / 5 tests failed in the full run, and that is the suite's only real failure. Not a wrong string: `catalogs` spreads `SCRAPER_UI_*` at `en.ts:770` and defines its own keys *after* it, so the `catalogs` copy already won at runtime and the overlapping values are identical where sampled. | P2 | **fixed `6c7ce0de`** — the 75 duplicated entries removed from `scraperUi`, per language. Behaviour-neutral and measured as such: **i18n-check reports 12,853 English keys before and after**, so nothing left the assembled catalog. `catalogDuplicateKeys` 4/4 and `dynamicI18nKeyGate` 8/8 now pass. **A wholesale delete of the block would have broken two live consumers** and was rejected for it: `settingsRegistry.ts` reads `verifiedSites.description` and `dynamicI18nKeyGate.test.ts` reads `verifiedSites.source.community`, neither of which exists in `catalogs`. **Left open on purpose:** the other **44** `scraperUi` keys became dead the moment D127 landed (zero consumers — checked by grep across `src/` excluding the two catalog homes). Deleting dead keys is separate cleanup and mixing it into this commit would have made it hard to review and revert. **Trap:** an entry can span lines — the first pass deleted only the `'key':` line, severed a plural object's body, and esbuild reported `Expected identifier` in all four files; placeholders like `{count}` also defeat naive brace counting, so strip string literals before measuring depth. |
+| D158 | the partial-i18n gate itself | **`tools/i18n-partial-check.cjs` — the gate D135 asked for, landed in this same merge — scores arrow-function arithmetic as user-facing JSX text.** It was red on arrival, on `ArcadeGames.tsx`, naming `alien.x + direction * speed` and `laser.y` as untranslated strings. Neither is a string. A gate that cries wolf on its first day is how a real finding gets ignored. | Its JSX-text pattern is `>([^<>{}\n]{2,120})<` and an arrow function's `=>` also ends in `>`. In `(alien) => alien.x + direction * speed < 4` the `=>` opens the match and the `<` of the comparison closes it. **`looksHuman()` cannot catch this** — it already rejects a capture containing `=>`, but the `=>` that caused the match sits OUTSIDE the capture, so the guard never sees it. Same shape produced `new Set` twice from `=> new Set<string>` and `t.chapterIndex` from a comparison. | P2 | **fixed `65c67d64`** — the opening `>` must not be preceded by `= ! < > -` (which also covers `>=`, `->` and the `>>` closing a nested generic) and the closing `<` must not be followed by `=`. **Proven not to weaken the gate, which was the whole risk:** running both regexes over the two files whose counts changed, *every* detection lost is code — `new Set` ×2 and `t.chapterIndex` — and a planted JSX label is still caught. At committed HEAD the gate goes from 3 false findings to 0 and stays exit 0. The remaining working-tree red is another track's in-flight `VisualNovelMetadataEditor.tsx`, whose 3 findings (`Windows, Linux`, `Unity`, `RPG Maker`) are genuine proper nouns for that track to baseline — **not** a defect and not mine to file. |
+| D159 | blanc (app drawer) | **`BlancAppDrawerPanel.tsx` imports `useT` twice**, landed that way in the merge. eslint reports it (`import/no-duplicates`, ×2) and it is a redeclaration TypeScript rejects. | `git show wt/files-app:...BlancAppDrawerPanel.tsx` has `import { useT } from '../../i18n';` at **both line 21 and line 30**; `feat/nyaa-subtitles` before the land had exactly one, at line 28. Almost certainly a merge artifact on the worktree side. **Downgraded from the P0 I first assumed after actually testing it:** esbuild — which is what Vite transforms this file with — accepts and dedupes it, so the panel is not broken at runtime. | P3 | **resolved in the working tree, deliberately NOT committed.** The duplicate sat inside the conflict hunk I had to resolve anyway, so the working copy now reads `import { alertDialog, confirmDialog, showToast } from '../ui';` with a single `useT` — that keeps files-app's D142 confirm guard AND another track's uncommitted `window.alert` → `alertDialog` change. The file is dirty with that track's hunk, so committing it would absorb their work; the fix ships when they commit theirs. eslint on the resolved file: **0 problems**. |
+
+| D160 | settings ▸ Verified Sites | **Deleting a site from the user's local database went through a native `window.confirm`** — OS chrome drawn on top of a desktop that is pretending to be an operating system, and on the one action that removes their data. `nativeDialogGate.test.ts` exists precisely to ban this and had been RED on this file; it was the **full suite's only remaining failure** after D157 cleared the other four. | `VerifiedSitesManager.tsx:186`, `if (!window.confirm(t('verifiedSites.confirmDelete', …)))`. **Pre-existing, not introduced by today's land, and measured at both ends:** at `409e8977` the same line read `window.confirm` with a raw English literal; D127 translated the string and left the native call, so the land carried the defect forward with better copy on it. Full run before: 2 files / 5 tests failed (4 `catalogDuplicateKeys` + this 1). After D157: 1 file / 1 test — this one. | P2 | **fixed `92895fdf`** — `confirmDialog` from `components/ui`, the same idiom as `ApiKeysPage`, `AppearancePage` and `CompanionsPage`, with `danger: true` so the confirm button is red and **Cancel takes initial focus**, which is what a delete should do. Keeps D127's committed keys, verified present in all four catalogs (`verifiedSites.delete`, `verifiedSites.confirmDelete` — 1/1/1/1). **The fix is lifted from the copy of this file I discarded during the land**, which had already converted this call — recorded that way rather than quietly reinvented, because it is the one respect in which the discarded version was better and a reader should be able to see the discard was not free. Gates: `nativeDialogGate` + `destructiveGuards` + `dialogTextTranslated` **22/22**, eslint clean. |
+
+### D107's owed live re-verification — DONE, and the key names in its row are stale
+
+D107's status line says *"Source- and gate-verified, NOT live … the new keys do not exist in the
+running renderer's catalogs … Re-verify after the mergeback."* **The mergeback is this turn's
+land, so that is now closed — but not by the keys D107 names.**
+
+Chasing `desktop.aero.*` cost me two steps and would cost the next reader the same, so: those 27
+keys **no longer exist anywhere**, and neither do their call sites. `90b5f002` IS in history
+(`git merge-base --is-ancestor` says so), but another track's later conversion superseded that
+naming with **`desktop.startMenu.*`**. It is a CLEAN supersession, not a regression, and it was
+checked in both directions before saying so: **0** `desktop.aero.` matches in any of the five
+catalog files, **0** in `DesktopShell.tsx`, so there are no orphaned keys and no dangling `t()`
+calls. The replacement family is **24 keys, present in all four catalogs** (en/ja/zh/ru = 24/24/24/24).
+
+**Verified against the RUNNING dev server**, not the tree — the register's actual claim was about
+what the renderer can resolve, and until this land the server was serving a branch without these
+commits. Fetched `http://localhost:5173/src/shared/i18n/catalogs/ja.ts` (200, 2,291,980 bytes)
+and read the values out of the served module:
+
+    desktop.startMenu.shutdown  ->  "Secret OS を終了"
+    desktop.shutdownConfirm     ->  "終了"
+    mediaLib.clear.title        ->  "メディアライブラリを消去"
+
+The third is the sharpest of D107's four destructive dialogs — the Clear media library confirm,
+whose message is the only place the app says the original files on disk are NOT deleted.
+
+**Deliberately NOT done, and the reason is a cost the verification did not need to pay:** I did
+not switch the live UI to ja and read the start menu by hand. That writes the user's own
+`ui-lang` (the setting an earlier worker already left on `ja` once, costing the next turn a
+restore) and needs a window reload to defeat the HMR catalog cache, on a desk another worker is
+sharing. The served-module read answers the same question — *can the running renderer resolve
+these keys, in Japanese* — without touching anything of the user's. The renderer was confirmed
+healthy at the same time: `#root` has 2 children and there is no `vite-error-overlay`, so the
+59-file land did not blank it (the D115 failure mode).

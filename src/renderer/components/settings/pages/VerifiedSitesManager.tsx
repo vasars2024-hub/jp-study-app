@@ -28,6 +28,7 @@ import {
   type FmhyDirectoryReconciliation,
 } from '../../../../shared/fmhyDirectoryImport';
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 
@@ -198,12 +199,18 @@ export default function VerifiedSitesManager() {
               if (promoted.issues.length) setMessage(promoted.issues[0].message);
               else { persist(promoted.value); setMessage(t('verifiedSites.msg.promoted', { name: site.name })); }
             }}>{t('verifiedSites.promote')}</button>}
-            <button type="button" className="btn small danger" onClick={() => {
-              if (!window.confirm(t('verifiedSites.confirmDelete', { name: site.name }))) return;
+            <button type="button" className="btn small danger" onClick={() => void (async () => {
+              const ok = await confirmDialog({
+                title: t('verifiedSites.delete'),
+                message: t('verifiedSites.confirmDelete', { name: site.name }),
+                confirmLabel: t('verifiedSites.delete'),
+                danger: true,
+              });
+              if (!ok) return;
               persist(removeVerifiedSite(document, site.id));
               if (draft?.id === site.id) setDraft(null);
               setMessage(t('verifiedSites.msg.deleted'));
-            }}>{t('verifiedSites.delete')}</button>
+            })()}>{t('verifiedSites.delete')}</button>
           </article>
         ))}
         {!filtered.length && <p className="muted">{document.sites.length ? t('verifiedSites.empty.filtered') : t('verifiedSites.empty.none')}</p>}
