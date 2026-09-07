@@ -1888,3 +1888,57 @@ cues to a JoJo episode remains rejected. **Gate 11 is 1 of 3 clauses and stays O
 19 of 20.** What closes it is now precisely one thing: a `sub-pack` candidate — archive or loose —
 for a title this library actually holds. Re-check in one call:
 `node debug/g14-live.cjs fetch "<a library title>" <hash> 127.0.0.1 8781 /qb`.
+
+### GATE 11 clauses 2–3 — 2026-09-07 09:15 EDT (primary). The "what closes it" question is now ANSWERED, and the answer is nothing on this index. Still OPEN, now PARKED ON MEASUREMENT rather than on inference.
+
+The 2026-09-06 entry closed clause 1 and left clauses 2–3 with a one-line re-check
+(`a sub-pack candidate — archive or loose — for a title this library actually holds`).
+**Nobody had run it across the whole library.** This turn did, through the product's own
+listing and then through the raw index as the control.
+
+**The library, re-derived live, not inherited** (`g14-live.cjs library ""`, pid 14128):
+**39 items, 3 real series** — `The Big O` (26 eps + 3 creditless), `JoJo no Kimyou na Bouken -
+Ougon no Kaze` (2), `Date a Live II - Kurumi Star Festival OVA` (1). The rest are 3 Hana
+podcast episodes, 1 onomatopoeia lecture and 3 `e2e-*` fixtures — none of which is a title any
+index carries subtitles for.
+
+**The product's own listing, run on each of the three** (`g14-live.cjs list "<title>"`):
+
+    The Big O                            ok true, 1 candidate
+    JoJo no Kimyou na Bouken …           ok true, 1 candidate
+    Date a Live II                       ok true, 1 candidate
+
+**All three return the SAME single candidate** — `nyaa:539c0886…`, `[PeepoHappy] Kitsunekko
+Archive 16/07/2021`, route **`sub-archive`**, **6,120,328,397 B (6.1 GB / 5.70 GiB)**, score 39.
+`SUBTITLE_SIZE_CEILING_BYTES` is `50 * 1024 * 1024` = 52,428,800 B (`shared/subtitleNyaa.ts:184`),
+so that is **116.7× the ceiling**, and it is the torrent the user already holds. **Zero `sub-pack`
+candidates for any title in this library.**
+
+**CONTROL — the raw index, so this is not the listing filtering something out**
+(`g14-live.cjs search "<q>" 50`, cap in MB):
+
+    "Big O"                    75 rows,  1 under 50 MB  — a Portuguese-BR DVD-rip of
+                                                          *Issunboushi no Shusse*, 0 seeders,
+                                                          an unrelated movie
+    "JoJo Ougon no Kaze"       75 rows,  0 under 50 MB
+    "ジョジョの奇妙な冒険 字幕"   4 rows,  0 under 50 MB   (Japanese-language query, so the
+                                                          romaji spelling is not the cause)
+    "Date a Live"              75 rows,  0 under 50 MB
+
+So the listing is not suppressing anything: **the index itself carries no subtitle-only
+release under the ceiling for any title this library holds.** The Conan pack that closed
+clause 1 remains the only one found, and `listMedia()` still returns **0 matching conan/コナン**.
+
+**Why clause 2 cannot be reached another way, checked rather than assumed.** A `SubtitleRecord`
+is only ever written by `acceptNyaaCandidate`, the media-item route, which refuses with *"That
+media item is no longer in the library"* when `listItems()` has no match. The harvest route that
+closed clause 1 returns cues and writes no record. So clause 2 structurally requires a library
+item, and clause 3 requires clause 2.
+
+**VERDICT — unchanged and deliberately not amended down.** Gate 11 is **1 of 3 clauses, OPEN**;
+Track 9 stays **19 of 20**; main-v1 stays **79 of 80**. Rejected again, for the record: attaching
+the Conan cues to a JoJo episode (fabricates a match), and closing 2–3 off the 5.7 GB
+`sub-archive` (a different route, and 116.7× over a ceiling the gate names explicitly). What
+closes it is a third-party fact — one `sub-pack` for The Big O, JoJo Golden Wind or Date a Live
+appearing on nyaa, or the user importing media for a title that already has one. **Neither is
+agent-reachable, so this is parked, not abandoned.** Re-check cost is now three commands.
