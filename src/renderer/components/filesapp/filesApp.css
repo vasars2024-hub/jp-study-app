@@ -17,6 +17,13 @@
   height: 100%;
   min-height: 0;
   color: var(--lq-work-text);
+  /* This app renders inside a `.fwin`, so a `@media` breakpoint here would ask
+     the 1904px DESKTOP viewport and never fire at the size that matters. The
+     toolbar rule at the end of this file needs to know how wide THIS WINDOW is,
+     which only a container query can answer. Same idiom, same reason, as
+     `.mc-root` in `mediaCenter.css`. */
+  container-type: inline-size;
+  container-name: fa;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1508,4 +1515,40 @@
   justify-content: flex-end;
   gap: var(--lq-space-2);
   padding-top: var(--lq-space-2);
+}
+
+/* ------------------------ narrow window: wrap the toolbar ------------------------
+   D118. `.fa-toolbar` is a `nowrap` flex row of seven items, six of them
+   `flex: none`. Drag the window under about 670px of toolbar width and the only
+   item that can shrink — the search field — collapses to ZERO, and then the
+   trailing buttons simply leave the box: `.fwin-body` is `overflow-x: hidden`
+   with no scroll route, so they are painted outside it and cannot be clicked at
+   all. Measured live 2026-09-06 at a 420px window: toolbar `scrollWidth` 670
+   against `clientWidth` 380, `.fa-search` **0px wide**, and Refresh, Scan a
+   folder and Clean up standing 23px, 108px and 207px past the clip edge. At
+   320px it was four.
+
+   Gated on a container query rather than applied unconditionally, because
+   `flex-wrap: wrap` alone changes the DEFAULT layout too: with `wrap` the
+   search's `auto` basis is its intrinsic input width, which no longer fits
+   beside the six fixed items, so an 820px window wrapped to two rows and the
+   search lost 39px. Measured at 820 and 760 with this block in place: toolbar
+   height 40, search 102 and 42, zero controls outside — byte-identical to
+   before. Below it: 620px 1 control outside -> 0, 420px 3 -> 0, 320px 4 -> 0,
+   and the search comes back to 322/364/264px respectively.
+
+   The breakpoint has margin on purpose. The toolbar's min-content is 670px, so
+   the failure begins around a 672px container; 700 sits just above it and never
+   fires while the one-row layout still fits. */
+@container fa (max-width: 700px) {
+  .fa-toolbar {
+    flex-wrap: wrap;
+    row-gap: var(--lq-space-2);
+    /* `height: 100%` would hold the wrapped rows at one row's worth and clip the
+       rest. The scaffold's toolbar track is `auto` and `.lq-scaffold-toolbar`
+       carries `min-height: var(--lq-toolbar-height)`, so growing is safe and the
+       single-row height is still the floor. */
+    height: auto;
+    min-height: 100%;
+  }
 }
