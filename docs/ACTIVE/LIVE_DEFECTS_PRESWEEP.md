@@ -564,3 +564,52 @@ the code under test. Re-run at `24182319` in the detached worktree: **1,172 file
 1 skipped, 14,758 tests passed / 6 skipped, zero failed, exit 0.** Worth carrying: a source-scan
 gate that walks the whole tree is fast alone and slow inside `npx vitest run`, and the default
 timeout is the thing that bites.
+
+## 2026-09-07 01:35 EDT — backup, class 3b: dynamic i18n keys whose table fell behind its type
+
+| D129 | settings (Verified sites) | **An imported community site shows a dotted identifier where its source name belongs.** The Source line, the reconcile row and the "reconciled" status message all read `verifiedSites.source.community` — in English, Japanese, Chinese and Russian alike. | `VerifiedSiteSource` has **four** members (`verifiedSites.ts:4`); the catalogs defined **three**. Reachable through a shipped control: the panel's portable **Import** button calls `importVerifiedSitesDocument`, and the normalizer preserves `'community'` (`verifiedSites.ts:159`) — the very source a community-curated list arrives with. Built at `VerifiedSitesManager.tsx` lines 158, 234 and 237. | P2 | fixed `6bd06b89` — 1 key x 4 locales, plus the scan that found it. |
+
+**The class, and why every existing gate is green on it.** `t(\`prefix.${expr}\`)` builds a key
+from data. When a string union gains a member and the catalog does not, the UI renders the raw key
+as visible text. **`i18n-check` compares the four locales AGAINST EACH OTHER**, so a key missing
+from all four is unanimously consistent and reports green — it did, before and after this fix. A
+missing-key scan resolves static `t('a.b')` literals and cannot evaluate a template. Third time
+this sweep that a gate said zero against real breakage and the classifier was the reason.
+
+**The scan:** `src/.coordination/presweep/dynamic-i18n-key-scan.cjs`. **231 dynamic prefixes, 645
+string unions, 110 bound, 1 finding.** It binds with no hand-maintained map: harvest the unions,
+harvest the suffixes under each prefix, bind when the union **contains** the table and shares ≥2
+members, then discard members the call site cannot reach.
+
+**The reduction is the evidence — 75 → 12 → 7 → 5 → 3 → 1, every step a confirmed false shape:**
+
+- **75 → 12** overlap alone bound `palette.section.*` to `MiniAppId` and `lexicon.wild.state.*` to
+  `AgentShellPhase`, on generic words like `clipboard`, `loading`, `error`. Containment fixed it.
+- **12 → 7** members the call site guards by hand: `if (plan.verdict !== 'ok')`,
+  `plan.status === 'ready' ? … : t(…)`. Both would have been filed as defects.
+- **7 → 5** members absent from a literal array the call site iterates. BlancShell's reset buttons
+  map `['general','layout','search','keyboard-shortcuts']`, deliberately omitting `tool-visibility`;
+  `FILE_KINDS` omits the machine-initiated `relabel`.
+- **5 → 3** **my own exemption list hid the refutation.** `unknown` was exempt from the containment
+  test, which let `connection.grade.*` bind to `SubtitleQualityGrade` and manufactured
+  `connection.grade.unrated`. The true domain is an inline union on `diagnoseConnectionProfile`'s
+  result and the catalog matches it exactly. **An exemption that hides the one member which would
+  have refuted the binding is how a scan invents a defect.**
+- **3 → 1** return-type narrowing: `sortFieldIsAbsent` is `'views' | 'date' | null` while its
+  parameter is the full `YtPlaylistSort`, so `yt.sort.noData.title` and `.unlogged` can never be
+  built. This only worked once the expression's own type **won outright** over the literal-array
+  heuristic instead of unioning with it — the same file declares `SORT_OPTS` with all five sorts,
+  for a different key family.
+
+**Controls.** With the four keys added the scan exits **0**; removing any one returns it, naming the
+locale and the file that builds it. A second instrument bug was caught the same way: a lazy
+quantifier in the return-type regex walked past the end of one function into the next and reported
+`emptyYtStore => 'views' | 'date' | null`, a signature that function does not have.
+
+**Verified and deliberately NOT filed:** `notebook.stream.media` is a union member the source
+itself documents as dead ("no view ever asked for it and no aggregator ever emitted one"), so its
+absence from the catalogs is correct.
+
+**Residual limit, stated so nobody reads exit 0 as proof of more than it is:** a prefix whose table
+is empty in every locale is skipped rather than reported, because there is nothing to bind against.
+That is a different defect class and this scan does not cover it.
