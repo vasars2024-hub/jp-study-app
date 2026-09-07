@@ -34,6 +34,22 @@ function values(xml: string, tag: string, attrs = ''): string[] {
   return [...xml.matchAll(new RegExp(pattern, 'g'))].map((match) => decodeXml(match[1].replace(/<[^>]+>/g, ''))).filter(Boolean);
 }
 
+/**
+ * The English meanings only.
+ *
+ * KANJIDIC2 writes English as a bare `<meaning>` and every other language as
+ * `<meaning m_lang="fr">`, so `values(block, 'meaning')` — which matches the tag
+ * with or without attributes — collected all of them. 犬 arrived as
+ * `dog · chien · perro · Cão`, four glosses of one word presented as four
+ * senses. `values`' positive attribute filter cannot express "and no
+ * attributes", hence the dedicated pattern.
+ */
+function englishMeanings(xml: string): string[] {
+  return [...xml.matchAll(/<meaning>([\s\S]*?)<\/meaning>/g)]
+    .map((match) => decodeXml(match[1].replace(/<[^>]+>/g, '')))
+    .filter(Boolean);
+}
+
 function firstNumber(xml: string, tag: string): number | null {
   const value = Number(values(xml, tag)[0]);
   return Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -82,8 +98,15 @@ export function importKanjidic(db: SqliteDb, xml: string, options: KanjidicImpor
       }
       const char = values(block, 'literal')[0];
       if (!char) { counts.skipped += 1; return; }
-      const readings = values(block, 'reading');
-      const meanings = values(block, 'meaning').filter((value) => value.length > 0);
+      // `<reading>` also carries this character's pinyin, Korean and Vietnamese
+      // readings. Taking them all put `quan3 · gyeon · 견 · Khuyển` in front of a
+      // Japanese learner, inside a `lang="ja"` span; on-yomi and kun-yomi are
+      // what a Japanese character row means by "readings".
+      const readings = [
+        ...values(block, 'reading', 'r_type="ja_on"'),
+        ...values(block, 'reading', 'r_type="ja_kun"'),
+      ];
+      const meanings = englishMeanings(block);
       insert.run(dictId, char, firstNumber(block, 'stroke_count'), values(block, 'rad_value')[0] ?? null,
         json(readings), json(meanings), values(block, 'jlpt')[0] ?? null, firstNumber(block, 'grade'), firstNumber(block, 'freq'));
       touched.add(char); counts.entries += 1; counts.characters += 1;

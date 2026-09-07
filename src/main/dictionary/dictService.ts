@@ -778,6 +778,35 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   return result;
 }
 
+const KANA = /[ぁ-ゟ゠-ヿ]/;
+
+/**
+ * A Japanese character row's readings, with the other languages' readings
+ * dropped.
+ *
+ * KANJIDIC2 gives every character its pinyin, Korean and Vietnamese readings
+ * alongside on-yomi and kun-yomi, and the importer used to store all of them:
+ * measured on this machine's own database, **49,450 of 86,498 stored `ja`
+ * readings (57%) are not Japanese**, across 12,634 of 13,108 characters.
+ * `importers/kanjidic.ts` now selects by `r_type`, but that only helps a
+ * database imported after the fix — this filter repairs the one the user
+ * already has, and is a no-op once the import is clean. Every `ja_on`/`ja_kun`
+ * reading carries kana and no other `r_type` does, so kana is the whole test.
+ *
+ * Deliberately scoped to `ja`: a `zh` row's readings are pinyin and correct.
+ *
+ * 403 rows are left with nothing — CJK-extension characters KANJIDIC2 carries
+ * with only Chinese readings, exactly one of which has a JLPT level, grade or
+ * frequency. They return empty, which is what a clean re-import stores (349 rows
+ * already do) and what the panel hides the Readings line for. Falling back to
+ * the whole list would put `yin3` under a `lang="ja"` heading, which is the
+ * defect this exists to stop.
+ */
+export function japaneseCharacterReadings(lang: string, readings: string[]): string[] {
+  if (lang !== 'ja') return readings;
+  return readings.filter((reading) => KANA.test(reading));
+}
+
 /**
  * Read the normalized character projection without trusting disabled sources.
  *
@@ -831,7 +860,7 @@ export function lookupCharacter(
       ...(row.strokes != null ? { strokes: row.strokes } : {}),
       ...(row.radical ? { radical: row.radical } : {}),
       components: jsonStringArray(row.components),
-      readings: jsonStringArray(row.readings),
+      readings: japaneseCharacterReadings(row.lang, jsonStringArray(row.readings)),
       meanings: jsonStringArray(row.meanings),
       ...(row.jlpt ? { jlpt: row.jlpt } : {}),
       ...(row.hsk ? { hsk: row.hsk } : {}),

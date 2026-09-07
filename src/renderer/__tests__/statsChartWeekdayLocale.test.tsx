@@ -194,3 +194,88 @@ describe('chartDayLabel', () => {
     expect(new Set([en, ja, ru]).size).toBe(3);
   });
 });
+
+/**
+ * D168 — every per-day figure in the 14-day chart was behind a mouse hover.
+ *
+ * Each column was a plain `<div>` carrying only `title`: no role, no
+ * `aria-label`, no `tabindex`. A bare div takes no accessible name from
+ * `title`, and with no focus stop there was no keyboard route to it either, so
+ * the bar heights were the entire non-mouse representation of the series.
+ * Measured live at pid 14128 window 12: 14 columns, `role` null, `aria-label`
+ * null, `tabindex` null.
+ *
+ * The label is asserted to EQUAL the title rather than merely to exist, because
+ * a second hand-built string is exactly how the two would drift apart.
+ */
+describe('StatsChart names each day for a reader who is not using a mouse', () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  const noop = vi.fn();
+
+  function chartState(watch: boolean): StatsState {
+    const summary = {
+      totalSeconds: 600,
+      totalChars: 4200,
+      totalWatchSeconds: watch ? 900 : 0,
+      daysActive: 2,
+      streak: 1,
+      todaySeconds: 60,
+      todayChars: 10,
+      todayWatchSeconds: 0,
+      recent: [
+        { date: '2026-09-06', seconds: 600, chars: 4200, watchSeconds: watch ? 900 : 0 },
+        { date: '2026-09-07', seconds: 120, chars: 55, watchSeconds: 0 },
+      ],
+      books: [],
+      shows: [],
+    } satisfies StatsSummary;
+    return { summary, peak: 600, hasData: true, refresh: noop, resetAllStats: noop };
+  }
+
+  async function columns(watch = false): Promise<HTMLElement[]> {
+    await act(async () => {
+      root.render(<StatsChart state={chartState(watch)} />);
+    });
+    return [...host.querySelectorAll<HTMLElement>('.stats-bar-col')];
+  }
+
+  it('gives every column a role and a name, and the name is the tooltip', async () => {
+    const cols = await columns();
+    expect(cols).toHaveLength(2);
+    for (const col of cols) {
+      expect(col.getAttribute('role')).toBe('img');
+      const label = col.getAttribute('aria-label') ?? '';
+      expect(label.length, 'an empty name is the same as no name').toBeGreaterThan(0);
+      expect(label, 'the name and the tooltip drifted apart').toBe(col.getAttribute('title'));
+    }
+  });
+
+  it('names the day its own figures, not a constant', async () => {
+    const [first, second] = await columns();
+    expect(first.getAttribute('aria-label')).not.toBe(second.getAttribute('aria-label'));
+    expect(first.getAttribute('aria-label')).toContain(formatNumber(4200));
+    expect(second.getAttribute('aria-label')).toContain('55');
+  });
+
+  it('includes watched time once anything has been watched', async () => {
+    const [first] = await columns(true);
+    const withWatch = first.getAttribute('aria-label') ?? '';
+    const [plain] = await columns(false);
+    expect(withWatch).not.toBe(plain.getAttribute('aria-label'));
+    expect(withWatch).toContain('15m');
+  });
+});

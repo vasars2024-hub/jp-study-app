@@ -9786,6 +9786,7 @@ export const zh: Catalog = {
   'lexicon.character.title': '字符信息',
   'lexicon.character.grounded': '基于已启用的词典来源',
   'lexicon.character.strokes': '笔画',
+  'lexicon.character.drawFirst': '请先写出这个字。',
   'lexicon.character.radical': '部首',
   'lexicon.character.components': '构件',
   'lexicon.character.jlpt': 'JLPT 等级',

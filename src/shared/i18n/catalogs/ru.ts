@@ -10727,6 +10727,7 @@ export const ru: Catalog = {
   'lexicon.character.title': 'Сведения об иероглифе',
   'lexicon.character.grounded': 'Данные из включённых словарных источников',
   'lexicon.character.strokes': 'Черты',
+  'lexicon.character.drawFirst': 'Сначала напишите иероглиф.',
   'lexicon.character.radical': 'Ключ',
   'lexicon.character.components': 'Компоненты',
   'lexicon.character.jlpt': 'Уровень JLPT',
