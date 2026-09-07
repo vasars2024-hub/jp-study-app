@@ -980,3 +980,36 @@ already in scope. Six new keys plus two CLDR-plural counts cover what Aero genui
 `i18n-hardcoded-check` cannot see this (CalendarView calls `t()` on line 100, which exempts the
 file); **D135's ratchet is what surfaced it**, and its entry is now removed rather than lowered:
 **44 files / 340 strings → 43 / 323.**
+
+### 2026-09-07 03:30 EDT — primary2: the branch was RED at its own tip, and it was not caught for two turns
+
+Not a product defect and not a register row — a **process** one, recorded because it is the boss
+audit's Job 1 ("the branch must be green at its own tip") failing quietly.
+
+`dbc5d509` put the visual-novel Remove behind a confirm. Correct, and it closed a real P1. It
+also turned **`visualNovelRemoveReports.test.tsx`** red: the click now awaits a dialog that never
+answers under jsdom, so `visualNovelRemove` was never reached and `removeCalls` read `[]`.
+`e574b8fa` repaired the *sibling* suite this exact way — the scoreboard line even says so, *"the
+VN confirm broke a behavioural test; repaired by driving the real dialog"* — and this second one
+was missed.
+
+**Measured, not assumed, before claiming it was not mine:** it fails identically at `1a8ac3f3`
+(the sync-down merge, before any of my three slices) and at **`5d38f63c`, the
+`feat/nyaa-subtitles` tip itself.** Repaired at `addacc6e`.
+
+**Two things worth carrying:**
+
+1. **A guard landed with a confirm breaks every test that clicked the thing it now guards.** After
+   adding a `confirmDialog` to an action, grep the suites for that action's `window.api` name
+   before calling the slice done — `dbc5d509` and the `353a7f27` Blanc Remove are the same shape
+   and there may be more.
+2. **The repair adds a FOURTH case that pins the guard**, answering the dialog `false`. Without
+   it every assertion in the file would pass just as well with the confirm deleted, which is
+   precisely how a guard is lost a second time. Control run for real: deleting `if (!ok) return;`
+   from the panel fails exactly that one case (1 failed / 3 passed) and the panel was restored
+   byte-identical.
+
+**And the reason two turns of green gates missed it:** the harness reports a piped background
+`vitest` run as **"completed (exit code 0)"** over `Tests 2 failed`. The appended
+`VITEST_EXIT=$?` sentinel read **1**, correctly. This is the third time this trap has been paid
+for. **Never read the harness's exit code for a piped vitest run; read your own sentinel.**
