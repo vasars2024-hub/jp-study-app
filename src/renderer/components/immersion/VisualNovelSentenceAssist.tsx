@@ -44,11 +44,13 @@ export default function VisualNovelSentenceAssist({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState('');
   const [audioBusy, setAudioBusy] = useState(false);
+  const [confirmRemoveAudio, setConfirmRemoveAudio] = useState(false);
 
   useEffect(() => {
     setDraft(draftFromCapture(capture));
     setAnalysis(null);
     setConfirmDelete(false);
+    setConfirmRemoveAudio(false);
   }, [capture.id]);
 
   useEffect(() => {
@@ -128,6 +130,9 @@ export default function VisualNovelSentenceAssist({
   };
 
   const attachAudio = async (): Promise<void> => {
+    // Reaching for the neighbouring control disarms the remove step, so a
+    // half-abandoned intent cannot fire on the next click.
+    setConfirmRemoveAudio(false);
     setAudioBusy(true);
     const response = await window.api.visualNovelAttachCaptureAudio(capture.id);
     setAudioBusy(false);
@@ -153,7 +158,16 @@ export default function VisualNovelSentenceAssist({
     setAudioBusy(false);
   };
 
+  // Two-step arm, matching `remove()` below rather than a modal: this button sat
+  // one click from destroying an attachment while its neighbour — the smaller
+  // destruction of the whole capture — already asked twice. Re-attaching means
+  // the native picker and finding the clip on disk again.
   const removeAudio = async (): Promise<void> => {
+    if (!confirmRemoveAudio) {
+      setConfirmRemoveAudio(true);
+      return;
+    }
+    setConfirmRemoveAudio(false);
     const response = await window.api.visualNovelRemoveCaptureAudio(capture.id);
     if (!response.ok || !response.database) {
       onStatus(response.error ?? t('vnAssist.msg.removeAudioFailed'), true);
@@ -209,7 +223,9 @@ export default function VisualNovelSentenceAssist({
               {audioBusy ? t('vnAssist.loadingAudio') : t('vnAssist.playClip')}
             </button>
             <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>{t('vnAssist.replaceClip')}</button>
-            <button type="button" disabled={audioBusy} onClick={() => void removeAudio()}>{t('vnAssist.removeClip')}</button>
+            <button type="button" className={confirmRemoveAudio ? 'is-confirming' : ''} disabled={audioBusy} onClick={() => void removeAudio()}>
+              {confirmRemoveAudio ? t('vnAssist.confirmRemove') : t('vnAssist.removeClip')}
+            </button>
           </>
         ) : (
           <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>
