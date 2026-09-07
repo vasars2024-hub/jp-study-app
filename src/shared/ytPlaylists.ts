@@ -283,6 +283,34 @@ export function isImmersionPlaylist(p: YtPlaylist): boolean {
   return p.youtubePlaylistId !== EXTENSION_YT_PLAYLIST_ID;
 }
 
+/**
+ * D300 — the channel a playlist belongs to, resolved by id and then by title.
+ *
+ * `channelId` and `channelTitle` are independent optionals (`:37`, `:61`) and
+ * `--flat-playlist` fills the title far more often than the id, so a lookup keyed
+ * on the id alone silently loses the channel for exactly the playlists the user
+ * added by link. Id first, because it is the stable key: a title collision must
+ * never be able to override a real id match.
+ *
+ * A miss returns `undefined` rather than a guess, so a caller can tell "no channel
+ * record" from "a channel with nothing tracked" — the difference between showing
+ * nothing and asserting a confident zero.
+ */
+export function resolveTrackedChannel(
+  playlist: Pick<YtPlaylist, 'channelId' | 'channelTitle'> | null | undefined,
+  channels: readonly YtChannel[],
+): YtChannel | undefined {
+  if (!playlist) return undefined;
+  if (playlist.channelId) {
+    const byId = channels.find((c) => c.channelId === playlist.channelId);
+    if (byId) return byId;
+  }
+  if (playlist.channelTitle) {
+    return channels.find((c) => c.title === playlist.channelTitle);
+  }
+  return undefined;
+}
+
 /** Merge remote flat-playlist entries into local videos; preserve status by youtubeId. */
 export function mergePlaylistVideos(
   playlistId: string,

@@ -1093,6 +1093,7 @@ other branch's max before minting, every time — that reservation lasted about 
 | D143 | resources + blanc (app drawer) | **The same saved-tool delete asked on one surface and not the other — and the asymmetry was two hours old.** Blanc's app drawer removed a collected tool, with whatever note the user wrote on it, on one click. | `tools:remove` has exactly two call sites. D17 (`cd57a7b3`, 01:51 the same night) put a confirm on `ResourcesContent.removeTool`; `BlancAppDrawerPanel.removeItem` kept calling the channel bare. Same store, same tool, same note, no undo. **The gap was created BY a fix** — D17 guarded the surface it was walking rather than the action. That is the D137 lesson turned on its own author, and the second time in one night this shape produced a P1. | P1 | fixed `606c889b` — the confirm moved to `collectedToolsActions`, both hosts call it, Resources' behaviour unchanged. Reuses `resources.myTools.*`, no new keys. Control: deleting the Blanc guard fails exactly the source-ratchet case. |
 | D144 | novels (Jiten plan) | **Removing a title from the reading plan silently destroyed the note written on it**, plus the chosen source and the acquisition progress. | `removePlan` (`main/jiten.ts`) filters the row out and writes. `JitenPlanEntry` carries `notes` — a real textarea at `NovelsContent.tsx:1097`, saved on blur — plus `selectedSourceId` and `acquisitionStatus`. The book itself survives: `removePlan` does not cascade into the library, checked not assumed. | P2 | fixed `999a0d36` — a **conditional** confirm. A title you merely queued stays one click, because a modal there is friction the user did not ask for; an entry asks only once it carries a note, a library link, or an acquisition past `planned`. `error` counts. Predicate is `planEntryCarriesWork` in `shared/jiten.ts` so the decision is testable in both directions. |
 | D149 | immersion (visual novels — sentence assist) | **"Remove voice clip" detached an attached recording on ONE click, while the button beside it — the bigger destruction of the whole capture — already asked twice.** | `removeAudio` (`VisualNovelSentenceAssist.tsx:157`) called `visual-novel:removeCaptureAudio` bare. The handler (`main/immersion/visualNovels.ts:1079`) sets `audioPath: ''` and saves; it does **not** delete the managed copy, so the loss is the *reference*, not the bytes — checked in the handler, not assumed. That is still unrecoverable from the UI: the orphaned copy sits unnamed under userData and re-attaching means the native picker plus finding the original clip again (`attachCaptureAudio` copies through `saveCaptureAudio`, so the source file does survive at its own path). `remove()` eleven lines above uses a two-step `confirmDelete` arm for a strictly larger destruction. Fifth sighting of the D136 tell: the smaller destruction asks, the larger-effort one does not. | P2 | fixed `4d4251f2` — a two-step arm, matching `remove()` in the same component rather than importing a modal into a dense action row. Reaching for **Replace voice clip** disarms it, and so does selecting a different sentence, so a half-abandoned intent cannot fire on the next click. **Zero new i18n keys** — `vnAssist.confirmRemove` already existed. Ratchet is behavioural (`visualNovelRemoveClipGuard.test.tsx`, 5 cases) because the source ratchet `destructiveGuards.test.ts` asserts a `confirmDialog`/`danger: true` shape this guard deliberately does not have. Control: deleting the arm turns 4 of 5 cases red. |
+| D300 | youtube | **The "Channel tracking" card never appeared — for the only channel the user is subscribed to.** Open YouTube, select the one playlist in the tree (`オノマトペ`), open **Playlist settings**: the block naming the channel, its subscription status and how many of its videos are tracked is simply absent, while the channel's name is printed right there in the tree two inches away as the playlist's subtitle. | `channelId` and `channelTitle` are **independent optionals** on `YtPlaylist` (`shared/ytPlaylists.ts:37`, `:61`) and `syncPlaylist`'s `--flat-playlist` fills the title far more often than the id. `YouTubePlaylistsView.tsx:977` guarded the card on `playlist.channelId` alone. Measured live on pid 14128: the store holds `オノマトペ` (16 videos, `channelTitle: ゆる言語学ラジオ`, **no `channelId`**), `Extension` (which HAS the id) and channel `ゆる言語学ラジオ` (subscribed, `videoCount` 3) — and `isImmersionPlaylist` deliberately keeps `Extension` out of the tree (D94), so the only *reachable* playlist was the one with no id. `/eval` on the live DOM read `NO CHANNEL CARD RENDERED`. | P3 | fixed `<sha>` — `resolveTrackedChannel(playlist, channels)` in `shared/ytPlaylists.ts`, id first (the stable key, so a duplicate title can never override a real id match) then title. **A miss returns `undefined` rather than a guess**, and the view renders the tracked-count line only when a record resolved — relaxing the guard without that would print a confident "0 videos tracked" for every channel the app has no record of, which is worse than the blank. 6 cases in `ytTrackedChannel.test.ts`; deleting the title fallback turns exactly 3 of them red. **Fix is unit-verified, NOT live-verified:** the running instance is served from the main tree, so a worktree edit cannot hot-reload into it. What IS live-verified is the defect and the fix's premise — the same resolution rule run against the live store returns `ゆる言語学ラジオ / videoCount 3 / subscribed` for the playlist that currently renders no card. |
 
 **D144's fix is not the one I would have preferred, and the better one is recorded rather than
 lost.** The pin is right that a soft delete with undo beats a modal, and `removeFromPlan` already
@@ -1372,3 +1373,62 @@ other branch and found the same zero). What is left is the shape neither can jud
 Method: read the rendered figure off the live surface, then read the store through the app's own
 `window.api` on the same instance, and compare. **Ids minted from D300** (primary2's range).
 Driving window 2 (`?desk=1`), pid 14128, so it cannot collide with a worker on window 1.
+
+### 2026-09-07 05:05 EDT — primary2, class 4's MANUAL half: the densest counting surface in the app, checked against its store
+
+**D300 filed and fixed.** The rest of this section is the negative result, which is the larger
+half and the part worth not re-deriving: **`files` and `youtube` were walked number-by-number
+against the stores behind them and every single count agreed.**
+
+**Method — and it is what makes a zero mean something.** For each surface: read the figure off
+the live DOM, then read the store through the app's own `window.api` **on the same instance**,
+and compare. Not source, not a fixture. Driven on window 2's empty desk (pid 14128), desk `0`
+windows before and after.
+
+**`files` — 32 tree nodes, 12 categories, three independent checks each.** The tree's own
+arithmetic (`Sources 174` = 20+4+0+81+2+67; `Outputs 250`; `Reference 1,663` = 8+13+1,642;
+`Everything 2,134` = 174+250+1,663+28+19) is self-consistent; every leaf equals its category's
+`own` count from `filesIndex()`; and every list rendered the number its header claimed.
+
+**The near-miss that would have been a false P1, and how it was caught.** `Decks` reads **27** in
+the tree and the summary, and the list rendered **24 rows** — exactly D32's shape, and the three
+absentees were the alphabetical tail (`ZH Pairs`, `ZH to EN`, `ZH to JP`), which is what a real
+cap looks like. **It is virtualization.** Two controls settled it: `scrollHeight` is `count × 32`
+to the pixel on five categories of wildly different size (Decks 864, Highlights 1,824, Video
+2,592, Notes 4,352, **Artwork 52,544 for 1,642 items**), and scrolling the deck list to the
+bottom brought all three missing names on screen. **A DOM row count is not a list length on this
+surface** — read `scrollHeight`, or scroll, before filing.
+
+**The second near-miss: main and the renderer report different counts for the same category, on
+purpose.** `filesIndex()` returns `outputs/notes total 0` and `outputs/highlights total 42` while
+the tree shows **136** and **57**. That is not drift — the Notebook lives in renderer
+`localStorage`, which no main-process reader can open (Chromium keeps it in a Snappy-blocked
+LevelDB), so `rendererEnumerators.ts` merges a second layer on arrival and **recomputes `counts`
+from the joined list**, which is why a group total can never disagree with its leaves. Main's 17
+enumerators sum to exactly its 1,979 items; the renderer's merge takes it to 2,134. **Read that
+file's header before treating a main/renderer count difference on `files` as a defect.**
+
+**`files` also passes the honest-states question this class runs into constantly.** Its
+`Everything` total says `50.2 GB · 288 with no size` rather than a confident number over unknown
+data; its kind breakdown truncates to seven and says `Other kinds — 13 more kinds`; and it names
+both categories it does not index, individually: *"Plan to read — still in Novels"*, *"Live
+captions — still in Reading Finder"*. That is the standard the rest of the app's counts should
+be read against.
+
+**`youtube` — counts all agree**, and two leads were run down to nothing: the tree renders **one**
+item where the store holds 2 playlists + 1 channel, which is `isImmersionPlaylist` deliberately
+excluding the extension-owned playlist (already recorded as D94, not a defect); and the playlist
+list rendered **16 rows for the store's 16 videos**, `Plan to watch 0` for a store `planToWatchIds`
+of 0. The one real finding on this surface was not a count at all — it was D300, found only
+because cross-checking the counts meant reading the channel record.
+
+**`immersion` — nothing to check.** 1,560 sites in the store and the surface renders **no
+aggregate count anywhere**; the visit counts are per-row. A surface with no claimed number cannot
+have a wrong one, and saying so is cheaper than the next worker re-opening it.
+
+**Still owed in this class, honestly:** the surfaces with the numbers most likely to drift are
+untouched — `stats` (every figure is derived), `flashcards` (per-deck due/new counts), `anki`
+(84 decks live vs the 27 app-owned decks `files` indexes — different populations, but nobody has
+confirmed the app-owned figure against AnkiConnect), and `library`/`player` (24 library items vs
+39 media items). Those are where the next class-4 turn should go. **Do not re-derive `files`,
+`youtube` or `immersion` — they are done for this class.**

@@ -20,10 +20,10 @@ import {
   normalizeYtStore,
   pickSurpriseVideo,
   planToWatchVideos,
+  resolveTrackedChannel,
   sortFieldIsAbsent,
   sortYtVideos,
   type YtPlaylist,
-  type YtChannel,
   type YtPlaylistFolder,
   type YtPlaylistSort,
   type YtPlaylistsStore,
@@ -478,11 +478,20 @@ export default function YouTubePlaylistsView() {
     </button>
   );
 
-  const channelById = useMemo(() => {
-    const m = new Map<string, YtChannel>();
-    for (const c of channels) m.set(c.channelId, c);
-    return m;
-  }, [channels]);
+  /**
+   * D300 — the Channel tracking card was skipped for a playlist whose channel the
+   * app knows perfectly well.
+   *
+   * The card guarded on `channelId` alone, so the user's one subscribed channel had
+   * nowhere to appear: the playlist carrying its id is the extension-owned one that
+   * `isImmersionPlaylist` deliberately keeps out of the tree, and the playlist that
+   * IS in the tree knows the channel only by name. The resolution rule lives in
+   * `shared/ytPlaylists.ts` so any other host reaches the same answer.
+   */
+  const trackedChannel = useMemo(
+    () => resolveTrackedChannel(playlist, channels),
+    [playlist, channels],
+  );
 
   // Rubric category 8, honest states. This surface had SIX disabled controls that said
   // nothing about why — the harness's `mutePairs` term — and every one of them guards on more
@@ -974,13 +983,19 @@ export default function YouTubePlaylistsView() {
                     <details className="yt-prefs-disclosure">
                       <summary>{t('yt.prefs.summary')}</summary>
                       <div className="yt-prefs-body">
-                    {playlist.channelId ? (
+                    {playlist.channelId || playlist.channelTitle ? (
                       <div className="yt-pref yt-channel-card">
                         <span>{t('yt.channel.tracking')}</span>
                         <div className="yt-channel-card-body">
-                          <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
+                          <div>{trackedChannel?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
                           <div>{t(`yt.subStatus.${playlist.subscriptionStatus}`)}</div>
-                          <div>{t('yt.channel.videosTracked', { count: channelById.get(playlist.channelId)?.videoCount ?? 0 })}</div>
+                          {/* Only claim a tracked count when a channel record actually
+                              resolved. Without this the fallback would render a confident
+                              "0 videos tracked" for every channel the app has no record of
+                              — a zero the user cannot tell from a real one. */}
+                          {trackedChannel ? (
+                            <div>{t('yt.channel.videosTracked', { count: trackedChannel.videoCount ?? 0 })}</div>
+                          ) : null}
                         </div>
                       </div>
                     ) : null}
