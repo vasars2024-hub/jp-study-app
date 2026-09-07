@@ -4162,6 +4162,8 @@ export const ja: Catalog = {
   'translate.tab.history': '履歴',
   'translate.intro': 'Qwen3によるオフライン翻訳（日・中・英・露）。',
   'translate.outputPlaceholder': '翻訳結果がここに表示されます。',
+  'translate.pane.sourceHeader': '{lang}の原文',
+  'translate.pane.outputHeader': '{lang}の訳文',
   'translate.working': '処理中…',
   'translate.askAgent': 'エージェントに聞く',
   'translate.askAgent.needsText': 'エージェントに聞くには、テキストを入力・貼り付け・選択してください。',

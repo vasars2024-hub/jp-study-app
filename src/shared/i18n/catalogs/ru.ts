@@ -4501,6 +4501,8 @@ export const ru: Catalog = {
   'translate.tab.history': 'История',
   'translate.intro': 'Офлайн-перевод Qwen3 (яп./кит./англ./рус.).',
   'translate.outputPlaceholder': 'Перевод появится здесь.',
+  'translate.pane.sourceHeader': 'Исходный текст ({lang})',
+  'translate.pane.outputHeader': 'Перевод ({lang})',
   'translate.working': 'Работаю…',
   'translate.askAgent': 'Спросить Агента',
   'translate.askAgent.needsText': 'Введите, вставьте или выделите текст, чтобы спросить Агента о нём.',

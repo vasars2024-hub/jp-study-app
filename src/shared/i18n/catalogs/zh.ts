@@ -4141,6 +4141,8 @@ export const zh: Catalog = {
   'translate.tab.history': '历史',
   'translate.intro': '本机 Qwen3 离线翻译（日/中/英/俄）。',
   'translate.outputPlaceholder': '译文显示在这里。',
+  'translate.pane.sourceHeader': '{lang}原文',
+  'translate.pane.outputHeader': '{lang}译文',
   'translate.working': '处理中…',
   'translate.askAgent': '询问智能体',
   'translate.askAgent.needsText': '请先输入、粘贴或选择文本，才能询问智能体。',

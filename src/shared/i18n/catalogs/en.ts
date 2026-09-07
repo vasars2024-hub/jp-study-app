@@ -4104,6 +4104,8 @@ export const en: Catalog = {
   'translate.tab.history': 'History',
   'translate.intro': 'Offline translation via Qwen3 on your machine — Japanese, Chinese, English, Russian.',
   'translate.outputPlaceholder': 'Translation appears here.',
+  'translate.pane.sourceHeader': '{lang} source',
+  'translate.pane.outputHeader': '{lang} output',
   'translate.working': 'Working…',
   'translate.askAgent': 'Ask the Agent',
   'translate.askAgent.needsText': 'Type, paste or select some text to ask the Agent about it.',

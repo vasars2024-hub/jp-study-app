@@ -275,7 +275,7 @@ export default function TranslateView() {
 
               <div className="aero-translate-workbench">
                 <section className="aero-translate-pane">
-                  <header>{LANG_LABELS[source]} source</header>
+                  <header>{t('translate.pane.sourceHeader', { lang: LANG_LABELS[source] })}</header>
                   <textarea
                     className="aero-translate-textarea"
                     lang={source}
@@ -293,7 +293,7 @@ export default function TranslateView() {
                 </section>
 
                 <section className="aero-translate-pane">
-                  <header>{LANG_LABELS[target]} output</header>
+                  <header>{t('translate.pane.outputHeader', { lang: LANG_LABELS[target] })}</header>
                   {/* `aria-live`: the result arrives asynchronously into a div
                       nothing announces, so with a screen reader the translation
                       simply appears and the user is never told. `polite` because
