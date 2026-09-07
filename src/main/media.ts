@@ -26,7 +26,12 @@ import {
 } from '../shared/ytAudioLang';
 import type { MediaBackupContract, MediaOrganizationPreview, MediaRelationship, MediaDuplicateChoice } from '../shared/mediaHub';
 import { previewMediaOrganization } from '../shared/mediaHub';
-import { inferMediaCategory, parseMediaFileName } from '../shared/mediaFileIdentity';
+import {
+  RELEASE_IDENTITY_VERSION,
+  inferMediaCategory,
+  parseMediaFileName,
+  refreshReleaseIdentity,
+} from '../shared/mediaFileIdentity';
 import {
   MEDIA_DOWNLOAD_DIRECTORY,
   MEDIA_LIBRARY_STORE_FILE,
@@ -164,6 +169,9 @@ function applyReleaseIdentity(item: MediaItem, fileName: string): boolean {
   set('resolution', parsed.resolution ?? undefined);
   // A year supplied by a metadata provider outranks one guessed from a file name.
   if (item.year === undefined) set('year', parsed.year ?? undefined);
+  // Record which parser wrote the identity, so a later one knows whether this
+  // item still needs the repass below.
+  set('releaseIdentityVersion', RELEASE_IDENTITY_VERSION);
 
   return changed;
 }
@@ -202,6 +210,7 @@ function addOrGetItem(
       item.title = cleanTitle(absPath);
     }
     if (item.seriesKey === undefined) applyReleaseIdentity(item, item.fileName);
+    else refreshReleaseIdentity(item);
   }
   if (touch) item.lastPlayedAt = Date.now();
   writeDb(db);
@@ -1070,7 +1079,14 @@ export function registerMediaIpc(): void {
       }
       // Backfill release identity for libraries imported before it existed, so
       // series grouping works without asking the user to re-import anything.
-      if (item.seriesKey === undefined && applyReleaseIdentity(item, item.fileName)) dirty = true;
+      if (item.seriesKey === undefined) {
+        if (applyReleaseIdentity(item, item.fileName)) dirty = true;
+      // And repair the ones an OLDER parser read wrong, which the line above
+      // cannot see: a wrong `seriesKey` is not an absent one, so every later
+      // parser rule stayed invisible to files the user already had.
+      } else if (refreshReleaseIdentity(item)) {
+        dirty = true;
+      }
     }
     if (dirty) writeDb(db);
     return db.items;

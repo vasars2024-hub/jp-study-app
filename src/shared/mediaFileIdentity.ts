@@ -107,6 +107,22 @@ export interface LocalMediaIdentityOptions {
 // File-name parsing
 // ---------------------------------------------------------------------------
 
+/**
+ * Bumped whenever a rule below changes what an existing name parses to.
+ *
+ * The library stores the parse, not the name's meaning, and the import path runs
+ * it exactly once. So every improvement here was invisible to the files a user
+ * already had: measured on a real library, `… Ougon no Kaze 39-END … .mp4` was
+ * still stored with no episode number and a series key of its own long after the
+ * `-END` rule shipped, because the backfill only ever fired on an *absent* key
+ * and a wrong key is not an absent one.
+ *
+ * `refreshReleaseIdentity` in `main/media.ts` compares this against the version
+ * stamped on each item and re-derives the four fields the parser owns. Raise it
+ * in the same commit as the rule change, or the fix reaches new imports only.
+ */
+export const RELEASE_IDENTITY_VERSION = 2;
+
 const EXTENSION = /\.([a-z0-9]{1,5})$/i;
 const LEADING_GROUP = /^[[(]([^\])]{1,40})[\])]\s*/;
 const TRAILING_CHECKSUM = /\s*[[(][0-9a-f]{8}[\])]\s*$/i;
@@ -444,6 +460,48 @@ export function inferMediaCategory(
     return ANIME_HINT.test(haystack) || fansub ? 'anime' : 'tv';
   }
   return mediaCategory(item);
+}
+
+/**
+ * The fields {@link parseMediaFileName} is the sole author of.
+ *
+ * Checked by grep before this list was written: nothing in main or the renderer
+ * assigns any of the four except the import parser, so re-deriving them cannot
+ * lose a provider's or the user's answer. The rest of the parse is deliberately
+ * absent — `mediaMetadata.buildPatch` writes `seriesTitle` and `year` from
+ * AniList/Jikan, so a repass would put the release name back over
+ * "JoJo's Bizarre Adventure: Golden Wind"; `category` respects a manual choice.
+ */
+export const PARSER_OWNED_IDENTITY = ['seriesKey', 'season', 'episode', 'episodeKind'] as const;
+
+/**
+ * Re-run the release parser over a library item written by an older one.
+ *
+ * Runs once per item per {@link RELEASE_IDENTITY_VERSION}. Never unsets: a name
+ * the current parser cannot read leaves whatever is stored alone, so the repass
+ * can only add or correct, and the stamp still advances so it is not retried on
+ * every listing.
+ *
+ * Returns true whenever the item was touched — which includes writing the stamp
+ * onto an item whose fields did not move. That has to persist too: without it
+ * the repass would run again forever and "once per version" would be false.
+ */
+export function refreshReleaseIdentity(item: MediaItem): boolean {
+  if (item.releaseIdentityVersion === RELEASE_IDENTITY_VERSION) return false;
+  const parsed = parseMediaFileName(item.fileName);
+  const next: Pick<MediaItem, (typeof PARSER_OWNED_IDENTITY)[number]> = {
+    seriesKey: parsed.titleKey || undefined,
+    season: parsed.season ?? undefined,
+    episode: parsed.episode ?? undefined,
+    episodeKind: parsed.kind,
+  };
+  for (const key of PARSER_OWNED_IDENTITY) {
+    const value = next[key];
+    if (value === undefined || item[key] === value) continue;
+    (item as Record<string, unknown>)[key] = value;
+  }
+  item.releaseIdentityVersion = RELEASE_IDENTITY_VERSION;
+  return true;
 }
 
 // ---------------------------------------------------------------------------

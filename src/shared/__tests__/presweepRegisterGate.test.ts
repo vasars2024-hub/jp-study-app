@@ -20,12 +20,34 @@ const REGISTER = resolve(__dirname, '../../../docs/ACTIVE/LIVE_DEFECTS_PRESWEEP.
 /**
  * Ranges are disjoint by construction, so two branches can never mint the same
  * number and a merge never needs to renumber. Add a worker here before it files.
+ *
+ * **Rounds, added 2026-09-07.** Round 1 gave each worker 20-21 ids and ran out:
+ * `primary2` filed D231-D234 and this gate had been RED ever since, because the
+ * table stopped after codex's 229 while the work did not. A ceiling written
+ * against one day's volume is the same defect this file's D236 records in the
+ * shadow gate — so rounds now extend rather than the whole scheme being
+ * rewritten, and the ids already minted keep the owner who actually minted them
+ * (231-237 are all `primary2`, verified with `git log -S` per row).
+ *
+ * When round 2 runs out, add round 3 the same way. Do NOT renumber anything.
  */
-export const MINTING_RANGES: Record<string, { from: number; to: number }> = {
-  primary: { from: 149, to: 169 },
-  primary2: { from: 170, to: 189 },
-  backup: { from: 190, to: 209 },
-  codex: { from: 210, to: 229 },
+export const MINTING_RANGES: Record<string, Array<{ from: number; to: number }>> = {
+  primary: [
+    { from: 149, to: 169 },
+    { from: 250, to: 269 },
+  ],
+  primary2: [
+    { from: 170, to: 189 },
+    { from: 230, to: 249 },
+  ],
+  backup: [
+    { from: 190, to: 209 },
+    { from: 270, to: 289 },
+  ],
+  codex: [
+    { from: 210, to: 229 },
+    { from: 290, to: 309 },
+  ],
 };
 
 /**
@@ -60,7 +82,7 @@ export function duplicateIds(ids: number[]): number[] {
 }
 
 export function outOfRangeIds(ids: number[]): number[] {
-  const ranges = Object.values(MINTING_RANGES);
+  const ranges = Object.values(MINTING_RANGES).flat();
   return ids
     .filter((id) => id > LEGACY_CEILING)
     .filter((id) => !ranges.some((r) => id >= r.from && id <= r.to))
@@ -82,16 +104,23 @@ describe('live defect register', () => {
   });
 
   it('keeps the worker ranges disjoint', () => {
-    const entries = Object.entries(MINTING_RANGES);
-    for (const [nameA, a] of entries) {
-      for (const [nameB, b] of entries) {
-        if (nameA >= nameB) continue;
+    // Flattened WITH the owner kept, so a round-2 block that collides names both
+    // sides. Every pair is compared, including two rounds of the same worker —
+    // an owner overlapping itself is still a range that can mint one id twice.
+    const blocks = Object.entries(MINTING_RANGES).flatMap(([name, rounds]) =>
+      rounds.map((r, i) => ({ label: `${name} round ${i + 1}`, ...r })),
+    );
+    for (let i = 0; i < blocks.length; i += 1) {
+      for (let j = i + 1; j < blocks.length; j += 1) {
+        const a = blocks[i];
+        const b = blocks[j];
         const overlaps = a.from <= b.to && b.from <= a.to;
-        expect(overlaps, `${nameA} overlaps ${nameB}`).toBe(false);
+        expect(overlaps, `${a.label} overlaps ${b.label}`).toBe(false);
       }
     }
-    for (const [name, r] of entries) {
-      expect(r.from, `${name} starts inside the legacy range`).toBeGreaterThan(LEGACY_CEILING);
+    for (const block of blocks) {
+      expect(block.from, `${block.label} starts inside the legacy range`).toBeGreaterThan(LEGACY_CEILING);
+      expect(block.to, `${block.label} ends before it starts`).toBeGreaterThanOrEqual(block.from);
     }
   });
 
@@ -103,10 +132,23 @@ describe('live defect register', () => {
   });
 
   it('catches an id minted outside every range', () => {
-    // D230 sits one step past codex's ceiling — the realistic mistake is landing just
-    // outside a range, not a wild number.
-    const md = ['| D230 | files | a | b | P2 | open |', '| D700 | note | c | d | P3 | open |'].join('\n');
-    expect(outOfRangeIds(parseRowIds(md))).toEqual([230, 700]);
+    // D310 sits one step past codex's round-2 ceiling — the realistic mistake is
+    // landing just outside a range, not a wild number. It was D230 until round 2
+    // was added, which brought 230 INTO primary2's range and would have left this
+    // control asserting a number that is now legal.
+    const md = ['| D310 | files | a | b | P2 | open |', '| D700 | note | c | d | P3 | open |'].join('\n');
+    expect(outOfRangeIds(parseRowIds(md))).toEqual([310, 700]);
+  });
+
+  it('accepts a round-2 id, so the fix is not just a widened net', () => {
+    // The positive half of the control above: 230 and 249 are primary2's round 2,
+    // 250 is primary's. A regression to a single round would fail this.
+    const md = [
+      '| D230 | files | a | b | P2 | open |',
+      '| D249 | note | c | d | P3 | open |',
+      '| D250 | agent | e | f | P3 | open |',
+    ].join('\n');
+    expect(outOfRangeIds(parseRowIds(md))).toEqual([]);
   });
 
   it('grandfathers the pre-range ids and does not match prose mentioning one', () => {
