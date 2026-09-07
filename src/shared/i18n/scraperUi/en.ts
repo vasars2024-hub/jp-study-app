@@ -539,6 +539,7 @@ export const SCRAPER_UI_EN: Catalog = {
   'verifiedSites.category.subtitles': 'Subtitles',
   'verifiedSites.source.built-in': 'built-in',
   'verifiedSites.source.user-imported': 'user-imported',
+  'verifiedSites.source.community': 'community',
   'verifiedSites.source.fmhy': 'FMHY',
   'verifiedSites.promotion.not-reviewed': 'not reviewed',
   'verifiedSites.promotion.eligible': 'eligible',

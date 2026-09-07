@@ -510,6 +510,7 @@ export const SCRAPER_UI_ZH: Catalog = {
   'verifiedSites.category.subtitles': '字幕',
   'verifiedSites.source.built-in': '内置',
   'verifiedSites.source.user-imported': '用户导入',
+  'verifiedSites.source.community': '社区',
   'verifiedSites.source.fmhy': 'FMHY',
   'verifiedSites.promotion.not-reviewed': '未审查',
   'verifiedSites.promotion.eligible': '符合条件',

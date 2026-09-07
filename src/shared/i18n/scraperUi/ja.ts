@@ -510,6 +510,7 @@ export const SCRAPER_UI_JA: Catalog = {
   'verifiedSites.category.subtitles': '字幕',
   'verifiedSites.source.built-in': '組み込み',
   'verifiedSites.source.user-imported': '利用者が取り込み',
+  'verifiedSites.source.community': 'コミュニティ',
   'verifiedSites.source.fmhy': 'FMHY',
   'verifiedSites.promotion.not-reviewed': '未審査',
   'verifiedSites.promotion.eligible': '対象',
