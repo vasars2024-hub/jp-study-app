@@ -32,8 +32,13 @@ const REPO = resolve(SRC, '..');
 const SCANNED = /\.(ts|tsx|css|html)$/;
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.vite']);
 
-/** U+00C2, U+00C3, U+00E2 — never written literally, so this file scans clean under its own rule. */
-const LEAD = new Set([0x00c2, 0x00c3, 0x00e2]);
+/**
+ * U+00C2, U+00C3, U+00E2 — built from escapes rather than written out, so this file scans
+ * clean under its own rule. One regex over the whole file is the fast path: a per-character
+ * walk of every line took 31s under a full parallel suite and timed out at 20s, while passing
+ * in 0.7s alone.
+ */
+const LEAD = new RegExp('[\\u00c2\\u00c3\\u00e2]');
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -47,18 +52,13 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 }
 
 function mojibakeLines(file: string): string[] {
-  const hits: string[] = [];
-  readFileSync(file, 'utf8')
+  const text = readFileSync(file, 'utf8');
+  if (!LEAD.test(text)) return [];
+  const where = relative(REPO, file).split(sep).join('/');
+  return text
     .split('\n')
-    .forEach((line, index) => {
-      for (const char of line) {
-        if (LEAD.has(char.codePointAt(0) ?? 0)) {
-          hits.push(`${relative(REPO, file).split(sep).join('/')}:${index + 1}  ${line.trim().slice(0, 120)}`);
-          return;
-        }
-      }
-    });
-  return hits;
+    .map((line, index) => (LEAD.test(line) ? `${where}:${index + 1}  ${line.trim().slice(0, 120)}` : ''))
+    .filter(Boolean);
 }
 
 describe('source carries no mis-decoded UTF-8', () => {
@@ -72,7 +72,9 @@ describe('source carries no mis-decoded UTF-8', () => {
     expect(files.some((f) => f.endsWith(`__tests__${sep}sourceMojibake.test.ts`))).toBe(true);
   });
 
+  // 3,500 file reads is I/O, not computation: 10s alone and 31s under a full parallel suite,
+  // which overran vitest's 20s default on the first full run. The budget is deliberate.
   it('finds no CP1252 lead artefact anywhere under src/', () => {
     expect(files.flatMap(mojibakeLines)).toEqual([]);
-  });
+  }, 120_000);
 });

@@ -105,10 +105,10 @@ describe('every glyph-only button in the app announces itself', () => {
       return n ? [n] : [];
     });
     expect(named.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(80);
-  });
+  }, 120_000);
 
   it('gives every one of them an aria-label, because its text cannot name it', () => {
     const unnamed = files.flatMap(unnamedGlyphButtons);
     expect(unnamed.map((b) => `${b.where}  ${b.glyph}  (${b.title})`)).toEqual([]);
-  });
+  }, 120_000);
 });
