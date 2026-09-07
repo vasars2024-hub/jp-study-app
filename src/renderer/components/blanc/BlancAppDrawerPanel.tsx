@@ -26,6 +26,8 @@ import type {
   CollectedToolKind,
 } from '../../../shared/collectedTools';
 import { readWorkspaces, WORKSPACE_LAUNCHER_KEY } from './BlancReadyToolPanels';
+import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
+import { useT } from '../../i18n';
 
 const MIGRATED_FLAG_KEY = `${WORKSPACE_LAUNCHER_KEY}.migrated`;
 
@@ -259,23 +261,15 @@ function useAppDrawer() {
     [reload],
   );
 
-  // D142 — a MODE GAP, the same shape as D137. This store is the Resources app's
-  // "My tools" store, and Study OS has guarded this exact call since D17: a confirm
-  // that names the tool and says the note written on it goes too, plus a toast when
-  // the removal FAILS. Blanc rendered its own drawer over the same store and had
-  // neither, so the identical ✕ was destructive-and-silent here and guarded there.
-  // The keys are reused rather than re-minted, so the two hosts cannot drift apart
-  // in wording either.
+  // D142/D143 — one defect, found on both branches at once, resolved to the better
+  // half of each. The SHAPE is the incoming one and it is right: the confirm lives in
+  // `collectedToolsActions`, so a third host cannot reintroduce the gap the way this
+  // one did. The failure TOAST is mine and the incoming version does not have it —
+  // D17 found both halves in Resources and a swallowed `tools:remove` rejection is
+  // still indistinguishable from a dead button.
   const removeItem = useCallback(
     async (id: string) => {
-      const tool = tools.find((candidate) => candidate.id === id);
-      const ok = await confirmDialog({
-        title: t('resources.myTools.removeConfirm.title'),
-        message: t('resources.myTools.removeConfirm.message', { name: tool?.name ?? tool?.url ?? '' }),
-        confirmLabel: t('resources.myTools.remove'),
-        danger: true,
-      });
-      if (!ok) return;
+      if (!await confirmRemoveCollectedTool(t, tools.find((candidate) => candidate.id === id))) return;
       try {
         await window.api.toolsRemove(id);
       } catch (error) {

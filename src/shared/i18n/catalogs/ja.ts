@@ -243,6 +243,9 @@ export const ja: Catalog = {
   'novels.notesPlaceholder': '読む計画、版の違い、取得元の覚え書きなど',
   'novels.msg.noJitenMatch': 'この検索に一致する Jiten の作品はありませんでした。',
   'novels.msg.removedFromPlan': '{title} を予定から削除しました。',
+  'novels.removePlan.confirm.title': 'この作品を予定から削除しますか？',
+  'novels.removePlan.confirm.message': '{title} を削除しますか？書いたメモ、選択した入手元、入手の進捗も一緒に削除され、元に戻せません。書籍自体はライブラリに残ります。',
+  'novels.removePlan.confirm.action': '予定から削除',
   'novels.msg.sourcesSaved': '取得元の設定を保存しました。',
   'novels.msg.imported': '{title} を取り込みました。',
   'novels.msg.chooseDirect': 'EPUB の直リンクを選ぶか、自分で EPUB の URL を貼り付けてください。',
@@ -4080,6 +4083,13 @@ export const ja: Catalog = {
   },
   'mediaLib.prune.none': '見つからないファイルはありません — ライブラリは最新です。',
   'mediaLib.prune.failed': '見つからないファイルを削除できませんでした: {error}',
+  'mediaLib.prune.confirm.title': '見つからない項目を削除しますか？',
+  'mediaLib.prune.confirm.message': {
+    one: 'ファイルが見つからない {count} 件の項目を削除しますか？メモ、再生位置、アートワーク、キャッシュされたコピーが削除され、元に戻せません。ドライブが接続されていない場合も「見つからない」と表示されます。心当たりがあれば先に接続してください。',
+    other: 'ファイルが見つからない {count} 件の項目を削除しますか？メモ、再生位置、アートワーク、キャッシュされたコピーが削除され、元に戻せません。ドライブが接続されていない場合も「見つからない」と表示されます。心当たりがあれば先に接続してください。',
+  },
+  'mediaLib.prune.confirm.messageUnknown': 'ファイルが見つからない項目をすべて削除しますか？メモ、再生位置、アートワーク、キャッシュされたコピーが削除され、元に戻せません。ドライブが接続されていない場合も「見つからない」と表示されます。心当たりがあれば先に接続してください。',
+  'mediaLib.prune.confirm.action': '項目を削除',
   'mediaLib.clear.title': 'メディアライブラリを消去',
   'mediaLib.clear.message':
     'メディアライブラリ全体を消去しますか？\n\nアプリに保存されたすべての動画と曲、キャッシュされた YouTube のダウンロード、変換済みのコピー、歌詞と「いいね」が削除されます。ディスク上の元のファイルは削除されません。',
@@ -5504,6 +5514,15 @@ export const ja: Catalog = {
   'media.relationships.note': 'メモ',
   'media.relationships.flashcard': 'フラッシュカード',
   'media.relationships.add': '関連を追加',
+  'mediaHub.diagnostics.duplicates': {
+    one: '重複したパス: {count}',
+    other: '重複したパス: {count}',
+  },
+  'mediaHub.diagnostics.missing': {
+    one: '見つからないファイル: {count}',
+    other: '見つからないファイル: {count}',
+  },
+  'mediaHub.diagnostics.pruneAction': '見つからない項目を削除',
   'mediaHub.series.title': 'ライブラリ内のシリーズ',
   'mediaHub.series.episodeCount': {
     other: '{count} 話',
@@ -5574,13 +5593,6 @@ export const ja: Catalog = {
   'mediaHub.shelf.unorganized': '未整理のファイル',
   'mediaHub.note.label': '{title} のメモ',
   'mediaHub.note.placeholder': 'メモを追加',
-  'mediaHub.diagnostics.duplicates': { other: '重複したパス：{count}' },
-  'mediaHub.diagnostics.missing': { other: '見つからないファイル：{count}' },
-  'mediaHub.diagnostics.prune': '見つからない項目を削除',
-  'mediaHub.prune.confirm.title': 'ファイルが見つからない項目を削除しますか？',
-  'mediaHub.prune.confirm.message': {
-    other: '現在ディスク上にファイルが見つからないライブラリ項目 {count} 件を削除しますか？ファイル自体には一切手を加えません。ただしドライブが取り外されているだけの場合、後で追加し直すと新しい項目になり、この項目の再生位置・メモ・学習プロファイルは元に戻りません。',
-  },
 
   // ---- メディアライブラリ: レール、ブラウザー、カード、詳細パネル ----
   'media.jobs.label': 'バックグラウンドのメディア処理',

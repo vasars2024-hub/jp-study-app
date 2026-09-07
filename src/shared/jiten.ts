@@ -13,6 +13,24 @@ export type JitenAcquisitionStatus =
   | 'mined'
   | 'error';
 
+/**
+ * Does this plan entry hold anything removing it would destroy for good?
+ *
+ * `removePlan` filters the row out and writes, with no undo. Re-adding a title
+ * you only planned costs one search, so a confirm there is friction; a note you
+ * typed, or an acquisition that has already linked, downloaded, imported,
+ * analyzed or mined, is not re-derivable that way. D144 gates the confirm on
+ * this so the cheap case stays one click.
+ *
+ * `error` counts: it is a state the user acted their way into and may be
+ * reading in order to retry.
+ */
+export function planEntryCarriesWork(entry: Pick<JitenPlanEntry, 'notes' | 'acquisitionStatus' | 'importedLibraryItemId'>): boolean {
+  if (entry.notes != null && entry.notes.trim() !== '') return true;
+  if (entry.importedLibraryItemId != null && entry.importedLibraryItemId !== '') return true;
+  return entry.acquisitionStatus != null && entry.acquisitionStatus !== 'planned';
+}
+
 export interface JitenConfig {
   apiBaseUrl: string;
   apiKey?: string;

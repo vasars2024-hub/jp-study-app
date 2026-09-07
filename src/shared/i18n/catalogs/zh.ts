@@ -241,6 +241,9 @@ export const zh: Catalog = {
   'novels.notesPlaceholder': '阅读计划、版本说明、来源提醒等',
   'novels.msg.noJitenMatch': '没有匹配此次搜索的 Jiten 作品。',
   'novels.msg.removedFromPlan': '已将 {title} 从计划中移除。',
+  'novels.removePlan.confirm.title': '将此作品从计划中移除？',
+  'novels.removePlan.confirm.message': '移除 {title}？你写的笔记、选择的来源以及获取进度也会一并删除且无法恢复。书籍本身会保留在你的媒体库中。',
+  'novels.removePlan.confirm.action': '从计划中移除',
   'novels.msg.sourcesSaved': '来源设置已保存。',
   'novels.msg.imported': '已导入 {title}。',
   'novels.msg.chooseDirect': '请选择 EPUB 直链，或粘贴你自己的 EPUB URL。',
@@ -4059,6 +4062,13 @@ export const zh: Catalog = {
   },
   'mediaLib.prune.none': '没有缺失的文件 — 媒体库已是最新。',
   'mediaLib.prune.failed': '无法移除缺失的文件：{error}',
+  'mediaLib.prune.confirm.title': '移除缺失的条目？',
+  'mediaLib.prune.confirm.message': {
+    one: '移除 {count} 个找不到文件的条目？它们的笔记、播放位置、封面和缓存副本将被删除且无法恢复。未连接的驱动器同样会显示为缺失——如有可能，请先重新连接。',
+    other: '移除 {count} 个找不到文件的条目？它们的笔记、播放位置、封面和缓存副本将被删除且无法恢复。未连接的驱动器同样会显示为缺失——如有可能，请先重新连接。',
+  },
+  'mediaLib.prune.confirm.messageUnknown': '移除所有找不到文件的条目？它们的笔记、播放位置、封面和缓存副本将被删除且无法恢复。未连接的驱动器同样会显示为缺失——如有可能，请先重新连接。',
+  'mediaLib.prune.confirm.action': '移除条目',
   'mediaLib.clear.title': '清空媒体库',
   'mediaLib.clear.message':
     '要清空整个媒体库吗？\n\n这将删除应用中保存的所有视频和歌曲、缓存的 YouTube 下载、转换后的副本以及歌词与喜欢记录。磁盘上的原始文件不会被删除。',
@@ -5474,6 +5484,15 @@ export const zh: Catalog = {
   'media.relationships.note': '笔记',
   'media.relationships.flashcard': '闪卡',
   'media.relationships.add': '添加关联',
+  'mediaHub.diagnostics.duplicates': {
+    one: '重复路径：{count}',
+    other: '重复路径：{count}',
+  },
+  'mediaHub.diagnostics.missing': {
+    one: '缺失的文件：{count}',
+    other: '缺失的文件：{count}',
+  },
+  'mediaHub.diagnostics.pruneAction': '移除缺失的条目',
   'mediaHub.series.title': '媒体库中的剧集',
   'mediaHub.series.episodeCount': {
     other: '{count} 集',
@@ -5544,13 +5563,6 @@ export const zh: Catalog = {
   'mediaHub.shelf.unorganized': '未整理的文件',
   'mediaHub.note.label': '{title} 的备注',
   'mediaHub.note.placeholder': '添加备注',
-  'mediaHub.diagnostics.duplicates': { other: '重复路径：{count}' },
-  'mediaHub.diagnostics.missing': { other: '缺失的文件：{count}' },
-  'mediaHub.diagnostics.prune': '移除缺失的条目',
-  'mediaHub.prune.confirm.title': '移除文件已缺失的条目？',
-  'mediaHub.prune.confirm.message': {
-    other: '要移除 {count} 个文件当前不在磁盘上的资料库条目吗？你的文件不会被改动。但如果它们只是因为驱动器未连接才找不到，之后重新添加会生成新的条目，这些条目的播放进度、备注和学习档案都无法恢复。',
-  },
 
   // ---- 媒体库：侧栏、浏览区、卡片、详情面板 ----
   'media.jobs.label': '后台媒体任务',

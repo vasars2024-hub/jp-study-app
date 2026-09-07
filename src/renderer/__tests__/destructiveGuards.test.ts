@@ -40,47 +40,82 @@ const CASES = [
   // D17, open since the resources walk. The tool and any note written on it went
   // on one click, and the `catch { /* ignore */ }` meant a FAILED removal looked
   // identical to a dead button.
-  { file: 'src/renderer/components/resources/ResourcesContent.tsx', api: 'toolsRemove' },
-  // D142 — the SAME store and the SAME action as the line above, on Blanc's own
-  // host. `BlancAppDrawerPanel` reuses `shared/collectedTools.ts` rather than
-  // adding a third store, so D17's fix in Resources left Blanc's ✕ destructive
-  // and silent. Both hosts are pinned so neither can regress alone.
-  { file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx', api: 'toolsRemove' },
+  //
+  // D143 then moved the confirm OUT of this file. `tools:remove` has two call
+  // sites and D17 guarded only the one it was walking, so Blanc's app drawer
+  // still removed a collected tool bare — a fix creating the very mode gap D137
+  // had just named. Both hosts now delegate to one helper, which is why these
+  // two cases name a different guard token: `confirmDialog(` is no longer in
+  // either file, and requiring it would have forced the guard back into the
+  // hosts where it can drift again.
+  {
+    file: 'src/renderer/components/resources/ResourcesContent.tsx',
+    api: 'toolsRemove',
+    guard: 'confirmRemoveCollectedTool(',
+    dangerIn: 'src/renderer/collectedToolsActions.ts',
+  },
+  {
+    file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx',
+    api: 'toolsRemove',
+    guard: 'confirmRemoveCollectedTool(',
+    dangerIn: 'src/renderer/collectedToolsActions.ts',
+  },
+  // D142's other half, which the collected-tools helper does not cover: deleting a
+  // FOLDER in the same drawer. `collectedTools.removeFolder` re-parents every
+  // shortcut to the drawer root, so only the folder is lost — and that is exactly
+  // what the confirm has to say (D138), which is why this one is inline with its
+  // own count rather than delegated.
   { file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx', api: 'toolsRemoveFolder' },
-  // D143. "Remove missing entries" is a bulk delete wearing a tidy-up label:
-  // "missing" is `!existsSync(path)`, so one unplugged drive makes every title on
-  // it missing at once, and a media id is a random UUID — so re-importing after
-  // the drive comes back cannot restore the entry's watch position, note or study
-  // profile.
-  { file: 'src/renderer/components/media/MediaContent.tsx', api: 'pruneMedia' },
-  // D145. Removing a tracked immersion site takes its visit count, its streak,
-  // its reading time and its progress with it (`shared/immersion.ts:18`), and the
-  // ✕ sits beside the button that OPENS the site. BOTH hosts called it bare, so
-  // the guard went into one shared helper rather than into whichever host was
-  // found first — see SOLE_CALLERS below, which is what keeps it that way.
+  // D145. Removing a tracked immersion site takes its visit count, its streak, its
+  // reading time and its progress with it (`shared/immersion.ts:18`), and the ✕ sits
+  // beside the button that OPENS the site. BOTH hosts called it bare, so the guard
+  // went into one shared helper — see SOLE_CALLERS, which is what keeps it there.
   { file: 'src/renderer/components/immersion/immersionSiteActions.ts', api: 'immersionRemoveSite' },
 ] as const;
 
 /**
  * A guard on a shared helper is only a guard while the helper is the ONLY route to
- * the API. D137 and D142 were both hosts reaching past a guarded path; this pins
- * the repair so a third host cannot reintroduce the same defect by calling
- * `window.api` directly. Renderer sources only — preload and `window.d.ts` declare
- * the channel and are not callers.
+ * the API. D137, D142/D143 and D145 are one defect class — a second host reaching
+ * past a guarded path — and until now nothing stopped a third. Each entry names
+ * every file allowed to call the channel; anything else is the gap reopening.
+ * Renderer sources only: preload and `window.d.ts` declare the channel and are not
+ * callers.
  */
 const SOLE_CALLERS = [
-  { api: 'immersionRemoveSite', through: 'src/renderer/components/immersion/immersionSiteActions.ts' },
+  {
+    api: 'immersionRemoveSite',
+    through: ['src/renderer/components/immersion/immersionSiteActions.ts'],
+  },
+  {
+    api: 'toolsRemove',
+    through: [
+      'src/renderer/components/blanc/BlancAppDrawerPanel.tsx',
+      'src/renderer/components/resources/ResourcesContent.tsx',
+    ],
+  },
+  // Two hosts, one shared confirm, and BOTH are already pinned as CASES above —
+  // so this entry is the one that notices a THIRD host appearing.
+  {
+    api: 'pruneMedia',
+    through: [
+      'src/renderer/components/MediaLibraryActions.tsx',
+      'src/renderer/components/media/pruneMissingMedia.ts',
+    ],
+  },
 ] as const;
 
 /**
  * Blank every comment, keeping the file's length so every offset still lines up.
  *
  * Without this the scan reads its own subject matter: `immersionSiteActions.ts`
- * documents the defect it repairs and writes `window.api.immersionRemoveSite(id)`
- * in the header comment, which is the FIRST match in the file, sits at module
- * level, and has no enclosing block at all — the test threw rather than failing,
- * which is a worse outcome than either. A comment that merely NAMES a destructive
- * call must never be scored as one, in either direction.
+ * and `pruneMissingMedia.ts` both document the defect they repair and write the
+ * `window.api.*` call in a header comment. In `immersionSiteActions` that comment
+ * is the FIRST match in the file, sits at module level and has no enclosing block
+ * at all — the test threw rather than failing, which is a worse outcome than
+ * either. A comment that merely NAMES a destructive call must never be scored as
+ * one, in either direction: a comment mentioning `confirmDialog(` inside an
+ * enclosing block would make an unguarded call read as GUARDED, and nothing would
+ * surface that. The same repair is in `destructive-guard-scan.cjs`.
  */
 function withoutComments(text: string): string {
   const out = text.split('');
@@ -144,36 +179,53 @@ function enclosingBlock(text: string, index: number, level = 0): string {
  * into the whole component and pass on some other dialog elsewhere in the file: the three
  * bodies under test measure well under that, the components they live in are far over it.
  */
-function guardingBody(text: string, index: number): string {
+function guardingBody(text: string, index: number, guard: string): string {
+  let widest = '';
   for (let level = 0; level < 4; level++) {
-    const body = enclosingBlock(text, index, level);
-    if (body.includes('confirmDialog(') && body.length < 4000) return body;
+    // A body with fewer than four nesting levels runs out of enclosing braces
+    // before the loop ends. That used to throw `no enclosing block` out of the
+    // whole test, which reports a MISSING GUARD as a harness crash — it cost a
+    // real diagnosis when D143 moved a guard into a shared module. Stop
+    // climbing and let the assertion below say what is actually wrong.
+    let body: string;
+    try {
+      body = enclosingBlock(text, index, level);
+    } catch {
+      break;
+    }
+    widest = body;
+    if (body.includes(guard) && body.length < 4000) return body;
   }
-  return enclosingBlock(text, index, 0);
+  return widest || enclosingBlock(text, index, 0);
 }
 
 describe('destructive actions confirm before they destroy', () => {
-  // The file is in the title because `toolsRemove` now has two hosts, and a bare
-  // `$api` title would leave a failure naming neither of them.
-  it.each(CASES.map((c) => ({ ...c, where: c.file.split('/').pop() })))(
-    '$api asks first in $where',
-    ({ file, api }) => {
+  it.each(CASES)('$api asks first in $file', (testCase) => {
+    const { file, api } = testCase;
+    const token: string = 'guard' in testCase ? testCase.guard : 'confirmDialog(';
     const text = withoutComments(readFileSync(resolve(ROOT, file), 'utf8'));
     const at = text.indexOf(`window.api.${api}(`);
     expect(at, `${api} call site not found in ${file}`).toBeGreaterThan(-1);
-    const body = guardingBody(text, at);
-    const guard = body.indexOf('confirmDialog(');
-    expect(guard, `${api} runs with no confirmDialog in its own function`).toBeGreaterThan(-1);
+    const body = guardingBody(text, at, token);
+    const guard = body.indexOf(token);
+    expect(guard, `${api} runs with no ${token} in its own function in ${file}`).toBeGreaterThan(-1);
     // Before the call, and the result is honoured: an unread promise is not a guard.
     expect(guard).toBeLessThan(body.indexOf(`window.api.${api}(`));
-    // `return;` or `return false;` — a guard that reports its own refusal to the
-    // caller (so the surface can stay open on Cancel) is still a guard.
-    expect(body).toMatch(/if\s*\(!ok\)\s*return(\s+[^;]+)?;/);
-      expect(body).toMatch(/danger:\s*true/);
-    },
-  );
+    // Either shape of "and it bailed out": the inline `ok` local, or a negated
+    // call to a delegating helper. Both must actually `return` — with or without
+    // a value. A guard that reports its own refusal to the caller (`return false`)
+    // is still a guard, and it is what lets a surface stay open on Cancel instead
+    // of closing as if the action had run.
+    expect(body, `${api} does not act on the answer in ${file}`)
+      .toMatch(/if\s*\(!\s*ok\)\s*return(\s+[^;\n]+)?;|if\s*\(!\s*await\s[^\n]*\)\s*return(\s+[^;\n]+)?;/);
+    // `danger: true` lives wherever the dialog is actually constructed — in the
+    // host for an inline confirm, in the shared helper for a delegated one.
+    const dangerFile = 'dangerIn' in testCase ? testCase.dangerIn : file;
+    expect(readFileSync(resolve(ROOT, dangerFile), 'utf8'), `${api}'s dialog is not danger`)
+      .toMatch(/danger:\s*true/);
+  });
 
-  it.each(SOLE_CALLERS)('$api is reached only through its guarded helper', ({ api, through }) => {
+  it.each(SOLE_CALLERS)('$api is reached only through its guarded route', ({ api, through }) => {
     const renderer = resolve(ROOT, 'src', 'renderer');
     const callers: string[] = [];
     const walk = (dir: string): void => {
@@ -189,18 +241,12 @@ describe('destructive actions confirm before they destroy', () => {
       }
     };
     walk(renderer);
-    expect(callers, `${api} must be called only from ${through}`).toEqual([through]);
+    expect(callers.sort(), `${api} must be called only from ${through.join(', ')}`)
+      .toEqual([...through].sort());
   });
 
-  it('reads a real body, not an empty string', () => {
-    const text = withoutComments(readFileSync(resolve(ROOT, CASES[0].file), 'utf8'));
-    const body = guardingBody(text, text.indexOf('window.api.lensHistoryClear('));
-    expect(body.length).toBeGreaterThan(120);
-    expect(body).toContain('lensHistoryClear');
-  });
-
-  // The masker is load-bearing enough to be tested rather than assumed: it decides
-  // which occurrence every case above reads.
+  // The masker decides WHICH occurrence every case above reads, so it is tested
+  // rather than assumed.
   it('blanks comments, keeps offsets, and leaves strings alone', () => {
     const src = [
       "const a = 'window.api.pruneMedia(';",
@@ -211,9 +257,26 @@ describe('destructive actions confirm before they destroy', () => {
     const masked = withoutComments(src);
     expect(masked).toHaveLength(src.length);
     // Two survive: the string literal (deliberately — a literal is code) and the
-    // real call. The two comments are gone.
+    // real call. Both comments are gone.
     expect(masked.split('window.api.pruneMedia(')).toHaveLength(3);
     expect(masked.indexOf('window.api.pruneMedia();')).toBe(src.indexOf('window.api.pruneMedia();'));
     expect(withoutComments("const s = '// not a comment'; x();")).toContain('// not a comment');
+  });
+
+  it('reads a real body, not an empty string', () => {
+    const text = readFileSync(resolve(ROOT, CASES[0].file), 'utf8');
+    const body = guardingBody(text, text.indexOf('window.api.lensHistoryClear('), 'confirmDialog(');
+    expect(body.length).toBeGreaterThan(120);
+    expect(body).toContain('lensHistoryClear');
+  });
+
+  it('a missing guard fails as an assertion, not as a harness crash', () => {
+    // The regression this file itself caused: `enclosingBlock` threw out of the
+    // test when a body had fewer than four levels, so "the guard is gone" and
+    // "the walker fell off the top of the file" were the same message.
+    const unguarded = 'async function drop(id) {\n  await window.api.toolsRemove(id);\n}\n';
+    const body = guardingBody(unguarded, unguarded.indexOf('window.api.toolsRemove('), 'confirmDialog(');
+    expect(body).toContain('toolsRemove');
+    expect(body.indexOf('confirmDialog(')).toBe(-1);
   });
 });

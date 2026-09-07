@@ -65,6 +65,7 @@ import {
 import { lookupWordFromMouseUp, isLookupClick } from '../../wordLookup';
 import { useT } from '../../i18n';
 import { confirmDialog } from '../ui/dialogService';
+import { confirmAndPruneMissingMedia } from './pruneMissingMedia';
 import { mediaHubBackupFilename } from '../../mediaHubStoragePanel';
 import {
   endMediaStudySession,
@@ -2266,31 +2267,6 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
     ['Unorganized files', 'mediaHub.shelf.unorganized', shelves.unorganized],
   ] as const;
 
-  /**
-   * D143. "Remove missing entries" dropped every library row whose file was not
-   * on disk, on one click, with no question asked.
-   *
-   * Two things make that worse than the label suggests. "Missing" is
-   * `!fs.existsSync(item.path)` (`main/media.ts:475`), so ONE unplugged external
-   * drive or unmounted share makes every title on it missing at the same moment.
-   * And a media id is `crypto.randomUUID()`, not a hash of the path — so
-   * re-importing the file once the drive is back mints a NEW id, and the watch
-   * position, the note, the subtitle offset and the whole
-   * `studyDatabase.profiles[item.id]` entry are keyed to the old one and are gone.
-   * The files themselves are never touched, which is exactly the reassurance the
-   * confirm has to give at the same time as the warning (D138).
-   */
-  const pruneMissing = async (): Promise<void> => {
-    const ok = await confirmDialog({
-      title: t('mediaHub.prune.confirm.title'),
-      message: t('mediaHub.prune.confirm.message', { count: diagnostics.missing.length }),
-      confirmLabel: t('mediaHub.diagnostics.prune'),
-      danger: true,
-    });
-    if (!ok) return;
-    await window.api.pruneMedia();
-  };
-
   return (
     <section className="media-hub-dashboard" aria-label={t('mediaHub.dashboard.label')}>
       {rows.map(([id, titleKey, shelf]) => shelf.length > 0 && (
@@ -2361,8 +2337,11 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
           {diagnostics.duplicates.length > 0 && <span>{t('mediaHub.diagnostics.duplicates', { count: diagnostics.duplicates.length })}</span>}
           {diagnostics.missing.length > 0 && <span>{t('mediaHub.diagnostics.missing', { count: diagnostics.missing.length })}</span>}
           {diagnostics.missing.length > 0 && (
-            <button type="button" onClick={() => void pruneMissing()}>
-              {t('mediaHub.diagnostics.prune')}
+            <button
+              type="button"
+              onClick={() => { void confirmAndPruneMissingMedia(t, diagnostics.missing.length); }}
+            >
+              {t('mediaHub.diagnostics.pruneAction')}
             </button>
           )}
         </div>
