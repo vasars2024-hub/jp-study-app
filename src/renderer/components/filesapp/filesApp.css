@@ -1551,4 +1551,20 @@
     height: auto;
     min-height: 100%;
   }
+
+  /* D119, same window, same cause, different slot. `.lq-dock-status` is
+     deliberately shrinkable — `liquid-controls.css` documents making it so,
+     because a `flex: none` status pinned the dock wider than its container and
+     squeezed `.lq-dock-routes` to nothing. That fix is right and stays. Its
+     other endpoint is what this rule handles: at a 420px window the status is
+     given 22px for a 183px readout, and because `.fa-status` is a flex ROW of
+     two spans, `text-overflow: ellipsis` cannot apply to it — the user gets a
+     sliced fragment of one glyph with no sign that anything was cut.
+     Measured live: `clientWidth` 22, `scrollWidth` 183, `text-overflow: clip`.
+     Absent is the honest state here, and it costs nothing: both numbers are
+     already on the tree badges ("Everything 2,131"), and the 22px returns to
+     the routes, which go 342 -> 364. */
+  .fa-status {
+    display: none;
+  }
 }
