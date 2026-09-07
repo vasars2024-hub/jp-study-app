@@ -2000,3 +2000,11 @@ one layer down and a convenience wrapper threw it away (`jimakuSearch`, `openSub
 and once a comment asserted the collapse was harmless while the caller made it permanent
 (`searchProviders`). **The generalisable check, for any provider call anywhere in this repo:
 follow the empty result to whatever writes it down, and ask what re-asks.**
+
+**Checked and CLEAN, recorded so it is not re-derived: `main/mediaDiscovery.ts`.** Both
+`searchDiscovery` (`:80`) and `browseDiscovery` (`:114`) consume the same `T[] | null` clients
+and both keep the distinction — they report it as `provenance.failures` / `servedBy: null`
+rather than collapsing it. More importantly they **persist nothing**, so there is no stored
+record to suppress a later retry, which is the half that makes this class expensive. A defect
+here would have been cosmetic; there isn't one. `browseDiscovery` is over-inclusive rather than
+under (an empty-but-answered Jikan is pushed as a `failure`), which is the safe direction.
