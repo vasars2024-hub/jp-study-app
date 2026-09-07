@@ -67,6 +67,35 @@ three subtitle defects the user found by watching a video for ten seconds surviv
 | D27 | anki | In Deck Workbench ▸ Recent imports, every row's buttons announce the same three words. With a screen reader there is no way to tell which of the 24 drafts you are about to discard or reopen. | Anki ▸ Deck Workbench ▸ tab through the Recent imports list. Measured live on the user's own profile: **24 rows, 58 buttons, 5 distinct accessible names** — "Open again", "Discard", and three "Resume from note N". | P2 | fixed 40948ea6 — `DeckWorkbench.tsx:820–856`, `aria-label` composed from the already-translated verb plus `session.label`, so no catalog key was needed (all four are dirty with another track). The visible label stays the verb; a sighted user reads the file from the row it sits in. Same shape as `ace53602` on Translate. Re-measured live in the same window: **5 → 40 distinct names**. 40 and not 58 because the user's list genuinely repeats the same file (`Default-20260129112153.apkg` 8 times, see D26) and two rows for the same file SHOULD announce the same. |
 | D28 | anki | "Discard" on a Deck Workbench draft deletes it on one click — no confirm, no undo. If the delete fails, nothing says so: the row is still there, which reads as "the button did nothing". | Anki ▸ Deck Workbench ▸ Recent imports ▸ Discard. `DeckWorkbench.tsx:546` awaits `window.api.ankiDraftSessionDelete(id)` with no try/catch, from an `onClick={() => void discardSession(...)}`, so a rejected `ipcRenderer.invoke` is an unhandled rejection with no user-visible message and `refreshSessions()` never runs. Its `Promise<boolean>` return is also discarded, so "deleted nothing" reads identically to success. | P2 | open, NOT driven — the only way to test an unconfirmed delete is to perform it on one of the user's own drafts, and one of them is a 38,089-note Re:Zero read stopped at note 20. Two separable fixes, and the honest-states half is unarguable: surface the failure (same class as `7d962c2b`), and decide whether a draft delete deserves a confirm. Both need a new catalog string, and all four catalogs are dirty with the in-flight pass described in D21. |
 
+### 2026-09-06 23:30 - A GREEN COMMIT CAN RUN RED IN `jp-wt-filesapp`. It is CRLF and the tests are not.
+
+Not a product defect and **not something to "fix" in a test.** The full suite went
+**1 failed / 14,742 passed, `VITEST_EXIT=1`** on `liquidWindowIdentity.test.ts`:
+`expected '\n' to contain 'data-section={win.section}'`. That `'\n'` is the tell — the
+test does `src.slice(src.indexOf('<section\n      ref={winRef}'))` and `indexOf`
+returned **-1**, so `slice(-1)` handed it the file's last character.
+
+`indexOf` missed because **the working copy of `DesktopShell.tsx` was 4225 of 4225
+lines CRLF**, so the anchor is `<section\r\n      ref={winRef}` and the test's `\n`
+literal cannot match. The **committed blob is pure LF** (0 CRLF lines), and
+`core.autocrlf = input` converts on commit but not on checkout — so git stays quiet,
+`git diff` is empty, and CI on a fresh LF checkout is green. Only this worktree runs red.
+
+**Proof it was the instrument and not the code**, because "it's just line endings" is
+exactly the excuse a real failure hides behind: after rewriting the working copy to LF,
+`git hash-object` on it and `git rev-parse HEAD:<path>` returned the **same blob,
+`29c4eb25`** — byte-identical to the commit — and the suite went **5/5**. So the passing
+run and the committed content are the same bytes; nothing was changed to make it pass.
+
+**Every merge-touched file here is fully CRLF** (`App.tsx` 925/925, `en.ts` 12276/12276,
+`ApiKeysPage.tsx` 415/415, `ReadingLensSection.tsx` 528/528...). Only `DesktopShell.tsx`
+broke a test, because only it is scanned by a suite matching a multi-line `\n` literal.
+**So the next source-scanning test added anywhere in this repo will fail here and pass in
+the main tree.** Before believing such a failure: `grep -c $'\r$' <file>` against
+`wc -l`, then compare `git hash-object <file>` with `git rev-parse HEAD:<file>`. If the
+hashes match, the commit is fine and the working copy is what needs normalizing —
+never the test, and never the source.
+
 ### Environment note, not a product defect - READ BEFORE THE NEXT LIVE CHECK
 Installing `7z-wasm` on 2026-09-06 (commit `9611596b`) **deleted
 `node_modules/.vite/deps`**, verified absent from PowerShell as well as Bash. The
