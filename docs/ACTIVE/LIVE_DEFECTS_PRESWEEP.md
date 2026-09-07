@@ -620,7 +620,7 @@ the code under test. Re-run at `24182319` in the detached worktree: **1,172 file
 gate that walks the whole tree is fast alone and slow inside `npx vitest run`, and the default
 timeout is the thing that bites.
 
-## 2026-09-07 01:05 EDT — primary2 claims the MACHINE-VOCABULARY class (D126–D130)
+## 2026-09-07 01:05 EDT — primary2 claims the MACHINE-VOCABULARY class (D133–D136)
 
 **Claimed before touching anything, per the collision rule.** `primary` named D125 (54 icon-only
 buttons with an empty accessible name) as its opening slice; I am deliberately NOT taking it.
@@ -655,17 +655,17 @@ would contradict CLAUDE.md i18n rule 4. Struck from the leads list.
 **Bookkeeping defect noticed in passing, not mine to renumber:** `D123` and `D124` are each used
 by two different findings — `primary`'s mojibake/glyph-button rows and `codexA`'s Aero-statistics
 and statistics-not-updating rows. Four rows, two ids. Whoever reconciles the register should
-renumber the later pair; I am starting at **D126** so I do not deepen it.
+renumber the later pair; I am starting at **D133** so I do not deepen it.
 
-## 2026-09-07 01:30 EDT — primary2, D126 and D127 closed; D128 and D129 filed
+## 2026-09-07 01:30 EDT — primary2, D133 and D134 closed; D135 and D129 filed
 
-| D126 | novels, reading, stats, blanc | **The difficulty, plan-status and level vocabulary the app COMPUTES was hardcoded English**, so a Russian or Japanese UI still read `Very Hard`, `analyzed`, `Beginner` and `Advanced`. 12 strings across 6 render sites. | `src/shared/jiten.ts:372` `difficultyLabel()` rendered raw at `NovelsContent.tsx` ×3 (the `.nov-diff` badge, the detail list, every `<option>` of the difficulty filter); `acquisitionStatus` printed as its raw lowercase enum in the row and the detail; `levelScale.ts` `JA_TIERS` tier 1 `Beginner` / tier 7 `Advanced` (and `ZH_TIERS` tier 7) reached by Reading Finder's level buttons **and their `title`s**, the level-range badge in three views, `LevelMeter`'s tier name and the Statistics level badge. | P2 | **fixed `3eeb532b`**, 26 keys × 4 languages. **The stored values do not move** — `difficultyLabel()` still writes the stable English enum into a plan entry and the filter still compares against it, so nothing persisted is rewritten and no comparison breaks (i18n rule 7). **The half that needed care is what must NOT be translated:** `N5`..`N1`, `HSK 1`..`HSK 6` and `JLPT` are proper nouns, so `tierNameKey`/`badgeKeyForTier`/`levelLabelKey` return `null` for exactly those — a blanket "translate the tier" would have mangled every JLPT badge in the app. `tierLabel()` went into `shared/levelScale.ts`, not the view, because `LevelMeter` needs it too; it takes `t` as an argument so the module stays pure math main can import. Gates: i18n-check exit 0 (12,749 keys), i18n-locale-arg exit 0, levelScale + levelEstimate 22/22. |
+| D133 | novels, reading, stats, blanc | **The difficulty, plan-status and level vocabulary the app COMPUTES was hardcoded English**, so a Russian or Japanese UI still read `Very Hard`, `analyzed`, `Beginner` and `Advanced`. 12 strings across 6 render sites. | `src/shared/jiten.ts:372` `difficultyLabel()` rendered raw at `NovelsContent.tsx` ×3 (the `.nov-diff` badge, the detail list, every `<option>` of the difficulty filter); `acquisitionStatus` printed as its raw lowercase enum in the row and the detail; `levelScale.ts` `JA_TIERS` tier 1 `Beginner` / tier 7 `Advanced` (and `ZH_TIERS` tier 7) reached by Reading Finder's level buttons **and their `title`s**, the level-range badge in three views, `LevelMeter`'s tier name and the Statistics level badge. | P2 | **fixed `3eeb532b`**, 26 keys × 4 languages. **The stored values do not move** — `difficultyLabel()` still writes the stable English enum into a plan entry and the filter still compares against it, so nothing persisted is rewritten and no comparison breaks (i18n rule 7). **The half that needed care is what must NOT be translated:** `N5`..`N1`, `HSK 1`..`HSK 6` and `JLPT` are proper nouns, so `tierNameKey`/`badgeKeyForTier`/`levelLabelKey` return `null` for exactly those — a blanket "translate the tier" would have mangled every JLPT badge in the app. `tierLabel()` went into `shared/levelScale.ts`, not the view, because `LevelMeter` needs it too; it takes `t` as an argument so the module stays pure math main can import. Gates: i18n-check exit 0 (12,749 keys), i18n-locale-arg exit 0, levelScale + levelEstimate 22/22. |
 
-| D127 | settings ▸ Verified Sites | **The entire panel rendered 105 English strings in every language** — card title and description, search and filter, every status and category option, all 16 editor field labels, the promotion review block, both checkbox groups, the duplicate reconciler, JSON import/export, the FMHY refresh section, and 14 status messages built inside event handlers. | Settings ▸ Verified Sites with the UI in Русский or 日本語. Counted with a text-node + UI-attribute scan of the component: **89 in markup, plus 16 handler-built messages**. | P2 | **fixed `97ec304c`** — 106 `t()` calls, 115 keys × 4 catalogs. Three literals remain and are correct: `https://example.org`, `ja, en` and `JP` are format examples, not prose. The status `<select>` is now generated from `STATUS_KEY`, which also deleted the second hand-maintained copy of the same six options in the editor. Counts carry CLDR plurals (ru: one/few/many/other). |
+| D134 | settings ▸ Verified Sites | **The entire panel rendered 105 English strings in every language** — card title and description, search and filter, every status and category option, all 16 editor field labels, the promotion review block, both checkbox groups, the duplicate reconciler, JSON import/export, the FMHY refresh section, and 14 status messages built inside event handlers. | Settings ▸ Verified Sites with the UI in Русский or 日本語. Counted with a text-node + UI-attribute scan of the component: **89 in markup, plus 16 handler-built messages**. | P2 | **fixed `97ec304c`** — 106 `t()` calls, 115 keys × 4 catalogs. Three literals remain and are correct: `https://example.org`, `ja, en` and `JP` are format examples, not prose. The status `<select>` is now generated from `STATUS_KEY`, which also deleted the second hand-maintained copy of the same six options in the editor. Counts carry CLDR plurals (ru: one/few/many/other). |
 
-| D128 | app-wide (the i18n gate itself) | **`tools/i18n-hardcoded-check.cjs` cannot fail on a partially-translated file, so it reported CLEAN over D127's 105 English strings for as long as they existed.** Its rule is "a component renders UI text WITHOUT adopting i18n" — one `t()` call anywhere in a file exempts the whole file. | Measured directly, not reasoned: after converting `VerifiedSitesManager.tsx` I removed its **105**-string baseline entry, then planted English literals back into a file with zero allowance. **1 literal → exit 0. 7 literals → exit 0.** The check never fires. (`MIN_STRINGS = 6` is a second, smaller floor beneath that, and was not the binding one here.) | P2 | **open.** Same shape as D120: a gate whose classifier reads clean while the user sees the breakage. The instrument that DOES see this class already exists — `src/.coordination/presweep/partial-i18n-scan.cjs` (D100) — but it is a **lead list, not a gate**: exit 0 by design, because a hit can legitimately be a proper noun or a unit. **The next worker's slice: give the partial scan a baseline and an exit code, the way `i18n-locale-arg-check.cjs` is built.** Do not simply flip it to exit 1 — it reports 340 leads in 44 files, of which a real share are legitimately literal, and a hard zero that produces false positives gets baselined away and then protects nothing (D120's own lesson). Baseline the current 44 files at their current counts and refuse growth. |
+| D135 | app-wide (the i18n gate itself) | **`tools/i18n-hardcoded-check.cjs` cannot fail on a partially-translated file, so it reported CLEAN over D134's 105 English strings for as long as they existed.** Its rule is "a component renders UI text WITHOUT adopting i18n" — one `t()` call anywhere in a file exempts the whole file. | Measured directly, not reasoned: after converting `VerifiedSitesManager.tsx` I removed its **105**-string baseline entry, then planted English literals back into a file with zero allowance. **1 literal → exit 0. 7 literals → exit 0.** The check never fires. (`MIN_STRINGS = 6` is a second, smaller floor beneath that, and was not the binding one here.) | P2 | **open.** Same shape as D120: a gate whose classifier reads clean while the user sees the breakage. The instrument that DOES see this class already exists — `src/.coordination/presweep/partial-i18n-scan.cjs` (D100) — but it is a **lead list, not a gate**: exit 0 by design, because a hit can legitimately be a proper noun or a unit. **The next worker's slice: give the partial scan a baseline and an exit code, the way `i18n-locale-arg-check.cjs` is built.** Do not simply flip it to exit 1 — it reports 340 leads in 44 files, of which a real share are legitimately literal, and a hard zero that produces false positives gets baselined away and then protects nothing (D120's own lesson). Baseline the current 44 files at their current counts and refuse growth. |
 
-| D130 | blanc (whole mode) | **Three Blanc files totalling ~2,900 lines call `useT()` zero times**, so those panels render English regardless of UI language — while 6 of the other 10 Blanc files DO translate. Blanc is currently half-translated, which is worse to read than uniformly English. | `BlancStudyPanels.tsx` 988 lines / **0** `useT()` / 66 distinct English literals (`Continue reading`, `Filters`, `Reset filters`, `Sites`, `Catalogue`, `Now playing`, `Direction`, `History`, `Clear`, …); `BlancStudyNativePanels.tsx` 1,262 lines / 0; `BlancAppDrawerPanel.tsx` 657 lines / 0; `BlancToolErrorBoundary.tsx` 99 lines / 0 — an error state, in English only. Against: `BlancShell.tsx` 4, `BlancReadyToolPanels.tsx` 4, and six more at 1 each. | P3 | **open, and it is a DECISION before it is a fix.** This is not neglect: `EXEMPT_DIRS = ['__devharness__', 'blanc']` in `tools/i18n-hardcoded-check.cjs` records it as deliberate, citing TASKS.md — *"Panel strings are plain English like every other Blanc panel (Blanc is deliberately outside the app-chrome i18n sweep)"*. **That decision has already been half-reversed in practice by the 6 files that adopted `useT`, which is how the mode ended up mixed.** Resolve it one way: either finish Blanc's conversion and drop the exemption, or revert the 6 and keep it uniform. Deliberately NOT nibbled at here — a seventh partially-converted file makes the inconsistency worse, not better. `3eeb532b` adds exactly one `useT` to `BlancReadingFinderPanel`, for the **shared** tier vocabulary only (that string is Study OS's, not Blanc prose); its own literals were left alone on purpose. |
+| D136 | blanc (whole mode) | **Three Blanc files totalling ~2,900 lines call `useT()` zero times**, so those panels render English regardless of UI language — while 6 of the other 10 Blanc files DO translate. Blanc is currently half-translated, which is worse to read than uniformly English. | `BlancStudyPanels.tsx` 988 lines / **0** `useT()` / 66 distinct English literals (`Continue reading`, `Filters`, `Reset filters`, `Sites`, `Catalogue`, `Now playing`, `Direction`, `History`, `Clear`, …); `BlancStudyNativePanels.tsx` 1,262 lines / 0; `BlancAppDrawerPanel.tsx` 657 lines / 0; `BlancToolErrorBoundary.tsx` 99 lines / 0 — an error state, in English only. Against: `BlancShell.tsx` 4, `BlancReadyToolPanels.tsx` 4, and six more at 1 each. | P3 | **open, and it is a DECISION before it is a fix.** This is not neglect: `EXEMPT_DIRS = ['__devharness__', 'blanc']` in `tools/i18n-hardcoded-check.cjs` records it as deliberate, citing TASKS.md — *"Panel strings are plain English like every other Blanc panel (Blanc is deliberately outside the app-chrome i18n sweep)"*. **That decision has already been half-reversed in practice by the 6 files that adopted `useT`, which is how the mode ended up mixed.** Resolve it one way: either finish Blanc's conversion and drop the exemption, or revert the 6 and keep it uniform. Deliberately NOT nibbled at here — a seventh partially-converted file makes the inconsistency worse, not better. `3eeb532b` adds exactly one `useT` to `BlancReadingFinderPanel`, for the **shared** tier vocabulary only (that string is Study OS's, not Blanc prose); its own literals were left alone on purpose. |
 
 **A lead from the cross-cutting UI-language row, struck as NOT a defect.** That row lists
 "`translate`'s direction toggle rendering `English`". `TranslateContent.tsx:35`'s own
@@ -679,9 +679,9 @@ of "English" and would contradict CLAUDE.md i18n rule 4. Do not "fix" it.
 `Grammar`, `Translate`, which ARE translated in the taskbar and not here). Both were read this
 turn and are real; neither was reached before the turn ended.
 
-### 2026-09-07 01:50 EDT — primary2, D128 CLOSED. The gate exists now, and one commit that lied.
+### 2026-09-07 01:50 EDT — primary2, D135 CLOSED. The gate exists now, and one commit that lied.
 
-**D128 fixed at `367cf19a` + `a2e4423a`.** `partial-i18n-scan.cjs` moved to
+**D135 fixed at `367cf19a` + `a2e4423a`.** `partial-i18n-scan.cjs` moved to
 `tools/i18n-partial-check.cjs` (git-detected rename, 100% similarity) and given
 `tools/i18n-partial-baseline.json`, an exit code and a per-file ratchet, modelled on
 `i18n-locale-arg-check.cjs`. `--report` keeps the old ranked summary, `--file` the per-file
@@ -721,16 +721,29 @@ clean at 10,823 each; i18n-missing-key **exit 0**; i18n-locale-arg **exit 0**;
 i18n-hardcoded **exit 0** (29 files / 663 strings, down from 30 / 768);
 i18n-partial **exit 0**; architecture-audit **"Nothing new"**.
 
-**Renumbered D129 → D130, 2026-09-07 01:58, before it could collide.** `backup` filed its own
-**D129** (dynamic i18n keys vs their union, fixed `6bd06b89`) in the SAME window, on
-`feat/nyaa-subtitles`. Theirs is upstream of this worktree and will arrive at the next sync-down,
-so mine moved rather than theirs. Caught by re-deriving the row count against
-`progress-state.json` during end-of-turn bookkeeping, not by reading the table — **the table
-alone could not show it, because their commit is not on this branch yet.** That is the general
-hazard behind the existing `D123`/`D124` double-use: concurrent workers on two branches mint the
-next id from a register that has not yet seen the other's. Cheap prophylactic for whoever
-reconciles this: mint from `max(id) + 1` across **both** branches
-(`git log feat/nyaa-subtitles..wt/files-app` and the reverse), not from the local file.
+**Renumbered D126/D127/D128/D130 → D133/D134/D135/D136 at the 02:30 sync-down, and this whole
+block is the renumbered one.** The prophylactic I wrote at 01:58 — mint from `max(id) + 1` across
+BOTH branches — was written one turn too late to save my own ids. While this block was being
+written on `wt/files-app`, `backup` and `codexB` minted **D126, D127, D128** on
+`feat/nyaa-subtitles` for entirely different defects (Statistics not updating, Aero watch history,
+the shared dialog defaults) and `D130` for the visual-novel removal. Merging the two branches
+produced **four** duplicate ids at once, which is the worst case the 01:58 note predicted.
+
+**Mine moved, not theirs, and the rule that decided it is worth keeping: the more widely CITED id
+stays.** The upstream four are referenced from eight other passages — codexA's verification note,
+`primary`'s class-5 row, two commit messages — while all four of mine were cited only from inside
+this block, which I own end to end. Renumbering the block was one scoped edit; renumbering theirs
+would have been eight cross-references and a stale `git log`.
+
+**The check that finds this, and it is the only one that does:** after every sync-down, run
+
+```
+grep -oE '^\| D[0-9]+ \|' docs/ACTIVE/LIVE_DEFECTS_PRESWEEP.md | sort | uniq -d
+```
+
+It must print nothing. Reading the table cannot find it and neither can a row count — before the
+merge each branch's file was internally consistent and both were correct about themselves.
+**A duplicate id is a property of the MERGE, so it can only be checked after one.**
 
 ## 2026-09-07 01:35 EDT — backup, class 3b: dynamic i18n keys whose table fell behind its type
 
@@ -870,3 +883,47 @@ It looks like an unguarded delete an LLM can call, and it is not — `localAgent
 at the **`full-automation`** permission level with a `delete-data` scope, and
 `agentOperationLog.ts:75` records it as the inverse of `media.add-item`. Permission-scoped and
 logged, not bare.
+
+## 2026-09-07 02:45 EDT — primary2, class 4 second mechanical shape: SILENT TRUNCATION
+
+`discarded-result-scan.cjs` covered one half of class 4 and found 0 new defects; the hand half was
+recorded as owed with "no script can do it". **One more shape of it turns out to be mechanical**,
+and it is the shape that produced the class's original P1 (D32, "Plan says 6 and lists 4"):
+
+| D137 | blanc, games, immersion, player, calendar, anki, scraper | **A list is silently truncated under a count that claims the full number.** `X.slice(0, N).map(…)` renders N rows while the label beside it reads `X.length`, so the screen says 120 notifications / 31 badges / 486 vocabulary candidates and shows 50 / 8 / 40, with nothing saying the rest exist. The user reads the missing rows as data loss, not as a cap. | `src/.coordination/presweep/count-vs-list-scan.cjs --truncation`: **48 truncated renders, 18 with no disclosure anywhere in ±30 lines.** Confirmed by reading the count and the render together at each site. | P2 | **open — see the fix commit below.** |
+
+**Both shapes exist in this repo, written the same week, which is why this is a real class and not
+a style preference.** The honest form is already here and is the model for the fix:
+
+```
+VisualNovelScriptImportPanel.tsx:93   {lines.length > 200 && <p>Showing the first 200 of {lines.length} …</p>}
+SubtitleHarvestPanel.tsx:974          {t('subHarvest.more', { count: analysis.vocabulary.length - VISIBLE_VOCAB })}
+BlancStudyNativePanels.tsx:701        Showing the 12 folders with the most to learn, of {backlog.groups.length}.
+DeckWorkbenchMedia / Siblings          'ankiWorkbench.media.more': 'and {count} more'
+```
+
+**The scanner, and its two passes.** `count-vs-list-scan.cjs` (RULE 1: app-wide and parameterised,
+one harness with two passes, not a probe per site).
+
+- *Default pass* — the count and the list read arrays related by NARROWING. 456 files, 219
+  narrowing bindings, 324 screen counts, 345 rendered lists, **87 leads**. Every one read;
+  **0 new defects.** They are all legitimate and the reasons are the useful part: an `All (N)`
+  option in a filter select is *supposed* to show the total; a virtualized window
+  (`CsvEditorPanel`'s `windowIndices`) is disclosed by its own `rowsShown` key; a summary tile row
+  (`ManagementPages` plugins: installed / enabled / updates / incompatible) labels the whole set,
+  not the filtered grid below it; `MalDownloadDialog` computes `hiddenUnits` explicitly.
+- *`--truncation` pass* — the shape above. This is where the defects were.
+
+**The instrument was wrong once and the correction is transferable.** The first version required an
+identifier immediately before `.length`, so it could not see `epubCards.filter(c => !c.folder).length`
+at all — the character before the dot is `)`. It reported **21 leads and none of the truncations**.
+Walking back over a balanced member chain instead took it to 87 leads and surfaced the entire class.
+**A member-chain scan that cannot step over a call expression is blind to exactly the computed
+counts that are worth checking.**
+
+**Stated limits, so `18` is not read as the whole class.** (a) Disclosure is judged by proximity —
+a "+N more" 40 lines away, or in a child component, reads as absent; conversely a nearby unrelated
+`.length >` reads as present, which is why **`GameArenaContent` was scored disclosed and is in fact
+a real site** (found by the default pass instead, and fixed below). Both directions of error are
+live. (b) Single-line chains only. (c) A truncation inside a component that is handed an
+already-capped array is invisible here.
