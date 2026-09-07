@@ -12797,4 +12797,13 @@ export const ru: Catalog = {
     many: '{count} дней',
     other: '{count} дня',
   },
+  'common.moveItemUp': 'Переместить «{name}» вверх',
+  'common.moveItemDown': 'Переместить «{name}» вниз',
+  'common.removeItem': 'Удалить «{name}»',
+  'common.decrease': 'Уменьшить: {label}',
+  'common.increase': 'Увеличить: {label}',
+  'common.zoomIn': 'Увеличить масштаб',
+  'common.zoomOut': 'Уменьшить масштаб',
+  'widgets.dailyGoals.decrement': 'Убавить на один',
+  'widgets.dailyGoals.increment': 'Прибавить один',
 };

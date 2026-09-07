@@ -1570,7 +1570,7 @@ export function LensChrome({
           {pinned ? t('lens.pin.pinned') : t('lens.pin.pin')}
         </button>
       )}
-      <button type="button" className="lens-chrome-close" onClick={onClose} title={t('lens.action.close')}>
+      <button type="button" className="lens-chrome-close" onClick={onClose} title={t('lens.action.close')} aria-label={t('lens.action.close')}>
         ×
       </button>
     </div>

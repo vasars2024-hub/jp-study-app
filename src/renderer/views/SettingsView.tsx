@@ -387,7 +387,7 @@ export function DictionarySettingsSection() {
                 )}
                 <button
                   className="btn small"
-                  title={t('settings.study.dict.higherPriority')}
+                  title={t('settings.study.dict.higherPriority')} aria-label={t('settings.study.dict.higherPriority')}
                   disabled={i === 0}
                   onClick={() => void onMove(d.id, -1)}
                 >
@@ -395,7 +395,7 @@ export function DictionarySettingsSection() {
                 </button>
                 <button
                   className="btn small"
-                  title={t('settings.study.dict.lowerPriority')}
+                  title={t('settings.study.dict.lowerPriority')} aria-label={t('settings.study.dict.lowerPriority')}
                   disabled={i === dicts.length - 1}
                   onClick={() => void onMove(d.id, 1)}
                 >
@@ -496,8 +496,8 @@ export function DictionarySettingsSection() {
                     </option>
                   ))}
                 </select>
-                <button className="btn small" title={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void onMoveSource(source.id, -1)}>↑</button>
-                <button className="btn small" title={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void onMoveSource(source.id, 1)}>↓</button>
+                <button className="btn small" title={t('settings.study.dict.higherPriority')} aria-label={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void onMoveSource(source.id, -1)}>↑</button>
+                <button className="btn small" title={t('settings.study.dict.lowerPriority')} aria-label={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void onMoveSource(source.id, 1)}>↓</button>
                 <button className="btn small" onClick={() => void onRemoveSource(source)}>{t('common.remove')}</button>
               </div>
             </li>

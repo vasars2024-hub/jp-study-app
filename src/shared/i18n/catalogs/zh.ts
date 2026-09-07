@@ -11632,4 +11632,13 @@ export const zh: Catalog = {
   'stats.status.chars': '字数：{chars}',
   'stats.status.activeDays': '活跃 {count} 天',
   'stats.streakDays': '{count} 天',
+  'common.moveItemUp': '将 {name} 上移',
+  'common.moveItemDown': '将 {name} 下移',
+  'common.removeItem': '移除 {name}',
+  'common.decrease': '减少 {label}',
+  'common.increase': '增加 {label}',
+  'common.zoomIn': '放大',
+  'common.zoomOut': '缩小',
+  'widgets.dailyGoals.decrement': '计数减一',
+  'widgets.dailyGoals.increment': '计数加一',
 };

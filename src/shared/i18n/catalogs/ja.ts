@@ -11758,4 +11758,13 @@ export const ja: Catalog = {
   'stats.status.chars': '文字数: {chars}',
   'stats.status.activeDays': '活動日数: {count} 日',
   'stats.streakDays': '{count} 日',
+  'common.moveItemUp': '{name} を上へ移動',
+  'common.moveItemDown': '{name} を下へ移動',
+  'common.removeItem': '{name} を削除',
+  'common.decrease': '{label} を下げる',
+  'common.increase': '{label} を上げる',
+  'common.zoomIn': '拡大',
+  'common.zoomOut': '縮小',
+  'widgets.dailyGoals.decrement': 'カウントを1減らす',
+  'widgets.dailyGoals.increment': 'カウントを1増やす',
 };

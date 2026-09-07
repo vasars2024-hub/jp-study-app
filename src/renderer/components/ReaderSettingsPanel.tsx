@@ -80,15 +80,26 @@ function Stepper(props: {
   decDisabled: boolean;
   incDisabled: boolean;
 }) {
+  const { t } = useT();
   return (
     <div className="sp-row">
       <span className="sp-label">{props.label}</span>
       <div className="sp-stepper">
-        <button className="btn small" disabled={props.decDisabled} onClick={props.onDec}>
+        <button
+          className="btn small"
+          aria-label={t('common.decrease', { label: props.label })}
+          disabled={props.decDisabled}
+          onClick={props.onDec}
+        >
           −
         </button>
         <span className="sp-value">{props.value}</span>
-        <button className="btn small" disabled={props.incDisabled} onClick={props.onInc}>
+        <button
+          className="btn small"
+          aria-label={t('common.increase', { label: props.label })}
+          disabled={props.incDisabled}
+          onClick={props.onInc}
+        >
           +
         </button>
       </div>

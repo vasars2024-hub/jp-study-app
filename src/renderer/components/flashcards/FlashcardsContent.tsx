@@ -1925,7 +1925,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 ? t('flash.search.matchCount', { count: filteredDeck.length })
                 : t('flash.search.matchCount', { count: filteredSaved.length })}
             </span>
-            <button type="button" className="flash-search-clear" title={t('flash.search.clear')} onClick={() => state.setSearch('')}>
+            <button type="button" className="flash-search-clear" title={t('flash.search.clear')} aria-label={t('flash.search.clear')} onClick={() => state.setSearch('')}>
               ×
             </button>
           </>
@@ -2324,7 +2324,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 />
                                 <button
                                   className="flash-row-x"
-                                  title={t('common.remove')}
+                                  title={t('common.remove')} aria-label={t('common.remove')}
                                   onClick={() => state.setDeck(removeDeckCard(card.id))}
                                 >
                                   ×
@@ -2378,7 +2378,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 )}
                 <span className="flash-row-meaning">{w.meaning}</span>
               </div>
-              <button className="flash-row-x" title={t('common.remove')} onClick={() => removeSaved(w.word)}>
+              <button className="flash-row-x" title={t('common.remove')} aria-label={t('common.remove')} onClick={() => removeSaved(w.word)}>
                 ×
               </button>
             </div>

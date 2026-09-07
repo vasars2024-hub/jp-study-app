@@ -437,9 +437,9 @@ export function CalendarNav({ state }: { state: CalendarState }) {
         // surrounding mode/transport strip remains contextual; universal toolbar glass would put
         // Calendar's one editing control directly on translucent material.
         <AnchorSurface bare className="cal-nav">
-          <button type="button" className="wgt-btn-icon" onClick={() => shift(-1)} title={t('calendar.prev')}>‹</button>
+          <button type="button" className="wgt-btn-icon" onClick={() => shift(-1)} title={t('calendar.prev')} aria-label={t('calendar.prev')}>‹</button>
           <button type="button" className="btn small" onClick={goToday}>{t('calendar.today')}</button>
-          <button type="button" className="wgt-btn-icon" onClick={() => shift(1)} title={t('calendar.next')}>›</button>
+          <button type="button" className="wgt-btn-icon" onClick={() => shift(1)} title={t('calendar.next')} aria-label={t('calendar.next')}>›</button>
           <span className="cal-header-label">{headerLabel}</span>
           <details className="cal-date-tools">
             <summary>{t('calendar.jumpToDate')}</summary>

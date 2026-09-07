@@ -3339,7 +3339,7 @@ function BlancSettingsPanel({
                 />
                 <span className="blanc-theme-label">{token.label}</span>
                 {overridden ? (
-                  <button type="button" onClick={() => clearThemeToken(token.id)} title="Reset this colour">
+                  <button type="button" onClick={() => clearThemeToken(token.id)} title="Reset this colour" aria-label="Reset this colour">
                     ×
                   </button>
                 ) : (

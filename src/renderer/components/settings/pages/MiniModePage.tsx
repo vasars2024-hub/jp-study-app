@@ -233,6 +233,7 @@ export default function MiniModePage() {
                 <button
                   type="button"
                   className="btn small"
+                  aria-label={t('common.moveItemUp', { name: appLabel(id) })}
                   disabled={i === 0}
                   onClick={() => patchMini({ apps: moveMiniApp(mini.apps, id, -1) })}
                 >
@@ -241,6 +242,7 @@ export default function MiniModePage() {
                 <button
                   type="button"
                   className="btn small"
+                  aria-label={t('common.moveItemDown', { name: appLabel(id) })}
                   disabled={i === mini.apps.length - 1}
                   onClick={() => patchMini({ apps: moveMiniApp(mini.apps, id, 1) })}
                 >
@@ -320,6 +322,7 @@ export default function MiniModePage() {
                   <button
                     type="button"
                     className="btn small"
+                    aria-label={t('common.moveItemUp', { name: def ? def.name : id })}
                     disabled={i === 0}
                     onClick={() => patchMini({ routines: moveMiniRoutine(mini.routines, id, -1) })}
                   >
@@ -328,6 +331,7 @@ export default function MiniModePage() {
                   <button
                     type="button"
                     className="btn small"
+                    aria-label={t('common.moveItemDown', { name: def ? def.name : id })}
                     disabled={i === mini.routines.length - 1}
                     onClick={() => patchMini({ routines: moveMiniRoutine(mini.routines, id, 1) })}
                   >

@@ -12303,4 +12303,13 @@ export const en: Catalog = {
     one: '{count} day',
     other: '{count} days',
   },
+  'common.moveItemUp': 'Move {name} up',
+  'common.moveItemDown': 'Move {name} down',
+  'common.removeItem': 'Remove {name}',
+  'common.decrease': 'Decrease {label}',
+  'common.increase': 'Increase {label}',
+  'common.zoomIn': 'Zoom in',
+  'common.zoomOut': 'Zoom out',
+  'widgets.dailyGoals.decrement': 'Count one less',
+  'widgets.dailyGoals.increment': 'Count one more',
 };
