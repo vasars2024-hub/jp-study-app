@@ -246,29 +246,37 @@ const START_PRIMARY_SECTIONS: WinSection[] = [
   'youtube',
   'player',
 ];
-const START_HINTS: Partial<Record<WinSection, string>> = {
-  agent: 'Stored Agent conversations',
-  player: 'Media Center · Library',
-  scraper: 'Find what to watch next',
-  video: 'Media Center · Video',
-  youtube: 'Immersion playlists',
-  music: 'Media Center · Music',
-  dictionary: 'Lookup and pitch',
-  grammar: 'Reference, Practice, guides',
-  files: 'Everything the app stores',
-  immersion: 'Live reader browser',
-  library: 'Local files & Reader Inbox',
-  novels: 'Reading shelf',
-  reading: 'Level-matched web reading',
-  translate: 'Sentence tools',
-  anki: 'Card export',
-  flashcards: 'Review queues',
-  games: 'Fast recall drills',
-  stats: 'Progress charts',
-  calendar: 'Study schedule',
-  resources: 'Reference hub',
-  settings: 'Control panel',
-  city: 'Grow a mooncap by reading',
+/**
+ * D189 — these are the subtitle under every app name in the Aero start menu,
+ * and they were English literals in every language. A module-level map cannot
+ * call `useT()` at declaration time, so per CLAUDE.md i18n rule 7 it carries
+ * the KEY and the consumer resolves it at render. `?? fallback` is why the map
+ * stays a map rather than the key being derived from the section id: a section
+ * with no entry has to reach a real string, not print `desktop.startApp.foo`.
+ */
+const START_HINT_KEYS: Partial<Record<WinSection, string>> = {
+  agent: 'desktop.startApp.agent',
+  player: 'desktop.startApp.player',
+  scraper: 'desktop.startApp.scraper',
+  video: 'desktop.startApp.video',
+  youtube: 'desktop.startApp.youtube',
+  music: 'desktop.startApp.music',
+  dictionary: 'desktop.startApp.dictionary',
+  grammar: 'desktop.startApp.grammar',
+  files: 'desktop.startApp.files',
+  immersion: 'desktop.startApp.immersion',
+  library: 'desktop.startApp.library',
+  novels: 'desktop.startApp.novels',
+  reading: 'desktop.startApp.reading',
+  translate: 'desktop.startApp.translate',
+  anki: 'desktop.startApp.anki',
+  flashcards: 'desktop.startApp.flashcards',
+  games: 'desktop.startApp.games',
+  stats: 'desktop.startApp.stats',
+  calendar: 'desktop.startApp.calendar',
+  resources: 'desktop.startApp.resources',
+  settings: 'desktop.startApp.settings',
+  city: 'desktop.startApp.city',
 };
 
 const WIRED_MODULES: Partial<Record<WinSection, { code: string; name: string; hint: string; ready: string }>> = {
@@ -2714,7 +2722,7 @@ export default function DesktopShell({
           type="button"
           className="os-start-aero-app"
           draggable
-          title={pinned ? 'Drag to move on desktop - click to open' : 'Drag to desktop - click to open'}
+          title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
           onDragStart={(e) => beginStartAppDrag(app, e)}
           onDragEnd={endStartAppDrag}
           onClick={() => open(app.id)}
@@ -2725,14 +2733,17 @@ export default function DesktopShell({
           <span className="os-start-aero-copy">
             <span className="os-start-aero-name">{wiredMeta ? wiredMeta.code : t(app.labelKey)}</span>
             <span className="os-start-aero-hint">
-              {wiredMeta ? `${wiredMeta.name} / ${wiredMeta.hint}` : START_HINTS[app.id] ?? 'Study app'}
+              {wiredMeta
+                ? `${wiredMeta.name} / ${wiredMeta.hint}`
+                : t(START_HINT_KEYS[app.id] ?? 'desktop.startApp.fallback')}
             </span>
           </span>
         </button>
         <button
           type="button"
           className={`os-start-aero-pin${pinned ? ' on' : ''}`}
-          title={pinned ? 'Remove from desktop' : 'Add to desktop'}
+          title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+          aria-label={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
           draggable={false}
           onClick={() => togglePinApp(app)}
         >
@@ -2983,7 +2994,7 @@ export default function DesktopShell({
           onDoubleClick={() => {
             if (!deskPrefs.singleClickOpen) void activateIcon(ic);
           }}
-          title={ic.kind === 'shortcut' ? ic.target : `Open ${ic.name}`}
+          title={ic.kind === 'shortcut' ? ic.target : t('desktop.openIcon', { name: ic.name })}
         >
           <div className={`os-desk-icon-img${ic.kind === 'action' ? ' action' : ''}${ic.action === 'addapp' ? ' tone-add' : ''}${ic.section ? ` app-${ic.section}` : ''}${ic.action ? ` action-${ic.action}` : ''}`}>
             {ic.icon ? (
