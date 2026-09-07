@@ -1011,3 +1011,39 @@ Nothing else an agent ran this month is sitting in the user's profile.
 ## 2026-09-07 05:58 EDT — codexA claims Statistics class 4 and related state paths
 
 Window **12** (`?popout=stats`), primary2 retains window 2. Ownership: `StatsContent.tsx`, focused Statistics tests, scoped catalog additions only if needed. Main-v1 gate 11 re-derived through live IPC: **39 media items, 0 Conan matches**; clauses 2–3 remain unproven and no attachment/acquisition attempted. A6-F2 cannot be landed while primary2 is actively writing its branch (39 ahead); A6-F1/A6-F3 fixes re-derived in committed source. New findings use D210 onward.
+
+## 2026-09-07 06:10 EDT — primary finishes codexA's interrupted Statistics slice (D210), and two more it exposed
+
+codexA ended mid-turn on a usage limit at 05:51 with D210 filed and no source change. Recovered:
+window **12** claimed (codexA is gone), D210 fixed and D211 found and fixed alongside it, D212
+filed unfixed with the reason.
+
+**Live evidence, one window, three languages, same 14 bars — this commit:**
+
+| ui-lang | `.stats-bar-lbl` | first bar's tooltip |
+|---|---|---|
+| ja | 火水木金土日月火水木金土日月 | `8月25日(火)：読書20m、視聴12m、13,200文字` |
+| ru | ВСЧПСВПВСЧПСВП | `вт, 25 авг.: чтение 20m, просмотр 12m, 13 200 симв.` |
+| en | TWTFSSMTWTFSSM | `Tue, Aug 25: 20m read, 12m watched, 13,200 chars` |
+
+**English is byte-identical to before the fix** — CLDR `weekday: 'narrow'` returns the same
+S M T W T F S the hardcoded array did, which is exactly why this defect survived: it is invisible
+in the language most turns run in. That is also why the test asserts English is UNCHANGED *and*
+that each other language differs from it.
+
+**Three mutation controls, all fire** (`src/renderer/__tests__/statsChartWeekdayLocale.test.tsx`,
+11 tests): pin the formatter's locale to `'en'` → 4 fail; drop `lang` at the call site
+(`weekdayInitial(d.date)`) → 1 fails, and it is the render-level test, because every unit test
+still passes — that is the exact shape D210 shipped in; restore `toLocaleString('en-US')` in
+`formatNumber` → 1 fails.
+
+**Trap for the next worker on this surface:** the language switch is applied by HMR to the module
+but the *lazy catalog* is not re-resolved, so a hot-updated window renders English strings while
+`localStorage['ui-lang']` says `ja`. I read `known / familiar / learning` under `lang=ja` and was
+one step from filing "the language switch does nothing". **Reload the window before scoring any
+i18n observation.** Also: codexA left `ui-lang` at `ja` in the shared profile when it died —
+restored to `en` and confirmed against the stored value, not by eye.
+
+| D210 | stats (Study OS / Blanc) | The last-14-days chart keeps English weekday initials when the interface is Japanese or Russian. The dates cannot be read in the chosen language. | Live pid 14128 window 12, switch UI to Japanese: headings translate but all 14 `.stats-bar-lbl` remain T W T F S S M T W T F S S M. `weekdayInitial` hardcodes English initials. | P3 | **fixed — this commit** — verified live in window 12 in three languages, see below. |
+| D211 | stats + ~60 sites (widgets, scraper, both shells) | Every grouped number in the app is grouped the American way. Russian, which groups with a space, reads `13,200 симв.` | Same window switched to Russian: the chart tooltip read `13,200 симв.` where Russian writes `13 200`. `renderer/stats.ts:567` `formatNumber` pinned `toLocaleString('en-US')`. | P3 | **fixed — this commit** — live tooltip now `вт, 25 авг.: чтение 20m, просмотр 12m, 13 200 симв.`; English byte-identical at `13,200`. |
+| D212 | stats + everywhere `formatDuration` reaches | Durations keep English unit letters in every language: the Russian tooltip says `чтение 20m`, the Japanese one `読書20m`. | `renderer/stats.ts:556` returns `${s}s` / `${m}m` / `${h}h ${m%60}m` — three literals, no `t()`. Seen live in the ru and ja tooltips at window 12 after D210/D211 landed. | P3 | **open — deliberately not fixed this turn.** The fix needs three new keys (`stats.duration.{s,m,hm}`, precedent `vnPanel.duration.*` which ja/zh/ru already translate) in all four catalogs, and **all four catalog files are dirty from another track right now**. Adding keys via a HEAD+edit blob would be silently dropped the next time that track reconstructs its own blob. Belongs to the turn that owns the catalogs. |
