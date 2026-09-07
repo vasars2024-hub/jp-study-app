@@ -40,16 +40,16 @@ export default function StatisticsView() {
   const menus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('stats.menu.file'),
       items: [
-        { id: 'reset', label: 'Reset statistics', disabled: !hasData, onSelect: () => void resetAllStats() },
+        { id: 'reset', label: t('stats.resetTitle'), disabled: !hasData, onSelect: () => void resetAllStats() },
       ],
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('stats.menu.view'),
       items: [
-        { id: 'refresh', label: 'Refresh', onSelect: refresh },
+        { id: 'refresh', label: t('stats.menu.refresh'), onSelect: refresh },
       ],
     },
   ];
@@ -60,49 +60,49 @@ export default function StatisticsView() {
         menus={menus}
         status={
           <>
-            <StatusBarField>{formatDuration(s.totalSeconds)} total</StatusBarField>
-            <StatusBarField>{formatNumber(s.totalChars)} chars</StatusBarField>
+            <StatusBarField>{t('stats.status.total', { duration: formatDuration(s.totalSeconds) })}</StatusBarField>
+            <StatusBarField>{t('stats.status.chars', { chars: formatNumber(s.totalChars) })}</StatusBarField>
             <StatusBarSpacer />
-            <StatusBarField>{s.daysActive} active days</StatusBarField>
+            <StatusBarField>{t('stats.status.activeDays', { count: s.daysActive })}</StatusBarField>
           </>
         }
         className="aero-stats-chrome"
       >
         <div className="aero-stats">
-          <Toolbar className="aero-stats-toolbar" aria-label="Statistics commands">
+          <Toolbar className="aero-stats-toolbar" aria-label={t('stats.commands')}>
             <button className="aero-stat-command" onClick={refresh}>
               <Icon name="refresh" size={13} />
-              Refresh
+              {t('stats.menu.refresh')}
             </button>
             <button className="aero-stat-command danger" disabled={!hasData} onClick={() => void resetAllStats()}>
-              Reset
+              {t('stats.reset')}
             </button>
             <ToolbarSpacer />
-            <span className="aero-stat-toolbar-note">Reading activity monitor</span>
+            <span className="aero-stat-toolbar-note">{t('stats.activityMonitor')}</span>
           </Toolbar>
 
           <div className="aero-stats-workbench">
-            <aside className="aero-stats-summary" aria-label="Reading summary">
-              <h2>Summary</h2>
+            <aside className="aero-stats-summary" aria-label={t('stats.summaryAria')}>
+              <h2>{t('stats.summary')}</h2>
               <dl>
                 <div>
-                  <dt>Today</dt>
+                  <dt>{t('stats.today')}</dt>
                   <dd>{formatDuration(s.todaySeconds)}</dd>
                 </div>
                 <div>
-                  <dt>Characters today</dt>
+                  <dt>{t('stats.charactersToday')}</dt>
                   <dd>{formatNumber(s.todayChars)}</dd>
                 </div>
                 <div>
-                  <dt>Streak</dt>
-                  <dd>{s.streak} days</dd>
+                  <dt>{t('stats.streak')}</dt>
+                  <dd>{t('stats.streakDays', { count: s.streak })}</dd>
                 </div>
                 <div>
-                  <dt>Total time</dt>
+                  <dt>{t('stats.totalTime')}</dt>
                   <dd>{formatDuration(s.totalSeconds)}</dd>
                 </div>
                 <div>
-                  <dt>Total chars</dt>
+                  <dt>{t('stats.totalChars')}</dt>
                   <dd>{formatNumber(s.totalChars)}</dd>
                 </div>
               </dl>
@@ -110,29 +110,29 @@ export default function StatisticsView() {
 
             <main className="aero-stats-main">
               <section className="aero-stats-panel">
-                <header>Last 14 days</header>
+                <header>{t('stats.last14Days')}</header>
                 {hasData ? (
                   <div className="aero-stats-chart">
                     {s.recent.map((d) => (
-                      <div key={d.date} className="aero-stats-bar" title={`${d.date}: ${formatDuration(d.seconds)}, ${formatNumber(d.chars)} chars`}>
+                      <div key={d.date} className="aero-stats-bar" title={t('stats.barTooltip', { date: d.date, duration: formatDuration(d.seconds), chars: formatNumber(d.chars) })}>
                         <span style={{ height: `${Math.round((d.seconds / peak) * 100)}%` }} />
                         <b>{weekdayInitial(d.date)}</b>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="aero-stats-empty">No reading samples recorded yet.</div>
+                  <div className="aero-stats-empty">{t('stats.noSamples')}</div>
                 )}
               </section>
 
               <section className="aero-stats-panel aero-stats-books-panel">
-                <header>Books</header>
+                <header>{t('stats.books')}</header>
                 {s.books.length > 0 ? (
                   <div className="aero-stats-table">
                     <div className="aero-stats-book-row aero-stats-book-head">
-                      <span>Title</span>
-                      <span>Time</span>
-                      <span>Chars</span>
+                      <span>{t('stats.col.title')}</span>
+                      <span>{t('stats.col.time')}</span>
+                      <span>{t('stats.col.chars')}</span>
                     </div>
                     {s.books.map((b) => (
                       <div key={b.id} className="aero-stats-book-row">
@@ -143,7 +143,7 @@ export default function StatisticsView() {
                     ))}
                   </div>
                 ) : (
-                  <div className="aero-stats-empty">No book totals yet.</div>
+                  <div className="aero-stats-empty">{t('stats.noBookTotals')}</div>
                 )}
               </section>
             </main>
