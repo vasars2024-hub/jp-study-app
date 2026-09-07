@@ -335,6 +335,7 @@ Cross-cutting passes, after the 25:
 | **class 5 - destructive-action guard** | primary | done | 2 | Scripted: `src/.coordination/presweep/destructive-guard-scan.cjs` over every renderer call to a destructive `window.api.*`, following one level of helper indirection. **42 call sites, 12 guarded, 30 unguarded** - and 27 of those 30 are legitimate on inspection (an undo path, a single-row remove, a helper whose caller confirms), which is the point of reading each one. **3 were real: D111.** Positive control: it reports `ytRemovePlaylist` GUARDED, which is D90's fix. Negative control: it reports `clearMediaLibrary` guarded only because of the helper hop - without it the app's best-guarded delete reads as unguarded. |
 | **dead exports (partial - one found in passing)** | primary | | 1 | D113. Not a systematic pass; that is the open-work sweep's job. |
 | **class 4 - count-vs-truth, mechanical half** | primary | partial | 0 new | Scripted: `src/.coordination/presweep/discarded-result-scan.cjs`. The one class-4 shape a machine can find is a MUTATING `window.api.*` whose answer is discarded - main returns the new state, the caller drops it, and the row and the count beside it never move. **17 leads, 0 NEW defects**; the one real hit is D113, already filed. The other 16 were read and accepted with reasons in the commit (`undoImports` reverses and its caller refetches; `inboxEnrich` builds the updated item itself; `windowChrome` notifies with its own normalized value). Positive control: it finds D113's `pruneMedia`. **The HAND half is still owed** - every badge, list length and progress figure read against its store - and no script can do it. |
+| **class 4 - count-vs-truth, SECOND mechanical shape** | primary2 | done | 1 | Scripted: `src/.coordination/presweep/count-vs-list-scan.cjs`, two passes, gated by `src/shared/__tests__/silentTruncationGate.test.ts`. **"No script can do it" was half wrong** - one more shape of class 4 is mechanical, and it is the shape that produced the class's original P1 (D32, "Plan says 6 and lists 4"): **the count and the list beside it read different arrays.** *Pass 1, narrowing relation:* 456 files, 219 narrowing bindings, 324 screen counts, 345 rendered lists, **87 leads, 0 new defects** - all legitimate, and the reasons are the transferable part (an `All (N)` filter option is *supposed* to show the total; a virtualized window discloses itself; a summary tile row labels the whole set, not the filtered grid below it). *Pass 2, `--truncation`:* **48 truncated renders, 18 disclosing nothing** -> **D137**, 8 real sites fixed, 13 read and accepted, baseline 13. **Two instrument bugs, both caught by a control and both of which would have published a false clean bill** - a member-chain walker that could not step over a call expression saw none of the truncations, and a cap's own `const` line counted as its own disclosure. **What is still owed and genuinely manual:** a count whose SOURCE disagrees with the store (D32's other half), and a count rendered in a different component from its list, which no same-file scan can pair. |
 | **class 3b - dynamic i18n keys vs their type** | backup | done | 1 | Scripted: `src/.coordination/presweep/dynamic-i18n-key-scan.cjs`. A key built from data (`` t(`prefix.${expr}`) ``) whose union gained a member the catalog never got, so the UI renders the raw dotted key as visible text **in all four languages at once**. **No existing gate can see it**: `i18n-check` compares the locales AGAINST EACH OTHER, so a key missing from all four is unanimously consistent and reports green. **231 prefixes, 645 unions, 110 bound, 1 defect (D129, fixed `6bd06b89`).** The filtering is the transferable part - 75 raw leads reduced to 1 through five confirmed false shapes (overlap without containment, hand-written guards, literal arrays the call site iterates, an exemption list that hid the refuting member, and a helper return type narrower than its parameter). Controls both ways: the fix takes it to exit 0, removing any one key returns it naming the locale. **Limit:** a prefix whose table is empty in every locale is skipped, not reported - a different class. **GATED 2026-09-07 by `primary` (`1f0f423d`)**: the scan lived under `.coordination`, which nothing executes, so the class could return the moment the sweep ended. It is now `src/shared/__tests__/dynamicI18nKeyGate.test.ts`, 8 cases - the repo-wide one floors `bound > 50` and `prefixes > 100` so a collapsed heuristic cannot make "no findings" true of nothing, and five fixture cases pin the false shapes. Re-derived live: with the key gone from all four catalogs `i18n-check` exits **0** and this exits **1**; gone from `ru` alone, both go red. |
 | **class 3c - a plural arm that hides a slot** | primary | done | 0 | `src/shared/__tests__/pluralArmSlots.test.ts` (`dbc5d509`). `translate()` interpolates ONE arm and ja/zh resolve only `other`, so a slot in `one` and not in `other` renders a sentence with the noun missing in Japanese and Chinese while English at count 1 reads perfectly. `i18n-check` cannot see it - the key is in all four locales, so they agree. Asserts `other` carries every slot any other arm uses, over **519 plural entries / 1,384 arms**. **Zero violations today**: this PINS the property, it did not repair one. One-directional on purpose - 8 entries have `other` carrying a slot `one` lacks (English spells 1 in words and drops `{count}`), which is idiom and must stay green; the negative-control case proves it does. **Two instrument corrections, both of which fabricated findings first:** a line-anchored arm matcher called 27 `ru` entries "no `other` arm" because that catalog packs two arms per line, and an arm body stopping at the first quote truncates at an apostrophe. Both are fixture cases now. **Not covered:** an arm whose slot is merely spelled differently (`{name}` vs `{title}`) reads as two slots and is reported; a slot ALL arms omit is invisible, because this compares arms with each other, not with the call site's vars. |
 
@@ -890,7 +891,9 @@ logged, not bare.
 recorded as owed with "no script can do it". **One more shape of it turns out to be mechanical**,
 and it is the shape that produced the class's original P1 (D32, "Plan says 6 and lists 4"):
 
-| D137 | blanc, games, immersion, player, calendar, anki, scraper | **A list is silently truncated under a count that claims the full number.** `X.slice(0, N).map(…)` renders N rows while the label beside it reads `X.length`, so the screen says 120 notifications / 31 badges / 486 vocabulary candidates and shows 50 / 8 / 40, with nothing saying the rest exist. The user reads the missing rows as data loss, not as a cap. | `src/.coordination/presweep/count-vs-list-scan.cjs --truncation`: **48 truncated renders, 18 with no disclosure anywhere in ±30 lines.** Confirmed by reading the count and the render together at each site. | P2 | **open — see the fix commit below.** |
+| D137 | blanc, games, immersion, player, calendar, anki, scraper | **A list is silently truncated under a count that claims the full number.** `X.slice(0, N).map(…)` renders N rows while the label beside it reads `X.length`, so the screen says 120 notifications / 31 badges / 486 vocabulary candidates and shows 50 / 8 / 40, with nothing saying the rest exist. The user reads the missing rows as data loss, not as a cap. | `src/.coordination/presweep/count-vs-list-scan.cjs --truncation`: **48 truncated renders, 18 with no disclosure anywhere in ±30 lines.** Confirmed by reading the count and the render together at each site. | P2 | **fixed `942e13de`** — 8 sites in 6 files disclose the overflow through one shared key; gated at baseline 13. See the closure section below for the table of sites and the two instrument bugs. |
+
+| D138 | calendar (Aero theme only) | **The Aero calendar chrome rendered 17 English literals in every language** — the menu bar (File / View / Go), the nav rail (Today / New event / Views / Reminders / Overdue), the schedule inspector's three pane titles and three empty states, both `aria-label`s, and the status bar's event and overdue counts. The Views rail printed raw mode ids (`Month`, `Week`) from `m[0].toUpperCase() + m.slice(1)`. | Switch the theme to Frutiger Aero with the UI in Русский or 日本語. Counted by `tools/i18n-partial-check.cjs --file renderer/views/CalendarView.tsx`: **17 untranslated**, now **0**. | P2 | **fixed `3f0b5986`.** 11 of the 17 needed no new key — `calendar.today`, `calendar.newEvent`, `calendar.mode.*` and `calendar.agenda.*` already existed and were already translated three lines away, and `modeLabels` was already in scope. Six new keys plus two CLDR-plural counts. Ratchet: 44 files / 340 strings → 43 / 323. |
 
 **Both shapes exist in this repo, written the same week, which is why this is a real class and not
 a style preference.** The honest form is already here and is the model for the fix:
@@ -927,3 +930,53 @@ a "+N more" 40 lines away, or in a child component, reads as absent; conversely 
 a real site** (found by the default pass instead, and fixed below). Both directions of error are
 live. (b) Single-line chains only. (c) A truncation inside a component that is handed an
 already-capped array is invisible here.
+
+### 2026-09-07 03:05 EDT — primary2, D137 CLOSED and D138 filed+closed
+
+**D137 fixed at `942e13de`.** Eight sites in six files now disclose the overflow through one
+shared key, `common.moreNotShown` (CLDR plurals in ru), following the form the repo already
+writes four different ways. Each cap became a named constant carrying the reason:
+
+| site | cap | the count that contradicted it |
+|---|---|---|
+| `BlancReadyToolPanels.tsx` notifications | 50 | `t('notifications.blanc.entries', { count: items.length })` |
+| `GameArenaContent.tsx` badge wall | 8 | `t('games.badgeCount', …)` in the header |
+| `MediaStudyMode.tsx` vocabulary | 40 | `{analysis.vocabulary.length} vocabulary candidates` |
+| `MediaStudyMode.tsx` sentences | 80 | `{analysis.sentences.length} Japanese subtitle sentences` |
+| `VisualNovelSentenceAssist.tsx` kanji links | 24 | `t('vnAssist.kanjiCount', …)` two lines above |
+| `VisualNovelCommunityPanel.tsx` reports | 8 | `{entry.communityReports.length} reports` |
+| `CalendarView.tsx` Aero Today / Overdue | 5 / 5 | the nav rail's own `<strong>{agendaToday.length}</strong>` |
+| `CalendarView.tsx` Aero Upcoming | 8 | — (capped with the other two, for consistency) |
+
+**Gated at `src/shared/__tests__/silentTruncationGate.test.ts`**, 5 cases, baseline **13**.
+A ratchet and not a hard zero, deliberately: the 13 remaining were each read and none has a
+count contradicting it. `{ranked.slice(0, 12)}` under a heading that promises no total is a
+design choice, and a gate that demands "+N more" there produces false positives, gets baselined
+away wholesale, and then protects nothing — D120's lesson and D135's.
+
+**One lead struck, so nobody re-files it:** `BlancReadyToolPanels.tsx:1186` caps cues at 5 and
+**already discloses** — `{cues.length > 5 && <p>Showing first 5 cues.</p>}`. It surfaced in the
+pair pass, not the truncation pass, and the truncation pass was right.
+
+**TWO INSTRUMENT BUGS, both caught by a control rather than by reading, and both would have
+produced a false clean bill:**
+1. The chain walker could not step over a call expression, so `X.filter(…).length` was invisible —
+   the character before the dot is `)`. The first version reported **21 leads and zero
+   truncations**; walking a balanced chain took it to 87 and surfaced the whole class.
+2. **A cap's own `const` declaration counted as its disclosure.** Every cap written as a named
+   constant therefore read as disclosed whenever its declaration sat inside the ±30-line window —
+   and that is precisely how `GameArenaContent` scored clean over a real defect. Found by the
+   gate's own named-constant case going red, not by inspection. Fixed by excluding declaration
+   and import lines.
+
+**D138 (P2, fixed `3f0b5986`) — the Aero calendar chrome re-typed strings already translated
+beside it.** Under the Frutiger Aero theme the calendar grows a menu bar, a nav rail and a
+schedule inspector; all **17** of their strings were English literals in every language. The
+finding is not that they were missed but how: `calendar.today`, `calendar.newEvent`,
+`calendar.mode.*` and `calendar.agenda.*` already existed and were already translated, so
+**11 of the 17 needed no new key at all**. The Views rail was printing
+`m[0].toUpperCase() + m.slice(1)` — raw mode ids — beside a translated `modeLabels` map that was
+already in scope. Six new keys plus two CLDR-plural counts cover what Aero genuinely adds.
+`i18n-hardcoded-check` cannot see this (CalendarView calls `t()` on line 100, which exempts the
+file); **D135's ratchet is what surfaced it**, and its entry is now removed rather than lowered:
+**44 files / 340 strings → 43 / 323.**
