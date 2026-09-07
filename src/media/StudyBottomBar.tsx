@@ -63,6 +63,11 @@ export interface StudyBottomBarProps {
   /* cue loop */
   hasCues: boolean;
   hasActiveCue: boolean;
+  /**
+   * A sidecar subtitle mount is still in flight, so `hasCues: false` is not yet a verdict.
+   * Optional so an existing caller keeps its behaviour; only the video overlay knows this.
+   */
+  subtitleLoading?: boolean;
   onPrevCue: () => void;
   onReplayCue: () => void;
   onNextCue: () => void;
@@ -130,16 +135,33 @@ export type CueRequirement = 'cues' | 'active-cue';
  * The i18n key explaining why a cue-dependent control is disabled, or `null` when it is not.
  *
  * Exported and pure so the decision can be tested without mounting the bar, which needs the
- * whole study-workspace context. The two strings already exist and already say the right
+ * whole study-workspace context. The three strings already exist and already say the right
  * thing in all four languages, so this invents no copy.
+ *
+ * `loading` is the third state and it exists because the other two were a lie for 39
+ * seconds. Measured live 2026-09-07 on `The Big O - 13`, whose Jimaku sidecar holds 261
+ * cues: from clicking the episode to these controls becoming usable was **38,839 ms**
+ * (the element alone needed 32,742 ms to reach `readyState >= 3`), and for that whole
+ * window `hasCues` was false, so every one of them said "No subtitle track is loaded."
+ * about a track that was on disk, advertised by the library card, and arriving. A wait
+ * the app is honest about costs the user nothing; an assertion that their file has no
+ * subtitles sends them off to generate one they already have.
  */
 export function cueControlTitleKey(
   needs: CueRequirement,
   hasCues: boolean,
   hasActiveCue: boolean,
-): 'mediaWorkspace.study.transcriptEmpty' | 'mediaWorkspace.study.waitingSubtitle' | null {
+  loading = false,
+):
+  | 'mediaWorkspace.study.transcriptEmpty'
+  | 'mediaWorkspace.study.waitingSubtitle'
+  | 'common.loading'
+  | null {
   const blocked = needs === 'cues' ? !hasCues : !hasActiveCue;
   if (!blocked) return null;
+  // Order matters: "still arriving" outranks both verdicts below, because neither of them
+  // is knowable yet. Only once the mount has resolved is "no track" a fact.
+  if (!hasCues && loading) return 'common.loading';
   // "No track" is something the user must act on; "between lines" resolves on its own.
   return hasCues
     ? 'mediaWorkspace.study.waitingSubtitle'
@@ -182,12 +204,17 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
     needs: CueRequirement,
     shortcutKey?: string,
   ): string | undefined => {
-    const key = cueControlTitleKey(needs, props.hasCues, props.hasActiveCue);
+    const key = cueControlTitleKey(
+      needs,
+      props.hasCues,
+      props.hasActiveCue,
+      props.subtitleLoading,
+    );
     if (key) return t(key);
     return shortcutKey
       ? t('mediaWorkspace.study.shortcutHint', { key: shortcutKey })
       : undefined;
-  }, [props.hasCues, props.hasActiveCue, t]);
+  }, [props.hasCues, props.hasActiveCue, props.subtitleLoading, t]);
 
   /*
     Immersion shows the bar only while the pointer is awake, and never a sheet.

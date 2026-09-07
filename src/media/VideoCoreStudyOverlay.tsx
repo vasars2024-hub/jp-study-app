@@ -811,6 +811,18 @@ export default function VideoCoreStudyOverlay({
     { path: string; name: string; trackNumber: number } | null
   >(null);
   const [mediaRevision, setMediaRevision] = React.useState(0);
+  /**
+   * True from the moment this effect arms until the mount has resolved either way.
+   *
+   * Not cosmetic. Measured live 2026-09-07 on `The Big O - 13` (a real Jimaku sidecar,
+   * 261 cues): clicking the episode to the cue controls becoming usable took **38.8 s**,
+   * of which the element itself needed 32.7 s to reach `readyState >= 3`. Everything in
+   * this window has `allCues.length === 0`, and `cueControlTitleKey` had only two answers
+   * for that — "between lines" and "No subtitle track is loaded." — so for 39 seconds the
+   * bar asserted the file had no subtitles while its track was on disk and arriving.
+   * A third state is the whole fix: the wait is honest, the assertion was not.
+   */
+  const [externalSubtitlePending, setExternalSubtitlePending] = React.useState(false);
   React.useEffect(
     () => window.api.onMediaChanged(() => setMediaRevision((revision) => revision + 1)),
     [],
@@ -821,6 +833,7 @@ export default function VideoCoreStudyOverlay({
     const localPath = localFilePath || playbackInfo?.localFile?.path;
     if (!manager || !localPath) return undefined;
     let cancelled = false;
+    setExternalSubtitlePending(true);
     const timer = window.setTimeout(() => {
       void (async () => {
         if (cancelled) return;
@@ -912,12 +925,15 @@ export default function VideoCoreStudyOverlay({
           // A mount failure is not worth breaking playback over — the video plays, and
           // the track picker simply has one fewer entry than it might have had.
         }
-      })();
+      })().finally(() => setExternalSubtitlePending(false));
     }, EXTERNAL_SUBTITLE_GRACE_MS);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      // The timer may never have fired, so the flag has to be cleared here too — a torn
+      // down effect that leaves it true would keep the bar saying "loading" forever.
+      setExternalSubtitlePending(false);
     };
   }, [manager, localFilePath, mediaRevision, playbackInfo?.localFile?.path]);
 
@@ -2699,6 +2715,7 @@ export default function VideoCoreStudyOverlay({
         barRef={dockRef}
         hasCues={allCues.length > 0}
         hasActiveCue={!!activeCue}
+        subtitleLoading={externalSubtitlePending}
         onPrevCue={() => jumpCue(-1)}
         onReplayCue={() => replayCue(activeCue)}
         onNextCue={() => jumpCue(1)}
