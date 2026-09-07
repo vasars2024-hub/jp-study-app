@@ -1536,3 +1536,51 @@ required and trimmed non-empty. So: **an i18n placeholder whose value can be `un
 as itself, in the accessible name, silently — `i18n-check` cannot see it and neither can a test
 that only ever passes a defined value.** Name by `title || message`, and keep the bare word as the
 last resort.
+
+### 2026-09-07 07:40 EDT — primary2, D171: a whole refusal class main-v1 gate 11 walked me into
+
+Claimed and released: **the nyaa subtitle-harvest path** (`SubtitleHarvestPanel`, inside
+`MalDownloadDialog`). Not a class-4 surface — I deliberately did **not** take `stats`,
+`flashcards`, `anki` or `library`, because `primary` holds window 1 and is in class 4, and the last
+five collisions all came from two workers landing on the same named piece of work.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D171 | scraper / subtitle harvest (in the MAL download dialog) | Ask for a title's Japanese subtitles and the panel answers **"No torrent index is enabled in this profile."** — an English sentence in every UI language, naming no way to fix it, and telling the user to *enable* an index when their profile has none to enable. | With the app's shipped settings (`sources.entries: []`): MAL/catalogue entry ▸ Download ▸ the subtitles half ▸ Search Nyaa. Live on the user's own `balanced` profile: `subtitleHarvestNyaaList({title:'The Big O', …})` → `keys ["ok","candidates","message","searchedAs"]`, **no `reason`**, that message. | P2 | **fixed `8abab7ac`** — reason split + carried, and one `nyaaCannotText` translates it for both the offer and the listing. |
+
+**How I got here, because the route is reusable.** I opened on the pin's item 1, main-v1 **gate 11
+clauses 2–3**, whose plan entry says what closes it: *"a `sub-pack` candidate — archive or loose —
+for a title this library actually holds."* That is mechanically searchable, so I searched it: the
+library's 39 items hold a full **26-episode `The Big O`**, 2 × `JoJo — Ougon no Kaze`, and a
+`Date a Live II` OVA. Every listing refused before it reached the index. **Gate 11 clauses 2–3 stay
+OPEN and gain a second blocker: the user's three scraper profiles carry zero torrent sources
+between them, so no listing can run at all on this machine right now.** I did not repair that by
+writing indexers into their settings — that is their persisted configuration, not a fixture.
+
+**Three things this turn actually establishes, each separately worth carrying:**
+
+1. **A main-process sentence rendered raw is an i18n hole no gate can see.** `i18n-check`,
+   `i18n-hardcoded-check` and the catalog-hygiene suite all read the *catalogs* and the *renderer*.
+   A string built in `src/main/**` and piped through a `message` field passes all three and lands
+   untranslated in the UI. `SubtitleHarvestPanel.tsx:835` is one of them; **there will be others,
+   and no instrument in this repo currently looks for them.** That is a class, not a row — the
+   greppable shape is a renderer `setX(result.message)` / `{message}` whose producer is under
+   `src/main/`.
+2. **The app's own better answer already existed six hundred lines away.** `malDownload.error.noIndexers`
+   — *"…Enable one on the Sources page first."* — is defined in all four catalogs and used by the
+   **download** half of the very same dialog. The defect was not a missing string; it was one route
+   of two not using it. When a refusal reads poorly, grep the catalogs before writing a new key.
+3. **`TorrentManagerPage.tsx:646-649` had already written down the mistake this path was making**,
+   in a comment: collapsing "no sources" with "all off" *"would send a user with no sources at all
+   hunting for a toggle that does not exist."* A correct decision recorded in one file does not
+   propagate to the others that need it. **A comment explaining a split is a lead: go find the
+   other callers of the thing being split.**
+
+**Controls, both against committed source, both restored byte-identical.** Collapsing the reason
+split turns exactly **2 tests red by name** (72 green); restoring `setMessage(result.message)` turns
+exactly **1 red** (16 green). 128 green across the three suites.
+
+**Stated plainly: the fix is NOT live-verified.** The running app (pid 14128) is served from the
+MAIN tree, so a `jp-wt-filesapp` edit cannot hot-reload into it, and the main half needs a restart
+regardless. The **before** state above is live and exact; the after rests on the tests and the two
+mutations. Whoever next restarts that app should re-run the repro and confirm the translated key.
