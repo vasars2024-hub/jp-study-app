@@ -926,3 +926,23 @@ twice) because two workers mint from "max + 1" on two branches that merge every 
 
 Mint inside your own range and the merge cannot collide, whichever branch you are on. This costs
 nothing and the alternative has now cost four duplicated fixes.
+
+### 2026-09-07 06:20 EDT — primary, class 4 manual: two windows the user cannot get back to
+
+Measured live through the app's own IPC on pid 14128 window 1, not read off source. The layout
+store holds **8 desktops**; three carry windows — index 1 "City" (files), **index 2 "Desktop 3"
+(scraper, maximized)** and **index 4 "Desktop 5" (scraper, maximized)**. The taskbar renders
+**2** desktop switches. `deskwinFocusDesktop` answered `{ok:true}` for 0 and 1 and **`{ok:false}`
+for 2, 3 and 4** — the same call, succeeding on the reachable pair, which is the control.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D149 | desktop shell | **An app you tear off onto a desktop of its own can never be got back.** The taskbar shows two desktop buttons, "Desktop 1" and "Desktop 2", and that is all there is — no third button appears however many desktops exist, and the keyboard shortcut only flips between the same two. Right now two maximized Scraper windows are sitting on desktops 3 and 5 with no way to reach either. The buttons also ignore the desktops' own names: this user's are called "Study" and "City" and both buttons say "Desktop N". | Taskbar ▸ drag any app button upward ~56px to tear it off ▸ it opens on a new desktop in its own window ▸ close that window ▸ the app is gone. It is not on Desktop 1 or Desktop 2 and no button leads to it. | P1 | open |
+| D150 | desktop shell | With "show all windows" turned on, a window listed under another desktop's badge clicks to **silence** if nothing is currently showing that desktop — no window, no error, no toast. It is the one case the badge exists for. | Settings ▸ taskbar ▸ show all windows ▸ tear an app off to a new desktop ▸ close that desktop's window ▸ click the app's badged entry in the taskbar. Nothing happens. | P2 | open |
+
+**Why both, and why they are one shape:** `DesktopShell.tsx:1353` already carries the correct
+helper — `deskwinFocusDesktop`, and `deskwinOpenDesktop` when nothing is showing that desktop —
+with a comment saying focus alone "has a real hole". The taskbar's own foreign-window button
+(`:3456`) calls the raise-only half and `void`s the answer. **A fix applied at one call site and
+not its sibling**, which is D137's and D143's shape for the third time. Grep every call site of
+the channel before writing the fix.
