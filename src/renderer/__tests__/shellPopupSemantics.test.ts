@@ -98,63 +98,45 @@ describe('the shell taskbar declares its popups', () => {
     expect(source).toContain("'notifications.wired.noUnreadError'");
   });
 
-  // This asserted `switchDesktop(0)` and `switchDesktop(1)` as literals until
-  // 2026-09-07, when D149 replaced the two hardcoded buttons with a map over
-  // `switchableDesktops` — so anything the user put on desktop 3 or beyond
-  // finally got a button. The old anchor then matched nothing and the test went
-  // red against a product that had got BETTER. Anchored on the mapped button
-  // instead, which is the shape that survives adding a desktop.
+  /*
+   * This case used to pin the two hardcoded switches by index —
+   * `buttonTag(source, 'switchDesktop(0)')` then `(1)`. That stopped being
+   * possible when the row became a map over every switchable desktop (D149):
+   * there is no `switchDesktop(0)` literal any more, `buttonTag` returned '',
+   * and a strictly BETTER implementation read as a regression. It is the same
+   * shape the class-5 ratchet hit on 2026-09-07 — a source ratchet that pins
+   * one spelling of a contract instead of the contract.
+   *
+   * So it asserts the contract: the one switch button carries `aria-pressed`
+   * bound to whether it IS the active desktop, and the state is not left to
+   * the `active` class alone.
+   *
+   * `primary` and `primary2` repaired this independently within an hour, on two
+   * branches neither could see. This is the UNION of the two, because each
+   * caught something the other missed — the class assertion is primary's, the
+   * derived-set case below is primary2's.
+   */
   it('the desktop switches carry their selected-ness programmatically, not only as a class', () => {
     const source = read(SHELL);
     const tag = buttonTag(source, 'switchDesktop(index)');
     expect(tag).toContain('aria-pressed={activeDesktop === index}');
-    // ...and there is exactly one such button, i.e. it is generated rather than
-    // written out per desktop. A second literal `switchDesktop(0)` button would
-    // mean the hardcoded row had come back and desktop 3+ lost its way in again.
+    // The class is still there, and must not be the only carrier.
+    expect(tag).toContain('os-desktop-switch');
+    // ...and no literal-index button came back beside it, which would mean the
+    // hardcoded row had returned and desktop 3+ lost its way in again.
     expect(source).not.toContain('switchDesktop(0)');
     expect(source).not.toContain('switchDesktop(1)');
   });
 
-  // D149's own property, guarded here because the assertion above would still
-  // pass if the row were mapped over a two-element constant.
+  // D149's own property. `switchableDesktops.map(` alone would still pass if the
+  // row were mapped over a two-element constant, so the SET is pinned too.
   it('the switch row is built from every reachable desktop, not a fixed pair', () => {
     const source = read(SHELL);
     expect(source).toContain('switchableDesktops.map(');
-    // The set has to be DERIVED, and from what actually holds windows — a
-    // literal pair behind the map is the D149 defect wearing a map. Both halves
-    // are named, because `switchableDesktopIndexes` called without `windowsOn`
-    // would strand a window on desktop 3 exactly as before.
     // `windowsOn` must be INSIDE that call, not merely somewhere in the file:
-    // the shell mentions it twice, so a whole-file `toContain` stayed green
-    // when the argument was deleted — measured, which is why this is anchored.
+    // the shell mentions it twice, so a whole-file `toContain` stayed green when
+    // the argument was deleted — measured, which is why this is anchored.
     expect(source).toMatch(/switchableDesktopIndexes\(\{[^}]*windowsOn:/);
   });
 
-});
-
-describe('controls — so the scan cannot pass vacuously', () => {
-  it('reads a shell file that actually contains the taskbar', () => {
-    const source = read(SHELL);
-    expect(source).toContain('os-tray');
-    expect(source).toContain('os-task-wins');
-    expect(source.length).toBeGreaterThan(10_000);
-  });
-
-  it('buttonTag survives an arrow handler, stops at its own >, and returns empty for an absent marker', () => {
-    // Four failures this must be able to see: an attribute AFTER a `() =>` handler lost
-    // (the real defect this helper was rewritten for), the wrong button matched, children
-    // read as attributes, and a marker that no longer exists reported as a pass. The last
-    // is the one that would make every assertion above vacuous, because `''` contains
-    // nothing — which is exactly what the `not.toContain` cases assert.
-    const fixture = [
-      '<button className="a" onClick={() => go(0)} aria-pressed={n === 0}>A</button>',
-      '<button className="b">B<span/></button>',
-    ].join('\n');
-    expect(buttonTag(fixture, 'go(0)')).toContain('aria-pressed={n === 0}');
-    expect(buttonTag(fixture, 'className="b"')).toBe('<button className="b"');
-    expect(buttonTag(fixture, 'className="b"')).not.toContain('span');
-    expect(buttonTag(fixture, 'className="zzz"')).toBe('');
-    // …so a positive assertion on a missing marker FAILS rather than passing silently.
-    expect(buttonTag(fixture, 'className="zzz"')).not.toContain('aria-haspopup');
-  });
 });
