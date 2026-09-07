@@ -54,6 +54,43 @@ const DESTRUCTIVE = new Set([
 
 const GUARDS = [/\bconfirmDialog\s*\(/, /\bwindow\.confirm\s*\(/, /\bshowMessageBox\s*\(/];
 
+/**
+ * Blank every comment, keeping the file's length so every offset and line number
+ * still lines up.
+ *
+ * Added 2026-09-07 after this scanner reported a phantom call site at
+ * `immersionSiteActions.ts:4` — a doc comment that NAMES the call it repairs.
+ * The register's class-5 row had been describing the scanner as masking comments
+ * and strings; it never did, and the error runs in both directions. A comment
+ * mentioning `confirmDialog(` would have made a genuinely unguarded call read as
+ * guarded, which is a false clean bill rather than a false alarm.
+ *
+ * Comments only, deliberately. String bodies are left alone: masking them would
+ * blank ordinary code for no measured benefit, and no false hit has ever come
+ * from one. The register is corrected to say that rather than the reverse.
+ */
+function withoutComments(text) {
+  const out = text.split('');
+  let mode = 'code';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (mode === 'code') {
+      if (ch === '/' && next === '/') { mode = 'line'; out[i] = ' '; }
+      else if (ch === '/' && next === '*') { mode = 'block'; out[i] = ' '; }
+      else if (ch === '"' || ch === "'" || ch === '`') mode = ch;
+    } else if (mode === 'line') {
+      if (ch === '\n') mode = 'code';
+      else out[i] = ' ';
+    } else if (mode === 'block') {
+      if (ch === '*' && next === '/') { out[i] = ' '; out[i + 1] = ' '; i++; mode = 'code'; }
+      else if (ch !== '\n') out[i] = ' ';
+    } else if (ch === '\\') i++;
+    else if (ch === mode) mode = 'code';
+  }
+  return out.join('');
+}
+
 function walk(dir, out = []) {
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, ent.name);
@@ -135,7 +172,9 @@ function guardedThroughHelper(text, blockStart) {
 
 const hits = [];
 for (const file of files) {
-  const text = fs.readFileSync(file, 'utf8');
+  // Offsets are preserved by the masker, so every line number below is still the
+  // real one in the real file.
+  const text = withoutComments(fs.readFileSync(file, 'utf8'));
   const re = /window\.api\.([A-Za-z0-9_]+)\s*\(/g;
   let m;
   while ((m = re.exec(text))) {
