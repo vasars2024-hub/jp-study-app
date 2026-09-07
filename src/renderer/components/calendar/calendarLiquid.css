@@ -165,3 +165,18 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+/*
+ * The event modal's one inline validation message (D162: the editor used to
+ * accept an end time before the start and the Day view then printed the range
+ * backwards). It lives here rather than in styles.css because this sheet is
+ * imported unconditionally by CalendarContent, so the rule applies in Standard,
+ * Liquid and Blanc alike -- the modal is a WORK surface in all three and takes
+ * no Liquid material. `--danger-text` is the themed text-weight danger token,
+ * declared at :root with a light-theme remap, so no colour is hardcoded here.
+ */
+.cal-field-error {
+  margin: calc(-1 * var(--lq-space-2, 4px)) 0 0;
+  color: var(--danger-text);
+  font-size: 0.85em;
+}

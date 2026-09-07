@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Icon from '../Icons';
 import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
+import { confirmDialog } from '../ui/dialogService';
 import './calendarLiquid.css';
 import {
   addEvent,
@@ -23,6 +24,7 @@ import {
   loadEvents,
   onCalendarChanged,
   REMINDER_LABELS,
+  toDateKey,
   updateEvent,
   type CalendarEvent,
   type EventCategory,
@@ -99,8 +101,14 @@ export function EventModal({
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  // `HH:MM` is zero-padded and fixed-width, so a plain string compare is a
+  // correct time compare. All-day events carry no times, so they cannot be
+  // inverted (D162).
+  const endsBeforeStart =
+    !form.allDay && Boolean(form.startTime) && Boolean(form.endTime) && form.endTime < form.startTime;
+
   const save = () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || endsBeforeStart) return;
     const payload: Omit<CalendarEvent, 'id' | 'createdAt'> = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
@@ -121,8 +129,27 @@ export function EventModal({
     onClose();
   };
 
-  const remove = () => {
-    if (isEditing) deleteEvent(form.id);
+  // D163: this was a bare `deleteEvent` beside Save, and `jp-calendar-events`
+  // lives in localStorage, which userData backups do not cover — so a misclick
+  // had no restore point. A repeating event is called out separately because
+  // deleting one destroys every occurrence, which the chip does not say.
+  const remove = async () => {
+    if (!isEditing) {
+      onClose();
+      return;
+    }
+    const name = form.title.trim() || t('calendar.modal.untitled');
+    const ok = await confirmDialog({
+      title: t('calendar.modal.deleteConfirm.title'),
+      message:
+        form.recurrence === 'none'
+          ? t('calendar.modal.deleteConfirm.message', { name })
+          : t('calendar.modal.deleteConfirm.recurring', { name }),
+      confirmLabel: t('calendar.modal.delete'),
+      danger: true,
+    });
+    if (!ok) return;
+    deleteEvent(form.id);
     onClose();
   };
 
@@ -182,9 +209,19 @@ export function EventModal({
               </label>
               <label className="cal-field">
                 <span>{t('calendar.modal.endTime')}</span>
-                <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
+                <input
+                  type="time"
+                  value={form.endTime}
+                  onChange={(e) => set('endTime', e.target.value)}
+                  aria-invalid={endsBeforeStart || undefined}
+                  aria-describedby={endsBeforeStart ? 'cal-time-error' : undefined}
+                />
               </label>
             </div>
+          )}
+
+          {endsBeforeStart && (
+            <p id="cal-time-error" className="cal-field-error" role="alert">{t('calendar.modal.endBeforeStart')}</p>
           )}
 
           <div className="cal-field-row">
@@ -253,11 +290,11 @@ export function EventModal({
 
         <div className="cal-modal-actions">
           {isEditing && (
-            <button type="button" className="cbh-btn danger" onClick={remove}>{t('calendar.modal.delete')}</button>
+            <button type="button" className="cbh-btn danger" onClick={() => void remove()}>{t('calendar.modal.delete')}</button>
           )}
           <div className="cal-modal-spacer" />
           <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim()}>
+          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim() || endsBeforeStart}>
             {isEditing ? t('common.save') : t('calendar.modal.create')}
           </button>
         </div>
@@ -343,7 +380,16 @@ export function useCalendar() {
   }, [rangeOccurrences]);
 
   const agendaToday = useMemo(() => getTodayOccurrences(), [events]);
-  const agendaUpcoming = useMemo(() => getUpcomingOccurrences(30), [events]);
+  // `getUpcomingOccurrences` counts from NOW, so anything later today is in
+  // both it and `agendaToday` — and the Agenda renders the two lists one under
+  // the other, so the user saw every such event twice (D161). Filtered at the
+  // call site rather than in the helper: the Home Workspace widget
+  // (`widgets/productivity.tsx`) calls the same helper for a flat "next 4"
+  // list, where including today is correct.
+  const agendaUpcoming = useMemo(() => {
+    const todayKey = toDateKey(new Date());
+    return getUpcomingOccurrences(30).filter((o) => o.occurrenceDate > todayKey);
+  }, [events]);
   const agendaOverdue = useMemo(() => getOverdueReminders(), [events]);
 
   const headerLabel = useMemo(() => {
