@@ -108,3 +108,33 @@ describe('scoring the real Jimaku candidate', () => {
     expect(scored).toHaveLength(0);
   });
 });
+
+/*
+ * The third way it swallowed a search, and the one that was still live.
+ *
+ * `jimakuSearch` drops the `down` flag its own client computes, so
+ * `discoverForItem` — its only caller — saw an empty array for a 429, a 5xx and
+ * a timeout alike and recorded `no-match`: a claim about the show, made out of
+ * an outage. `no-match` is evidential, so that claim then suppressed the retry
+ * for the whole 7-day window. The real library carries 52 jimaku `no-match`
+ * rows for The Big O, a series jimaku demonstrably has per-episode files for.
+ */
+describe('recentlyFailed — a provider outage', () => {
+  it('does not let an outage suppress the retry', () => {
+    const item = itemWith([{ providerId: 'jimaku', lang: 'ja', reason: 'provider-down', ageDays: 0.01 }]);
+    expect(recentlyFailed(item, 'jimaku', 'ja', 7)).toBe(false);
+  });
+
+  // The control: the same age and the same provider, with the reason that IS
+  // evidence about the catalogue, must still suppress. Without this the test
+  // above would pass on a back-off that had simply stopped working.
+  it('still suppresses when the provider actually answered with nothing', () => {
+    const item = itemWith([{ providerId: 'jimaku', lang: 'ja', reason: 'no-match', ageDays: 0.01 }]);
+    expect(recentlyFailed(item, 'jimaku', 'ja', 7)).toBe(true);
+  });
+
+  it('is unaffected by how the multi-language failure row is keyed', () => {
+    const item = itemWith([{ providerId: 'opensubtitles', lang: 'ja,en', reason: 'provider-down', ageDays: 0.01 }]);
+    expect(recentlyFailed(item, 'opensubtitles', 'ja,en', 7)).toBe(false);
+  });
+});

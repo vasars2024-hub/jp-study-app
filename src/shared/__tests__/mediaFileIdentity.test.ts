@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PARSER_OWNED_IDENTITY,
+  RELEASE_IDENTITY_VERSION,
   inferMediaCategory,
   localMediaSlotKey,
   mediaLibraryTarget,
   parseMediaFileName,
+  refreshReleaseIdentity,
   resolveLocalMediaIdentities,
   sanitizeMediaPathSegment,
 } from '../mediaFileIdentity';
@@ -246,5 +249,89 @@ describe('sanitizeMediaPathSegment', () => {
   it('never returns an empty segment, and drops trailing dots and spaces', () => {
     expect(sanitizeMediaPathSegment('///')).toBe('Untitled');
     expect(sanitizeMediaPathSegment('Show. ')).toBe('Show');
+  });
+});
+
+describe('refreshReleaseIdentity', () => {
+  /**
+   * The real row out of the user's own library, as an older parser stored it:
+   * no episode number, and a series key with the release's `39-END` tail baked
+   * in, so the last episode of Golden Wind sat outside its own series.
+   */
+  const staleJoJo = (): MediaItem => item(
+    'jojo-39',
+    '[Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 39-END (WEBRip 720p Hi444PP AAC) RAW [DAB47203].mp4',
+    {
+      seriesKey: 'jojo no kimyou na bouken ougon no kaze 39 end',
+      seriesTitle: "JoJo's Bizarre Adventure: Golden Wind",
+      episodeKind: 'unknown',
+      year: 2018,
+      category: 'anime',
+    },
+  );
+
+  it('repairs a series key and episode an older parser could not read', () => {
+    const stored = staleJoJo();
+    expect(refreshReleaseIdentity(stored)).toBe(true);
+    expect(stored.seriesKey).toBe('jojo no kimyou na bouken ougon no kaze');
+    expect(stored.episode).toBe(39);
+    expect(stored.episodeKind).toBe('episode');
+    expect(stored.releaseIdentityVersion).toBe(RELEASE_IDENTITY_VERSION);
+  });
+
+  it('regroups the repaired file with the rest of its series', () => {
+    const ep38 = item('jojo-38', '[Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 38 (WEBRip 720p Hi444PP AAC) RAW [A95B628C].mp4');
+    const ep39 = staleJoJo();
+    for (const entry of [ep38, ep39]) refreshReleaseIdentity(entry);
+    // One key for the season, which is what `mediaMetadata.groupTitles` needs to
+    // look the series up once and what subtitle discovery matches episodes with.
+    expect(new Set([ep38.seriesKey, ep39.seriesKey]).size).toBe(1);
+  });
+
+  /**
+   * The whole reason the repass is restricted to four fields. A provider has
+   * already written the display title and the year here; re-parsing the release
+   * name must not put "JoJo no Kimyou na Bouken - Ougon no Kaze" back over them.
+   */
+  it('leaves every field a provider or the user owns alone', () => {
+    const stored = staleJoJo();
+    stored.category = 'movie';
+    refreshReleaseIdentity(stored);
+    expect(stored.seriesTitle).toBe("JoJo's Bizarre Adventure: Golden Wind");
+    expect(stored.year).toBe(2018);
+    expect(stored.category).toBe('movie');
+  });
+
+  it('never unsets a stored field when the parser reads nothing', () => {
+    const stored = item('x', 'no-markers-at-all.mkv', {
+      seriesKey: 'hand typed key',
+      episode: 7,
+      season: 2,
+    });
+    refreshReleaseIdentity(stored);
+    expect(stored.episode).toBe(7);
+    expect(stored.season).toBe(2);
+  });
+
+  it('runs once per version, so a listing does not re-parse the library forever', () => {
+    const stored = staleJoJo();
+    expect(refreshReleaseIdentity(stored)).toBe(true);
+    expect(refreshReleaseIdentity(stored)).toBe(false);
+    expect(refreshReleaseIdentity(stored)).toBe(false);
+  });
+
+  it('repasses an item stamped by an older parser version', () => {
+    const stored = staleJoJo();
+    stored.releaseIdentityVersion = RELEASE_IDENTITY_VERSION - 1;
+    expect(refreshReleaseIdentity(stored)).toBe(true);
+    expect(stored.episode).toBe(39);
+  });
+
+  /**
+   * Non-vacuity control. If this list ever grows to include `seriesTitle`, the
+   * provider-safety test above is the one that fails — this one names the cause.
+   */
+  it('owns exactly the four fields no provider writes', () => {
+    expect([...PARSER_OWNED_IDENTITY]).toEqual(['seriesKey', 'season', 'episode', 'episodeKind']);
   });
 });

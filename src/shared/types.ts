@@ -208,6 +208,13 @@ export interface ExampleResult {
    * this file) — pointing there is what would make types.ts part of a cycle.
    */
   episodeKind?: import('./mediaReleaseKind').MediaReleaseKind;
+  /**
+   * Which release-name parser wrote `seriesKey` / `season` / `episode` /
+   * `episodeKind`, so a later parser can repair what an earlier one misread.
+   * Absent on everything imported before the stamp existed, which is exactly the
+   * set that needs the first repass. See `RELEASE_IDENTITY_VERSION`.
+   */
+  releaseIdentityVersion?: number;
   /** Scene / fansub group, when the name carries one. */
   releaseGroup?: string;
   /** Vertical resolution in lines (1080 for `1080p`). */

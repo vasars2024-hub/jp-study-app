@@ -10,11 +10,20 @@ vi.mock('electron', () => ({
   net: { request: () => undefined },
 }));
 
+/**
+ * What the two search providers answer this test.
+ *
+ * `null` and `[]` are different answers and the whole point of the outage cases
+ * below: `null` means the provider never responded, `[]` means it responded with
+ * nothing. Defaults to `[]`/`[]` so every pre-existing case behaves as before.
+ */
+const providerScript: { jikan: unknown[] | null; anilist: unknown[] | null } = { jikan: [], anilist: [] };
+
 // Stub the provider clients: this file tests grouping, backfill decisions and the
 // concurrency guard, none of which should wait on real HTTP retry backoff.
 vi.mock('../mediaProviderClients', () => ({
-  jikanSearch: async () => [],
-  anilistSearch: async () => [],
+  jikanSearch: async () => providerScript.jikan,
+  anilistSearch: async () => providerScript.anilist,
   jikanById: async () => null,
   anilistById: async () => null,
   jikanEpisodeInfo: async () => ({}),
@@ -125,5 +134,55 @@ describe('sweep concurrency', () => {
     await runMediaMetadata({});
     expect(mediaMetadataRunning()).toBe(false);
     expect((await runMediaMetadata({})).ok).toBe(true);
+  });
+});
+
+/**
+ * An outage must not be written down as "this title does not exist".
+ *
+ * This path's stamp is PERMANENT — `alreadyFetched` returns true once
+ * `metadataSource` and `metadataUpdatedAt` are both set, `needsEpisodeBackfill`
+ * explicitly excludes `'unmatched'`, and there is no `retryAfterDays` here at
+ * all. So a minute of provider downtime cost the title its AniList id for good,
+ * and without that id every later Jimaku subtitle search for it drops from an
+ * exact id match to a title match, silently.
+ *
+ * `jikanSearch`'s own doc already recorded the measurement (Jikan at 504,
+ * AniList at 403, on 2026-08-16) and kept the `null`-versus-`[]` contract;
+ * `searchProviders` was throwing it away one layer up.
+ */
+describe('a provider outage is not a fact about the title', () => {
+  const patchesFor = async (jikan: unknown[] | null, anilist: unknown[] | null) => {
+    providerScript.jikan = jikan;
+    providerScript.anilist = anilist;
+    const patches: Record<string, unknown>[] = [];
+    registerMediaMetadataIpc({
+      listItems: () => [ep(1)],
+      patchItems: (_ids, patch) => { patches.push(patch as Record<string, unknown>); },
+      patchEachItem: () => undefined,
+    });
+    await runMediaMetadata({});
+    providerScript.jikan = [];
+    providerScript.anilist = [];
+    return patches;
+  };
+
+  it('does not stamp unmatched when neither provider answered', async () => {
+    expect(await patchesFor(null, null)).toEqual([]);
+  });
+
+  it('does not stamp unmatched when the fallback provider is the one that is down', async () => {
+    // Jikan answering "nothing" is not a settled answer while AniList — the very
+    // provider that exists to carry what MyAnimeList lacks — never replied.
+    expect(await patchesFor([], null)).toEqual([]);
+  });
+
+  it('still stamps unmatched when both providers answered and had nothing', async () => {
+    // The negative control, and the reason the two above mean anything: if the
+    // guard were simply "never stamp", the sweep would re-ask a genuinely absent
+    // title on every pass forever, which is the behaviour the stamp exists to stop.
+    const patches = await patchesFor([], []);
+    expect(patches).toHaveLength(1);
+    expect(patches[0].metadataSource).toBe('unmatched');
   });
 });

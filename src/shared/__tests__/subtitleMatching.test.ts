@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bestSubtitleMatch, matchSubtitleTracks } from '../subtitleMatching';
+import { bestSubtitleMatch, matchSubtitleTracks, mismatchedAutoSubtitleIds } from '../subtitleMatching';
+import type { SubtitleRecord } from '../subtitleRecord';
 import { normalizeSubtitleProvidersDocument, type SubtitleProvidersDocument } from '../subtitleProviders';
 
 const ALL_SIGNALS = ['title', 'episode', 'season', 'year', 'release-group', 'duration', 'language'];
@@ -165,5 +166,77 @@ describe('matchSubtitleTracks', () => {
     ]);
     const target = { identityId: 'mid-1', title: 'Show', language: 'ja', episode: 1 };
     expect(matchSubtitleTracks(document, target)).toEqual(matchSubtitleTracks(document, target));
+  });
+});
+
+describe('mismatchedAutoSubtitleIds', () => {
+  const record = (over: Partial<SubtitleRecord> = {}): SubtitleRecord => ({
+    id: 'r1',
+    lang: 'ja',
+    source: 'provider',
+    format: 'srt',
+    path: 'subtitles/x/a.srt',
+    addedAt: 0,
+    ...over,
+  });
+
+  /** The real row: episode 1's 267-cue script sitting on a creditless opening. */
+  const bigOExtra = {
+    episode: undefined,
+    subtitles: [record({
+      id: 'jimaku-e01',
+      label: 'The Big O.E01.Bandai.ja.srt',
+      providerItemId: 'jimaku:1178:The Big O.E01.Bandai.ja.srt',
+      confidence: 100,
+    })],
+  };
+
+  it('names a numbered provider track auto-attached to an item with no episode', () => {
+    expect(mismatchedAutoSubtitleIds(bigOExtra)).toEqual(['jimaku-e01']);
+  });
+
+  it('leaves a numbered item alone, however the track is named', () => {
+    expect(mismatchedAutoSubtitleIds({ ...bigOExtra, episode: 1 })).toEqual([]);
+    expect(mismatchedAutoSubtitleIds({ ...bigOExtra, episode: 13 })).toEqual([]);
+  });
+
+  it('keeps a track whose name declares no episode, because that is not a disagreement', () => {
+    expect(mismatchedAutoSubtitleIds({
+      episode: undefined,
+      subtitles: [record({ id: 'pack', label: 'The Big O.Complete.Bandai.ja.srt' })],
+    })).toEqual([]);
+  });
+
+  it('never touches a track the matcher did not choose', () => {
+    for (const source of ['embedded', 'sidecar', 'generated'] as const) {
+      expect(mismatchedAutoSubtitleIds({
+        episode: null,
+        subtitles: [record({ id: source, source, label: 'The Big O.E01.Bandai.ja.srt' })],
+      })).toEqual([]);
+    }
+  });
+
+  it('falls back to the provider item id when a record carries no label', () => {
+    expect(mismatchedAutoSubtitleIds({
+      episode: undefined,
+      subtitles: [record({ id: 'no-label', label: undefined, providerItemId: 'jimaku:1178:The Big O.E01.Bandai.ja.srt' })],
+    })).toEqual(['no-label']);
+  });
+
+  it('drops only the mismatched records and returns the rest untouched', () => {
+    const ids = mismatchedAutoSubtitleIds({
+      episode: undefined,
+      subtitles: [
+        record({ id: 'bad', label: 'The Big O.E01.Bandai.ja.srt' }),
+        record({ id: 'pack', label: 'The Big O.Bandai.ja.srt' }),
+        record({ id: 'mine', source: 'sidecar', label: 'The Big O.E01.ja.srt' }),
+      ],
+    });
+    expect(ids).toEqual(['bad']);
+  });
+
+  it('is empty for an item with no subtitles at all', () => {
+    expect(mismatchedAutoSubtitleIds({ episode: undefined })).toEqual([]);
+    expect(mismatchedAutoSubtitleIds({ episode: undefined, subtitles: [] })).toEqual([]);
   });
 });

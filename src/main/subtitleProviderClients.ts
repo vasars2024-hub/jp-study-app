@@ -243,28 +243,19 @@ export interface JimakuMatch {
 interface JimakuFile { name?: string; url?: string; size?: number }
 
 /**
- * Japanese subtitles for an AniList id.
+ * Japanese subtitles for an AniList id, and which entry answered.
  *
  * Keying on the AniList id — which the Phase 2 metadata sweep stores — rather than
  * on a title string is what makes this provider reliable: there is no title
- * ambiguity left to get wrong, only the episode number.
- */
-export async function jimakuSearch(
-  anilistId: number | undefined,
-  title: string,
-  episode: number | null,
-): Promise<ProviderSubtitleCandidate[]> {
-  return (await jimakuSearchDetailed(anilistId, title, episode)).candidates;
-}
-
-/**
- * As `jimakuSearch`, and also says *which* entry answered.
+ * ambiguity left to get wrong, only the episode number. The entry matters to the
+ * harvest panel: with the AniList id lookup down a listing can be the wrong show,
+ * and a user who cannot see which entry was picked has no way to tell a fuzzy
+ * title hit from an exact one.
  *
- * Split out rather than widening `jimakuSearch`, whose other caller
- * (`subtitleDiscovery.ts`) matches against a local file and has no use for the
- * entry. The harvest panel does: with the AniList id lookup down, a listing can
- * be the wrong show, and a user who cannot see which entry was picked has no
- * way to tell a fuzzy title hit from an exact one.
+ * There is deliberately no candidates-only wrapper. One existed, both remaining
+ * callers had already moved off it, and its only effect was to make the `down`
+ * flag easy to drop — which is exactly the defect (D252) that cost The Big O 49
+ * false "no subtitles filed" rows.
  */
 export async function jimakuSearchDetailed(
   anilistId: number | undefined,
@@ -387,9 +378,24 @@ export interface OpenSubtitlesQuery {
   movieHash?: string | null;
 }
 
-export async function openSubtitlesSearch(query: OpenSubtitlesQuery): Promise<ProviderSubtitleCandidate[]> {
+/** The same reply Jimaku gives: candidates, plus whether the request was answered at all. */
+export interface OpenSubtitlesMatch {
+  candidates: ProviderSubtitleCandidate[];
+  /**
+   * The search itself did not answer — a 429, a 5xx, a timeout, a 200 carrying
+   * something that is not JSON. Distinct from a 200 carrying `{data: []}`: one
+   * is a fact about this release, the other is a fact about the minute.
+   */
+  down: boolean;
+  /** The status that made `down` true, for the log. 0 when nothing answered. */
+  downStatus: number;
+}
+
+export async function openSubtitlesSearchDetailed(query: OpenSubtitlesQuery): Promise<OpenSubtitlesMatch> {
   const key = keyFor('opensubtitles');
-  if (!key) return [];
+  // Not `down`: no key means we never asked, which callers already model as
+  // `no-key`. Reporting it as an outage would hide a fixable configuration.
+  if (!key) return { candidates: [], down: false, downStatus: 0 };
 
   const params = new URLSearchParams();
   if (query.movieHash) params.set('moviehash', query.movieHash);
@@ -398,10 +404,14 @@ export async function openSubtitlesSearch(query: OpenSubtitlesQuery): Promise<Pr
   if (query.episode !== null) params.set('episode_number', String(query.episode));
   if (query.languages.length) params.set('languages', query.languages.join(','));
 
-  const response = await requestJson<{ data?: OsSubtitle[] }>(
+  const reply = await requestJsonReply<{ data?: OsSubtitle[] }>(
     `${OPENSUBTITLES}/subtitles?${params.toString()}`,
     { headers: { 'Api-Key': key } },
   );
+  if (reply.value === null) {
+    return { candidates: [], down: true, downStatus: reply.status };
+  }
+  const response = reply.value;
 
   const out: ProviderSubtitleCandidate[] = [];
   for (const entry of response?.data ?? []) {
@@ -425,7 +435,7 @@ export async function openSubtitlesSearch(query: OpenSubtitlesQuery): Promise<Pr
       fetchToken: String(file.file_id),
     });
   }
-  return out;
+  return { candidates: out, down: false, downStatus: reply.status };
 }
 
 /**

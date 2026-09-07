@@ -24,6 +24,8 @@
  */
 
 import { normalizeMediaTitleKey } from './mediaIdentity';
+import { parseMediaFileName } from './mediaFileIdentity';
+import type { SubtitleRecord } from './subtitleRecord';
 import {
   normalizeSubtitleLanguage,
   normalizeSubtitleProvidersDocument,
@@ -270,4 +272,40 @@ export function bestSubtitleMatch(
   options: SubtitleMatchOptions = {},
 ): SubtitleMatchCandidate | null {
   return matchSubtitleTracks(document, target, options).candidates[0] ?? null;
+}
+
+/**
+ * Auto-attached tracks the unnumbered-target guard would refuse today.
+ *
+ * `subtitleDiscovery` stopped attaching a numbered provider track to an item the
+ * library cannot number on 2026-08-24 — episode 1's dialogue is not the
+ * creditless opening's. The guard only governs new attachments, so the records
+ * an earlier sweep already wrote stayed exactly where they were, and there is no
+ * path in the product that revisits them: the sweep skips any item that already
+ * has the wanted language, which a wrong track satisfies as well as a right one.
+ *
+ * Measured on the real library — `The Big O - Creditless Opening`, `… Ending 1`
+ * and `… Ending 2` each still carry `The Big O.E01.Bandai.ja.srt`, the same
+ * 267-cue file, at `confidence: 100`.
+ *
+ * Deliberately narrow, in three ways. Only `provider` records, because embedded,
+ * sidecar and generated tracks are the container's, the user's folder's or this
+ * machine's — none of them was chosen by the matcher. Only items the library
+ * cannot number, which is the exact condition the live guard tests. And only
+ * when the track's own name declares an episode: a pack or a title-only name
+ * parses to nothing and is left alone, so "we cannot tell" stays a keep.
+ */
+export function mismatchedAutoSubtitleIds(
+  item: { episode?: number | null; subtitles?: readonly SubtitleRecord[] },
+): string[] {
+  if (item.episode !== undefined && item.episode !== null) return [];
+  const ids: string[] = [];
+  for (const record of item.subtitles ?? []) {
+    if (record.source !== 'provider') continue;
+    const name = record.label?.trim() || record.providerItemId?.trim() || '';
+    if (!name) continue;
+    if (typeof parseMediaFileName(name).episode !== 'number') continue;
+    ids.push(record.id);
+  }
+  return ids;
 }
