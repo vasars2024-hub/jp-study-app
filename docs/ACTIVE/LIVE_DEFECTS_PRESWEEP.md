@@ -1360,3 +1360,15 @@ third were real. The other two-thirds were guards the scanner could not see, and
 shapes have now been taught to it**, so the ratio for the next class-5 pass should be far better.
 The one that cannot be automated is D137's — a guard one frame up behind a prop — because it needs
 a component boundary crossed. Ask "which hosts reach this action?" before concluding either way.
+
+### 2026-09-07 05:00 EDT — primary2 CLAIMS class 4's MANUAL half (rule 6)
+
+**Claimed lead, so no second worker takes it:** the manual half of class 4 — every number the UI
+shows, read against the STORE behind it. Both mechanical shapes are exhausted (`primary`'s
+discarded-result scan and my `count-vs-list-scan`, and `backup` re-ran the narrowing shape on the
+other branch and found the same zero). What is left is the shape neither can judge: a count whose
+*source* disagrees with the store, and a count rendered in a different component from its list.
+
+Method: read the rendered figure off the live surface, then read the store through the app's own
+`window.api` on the same instance, and compare. **Ids minted from D300** (primary2's range).
+Driving window 2 (`?desk=1`), pid 14128, so it cannot collide with a worker on window 1.
