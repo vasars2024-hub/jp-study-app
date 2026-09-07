@@ -170,6 +170,77 @@ function guardedThroughHelper(text, blockStart) {
   return { name, callers: callers.length, allGuarded };
 }
 
+/**
+ * The THIRD guard shape, and the scanner was blind to it: a two-step arm. The first click only
+ * sets a state flag and returns, the button re-labels itself to say what the next click will do,
+ * and the second click destroys. No `confirmDialog` ever appears, so this file scored
+ * `visualNovelRemoveCapture` — which has asked twice since it was written — as a bare call, and it
+ * sat on the lead list across several turns until a worker read it and struck it by hand.
+ *
+ * Deliberately narrow, because a false NEGATIVE here hides a real defect. All three must hold:
+ *   1. an early return of exactly the arm shape — `if (!flag) { setFlag(true); return; }` —
+ *      positioned BEFORE the destructive call inside the same block;
+ *   2. `flag` is real `useState` state, not any local boolean;
+ *   3. `flag` drives a render branch (`flag ?`), so the label actually changes on the first
+ *      click. Without that the click is swallowed with no visible reason, which is a broken
+ *      button rather than a guard — and the scanner should keep reporting it.
+ *
+ * And it is asked at the INNERMOST block ONLY, unlike the `confirmDialog` walk. The negative
+ * control caught the reason: with a three-level walk, `removeAudio` came back guarded even with
+ * its own arm's render branch deleted, because `remove()` — a different handler, forty lines up
+ * in the same component — has an arm of its own, and the component body is a shared enclosing
+ * block. One armed button would have absolved every destructive call in its component. An arm
+ * is a local early return by construction, so demanding it in the same function costs nothing.
+ */
+function armedThroughTwoStep(text, block, callAt) {
+  const arm = /if\s*\(\s*!\s*([A-Za-z0-9_$]+)\s*\)\s*\{[^{}]*\bset[A-Za-z0-9_$]*\(\s*true\s*\)[^{}]*\breturn\b[^{}]*\}/g;
+  let m;
+  while ((m = arm.exec(block))) {
+    if (m.index >= callAt) continue;
+    const flag = m[1];
+    const declared = new RegExp(`\\[\\s*${flag}\\s*,[^\\]]*\\]\\s*=\\s*useState`).test(text);
+    const rendered = new RegExp(`[{\\s(]${flag}\\s*\\?`).test(text);
+    if (declared && rendered) return flag;
+  }
+  return null;
+}
+
+/**
+ * The FOURTH shape: the confirm lives in another module. `guardedThroughHelper` above only
+ * follows indirection WITHIN a file, so once D142 and D143 moved their dialogs into shared
+ * `confirm*` helpers — which is the right fix, since it is the only thing that stops a guard
+ * drifting between two hosts — this scanner started reporting the app's newest guards as bare
+ * calls. Four false leads, all of them created by correct repairs.
+ *
+ * The convention both fixes landed on is `if (!await confirmSomething(...)) return;`, so that is
+ * what is matched, and the name alone is not trusted: the module it is imported from must
+ * actually reach `confirmDialog`/`window.confirm`. A helper that merely sounds like a confirm
+ * does not count.
+ */
+function guardedThroughConfirmModule(file, text, block, callAt) {
+  const re = /if\s*\(\s*!\s*await\s+(confirm[A-Za-z0-9_$]*)\s*\(/g;
+  let m;
+  while ((m = re.exec(block))) {
+    if (m.index >= callAt) continue;
+    const name = m[1];
+    const from = new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*['"]([^'"]+)['"]`).exec(text)?.[1];
+    // Defined in this same file and reaching a real dialog: already a guard.
+    if (!from) {
+      if (GUARDS.some((g) => g.test(text))) return `${name}() (same file)`;
+      continue;
+    }
+    const base = path.resolve(path.dirname(file), from);
+    const target = ['.ts', '.tsx', '/index.ts', '/index.tsx', '']
+      .map((ext) => `${base}${ext}`)
+      .find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
+    if (!target) continue;
+    if (GUARDS.some((g) => g.test(fs.readFileSync(target, 'utf8')))) {
+      return `${name}() in ${path.relative(SRC, target).replace(/\\/g, '/')}`;
+    }
+  }
+  return null;
+}
+
 const hits = [];
 for (const file of files) {
   // Offsets are preserved by the masker, so every line number below is still the
@@ -187,6 +258,17 @@ for (const file of files) {
     if (guardedAt < 0 && blocks.length > 0) {
       const helper = guardedThroughHelper(text, text.lastIndexOf(blocks[0], m.index));
       if (helper?.allGuarded) { guardedAt = 0; via = `${helper.name}() x${helper.callers}`; }
+    }
+    if (guardedAt < 0 && blocks.length > 0) {
+      // Innermost block only — see `armedThroughTwoStep`'s note on the control.
+      const start = text.lastIndexOf(blocks[0], m.index);
+      const flag = armedThroughTwoStep(text, blocks[0], m.index - start);
+      if (flag) { guardedAt = 0; via = `two-step arm (${flag})`; }
+    }
+    for (let level = 0; guardedAt < 0 && level < blocks.length; level++) {
+      const start = text.lastIndexOf(blocks[level], m.index);
+      const delegated = guardedThroughConfirmModule(file, text, blocks[level], m.index - start);
+      if (delegated) { guardedAt = level; via = delegated; }
     }
     hits.push({
       file: path.relative(SRC, file).replace(/\\/g, '/'),
