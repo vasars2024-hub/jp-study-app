@@ -109,7 +109,14 @@ function looksHuman(s) {
 
 const ATTR = /\b(label|placeholder|title|aria-label|alt)\s*=\s*(['"])((?:[^'"\\]|\\.)*)\2/g;
 const PROP = /\b(label|hint|description|placeholder|emptyText|subtitle)\s*:\s*(['"])((?:[^'"\\]|\\.)*)\2/g;
-const TEXT = />([^<>{}\n]{2,120})</g;
+// The opening `>` must really close a JSX tag. An arrow function's `=>` also ends in
+// `>`, so `(alien) => alien.x + direction * speed < 4` matched with ` alien.x + direction
+// * speed ` as its "JSX text" — arithmetic, scored as a user-visible label. looksHuman()
+// cannot catch it: its code-punctuation guard reads the CAPTURE, and the `=>` that caused
+// the match sits outside it. Measured on ArcadeGames.tsx, where it produced 2 findings
+// that were both pure game physics. Excluding `=` `!` `<` `>` `-` before the `>` also
+// covers `>=`, `->` and the `>>` of a closing generic; `(?!=)` stops `<=` closing one.
+const TEXT = /(?<![=!<>-])>([^<>{}\n]{2,120})<(?!=)/g;
 
 function scan(rel) {
   const raw = fs.readFileSync(path.join(SRC, rel), 'utf8');
