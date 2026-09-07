@@ -6502,6 +6502,9 @@ export const ru: Catalog = {
   },
   'immersion.streakDays': '{days} дн.',
   'immersion.remove': 'Удалить',
+  'immersion.removeConfirm.title': 'Удалить этот сайт?',
+  'immersion.removeConfirm.message': 'Удалить {title}? Вместе с ним будут удалены посещения ({visits}), серия из {days} дн., время чтения и прогресс, а при повторном добавлении всё начнётся с нуля.',
+  'immersion.removeConfirm.messageFresh': 'Удалить {title}? Здесь ещё ничего не прочитано, поэтому больше ничего не будет удалено.',
   'immersion.liveLookupOn':
     'Поиск по странице включён — выделите японский текст или наведите с Shift',
   'immersion.liveLookupOff': 'Поиск по странице выключен',

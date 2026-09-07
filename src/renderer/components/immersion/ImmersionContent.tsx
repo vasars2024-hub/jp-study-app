@@ -67,6 +67,7 @@ import { getTokenizer, tokenizerReady } from '../../tokenizer';
 import { onKnowledgeChanged } from '../../knownWords';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
+import { removeImmersionSiteWithConfirm } from './immersionSiteActions';
 
 export { IMMERSION_MODE_CYCLE, IMMERSION_STARTERS, WK_HIGHLIGHT_CSS };
 export type { ImmersionMode };
@@ -1237,7 +1238,7 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
                  given a new key: the verb is already translated and the site title is
                  the user's own text. */
               aria-label={`${t('immersion.remove')} — ${s.title}`}
-              onClick={() => void window.api.immersionRemoveSite(s.id)}
+              onClick={() => void removeImmersionSiteWithConfirm(s)}
             >
               <Icon name="close" size={12} />
             </button>

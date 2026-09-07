@@ -31,6 +31,7 @@ import {
   useImmersion,
 } from '../components/immersion/ImmersionContent';
 import VisualNovelPanel from '../components/immersion/VisualNovelPanel';
+import { removeImmersionSiteWithConfirm } from '../components/immersion/immersionSiteActions';
 
 export default function ImmersionView() {
   const aero = useAeroMaterials();
@@ -347,7 +348,7 @@ export default function ImmersionView() {
                         className="aero-immersion-site-remove"
                         title={t('immersion.remove')}
                         aria-label={`${t('immersion.remove')} — ${s.title}`}
-                        onClick={() => void window.api.immersionRemoveSite(s.id)}
+                        onClick={() => void removeImmersionSiteWithConfirm(s)}
                       >
                         <Icon name="close" size={12} />
                       </button>
