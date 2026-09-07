@@ -91,6 +91,7 @@ import {
 } from '../desktopState';
 import { showOsToast } from './ToastHost';
 import {
+  clockHour12,
   ICON_METRICS,
   loadDesktopPrefs,
   onDesktopPrefsChanged,
@@ -3511,7 +3512,7 @@ export default function DesktopShell({
           {wired && <WiredGlobe />}
           <TaskbarClock
             showSeconds={!!deskPrefs.clockSeconds}
-            hour12={!deskPrefs.clock24h}
+            hour12={clockHour12(deskPrefs.clock24h)}
             showDate={!!deskPrefs.clockShowDate}
           />
           <button
@@ -3749,7 +3750,8 @@ function TaskbarClock({
   showDate,
 }: {
   showSeconds: boolean;
-  hour12: boolean;
+  /** `undefined` = no override, so `Intl` picks the locale's own hour cycle. */
+  hour12: boolean | undefined;
   showDate: boolean;
 }) {
   const { lang } = useT();

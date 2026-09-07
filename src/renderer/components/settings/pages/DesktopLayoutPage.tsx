@@ -145,11 +145,27 @@ export default function DesktopLayoutPage() {
         </div>
         <div className="os-viz-row">
           <span className="os-viz-label muted">{t('settings.desktop.label.clock')}</span>
-          <button type="button" className={seg(!deskPrefs.clock24h)} onClick={() => patchDesk({ clock24h: false })}>
-            12h
+          <button
+            type="button"
+            className={seg(deskPrefs.clock24h === 'auto')}
+            onClick={() => patchDesk({ clock24h: 'auto' })}
+            title={t('settings.desktop.clock.autoHint')}
+          >
+            {t('settings.desktop.clock.auto')}
           </button>
-          <button type="button" className={seg(deskPrefs.clock24h)} onClick={() => patchDesk({ clock24h: true })}>
-            24h
+          <button
+            type="button"
+            className={seg(deskPrefs.clock24h === false)}
+            onClick={() => patchDesk({ clock24h: false })}
+          >
+            {t('settings.desktop.clock.h12')}
+          </button>
+          <button
+            type="button"
+            className={seg(deskPrefs.clock24h === true)}
+            onClick={() => patchDesk({ clock24h: true })}
+          >
+            {t('settings.desktop.clock.h24')}
           </button>
           <button
             type="button"

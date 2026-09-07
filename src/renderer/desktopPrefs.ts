@@ -21,7 +21,15 @@ export interface DesktopPrefs {
   iconsLocked: boolean;
   singleClickOpen: boolean;
   taskbarSize: TaskbarSizeId;
-  clock24h: boolean;
+  /**
+   * `'auto'` (the default) leaves the hour cycle to `Intl`, so the clock follows
+   * the UI language — ru/ja/zh render 24-hour and en renders 12-hour. `true` and
+   * `false` are the user's explicit choice and are honoured in every language.
+   * A hard `false` default used to force 12-hour everywhere, which put an en-US
+   * `10:59 PM` next to a Russian `6 сент.` in the same taskbar. Booleans stored
+   * before the three-state control still load unchanged.
+   */
+  clock24h: boolean | 'auto';
   clockSeconds: boolean;
   clockShowDate: boolean;
   startColumns: StartColumnsId;
@@ -45,7 +53,7 @@ const DEFAULTS: DesktopPrefs = {
   iconsLocked: false,
   singleClickOpen: false,
   taskbarSize: 'normal',
-  clock24h: false,
+  clock24h: 'auto',
   clockSeconds: false,
   clockShowDate: true,
   startColumns: 4,
@@ -71,6 +79,21 @@ function normalizeSnapGrid(n: unknown): SnapGridId {
   return DEFAULTS.snapGrid;
 }
 
+/** Anything that is not an explicit boolean means "let the locale decide". */
+function normalizeClock24h(v: unknown): boolean | 'auto' {
+  return v === true || v === false ? v : 'auto';
+}
+
+/**
+ * The `hour12` option to pass to `toLocaleTimeString`. `undefined` is not the
+ * same as `false` here: an absent option lets `Intl` use the locale's own hour
+ * cycle, which is the whole point of `'auto'`. Passing `false` would force
+ * 24-hour on English too.
+ */
+export function clockHour12(pref: DesktopPrefs['clock24h']): boolean | undefined {
+  return pref === 'auto' ? undefined : !pref;
+}
+
 export function loadDesktopPrefs(): DesktopPrefs {
   try {
     const raw = localStorage.getItem(KEY);
@@ -80,6 +103,7 @@ export function loadDesktopPrefs(): DesktopPrefs {
         ...DEFAULTS,
         ...parsed,
         snapGrid: normalizeSnapGrid(parsed.snapGrid ?? DEFAULTS.snapGrid),
+        clock24h: normalizeClock24h(parsed.clock24h),
       };
     }
   } catch {
@@ -113,6 +137,9 @@ export function saveDesktopPrefs(partial: Partial<DesktopPrefs>): DesktopPrefs {
     ...partial,
     snapGrid: normalizeSnapGrid(
       partial.snapGrid !== undefined ? partial.snapGrid : prev.snapGrid,
+    ),
+    clock24h: normalizeClock24h(
+      partial.clock24h !== undefined ? partial.clock24h : prev.clock24h,
     ),
   };
   try {
