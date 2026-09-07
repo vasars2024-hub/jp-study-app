@@ -5371,6 +5371,18 @@ export const en: Catalog = {
   'calendar.agenda.nothingUpcoming': 'Nothing on the horizon.',
   'calendar.agenda.overdueReminders': 'Overdue reminders',
   'calendar.agenda.none': 'None.',
+  // The Aero chrome (menu bar, nav rail, schedule inspector). Everything it renders that the
+  // default theme already had reuses the keys above — these are only the strings Aero adds.
+  'calendar.aero.menu.file': 'File',
+  'calendar.aero.menu.view': 'View',
+  'calendar.aero.menu.go': 'Go',
+  'calendar.aero.nav': 'Calendar navigator',
+  'calendar.aero.inspector': 'Schedule inspector',
+  'calendar.aero.views': 'Views',
+  'calendar.aero.reminders': 'Reminders',
+  'calendar.aero.overdue': 'Overdue',
+  'calendar.aero.eventCount': { one: '{count} event', other: '{count} events' },
+  'calendar.aero.overdueCount': { one: '{count} overdue', other: '{count} overdue' },
   'calendar.modal.editEvent': 'Edit event',
   'calendar.modal.title': 'Title',
   'calendar.modal.titlePlaceholder': 'Event title',

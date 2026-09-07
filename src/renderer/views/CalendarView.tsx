@@ -60,12 +60,12 @@ export default function CalendarView() {
   const calMenus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
-      items: [{ id: 'new', label: 'New event…', onSelect: () => openNew(toKey(cursor)) }],
+      label: t('calendar.aero.menu.file'),
+      items: [{ id: 'new', label: t('calendar.newEvent'), onSelect: () => openNew(toKey(cursor)) }],
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('calendar.aero.menu.view'),
       items: (['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => ({
         id: m,
         label: modeLabels[m],
@@ -74,7 +74,7 @@ export default function CalendarView() {
     },
     {
       id: 'go',
-      label: 'Go',
+      label: t('calendar.aero.menu.go'),
       items: [
         { id: 'today', label: t('calendar.today'), onSelect: goToday },
         { id: 'prev', label: t('calendar.prev'), disabled: mode === 'agenda', onSelect: () => shift(-1) },
@@ -86,9 +86,11 @@ export default function CalendarView() {
   const calStatus = (
     <>
       <StatusBarField>{headerLabel}</StatusBarField>
-      <StatusBarField>{events.length} events</StatusBarField>
+      <StatusBarField>{t('calendar.aero.eventCount', { count: events.length })}</StatusBarField>
       <StatusBarSpacer />
-      {agendaOverdue.length > 0 && <StatusBarField live>{agendaOverdue.length} overdue</StatusBarField>}
+      {agendaOverdue.length > 0 && (
+        <StatusBarField live>{t('calendar.aero.overdueCount', { count: agendaOverdue.length })}</StatusBarField>
+      )}
     </>
   );
 
@@ -106,7 +108,7 @@ export default function CalendarView() {
       </ContextualSurface>
 
       {aero && (
-        <aside className="aero-cal-sidebar" aria-label="Calendar navigator">
+        <aside className="aero-cal-sidebar" aria-label={t('calendar.aero.nav')}>
           <div className="aero-cal-date-card">
             <span>{today.toLocaleDateString(LANG_TAGS[lang], { weekday: 'short' })}</span>
             <strong>{today.getDate()}</strong>
@@ -114,14 +116,14 @@ export default function CalendarView() {
           </div>
           <button type="button" className="aero-cal-nav-row" onClick={goToday}>
             <Icon name="calendar" size={15} />
-            <span>Today</span>
+            <span>{t('calendar.today')}</span>
             <strong>{agendaToday.length}</strong>
           </button>
           <button type="button" className="aero-cal-nav-row" onClick={() => openNew(toKey(cursor))}>
             <Icon name="plus" size={15} />
-            <span>New event</span>
+            <span>{t('calendar.newEvent')}</span>
           </button>
-          <div className="aero-cal-pane-title">Views</div>
+          <div className="aero-cal-pane-title">{t('calendar.aero.views')}</div>
           {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
             <button
               key={m}
@@ -130,13 +132,13 @@ export default function CalendarView() {
               onClick={() => setMode(m)}
             >
               <Icon name={m === 'agenda' ? 'clipboard' : 'calendar'} size={15} />
-              <span>{m[0].toUpperCase() + m.slice(1)}</span>
+              <span>{modeLabels[m]}</span>
             </button>
           ))}
-          <div className="aero-cal-pane-title">Reminders</div>
+          <div className="aero-cal-pane-title">{t('calendar.aero.reminders')}</div>
           <button type="button" className={`aero-cal-nav-row ${agendaOverdue.length ? 'urgent' : ''}`} onClick={() => setMode('agenda')}>
             <Icon name="bookmark" size={15} />
-            <span>Overdue</span>
+            <span>{t('calendar.aero.overdue')}</span>
             <strong>{agendaOverdue.length}</strong>
           </button>
         </aside>
@@ -147,10 +149,10 @@ export default function CalendarView() {
       <CalendarBody state={state} />
 
       {aero && (
-        <aside className="aero-cal-inspector" aria-label="Schedule inspector">
-          <div className="aero-cal-pane-title">Today</div>
+        <aside className="aero-cal-inspector" aria-label={t('calendar.aero.inspector')}>
+          <div className="aero-cal-pane-title">{t('calendar.today')}</div>
           {agendaToday.length === 0 ? (
-            <p className="muted">Nothing today.</p>
+            <p className="muted">{t('calendar.agenda.nothingToday')}</p>
           ) : (
             <ul className="aero-cal-list">
               {agendaToday.slice(0, AGENDA_ROWS).map((ev) => (
@@ -163,9 +165,9 @@ export default function CalendarView() {
               )}
             </ul>
           )}
-          <div className="aero-cal-pane-title">Upcoming</div>
+          <div className="aero-cal-pane-title">{t('calendar.agenda.upcoming')}</div>
           {agendaUpcoming.length === 0 ? (
-            <p className="muted">Nothing scheduled.</p>
+            <p className="muted">{t('calendar.agenda.nothingUpcoming')}</p>
           ) : (
             <ul className="aero-cal-list">
               {agendaUpcoming.slice(0, AGENDA_UPCOMING_ROWS).map((ev) => (
@@ -181,9 +183,9 @@ export default function CalendarView() {
               )}
             </ul>
           )}
-          <div className="aero-cal-pane-title">Overdue</div>
+          <div className="aero-cal-pane-title">{t('calendar.aero.overdue')}</div>
           {agendaOverdue.length === 0 ? (
-            <p className="muted">None.</p>
+            <p className="muted">{t('calendar.agenda.none')}</p>
           ) : (
             <ul className="aero-cal-list">
               {agendaOverdue.slice(0, AGENDA_ROWS).map((ev) => (

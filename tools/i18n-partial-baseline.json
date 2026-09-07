@@ -4,7 +4,6 @@
   "renderer/components/PlaylistEditor.tsx": 21,
   "renderer/views/ResourcesView.tsx": 20,
   "renderer/components/MiniShell.tsx": 17,
-  "renderer/views/CalendarView.tsx": 17,
   "renderer/views/NovelReader.tsx": 17,
   "renderer/components/settings/SettingsApp.tsx": 16,
   "renderer/components/immersion/VisualNovelCommunityPanel.tsx": 15,
