@@ -24,6 +24,8 @@ import type {
   CollectedToolKind,
 } from '../../../shared/collectedTools';
 import { readWorkspaces, WORKSPACE_LAUNCHER_KEY } from './BlancReadyToolPanels';
+import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
+import { useT } from '../../i18n';
 
 const MIGRATED_FLAG_KEY = `${WORKSPACE_LAUNCHER_KEY}.migrated`;
 
@@ -68,6 +70,7 @@ function openTool(toolId: string): void {
 }
 
 function useAppDrawer() {
+  const { t } = useT();
   const [tools, setTools] = useState<CollectedTool[]>([]);
   const [folders, setFolders] = useState<CollectedFolder[]>([]);
   const [status, setStatus] = useState('');
@@ -227,12 +230,18 @@ function useAppDrawer() {
     [reload],
   );
 
+  // D143. The same `tools:remove` that Resources guards at D17 was reached bare
+  // from here — same store, same tool, same note, one host asking and the other
+  // not. The confirm lives in `collectedToolsActions` so a third host cannot
+  // reintroduce the gap. Blanc chrome is plain English by policy, but a reused
+  // shared dialog is shared content and stays translated.
   const removeItem = useCallback(
     async (id: string) => {
+      if (!await confirmRemoveCollectedTool(t, tools.find((candidate) => candidate.id === id))) return;
       await window.api.toolsRemove(id);
       await reload();
     },
-    [reload],
+    [reload, t, tools],
   );
 
   const moveItem = useCallback(

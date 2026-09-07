@@ -21,7 +21,8 @@ import type {
 } from '../../../shared/resourcesCatalog';
 import type { CollectedTool } from '../../../shared/collectedTools';
 import { useT } from '../../i18n';
-import { confirmDialog, showToast } from '../ui';
+import { showToast } from '../ui';
+import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
 
 export type Filter = 'All' | string;
 export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'offline';
@@ -158,14 +159,10 @@ export function useResources() {
   // indistinguishable from a dead control.
   const removeTool = useCallback(
     async (id: string) => {
-      const tool = tools.find((candidate) => candidate.id === id);
-      const ok = await confirmDialog({
-        title: t('resources.myTools.removeConfirm.title'),
-        message: t('resources.myTools.removeConfirm.message', { name: tool?.name ?? tool?.url ?? '' }),
-        confirmLabel: t('resources.myTools.remove'),
-        danger: true,
-      });
-      if (!ok) return;
+      // D143: the confirm moved to `collectedToolsActions` unchanged, because
+      // Blanc's app drawer reaches the same channel and was not asking. Both
+      // hosts now call one helper rather than keeping two copies in step.
+      if (!await confirmRemoveCollectedTool(t, tools.find((candidate) => candidate.id === id))) return;
       try {
         await window.api.toolsRemove(id);
       } catch (error) {
