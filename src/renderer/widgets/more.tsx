@@ -36,7 +36,7 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
     <div className="wgt wgt-world">
       <ul className="wgt-world-list">
         {zones.map((z) => {
-          let time = 'â€”';
+          let time = '—';
           try {
             time = now.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit', timeZone: z.tz });
           } catch {
@@ -46,7 +46,7 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
             <li key={z.id}>
               <span className="wgt-world-label">{z.label}</span>
               <span className="wgt-world-time">{time}</span>
-              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => setSettings({ zones: zones.filter((x) => x.id !== z.id) })}>Ã—</button>
+              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => setSettings({ zones: zones.filter((x) => x.id !== z.id) })}>×</button>
             </li>
           );
         })}
@@ -96,10 +96,10 @@ export function DailyGoals({ settings, setSettings }: WidgetProps) {
             </div>
             <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${(g.done / g.target) * 100}%` }} /></div>
             <div className="wgt-goal-ctrls">
-              <button className="wgt-btn-icon sm" onClick={() => bump(g.id, -1)}>âˆ’</button>
+              <button className="wgt-btn-icon sm" onClick={() => bump(g.id, -1)}>−</button>
               <button className="wgt-btn-icon sm" onClick={() => bump(g.id, 1)}>+</button>
               <button className="wgt-btn-icon sm" title={t('widgets.dailyGoals.raiseTarget')} onClick={() => write(goals.map((x) => (x.id === g.id ? { ...x, target: x.target + 1 } : x)))}>+T</button>
-              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => write(goals.filter((x) => x.id !== g.id))}>Ã—</button>
+              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => write(goals.filter((x) => x.id !== g.id))}>×</button>
             </div>
           </li>
         ))}
@@ -149,7 +149,7 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
           <li key={h.id}>
             <div className="wgt-habit-top">
               <span className="wgt-habit-text">{h.text}</span>
-              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => write(habits.filter((x) => x.id !== h.id))}>Ã—</button>
+              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => write(habits.filter((x) => x.id !== h.id))}>×</button>
             </div>
             <div className="wgt-habit-days">
               {days.map((d) => (

@@ -391,7 +391,7 @@ export function DictionarySettingsSection() {
                   disabled={i === 0}
                   onClick={() => void onMove(d.id, -1)}
                 >
-                  â†‘
+                  ↑
                 </button>
                 <button
                   className="btn small"
@@ -399,7 +399,7 @@ export function DictionarySettingsSection() {
                   disabled={i === dicts.length - 1}
                   onClick={() => void onMove(d.id, 1)}
                 >
-                  â†“
+                  ↓
                 </button>
                 {!d.bundled && (
                   <button
@@ -674,7 +674,7 @@ export default function SettingsView() {
               disabled={atMin}
               aria-label={t('settings.a11y.zoom.decrease')}
             >
-              âˆ’
+              −
             </button>
             <span className="zoom-val">{pct}%</span>
             <button

@@ -1121,7 +1121,7 @@ const api = {
     ipcRenderer.invoke('filesapp:cleanup-undo', undoToken),
 
   // Pop an app out into its own borderless OS window (same app, second window).
-  // The main process dedupes by section â€” calling this again for an already-open
+  // The main process dedupes by section — calling this again for an already-open
   // section just focuses that window instead of opening a duplicate.
   popOut: (section: string): Promise<boolean> => ipcRenderer.invoke('popout:open', section),
   /** Sections currently open in their own pop-out window. */
@@ -1136,7 +1136,7 @@ const api = {
   popoutControl: (action: 'minimize' | 'maximize' | 'close'): Promise<void> =>
     ipcRenderer.invoke('popout:control', action),
 
-  /** Floating Mini Widget Mode â€” borderless transparent always-on-top craft window. */
+  /** Floating Mini Widget Mode — borderless transparent always-on-top craft window. */
   miniOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('mini:open', size),
   miniClose: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('mini:close'),
@@ -1221,7 +1221,7 @@ const api = {
     };
   }> => ipcRenderer.invoke('osHotkey:uninstall'),
 
-  /** Floating lock widget â€” frameless, transparent, no OS shadow. */
+  /** Floating lock widget — frameless, transparent, no OS shadow. */
   lockscreenOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('lockscreen:open', size),
   lockscreenUnlock: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('lockscreen:unlock'),
@@ -1234,7 +1234,7 @@ const api = {
     return () => ipcRenderer.removeListener('lockscreen:unlocked', handler);
   },
 
-  // L4 â€” transparent OS companion host over the real desktop
+  // L4 — transparent OS companion host over the real desktop
   companionHostSetEnabled: (
     enabled: boolean,
     span?: 'primary' | 'all',
@@ -2740,7 +2740,7 @@ const api = {
   // Tells the main process which UI language is active, so native dialog
   // titles/filters (file pickers) aren't stuck in English. See main/i18n.ts.
   // Fire-and-forget: main's handler is a `handle()`, so this must be an
-  // `invoke()` call to actually reach it â€” a plain `send()` would silently
+  // `invoke()` call to actually reach it — a plain `send()` would silently
   // go nowhere.
   setUiLang: (lang: string): void => {
     void ipcRenderer.invoke('i18n:setLang', lang);
