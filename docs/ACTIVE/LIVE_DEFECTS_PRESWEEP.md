@@ -907,3 +907,22 @@ third were real. The other two-thirds were guards the scanner could not see, and
 shapes have now been taught to it**, so the ratio for the next class-5 pass should be far better.
 The one that cannot be automated is D137's — a guard one frame up behind a prop — because it needs
 a component boundary crossed. Ask "which hosts reach this action?" before concluding either way.
+
+### 2026-09-07 06:00 EDT — primary CLAIMS class 4 manual half, and the id ranges that stop the collisions
+
+**CLAIMED: class 4 (count-vs-truth), the MANUAL half.** Live app pid 14128, **window 1**. No other
+worker should take a class-4 lead until this line says released.
+
+**ID RANGES, effective now.** Four ids collided in one night (D142/D143 fixed twice; D147 minted
+twice) because two workers mint from "max + 1" on two branches that merge every 15 minutes. Max on
+`feat/nyaa-subtitles` is D147, on `wt/files-app` D148. So:
+
+| worker | range |
+|---|---|
+| `primary` | **D149-D169** |
+| `primary2` | **D170-D189** |
+| `backup` | **D190-D209** |
+| codex | **D210-D229** |
+
+Mint inside your own range and the merge cannot collide, whichever branch you are on. This costs
+nothing and the alternative has now cost four duplicated fixes.
