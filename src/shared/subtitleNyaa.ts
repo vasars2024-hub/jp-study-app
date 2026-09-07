@@ -43,12 +43,18 @@ export interface NyaaAcquisitionConfig {
 }
 
 /**
- * Why the nyaa provider cannot run. One union, exported, because the same list
- * is restated in `subtitleHarvest.ts`'s offer and the two drifted the moment a
+ * Why the nyaa provider cannot run. One list, exported, because the same set is
+ * restated in `subtitleHarvest.ts`'s offer and the two drifted the moment a
  * fifth reason existed.
+ *
+ * A value, not just a type: `subtitleDiscovery.ts` has to know at runtime that
+ * every one of these is a statement about *this machine's configuration* and
+ * never about whether the subtitle exists, so none of them may suppress a
+ * retry. Deriving the type from the array is what stops a seventh reason being
+ * added here and silently becoming evidential over there.
  */
-export type NyaaUnavailableReason =
-  | 'not-configured'
+export const NYAA_UNAVAILABLE_REASONS = [
+  'not-configured',
   // Two causes, two different fixes, and they were one reason until 2026-09-07.
   // `TorrentManagerPage` had already split them with a comment saying why —
   // collapsing them "would send a user with no sources at all hunting for a
@@ -56,11 +62,14 @@ export type NyaaUnavailableReason =
   // index on a machine whose three profiles carry zero torrent sources between
   // them. `no-torrent-source` is "there is nothing to turn on"; `no-indexer`
   // keeps its old meaning, "they exist and are all off".
-  | 'no-torrent-source'
-  | 'no-indexer'
-  | 'qbit-disabled'
-  | 'qbit-remote'
-  | 'qbit-no-credential';
+  'no-torrent-source',
+  'no-indexer',
+  'qbit-disabled',
+  'qbit-remote',
+  'qbit-no-credential',
+] as const;
+
+export type NyaaUnavailableReason = (typeof NYAA_UNAVAILABLE_REASONS)[number];
 
 /**
  * Whether the qBittorrent settings can authenticate at all, for the mode in

@@ -66,7 +66,7 @@ import {
   fetchSubtitleCandidate,
   hasSubtitleProviderKey,
   jimakuSearchDetailed,
-  openSubtitlesSearch,
+  openSubtitlesSearchDetailed,
   setSubtitleProviderKey,
   testSubtitleProvider,
   type ProviderSubtitleCandidate,
@@ -83,7 +83,11 @@ import {
 } from './subtitleNyaaSource';
 import { harvestSearchAliases } from '../shared/subtitleHarvest';
 import { storedMalFacts } from './subtitleHarvest';
-import { asNyaaAcquisitionConfig, describeEmptyNyaaListing } from '../shared/subtitleNyaa';
+import {
+  NYAA_UNAVAILABLE_REASONS,
+  asNyaaAcquisitionConfig,
+  describeEmptyNyaaListing,
+} from '../shared/subtitleNyaa';
 import { providerSearchTitle } from '../shared/mediaFileIdentity';
 import { osdbHashFile } from './osdbHash';
 import { enqueueTranscription } from './transcriptionJobs';
@@ -407,8 +411,23 @@ export function retainedOnForce(records: readonly SubtitleRecord[] | undefined):
  * `provider-down` is the same argument one reason over: a 429, a 5xx or a
  * timeout means the question was never answered either. Letting an outage
  * suppress the retry turns a bad minute into a bad week.
+ *
+ * Every `NyaaUnavailableReason` is the same argument a third time, and the
+ * biggest of the three by volume. All six are refusals by `nyaaAvailability`
+ * *before any request is made* — no torrent index, qBittorrent off, no
+ * credential, a save path this machine cannot read. Measured on the real
+ * library 2026-09-07: **127 stored `nyaa | not-configured` rows across 39
+ * items**, every one of them a note about this app's own settings that was
+ * being read as a fact about the show. The cost is exactly the `no-key` cost —
+ * a user who turns qBittorrent on, or enables their first torrent index, would
+ * have found nyaa skipped for up to `retryAfterDays` afterwards, recording
+ * nothing to explain the silence.
  */
-const NON_EVIDENTIAL_FAILURES = new Set(['no-key', 'provider-down']);
+const NON_EVIDENTIAL_FAILURES = new Set<string>([
+  'no-key',
+  'provider-down',
+  ...NYAA_UNAVAILABLE_REASONS,
+]);
 
 function recentlyFailed(item: MediaItem, providerId: string, lang: string, retryAfterDays: number): boolean {
   const cutoff = Date.now() - retryAfterDays * DAY_MS;
@@ -417,6 +436,31 @@ function recentlyFailed(item: MediaItem, providerId: string, lang: string, retry
     && failure.lang === lang
     && !NON_EVIDENTIAL_FAILURES.has(failure.reason)
     && failure.attemptedAt > cutoff);
+}
+
+/**
+ * The failure rows worth keeping — which is only the ones the back-off consults.
+ *
+ * `subtitleFailures` has exactly one reader in the whole tree: `recentlyFailed`,
+ * above. It is not rendered anywhere, and no other code branches on it. So a row
+ * carrying a non-evidential reason is storage for something nothing will ever
+ * ask, and the list is capped at 24 per item and FIFO — meaning those rows push
+ * out the ones the back-off does need, until it forgets everything and re-asks
+ * every provider on every sweep.
+ *
+ * Measured on the real library 2026-09-07: **550 rows across 39 items, of which
+ * 498 are non-evidential** (313 `opensubtitles | no-key`, 127
+ * `nyaa | not-configured`, 58 `jimaku | no-key`) against 52 real
+ * `jimaku | no-match`. 23 items sat at 21 rows and one was already at the cap.
+ *
+ * Applied on write rather than as a migration, deliberately: this is not a
+ * schema change needing a version stamp, it is declining to store something with
+ * no reader, and it repairs the historical rows the first time each item is
+ * swept. `subtitlesCheckedAt` still records when the item was last looked at, so
+ * no timeline is lost with them.
+ */
+function keptFailures(failures: readonly SubtitleSearchFailure[]): SubtitleSearchFailure[] {
+  return failures.filter((failure) => !NON_EVIDENTIAL_FAILURES.has(failure.reason));
 }
 
 function hasLanguage(records: readonly SubtitleRecord[], lang: string): boolean {
@@ -531,6 +575,32 @@ async function discoverForItem(
     // network and has no key, and gating on the key-bearing predicate would
     // have dropped it out of the loop silently.
     if (!isRemoteSubtitleProvider(providerId)) continue;
+
+    // A manual-only provider cannot produce anything this loop is allowed to
+    // keep — the attach below refuses it by design, because a torrent-index hit
+    // is a name match with no curation and auto-attaching one means the wrong
+    // cut plays. So asking it is work whose result is discarded on the next
+    // line but one: an availability probe (which stats the qBittorrent save
+    // path), a second of index pacing, and a search with a 20 s timeout, per
+    // item, per sweep. On this machine's 39-item library that is ≥39 s added to
+    // a sweep for nothing.
+    //
+    // It also *wrote* for nothing. Every pass recorded a failure row — measured
+    // 2026-09-07, **127 stored `nyaa | not-configured` rows** — into a list
+    // capped at 24 per item, evicting the rows that do say something. Neither
+    // `manual-only` nor any `NyaaUnavailableReason` has a single consumer
+    // anywhere in `src/`; nothing renders them and nothing decides on them.
+    //
+    // Nyaa is still fully reachable, deliberately and by the user: the listing
+    // handler below (`subtitleDiscovery:nyaaList` → `subtitleDiscovery:nyaaAccept`)
+    // is how a nyaa subtitle is actually taken, and it is unaffected.
+    //
+    // The nyaa arms further down are left in place rather than deleted. They are
+    // unreachable while nyaa is the only entry in `MANUAL_ONLY_SUBTITLE_PROVIDERS`,
+    // but deleting them would make a future change to that list fall through to
+    // the `else` branch and search nyaa *as OpenSubtitles*, which fails silently.
+    if (isManualOnlySubtitleProvider(providerId)) continue;
+
     if (isNetworkSubtitleProvider(providerId) && !hasSubtitleProviderKey(providerId)) {
       failures.push({ providerId, lang: missing.join(','), attemptedAt: Date.now(), reason: 'no-key' });
       continue;
@@ -588,13 +658,19 @@ async function discoverForItem(
         });
       } else {
         const hashed = await osdbHashFile(item.path);
-        candidates = await openSubtitlesSearch({
+        // `…Detailed` for the same reason as Jimaku above: the plain form
+        // returns `[]` for a 429, a 5xx and a timeout alike, and this loop turns
+        // an empty list into an evidential `no-match` that suppresses the
+        // provider for `retryAfterDays`.
+        const reply = await openSubtitlesSearchDetailed({
           title: providerSearchTitle(item.seriesTitle ?? item.title),
           season: item.season ?? null,
           episode: item.episode ?? null,
           languages: wanted,
           movieHash: hashed?.hash ?? null,
         });
+        candidates = reply.candidates;
+        providerDown = reply.down;
       }
     } catch (error) {
       failures.push({
@@ -795,7 +871,7 @@ export async function runSubtitleDiscovery(
         host.patchItems([item.id], {
           subtitles: outcome.records,
           // Failures accumulate but are bounded, so the record cannot grow forever.
-          subtitleFailures: [...(item.subtitleFailures ?? []), ...outcome.failures].slice(-24),
+          subtitleFailures: keptFailures([...(item.subtitleFailures ?? []), ...outcome.failures]).slice(-24),
           subtitlesCheckedAt: Date.now(),
         });
         done += 1;
@@ -1298,5 +1374,5 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
 
 export const __subtitleDiscoveryTestables = {
   scoreCandidates, toProvidersDocument, recentlyFailed, hasLanguage, retainedOnForce,
-  hasUnattachedSidecar,
+  hasUnattachedSidecar, keptFailures,
 };
