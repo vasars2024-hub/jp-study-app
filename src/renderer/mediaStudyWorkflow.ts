@@ -110,9 +110,31 @@ function difficultyScore(label: string | null, unknownRatio: number): number {
   return Math.min(100, Math.round(base + unknownRatio * 10));
 }
 
+/**
+ * Which of the three difficulty verdicts a profile earns.
+ *
+ * Exported so `MediaLanguageProfileCard` can re-derive it at render time instead
+ * of printing the English sentence `recommendation()` froze into the store. That
+ * sentence is written once, at analysis time, so a later language switch could
+ * never reach it — and because `knownRatio` is stored alongside it, profiles
+ * written before this existed translate correctly too, with no migration (D175).
+ */
+export type MediaRecommendationKind = 'comfortable' | 'challenging' | 'intensive';
+
+export function recommendationKind(knownRatio: number): MediaRecommendationKind {
+  if (knownRatio >= 0.9) return 'comfortable';
+  if (knownRatio >= 0.75) return 'challenging';
+  return 'intensive';
+}
+
+/**
+ * The English sentence, still written into the profile so any consumer reading
+ * the stored field keeps working. The card no longer reads it.
+ */
 function recommendation(knownRatio: number, level: string | null): string {
-  if (knownRatio >= 0.9) return 'Comfortable for your current vocabulary.';
-  if (knownRatio >= 0.75) return `Challenging but suitable${level ? ` around ${level}` : ''}.`;
+  const kind = recommendationKind(knownRatio);
+  if (kind === 'comfortable') return 'Comfortable for your current vocabulary.';
+  if (kind === 'challenging') return `Challenging but suitable${level ? ` around ${level}` : ''}.`;
   return `Intensive study content${level ? `; recommended for ${level}+ learners` : ''}.`;
 }
 

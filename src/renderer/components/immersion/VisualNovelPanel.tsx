@@ -35,6 +35,7 @@ import { CAPTURE_KIND_KEYS } from './captureKindKeys';
 import DictionaryPopup from '../DictionaryPopup';
 import ReaderCollectionPanel from '../ReaderCollectionPanel';
 import { useT } from '../../i18n';
+import type { TVars } from '../../../shared/i18n/core';
 import { confirmDialog } from '../ui/dialogService';
 import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
 import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
@@ -96,12 +97,25 @@ function captureSceneKey(capture: Pick<VisualNovelTextCapture, 'chapter' | 'scen
   return `${capture.chapter.trim()}\u0000${capture.scene.trim()}`;
 }
 
-function formatDuration(totalSeconds: number): string {
+/**
+ * Playtime, in the interface language.
+ *
+ * `vnPanel.duration.{hm,m}` had been written and translated into all four
+ * catalogs and then never wired: this function returned `${hours}h ${minutes}m`
+ * literals right beside them, so the panel read `3h 47m` in Japanese while its
+ * own translations sat unused with zero consumers (D176). Nothing catches that —
+ * `i18n-check` only asks whether a key is TRANSLATED, not whether it is USED.
+ *
+ * Deliberately not the shared `formatDuration`: this one floors rather than
+ * rounds and never falls back to seconds, because a playtime of `45s` beside an
+ * engine name would read as a failed launch rather than a short session.
+ */
+function formatDuration(totalSeconds: number, t: (key: string, vars?: TVars) => string): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  if (hours) return t('vnPanel.duration.hm', { hours, minutes });
+  return t('vnPanel.duration.m', { minutes });
 }
 
 export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
@@ -799,6 +813,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   {selected.engine} · {selected.engineCompatibility} · {formatDuration(
                     selected.totalPlaytimeSec
                     + (sessionStartedAt ? Math.max(0, (clockNow - sessionStartedAt) / 1000) : 0),
+                    t,
                   )}
                   {sessionStartedAt ? ' · timing' : ''}
                 </span>

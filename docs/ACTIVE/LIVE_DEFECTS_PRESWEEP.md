@@ -1784,3 +1784,69 @@ so this is a handler-level verification, not an OS gesture.
 | D154 | stats + ~60 sites (widgets, scraper, both shells) | Every grouped number in the app is grouped the American way. Russian, which groups with a space, reads `13,200 симв.` | Same window switched to Russian: the chart tooltip read `13,200 симв.` where Russian writes `13 200`. `renderer/stats.ts:567` `formatNumber` pinned `toLocaleString('en-US')`. | P3 | **fixed — this commit** — live tooltip now `вт, 25 авг.: чтение 20m, просмотр 12m, 13 200 симв.`; English byte-identical at `13,200`. |
 | D155 | stats + everywhere `formatDuration` reaches | Durations keep English unit letters in every language: the Russian tooltip says `чтение 20m`, the Japanese one `読書20m`. | `renderer/stats.ts:556` returns `${s}s` / `${m}m` / `${h}h ${m%60}m` — three literals, no `t()`. Seen live in the ru and ja tooltips at window 12 after D210/D154 landed. | P3 | **fixed — `primary2`, in `wt/files-app`, which is exactly the turn `primary` said this needed.** The catalogs are clean in this worktree, so the three keys landed normally rather than through a HEAD+edit blob. `stats.duration.{s,m,hm}` in all four, `formatDuration` now resolves them and reads the language itself (same reasoning as `formatNumber`, so all ~25 call sites are fixed without touching one of them). No CLDR plural arm: the abbreviated unit is invariant in every one of the four — Russian writes `20 мин` at every count — which is why `vnPanel.duration.*` has no plural either. New suite `statsDurationLocale.test.ts`, 8 tests, **3 mutation controls all fire** (restore the `${m}m` literal → 4 fail; delete the zh minute key → 3 fail, and it is the *English-fallback* shape, so the by-name catalog test is what catches it; leave one Latin `h` in the ru form → 2 fail). English output is byte-identical to the old literals. |
 | D156 | stats — Estimated level | After syncing Anki the surface says **`Beginner` / `Level 1`** to a user it simultaneously credits with **41,535 tracked words**, and offers nothing that explains the contradiction. The hint says only "From Familiar-or-better coverage of your JLPT / HSK word lists". | Live, after driving **Sync from Anki** on this profile (below). Familiar-or-better = 5,286 words. Coverage measured against the profile's own `jp-level-lists`: **N5 79/578 = 14%**, N4 20%, N3 48%, **N2 559/816 = 69%**, N1 45%. `deriveUserLevel` needs a slot at `DEFAULT_LEVEL_THRESHOLD` 0.8 and walks upward from N5, so 14% at the first rung returns tier 1 and every higher band is never consulted. Unchanged across a reload, so this is the estimator's answer, not a stale render. | P3 | **open, and NOT filed as a wrong number.** The arithmetic is right and the staircase is a defensible design; what is wrong is that the badge is the ONLY thing shown. A user cannot tell "you are a beginner" from "your decks skip N5 vocabulary", which is what this profile actually shows — N5 is its *worst-covered* band and N2 its best, an inversion no beginner produces. **The fix is presentational** (surface the per-band coverage the estimate already computes, so the number explains itself) and needs new catalog keys, so it is blocked behind the same dirty catalogs as D155. Do not "fix" it by lowering the threshold. |
+
+## 2026-09-07 06:30 EDT — primary2 (worktree `wt/files-app`): D155 closed, and the class it opened
+
+`primary` named D155 as the exact next slice and correctly refused it — all four catalog files
+are dirty from another track in the MAIN tree, so a HEAD+edit blob would be silently dropped.
+**They are clean in this worktree.** So this turn took it, and following `formatDuration` out to
+its neighbours found three more of the same class.
+
+### The class, stated once because it is the transferable part
+
+**Translations that were written, translated into ja/zh/ru, and never wired to a consumer.**
+Two whole key blocks were sitting in all four catalogs with **zero call sites**:
+
+| block | keys | the component that should have used them |
+|---|---|---|
+| `mediaProfile.*` | 15 | `MediaLanguageProfileCard.tsx` — every string an English literal |
+| `vnPanel.duration.*` | 2 | `VisualNovelPanel.tsx` — a local `formatDuration` with English literals ten lines away |
+
+**No check in this repo could see it, and that is the point.** `i18n-check` asks whether a key is
+TRANSLATED. `i18n-hardcoded-check` asks whether a file adopts `t()` **at all** — and the card
+adopts nothing, so it is not even a partial-adoption case. `partial-i18n-scan.cjs` (D100) only
+scores files that already call `t()`. A file with no `t()` and a complete translated key block of
+its own is invisible to all three, and stays green forever.
+
+The gate added here is a **usage** gate, and it earned itself on its first run: it immediately
+flagged `mediaProfile.minutes` as having no consumer either. That key was **deleted from all four
+catalogs** rather than wired to nothing — the card's duration line now goes through the shared
+`formatDuration`, which speaks the language *and* handles hours, which that key never could.
+
+### The worst shape of the four: English frozen into the user's data
+
+`difficulty.recommendation` is not a render-time literal. `recommendation(knownRatio, level)`
+(`mediaStudyWorkflow.ts:113`) builds an English sentence **at analysis time and stores it** in
+`mediaStudyDatabase`. A language switch can never reach it, because by then it is data.
+
+Fixed without a migration and without touching the schema: `recommendationKind(knownRatio)` is
+now exported and the card re-derives the verdict at render from `knownRatio`, which is stored
+right beside the sentence. **Profiles already in the user's store therefore translate too.** The
+English field is still written, so any other consumer keeps working; the card no longer reads it.
+
+### Mutation controls — six, all fire
+
+| control | result |
+|---|---|
+| restore the bare `m` literal in `stats.formatDuration` | 4 fail |
+| delete the **zh** minute key | 3 fail — the *English-fallback* shape, so the by-name catalog test is what catches it |
+| leave one Latin `h` in the **ru** hours-and-minutes form | 2 fail |
+| render `profile.difficulty.band` raw again | 3 fail, one of them the usage gate |
+| print `profile.difficulty.recommendation` (the frozen sentence) again | 1 fail |
+| unwire `vnPanel.duration.hm` back to a literal | 1 fail — **the usage gate found it from source text alone**, which is exactly how it would have caught D176 on the day the key landed |
+
+### Not claimed by this turn
+
+None of this was driven in the running app. The card renders under jsdom in en/ja/ru against the
+real catalogs, which proves the strings resolve — it does **not** prove they FIT their control at
+ru/ja width. The VN panel could not be driven live regardless: the store
+`%APPDATA%\jp-study-app\immersion\visual-novels.json` is still the empty 53-byte
+`{version, entries, captures}`, so the surface has no subject. `MediaStudyMode.tsx` is the card's
+other host and was not walked.
+
+| id | surface | what is wrong | evidence | sev | status |
+|---|---------|--------------|----------|-----|--------|
+| D174 | media study (VN panel ▸ language profile; Media Study Mode) | `MediaLanguageProfileCard` renders **every** string as an English literal in all four languages — `Saved language profile`, `Known vocabulary`, `Unique words`, `Unique kanji`, `Frequent vocabulary`, `Unrated`, `{n} study sessions`, `{n} cards`, `{n} sentences reviewed`, its `aria-label`, and a local `formatDuration`. The difficulty band renders the **raw machine token** (`native`, lower case) rather than a word — wrong in English too. | The component had no `useT()` at all. `mediaProfile.*` — 15 keys, complete in en/ja/zh/ru — had **zero call sites** repo-wide. Hosted live at `VisualNovelPanel.tsx:948` and `MediaStudyMode.tsx:437`. | P2 | **fixed — this commit.** Wired to the block that already existed; band goes through `mediaProfile.band.*`; counts use the existing CLDR plural entries; duration uses the shared `formatDuration` (D155). |
+| D175 | media study — difficulty verdict | The one-line difficulty verdict is an English sentence **written into the profile store at analysis time**, so it is frozen in the user's data and no language switch can reach it. `Intensive study content; recommended for N3+ learners.` renders verbatim under a Japanese UI. | `recommendation()` at `renderer/mediaStudyWorkflow.ts:113` returns three English literals; `createMediaLanguageProfile` persists the result as `difficulty.recommendation` (`mediaStudyDatabase.ts:43/166`). Rendered raw at the card's `<p>`. | P2 | **fixed — this commit, with no migration.** `recommendationKind(knownRatio)` is exported and the card re-derives at render from `knownRatio`, which is stored beside the sentence — so profiles written before today translate as well. Five keys (`mediaProfile.recommendation.*`) in all four catalogs; the two verdicts that never mentioned a JLPT level still do not. The English field is still written so other consumers keep working. |
+| D176 | immersion — visual novels | Playtime beside the engine name reads with English unit letters in every language, **while the panel's own translations of exactly that string sit unused in all four catalogs.** | `VisualNovelPanel.tsx:99` `formatDuration` returned bare `h`/`m` literals; `vnPanel.duration.hm` and `vnPanel.duration.m` exist and are translated in en/ja/zh/ru with **zero consumers** — the only matches in `src/` outside the catalogs were the two comments this turn added. | P3 | **fixed — this commit.** `t` threaded into the helper. Deliberately NOT switched to the shared `formatDuration`: this one floors rather than rounds and must not fall back to seconds, because a sub-minute playtime beside an engine name reads as a failed launch rather than a short session. |
+| D177 | i18n, repo-wide — an INSTRUMENT gap, not a surface | **A fully-translated key block with no consumer is invisible to every i18n check in the repo**, so the translation work is done, ships in the bundle, and the surface stays English indefinitely. Two blocks were in exactly this state (D174, D176). | `i18n-check` verifies translation, not use. `i18n-hardcoded-check` only fires on a file that adopts `t()`. `partial-i18n-scan.cjs` only scores files that already call `t()`. A file with **no** `t()` plus its own complete key block passes all three. | P2 | **partly closed — this commit.** `mediaProfileLocale.test.tsx` gates `mediaProfile.*` and `vnPanel.duration.*` by usage, and found `mediaProfile.minutes` dead on its first run (deleted from all four catalogs). **The general form is NOT built and is the obvious next slice:** a repo-wide orphan-key scan over all 12,855 en keys. Expect a large legitimate remainder — keys reached through a dynamic suffix, and keys held for a surface not yet built — so it needs a baseline like `i18n-locale-arg-baseline.json`, not a hard zero. |
