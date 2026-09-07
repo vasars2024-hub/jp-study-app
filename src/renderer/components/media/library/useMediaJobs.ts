@@ -105,9 +105,54 @@ function upsert(job: MediaJob): void {
 /** Wired once, on the first subscriber, then left running for the session. */
 let wired = false;
 
+/**
+ * Seed the store from the transcription queue main already holds.
+ *
+ * Every other channel here is push-only, which is right for work that starts while
+ * the window is open. The transcription queue is the exception: it **persists to
+ * userData and is restored at boot** (`transcriptionJobs.ts` `loadQueue`), and
+ * `scheduleDrain` exists specifically so a restored queue runs even before a
+ * renderer is ready. So after a restart there can be real pending work that has
+ * broadcast nothing yet — and the panel, built purely from progress events, showed
+ * an empty list. `transcriptionQueue()` is the route that answers this and had no
+ * caller anywhere in the renderer (D245's class).
+ *
+ * Only jobs the push channel has not already reported are added, so a progress
+ * event that arrives first always wins over this snapshot.
+ */
+function hydrateTranscriptionQueue(): void {
+  const load = window.api?.transcriptionQueue;
+  if (typeof load !== 'function') return;
+  void load()
+    .then((queued) => {
+      if (!Array.isArray(queued)) return;
+      for (const job of queued) {
+        if (!job || typeof job.mediaId !== 'string') continue;
+        const id = `transcription:${job.mediaId}`;
+        if (jobs.has(id)) continue;
+        jobs.set(id, {
+          id,
+          kind: 'transcription',
+          title: job.title,
+          phase: 'queued',
+          done: 0,
+          total: 0,
+          finished: false,
+          updatedAt: job.queuedAt || Date.now(),
+        });
+      }
+      rebuild();
+    })
+    .catch(() => {
+      /* a queue we cannot read is not worth a broken panel */
+    });
+}
+
 function wire(): void {
   if (wired) return;
   wired = true;
+
+  hydrateTranscriptionQueue();
 
   window.api.onMediaMetadataProgress?.((p: MediaMetadataProgress) => {
     upsert({
@@ -203,6 +248,15 @@ const read = (): MediaJobsSnapshot => snapshot;
 export function useMediaJobs(): MediaJobsSnapshot {
   return useSyncExternalStore(subscribe, read, read);
 }
+
+/**
+ * The same `subscribe`/`read` pair the hook hands to `useSyncExternalStore`.
+ *
+ * Exposed because the interesting behaviour is the STORE's — `wire()` runs on the
+ * first subscribe, and D246's queue hydration happens there — and asserting it
+ * through a mounted component would be measuring React, not this.
+ */
+export const useMediaJobsStoreForTest = { subscribe, read };
 
 /** Test seam: drops all state so one case cannot leak into the next. */
 export const __mediaJobsTestables = {
