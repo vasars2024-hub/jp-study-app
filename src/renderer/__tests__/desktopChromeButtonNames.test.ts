@@ -26,13 +26,17 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const REPO = resolve(__dirname, '../../..');
-const SHELL = 'src/renderer/components/DesktopShell.tsx';
+const CHROME = [
+  { path: 'src/renderer/components/DesktopShell.tsx', minimum: 8 },
+  { path: 'src/renderer/App.tsx', minimum: 4 },
+];
 
-function shellSource(): string {
-  return readFileSync(resolve(REPO, SHELL), 'utf8');
+function shellSource(path: string): string {
+  return readFileSync(resolve(REPO, path), 'utf8');
 }
 
 function stripComments(source: string): string {
@@ -48,19 +52,20 @@ function stripComments(source: string): string {
  */
 function glyphButtons(source: string): { glyph: string; hasAriaLabel: boolean; title: string }[] {
   const text = stripComments(source);
+  const tree = ts.createSourceFile('chrome.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const out: { glyph: string; hasAriaLabel: boolean; title: string }[] = [];
-  const open = /<button\b/g;
-  let match: RegExpExecArray | null;
-  while ((match = open.exec(text))) {
-    const tagEnd = text.indexOf('>', match.index);
-    const close = text.indexOf('</button>', tagEnd);
-    if (tagEnd < 0 || close < 0) continue;
-    const attrs = text.slice(match.index, tagEnd);
-    const children = text.slice(tagEnd + 1, close).trim();
+  function visit(node: ts.Node) {
+    if (!ts.isJsxElement(node) || node.openingElement.tagName.getText(tree) !== 'button') {
+      ts.forEachChild(node, visit);
+      return;
+    }
+    // JSX callbacks contain `=>`: the first `>` is not necessarily the end of the tag.
+    const attrs = node.openingElement.attributes.getText(tree);
+    const children = text.slice(node.openingElement.end, node.closingElement.pos).trim();
     // A bare glyph, or a ternary whose two arms are both quoted glyphs.
     const bare = /^[^\w\s]$/u.test(children);
     const ternary = /^\{[^}]*\?\s*'([^\w\s])'\s*:\s*'([^\w\s])'\s*\}$/u.exec(children);
-    if (!bare && !ternary) continue;
+    if (!bare && !ternary) return;
     const titleMatch = /title=\{([^}]*)\}/.exec(attrs);
     out.push({
       glyph: bare ? children : `${ternary?.[1]}/${ternary?.[2]}`,
@@ -68,29 +73,34 @@ function glyphButtons(source: string): { glyph: string; hasAriaLabel: boolean; t
       title: titleMatch ? titleMatch[1].trim() : '',
     });
   }
+  visit(tree);
   return out;
 }
 
-describe('DesktopShell window chrome announces itself', () => {
+describe.each(CHROME)('$path window chrome announces itself', ({ path, minimum }) => {
   it('finds the glyph-only buttons at all, so the rule below is not vacuous', () => {
-    const found = glyphButtons(shellSource());
+    const found = glyphButtons(shellSource(path));
     // Framed bar and frameless cluster each render pop-out, Liquid, minimize, maximize, close.
-    expect(found.length).toBeGreaterThanOrEqual(8);
-    expect(found.map((b) => b.glyph)).toContain('⧉');
+    expect(found.length).toBeGreaterThanOrEqual(minimum);
     expect(found.map((b) => b.glyph)).toContain('─');
   });
 
   it('gives every glyph-only button an aria-label, because its text cannot name it', () => {
-    const unnamed = glyphButtons(shellSource()).filter((b) => !b.hasAriaLabel);
+    const unnamed = glyphButtons(shellSource(path)).filter((b) => !b.hasAriaLabel);
     expect(unnamed.map((b) => `${b.glyph} (title=${b.title || 'none'})`)).toEqual([]);
   });
 
   it('does not let title stand in for the label', () => {
     // Every glyph button that carries a title must carry the label too — the pairing is the
     // repair. A title with no label is exactly the shape that shipped.
-    const titledWithoutLabel = glyphButtons(shellSource()).filter(
+    const titledWithoutLabel = glyphButtons(shellSource(path)).filter(
       (b) => b.title !== '' && !b.hasAriaLabel,
     );
     expect(titledWithoutLabel).toEqual([]);
   });
+});
+
+it('detects an unlabeled glyph even after an arrow callback and ignores comment labels', () => {
+  expect(glyphButtons(`<button title={'Close'} onClick={() => close()} /* aria-label="Close" */>×</button>`))
+    .toEqual([{ glyph: '×', hasAriaLabel: false, title: "'Close'" }]);
 });

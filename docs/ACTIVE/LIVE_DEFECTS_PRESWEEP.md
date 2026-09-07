@@ -433,3 +433,10 @@ D-number range was read off the other branch too - but only the NUMBERS were rea
 branch's cross-cutting table, and class 5 is a cross-cutting pass rather than a surface. **Before
 claiming a cross-cutting CLASS, read `wt/files-app`'s cross-cutting table, not just its coverage
 table and its highest D number.**
+
+## 2026-09-07 00:41 EDT — codexA, boss audit A6-F1
+
+| D121 | pop-out chrome | Minimize, Maximize and Close announce drawing glyphs rather than their functions. | Open Settings as a pop-out; inspect the titlebar controls (audit A6-F1). | P2 | Fixed in this slice; live window 9 at integration HEAD plus edit: Make Liquid / Minimize / Maximize / Close. Removing Close aria-label restores ×; restoring returns Close. No Vite error overlay. |
+| D122 | desktop shortcuts | Remove from desktop has only a glyph as its accessible name. | DesktopShell.tsx shortcut remove button has a title but no aria-label. | P2 | Source-confirmed and repaired in this slice; current desktops contain zero shortcuts, so the fix is unit-verified only. The JSX parser now detects callbacks containing => instead of skipping the button. |
+
+The chrome regression scans both DesktopShell and App.tsx with TypeScript JSX parsing: 7/7 tests. A6-F3 was already recovered at 7bc4eb31. A6-F2 product commits are integrated through 55c74450; the two remaining worktree commits are documentation only. Shared app was not restarted; codexA owns only its newly opened Settings pop-out (window 9).

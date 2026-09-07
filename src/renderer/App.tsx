@@ -908,15 +908,15 @@ function PopoutChrome({
             {liquid ? '◆' : '◇'}
           </button>
         )}
-        <button className="popout-btn" title={t('appShell.minimize')} onClick={() => void window.api.popoutControl('minimize')}>
+        <button className="popout-btn" title={t('appShell.minimize')} aria-label={t('appShell.minimize')} onClick={() => void window.api.popoutControl('minimize')}>
           ─
         </button>
         {canMaximize && (
-          <button className="popout-btn" title={t('appShell.maximize')} onClick={() => void window.api.popoutControl('maximize')}>
+          <button className="popout-btn" title={t('appShell.maximize')} aria-label={t('appShell.maximize')} onClick={() => void window.api.popoutControl('maximize')}>
             ▢
           </button>
         )}
-        <button className="popout-btn popout-close" title={t('common.close')} onClick={() => void window.api.popoutControl('close')}>
+        <button className="popout-btn popout-close" title={t('common.close')} aria-label={t('common.close')} onClick={() => void window.api.popoutControl('close')}>
           ×
         </button>
       </div>
