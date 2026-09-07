@@ -515,3 +515,7 @@ after its icon id (`heart`, `skip-back`), which is a worse name than none and wo
 change 130 controls at once. The name belongs on the button.
 
 D2 verification, 2026-09-07 00:54 EDT: delivered Enter **1/1** opens **悪の教典 02** with its real Japanese text through the existing reader, from BOTH standard and Aero lists (24 rows → 0 list rows + novel-scroller). Reader Library button returns to the shelf. Unit controls keep single-click selection, Space, unrelated keys and double click; held Enter opens once. Isolated old view fails **3/13** Enter cases, all **10 controls pass**; corrected view passes **13/13**; shared tree Library suites **21/21**. Console errors **0**. Library remains partial; this closes D2 rather than claiming its whole inventory.
+
+## 2026-09-07 00:56 EDT — codexA claims live Statistics updates
+
+| D124 | stats / reader integration | Statistics stops updating after opening, even while another window records real study time. | Open Statistics, then read 悪の教典 02 in a separate Library pop-out. Window 12 keeps Read today at **1m** after its localStorage reaches **136.351 seconds (2m)**; per-book time also stays at the earlier snapshot. No fake data injected. | P2 | open — claimed codexA; useStats memo depends only on manual refresh/reset and subscribes to no reading/watch/storage/language changes. Share an event subscription with study widgets; preserve independent read/watch totals. |
