@@ -65,7 +65,7 @@ import {
 import {
   fetchSubtitleCandidate,
   hasSubtitleProviderKey,
-  jimakuSearch,
+  jimakuSearchDetailed,
   openSubtitlesSearch,
   setSubtitleProviderKey,
   testSubtitleProvider,
@@ -403,8 +403,12 @@ export function retainedOnForce(records: readonly SubtitleRecord[] | undefined):
  * no new failure while doing it, and so offered the user nothing to explain the
  * silence. Measured on this machine — a Jimaku key added 5.98 days after a
  * keyless sweep was still being ignored, with a 7-day window.
+ *
+ * `provider-down` is the same argument one reason over: a 429, a 5xx or a
+ * timeout means the question was never answered either. Letting an outage
+ * suppress the retry turns a bad minute into a bad week.
  */
-const NON_EVIDENTIAL_FAILURES = new Set(['no-key']);
+const NON_EVIDENTIAL_FAILURES = new Set(['no-key', 'provider-down']);
 
 function recentlyFailed(item: MediaItem, providerId: string, lang: string, retryAfterDays: number): boolean {
   const cutoff = Date.now() - retryAfterDays * DAY_MS;
@@ -556,15 +560,23 @@ async function discoverForItem(
 
     emit('searching-providers', { providerId });
     let candidates: ProviderSubtitleCandidate[] = [];
+    // Set when the provider itself did not answer — a rate limit, a 5xx, a
+    // timeout. Kept separate from an empty candidate list because they are not
+    // the same claim, and only one of them is about this show.
+    let providerDown = false;
     try {
       if (providerId === 'jimaku') {
         // Japanese-only provider; asking it for anything else is a wasted request.
         if (!wanted.some((lang) => lang.startsWith('ja'))) continue;
-        candidates = await jimakuSearch(
+        // `jimakuSearchDetailed` rather than `jimakuSearch`: the plain form drops
+        // the `down` flag, and this is the caller that most needs it.
+        const reply = await jimakuSearchDetailed(
           item.anilistId,
           providerSearchTitle(item.seriesTitle ?? item.title),
           item.episode ?? null,
         );
+        candidates = reply.candidates;
+        providerDown = reply.down;
       } else if (providerId === 'nyaa') {
         candidates = await nyaaSearch({
           // Checked non-null by the availability gate above.
@@ -595,6 +607,24 @@ async function discoverForItem(
     }
 
     if (cancelled.has(item.id)) return { records, failures, files };
+
+    // An outage is not an answer about this title. Recording `no-match` here is
+    // what the client's own comment warns against — measured 2026-08-17, eight
+    // titles reported "no Japanese subtitles filed" and returned 125/57/168/36/
+    // 95/48/60/47 files when the same requests were spaced 6 s apart — and it
+    // costs more than a wrong word, because `no-match` is evidential and
+    // suppresses the retry for `retryAfterDays` (7 by default). The real library
+    // carries 52 jimaku `no-match` rows for The Big O, a series jimaku
+    // demonstrably has per-episode files for: E01 and E13 are both attached.
+    if (providerDown) {
+      failures.push({
+        providerId,
+        lang: wanted.join(','),
+        attemptedAt: Date.now(),
+        reason: 'provider-down',
+      });
+      continue;
+    }
     emit('matching', { providerId });
 
     for (const lang of wanted) {
