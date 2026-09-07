@@ -983,3 +983,27 @@ required and trimmed non-empty. So: **an i18n placeholder whose value can be `un
 as itself, in the accessible name, silently — `i18n-check` cannot see it and neither can a test
 that only ever passes a defined value.** Name by `title || message`, and keep the bare word as the
 last resort.
+
+### 2026-09-07 07:20 EDT — primary, class 4 manual: flashcards, and one thing an agent left behind
+
+**Flashcards agrees with its store, and that is the finding.** Every number the surface shows —
+`All 4`, `Unfiled 4`, `EPUB decks (4)`, `All in current folder (4)`, `Add audio to 4 cards`,
+`Start review (4)`, `Dictionary (0)` — matches `jp-flashcard-deck`, which holds `folders: 0,
+cards: 4`. Zero count-vs-truth defects on this surface. Recorded rather than left blank, because
+"0 found" is an answer and a blank reads as unvisited.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D153 | flashcards | **The only flashcards in the profile are four an agent left behind.** The deck is called `zzprobe-headerless` and holds 猫/犬/鳥/魚. Every count on the Flashcards surface — "All 4", "EPUB decks (4)", "Start review (4)" — is counting them, so the surface looks populated while the user has never saved a card. | Flashcards ▸ the deck strip. `localStorage['jp-flashcard-deck']` = 4 cards, all `bookTitle: "zzprobe-headerless"`, all `addedAt` **2026-09-06 10:58:49 EDT**. `jp-deck-level-cache-v1` carries a matching `import-zzprobe-headerless::zzprobe-headerless` entry. | P3 | **open — deliberately NOT deleted by me.** Removing it is one click in the app's own deck management. It is the user's `localStorage`, it has no restore point, and deleting study data is the one class of action the relay's standing authorization explicitly reserves for the user. Filing it is the escalation. |
+
+**A near-miss worth recording, because it would have been a false P1.** My first read of those cards
+printed `{front: "", back: "cat"}` and I was one step from filing "the importer creates cards with
+no front side". The card shape is `word/reading/meaning`, not `front/back` — my probe asked for
+fields the record does not have and got `''`. The records are perfectly well formed
+(`猫 / ねこ / cat`), and `rowsToDeckEntries` (`shared/deckImport.ts`) already refuses a row whose
+word is empty (`if (!word.trim()) continue;`). **Read the record's own keys before scoring the
+values.**
+
+**Litter sweep, since one piece of it turned up:** all 66 `localStorage` keys scanned for
+`zzprobe|zzqqxx|probe-|__probe|PLANT|headerless|test-fixture`. **2 hits, both the same deck.**
+Nothing else an agent ran this month is sitting in the user's profile.
