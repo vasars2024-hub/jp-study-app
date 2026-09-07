@@ -1871,3 +1871,50 @@ sharing. The served-module read answers the same question — *can the running r
 these keys, in Japanese* — without touching anything of the user's. The renderer was confirmed
 healthy at the same time: `#root` has 2 children and there is no `vite-error-overlay`, so the
 59-file land did not blank it (the D115 failure mode).
+
+## 2026-09-07 15:35 EDT — primary, main tree: the automatic-subtitle chain, and one class three times
+
+Claimed and closed a **cross-cutting thread rather than a surface**: the 09-07 09:55 pin's own
+objective — *"make sure the automatic subtitle finding for downloaded episodes actually works"* —
+measured hop by hop against the user's real `media.json` (39 items, 37 video, 11 with any subtitle
+track). **No coverage cell moved and none should**; this is not a surface walk.
+
+**D250, D251 and D252 are one defect three times, and it is worth naming as a class:**
+
+> **A fixed rule does not repair what the old rule already wrote, and nothing revisits it.**
+
+- **D250** — the release parser learned `-END`; both backfill sites gate on
+  `seriesKey === undefined`, and a *wrong* key is not an absent one.
+- **D251** — the sharpest. `subtitleDiscovery.ts:360` has refused this attachment since
+  2026-08-24 **and its own comment cites the three still-attached bad rows as the measurement
+  that produced the guard.** They were left in place, and the sweep's eligibility filter then
+  made them unreachable: a wrong ja track satisfies "has the wanted language" as well as a
+  right one.
+- **D252** — the client exposes a `down` flag precisely so an outage is not reported as a fact
+  about the show; `jimakuSearch` drops it, and `no-match` is evidential, so a 429 suppressed
+  the provider for 7 days.
+
+**The habit this argues for:** when you fix a rule that writes to a store, ask in the same commit
+what the old rule already wrote — and *measure it against the real profile*. All three answers
+came from bundling the shipping function with `esbuild` and running it over a **copy** of
+`%APPDATA%\jp-study-app\media.json`. That took seconds, needed no app restart, and is a
+repeatable recipe: `npx esbuild <module> --bundle --platform=node --format=cjs --outfile=<tmp>`,
+then `require` it from a throwaway script under `~\.claude-runs\`.
+
+**A trap that cost a re-run, worth more than the fix:** three `perl -0pi -e` mutation controls
+read as clean passes because the pattern ended in `\n` and the file is CRLF — the substitution
+silently matched nothing. **Verify a mutation APPLIED before you believe it passed**: line count,
+occurrence count, or a grep for the mutated text. Re-run with `\r?\n`, all three fired.
+
+**Left open, deliberately, and it is the next slice:** D252's *record* half is source-verified,
+not driven. `discoverForItem` is not in `__subtitleDiscoveryTestables` and no harness drives
+`runSubtitleDiscovery` with a mocked provider client. Build one — electron is already mocked in
+`src/main/__tests__/subtitleDiscovery.test.ts` — and it closes three things at once: D252's
+record half, D251's prune firing inside the sweep, and the **nyaa and opensubtitles arms, which
+still collapse an outage into `no-match` and are NOT fixed here.**
+
+**Also measured, not filed as a defect, so the next worker does not re-derive it:** of the user's
+29 Big O items, 24 have no subtitle at all (episodes 2–12, 14–26), and those 24 are exactly the
+items carrying a `jimaku no-match` row. Episode 13 and the three extras have one. Whether the
+24 recover is a live question for after a restart — D252 removes the 7-day suppression, but
+whether jimaku actually has those episodes filed is a third-party fact nobody has checked.
