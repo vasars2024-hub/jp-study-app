@@ -182,6 +182,24 @@ export interface SubtitleDiscoveryResult {
   attached: number;
   /** Items where every source came back empty. */
   empty: number;
+  /**
+   * Of the `empty` items, how many were empty because a provider was DOWN rather
+   * than because it answered "nothing for this title".
+   *
+   * The per-provider layer has always known the difference — `subtitleProviderClients`
+   * carries `down`/`downStatus` and `subtitleDiscovery` records a distinct
+   * `provider-down` failure precisely so an outage is never written as evidential
+   * `no-match`. That distinction stopped at the item and never reached the caller,
+   * so the result of a sweep with no network was byte-identical to the result of a
+   * sweep that genuinely found nothing.
+   *
+   * Measured 2026-09-07 on the user's own 39-item library through the `/network`
+   * bridge route: offline `{ok:true, attached:0, empty:28, files:0}`; the online
+   * control on the same call `{ok:true, attached:3, empty:25, files:3}`. Three
+   * titles that DO have subtitles were reported exactly like the twenty-five that
+   * do not.
+   */
+  unreachable: number;
   /** Subtitle files written in total. */
   files: number;
   error?: string;
@@ -425,4 +443,22 @@ export function orderedSubtitleProviders(settings: SubtitleDiscoverySettings): S
     .filter((provider) => provider.enabled)
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
     .map((provider) => provider.id);
+}
+
+/**
+ * Whether a sweep that reported success actually reached anybody.
+ *
+ * The predicate a caller needs and could not write, because `ok` answers a
+ * different question: `ok` is "the sweep ran", and a sweep with no network runs
+ * perfectly and finds nothing. Both halves are load-bearing.
+ *
+ * - `files === 0` and not merely `attached === 0`: a run that attached nothing new
+ *   but did download a file for a title that already had one is still evidence the
+ *   providers answered, and calling that an outage would be a false alarm.
+ * - `unreachable > 0` and not `unreachable === empty`: a partial outage is still an
+ *   outage. If two providers are down and a third answers "nothing for this title",
+ *   the user has not been told anything about the two.
+ */
+export function subtitleSweepWentNowhere(result: SubtitleDiscoveryResult): boolean {
+  return result.ok && result.files === 0 && result.unreachable > 0;
 }

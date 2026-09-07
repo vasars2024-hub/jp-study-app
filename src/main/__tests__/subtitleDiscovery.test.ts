@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { __subtitleDiscoveryTestables, pickPlaybackSubtitle } from '../subtitleDiscovery';
+import {
+  subtitleSweepWentNowhere,
+  type SubtitleDiscoveryResult,
+} from '../../shared/subtitleDiscoveryIpc';
 
 // subtitleDiscovery registers IPC and reads userData at module load; stub just
 // enough for it to import. The functions under test are pure over their inputs.
@@ -379,5 +383,53 @@ describe('hasUnattachedSidecar', () => {
     expect(hasUnattachedSidecar({
       id: 'm2', path: path.join(dir, 'nope', 'gone.mp4'), subtitles: [],
     } as Parameters<typeof hasUnattachedSidecar>[0])).toBe(false);
+  });
+});
+
+/**
+ * The predicate that separates "nobody answered" from "nobody has it".
+ *
+ * Measured 2026-09-07 on the user's own 39-item library through the `/network`
+ * bridge route: with the session blackholed, `runSubtitleDiscovery({})` returned
+ * `{ok:true, attached:0, empty:28, files:0}`; the online control on the same call
+ * returned `{ok:true, attached:3, empty:25, files:3}`. Three titles that DO have
+ * subtitles were reported exactly like the twenty-five that do not, and the caller
+ * had no field that could tell them apart. The cases below are written so that the
+ * two obvious cheaper readings — "just check `ok`" and "check `attached === 0`" —
+ * both fail.
+ */
+describe('subtitleSweepWentNowhere', () => {
+  const result = (over: Partial<SubtitleDiscoveryResult>): SubtitleDiscoveryResult =>
+    ({ ok: true, attached: 0, empty: 0, unreachable: 0, files: 0, ...over });
+
+  it('is true for the measured offline sweep', () => {
+    expect(subtitleSweepWentNowhere(result({ empty: 28, unreachable: 28 }))).toBe(true);
+  });
+
+  it('is false for the measured online control, which reported the same ok', () => {
+    // The whole point: `ok` is identical in both, so a check on `ok` alone cannot
+    // distinguish them.
+    expect(subtitleSweepWentNowhere(result({ attached: 3, empty: 25, files: 3 }))).toBe(false);
+  });
+
+  it('is false when every provider genuinely answered "nothing for this title"', () => {
+    expect(subtitleSweepWentNowhere(result({ empty: 28, unreachable: 0 }))).toBe(false);
+  });
+
+  it('is false when files were written despite a partial outage', () => {
+    // `files`, not `attached`. A run that downloaded a track for a title that
+    // already had one attaches nothing new, and calling that an outage would put a
+    // red toast on a working search.
+    expect(subtitleSweepWentNowhere(result({ attached: 0, empty: 27, unreachable: 4, files: 2 }))).toBe(false);
+  });
+
+  it('is true for a PARTIAL outage that found nothing', () => {
+    // Not `unreachable === empty`. Two providers down and a third saying "no" still
+    // leaves the user uninformed about the two.
+    expect(subtitleSweepWentNowhere(result({ empty: 28, unreachable: 1 }))).toBe(true);
+  });
+
+  it('is false when the sweep itself failed, which already has its own error', () => {
+    expect(subtitleSweepWentNowhere(result({ ok: false, unreachable: 9, error: 'nope' }))).toBe(false);
   });
 });

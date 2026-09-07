@@ -26,6 +26,7 @@ import {
 } from '../TranscriptionCardOptions';
 import { episodesBySeason, providerEpisodeTitle, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
+import { subtitleSweepWentNowhere } from '../../../../shared/subtitleDiscoveryIpc';
 import {
   fusionArbitrationStatus,
   fusionCueCounts,
@@ -186,7 +187,14 @@ export default function MediaDetailPanel({
         mediaIds: [entry.primary.id],
         force: true,
       });
-      showToast(result.ok
+      // `ok` alone is not "we got an answer". A sweep with no network returns
+      // ok:true and zero files, which is exactly what a title that genuinely has
+      // no subtitles returns — so this used to tell the user "0 subtitles found"
+      // for their whole library the moment their connection dropped, in a neutral
+      // toast, with nothing anywhere saying the search never reached anyone.
+      // `unreachable` is the count the runner already knew and did not report.
+      const wentNowhere = subtitleSweepWentNowhere(result);
+      showToast(result.ok && !wentNowhere
         ? { message: t('media.subtitles.searchDone', { count: result.files }), kind: result.files ? 'success' : 'default' }
         : { message: result.error ?? t('media.subtitles.searchFailed'), kind: 'error' });
     } catch (error) {

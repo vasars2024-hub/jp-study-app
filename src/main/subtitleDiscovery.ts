@@ -778,14 +778,14 @@ function eligible(item: MediaItem): boolean {
 export async function runSubtitleDiscovery(
   request: SubtitleDiscoveryRequest = {},
 ): Promise<SubtitleDiscoveryResult> {
-  if (!host) return { ok: false, attached: 0, empty: 0, files: 0, error: 'Subtitle discovery host is not registered.' };
-  if (sweeping) return { ok: false, attached: 0, empty: 0, files: 0, error: 'A subtitle sweep is already running.' };
+  if (!host) return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'Subtitle discovery host is not registered.' };
+  if (sweeping) return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'A subtitle sweep is already running.' };
 
   const settings = loadDiscoverySettings();
   const languages = (request.languages?.length ? request.languages : settings.autoDownloadLanguages)
     .map((lang) => lang.trim().toLowerCase())
     .filter(Boolean);
-  if (languages.length === 0) return { ok: true, attached: 0, empty: 0, files: 0 };
+  if (languages.length === 0) return { ok: true, attached: 0, empty: 0, unreachable: 0, files: 0 };
 
   const only = request.mediaIds?.length ? new Set(request.mediaIds) : undefined;
   // Repair BEFORE selecting, not inside the per-item pass, because a wrong track
@@ -815,12 +815,15 @@ export async function runSubtitleDiscovery(
     return hasUnattachedSidecar(item);
   });
 
-  if (items.length === 0) return { ok: true, attached: 0, empty: 0, files: 0 };
+  if (items.length === 0) return { ok: true, attached: 0, empty: 0, unreachable: 0, files: 0 };
 
   sweeping = true;
   const startedAt = Date.now();
   let attached = 0;
   let empty = 0;
+  // Of `empty`, the ones that were empty because nobody answered. See
+  // `SubtitleDiscoveryResult.unreachable` for why this is counted separately.
+  let unreachable = 0;
   let files = 0;
   let done = 0;
 
@@ -865,7 +868,13 @@ export async function runSubtitleDiscovery(
 
         const gained = outcome.records.length > (item.subtitles?.length ?? 0);
         if (gained) attached += 1;
-        else empty += 1;
+        else {
+          empty += 1;
+          // Read off THIS run's failures, not the item's accumulated list: a
+          // `provider-down` row kept from a previous sweep would make every later
+          // healthy sweep report an outage.
+          if (outcome.failures.some((failure) => failure.reason === 'provider-down')) unreachable += 1;
+        }
         files += outcome.files;
 
         host.patchItems([item.id], {
@@ -879,6 +888,9 @@ export async function runSubtitleDiscovery(
       } catch (error) {
         done += 1;
         empty += 1;
+        // A throw out of `discoverForItem` is the network failing hard rather than a
+        // provider answering; it belongs on the same side of the line as `down`.
+        unreachable += 1;
         emit('error', { error: error instanceof Error ? error.message : String(error) });
       } finally {
         running.delete(item.id);
@@ -891,7 +903,7 @@ export async function runSubtitleDiscovery(
     cancelled.clear();
   }
 
-  return { ok: true, attached, empty, files };
+  return { ok: true, attached, empty, unreachable, files };
 }
 
 // ---------------------------------------------------------------------------
