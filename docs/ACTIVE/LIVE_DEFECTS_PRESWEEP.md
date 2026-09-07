@@ -461,3 +461,34 @@ a label written. Splitting the class that way is what made it one turn instead o
 D10 retracted as **not-reproducible at cd503890**: toolbar Reset and File → Reset statistics BOTH show the shared irreversible-reset warning. Both cancelled; all jp-study-stats* localStorage strings are byte-identical before/after. The original row inspected the caller but missed useStats.resetAllStats confirmation.
 
 | D123 | stats (Aero) | Switching to Aero hides all watching activity: total time, per-show history and watch segments disappear. | Statistics pop-out window 10, per-window Aero material seam. Live store contains 7,173.3 watch seconds and 6 shows; Aero renders no watch totals, show rows or watch bars. | P2 | open — claimed codexA; reuse shared StatsChart and StatsShows and add the existing watch summary labels to Aero. Standard/Wired and Blanc already consume the shared components. |
+
+### 2026-09-07 00:50 EDT — primary, D124 closed. Numbers, and the two ways the instrument was blind.
+
+**D124 fixed at `e1985518`.** 45 sites across 20 files; `glyphButtonNames.test.ts` now derives
+the population from `src/renderer` + `src/media` instead of listing paths, and asserts zero.
+Verified at the commit in a **detached worktree**, not the shared tree: i18n-check exit 0
+(12,732 keys, all translated), i18n-dupe-keys clean (10,691 per catalog), architecture-audit
+"Nothing new", the three name/encoding gates 12/12.
+
+**Negative control:** deleting the `aria-label` from `widgets/levels.tsx` fails the gate at
+`levels.tsx:58 × (has a title, which cannot name it)` — the exact file, line and reason — and
+restoring it passes. Without that the "0 unnamed" reading would be worth nothing.
+
+**Both blindnesses were in the instrument, and this is the reusable part.**
+1. *One hardcoded path.* `desktopChromeButtonNames.test.ts` read
+   `const SHELL = 'src/renderer/components/DesktopShell.tsx'`, so 45 sites in 20 other files
+   were outside its universe while it reported green.
+2. *The regex took the wrong `>`.* `text.indexOf('>', match.index)` finds the arrow of
+   `onClick={() => …}` before the end of the opening tag, so **any button with a callback was
+   skipped — including one in the file it *was* scanning** (`DesktopShell.tsx`'s Remove from
+   desktop, which codexA fixed as D122). Switching to a TSX parse moved the count from 45 to 52.
+
+**Method that made it one turn rather than twenty:** 32 of 45 already carried a `title` saying
+the right words, so those are a scripted copy — the string was never the missing thing, only its
+attribute. The remaining 13 had no words anywhere and were hand-written, which is where the 9
+new keys went. Move/remove in a list now name the row they act on (`Move {name} up`) rather than
+repeating "Move up" six times down a column.
+
+**One offender is left in the tree and it is a decision, not a miss:**
+`__devharness__/videoStudyHarness.tsx:167`. The harness directory is slated for deletion; the
+gate excludes it by name, and that exclusion line is what to delete if it ever ships.
