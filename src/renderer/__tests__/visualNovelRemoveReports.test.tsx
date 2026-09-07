@@ -18,8 +18,27 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { normalizeVisualNovelDatabase } from '../../shared/visualNovel';
+
+/**
+ * `dbc5d509` put Remove behind a confirm — correctly, it was destroying every mined sentence
+ * with no guard — and that turned this whole file red: the click now awaits a dialog that never
+ * answers under jsdom, so `visualNovelRemove` was never reached and `removeCalls` read `[]`.
+ * The dialog is STUBBED rather than driven, following `readingLensCaptureHistory.test.tsx`, so
+ * both answers can be asserted; a file that only ever confirms would pass just as well with the
+ * guard deleted. Note the panel imports from `../ui/dialogService` directly, not from
+ * `../components/ui`, so that is the specifier mocked here.
+ */
+let confirmAnswer = true;
+const confirmCalls: unknown[] = [];
+vi.mock('../components/ui/dialogService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../components/ui/dialogService')>()),
+  confirmDialog: async (opts: unknown) => {
+    confirmCalls.push(opts);
+    return confirmAnswer;
+  },
+}));
 
 const seed = normalizeVisualNovelDatabase({
   version: 1,
@@ -77,6 +96,8 @@ afterEach(() => {
   root?.unmount();
   root = null;
   removeCalls = [];
+  confirmCalls.length = 0;
+  confirmAnswer = true;
   document.body.replaceChildren();
 });
 
@@ -124,6 +145,19 @@ describe('removing a visual novel reports what happened', () => {
     expect(status()).toBe('Sample Visual Novel is still in the local library.');
     expect(host.querySelector('.media-error')).not.toBeNull();
     // And the entry is still on screen, because it is still there.
+    expect(host.querySelector('.visual-novel-summary-actions')).not.toBeNull();
+  });
+
+  it('asks first, and answering No removes nothing and says nothing', async () => {
+    // The guard `dbc5d509` added, pinned. Without this case every assertion above would pass
+    // just as well with the confirm deleted, which is exactly how the guard could be lost again.
+    confirmAnswer = false;
+    removeAnswer = emptied;
+    await mount();
+    await act(async () => { removeButton().click(); });
+    expect(confirmCalls).toHaveLength(1);
+    expect(removeCalls).toEqual([]);
+    expect(status()).toBe('');
     expect(host.querySelector('.visual-novel-summary-actions')).not.toBeNull();
   });
 });
