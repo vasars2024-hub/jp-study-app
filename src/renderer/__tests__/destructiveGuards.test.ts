@@ -40,7 +40,26 @@ const CASES = [
   // D17, open since the resources walk. The tool and any note written on it went
   // on one click, and the `catch { /* ignore */ }` meant a FAILED removal looked
   // identical to a dead button.
-  { file: 'src/renderer/components/resources/ResourcesContent.tsx', api: 'toolsRemove' },
+  //
+  // D143 then moved the confirm OUT of this file. `tools:remove` has two call
+  // sites and D17 guarded only the one it was walking, so Blanc's app drawer
+  // still removed a collected tool bare — a fix creating the very mode gap D137
+  // had just named. Both hosts now delegate to one helper, which is why these
+  // two cases name a different guard token: `confirmDialog(` is no longer in
+  // either file, and requiring it would have forced the guard back into the
+  // hosts where it can drift again.
+  {
+    file: 'src/renderer/components/resources/ResourcesContent.tsx',
+    api: 'toolsRemove',
+    guard: 'confirmRemoveCollectedTool(',
+    dangerIn: 'src/renderer/collectedToolsActions.ts',
+  },
+  {
+    file: 'src/renderer/components/blanc/BlancAppDrawerPanel.tsx',
+    api: 'toolsRemove',
+    guard: 'confirmRemoveCollectedTool(',
+    dangerIn: 'src/renderer/collectedToolsActions.ts',
+  },
 ] as const;
 
 /** The Nth enclosing brace block around `index`, 0 = innermost. */
@@ -80,32 +99,63 @@ function enclosingBlock(text: string, index: number, level = 0): string {
  * into the whole component and pass on some other dialog elsewhere in the file: the three
  * bodies under test measure well under that, the components they live in are far over it.
  */
-function guardingBody(text: string, index: number): string {
+function guardingBody(text: string, index: number, guard: string): string {
+  let widest = '';
   for (let level = 0; level < 4; level++) {
-    const body = enclosingBlock(text, index, level);
-    if (body.includes('confirmDialog(') && body.length < 4000) return body;
+    // A body with fewer than four nesting levels runs out of enclosing braces
+    // before the loop ends. That used to throw `no enclosing block` out of the
+    // whole test, which reports a MISSING GUARD as a harness crash — it cost a
+    // real diagnosis when D143 moved a guard into a shared module. Stop
+    // climbing and let the assertion below say what is actually wrong.
+    let body: string;
+    try {
+      body = enclosingBlock(text, index, level);
+    } catch {
+      break;
+    }
+    widest = body;
+    if (body.includes(guard) && body.length < 4000) return body;
   }
-  return enclosingBlock(text, index, 0);
+  return widest || enclosingBlock(text, index, 0);
 }
 
 describe('destructive actions confirm before they destroy', () => {
-  it.each(CASES)('$api asks first', ({ file, api }) => {
+  it.each(CASES)('$api asks first in $file', (testCase) => {
+    const { file, api } = testCase;
+    const token: string = 'guard' in testCase ? testCase.guard : 'confirmDialog(';
     const text = readFileSync(resolve(ROOT, file), 'utf8');
     const at = text.indexOf(`window.api.${api}(`);
     expect(at, `${api} call site not found in ${file}`).toBeGreaterThan(-1);
-    const body = guardingBody(text, at);
-    const guard = body.indexOf('confirmDialog(');
-    expect(guard, `${api} runs with no confirmDialog in its own function`).toBeGreaterThan(-1);
+    const body = guardingBody(text, at, token);
+    const guard = body.indexOf(token);
+    expect(guard, `${api} runs with no ${token} in its own function in ${file}`).toBeGreaterThan(-1);
     // Before the call, and the result is honoured: an unread promise is not a guard.
     expect(guard).toBeLessThan(body.indexOf(`window.api.${api}(`));
-    expect(body).toMatch(/if\s*\(!ok\)\s*return;/);
-    expect(body).toMatch(/danger:\s*true/);
+    // Either shape of "and it bailed out": the inline `ok` local, or a negated
+    // call to a delegating helper. Both must actually `return`.
+    expect(body, `${api} does not act on the answer in ${file}`)
+      .toMatch(/if\s*\(!\s*ok\)\s*return;|if\s*\(!\s*await\s[^\n]*\)\s*return;/);
+    // `danger: true` lives wherever the dialog is actually constructed — in the
+    // host for an inline confirm, in the shared helper for a delegated one.
+    const dangerFile = 'dangerIn' in testCase ? testCase.dangerIn : file;
+    expect(readFileSync(resolve(ROOT, dangerFile), 'utf8'), `${api}'s dialog is not danger`)
+      .toMatch(/danger:\s*true/);
   });
 
   it('reads a real body, not an empty string', () => {
     const text = readFileSync(resolve(ROOT, CASES[0].file), 'utf8');
-    const body = guardingBody(text, text.indexOf('window.api.lensHistoryClear('));
+    const body = guardingBody(text, text.indexOf('window.api.lensHistoryClear('), 'confirmDialog(');
     expect(body.length).toBeGreaterThan(120);
     expect(body).toContain('lensHistoryClear');
+  });
+
+  it('a missing guard fails as an assertion, not as a harness crash', () => {
+    // The regression this file itself caused: `enclosingBlock` threw out of the
+    // test when a body had fewer than four levels, so "the guard is gone" and
+    // "the walker fell off the top of the file" were the same message.
+    const unguarded = 'async function drop(id) {\n  await window.api.toolsRemove(id);\n}\n';
+    const body = guardingBody(unguarded, unguarded.indexOf('window.api.toolsRemove('), 'confirmDialog(');
+    expect(body).toContain('toolsRemove');
+    expect(body.indexOf('confirmDialog(')).toBe(-1);
   });
 });
