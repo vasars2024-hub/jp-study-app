@@ -112,14 +112,37 @@ describe('the gate fires on a planted shadow', () => {
 });
 
 describe('the baseline is a real file and covers the known population', () => {
-  it('lists the 11 files the sweep found, so growth is what fails', () => {
+  /**
+   * D236 — this assertion was written as a FLOOR (>= 11 files, >= 35 strings)
+   * on a number whose whole purpose is to fall. D233 cleared FieldMappingEditor
+   * in the very commit that introduced the gate, taking the baseline to 10 / 24,
+   * so the test was red the moment it landed and every future fix would have
+   * re-broken it. A ratchet test asserts the direction, not a magic number.
+   *
+   * The real risk the original was reaching for is the opposite one, and it is
+   * named in the tool's own header: a noisy gate gets baselined away WHOLESALE.
+   * So: a ceiling that only moves down, and a non-empty floor of 1.
+   */
+  const CEILING_FILES = 10;
+  const CEILING_STRINGS = 24;
+
+  it('shrinks and never grows, and is never emptied wholesale', () => {
     const baseline = JSON.parse(
       readFileSync(join(REPO, 'tools', 'i18n-shadow-baseline.json'), 'utf8'),
     ) as Record<string, number>;
     const files = Object.keys(baseline);
-    expect(files.length).toBeGreaterThanOrEqual(11);
     const total = Object.values(baseline).reduce((a, b) => a + b, 0);
-    expect(total).toBeGreaterThanOrEqual(35);
+
+    expect(files.length, 'the baseline was emptied — the gate now guards nothing').toBeGreaterThan(0);
+    expect(
+      files.length,
+      `the baseline GREW to ${files.length} files; lower CEILING_FILES only when work removed entries`,
+    ).toBeLessThanOrEqual(CEILING_FILES);
+    expect(
+      total,
+      `the baseline GREW to ${total} strings; lower CEILING_STRINGS only when work removed entries`,
+    ).toBeLessThanOrEqual(CEILING_STRINGS);
+
     // Every entry must be a real path — a stale key silences a whole file.
     for (const file of files) {
       expect(() => readFileSync(join(REPO, 'src', file), 'utf8'), `${file} is gone`).not.toThrow();

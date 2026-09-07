@@ -20,16 +20,6 @@ export const MINING_UI_JA: Catalog = {
   'dict.view.hint.zh':
     '中国語↔英語のオフライン辞書（CC-CEDICT）。結果には声調記号つきのピンインが表示されます。読書中に単語を選択して調べるか、星アイコンでフラッシュカードに保存できます。',
 
-  'cardPreview.frameTitle': 'カード面のプレビュー',
-  'cardPreview.label': 'カードプレビュー',
-  'cardPreview.empty': 'フィールド対応を設定すると、カードの見た目を確認できます。',
-  'cardPreview.profileHint': '{label} — 表面{front} / 裏面{back}',
-  'cardPreview.fallbackToggle': '表現フォールバック',
-  'cardPreview.front': '表面',
-  'cardPreview.back': '裏面',
-  'cardPreview.hint':
-    'このプロファイルのサンプル内容です。実際に作成されるカードには、辞書と Tatoeba の最新データが使われます。',
-
   'jiten.mining.title': 'Jiten 語彙マイニング',
   'jiten.mining.desc': 'Jiten のメディアデッキを、ローカルのフラッシュカードに直接取り込みます。',
   'jiten.mining.refresh': '更新',

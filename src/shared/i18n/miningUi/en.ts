@@ -33,16 +33,6 @@ export const MINING_UI_EN: Catalog = {
   'dict.view.hint.zh':
     'Offline Chinese↔English dictionary (CC-CEDICT). Results show pinyin with tone marks. Highlight a word while reading to look it up, or tap the star icon to save it to Flashcards.',
 
-  // AnkiCardPreview
-  'cardPreview.frameTitle': 'Card face preview',
-  'cardPreview.label': 'Card preview',
-  'cardPreview.empty': 'Configure field mappings to see how cards will look.',
-  'cardPreview.profileHint': '{label} — {front} front / {back} back',
-  'cardPreview.fallbackToggle': 'Expression fallback',
-  'cardPreview.front': 'Front',
-  'cardPreview.back': 'Back',
-  'cardPreview.hint': 'Sample content for this profile. Mined cards use live dictionary and Tatoeba data.',
-
   // JitenMiningPanel
   'jiten.mining.title': 'Jiten vocab mining',
   'jiten.mining.desc': 'Mine a Jiten media deck directly into the local flashcard library.',

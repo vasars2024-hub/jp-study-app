@@ -20,15 +20,6 @@ export const MINING_UI_ZH: Catalog = {
   'dict.view.hint.zh':
     '中英离线词典（CC-CEDICT）。结果会显示带声调符号的拼音。阅读时选中词语即可查询，或点击星标保存到闪卡。',
 
-  'cardPreview.frameTitle': '卡面预览',
-  'cardPreview.label': '卡片预览',
-  'cardPreview.empty': '配置字段映射后，即可查看卡片的样子。',
-  'cardPreview.profileHint': '{label} — 正面{front} / 背面{back}',
-  'cardPreview.fallbackToggle': '表达式回退',
-  'cardPreview.front': '正面',
-  'cardPreview.back': '背面',
-  'cardPreview.hint': '这是该配置的示例内容。实际挖取的卡片会使用词典与 Tatoeba 的实时数据。',
-
   'jiten.mining.title': 'Jiten 词汇挖取',
   'jiten.mining.desc': '把 Jiten 的媒体牌组直接挖取到本地闪卡库。',
   'jiten.mining.refresh': '刷新',

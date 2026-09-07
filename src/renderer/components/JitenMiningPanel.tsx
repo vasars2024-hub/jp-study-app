@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_JITEN_DOWNLOAD_OPTIONS,
-  JITEN_DOWNLOAD_TYPE_LABELS,
-  JITEN_ORDER_LABELS,
+  JITEN_DOWNLOAD_TYPE_KEYS,
+  JITEN_ORDER_KEYS,
+  JITEN_STATUS_KEY,
   parseJitenCsvDeck,
   type JitenDeckDownloadType,
   type JitenDeckOrder,
@@ -10,6 +11,7 @@ import {
   type JitenStore,
 } from '../../shared/jiten';
 import Icon from './Icons';
+import { useT } from '../i18n';
 import { replaceImportedDeck } from '../flashcardDeck';
 
 type Props = {
@@ -18,6 +20,7 @@ type Props = {
 };
 
 export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) {
+  const { t } = useT();
   const [store, setStore] = useState<JitenStore | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [minOccurrences, setMinOccurrences] = useState(DEFAULT_JITEN_DOWNLOAD_OPTIONS.minOccurrences ?? 1);
@@ -77,12 +80,12 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
         excludeExampleSentences,
       });
       if (!result.ok || !result.content) {
-        setStatus(result.error ?? 'Jiten did not return a deck.');
+        setStatus(result.error ?? t('jiten.mining.err.noDeck'));
         return;
       }
       const cards = parseJitenCsvDeck(result.content);
       if (!cards.length) {
-        setStatus('No usable cards were found in the Jiten deck.');
+        setStatus(t('jiten.mining.err.noCards'));
         return;
       }
       const bookId = `jiten-${entry.jitenDeckId}`;
@@ -109,7 +112,7 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
       });
       setStore(updated);
       setPreviewCount(cards.length);
-      setStatus(`Saved ${cards.length} Jiten cards for ${entry.titleJp}.`);
+      setStatus(t('jiten.mining.saved', { count: cards.length, title: entry.titleJp }));
       onDeckSaved?.();
 
       // Cache the deck's cover locally the first time it's mined, so the
@@ -134,22 +137,22 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
       <section className="anki-card jiten-mining-block">
         <div className="jiten-mining-head">
           <div>
-            <h2>Jiten vocab mining</h2>
-            <p className="muted">Mine a Jiten media deck directly into the local flashcard library.</p>
+            <h2>{t('jiten.mining.title')}</h2>
+            <p className="muted">{t('jiten.mining.desc')}</p>
           </div>
           <button type="button" className="btn subtle" onClick={() => void refresh()}>
             <Icon name="refresh" size={14} />
-            Refresh
+            {t('jiten.mining.refresh')}
           </button>
         </div>
 
         {jitenPlans.length === 0 ? (
-          <p className="muted">Plan a Jiten title in Novels first, then return here to mine its deck.</p>
+          <p className="muted">{t('jiten.mining.empty')}</p>
         ) : (
           <>
             <div className="jiten-mining-grid">
               <label>
-                Planned title
+                {t('jiten.mining.plannedTitle')}
                 <select value={selectedEntry?.id ?? ''} onChange={(e) => setSelectedPlanId(e.target.value)}>
                   {jitenPlans.map((entry) => (
                     <option key={entry.id} value={entry.id}>
@@ -159,30 +162,30 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
                 </select>
               </label>
               <label>
-                Deck scope
+                {t('jiten.mining.deckScope')}
                 <select
                   value={downloadType}
                   onChange={(e) => setDownloadType(Number(e.target.value) as JitenDeckDownloadType)}
                 >
-                  {Object.entries(JITEN_DOWNLOAD_TYPE_LABELS).map(([value, label]) => (
+                  {Object.entries(JITEN_DOWNLOAD_TYPE_KEYS).map(([value, key]) => (
                     <option key={value} value={value}>
-                      {label}
+                      {t(key)}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                Card order
+                {t('jiten.mining.cardOrder')}
                 <select value={order} onChange={(e) => setOrder(Number(e.target.value) as JitenDeckOrder)}>
-                  {Object.entries(JITEN_ORDER_LABELS).map(([value, label]) => (
+                  {Object.entries(JITEN_ORDER_KEYS).map(([value, key]) => (
                     <option key={value} value={value}>
-                      {label}
+                      {t(key)}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                Min occurrences
+                {t('jiten.mining.minOccurrences')}
                 <input
                   type="number"
                   min={1}
@@ -191,12 +194,12 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
                 />
               </label>
               <label>
-                Max occurrences
+                {t('jiten.mining.maxOccurrences')}
                 <input
                   type="number"
                   min={0}
                   value={maxOccurrences ?? ''}
-                  placeholder="No limit"
+                  placeholder={t('jiten.mining.noLimit')}
                   onChange={(e) => {
                     const n = Number(e.target.value);
                     setMaxOccurrences(e.target.value === '' || !Number.isFinite(n) || n <= 0 ? null : Math.floor(n));
@@ -205,7 +208,7 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
               </label>
               {(downloadType === 2 || downloadType === 3 || downloadType === 4) && (
                 <label>
-                  Top N words
+                  {t('jiten.mining.topWords')}
                   <input
                     type="number"
                     min={1}
@@ -216,7 +219,7 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
               )}
               {downloadType === 5 && (
                 <label>
-                  Target coverage %
+                  {t('jiten.mining.targetCoverage')}
                   <input
                     type="number"
                     min={1}
@@ -232,7 +235,7 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
                   checked={excludeKana}
                   onChange={(e) => setExcludeKana(e.target.checked)}
                 />
-                Exclude kana-only terms
+                {t('jiten.mining.excludeKana')}
               </label>
               <label className="jiten-mining-check">
                 <input
@@ -240,15 +243,18 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
                   checked={excludeExampleSentences}
                   onChange={(e) => setExcludeExampleSentences(e.target.checked)}
                 />
-                Skip example sentences
+                {t('jiten.mining.skipExamples')}
               </label>
             </div>
 
             {selectedEntry && (
               <div className="jiten-mining-summary">
-                <span>{selectedEntry.difficultyLabel ?? 'Unknown difficulty'}</span>
-                <span>{selectedEntry.tags.slice(0, 4).join(', ') || 'No Jiten tags'}</span>
-                <span>{selectedEntry.acquisitionStatus}</span>
+                <span>{selectedEntry.difficultyLabel ?? t('jiten.mining.unknownDifficulty')}</span>
+                <span>{selectedEntry.tags.slice(0, 4).join(', ') || t('jiten.mining.noTags')}</span>
+                {/* The status was printed as its raw wire value ("analyzed"), in
+                    every language. Novels resolves the same enum through the
+                    same map — see JITEN_STATUS_KEY. */}
+                <span>{t(JITEN_STATUS_KEY[selectedEntry.acquisitionStatus] ?? 'novels.status.planned')}</span>
               </div>
             )}
 
@@ -260,9 +266,11 @@ export default function JitenMiningPanel({ initialDeckId, onDeckSaved }: Props) 
                 onClick={() => selectedEntry && void mineDeck(selectedEntry)}
               >
                 <Icon name="download" size={16} />
-                {downloading ? 'Downloading deck' : 'Mine Jiten vocab'}
+                {downloading ? t('jiten.mining.downloading') : t('jiten.mining.mine')}
               </button>
-              {previewCount > 0 && <span className="muted">{previewCount} cards in the latest import.</span>}
+              {previewCount > 0 && (
+                <span className="muted">{t('jiten.mining.importedCount', { count: previewCount })}</span>
+              )}
             </div>
           </>
         )}

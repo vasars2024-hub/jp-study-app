@@ -236,21 +236,41 @@ export function jitenGenreId(name: string): number | undefined {
   return undefined;
 }
 
-export const JITEN_DOWNLOAD_TYPE_LABELS: Record<JitenDeckDownloadType, string> = {
-  1: 'Full deck',
-  2: 'Top words (global frequency)',
-  3: 'Top words (deck frequency)',
-  4: 'Top words (chronological)',
-  5: 'Target coverage %',
-  6: 'By occurrence count',
+// Option labels for the deck-scope and card-order selects. A module-level
+// record cannot call useT(), so per CLAUDE.md "i18n workflow" §7 these hold the
+// i18n KEY and the consumer resolves it with t() at render time. The English
+// text lives in `shared/i18n/miningUi/*.ts` under the same ids.
+export const JITEN_DOWNLOAD_TYPE_KEYS: Record<JitenDeckDownloadType, string> = {
+  1: 'jiten.downloadType.1',
+  2: 'jiten.downloadType.2',
+  3: 'jiten.downloadType.3',
+  4: 'jiten.downloadType.4',
+  5: 'jiten.downloadType.5',
+  6: 'jiten.downloadType.6',
 };
 
-export const JITEN_ORDER_LABELS: Record<JitenDeckOrder, string> = {
-  1: 'Chronological',
-  2: 'Global frequency',
-  3: 'Deck frequency',
-  4: 'Import order',
-  5: 'Random',
+export const JITEN_ORDER_KEYS: Record<JitenDeckOrder, string> = {
+  1: 'jiten.order.1',
+  2: 'jiten.order.2',
+  3: 'jiten.order.3',
+  4: 'jiten.order.4',
+  5: 'jiten.order.5',
+};
+
+/**
+ * Acquisition status -> i18n key. Lives here beside `JitenAcquisitionStatus`
+ * rather than inside a view, so every surface that renders a plan's status
+ * resolves the same translated word instead of printing the raw wire value.
+ * `NovelsContent` re-exports it as `PLAN_STATUS_KEY`, its historical name.
+ */
+export const JITEN_STATUS_KEY: Record<JitenAcquisitionStatus, string> = {
+  planned: 'novels.status.planned',
+  linked: 'novels.status.linked',
+  downloaded: 'novels.status.downloaded',
+  imported: 'novels.status.imported',
+  analyzed: 'novels.status.analyzed',
+  mined: 'novels.status.mined',
+  error: 'novels.status.error',
 };
 
 export const DEFAULT_JITEN_DOWNLOAD_OPTIONS: JitenDeckDownloadOptions = {

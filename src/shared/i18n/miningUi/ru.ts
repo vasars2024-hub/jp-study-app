@@ -24,16 +24,6 @@ export const MINING_UI_RU: Catalog = {
   'dict.view.hint.zh':
     'Офлайновый китайско-английский словарь (CC-CEDICT). В результатах показывается пиньинь с тоновыми знаками. Выделите слово при чтении, чтобы найти его, или нажмите звёздочку, чтобы сохранить в карточки.',
 
-  'cardPreview.frameTitle': 'Предпросмотр стороны карточки',
-  'cardPreview.label': 'Предпросмотр карточки',
-  'cardPreview.empty': 'Настройте соответствие полей, чтобы увидеть, как будут выглядеть карточки.',
-  'cardPreview.profileHint': '{label} — {front} спереди / {back} сзади',
-  'cardPreview.fallbackToggle': 'Запасной вариант с выражением',
-  'cardPreview.front': 'Лицевая',
-  'cardPreview.back': 'Оборотная',
-  'cardPreview.hint':
-    'Примерное содержимое для этого профиля. В добытых карточках используются актуальные данные словаря и Tatoeba.',
-
   'jiten.mining.title': 'Добыча лексики из Jiten',
   'jiten.mining.desc': 'Добывайте медиа-колоду Jiten прямо в локальную библиотеку карточек.',
   'jiten.mining.refresh': 'Обновить',

@@ -24,8 +24,8 @@ import {
   JITEN_GENRES,
   jitenGenreId,
   jitenGenreName,
+  JITEN_STATUS_KEY,
   planEntryCarriesWork,
-  type JitenAcquisitionStatus,
   type JitenDeck,
   type JitenPlanEntry,
   type JitenSourceLink,
@@ -108,16 +108,10 @@ export const DIFFICULTY_KEY: Record<Difficulty | 'Unknown', string> = {
 };
 
 // Same rule for the acquisition status, which was printed as its raw lowercase
-// enum value ("analyzed", "mined") in every language.
-export const PLAN_STATUS_KEY: Record<JitenAcquisitionStatus, string> = {
-  planned: 'novels.status.planned',
-  linked: 'novels.status.linked',
-  downloaded: 'novels.status.downloaded',
-  imported: 'novels.status.imported',
-  analyzed: 'novels.status.analyzed',
-  mined: 'novels.status.mined',
-  error: 'novels.status.error',
-};
+// enum value ("analyzed", "mined") in every language. The map moved to
+// `shared/jiten.ts` beside the type it keys, because JitenMiningPanel prints the
+// same status and pulling this whole module in for one record is not on.
+export const PLAN_STATUS_KEY = JITEN_STATUS_KEY;
 
 const NOVEL_TYPE_SET = new Set<string>(NOVEL_TYPES);
 const DIFFICULTY_SET = new Set<string>(DIFFICULTY_ORDER);
