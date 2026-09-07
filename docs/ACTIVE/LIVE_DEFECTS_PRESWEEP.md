@@ -31,6 +31,28 @@ three subtitle defects the user found by watching a video for ten seconds surviv
    and say so in the row with what you measured.
 3. **Never close a row you did not verify against the running app.**
 4. **Do not delete rows.** Mark them; the register is append-only.
+5. **Mint your id from YOUR OWN RANGE.** Four times on the night of 2026-09-07 two workers
+   minted the same number for different defects, and twice they fixed the same defect
+   independently — because both branches were taking the next lead from one shared counter and
+   merging only every fifteen minutes. **Convergence is the default under that arrangement,
+   not bad luck.** The ranges are disjoint, so a merge never has to renumber and a commit
+   message never names an id that has since moved:
+
+   | worker | range |
+   |--------|-------|
+   | `primary` | D200–D299 |
+   | `primary2` | D300–D399 |
+   | `backup` | D400–D499 |
+   | `codexA` | D500–D599 |
+   | `codexB` | D600–D699 |
+
+   D1–D149 are the pre-range ids: grandfathered, still unique, never reused.
+   `src/shared/__tests__/presweepRegisterGate.test.ts` enforces both properties in the suite —
+   the `uniq -d` check that caught all four collisions is hand-run, so it catches without
+   preventing. Add a worker to `MINTING_RANGES` before it files its first row.
+6. **Claim the lead, not just the surface.** The same arrangement makes two workers pick the
+   same *next lead* out of one scanner's output. Before you start on one, name it in your
+   class's row in a committed edit — a surface claim is not fine-grained enough to stop this.
 
 ---
 
