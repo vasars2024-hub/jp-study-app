@@ -335,6 +335,7 @@ Cross-cutting passes, after the 25:
 | **class 5 - destructive-action guard** | primary | done | 2 | Scripted: `src/.coordination/presweep/destructive-guard-scan.cjs` over every renderer call to a destructive `window.api.*`, following one level of helper indirection. **42 call sites, 12 guarded, 30 unguarded** - and 27 of those 30 are legitimate on inspection (an undo path, a single-row remove, a helper whose caller confirms), which is the point of reading each one. **3 were real: D111.** Positive control: it reports `ytRemovePlaylist` GUARDED, which is D90's fix. Negative control: it reports `clearMediaLibrary` guarded only because of the helper hop - without it the app's best-guarded delete reads as unguarded. |
 | **dead exports (partial - one found in passing)** | primary | | 1 | D113. Not a systematic pass; that is the open-work sweep's job. |
 | **class 4 - count-vs-truth, mechanical half** | primary | partial | 0 new | Scripted: `src/.coordination/presweep/discarded-result-scan.cjs`. The one class-4 shape a machine can find is a MUTATING `window.api.*` whose answer is discarded - main returns the new state, the caller drops it, and the row and the count beside it never move. **17 leads, 0 NEW defects**; the one real hit is D113, already filed. The other 16 were read and accepted with reasons in the commit (`undoImports` reverses and its caller refetches; `inboxEnrich` builds the updated item itself; `windowChrome` notifies with its own normalized value). Positive control: it finds D113's `pruneMedia`. **The HAND half is still owed** - every badge, list length and progress figure read against its store - and no script can do it. |
+| **class 3b - dynamic i18n keys vs their type** | backup | done | 1 | Scripted: `src/.coordination/presweep/dynamic-i18n-key-scan.cjs`. A key built from data (`` t(`prefix.${expr}`) ``) whose union gained a member the catalog never got, so the UI renders the raw dotted key as visible text **in all four languages at once**. **No existing gate can see it**: `i18n-check` compares the locales AGAINST EACH OTHER, so a key missing from all four is unanimously consistent and reports green. **231 prefixes, 645 unions, 110 bound, 1 defect (D129, fixed `6bd06b89`).** The filtering is the transferable part - 75 raw leads reduced to 1 through five confirmed false shapes (overlap without containment, hand-written guards, literal arrays the call site iterates, an exemption list that hid the refuting member, and a helper return type narrower than its parameter). Controls both ways: the fix takes it to exit 0, removing any one key returns it naming the locale. **Limit:** a prefix whose table is empty in every locale is skipped, not reported - a different class. |
 
 ### The two scripted class passes, 2026-09-06 by `primary2` - method, numbers and limits
 
@@ -383,9 +384,9 @@ M defects, K fixed" - so the user knows their pass can start.
 ### 2026-09-06 19:43 EDT — codexB claim and live findings
 D100 Start-menu chrome and confirmation text, D98 Settings commands, and D25 Appearance Blanc launcher are claimed by codexB. Window 1 is reserved; primary2 retains window 2. Gate 11 recheck through live listMedia: 39 items, zero Conan matches; no acquisition or attachment attempted. Boss F1/F2/F4 already fixed by 6a06e067/8c728ff5/c0a87c93.
 
-| D107 | shared dialogs | In Japanese, a translated restart question still offers an English **Cancel** button. The same shared defaults leave confirmation, notice and text-entry dialogs in English unless each caller supplies its own labels. | Window 1, pid 14128: switch language with Settings Appearance 日本語; open Aero Start menu through the per-window AppChrome material seam; press Restart. Live text is `Secret OS を再起動` / Japanese question / **Cancel** / `再起動`. Cancel was pressed; no restart performed. Source: `components/ui/dialogService.tsx` has literal defaults for all three dialog kinds. | P2 | open — claimed codexB; fix the shared defaults with the real language subscription and preserve caller labels. |
+| D128 | shared dialogs | In Japanese, a translated restart question still offers an English **Cancel** button. The same shared defaults leave confirmation, notice and text-entry dialogs in English unless each caller supplies its own labels. | Window 1, pid 14128: switch language with Settings Appearance 日本語; open Aero Start menu through the per-window AppChrome material seam; press Restart. Live text is `Secret OS を再起動` / Japanese question / **Cancel** / `再起動`. Cancel was pressed; no restart performed. Source: `components/ui/dialogService.tsx` has literal defaults for all three dialog kinds. | P2 | open — claimed codexB; fix the shared defaults with the real language subscription and preserve caller labels. |
 
-D100 codexB slice 1: 30 keys x 4 locales localize Start-menu groups/actions, power tooltips and all three confirmation paths. WIRED ARCHIVE/GrammarX brand names retained; descriptive module hints remain a separate open registry, not credited closed. Live pid 14128/window 1 through temporary per-window AppChrome Aero material: JA labels 検索/学習アプリ/場所とツール, RU Поиск/Учебные приложения/Разделы и инструменты; all 7 accessible labels translated, Russian button overflow 0. Restart dialog translated and cancelled; no restart. Settings Start control moved スタート then Пуск, ruling out a duplicate language module. 14/14 nearest shell tests; i18n 12639 complete; eslint 0 errors/4 pre-existing unused warnings. D107 remains open. Material override does not claim a full Aero boot/theme workflow. Initial screenshot UnknownVizError; subsequent capture succeeded. During editing an overbroad replacement briefly put t() in a module-level registry; reverted before commit and renderer 1 alone reloaded after confirming it had no open windows. Shared main was not restarted.
+D100 codexB slice 1: 30 keys x 4 locales localize Start-menu groups/actions, power tooltips and all three confirmation paths. WIRED ARCHIVE/GrammarX brand names retained; descriptive module hints remain a separate open registry, not credited closed. Live pid 14128/window 1 through temporary per-window AppChrome Aero material: JA labels 検索/学習アプリ/場所とツール, RU Поиск/Учебные приложения/Разделы и инструменты; all 7 accessible labels translated, Russian button overflow 0. Restart dialog translated and cancelled; no restart. Settings Start control moved スタート then Пуск, ruling out a duplicate language module. 14/14 nearest shell tests; i18n 12639 complete; eslint 0 errors/4 pre-existing unused warnings. D128 (renumbered from a duplicate D107 on 2026-09-07) remains open. Material override does not claim a full Aero boot/theme workflow. Initial screenshot UnknownVizError; subsequent capture succeeded. During editing an overbroad replacement briefly put t() in a module-level registry; reverted before commit and renderer 1 alone reloaded after confirming it had no open windows. Shared main was not restarted.
 
 | D110 | cross-cutting | **Every pop-out window kept an English title in ja/zh/ru**, and the fix for that introduced a second defect: one window would have been titled with its own section id. `?popout=<section>` titles came from a table of hard-coded English strings (`Library`, `Dictionary`, `Anki`, `Settings`, ... 23 of them), so a Japanese user opening any app in its own window read an English title bar. The in-flight repair swapped the table for catalog keys and resolved it with `key ? translate(key) : section` - which collapses two cases the old `POPOUT_LABELS[popout] ?? popout` kept apart. `??` falls back only on null/undefined, so `musicwidget`'s deliberately-empty entry stayed empty; a truthiness test sends it down the fallback arm. `PopoutChrome` reads a blank label as "icon-only drag strip" (`popout-drag ${label ? '' : 'popout-drag-icon'}`), so the music widget pop-out would have gained a text title reading `musicwidget` where the design has an icon. | Source, both halves. HEAD before this turn: `App.tsx` `POPOUT_LABELS` held 23 raw English values and nothing resolved them. The regression is reproduced by a mutation control - restoring `: section` fails `popoutLabels.test.ts` 1 of 6 with `expected 'musicwidget' to be ''`. | P2 | fixed 17bdff07. The table moved to `renderer/popoutLabels.ts` so it is importable: nothing could unit-test it inside `App.tsx`, which is why the D89 gate had to scrape the object out with a regex (that gate now reads it as a value). **Filed as D108 in the commit message and renumbered to D110** - `wt/files-app` already holds D108 and D109, which the main tree cannot see until the mergeback lands. |
 
@@ -513,7 +514,7 @@ a label written. Splitting the class that way is what made it one turn instead o
 
 D10 retracted as **not-reproducible at cd503890**: toolbar Reset and File → Reset statistics BOTH show the shared irreversible-reset warning. Both cancelled; all jp-study-stats* localStorage strings are byte-identical before/after. The original row inspected the caller but missed useStats.resetAllStats confirmation.
 
-| D123 | stats (Aero) | Switching to Aero hides all watching activity: total time, per-show history and watch segments disappear. | Statistics pop-out window 10, per-window Aero material seam. Live store contains 7,173.3 watch seconds and 6 shows; Aero renders no watch totals, show rows or watch bars. | P2 | open — claimed codexA; reuse shared StatsChart and StatsShows and add the existing watch summary labels to Aero. Standard/Wired and Blanc already consume the shared components. |
+| D127 | stats (Aero) | Switching to Aero hides all watching activity: total time, per-show history and watch segments disappear. | Statistics pop-out window 10, per-window Aero material seam. Live store contains 7,173.3 watch seconds and 6 shows; Aero renders no watch totals, show rows or watch bars. | P2 | open — claimed codexA; reuse shared StatsChart and StatsShows and add the existing watch summary labels to Aero. Standard/Wired and Blanc already consume the shared components. |
 
 ### 2026-09-07 00:50 EDT — primary, D124 closed. Numbers, and the two ways the instrument was blind.
 
@@ -546,7 +547,7 @@ repeating "Move up" six times down a column.
 `__devharness__/videoStudyHarness.tsx:167`. The harness directory is slated for deletion; the
 gate excludes it by name, and that exclusion line is what to delete if it ever ships.
 
-D123 verification, 2026-09-07 00:49 EDT: Aero window 10 now renders **1h 59m watched, 6 shows, 4 nonzero watch segments**; raw days sum **7,173.3 seconds**, read sum **31,408.916 seconds / 542,290 chars** agrees with 8h 43m and 542,290. No new API/store: standard, Wired, Files and Blanc keep their shared StatsChart/StatsShows path. At 520×580, show-list width/scrollWidth is **320/320** after fixing shared readout flex shrink (before **320/402**). Existing book table remains horizontally scrollable; screenshot inspected, main scroller reaches the show rows. Console error log total **0**. Tests: isolated checkout old Aero fails **1/6**, other modes and empty controls pass **5/6**; corrected view passes **26/26 across 4 suites**. Statistics surface remains partial: Anki sync and full per-row journeys are still owed.
+D127 verification, 2026-09-07 00:49 EDT: Aero window 10 now renders **1h 59m watched, 6 shows, 4 nonzero watch segments**; raw days sum **7,173.3 seconds**, read sum **31,408.916 seconds / 542,290 chars** agrees with 8h 43m and 542,290. No new API/store: standard, Wired, Files and Blanc keep their shared StatsChart/StatsShows path. At 520×580, show-list width/scrollWidth is **320/320** after fixing shared readout flex shrink (before **320/402**). Existing book table remains horizontally scrollable; screenshot inspected, main scroller reaches the show rows. Console error log total **0**. Tests: isolated checkout old Aero fails **1/6**, other modes and empty controls pass **5/6**; corrected view passes **26/26 across 4 suites**. Statistics surface remains partial: Anki sync and full per-row journeys are still owed.
 
 ## 2026-09-07 00:52 EDT — codexA claims Library D2
 
@@ -571,7 +572,42 @@ D2 verification, 2026-09-07 00:54 EDT: delivered Enter **1/1** opens **悪の教
 
 ## 2026-09-07 00:56 EDT — codexA claims live Statistics updates
 
-| D124 | stats / reader integration | Statistics stops updating after opening, even while another window records real study time. | Open Statistics, then read 悪の教典 02 in a separate Library pop-out. Window 12 keeps Read today at **1m** after its localStorage reaches **136.351 seconds (2m)**; per-book time also stays at the earlier snapshot. No fake data injected. | P2 | open — claimed codexA; useStats memo depends only on manual refresh/reset and subscribes to no reading/watch/storage/language changes. Share an event subscription with study widgets; preserve independent read/watch totals. |
+| D126 | stats / reader integration | Statistics stops updating after opening, even while another window records real study time. | Open Statistics, then read 悪の教典 02 in a separate Library pop-out. Window 12 keeps Read today at **1m** after its localStorage reaches **136.351 seconds (2m)**; per-book time also stays at the earlier snapshot. No fake data injected. | P2 | fixed `1ba582b7` — see the recovery note below. |
+
+## 2026-09-07 01:05 EDT — backup: recovering codexB's interrupted slice, and a third id collision
+
+**codexB ended mid-turn at 00:58:16** (usage limit), between `04188419` and a commit of its own.
+It left a coherent, finished-looking slice uncommitted: `stats.ts`, `StatsContent.tsx`,
+`widgets/study.tsx` and an untracked `statsLiveUpdates.test.tsx`. Recovered and landed whole as
+**`1ba582b7`** — nothing was rewritten, only verified and committed.
+
+**D126 fixed.** `useStats`' summary memo depended solely on a manual refresh nonce, so an open
+Statistics window subscribed to nothing at all. `onStatsChanged()` is now the one subscription
+both hosts share: the reading and watch events, a new `STATS_RESET_EVENT`, the study-language
+change, a cross-window `storage` write to the **active** stats key, window focus, and a 60 s clock
+that refreshes only when the day key actually rolls over. The study widget's hand-rolled listener
+pair plus its unconditional 30 s poll became the same one call, so it no longer repaints on a
+timer. Read and watch stay independent channels; no number is computed differently.
+
+**Verified, not assumed.** `statsLiveUpdates` + `statisticsModeParity`: **11 passed, 0 failed**.
+**Mutation control run for real** — deleting the `useStats` subscription line fails **4 of the 5**
+new cases, naming the midnight-rollover assertion first; restoring it returns 5/5. The disposal
+case is the one that would have caught a leak: after `dispose()` it drives a real `recordReading`,
+a `focus` and 24 h of fake time and asserts `refresh` was never called and `getTimerCount()` is 0.
+
+**Three defect ids collided, not two.** codexB had already renumbered its own two rows in the
+working tree (`D123`→`D127` Aero watch history, `D124`→`D126` this row) because `primary` had
+committed D123/D124/D125 for the mojibake and glyph-button classes in the same minutes. It did not
+reach the third: **`D107` is used twice** — line 279 is primary2's twelve raw-literal dialog call
+sites (fixed `90b5f002`+`40b9e06b`), line 386 is codexB's shared `dialogService` **defaults**
+(open). Different defects, same id. The later row is renumbered **`D128`**; the earlier keeps
+`D107`, since three other passages already cite it by that number. Both are real and neither is
+merged into the other. The register now has **zero duplicate ids** (`grep -o '^| D[0-9]* |' | uniq -d` is empty).
+
+**Why this class of collision keeps happening, for whoever files next:** three workers append to
+one register concurrently and each picks "the next free number" from a copy that is already stale
+by the time it writes. The cheap defence is to run that `uniq -d` after appending a row, which is
+how this one was found.
 
 **Gate footnote for D123/D124, 2026-09-07 01:00.** The first full run at `e1985518` came back
 **1 failed / 14,751 passed** and the failure was **my own new gate**, not the product: reading
@@ -694,3 +730,52 @@ hazard behind the existing `D123`/`D124` double-use: concurrent workers on two b
 next id from a register that has not yet seen the other's. Cheap prophylactic for whoever
 reconciles this: mint from `max(id) + 1` across **both** branches
 (`git log feat/nyaa-subtitles..wt/files-app` and the reverse), not from the local file.
+
+## 2026-09-07 01:35 EDT — backup, class 3b: dynamic i18n keys whose table fell behind its type
+
+| D129 | settings (Verified sites) | **An imported community site shows a dotted identifier where its source name belongs.** The Source line, the reconcile row and the "reconciled" status message all read `verifiedSites.source.community` — in English, Japanese, Chinese and Russian alike. | `VerifiedSiteSource` has **four** members (`verifiedSites.ts:4`); the catalogs defined **three**. Reachable through a shipped control: the panel's portable **Import** button calls `importVerifiedSitesDocument`, and the normalizer preserves `'community'` (`verifiedSites.ts:159`) — the very source a community-curated list arrives with. Built at `VerifiedSitesManager.tsx` lines 158, 234 and 237. | P2 | fixed `6bd06b89` — 1 key x 4 locales, plus the scan that found it. |
+
+**The class, and why every existing gate is green on it.** `t(\`prefix.${expr}\`)` builds a key
+from data. When a string union gains a member and the catalog does not, the UI renders the raw key
+as visible text. **`i18n-check` compares the four locales AGAINST EACH OTHER**, so a key missing
+from all four is unanimously consistent and reports green — it did, before and after this fix. A
+missing-key scan resolves static `t('a.b')` literals and cannot evaluate a template. Third time
+this sweep that a gate said zero against real breakage and the classifier was the reason.
+
+**The scan:** `src/.coordination/presweep/dynamic-i18n-key-scan.cjs`. **231 dynamic prefixes, 645
+string unions, 110 bound, 1 finding.** It binds with no hand-maintained map: harvest the unions,
+harvest the suffixes under each prefix, bind when the union **contains** the table and shares ≥2
+members, then discard members the call site cannot reach.
+
+**The reduction is the evidence — 75 → 12 → 7 → 5 → 3 → 1, every step a confirmed false shape:**
+
+- **75 → 12** overlap alone bound `palette.section.*` to `MiniAppId` and `lexicon.wild.state.*` to
+  `AgentShellPhase`, on generic words like `clipboard`, `loading`, `error`. Containment fixed it.
+- **12 → 7** members the call site guards by hand: `if (plan.verdict !== 'ok')`,
+  `plan.status === 'ready' ? … : t(…)`. Both would have been filed as defects.
+- **7 → 5** members absent from a literal array the call site iterates. BlancShell's reset buttons
+  map `['general','layout','search','keyboard-shortcuts']`, deliberately omitting `tool-visibility`;
+  `FILE_KINDS` omits the machine-initiated `relabel`.
+- **5 → 3** **my own exemption list hid the refutation.** `unknown` was exempt from the containment
+  test, which let `connection.grade.*` bind to `SubtitleQualityGrade` and manufactured
+  `connection.grade.unrated`. The true domain is an inline union on `diagnoseConnectionProfile`'s
+  result and the catalog matches it exactly. **An exemption that hides the one member which would
+  have refuted the binding is how a scan invents a defect.**
+- **3 → 1** return-type narrowing: `sortFieldIsAbsent` is `'views' | 'date' | null` while its
+  parameter is the full `YtPlaylistSort`, so `yt.sort.noData.title` and `.unlogged` can never be
+  built. This only worked once the expression's own type **won outright** over the literal-array
+  heuristic instead of unioning with it — the same file declares `SORT_OPTS` with all five sorts,
+  for a different key family.
+
+**Controls.** With the four keys added the scan exits **0**; removing any one returns it, naming the
+locale and the file that builds it. A second instrument bug was caught the same way: a lazy
+quantifier in the return-type regex walked past the end of one function into the next and reported
+`emptyYtStore => 'views' | 'date' | null`, a signature that function does not have.
+
+**Verified and deliberately NOT filed:** `notebook.stream.media` is a union member the source
+itself documents as dead ("no view ever asked for it and no aggregator ever emitted one"), so its
+absence from the catalogs is correct.
+
+**Residual limit, stated so nobody reads exit 0 as proof of more than it is:** a prefix whose table
+is empty in every locale is skipped rather than reported, because there is nothing to bind against.
+That is a different defect class and this scan does not cover it.

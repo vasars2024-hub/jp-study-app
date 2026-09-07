@@ -35,6 +35,7 @@ import { CAPTURE_KIND_KEYS } from './captureKindKeys';
 import DictionaryPopup from '../DictionaryPopup';
 import ReaderCollectionPanel from '../ReaderCollectionPanel';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../ui/dialogService';
 import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
 import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
 import { ContextualSurface } from '../liquid/LiquidSurface';
@@ -388,6 +389,24 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
    * so a silent no-op announced itself as a success.
    */
   const removeEntry = async (id: string, title: string): Promise<void> => {
+    // `visual-novel:remove` does not remove one row. It filters `captures` by
+    // `visualNovelId` too, so every sentence the reader mined out of this novel —
+    // with its screenshot and any voice clip attached to it — is deleted in the
+    // same `saveDatabase`, straight to disk, with no undo. The button said only
+    // "Remove" and asked nothing, while the sibling capture row guards deleting
+    // ONE sentence behind a two-step confirm. So the smaller destruction was
+    // guarded and the larger one was not. The count is named because a confirm
+    // that does not say what it takes is barely a confirm.
+    const doomed = capturesForVisualNovel(database, id).length;
+    const ok = await confirmDialog({
+      title: t('vnPanel.confirm.remove.title'),
+      message: doomed
+        ? t('vnPanel.confirm.remove.message', { title, count: doomed })
+        : t('vnPanel.confirm.remove.messageEmpty', { title }),
+      confirmLabel: t('vnPanel.remove'),
+      danger: true,
+    });
+    if (!ok) return;
     const next = await window.api.visualNovelRemove(id);
     setDatabase(next);
     if (next.entries.some((entry) => entry.id === id)) {

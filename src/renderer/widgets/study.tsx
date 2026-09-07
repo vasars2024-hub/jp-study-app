@@ -4,8 +4,7 @@ import {
   getSummary,
   formatDuration,
   formatNumber,
-  READING_RECORDED_EVENT,
-  WATCH_RECORDED_EVENT,
+  onStatsChanged,
   type StatsSummary,
 } from '../stats';
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
@@ -14,23 +13,14 @@ import { useT } from '../i18n';
 
 /**
  * Live stats summary — refreshes whenever the reader **or the media player** records
- * activity. Both events, because since Phase 6 slice 8 either one can move these numbers
- * and a widget that repainted for only one of them would sit stale for up to 30 s in the
- * middle of the session that was changing it.
+ * activity. The shared subscription also handles resets, language changes, midnight,
+ * and writes from a separate reader/player window without polling the whole store.
  */
 function useStatsSummary(): StatsSummary {
   const [s, setS] = useState<StatsSummary>(() => getSummary());
   useEffect(() => {
     const refresh = () => setS(getSummary());
-    window.addEventListener(READING_RECORDED_EVENT, refresh);
-    window.addEventListener(WATCH_RECORDED_EVENT, refresh);
-    // Also pick up cross-day changes / other windows.
-    const t = window.setInterval(refresh, 30000);
-    return () => {
-      window.removeEventListener(READING_RECORDED_EVENT, refresh);
-      window.removeEventListener(WATCH_RECORDED_EVENT, refresh);
-      window.clearInterval(t);
-    };
+    return onStatsChanged(refresh);
   }, []);
   return s;
 }

@@ -534,6 +534,7 @@ export const SCRAPER_UI_RU: Catalog = {
   'verifiedSites.category.subtitles': 'Субтитры',
   'verifiedSites.source.built-in': 'встроенный',
   'verifiedSites.source.user-imported': 'импортирован пользователем',
+  'verifiedSites.source.community': 'сообщество',
   'verifiedSites.source.fmhy': 'FMHY',
   'verifiedSites.promotion.not-reviewed': 'не рассмотрено',
   'verifiedSites.promotion.eligible': 'подходит',

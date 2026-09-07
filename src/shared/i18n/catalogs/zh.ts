@@ -563,6 +563,9 @@ export const zh: Catalog = {
   'vnPanel.msg.sentenceSaved': '已将所选句子保存到 Media 文件夹。',
   'vnPanel.msg.sentenceExists': '该句子已经保存过了。',
   'vnPanel.remove': '移除',
+  'vnPanel.confirm.remove.title': '移除这部视觉小说？',
+  'vnPanel.confirm.remove.message': '要将 {title} 从本地库中移除吗？从中采集的 {count} 条句子也会一并删除，且无法撤销。',
+  'vnPanel.confirm.remove.messageEmpty': '要将 {title} 从本地库中移除吗？此操作无法撤销。',
   'vnPanel.compat.supported': '已支持',
   'vnPanel.compat.partial': '部分支持',
   'vnPanel.compat.manual': '手动',
@@ -5630,7 +5633,7 @@ export const zh: Catalog = {
   'media.collection.placeholder': '收藏夹名称',
   'media.remove.title': '要从媒体库中移除吗？',
   'media.remove.message': {
-    other: '要从媒体库中移除 {title} 及其 {count} 个文件吗？文件本身仍保留在磁盘上。',
+    other: '要从媒体库中移除 {title} 及其 {count} 个文件吗？文件本身仍保留在磁盘上，但为其下载或转写的字幕会被删除。',
   },
   'media.remove.confirm': '移除',
   'media.toast.addedToCollection': '已添加到 {name}。',

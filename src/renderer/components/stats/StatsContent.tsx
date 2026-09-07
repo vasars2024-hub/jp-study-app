@@ -19,6 +19,7 @@ import {
   formatDuration,
   formatNumber,
   getSummary,
+  onStatsChanged,
   resetStats,
   type StatsSummary,
 } from '../../stats';
@@ -64,6 +65,7 @@ export function useStats(): StatsState {
   const summary: StatsSummary = useMemo(() => getSummary(), [nonce]);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
+  useEffect(() => onStatsChanged(refresh), [refresh]);
 
   const resetAllStats = useCallback(async () => {
     const ok = await confirmDialog({

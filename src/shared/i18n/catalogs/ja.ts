@@ -565,6 +565,9 @@ export const ja: Catalog = {
   'vnPanel.msg.sentenceSaved': '選択した文を Media フォルダーに保存しました。',
   'vnPanel.msg.sentenceExists': 'その文はすでに保存されています。',
   'vnPanel.remove': '削除',
+  'vnPanel.confirm.remove.title': 'このビジュアルノベルを削除しますか？',
+  'vnPanel.confirm.remove.message': '{title} をローカルライブラリから削除しますか？このノベルから取り込んだ {count} 件の文も一緒に削除され、元に戻せません。',
+  'vnPanel.confirm.remove.messageEmpty': '{title} をローカルライブラリから削除しますか？元に戻せません。',
   'vnPanel.compat.supported': '対応',
   'vnPanel.compat.partial': '一部対応',
   'vnPanel.compat.manual': '手動',
@@ -5660,7 +5663,7 @@ export const ja: Catalog = {
   'media.collection.placeholder': 'コレクション名',
   'media.remove.title': 'ライブラリから削除しますか？',
   'media.remove.message': {
-    other: '{title} と {count} 件のファイルをライブラリから削除しますか？ ファイル自体はディスクに残ります。',
+    other: '{title} と {count} 件のファイルをライブラリから削除しますか？ ファイル自体はディスクに残りますが、この作品のためにダウンロード・文字起こしした字幕は削除されます。',
   },
   'media.remove.confirm': '削除',
   'media.toast.addedToCollection': '{name} に追加しました。',
