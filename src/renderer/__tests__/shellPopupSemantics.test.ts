@@ -98,12 +98,28 @@ describe('the shell taskbar declares its popups', () => {
     expect(source).toContain("'notifications.wired.noUnreadError'");
   });
 
+  /*
+   * This case used to pin the two hardcoded switches by index —
+   * `buttonTag(source, 'switchDesktop(0)')` then `(1)`. That stopped being
+   * possible when the row became a map over every switchable desktop (D149):
+   * there is no `switchDesktop(0)` literal any more, `buttonTag` returned '',
+   * and a strictly BETTER implementation read as a regression. It is the same
+   * shape the class-5 ratchet hit on 2026-09-07 — a source ratchet that pins
+   * one spelling of a contract instead of the contract.
+   *
+   * So it asserts the contract: the one switch button carries `aria-pressed`
+   * bound to whether it IS the active desktop, and the state is not left to
+   * the `active` class alone.
+   */
   it('the desktop switches carry their selected-ness programmatically, not only as a class', () => {
     const source = read(SHELL);
-    for (const n of [0, 1]) {
-      const tag = buttonTag(source, `switchDesktop(${n})`);
-      expect(tag).toContain(`aria-pressed={activeDesktop === ${n}}`);
-    }
+    const tag = buttonTag(source, 'switchDesktop(index)');
+    expect(tag).toContain('aria-pressed={activeDesktop === index}');
+    // The class is still there, and must not be the only carrier.
+    expect(tag).toContain('os-desktop-switch');
+    // And the row is genuinely a map, not two buttons that happen to share a
+    // handler name — otherwise a desktop past the second has no button at all.
+    expect(source).toContain('switchableDesktops.map(');
   });
 
 });
