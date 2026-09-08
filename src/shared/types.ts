@@ -252,6 +252,13 @@ export interface ExampleResult {
   /** `TV`, `Movie`, `OVA` — the provider's own format label. */
   format?: string;
   relatedTitles?: string[];
+  /**
+   * The same relations with their AniList ids and episode counts, which is what
+   * makes them answerable. `relatedTitles` is display text — a folder holding
+   * two seasons cannot ask a provider about episode 26 with a string. See
+   * `shared/mediaSeasons.ts` (D266).
+   */
+  relatedWorks?: import('./mediaSeasons').RelatedWork[];
   malId?: number;
   anilistId?: number;
   /**

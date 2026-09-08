@@ -225,6 +225,7 @@ async function buildPatch(
     rating: work.rating,
     rank: work.rank,
     relatedTitles: work.relatedTitles?.length ? work.relatedTitles : undefined,
+    relatedWorks: work.relatedWorks?.length ? work.relatedWorks : undefined,
     malId: work.malId,
     anilistId: work.anilistId,
     metadataSource: work.provider,

@@ -20,6 +20,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import type { MediaMetadataProviderId } from '../shared/mediaMetadataIpc';
+import type { RelatedWork } from '../shared/mediaSeasons';
 
 /** What a provider hands back, normalized across the two. */
 export interface ProviderWork {
@@ -40,6 +41,12 @@ export interface ProviderWork {
   rank?: number;
   popularity?: number;
   relatedTitles?: string[];
+  /**
+   * The same relations as `relatedTitles`, kept with their ids and episode
+   * counts. AniList-only: Jikan's related list carries MAL ids, and mixing the
+   * two id spaces is how a lookup silently asks about a different show.
+   */
+  relatedWorks?: RelatedWork[];
   posterUrl?: string;
   bannerUrl?: string;
   malId?: number;
@@ -464,7 +471,7 @@ const ANILIST_FIELDS = `
   coverImage { extraLarge large }
   bannerImage
   studios(isMain: true) { nodes { name } }
-  relations { edges { node { title { romaji english } } } }
+  relations { edges { relationType node { id title { romaji english } format episodes } } }
 `;
 
 interface AnilistMedia {
@@ -483,7 +490,17 @@ interface AnilistMedia {
   coverImage?: { extraLarge?: string | null; large?: string | null };
   bannerImage?: string | null;
   studios?: { nodes?: Array<{ name?: string | null }> };
-  relations?: { edges?: Array<{ node?: { title?: { romaji?: string | null; english?: string | null } } }> };
+  relations?: {
+    edges?: Array<{
+      relationType?: string | null;
+      node?: {
+        id?: number | null;
+        title?: { romaji?: string | null; english?: string | null };
+        format?: string | null;
+        episodes?: number | null;
+      };
+    }>;
+  };
 }
 
 function anilistToWork(media: AnilistMedia): ProviderWork {
@@ -519,6 +536,26 @@ function anilistToWork(media: AnilistMedia): ProviderWork {
         .map((edge) => text(edge?.node?.title?.english) ?? text(edge?.node?.title?.romaji))
         .filter((v): v is string => !!v),
     )].slice(0, 12),
+    // The same edges kept structurally. `relatedTitles` above is display text
+    // and cannot be queried with: a subtitle provider needs the id, and working
+    // out which entry holds episode 26 of a two-season folder needs the episode
+    // count. See `shared/mediaSeasons.ts` (D266).
+    relatedWorks: (media.relations?.edges ?? [])
+      .map((edge): RelatedWork | null => {
+        const id = num(edge?.node?.id ?? undefined);
+        const title = text(edge?.node?.title?.english) ?? text(edge?.node?.title?.romaji);
+        const relationType = text(edge?.relationType);
+        if (!id || !title || !relationType) return null;
+        return {
+          anilistId: id,
+          relationType,
+          title,
+          format: text(edge?.node?.format),
+          episodeCount: num(edge?.node?.episodes ?? undefined),
+        };
+      })
+      .filter((work): work is RelatedWork => work !== null)
+      .slice(0, 12),
     posterUrl: text(media.coverImage?.extraLarge) ?? text(media.coverImage?.large),
     bannerUrl: text(media.bannerImage),
   };

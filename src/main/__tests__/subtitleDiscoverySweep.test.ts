@@ -75,6 +75,8 @@ interface ProviderScript {
 const script: ProviderScript = {} as ProviderScript;
 /** Which provider clients were actually reached, in order. */
 const asked: string[] = [];
+/** The arguments each Jimaku call carried, in order. */
+const jimakuAsked: { anilistId?: number; title?: string; episode?: number | null }[] = [];
 
 function resetScript(): void {
   script.jimaku = { candidates: [], down: false, downStatus: 200 };
@@ -90,8 +92,12 @@ vi.mock('../subtitleProviderClients', () => ({
   hasSubtitleProviderKey: (id: string) => script.keys[id] === true,
   setSubtitleProviderKey: () => undefined,
   testSubtitleProvider: async () => ({ ok: true }),
-  jimakuSearchDetailed: async () => {
+  jimakuSearchDetailed: async (anilistId?: number, title?: string, episode?: number | null) => {
     asked.push('jimaku');
+    // The question actually asked, not just that one was. D266 is a defect
+    // entirely about WHICH entry and WHICH episode number went over the wire,
+    // and a stub that drops its arguments cannot see it.
+    jimakuAsked.push({ anilistId, title, episode });
     return { ...script.jimaku, entry: null, basis: 'anilist', rejectedEntry: null };
   },
   openSubtitlesSearchDetailed: async () => {
@@ -197,6 +203,7 @@ async function sweep(item: MediaItem, request: Record<string, unknown> = {}): Pr
   // otherwise read the first one's calls in the second one's result, and
   // `asked` assertions would pass or fail for the wrong reason.
   asked.length = 0;
+  jimakuAsked.length = 0;
   let current = item;
   registerSubtitleDiscoveryIpc({
     listItems: () => [current],
@@ -357,5 +364,103 @@ describe('the sweep still attaches when a provider answers', () => {
     const out = await sweep(mediaItem());
     expect(reasons(out.failures, 'opensubtitles')).toEqual(['download-failed']);
     expect(out.records).toEqual([]);
+  });
+});
+
+// D266. The user's `The Big O` folder is 26 files, all stamped `anilistId: 567`
+// — season 1, `episodes: 13`. Jimaku entry 1178 holds exactly E01–E13, so
+// episodes 14–26 were asked about under an entry that cannot contain them and
+// the correct "nothing" was stored as evidential, suppressing every retry.
+describe('a folder holding two seasons', () => {
+  const SEQUEL = {
+    anilistId: 568, relationType: 'SEQUEL', title: 'The Big O II', format: 'TV', episodeCount: 13,
+  };
+  /** Episode 26 of the folder, i.e. episode 13 of the second entry. */
+  const episode26 = (over: Partial<MediaItem> = {}): MediaItem => mediaItem({
+    id: 'm26',
+    title: 'The Big O - 26',
+    fileName: 'The Big O - 26.mkv',
+    path: path.join(tmpRoot, 'The Big O - 26.mkv'),
+    episode: 26,
+    episodeCount: 13,
+    relatedWorks: [SEQUEL],
+    ...over,
+  } as Partial<MediaItem>);
+
+  const jimakuCandidate = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    providerId: 'jimaku',
+    providerItemId: 'jimaku:1179:The Big O II.E13.Bandai.ja.srt',
+    language: 'ja',
+    format: 'srt',
+    releaseName: 'The Big O II.E13.Bandai.ja.srt',
+    season: null,
+    // What the sequel entry's own numbering says, which is NOT the folder's.
+    episode: 13,
+    releaseGroup: null,
+    hearingImpaired: false,
+    hashMatch: false,
+    downloads: null,
+    fetchToken: 'https://x/e13.srt',
+    ...over,
+  });
+
+  it('asks the SEQUEL entry, about its own episode 13', async () => {
+    await sweep(episode26());
+    expect(jimakuAsked).toEqual([{ anilistId: 568, title: 'The Big O II', episode: 13 }]);
+  });
+
+  it('still asks the matched entry for an episode inside it', async () => {
+    // The discriminating positive. Without it, "always hop to the sequel" passes
+    // every other case here and breaks all thirteen episodes that worked.
+    await sweep(mediaItem());
+    expect(jimakuAsked).toEqual([{ anilistId: 567, title: 'The Big O', episode: 7 }]);
+  });
+
+  it('attaches the sequel file to the folder-numbered item', async () => {
+    // The half a naive fix drops: the candidate comes back numbered 13 in the
+    // sequel's frame, the item is episode 26 in the folder's, and the matcher
+    // reads that disagreement as the wrong episode and rejects it — so the
+    // search succeeds and nothing is attached.
+    script.jimaku = { candidates: [jimakuCandidate()], down: false, downStatus: 200 };
+    const out = await sweep(episode26());
+    expect(out.records.map((record) => record.providerId)).toEqual(['jimaku']);
+    expect(reasons(out.failures, 'jimaku')).toEqual([]);
+  });
+
+  it('does not renumber a candidate that is a different episode of the sequel', async () => {
+    // Only the requested episode is rewritten. A stray E04 in the same listing
+    // must stay wrong, or the remap becomes "attach whatever came back".
+    script.jimaku = {
+      candidates: [jimakuCandidate({
+        providerItemId: 'jimaku:1179:The Big O II.E04.Bandai.ja.srt',
+        releaseName: 'The Big O II.E04.Bandai.ja.srt',
+        episode: 4,
+      })],
+      down: false,
+      downStatus: 200,
+    };
+    const out = await sweep(episode26());
+    expect(out.records).toEqual([]);
+    expect(reasons(out.failures, 'jimaku')).toEqual(['no-match']);
+  });
+
+  it('refuses, and says why, when no sequel accounts for the episode', async () => {
+    const out = await sweep(episode26({ relatedWorks: [] } as Partial<MediaItem>));
+    // Never asked: that question is already known to answer nothing, and its
+    // `no-match` is exactly what made this permanent.
+    expect(out.asked).not.toContain('jimaku');
+    expect(reasons(out.failures, 'jimaku')).toEqual(['episode-out-of-range:no-sequel']);
+  });
+
+  it('refuses when the episode is past the sequel as well', async () => {
+    const out = await sweep(episode26({ episode: 40 } as Partial<MediaItem>));
+    expect(out.asked).not.toContain('jimaku');
+    expect(reasons(out.failures, 'jimaku')).toEqual(['episode-out-of-range:beyond-sequel']);
+  });
+
+  it('leaves an item with no published episode count alone', async () => {
+    // No boundary, no "outside" it. This is most of the library.
+    await sweep(episode26({ episodeCount: undefined } as Partial<MediaItem>));
+    expect(jimakuAsked).toEqual([{ anilistId: 567, title: 'The Big O', episode: 26 }]);
   });
 });

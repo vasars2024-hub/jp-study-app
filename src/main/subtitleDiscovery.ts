@@ -89,6 +89,7 @@ import {
   describeEmptyNyaaListing,
 } from '../shared/subtitleNyaa';
 import { providerSearchTitle } from '../shared/mediaFileIdentity';
+import { resolveSeasonForEpisode } from '../shared/mediaSeasons';
 import { osdbHashFile } from './osdbHash';
 import { enqueueTranscription } from './transcriptionJobs';
 
@@ -638,15 +639,49 @@ async function discoverForItem(
       if (providerId === 'jimaku') {
         // Japanese-only provider; asking it for anything else is a wasted request.
         if (!wanted.some((lang) => lang.startsWith('ja'))) continue;
+        // D266. A folder holding two seasons is stamped with the FIRST season's
+        // id, so episode 26 is asked about under an entry whose own metadata
+        // says it has 13 — a question that cannot be answered, whose "no"
+        // is then stored as evidence and suppresses the provider for
+        // `retryAfterDays`. Measured live: `The Big O` is 26 files all carrying
+        // `anilistId: 567`, and jimaku entry 1178 holds exactly E01–E13.
+        const season = resolveSeasonForEpisode(item);
+        if (season.kind === 'unresolved') {
+          // Deliberately not falling through to the original id. That query is
+          // already known to answer nothing, and its `no-match` is what made
+          // this permanent. The reason is recorded instead, so a later sweep —
+          // or a hand-corrected match — starts from the truth.
+          failures.push({
+            providerId,
+            lang: wanted.join(','),
+            attemptedAt: Date.now(),
+            reason: `episode-out-of-range:${season.reason}`,
+          });
+          continue;
+        }
         // `jimakuSearchDetailed` rather than `jimakuSearch`: the plain form drops
         // the `down` flag, and this is the caller that most needs it.
         const reply = await jimakuSearchDetailed(
-          item.anilistId,
-          providerSearchTitle(item.seriesTitle ?? item.title),
-          item.episode ?? null,
+          season.kind === 'resolved' ? season.hop.anilistId : item.anilistId,
+          providerSearchTitle(
+            season.kind === 'resolved' ? season.hop.title : (item.seriesTitle ?? item.title),
+          ),
+          season.kind === 'resolved' ? season.hop.episode : (item.episode ?? null),
         );
         candidates = reply.candidates;
         providerDown = reply.down;
+        // The candidates now carry the SEQUEL's episode numbering while the
+        // library item still carries the folder's. Left as-is they disagree,
+        // and `matchSubtitleTracks` reads that as the wrong episode and rejects
+        // every one of them — the fix would find the files and then throw them
+        // away. Rewriting the number here keeps the comparison in the item's
+        // own frame, which is the only frame the rest of the pipeline knows.
+        if (season.kind === 'resolved') {
+          const absolute = item.episode ?? null;
+          candidates = candidates.map((candidate) => (
+            candidate.episode === season.hop.episode ? { ...candidate, episode: absolute } : candidate
+          ));
+        }
       } else if (providerId === 'nyaa') {
         candidates = await nyaaSearch({
           // Checked non-null by the availability gate above.
