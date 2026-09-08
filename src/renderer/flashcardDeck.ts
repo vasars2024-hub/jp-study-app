@@ -28,10 +28,12 @@ export type FlashcardTextProvenance =
   | 'book-text';
 
 import {
+  filterLocalReviewsDue,
   type LocalSrsAlgorithm,
   type LocalSrsRating,
   type LocalSrsState,
 } from '../shared/localSrs';
+import type { FlashcardReviewMode } from '../shared/flashcardReview';
 import {
   adaptStateForAlgorithm,
   migrateSrsState,
@@ -582,6 +584,31 @@ export function filterDeckCards(cards: DeckFlashcard[], filter: DeckFolderFilter
   if (filter === 'all') return cards;
   if (filter === 'unfiled') return cards.filter((c) => !c.folder);
   return cards.filter((c) => c.folder === filter);
+}
+
+/**
+ * The cards a review session started from `bookKey` would actually contain.
+ *
+ * One predicate, so the number beside a source in the picker and the number on
+ * the Start review button are the same question asked once. D310: the picker
+ * counted `filteredDeck` — folder AND the find-box query — while the session
+ * pool is folder-only, so typing anything in the find box moved every number in
+ * the picker and none of the cards in the session. Measured live: a query
+ * matching nothing showed "All in current folder (0)" directly above
+ * "Start review (4)".
+ *
+ * `pool` is the folder-scoped deck (`filterDeckCards(epubCards, folderFilter)`),
+ * never the searched one — search is deliberately not a session filter.
+ */
+export function reviewSessionCards(
+  pool: DeckFlashcard[],
+  bookKey: string,
+  dueOnly: boolean,
+  mode: FlashcardReviewMode,
+): DeckFlashcard[] {
+  const byBook = filterDeckByBook(pool, bookKey);
+  const due = dueOnly ? filterLocalReviewsDue(byBook) : byBook;
+  return mode === 'audio' ? due.filter((card) => card.audioDataUrl || card.audioPath) : due;
 }
 
 /**

@@ -27,6 +27,7 @@
  * (Study OS's aero overview keeps those and stays in `FlashcardsView`).
  */
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -61,6 +62,7 @@ import {
   removeDeckCard,
   removeBookGroup,
   renameBookGroup,
+  reviewSessionCards,
   searchDeckCards,
   setBookGroupFolder,
   setDeckCardFolder,
@@ -265,6 +267,8 @@ export interface FlashcardsState {
   epubDueCards: DeckFlashcard[];
   epubReviewCandidates: DeckFlashcard[];
   epubReviewSessionCandidates: DeckFlashcard[];
+  /** Size of the session a given source option would start. See D310. */
+  reviewSourceCount: (bookKey: string) => number;
   filteredSaved: SavedWord[];
   unknownReviewCards: ReviewCard[];
   knownReviewCards: ReviewCard[];
@@ -456,10 +460,18 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     return reviewDueOnly ? filterLocalReviewsDue(pool) : pool;
   }, [epubReviewPool, reviewBookKey, reviewDueOnly]);
   const epubReviewSessionCandidates = useMemo(
-    () => reviewMode === 'audio'
-      ? epubReviewCandidates.filter((card) => card.audioDataUrl || card.audioPath)
-      : epubReviewCandidates,
-    [epubReviewCandidates, reviewMode],
+    () => reviewSessionCards(epubReviewPool, reviewBookKey, reviewDueOnly, reviewMode),
+    [epubReviewPool, reviewBookKey, reviewDueOnly, reviewMode],
+  );
+  /**
+   * What the source picker labels each option with: the size of the session that
+   * option would start, asked through the same predicate the Start review button
+   * uses. D310 — it used to read off `filteredDeck`, which the find box narrows
+   * and the session ignores.
+   */
+  const reviewSourceCount = useCallback(
+    (bookKey: string) => reviewSessionCards(epubReviewPool, bookKey, reviewDueOnly, reviewMode).length,
+    [epubReviewPool, reviewDueOnly, reviewMode],
   );
   const audioCandidateCount = useMemo(
     () => epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath).length,
@@ -1085,6 +1097,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     epubDueCards,
     epubReviewCandidates,
     epubReviewSessionCandidates,
+    reviewSourceCount,
     filteredSaved,
     unknownReviewCards,
     knownReviewCards,
@@ -1685,6 +1698,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     bookGroups,
     epubReviewBooks,
     epubReviewSessionCandidates,
+    reviewSourceCount,
     recentStrip,
     reviewBookKey,
     reviewDueOnly,
@@ -1956,13 +1970,22 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               <label>
                 {t('flash.epubSource')}
                 <select value={reviewBookKey} onChange={(e) => state.setReviewBookKey(e.target.value)}>
-                  <option value="all">{t('flash.allInFolder', { count: filteredDeck.length })}</option>
+                  {/*
+                    D310: every number here is the size of the session that option
+                    would start, via the same `reviewSessionCards` the Start review
+                    button uses. It read off `filteredDeck` before — folder AND the
+                    find box — so a query matching nothing showed "All in current
+                    folder (0)" directly above "Start review (4)". The per-book
+                    `inFolder || group.cards.length` fallback was the other half of
+                    it: a book with nothing in scope printed its whole-deck total
+                    rather than the 0 it actually offers.
+                  */}
+                  <option value="all">{t('flash.allInFolder', { count: reviewSourceCount('all') })}</option>
                   {epubReviewBooks.map((group) => {
                     const key = `${group.bookId}::${group.bookTitle}`;
-                    const inFolder = filterDeckByBook(filteredDeck, key).length;
                     return (
                       <option key={key} value={key}>
-                        {group.bookTitle} ({inFolder || group.cards.length})
+                        {group.bookTitle} ({reviewSourceCount(key)})
                       </option>
                     );
                   })}
