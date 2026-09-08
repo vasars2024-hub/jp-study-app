@@ -15,6 +15,8 @@
 
 import { mediaCategory, type MediaCategory } from './mediaCategories';
 import { METADATA_ACCEPT_CONFIDENCE } from './mediaMetadataMatch';
+import { resolveSeasonForEpisode } from './mediaSeasons';
+import type { MediaSubtitleEvidence } from './mediaSubtitleStatus';
 import { hasJapaneseSubtitles, subtitleLanguages } from './subtitleRecord';
 import type { SubtitleRecord } from './subtitleRecord';
 import { sortMediaItems, seriesLabel } from './mediaSorting';
@@ -106,6 +108,11 @@ export interface LibraryEntry {
    * `hasJapaneseSubtitles`, which is only ever about `primary`.
    */
   japaneseSubtitleCount: number;
+  /**
+   * At least one member is numbered past the entry AniList matched, with no sequel
+   * resolvable — so a provider keyed on that entry cannot answer for it. D317.
+   */
+  subtitleSeasonUnresolved: boolean;
   /** True once discovery has actually run, so "none found" differs from "never looked". */
   subtitlesChecked: boolean;
   year: number | null;
@@ -229,6 +236,28 @@ export function providerEpisodeTitle(item: MediaItem): string | null {
   return text(item.episodeTitles?.[String(item.episode)]) || null;
 }
 
+/**
+ * Subtitle evidence for ONE file, for the per-episode rows in the detail drawer.
+ *
+ * D317. The drawer already renders a status pill on every episode row and already
+ * had the component to do it with; the call site passed `mediaSubtitleStatus()`
+ * with no arguments, which always returns `null`, so all 29 rows of The Big O
+ * rendered nothing. A user who clicks a card reading "Japanese subtitles on 13 of
+ * 26" lands on the one list that could tell them *which* 13 and is told nothing.
+ *
+ * Group-scoped fields are deliberately absent: `japanese` describes several
+ * episodes and this is one file, which is the same distinction `buildEntry` draws
+ * between `hasJapaneseSubtitles` and `japaneseSubtitleCount`.
+ */
+export function episodeSubtitleEvidence(item: MediaItem): MediaSubtitleEvidence {
+  return {
+    languages: subtitleLanguages(item.subtitles),
+    hasJapanese: hasJapaneseSubtitles(item.subtitles),
+    search: typeof item.subtitlesCheckedAt === 'number' ? 'idle' : undefined,
+    wrongSeason: resolveSeasonForEpisode(item).kind === 'unresolved',
+  };
+}
+
 function maxOrNull(values: readonly (number | undefined)[]): number | null {
   let best: number | null = null;
   for (const value of values) {
@@ -283,6 +312,11 @@ function buildEntry(id: string, grouping: LibraryGrouping, members: MediaItem[])
     // subtitles ready" for all 26. Counted over `items`, which is the same set `episodeCount`
     // reports, so the pill and the `0 / 26` badge beside it finally describe one thing.
     japaneseSubtitleCount: items.filter((item) => hasJapaneseSubtitles(item.subtitles)).length,
+    // D317. Only members that are BOTH uncovered and unresolvable count: an episode
+    // that already has its Japanese track is not waiting on a season hop, and letting
+    // it set this flag would put a warning on a card that is perfectly served.
+    subtitleSeasonUnresolved: items.some((item) => !hasJapaneseSubtitles(item.subtitles)
+      && resolveSeasonForEpisode(item).kind === 'unresolved'),
     subtitlesChecked: typeof primary.subtitlesCheckedAt === 'number',
     year: maxOrNull(items.map((item) => item.year)),
     seasons,

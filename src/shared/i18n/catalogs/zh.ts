@@ -5792,6 +5792,7 @@ export const zh: Catalog = {
     other: '找到 {count} 种字幕语言',
   },
   'media.subStatus.none': '未找到字幕',
+  'media.subStatus.wrongSeason': '超出匹配到的季范围 — 在错误的季中搜索',
   'media.subStatus.searching': '正在搜索字幕…',
   'media.subStatus.transcribing': '正在转写日语音频 — {percent}%',
   'media.subStatus.failed': '字幕搜索失败',

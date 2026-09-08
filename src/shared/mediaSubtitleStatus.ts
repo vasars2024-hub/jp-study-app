@@ -47,6 +47,19 @@ export interface MediaSubtitleEvidence {
    * single-file card and the answer is unchanged.
    */
   japanese?: { have: number; of: number };
+  /**
+   * The episode number is past the matched entry's own published run, and no
+   * single sequel accounts for it — so no provider keyed on that entry was ever
+   * really asked about this episode.
+   *
+   * D317. Kept separate from `search` because the two make opposite claims: an
+   * `idle` search that found nothing says *the catalogue has no subtitles for
+   * this*, which is a fact about the show, while this says *we asked the wrong
+   * entry*, which is a fact about the question. Only one of them is something a
+   * user can act on, and discovery already draws exactly this distinction when
+   * it records `episode-out-of-range:` instead of `no-match`.
+   */
+  wrongSeason?: boolean;
 }
 
 export interface MediaSubtitleStatus {
@@ -68,7 +81,9 @@ const clampPercent = (value: unknown): number => {
  * `null` when there is nothing worth a line of the card.
  */
 export function mediaSubtitleStatus(evidence: MediaSubtitleEvidence = {}): MediaSubtitleStatus | null {
-  const { transcription, search, languages, hasJapanese, metadataNeedsReview, japanese } = evidence;
+  const {
+    transcription, search, languages, hasJapanese, metadataNeedsReview, japanese, wrongSeason,
+  } = evidence;
 
   // 1. Failures the user can act on.
   if (transcription?.phase === 'error') {
@@ -123,6 +138,17 @@ export function mediaSubtitleStatus(evidence: MediaSubtitleEvidence = {}): Media
   const count = languages?.length ?? 0;
   if (count > 0) {
     return { tone: 'neutral', labelKey: 'media.subStatus.languagesFound', vars: { count } };
+  }
+
+  // D317. Still section 3: this is an answer about the subtitle SEARCH, which is
+  // what the pill is about, so it outranks the metadata advisory below. It is
+  // deliberately not gated on `search`, because the claim is arithmetic on the
+  // item's own stored run length rather than something a provider told us — it
+  // is equally true, and most useful, before the first sweep ever runs. That is
+  // the one place this module's "never say it if we never looked" rule does not
+  // apply, precisely because nothing here is being inferred from a lookup.
+  if (wrongSeason) {
+    return { tone: 'warning', labelKey: 'media.subStatus.wrongSeason' };
   }
 
   // 4. Advisory. Last because it is about metadata, not about studying.

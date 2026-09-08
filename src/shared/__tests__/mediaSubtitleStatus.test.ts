@@ -152,3 +152,52 @@ describe('mediaSubtitleStatus', () => {
     });
   });
 });
+
+/**
+ * D317. Discovery already distinguishes "the catalogue has nothing for this show" from
+ * "the episode is past the entry we matched, so nobody was asked about it" — it records
+ * `episode-out-of-range:<reason>` rather than `no-match`, and its own comment says why:
+ * *one of which a user can act on*. The pill collapsed both onto "No subtitles found".
+ */
+describe('wrong season', () => {
+  it('says the search asked the wrong entry rather than that nothing exists', () => {
+    expect(mediaSubtitleStatus({ search: 'idle', wrongSeason: true })).toEqual({
+      tone: 'warning',
+      labelKey: 'media.subStatus.wrongSeason',
+    });
+  });
+
+  it('CONTROL: an in-range search that found nothing still says so', () => {
+    expect(mediaSubtitleStatus({ search: 'idle', wrongSeason: false })?.labelKey)
+      .toBe('media.subStatus.none');
+  });
+
+  it('speaks before the first sweep, because the verdict is arithmetic not a lookup', () => {
+    // The rest of this module refuses to speak without evidence. This branch is the one
+    // exception and it is deliberate: `episode > episodeCount` is true of the stored
+    // metadata whether or not a provider has ever been asked, so telling the user up
+    // front is not a guess — it is the earliest honest moment.
+    expect(mediaSubtitleStatus({ wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.wrongSeason');
+  });
+
+  it('never overrides a real subtitle a split cour actually served', () => {
+    expect(mediaSubtitleStatus({ hasJapanese: true, wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.jaReady');
+    expect(mediaSubtitleStatus({ languages: ['en'], wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.languagesFound');
+    expect(mediaSubtitleStatus({ japanese: { have: 13, of: 26 }, wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.jaPartial');
+  });
+
+  it('keeps urgency above it, and outranks the metadata advisory below it', () => {
+    expect(mediaSubtitleStatus({ search: 'failed', wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.failed');
+    expect(mediaSubtitleStatus({ search: 'searching', wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.searching');
+    // Section 4 is explicitly "about metadata, not about studying"; this is about the
+    // subtitle search, which is what the pill is for.
+    expect(mediaSubtitleStatus({ metadataNeedsReview: true, wrongSeason: true })?.labelKey)
+      .toBe('media.subStatus.wrongSeason');
+  });
+});

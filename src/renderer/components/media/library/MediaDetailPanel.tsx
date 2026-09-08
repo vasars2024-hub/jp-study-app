@@ -24,7 +24,12 @@ import {
   TranscriptionCardOptionsControl,
   useTranscriptionCardOptions,
 } from '../TranscriptionCardOptions';
-import { episodesBySeason, providerEpisodeTitle, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
+import {
+  episodeSubtitleEvidence,
+  episodesBySeason,
+  providerEpisodeTitle,
+  type LibraryEntry,
+} from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
 import { subtitleSweepWentNowhere } from '../../../../shared/subtitleDiscoveryIpc';
 import {
@@ -383,7 +388,7 @@ export default function MediaDetailPanel({
                   item={item}
                   ordinal={index + 1}
                   active={item.id === currentId}
-                  status={mediaSubtitleStatus()}
+                  status={mediaSubtitleStatus(episodeSubtitleEvidence(item))}
                   onOpen={onPlay}
                 />
               ))}
@@ -399,6 +404,7 @@ export default function MediaDetailPanel({
                       item={item}
                       ordinal={index + 1}
                       active={item.id === currentId}
+                      status={mediaSubtitleStatus(episodeSubtitleEvidence(item))}
                       onOpen={onPlay}
                     />
                   ))}

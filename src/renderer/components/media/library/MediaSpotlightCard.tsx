@@ -107,6 +107,7 @@ export default function MediaSpotlightCard({
                 ? { have: entry.japaneseSubtitleCount, of: entry.episodeCount }
                 : undefined,
               search: entry.subtitlesChecked ? 'idle' : undefined,
+              wrongSeason: entry.subtitleSeasonUnresolved,
               metadataNeedsReview: entry.metadataNeedsReview,
             })}
           />

@@ -5828,6 +5828,7 @@ export const ja: Catalog = {
     other: '字幕 {count} 言語が見つかりました',
   },
   'media.subStatus.none': '字幕が見つかりません',
+  'media.subStatus.wrongSeason': 'マッチしたシーズンの範囲外です — 誤ったシーズンで検索されました',
   'media.subStatus.searching': '字幕を検索中…',
   'media.subStatus.transcribing': '日本語音声を文字起こし中 — {percent}%',
   'media.subStatus.failed': '字幕の検索に失敗しました',

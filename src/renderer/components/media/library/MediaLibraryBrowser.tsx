@@ -126,6 +126,8 @@ const LibraryEntryCard = memo(function LibraryEntryCard({
         // `idle` means a search actually ran and found nothing, which
         // is a different statement from having never looked.
         search: entry.subtitlesChecked ? 'idle' : undefined,
+        // …and "we asked the wrong entry" is a third statement again (D317).
+        wrongSeason: entry.subtitleSeasonUnresolved,
         metadataNeedsReview: entry.metadataNeedsReview,
       })}
       active={entry.id === selectedId || entry.items.some((i) => i.id === currentId)}

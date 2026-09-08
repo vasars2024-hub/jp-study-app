@@ -5859,6 +5859,7 @@ export const en: Catalog = {
     other: '{count} subtitle languages found',
   },
   'media.subStatus.none': 'No subtitles found',
+  'media.subStatus.wrongSeason': 'Past the matched season — searched under the wrong one',
   'media.subStatus.searching': 'Searching for subtitles…',
   'media.subStatus.transcribing': 'Transcribing Japanese audio — {percent}%',
   'media.subStatus.failed': 'Subtitle search failed',

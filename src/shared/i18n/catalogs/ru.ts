@@ -6403,6 +6403,7 @@ export const ru: Catalog = {
     other: 'Найдено {count} языка субтитров',
   },
   'media.subStatus.none': 'Субтитры не найдены',
+  'media.subStatus.wrongSeason': 'За пределами сопоставленного сезона — искали не в том сезоне',
   'media.subStatus.searching': 'Поиск субтитров…',
   'media.subStatus.transcribing': 'Расшифровка японской речи — {percent}%',
   'media.subStatus.failed': 'Не удалось найти субтитры',

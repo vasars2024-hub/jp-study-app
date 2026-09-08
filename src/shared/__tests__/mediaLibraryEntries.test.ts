@@ -3,6 +3,7 @@ import type { MediaItem } from '../types';
 import { inferMediaCategory, parseMediaFileName } from '../mediaFileIdentity';
 import {
   buildLibraryEntries,
+  episodeSubtitleEvidence,
   episodesBySeason,
   groupingForCategory,
   isContinueWatching,
@@ -104,6 +105,53 @@ describe('buildLibraryEntries', () => {
     expect(entries[0].episodeCount).toBe(2);
     expect(entries[0].japaneseSubtitleCount).toBeLessThanOrEqual(entries[0].episodeCount);
     expect(entries[0].japaneseSubtitleCount).toBe(2);
+  });
+
+  /**
+   * D317, the user's own library again: The Big O's 26 files all carry `anilistId: 567`,
+   * whose own metadata says `episodes: 13`, and AniList has been answering 403 since
+   * 2026-09-07 so `relatedWorks` is never populated and no sequel can be resolved.
+   * Episodes 14-26 are therefore asked under an entry that structurally cannot hold
+   * them, and the card said "No subtitles found" — a claim about the catalogue, from a
+   * search that never asked about these episodes at all.
+   */
+  it('flags a run numbered past the entry it was matched to', () => {
+    const ja = { lang: 'ja', source: 'test', path: 'x.srt' } as never;
+    const entries = buildLibraryEntries(
+      Array.from({ length: 26 }, (_, i) =>
+        episode(i + 1, { anilistId: 567, episodeCount: 13, ...(i < 13 ? { subtitles: [ja] } : {}) })),
+    );
+    expect(entries[0].subtitleSeasonUnresolved).toBe(true);
+  });
+
+  it('CONTROL: a run inside its own published length is not flagged', () => {
+    const entries = buildLibraryEntries(
+      Array.from({ length: 13 }, (_, i) => episode(i + 1, { anilistId: 567, episodeCount: 13 })),
+    );
+    expect(entries[0].subtitleSeasonUnresolved).toBe(false);
+  });
+
+  it('CONTROL: a resolvable sequel is not an unresolved season', () => {
+    const entries = buildLibraryEntries(
+      Array.from({ length: 26 }, (_, i) => episode(i + 1, {
+        anilistId: 567,
+        episodeCount: 13,
+        relatedWorks: [{ anilistId: 568, relationType: 'SEQUEL', title: 'The Big O II', format: 'TV', episodeCount: 13 }],
+      })),
+    );
+    expect(entries[0].subtitleSeasonUnresolved).toBe(false);
+  });
+
+  it('CONTROL: an out-of-range episode that already HAS Japanese is not flagged', () => {
+    // Otherwise a split cour filed as one Jimaku entry — which really can serve
+    // episode 20 while AniList says the season has 12 — would carry a warning on a
+    // card that is fully served.
+    const ja = { lang: 'ja', source: 'test', path: 'x.srt' } as never;
+    const entries = buildLibraryEntries(
+      Array.from({ length: 26 }, (_, i) =>
+        episode(i + 1, { anilistId: 567, episodeCount: 13, subtitles: [ja] })),
+    );
+    expect(entries[0].subtitleSeasonUnresolved).toBe(false);
   });
 
   it('shelves openings, endings, OVAs and specials apart from the run', () => {
@@ -304,5 +352,42 @@ describe('isContinueWatching — one predicate for the shelf and its badge', () 
     // No duration means no fraction, so nothing can call it watched — and a
     // rule that dropped it would hide every item the prober never measured.
     expect(isContinueWatching(episode(1, { durationSec: undefined, positionSec: 30 }))).toBe(true);
+  });
+});
+
+/**
+ * D317. `MediaDetailPanel` rendered a `MediaStatusPill` on every episode row and fed it
+ * `mediaSubtitleStatus()` — the no-argument call, which always returns `null`. Measured
+ * live on pid 4652: The Big O's drawer held **29 episode rows and 0 pills**, so the one
+ * list that could say which 13 of 26 episodes carry Japanese said nothing on any row.
+ */
+describe('episodeSubtitleEvidence', () => {
+  const ja = { lang: 'ja', source: 'test', path: 'x.srt' } as never;
+
+  it('reports a covered episode as covered', () => {
+    const evidence = episodeSubtitleEvidence(episode(1, { subtitles: [ja], subtitlesCheckedAt: 5 }));
+    expect(evidence.hasJapanese).toBe(true);
+    expect(evidence.languages).toEqual(['ja']);
+  });
+
+  it('separates a search that ran from one that never did', () => {
+    expect(episodeSubtitleEvidence(episode(2)).search).toBeUndefined();
+    expect(episodeSubtitleEvidence(episode(2, { subtitlesCheckedAt: 5 })).search).toBe('idle');
+  });
+
+  it('carries the wrong-season verdict for an episode past the matched entry', () => {
+    const evidence = episodeSubtitleEvidence(episode(26, { anilistId: 567, episodeCount: 13 }));
+    expect(evidence.wrongSeason).toBe(true);
+  });
+
+  it('CONTROL: an episode inside the run carries no verdict', () => {
+    expect(episodeSubtitleEvidence(episode(7, { anilistId: 567, episodeCount: 13 })).wrongSeason)
+      .toBe(false);
+  });
+
+  it('CONTROL: never claims group-scoped evidence about one file', () => {
+    // `japanese: {have, of}` is the fraction a SERIES card shows. Passing it here would
+    // make every row of a 26-episode drawer read "Japanese subtitles on 13 of 26".
+    expect(episodeSubtitleEvidence(episode(1)).japanese).toBeUndefined();
   });
 });
