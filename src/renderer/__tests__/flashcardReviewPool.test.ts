@@ -12,7 +12,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   filterDeckCards,
@@ -23,6 +23,31 @@ import {
 import type { LocalSrsState } from '../shared/localSrs';
 
 const NOW = Date.UTC(2026, 8, 7, 12);
+
+/**
+ * D419. The clock has to be pinned, and it was not.
+ *
+ * `filterLocalReviewsDue` defaults its `now` to `Date.now()`, and `NOT_DUE`
+ * below is `NOW + one day` — a fixed instant, 2026-09-08 12:00 UTC. So this
+ * suite was true only for the 24 hours after it was written: at 12:00 UTC on
+ * 2026-09-08 the "future" schedule became the past, card 3 became due, and
+ * "drops a card scheduled into the future only when due-only is on" went red
+ * on a tree nobody had touched. Caught in the full run 90 minutes after it
+ * expired, on a turn that had changed nothing in flashcards.
+ *
+ * Freezing the clock at NOW is the fix rather than making NOT_DUE relative to
+ * `Date.now()`: the rest of the fixture (`addedAt`, `lastReviewedAt`) is also
+ * expressed against NOW, so one pinned instant keeps the whole deck coherent
+ * and the suite says the same thing in a year as it does today.
+ */
+beforeAll(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+});
+
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 /** A valid future schedule, so `filterLocalReviewsDue` treats the card as NOT due. */
 const NOT_DUE: LocalSrsState = {

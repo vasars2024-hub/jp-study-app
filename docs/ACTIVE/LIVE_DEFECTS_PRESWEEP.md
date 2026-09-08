@@ -2822,3 +2822,31 @@ indexer search by itself. Navigating to it during this sweep put `INFO | torrent
 index): 75 results.` / `60 results after filters.` on the live log three times without a click. The
 pin's "do not run the indexer search" limit cannot be honoured by not clicking — it is honoured by
 not opening that page.
+
+### 2026-09-08 10:35 EDT — primary2, D419: the branch went red on its own, on a tree nobody touched
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D419 | tooling / flashcards | Not user-visible — filed because it turned the whole branch red between one turn and the next, with no commit in between. `flashcardReviewPool.test.ts` **expired**. Its fixture pinned a card's due date at a literal `Date.UTC(2026, 8, 7, 12) + one day` and called it "a valid future schedule", but `filterLocalReviewsDue` defaults its `now` to `Date.now()` and nothing froze the clock. At **12:00 UTC on 2026-09-08** that future became the past, card 3 became due, and *"drops a card scheduled into the future only when due-only is on"* started failing. | Full `npx vitest run` at `c4946915`: **1 failed / 15,373 passed**, the failure being `expected ['1','2','3','4'] to deeply equal ['1','2','4']` — card 3, the NOT_DUE one, back in the due-only pool. Reproduced alone (1 failed / 8 passed), so it is not a full-run flake. Nothing in this turn touched flashcards; the suite's own last commit is `63748864` (D310, 2026-09-07). The clock had simply crossed the fixture's hardcoded instant about 90 minutes earlier. | P2 | **fixed — this commit.** `vi.useFakeTimers()` + `setSystemTime(NOW)` around the suite. Freezing is the right fix rather than making the fixture relative to `Date.now()`: `addedAt` and `lastReviewedAt` are also expressed against `NOW`, so one pinned instant keeps the whole deck coherent and the suite says the same thing next year as today. 9/9. The mutation control is the defect itself — removing the `beforeAll` reproduces the exact failure on today's date, which is how it was found. |
+
+**LEAD for the next worker, not a defect row — this class is almost certainly not alone.** Fifteen
+suites hardcode a `Date.UTC(202x, …)` epoch and never pin the clock:
+
+    renderer/__tests__/  deckScheduleSweeps · deckWorkbenchStale · flashcardDeckSrs ·
+                         mediaHubStoragePanel · readingListTimelinePanel · schedulingPanel
+    shared/__tests__/    agentSpendLedger · ankiLocalDeck · blancConsole · flashcardScheduling ·
+                         localAgentAutomationRuns · localSrs · readingListExport ·
+                         readingListTimeline · youtubeDiscovery
+
+**Most are probably fine** — a suite that passes its own `now` into the subject is deterministic no
+matter what the wall clock says, and several of these plainly do. The dangerous shape is narrower
+and worth naming precisely: a fixture that computes a *relative* offset from a *fixed* epoch
+(`EPOCH + 86_400_000`) and then calls a function whose `now` **defaults** to `Date.now()`. That
+combination is true only until the wall clock overtakes the offset, and then it fails on a date
+nobody chose, on a commit nobody made.
+
+**How to settle it cheaply, without reading fifteen files:** run the suite under an advanced clock
+and see which ones change answer. `npx vitest run <files>` with `TZ` untouched but the system time
+moved a year forward is the decisive control — anything that flips was a time bomb, anything that
+does not is genuinely deterministic. A green run today proves nothing about tomorrow, which is the
+whole reason D419 reached the branch.
