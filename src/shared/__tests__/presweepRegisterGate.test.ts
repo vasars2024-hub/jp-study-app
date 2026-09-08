@@ -41,21 +41,25 @@ export const MINTING_RANGES: Record<string, Array<{ from: number; to: number }>>
     { from: 149, to: 169 },
     { from: 250, to: 269 },
     { from: 310, to: 329 },
+    { from: 390, to: 409 },
   ],
   primary2: [
     { from: 170, to: 189 },
     { from: 230, to: 249 },
     { from: 330, to: 349 },
+    { from: 410, to: 429 },
   ],
   backup: [
     { from: 190, to: 209 },
     { from: 270, to: 289 },
     { from: 350, to: 369 },
+    { from: 430, to: 449 },
   ],
   codex: [
     { from: 210, to: 229 },
     { from: 290, to: 309 },
     { from: 370, to: 389 },
+    { from: 450, to: 469 },
   ],
 };
 
