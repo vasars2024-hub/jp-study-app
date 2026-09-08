@@ -39,6 +39,14 @@ export interface MediaSubtitleEvidence {
   };
   /** Set when a metadata match landed below the auto-accept threshold. */
   metadataNeedsReview?: boolean;
+  /**
+   * For a card that stands for several episodes: how many of them carry Japanese.
+   *
+   * `hasJapanese` above describes ONE file — the one a click opens — which is the right
+   * subject for a single-file card and a misleading one for a series. Omit this for a
+   * single-file card and the answer is unchanged.
+   */
+  japanese?: { have: number; of: number };
 }
 
 export interface MediaSubtitleStatus {
@@ -60,7 +68,7 @@ const clampPercent = (value: unknown): number => {
  * `null` when there is nothing worth a line of the card.
  */
 export function mediaSubtitleStatus(evidence: MediaSubtitleEvidence = {}): MediaSubtitleStatus | null {
-  const { transcription, search, languages, hasJapanese, metadataNeedsReview } = evidence;
+  const { transcription, search, languages, hasJapanese, metadataNeedsReview, japanese } = evidence;
 
   // 1. Failures the user can act on.
   if (transcription?.phase === 'error') {
@@ -87,8 +95,30 @@ export function mediaSubtitleStatus(evidence: MediaSubtitleEvidence = {}): Media
 
   // 3. Settled facts, most useful first. Japanese is the reason this app exists,
   //    so it outranks a raw language count even when the count is larger.
+  //
+  //    Partial coverage comes FIRST, because "ready" is the one word a half-covered
+  //    series must not be described with. D316, measured on the user's own library: The Big O
+  //    carries Japanese on episodes 1-13 and nothing on 14-26, and the card said ready for all
+  //    26 because episode 1 happens to be its primary. A user picks it, studies to episode 13
+  //    and the subtitles simply stop — with nothing on the card having warned them.
+  if (japanese && japanese.of > 1 && japanese.have > 0 && japanese.have < japanese.of) {
+    return {
+      tone: 'neutral',
+      labelKey: 'media.subStatus.jaPartial',
+      vars: { have: japanese.have, of: japanese.of },
+    };
+  }
   if (hasJapanese) {
     return { tone: 'ready', labelKey: 'media.subStatus.jaReady' };
+  }
+  // A group where the opened file has none but siblings do is still worth saying out loud —
+  // otherwise the one card that could send the user to a covered episode says nothing.
+  if (japanese && japanese.have > 0) {
+    return {
+      tone: 'neutral',
+      labelKey: 'media.subStatus.jaPartial',
+      vars: { have: japanese.have, of: japanese.of },
+    };
   }
   const count = languages?.length ?? 0;
   if (count > 0) {

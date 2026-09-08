@@ -5823,6 +5823,7 @@ export const ja: Catalog = {
   'media.card.progress': '{percent}% 視聴済み',
 
   'media.subStatus.jaReady': '日本語字幕あり',
+  'media.subStatus.jaPartial': '日本語字幕は{of}話中{have}話',
   'media.subStatus.languagesFound': {
     other: '字幕 {count} 言語が見つかりました',
   },

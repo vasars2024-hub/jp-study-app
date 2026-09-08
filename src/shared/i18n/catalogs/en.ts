@@ -5853,6 +5853,7 @@ export const en: Catalog = {
   'media.card.progress': '{percent}% watched',
 
   'media.subStatus.jaReady': 'Japanese subtitles ready',
+  'media.subStatus.jaPartial': 'Japanese subtitles on {have} of {of}',
   'media.subStatus.languagesFound': {
     one: '{count} subtitle language found',
     other: '{count} subtitle languages found',

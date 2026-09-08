@@ -5787,6 +5787,7 @@ export const zh: Catalog = {
   'media.card.progress': '已观看 {percent}%',
 
   'media.subStatus.jaReady': '日语字幕已就绪',
+  'media.subStatus.jaPartial': '{of} 集中 {have} 集有日语字幕',
   'media.subStatus.languagesFound': {
     other: '找到 {count} 种字幕语言',
   },

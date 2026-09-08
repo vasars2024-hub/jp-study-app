@@ -101,6 +101,11 @@ export interface LibraryEntry {
   subtitleLanguages: string[];
   /** Whether that file has a Japanese track, which gates the study tools. */
   hasJapaneseSubtitles: boolean;
+  /**
+   * How many of `episodeCount` carry Japanese. The whole-group answer, as against
+   * `hasJapaneseSubtitles`, which is only ever about `primary`.
+   */
+  japaneseSubtitleCount: number;
   /** True once discovery has actually run, so "none found" differs from "never looked". */
   subtitlesChecked: boolean;
   year: number | null;
@@ -272,6 +277,12 @@ function buildEntry(id: string, grouping: LibraryGrouping, members: MediaItem[])
     // state is the one the status line is actually promising something about.
     subtitleLanguages: subtitleLanguages(primary.subtitles),
     hasJapaneseSubtitles: hasJapaneseSubtitles(primary.subtitles),
+    // D316. The primary is the right subject for a ONE-FILE card and the wrong one for a
+    // series: measured on the user's own library, The Big O carries Japanese on episodes 1-13
+    // and nothing on 14-26, and because episode 1 is the primary the card read "Japanese
+    // subtitles ready" for all 26. Counted over `items`, which is the same set `episodeCount`
+    // reports, so the pill and the `0 / 26` badge beside it finally describe one thing.
+    japaneseSubtitleCount: items.filter((item) => hasJapaneseSubtitles(item.subtitles)).length,
     subtitlesChecked: typeof primary.subtitlesCheckedAt === 'number',
     year: maxOrNull(items.map((item) => item.year)),
     seasons,

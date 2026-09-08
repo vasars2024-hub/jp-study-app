@@ -6395,6 +6395,7 @@ export const ru: Catalog = {
   'media.card.progress': 'Просмотрено {percent}%',
 
   'media.subStatus.jaReady': 'Японские субтитры готовы',
+  'media.subStatus.jaPartial': 'Японские субтитры: {have} из {of}',
   'media.subStatus.languagesFound': {
     one: 'Найден {count} язык субтитров',
     few: 'Найдено {count} языка субтитров',

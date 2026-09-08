@@ -100,6 +100,12 @@ export default function MediaSpotlightCard({
             status={mediaSubtitleStatus({
               languages: entry.subtitleLanguages,
               hasJapanese: entry.hasJapaneseSubtitles,
+              // Same group-scoped reading as the browser card — the spotlight is the
+              // largest thing on the surface, so it is the worst place to say "ready"
+              // about a series that is half covered (D316).
+              japanese: entry.grouping !== 'none'
+                ? { have: entry.japaneseSubtitleCount, of: entry.episodeCount }
+                : undefined,
               search: entry.subtitlesChecked ? 'idle' : undefined,
               metadataNeedsReview: entry.metadataNeedsReview,
             })}

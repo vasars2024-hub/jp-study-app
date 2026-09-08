@@ -66,6 +66,46 @@ describe('buildLibraryEntries', () => {
     expect(entries[0].items.map((i) => i.episode)).toEqual([1, 2, 3]);
   });
 
+  /**
+   * D316, reproducing the user's own library exactly: The Big O is 26 episodes plus 3
+   * specials, Japanese subtitles reach episodes 1-13 and stop, and episode 1 is the primary.
+   * `hasJapaneseSubtitles` therefore read true and the card said "ready" for all 26.
+   */
+  it('counts Japanese across the run, not just the episode a click would open', () => {
+    const ja = { lang: 'ja', source: 'test', path: 'x.srt' } as never;
+    const entries = buildLibraryEntries(
+      Array.from({ length: 26 }, (_, i) =>
+        episode(i + 1, i < 13 ? { subtitles: [ja] } : {}),
+      ),
+    );
+    expect(entries[0].episodeCount).toBe(26);
+    // The primary is episode 1, which HAS Japanese — that is the whole trap.
+    expect(entries[0].hasJapaneseSubtitles).toBe(true);
+    expect(entries[0].japaneseSubtitleCount).toBe(13);
+  });
+
+  it('CONTROL: a fully covered run counts every episode, so it can still read ready', () => {
+    const ja = { lang: 'ja', source: 'test', path: 'x.srt' } as never;
+    const entries = buildLibraryEntries(
+      Array.from({ length: 5 }, (_, i) => episode(i + 1, { subtitles: [ja] })),
+    );
+    expect(entries[0].japaneseSubtitleCount).toBe(entries[0].episodeCount);
+  });
+
+  it('counts over the same set episodeCount reports, so specials cannot skew the fraction', () => {
+    // If the count walked `ordered` instead of `items`, a covered special would push the
+    // numerator past a denominator that excludes it — 3 of 2.
+    const ja = { lang: 'ja', source: 'test', path: 'x.srt' } as never;
+    const entries = buildLibraryEntries([
+      episode(1, { subtitles: [ja] }),
+      episode(2, { subtitles: [ja] }),
+      episode(0, { episodeKind: 'special', title: 'The Big O Opening', subtitles: [ja] }),
+    ]);
+    expect(entries[0].episodeCount).toBe(2);
+    expect(entries[0].japaneseSubtitleCount).toBeLessThanOrEqual(entries[0].episodeCount);
+    expect(entries[0].japaneseSubtitleCount).toBe(2);
+  });
+
   it('shelves openings, endings, OVAs and specials apart from the run', () => {
     const entries = buildLibraryEntries([
       episode(1),

@@ -118,6 +118,11 @@ const LibraryEntryCard = memo(function LibraryEntryCard({
       status={mediaSubtitleStatus({
         languages: entry.subtitleLanguages,
         hasJapanese: entry.hasJapaneseSubtitles,
+        // Only for a card that stands for several episodes — on a single-file card the
+        // primary IS the group and a fraction would say nothing (D316).
+        japanese: entry.grouping !== 'none'
+          ? { have: entry.japaneseSubtitleCount, of: entry.episodeCount }
+          : undefined,
         // `idle` means a search actually ran and found nothing, which
         // is a different statement from having never looked.
         search: entry.subtitlesChecked ? 'idle' : undefined,
