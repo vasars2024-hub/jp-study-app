@@ -217,6 +217,19 @@ describe('ImmersionView Aero shell renders in the interface language', () => {
     'Refresh saved sites',
   ];
 
+  it.each(LANGS)('disables page actions with a reason and preserves icon names in %s', async (lang) => {
+    await render(lang);
+    const catalog = catalogFor(lang);
+    for (const key of ['saveSite', 'saveAsTool', 'exportToLibrary', 'captureVideo', 'openInSystemBrowser']) {
+      const name = catalog['immersion.' + key];
+      const button = [...host.querySelectorAll<HTMLButtonElement>('.aero-immersion-icon-btn')]
+        .find((candidate) => candidate.getAttribute('aria-label') === name);
+      expect(button, key).toBeDefined();
+      expect(button!.disabled, key).toBe(true);
+      expect(button!.title, key).toBe(catalog['immersion.reason.noPage']);
+    }
+  });
+
   it('reaches the Aero shell at all, and is English by default', async () => {
     const text = await render('en');
     // The classic shell has no menu bar and no status bar, so this is the

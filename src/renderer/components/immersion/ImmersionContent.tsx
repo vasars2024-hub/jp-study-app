@@ -866,6 +866,7 @@ export function ImmersionToolbar({ state, overflow }: { state: ImmersionState; o
   const noBack = histIdx <= 0;
   const noForward = histIdx < 0 || histIdx >= history.length - 1;
   const noPage = !state.currentUrl;
+  const pageActionProps = { disabled: noPage, title: noPage ? t('immersion.reason.noPage') : undefined };
   return (
     /* `lq-hit-scope`: rubric category 1 measured every button in this bar under the 32px
        pointer floor — the icon buttons at 28x24, the mode segments at 25.5. The scope gives
@@ -1012,32 +1013,33 @@ export function ImmersionToolbar({ state, overflow }: { state: ImmersionState; o
             <Icon name="close" size={14} />
             <span>{t('immersion.closePage')}</span>
           </button>
-          <button type="button" className="btn small" onClick={() => void state.saveCurrentSite()}>
+          <button type="button" className="btn small" {...pageActionProps} onClick={() => void state.saveCurrentSite()}>
             <Icon name="bookmark" size={14} />
             <span>{t('immersion.saveSite')}</span>
           </button>
-          <button type="button" className="btn small" onClick={() => void state.saveCurrentAsTool()}>
+          <button type="button" className="btn small" {...pageActionProps} onClick={() => void state.saveCurrentAsTool()}>
             <Icon name="star" size={14} />
             <span>{t('immersion.saveAsTool')}</span>
           </button>
-          <button type="button" className="btn small" onClick={() => void state.exportToLibrary()}>
+          <button type="button" className="btn small" {...pageActionProps} onClick={() => void state.exportToLibrary()}>
             <Icon name="download" size={14} />
             <span>{t('immersion.exportToLibrary')}</span>
           </button>
           <button
             type="button"
             className="btn small"
-            disabled={captureBusy}
+            {...pageActionProps}
+            disabled={captureBusy || noPage}
             onClick={() => void state.captureVideo()}
           >
             <Icon name="video" size={14} />
             <span>{t('immersion.captureVideo')}</span>
           </button>
-          <button type="button" className="btn small" onClick={() => void state.captureWithLens()}>
+          <button type="button" className="btn small" {...pageActionProps} onClick={() => void state.captureWithLens()}>
             <Icon name="scan" size={14} />
             <span>{t('immersion.lensCapture')}</span>
           </button>
-          <button type="button" className="btn small" onClick={state.openExternal}>
+          <button type="button" className="btn small" {...pageActionProps} onClick={state.openExternal}>
             <Icon name="external" size={14} />
             <span>{t('immersion.openInSystemBrowser')}</span>
           </button>
