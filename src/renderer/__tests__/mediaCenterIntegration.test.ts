@@ -358,4 +358,79 @@ describe('Media Center video stage', () => {
     // sidecar is not `disabled`.
     expect(en['mediaCenter.video.workspacePlayerDetail']).not.toMatch(/is running|is ready/);
   });
+  /**
+   * D248 — the two whole-library sweeps in Media Center ▸ settings used to be
+   * `onClick={() => void window.api.x()}`, where the `void` WAS the handler:
+   * a 14.9 s (online) to 71.2 s (offline) job with no spinner, no toast and no
+   * pollable status. These assertions are read against a COMMENT-STRIPPED copy
+   * of the source, because this file's own fix comment quotes the defective
+   * form and a raw `toContain` would score the prose as the code.
+   */
+  describe('the whole-library sweeps report what they did', () => {
+    const code = read('renderer/views/MediaCenterView.tsx')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+    it('no longer fires either sweep as a bare void call', () => {
+      expect(code).not.toContain('void window.api.runMediaMetadata()');
+      expect(code).not.toContain('void window.api.runSubtitleDiscovery()');
+    });
+
+    it('awaits each sweep and toasts its outcome', () => {
+      expect(code).toContain('const result = await window.api.runMediaMetadata()');
+      expect(code).toContain('const result = await window.api.runSubtitleDiscovery()');
+      expect(code).toContain("t('mediaCenter.settings.metadataDone'");
+      expect(code).toContain("t('mediaCenter.settings.metadataFailed')");
+      expect(code).toContain("t('media.subtitles.searchDone'");
+      expect(code).toContain("t('media.subtitles.searchFailed')");
+    });
+
+    it('does not call an offline sweep a clean zero', () => {
+      // The whole point of D247: `ok:true, files:0` is what a real outage AND an
+      // empty library both return. Without this predicate the settings button
+      // would toast a neutral "Attached 0 subtitle files" for a dead network —
+      // the exact defect just fixed one file away in MediaDetailPanel.
+      expect(code).toContain('subtitleSweepWentNowhere(result)');
+      expect(code).toMatch(/result\.ok && !wentNowhere/);
+    });
+
+    it('disables both buttons while either sweep runs', () => {
+      // One job at a time: both walk the whole library, and a second pass started
+      // on top of the first only fights it.
+      expect(code).toContain("useState<'metadata' | 'subtitles' | null>(null)");
+      const disabled = code.match(/disabled=\{libraryJob !== null\}/g) ?? [];
+      expect(disabled).toHaveLength(2);
+      expect(code).toContain("aria-busy={libraryJob === 'metadata'}");
+      expect(code).toContain("aria-busy={libraryJob === 'subtitles'}");
+      // The label has to change too — a disabled button with unchanged text reads
+      // as broken, not as busy.
+      expect(code).toContain("t('mediaCenter.settings.working')");
+      expect(code).toContain("t('media.subtitles.searching')");
+    });
+
+    it('translates the three new settings keys in all four catalogues', () => {
+      for (const key of [
+        'mediaCenter.settings.working',
+        'mediaCenter.settings.metadataDone',
+        'mediaCenter.settings.metadataFailed',
+      ]) {
+        expect(en[key], `missing en key ${key}`).toBeTruthy();
+        expect(ja[key], `missing ja key ${key}`).toBeTruthy();
+        expect(ru[key], `missing ru key ${key}`).toBeTruthy();
+        expect(zh[key], `missing zh key ${key}`).toBeTruthy();
+      }
+      // Every plural arm must carry BOTH slots. An arm that drops `{unmatched}`
+      // is unrenderable in the language that selects it, and `i18n-check` counts
+      // keys, not slots — it cannot see this.
+      for (const catalog of [en, ja, ru, zh]) {
+        const done = catalog['mediaCenter.settings.metadataDone'];
+        const arms = typeof done === 'string' ? [done] : Object.values(done as Record<string, string>);
+        expect(arms.length).toBeGreaterThan(0);
+        for (const arm of arms) {
+          expect(arm).toContain('{count}');
+          expect(arm).toContain('{unmatched}');
+        }
+      }
+    });
+  });
 });

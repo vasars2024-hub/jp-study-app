@@ -76,7 +76,11 @@ import {
   videoGenerateDisabledReason,
   videoSubtitlesDisabledReason,
 } from '../../shared/mediaVideoActionReason';
-import type { SubtitleProviderCredentialState } from '../../shared/subtitleDiscoveryIpc';
+import {
+  subtitleSweepWentNowhere,
+  type SubtitleProviderCredentialState,
+} from '../../shared/subtitleDiscoveryIpc';
+import { showToast } from '../components/ui';
 import './mediaCenter.css';
 
 export type MediaCenterTab =
@@ -1422,6 +1426,55 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
   const { t } = useT();
   const currentRate = state.playbackRate;
   const { catalogueRows, profileRows } = useSourceRows(provenance);
+
+  /**
+   * Which whole-library job is in flight, or null.
+   *
+   * Both of these used to be `onClick={() => void window.api.x()}` — the `void`
+   * WAS the handler. Measured on the user's own 39-item library: the subtitle
+   * sweep runs 14.9 s online and 71.2 s offline, and `subtitleDiscoveryStatus()`
+   * reports `{running: false}` throughout, so there was nothing to poll either.
+   * A user clicked, waited a minute, saw nothing change, and clicked again.
+   * One job at a time: both sweeps walk the whole library and a second pass
+   * started on top of the first only fights it.
+   */
+  const [libraryJob, setLibraryJob] = useState<'metadata' | 'subtitles' | null>(null);
+
+  const refreshMetadata = useCallback(async () => {
+    setLibraryJob('metadata');
+    try {
+      const result = await window.api.runMediaMetadata();
+      showToast(result.ok
+        ? {
+            message: t('mediaCenter.settings.metadataDone', { count: result.matched, unmatched: result.unmatched }),
+            kind: result.matched ? 'success' : 'default',
+          }
+        : { message: result.error ?? t('mediaCenter.settings.metadataFailed'), kind: 'error' });
+    } catch (error) {
+      showToast({ message: error instanceof Error ? error.message : String(error), kind: 'error' });
+    } finally {
+      setLibraryJob(null);
+    }
+  }, [t]);
+
+  const findSubtitles = useCallback(async () => {
+    setLibraryJob('subtitles');
+    try {
+      const result = await window.api.runSubtitleDiscovery();
+      // `ok` alone is not "we got an answer" — a sweep with no network returns
+      // ok:true and zero files, indistinguishable from a library that genuinely
+      // has none. Same predicate the per-episode button uses (D247).
+      const wentNowhere = subtitleSweepWentNowhere(result);
+      showToast(result.ok && !wentNowhere
+        ? { message: t('media.subtitles.searchDone', { count: result.files }), kind: result.files ? 'success' : 'default' }
+        : { message: result.error ?? t('media.subtitles.searchFailed'), kind: 'error' });
+    } catch (error) {
+      showToast({ message: error instanceof Error ? error.message : String(error), kind: 'error' });
+    } finally {
+      setLibraryJob(null);
+    }
+  }, [t]);
+
   return (
     <div className="mc-page mc-settings-page">
       <div className="mc-settings-head">
@@ -1540,8 +1593,12 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
             <button type="button" onClick={() => void state.openFile()}><Icon name="file" size={12} /> {t('mediaCenter.settings.importFiles')}</button>
             <button type="button" onClick={() => void state.openFolder()}><Icon name="folder-open" size={12} /> {t('mediaCenter.settings.importFolder')}</button>
             <button type="button" onClick={() => void state.chooseWatchFolder()}><Icon name="eye" size={12} /> {state.watchFolder ? t('mediaCenter.settings.changeWatch') : t('mediaCenter.settings.chooseWatch')}</button>
-            <button type="button" onClick={() => void window.api.runMediaMetadata()}><Icon name="refresh" size={12} /> {t('mediaCenter.settings.refreshMetadata')}</button>
-            <button type="button" onClick={() => void window.api.runSubtitleDiscovery()}><Icon name="caption" size={12} /> {t('mediaCenter.settings.findSubtitles')}</button>
+            <button type="button" onClick={() => void refreshMetadata()} disabled={libraryJob !== null} aria-busy={libraryJob === 'metadata'}>
+              <Icon name="refresh" size={12} /> {libraryJob === 'metadata' ? t('mediaCenter.settings.working') : t('mediaCenter.settings.refreshMetadata')}
+            </button>
+            <button type="button" onClick={() => void findSubtitles()} disabled={libraryJob !== null} aria-busy={libraryJob === 'subtitles'}>
+              <Icon name="caption" size={12} /> {libraryJob === 'subtitles' ? t('media.subtitles.searching') : t('mediaCenter.settings.findSubtitles')}
+            </button>
           </div>
           {state.watchFolder && <p className="mc-path-note" title={state.watchFolder}>{state.watchFolder}</p>}
         </SettingsSection>

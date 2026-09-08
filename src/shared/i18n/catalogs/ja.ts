@@ -8501,6 +8501,11 @@ export const ja: Catalog = {
   'mediaCenter.settings.chooseWatch': '監視フォルダーを選択',
   'mediaCenter.settings.findSubtitles': '字幕を検索',
   'mediaCenter.settings.refreshMetadata': '全メタデータを更新',
+  'mediaCenter.settings.working': '処理中...',
+  'mediaCenter.settings.metadataDone': {
+    other: '{count} 件のタイトルのメタデータを更新しました。{unmatched} 件は一致しませんでした。',
+  },
+  'mediaCenter.settings.metadataFailed': 'メタデータの更新に失敗しました。',
   'mediaCenter.settings.dictationDetail': '字幕を隠して聞き取った内容を確認します',
   'mediaCenter.settings.shadowingDetail': '発音を録音してお手本と比較します',
   'mediaCenter.settings.transcriptionLanguage': '文字起こし言語',

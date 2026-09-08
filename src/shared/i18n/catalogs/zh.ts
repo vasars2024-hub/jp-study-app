@@ -8455,6 +8455,11 @@ export const zh: Catalog = {
   'mediaCenter.settings.chooseWatch': '选择监视文件夹',
   'mediaCenter.settings.findSubtitles': '查找字幕',
   'mediaCenter.settings.refreshMetadata': '刷新全部元数据',
+  'mediaCenter.settings.working': '处理中...',
+  'mediaCenter.settings.metadataDone': {
+    other: '已更新 {count} 个标题的元数据。{unmatched} 个未匹配。',
+  },
+  'mediaCenter.settings.metadataFailed': '刷新元数据失败。',
   'mediaCenter.settings.dictationDetail': '隐藏字幕并检查听到的内容',
   'mediaCenter.settings.shadowingDetail': '录音并比较自己的复述',
   'mediaCenter.settings.transcriptionLanguage': '转写语言',

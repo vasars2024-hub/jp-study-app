@@ -8927,6 +8927,12 @@ export const en: Catalog = {
   'mediaCenter.settings.chooseWatch': 'Choose watch folder',
   'mediaCenter.settings.findSubtitles': 'Find subtitles',
   'mediaCenter.settings.refreshMetadata': 'Refresh all metadata',
+  'mediaCenter.settings.working': 'Working...',
+  'mediaCenter.settings.metadataDone': {
+    one: 'Metadata updated for {count} title. {unmatched} unmatched.',
+    other: 'Metadata updated for {count} titles. {unmatched} unmatched.',
+  },
+  'mediaCenter.settings.metadataFailed': 'Refreshing metadata failed.',
   'mediaCenter.settings.dictationDetail': 'Hide the cue and check what you heard',
   'mediaCenter.settings.shadowingDetail': 'Record and compare your spoken repetition',
   'mediaCenter.settings.transcriptionLanguage': 'Transcription language',
