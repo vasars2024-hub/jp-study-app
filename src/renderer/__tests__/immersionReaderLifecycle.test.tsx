@@ -173,6 +173,84 @@ describe('a reader pass may only publish for the page still on screen', () => {
     }
   });
 
+  /**
+   * D400 — the per-day reading clock could exceed 24 hours in a day.
+   *
+   * Every host that mounts `useImmersion` runs its own 5-second ticker against
+   * ONE shared per-day total in main: Study OS's `ImmersionView`, Blanc's
+   * library panel, and one of each per app window. None of them asked whether
+   * the window was on screen, so a hidden or occluded window banked wall-clock
+   * time alongside the window in front of it. Measured on the real profile
+   * before the guard: 2026-08-27 recorded 36.8 hours.
+   */
+  describe('the reading clock only runs for a page on screen', () => {
+    function setVisibility(value: 'visible' | 'hidden') {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => value,
+      });
+    }
+
+    /** Seconds this host has reported to main, summed over every flush. */
+    function reportedSeconds(): number {
+      return recordVisit.mock.calls.reduce(
+        (sum, [arg]) => sum + ((arg as { seconds?: number } | undefined)?.seconds ?? 0),
+        0,
+      );
+    }
+
+    afterEach(() => { setVisibility('visible'); });
+
+    it('banks time while the window is visible — the control', async () => {
+      vi.useFakeTimers();
+      try {
+        setVisibility('visible');
+        await mount();
+        await act(async () => { state.navigate(WIKI); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+        // Six 5s ticks; the exact figure is timer-scheduling dependent, so the
+        // assertion is that a real span was banked, not that it was exactly 30.
+        expect(reportedSeconds()).toBeGreaterThan(20);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('banks nothing while the window is hidden', async () => {
+      vi.useFakeTimers();
+      try {
+        setVisibility('visible');
+        await mount();
+        await act(async () => { state.navigate(WIKI); });
+        setVisibility('hidden');
+        await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+        expect(reportedSeconds()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not bank the hidden stretch retroactively when the window returns', async () => {
+      vi.useFakeTimers();
+      try {
+        setVisibility('visible');
+        await mount();
+        await act(async () => { state.navigate(WIKI); });
+        setVisibility('hidden');
+        await act(async () => { await vi.advanceTimersByTimeAsync(600_000); });
+        setVisibility('visible');
+        await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+        // Ten minutes hidden then ten seconds visible must bank ~10s, not ~610.
+        // The 120s sanity clamp alone would NOT catch this: it is applied per
+        // tick, and the ticker keeps firing while hidden.
+        expect(reportedSeconds()).toBeLessThan(20);
+        expect(reportedSeconds()).toBeGreaterThan(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it('lets the newer page win when an older extraction lands late', async () => {
     await mount();
     await act(async () => { state.navigate(WIKI); });

@@ -259,8 +259,18 @@ export function useImmersion() {
   useEffect(() => {
     const tick = window.setInterval(() => {
       const elapsed = (Date.now() - pageOpenAt.current) / 1000;
+      // Reset the mark OUTSIDE the guard below: a span that is not credited must
+      // still be consumed, or the first tick after the window comes back would
+      // bank the whole hidden stretch in one go.
       pageOpenAt.current = Date.now();
-      if (elapsed > 0 && elapsed < 120 && currentUrl) {
+      // A page nobody is looking at is not being read. Every host that mounts
+      // this hook — Study OS's ImmersionView, Blanc's library panel, and one of
+      // each per app window — runs its own ticker against ONE shared per-day
+      // total in main, so a hidden or occluded window was adding wall-clock time
+      // to the same day as the window in front of it. Measured on the real
+      // profile before this guard: 2026-08-27 banked 36.8 HOURS in a 24-hour day
+      // (metrics.json, 38 days, 343.7 h total).
+      if (elapsed > 0 && elapsed < 120 && currentUrl && document.visibilityState === 'visible') {
         secondsAcc.current += elapsed;
       }
       if (secondsAcc.current >= 2 || charsAcc.current > 0) flushStats();
