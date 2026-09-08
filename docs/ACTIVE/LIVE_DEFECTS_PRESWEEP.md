@@ -2909,3 +2909,43 @@ already had. Pass `detail: 'files'`.
 and the reason rather than failing generically; and `filesMineChain` distinguishes *"nothing was
 Japanese"* from *"everything was already mined"* with two separate reason keys, which is the
 honest split and should be kept.
+
+### 2026-09-08 11:55 EDT — primary2, files: D421 fixed and proven live; D422 found while proving it
+
+**D421 is FIXED (`bfce31df`, corrected by `5fbff966`) and this is the first time the number has
+ever moved.** Live, pid 11736, window 2, on the user's own index, after a full reload so the new
+module was really the one running (`VITE-ERROR-OVERLAY` count **0** before measuring):
+
+    baseline                     Mined cards   4   ·  Text not yet mined  98
+    mine 1 subtitle (200 cards)  Mined cards 204   ·  Text not yet mined  97
+    undo / restore               Mined cards   4   ·  Text not yet mined  98
+
+`98 → 97` is the whole gate. The baseline is honest rather than lucky: the four cards already in
+the deck carry `bookId: 'import-zzprobe-headerless'`, which is **not** a `files:` id, so nothing
+is marked and 98 is the correct starting answer. The deck was returned to exactly its four
+original cards, verified by a bookId histogram reading `{ import-zzprobe-headerless: 4 }` — the
+same shape and the same keys (`folders`, `cards`) it was found with.
+
+**Two things the fix had to survive, both worth keeping:**
+
+- **It took the whole index to 0 before it was guarded.** `filesApp.test.tsx` went **52 red**
+  because `filesAppRendererEnumerators`'s deck reader is only safe inside the enumerator loop's
+  try/catch, and the derivation runs *after* the join, outside it. A store-reading pass placed
+  after the loop must carry its own guard or one unreadable store costs every category.
+- **The parity gate caught a 26th route.** `filesAppRouteParity` (gate 6) scans the file for
+  `source: '...'` literals and pins the count at 25; the guard's `'local-deck-mined'` error report
+  minted a route that does not exist. The failure now attaches to the deck's own report.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D422 | files — mine receipt | **Refresh silently destroys the only undo for the cards you just mined.** The receipt offers `Undo all added cards`. The rail counters next to it are still stale (D420), so the natural next click is `Refresh` — and that wipes the receipt. 200 cards are now in the deck with no undo, no confirmation that anything was lost, and no way back except deleting them by hand. **D420 makes this near-certain rather than unlucky: the stale count is exactly what sends the user to Refresh.** | Live, and it happened to me while verifying D421 rather than being constructed. Mine 1 item → receipt reads *"1 of 1 items added 200 cards; 0 failed."* with `Undo all added cards` present. Click `Refresh`. Re-query the buttons: `Undo all added cards` is **absent**, the deck store still holds **204** cards, and the rail now reads `Mined cards 204`. I had to restore the user's deck by filtering `bookId` on the `files:` prefix, which is not a path the product offers. `bulkMineState` is component state and the refresh path resets it; `onBulkMine`'s own comment says the receipt "retains the exact batch and its undo ids" and is "the only recovery path for cards the first click added" — Refresh was simply never considered a thing that could clear it. | P2 | **open — filed, not fixed, and deliberately so.** The fix is a product decision, not a one-liner: either the receipt survives a refresh (it is about a completed write, not about the index), or the undo moves out of component state into the same tombstone/undo store the soft-delete path already uses. The second is better and is more than a pre-sweep slice. **Fix D420 and D422 together, D422 first** — making Refresh update the counts without preserving the receipt would remove the last reason a user refreshes while leaving the trap exactly where it is. |
+
+**Instrument note, because it cost real time and is general.** `deriveMinedFlags` and
+`minedSourceIdsFromDeck` both passed in isolation (`SET_OK []`, `WRI_OK items= 1`) while the
+suite that exercises them through the component failed 52 cases. The cause was a **partial
+`vi.mock`**: `filesApp.test.tsx` mocks `../flashcardDeck` with a factory supplying only
+`loadDeck`, `addDeckCardsTracked` and `removeDeckCards`, so `parseFlashcardDeckStore` is
+`undefined` under it. The existing enumerator survived that for as long as it has existed because
+its throw was caught and *reported*; mine was not. **A function that works when called directly
+and fails through the component is a mock boundary, not a logic error — check the factory's key
+list before re-reading your own code.**
