@@ -153,8 +153,17 @@ describe('files-app system panels — the readers are the old page’s readers',
 
 describe('files-app system panels — the app renders them', () => {
   it('FilesApp branches to a panel before it consults index state', () => {
-    const panelBranch = FILES_APP.indexOf('isFilesPanelCategory(scope)');
-    const loadingBranch = FILES_APP.indexOf("state.status === 'loading'");
+    // Scoped to the canvas, not to the whole file. `indexOf` over the module found the
+    // FIRST textual occurrence of the status read, which since D314 is a derived flag
+    // declared hundreds of lines above — a declaration that gates nothing and reordered
+    // the two indices without changing a line of the branching this is about. The claim
+    // was always about the order of the branches inside `canvas`, so read that.
+    const canvasStart = FILES_APP.indexOf('const canvas = (() => {');
+    expect(canvasStart).toBeGreaterThan(-1);
+    const canvas = FILES_APP.slice(canvasStart);
+
+    const panelBranch = canvas.indexOf('isFilesPanelCategory(scope)');
+    const loadingBranch = canvas.indexOf("state.status === 'loading'");
     expect(panelBranch).toBeGreaterThan(-1);
     expect(loadingBranch).toBeGreaterThan(-1);
     // An enumerator failure must not hide the app's own diagnostics screen.
