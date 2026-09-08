@@ -20,6 +20,7 @@ import { formatAgeMinutes, formatInMinutes } from '../data/charts';
 import {
   EMPTY_SNAPSHOT,
   activeJobs,
+  distinctEpisodes,
   distinctSeries,
   downloadedBytes,
   failedDownloads,
@@ -159,11 +160,9 @@ export default function DashboardPage() {
         sources,
         downloads,
         scheduler: null,
-        episodes: {
-          indexed: episodeRows.length,
-          japanese: episodeRows.filter((row) =>
-            row.subtitles.some((subtitle) => subtitle.language === 'ja')).length,
-        },
+        // Deduplicated: the same series scraped twice returns every episode row
+        // twice, and this figure is labelled "episodes indexed", not "rows".
+        episodes: distinctEpisodes(episodeRows),
         // An empty capability list means the port fell back to sample data.
         live: capabilities.length > 0,
       });

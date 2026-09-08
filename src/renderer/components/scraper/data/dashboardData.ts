@@ -18,6 +18,7 @@
 
 import type {
   DownloadRow,
+  EpisodeRow,
   ScrapeJobSummary,
   SourceStatus,
 } from '../../../../shared/scraperResults';
@@ -142,6 +143,35 @@ export function healthySources(sources: readonly SourceStatus[]): number {
  */
 export function downloadedBytes(jobs: readonly ScrapeJobSummary[]): number {
   return jobs.reduce((total, job) => total + (Number.isFinite(job.bytes) ? job.bytes : 0), 0);
+}
+
+/**
+ * How many DISTINCT episodes the catalogue holds across the results handed in,
+ * and how many of those carry a Japanese subtitle track.
+ *
+ * Scraping a series twice writes two jobs whose results each repeat every
+ * episode row, so summing rows counts one episode once per RUN. That is the
+ * same shape `resultLibrary` was fixed for when five runs of one series read as
+ * "500% catalogue coverage" — the Dashboard's own totals were never moved over.
+ * Measured live 2026-09-08 on the user's history: 2,453 rows, 1,193 episodes.
+ *
+ * `EpisodeRow.id` is the identity: it is derived from the series and the episode
+ * number (`anilist-21-e1`) and is byte-identical across runs — verified on the
+ * two ONE PIECE jobs, 1,147 of 1,147 ids overlapping.
+ */
+export function distinctEpisodes(
+  rows: readonly EpisodeRow[],
+): { indexed: number; japanese: number } {
+  const seen = new Set<string>();
+  const japanese = new Set<string>();
+  for (const row of rows) {
+    // A row with no id cannot be deduplicated against anything, so it counts
+    // once on its own terms rather than being dropped or collapsed with others.
+    const id = row.id || `${row.seriesId}#${row.number}#${seen.size}`;
+    seen.add(id);
+    if (row.subtitles.some((subtitle) => subtitle.language === 'ja')) japanese.add(id);
+  }
+  return { indexed: seen.size, japanese: japanese.size };
 }
 
 export interface DashboardSnapshot {

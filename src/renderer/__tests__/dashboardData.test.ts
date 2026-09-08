@@ -11,12 +11,14 @@
 import { describe, expect, it } from 'vitest';
 import type {
   DownloadRow,
+  EpisodeRow,
   ScrapeJobSummary,
   SourceStatus,
 } from '../../shared/scraperResults';
 import type { ScraperSchedulerState } from '../../shared/scraperIpc';
 import {
   activeJobs,
+  distinctEpisodes,
   distinctSeries,
   downloadedBytes,
   failedDownloads,
@@ -232,5 +234,86 @@ describe('sources and bytes', () => {
         job({ id: 'c', bytes: Number.NaN }),
       ]),
     ).toBe(3000);
+  });
+});
+
+/*
+ * D319b — "Episodes indexed" counted rows, not episodes.
+ *
+ * Measured live 2026-09-08 on the user's own history: 10 jobs over 5 series,
+ * with ONE PIECE scraped twice (1,147 rows each, 1,147 of 1,147 ids identical)
+ * and Frieren scraped five times (28 rows each). The Dashboard summed the rows
+ * and printed 2,453 in three places; the catalogue holds 1,193 episodes. It is
+ * the same double-count `resultLibrary` was fixed for, still live here.
+ */
+function episode(partial: Partial<EpisodeRow>): EpisodeRow {
+  return {
+    id: 'anilist-21-e1',
+    seriesId: 'anilist-21',
+    number: 1,
+    numberLabel: '1',
+    season: 1,
+    titleEn: 'An Episode',
+    titleJa: 'あるエピソード',
+    kind: 'episode',
+    audio: [],
+    resolution: '1080p',
+    sourceId: 'catalogue',
+    sourceLabel: 'Catalogue',
+    sizeBytes: 0,
+    durationSec: 1440,
+    airDate: null,
+    url: '',
+    thumbnailUrl: null,
+    subtitles: [],
+    status: 'ready',
+    statusNote: '',
+    ...partial,
+  } as EpisodeRow;
+}
+
+describe('distinctEpisodes', () => {
+  it('counts one episode once however many runs returned it', () => {
+    const twice = [
+      episode({ id: 'anilist-21-e1' }),
+      episode({ id: 'anilist-21-e2', number: 2 }),
+      // Second scrape of the same series: identical ids, new rows.
+      episode({ id: 'anilist-21-e1' }),
+      episode({ id: 'anilist-21-e2', number: 2 }),
+    ];
+    expect(twice).toHaveLength(4);
+    expect(distinctEpisodes(twice).indexed).toBe(2);
+  });
+
+  it('does not merge different episodes that share a number across series', () => {
+    expect(distinctEpisodes([
+      episode({ id: 'anilist-21-e1', seriesId: 'anilist-21' }),
+      episode({ id: 'anilist-154587-e1', seriesId: 'anilist-154587' }),
+    ]).indexed).toBe(2);
+  });
+
+  it('deduplicates the Japanese-track count on the same identity', () => {
+    const ja = { language: 'ja', label: 'Japanese', kind: 'subtitle' } as unknown as
+      EpisodeRow['subtitles'][number];
+    const rows = [
+      episode({ id: 'anilist-21-e1', subtitles: [ja] }),
+      episode({ id: 'anilist-21-e1', subtitles: [ja] }),
+      episode({ id: 'anilist-21-e2', number: 2 }),
+    ];
+    expect(distinctEpisodes(rows)).toEqual({ indexed: 2, japanese: 1 });
+  });
+
+  it('keeps an id-less row rather than collapsing every one of them into one', () => {
+    // Control for the dedupe key itself: falling back to a constant would make
+    // any number of unidentifiable rows read as a single episode.
+    const rows = [
+      episode({ id: '', seriesId: 's', number: 1 }),
+      episode({ id: '', seriesId: 's', number: 2 }),
+    ];
+    expect(distinctEpisodes(rows).indexed).toBe(2);
+  });
+
+  it('is empty for no rows', () => {
+    expect(distinctEpisodes([])).toEqual({ indexed: 0, japanese: 0 });
   });
 });
