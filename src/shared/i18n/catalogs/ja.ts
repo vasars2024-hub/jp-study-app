@@ -1940,6 +1940,7 @@ export const ja: Catalog = {
   'settings.memory.backupRestored': 'バックアップを復元しました（すべての設定とホスト構成）— 再読み込み中…',
   'settings.memory.clearDomainTitle': '設定領域をクリア',
   'settings.memory.clearDomainMsg': '「{label}」をクリアしますか？その設定領域だけが削除されます。',
+  'settings.memory.clearDomainAria': '「{label}」をクリア',
   'settings.memory.clearedLabel': 'クリアしました: {label}',
   'settings.memory.factoryTitle': '初期化',
   'settings.memory.factoryMessage': '初期化：ローカル設定・デッキ・下書き・キャッシュを削除し、マイニング設定をリセットして再起動します。先にバックアップをエクスポートしてください。続行しますか？',

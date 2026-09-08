@@ -1927,6 +1927,7 @@ export const zh: Catalog = {
   'settings.memory.backupRestored': '已恢复备份（全部设置与主机配置）— 正在重新加载…',
   'settings.memory.clearDomainTitle': '清除设置域',
   'settings.memory.clearDomainMsg': '清除“{label}”？只会删除该设置域。',
+  'settings.memory.clearDomainAria': '清除“{label}”',
   'settings.memory.clearedLabel': '已清除：{label}',
   'settings.memory.factoryTitle': '恢复出厂设置',
   'settings.memory.factoryMessage': '恢复出厂设置：删除本地设置、牌组、草稿、缓存并重置挖词配置，然后重启。请先导出备份。继续？',

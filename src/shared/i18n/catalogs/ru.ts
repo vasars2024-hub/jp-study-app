@@ -2116,6 +2116,7 @@ export const ru: Catalog = {
   'settings.memory.backupRestored': 'Бэкап восстановлен (все настройки + host) — перезагрузка…',
   'settings.memory.clearDomainTitle': 'Очистить домен настроек',
   'settings.memory.clearDomainMsg': 'Очистить «{label}»? Удалится только этот домен настроек.',
+  'settings.memory.clearDomainAria': 'Очистить «{label}»',
   'settings.memory.clearedLabel': 'Очищено: {label}',
   'settings.memory.factoryTitle': 'Сброс к заводским',
   'settings.memory.factoryMessage': 'Сброс: удалит локальные настройки, колоды, черновики, кэши и сбросит майнинг, затем перезапустит. Сначала экспортируйте бэкап. Продолжить?',

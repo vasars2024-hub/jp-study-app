@@ -2087,6 +2087,7 @@ export const en: Catalog = {
   'settings.memory.backupRestored': 'Backup restored (all settings + host configs) — reloading…',
   'settings.memory.clearDomainTitle': 'Clear settings domain',
   'settings.memory.clearDomainMsg': 'Clear "{label}"? This only removes that settings domain.',
+  'settings.memory.clearDomainAria': 'Clear "{label}"',
   'settings.memory.clearedLabel': 'Cleared: {label}',
   'settings.memory.factoryTitle': 'Factory reset',
   'settings.memory.factoryMessage': 'Factory reset: deletes local settings, decks, drafts, caches, and resets mining config, then restarts. Export a backup first. Continue?',

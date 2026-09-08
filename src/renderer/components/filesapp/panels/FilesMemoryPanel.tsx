@@ -644,9 +644,16 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
                   <td className="fa-panel-note">{d.detail}</td>
                   <td>
                     {d.clearable ? (
+                      /* D344. The visible word stays "Clear" — the column head
+                         says which column it is and 27 rows of the domain name
+                         would be unreadable. The ACCESSIBLE name carries the
+                         domain, because a screen reader offers these as a flat
+                         list of 27 buttons all called "Clear", each destroying
+                         a different settings domain. */
                       <button
                         type="button"
                         className="btn small"
+                        aria-label={t('settings.memory.clearDomainAria', { label: d.label })}
                         disabled={busy || !(d.present || d.bytes > 0)}
                         onClick={() => void handleClearDomain(d)}
                       >
