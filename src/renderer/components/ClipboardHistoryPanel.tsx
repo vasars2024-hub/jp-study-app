@@ -3,7 +3,7 @@
 // command palette) via the 'clipboard:open' CustomEvent, same pattern as
 // CommandPalette. Mounted once in App.tsx.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from './Icons';
 import {
   CLIPBOARD_TYPE_LABELS,
@@ -24,6 +24,7 @@ import {
 } from '../clipboardHistory';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { useT } from '../i18n';
+import { useModalKeyboard } from './ui/useModalKeyboard';
 import { LANG_TAGS } from '../../shared/i18n/core';
 
 type FilterKey = 'all' | 'word' | 'sentence' | 'dictionary' | 'reader' | 'manual';
@@ -167,6 +168,8 @@ function EntryCard({
 export default function ClipboardHistoryPanel() {
   const { t } = useT();
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [entries, setEntries] = useState<ClipboardEntry[]>([]);
@@ -209,6 +212,21 @@ export default function ClipboardHistoryPanel() {
     if (!open) setSelected(new Set());
   }, [open]);
 
+  /*
+   * `.cbh-backdrop` is `position: fixed`, `inset: 0`, `rgba(0, 0, 0, 0.4)` at
+   * z 20000 with `pointer-events: auto`, so this panel is modal to the mouse.
+   * Until 2026-09-08 it was not modal to the keyboard: measured live on the
+   * user's own desk, ONE Shift+Tab out of the search box landed on the taskbar's
+   * "Restore all windows", and from there Escape no longer closed the panel at
+   * all — its only handler was on the input.
+   */
+  useModalKeyboard({
+    panelRef,
+    onEscape: () => setOpen(false),
+    enabled: open,
+    initialFocusRef: searchRef,
+  });
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return entries
@@ -242,24 +260,31 @@ export default function ClipboardHistoryPanel() {
   return (
     <>
       <div className="cbh-backdrop" onMouseDown={() => setOpen(false)} />
-      <div className="cbh-panel" role="dialog" aria-label={t('clipboard.dialogLabel')}>
+      <div
+        className="cbh-panel"
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        ref={panelRef}
+        aria-label={t('clipboard.dialogLabel')}
+      >
         <div className="cbh-head">
           <Icon name="clipboard" size={16} />
+          {/*
+            Escape used to live here, on the input's own onKeyDown. That worked
+            only while focus was inside the input — and one Shift+Tab took it
+            out, measured live 2026-09-08 (row D412). `useModalKeyboard` now owns
+            the key at document capture, which also keeps the promise the old
+            comment made: MediaWorkspaceHost's window listener is a BUBBLE
+            listener, so stopping propagation at capture keeps the workspace
+            underneath from closing too.
+          */}
           <input
-            autoFocus
+            ref={searchRef}
             className="cbh-search"
             placeholder={t('clipboard.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            // preventDefault, like the palette does: now that this panel sits
-            // above the full-screen media workspace, an unmarked Escape bubbles
-            // to MediaWorkspaceHost's window listener and closes the workspace
-            // underneath as well. That listener already bails on defaultPrevented.
-            onKeyDown={(e) => {
-              if (e.key !== 'Escape') return;
-              e.preventDefault();
-              setOpen(false);
-            }}
           />
           <button type="button" className="cbh-icon-btn" title={t('clipboard.settings')} onClick={() => setSettingsOpen((v) => !v)}>
             <Icon name="settings" size={15} />

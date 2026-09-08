@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon, { type IconName } from './Icons';
+import { useModalKeyboard } from './ui/useModalKeyboard';
 import {
   COMMAND_CATALOG,
   commandIsLive,
@@ -133,6 +134,7 @@ export default function CommandPalette() {
   const [grammarItems, setGrammarItems] = useState<UngroupedItem[]>([]);
   const [settingsRows, setSettingsRows] = useState<SettingsRow[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -150,9 +152,27 @@ export default function CommandPalette() {
     return () => window.removeEventListener('palette:open', onOpen);
   }, []);
 
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+  /*
+   * `.palette-backdrop` is `position: fixed`, `inset: 0`, `rgba(0, 0, 0, 0.4)`
+   * at z 20000 with `pointer-events: auto` — modal to the mouse. Until
+   * 2026-09-08 it was not modal to the keyboard (row D412): measured live on the
+   * user's own desk, ONE Shift+Tab out of the input landed on the taskbar's
+   * "Show desktop (minimize all)", and from there Escape stopped closing the
+   * palette, because Escape lived on the input's own onKeyDown. A keyboard user
+   * who tabbed once was left with a scrim they could not dismiss and Enter over
+   * a control that minimises every window.
+   *
+   * The hook also owns the initial focus now, which is why the old
+   * `inputRef.current?.focus()` effect is gone rather than duplicated. It sits
+   * here, above `close`, so an inline arrow rather than that callback — the
+   * hook holds `onEscape` in a ref precisely so call sites can pass one.
+   */
+  useModalKeyboard({
+    panelRef,
+    onEscape: () => setOpen(false),
+    enabled: open,
+    initialFocusRef: inputRef,
+  });
 
   useLayoutEffect(() => {
     if (!open) return undefined;
@@ -409,7 +429,14 @@ export default function CommandPalette() {
   return (
     <>
       <div className="palette-backdrop" onMouseDown={close} />
-      <div className="palette" role="dialog" aria-label={t('palette.ariaLabel')}>
+      <div
+        className="palette"
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        ref={panelRef}
+        aria-label={t('palette.ariaLabel')}
+      >
         <div className="palette-head">
           <Icon name={mode === 'search' ? 'search' : 'command'} size={16} />
           <input
