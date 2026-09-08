@@ -17,7 +17,7 @@ import {
   type ScraperConsoleSource,
 } from '../../../../shared/scraperConsole';
 import { loadScraperSettingsDocument, onScraperSettingsChanged } from '../../../scraperSettingsStore';
-import { sx, sxs, type ScraperTextKey } from '../strings';
+import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
 import { FIXTURE_HTML } from '../data/fixtures';
 
 function ToolHead({ page, title, subtitle }: { page: string; title: string; subtitle: string }) {
@@ -30,7 +30,7 @@ function ToolHead({ page, title, subtitle }: { page: string; title: string; subt
         </h1>
         <p className="scr-page-sub">{subtitle}</p>
       </div>
-      <span className="scr-tool-badge"><Icon name="shield" size={13} /> Local sandbox</span>
+      <span className="scr-tool-badge"><Icon name="shield" size={13} /> {sx('tools.sandbox')}</span>
     </header>
   );
 }
@@ -59,22 +59,33 @@ export function SelectorTesterPage() {
 
   return (
     <div className="scr-page">
-      <ToolHead page="selector-tester" title="Selector Tester" subtitle="Test CSS and XPath selectors against a captured page without sending network requests." />
+      <ToolHead page="selector-tester" title={sx('tools.selector.title')} subtitle={sx('tools.selector.subtitle')} />
       <div className="scr-tool-controls">
         <Select
           value={mode}
+          aria-label={sx('tools.selector.modeLabel')}
           onChange={(event) => setMode(event.target.value as 'css' | 'xpath')}
           options={[{ value: 'css', label: 'CSS' }, { value: 'xpath', label: 'XPath' }]}
         />
-        <input className="scr-input scr-input--mono" value={selector} onChange={(event) => setSelector(event.target.value)} />
-        <Button variant="primary" size="sm" onClick={() => void run()}>Run selector</Button>
+        <input
+          className="scr-input scr-input--mono"
+          aria-label={sx('tools.selector.selectorLabel')}
+          value={selector}
+          onChange={(event) => setSelector(event.target.value)}
+        />
+        <Button variant="primary" size="sm" onClick={() => void run()}>{sx('tools.selector.run')}</Button>
       </div>
       {error && <p className="scr-error-callout">{error}</p>}
       <div className="scr-tool-split">
-        <ScrCard title="Page sample" description="Editable HTML fixture">
-          <textarea className="scr-input scr-input--area scr-code-editor" value={html} onChange={(event) => setHtml(event.target.value)} />
+        <ScrCard title={sx('tools.selector.sample')} description={sx('tools.selector.sampleHint')}>
+          <textarea
+            className="scr-input scr-input--area scr-code-editor"
+            aria-label={sx('tools.selector.htmlLabel')}
+            value={html}
+            onChange={(event) => setHtml(event.target.value)}
+          />
         </ScrCard>
-        <ScrCard title={`${matches.length} matches`} statusId="page.selector-tester">
+        <ScrCard title={sxn('tools.matches', matches.length)} statusId="page.selector-tester">
           <div className="scr-match-list">
             {matches.map((match) => (
               <div key={`${match.index}-${match.path}`} className="scr-match">
@@ -102,12 +113,15 @@ const REGEX_SAMPLE = `[SubsPlease] One Piece - 1112 (1080p) [A1B2C3D4].mkv
 [Judas] One Piece - 1113 [1080p][HEVC x265 10bit][Dual-Audio].mkv
 [Erai-raws] ワンピース - 1114 [720p][Multiple Subtitle].mkv`;
 
+// `labelKey` rather than a label: this array is module-level, so it cannot call
+// sx() at declaration time without freezing the language at module-eval —
+// CLAUDE.md i18n rule 7, the same contract widgets/registry.tsx follows.
 const REGEX_PRESETS = [
-  { label: 'Release group + episode', pattern: '\\[(?<group>[^\\]]+)\\].*?-\\s*(?<episode>\\d+)', flags: 'gmi' },
-  { label: 'Resolution', pattern: '(?<resolution>2160p|1080p|720p|480p)', flags: 'gi' },
-  { label: 'CRC checksum', pattern: '\\[(?<crc>[A-F0-9]{8})\\]', flags: 'gi' },
-  { label: 'Japanese episode', pattern: '(?<episode>\\d+)\\s*話', flags: 'gi' },
-] as const;
+  { labelKey: 'tools.regex.preset.group', pattern: '\\[(?<group>[^\\]]+)\\].*?-\\s*(?<episode>\\d+)', flags: 'gmi' },
+  { labelKey: 'tools.regex.preset.resolution', pattern: '(?<resolution>2160p|1080p|720p|480p)', flags: 'gi' },
+  { labelKey: 'tools.regex.preset.crc', pattern: '\\[(?<crc>[A-F0-9]{8})\\]', flags: 'gi' },
+  { labelKey: 'tools.regex.preset.japanese', pattern: '(?<episode>\\d+)\\s*話', flags: 'gi' },
+] as const satisfies ReadonlyArray<{ labelKey: ScraperTextKey; pattern: string; flags: string }>;
 
 export function RegexTesterPage() {
   const [pattern, setPattern] = useState('\\[(?<group>[^\\]]+)\\].*?-\\s*(?<episode>\\d+)');
@@ -130,48 +144,65 @@ export function RegexTesterPage() {
 
   return (
     <div className="scr-page">
-      <ToolHead page="regex-tester" title="Regex Tester" subtitle="Build extraction patterns with live matches and capture-group visibility." />
-      <section className="scr-tool-preset-row" aria-label="Regex pattern library">
-        <span>Pattern library</span>
+      <ToolHead page="regex-tester" title={sx('tools.regex.title')} subtitle={sx('tools.regex.subtitle')} />
+      <section className="scr-tool-preset-row" aria-label={sx('tools.regex.libraryLabel')}>
+        <span>{sx('tools.regex.library')}</span>
         {REGEX_PRESETS.map((preset) => (
           <button
             type="button"
-            key={preset.label}
+            key={preset.labelKey}
             className={preset.pattern === pattern ? 'is-active' : ''}
+            // D415's class: `is-active` is a colour, and a colour is not a state.
+            aria-pressed={preset.pattern === pattern}
             onClick={() => {
               setPattern(preset.pattern);
               setFlags(preset.flags);
             }}
           >
-            {preset.label}
+            {sx(preset.labelKey)}
           </button>
         ))}
       </section>
       <div className="scr-tool-controls">
         <span className="scr-code-prefix">/</span>
-        <input className="scr-input scr-input--mono" value={pattern} onChange={(event) => setPattern(event.target.value)} />
+        <input
+          className="scr-input scr-input--mono"
+          aria-label={sx('tools.regex.patternLabel')}
+          value={pattern}
+          onChange={(event) => setPattern(event.target.value)}
+        />
         <span className="scr-code-prefix">/</span>
-        <input className="scr-input scr-input--mono scr-input--flags" value={flags} onChange={(event) => setFlags(event.target.value)} />
+        <input
+          className="scr-input scr-input--mono scr-input--flags"
+          aria-label={sx('tools.regex.flagsLabel')}
+          value={flags}
+          onChange={(event) => setFlags(event.target.value)}
+        />
       </div>
       {error && <p className="scr-error-callout">{error}</p>}
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Matches</span><span className="scr-tile-value">{matches.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Capture groups</span><span className="scr-tile-value">{matches[0]?.groups.length ?? 0}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Sample characters</span><span className="scr-tile-value">{sample.length}</span></div>
-        <div className={`scr-tile${error ? ' is-bad' : ''}`}><span className="scr-tile-label">Pattern state</span><span className="scr-tile-value scr-tile-value--format">{error ? 'Invalid' : 'Valid'}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('tools.regex.tileMatches')}</span><span className="scr-tile-value">{sxNumber(matches.length)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('tools.regex.tileGroups')}</span><span className="scr-tile-value">{sxNumber(matches[0]?.groups.length ?? 0)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('tools.regex.tileChars')}</span><span className="scr-tile-value">{sxNumber(sample.length)}</span></div>
+        <div className={`scr-tile${error ? ' is-bad' : ''}`}><span className="scr-tile-label">{sx('tools.regex.tileState')}</span><span className="scr-tile-value scr-tile-value--format">{sx(error ? 'tools.regex.invalid' : 'tools.regex.valid')}</span></div>
       </div>
       <div className="scr-tool-split">
-        <ScrCard title="Sample text">
-          <textarea className="scr-input scr-input--area scr-code-editor" value={sample} onChange={(event) => setSample(event.target.value)} />
+        <ScrCard title={sx('tools.regex.sample')}>
+          <textarea
+            className="scr-input scr-input--area scr-code-editor"
+            aria-label={sx('tools.regex.sample')}
+            value={sample}
+            onChange={(event) => setSample(event.target.value)}
+          />
         </ScrCard>
-        <ScrCard title={`${matches.length} matches`} statusId="page.regex-tester">
+        <ScrCard title={sxn('tools.matches', matches.length)} statusId="page.regex-tester">
           <div className="scr-match-list">
             {matches.map((match, index) => (
               <div key={`${match.index}-${index}`} className="scr-match">
                 <span className="scr-match-index">{index + 1}</span>
                 <div>
                   <code>{match.value}</code>
-                  <p>Offset {match.index} · Groups: {match.groups.join(' · ') || 'none'}</p>
+                  <p>{sxss('tools.regex.hit', sxNumber(match.index), match.groups.join(' · ') || sx('tools.regex.noGroups'))}</p>
                 </div>
               </div>
             ))}
@@ -212,42 +243,53 @@ export function HttpInspectorPage() {
 
   return (
     <div className="scr-page">
-      <ToolHead page="http-inspector" title="HTTP Inspector" subtitle="Inspect a redacted request/response exchange and its timing breakdown." />
-      <section className="scr-tool-preset-row" aria-label="Request presets">
-        <span>Request presets</span>
-        {[
-          ['Episode page', 'GET', 'https://streamsb.example/anime/one-piece'],
-          ['Metadata API', 'GET', 'https://api.jikan.moe/v4/anime/21'],
-          ['Subtitle manifest', 'HEAD', 'https://jimaku.example/one-piece/1'],
-        ].map(([label, nextMethod, nextUrl]) => (
+      <ToolHead page="http-inspector" title={sx('tools.http.title')} subtitle={sx('tools.http.subtitle')} />
+      <section className="scr-tool-preset-row" aria-label={sx('tools.http.presetsLabel')}>
+        <span>{sx('tools.http.presets')}</span>
+        {([
+          ['tools.http.presetEpisode', 'GET', 'https://streamsb.example/anime/one-piece'],
+          ['tools.http.presetMetadata', 'GET', 'https://api.jikan.moe/v4/anime/21'],
+          ['tools.http.presetManifest', 'HEAD', 'https://jimaku.example/one-piece/1'],
+        ] as const).map(([labelKey, nextMethod, nextUrl]) => (
           <button
             type="button"
-            key={label}
+            key={labelKey}
             onClick={() => {
               setMethod(nextMethod);
               setUrl(nextUrl);
             }}
           >
-            {label}
+            {sx(labelKey)}
           </button>
         ))}
       </section>
       <div className="scr-tool-controls">
-        <Select value={method} onChange={(event) => setMethod(event.target.value)} options={['GET', 'HEAD', 'POST'].map((value) => ({ value, label: value }))} />
-        <input className="scr-input scr-input--mono" value={url} onChange={(event) => setUrl(event.target.value)} />
+        <Select
+          value={method}
+          aria-label={sx('tools.http.methodLabel')}
+          onChange={(event) => setMethod(event.target.value)}
+          options={['GET', 'HEAD', 'POST'].map((value) => ({ value, label: value }))}
+        />
+        <input
+          className="scr-input scr-input--mono"
+          aria-label={sx('tools.http.urlLabel')}
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+        />
         <Button variant="primary" size="sm" disabled={loading} onClick={() => void send()}>
-          {loading ? 'Sending…' : 'Send request'}
+          {sx(loading ? 'tools.http.sending' : 'tools.http.send')}
         </Button>
       </div>
       <div className="scr-tool-split">
-        <ScrCard title="Request headers" description="Sensitive values are redacted before they reach this inspector.">
+        <ScrCard title={sx('tools.http.requestHeaders')} description={sx('tools.http.requestHeadersHint')}>
+          {/* Header names and their values are protocol tokens, not chrome. */}
           <div className="scr-header-list">
             <div><code>accept</code><span>text/html</span></div>
             <div><code>user-agent</code><span>AnimeScraper/1.0</span></div>
             <div><code>referer</code><span>same-origin</span></div>
           </div>
         </ScrCard>
-        <ScrCard title="Request history" statusId="page.http-inspector">
+        <ScrCard title={sx('tools.http.history')} statusId="page.http-inspector">
           <div className="scr-http-history">
             {history.map((entry) => (
               <button
@@ -261,10 +303,10 @@ export function HttpInspectorPage() {
                 <span className="scr-pill scr-pill--outline">{entry.method}</span>
                 <span>{entry.url}</span>
                 <b>{entry.status}</b>
-                <small>{entry.duration} ms</small>
+                <small>{sxn('tools.http.ms', entry.duration)}</small>
               </button>
             ))}
-            {!history.length && <p className="scr-muted">Completed requests appear here for quick comparison.</p>}
+            {!history.length && <p className="scr-muted">{sx('tools.http.historyEmpty')}</p>}
           </div>
         </ScrCard>
       </div>
@@ -272,23 +314,23 @@ export function HttpInspectorPage() {
         <>
           <div className="scr-http-stats">
             <span className="scr-http-status">{result.status} {result.statusText}</span>
-            {Object.entries(result.timingMs).map(([key, value]) => <span key={key}><small>{key}</small><b>{value} ms</b></span>)}
-            <span><small>size</small><b>{result.sizeBytes} B</b></span>
+            {Object.entries(result.timingMs).map(([key, value]) => <span key={key}><small>{key}</small><b>{sxn('tools.http.ms', value)}</b></span>)}
+            <span><small>{sx('tools.http.size')}</small><b>{sxNumber(result.sizeBytes)} B</b></span>
           </div>
           <div className="scr-tool-split">
-            <ScrCard title="Response headers" statusId="page.http-inspector">
+            <ScrCard title={sx('tools.http.responseHeaders')} statusId="page.http-inspector">
               <div className="scr-header-list">
                 {Object.entries(result.headers).map(([key, value]) => <div key={key}><code>{key}</code><span>{value}</span></div>)}
               </div>
             </ScrCard>
-            <ScrCard title="Response body">
+            <ScrCard title={sx('tools.http.responseBody')}>
               <pre className="scr-response-body">{result.body}</pre>
             </ScrCard>
           </div>
         </>
       ) : (
-        <ScrCard title="Ready to inspect">
-          <p className="scr-muted">Send the sample request to display status, headers, body, size, and timing.</p>
+        <ScrCard title={sx('tools.http.ready')}>
+          <p className="scr-muted">{sx('tools.http.readyHint')}</p>
         </ScrCard>
       )}
     </div>

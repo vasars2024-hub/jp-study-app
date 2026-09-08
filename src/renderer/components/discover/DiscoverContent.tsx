@@ -519,6 +519,9 @@ export function DiscoveryControls({ state }: { state: DiscoveryState }) {
                 key={id}
                 type="button"
                 className={`disc-seg-btn ${!searching && feed === id ? 'active' : ''}`}
+                // Same reason as the media-type segment above: `active` is a
+                // colour, and a colour is not a state.
+                aria-pressed={!searching && feed === id}
                 onClick={() => setFeed(id)}
               >
                 {t(`scraper.feed.${id}`)}

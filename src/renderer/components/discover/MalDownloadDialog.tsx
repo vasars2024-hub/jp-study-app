@@ -896,6 +896,9 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
                 key={id}
                 type="button"
                 className={`disc-seg-btn ${animeMode === id ? 'active' : ''}`}
+                // `active` is a colour; the pressed state is what a screen
+                // reader and a colour-blind user actually get.
+                aria-pressed={animeMode === id}
                 disabled={busy}
                 onClick={() => {
                   setAnimeMode(id);
@@ -919,6 +922,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
                 key={id}
                 type="button"
                 className={`disc-seg-btn ${mangaMode === id ? 'active' : ''}`}
+                aria-pressed={mangaMode === id}
                 disabled={busy || (id === 'chapters' && providers.length === 0)}
                 title={id === 'chapters' && providers.length === 0
                   ? t('malDownload.error.noProviders')
@@ -1002,6 +1006,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
                     key={mode}
                     type="button"
                     className={`disc-seg-btn ${selection.mode === mode ? 'active' : ''}`}
+                    aria-pressed={selection.mode === mode}
                     disabled={busy}
                     onClick={() => patch({ mode })}
                   >

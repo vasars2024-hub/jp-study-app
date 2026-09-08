@@ -608,6 +608,75 @@ const TEXT = {
   'console.cmd.profile.active': 'The values the active profile would run a scrape with',
   'console.cmd.logs.tail': 'The tail of the live log this page is subscribed to',
 
+  // ---- Developer tool pages: Selector Tester / Regex Tester / HTTP Inspector ----
+  // D413. These three pages were written straight into JSX and never entered
+  // this table, so the migration the 603 `scrApp.*` keys carry could not reach
+  // them — in a Japanese UI the rail read セレクターテスター and the page it
+  // opened was headed `Selector Tester`. The `.label` keys are accessible names
+  // for controls that had none (D416): a bare `<input>` announces its value,
+  // not its purpose.
+  //
+  // Deliberately NOT here, and they should stay literal: `CSS` / `XPath` /
+  // `GET` / `HEAD` / `POST`, the header names `accept` / `user-agent` /
+  // `referer`, and the fixture HTML and release names in the sample boxes —
+  // protocol tokens and study content, per CLAUDE.md i18n rule 4.
+  'tools.sandbox': 'Local sandbox',
+  'tools.matches': (n: number) => `${n} match${n === 1 ? '' : 'es'}`,
+
+  'tools.selector.title': 'Selector Tester',
+  'tools.selector.subtitle':
+    'Test CSS and XPath selectors against a captured page without sending network requests.',
+  'tools.selector.modeLabel': 'Selector language',
+  'tools.selector.selectorLabel': 'Selector',
+  'tools.selector.run': 'Run selector',
+  'tools.selector.sample': 'Page sample',
+  'tools.selector.sampleHint': 'Editable HTML fixture',
+  'tools.selector.htmlLabel': 'Page sample HTML',
+
+  'tools.regex.title': 'Regex Tester',
+  'tools.regex.subtitle': 'Build extraction patterns with live matches and capture-group visibility.',
+  'tools.regex.libraryLabel': 'Regex pattern library',
+  'tools.regex.library': 'Pattern library',
+  'tools.regex.preset.group': 'Release group + episode',
+  'tools.regex.preset.resolution': 'Resolution',
+  'tools.regex.preset.crc': 'CRC checksum',
+  'tools.regex.preset.japanese': 'Japanese episode',
+  'tools.regex.patternLabel': 'Regular expression',
+  'tools.regex.flagsLabel': 'Regular expression flags',
+  'tools.regex.sample': 'Sample text',
+  'tools.regex.tileMatches': 'Matches',
+  'tools.regex.tileGroups': 'Capture groups',
+  'tools.regex.tileChars': 'Sample characters',
+  'tools.regex.tileState': 'Pattern state',
+  'tools.regex.valid': 'Valid',
+  'tools.regex.invalid': 'Invalid',
+  'tools.regex.hit': (offset: string, groups: string) => `Offset ${offset} · Groups: ${groups}`,
+  'tools.regex.noGroups': 'none',
+
+  'tools.http.title': 'HTTP Inspector',
+  'tools.http.subtitle': 'Inspect a redacted request/response exchange and its timing breakdown.',
+  'tools.http.presetsLabel': 'Request presets',
+  'tools.http.presets': 'Request presets',
+  'tools.http.presetEpisode': 'Episode page',
+  'tools.http.presetMetadata': 'Metadata API',
+  'tools.http.presetManifest': 'Subtitle manifest',
+  'tools.http.methodLabel': 'Request method',
+  'tools.http.urlLabel': 'Request URL',
+  'tools.http.send': 'Send request',
+  'tools.http.sending': 'Sending…',
+  'tools.http.requestHeaders': 'Request headers',
+  'tools.http.requestHeadersHint':
+    'Sensitive values are redacted before they reach this inspector.',
+  'tools.http.history': 'Request history',
+  'tools.http.historyEmpty': 'Completed requests appear here for quick comparison.',
+  'tools.http.size': 'size',
+  'tools.http.responseHeaders': 'Response headers',
+  'tools.http.responseBody': 'Response body',
+  'tools.http.ready': 'Ready to inspect',
+  'tools.http.readyHint':
+    'Send the sample request to display status, headers, body, size, and timing.',
+  'tools.http.ms': (n: number) => `${n} ms`,
+
   // ---- Advanced Settings drawer ----
   // Field labels and hints live in settings/fields.ts, beside the bounds they
   // describe; only the drawer's own chrome is here.

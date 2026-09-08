@@ -1384,6 +1384,12 @@ export function PluginsPage() {
             trailing={
               <Toggle
                 checked={plugin.enabled}
+                // The card's title is the plugin name, but a `trailing` control
+                // is not a child of it — so without this the only switch that
+                // enables an adapter announces as an unnamed "switch, off", one
+                // per installed plugin. The other three Toggles in this file
+                // name themselves the same way.
+                aria-label={t('scraperMgmt.plugins.enablePlugin', { name: plugin.name })}
                 disabled={!plugin.compatible}
                 onChange={(event) =>
                   setPlugins((current) =>

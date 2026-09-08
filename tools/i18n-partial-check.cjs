@@ -120,8 +120,16 @@ const TEXT = /(?<![=!<>-])>([^<>{}\n]{2,120})<(?!=)/g;
 
 function scan(rel) {
   const raw = fs.readFileSync(path.join(SRC, rel), 'utf8');
-  // A file that never calls t() is the OTHER tool's business, not this one's.
-  if (!/\bt\s*\(\s*['"`]|useT\s*\(/.test(raw)) return null;
+  // A file that adopted NO string system is the OTHER tool's business, not this
+  // one's. `sx(` counts, and leaving it out was D417: `i18n-hardcoded-check`
+  // treats `sx(` as adoption (correctly — the Scraper app is on its own string
+  // table, see scraper/strings.ts), so one `sx()` call marked all 511 lines of
+  // `scraper/pages/ToolPages.tsx` adopted there, while this scanner skipped the
+  // same file for having no `t(`. Three whole pages of literal English sat in
+  // the gap between the two gates and rendered untranslated in ja/zh/ru.
+  // `mask()` below has understood `sx(` since it was written; only this line
+  // did not.
+  if (!/\bt\s*\(\s*['"`]|useT\s*\(|\bsx\s*\(\s*['"`]/.test(raw)) return null;
   const text = mask(raw);
   const lineAt = (i) => text.slice(0, i).split('\n').length;
   const hits = [];
