@@ -1404,6 +1404,40 @@ describe('Agent workspace shell', () => {
     expect(text()).toContain('agent.state.emptyTitle');
   });
 
+  /**
+   * The second click of a double-click must not be the one that destroys
+   * anything. Both confirms replace their trigger in place, so whichever button
+   * renders first inherits the trigger's rectangle — measured live on
+   * 2026-09-08, the danger button was under the cursor 122 ms after the first
+   * click, inside Windows' 500 ms double-click interval. Order is the guard, so
+   * it is asserted rather than left to styling.
+   */
+  it('puts Cancel under the cursor, not the destructive button, in both confirms', async () => {
+    stored = populated();
+    await mount();
+
+    await click(buttonWith('agent.conversation.delete'));
+    const deleteRow = [...host.querySelectorAll<HTMLButtonElement>('.agent-conversation-actions button')];
+    expect(deleteRow.map((button) => button.textContent))
+      .toEqual(['common.cancel', 'agent.conversation.deleteConfirm']);
+    expect(deleteRow[0].className).not.toContain('agent-action-danger');
+    await click(deleteRow[0]);
+    expect(calls.some((call) => call.method === 'delete')).toBe(false);
+
+    await click(buttonWith('agent.rail.clear'));
+    const clearRow = [...host.querySelectorAll<HTMLButtonElement>('.agent-rail-foot button')];
+    expect(clearRow).toHaveLength(2);
+    expect(clearRow[0].textContent).toBe('common.cancel');
+    expect(clearRow[0].className).not.toContain('agent-action-danger');
+    expect(clearRow[1].className).toContain('agent-action-danger');
+    // ...and the destructive label says what it destroys. "Confirm clear" named
+    // nothing; the count is the only thing that tells the user the button is
+    // about their whole history and not the conversation they were looking at.
+    expect(clearRow[1].textContent).toBe('agent.rail.clearConfirm=2');
+    await click(clearRow[0]);
+    expect(calls.some((call) => call.method === 'clear')).toBe(false);
+  });
+
   it('shows a recoverable error, and retrying calls the bridge again', async () => {
     loadResult = { ok: false, code: 'read-failed' };
     await mount();

@@ -173,15 +173,38 @@ describe('Agent workspace transforms', () => {
     expect(agentWorkspaceWithNewConversation(state, { id: '  ', title: 'Blank', now: 500 })).toBeNull();
   });
 
-  it('toggles a pin and marks the conversation as touched', () => {
+  it('toggles a pin without touching the conversation timestamp', () => {
+    // Pinning edits nothing about the conversation, and `updatedAt` is the only
+    // record of when it was last worked on. Stamping it here meant pin-then-unpin
+    // — the obvious way to discover what the button does — permanently reordered
+    // the rail and overwrote the real timestamp with no way back.
     const state = workspace([conversation({ id: 'a', updatedAt: 1 })], 'a');
-    const pinned = agentWorkspaceWithPinToggled(state, 'a', 900);
+    const pinned = agentWorkspaceWithPinToggled(state, 'a');
     expect(pinned).not.toBeNull();
-    expect(pinned?.conversations[0]).toMatchObject({ pinned: true, updatedAt: 900 });
+    expect(pinned?.conversations[0]).toMatchObject({ pinned: true, updatedAt: 1 });
 
-    const unpinned = pinned ? agentWorkspaceWithPinToggled(pinned, 'a', 901) : null;
-    expect(unpinned?.conversations[0]).toMatchObject({ pinned: false, updatedAt: 901 });
-    expect(agentWorkspaceWithPinToggled(state, 'missing', 900)).toBeNull();
+    const unpinned = pinned ? agentWorkspaceWithPinToggled(pinned, 'a') : null;
+    expect(unpinned?.conversations[0]).toMatchObject({ pinned: false, updatedAt: 1 });
+    expect(agentWorkspaceWithPinToggled(state, 'missing')).toBeNull();
+  });
+
+  it('restores the exact rail order when a pin is added and then removed', () => {
+    // The round trip is the whole point: the user has to be able to undo a pin
+    // and get their list back, not a list that merely looks similar.
+    const before = workspace([
+      conversation({ id: 'older', updatedAt: 10 }),
+      conversation({ id: 'newer', updatedAt: 20 }),
+    ]);
+    expect(agentConversationSummaries(before).map((s) => s.id)).toEqual(['newer', 'older']);
+
+    const pinned = agentWorkspaceWithPinToggled(before, 'older');
+    if (!pinned) throw new Error('pinning a present conversation must return a state');
+    expect(agentConversationSummaries(pinned).map((s) => s.id)).toEqual(['older', 'newer']);
+
+    const unpinned = agentWorkspaceWithPinToggled(pinned, 'older');
+    if (!unpinned) throw new Error('unpinning a present conversation must return a state');
+    expect(agentConversationSummaries(unpinned).map((s) => s.id)).toEqual(['newer', 'older']);
+    expect(unpinned.conversations).toEqual(before.conversations);
   });
 
   it('switches the workflow preset, and reports no change when it is already set', () => {
