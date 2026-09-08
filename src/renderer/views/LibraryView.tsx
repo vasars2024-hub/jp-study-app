@@ -37,6 +37,7 @@ import { LANG_TAGS } from '../../shared/i18n/core';
 import { INBOX_FOLDER } from '../../shared/inboxMeta';
 import {
   availableFilterChips,
+  compareLibraryLength,
   effectiveLang,
   effectiveLevelEstimate,
   levelSortKey,
@@ -608,8 +609,14 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           return a.title.localeCompare(b.title);
         case 'lang':
           return effectiveLang(a).localeCompare(effectiveLang(b));
-        case 'length':
-          return (b.inboxMeta?.charCount ?? 0) - (a.inboxMeta?.charCount ?? 0);
+        case 'length': {
+          // Falls through to the date order for the tail this cannot rank, so a
+          // shelf where nothing carries a length still comes back in a
+          // meaningful order rather than store order pretending to be sorted.
+          const byLength = compareLibraryLength(a, b);
+          if (byLength !== 0) return byLength;
+          return (b.inboxMeta?.receivedAt ?? b.createdAt) - (a.inboxMeta?.receivedAt ?? a.createdAt);
+        }
         case 'level':
           return levelSortKey(a, bookLevels[a.id]) - levelSortKey(b, bookLevels[b.id]);
         case 'source':

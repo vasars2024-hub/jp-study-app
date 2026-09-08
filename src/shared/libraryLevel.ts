@@ -45,6 +45,44 @@ export function levelSortKey(
   return 99;
 }
 
+/**
+ * How "Sort by length" orders one item.
+ *
+ * `bucket` first, then `value` descending inside it. Two units of length exist
+ * in this library and they are not comparable: `inboxMeta.charCount` is
+ * characters and lives only on articles the Chrome extension sent, `pageCount`
+ * is pages and lives only on manga. Turning one into the other needs a
+ * characters-per-page constant nobody here has measured, and inventing one
+ * would make the order look precise while being arbitrary — so the two stay in
+ * separate runs and nothing is fabricated.
+ *
+ * Everything with no known length lands in the last bucket, where the caller's
+ * date fallback orders it. Before this existed the comparator read
+ * `inboxMeta?.charCount ?? 0` alone, which is `0` for every file-imported book:
+ * measured on the user's own shelf that was **24 of 24 items**, so the whole
+ * option was a control that changed nothing, while the app knew a real page
+ * count for 4 of them.
+ */
+export function librarySortLength(item: LibraryItem): { bucket: number; value: number } {
+  const chars = item.inboxMeta?.charCount;
+  if (typeof chars === 'number' && Number.isFinite(chars) && chars > 0) {
+    return { bucket: 0, value: chars };
+  }
+  const pages = item.pageCount;
+  if (typeof pages === 'number' && Number.isFinite(pages) && pages > 0) {
+    return { bucket: 1, value: pages };
+  }
+  return { bucket: 2, value: 0 };
+}
+
+/** Comparator for `librarySortLength`. Returns 0 when neither item has a length. */
+export function compareLibraryLength(a: LibraryItem, b: LibraryItem): number {
+  const left = librarySortLength(a);
+  const right = librarySortLength(b);
+  if (left.bucket !== right.bucket) return left.bucket - right.bucket;
+  return right.value - left.value;
+}
+
 export const LIBRARY_LANG_CHIPS = ['all', 'ja', 'zh', 'en', 'unknown'] as const;
 export const LIBRARY_LEVEL_CHIPS = ['all', '1', '2', '3', '4', '5', '6', '7'] as const;
 
