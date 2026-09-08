@@ -444,18 +444,38 @@ describe('a folder holding two seasons', () => {
     expect(reasons(out.failures, 'jimaku')).toEqual(['no-match']);
   });
 
-  it('refuses, and says why, when no sequel accounts for the episode', async () => {
+  it('says why, rather than "no-match", when no sequel accounts for the episode', async () => {
     const out = await sweep(episode26({ relatedWorks: [] } as Partial<MediaItem>));
-    // Never asked: that question is already known to answer nothing, and its
-    // `no-match` is exactly what made this permanent.
-    expect(out.asked).not.toContain('jimaku');
+    // Still asked. `episodeCount` is AniList's and the entry's contents are
+    // Jimaku's: a split cour filed as one entry really can hold episode 20 of a
+    // 12-episode season, and skipping the request would lose that.
+    expect(out.asked).toContain('jimaku');
     expect(reasons(out.failures, 'jimaku')).toEqual(['episode-out-of-range:no-sequel']);
   });
 
-  it('refuses when the episode is past the sequel as well', async () => {
+  it('says why when the episode is past the sequel as well', async () => {
     const out = await sweep(episode26({ episode: 40 } as Partial<MediaItem>));
-    expect(out.asked).not.toContain('jimaku');
     expect(reasons(out.failures, 'jimaku')).toEqual(['episode-out-of-range:beyond-sequel']);
+  });
+
+  it('records plain no-match for an in-range episode the catalogue really lacks', async () => {
+    // The discriminating positive: `episode-out-of-range` must not become the
+    // universal label for an empty Jimaku answer, or it says nothing at all.
+    const out = await sweep(mediaItem());
+    expect(reasons(out.failures, 'jimaku')).toEqual(['no-match']);
+  });
+
+  it('still attaches when an out-of-range item turns out to have the file anyway', async () => {
+    // The capability the earlier skip would have cost: AniList says 13, the
+    // Jimaku entry holds the episode regardless, and the record must land.
+    script.jimaku = {
+      candidates: [jimakuCandidate({ episode: 26, releaseName: 'The Big O.E26.Bandai.ja.srt' })],
+      down: false,
+      downStatus: 200,
+    };
+    const out = await sweep(episode26({ relatedWorks: [] } as Partial<MediaItem>));
+    expect(out.records.map((record) => record.providerId)).toEqual(['jimaku']);
+    expect(reasons(out.failures, 'jimaku')).toEqual([]);
   });
 
   it('leaves an item with no published episode count alone', async () => {

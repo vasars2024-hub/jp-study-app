@@ -635,30 +635,33 @@ async function discoverForItem(
     // timeout. Kept separate from an empty candidate list because they are not
     // the same claim, and only one of them is about this show.
     let providerDown = false;
+    // D266. Set when this item's episode number is past the matched entry's own
+    // run length and no sequel accounts for it, so an empty answer is a fact
+    // about the QUESTION rather than about the show. Only Jimaku sets it: it is
+    // the one provider keyed on an entry id, and a torrent index or
+    // OpenSubtitles is asked by title and absolute episode, where the folder's
+    // own numbering is the correct one.
+    let outOfRange: string | null = null;
     try {
       if (providerId === 'jimaku') {
         // Japanese-only provider; asking it for anything else is a wasted request.
         if (!wanted.some((lang) => lang.startsWith('ja'))) continue;
-        // D266. A folder holding two seasons is stamped with the FIRST season's
-        // id, so episode 26 is asked about under an entry whose own metadata
-        // says it has 13 — a question that cannot be answered, whose "no"
-        // is then stored as evidence and suppresses the provider for
-        // `retryAfterDays`. Measured live: `The Big O` is 26 files all carrying
-        // `anilistId: 567`, and jimaku entry 1178 holds exactly E01–E13.
+        // A folder holding two seasons is stamped with the FIRST season's id, so
+        // episode 26 is asked about under an entry whose own metadata says it
+        // has 13 — and the correct "nothing" is then stored as evidence and
+        // suppresses the provider for `retryAfterDays`. Measured live: `The Big
+        // O` is 26 files all carrying `anilistId: 567`, and jimaku entry 1178
+        // holds exactly E01–E13.
         const season = resolveSeasonForEpisode(item);
-        if (season.kind === 'unresolved') {
-          // Deliberately not falling through to the original id. That query is
-          // already known to answer nothing, and its `no-match` is what made
-          // this permanent. The reason is recorded instead, so a later sweep —
-          // or a hand-corrected match — starts from the truth.
-          failures.push({
-            providerId,
-            lang: wanted.join(','),
-            attemptedAt: Date.now(),
-            reason: `episode-out-of-range:${season.reason}`,
-          });
-          continue;
-        }
+        // An unresolved item is still ASKED, deliberately. `episodeCount` comes
+        // from AniList and the entry's contents do not: a split cour filed as
+        // one Jimaku entry really can hold episode 20 while AniList says the
+        // season has 12, and skipping the request would turn an honesty fix
+        // into a capability regression. What changes is what an EMPTY answer is
+        // recorded as — see `outOfRange` below. Measured 2026-09-07: AniList
+        // answers 403 to every query, so `relatedWorks` cannot be populated at
+        // all today and this is the arm the whole library lands in.
+        if (season.kind === 'unresolved') outOfRange = season.reason;
         // `jimakuSearchDetailed` rather than `jimakuSearch`: the plain form drops
         // the `down` flag, and this is the caller that most needs it.
         const reply = await jimakuSearchDetailed(
@@ -742,7 +745,17 @@ async function discoverForItem(
       const scored = scoreCandidates(candidates, item, lang, settings.minConfidence);
       const best = scored.find((entry) => !known.has(entry.candidate.providerItemId));
       if (!best) {
-        failures.push({ providerId, lang, attemptedAt: Date.now(), reason: 'no-match' });
+        // `no-match` is a claim about the catalogue. When the episode is past
+        // the entry's published run length and no sequel could be resolved, the
+        // catalogue was never really asked about THIS episode, and saying so is
+        // the difference between "this show has no subtitles" and "we asked the
+        // wrong entry" — one of which a user can act on.
+        failures.push({
+          providerId,
+          lang,
+          attemptedAt: Date.now(),
+          reason: outOfRange ? `episode-out-of-range:${outOfRange}` : 'no-match',
+        });
         continue;
       }
       // Only attach automatically for languages the user opted into.
