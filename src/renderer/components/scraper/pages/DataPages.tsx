@@ -16,6 +16,7 @@ import { formatAgeMinutes, formatEtaClock } from '../data/charts';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
 import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
+import { distinctEpisodes } from '../data/dashboardData';
 import { sx, sxn, sxs } from '../strings';
 import { SERIES, episodes, type FixtureSeries } from '../data/fixtures';
 import { scraperArtwork } from '../artwork';
@@ -136,6 +137,9 @@ export function ResultsPage() {
     () => summarizeSeriesResults(library?.series ?? [], rows),
     [library, rows],
   );
+  // Deduplicated on `EpisodeRow.id` (untouched by `buildResultLibrary`, which
+  // re-tags only `seriesId`), so re-running a scrape cannot inflate either tile.
+  const distinct = useMemo(() => distinctEpisodes(rows), [rows]);
   const visible = useMemo(
     () => filterSeriesResults(bySeries, filter, query),
     [bySeries, filter, query],
@@ -201,25 +205,29 @@ export function ResultsPage() {
         }
       />
 
+      {/* Each card below is one stored RUN, not one series - that is what the
+          per-job `librarySeriesId` fix established, and it is why a series
+          scraped five times shows five cards. The first tile therefore counts
+          results; calling it "Series" made this page say 10 while the Dashboard
+          said 5 for the same library. The episode tiles deduplicate on
+          `EpisodeRow.id`, so they cannot count one episode once per run. */}
       <div className="scr-tile-row">
         <div className="scr-tile">
-          <span className="scr-tile-label">{sx('results.series')}</span>
-          <span className="scr-tile-value">{bySeries.length}</span>
+          <span className="scr-tile-label">{sx('results.count')}</span>
+          <span className="scr-tile-value">{bySeries.length.toLocaleString()}</span>
         </div>
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('results.episodes')}</span>
-          <span className="scr-tile-value">{rows.length.toLocaleString()}</span>
+          <span className="scr-tile-value">{distinct.indexed.toLocaleString()}</span>
         </div>
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('results.withJa')}</span>
-          <span className="scr-tile-value">
-            {bySeries.reduce((n, s) => n + s.withJapanese, 0).toLocaleString()}
-          </span>
+          <span className="scr-tile-value">{distinct.japanese.toLocaleString()}</span>
         </div>
         <div className="scr-tile is-bad">
           <span className="scr-tile-label">{sx('results.failed')}</span>
           <span className="scr-tile-value">
-            {bySeries.reduce((n, s) => n + s.failed, 0)}
+            {bySeries.reduce((n, s) => n + s.failed, 0).toLocaleString()}
           </span>
         </div>
       </div>
@@ -251,7 +259,7 @@ export function ResultsPage() {
           />
         </label>
         <span className="scr-result-control-spacer" />
-        <span className="scr-muted">{visible.length} series</span>
+        <span className="scr-muted">{sxn('results.countLabel', visible.length)}</span>
       </div>
 
       <div className="scr-grid">

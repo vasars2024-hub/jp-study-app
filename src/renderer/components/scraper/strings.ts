@@ -499,7 +499,11 @@ const TEXT = {
   // ---- Data pages ----
   'page.results.title': 'Results',
   'page.results.subtitle': 'Everything collected so far, grouped by series and ready for review.',
-  'results.series': 'Series',
+  // Not 'Series': each row in this library is one stored RUN (`librarySeriesId`
+  // is job-scoped), so a series scraped five times is five rows. Labelling the
+  // count 'Series' made this page report 10 where the Dashboard reported 5.
+  'results.count': 'Results',
+  'results.countLabel': (n: number) => `${n.toLocaleString()} results`,
   'results.episodes': 'Episodes',
   'results.withJa': 'With Japanese subtitles',
   'results.failed': 'Failed',
