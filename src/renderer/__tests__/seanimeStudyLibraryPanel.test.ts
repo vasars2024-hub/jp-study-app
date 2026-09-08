@@ -40,6 +40,12 @@ function stubApi(
     connected: true,
     decks: ['JP Study::Immersion'],
   },
+  /**
+   * Merged last, so a case can replace any route — D311 needs `seanimeStart` and
+   * a `seanimeStudyLibrary` whose answer CHANGES once the sidecar is up, which a
+   * fixed `reply` cannot express.
+   */
+  overrides: Record<string, unknown> = {},
 ): void {
   vi.stubGlobal('window', globalThis.window);
   (globalThis.window as unknown as { api: Record<string, unknown> }).api = {
@@ -48,6 +54,8 @@ function stubApi(
     addMediaPaths,
     ankiStatus: async () => ({ models: [], ...anki }),
     profileRulesGet: async () => ({ schemaVersion: 2, rules: [] }),
+    seanimeStart: async () => ({ kind: 'ready', error: null }),
+    ...overrides,
   };
 }
 
@@ -101,6 +109,70 @@ describe('SeanimeStudyLibraryPanel', () => {
     expect(html).toContain('The media library could not be read.');
     // The distinction that matters: this must NOT read as "your library is empty".
     expect(html).not.toContain('The media server has no files yet.');
+  });
+
+  /**
+   * D311 — measured live, pid 4652 window 1: the Readiness pane said "Start the
+   * media server, then refresh." and the whole window held 16 buttons, of which
+   * the only pane control was Refresh. `MediaWorkspaceHost` and `BlancStudyPlayer`
+   * have carried a real Start button the whole time, so the capability existed and
+   * this surface alone was a dead end.
+   */
+  describe('the offline state can start the server it names', () => {
+    it('offers the control its own instruction asks for', async () => {
+      stubApi({ ok: false, error: 'Seanime sidecar is stopped.' });
+      const html = await render();
+      expect(html).toContain('Start the media server, then refresh.');
+      expect(html).toContain('Start the media server<');
+    });
+
+    it('does not offer it once the library reads', async () => {
+      // Control: an unconditional button would pass the case above while making
+      // the healthy surface offer a redundant start.
+      stubApi({ ok: true, files: [] });
+      const html = await render();
+      expect(html).not.toContain('Start the media server');
+    });
+
+    it('re-reads the library after a start that reaches ready', async () => {
+      let up = false;
+      stubApi({ ok: false, error: 'Seanime sidecar is stopped.' }, [mediaItem()], undefined, undefined, {
+        seanimeStudyLibrary: async () => (up
+          ? { ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] }
+          : { ok: false, error: 'Seanime sidecar is stopped.' }),
+        seanimeStart: async () => {
+          up = true;
+          return { kind: 'ready', error: null };
+        },
+      });
+      await render();
+      const mounted = host as HTMLDivElement;
+      const button = [...mounted.querySelectorAll('button')]
+        .find((b) => b.textContent?.trim() === 'Start the media server');
+      expect(button).toBeTruthy();
+      await act(async () => { (button as HTMLButtonElement).click(); });
+      // The panel reloaded on its own: the error box is gone and real rows arrived.
+      expect(mounted.innerHTML).not.toContain('The media library could not be read.');
+      expect(mounted.innerHTML).toContain('class="study-lib-list"');
+    });
+
+    it('says why a start failed instead of silently doing nothing', async () => {
+      stubApi({ ok: false, error: 'Seanime sidecar is stopped.' }, [], undefined, undefined, {
+        seanimeStart: async () => ({
+          kind: 'failed',
+          error: 'sidecar did not become healthy within 30s',
+        }),
+      });
+      await render();
+      const mounted = host as HTMLDivElement;
+      const button = [...mounted.querySelectorAll('button')]
+        .find((b) => b.textContent?.trim() === 'Start the media server');
+      expect(button).toBeTruthy();
+      await act(async () => { (button as HTMLButtonElement).click(); });
+      expect(mounted.innerHTML).toContain('sidecar did not become healthy within 30s');
+      // Still offline, and still says so — a failed start must not look like a fix.
+      expect(mounted.innerHTML).toContain('The media library could not be read.');
+    });
   });
 
   it('states the next action for each state, not just the state name', async () => {

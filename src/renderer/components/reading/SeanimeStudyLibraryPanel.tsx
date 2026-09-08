@@ -181,7 +181,34 @@ export default function SeanimeStudyLibraryPanel({
   const [anki, setAnki] = useState<SeanimeStudyAnkiHealth | null>(null);
   const [mined, setMined] = useState<Map<string, WatchLoopEntryRollup>>(() => new Map());
 
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
+
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
+
+  /**
+   * D311 — the error state told the user to start the media server and gave them
+   * no way to do it. `MediaWorkspaceHost` and `BlancStudyPlayer` have carried
+   * exactly this control the whole time; the capability was present and only this
+   * surface was missing it, so this is one button, not a new route.
+   *
+   * `seanimeStart()` polls health before it resolves, so its answer is terminal:
+   * `ready` means reloading will now succeed, and anything else carries the
+   * sidecar's own reason, which is worth more than a generic failure.
+   */
+  const startServer = useCallback(async () => {
+    setStarting(true);
+    setStartError('');
+    try {
+      const status = await window.api.seanimeStart();
+      if (status.kind === 'ready') reload();
+      else setStartError(status.error || status.kind);
+    } catch (error) {
+      setStartError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setStarting(false);
+    }
+  }, [reload]);
 
   useEffect(() => {
     let dead = false;
@@ -428,6 +455,25 @@ export default function SeanimeStudyLibraryPanel({
           <p><strong>{t('studyLibrary.unavailable')}</strong></p>
           <p className="study-lib-empty-detail">{load.message}</p>
           <p>{t('studyLibrary.unavailableHint')}</p>
+          <button
+            type="button"
+            // Reuses the panel's own button chrome rather than adding a rule to a
+            // stylesheet another track is holding dirty; `justify-self` keeps it
+            // from stretching across the grid the empty box lays out.
+            className="study-lib-refresh study-lib-start-server"
+            style={{ justifySelf: 'start' }}
+            onClick={() => void startServer()}
+            disabled={starting}
+          >
+            <Icon name="player" size={13} />
+            {starting ? t('mediaWorkspace.connectingServer') : t('mediaWorkspace.startServer')}
+          </button>
+          {/* Same treatment `load.message` gets above: the sidecar's own reason,
+              which is the only thing that distinguishes "no binary" from "port
+              taken" from "timed out". */}
+          {startError ? (
+            <p className="study-lib-empty-detail" role="status">{startError}</p>
+          ) : null}
         </div>
       ) : null}
 
