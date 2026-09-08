@@ -2868,3 +2868,44 @@ and see which ones change answer. `npx vitest run <files>` with `TZ` untouched b
 moved a year forward is the decisive control — anything that flips was a time bomb, anything that
 does not is genuinely deterministic. A green run today proves nothing about tomorrow, which is the
 whole reason D419 reached the branch.
+
+### 2026-09-08 11:20 EDT — primary2, files: the bulk Mine tail, and a smart search that can only ever count everything
+
+Live, pid 11736, **window 2**, on the user's own **43,686-item** index, served from this worktree.
+This is the `files` row's named tail — *"executing a bulk Mine"*. It is now driven, end to end,
+twice, and the user's deck was returned to its starting **4 cards** after each run (read back from
+`jp-flashcard-deck` both times, not inferred from the UI).
+
+**The mine path itself is sound and should not be "improved".** Both branches were driven:
+
+- **Refusal branch** — two `Note` rows selected: *"0 of 2 items added 0 cards; 2 failed."* with a
+  per-item reason, *"𭕄 — This item is not a file, so there is no text to read."* No Undo offered,
+  correctly, because nothing was added.
+- **Success branch** — a `.ass` and a `.vtt` selected: *"2 of 2 items added 341 cards; 0 failed."*
+  with the per-item split **200 + 141 = 341**, reconciling exactly, and an **Undo all added cards**
+  that took the store back to 4. `onBulkMine` is sequential on purpose and clears the selection
+  after the write so a second click cannot overwrite the only recovery path — both are commented
+  and both are right.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D420 | files — rail counts | **You mine 141 cards and the counter on the same screen still says 4.** The receipt says *"1 of 1 items added 141 cards"* while the rail three inches away reads `Mined cards 4` and `Everything 43,686`. Only a manual **Refresh** reconciles them. | Controlled, one item, ground truth read from the store rather than the UI. Before: `jp-flashcard-deck` **4 cards**, rail `Mined cards 4`. Mine one `.vtt` → store **145** (+141), rail **still `Mined cards 4`**. Click `Refresh` → rail `Mined cards 145`, `Everything 43,686 → 43,827` (+141, reconciles). So the index is assembled once and nothing re-enumerates it after the surface's **own** write. | P3 | **open.** Distinct from D314, which was the *cold open*; this is a stale count *after an action inside the surface*. The fix is to re-enumerate after a mine completes, the same way `Refresh` already does — small, but it belongs with D421 below, because fixing the refresh without fixing the predicate makes `Text not yet mined` visibly *wrong* rather than merely stale. |
+| D421 | files — "Text not yet mined" | **The saved search that exists to show you what you have not mined yet can never shrink.** Mine every subtitle, transcript and book in the library and it still reads `Text not yet mined 98`. It counted 98 before mining 141 cards out of it and 98 after, and 98 after a Refresh that correctly moved every other number on the rail. | `preset:unmined-text` is `{ kinds: ['subtitle','transcript','book'], flags: { mined: false } }` (`shared/filesApp/smartFolders.ts:117`). **`flags.mined` is written in exactly two places in the whole tree**, `rendererEnumerators.ts:210` and `:236`, and **both are about deck cards** — every row in the deck store is `mined: true`, and a deck folder is `mined: bucket.count > 0`. Nothing anywhere sets `mined` on a `subtitle`, `transcript` or `book`. `matchesSmartCriteria` compares `Boolean(item.flags[name]) === wanted`, and `flags` is sparse, so for all three kinds the flag is `undefined` → `false` → **matches, always, on every profile, forever.** This is D418's shape exactly: a predicate whose vocabulary is written by one half of the app and read by the other. | P2 | **open — the fix is named and is not multi-turn.** `deriveCrossStoreFlags` (`shared/filesApp/catalog.ts:417`) is already the designated place and already does this for `transcribed`; its own comment states the principle this violates — *"absent, not false, because 'we could not tell' and 'not transcribed' are different answers."* The link is exact and invertible: `mineBookIdFor(item)` is **`files:${item.id}`** (`shared/filesApp/mining.ts:238`), so a deck card with `bookId === 'files:' + item.id` proves that item was mined. Needs the card's `bookId` carried onto the `mined-card` `FilesItem` (the enumerator currently keeps only `location.pointer = card.id`), then one pass in `deriveCrossStoreFlags`. **Leave the flag absent, not `false`, for anything unmatched** — the transcript precedent, and the reason it must not be widened. |
+
+**The negative control, and it is what makes D421 a defect rather than a design choice.** The very
+same mechanism works for the neighbouring pair: `Untranscribed videos **79**` + `Transcribed
+videos **2**` = `Video **81**`, and it discriminates because `transcribed` really is written onto
+video items — `main/filesApp/enumerators.ts:385`/`:403` and the `deriveCrossStoreFlags` pass at
+`catalog.ts:434`. Mining has the identical shape, the identical fix site, and no writer.
+
+**A trap that cost two calls and is general.** `os:open`'s `detail` is a **bare section string**
+(`filesAppScope.ts:9` says so in as many words). Dispatching
+`new CustomEvent('os:open', { detail: { section: 'files' } })` returns cleanly, reports nothing
+wrong, and opens **nothing** — the surface simply never appears and the probe reads the desk it
+already had. Pass `detail: 'files'`.
+
+**Also cleared, so it is not re-derived:** every count on the rail reconciles *after* a Refresh
+(`Everything` moved by exactly the number of cards added); the mine refusal copy names the item
+and the reason rather than failing generically; and `filesMineChain` distinguishes *"nothing was
+Japanese"* from *"everything was already mined"* with two separate reason keys, which is the
+honest split and should be kept.
