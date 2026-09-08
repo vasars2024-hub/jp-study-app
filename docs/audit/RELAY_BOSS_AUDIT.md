@@ -309,3 +309,33 @@ Findings:
 Plans and ledgers cross-examined last: Main V1 plan/evidence remain explicit that gate 11 clauses 2-3 lack proof; no completion reversal is invented. The pre-sweep register marks YouTube partial and D318 open, and records D319/D322 fixed. Fresh Scraper observations support the latter two; fresh metadata-field counts support D318. The previous boss handoff's A6-F1 has a subsequent D121 repair record and corresponding popout-aria change in this window, but this audit did not repeat every live popout property and therefore does not close it anew. Anki Workbench-specific plan deep dive is skipped because no Workbench-specific product commit was selected/identified in this window; Blanc/Aero authoritative acceptance and whole-host controls remain incomplete, not passed from docs.
 
 Handoff: Next normal worker's first action is reproduce and fix F1 before continuing the product ladder; then add real timer lifecycle coverage for F2 and resolve F3's evidence provenance. Audit retry must continue this same unique marker section, obtain fresh main-process focusability/transparency/input/move/resize evidence through an authorized bridge capability, complete every affected surface's reachability and reverse/geometry cells, finish per-product hunk/integration hygiene review, and derive a fresh pre-window failure identity baseline. Do not claim FINDINGS/PASS from the 56-test run or the two successful Scraper flows alone. Required evidence gaps, rather than lack of actionable findings, are why this attempt is BLOCKED. Temporary evidence and both clean audit checkouts are intentionally retained for retry; no audit-created development service remains running. Only this unique audit section is staged for a local ledger commit. The index blob is constructed from the prior HEAD ledger plus this section, preserving all foreign working-tree ledger hunks unstaged; the committed hunk and unchanged shared-file bytes are verified after commit.
+
+### Worker response to audit-20260908-004413-4bbf3625 — 2026-09-08, primary2 (not an audit result)
+
+This is the normal worker's reply to that section's handoff ("reproduce and fix F1 before
+continuing the product ladder; then add real timer lifecycle coverage for F2 and resolve F3's
+evidence provenance"), recorded here so a retry does not re-derive closed work. It does not
+change that attempt's `Result: BLOCKED`, and the live-evidence gaps it lists are untouched.
+
+- **F1 (P0) — FIXED, `0691b761`.** Reproduced independently: a scripted provider parked inside
+  its call, a concurrent write, then release. `commitStore()` is now the only write path for
+  anything that awaits — it re-reads at commit time and applies a synchronous mutator, and a
+  mutator returning `null` aborts the write so an in-flight response cannot resurrect a deleted
+  playlist. `syncPlaylistFromUrl` split into `fetchPlaylist` (network, holds no store) and
+  `applyPlaylistSync` (sync, inside the commit, re-resolving the playlist **by id**). Applied to
+  **all eight** windows, not the timer alone, per the audit's own "do not merely guard
+  timer-versus-timer overlap". Mutation control: restoring the one-snapshot sweep turns 3 of 10
+  red; the positive control stays green.
+- **F2 (P2) — FIXED, `0691b761`.** Five fake-timer lifecycle cases. The finding was reproduced
+  side by side before fixing: with `startYtAutoUpdateTimer`'s body emptied the new suite turns
+  4 of 10 red while `ytAutoUpdateClock.test.ts` still reports **14/14 passed**, exactly as the
+  audit predicted.
+- **F3 (P3) — RESOLVED, `0691b761`.** `catalogDuplicateKeys.test.ts` committed, so the citation
+  in `3fa7052c` is now true. Kept rather than de-cited because it is a real gate: a source scan
+  across the per-language catalogs **and** the six module catalogs they spread, with its own
+  non-vacuity floor. Mutation control: a planted cross-file duplicate turns it red naming both
+  file:line sites.
+- All three also filed as user-facing register rows **D334, D335, D336**.
+- **Untouched, and still owed by a retry:** the main-process focusability/transparency/input and
+  move/resize/geometry evidence, the per-surface reachability cells, per-product hunk review, and
+  a fresh pre-window failure baseline. Nothing here closes any of that.
