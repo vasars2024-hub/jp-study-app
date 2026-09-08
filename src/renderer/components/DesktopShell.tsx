@@ -2789,10 +2789,16 @@ export default function DesktopShell({
         // `desktop-on-another-display` whenever the desktop you clicked is
         // already being shown on a second monitor. It used to reach a
         // `console.error` and nothing else, so the button read as dead (D151).
+        // `showOsToast` defaults to `kind = 'ok'`, so an unqualified call draws
+        // the success edge and is announced politely. A refusal is a `warn` and
+        // a genuine failure is an `err`; the two share this call site but not
+        // their severity.
+        const refused = res.error === 'desktop-on-another-display';
         showOsToast(
-          res.error === 'desktop-on-another-display'
+          refused
             ? t('desktop.switch.onAnotherDisplay', { desktop: t('desktop.desktopN', { n: target + 1 }) })
             : t('desktop.switch.failed', { desktop: t('desktop.desktopN', { n: target + 1 }) }),
+          refused ? 'warn' : 'err',
         );
         hydrating.current = false;
         return;
@@ -2804,7 +2810,10 @@ export default function DesktopShell({
       // own label — "City" for index 1 — and telling a user who clicked
       // "Desktop 2" about "City" names something they cannot see. Measured live
       // before this line was written.
-      showOsToast(t('desktop.switch.failed', { desktop: t('desktop.desktopN', { n: target + 1 }) }));
+      showOsToast(
+        t('desktop.switch.failed', { desktop: t('desktop.desktopN', { n: target + 1 }) }),
+        'err',
+      );
       hydrating.current = false;
     }
   };
@@ -2827,12 +2836,14 @@ export default function DesktopShell({
     try {
       const res = await window.api.deskwinAllocateDesktop();
       if (!res.ok || typeof res.desktopIndex !== 'number') {
-        showOsToast(t('desktop.tearOff.noneFree'));
+        // Same shape as the switch toasts above: no free desktop is a refusal
+        // the user can act on, the thrown case is a failure.
+        showOsToast(t('desktop.tearOff.noneFree'), 'warn');
         return;
       }
       target = res.desktopIndex;
     } catch {
-      showOsToast(t('desktop.tearOff.failed'));
+      showOsToast(t('desktop.tearOff.failed'), 'err');
       return;
     }
 
@@ -2849,7 +2860,7 @@ export default function DesktopShell({
       await window.api.deskwinOpenDesktop(target);
     } catch (err) {
       console.error('[desktopState] tear-off failed:', err);
-      showOsToast(t('desktop.tearOff.failed'));
+      showOsToast(t('desktop.tearOff.failed'), 'err');
     }
   };
 
@@ -3549,7 +3560,7 @@ export default function DesktopShell({
                 // monitor-ring route uses, and it says so when it still fails.
                 onClick={() => {
                   void focusOrOpenDesktop(desktopIndex).then((ok) => {
-                    if (!ok) showOsToast(t('desktop.switch.failed', { desktop: desktopName }));
+                    if (!ok) showOsToast(t('desktop.switch.failed', { desktop: desktopName }), 'err');
                   });
                 }}
               >

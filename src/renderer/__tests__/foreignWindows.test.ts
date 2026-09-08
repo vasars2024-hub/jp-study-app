@@ -220,6 +220,43 @@ describe('every desktop-showing route opens when nothing is showing it', () => {
     expect(shell).toContain("t('desktop.switch.failed'");
   });
 
+  /**
+   * Boss-audit F4 (2026-09-08). The two assertions above are satisfied by the
+   * KEY being referenced, which is exactly what let three failure toasts ship
+   * announcing themselves as successes: `showOsToast` defaults to `kind = 'ok'`,
+   * so an unqualified call draws the success edge and is queued politely behind
+   * whatever the screen reader was already saying.
+   *
+   * This reads the calls rather than the keys, and it generalises — a NEW
+   * unqualified call site fails it too, which a list of three line numbers
+   * would not.
+   */
+  it('every toast in the shell states its severity instead of defaulting to ok', async () => {
+    const fs = await import('node:fs');
+    const shell = fs.readFileSync('src/renderer/components/DesktopShell.tsx', 'utf8');
+
+    const calls: Array<{ line: number; text: string }> = [];
+    const needle = 'showOsToast(';
+    for (let i = shell.indexOf(needle); i !== -1; i = shell.indexOf(needle, i + 1)) {
+      let depth = 0;
+      let end = i + needle.length - 1;
+      for (; end < shell.length; end++) {
+        if (shell[end] === '(') depth++;
+        else if (shell[end] === ')' && --depth === 0) break;
+      }
+      calls.push({ line: shell.slice(0, i).split('\n').length, text: shell.slice(i, end + 1) });
+    }
+
+    // Guards the scanner itself: if the extraction breaks, this fails loudly
+    // rather than reporting a clean sweep over nothing.
+    expect(calls.length).toBeGreaterThanOrEqual(7);
+
+    const unqualified = calls
+      .filter((c) => !/'(ok|muted|warn|warning|err|error)'/.test(c.text))
+      .map((c) => `${c.line}: ${c.text.split('\n')[0]}`);
+    expect(unqualified).toEqual([]);
+  });
+
   it('steps the keyboard shortcut through the same ring the switcher shows', async () => {
     const fs = await import('node:fs');
     const shell = fs.readFileSync('src/renderer/components/DesktopShell.tsx', 'utf8');
