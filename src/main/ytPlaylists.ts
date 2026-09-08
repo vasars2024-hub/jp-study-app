@@ -144,6 +144,30 @@ function saveAndBroadcast(store: YtPlaylistsStore): YtPlaylistsStore {
   return normalized;
 }
 
+/**
+ * The only write path for anything that awaits.
+ *
+ * `writeStore` persists the WHOLE store, so a caller that read a snapshot,
+ * awaited a provider and then wrote that snapshot back reverted every unrelated
+ * write made while it ran — a saved folder, an `autoUpdate` the user turned off,
+ * a playlist they removed. A yt-dlp sweep is minutes long and the background
+ * auto-update timer runs one unattended, so that window is wide and the loss is
+ * silent. Mutations therefore run against the store as it is on disk at commit
+ * time; the mutator is synchronous, so nothing can interleave with it.
+ *
+ * Returning `null` aborts the commit and writes nothing — that is how a caller
+ * says "the thing I was working on is gone, and a response already in flight
+ * must not resurrect it".
+ */
+function commitStore(
+  mutate: (store: YtPlaylistsStore) => YtPlaylistsStore | null | void,
+): YtPlaylistsStore {
+  const fresh = readStore();
+  const next = mutate(fresh);
+  if (next === null) return fresh;
+  return saveAndBroadcast(next ?? fresh);
+}
+
 function touchChannelFromPlaylist(store: YtPlaylistsStore, playlist: YtPlaylist): YtPlaylistsStore {
   return ensureTrackedChannel(store, playlist);
 }
@@ -221,11 +245,17 @@ function mapFlatEntries(data: unknown): {
   return { title, channelTitle, youtubePlaylistId, entries };
 }
 
-async function syncPlaylistFromUrl(
-  store: YtPlaylistsStore,
-  url: string,
-  existing?: YtPlaylist,
-): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> {
+interface PlaylistFetch {
+  listId: string;
+  url: string;
+  mapped: ReturnType<typeof mapFlatEntries>;
+}
+
+/**
+ * The network half of a playlist sync. It touches no store, which is the whole
+ * point: awaiting it cannot strand a stale snapshot.
+ */
+async function fetchPlaylist(url: string): Promise<PlaylistFetch | { error: string }> {
   const listId = parseYoutubePlaylistId(url);
   if (!listId) return { error: 'Not a valid YouTube playlist URL (missing list=…).' };
 
@@ -238,15 +268,39 @@ async function syncPlaylistFromUrl(
     url.trim(),
   ]);
   if (!result.ok) return { error: result.error };
+  return { listId, url: url.trim(), mapped: mapFlatEntries(result.data) };
+}
 
-  const mapped = mapFlatEntries(result.data);
+/**
+ * The store half, deliberately synchronous so it can run inside `commitStore`
+ * against a freshly-read store. The playlist is re-resolved BY ID here rather
+ * than carried across the await as an object — that is what makes a mid-sync
+ * `autoUpdate: false` or a rename survive, since `{ ...existing }` then spreads
+ * the user's current values and not the ones from before the fetch.
+ *
+ * Returns null when an `existingId` no longer resolves: the user removed the
+ * playlist while its response was in flight, and a delete must stay deleted.
+ */
+function applyPlaylistSync(
+  store: YtPlaylistsStore,
+  fetched: PlaylistFetch,
+  existingId?: string,
+): { store: YtPlaylistsStore; playlist: YtPlaylist } | null {
+  const { mapped, listId } = fetched;
+  const url = fetched.url;
+  const resolvedYoutubeId = mapped.youtubePlaylistId || listId;
+  const existing = existingId
+    ? store.playlists.find((p) => p.id === existingId)
+    : store.playlists.find((p) => p.youtubePlaylistId === resolvedYoutubeId);
+  if (existingId && !existing) return null;
+
   const playlistId = existing?.id ?? crypto.randomUUID();
   const playlist: YtPlaylist = existing
     ? {
         ...existing,
         title: mapped.title || existing.title,
-        url: url.trim(),
-        youtubePlaylistId: mapped.youtubePlaylistId || listId,
+        url,
+        youtubePlaylistId: resolvedYoutubeId,
         channelTitle: mapped.channelTitle ?? existing.channelTitle,
         lastSyncedAt: Date.now(),
         lastCheckedAt: Date.now(),
@@ -254,8 +308,8 @@ async function syncPlaylistFromUrl(
     : {
         id: playlistId,
         title: mapped.title || 'Playlist',
-        url: url.trim(),
-        youtubePlaylistId: mapped.youtubePlaylistId || listId,
+        url,
+        youtubePlaylistId: resolvedYoutubeId,
         channelTitle: mapped.channelTitle,
         subscriptionStatus: 'subscribed',
         lang: 'ja',
@@ -276,16 +330,32 @@ async function syncPlaylistFromUrl(
   }
 
   if (existing) {
+    // Upsert by youtube playlist id: when no `existingId` was given, `existing`
+    // is already the duplicate this url resolves to, so there is nothing to add.
     store.playlists = store.playlists.map((p) => (p.id === playlistId ? playlist : p));
   } else {
-    // Upsert by youtube playlist id
-    const dup = store.playlists.find((p) => p.youtubePlaylistId === playlist.youtubePlaylistId);
-    if (dup) {
-      return syncPlaylistFromUrl(store, url, dup);
-    }
     store.playlists.unshift(playlist);
   }
   return { store: touchChannelFromPlaylist(store, playlist), playlist };
+}
+
+/**
+ * Fetch a playlist and commit it: the network call holds no snapshot, and the
+ * apply runs against the store as it is when the response lands.
+ */
+async function syncAndCommit(
+  url: string,
+  existingId?: string,
+): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> {
+  const fetched = await fetchPlaylist(url);
+  if ('error' in fetched) return fetched;
+  let synced: { store: YtPlaylistsStore; playlist: YtPlaylist } | null = null;
+  const store = commitStore((fresh) => {
+    synced = applyPlaylistSync(fresh, fetched, existingId);
+    return synced ? synced.store : null;
+  });
+  if (!synced) return { error: 'That playlist was removed while it was syncing.' };
+  return { store, playlist: (synced as { playlist: YtPlaylist }).playlist };
 }
 
 function preferSubsToDownloadOptions(preferSubs: YtSubLang[]): YouTubeDownloadOptions {
@@ -314,17 +384,19 @@ export async function downloadVideosByIds(
   store: YtPlaylistsStore;
   results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
 }> {
-  const store = readStore();
   const results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }> = [];
   const ids = Array.isArray(videoIds) ? videoIds : [];
   for (let i = 0; i < ids.length; i++) {
     const videoId = ids[i];
-    const video = store.videos.find((v) => v.id === videoId);
+    // Re-read per video: a download of twenty is long, and the nineteenth must
+    // be planned against the library as it is now, not as it was at the start.
+    const snapshot = readStore();
+    const video = snapshot.videos.find((v) => v.id === videoId);
     if (!video) {
       results.push({ videoId, ok: false, error: 'Video not found.' });
       continue;
     }
-    const pl = store.playlists.find((p) => p.id === video.playlistId);
+    const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
     const opts = preferSubsToDownloadOptions(pl?.preferSubs ?? ['ja']);
     if (downloadOpts?.audioOnly === true) opts.audioOnly = true;
     if (downloadOpts?.allSubs === true) opts.allSubs = true;
@@ -348,14 +420,20 @@ export async function downloadVideosByIds(
       results.push({ videoId, ok: false, error: result.error });
       continue;
     }
-    video.downloaded = true;
-    video.mediaItemId = result.item.id;
-    video.hasOfficialSubs = Boolean(result.subtitle);
-    video.loggedAt = video.loggedAt ?? Date.now();
+    commitStore((fresh) => {
+      const target = fresh.videos.find((v) => v.id === videoId);
+      // Removed while it downloaded. The file on disk is the user's to keep;
+      // the row is not coming back.
+      if (!target) return null;
+      target.downloaded = true;
+      target.mediaItemId = result.item.id;
+      target.hasOfficialSubs = Boolean(result.subtitle);
+      target.loggedAt = target.loggedAt ?? Date.now();
+      return fresh;
+    });
     results.push({ videoId, ok: true, mediaItemId: result.item.id });
   }
-  saveAndBroadcast(store);
-  return { store, results };
+  return { store: readStore(), results };
 }
 
 async function fetchSubsOnly(
@@ -403,10 +481,8 @@ async function fetchSubsOnly(
 
 /** Used by extension bridge. */
 export async function addPlaylistByUrl(url: string): Promise<{ ok: true; playlistId: string } | { ok: false; error: string }> {
-  const store = readStore();
-  const result = await syncPlaylistFromUrl(store, url);
+  const result = await syncAndCommit(url);
   if ('error' in result) return { ok: false, error: result.error };
-  saveAndBroadcast(result.store);
   return { ok: true, playlistId: result.playlist.id };
 }
 
@@ -428,6 +504,30 @@ function needsMetadataRefetch(video: YtVideo): boolean {
   return video.title === video.youtubeId && video.durationSec === undefined;
 }
 
+/** Find the Extension captures playlist in the given store, creating it if absent. */
+function ensureExtensionPlaylist(store: YtPlaylistsStore): YtPlaylist {
+  const found = store.playlists.find((p) => p.youtubePlaylistId === EXTENSION_PLAYLIST_KEY);
+  if (found) return found;
+  const created: YtPlaylist = {
+    id: crypto.randomUUID(),
+    title: 'Extension',
+    url: 'extension://captures',
+    youtubePlaylistId: EXTENSION_PLAYLIST_KEY,
+    channelTitle: 'Chrome extension',
+    subscriptionStatus: 'custom',
+    lang: 'ja',
+    preferSubs: ['ja', 'en'],
+    autoUpdate: false,
+    lastSyncedAt: Date.now(),
+    lastCheckedAt: Date.now(),
+    updateFrequencyHours: DEFAULT_AUTO_UPDATE_HOURS,
+    sortDefault: 'date',
+    createdAt: Date.now(),
+  };
+  store.playlists.unshift(created);
+  return created;
+}
+
 export async function addVideoByUrl(
   url: string,
 ): Promise<
@@ -439,36 +539,27 @@ export async function addVideoByUrl(
   const youtubeId = parseYoutubeVideoId(trimmed);
   if (!youtubeId) return { ok: false, error: 'Not a valid YouTube video URL.' };
 
-  let store = readStore();
-  let pl = store.playlists.find((p) => p.youtubePlaylistId === EXTENSION_PLAYLIST_KEY);
-  if (!pl) {
-    pl = {
-      id: crypto.randomUUID(),
-      title: 'Extension',
-      url: 'extension://captures',
-      youtubePlaylistId: EXTENSION_PLAYLIST_KEY,
-      channelTitle: 'Chrome extension',
-      subscriptionStatus: 'custom',
-      lang: 'ja',
-      preferSubs: ['ja', 'en'],
-      autoUpdate: false,
-      lastSyncedAt: Date.now(),
-      lastCheckedAt: Date.now(),
-      updateFrequencyHours: DEFAULT_AUTO_UPDATE_HOURS,
-      sortDefault: 'date',
-      createdAt: Date.now(),
-    };
-    store.playlists.unshift(pl);
-  }
-
-  const playlistIdResolved = pl.id;
-  const existing = store.videos.find((v) => v.playlistId === playlistIdResolved && v.youtubeId === youtubeId);
-  if (existing && !needsMetadataRefetch(existing)) {
-    saveAndBroadcast(store);
-    return { ok: true, playlistId: playlistIdResolved, videoId: existing.id, youtubeId, duplicate: true };
+  // Phase 1, synchronous: make sure the Extension playlist exists and decide
+  // whether this capture is already complete. Committed before the fetch so the
+  // early-return answers with a persisted playlist id.
+  let earlyHit: { playlistId: string; videoId: string } | null = null;
+  let playlistIdResolved = '';
+  commitStore((store) => {
+    const pl = ensureExtensionPlaylist(store);
+    playlistIdResolved = pl.id;
+    const existing = store.videos.find((v) => v.playlistId === pl.id && v.youtubeId === youtubeId);
+    if (existing && !needsMetadataRefetch(existing)) {
+      earlyHit = { playlistId: pl.id, videoId: existing.id };
+    }
+    return store;
+  });
+  if (earlyHit) {
+    const hit = earlyHit as { playlistId: string; videoId: string };
+    return { ok: true, playlistId: hit.playlistId, videoId: hit.videoId, youtubeId, duplicate: true };
   }
 
   let title = youtubeId;
+  let channelId: string | undefined;
   let channelTitle: string | undefined;
   let durationSec: number | undefined;
   let viewCount: number | undefined;
@@ -480,7 +571,7 @@ export async function addVideoByUrl(
     const root = meta.data as Record<string, unknown>;
     if (typeof root.title === 'string' && root.title) title = root.title;
     if (typeof root.channel_id === 'string' && root.channel_id) {
-      pl.channelId = root.channel_id;
+      channelId = root.channel_id;
     }
     channelTitle =
       (typeof root.channel === 'string' && root.channel) ||
@@ -496,46 +587,61 @@ export async function addVideoByUrl(
     }
   }
 
-  if (existing) {
-    // Second visit to a row this function stored hollow the first time, because
-    // yt-dlp did not answer. Patch what we now know and leave the rest alone —
-    // the id, the position and any `downloaded`/`transcribed` progress the user
-    // has since earned on it all stay.
-    existing.title = title;
-    existing.thumbUrl = thumbUrl;
-    if (durationSec !== undefined) existing.durationSec = durationSec;
-    if (viewCount !== undefined) existing.viewCount = viewCount;
-    if (channelTitle) existing.channelTitle = channelTitle;
-    if (publishedAt !== undefined) existing.publishedAt = publishedAt;
+  // Phase 3: commit against the store as it is now, not as it was before the
+  // fetch. The playlist and the row are both re-resolved here — the capture may
+  // have arrived a second time, or the user may have cleared the playlist.
+  let landed: { videoId: string; duplicate: boolean } | null = null;
+  commitStore((store) => {
+    const pl = ensureExtensionPlaylist(store);
+    playlistIdResolved = pl.id;
+    if (channelId) pl.channelId = channelId;
+    const existing = store.videos.find((v) => v.playlistId === pl.id && v.youtubeId === youtubeId);
+    if (existing) {
+      // Second visit to a row this function stored hollow the first time,
+      // because yt-dlp did not answer. Patch what we now know and leave the rest
+      // alone — the id, the position and any `downloaded`/`transcribed` progress
+      // the user has since earned on it all stay.
+      existing.title = title;
+      existing.thumbUrl = thumbUrl;
+      if (durationSec !== undefined) existing.durationSec = durationSec;
+      if (viewCount !== undefined) existing.viewCount = viewCount;
+      if (channelTitle) existing.channelTitle = channelTitle;
+      if (publishedAt !== undefined) existing.publishedAt = publishedAt;
+      if (channelTitle) pl.channelTitle = channelTitle;
+      landed = { videoId: existing.id, duplicate: true };
+      return touchChannelFromPlaylist(store, pl);
+    }
+    const video: YtVideo = {
+      id: `ytv-${pl.id}-${youtubeId}`,
+      playlistId: pl.id,
+      youtubeId,
+      title,
+      url: youtubeWatchUrl(youtubeId),
+      thumbUrl,
+      durationSec,
+      viewCount,
+      channelTitle,
+      position: store.videos.filter((v) => v.playlistId === pl.id).length,
+      publishedAt,
+      downloaded: false,
+      hasOfficialSubs: null,
+      transcribed: false,
+    };
+    store.videos.push(video);
+    pl.lastSyncedAt = Date.now();
+    pl.lastCheckedAt = Date.now();
     if (channelTitle) pl.channelTitle = channelTitle;
-    store = touchChannelFromPlaylist(store, pl);
-    saveAndBroadcast(store);
-    return { ok: true, playlistId: playlistIdResolved, videoId: existing.id, youtubeId, duplicate: true };
-  }
-
-  const video: YtVideo = {
-    id: `ytv-${playlistIdResolved}-${youtubeId}`,
+    landed = { videoId: video.id, duplicate: false };
+    return touchChannelFromPlaylist(store, pl);
+  });
+  const out = landed as unknown as { videoId: string; duplicate: boolean };
+  return {
+    ok: true,
     playlistId: playlistIdResolved,
+    videoId: out.videoId,
     youtubeId,
-    title,
-    url: youtubeWatchUrl(youtubeId),
-    thumbUrl,
-    durationSec,
-    viewCount,
-    channelTitle,
-    position: store.videos.filter((v) => v.playlistId === playlistIdResolved).length,
-    publishedAt,
-    downloaded: false,
-    hasOfficialSubs: null,
-    transcribed: false,
+    ...(out.duplicate ? { duplicate: true } : {}),
   };
-  store.videos.push(video);
-  pl.lastSyncedAt = Date.now();
-  pl.lastCheckedAt = Date.now();
-  if (channelTitle) pl.channelTitle = channelTitle;
-  store = touchChannelFromPlaylist(store, pl);
-  saveAndBroadcast(store);
-  return { ok: true, playlistId: playlistIdResolved, videoId: video.id, youtubeId };
 }
 
 const AUTO_UPDATE_TICK_MS = 60 * 60 * 1000;
@@ -566,11 +672,22 @@ export async function runAutoUpdateDue(): Promise<YtPlaylistsStore> {
   const due = store.playlists.filter(
     (p) => isImmersionPlaylist(p) && p.autoUpdate && isDue(p.lastCheckedAt, p.updateFrequencyHours, now),
   );
+  // Each playlist commits on its own. Holding one snapshot across the whole
+  // sweep is what made this unattended timer revert the user's work: a sweep of
+  // twenty playlists is minutes long, and everything they saved in that window
+  // was overwritten by the state from before it started.
   for (const pl of due) {
-    const result = await syncPlaylistFromUrl(store, pl.url, pl);
-    if (!('error' in result)) store = result.store;
+    const fetched = await fetchPlaylist(pl.url);
+    if ('error' in fetched) continue;
+    store = commitStore((fresh) => {
+      const current = fresh.playlists.find((p) => p.id === pl.id);
+      // Removed, or auto-update switched off, while this response was in
+      // flight. Either way the user has spoken more recently than the sweep.
+      if (!current || !current.autoUpdate) return null;
+      const applied = applyPlaylistSync(fresh, fetched, pl.id);
+      return applied ? applied.store : null;
+    });
   }
-  if (due.length) saveAndBroadcast(store);
   return store;
 }
 
@@ -646,11 +763,8 @@ export function registerYtPlaylistsIpc(): void {
   });
 
   ipcMain.handle('yt:addPlaylist', async (_e, url: string) => {
-    const store = readStore();
-    const result = await syncPlaylistFromUrl(store, typeof url === 'string' ? url : '');
+    const result = await syncAndCommit(typeof url === 'string' ? url : '');
     if ('error' in result) return { error: result.error };
-    result.store = touchChannelFromPlaylist(result.store, result.playlist);
-    saveAndBroadcast(result.store);
     return { store: result.store, playlist: result.playlist };
   });
 
@@ -681,13 +795,10 @@ export function registerYtPlaylistsIpc(): void {
   });
 
   ipcMain.handle('yt:refreshPlaylist', async (_e, playlistId: string) => {
-    const store = readStore();
-    const pl = store.playlists.find((p) => p.id === playlistId);
+    const pl = readStore().playlists.find((p) => p.id === playlistId);
     if (!pl) return { error: 'Playlist not found.' };
-    const result = await syncPlaylistFromUrl(store, pl.url, pl);
+    const result = await syncAndCommit(pl.url, pl.id);
     if ('error' in result) return { error: result.error };
-    result.store = touchChannelFromPlaylist(result.store, result.playlist);
-    saveAndBroadcast(result.store);
     return { store: result.store, playlist: result.playlist };
   });
 
@@ -816,7 +927,7 @@ export function registerYtPlaylistsIpc(): void {
       const refreshedPlaylistIds: string[] = [];
       const errors: string[] = [];
       for (const pl of targets) {
-        const result = await syncPlaylistFromUrl(store, pl.url, pl);
+        const result = await syncAndCommit(pl.url, pl.id);
         if ('error' in result) {
           errors.push(result.error);
           continue;
@@ -824,13 +935,19 @@ export function registerYtPlaylistsIpc(): void {
         store = result.store;
         refreshedPlaylistIds.push(pl.id);
       }
-      // A sync that failed is not a check. `syncPlaylistFromUrl` already stamps
+      // A sync that failed is not a check. `applyPlaylistSync` already stamps
       // `lastCheckedAt` on each playlist it actually refreshed; stamping the rest
       // here made `yt:autoUpdateDue` skip them for a whole `updateFrequencyHours`
       // window on the strength of a request that never answered.
+      if (!errors.length) {
+        store = commitStore((fresh) => {
+          const nextChannel = fresh.channels.find((c) => c.channelId === channelId);
+          if (!nextChannel) return null;
+          nextChannel.lastCheckedAt = Date.now();
+          return fresh;
+        });
+      }
       const nextChannel = store.channels.find((c) => c.channelId === channelId);
-      if (nextChannel && !errors.length) nextChannel.lastCheckedAt = Date.now();
-      saveAndBroadcast(store);
       return { store, channel: nextChannel ?? channel, refreshedPlaylistIds, errors };
     },
   );
@@ -857,26 +974,30 @@ export function registerYtPlaylistsIpc(): void {
       _e,
       videoIds: string[],
     ): Promise<{ store: YtPlaylistsStore; results: Array<{ videoId: string; ok: boolean; error?: string }> }> => {
-      const store = readStore();
       const results: Array<{ videoId: string; ok: boolean; error?: string }> = [];
       for (const videoId of Array.isArray(videoIds) ? videoIds : []) {
-        const video = store.videos.find((v) => v.id === videoId);
+        const snapshot = readStore();
+        const video = snapshot.videos.find((v) => v.id === videoId);
         if (!video) {
           results.push({ videoId, ok: false, error: 'Video not found.' });
           continue;
         }
-        const pl = store.playlists.find((p) => p.id === video.playlistId);
+        const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
         const out = await fetchSubsOnly(video.youtubeId, video.url, pl?.preferSubs ?? ['ja']);
         if (!out.ok) {
           results.push({ videoId, ok: false, error: out.error });
           continue;
         }
-        video.hasOfficialSubs = out.hasSubs;
-        video.loggedAt = video.loggedAt ?? Date.now();
+        commitStore((fresh) => {
+          const target = fresh.videos.find((v) => v.id === videoId);
+          if (!target) return null;
+          target.hasOfficialSubs = out.hasSubs;
+          target.loggedAt = target.loggedAt ?? Date.now();
+          return fresh;
+        });
         results.push({ videoId, ok: true });
       }
-      saveAndBroadcast(store);
-      return { store, results };
+      return { store: readStore(), results };
     },
   );
 
@@ -934,15 +1055,17 @@ export function registerYtPlaylistsIpc(): void {
         } catch {
           /* window may be gone */
         }
-        const result = await syncPlaylistFromUrl(store, pl.url, pl);
+        const result = await syncAndCommit(pl.url, pl.id);
         if ('error' in result) {
           errors.push({ playlistId: pl.id, title: pl.title, error: result.error });
         } else {
           store = result.store;
         }
       }
-      store.lastNewsCheckedAt = Date.now();
-      saveAndBroadcast(store);
+      store = commitStore((fresh) => {
+        fresh.lastNewsCheckedAt = Date.now();
+        return fresh;
+      });
       const newVideoIds = diffNewVideos(store, since).map((v) => v.id);
       try {
         sender.send('yt:refreshProgress', {
