@@ -27,13 +27,17 @@ const VERDICT_KEY: Record<AgentPipelineVerdict, string> = {
  * It is a read-out, not a control surface: nothing here can re-run or alter a
  * step. Every action the Agent can take remains available by hand in its own
  * panel, so this view never becomes the only route to something.
+ *
+ * That sentence used to sit above an optional `onClear` and a Clear button. No
+ * call site ever passed the prop, so the button had never rendered and its four
+ * translations were dead — and wiring it would have contradicted the paragraph
+ * above, since a read-out you can erase is not one. It was removed rather than
+ * connected.
  */
 export function AgentPipelineTerminal({
   lines,
-  onClear,
 }: {
   lines: readonly AgentPipelineLine[];
-  onClear?: () => void;
 }) {
   const { t } = useT();
   const tailRef = useRef<HTMLDivElement>(null);
@@ -57,11 +61,6 @@ export function AgentPipelineTerminal({
     >
       <div className="ai-studio-log-toolbar">
         <p className="muted collapse-lead">{t('agent.pipeline.lead')}</p>
-        {lines.length > 0 && onClear && (
-          <button className="btn" type="button" onClick={onClear}>
-            {t('agent.pipeline.clear')}
-          </button>
-        )}
       </div>
 
       {flagged && (

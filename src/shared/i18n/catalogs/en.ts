@@ -8442,11 +8442,11 @@ export const en: Catalog = {
   'agent.capabilities.operation.flashcard.delete-deck': 'Delete a flashcard deck',
   'agent.pipeline.title': 'Pipeline',
   'agent.pipeline.lead':
-    'Every step the Agent ran, what it claimed, and whether that claim was found in your data.',
-  'agent.pipeline.empty': 'No steps yet.',
+    'Every step the Agent has run since this window opened, what it claimed, and whether that '
+    + 'claim was found in your data. Closing the window clears this view.',
+  'agent.pipeline.empty': 'No steps in this window yet.',
   'agent.pipeline.summary.steps': { one: '{count} step', other: '{count} steps' },
   'agent.pipeline.summary.empty': 'Idle',
-  'agent.pipeline.clear': 'Clear',
   'agent.pipeline.failed': 'failed',
   'agent.pipeline.found': 'found {found} of {claimed} {entityType}',
   'agent.pipeline.destination': 'in {place}',

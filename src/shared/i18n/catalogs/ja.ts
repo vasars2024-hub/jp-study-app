@@ -2627,11 +2627,10 @@ export const ja: Catalog = {
   'agent.capabilities.operation.flashcard.delete-deck': 'フラッシュカードデッキを削除',
   'agent.pipeline.title': 'パイプライン',
   'agent.pipeline.lead':
-    'エージェントが実行した各ステップと、その主張が実際のデータで確認できたかどうか。',
-  'agent.pipeline.empty': 'ステップはまだありません。',
+    'このウィンドウを開いてからエージェントが実行した各ステップと、その主張が実際のデータで確認できたかどうか。ウィンドウを閉じるとこの表示は消えます。',
+  'agent.pipeline.empty': 'このウィンドウではまだステップがありません。',
   'agent.pipeline.summary.steps': { other: '{count}ステップ' },
   'agent.pipeline.summary.empty': '待機中',
-  'agent.pipeline.clear': 'クリア',
   'agent.pipeline.failed': '失敗',
   'agent.pipeline.found': '{claimed}件中{found}件の{entityType}を確認',
   'agent.pipeline.destination': '保存先: {place}',

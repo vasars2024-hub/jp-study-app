@@ -2829,8 +2829,9 @@ export const ru: Catalog = {
   'agent.capabilities.operation.flashcard.delete-deck': 'Удалить колоду карточек',
   'agent.pipeline.title': 'Конвейер',
   'agent.pipeline.lead':
-    'Каждый шаг, выполненный агентом, что он заявил и подтвердилось ли это в ваших данных.',
-  'agent.pipeline.empty': 'Шагов пока нет.',
+    'Каждый шаг, выполненный агентом с момента открытия этого окна, что он заявил и '
+    + 'подтвердилось ли это в ваших данных. Закрытие окна очищает этот список.',
+  'agent.pipeline.empty': 'В этом окне шагов пока нет.',
   'agent.pipeline.summary.steps': {
     one: '{count} шаг',
     few: '{count} шага',
@@ -2838,7 +2839,6 @@ export const ru: Catalog = {
     other: '{count} шага',
   },
   'agent.pipeline.summary.empty': 'Ожидание',
-  'agent.pipeline.clear': 'Очистить',
   'agent.pipeline.failed': 'ошибка',
   'agent.pipeline.found': 'найдено {found} из {claimed} ({entityType})',
   'agent.pipeline.destination': 'в «{place}»',
