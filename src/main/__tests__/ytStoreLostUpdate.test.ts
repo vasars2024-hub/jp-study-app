@@ -304,3 +304,87 @@ describe('F2 — the auto-update clock lifecycle', () => {
     expect(ytDlpCalls).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// F3 — an interrupted write must not become an empty library
+// ---------------------------------------------------------------------------
+
+/**
+ * The 2026-09-08 boss audit's third finding, reproduced from its own probe.
+ * `writeStore` persisted the whole store with a bare `writeFileSync`, and
+ * `readStore` answered ANY failure with an empty store — so a file truncated by
+ * a crash mid-write read as "no playlists" and the next ordinary save made that
+ * permanent. Every case here fails on the pre-fix code.
+ */
+describe('F3 — a store that cannot be read is preserved, not overwritten', () => {
+  /** Files sitting next to the store, so quarantine and temp files are visible. */
+  function siblings(suffix: string): string[] {
+    return fs
+      .readdirSync(userDataDir)
+      .filter((f) => f.startsWith('yt-playlists.json') && f.includes(suffix));
+  }
+
+  it('quarantines a truncated store instead of writing an empty one over it', async () => {
+    writeStore({
+      playlists: [playlist({ id: 'p1' }), playlist({ id: 'p2' })],
+      folders: [{ id: 'f1', name: 'Anime', createdAt: 1 }],
+    });
+    const original = fs.readFileSync(storeFile(), 'utf-8');
+    // What a crash part-way through `writeFileSync` leaves behind.
+    fs.writeFileSync(storeFile(), original.slice(0, Math.floor(original.length * 0.6)), 'utf-8');
+
+    await invoke('yt:saveFolder', { id: 'f9', name: 'Later' });
+
+    const quarantined = siblings('.corrupt-');
+    expect(quarantined).toHaveLength(1);
+    // The bytes survive, so the loss is recoverable rather than total.
+    expect(fs.readFileSync(path.join(userDataDir, quarantined[0]), 'utf-8')).toBe(
+      original.slice(0, Math.floor(original.length * 0.6)),
+    );
+  });
+
+  it('quarantines a store whose shape is not recognised but that clearly held content', async () => {
+    fs.writeFileSync(
+      storeFile(),
+      JSON.stringify({ version: 2, playlists: [{ id: 'p1' }], videos: [], folders: [] }),
+      'utf-8',
+    );
+
+    await invoke('yt:saveFolder', { id: 'f9', name: 'Later' });
+
+    expect(siblings('.corrupt-')).toHaveLength(1);
+  });
+
+  it('control — an intact store survives the identical sequence untouched', async () => {
+    writeStore({
+      playlists: [playlist({ id: 'p1' }), playlist({ id: 'p2' })],
+      folders: [{ id: 'f1', name: 'Anime', createdAt: 1 }],
+    });
+
+    await invoke('yt:saveFolder', { id: 'f9', name: 'Later' });
+
+    const after = readStore();
+    expect(after.playlists.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(after.folders.map((f) => f.id).sort()).toEqual(['f1', 'f9']);
+    expect(siblings('.corrupt-')).toHaveLength(0);
+  });
+
+  it('control — an absent store is a normal empty start, not a corruption', async () => {
+    expect(fs.existsSync(storeFile())).toBe(false);
+
+    await invoke('yt:saveFolder', { id: 'f9', name: 'Later' });
+
+    expect(readStore().folders.map((f) => f.id)).toEqual(['f9']);
+    expect(siblings('.corrupt-')).toHaveLength(0);
+  });
+
+  it('leaves no temporary file behind, so the store is never half-written', async () => {
+    writeStore({ playlists: [playlist({ id: 'p1' })] });
+
+    await invoke('yt:saveFolder', { id: 'f9', name: 'Later' });
+
+    expect(siblings('.tmp')).toHaveLength(0);
+    // And the file that IS there parses — the whole point of temp+rename.
+    expect(readStore().playlists.map((p) => p.id)).toEqual(['p1']);
+  });
+});

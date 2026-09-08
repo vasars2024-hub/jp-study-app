@@ -45,6 +45,7 @@ import {
   withYtDlpJsRuntime,
 } from './media';
 import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
+import { errorDetail, logDiagnostic } from './errorLog';
 
 const DEFAULT_AUTO_UPDATE_HOURS = 12;
 
@@ -64,13 +65,81 @@ function transcriptPath(youtubeId: string): string {
   return path.join(transcriptsDir(), `${youtubeId}.json`);
 }
 
-function readStore(): YtPlaylistsStore {
+/**
+ * Move a store we cannot read aside instead of letting the next save overwrite
+ * it. Returns the quarantine path, or null when the rename itself failed —
+ * either way the caller carries on with an empty store, because refusing to
+ * start is worse than starting empty once the bytes are safe.
+ */
+function quarantineStore(reason: string): string | null {
+  const file = storePath();
+  const aside = `${file}.corrupt-${Date.now()}`;
   try {
-    const raw = fs.readFileSync(storePath(), 'utf-8');
-    return normalizeYtStore(JSON.parse(raw));
+    fs.renameSync(file, aside);
   } catch {
+    return null;
+  }
+  logDiagnostic(
+    'error',
+    'youtube',
+    'readStore',
+    `Playlist store was unreadable (${reason}); moved to ${path.basename(aside)} and started empty.`,
+  );
+  return aside;
+}
+
+/**
+ * Read the store, keeping apart three cases that used to collapse into one.
+ *
+ * This used to be `catch { return emptyYtStore(); }`, so a file left truncated
+ * by an interrupted write read as "the user has no playlists" and the very next
+ * ordinary save persisted that emptiness over the only copy — every playlist,
+ * video, folder and subscription gone, silently. Now an absent file is still a
+ * normal empty start, an unparseable one is moved aside so the bytes survive,
+ * and any other I/O failure is raised rather than answered with a blank library
+ * that a later write would make permanent.
+ */
+function readStore(): YtPlaylistsStore {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(storePath(), 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === 'ENOENT') return emptyYtStore();
+    throw err;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    quarantineStore(errorDetail(err));
     return emptyYtStore();
   }
+
+  const store = normalizeYtStore(parsed);
+  // `normalizeYtStore` is a total function: any shape it does not recognise
+  // comes back as an empty store, which is indistinguishable from a genuinely
+  // empty one. Only the raw text can tell them apart, so ask it before
+  // accepting the emptiness.
+  if (isEmptyYtStore(store) && rawClaimsContent(parsed)) {
+    quarantineStore('shape not recognised');
+  }
+  return store;
+}
+
+function isEmptyYtStore(store: YtPlaylistsStore): boolean {
+  return (
+    store.playlists.length === 0 && store.videos.length === 0 && store.folders.length === 0
+  );
+}
+
+/** True when the parsed JSON held playlists/videos/folders that normalizing dropped. */
+function rawClaimsContent(parsed: unknown): boolean {
+  if (!parsed || typeof parsed !== 'object') return false;
+  const o = parsed as Record<string, unknown>;
+  return (['playlists', 'videos', 'folders'] as const).some(
+    (k) => Array.isArray(o[k]) && (o[k] as unknown[]).length > 0,
+  );
 }
 
 /** Read-only snapshot for the Chrome extension HTTP bridge. */
@@ -126,9 +195,28 @@ export function playlistTrackedStatus(youtubePlaylistIdOrUrl: string): {
   };
 }
 
+/**
+ * Write through a temporary file and rename onto the target, matching the ten
+ * other userData stores under `src/main` (agentOperationalStore, collectedTools,
+ * credentials/vault and the rest). A bare `writeFileSync` leaves a truncated
+ * file behind if the process dies mid-write, and `readStore` then had no way to
+ * tell that from an empty library. The sweep now writes once per playlist and
+ * once per downloaded video, so these writes happen unattended and often.
+ */
 function writeStore(store: YtPlaylistsStore): void {
-  fs.mkdirSync(path.dirname(storePath()), { recursive: true });
-  fs.writeFileSync(storePath(), JSON.stringify(store, null, 2), 'utf-8');
+  const file = storePath();
+  const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(store, null, 2), 'utf-8');
+    fs.renameSync(temporary, file);
+  } finally {
+    try {
+      fs.rmSync(temporary, { force: true });
+    } catch {
+      // Already renamed onto the target, or the temporary file vanished.
+    }
+  }
 }
 
 function broadcastStore(store: YtPlaylistsStore): void {
