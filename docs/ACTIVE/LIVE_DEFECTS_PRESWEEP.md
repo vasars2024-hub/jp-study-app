@@ -2720,3 +2720,21 @@ sort both *looked* broken through a probe that was asking the wrong object. `Ope
 no new `.fwin` is a pop-out `BrowserWindow`, and a `Length` sort that returns store order is either
 a dead comparator or a shelf with no lengths — only reading the field on the live items separates
 them. **Before filing "this control does nothing", read the datum it sorts, counts or filters on.**
+
+### 2026-09-08 09:10 EDT — primary2 CLAIMS `scraper`'s 15 undriven pages
+
+**CLAIMED: surface 24 (`scraper`), the "NOT driven: the other 15 pages" tail its own row names.**
+No other worker should take a scraper page until this line says released. Ids mint from
+**D413–D429** (round 4, `primary2`; D410–D412 already spent).
+
+**Environment, stated up front because it is different from every earlier scraper turn:** no
+Electron instance was running at 09:00 (`Get-Process electron` empty, nothing answering
+39273–39278), so I started one **from this worktree** — pid 11736, port 39273, branch
+`wt/files-app` @ `b18efeb7` (fast-forwarded to `feat/nyaa-subtitles` at the top of the turn, clean).
+That means, for the first time on this branch, **a fix I make is served to the app I am measuring**,
+so rows here can claim a live re-read after the fix instead of "not yet seen live". Window 2
+(`?desk=1`, 1920×1032) is the empty desk and is the one I drive; window 1 is left alone.
+
+**Operating limits I will not cross on this surface**, from the pin: no Test Connection and no
+indexer search (both put a real request on the wire), and nothing at all against the transfer
+table's row actions — it holds 10 real pre-existing torrents of the user's.
