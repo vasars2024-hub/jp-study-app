@@ -1066,6 +1066,32 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   const knownItemIds = useMemo(() => new Set(allItems.map((i) => i.id)), [allItems]);
 
+  /**
+   * D314. Every number in the rail is derived from the index, so before the index arrives they
+   * are all a fabricated zero — and the rail asserted it as fact. Measured live on the user's
+   * own 43,685-item index: for ~13 s of every open the sidebar read `Everything 0`, `Sources 0`,
+   * `Books 0` down all 32 nodes and the status bar read "0 items · Total 0 B", while the canvas
+   * one pane across correctly said "Reading the index…". A user with 50.2 GB filed is told, in
+   * the app's most confident voice, that they have nothing.
+   *
+   * The same call is already made one branch below for the panel leaves — "a count of 0 there
+   * would be an honest number answering a question nobody asked" — and at the status bar, whose
+   * own comment says "0 items, total 0 B is true of a panel and says nothing". The loading case
+   * simply never got the same treatment. So: no index, no number.
+   *
+   * `aria-hidden` follows the panel-mark precedent directly above — the glyph is not content,
+   * and the button's accessible name is the folder's own label either way.
+   */
+  const indexPending = state.status === 'loading';
+  const treeCount = (n: number) =>
+    indexPending ? (
+      <span className="fa-tree-count" aria-hidden>
+        …
+      </span>
+    ) : (
+      <span className="fa-tree-count">{n.toLocaleString(LANG_TAGS[lang])}</span>
+    );
+
   /** The item a rail drop is carrying, read back from the index by its id. */
   const itemFromDrag = useCallback(
     (event: DragEvent): FilesItem | null => {
@@ -1095,7 +1121,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         }}
       >
         <span className="fa-tree-label">{t('filesApp.tree.everything')}</span>
-        <span className="fa-tree-count">{allItems.length.toLocaleString(LANG_TAGS[lang])}</span>
+        {treeCount(allItems.length)}
       </button>
       {FILES_TREE.map((node) => (
         <button
@@ -1145,9 +1171,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               ›
             </span>
           ) : (
-            <span className="fa-tree-count">
-              {countFor(node.id).toLocaleString(LANG_TAGS[lang])}
-            </span>
+            treeCount(countFor(node.id))
           )}
         </button>
       ))}
@@ -1221,9 +1245,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               </span>
               {/* Counted from the live index on every render. There is no cached
                   membership anywhere, which is what gate 19 is really asking. */}
-              <span className="fa-tree-count">
-                {smartFolderCount(allItems, folder.criteria).toLocaleString(LANG_TAGS[lang])}
-              </span>
+              {treeCount(smartFolderCount(allItems, folder.criteria))}
             </button>
             {/* A preset has no delete control at all — it is compiled in, and a
                 button that appears to remove it would be lying. The model
@@ -1394,11 +1416,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                 }}
               >
                 <span className="fa-tree-label">{collection.name}</span>
-                <span className="fa-tree-count">
-                  {resolveCollection(collection, knownItemIds).presentItemIds.length.toLocaleString(
-                    LANG_TAGS[lang],
-                  )}
-                </span>
+                {treeCount(resolveCollection(collection, knownItemIds).presentItemIds.length)}
               </button>
             ),
           )
@@ -2229,6 +2247,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         </p>
       ) : null}
     </LiquidInspector>
+  ) : indexPending ? (
+    // D314, third site. The summary breaks the same scope down by kind, so before the index
+    // arrives it reads "Shown 0 items / Total size 0 B" and a kind list with nothing in it —
+    // an inventory of an index nobody has read yet. Say what is actually happening instead.
+    <div className="fa-details fa-details-summary">
+      <h2 className="fa-details-title">{scopeLabel ?? t('filesApp.summary.title')}</h2>
+      <p className="fa-state">{t('filesApp.state.loading')}</p>
+    </div>
   ) : (
     <div className="fa-details fa-details-summary">
       <h2 className="fa-details-title">{scopeLabel ?? t('filesApp.summary.title')}</h2>
@@ -2341,6 +2367,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         // "0 items, total 0 B" is true of a panel and says nothing; the honest
         // line names where these numbers came from instead.
         <span>{t('filesApp.system.movedFromSettings')}</span>
+      ) : indexPending ? (
+        // D314, the same reasoning one branch up: before the index arrives these are zero
+        // because nothing has been counted yet, not because there is nothing. Say which —
+        // the canvas is already saying it, and the two lines must not contradict each other.
+        <span>{t('filesApp.state.loading')}</span>
       ) : (
         <>
           <span>{t('filesApp.status.items', { count: visible.length })}</span>

@@ -914,6 +914,42 @@ describe('Files app — honest states', () => {
     expect(filesIndex).not.toHaveBeenCalled();
   });
 
+  /**
+   * D314, measured live on the user's own 43,685-item index: for ~13 s of every open the rail
+   * read `Everything 0`, `Sources 0`, `Books 0` down all 32 nodes and the status bar read
+   * "0 items · Total 0 B", while the canvas one pane across correctly said "Reading the index…".
+   * Two lines of the same window contradicting each other, with the confident one wrong.
+   */
+  it('shows no count at all while the index is still being read, rather than a zero', async () => {
+    // A promise that never settles IS the loading state — the component has asked and has not
+    // been answered, which is exactly the window the user was seeing zeros in.
+    filesIndex.mockImplementation(() => new Promise<FilesIndexSnapshot>(() => {}));
+    await mount(<FilesApp />);
+    await settle();
+
+    expect(hasText('Reading the index…')).toBe(true);
+    const counts = Array.from(host?.querySelectorAll('.fa-tree-count') ?? []).map(
+      (n) => n.textContent ?? '',
+    );
+    // Non-vacuity: the rail must actually be rendered, or this passes by finding nothing.
+    expect(counts.length).toBeGreaterThan(10);
+    expect(counts.filter((c) => c === '0')).toEqual([]);
+    expect(hasText('0 items')).toBe(false);
+    expect(hasText('Total 0 B')).toBe(false);
+  });
+
+  it('CONTROL: a real zero still prints once the index has answered', async () => {
+    // The fix must suppress the *unknown*, not every zero. `sources/books` genuinely holds
+    // nothing in this fixture, and that 0 is a measurement the user is entitled to.
+    await mount(<FilesApp />);
+    await settle();
+
+    expect(hasText('Reading the index…')).toBe(false);
+    const books = railButton(/^Books$/);
+    expect(books?.querySelector('.fa-tree-count')?.textContent).toBe('0');
+    expect(hasText('Total 0 B')).toBe(false); // the fixture has size, so this stays a real number
+  });
+
   it('refresh asks main to rebuild rather than re-serving the cache', async () => {
     await mount(<FilesApp />);
     await settle();
