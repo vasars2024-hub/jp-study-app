@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { __mediaMetadataTestables, mediaMetadataRunning, registerMediaMetadataIpc, runMediaMetadata } from '../mediaMetadata';
 import type { MediaItem } from '../../shared/types';
@@ -184,5 +186,55 @@ describe('a provider outage is not a fact about the title', () => {
     const patches = await patchesFor([], []);
     expect(patches).toHaveLength(1);
     expect(patches[0].metadataSource).toBe('unmatched');
+  });
+});
+
+/**
+ * D265 — the library must re-check itself at launch.
+ *
+ * This is a call-site contract in `media.ts`, not a behaviour of a pure
+ * function, so it is read from the source. The source is comment-stripped
+ * first: the fix's own comment names `scheduleMetadataSweep()` and the four
+ * import triggers, and a raw `toContain` would score that prose as the call.
+ */
+describe('the metadata + subtitle sweep re-checks at launch', () => {
+  const code = readFileSync(resolve(__dirname, '..', 'media.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('schedules a sweep from registerMediaIpc, not only from the import paths', () => {
+    const body = code.slice(code.indexOf('export function registerMediaIpc'));
+    // Everything before this fix called it from an import handler, each of which
+    // sits inside an `ipcMain.handle(` callback. A call in the registration body
+    // itself — before the first handler — is the launch trigger.
+    const firstHandler = body.indexOf('ipcMain.handle(');
+    expect(firstHandler, 'registerMediaIpc must still register handlers').toBeGreaterThan(0);
+    expect(body.slice(0, firstHandler)).toContain('scheduleMetadataSweep();');
+  });
+
+  it('keeps every import trigger it already had', () => {
+    // The launch sweep is an addition. Losing an import trigger would trade a
+    // two-week-stale library for a newly-imported one that is never swept at all.
+    const calls = code.match(/scheduleMetadataSweep\(\);/g) ?? [];
+    expect(calls.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('still runs subtitles after metadata and behind the autoDiscover gate', () => {
+    // Jimaku matches on the AniList id the metadata pass stores, so a launch
+    // sweep that searched subtitles first would throw away the signal that makes
+    // its hits exact — and a launch sweep that ignored `autoDiscover` would make
+    // network requests for a user who switched discovery off.
+    const sweep = code.slice(code.indexOf('function scheduleMetadataSweep'));
+    const metadataAt = sweep.indexOf('runMediaMetadata({})');
+    const subtitlesAt = sweep.indexOf('runSubtitleDiscovery({})');
+    expect(metadataAt).toBeGreaterThan(-1);
+    expect(subtitlesAt).toBeGreaterThan(metadataAt);
+    expect(sweep.slice(0, subtitlesAt)).toContain('loadDiscoverySettings().autoDiscover');
+  });
+
+  it('is debounced, so launch plus an immediate import is one sweep', () => {
+    const sweep = code.slice(code.indexOf('function scheduleMetadataSweep'), code.indexOf('function patchEachItem'));
+    expect(sweep).toContain('clearTimeout(metadataSweepTimer)');
+    expect(sweep).toMatch(/setTimeout\(/);
   });
 });

@@ -1019,6 +1019,27 @@ export function registerMediaIpc(): void {
   // library, so it gets no host at all — it can only search and browse.
   registerMediaDiscoveryIpc();
 
+  /**
+   * D265 — re-check the library once at launch.
+   *
+   * Every other trigger for this sweep is an import (`:1252` pick files, `:1274`
+   * add folder, `:1345` drag-drop, `:1391` addAcquired). There was no fifth
+   * caller, so a title imported before its subtitles were filed stayed
+   * subtitle-less permanently: `retryAfterDays` expires the back-off after a
+   * week, but nothing ever asked again. Measured on the real library — 24 of the
+   * 26 `The Big O` episodes sat at zero records carrying `jimaku | no-match`
+   * rows from August, and 11 of them attached a correct `ja` file within a
+   * second each the moment the same call was made again.
+   *
+   * Cheap when there is nothing to do: `recentlyFailed` still suppresses every
+   * provider whose evidential failure is inside `retryAfterDays`, so a
+   * freshly-swept library makes zero provider requests and only walks its own
+   * items. Deliberately once at launch rather than on a timer — a periodic sweep
+   * needs its own cancellation, progress and settings surface, and launch is
+   * when the user is about to watch something anyway.
+   */
+  scheduleMetadataSweep();
+
   ipcMain.handle('media:handoff', async (_e, handoff: PlaybackHandoff, profile: ExternalPlayerProfile): Promise<string | null> => {
     if (!handoff || !profile || !path.isAbsolute(handoff.mediaPath) || !fs.existsSync(handoff.mediaPath) || !path.isAbsolute(profile.executablePath)) return 'Media and player paths must be existing absolute paths.';
     const args = profile.arguments.map((arg) => arg.replaceAll('{media}', handoff.mediaPath).replaceAll('{subtitle}', handoff.subtitlePath ?? '').replaceAll('{title}', handoff.title));
