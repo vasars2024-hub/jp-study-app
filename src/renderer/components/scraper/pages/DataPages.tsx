@@ -882,7 +882,7 @@ export function HistoryPage() {
       <div className="scr-history-overview">
         <div className="scr-tile-row">
           <div className="scr-tile"><span className="scr-tile-label">Episodes found</span><span className="scr-tile-value">{totals.episodes.toLocaleString()}</span></div>
-          <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">Failed checks</span><span className="scr-tile-value">{totals.failures}</span></div>
+          <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">Failed checks</span><span className="scr-tile-value">{totals.failures.toLocaleString()}</span></div>
           <div className="scr-tile"><span className="scr-tile-label">Data indexed</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(totals.bytes)}</span></div>
           <div className="scr-tile"><span className="scr-tile-label">Average runtime</span><span className="scr-tile-value scr-tile-value--text">{formatDuration(totals.average)}</span></div>
         </div>
@@ -954,7 +954,7 @@ export function HistoryPage() {
                   <div role="gridcell" className="scr-td"><Pill tone="outline">{job.profile}</Pill></div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{job.found.toLocaleString()}</span></div>
                   <div role="gridcell" className="scr-td">
-                    <span className={`scr-t-num${job.failed ? ' scr-seed is-low' : ''}`}>{job.failed}</span>
+                    <span className={`scr-t-num${job.failed ? ' scr-seed is-low' : ''}`}>{job.failed.toLocaleString()}</span>
                   </div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{formatBytes(job.bytes)}</span></div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{formatDuration(job.durationSec)}</span></div>
