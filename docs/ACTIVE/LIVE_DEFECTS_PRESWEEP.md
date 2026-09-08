@@ -2738,3 +2738,46 @@ so rows here can claim a live re-read after the fix instead of "not yet seen liv
 **Operating limits I will not cross on this surface**, from the pin: no Test Connection and no
 indexer search (both put a real request on the wire), and nothing at all against the transfer
 table's row actions — it holds 10 real pre-existing torrents of the user's.
+
+### 2026-09-08 09:45 EDT — primary2, scraper: all 17 pages driven, 5 rows
+
+Live, pid 11736, **window 2**, Scraper window 820x580, on this worktree's own build. Every one of
+the **17 rail pages** was opened and inventoried; the class-1 (accessible name) and class-3 (i18n)
+passes were run per page rather than whole-window, which is what the earlier "58 controls, 0
+unnamed" figure could not do — that number was measured on **one** page.
+
+**Per-page control counts, all 17, so the next worker does not re-derive them:** Dashboard 26 ·
+New Scrape 31 · Discover 20 · History 13 · Source Manager 39 · Torrent Manager 74 · Profiles 26 ·
+Scheduled Tasks 2 · Site Rules 2 · Plugins 9 · Results 15 · Downloads 2 · Exports 9 ·
+Selector Tester 4 · Regex Tester 7 · HTTP Inspector 6 · Script Console 14.
+
+**Cleared without a row, recorded so they are not re-checked:** Scheduled Tasks, Site Rules and
+Downloads each carry only 2 controls and that is **honest, not a shell** — all three are real empty
+states with real copy ("No schedules yet. Add one to run a scrape on a cron.", "No site rules yet.
+Add one for a site that lists episodes in its own markup — catalogue-backed titles do not need a
+rule.", "The download queue is empty."), each beside live zero counters and a working primary
+action. Fourteen of the seventeen pages have **0** unnamed controls.
+
+**One instrument correction, because it produced a false clean bill in this very turn.** My first
+inventory used `textContent` as the accessible name for every element and reported **0 unnamed on
+every page**. `textContent` is not the accessible name of a `<select>` (it is the option list), nor
+of a `<textarea>` (it is the value) — computing it that way *invents* a name for exactly the
+controls most likely to lack one. Rewritten to follow HTML-AAM (`aria-labelledby`, then
+`aria-label`, then `label[for]` / a wrapping `<label>`, then `value` for button-inputs, then
+`placeholder`, then `title`), the same sweep found **10** unnamed controls. **Any earlier
+"0 unnamed" in this register that was computed from textContent should be re-derived.**
+
+**A second trap, and the reason the first five pages read `controls: 0`:** the Scraper restores its
+Advanced Settings drawer open, and `scraper.css:5107` deliberately sets `.scr-main { display: none }`
+while a drawer is open below a 1100px container. That is correct, documented behaviour — but it
+means a page sweep must close the drawer first or every page measures empty. Also: match rail
+buttons with `.scr-rail button`, not `w.querySelectorAll('button')` — the drawer's category list
+carries the same labels ("Sources", "Torrents", "Profiles") and a whole-window match hits it.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D413 | scraper | **Switch the app to Japanese and three of the Scraper's seventeen pages stay entirely in English** — the rail button says セレクターテスター and the page it opens is headed `Selector Tester`, in Latin script, with every label under it in English too. Same for 正規表現テスター to `Regex Tester` and HTTP インスペクター to `HTTP Inspector`. The `Local sandbox` badge is English on all four tool pages including the one that is otherwise fully translated. | Live, window 2. `localStorage['ui-lang'] = 'ja'` then reload — the app's own boot path, so `initI18n()` resolves the catalog before first render. Counted Latin-script runs of 4+ letters in each page's `innerText`: **Selector Tester 13 · Regex Tester 33 · HTTP Inspector 31**, against **0** on Site Rules and 1 on Discover (the proper noun `YouTube`). Every string on those three pages is a raw literal in `pages/ToolPages.tsx` — `title="Selector Tester"`, `Run selector`, `Pattern library`, `Send request`, `Ready to inspect` — while the same file's `ScriptConsolePage` correctly resolves through `sx()` and rendered as スクリプトコンソール in the same pass. The migration those `sx()` calls feed is real and largely done: **603 `scrApp.*` keys, present in all four of `shared/i18n/scraperUi/{en,ja,zh,ru}.ts`.** The three tool pages simply never entered `strings.ts`, so the migration could never reach them. | P2 | **fixed — this commit.** |
+| D414 | scraper - Plugins | **The only control that turns a plugin on or off has no name.** A screen reader announces "switch, off" twice on this page with nothing to say which of the two installed adapters it belongs to. | Live. `plugins` page, 2 installed (`broken-one`, `Jimaku Bridge`). Both toggles read `<input role="switch" type="checkbox">` inside `<label class="ui-toggle">` whose text content is **empty** — no `aria-label`, no `aria-labelledby`, no `label[for]`, so the accessible name is the empty string. **The negative control is in the same file:** the other three `Toggle` call sites in `ManagementPages.tsx` (`:830` scheduler entry, `:940` scheduler policy, `:1170` site rule) all pass an `aria-label`; only `:1385`, the plugin toggle, does not. | P2 | **fixed — this commit.** |
+| D415 | scraper - Discover, MAL download dialog | **Four segmented pickers say which option is selected with colour and nothing else.** On Discover the feed row (This season / Airing / Popular / Upcoming) looks chosen but is not announced as chosen, and the same is true of three segments in the MyAnimeList download dialog. A screen-reader user is read four identical unpressed buttons; a colour-blind user gets no second cue. | Live on Discover: the three `.disc-seg-btn` groups measured `Anime` to `aria-pressed="true"`, `Discover` tab to `aria-selected="true"`, and **`This season` to all of `aria-pressed` / `aria-current` / `aria-selected` null** while carrying the `active` class. Source: `DiscoverContent.tsx:521` (feed), `MalDownloadDialog.tsx:898` (anime shelf), `:921` (manga shelf), `:1004` (amount mode). **The precedent is two lines away and carries its own comment:** `DiscoverContent.tsx:504` sets `aria-pressed` with *"The active segment is signalled by colour alone otherwise, which neither a screen reader nor a colour-blind user can read."* `YoutubeDiscoveryPanel.tsx:487` does the same. Four siblings were missed. | P2 | **fixed — this commit.** |
+| D416 | scraper - Selector Tester, Regex Tester, HTTP Inspector | **Eight of the seventeen controls on the three tool pages have no name at all** — the CSS/XPath mode picker, the selector box, the HTML fixture editor, the regex pattern box, the flags box, the sample-text editor, the HTTP method picker and the URL box. Every one is the primary input of the page it sits on. | Live, per-page HTML-AAM name computation (see the instrument note above): Selector Tester **3 of 4** controls unnamed, Regex Tester **3 of 7**, HTTP Inspector **2 of 6**. None carries `aria-label`, a `<label>`, a `placeholder` or a `title`. The other fourteen pages score 0 unnamed, so this is these three files, not an app-wide shape. | P2 | **fixed — this commit.** |
+| D417 | tooling (why D413 survived) | Not user-visible — filed because it is the reason a whole page of English text passed every gate. **`ToolPages.tsx` is invisible to both i18n instruments at once.** `i18n-hardcoded-check` counts `sx(` as adoption (correctly — the Scraper is on its own string system), so one `sx()` call in `ScriptConsolePage` marks the whole 511-line file as adopted. `i18n-partial-check`, which exists precisely to catch literals inside an adopted file, bails at its line 124 because that test only recognises `t(` and `useT(`, never `sx(`. So a file with one `sx()` call and forty raw literals is adopted enough for one gate and not adopted at all for the other, and falls straight through the gap. | P2 | **fixed — this commit.** |
