@@ -23,6 +23,7 @@ import {
   ImmersionBody,
   ImmersionPopups,
   ImmersionSiteSearch,
+  ImmersionSitesStatus,
   ImmersionToolbar,
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
@@ -236,25 +237,26 @@ export default function ImmersionView() {
             >
               <Icon name="dictionary" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.saveSite')} onClick={() => void state.saveCurrentSite()}>
+            <Button size="sm" className="aero-immersion-icon-btn" aria-label={t('immersion.saveSite')} title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.saveSite')} disabled={!currentUrl} onClick={() => void state.saveCurrentSite()}>
               <Icon name="bookmark" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.saveAsTool')} onClick={() => void state.saveCurrentAsTool()}>
+            <Button size="sm" className="aero-immersion-icon-btn" aria-label={t('immersion.saveAsTool')} title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.saveAsTool')} disabled={!currentUrl} onClick={() => void state.saveCurrentAsTool()}>
               <Icon name="star" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.exportToLibrary')} onClick={() => void state.exportToLibrary()}>
+            <Button size="sm" className="aero-immersion-icon-btn" aria-label={t('immersion.exportToLibrary')} title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.exportToLibrary')} disabled={!currentUrl} onClick={() => void state.exportToLibrary()}>
               <Icon name="download" size={14} />
             </Button>
             <Button
               size="sm"
               className="aero-immersion-icon-btn"
-              title={t('immersion.captureVideo')}
-              disabled={captureBusy}
+              aria-label={t('immersion.captureVideo')}
+              title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.captureVideo')}
+              disabled={captureBusy || !currentUrl}
               onClick={() => void state.captureVideo()}
             >
               <Icon name="video" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.openInSystemBrowser')} onClick={state.openExternal}>
+            <Button size="sm" className="aero-immersion-icon-btn" aria-label={t('immersion.openInSystemBrowser')} title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.openInSystemBrowser')} disabled={!currentUrl} onClick={state.openExternal}>
               <Icon name="external" size={14} />
             </Button>
             <Button
@@ -333,9 +335,11 @@ export default function ImmersionView() {
                     <Icon name="refresh" size={13} />
                   </Button>
                 </div>
-                {sites.length === 0 && (
-                  <p className="aero-immersion-rail-empty">{t('immersion.rail.empty')}</p>
-                )}
+                {/* Aero's own empty paragraph used to live here unconditionally on
+                    `sites.length === 0`, which is true while the read is still running
+                    and true when it failed. `ImmersionSitesStatus` owns all three
+                    states now and keeps Aero's typography through the class prop. */}
+                <ImmersionSitesStatus state={state} messageClassName="aero-immersion-rail-empty" />
                 <ImmersionSiteSearch state={state} />
                 <ul className="aero-immersion-site-list">
                   {state.filteredSites.map((s) => (

@@ -18356,6 +18356,25 @@ html[data-taskbar-size='large'] .os-tray-btn {
   padding: 8px 12px;
   font-size: 12px;
 }
+/* The saved-sites read failing is a state the rail must show, not swallow. The
+   retry sits under the message rather than beside it so a narrow docked rail
+   never truncates the button. */
+.immersion-sites-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+/* --danger-text is the readable text member of the P1.1 danger family; Aero and
+   Wired set `--danger: initial`, which makes --danger-text guaranteed-invalid
+   there too, so both fallbacks are load-bearing rather than decoration. */
+.immersion-sites-error p {
+  margin: 0;
+  padding: 0;
+  color: var(--danger-text, var(--danger, #d13438));
+}
 .immersion-site-list {
   list-style: none;
   margin: 0;

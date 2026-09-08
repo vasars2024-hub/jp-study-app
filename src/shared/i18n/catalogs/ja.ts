@@ -6013,6 +6013,8 @@ export const ja: Catalog = {
   'immersion.openPageToBegin': 'ページを開いてイマージョン読書を始めましょう。',
   'immersion.hint': '検索するとライブで開く · F8でモード切替 · F6でフォーカス · Ctrl+LでURLバー',
   'immersion.sites': 'サイト',
+  'immersion.rail.loadFailed': '保存済みサイトを読み込めませんでした。表示中のサイトは保持されます。',
+  'immersion.rail.retry': '再試行',
   'immersion.rail.empty': '保存したサイトがここに表示されます。どのページもブックマークできます。',
   'immersion.rail.destinations': 'おすすめのサイト',
   'immersion.refreshSites': 'サイトを再読み込み',

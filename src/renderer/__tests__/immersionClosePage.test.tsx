@@ -83,6 +83,23 @@ afterEach(() => {
 });
 
 describe('closing an Immersion page', () => {
+
+  it('disables page actions until a page opens, and disables them again after close', async () => {
+    const h = await mountImmersion();
+    const actions = () => [...h.container.querySelectorAll<HTMLButtonElement>('.immersion-overflow-body > button')]
+      .filter((button) => !button.classList.contains('visual-novel-open'));
+    expect(actions()).toHaveLength(7);
+    for (const button of actions()) {
+      expect(button.disabled, button.textContent ?? '').toBe(true);
+      expect(button.title).toBe('No page is open — choose a destination to begin.');
+    }
+    expect(h.container.querySelector<HTMLButtonElement>('.visual-novel-open')!.disabled).toBe(false);
+    await openPage(h, 'https://ja.wikipedia.org/wiki/Main_Page');
+    for (const button of actions()) expect(button.disabled, button.textContent ?? '').toBe(false);
+    await h.click(CLOSE);
+    for (const button of actions()) expect(button.disabled, button.textContent ?? '').toBe(true);
+  });
+
   it('offers the control from the starter state, disabled and saying why', async () => {
     const h = await mountImmersion();
     const close = h.container.querySelector<HTMLButtonElement>(CLOSE);
