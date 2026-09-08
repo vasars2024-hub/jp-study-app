@@ -896,6 +896,30 @@
   color: var(--lq-liquid-text-muted);
 }
 
+/* D343. The one other place this item lives, as a control rather than a label.
+   It sits inside a `dd` in a two-column grid, so it is styled as a link and
+   not as a bar: a full-width action button here would read as a second Open.
+   The hit floor is met with padding on an inline-flex box rather than a
+   `min-width`, which would stretch the grid column past its content. */
+.fa-details-also-go {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--lq-hit-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fa-details-also-go:hover {
+  color: var(--lq-work-text);
+}
+
 /* The no-selection inspector is the SAME panel as the item inspector, not a
    second kind of thing, so it inherits `.fa-details` and adds nothing but the
    two corrections below. `.fa-state` carries its own `--lq-space-4` because it

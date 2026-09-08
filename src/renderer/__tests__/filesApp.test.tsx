@@ -374,11 +374,19 @@ describe('Files app — sorting is real and reversible (gate 14)', () => {
     await mount(<FilesApp />);
     await settle();
     await click(columnHeader('Size'));
-    const sorted = Array.from(host?.querySelectorAll('[role="columnheader"]') ?? []).filter(
-      (h) => h.getAttribute('aria-sort') !== 'none',
-    );
+    const headers = Array.from(host?.querySelectorAll('[role="columnheader"]') ?? []);
+    const sorted = headers.filter((h) => {
+      const state = h.getAttribute('aria-sort');
+      return state !== null && state !== 'none';
+    });
     expect(sorted).toHaveLength(1);
     expect(sorted[0].textContent).toBe('Size');
+    // D342. A column that cannot be sorted carries NO `aria-sort` — "none"
+    // there advertises a sort gesture the header does not honour. Only the
+    // sortable headers may declare a state, and every one of them must.
+    const declaring = headers.filter((h) => h.getAttribute('aria-sort') !== null);
+    expect(declaring).toHaveLength(headers.length - 1);
+    expect(headers[0].getAttribute('aria-sort')).toBeNull();
   });
 
   it('switching column starts that column ascending rather than inheriting a flip', async () => {
@@ -923,7 +931,10 @@ describe('Files app — honest states', () => {
   it('shows no count at all while the index is still being read, rather than a zero', async () => {
     // A promise that never settles IS the loading state — the component has asked and has not
     // been answered, which is exactly the window the user was seeing zeros in.
-    filesIndex.mockImplementation(() => new Promise<FilesIndexSnapshot>(() => {}));
+    // `() => undefined` rather than `() => {}` only because the latter is an
+    // eslint error (`no-empty-function`) that this file has carried unlinted;
+    // an executor that never calls resolve is the point either way.
+    filesIndex.mockImplementation(() => new Promise<FilesIndexSnapshot>(() => undefined));
     await mount(<FilesApp />);
     await settle();
 

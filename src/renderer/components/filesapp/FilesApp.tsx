@@ -487,12 +487,27 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
 
   /**
-   * Counts come from the snapshot when nothing is filtered, and are recomputed
-   * against the search when something is — so the tree shows how many hits are
+   * Counts come from the snapshot only while `allItems` still IS the snapshot,
+   * and are recomputed otherwise — so the tree shows how many rows are really
    * in each category rather than a total the visible list contradicts.
+   *
+   * D341: the snapshot's own counts were reused for every unsearched render,
+   * including after a soft delete, which removes rows from `allItems` and
+   * never touches the snapshot. The root node renders `allItems.length`, so
+   * one delete left `Everything` a row lower than the sum of the categories
+   * underneath it — measured live at 43,685 against 43,686 — and the category
+   * the row left never moved at all. The length comparison is exact here
+   * because `visibleItems` only ever removes.
    */
   const counts = useMemo(() => {
-    if (!query.trim()) return state.snapshot?.counts ?? countByCategory([]);
+    if (!query.trim()) {
+      const snapshotItems = state.snapshot?.items;
+      if (!snapshotItems) return countByCategory([]);
+      if (allItems.length === snapshotItems.length) {
+        return state.snapshot?.counts ?? countByCategory(allItems);
+      }
+      return countByCategory(allItems);
+    }
     return countByCategory(allItems.filter((i) => matchesQuery(i, query)));
     // `lang` is not read here; counts are numbers, not translated strings.
   }, [state.snapshot, allItems, query]);
@@ -1691,7 +1706,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   const header = (
     <div className="fa-row fa-head" role="row" aria-rowindex={1}>
-      <span role="columnheader" aria-sort="none" className="fa-cell fa-cell-select">
+      {/* D342: no `aria-sort` here. This column cannot be sorted, and
+          `aria-sort="none"` is not "not applicable" — it means "sortable, and
+          not currently the sort", which is why screen readers offer a sort
+          gesture on it. The absent attribute is the honest one. */}
+      <span role="columnheader" className="fa-cell fa-cell-select">
         <span className="fa-visually-hidden">{t('filesApp.bulk.selection')}</span>
       </span>
       {columnsFor(viewMode).map((column) => (
@@ -2128,13 +2147,28 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <>
             <dt>{t('filesApp.details.alsoIn')}</dt>
             <dd className="fa-details-also" data-reach={reachability.kind}>
-              {reachability.kind === 'section'
-                ? t(`palette.section.${reachability.section}`)
-                : t(
-                    reachability.kind === 'global'
-                      ? 'filesApp.details.alsoInGlobal'
-                      : 'filesApp.details.onlyHere',
-                  )}
+              {/* D343: the section case is a BUTTON. Naming the one other place
+                  an item lives and then making the user find it by hand is the
+                  dead end this row exists to close — and it sat directly above
+                  Open's "nothing in this app opens this kind of item", which
+                  reads as a contradiction. `openSectionSurface` is the same
+                  route the Open decision takes, so a click lands in the same
+                  window a routable row would have opened. */}
+              {reachability.kind === 'section' ? (
+                <button
+                  type="button"
+                  className="fa-details-also-go"
+                  onClick={() => openSectionSurface(reachability.section)}
+                >
+                  {t(`palette.section.${reachability.section}`)}
+                </button>
+              ) : (
+                t(
+                  reachability.kind === 'global'
+                    ? 'filesApp.details.alsoInGlobal'
+                    : 'filesApp.details.onlyHere',
+                )
+              )}
             </dd>
           </>
         ) : null}
