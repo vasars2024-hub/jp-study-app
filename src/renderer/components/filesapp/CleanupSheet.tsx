@@ -18,7 +18,7 @@
  * from this side, which would make gate 34's own evidence depend on a human
  * clicking. A Browse button can be added beside the field later.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { formatSize } from './format';
 import {
@@ -67,6 +67,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [relocateFor, setRelocateFor] = useState<string | null>(null);
   const [relocatePath, setRelocatePath] = useState('');
+  const sheetRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => onCleanupSettingsChanged(() => setSettings(loadCleanupSettings())), []);
 
@@ -168,8 +169,38 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
     });
   };
 
+  /*
+   * D346. Clicking "Clean up" appended this panel to the window body and left
+   * it entirely below the fold: measured live, the panel's top landed at
+   * exactly the window's bottom edge (580 px into an 820x580 window), the body
+   * scroller went to 12,995 px against a 545 px viewport, `scrollTop` stayed 0
+   * and **0 pixels of it were visible**. The user pressed the button and saw
+   * nothing happen. So opening it brings it into view and puts the keyboard on
+   * it, which is also what makes it reachable without a mouse.
+   *
+   * `role="region"` and NOT `dialog`/`aria-modal`: this is a `position: static`
+   * section inside the window body, the list above it stays live and 113
+   * controls behind it stay legitimately tabbable. Declaring it modal would
+   * tell a screen reader the rest of the window is hidden when it is not —
+   * that is the failure register row D9 is about, and claiming modality here
+   * would be committing it rather than fixing it. The scan sheet next door IS
+   * a real overlay and correctly uses `useModalKeyboard`.
+   */
+  useEffect(() => {
+    const panel = sheetRef.current;
+    if (!panel) return;
+    panel.scrollIntoView({ block: 'start' });
+    panel.focus({ preventScroll: true });
+  }, []);
+
   return (
-    <div className="fa-sheet fa-cleanup" role="dialog" aria-label={t('filesApp.cleanup.title')}>
+    <section
+      ref={sheetRef}
+      tabIndex={-1}
+      className="fa-sheet fa-cleanup"
+      role="region"
+      aria-label={t('filesApp.cleanup.title')}
+    >
       <div className="fa-sheet-head">
         <h2>{t('filesApp.cleanup.title')}</h2>
         <button type="button" className="fa-btn" onClick={onClose}>
@@ -397,7 +428,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
           </p>
         </section>
       ) : null}
-    </div>
+    </section>
   );
 }
 
