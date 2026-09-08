@@ -5982,6 +5982,8 @@ export const ja: Catalog = {
   'immersion.capturing': '動画をキャプチャ中…',
   'immersion.savedToMedia': 'メディアライブラリに保存しました',
   'immersion.captureFailed': 'キャプチャに失敗しました',
+  'immersion.captureNoVideo': 'このページに動画はありません。キャプチャは動画ページ（YouTube、Vimeo など yt-dlp が対応するサイト）で使えます。',
+  'immersion.captureFailedDetail': 'キャプチャに失敗しました。{detail}',
   'immersion.back': '戻る',
   'immersion.forward': '進む',
   'immersion.reason.noBack': 'このセッションで戻れるページはまだありません。',

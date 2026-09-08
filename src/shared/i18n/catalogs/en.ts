@@ -6019,6 +6019,8 @@ export const en: Catalog = {
   'immersion.capturing': 'Capturing video…',
   'immersion.savedToMedia': 'Saved to Media library',
   'immersion.captureFailed': 'Capture failed',
+  'immersion.captureNoVideo': 'No video on this page. Capture works on video pages — YouTube, Vimeo and the other sites yt-dlp supports.',
+  'immersion.captureFailedDetail': 'Capture failed. {detail}',
   'immersion.back': 'Back',
   'immersion.forward': 'Forward',
   'immersion.reason.noBack': 'No page to go back to in this session yet.',

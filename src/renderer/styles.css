@@ -18274,6 +18274,19 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .immersion-banner.status {
   color: var(--text);
   cursor: pointer;
+  /* It is a <button> now (keyboard-dismissible); keep the banner's own box.
+     Longhands, not the `font` shorthand: the shorthand also resets font-size,
+     which outranks `.immersion-banner`'s own 12px on this element and rendered
+     the status line 14px while Loading and the error stayed 12. */
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
 }
 .immersion-empty {
   display: flex;

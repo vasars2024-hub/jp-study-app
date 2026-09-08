@@ -6568,6 +6568,8 @@ export const ru: Catalog = {
   'immersion.capturing': 'Захват видео…',
   'immersion.savedToMedia': 'Сохранено в медиатеке',
   'immersion.captureFailed': 'Не удалось выполнить захват',
+  'immersion.captureNoVideo': 'На этой странице нет видео. Захват работает на страницах с видео — YouTube, Vimeo и другие сайты, поддерживаемые yt-dlp.',
+  'immersion.captureFailedDetail': 'Не удалось выполнить захват. {detail}',
   'immersion.back': 'Назад',
   'immersion.forward': 'Вперёд',
   'immersion.reason.noBack': 'В этой сессии пока нет страницы для возврата.',

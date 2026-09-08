@@ -209,6 +209,31 @@ export function isRemoteMediaUrl(url: string): boolean {
   }
 }
 
+/**
+ * Does a failed capture mean "this page simply has no video", rather than
+ * something the user could act on?
+ *
+ * `isRemoteMediaUrl` deliberately admits every http(s) page that is not a
+ * search portal, because yt-dlp supports over a thousand sites and no
+ * host-list this app could carry would stay right. The cost of that
+ * permissiveness is that Capture is offered on an ordinary article too, and
+ * measured live on NHK Easy the banner then read
+ * `Download failed: ERROR: Unsupported URL: https://news.web.nhk/news/easy/` —
+ * a raw yt-dlp diagnostic, in English in every language, telling a reader
+ * nothing they can do. The attempt is right; only the reporting was wrong.
+ *
+ * Matched against yt-dlp's own wording, not ours, so it must stay substring
+ * matching on lowercase: the tool prefixes `ERROR: `, sometimes a colon and
+ * the URL, and localises nothing.
+ */
+export function isNoVideoCaptureError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes('unsupported url')
+    || m.includes('no video formats')
+    || m.includes('no video could be found')
+    || m.includes('does not have a video');
+}
+
 export function emptyDayMetrics(): ImmersionDayMetrics {
   return { seconds: 0, chars: 0, wordsMined: 0, videosCaptured: 0, pagesExported: 0 };
 }

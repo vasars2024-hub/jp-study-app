@@ -5946,6 +5946,8 @@ export const zh: Catalog = {
   'immersion.capturing': '正在抓取视频…',
   'immersion.savedToMedia': '已保存到媒体库',
   'immersion.captureFailed': '抓取失败',
+  'immersion.captureNoVideo': '此页面没有视频。抓取适用于视频页面 — YouTube、Vimeo 以及 yt-dlp 支持的其他网站。',
+  'immersion.captureFailedDetail': '抓取失败。{detail}',
   'immersion.back': '后退',
   'immersion.forward': '前进',
   'immersion.reason.noBack': '本次会话中还没有可返回的页面。',

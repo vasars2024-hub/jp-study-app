@@ -5,6 +5,7 @@ import {
   immersionStatsId,
   isBrowsingPortalUrl,
   isImmersionSearchQuery,
+  isNoVideoCaptureError,
   isRemoteMediaUrl,
   isYouTubeUrl,
   nextSiteStreak,
@@ -66,6 +67,34 @@ describe('immersion browsing helpers', () => {
   it('accepts remote media URLs but not search portals', () => {
     expect(isRemoteMediaUrl('https://vimeo.com/123')).toBe(true);
     expect(isRemoteMediaUrl('https://www.google.com/search?q=video')).toBe(false);
+  });
+});
+
+describe('isNoVideoCaptureError', () => {
+  /*
+   * The literal string measured live on 2026-09-08: Capture video to Media was
+   * pressed on NHK Easy (an article, no video) and the immersion banner read
+   * exactly this. It is the whole reason the classifier exists, so it is the
+   * first case rather than a paraphrase of it.
+   */
+  it('recognises the message the live app actually produced', () => {
+    expect(isNoVideoCaptureError(
+      'Download failed: ERROR: Unsupported URL: https://news.web.nhk/news/easy/',
+    )).toBe(true);
+  });
+  it('matches yt-dlp wording regardless of case', () => {
+    expect(isNoVideoCaptureError('ERROR: unsupported url: https://example.com')).toBe(true);
+    expect(isNoVideoCaptureError('ERROR: No video formats found!')).toBe(true);
+  });
+  /*
+   * The control. A capture that failed for a reason the user could act on must
+   * NOT be flattened into "this page has no video" — those keep their detail.
+   */
+  it('leaves actionable failures alone', () => {
+    expect(isNoVideoCaptureError('Download failed: ERROR: yt-dlp is not installed')).toBe(false);
+    expect(isNoVideoCaptureError('Download failed: ERROR: HTTP Error 403: Forbidden')).toBe(false);
+    expect(isNoVideoCaptureError('Download failed: ERROR: Sign in to confirm your age')).toBe(false);
+    expect(isNoVideoCaptureError('Download failed.')).toBe(false);
   });
 });
 

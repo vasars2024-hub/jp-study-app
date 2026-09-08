@@ -23,6 +23,7 @@ import {
   IMMERSION_STARTERS,
   IMMERSION_SUBJECT_LANG,
   immersionStatsId,
+  isNoVideoCaptureError,
   isRemoteMediaUrl,
   nextImmersionMode,
   normalizeImmersionUrl,
@@ -777,7 +778,14 @@ export function useImmersion() {
     try {
       const res = await window.api.downloadYouTube(currentUrl, false);
       if ('error' in res && res.error) {
-        setStatus(res.error);
+        // `res.error` is main's `Download failed: <yt-dlp's last stderr line>`
+        // (`main/media.ts:375`) — an English literal wrapping a raw tool
+        // diagnostic. Neither half is a sentence a reader can act on, so the
+        // common case gets the product's own words and everything else keeps
+        // the detail but inside a translated frame.
+        setStatus(isNoVideoCaptureError(res.error)
+          ? t('immersion.captureNoVideo')
+          : t('immersion.captureFailedDetail', { detail: res.error }));
       } else {
         void window.api.immersionBumpMetrics({ videosCaptured: 1 });
         setStatus(t('immersion.savedToMedia'));
@@ -1117,11 +1125,24 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
   return (
     <div className={`immersion-stage${splitView ? ' immersion-split' : ''}${stageClassName ? ` ${stageClassName}` : ''}`}>
       {loading && <div className="immersion-banner">{t('immersion.loading')}</div>}
-      {error && <div className="immersion-banner error">{error}</div>}
+      {error && <div className="immersion-banner error" role="alert">{error}</div>}
+      {/*
+        The banner below is the ONLY outcome channel the eight overflow actions
+        have — Save site, Save as tool, Export to Library, Capture video and the
+        lens all report through it and nothing else. It was a bare `div` with an
+        `onClick`, so the dismissal was mouse-only and the outcome was never
+        announced; Aero's copy of the same banner is already a `button`
+        (`ImmersionView.tsx:286`), so this is the classic shell catching up.
+
+        The live region is a separate always-mounted node on purpose. A region
+        that mounts together with its first message is not reliably announced —
+        the text has to CHANGE inside a region that was already there.
+      */}
+      <div className="sr-only" role="status" aria-live="polite">{status ?? ''}</div>
       {status && (
-        <div className="immersion-banner status" onClick={() => state.setStatus(null)}>
+        <button type="button" className="immersion-banner status" onClick={() => state.setStatus(null)}>
           {status}
-        </div>
+        </button>
       )}
 
       {!currentUrl && !loading && (
