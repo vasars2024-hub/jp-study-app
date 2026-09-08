@@ -179,6 +179,15 @@ describe('F1 — the unattended sweep must not revert concurrent writes', () => 
     await sweep;
 
     expect(readStore().playlists[0].autoUpdate).toBe(false);
+
+    // Boss-audit F5 (2026-09-08): the assertion above passes whether or not the
+    // `!current.autoUpdate` half of the guard exists, because `applyPlaylistSync`
+    // spreads `{...existing}` and carries the flag through either way. Deleting
+    // that half left all 24 cases green while a playlist the user had just
+    // switched off still took the sweep's videos and got stamped. THESE are the
+    // assertions that die with the guard — do not drop them as redundant.
+    expect(readStore().videos).toHaveLength(0);
+    expect(readStore().playlists[0].lastCheckedAt).toBeUndefined();
   });
 
   it('keeps a playlist removed while the sweep is in flight removed', async () => {
