@@ -479,6 +479,10 @@ export const SCRAPER_UI_ZH: Catalog = {
   'scraperMgmt.permissions.storage': '存储访问',
   'scraperMgmt.permissions.broad': '广泛访问',
   'scraperMgmt.permissions.anixNote': '旧版 AniX 仍处于停用状态，因为它请求通配符网络访问和直接的文件系统访问。',
+  'scraperMgmt.permissions.broadNote': {
+    other: '已安装的 {count} 个适配器请求通配符网络访问或直接的文件系统访问。在你明确启用之前，它们保持停用。',
+  },
+  'scraperMgmt.permissions.noBroad': '没有已安装的适配器请求通配符网络访问或直接的文件系统访问。',
   'scraperMgmt.updates.title': '更新中心',
   'scraperMgmt.updates.description': '适配器的更新与桌面应用本体分开发布。',
   'scraperMgmt.updates.available': '{count} 个可用',

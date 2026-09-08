@@ -2781,3 +2781,44 @@ carries the same labels ("Sources", "Torrents", "Profiles") and a whole-window m
 | D415 | scraper - Discover, MAL download dialog | **Four segmented pickers say which option is selected with colour and nothing else.** On Discover the feed row (This season / Airing / Popular / Upcoming) looks chosen but is not announced as chosen, and the same is true of three segments in the MyAnimeList download dialog. A screen-reader user is read four identical unpressed buttons; a colour-blind user gets no second cue. | Live on Discover: the three `.disc-seg-btn` groups measured `Anime` to `aria-pressed="true"`, `Discover` tab to `aria-selected="true"`, and **`This season` to all of `aria-pressed` / `aria-current` / `aria-selected` null** while carrying the `active` class. Source: `DiscoverContent.tsx:521` (feed), `MalDownloadDialog.tsx:898` (anime shelf), `:921` (manga shelf), `:1004` (amount mode). **The precedent is two lines away and carries its own comment:** `DiscoverContent.tsx:504` sets `aria-pressed` with *"The active segment is signalled by colour alone otherwise, which neither a screen reader nor a colour-blind user can read."* `YoutubeDiscoveryPanel.tsx:487` does the same. Four siblings were missed. | P2 | **fixed — this commit.** |
 | D416 | scraper - Selector Tester, Regex Tester, HTTP Inspector | **Eight of the seventeen controls on the three tool pages have no name at all** — the CSS/XPath mode picker, the selector box, the HTML fixture editor, the regex pattern box, the flags box, the sample-text editor, the HTTP method picker and the URL box. Every one is the primary input of the page it sits on. | Live, per-page HTML-AAM name computation (see the instrument note above): Selector Tester **3 of 4** controls unnamed, Regex Tester **3 of 7**, HTTP Inspector **2 of 6**. None carries `aria-label`, a `<label>`, a `placeholder` or a `title`. The other fourteen pages score 0 unnamed, so this is these three files, not an app-wide shape. | P2 | **fixed — this commit.** |
 | D417 | tooling (why D413 survived) | Not user-visible — filed because it is the reason a whole page of English text passed every gate. **`ToolPages.tsx` is invisible to both i18n instruments at once.** `i18n-hardcoded-check` counts `sx(` as adoption (correctly — the Scraper is on its own string system), so one `sx()` call in `ScriptConsolePage` marks the whole 511-line file as adopted. `i18n-partial-check`, which exists precisely to catch literals inside an adopted file, bails at its line 124 because that test only recognises `t(` and `useT(`, never `sx(`. So a file with one `sx()` call and forty raw literals is adopted enough for one gate and not adopted at all for the other, and falls straight through the gap. | P2 | **fixed — this commit.** |
+
+### 2026-09-08 10:20 EDT — primary2, scraper: D418, a security panel that could only ever read zero
+
+Class 4 (count-vs-truth), found by asking the pin's question of every number on the Plugins page:
+does the data agree? One did not, and it is the one the page exists to be trusted about.
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D418 | scraper - Plugins | **The Permission audit says no installed adapter wants anything.** `Jimaku Bridge` lists `http` and `subtitles` on its own card, and the panel immediately below it reads `0 Network access · 0 Browser control · 0 Storage access · 0 Broad access`. Under that sits a sentence about `Legacy AniX` — an adapter that is not installed and never was on this machine. | Live, pid 11736, window 2, Scraper - Plugins, on the app's real plugin store (2 installed: `broken-one`, whose manifest does not parse, and `Jimaku Bridge`). The audit's four predicates tested `permission.startsWith('network:'/'browser:'/'storage:')`, which is the vocabulary of the renderer's own `data/fixtures.ts`. The manifest reader validates against a different one — `main/scraper/plugins.ts` `KNOWN_PERMISSIONS` is `http, sources, torrents, metadata, subtitles, export, settings`, bare words — and anything carrying one of those prefixes falls into `unknownPermissions`, which sets `compatible: false`. **So the audit could only ever count adapters the app had already rejected: for every plugin that works, all four counters were structurally 0, on every install, forever.** Nothing else in the tree interprets these permissions, so the two lists had no third party to keep them honest. | P2 | **fixed — this commit.** The vocabulary and its groups now live together in `shared/scraperPluginPermissions.ts`; `main/scraper/plugins.ts` imports and re-exports `KNOWN_PERMISSIONS` from there, and the renderer asks the same module. Live after the fix: **Network access 0 -> 1**, and the negative control holds — `broken-one` declares no permissions and is not counted, so it reads 1 and not 2. The AniX sentence is replaced by a count-bearing one that renders only when a broad-access adapter really is installed; on this machine it now reads *"No installed adapter asks for wildcard network or direct filesystem access."* Gate `shared/__tests__/scraperPluginPermissions.test.ts`, 5 cases, one of which encodes the live Jimaku manifest and another of which asserts that `network` and `storage` are **reachable from the accepted vocabulary at all** — that last one is the shape of the defect rather than an instance of it. Mutation (point the resolver back at the `network:` prefix): **3 of 5 red**, and the two legacy-prefix cases correctly stay green because they test the other half. |
+
+**Decision recorded, under the standing auto-approval for reversible internal choices.** The
+permission-to-group map had to be invented — nothing in the tree defined one. `http`, `sources`,
+`torrents`, `metadata` and `subtitles` are all **network**: each exists so an adapter can reach
+something off this machine, which is what a reader of "Network access" wants to know. `export` and
+`settings` are **storage**: they write things the user keeps. **`browser` deliberately has no
+member** — this build has no browser-automation capability, so a 0 in that tile is the true answer
+rather than a missing one, and a test asserts that emptiness on purpose so the next worker either
+removes the tile or adds the capability instead of quietly mapping something else into it. The
+legacy prefixed vocabulary is still recognised, because it only ever appears on a plugin this build
+calls incompatible, and that is exactly the adapter whose reach the audit most needs to show.
+
+**Cleared without a row on the same page, so they are not re-derived:** `Installed 2 · Enabled 0 ·
+Updates 0 · Incompatible 1` all agree with the store (`broken-one` is the incompatible one, and its
+card says why in plain words: *"The manifest is missing or could not be read."*); `updateAvailable`
+is an empty string by design, with a comment saying an update check would mean a network call per
+plugin per page visit; and the live log's four `WARN | plugins | broken-one: Expected property name
+or '}' in JSON at position 2` lines are that same fixture being honest, not a failure.
+
+**Also seen and NOT filed, with the reason.** The Selector Tester surfaces the browser's raw
+exception verbatim — `Failed to execute 'querySelectorAll' on 'Document': '>>>bad<<<' is not a
+valid selector.` — and it stays English in a Japanese UI. It is an engine message on a page whose
+entire purpose is writing selectors, and the exact text is the diagnostic the user came for.
+Translating it is not possible and paraphrasing it would cost information. Driven for real:
+`.ep-list > li` -> 3 matches, `.ep-link` -> 3 `a.ep-link` matches with the right episode titles,
+`>>>bad<<<` -> the message above with the card correctly reading `0 matches`.
+
+**One behaviour worth knowing before the next scraper turn:** opening **Torrent Manager** runs an
+indexer search by itself. Navigating to it during this sweep put `INFO | torrents | Nyaa (torrent
+index): 75 results.` / `60 results after filters.` on the live log three times without a click. The
+pin's "do not run the indexer search" limit cannot be honoured by not clicking — it is honoured by
+not opening that page.

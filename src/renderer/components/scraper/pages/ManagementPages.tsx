@@ -41,6 +41,7 @@ import {
 import type { ScraperScheduleEntry } from '../../../../shared/scraperOutputSettings';
 import type { ScraperSchedulerState } from '../../../../shared/scraperIpc';
 import { isValidCron, nextCronRun, parseCron } from '../../../../shared/scraperCron';
+import { permissionGroup, type PermissionGroup } from '../../../../shared/scraperPluginPermissions';
 
 /**
  * These four pages translate through shared/i18n rather than the Scraper app's
@@ -1281,15 +1282,20 @@ export function PluginsPage() {
       ),
     [plugins, filter],
   );
-  const permissionCounts = useMemo(
-    () => ({
-      network: plugins.filter((plugin) => plugin.permissions.some((permission) => permission.startsWith('network:'))).length,
-      browser: plugins.filter((plugin) => plugin.permissions.some((permission) => permission.startsWith('browser:'))).length,
-      storage: plugins.filter((plugin) => plugin.permissions.some((permission) => permission.startsWith('storage:'))).length,
-      broad: plugins.filter((plugin) => plugin.permissions.some((permission) => permission.includes('*') || permission.startsWith('filesystem:'))).length,
-    }),
-    [plugins],
-  );
+  // D418: these predicates used to test for `network:` / `browser:` / `storage:`
+  // prefixes, which is the fixture vocabulary. `permissionGroup` is derived from
+  // the list the manifest reader actually validates against, so the panel and
+  // the validator cannot drift apart again.
+  const permissionCounts = useMemo(() => {
+    const count = (group: PermissionGroup) =>
+      plugins.filter((plugin) => plugin.permissions.some((p) => permissionGroup(p) === group)).length;
+    return {
+      network: count('network'),
+      browser: count('browser'),
+      storage: count('storage'),
+      broad: count('broad'),
+    };
+  }, [plugins]);
 
   // `lang`, never `t` — see ProfilesPage.
   const filterChips = useMemo(
@@ -1425,7 +1431,18 @@ export function PluginsPage() {
             <span><Icon name="drive" size={14} /><b>{permissionCounts.storage}</b><small>{t('scraperMgmt.permissions.storage')}</small></span>
             <span className={permissionCounts.broad ? 'is-risk' : ''}><Icon name="warning" size={14} /><b>{permissionCounts.broad}</b><small>{t('scraperMgmt.permissions.broad')}</small></span>
           </div>
-          <p className="scr-muted">{t('scraperMgmt.permissions.anixNote')}</p>
+          {/*
+            D418's second half. This line used to render unconditionally and
+            named `Legacy AniX` — a plugin that exists only in the renderer's
+            own `data/fixtures.ts`. On a real install it told the user about an
+            adapter they have never had. It now appears only when a
+            broad-access adapter really is installed, and says how many.
+          */}
+          <p className="scr-muted">
+            {permissionCounts.broad
+              ? t('scraperMgmt.permissions.broadNote', { count: permissionCounts.broad })
+              : t('scraperMgmt.permissions.noBroad')}
+          </p>
         </ScrCard>
         <ScrCard
           title={t('scraperMgmt.updates.title')}

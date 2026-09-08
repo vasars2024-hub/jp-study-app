@@ -506,7 +506,15 @@ export const SCRAPER_UI_EN: Catalog = {
   'scraperMgmt.permissions.browser': 'Browser control',
   'scraperMgmt.permissions.storage': 'Storage access',
   'scraperMgmt.permissions.broad': 'Broad access',
+  // D418: `anixNote` named a plugin that only exists in the renderer's own
+  // fixture list and rendered on every install. Kept as a key because the
+  // catalogs still hold its translations; nothing renders it any more.
   'scraperMgmt.permissions.anixNote': 'Legacy AniX remains disabled because it requests wildcard network and direct filesystem access.',
+  'scraperMgmt.permissions.broadNote': {
+    one: '{count} installed adapter asks for wildcard network or direct filesystem access. It stays disabled until you enable it deliberately.',
+    other: '{count} installed adapters ask for wildcard network or direct filesystem access. They stay disabled until you enable them deliberately.',
+  },
+  'scraperMgmt.permissions.noBroad': 'No installed adapter asks for wildcard network or direct filesystem access.',
   'scraperMgmt.updates.title': 'Update center',
   'scraperMgmt.updates.description': 'Adapter updates are staged independently from the desktop application.',
   'scraperMgmt.updates.available': '{count} available',

@@ -19,16 +19,15 @@ import { scraperStorePath } from './store';
 const PLUGINS_DIR = 'plugins';
 const MANIFEST = 'manifest.json';
 
-/** Permissions this build understands. Anything else marks a plugin incompatible. */
-export const KNOWN_PERMISSIONS = [
-  'http',
-  'sources',
-  'torrents',
-  'metadata',
-  'subtitles',
-  'export',
-  'settings',
-] as const;
+// The permission vocabulary moved to `shared/scraperPluginPermissions.ts` on
+// 2026-09-08 (D418) so the renderer's Permission audit reads the same list this
+// reader validates against. Re-exported here because that is the name every
+// existing importer knows.
+// (A bare `export ... from` would not bind the name in this module's own scope,
+// and `readManifest` below needs it.)
+import { KNOWN_PERMISSIONS } from '../../shared/scraperPluginPermissions';
+
+export { KNOWN_PERMISSIONS };
 
 /** Manifest API versions this build can host. */
 export const SUPPORTED_API_VERSIONS = [1];

@@ -479,6 +479,10 @@ export const SCRAPER_UI_JA: Catalog = {
   'scraperMgmt.permissions.storage': '保存領域へのアクセス',
   'scraperMgmt.permissions.broad': '広範なアクセス',
   'scraperMgmt.permissions.anixNote': '旧 AniX は、ワイルドカードのネットワーク権限とファイルシステムへの直接アクセスを要求するため、無効のままにしています。',
+  'scraperMgmt.permissions.broadNote': {
+    other: '導入済みのアダプター {count} 件が、ワイルドカードのネットワーク権限またはファイルシステムへの直接アクセスを要求しています。明示的に有効にするまで、無効のままです。',
+  },
+  'scraperMgmt.permissions.noBroad': 'ワイルドカードのネットワーク権限やファイルシステムへの直接アクセスを要求している導入済みアダプターはありません。',
   'scraperMgmt.updates.title': '更新センター',
   'scraperMgmt.updates.description': 'アダプターの更新は、デスクトップアプリ本体とは別に用意されます。',
   'scraperMgmt.updates.available': '{count} 件が利用可能',
