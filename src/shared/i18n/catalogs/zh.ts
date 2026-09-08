@@ -2483,7 +2483,9 @@ export const zh: Catalog = {
   'agent.rail.pin': '置顶对话',
   'agent.rail.unpin': '取消置顶',
   'agent.rail.clear': '清除历史',
-  'agent.rail.clearConfirm': '确认清除',
+  'agent.rail.clearConfirm': {
+    other: '删除全部 {count} 个对话（无法撤销）',
+  },
   'agent.state.loading': '正在读取已保存的对话…',
   'agent.state.retry': '重试',
   'agent.state.emptyTitle': '暂无已保存的对话',

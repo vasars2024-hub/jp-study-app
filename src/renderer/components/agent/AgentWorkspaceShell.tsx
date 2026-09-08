@@ -1960,10 +1960,9 @@ export default function AgentWorkspaceShell() {
 
   const togglePin = useCallback((conversationId: string) => {
     if (!state) return;
-    const now = Date.now();
     void run(() => updateAgentWorkspace(
       state,
-      (current) => agentWorkspaceWithPinToggled(current, conversationId, now),
+      (current) => agentWorkspaceWithPinToggled(current, conversationId),
     ));
   }, [run, state]);
 
@@ -2178,15 +2177,18 @@ export default function AgentWorkspaceShell() {
 
           <div className="agent-rail-foot">
             {pendingClear ? (
+              /*
+               * Cancel comes FIRST, and that ordering is the guard, not styling.
+               * The confirm replaces the trigger in place, so when the danger
+               * button was first it inherited the trigger's own rectangle:
+               * measured live on 2026-09-08, 122 ms after clicking "Clear
+               * history" the pixel under the cursor was already "Confirm clear",
+               * well inside Windows' 500 ms double-click interval. A double-click
+               * on a button labelled "Clear history" therefore deleted every
+               * conversation, with no undo. Putting Cancel under the cursor makes
+               * the accidental second click harmless.
+               */
               <>
-                <button
-                  type="button"
-                  className="agent-action agent-action-danger"
-                  onClick={() => void run(clearAgentWorkspace)}
-                  disabled={blocked}
-                >
-                  {t('agent.rail.clearConfirm')}
-                </button>
                 <button
                   type="button"
                   className="agent-action"
@@ -2194,6 +2196,14 @@ export default function AgentWorkspaceShell() {
                   disabled={blocked}
                 >
                   {t('common.cancel')}
+                </button>
+                <button
+                  type="button"
+                  className="agent-action agent-action-danger"
+                  onClick={() => void run(clearAgentWorkspace)}
+                  disabled={blocked}
+                >
+                  {t('agent.rail.clearConfirm', { count: summaries.length })}
                 </button>
               </>
             ) : (
@@ -2296,15 +2306,8 @@ export default function AgentWorkspaceShell() {
                   ))}
                 </div>
                 {pendingDeleteId === selected.id ? (
+                  /* Cancel first, for the same reason as the rail's clear confirm. */
                   <div className="agent-conversation-actions">
-                    <button
-                      type="button"
-                      className="agent-action agent-action-danger"
-                      onClick={() => void run(() => deleteAgentConversation(selected.id))}
-                      disabled={blocked}
-                    >
-                      {t('agent.conversation.deleteConfirm')}
-                    </button>
                     <button
                       type="button"
                       className="agent-action"
@@ -2312,6 +2315,14 @@ export default function AgentWorkspaceShell() {
                       disabled={blocked}
                     >
                       {t('common.cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      className="agent-action agent-action-danger"
+                      onClick={() => void run(() => deleteAgentConversation(selected.id))}
+                      disabled={blocked}
+                    >
+                      {t('agent.conversation.deleteConfirm')}
                     </button>
                   </div>
                 ) : (

@@ -2650,7 +2650,10 @@ export const en: Catalog = {
   'agent.rail.pin': 'Pin conversation',
   'agent.rail.unpin': 'Unpin conversation',
   'agent.rail.clear': 'Clear history',
-  'agent.rail.clearConfirm': 'Confirm clear',
+  'agent.rail.clearConfirm': {
+    one: 'Delete {count} conversation — no undo',
+    other: 'Delete all {count} conversations — no undo',
+  },
   'agent.state.loading': 'Reading stored conversations…',
   'agent.state.retry': 'Try again',
   'agent.state.emptyTitle': 'No stored conversations',

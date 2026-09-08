@@ -2497,7 +2497,9 @@ export const ja: Catalog = {
   'agent.rail.pin': '会話をピン留め',
   'agent.rail.unpin': 'ピン留めを解除',
   'agent.rail.clear': '履歴を消去',
-  'agent.rail.clearConfirm': '消去を確認',
+  'agent.rail.clearConfirm': {
+    other: '会話 {count} 件をすべて削除（取り消せません）',
+  },
   'agent.state.loading': '保存された会話を読み込み中…',
   'agent.state.retry': '再試行',
   'agent.state.emptyTitle': '保存された会話はありません',

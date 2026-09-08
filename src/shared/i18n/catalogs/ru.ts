@@ -2690,7 +2690,12 @@ export const ru: Catalog = {
   'agent.rail.pin': 'Закрепить разговор',
   'agent.rail.unpin': 'Открепить разговор',
   'agent.rail.clear': 'Очистить историю',
-  'agent.rail.clearConfirm': 'Подтвердить очистку',
+  'agent.rail.clearConfirm': {
+    one: 'Удалить {count} разговор — без возврата',
+    few: 'Удалить все {count} разговора — без возврата',
+    many: 'Удалить все {count} разговоров — без возврата',
+    other: 'Удалить все {count} разговоров — без возврата',
+  },
   'agent.state.loading': 'Чтение сохранённых разговоров…',
   'agent.state.retry': 'Повторить',
   'agent.state.emptyTitle': 'Сохранённых разговоров нет',

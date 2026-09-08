@@ -253,10 +253,26 @@ export function agentWorkspaceWithMode(
   };
 }
 
+/**
+ * Toggles the rail pin, and deliberately leaves `updatedAt` alone.
+ *
+ * This used to stamp `now`, on the same reasoning as the mode switch above. It
+ * is wrong here, and destructively so: `updatedAt` is the only record of when a
+ * conversation was last worked on, the rail sorts the unpinned group on it, and
+ * pinning edits nothing about the conversation. So pinning and then unpinning —
+ * the obvious way to find out what the button does — left the conversation
+ * parked at the top of the list above ones the user had genuinely used more
+ * recently, permanently, with the real timestamp overwritten and unrecoverable.
+ * Measured live on 2026-09-08: a 0-message conversation jumped the 4-message one
+ * above it and stayed there after the pin was removed.
+ *
+ * Pinned order still reads well without the stamp: within the pinned group the
+ * sort falls through to recency, which is what someone pinning several
+ * conversations expects to see.
+ */
 export function agentWorkspaceWithPinToggled(
   state: AgentWorkspaceState,
   conversationId: string,
-  now: number,
 ): AgentWorkspaceState | null {
   const target = state.conversations.find((conversation) => conversation.id === conversationId);
   if (!target) return null;
@@ -264,7 +280,7 @@ export function agentWorkspaceWithPinToggled(
     ...state,
     conversations: state.conversations.map((conversation) => (
       conversation.id === conversationId
-        ? { ...conversation, pinned: !conversation.pinned, updatedAt: now }
+        ? { ...conversation, pinned: !conversation.pinned }
         : conversation
     )),
   };
