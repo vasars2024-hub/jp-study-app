@@ -5501,6 +5501,11 @@ export const ru: Catalog = {
   'library.emptyFolder.title': 'Эта папка пуста',
   'library.emptyFolder.desc': 'Перетащите книги на полку или вернитесь к «Все».',
   'library.emptyFolder.descClassic': 'Кнопкой папки на книге положите её сюда или вернитесь к «Все».',
+  'library.emptyFilter.title': 'Ничего не подходит под фильтр',
+  'library.emptyFilter.desc': 'На этой полке есть книги, но фильтр по языку и уровню скрывает их все.',
+  'library.emptyFilter.descClassic':
+    'На этой полке есть книги — фильтр по языку и уровню выше скрывает их все.',
+  'library.emptyFilter.clear': 'Сбросить фильтр',
 
   'manga.backLibrary': 'Библиотека',
   'manga.fit.height': 'По высоте',

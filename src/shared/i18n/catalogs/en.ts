@@ -4986,6 +4986,11 @@ export const en: Catalog = {
   'library.emptyFolder.title': 'This folder is empty',
   'library.emptyFolder.desc': 'Drop books onto the shelf or switch back to All items.',
   'library.emptyFolder.descClassic': 'Use the folder button on any book to file it here, or switch back to All.',
+  'library.emptyFilter.title': 'Nothing here matches the filter',
+  'library.emptyFilter.desc': 'This shelf has books, but the language and level filter hides all of them.',
+  'library.emptyFilter.descClassic':
+    'This shelf has books — the language and level filter above is hiding every one of them.',
+  'library.emptyFilter.clear': 'Clear the filter',
 
   // Manga reader + OCR overlays (Phase 5)
   'manga.backLibrary': 'Library',

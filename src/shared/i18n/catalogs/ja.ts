@@ -4988,6 +4988,11 @@ export const ja: Catalog = {
   'library.emptyFolder.title': 'このフォルダは空です',
   'library.emptyFolder.desc': '本を棚にドロップするか、「すべて」に戻ってください。',
   'library.emptyFolder.descClassic': '本のフォルダボタンでここに整理するか、「すべて」に戻ってください。',
+  'library.emptyFilter.title': 'フィルタに一致するものがありません',
+  'library.emptyFilter.desc': 'この棚に本はありますが、言語とレベルのフィルタがすべて隠しています。',
+  'library.emptyFilter.descClassic':
+    'この棚に本はあります。上の言語とレベルのフィルタがそのすべてを隠しています。',
+  'library.emptyFilter.clear': 'フィルタを解除',
 
   'manga.backLibrary': 'ライブラリ',
   'manga.fit.height': '縦に合わせる',

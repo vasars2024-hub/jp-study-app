@@ -4959,6 +4959,10 @@ export const zh: Catalog = {
   'library.emptyFolder.title': '此文件夹为空',
   'library.emptyFolder.desc': '将图书拖到书架，或切换回“全部”。',
   'library.emptyFolder.descClassic': '用图书上的文件夹按钮归类到此处，或切换回“全部”。',
+  'library.emptyFilter.title': '没有符合筛选条件的内容',
+  'library.emptyFilter.desc': '此书架里有书，但语言和等级筛选把它们全部隐藏了。',
+  'library.emptyFilter.descClassic': '此书架里有书——上方的语言和等级筛选把它们全部隐藏了。',
+  'library.emptyFilter.clear': '清除筛选',
 
   'manga.backLibrary': '书库',
   'manga.fit.height': '适应高度',

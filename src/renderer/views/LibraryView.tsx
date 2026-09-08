@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -39,6 +40,7 @@ import {
   effectiveLang,
   effectiveLevelEstimate,
   levelSortKey,
+  matchesLibraryFilters,
 } from '../../shared/libraryLevel';
 import { useCoverArt } from '../utils/coverArt';
 import {
@@ -564,30 +566,38 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     setItems(await window.api.setLibraryCover(id, rel));
   }
 
+  /** The active folder's items, before the language / level chips narrow them. */
+  const scoped = useMemo(() => {
+    if (active === 'all') return items;
+    if (active === 'unfiled') return items.filter((it) => !it.folder || !folders.includes(it.folder));
+    return items.filter((it) => it.folder === active);
+  }, [items, active, folders]);
+
+  /**
+   * Folder chip counts, narrowed by the SAME language / level filter the grid applies.
+   *
+   * A chip counts what clicking it would show, or it is a promise the shelf does not keep:
+   * measured live on the real library, `Manga 3` under the Japanese filter opened onto zero
+   * books and the message "This folder is empty". `matchesLibraryFilters` is the one predicate
+   * `visible` uses below, so the two cannot drift apart again.
+   */
   const counts = useMemo(() => {
     const c = new Map<string, number>();
     let unfiled = 0;
+    let all = 0;
     for (const it of items) {
+      if (!matchesLibraryFilters(it, bookLevels, { lang: langFilter, level: levelFilter })) continue;
+      all += 1;
       if (it.folder && folders.includes(it.folder)) c.set(it.folder, (c.get(it.folder) ?? 0) + 1);
       else unfiled += 1;
     }
-    return { byFolder: c, unfiled };
-  }, [items, folders]);
+    return { byFolder: c, unfiled, all };
+  }, [items, folders, bookLevels, langFilter, levelFilter]);
 
   const visible = useMemo(() => {
-    let list: LibraryItem[];
-    if (active === 'all') list = items;
-    else if (active === 'unfiled') {
-      list = items.filter((it) => !it.folder || !folders.includes(it.folder));
-    } else list = items.filter((it) => it.folder === active);
-
-    if (langFilter !== 'all') {
-      list = list.filter((it) => effectiveLang(it) === langFilter);
-    }
-    if (levelFilter !== 'all') {
-      const lv = Number(levelFilter);
-      list = list.filter((it) => levelSortKey(it, bookLevels[it.id]) === lv);
-    }
+    const list = scoped.filter((it) =>
+      matchesLibraryFilters(it, bookLevels, { lang: langFilter, level: levelFilter }),
+    );
 
     const sorted = [...list];
     sorted.sort((a, b) => {
@@ -612,7 +622,18 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       }
     });
     return sorted;
-  }, [items, active, folders, sortBy, langFilter, levelFilter, bookLevels]);
+  }, [scoped, sortBy, langFilter, levelFilter, bookLevels]);
+
+  /**
+   * The scope holds books and the filter hid every one of them. Distinct from an empty folder,
+   * because the remedy is the opposite: clear the filter, not file something in here.
+   */
+  const filterHidesAll = visible.length === 0 && scoped.length > 0;
+
+  const clearFilters = useCallback(() => {
+    setLangFilter('all');
+    setLevelFilter('all');
+  }, []);
 
   const groupedVisible = useMemo(() => {
     if (groupBy === 'none') return [{ key: '', items: visible }];
@@ -652,15 +673,10 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
    * step removed. `all` is always kept, and so is whatever is currently selected: a filter you
    * can apply and then cannot see or undo is worse than the clutter this removes.
    */
-  const filterOptions = useMemo(() => {
-    const scoped =
-      active === 'all'
-        ? items
-        : active === 'unfiled'
-          ? items.filter((it) => !it.folder || !folders.includes(it.folder))
-          : items.filter((it) => it.folder === active);
-    return availableFilterChips(scoped, bookLevels, { lang: langFilter, level: levelFilter });
-  }, [items, folders, active, bookLevels, langFilter, levelFilter]);
+  const filterOptions = useMemo(
+    () => availableFilterChips(scoped, bookLevels, { lang: langFilter, level: levelFilter }),
+    [scoped, bookLevels, langFilter, levelFilter],
+  );
 
   /**
    * What the collapsed filter disclosure has to say out loud. A filter that is applied while
@@ -879,7 +895,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       items: [
         {
           id: 'view-all',
-          label: t('library.menu.viewAll', { count: items.length }),
+          label: t('library.menu.viewAll', { count: counts.all }),
           disabled: active === 'all',
           onSelect: () => setActive('all'),
         },
@@ -1085,7 +1101,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
             >
               <Icon name="library" size={15} />
               <span>{t('library.filter.allItems')}</span>
-              <strong>{items.length}</strong>
+              <strong>{counts.all}</strong>
             </button>
             {folders.map((f) => (
               <button
@@ -1106,7 +1122,10 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 <strong>{counts.byFolder.get(f) ?? 0}</strong>
               </button>
             ))}
-            {counts.unfiled > 0 && (
+            {/* Kept while it is the active selection even at zero — a filter that removes the
+                chip you are standing on leaves you somewhere you cannot see or leave. Same
+                rule `availableFilterChips` states for the language and level chips. */}
+            {(counts.unfiled > 0 || active === 'unfiled') && (
               <button
                 type="button"
                 className={`aero-library-tree-row ${active === 'unfiled' ? 'active' : ''}`}
@@ -1265,6 +1284,15 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                   {t('library.empty.cta')}
                 </Button>
               </div>
+            ) : filterHidesAll ? (
+              <div className="aero-library-empty">
+                <Icon name="folder" size={38} />
+                <h2>{t('library.emptyFilter.title')}</h2>
+                <p className="muted">{t('library.emptyFilter.desc')}</p>
+                <Button variant="primary" onClick={clearFilters}>
+                  {t('library.emptyFilter.clear')}
+                </Button>
+              </div>
             ) : visible.length === 0 ? (
               <div className="aero-library-empty">
                 <Icon name="folder" size={38} />
@@ -1419,7 +1447,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           title={t('library.chip.allTitle')}
           {...chipDropProps(null, false)}
         >
-          {t('library.filter.all')} <span className="lib-chip-count">{items.length}</span>
+          {t('library.filter.all')} <span className="lib-chip-count">{counts.all}</span>
         </button>
         {folders.map((f) => (
           <button
@@ -1451,7 +1479,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
             )}
           </button>
         ))}
-        {counts.unfiled > 0 && folders.length > 0 && (
+        {(counts.unfiled > 0 || active === 'unfiled') && folders.length > 0 && (
           <button
             className={`lib-folder-chip ${active === 'unfiled' ? 'active' : ''} ${dropHover === '__all__' ? '' : ''}`}
             aria-pressed={active === 'unfiled'}
@@ -1603,6 +1631,17 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           <p className="muted">{t('library.empty.descClassic')}</p>
           <button className="btn primary" onClick={importFiles}>
             {t('library.empty.cta')}
+          </button>
+        </div>
+      ) : filterHidesAll ? (
+        <div className="empty">
+          <div className="empty-emoji">
+            <Icon name="folder" size={44} />
+          </div>
+          <h2>{t('library.emptyFilter.title')}</h2>
+          <p className="muted">{t('library.emptyFilter.descClassic')}</p>
+          <button className="btn primary" onClick={clearFilters}>
+            {t('library.emptyFilter.clear')}
           </button>
         </div>
       ) : visible.length === 0 ? (

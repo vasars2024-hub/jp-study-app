@@ -82,3 +82,29 @@ export function availableFilterChips(
     ) as string[],
   };
 }
+
+/**
+ * Does one item survive the language / level filter chips?
+ *
+ * The ONE predicate. Library used to apply the two filters inline while building the visible
+ * grid and count folder chips over the unfiltered store, so the two answers drifted: on the
+ * real 24-item library with Japanese selected, the `Manga` chip promised 3 and opened onto
+ * "This folder is empty" — which was false (it holds 3) and pointed at the wrong remedy
+ * (file a book into it, rather than clear the filter). Counting and showing must ask the same
+ * question, so they call this and nothing else.
+ *
+ * The sibling `availableFilterChips` already applies the symmetric rule in the other
+ * direction — lang/level chips are scoped to the active folder — on the stated grounds that a
+ * filter which can only return nothing is a dead control. A folder chip is one too.
+ */
+export function matchesLibraryFilters(
+  item: LibraryItem,
+  bookLevels: Readonly<Record<string, BookLevelEstimate | null | undefined>>,
+  selected: { lang: string; level: string },
+): boolean {
+  if (selected.lang !== 'all' && effectiveLang(item) !== selected.lang) return false;
+  if (selected.level !== 'all' && levelSortKey(item, bookLevels[item.id]) !== Number(selected.level)) {
+    return false;
+  }
+  return true;
+}
