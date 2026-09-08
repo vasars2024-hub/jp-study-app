@@ -76,6 +76,7 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.a11y.roundAudio': '第{current}問／全{total}問：音声を聞いて解答してください',
   'games.verdict.correct': '正解',
   'games.verdict.answer': '答え：',
+  'games.match.instruction': '日本語の単語をそれぞれの意味と結びつけてください。',
   'games.match.pick': '意味を選択',
   'games.coverage.label': 'このレベルのデッキ収録率',
   'games.coverage.count': 'レベル単語リストのうち{have}/{total}がデッキにあります · {pct}%',

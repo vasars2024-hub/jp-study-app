@@ -725,8 +725,13 @@ function PromptBlock({ round }: { round: GameRound }) {
       {speaks ? (
         <div className="game-prompt-sub">{t('games.audioPrompt')}</div>
       ) : (
-        <div className="game-prompt-main" lang="ja">
-          {round.prompt}
+        // `lang` follows the prompt rather than the game: Sentence Builder and
+        // Speed Type ask in the player's own language, so a fixed `ja` put
+        // English behind a Japanese voice and a Japanese font stack. A keyed
+        // prompt is UI chrome, renders in the UI language, and so declares
+        // nothing — it inherits the document's language, which is correct.
+        <div className="game-prompt-main" lang={round.promptKey ? undefined : round.promptLang}>
+          {round.promptKey ? t(round.promptKey) : round.prompt}
         </div>
       )}
       {/* The translated meaning of the missing word — the only clue in a cloze. */}

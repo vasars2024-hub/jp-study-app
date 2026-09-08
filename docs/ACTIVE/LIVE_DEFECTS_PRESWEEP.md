@@ -2597,3 +2597,12 @@ The page subtitle "grouped by series" is left alone for the same reason.
 `src/renderer/__tests__/scraperResultsTotals.test.tsx`.
 
 Defect ids: **D319–D322** from `primary`'s range 310–329. **323–329 remain.**
+
+---
+
+## 2026-09-08 `primary2` — games (Game Arena), the round prompt
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D330 | games | The question line of a round is declared Japanese even when it is plainly English. In Sentence Builder the question is `I eat dinner together with my family.`, in Word Match Rush it is `Match each Japanese word to its meaning.` — both are announced by a screen reader in a Japanese voice, and both are laid out with the app's Japanese font stack rather than its Latin one. Speed Type and Counter Quiz have the same shape. | Game Arena ▸ Sentence Builder ▸ Start round. Measured live 2026-09-08, pid 4652, window 2: `<div class="game-prompt-main" lang="ja">I eat dinner together with my family.</div>`, with `document.documentElement.lang === "en"` — so the `ja` is a real override of a correct document language, not an inherited one. Same read on Word Match Rush. | P2 | open |
+| D331 | games | Word Match Rush shows its instruction in English no matter what language the app is set to. Every other string on the surface — the game names, the HUD, the buttons, "Pick a meaning" — is translated. | Game Arena ▸ Word Match Rush ▸ Start round. Live 2026-09-08 the prompt reads `Match each Japanese word to its meaning.` Source: `src/renderer/games/engine.ts:432` and `:492` build the round with `prompt: 'Match each Japanese word to its meaning.'` — a raw literal, not a catalog key — and `PromptBlock` renders `round.prompt` verbatim. | P2 | open |

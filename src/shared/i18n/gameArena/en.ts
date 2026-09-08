@@ -96,6 +96,7 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.a11y.roundAudio': 'Question {current} of {total}: listen, then answer',
   'games.verdict.correct': 'Correct',
   'games.verdict.answer': 'Answer:',
+  'games.match.instruction': 'Match each Japanese word to its meaning.',
   'games.match.pick': 'Pick a meaning',
   'games.coverage.label': 'Deck coverage for this level',
   'games.coverage.count': '{have}/{total} of your level list is in your deck · {pct}%',

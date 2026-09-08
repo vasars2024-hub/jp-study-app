@@ -79,6 +79,7 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.a11y.roundAudio': 'Вопрос {current} из {total}: прослушайте и ответьте',
   'games.verdict.correct': 'Верно',
   'games.verdict.answer': 'Ответ:',
+  'games.match.instruction': 'Сопоставьте каждое японское слово с его значением.',
   'games.match.pick': 'Выберите значение',
   'games.coverage.label': 'Покрытие колодой на этом уровне',
   'games.coverage.count': '{have}/{total} слов вашего уровня есть в колоде · {pct}%',

@@ -214,3 +214,52 @@ describe('a finished session is banked exactly once', () => {
     }
   });
 });
+
+/**
+ * D330 / D331, measured live 2026-09-08 against pid 4652:
+ *   <div class="game-prompt-main" lang="ja">I eat dinner together with my family.</div>
+ * with `document.documentElement.lang === 'en'`. Sentence Builder, Speed Type
+ * and Counter Quiz ask in the player's own language, and Word Match Rush asks
+ * in UI chrome that was a raw English literal in `engine.ts`.
+ */
+describe('the prompt declares the language it is actually written in', () => {
+  // Mutation control: restore the literal `lang="ja"` on `.game-prompt-main`
+  // and this case alone goes red — the Japanese-prompt case below stays green,
+  // so a component that hardcodes `ja` cannot pass the pair.
+  it('does not claim a source-language question is Japanese', async () => {
+    await render();
+    await startGame('games.def.sentence-builder.title');
+
+    const prompt = host.querySelector<HTMLElement>('.game-prompt-main');
+    expect(prompt, 'sentence builder did not reach a round').not.toBeNull();
+    // The question is the English meaning; the answer is the Japanese.
+    expect(prompt!.textContent).not.toMatch(/[぀-ヿ]/);
+    expect(prompt!.getAttribute('lang')).toBe('en');
+  });
+
+  // The other half of the control: a genuinely Japanese prompt must still say
+  // so, or "stop hardcoding ja" could be satisfied by dropping `lang` entirely.
+  it('still marks a Japanese question as Japanese', async () => {
+    await render();
+    await startGame('games.def.kana-sprint.title');
+
+    const prompt = host.querySelector<HTMLElement>('.game-prompt-main');
+    expect(prompt, 'kana sprint did not reach a round').not.toBeNull();
+    expect(prompt!.textContent).toMatch(/[぀-ヿ]/);
+    expect(prompt!.getAttribute('lang')).toBe('ja');
+  });
+
+  // Mutation control: drop `promptKey` from the two word-match constructors in
+  // `engine.ts` and this case goes red on the first assertion (the raw English
+  // literal comes back), while both cases above stay green.
+  it('renders the match instruction from the catalog, in the UI language', async () => {
+    await render();
+    await startGame('games.def.word-match.title');
+
+    const prompt = host.querySelector<HTMLElement>('.game-prompt-main');
+    expect(prompt, 'word match did not reach a round').not.toBeNull();
+    expect(prompt!.textContent).toBe('games.match.instruction');
+    // Chrome resolves in the UI language, so it must not override the document.
+    expect(prompt!.hasAttribute('lang')).toBe(false);
+  });
+});
