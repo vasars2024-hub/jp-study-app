@@ -34,11 +34,21 @@
  *                 hazard (nothing was under the cursor), listed so the count of
  *                 what was examined is honest.
  *
- * DANGER-FIRST is a LEAD, not a verdict. Two shapes produce it legitimately and
- * must be checked by hand before filing: the pair may render somewhere the
- * trigger never was (a modal, a toast, a different row), and the trigger may be
- * far wider or narrower than the confirm so the rects do not actually overlap.
- * Confirm with `elementFromPoint` at the trigger's own centre before filing.
+ * The displacement rule, which is what makes DANGER-FIRST mean something. A
+ * first pass asked only "is the danger button before the cancel button", and
+ * that reported three sites that are in fact safe. Each was safe for the same
+ * reason, so the hand-ruling became the rule: **anything that RENDERS before the
+ * danger button pushes it out of the trigger's rectangle.** A confirm question
+ * (`AutoAudioPreferences`, `TranscriptionCardOptions`) or a message paragraph
+ * (`FilesDeletionControls`, inside its `role="alertdialog"`) is enough. The
+ * Agent rail had nothing: the danger button was the first thing in the fragment.
+ * So a pair is DANGER-FIRST only when the destructive button comes before the
+ * cancel AND nothing is rendered ahead of it.
+ *
+ * Still a LEAD, not a verdict: the pair may render somewhere the trigger never
+ * was, and the trigger may be far wider or narrower than the confirm so the
+ * rects do not actually overlap. Confirm with `elementFromPoint` at the
+ * trigger's own centre before filing.
  *
  * Usage:
  *   node src/.coordination/presweep/inline-confirm-order-scan.cjs
@@ -95,6 +105,28 @@ function buttonsIn(chunk) {
 }
 
 /**
+ * True when some JSX child renders before `index` — a text literal or an
+ * expression child, which is what displaces the button after it.
+ *
+ * A tag-closing `>` followed by `{` or by printable text is the signal. The
+ * `previous !== '='` guard is load-bearing: `onClick={() => setPending(null)}`
+ * on a WRAPPER element puts a `>` followed by ` setPending` in front of the
+ * first button, and without the guard every wrapper with an arrow prop reads as
+ * having content.
+ */
+function rendersContentBefore(chunk, index) {
+  const head = chunk.slice(0, index);
+  for (let i = 0; i < head.length; i += 1) {
+    if (head[i] !== '>' || head[i - 1] === '=') continue;
+    let j = i + 1;
+    while (j < head.length && /\s/.test(head[j])) j += 1;
+    if (j >= head.length) return false;
+    if (head[j] !== '<') return true;
+  }
+  return false;
+}
+
+/**
  * Walks forward from `? (` matching parens, so a ternary containing its own
  * nested ternaries and calls is still cut at the right place.
  */
@@ -133,7 +165,9 @@ function classify(source) {
             : '';
           const altButtons = buttonsIn(alternate);
           if (altButtons.length === 1) {
-            verdict = danger[0].start < cancel[0].start ? 'DANGER-FIRST' : 'SAFE-FIRST';
+            const dangerLeads = danger[0].start < cancel[0].start
+              && !rendersContentBefore(consequent, danger[0].start);
+            verdict = dangerLeads ? 'DANGER-FIRST' : 'SAFE-FIRST';
           }
         }
         const line = source.slice(0, match.index).split('\n').length;
