@@ -165,6 +165,58 @@
   overflow-wrap: anywhere;
 }
 
+/* Blanc's half of the shared markdown rendering. Deliberately flatter than
+   Study OS's: Blanc is the focused surface, so an answer gets structure and
+   nothing decorative. */
+.blanc-agent-message-text-rich {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  white-space: normal;
+}
+
+.blanc-agent-message-text-para {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.blanc-agent-message-text-heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.blanc-agent-message-text-list {
+  margin: 0;
+  padding-inline-start: 1.35em;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+.blanc-agent-message-text-code {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 6%);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.blanc-agent-message-text-rich code {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 6%);
+  font-size: 0.95em;
+}
+
+.blanc-agent-message-text-code code {
+  padding: 0;
+  background: none;
+}
+
 /* The per-tool crash guard (BlancToolErrorBoundary).
    ---------------------------------------------------------------------------
    Housed here rather than in blanc.css for the same parallel-stream reason the

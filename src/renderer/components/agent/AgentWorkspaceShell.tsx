@@ -169,6 +169,7 @@ import {
 } from '../../../shared/agentUndo';
 import { performAgentUndo, readAgentUndoContext } from '../../agentUndoClient';
 import { runAgentNavigation } from '../../agentNavigationClient';
+import { AgentMessageText } from './AgentMessageText';
 import {
   AGENT_ATTACHMENT_ACCEPT,
   readAgentAttachmentFiles,
@@ -692,7 +693,15 @@ function MessageRow({
           </button>
         ) : null}
       </div>
-      {message.text ? <p className="agent-message-text">{message.text}</p> : null}
+      {/*
+        Assistant answers arrive in markdown from every provider this app talks
+        to, so they are formatted; a user's own text is shown exactly as typed.
+      */}
+      <AgentMessageText
+        text={message.text}
+        className="agent-message-text"
+        markdown={message.role === 'assistant'}
+      />
       {message.error ? (
         <p className="agent-message-error">
           {EXECUTION_ERROR_CODES.has(message.error as AgentExecutionFailureCode)

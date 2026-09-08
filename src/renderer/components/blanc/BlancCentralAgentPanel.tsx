@@ -64,6 +64,7 @@ import { loadLocalAgentSettings } from '../../localAgentSettingsStore';
 import { AgentSpendPanel } from '../agent/AgentSpendPanel';
 import { AgentGovernancePanel } from '../agent/AgentGovernancePanel';
 import { AgentConversationPlanQueue } from '../agent/AgentConversationPlanQueue';
+import { AgentMessageText } from '../agent/AgentMessageText';
 import {
   AGENT_CLOUD_TARGETS,
   agentTargetLabel,
@@ -455,7 +456,12 @@ export function BlancCentralAgentPanel() {
                 </span>
               ) : null}
             </p>
-            <p className="blanc-agent-message-text">{message.text}</p>
+            {/* Same formatting as Study OS — the same answer, in Blanc's material. */}
+            <AgentMessageText
+              text={message.text}
+              className="blanc-agent-message-text"
+              markdown={message.role === 'assistant'}
+            />
           </article>
         ))}
       </div>
