@@ -111,7 +111,7 @@ export default function MotionPage() {
             <button
               key={id}
               type="button"
-              className={seg(m.motionMode === id)}
+              {...seg(m.motionMode === id)}
               onClick={() => patch({ motionMode: id })}
             >
               {t(labelKey)}
@@ -185,7 +185,7 @@ export default function MotionPage() {
             <button
               key={id}
               type="button"
-              className={seg(m.rewardParticles === id)}
+              {...seg(m.rewardParticles === id)}
               disabled={m.motionMode === 'disabled'}
               onClick={() => patch({ rewardParticles: id })}
             >

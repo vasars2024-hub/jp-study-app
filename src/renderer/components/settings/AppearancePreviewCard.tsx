@@ -36,12 +36,13 @@ import {
   type RadiusId,
   type ShadowStrengthId,
 } from '../../osPersonalization';
+import type { SegButtonProps } from '../ui/segButton';
 
 export interface AppearancePreviewCardProps {
   look: OsPersonalization;
   theme: string;
   highlight?: boolean;
-  seg: (active: boolean) => string;
+  seg: (active: boolean) => SegButtonProps;
   onApply: (draft: OsPersonalization, themeId: string) => void;
 }
 
@@ -206,7 +207,7 @@ export default function AppearancePreviewCard({
                 <button
                   key={id}
                   type="button"
-                  className={seg(draft[group.key] === id)}
+                  {...seg(draft[group.key] === id)}
                   onClick={() =>
                     patch({
                       [group.key]: id as DensityId | RadiusId | ChromeMaterialId | ShadowStrengthId | FontFamilyId,

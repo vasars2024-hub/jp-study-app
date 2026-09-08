@@ -177,7 +177,7 @@ export default function LockscreenPage() {
             <button
               key={id}
               type="button"
-              className={seg(cfg.tint === id)}
+              {...seg(cfg.tint === id)}
               onClick={() => setCfg(saveLockscreen({ tint: id }))}
             >
               {t(labelKey)}

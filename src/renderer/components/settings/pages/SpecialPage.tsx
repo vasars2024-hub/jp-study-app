@@ -438,7 +438,7 @@ export default function SpecialPage() {
               <button
                 key={id}
                 type="button"
-                className={seg(wiredSettings.crtIntensity === id)}
+                {...seg(wiredSettings.crtIntensity === id)}
                 onClick={() => setWiredSettings(saveWiredArchiveSettings({ crtIntensity: id }))}
               >
                 {id.toUpperCase()}
@@ -451,7 +451,7 @@ export default function SpecialPage() {
               <button
                 key={id}
                 type="button"
-                className={seg(wiredSettings.motionLevel === id)}
+                {...seg(wiredSettings.motionLevel === id)}
                 onClick={() => setWiredSettings(saveWiredArchiveSettings({ motionLevel: id }))}
               >
                 {id.toUpperCase()}

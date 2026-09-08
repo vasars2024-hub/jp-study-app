@@ -11,10 +11,8 @@ import {
   setStudyLang,
   type StudyLang,
 } from '../../../studyEnvironment';
+import { segButton as seg } from '../../ui/segButton';
 
-function seg(active: boolean): string {
-  return `btn small ${active ? 'primary' : ''}`;
-}
 
 /** Settings > Study — environment switch + missing starter assets CTA. */
 export default function StudyLanguageSection() {
@@ -62,7 +60,7 @@ export default function StudyLanguageSection() {
         <div className="sp-seg" role="group" aria-label={t('settings.study.lang.aria')}>
           <button
             type="button"
-            className={seg(studyLang === 'ja')}
+            {...seg(studyLang === 'ja')}
             onClick={() => setStudyLang('ja')}
             lang="ja"
           >
@@ -70,7 +68,7 @@ export default function StudyLanguageSection() {
           </button>
           <button
             type="button"
-            className={seg(studyLang === 'zh')}
+            {...seg(studyLang === 'zh')}
             onClick={() => setStudyLang('zh')}
             lang="zh"
           >

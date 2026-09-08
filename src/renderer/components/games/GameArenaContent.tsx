@@ -609,6 +609,7 @@ function KanaScopePicker({ selection }: { selection: KanaSelection }) {
         <button
           type="button"
           className={`btn small ${manual ? '' : 'primary'}`}
+          aria-pressed={!manual}
           onClick={() => patch({ mode: 'auto' })}
         >
           {t('games.kana.mode.auto')}
@@ -616,6 +617,7 @@ function KanaScopePicker({ selection }: { selection: KanaSelection }) {
         <button
           type="button"
           className={`btn small ${manual ? 'primary' : ''}`}
+          aria-pressed={manual}
           onClick={() => patch({ mode: 'manual' })}
         >
           {t('games.kana.mode.manual')}
@@ -629,6 +631,7 @@ function KanaScopePicker({ selection }: { selection: KanaSelection }) {
                 key={script}
                 type="button"
                 className={`btn small ${selection.scripts.includes(script) ? 'primary' : ''}`}
+                aria-pressed={selection.scripts.includes(script)}
                 onClick={() => toggleScript(script)}
               >
                 {t(`games.kana.script.${script}`)}
@@ -641,6 +644,7 @@ function KanaScopePicker({ selection }: { selection: KanaSelection }) {
                 key={group.id}
                 type="button"
                 className={`btn small ${selection.groups.includes(group.id) ? 'primary' : ''}`}
+                aria-pressed={selection.groups.includes(group.id)}
                 onClick={() => toggleGroup(group.id)}
               >
                 {t(`games.kana.group.${group.id}`)}

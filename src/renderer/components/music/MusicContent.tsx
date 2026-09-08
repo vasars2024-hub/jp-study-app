@@ -777,6 +777,7 @@ export function MusicControls({
     <ContextualSurface className="music-controls lq-hit-scope">
       <button
         className={`btn small ${ps.shuffle ? 'primary' : ''}`}
+        aria-pressed={ps.shuffle}
         onClick={player.toggleShuffle}
         title={t('music.controls.shuffle')}
       >
@@ -812,6 +813,7 @@ export function MusicControls({
       </button>
       <button
         className={`btn small music-repeat-btn ${ps.repeat !== 'off' ? 'primary' : ''}`}
+        aria-pressed={ps.repeat !== 'off'}
         onClick={player.cycleRepeat}
         title={t('music.controls.repeatTitle', { mode: t(`music.repeat.${ps.repeat}`) })}
       >

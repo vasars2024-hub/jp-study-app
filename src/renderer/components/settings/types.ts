@@ -7,6 +7,7 @@ import type { ReaderSettings } from '../../readerSettings';
 import type { WhisperDevice, WhisperModelTier } from '../../whisperSettings';
 import type { LyricsSettings } from '../../lyricsSettings';
 import type { MiniModeSettings } from '../../miniMode';
+import type { SegButtonProps } from '../ui/segButton';
 
 export interface WallChoice {
   kind: 'preset' | 'image' | 'video' | 'slideshow';
@@ -195,5 +196,10 @@ export interface SettingsController extends SettingsWallProps {
   patchMini: (p: Partial<MiniModeSettings>) => void;
   advancedMode: boolean;
   setAdvancedMode: (on: boolean) => void;
-  seg: (active: boolean) => string;
+  /**
+   * Props for one button in a segmented control — className AND the state that
+   * goes with it. It returns props rather than a class name so the two cannot
+   * be applied separately; see `components/ui/segButton.ts` (D333).
+   */
+  seg: (active: boolean) => SegButtonProps;
 }

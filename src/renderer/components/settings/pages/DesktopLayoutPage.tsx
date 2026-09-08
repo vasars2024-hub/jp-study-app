@@ -28,7 +28,7 @@ export default function DesktopLayoutPage() {
             <button
               key={id}
               type="button"
-              className={seg(deskPrefs.iconSize === id)}
+              {...seg(deskPrefs.iconSize === id)}
               onClick={() => patchDesk({ iconSize: id })}
             >
               {t(labelKey)}
@@ -39,14 +39,14 @@ export default function DesktopLayoutPage() {
           <span className="os-viz-label muted">{t('settings.desktop.label.labels')}</span>
           <button
             type="button"
-            className={seg(deskPrefs.iconLabel === 'always')}
+            {...seg(deskPrefs.iconLabel === 'always')}
             onClick={() => patchDesk({ iconLabel: 'always' })}
           >
             {t('settings.desktop.labels.always')}
           </button>
           <button
             type="button"
-            className={seg(deskPrefs.iconLabel === 'hover')}
+            {...seg(deskPrefs.iconLabel === 'hover')}
             onClick={() => patchDesk({ iconLabel: 'hover' })}
           >
             {t('settings.desktop.labels.hover')}
@@ -65,7 +65,7 @@ export default function DesktopLayoutPage() {
             <button
               key={id}
               type="button"
-              className={seg(deskPrefs.iconTextColor === id)}
+              {...seg(deskPrefs.iconTextColor === id)}
               onClick={() => patchDesk({ iconTextColor: id })}
             >
               {t(labelKey)}
@@ -85,7 +85,7 @@ export default function DesktopLayoutPage() {
             <button
               key={id}
               type="button"
-              className={seg(deskPrefs.snapGrid === id)}
+              {...seg(deskPrefs.snapGrid === id)}
               onClick={() => {
                 patchDesk({ snapGrid: id });
                 if (id > 0) {
@@ -136,7 +136,7 @@ export default function DesktopLayoutPage() {
             <button
               key={id}
               type="button"
-              className={seg(deskPrefs.taskbarSize === id)}
+              {...seg(deskPrefs.taskbarSize === id)}
               onClick={() => patchDesk({ taskbarSize: id })}
             >
               {t(labelKey)}
@@ -147,7 +147,7 @@ export default function DesktopLayoutPage() {
           <span className="os-viz-label muted">{t('settings.desktop.label.clock')}</span>
           <button
             type="button"
-            className={seg(deskPrefs.clock24h === 'auto')}
+            {...seg(deskPrefs.clock24h === 'auto')}
             onClick={() => patchDesk({ clock24h: 'auto' })}
             title={t('settings.desktop.clock.autoHint')}
           >
@@ -155,28 +155,28 @@ export default function DesktopLayoutPage() {
           </button>
           <button
             type="button"
-            className={seg(deskPrefs.clock24h === false)}
+            {...seg(deskPrefs.clock24h === false)}
             onClick={() => patchDesk({ clock24h: false })}
           >
             {t('settings.desktop.clock.h12')}
           </button>
           <button
             type="button"
-            className={seg(deskPrefs.clock24h === true)}
+            {...seg(deskPrefs.clock24h === true)}
             onClick={() => patchDesk({ clock24h: true })}
           >
             {t('settings.desktop.clock.h24')}
           </button>
           <button
             type="button"
-            className={seg(deskPrefs.clockSeconds)}
+            {...seg(deskPrefs.clockSeconds)}
             onClick={() => patchDesk({ clockSeconds: !deskPrefs.clockSeconds })}
           >
             {t('settings.desktop.clock.seconds')}
           </button>
           <button
             type="button"
-            className={seg(deskPrefs.clockShowDate)}
+            {...seg(deskPrefs.clockShowDate)}
             onClick={() => patchDesk({ clockShowDate: !deskPrefs.clockShowDate })}
           >
             {t('settings.desktop.clock.date')}
@@ -196,7 +196,7 @@ export default function DesktopLayoutPage() {
             <button
               key={n}
               type="button"
-              className={seg(deskPrefs.startColumns === n)}
+              {...seg(deskPrefs.startColumns === n)}
               onClick={() => patchDesk({ startColumns: n })}
             >
               {n}

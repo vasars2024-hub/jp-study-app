@@ -255,7 +255,7 @@ export default function AppearancePage() {
             onChange={(e) => patchLook({ accentMode: 'custom', customAccent: e.target.value })}
             title={t('settings.appearance.accent.customTitle')}
           />
-          <button type="button" className={seg(look.accentMode === 'custom')} onClick={() => patchLook({ accentMode: 'custom' })}>
+          <button type="button" {...seg(look.accentMode === 'custom')} onClick={() => patchLook({ accentMode: 'custom' })}>
             {t('settings.appearance.accent.useCustom')}
           </button>
         </div>
@@ -274,7 +274,7 @@ export default function AppearancePage() {
             ['system', 'settings.appearance.font.system'],
             ['jp-first', 'settings.appearance.font.jpFirst'],
           ] as [FontFamilyId, string][]).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(look.fontFamily === id)} onClick={() => patchLook({ fontFamily: id })}>
+            <button key={id} type="button" {...seg(look.fontFamily === id)} onClick={() => patchLook({ fontFamily: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -286,7 +286,7 @@ export default function AppearancePage() {
             ['comfortable', 'settings.appearance.density.comfortable'],
             ['spacious', 'settings.appearance.density.spacious'],
           ] as [DensityId, string][]).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(look.density === id)} onClick={() => patchLook({ density: id })}>
+            <button key={id} type="button" {...seg(look.density === id)} onClick={() => patchLook({ density: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -298,7 +298,7 @@ export default function AppearancePage() {
             ['soft', 'settings.appearance.corners.soft'],
             ['round', 'settings.appearance.corners.round'],
           ] as [RadiusId, string][]).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(look.radius === id)} onClick={() => patchLook({ radius: id })}>
+            <button key={id} type="button" {...seg(look.radius === id)} onClick={() => patchLook({ radius: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -317,7 +317,7 @@ export default function AppearancePage() {
             ['solid', 'settings.appearance.chrome.solid'],
             ['frosted', 'settings.appearance.chrome.frosted'],
           ] as [ChromeMaterialId, string][]).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(look.chrome === id)} onClick={() => patchLook({ chrome: id })}>
+            <button key={id} type="button" {...seg(look.chrome === id)} onClick={() => patchLook({ chrome: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -329,7 +329,7 @@ export default function AppearancePage() {
             ['soft', 'settings.appearance.shadows.soft'],
             ['deep', 'settings.appearance.shadows.deep'],
           ] as [ShadowStrengthId, string][]).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(look.shadow === id)} onClick={() => patchLook({ shadow: id })}>
+            <button key={id} type="button" {...seg(look.shadow === id)} onClick={() => patchLook({ shadow: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -349,7 +349,7 @@ export default function AppearancePage() {
             <button
               key={opt.id}
               type="button"
-              className={seg(borderSettings.style === opt.id)}
+              {...seg(borderSettings.style === opt.id)}
               onClick={() => {
                 const updated = saveAppBorderSettings({ ...borderSettings, style: opt.id });
                 setBorderSettings(updated);
@@ -410,7 +410,7 @@ export default function AppearancePage() {
             <button
               key={opt.id}
               type="button"
-              className={seg(pillarboxSettings.style === opt.id)}
+              {...seg(pillarboxSettings.style === opt.id)}
               onClick={() => {
                 const updated = savePillarboxSettings({ ...pillarboxSettings, style: opt.id });
                 setPillarboxSettings(updated);
@@ -449,7 +449,7 @@ export default function AppearancePage() {
             <button
               key={String(on)}
               type="button"
-              className={seg(pillarboxSettings.nativeFill === on)}
+              {...seg(pillarboxSettings.nativeFill === on)}
               onClick={() => {
                 const updated = savePillarboxSettings({ ...pillarboxSettings, nativeFill: on });
                 setPillarboxSettings(updated);
