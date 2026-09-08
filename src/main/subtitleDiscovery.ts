@@ -914,7 +914,16 @@ export async function runSubtitleDiscovery(
           enqueueTranscription({ mediaId: item.id, lang: 'ja' });
         }
 
-        const gained = outcome.records.length > (item.subtitles?.length ?? 0);
+        // D268. The baseline is what the run STARTED from, not what the item had
+        // before it. A forced re-search drops every rediscoverable record first
+        // (`discoverForItem`'s `retainedOnForce`), so an item that had one
+        // subtitle and successfully re-attached one compares 1 > 1, counts as
+        // `empty`, and the user who pressed *Find subtitles* is told "0
+        // subtitles" about a search that worked. Measured live 2026-09-07 on
+        // `The Big O - 07`: `{attached: 0, empty: 3, files: 1}` while the store
+        // held the freshly attached record.
+        const before = request.force === true ? retainedOnForce(item.subtitles).length : (item.subtitles?.length ?? 0);
+        const gained = outcome.records.length > before;
         if (gained) attached += 1;
         else {
           empty += 1;

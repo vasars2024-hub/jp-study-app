@@ -217,6 +217,31 @@ async function sweep(item: MediaItem, request: Record<string, unknown> = {}): Pr
   };
 }
 
+/**
+ * Same driver, but handing back the RESULT ENVELOPE as well as the store.
+ *
+ * `sweep()` deliberately returns only what was persisted, because that is what
+ * outlives the run. The counts the caller is shown are a separate claim and can
+ * disagree with it — which is D268.
+ */
+async function sweepResult(item: MediaItem, request: Record<string, unknown> = {}): Promise<{
+  result: { attached: number; empty: number; files: number };
+  records: { lang: string; providerId?: string }[];
+}> {
+  asked.length = 0;
+  jimakuAsked.length = 0;
+  let current = item;
+  registerSubtitleDiscoveryIpc({
+    listItems: () => [current],
+    patchItems: (_ids, patch) => { current = { ...current, ...patch }; },
+  });
+  const result = await runSubtitleDiscovery(request);
+  return {
+    result: result as unknown as { attached: number; empty: number; files: number },
+    records: (current.subtitles ?? []) as { lang: string; providerId?: string }[],
+  };
+}
+
 const reasons = (failures: SubtitleSearchFailure[], providerId: string): string[] =>
   failures.filter((f) => f.providerId === providerId).map((f) => f.reason);
 
@@ -364,6 +389,53 @@ describe('the sweep still attaches when a provider answers', () => {
     const out = await sweep(mediaItem());
     expect(reasons(out.failures, 'opensubtitles')).toEqual(['download-failed']);
     expect(out.records).toEqual([]);
+  });
+});
+
+// D268, found by driving the D266 fix on the real library: a forced re-search of
+// `The Big O - 07` returned `{attached: 0, empty: 3, files: 1}` while the store
+// held the freshly attached record. The user who pressed *Find subtitles* is
+// told "0 subtitles" about a search that worked.
+describe('what the sweep reports back to the caller', () => {
+  /** An item that already has one provider record, as most of the library does. */
+  const withRecord = (): MediaItem => mediaItem({
+    subtitles: [{
+      id: 'rec-1',
+      lang: 'ja',
+      source: 'provider',
+      providerId: 'opensubtitles',
+      path: 'subtitles/m1/old.srt',
+      format: 'srt',
+      addedAt: 1,
+    }],
+  } as Partial<MediaItem>);
+
+  it('counts a forced re-search that re-attached as attached, not empty', async () => {
+    script.opensubtitles = { candidates: [osCandidate()], down: false, downStatus: 200 };
+    const out = await sweepResult(withRecord(), { force: true });
+    expect(out.result).toMatchObject({ attached: 1, empty: 0 });
+  });
+
+  it('still counts a forced re-search that found nothing as empty', async () => {
+    // The discriminating positive. Without it, "always attached" passes above
+    // and the count becomes as useless in the other direction.
+    const out = await sweepResult(withRecord(), { force: true });
+    expect(out.result).toMatchObject({ attached: 0, empty: 1 });
+  });
+
+  it('counts an unforced run against everything the item already had', async () => {
+    // Not forced: nothing was dropped, so the item's own list IS the baseline
+    // and an item that gains nothing must still read as empty. The existing
+    // record is English, because an item that already has the wanted language
+    // is skipped by the sweep entirely and never counted either way — measured
+    // here, not assumed.
+    const english = { ...withRecord() } as MediaItem;
+    (english as { subtitles: { lang: string }[] }).subtitles = [
+      { ...(english.subtitles ?? [])[0], lang: 'en' } as unknown as { lang: string },
+    ];
+    expect((await sweepResult(english, {})).result).toMatchObject({ attached: 0, empty: 1 });
+    // And the skip itself, stated rather than implied.
+    expect((await sweepResult(withRecord(), {})).result).toMatchObject({ attached: 0, empty: 0 });
   });
 });
 
