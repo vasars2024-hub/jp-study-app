@@ -2720,3 +2720,13 @@ sort both *looked* broken through a probe that was asking the wrong object. `Ope
 no new `.fwin` is a pop-out `BrowserWindow`, and a `Length` sort that returns store order is either
 a dead comparator or a shelf with no lengths — only reading the field on the live items separates
 them. **Before filing "this control does nothing", read the datum it sorts, counts or filters on.**
+
+### 2026-09-08 — codexB, immersion remaining controls
+
+| # | surface | what the USER sees | repro (exact) | sev | status |
+|---|---------|--------------------|---------------|-----|--------|
+| D395 | immersion, Blanc, Aero | With no page open, More offers Save site, Save as tool, Export to Library and Open in system browser as enabled actions. Clicking each silently does nothing. Capture and Lens also require a page, but their disabled state is not explained beside the correctly disabled Close page. | Live Electron pid 11736, window 1: Immersion starter screen → More → each of the four actions. All four disabled=false; content unchanged after clicks and no rejection. Shared toolbar renders all six without a no-page gate; Aero has the same omission in its toolbar while its menu already disables page actions. | P2 | fixed `3b172b31` — candidate compiled from HEAD plus owned edits and hot-refreshed into the real Electron window (no DOM-attribute injection). Starter: 7 disabled including Close; Wikipedia open: all 7 enabled; Close: all 7 disabled. Aero: 5 page-action icons disabled with names/reasons preserved. Visual novel library stays enabled. |
+
+D395 verification: shared-tree targeted tests 32/32; the identical committed candidate in a clean detached worktree 32/32. No new catalog keys. Saved-site search drove real keyboard input: nonsense query → 0 rows and an honest empty state; Escape → 19 visible rows; full-width ＮＨＫ → 4 matching sites. Focus starter → Exit focus shown; Escape → reader toolbar restored. Existing Wikipedia favorite → Save site → “Saved to Sites Library”; Close restored the starter. Wikipedia guest rendered its real Japanese page (title Wikipedia); screenshot inspected.
+
+Live-build constraint: shared app pid 11736 serves wt/files-app. Main-tree source was transformed by an owned renderer-only Vite server and registered through React Refresh in window 1, sharing the original runtime/dependencies. HEAD+owned edits were used because the shared main-tree files contain foreign hunks. No other window, worktree file or main process was changed. This proves the candidate renderer behavior; normal served-build integration still waits for the other worktree to sync.
