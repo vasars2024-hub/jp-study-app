@@ -5,9 +5,25 @@ export const MIRROR_EVALUATOR_ASSET_ID = 'mirror-writing-evaluator';
 
 export type MirrorAxis = 'grammar' | 'vocabulary' | 'flow' | 'fidelity';
 
+export interface MirrorTip {
+  span?: string;
+  /**
+   * Free text. An API evaluator writes its own prose and there is nothing to
+   * key it to, so this stays required and is also the fallback for a renderer
+   * that does not know about `messageKey`.
+   */
+  message: string;
+  /**
+   * Set only by the LOCAL rubric, whose sentences are fixed app chrome. The
+   * renderer resolves it and ignores `message` — D332: the labels around the
+   * verdict were translated while the verdict itself stayed English.
+   */
+  messageKey?: string;
+}
+
 export interface MirrorAxisScore {
   score: number;
-  tips: { span?: string; message: string }[];
+  tips: MirrorTip[];
 }
 
 export interface MirrorEvaluation {
@@ -15,6 +31,8 @@ export interface MirrorEvaluation {
   total: number;
   axes: Record<MirrorAxis, MirrorAxisScore>;
   summary: string;
+  /** Same contract as `MirrorTip.messageKey`, for the one-line verdict. */
+  summaryKey?: string;
 }
 
 export type MirrorEvaluationFailure =
@@ -26,7 +44,15 @@ export type MirrorEvaluationFailure =
 
 export type MirrorEvaluationResult =
   | { ok: true; evaluation: MirrorEvaluation }
-  | { ok: false; reason: MirrorEvaluationFailure; message: string };
+  | {
+      ok: false;
+      reason: MirrorEvaluationFailure;
+      /** English fallback, and the only text available when the failure is a platform exception. */
+      message: string;
+      /** Set when the failure is the app's own prose rather than a platform string — D332. */
+      messageKey?: string;
+      messageVars?: Record<string, string | number>;
+    };
 
 function clampScore(value: unknown): number | null {
   const n = Number(value);
@@ -34,7 +60,7 @@ function clampScore(value: unknown): number | null {
   return Math.min(100, Math.max(0, Math.round(n)));
 }
 
-function validateTip(value: unknown): { span?: string; message: string } | null {
+function validateTip(value: unknown): MirrorTip | null {
   if (!value || typeof value !== 'object') return null;
   const tip = value as { span?: unknown; message?: unknown };
   if (typeof tip.message !== 'string' || !tip.message.trim()) return null;
@@ -49,7 +75,7 @@ function validateAxis(value: unknown): MirrorAxisScore | null {
   const raw = value as { score?: unknown; tips?: unknown };
   const score = clampScore(raw.score);
   if (score === null || !Array.isArray(raw.tips)) return null;
-  const tips = raw.tips.map(validateTip).filter((tip): tip is { span?: string; message: string } => !!tip).slice(0, 4);
+  const tips = raw.tips.map(validateTip).filter((tip): tip is MirrorTip => !!tip).slice(0, 4);
   return { score, tips };
 }
 
@@ -138,26 +164,26 @@ function localRubricEvaluate(text: MirrorText, draft: string): MirrorEvaluation 
   const lengthRatio = Math.min(1.25, trimmed.length / Math.max(1, text.reference.length));
 
   const grammarTips: { span?: string; message: string }[] = [];
-  if (jpRatio < 0.75) grammarTips.push({ message: 'Use mostly Japanese script in the answer.' });
-  if (!hasPoliteEnding) grammarTips.push({ message: 'Add a clear sentence ending such as です, ます, ました, or ください where appropriate.' });
-  if (sentenceCount < Math.min(2, text.ideaMap.length)) grammarTips.push({ message: 'Split the ideas into clear Japanese sentences.' });
-  if (grammarTips.length === 0) grammarTips.push({ message: 'Sentence endings and script balance look stable for this level.' });
+  if (jpRatio < 0.75) grammarTips.push({ message: 'Use mostly Japanese script in the answer.', messageKey: 'games.mirror.tip.grammar.script' });
+  if (!hasPoliteEnding) grammarTips.push({ message: 'Add a clear sentence ending such as です, ます, ました, or ください where appropriate.', messageKey: 'games.mirror.tip.grammar.ending' });
+  if (sentenceCount < Math.min(2, text.ideaMap.length)) grammarTips.push({ message: 'Split the ideas into clear Japanese sentences.', messageKey: 'games.mirror.tip.grammar.split' });
+  if (grammarTips.length === 0) grammarTips.push({ message: 'Sentence endings and script balance look stable for this level.', messageKey: 'games.mirror.tip.grammar.ok' });
 
   const vocabularyTips: { span?: string; message: string }[] = [];
-  if (draftTerms.length < Math.max(2, text.level)) vocabularyTips.push({ message: 'Use more content words from the idea map rather than only short function words.' });
-  if (uniqueKanji < Math.max(1, text.level - 1)) vocabularyTips.push({ message: 'Try using the core kanji vocabulary expected at this level.' });
-  if (vocabularyTips.length === 0) vocabularyTips.push({ message: 'Vocabulary density is healthy for this prompt.' });
+  if (draftTerms.length < Math.max(2, text.level)) vocabularyTips.push({ message: 'Use more content words from the idea map rather than only short function words.', messageKey: 'games.mirror.tip.vocabulary.contentWords' });
+  if (uniqueKanji < Math.max(1, text.level - 1)) vocabularyTips.push({ message: 'Try using the core kanji vocabulary expected at this level.', messageKey: 'games.mirror.tip.vocabulary.kanji' });
+  if (vocabularyTips.length === 0) vocabularyTips.push({ message: 'Vocabulary density is healthy for this prompt.', messageKey: 'games.mirror.tip.vocabulary.ok' });
 
   const flowTips: { span?: string; message: string }[] = [];
-  if (!hasConnective && text.ideaMap.length >= 3) flowTips.push({ message: 'Connect ideas with words like ので, そして, ただし, or ため.' });
-  if (sentenceCount > text.ideaMap.length + 2) flowTips.push({ message: 'The draft is fragmented; combine related clauses for a smoother paragraph.' });
-  if (flowTips.length === 0) flowTips.push({ message: 'The draft has a readable paragraph shape.' });
+  if (!hasConnective && text.ideaMap.length >= 3) flowTips.push({ message: 'Connect ideas with words like ので, そして, ただし, or ため.', messageKey: 'games.mirror.tip.flow.connect' });
+  if (sentenceCount > text.ideaMap.length + 2) flowTips.push({ message: 'The draft is fragmented; combine related clauses for a smoother paragraph.', messageKey: 'games.mirror.tip.flow.fragmented' });
+  if (flowTips.length === 0) flowTips.push({ message: 'The draft has a readable paragraph shape.', messageKey: 'games.mirror.tip.flow.ok' });
 
   const fidelityTips: { span?: string; message: string }[] = [];
-  if (coverage < 0.45) fidelityTips.push({ message: 'Several core ideas from the prompt are missing or expressed too indirectly.' });
-  if (lengthRatio < 0.45) fidelityTips.push({ message: 'The answer is much shorter than the reference, so it likely omits required meaning.' });
-  if (coveredTerms[0]) fidelityTips.push({ span: coveredTerms[0], message: 'This key idea is represented clearly.' });
-  if (fidelityTips.length === 0) fidelityTips.push({ message: 'The main ideas appear to be covered.' });
+  if (coverage < 0.45) fidelityTips.push({ message: 'Several core ideas from the prompt are missing or expressed too indirectly.', messageKey: 'games.mirror.tip.fidelity.missing' });
+  if (lengthRatio < 0.45) fidelityTips.push({ message: 'The answer is much shorter than the reference, so it likely omits required meaning.', messageKey: 'games.mirror.tip.fidelity.short' });
+  if (coveredTerms[0]) fidelityTips.push({ span: coveredTerms[0], message: 'This key idea is represented clearly.', messageKey: 'games.mirror.tip.fidelity.covered' });
+  if (fidelityTips.length === 0) fidelityTips.push({ message: 'The main ideas appear to be covered.', messageKey: 'games.mirror.tip.fidelity.ok' });
 
   const grammar = axis(jpRatio * 42 + (hasPoliteEnding ? 26 : 8) + Math.min(32, sentenceCount * 11), grammarTips);
   const vocabulary = axis(Math.min(42, draftTerms.length * 6) + Math.min(30, uniqueKanji * 5) + Math.min(28, lengthRatio * 22), vocabularyTips);
@@ -175,12 +201,18 @@ function localRubricEvaluate(text: MirrorText, draft: string): MirrorEvaluation 
         : total >= 65
           ? 'Solid draft. Tighten missing ideas and sentence flow before comparing with the reference.'
           : 'Early draft. Focus on covering every idea in clear Japanese sentences.',
+    summaryKey: total >= 85 ? 'games.mirror.summary.strong' : total >= 65 ? 'games.mirror.summary.solid' : 'games.mirror.summary.early',
   };
 }
 
 async function callApi(settings: GameArenaSettings, text: MirrorText, draft: string, retry: boolean): Promise<MirrorEvaluationResult> {
   if (!settings.mirrorApiUrl.trim() || !settings.mirrorApiKey.trim()) {
-    return { ok: false, reason: 'api-missing', message: 'Configure an API endpoint and key in Game Arena settings.' };
+    return {
+      ok: false,
+      reason: 'api-missing',
+      message: 'Configure an API endpoint and key in Game Arena settings.',
+      messageKey: 'games.mirror.error.apiMissing',
+    };
   }
 
   try {
@@ -203,18 +235,32 @@ async function callApi(settings: GameArenaSettings, text: MirrorText, draft: str
       }),
     });
     if (!response.ok) {
-      return { ok: false, reason: 'network', message: `Evaluator request failed (${response.status}).` };
+      return {
+        ok: false,
+        reason: 'network',
+        message: `Evaluator request failed (${response.status}).`,
+        messageKey: 'games.mirror.error.network',
+        messageVars: { status: response.status },
+      };
     }
     const parsed = extractJson(await response.json());
     const evaluation = validateMirrorEvaluation(parsed);
     if (evaluation) return { ok: true, evaluation };
     if (!retry) return callApi(settings, text, draft, true);
-    return { ok: false, reason: 'schema-invalid', message: 'The evaluator response did not match the score schema.' };
+    return {
+      ok: false,
+      reason: 'schema-invalid',
+      message: 'The evaluator response did not match the score schema.',
+      messageKey: 'games.mirror.error.schemaInvalid',
+    };
   } catch (err) {
     return {
       ok: false,
       reason: 'network',
+      // A platform exception is not our prose, so it carries no key and stays
+      // verbatim; only our own fallback sentence is translatable.
       message: err instanceof Error ? err.message : 'The evaluator request failed.',
+      messageKey: err instanceof Error ? undefined : 'games.mirror.error.requestFailed',
     };
   }
 }
@@ -234,6 +280,7 @@ export async function evaluateMirrorWriting(
       ok: false,
       reason: 'model-missing',
       message: 'Download the local Mirror Writing evaluator or switch to a configured API backend.',
+      messageKey: 'games.mirror.error.modelMissing',
     };
   }
 

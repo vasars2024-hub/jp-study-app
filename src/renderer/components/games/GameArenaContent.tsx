@@ -1089,7 +1089,9 @@ function MirrorWritingPanel({
     const result = await evaluateMirrorWriting(settings, text, draft, installed);
     setBusy(false);
     if (!result.ok) {
-      setError(result.message);
+      // The evaluator is a plain module, so it hands back a key and resolves it
+      // here — D332. A platform exception has no key and stays verbatim.
+      setError(result.messageKey ? t(result.messageKey, result.messageVars) : result.message);
       return;
     }
     setEvaluation(result.evaluation);
@@ -1153,7 +1155,7 @@ function MirrorWritingPanel({
         <div className="mirror-score-card">
           <div className="mirror-total">
             <b>{evaluation.total}</b>
-            <span>{evaluation.summary}</span>
+            <span>{evaluation.summaryKey ? t(evaluation.summaryKey) : evaluation.summary}</span>
           </div>
           {(['grammar', 'vocabulary', 'flow', 'fidelity'] as MirrorAxis[]).map((axis) => (
             <div key={axis} className="mirror-axis">
@@ -1163,7 +1165,7 @@ function MirrorWritingPanel({
               </div>
               {evaluation.axes[axis].tips.map((tip, index) => (
                 <p key={`${axis}-${index}`}>
-                  {tip.span && <code>{tip.span}</code>} {tip.message}
+                  {tip.span && <code>{tip.span}</code>} {tip.messageKey ? t(tip.messageKey) : tip.message}
                 </p>
               ))}
             </div>
