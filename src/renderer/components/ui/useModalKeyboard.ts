@@ -39,16 +39,29 @@ export interface ModalKeyboardOptions {
   onEscape: (() => void) | null;
   /** False while the dialog is mounted but not shown. Defaults to true. */
   enabled?: boolean;
+  /**
+   * Take the initial focus instead of the panel. The panel is the right default
+   * — focusing the first control reads that control's label rather than the
+   * dialog's — but a picker whose whole point is type-to-filter wants its search
+   * box, and `autoFocus` alone loses that race: React applies it during commit
+   * and this effect then steals it back on the very next tick.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
-export function useModalKeyboard({ panelRef, onEscape, enabled = true }: ModalKeyboardOptions): void {
+export function useModalKeyboard({
+  panelRef,
+  onEscape,
+  enabled = true,
+  initialFocusRef,
+}: ModalKeyboardOptions): void {
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
   useEffect(() => {
     if (!enabled) return;
     const restoreTo = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
+    (initialFocusRef?.current ?? panelRef.current)?.focus();
 
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
@@ -77,6 +90,9 @@ export function useModalKeyboard({ panelRef, onEscape, enabled = true }: ModalKe
       // through the whole window to get back to what they were doing.
       restoreTo?.focus?.();
     };
+    // `initialFocusRef` is deliberately not a dependency: it is read once, and a
+    // call site passing a fresh ref object would otherwise re-run the effect and
+    // re-capture `restoreTo` as the dialog's own control.
   }, [enabled, panelRef]);
 }
 

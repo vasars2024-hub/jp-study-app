@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { WidgetSnapshot } from '../../shared/desktop';
 import { WIDGETS, getWidgetDef } from '../widgets/registry';
 import { WIDGET_CATEGORIES, type WidgetCategory } from '../widgets/types';
 import Icon from './Icons';
 import { useT } from '../i18n';
 import { useWiredMaterials } from './ui';
+import { useModalKeyboard } from './ui/useModalKeyboard';
 import { wiredWidgetDesc, wiredWidgetTitle } from '../widgets/wiredLabels';
 
 // Persist favorites + recently-used across sessions (small UI state → localStorage).
@@ -63,6 +64,23 @@ export default function WidgetGallery({
   const [prefs, setPrefs] = useState<GalleryPrefs>(loadPrefs);
   const [tab, setTab] = useState<Tab>('All');
   const [query, setQuery] = useState('');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  /*
+   * The gallery is modal to the mouse — `.widget-gallery-backdrop` is
+   * `position: fixed`, `inset: 0`, `rgba(0, 0, 0, 0.45)` at z 900 with
+   * `pointer-events: auto`, so the whole desk is dimmed and unclickable
+   * behind it. Until 2026-09-08 it was not modal to the keyboard at all
+   * (register row D411). Measured live on a 1904x993 desk: Escape left it
+   * open, and ONE Shift+Tab out of the search box landed on a Flashcards
+   * card's **Remove** button under the scrim.
+   *
+   * `initialFocusRef` keeps the search box focused — the gallery is a
+   * type-to-filter picker, and `autoFocus` alone loses the race against this
+   * hook's own focus move.
+   */
+  useModalKeyboard({ panelRef, onEscape: onClose, initialFocusRef: searchRef });
 
   const tabLabel = (tb: Tab): string => {
     if (tb === 'All') return t('widgetGallery.tab.all');
@@ -158,14 +176,21 @@ export default function WidgetGallery({
   return (
     <>
       <div className="widget-gallery-backdrop" onClick={onClose} />
-      <div className="widget-gallery" role="dialog" aria-label={t('widgetGallery.dialogLabel')}>
+      <div
+        className="widget-gallery"
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        ref={panelRef}
+        aria-label={t('widgetGallery.dialogLabel')}
+      >
         <div className="widget-gallery-head">
           <span className="widget-gallery-title">{t('widgetGallery.title')}</span>
           <input
             className="widget-gallery-search"
             placeholder={t('widgetGallery.searchPlaceholder')}
             value={query}
-            autoFocus
+            ref={searchRef}
             onChange={(e) => setQuery(e.target.value)}
           />
           <button className="widget-b" title={t('common.close')} aria-label={t('common.close')} onClick={onClose}>×</button>

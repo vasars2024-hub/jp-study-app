@@ -39,6 +39,18 @@ function Panel({ onEscape, enabled }: { onEscape: (() => void) | null; enabled?:
   );
 }
 
+function PanelWithSearch() {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  useModalKeyboard({ panelRef, onEscape: vi.fn(), initialFocusRef: searchRef });
+  return (
+    <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" data-testid="panel">
+      <input ref={searchRef} data-testid="search" />
+      <button type="button">last</button>
+    </div>
+  );
+}
+
 function mount(onEscape: (() => void) | null, enabled = true): HTMLElement {
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -143,5 +155,33 @@ describe('useModalKeyboard', () => {
     const { reachedDocument } = pressEscape();
     expect(onEscape).not.toHaveBeenCalled();
     expect(reachedDocument).toBe(true);
+  });
+
+  /**
+   * `initialFocusRef`, added 2026-09-08 for the widget gallery (row D411).
+   *
+   * A type-to-filter picker wants its search box, not the panel. `autoFocus`
+   * alone cannot deliver that once this hook is adopted: React applies it
+   * during commit and the effect below then steals focus back on the next
+   * tick, so the user's first keystroke goes nowhere. The default is
+   * deliberately unchanged — the panel reads the DIALOG's name, a control
+   * reads its own.
+   */
+  it('honours initialFocusRef, and still restores to the trigger', () => {
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const r = createRoot(host);
+    root = r;
+    act(() => r.render(<PanelWithSearch />));
+    const search = host.querySelector('[data-testid="search"]');
+    expect(document.activeElement).toBe(search);
+
+    act(() => root?.unmount());
+    root = null;
+    expect(document.activeElement).toBe(trigger);
   });
 });
