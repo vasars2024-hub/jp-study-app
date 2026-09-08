@@ -156,6 +156,19 @@ export function isWatched(item: MediaItem): boolean {
   return fraction !== null && fraction >= WATCHED_THRESHOLD;
 }
 
+/**
+ * Whether an item belongs on the Continue watching shelf.
+ *
+ * Named and shared because it was written twice and the two copies disagreed
+ * (D269). The shelf itself dropped anything `isWatched` — 92% — while the rail
+ * badge counting that same shelf dropped only the last five seconds, so an
+ * episode watched to 95% was counted in the badge and absent from the list it
+ * labelled. Two predicates for one shelf is the bug; a shared one is the fix.
+ */
+export function isContinueWatching(item: MediaItem): boolean {
+  return (item.positionSec ?? 0) > 0 && !isWatched(item);
+}
+
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 function albumKey(item: MediaItem): string {

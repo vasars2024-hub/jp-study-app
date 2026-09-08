@@ -19,7 +19,7 @@ import MediaLibraryBrowser, { type LibraryViewMode } from './MediaLibraryBrowser
 import MediaDetailPanel from './MediaDetailPanel';
 import MediaJobStrip from './MediaJobStrip';
 import { invalidateMediaArtwork } from './useMediaArtwork';
-import { buildLibraryEntries, isWatched, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
+import { buildLibraryEntries, isContinueWatching, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaCategory, type MediaCategory } from '../../../../shared/mediaCategories';
 import { searchMediaHub } from '../../../../shared/mediaHub';
 import { resolveSortForCategory, sortMediaItems, type MediaSortId } from '../../../../shared/mediaSorting';
@@ -165,7 +165,7 @@ export default function MediaLibraryShell({
       case 'queue':
         return items.filter((item) => item.studyQueue === true);
       case 'continue':
-        return items.filter((item) => (item.positionSec ?? 0) > 0 && !isWatched(item));
+        return items.filter(isContinueWatching);
       case 'recent':
         return sortMediaItems(items, 'recently-added', 'desc');
       default:

@@ -26,6 +26,7 @@ import { Sidebar, type SidebarItem } from '../../ui';
 import Icon, { type IconName } from '../../Icons';
 import { useT } from '../../../i18n';
 import { mediaCategory, MEDIA_CATEGORIES, type MediaCategory } from '../../../../shared/mediaCategories';
+import { isContinueWatching } from '../../../../shared/mediaLibraryEntries';
 import type { MediaItem } from '../../../../shared/types';
 
 /** What the rail can select. Parsed/serialized as a plain string id. */
@@ -142,8 +143,11 @@ export default function MediaLibrarySidebar({ items, value, onSelect, footer }: 
       byCategory.set(category, (byCategory.get(category) ?? 0) + 1);
       if (item.favorite) favorites += 1;
       if (item.studyQueue) queue += 1;
-      const position = item.positionSec ?? 0;
-      if (position > 0 && (!item.durationSec || position < item.durationSec - 5)) continueWatching += 1;
+      // The shelf's own predicate, not a second copy of it. D269: this counted
+      // anything short of the last five seconds while the shelf dropped
+      // anything past 92%, so an episode watched to 95% was in the badge and
+      // absent from the list the badge labels.
+      if (isContinueWatching(item)) continueWatching += 1;
       for (const name of item.collections ?? []) {
         collections.set(name, (collections.get(name) ?? 0) + 1);
       }
