@@ -1942,3 +1942,46 @@ the Conan cues to a JoJo episode (fabricates a match), and closing 2–3 off the
 closes it is a third-party fact — one `sub-pack` for The Big O, JoJo Golden Wind or Date a Live
 appearing on nyaa, or the user importing media for a title that already has one. **Neither is
 agent-reachable, so this is parked, not abandoned.** Re-check cost is now three commands.
+
+### GATE 11 clauses 2–3 — 2026-09-08 (primary2). The "not agent-reachable" verdict is STALE. It was written 40 minutes before the user removed the premise it rests on.
+
+Not a re-derivation of the measurements above — those stand, and are still correct. This
+corrects one **premise**, and it is the premise the park is built on.
+
+The 2026-09-07 entry concludes: *"What closes it is a third-party fact — one `sub-pack` for The
+Big O, JoJo Golden Wind or Date a Live appearing on nyaa, or the user importing media for a
+title that already has one. **Neither is agent-reachable**, so this is parked."*
+
+That entry is timestamped **09:15 EDT**. At **09:55 EDT the same morning** the user was asked
+directly whether to keep a one-file exception on video acquisition or remove the clause, and
+answered *"no just lift the rule fully"*. The standing pin now reads: **the relay MAY acquire
+media — including video — whenever a gate, a defect or a verification needs a subject. No
+per-case ceiling, no asking first.**
+
+So the second of the two disjuncts — *the user importing media for a title that already has a
+sub-pack* — **stopped being third-party 40 minutes after that verdict was written**, and no turn
+since has revisited it (`git log --since="2026-09-07 09:55" --grep="gate 11"` is empty across all
+branches). The gate has been parked for a day on a constraint that no longer exists.
+
+**The subject is already known-good, which is what makes this cheap.** Clause 1 was closed by
+`9611596b` against the Conan `.7z` — it opened into **26 real Japanese SRTs** off the swarm. The
+only reason clauses 2–3 could not use it is that `acceptNyaaCandidate` refuses with *"That media
+item is no longer in the library"* when `listItems()` has no match, and `listMedia()` returns
+**0 matching conan/コナン** (re-derived live this turn: **39 items**, unchanged). Acquiring one
+Conan episode makes that match exist. Nothing is fabricated: the cues and the video are the same
+title, which is exactly the check the two earlier refusals were protecting.
+
+**Exact slice, for the turn that takes it.** Acquire ONE Conan episode into the library
+(`jp-study` category — permitted, and the pin's other limits are untouched: nothing outside
+`jp-study` / `jp-study-subtitles`, never touch a torrent the user already had, gate 12's
+"no video file is ever requested" assertion is about the PRODUCT and still binds). Then run the
+product's own listing for that title, accept the `sub-pack`, and verify the two clauses: a
+`SubtitleRecord` lands, and its cues render in the player through the Jimaku path.
+
+**Why this turn did not run it, stated rather than implied.** It is a real download of unbounded
+duration, and `debug/g14-live.cjs` — the harness the entry above cites for the three-command
+re-check — **does not exist in this worktree**; `debug/` is untracked in its entirety, so that
+harness only ever lived in the main tree. Rebuilding it plus a video acquisition plus the accept
+and render checks is more than one turn's tail. **Status is therefore unchanged — gate 11 is 1 of
+3 clauses, OPEN; Track 9 is 19 of 20; main-v1 is 79 of 80 — but it is no longer PARKED. It is
+open, agent-reachable, and the next Track 9 turn should open on it.**
