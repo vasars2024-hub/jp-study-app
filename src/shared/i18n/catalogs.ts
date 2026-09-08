@@ -33,7 +33,6 @@ import { DEFAULT_LANG } from './core';
 import { en } from './catalogs/en';
 
 export { en };
-export { GAME_ARENA_CHROME } from './catalogs/gameArena';
 
 /**
  * Loaded catalogs, keyed by language. English is present from the start; the

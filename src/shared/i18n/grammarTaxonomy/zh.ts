@@ -7,9 +7,9 @@
  * module landed in boot and every language's labels shipped to every session.
  * One module per language keeps each with its own catalog chunk.
  *
- * Kept out of the catalogs themselves because those spread a single shared
- * object into all four (see GAME_ARENA_CHROME), which would leave this block in
- * English everywhere while tools/i18n-check.cjs reported it fully translated —
+ * Kept out of the catalogs themselves because spreading ONE shared object into
+ * all four would leave this block in English everywhere while
+ * tools/i18n-check.cjs reported it fully translated —
  * that script compares key *presence* only. Four separate records make an
  * untranslated entry visible.
  *
