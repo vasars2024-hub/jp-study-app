@@ -38,12 +38,17 @@ three subtitle defects the user found by watching a video for ten seconds surviv
    not bad luck.** The ranges are disjoint, so a merge never has to renumber and a commit
    message never names an id that has since moved:
 
-   | worker | range |
-   |--------|-------|
-   | `primary` | D149–D169 |
-   | `primary2` | D170–D189 |
-   | `backup` | D190–D209 |
-   | codex | D210–D229 |
+   | worker | round 1 | round 2 | round 3 |
+   |--------|---------|---------|---------|
+   | `primary` | D149–D169 | D250–D269 | D310–D329 |
+   | `primary2` | D170–D189 | D230–D249 | D330–D349 |
+   | `backup` | D190–D209 | D270–D289 | D350–D369 |
+   | codex | D210–D229 | D290–D309 | D370–D389 |
+
+   Rounds EXTEND, they never renumber: a round is added when one runs out (round 2 on
+   2026-09-07 after `primary2` filed past 229 with a red gate; round 3 the same evening,
+   for all four at once, because `primary` filled 250–269 exactly and the next worker
+   to fill would have hit the identical wall).
 
    D1–D148 are the pre-range ids: grandfathered, still unique, never reused.
    `src/shared/__tests__/presweepRegisterGate.test.ts` enforces both properties in the suite —

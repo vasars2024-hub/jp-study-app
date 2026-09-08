@@ -29,24 +29,33 @@ const REGISTER = resolve(__dirname, '../../../docs/ACTIVE/LIVE_DEFECTS_PRESWEEP.
  * rewritten, and the ids already minted keep the owner who actually minted them
  * (231-237 are all `primary2`, verified with `git log -S` per row).
  *
- * When round 2 runs out, add round 3 the same way. Do NOT renumber anything.
+ * **Round 3, added 2026-09-07 evening**, before it was needed rather than after:
+ * `primary` filled 250-269 exactly (D250-D269 are all present in the register), so
+ * its next row had nowhere to land. Every worker got a round-3 block in the same
+ * edit — the wall is the same distance away for all four and a one-worker patch
+ * just moves the RED gate to whoever files next. When round 3 runs out, add round
+ * 4 the same way. Do NOT renumber anything.
  */
 export const MINTING_RANGES: Record<string, Array<{ from: number; to: number }>> = {
   primary: [
     { from: 149, to: 169 },
     { from: 250, to: 269 },
+    { from: 310, to: 329 },
   ],
   primary2: [
     { from: 170, to: 189 },
     { from: 230, to: 249 },
+    { from: 330, to: 349 },
   ],
   backup: [
     { from: 190, to: 209 },
     { from: 270, to: 289 },
+    { from: 350, to: 369 },
   ],
   codex: [
     { from: 210, to: 229 },
     { from: 290, to: 309 },
+    { from: 370, to: 389 },
   ],
 };
 
@@ -132,12 +141,20 @@ describe('live defect register', () => {
   });
 
   it('catches an id minted outside every range', () => {
-    // D310 sits one step past codex's round-2 ceiling — the realistic mistake is
-    // landing just outside a range, not a wild number. It was D230 until round 2
-    // was added, which brought 230 INTO primary2's range and would have left this
-    // control asserting a number that is now legal.
-    const md = ['| D310 | files | a | b | P2 | open |', '| D700 | note | c | d | P3 | open |'].join('\n');
-    expect(outOfRangeIds(parseRowIds(md))).toEqual([310, 700]);
+    // The subject is DERIVED, not written down. The realistic mistake is landing one
+    // step past the highest ceiling, and a literal here has gone stale twice already —
+    // it was D230 until round 2 brought 230 into primary2's range, then D310 until
+    // round 3 brought 310 into primary's. Each time the control flipped from "catches
+    // an illegal id" to "asserts a now-LEGAL id is illegal", i.e. it went red for the
+    // opposite of the reason it exists. Deriving it means round 4 cannot repeat that.
+    const ceiling = Math.max(...Object.values(MINTING_RANGES).flat().map((r) => r.to));
+    const justPast = ceiling + 1;
+    const wild = ceiling + 10_000;
+    const md = [
+      `| D${justPast} | files | a | b | P2 | open |`,
+      `| D${wild} | note | c | d | P3 | open |`,
+    ].join('\n');
+    expect(outOfRangeIds(parseRowIds(md))).toEqual([justPast, wild]);
   });
 
   it('accepts a round-2 id, so the fix is not just a widened net', () => {
