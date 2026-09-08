@@ -1259,6 +1259,99 @@ describe('Files app — bulk mine isolates every item (gate 20)', () => {
       'Removed all 2 cards added by this bulk action.',
     );
   });
+
+  /**
+   * D422. The receipt used to live inside the item inspector, and `selected` is
+   * resolved from the FILTERED list — so anything that took the mined row out of
+   * view (a refresh into a folder it no longer belongs to, a scope change, or
+   * simply closing the details pane) removed the only undo for cards that were
+   * already written, silently. Closing the inspector is the smallest gesture
+   * that reproduces it; the mutation control is putting the receipt back.
+   */
+  it('D422: the undo survives the inspector that produced it going away', async () => {
+    filesIndex.mockImplementation(async () => snapshot(bulkItems));
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 1,
+      passages: [{ index: 1, text: '最初の文' }],
+    }));
+
+    await mount(<FilesApp />);
+    await settle();
+    await selectForBulk('First transcript');
+    await click(host?.querySelector<HTMLButtonElement>('.fa-bulk-mine'));
+
+    expect(deck).toHaveLength(1);
+    // `.fa-action-open`, not `.fa-details`/`.fa-details-list`: the "nothing
+    // selected" state reuses BOTH of those, so only a per-item action proves the
+    // item inspector itself is up.
+    expect(host?.querySelector('.fa-action-open')).toBeTruthy();
+    expect(host?.querySelector('.fa-bulk-undo')).toBeTruthy();
+
+    // The gesture. Nothing about the completed write changed.
+    await click(host?.querySelector<HTMLButtonElement>('[aria-label="Close details"]'));
+    expect(host?.querySelector('.fa-action-open')).toBeFalsy();
+
+    const undo = host?.querySelector<HTMLButtonElement>('.fa-bulk-undo');
+    expect(undo).toBeTruthy();
+    await click(undo);
+    expect(deck).toHaveLength(0);
+  });
+
+  /**
+   * D420. The rail counts read the deck, so a mine makes them stale the instant
+   * the receipt appears. `announceFilesIndexChanged` is the bus the importer
+   * already uses; asserting the FORCED re-read is what proves the rail can
+   * actually change, since main caches the unforced snapshot.
+   */
+  it('D420: a mine forces the index to re-read, and so does its undo', async () => {
+    filesIndex.mockImplementation(async () => snapshot(bulkItems));
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 1,
+      passages: [{ index: 1, text: '最初の文' }],
+    }));
+
+    await mount(<FilesApp />);
+    await settle();
+    const beforeMine = filesIndex.mock.calls.filter(([force]) => force === true).length;
+
+    await selectForBulk('First transcript');
+    await click(host?.querySelector<HTMLButtonElement>('.fa-bulk-mine'));
+    await settle();
+    const afterMine = filesIndex.mock.calls.filter(([force]) => force === true).length;
+    expect(afterMine).toBeGreaterThan(beforeMine);
+
+    await click(host?.querySelector<HTMLButtonElement>('.fa-bulk-undo'));
+    await settle();
+    expect(filesIndex.mock.calls.filter(([force]) => force === true).length).toBeGreaterThan(
+      afterMine,
+    );
+  });
+
+  /**
+   * The other half of D420, and the reason it is a separate case: a refusal
+   * writes nothing, so re-walking a 43k-item index for it would be a poll with
+   * extra steps. The positive control above is what stops this being satisfied
+   * by never announcing at all.
+   */
+  it('D420: a mine that adds nothing does not re-read the index', async () => {
+    filesIndex.mockImplementation(async () => snapshot(bulkItems));
+    filesMineSource.mockImplementation(async () => {
+      throw new Error('fixture read failed');
+    });
+
+    await mount(<FilesApp />);
+    await settle();
+    const before = filesIndex.mock.calls.filter(([force]) => force === true).length;
+
+    await selectForBulk('First transcript');
+    await click(host?.querySelector<HTMLButtonElement>('.fa-bulk-mine'));
+    await settle();
+
+    expect(deck).toHaveLength(0);
+    expect(filesIndex.mock.calls.filter(([force]) => force === true).length).toBe(before);
+  });
 });
 
 /* ---------------------- gate 5: context entry ---------------------- */

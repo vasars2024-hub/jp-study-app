@@ -49,6 +49,40 @@
   padding: 0;
 }
 
+/* D422. The mine receipts are a SIBLING of the list, not a child of the
+   inspector, so that nothing the mine itself causes can unmount the undo. That
+   makes the canvas a two-child box in exactly the frames where a receipt is on
+   screen, and `.fa-list`'s `height: 100%` would then overflow it by the height
+   of the receipt. The class is applied only in those frames, so the single-child
+   case keeps its original box and nothing else on this surface moves. */
+.fa-shell-receipts > .lq-scaffold-canvas {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fa-shell-receipts > .lq-scaffold-canvas > .fa-list,
+.fa-shell-receipts > .lq-scaffold-canvas > .fa-state {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.fa-receipts {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2);
+  padding: var(--lq-space-3);
+  border-bottom: 1px solid var(--lq-work-border, rgb(255 255 255 / 12%));
+  background: var(--lq-work-bg);
+  color: var(--lq-work-text);
+  /* A batch of 26 files states 26 outcomes. The list below must not be pushed
+     off screen by its own receipt, so the receipt scrolls instead. */
+  max-height: 40%;
+  overflow-y: auto;
+}
+
 /* ----------------------------- rail ----------------------------- */
 
 .fa-tree {

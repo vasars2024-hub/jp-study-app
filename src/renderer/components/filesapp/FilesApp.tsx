@@ -159,6 +159,7 @@ import {
   peekPendingFilesScope,
   type FilesScopeRequest,
 } from './filesAppScope';
+import { announceFilesIndexChanged } from '../../filesIndexBus';
 import { useFilesIndex } from './useFilesIndex';
 import { ScanReviewSheet } from './ScanReviewSheet';
 import { CleanupSheet } from './CleanupSheet';
@@ -661,7 +662,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const onMine = useCallback(async () => {
     if (!selected) return;
     setMineState({ status: 'reading' });
-    setMineState(await mineOne(selected));
+    const settled = await mineOne(selected);
+    setMineState(settled);
+    // D420. A mine writes the deck, and the deck is one of this index's own
+    // sources — so the rail counts beside the receipt are stale the instant the
+    // receipt appears, and only a manual Refresh reconciled them. The importer's
+    // bus is the existing answer to exactly this ("the window showing the file
+    // system does not know the file system changed"), and it reaches the other
+    // Files windows and the Blanc panel too, which a local `refresh()` would not.
+    // Announced only on a write: a refusal changed nothing.
+    if (settled.status === 'done' && settled.added > 0) announceFilesIndexChanged();
   }, [selected, mineOne]);
 
   const toggleBulkSelection = useCallback((item: FilesItem) => {
@@ -692,6 +702,12 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     // marks the action complete and prevents a second click from overwriting
     // the only recovery path for cards the first click added.
     setBulkSelectedIds(new Set());
+    // D420, once for the whole batch rather than per item: the loop above can
+    // write thousands of cards, and re-enumerating a 43k-item index after each
+    // one would be the poll this bus exists to avoid.
+    if (results.some((entry) => entry.result.status === 'done' && entry.result.added > 0)) {
+      announceFilesIndexChanged();
+    }
   }, [allItems, bulkSelectedIds, mineOne]);
 
   const onUndoBulkMine = useCallback(() => {
@@ -701,6 +717,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
     removeDeckCards(ids);
     setBulkMineState({ status: 'undone', count: ids.length, results: bulkMineState.results });
+    // The counts have to come back DOWN as well, or an undo leaves the rail
+    // claiming cards that are no longer in the deck.
+    if (ids.length > 0) announceFilesIndexChanged();
   }, [bulkMineState]);
 
   // Read outside the updater deliberately: React double-invokes state updaters
@@ -709,6 +728,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     if (mineState.status !== 'done') return;
     removeDeckCards(mineState.addedIds);
     setMineState({ status: 'undone', count: mineState.addedIds.length });
+    if (mineState.addedIds.length > 0) announceFilesIndexChanged();
   }, [mineState]);
 
   /** A new selection invalidates the previous item's result, never carries it over. */
@@ -2074,6 +2094,27 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   })();
 
   /**
+   * D422. The home for both mine receipts, and the point of it is that this node
+   * is a sibling of the canvas rather than a child of the inspector: nothing a
+   * mine can cause — a re-enumeration, the row leaving its folder, the row being
+   * de-selected — can unmount it, so `Undo all added cards` is reachable for as
+   * long as it is offered. Before this, mining out of `Text not yet mined` and
+   * then pressing Refresh destroyed the only recovery path for the cards that
+   * click had just written, with no warning and nothing said.
+   *
+   * Rendered as `null` when both are idle so the list keeps the whole canvas;
+   * `.fa-shell-receipts` is what gives the canvas its flex column only in the
+   * frames where there is actually something to place.
+   */
+  const mineReceipts =
+    mineResult || bulkMineResult ? (
+      <div className="fa-receipts">
+        {mineResult}
+        {bulkMineResult}
+      </div>
+    ) : null;
+
+  /**
    * What the inspector says when nothing is selected — rubric category 4.
    *
    * Measured live 2026-09-04 at maximized (1264x773): the inspector was a 320px
@@ -2207,8 +2248,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       ) : (
         <p className="fa-details-note fa-mine-refusal">{t(mineability.reasonKey)}</p>
       )}
-      {mineResult}
-      {bulkMineResult}
+      {/* D422: the two mine receipts used to render HERE. They now live in the
+          receipts region beside the list, because this inspector is resolved
+          from the FILTERED row (`selected` reads `visible`, not `allItems`) and
+          therefore unmounts the moment the mined row leaves the current folder
+          — which, since D421 taught "Text not yet mined" to shrink, is the
+          NORMAL outcome of the very action the receipt reports. The delete
+          receipt was moved out for the same reason and says so at its own
+          declaration; this is that rule applied to the other two writes. */}
       {/* Gate 18's first half. A toggle, because pin and unpin are one gesture
           and two buttons would let the app show both at once. */}
       <button
@@ -2506,7 +2553,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   return (
     <>
     <LiquidAppScaffold
-      className={`fa-shell${onPanel ? ' fa-shell-panel' : ''}`}
+      className={`fa-shell${onPanel ? ' fa-shell-panel' : ''}${
+        mineReceipts ? ' fa-shell-receipts' : ''
+      }`}
       rail={rail}
       railLabel={t('filesApp.tree.label')}
       toolbar={toolbar}
@@ -2518,6 +2567,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       dock={dock}
       compactDock={compactDock}
     >
+      {mineReceipts}
       {canvas}
     </LiquidAppScaffold>
     {scanOpen ? (
