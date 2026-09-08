@@ -435,6 +435,46 @@ export function deriveCrossStoreFlags(items: readonly FilesItem[]): FilesItem[] 
   });
 }
 
+/** The kinds `preset:unmined-text` asks about — the only ones `mined` can describe. */
+const MINEABLE_KINDS: readonly FilesItemKind[] = ['subtitle', 'transcript', 'book'];
+
+/**
+ * The mining counterpart of {@link deriveCrossStoreFlags}, and it exists for the
+ * same reason: two enumerators produce the halves and neither can see the other.
+ *
+ * D421. `flags.mined` was written in exactly two places, both about deck *cards*
+ * — every row in the deck store is `mined: true`, and a deck folder is
+ * `mined: bucket.count > 0`. Nothing ever set it on the `subtitle`, `transcript`
+ * or `book` a card was mined OUT of. `preset:unmined-text` asks for
+ * `flags: { mined: false }`, and `matchesSmartCriteria` compares
+ * `Boolean(item.flags[name]) === wanted` over a sparse `flags`, so an absent
+ * flag reads `false` and **every** text item matched, on every profile, forever.
+ * The saved search that exists to show what you have not mined yet could never
+ * shrink: it read 98 before 141 cards were mined out of it and 98 after.
+ *
+ * The link is exact rather than heuristic — `mineBookIdFor` writes
+ * `files:${item.id}` onto every card it creates, so `bookId` inverts to the id
+ * of the row it came from. Nothing is guessed from a name here, unlike the
+ * YouTube-id path above.
+ *
+ * Unmatched items are left ABSENT, not `false`, for the reason
+ * `deriveCrossStoreFlags` states about transcripts: "we could not tell" and "not
+ * mined" are different answers. Only the kinds the preset asks about are
+ * touched, so a `mined: true` deck row can never be overwritten by this pass.
+ */
+export function deriveMinedFlags(
+  items: readonly FilesItem[],
+  minedSourceIds: ReadonlySet<string>,
+): FilesItem[] {
+  if (minedSourceIds.size === 0) return [...items];
+  return items.map((item) => {
+    if (!MINEABLE_KINDS.includes(item.kind)) return item;
+    if (item.flags.mined) return item;
+    if (!minedSourceIds.has(item.id)) return item;
+    return { ...item, flags: { ...item.flags, mined: true } };
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Counting — gate 1.
  * ------------------------------------------------------------------ */

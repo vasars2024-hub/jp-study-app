@@ -12,6 +12,7 @@ import {
   notebookFilesItems,
   savedWordFilesItems,
   translationHistoryFilesItems,
+  minedSourceIdsFromDeck,
   withRendererItems,
 } from '../components/filesapp/rendererEnumerators';
 import { NOTEBOOK_TIMELINE_STORAGE_KEY, type NotebookTimelineEntry } from '../notebookTimeline';
@@ -396,5 +397,30 @@ describe('files app — the absorbed study-record streams (gate 7)', () => {
     expect(savedWordFilesItems([{ word: '猫', reading: '', meaning: '', addedAt: 1 }], 'k')).toHaveLength(1);
     expect(knownWordFilesItems([{ word: '猫', level: 1 }], 'k')).toHaveLength(1);
     expect(clipboardFilesItems([{ id: 'c', type: 'text', text: 't', createdAt: 1 }])).toHaveLength(1);
+  });
+});
+
+describe('files app — the mined link back to a source row (D421)', () => {
+  it('reads the Files row id out of every card this app mined, and nothing else', () => {
+    const raw = JSON.stringify({
+      cards: [
+        card({ id: 'k1', bookId: 'files:downloads:ep39.ass' }),
+        card({ id: 'k2', bookId: 'files:books:1q84' }),
+        card({ id: 'k3', bookId: 'harvest:jojo' }),
+        card({ id: 'k4', bookId: 'import-zzprobe-headerless' }),
+        card({ id: 'k5' }),
+      ],
+      folders: [],
+    });
+    // Two of the five, and only the two this app mined out of a Files row.
+    expect([...minedSourceIdsFromDeck(raw)].sort()).toEqual([
+      'books:1q84',
+      'downloads:ep39.ass',
+    ]);
+  });
+
+  it('reads an empty set from an empty or unreadable deck rather than throwing', () => {
+    expect(minedSourceIdsFromDeck(null).size).toBe(0);
+    expect(minedSourceIdsFromDeck('{ not json at all').size).toBe(0);
   });
 });

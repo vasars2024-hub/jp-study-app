@@ -234,9 +234,28 @@ export function existingDeckKeys(texts: Iterable<string>): Set<string> {
   return out;
 }
 
+/**
+ * Namespace for {@link mineBookIdFor}. Exported so the inverse
+ * ({@link minedSourceIdFromBookId}) cannot drift from the forward direction —
+ * D421 was caused by exactly that kind of split vocabulary.
+ */
+export const MINE_BOOK_ID_PREFIX = 'files:';
+
 /** The deck key every card from one Files item shares, so they group together. */
 export function mineBookIdFor(item: FilesItem): string {
-  return `files:${item.id}`;
+  return `${MINE_BOOK_ID_PREFIX}${item.id}`;
+}
+
+/**
+ * The inverse: the Files item id a deck card was mined out of, or `null` for a
+ * card this app's Files mining did not create (the harvest flow writes
+ * `harvest:…`, an import writes `import-…`). `null` rather than a guess — a
+ * wrong id would mark the wrong row mined, which is the failure D421 was.
+ */
+export function minedSourceIdFromBookId(bookId: string | undefined | null): string | null {
+  if (typeof bookId !== 'string' || !bookId.startsWith(MINE_BOOK_ID_PREFIX)) return null;
+  const id = bookId.slice(MINE_BOOK_ID_PREFIX.length);
+  return id ? id : null;
 }
 
 function timeLabel(passage: FilesMinePassage): string | undefined {

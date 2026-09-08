@@ -20,12 +20,14 @@
 import {
   categoryForKind,
   countByCategory,
+  deriveMinedFlags,
   filesItemPathKey,
   type FilesIndexSnapshot,
   type FilesItem,
   type FilesItemKind,
   type FilesProvenance,
 } from '../../../shared/filesApp/catalog';
+import { minedSourceIdFromBookId } from '../../../shared/filesApp/mining';
 import {
   NOTEBOOK_TIMELINE_STORAGE_KEY,
   loadNotebookTimeline,
@@ -504,6 +506,27 @@ function readLocalStorage(key: string): string | null {
   }
 }
 
+/**
+ * The Files rows the local deck proves have been mined, read from the same
+ * store the cards themselves come from (D421).
+ *
+ * Kept separate from {@link flashcardDeckFilesItems} rather than folded into it:
+ * that one answers "what rows does the deck contribute", this one answers "what
+ * does the deck say about rows somebody else contributed", and only the second
+ * may reach across into another enumerator's output.
+ */
+export function minedSourceIdsFromDeck(
+  raw: string | null = readLocalStorage(FLASHCARD_DECK_STORAGE_KEY),
+): Set<string> {
+  const { store } = parseFlashcardDeckStore(raw);
+  const out = new Set<string>();
+  for (const card of store.cards) {
+    const id = minedSourceIdFromBookId(card?.bookId);
+    if (id) out.add(id);
+  }
+  return out;
+}
+
 /** Every renderer-owned enumerator, in one place. */
 export const RENDERER_FILES_ENUMERATORS: readonly {
   source: string;
@@ -574,5 +597,29 @@ export function withRendererItems(snapshot: FilesIndexSnapshot): FilesIndexSnaps
     }
   }
 
-  return { ...snapshot, items, counts: countByCategory(items), enumerators: reports };
+  // After the join, never inside it: the deck is one enumerator's output and the
+  // rows it marks belong to others, so this can only run once every side has
+  // contributed. Same placement rule, and same reason, as `deriveCrossStoreFlags`.
+  //
+  // Guarded on the same terms as the enumerators above, and for a reason worth
+  // keeping: this pass reads a store, so it can fail the way a reader fails, and
+  // it runs OUTSIDE the loop that catches those. Unguarded it took the entire
+  // index down — every category to 0 — when the deck module was unreadable. A
+  // failure here must cost the mined flags and nothing else, and it is reported
+  // rather than swallowed so "no source is mined" stays distinguishable from
+  // "the deck could not be read".
+  const derivedStarted = Date.now();
+  let derived = items;
+  try {
+    derived = deriveMinedFlags(items, minedSourceIdsFromDeck());
+  } catch (err) {
+    reports.push({
+      source: 'local-deck-mined',
+      itemCount: 0,
+      elapsedMs: Date.now() - derivedStarted,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return { ...snapshot, items: derived, counts: countByCategory(derived), enumerators: reports };
 }
