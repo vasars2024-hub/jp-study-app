@@ -49,15 +49,23 @@ export default function ExtensionBridgeSection() {
       highlight={focusSettingId === 'extension-bridge'}
     >
       <p className="muted os-set-hint">
+        {/*
+          `String(port)` and not the number: `t()` runs every numeric parameter
+          through `Intl.NumberFormat`, so the bridge port rendered as
+          "127.0.0.1:18,765" on screen (measured live 2026-09-08, register row
+          D424) and would read "18 765" under ru. A port is an identifier, not a
+          quantity, and the one thing a user does with this line is copy it.
+          Same reason `ReadingTimeline` already wraps its year in `String`.
+        */}
         {status?.running
-          ? t('settings.extension.running', { port: status.port })
+          ? t('settings.extension.running', { port: String(status.port) })
           : /*
              * "Stopped" alone left the one actionable failure invisible: the port
              * was already taken, and the number shown next to it belonged to
              * whoever took it. Name the reason instead.
              */
             status?.stoppedReasonKey === 'portInUse'
-            ? t('settings.extension.stoppedPortInUse', { port: status.port })
+            ? t('settings.extension.stoppedPortInUse', { port: String(status.port) })
             : status?.stoppedReasonKey === 'listenFailed'
               ? t('settings.extension.stoppedError', { detail: status.stoppedDetail ?? '' })
               : t('settings.extension.stopped')}
