@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useT } from '../i18n';
 import type { SourceLang } from './types';
 import { recordGameResult } from '../stats';
 
@@ -118,7 +119,14 @@ function ArcadeShell({
         </div>
       </div>
       {children}
-      <div className="arcade-game__status">{status}</div>
+      {/*
+        Every arcade game reports what just happened through this one line, and
+        it changed silently: a hit, a cleared board, a lost run all rewrote a
+        plain div. A screen reader has no other channel here — the games are
+        drawn, not described — so this is the only place the outcome exists as
+        text, and it has to announce itself.
+      */}
+      <div className="arcade-game__status" role="status" aria-live="polite">{status}</div>
       {complete && (
         <button type="button" className="btn primary" onClick={onReset}>
           Restart
@@ -1383,8 +1391,33 @@ function makeMineBoard(stage: number): MineState {
 
 function ThemedMinesweeper(props: ArcadeGamePanelProps) {
   const record = useArcadeResult(props);
+  const { t, lang } = useT();
   const [state, setState] = useState<MineState>(() => makeMineBoard(1));
   const reset = (): void => setState(makeMineBoard(1));
+
+  /**
+   * What one cell is called.
+   *
+   * The board is 25 bare `<button>`s whose only content appears once they are
+   * revealed, so an unplayed board announced itself as "button" twenty-five
+   * times over — no position, no state, and a revealed 0 reads the same as an
+   * untouched square because its label is the empty string. The name has to
+   * carry both halves: where it is, and what it is now.
+   */
+  const cellLabel = useCallback(
+    (cell: MineState['board'][number], index: number): string => {
+      const row = Math.floor(index / state.size) + 1;
+      const col = (index % state.size) + 1;
+      if (cell.flagged && !cell.selected) return t('games.arcade.mines.cellFlagged', { row, col });
+      if (!cell.selected) return t('games.arcade.mines.cellHidden', { row, col });
+      if (cell.mine) return t('games.arcade.mines.cellMine', { row, col });
+      if (!cell.value) return t('games.arcade.mines.cellEmpty', { row, col });
+      return t('games.arcade.mines.cellCount', { row, col, count: cell.value });
+    },
+    // `lang`, never `t` — `t`'s identity is stable by design, so depending on it
+    // goes stale after a language switch instead of erroring.
+    [lang, state.size, t],
+  );
 
   const reveal = (start: number): void => {
     setState((current) => {
@@ -1456,11 +1489,17 @@ function ThemedMinesweeper(props: ArcadeGamePanelProps) {
 
   return (
     <ArcadeShell {...props} title={title} subtitle="RaemondBW recursive board logic, restyled for the active shell" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
-      <div className="arcade-mines" style={{ gridTemplateColumns: `repeat(${state.size}, minmax(0, 1fr))` }}>
+      <div
+        className="arcade-mines"
+        role="group"
+        aria-label={t('games.arcade.mines.board', { size: state.size })}
+        style={{ gridTemplateColumns: `repeat(${state.size}, minmax(0, 1fr))` }}
+      >
         {state.board.map((cell, index) => (
           <button
             key={index}
             type="button"
+            aria-label={cellLabel(cell, index)}
             className={`${cell.selected ? cell.mine ? 'mine' : 'open' : ''} ${cell.flagged ? 'flagged' : ''}`.trim()}
             onClick={() => reveal(index)}
             onContextMenu={(event) => flag(event, index)}

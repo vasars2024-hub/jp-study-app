@@ -30,6 +30,12 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   // Was 'Plan 3 / 3.5' — an internal build-plan reference rendered into the
   // Game Arena window chrome in every language mode (audit F14). A kicker
   // should say what the window is, not which plan document produced it.
+  'games.arcade.mines.board': 'Minefield, {size} by {size}',
+  'games.arcade.mines.cellHidden': 'Row {row}, column {col} — hidden',
+  'games.arcade.mines.cellFlagged': 'Row {row}, column {col} — flagged',
+  'games.arcade.mines.cellMine': 'Row {row}, column {col} — mine',
+  'games.arcade.mines.cellEmpty': 'Row {row}, column {col} — clear',
+  'games.arcade.mines.cellCount': { other: 'Row {row}, column {col} — {count} mines nearby' },
   'games.kicker': 'Practice',
   'games.title': 'Game Arena',
   'games.desc': 'Fast local drills plus Mirror Writing evaluation, all keyed to your level.',

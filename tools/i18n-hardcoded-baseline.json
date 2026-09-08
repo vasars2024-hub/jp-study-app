@@ -15,7 +15,6 @@
   "src/renderer/components/translate-analysis/DeclensionDrawer.tsx": 9,
   "src/renderer/components/ui/MenuBar.tsx": 10,
   "src/renderer/components/ui/SplitPane.tsx": 7,
-  "src/renderer/games/ArcadeGames.tsx": 71,
   "src/renderer/main.tsx": 6,
   "src/renderer/widgets/registry.tsx": 6
 }
