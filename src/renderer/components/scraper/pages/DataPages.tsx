@@ -17,7 +17,7 @@ import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
 import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import { distinctEpisodes } from '../data/dashboardData';
-import { sx, sxn, sxs } from '../strings';
+import { sx, sxn, sxNumber, sxs } from '../strings';
 import { SERIES, episodes, type FixtureSeries } from '../data/fixtures';
 import { scraperArtwork } from '../artwork';
 import { buildEpisodeExport, exportExtension } from '../data/exportBuilder';
@@ -214,20 +214,20 @@ export function ResultsPage() {
       <div className="scr-tile-row">
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('results.count')}</span>
-          <span className="scr-tile-value">{bySeries.length.toLocaleString()}</span>
+          <span className="scr-tile-value">{sxNumber(bySeries.length)}</span>
         </div>
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('results.episodes')}</span>
-          <span className="scr-tile-value">{distinct.indexed.toLocaleString()}</span>
+          <span className="scr-tile-value">{sxNumber(distinct.indexed)}</span>
         </div>
         <div className="scr-tile">
           <span className="scr-tile-label">{sx('results.withJa')}</span>
-          <span className="scr-tile-value">{distinct.japanese.toLocaleString()}</span>
+          <span className="scr-tile-value">{sxNumber(distinct.japanese)}</span>
         </div>
         <div className="scr-tile is-bad">
           <span className="scr-tile-label">{sx('results.failed')}</span>
           <span className="scr-tile-value">
-            {bySeries.reduce((n, s) => n + s.failed, 0).toLocaleString()}
+            {sxNumber(bySeries.reduce((n, s) => n + s.failed, 0))}
           </span>
         </div>
       </div>
@@ -890,7 +890,7 @@ export function HistoryPage() {
       <div className="scr-history-overview">
         <div className="scr-tile-row">
           <div className="scr-tile"><span className="scr-tile-label">Episodes found</span><span className="scr-tile-value">{totals.episodes.toLocaleString()}</span></div>
-          <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">Failed checks</span><span className="scr-tile-value">{totals.failures.toLocaleString()}</span></div>
+          <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">Failed checks</span><span className="scr-tile-value">{sxNumber(totals.failures)}</span></div>
           <div className="scr-tile"><span className="scr-tile-label">Data indexed</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(totals.bytes)}</span></div>
           <div className="scr-tile"><span className="scr-tile-label">Average runtime</span><span className="scr-tile-value scr-tile-value--text">{formatDuration(totals.average)}</span></div>
         </div>
@@ -962,7 +962,7 @@ export function HistoryPage() {
                   <div role="gridcell" className="scr-td"><Pill tone="outline">{job.profile}</Pill></div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{job.found.toLocaleString()}</span></div>
                   <div role="gridcell" className="scr-td">
-                    <span className={`scr-t-num${job.failed ? ' scr-seed is-low' : ''}`}>{job.failed.toLocaleString()}</span>
+                    <span className={`scr-t-num${job.failed ? ' scr-seed is-low' : ''}`}>{sxNumber(job.failed)}</span>
                   </div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{formatBytes(job.bytes)}</span></div>
                   <div role="gridcell" className="scr-td"><span className="scr-t-num">{formatDuration(job.durationSec)}</span></div>

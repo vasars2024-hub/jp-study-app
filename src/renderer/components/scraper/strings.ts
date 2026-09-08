@@ -17,7 +17,7 @@
 // release groups (CLAUDE.md i18n rule 4). Only chrome goes through this file.
 
 import { catalogFor, en as SHARED_EN } from '../../../shared/i18n/catalogs';
-import { translate, type TVars } from '../../../shared/i18n/core';
+import { LANG_TAGS, translate, type TVars } from '../../../shared/i18n/core';
 import { getUiLang } from '../../i18n';
 
 const TEXT = {
@@ -503,7 +503,7 @@ const TEXT = {
   // is job-scoped), so a series scraped five times is five rows. Labelling the
   // count 'Series' made this page report 10 where the Dashboard reported 5.
   'results.count': 'Results',
-  'results.countLabel': (n: number) => `${n.toLocaleString()} results`,
+  'results.countLabel': (n: number) => `${sxNumber(n)} results`,
   'results.episodes': 'Episodes',
   'results.withJa': 'With Japanese subtitles',
   'results.failed': 'Failed',
@@ -711,6 +711,18 @@ function shared(key: ScraperTextKey, vars?: TVars): string | null {
 }
 
 /** Resolve a plain string. Count-bearing keys should use sxn() instead. */
+/**
+ * Format a number in the language the user chose IN THIS APP.
+ *
+ * A bare `toLocaleString()` follows the OS locale instead, which is invisible in
+ * en/ja/zh — they all group with commas — and wrong in ru, where the separator
+ * is a space. Every number this app prints should go through here.
+ * `tools/i18n-locale-arg-check.cjs` counts the bare calls that remain.
+ */
+export function sxNumber(value: number): string {
+  return value.toLocaleString(LANG_TAGS[getUiLang()]);
+}
+
 export function sx(key: ScraperTextKey): string {
   const migrated = shared(key);
   if (migrated !== null) return migrated;
