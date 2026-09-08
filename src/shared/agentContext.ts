@@ -249,3 +249,40 @@ export function conversationWithoutAgentContext(
   if (context.length === conversation.context.length) return null;
   return { ...conversation, context, updatedAt: now };
 }
+
+/**
+ * The shelf label to SHOW, which is not always the one that was stored.
+ *
+ * `routeAgentContext` resolves a section's name through `t()` and the result is
+ * then persisted on a `retained` item, so the shelf keeps whatever language the
+ * capture happened in — measured live 2026-09-08 (register row D425): an English
+ * capture still read "Grammar / Translate / Dictionary / Control Center" with
+ * the app switched to Japanese and every chip beside them reading 場所 / 通常.
+ * Being retained, it survives a restart and never self-heals.
+ *
+ * A bare `route` item carries the section in `source.app` and nothing else, so
+ * the name can simply be resolved again on every render. Three cases
+ * deliberately keep the stored string:
+ *
+ *  - any other kind — the label is the user's own content (a term, a selection,
+ *    a deck name) and translating it would be the i18n policy's exact
+ *    prohibition;
+ *  - a `settingsRouteAgentContext` item, which sets `source.route` and whose
+ *    label names a settings CARD rather than a section, so there is no section
+ *    key to resolve it by;
+ *  - an unknown `source.app`, which is a section this build does not have.
+ */
+export function agentContextDisplayLabel(
+  item: Pick<AgentContextItem, 'kind' | 'label' | 'source'>,
+  sectionLabelKeys: Record<string, string>,
+  t: (key: string) => string,
+): string {
+  if (item.kind !== 'route') return item.label;
+  if (item.source.route || item.source.controlId) return item.label;
+  const key = sectionLabelKeys[item.source.app];
+  if (!key) return item.label;
+  const resolved = t(key);
+  // `t()` returns the key itself when nothing resolves it. Showing
+  // `palette.section.grammar` would be worse than the stale English.
+  return resolved && resolved !== key ? resolved : item.label;
+}

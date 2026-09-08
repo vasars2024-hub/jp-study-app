@@ -175,6 +175,7 @@ import {
   readAgentAttachmentFiles,
   type AgentAttachmentReadFailureCode,
 } from '../../agentAttachments';
+import { agentContextDisplayLabel } from '../../../shared/agentContext';
 import { mergeStagedImageAttachments } from '../../../shared/agentImageStaging';
 import { onAgentImageStaged, takeAgentImages } from '../../agentImageStagingClient';
 import {
@@ -300,7 +301,26 @@ function ContextShelf({
               <span className="agent-chip agent-chip-kind">
                 {t(`agent.context.kind.${item.kind}`)}
               </span>
-              <span className="agent-context-item-label">{item.label}</span>
+              {/*
+                A bare `route` item names one of the app's own sections, and its
+                label was `t(...)`-resolved by the producer and then PERSISTED
+                (`routeAgentContext`, `agentContextHandoff.ts:286`). So a shelf
+                captured in English still read "Grammar / Translate / Dictionary /
+                Control Center" after switching the app to Japanese, beside chips
+                that had all become 場所 / 通常 — measured live 2026-09-08,
+                register row D425. It never self-heals: the item is `retained`, so
+                it survives a restart with the old language baked in.
+
+                `source.app` is the section and is enough to resolve the name
+                again on every render. Only the BARE producer is re-resolved:
+                `settingsRouteAgentContext` sets `source.route`, and its label
+                names a settings card rather than a section, so there is nothing
+                to look it up by — that half is a separate, narrower gap and is
+                recorded on the register row rather than guessed at here.
+              */}
+              <span className="agent-context-item-label">
+                {agentContextDisplayLabel(item, AGENT_NAVIGATION_SECTION_LABEL_KEYS, t)}
+              </span>
               <span
                 className={`agent-chip agent-chip-sensitivity agent-sensitivity-${item.sensitivity}`}
               >
