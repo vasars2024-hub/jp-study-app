@@ -186,12 +186,30 @@ function groupFromName(name: string): string | null {
   return /^\s*\[([^\]]{1,40})\]/.exec(name)?.[1]?.trim() || null;
 }
 
-/** Episode number from a release/file name, for the matcher's episode signal. */
+/**
+ * Episode number from a release/file name, for the matcher's episode signal.
+ *
+ * The fourth pattern — a bare `E<nn>` with no season token — is the form Jimaku's
+ * own Bandai releases use (`The Big O.E01.Bandai.ja.srt`), and its absence was
+ * D267: none of the first three patterns match it, so every such file returned
+ * `null`, the unnumbered-target guard in `scoreCandidates` was skipped, and
+ * episode 1's dialogue was auto-attached to three creditless specials at
+ * confidence 100.
+ *
+ * It is fenced with alphanumeric lookaround rather than `\b` on purpose. `\b`
+ * is wrong in both directions here: `_` is a word character, so `Show_E07` would
+ * not match, while a CRC32 tag such as `[E0F1A2B3]` — the single most common
+ * token in an anime release name — would be read as episode 0. Bare `E` is the
+ * most collision-prone token there is, and this number feeds candidate scoring
+ * for EVERY provider, so a false positive misattributes a subtitle rather than
+ * merely failing to block one.
+ */
 function episodeFromName(name: string): number | null {
   const patterns = [
     /\bs\d{1,2}[\s._-]*e(\d{1,3})\b/i,
     /\b(?:episode|ep)[\s._-]*(\d{1,3})\b/i,
     /\s-\s*(\d{1,3})(?=\D|$)/,
+    /(?<![a-z0-9])e(\d{1,3})(?![a-z0-9])/i,
   ];
   for (const pattern of patterns) {
     const value = Number(pattern.exec(name)?.[1]);

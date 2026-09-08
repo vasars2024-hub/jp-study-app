@@ -166,3 +166,63 @@ describe('jimakuSearchDetailed — down is set by who actually knows', () => {
     expect(match.downStatus).toBe(200);
   });
 });
+
+// D267. This lives here rather than in its own file because `episodeFromName`
+// is private and the number it produces only matters as it reaches a candidate,
+// which is exactly what this harness already drives. Every case asks with
+// `episode = null` — an unnumbered target, the creditless-special case — so the
+// number in the assertion can only have come from the NAME.
+describe('candidate episode numbering — what the matcher is given', () => {
+  /** One listing, one file, straight through the real client. */
+  async function episodeOf(fileName: string): Promise<number | null> {
+    replies = [
+      { status: 200, body: ENTRY },
+      { status: 200, body: JSON.stringify([{ name: fileName, url: 'https://x/1.srt' }]) },
+    ];
+    const match = await jimakuSearchDetailed(undefined, 'Bakuman.', null);
+    expect(match.candidates).toHaveLength(1);
+    return match.candidates[0].episode;
+  }
+
+  it.each([
+    // The live D267 subject: Jimaku's own Bandai naming, which read as `null`.
+    ['The Big O.E01.Bandai.ja.srt', 1],
+    ['The Big O.E13.Bandai.ja.srt', 13],
+    // `_` is a word character, so a `\b`-fenced pattern would miss this one.
+    ['Show_E07_1080p.ja.srt', 7],
+    ['[Group] Show E12 [1080p].srt', 12],
+    ['Show (E4).ja.ass', 4],
+    // The three patterns that already worked must keep working.
+    ['Show.S02E05.1080p.srt', 5],
+    ['Show Episode 3.ja.srt', 3],
+    ['Bakuman - 01.ja.srt', 1],
+  ])('reads %s as episode %i', async (name, expected) => {
+    expect(await episodeOf(name)).toBe(expected);
+  });
+
+  it.each([
+    // A CRC32 tag is the token bare `E` collides with, and it is in almost every
+    // anime release name. Reading `[E0F1A2B3]` as episode 0 would attach a
+    // special's file to episode 0 and block it from every unnumbered target.
+    ['[Group] Show [E0F1A2B3].srt'],
+    ['[Group] Show [1E2A3B4C].srt'],
+    ['[Group] Show [DEAD10CC].srt'],
+    // Codec and container tokens that carry a digit after an `e`.
+    ['Show [E-AC3 2.0][x265].ja.srt'],
+    ['Show.WEB-DL.DDPA5.1.ja.srt'],
+  ])('does NOT invent an episode from %s', async (name) => {
+    expect(await episodeOf(name)).toBeNull();
+  });
+
+  it('still falls back to the requested episode when the name says nothing', async () => {
+    // The discriminating positive for the whole change: a numbered target must
+    // keep the fallback that makes `?episode=` listings match at all. Without
+    // this, "always null" passes every negative case above.
+    replies = [
+      { status: 200, body: ENTRY },
+      { status: 200, body: JSON.stringify([{ name: 'Bakuman.ja.srt', url: 'https://x/1.srt' }]) },
+    ];
+    const match = await jimakuSearchDetailed(undefined, 'Bakuman.', 9);
+    expect(match.candidates[0].episode).toBe(9);
+  });
+});

@@ -87,8 +87,8 @@ describe('scoring the real Jimaku candidate', () => {
     format: 'srt',
     releaseName: 'The Big O.E13.Bandai.ja.srt',
     season: null,
-    // `episodeFromName` cannot read `.E13.`; this is the requested-episode
-    // fallback, which is what makes the match work.
+    // Since D267 the name itself parses to 13; before that this number could
+    // only come from the requested-episode fallback.
     episode: 13,
     releaseGroup: null,
     hearingImpaired: false,
@@ -136,5 +136,60 @@ describe('recentlyFailed — a provider outage', () => {
   it('is unaffected by how the multi-language failure row is keyed', () => {
     const item = itemWith([{ providerId: 'opensubtitles', lang: 'ja,en', reason: 'provider-down', ageDays: 0.01 }]);
     expect(recentlyFailed(item, 'opensubtitles', 'ja,en', 7)).toBe(false);
+  });
+});
+
+// D267, the other half of the seam. The guard in `scoreCandidates` was written
+// on 2026-08-24 and had never once fired, because the number it tests for was
+// always `null` for exactly the naming this provider emits. These two cases are
+// the live subject: `The Big O.E01.Bandai.ja.srt` was auto-attached to the
+// creditless opening and both creditless endings at confidence 100.
+describe('an item the library cannot number', () => {
+  /** A creditless special: `episodeKind: 'special'`, no episode number. */
+  function specialItem(): MediaItem {
+    return {
+      ...itemWith([]),
+      id: 'special-1',
+      title: 'The Big O - Creditless Opening',
+      fileName: 'The Big O - Creditless Opening.mkv',
+      path: 'C:/media/The Big O - Creditless Opening.mkv',
+      episode: null,
+      episodeKind: 'special',
+    } as unknown as MediaItem;
+  }
+
+  const bandaiE01: ProviderSubtitleCandidate = {
+    providerId: 'jimaku',
+    providerItemId: 'jimaku:1178:The Big O.E01.Bandai.ja.srt',
+    language: 'ja',
+    format: 'srt',
+    releaseName: 'The Big O.E01.Bandai.ja.srt',
+    season: null,
+    // What the client now produces from that name. `null` here is the bug.
+    episode: 1,
+    releaseGroup: null,
+    hearingImpaired: false,
+    hashMatch: false,
+    downloads: null,
+    fetchToken: 'https://example.test/e01.srt',
+  };
+
+  it('refuses a numbered track for an unnumbered target', () => {
+    expect(scoreCandidates([bandaiE01], specialItem(), 'ja', 70)).toEqual([]);
+  });
+
+  it('is what the parsed number buys — the same file passed straight through as null', () => {
+    // The pre-D267 state, reconstructed. If this ever stops accepting, the
+    // guard has started rejecting on something other than the episode number
+    // and the test above no longer proves what it claims.
+    const scored = scoreCandidates([{ ...bandaiE01, episode: null }], specialItem(), 'ja', 70);
+    expect(scored).toHaveLength(1);
+  });
+
+  it('still attaches that file to episode 1 itself', () => {
+    // The discriminating positive: the guard must not have become "reject every
+    // numbered candidate".
+    const episodeOne = { ...itemWith([]), title: 'The Big O - 01', episode: 1 } as unknown as MediaItem;
+    expect(scoreCandidates([bandaiE01], episodeOne, 'ja', 70)).toHaveLength(1);
   });
 });
