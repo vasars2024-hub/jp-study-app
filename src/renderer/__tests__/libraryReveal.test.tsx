@@ -95,12 +95,17 @@ describe('LibraryView — reveal (§11.1)', () => {
     // The shelf's folder rail (`LibraryView.tsx:1393`), not the View menu —
     // menu items render as bare children on the default theme, so a menu-only
     // control is not reachable from a jsdom mount at all.
-    const english = [...host.querySelectorAll<HTMLElement>('.lib-folder-chip')].find((node) =>
+    const englishChip = [...host.querySelectorAll<HTMLElement>('.lib-folder-chip')].find((node) =>
       node.textContent?.includes('English'),
     );
-    expect(english, 'no folder button for English').toBeTruthy();
+    expect(englishChip, 'no folder button for English').toBeTruthy();
+    // A folder chip is a split pill: the outer element is the pill and the two
+    // real buttons live inside it, so the click has to land on the select half.
+    // The `?? chip` keeps this test honest against the non-folder chips (All,
+    // Unfiled, the language and level filters), which are still bare buttons.
+    const english = englishChip!.querySelector<HTMLElement>('.lib-folder-chip-select') ?? englishChip!;
     await act(async () => {
-      english!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      english.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
     // The Japanese book is now filtered out — the precondition, asserted rather

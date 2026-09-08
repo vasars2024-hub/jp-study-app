@@ -1004,7 +1004,13 @@ html[data-chrome='frosted'] .os-taskbar {
   --panel-2: #f3e8d7;
   --sidebar: #f5ecdd;
   --text: #5b4637;
-  --muted: #8a7360;
+  /* Darkened from #8a7360 on 2026-08-03 (slice 77). It scored 3.69:1 on --panel-2, against the
+     4.5:1 WCAG AA wants for body text, and it is the single colour behind most of this theme's
+     174 real text failures. Darkened 13% along its own channels, so the hue is untouched and only
+     the value moves — the warm sepia character is the point of the theme. Worst case is the
+     DARKEST surface, not the lightest: for dark text on a light ground, contrast is worst where
+     the background is deepest. Now 4.62:1 on --panel-2. */
+  --muted: #786454;
   --border: #d4c5a9;
   --control-bg: rgba(91, 70, 55, 0.05);
   --control-border: #d4c5a9;
@@ -1056,7 +1062,8 @@ html[data-chrome='frosted'] .os-taskbar {
   --panel-2: #e2f3ea;
   --sidebar: #e8f6ef;
   --text: #1f4e3d;
-  --muted: #4f7a68;
+  /* 4.23:1 -> 4.64:1 on --panel-2; see the soft-sepia --muted note. Hue preserved. */
+  --muted: #4b7362;
   --border: #b8e0cc;
   --control-bg: rgba(31, 78, 61, 0.05);
   --control-border: #b8e0cc;
@@ -1074,7 +1081,8 @@ html[data-chrome='frosted'] .os-taskbar {
   --panel-2: #f4e3df;
   --sidebar: #f7eae6;
   --text: #6e3a3a;
-  --muted: #9a6a68;
+  /* 3.65:1 -> 4.60:1 on --panel-2; see the soft-sepia --muted note. Hue preserved. */
+  --muted: #855c5a;
   --border: #e6d0cd;
   --control-bg: rgba(110, 58, 58, 0.05);
   --control-border: #e6d0cd;
@@ -1124,7 +1132,8 @@ html[data-chrome='frosted'] .os-taskbar {
   --panel-2: #efe9df;
   --sidebar: #f3efe8;
   --text: #2c2a26;
-  --muted: #6f6a60;
+  /* 4.45:1 -> 4.65:1 on --panel-2; see the soft-sepia --muted note. Hue preserved. */
+  --muted: #6c675e;
   --border: #ddd6cb;
   --control-bg: rgba(44, 42, 38, 0.05);
   --control-border: #ddd6cb;
@@ -1543,6 +1552,26 @@ html[data-display-links='1'] .linkish {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.26),
     inset 0 0 42px rgba(255, 255, 255, 0.18);
+}
+/* Native Fill (Phase 4 · M3): drop the fixed 1280x960 4:3 stage and let the
+   Aero desktop occupy the whole window. Presentation only — nothing inside the
+   frame changes, and the scale variable simply stops being used. Settings →
+   Appearance → Pillarbox style writes `data-aero-fill` (pillarboxSettings.ts). */
+:root[data-materials='aero'][data-aero-fill='on'] .os-viewport-frame {
+  inset: 0;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: auto;
+  transform: none;
+  outline: none;
+  box-shadow: none;
+}
+:root[data-materials='aero'][data-aero-fill='on'] .os-viewport-ambience {
+  display: none;
+}
+:root[data-materials='aero'][data-aero-fill='on'] .os-viewport-frame::after {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 button {
@@ -3667,6 +3696,7 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 /* Shared control skin for the AI Card Studio and Advanced EPUB mining forms.
    Native selects had no styling at all, so Windows drew them as stock white
    controls that clashed with the dark panels. Uses the same tokens as the
@@ -5797,8 +5827,15 @@ mark.lookup-mark,
   padding: 11px 14px;
   font-size: 16px;
 }
+/* NO `outline: none` HERE. It used to sit on this rule, and because the global focus ring
+   (`html[data-display-focus='normal'] *:focus-visible`, ~line 1083) has the same specificity and
+   comes EARLIER in this file, this rule won on source order and suppressed the ring outright —
+   leaving `--accent-2` as the only focus cue. Measured 2026-08-03 on soft-sepia: rgb(255,107,129)
+   on rgb(251,243,232) is 2.49:1, against the 3:1 WCAG wants for a focus indicator. Focusing the
+   field made its boundary WORSE than at rest, where the shared --control-edge hairline scores
+   4.45:1. Both the CSS path and the pixel path measured 2.49 independently. The border tint stays
+   as a secondary cue; the ring is what carries the contrast. */
 .dict-search input:focus {
-  outline: none;
   border-color: var(--accent-2);
 }
 .dict-hint {
@@ -12505,10 +12542,48 @@ mark.lookup-mark,
   margin-left: 2px;
   padding: 0 3px;
   color: var(--muted);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
   border-radius: 4px;
 }
 .lib-chip-del:hover {
   color: var(--accent);
+}
+/* The folder pill is a split control: the span is the pill, and the two real
+   buttons inside it carry the padding the pill used to. Mirrors
+   `.flash-view .flash-folders` in FlashcardsContent.css, which already had to
+   solve this — see the comment on the chip in LibraryView. */
+.lib-folder-chip-group {
+  padding: 0;
+  gap: 0;
+}
+.lib-folder-chip-group .lib-folder-chip-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  border-radius: 999px;
+  cursor: pointer;
+}
+/* No min-height: the select button's padding is the pill's old padding, so a
+   folder chip stays exactly as tall as the All / Unfiled / Covers chips beside
+   it. A 32px floor here made folder pills 34px and the rest 31. */
+.lib-folder-chip-group .lib-chip-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 26px;
+  min-width: 26px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
 }
 .lib-folder-new {
   border-style: dashed;
@@ -16034,26 +16109,6 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .unified-search-result-cover { width: 40px; height: 56px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
 .unified-search-result-copy { display: grid; gap: 2px; min-width: 0; }
 .unified-search-result-copy strong, .unified-search-result-copy span { overflow-wrap: anywhere; }
-
-/* ---- Settings ▸ API keys (credentials vault) ------------------------------ */
-/* Follows the .unified-search-provider block above: one card per credential,
-   panel-tinted, with the secret never rendered — only its configured state. */
-.credential-list { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
-.credential-row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%); }
-.credential-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
-.credential-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.credential-row-text strong { font-size: 13px; }
-.credential-state-on, .credential-state-off { font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-.credential-state-on { color: var(--ok, #4ade80); background: color-mix(in srgb, var(--ok, #4ade80) 16%, transparent); }
-.credential-state-off { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
-.credential-used-by, .credential-free-tier, .credential-env { margin: 6px 0 0; font-size: 12px; }
-.credential-field { display: grid; gap: 4px; margin: 10px 0 0; }
-.credential-field label { font-size: 12px; color: var(--muted); }
-.credential-field input { width: 100%; }
-.credential-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
-/* A store that cannot encrypt is a security statement, not a hint: it reads as a
-   warning rather than as muted body text. */
-.credential-warning { margin: 10px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--warn, #f59e0b) 45%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent); color: var(--warn, #f59e0b); font-size: 12px; }
 .tracking-management-list { display: grid; gap: 12px; }
 .tracking-management-record { display: grid; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
 .tracking-management-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
@@ -17790,7 +17845,6 @@ html[data-taskbar-size='large'] .os-tray-btn {
   min-width: 160px;
   display: flex;
 }
-
 /* The toolbar's overflow disclosure. The body FLOATS rather than joining the row: the
    toolbar is a wrapping flex row and an in-flow body would push the row to two lines and
    move the stage down every time the menu opened. `position: relative` on the details, so
@@ -27505,6 +27559,26 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
   margin-top: 10px;
   font-size: 12px;
 }
+
+/* ---- Settings ▸ API keys (credentials vault) ------------------------------ */
+/* Follows the .unified-search-provider block above: one card per credential,
+   panel-tinted, with the secret never rendered — only its configured state. */
+.credential-list { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.credential-row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%); }
+.credential-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.credential-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.credential-row-text strong { font-size: 13px; }
+.credential-state-on, .credential-state-off { font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.credential-state-on { color: var(--ok, #4ade80); background: color-mix(in srgb, var(--ok, #4ade80) 16%, transparent); }
+.credential-state-off { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.credential-used-by, .credential-free-tier, .credential-env { margin: 6px 0 0; font-size: 12px; }
+.credential-field { display: grid; gap: 4px; margin: 10px 0 0; }
+.credential-field label { font-size: 12px; color: var(--muted); }
+.credential-field input { width: 100%; }
+.credential-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+/* A store that cannot encrypt is a security statement, not a hint: it reads as a
+   warning rather than as muted body text. */
+.credential-warning { margin: 10px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--warn, #f59e0b) 45%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent); color: var(--warn, #f59e0b); font-size: 12px; }
 
 /* ---------- Library: compact list + contextual detail drawer (Study OS) -----
    The cover grid above is what the Library opens as. These two shapes are what

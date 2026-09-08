@@ -1456,12 +1456,19 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
         >
           {t('library.filter.all')} <span className="lib-chip-count">{counts.all}</span>
         </button>
+        {/*
+          Split pill, not a button with a button inside it. The delete used to be
+          a bare <span onClick> nested in this chip's <button>: invalid nesting,
+          no role, no tabindex and no accessible name, so it could not be focused
+          and a screen reader was told nothing about it. The shape here is the one
+          Flashcards already uses for the same control (`flash-folder-chip-group`)
+          — the outer span is the pill and owns drag and drop, the two real
+          buttons are siblings inside it.
+        */}
         {folders.map((f) => (
-          <button
+          <span
             key={f}
-            className={`lib-folder-chip ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
-            aria-pressed={active === f}
-            onClick={() => setActive(f)}
+            className={`lib-folder-chip lib-folder-chip-group ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
             title={t('library.chip.folderTitle', { name: f })}
             draggable
             onDragStart={(e) => {
@@ -1470,21 +1477,30 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
             }}
             {...chipDropProps(f, true)}
           >
-            <Icon name="folder" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-            {f} <span className="lib-chip-count">{counts.byFolder.get(f) ?? 0}</span>
+            <button
+              type="button"
+              className="lib-folder-chip-select"
+              aria-pressed={active === f}
+              onClick={() => setActive(f)}
+            >
+              <Icon name="folder" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+              {f} <span className="lib-chip-count">{counts.byFolder.get(f) ?? 0}</span>
+            </button>
             {active === f && (
-              <span
+              <button
+                type="button"
                 className="lib-chip-del"
                 title={t('library.chip.deleteTitle')}
+                aria-label={t('library.chip.deleteTitle')}
                 onClick={(e) => {
                   e.stopPropagation();
                   void deleteFolder(f);
                 }}
               >
                 <Icon name="close" size={11} />
-              </span>
+              </button>
             )}
-          </button>
+          </span>
         ))}
         {(counts.unfiled > 0 || active === 'unfiled') && folders.length > 0 && (
           <button
@@ -1518,9 +1534,18 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 }
               }}
             />
-            <span className="lib-chip-del" title={t('library.chip.createTitle')} onClick={() => void createFolder()}>
+            {/* Enter in the field already creates the folder; this is the same
+                action for the mouse, and it has to be reachable and named for
+                everyone else too. */}
+            <button
+              type="button"
+              className="lib-chip-del"
+              title={t('library.chip.createTitle')}
+              aria-label={t('library.chip.createTitle')}
+              onClick={() => void createFolder()}
+            >
               <Icon name="check" size={11} />
-            </span>
+            </button>
           </span>
         ) : (
           <button

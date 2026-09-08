@@ -30,7 +30,14 @@ import { describe, expect, it } from 'vitest';
 const FILES: Array<{ path: string; label: string; floor: number }> = [
   // 15, not 16: `aero-library-tile` (LibraryView.tsx:1917) is a `<div role="button">`,
   // which this scan deliberately does not reach. It already carries `aria-pressed`.
-  { path: 'src/renderer/views/LibraryView.tsx', label: 'library', floor: 15 },
+  //
+  // 14, not 15, since 2026-09-08 (D393): the folder chip became a split pill —
+  // the conditional `active` class moved to the wrapping `<span>` and the
+  // `aria-pressed` sits on the `.lib-folder-chip-select` button inside it, which
+  // is the correct shape and not one this `<button …active…>` scan can see. The
+  // site is still covered, by `folderChipSplitPill` below, which asserts the
+  // select half announces its state and the delete half is a real named button.
+  { path: 'src/renderer/views/LibraryView.tsx', label: 'library', floor: 14 },
   { path: 'src/renderer/views/YouTubePlaylistsView.tsx', label: 'youtube', floor: 5 },
   { path: 'src/renderer/components/novels/NovelsContent.tsx', label: 'novels', floor: 2 },
 ];
@@ -178,5 +185,84 @@ describe('D93 — deleting a YouTube folder asks first', () => {
     // one mechanism per file, or the odd one out is the one nobody maintains.
     expect(src).not.toContain('window.confirm(');
     expect((src.match(/await confirmDialog\(\{/g) ?? []).length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+/**
+ * D393 — the library folder chip was a `<button>` with a click-handling `<span>`
+ * inside it.
+ *
+ * Measured live on 2026-09-08, pid 4652: the delete affordance was
+ * `tag: SPAN, role: null, tabindex: null, aria-label: null, textContent: ""`,
+ * `del.focus()` left `document.activeElement` elsewhere, and it sat inside the
+ * chip `<button>` whose whole accessible name was `"zzprobe-folder 0"`. So the
+ * one visible way to delete a folder was mouse-only and assistive tech was told
+ * nothing about it. Flashcards had already solved this with
+ * `flash-folder-chip-group`; this is that shape.
+ *
+ * Source-scanned for the reason the top of this file gives: `environment: 'node'`
+ * and these views reach singletons at module eval, so a render harness reaches a
+ * handful of sites and a scan reaches all of them.
+ */
+/** Blanks out block and line comments so prose about a defect cannot score as it. */
+function maskComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, lead: string) => lead + ' '.repeat(m.length - lead.length));
+}
+
+describe('D393 — the library folder chip is a split pill, not a button inside a button', () => {
+  const src = fs.readFileSync('src/renderer/views/LibraryView.tsx', 'utf8');
+
+  it('has no click-handling <span> left in the file', () => {
+    // The exact shape that was wrong, twice: the folder delete and the folder
+    // editor's create tick. `<span … onClick` cannot be focused and has no role.
+    //
+    // Comments are masked first, and that is not fussiness: the comment ABOVE the
+    // fixed chip spells out `<span onClick>` to say what it replaced, and without
+    // this the prose describing the fix fails the rule the fix satisfies. A source
+    // ratchet in this repo has scored a comment as a call site before.
+    const spans = [...maskComments(src).matchAll(/<span(?=[\s>])[^>]*?onClick/gs)]
+      .map((m) => m[0].slice(0, 80));
+    expect(spans).toEqual([]);
+  });
+
+  it('the comment mask is real: the pre-fix markup still fails, in code', () => {
+    const before = "<span className=\"lib-chip-del\" onClick={(e) => del(f)}><Icon /></span>";
+    expect([...maskComments(before).matchAll(/<span(?=[\s>])[^>]*?onClick/gs)]).toHaveLength(1);
+    expect([...maskComments(`/* ${before} */`).matchAll(/<span(?=[\s>])[^>]*?onClick/gs)]).toHaveLength(0);
+    expect([...maskComments(`// ${before}`).matchAll(/<span(?=[\s>])[^>]*?onClick/gs)]).toHaveLength(0);
+  });
+
+  it('the select half announces which folder is chosen', () => {
+    const select = src.slice(
+      src.indexOf('className="lib-folder-chip-select"'),
+      src.indexOf('className="lib-folder-chip-select"') + 220,
+    );
+    expect(select).toContain('aria-pressed={active === f}');
+    expect(select).toContain('onClick={() => setActive(f)}');
+  });
+
+  it('both `lib-chip-del` sites are real buttons with an accessible name', () => {
+    const sites = [...src.matchAll(/className="lib-chip-del"/g)];
+    // Two: the folder delete and the folder editor's create tick. A floor rather
+    // than an equality would let one of them silently regress to a span.
+    expect(sites).toHaveLength(2);
+    for (const site of sites) {
+      const open = src.lastIndexOf('<', site.index);
+      const tag = src.slice(open, src.indexOf('>', site.index) + 1);
+      expect(tag.startsWith('<button')).toBe(true);
+      expect(tag).toMatch(/aria-label=\{t\(/);
+    }
+  });
+
+  it('the pill keeps drag and drop, which used to live on the chip button', () => {
+    const chip = src.slice(
+      src.indexOf('lib-folder-chip lib-folder-chip-group'),
+      src.indexOf('lib-folder-chip lib-folder-chip-group') + 600,
+    );
+    expect(chip).toContain('draggable');
+    expect(chip).toContain("e.dataTransfer.setData('app/lib-folder', f)");
+    expect(chip).toContain('{...chipDropProps(f, true)}');
   });
 });
