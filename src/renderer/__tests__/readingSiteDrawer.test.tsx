@@ -94,4 +94,61 @@ describe('reading site detail drawer', () => {
     root = null;
     expect(document.activeElement).toBe(opener);
   });
+  /**
+   * Boss-audit follow-up, 2026-09-08 (register row D390). The drawer already
+   * took focus and already closed on Escape, and BOTH of those passed while the
+   * two halves that make a scrim honest were missing.
+   *
+   * `.rf-drawer-layer` is `position: fixed; inset: 0` and `.rf-drawer-scrim`
+   * paints `rgb(0 0 0 / 0.28)` across the whole viewport and swallows clicks. So
+   * the catalogue behind is already unusable to a sighted user, and the drawer
+   * owed a screen reader the same statement plus a keyboard that cannot walk out
+   * into it.
+   */
+  it('declares the modality its scrim already enforces', async () => {
+    await mount();
+    expect(drawer().getAttribute('aria-modal')).toBe('true');
+  });
+
+  it('keeps Tab inside the drawer, so focus never lands behind the scrim', async () => {
+    await mount();
+    const focusables = [
+      ...drawer().querySelectorAll<HTMLElement>(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
+      ),
+    ];
+    expect(focusables.length).toBeGreaterThan(1);
+
+    // Standing on the last control, a plain Tab would leave the dialog.
+    const last = focusables[focusables.length - 1];
+    last.focus();
+    expect(document.activeElement).toBe(last);
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(focusables[0]);
+
+    // And Shift+Tab off the first wraps to the last rather than to the taskbar.
+    focusables[0].focus();
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }),
+      );
+    });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('closes on Escape from OUTSIDE the drawer, not only from within it', async () => {
+    const { onClose } = await mount();
+    // Escape used to live on the panel's own onKeyDown, so it stopped working
+    // the moment focus was anywhere else - which, with no trap, was one Tab away.
+    const stray = document.createElement('button');
+    document.body.append(stray);
+    stray.focus();
+
+    await act(async () => {
+      stray.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

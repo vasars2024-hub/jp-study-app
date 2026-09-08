@@ -9,6 +9,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Icon from '../Icons';
+import { useModalKeyboard } from '../ui/useModalKeyboard';
 import './readingSiteDrawer.css';
 import {
   READING_SITES,
@@ -426,13 +427,16 @@ export function ReadingSiteDetail({
   // A drawer that opens without focus is unreachable by keyboard, and one that
   // drops focus on close strands the caret at the top of the document. Focus
   // moves in on mount and returns to the card that opened it.
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    drawerRef.current?.focus();
-    return () => {
-      if (opener && document.contains(opener)) opener.focus();
-    };
-  }, []);
+  //
+  // This was a hand-rolled effect doing only those two halves. It is now the
+  // shared hook, which adds the two that were missing: a Tab trap, and Escape
+  // at the DOCUMENT rather than on the panel's own `onKeyDown`. Those are not
+  // decoration here — `.rf-drawer-layer` is `position: fixed; inset: 0` and
+  // `.rf-drawer-scrim` paints `rgb(0 0 0 / 0.28)` over the whole viewport and
+  // swallows clicks, so one Tab out of the drawer landed on a grid that dims
+  // and refuses the mouse, and Escape then stopped closing anything because the
+  // handler had gone out of scope with the focus.
+  useModalKeyboard({ panelRef: drawerRef, onEscape: onClose });
 
   const fetchChapter = async (): Promise<void> => {
     const u = url.trim();
@@ -489,17 +493,16 @@ export function ReadingSiteDetail({
       <aside
         className="rf-drawer"
         role="dialog"
+        // The scrim dims the whole viewport and blocks the mouse, so the grid
+        // behind is already unusable to a sighted user. `aria-modal` is what
+        // says the same thing to a screen reader; without it the catalogue
+        // stayed in the a11y tree as though it were still reachable.
+        aria-modal="true"
         // Labelled by the site's own name rather than a new string: the heading
         // already says what this panel is, in the catalogue's own language.
         aria-labelledby={headingId}
         ref={drawerRef}
         tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.stopPropagation();
-            onClose();
-          }
-        }}
       >
         <div className="rf-drawer-head">
           <h2 id={headingId} lang="ja">{site.name}</h2>
