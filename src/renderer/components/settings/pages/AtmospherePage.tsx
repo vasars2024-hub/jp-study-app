@@ -48,7 +48,7 @@ export default function AtmospherePage() {
             <button
               key={id}
               type="button"
-              className={seg(env.performanceTier === id)}
+              {...seg(env.performanceTier === id)}
               onClick={() => patchEnv({ performanceTier: id })}
               disabled={!env.enabled}
             >
@@ -69,7 +69,7 @@ export default function AtmospherePage() {
             <button
               key={p.id}
               type="button"
-              className={seg(env.environmentPresetId === p.id)}
+              {...seg(env.environmentPresetId === p.id)}
               title={p.description}
               onClick={() => {
                 // Clicking the active preset clears it — otherwise these chips
@@ -169,7 +169,7 @@ export default function AtmospherePage() {
               <button
                 key={p.id}
                 type="button"
-                className={seg(on)}
+                {...seg(on)}
                 disabled={!env.enabled || !env.particlesEnabled || env.matchParticleSuggestions}
                 title={p.label}
                 onClick={() => {
@@ -258,7 +258,7 @@ export default function AtmospherePage() {
             <button
               key={id}
               type="button"
-              className={seg((env.weather?.mode ?? 'off') === id)}
+              {...seg((env.weather?.mode ?? 'off') === id)}
               disabled={!env.enabled}
               onClick={() => patchEnv({ weather: { mode: id, intensity: env.weather?.intensity ?? 0.5 } })}
             >

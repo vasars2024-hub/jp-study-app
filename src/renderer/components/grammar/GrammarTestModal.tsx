@@ -312,6 +312,7 @@ export default function GrammarTestModal({
                       key={n}
                       type="button"
                       className={`btn ${options.count === n ? 'primary' : ''}`}
+                      aria-pressed={options.count === n}
                       disabled={n > maxAvailable}
                       onClick={() => {
                         patch({ count: n });

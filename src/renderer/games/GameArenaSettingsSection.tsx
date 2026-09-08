@@ -8,13 +8,11 @@ import {
   type GameArenaSettings,
 } from './settings';
 import type { SourceLang } from './types';
+import { segButton as seg } from '../components/ui/segButton';
 
 const LEVELS: ArenaLevelOverride[] = ['auto', 1, 2, 3, 4, 5, 6, 7];
 const SOURCE_LANGS: SourceLang[] = ['en', 'ru', 'zh'];
 
-function seg(active: boolean): string {
-  return `btn small ${active ? 'primary' : ''}`;
-}
 
 export default function GameArenaSettingsSection() {
   const { t } = useT();
@@ -55,7 +53,7 @@ export default function GameArenaSettingsSection() {
           <button
             key={lang}
             type="button"
-            className={seg(settings.sourceLang === lang)}
+            {...seg(settings.sourceLang === lang)}
             onClick={() => patch({ sourceLang: lang })}
           >
             {t(`games.lang.${lang}`)}
@@ -69,7 +67,7 @@ export default function GameArenaSettingsSection() {
           <button
             key={level}
             type="button"
-            className={seg(settings.levelOverride === level)}
+            {...seg(settings.levelOverride === level)}
             onClick={() => patch({ levelOverride: level })}
           >
             {level === 'auto' ? t('games.level.auto') : t('games.level.n', { level })}
@@ -81,14 +79,14 @@ export default function GameArenaSettingsSection() {
         <span className="muted">{t('games.settings.mirrorBackend')}</span>
         <button
           type="button"
-          className={seg(settings.mirrorBackend === 'local')}
+          {...seg(settings.mirrorBackend === 'local')}
           onClick={() => patch({ mirrorBackend: 'local' })}
         >
           {t('games.mirror.backend.local')}
         </button>
         <button
           type="button"
-          className={seg(settings.mirrorBackend === 'api')}
+          {...seg(settings.mirrorBackend === 'api')}
           onClick={() => patch({ mirrorBackend: 'api' })}
         >
           {t('games.mirror.backend.api')}

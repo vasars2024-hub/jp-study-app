@@ -69,6 +69,7 @@ export default function VisualizerPage() {
                     key={m.id}
                     type="button"
                     className={`btn small ${viz.mode === m.id ? 'primary' : ''}`}
+                    aria-pressed={viz.mode === m.id}
                     onClick={() => patchViz({ mode: m.id })}
                   >
                     {t(m.labelKey)}
@@ -82,6 +83,7 @@ export default function VisualizerPage() {
                     key={st.id}
                     type="button"
                     className={`btn small ${viz.style === st.id ? 'primary' : ''}`}
+                    aria-pressed={viz.style === st.id}
                     /* The one control that re-drives the live canvas, so it is named the way
                        the dock's routes already are (`data-viz-action`). A style row addressed
                        by position or by its translated label is a different control in each of
@@ -100,6 +102,7 @@ export default function VisualizerPage() {
                     key={f.id}
                     type="button"
                     className={`btn small ${viz.freqTarget === f.id ? 'primary' : ''}`}
+                    aria-pressed={viz.freqTarget === f.id}
                     onClick={() => patchViz({ freqTarget: f.id })}
                   >
                     {t(f.labelKey)}
@@ -141,6 +144,7 @@ export default function VisualizerPage() {
                     key={c.id}
                     type="button"
                     className={`btn small ${viz.colorTheme === c.id ? 'primary' : ''}`}
+                    aria-pressed={viz.colorTheme === c.id}
                     onClick={() => patchViz({ colorTheme: c.id })}
                   >
                     {t(c.labelKey)}

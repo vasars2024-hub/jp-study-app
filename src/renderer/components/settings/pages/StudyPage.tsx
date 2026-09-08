@@ -21,10 +21,8 @@ import {
   type FocusLockMinutes,
   type FocusTabId,
 } from '../../../focusMode';
+import { segButton as seg } from '../../ui/segButton';
 
-function seg(active: boolean): string {
-  return `btn small ${active ? 'primary' : ''}`;
-}
 
 export default function StudyPage() {
   const { t } = useT();
@@ -79,7 +77,7 @@ export default function StudyPage() {
             <button
               key={minutes}
               type="button"
-              className={seg(cfg.lockMinutes === minutes)}
+              {...seg(cfg.lockMinutes === minutes)}
               onClick={() => patch({ lockMinutes: minutes as FocusLockMinutes })}
             >
               {t(labelKey)}
@@ -100,7 +98,7 @@ export default function StudyPage() {
             <button
               key={id}
               type="button"
-              className={seg(cfg.defaultTab === id)}
+              {...seg(cfg.defaultTab === id)}
               onClick={() => patch({ defaultTab: id })}
             >
               {t(labelKey)}

@@ -616,6 +616,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                   <button
                     type="button"
                     className={`btn small ${capturing === r.id && captureMode === 'add' ? 'primary' : ''}`}
+                    aria-pressed={capturing === r.id && captureMode === 'add'}
                     title={t('settings.shortcuts.addKeyTitle')}
                     onClick={() => startCapture(r.id, 'add')}
                   >

@@ -102,6 +102,7 @@ import {
   openFilesAppForMemory,
   openFilesAppForSystemCard,
 } from '../filesapp/filesAppScope';
+import { segButton } from '../ui/segButton';
 
 /**
  * Appearance is the heaviest Settings page: its isolated preview and complete theme grid mount
@@ -365,7 +366,7 @@ export default function SettingsApp(props: SettingsWallProps) {
       patchMini: (p) => setMini(saveMiniMode(p)),
       advancedMode,
       setAdvancedMode: (on: boolean) => setAdvancedModeState(setSettingsAdvanced(on)),
-      seg: (active: boolean) => `btn small ${active ? 'primary' : ''}`,
+      seg: segButton,
     }),
     [
       props,

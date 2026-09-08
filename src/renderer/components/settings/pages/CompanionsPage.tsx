@@ -331,7 +331,7 @@ export default function CompanionsPage() {
               <button
                 key={d.id}
                 type="button"
-                className={seg(on)}
+                {...seg(on)}
                 disabled={!env.enabled || !env.companionsEnabled}
                 title={d.blurb}
                 onClick={() => {
@@ -359,7 +359,7 @@ export default function CompanionsPage() {
             <button
               key={id}
               type="button"
-              className={seg(env.companionReactivity === id)}
+              {...seg(env.companionReactivity === id)}
               disabled={!env.enabled || !env.companionsEnabled}
               onClick={() => patchEnv({ companionReactivity: id })}
             >
@@ -743,7 +743,7 @@ export default function CompanionsPage() {
           <span className="os-viz-label muted">{t('settings.companions.monitors')}</span>
           <button
             type="button"
-            className={seg(deskPrefs.companionHostDisplays !== 'all')}
+            {...seg(deskPrefs.companionHostDisplays !== 'all')}
             disabled={!env.enabled || !env.companionsEnabled || !env.companionsOnOsDesktop}
             onClick={() => patchDesk({ companionHostDisplays: 'primary' })}
           >
@@ -751,7 +751,7 @@ export default function CompanionsPage() {
           </button>
           <button
             type="button"
-            className={seg(deskPrefs.companionHostDisplays === 'all')}
+            {...seg(deskPrefs.companionHostDisplays === 'all')}
             disabled={!env.enabled || !env.companionsEnabled || !env.companionsOnOsDesktop}
             onClick={() => patchDesk({ companionHostDisplays: 'all' })}
           >

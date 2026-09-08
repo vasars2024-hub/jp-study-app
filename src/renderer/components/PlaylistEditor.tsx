@@ -329,6 +329,7 @@ export default function PlaylistEditor({
             key={id}
             type="button"
             className={`btn small ${active.transition === id ? 'primary' : ''}`}
+            aria-pressed={active.transition === id}
             disabled={disabled}
             onClick={() => updateActive({ transition: id })}
           >

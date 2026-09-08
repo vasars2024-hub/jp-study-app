@@ -22,10 +22,8 @@ import {
 
 import { useT } from '../../../i18n';
 import type { WindowChromeMode } from '../../../windowChrome';
+import { segButton as seg } from '../../ui/segButton';
 
-function seg(active: boolean): string {
-  return `btn small ${active ? 'primary' : ''}`;
-}
 
 export default function DisplayPage() {
   const { t } = useT();
@@ -69,7 +67,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.windowChromeMode === id)}
+              {...seg(d.windowChromeMode === id)}
               onClick={() => patch({ windowChromeMode: id })}
             >
               {t(labelKey)}
@@ -168,7 +166,7 @@ export default function DisplayPage() {
               ['high', 'settings.display.contrast.high'],
             ] as [ContrastId, string][]
           ).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(d.contrast === id)} onClick={() => patch({ contrast: id })}>
+            <button key={id} type="button" {...seg(d.contrast === id)} onClick={() => patch({ contrast: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -185,7 +183,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.letterSpacing === id)}
+              {...seg(d.letterSpacing === id)}
               onClick={() => patch({ letterSpacing: id })}
             >
               {t(labelKey)}
@@ -283,7 +281,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.colorFilter === id)}
+              {...seg(d.colorFilter === id)}
               onClick={() => patch({ colorFilter: id })}
             >
               {t(labelKey)}
@@ -309,7 +307,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.transparency === id)}
+              {...seg(d.transparency === id)}
               onClick={() => patch({ transparency: id })}
             >
               {t(labelKey)}
@@ -332,7 +330,7 @@ export default function DisplayPage() {
               ['strong', 'settings.display.focus.strong'],
             ] as [FocusRingId, string][]
           ).map(([id, labelKey]) => (
-            <button key={id} type="button" className={seg(d.focusRing === id)} onClick={() => patch({ focusRing: id })}>
+            <button key={id} type="button" {...seg(d.focusRing === id)} onClick={() => patch({ focusRing: id })}>
               {t(labelKey)}
             </button>
           ))}
@@ -356,7 +354,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.scrollbarMode === id)}
+              {...seg(d.scrollbarMode === id)}
               onClick={() => patch({ scrollbarMode: id })}
             >
               {t(labelKey)}
@@ -389,7 +387,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.pointerSize === id)}
+              {...seg(d.pointerSize === id)}
               onClick={() => patch({ pointerSize: id })}
             >
               {t(labelKey)}
@@ -415,7 +413,7 @@ export default function DisplayPage() {
             <button
               key={id}
               type="button"
-              className={seg(d.animationLevel === id)}
+              {...seg(d.animationLevel === id)}
               onClick={() => patch({ animationLevel: id })}
             >
               {t(labelKey)}

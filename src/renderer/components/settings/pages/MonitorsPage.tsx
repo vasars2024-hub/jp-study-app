@@ -162,7 +162,7 @@ export default function MonitorsPage() {
                         <button
                           key={mode}
                           type="button"
-                          className={seg((assignment?.taskbar ?? 'full') === mode)}
+                          {...seg((assignment?.taskbar ?? 'full') === mode)}
                           onClick={() => patch(display.key, { taskbar: mode })}
                         >
                           {t(labelKey)}
@@ -223,7 +223,7 @@ export default function MonitorsPage() {
             <button
               key={n}
               type="button"
-              className={seg(virtualCount === n)}
+              {...seg(virtualCount === n)}
               onClick={() => {
                 void window.api.displaySetVirtualCount(n).then(() => {
                   setVirtualCount(n);

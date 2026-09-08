@@ -112,7 +112,7 @@ export default function FileDropsPage() {
             <button
               key={depth}
               type="button"
-              className={seg(prefs.undoDepth === depth)}
+              {...seg(prefs.undoDepth === depth)}
               onClick={() => patch({ undoDepth: depth })}
             >
               {depth === 0 ? t('settings.fileDrops.undo.off') : String(depth)}
