@@ -6595,6 +6595,8 @@ export const ru: Catalog = {
   'immersion.openPageToBegin': 'Откройте страницу, чтобы начать чтение на погружении.',
   'immersion.hint': 'Поиск открывается в прямом режиме · F8 — смена режима · F6 — фокус · Ctrl+L — строка адреса',
   'immersion.sites': 'Сайты',
+  'immersion.rail.loadFailed': 'Не удалось загрузить сохранённые сайты. Уже показанные сайты сохранены на экране.',
+  'immersion.rail.retry': 'Повторить',
   'immersion.rail.empty': 'Сохранённые сайты появятся здесь. Добавьте в закладки любую страницу.',
   'immersion.rail.destinations': 'Куда пойти читать',
   'immersion.refreshSites': 'Обновить сайты',

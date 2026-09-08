@@ -23,6 +23,7 @@ import {
   ImmersionBody,
   ImmersionPopups,
   ImmersionSiteSearch,
+  ImmersionSitesStatus,
   ImmersionToolbar,
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
@@ -334,9 +335,11 @@ export default function ImmersionView() {
                     <Icon name="refresh" size={13} />
                   </Button>
                 </div>
-                {sites.length === 0 && (
-                  <p className="aero-immersion-rail-empty">{t('immersion.rail.empty')}</p>
-                )}
+                {/* Aero's own empty paragraph used to live here unconditionally on
+                    `sites.length === 0`, which is true while the read is still running
+                    and true when it failed. `ImmersionSitesStatus` owns all three
+                    states now and keeps Aero's typography through the class prop. */}
+                <ImmersionSitesStatus state={state} messageClassName="aero-immersion-rail-empty" />
                 <ImmersionSiteSearch state={state} />
                 <ul className="aero-immersion-site-list">
                   {state.filteredSites.map((s) => (

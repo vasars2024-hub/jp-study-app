@@ -131,6 +131,7 @@ export function useImmersion() {
   const [error, setError] = useState<string | null>(null);
   const [readerHtml, setReaderHtml] = useState('');
   const [sites, setSites] = useState<ImmersionSite[]>([]);
+  const [sitesStatus, setSitesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [siteQuery, setSiteQuery] = useState('');
   const normalizedSiteQuery = siteQuery.trim().normalize('NFKC').toLowerCase();
   /**
@@ -175,6 +176,13 @@ export function useImmersion() {
    * setState would not have committed for the first of them.
    */
   const loadFailure = useRef<ImmersionLoadFailure | null>(null);
+  // Only the latest extraction for the page still on screen may publish results.
+  const readerRequest = useRef(0);
+  const readerUrl = useRef('');
+  useEffect(() => () => {
+    readerRequest.current += 1;
+    readerUrl.current = '';
+  }, []);
   // Host-side rate limit on the guest channel. The guest limits itself too, but
   // that limiter runs in the process we are defending against — this one is the
   // enforcement. Kept in a ref so it survives re-render but resets per page.
@@ -197,6 +205,7 @@ export function useImmersion() {
 
   // ----- Sites library -----
   const refreshSites = useCallback(async () => {
+    setSitesStatus('loading');
     try {
       const store: ImmersionSitesStore = await window.api.immersionListSites();
       setSites(
@@ -204,8 +213,9 @@ export function useImmersion() {
           (a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.lastVisited - a.lastVisited,
         ),
       );
+      setSitesStatus('ready');
     } catch {
-      /* IPC not ready */
+      setSitesStatus('error');
     }
   }, []);
 
@@ -217,6 +227,7 @@ export function useImmersion() {
           (a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.lastVisited - a.lastVisited,
         ),
       );
+      setSitesStatus('ready');
     });
   }, [refreshSites]);
 
@@ -289,7 +300,10 @@ export function useImmersion() {
     // A page that never opened has no article to extract, and saying "reader extraction failed,
     // wait for the page to finish loading" about it is advice the user cannot act on: the load is
     // over and it failed. Keep the real reason on screen instead of overwriting it with a symptom.
-    if (!mayRunReaderPass(loadFailure.current, url)) return;
+    if (readerUrl.current !== url || !mayRunReaderPass(loadFailure.current, url)) return;
+    const request = ++readerRequest.current;
+    const isCurrent = () => request === readerRequest.current && readerUrl.current === url
+      && mayRunReaderPass(loadFailure.current, url);
     setLoading(true);
     setError(null);
     try {
@@ -308,8 +322,10 @@ export function useImmersion() {
         if (attempt > 0) {
           await new Promise((r) => window.setTimeout(r, nhk ? 700 + attempt * 450 : 500 + attempt * 350));
         }
+        if (!isCurrent()) return;
         try {
           const next = await fetchReadableArticle(url, webviewRef.current);
+          if (!isCurrent()) return;
           const nextLen = textLen(next.html);
           if (nextLen > bestLen || (articleReady(next.html) && !art)) {
             art = next;
@@ -320,6 +336,7 @@ export function useImmersion() {
           /* retry after webview hydration */
         }
       }
+      if (!isCurrent()) return;
       if (!art || bestLen < 40) {
         throw new Error(t('immersion.readerExtractionFailed'));
       }
@@ -337,6 +354,7 @@ export function useImmersion() {
       void window.api.immersionRecordVisit({ url: art.url, title: art.title, countVisit: false });
       setLoading(false);
     } catch (e) {
+      if (!isCurrent()) return;
       setError(
         e instanceof Error ? e.message : t('immersion.readerExtractionFailedSwitchLive'),
       );
@@ -349,6 +367,8 @@ export function useImmersion() {
     (raw: string, opts?: { pushHistory?: boolean; mode?: ImmersionMode }) => {
       const url = ensureProtocol(raw);
       if (!url) return;
+      readerRequest.current += 1;
+      readerUrl.current = url;
       // §5.13: route cue on node navigation (cue exists only in the wired pack).
       if (document.documentElement.getAttribute('data-materials') === 'wired') {
         window.dispatchEvent(new CustomEvent('wired:route'));
@@ -459,6 +479,8 @@ export function useImmersion() {
   const closePage = useCallback(() => {
     if (!currentUrl) return;
     flushStats();
+    readerRequest.current += 1;
+    readerUrl.current = '';
     activeStatsId.current = '';
     activeTitle.current = '';
     pageOpenAt.current = 0;
@@ -495,7 +517,9 @@ export function useImmersion() {
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv || (mode === 'focus' && !!readerHtml)) return;
+    let readerTimer: ReturnType<typeof window.setTimeout> | undefined;
     const onStart = () => {
+      readerRequest.current += 1;
       loadFailure.current = null;
       setLoading(true);
     };
@@ -506,7 +530,9 @@ export function useImmersion() {
       if (loadFailure.current) return;
       if ((mode === 'reader' || mode === 'focus') && currentUrl) {
         const delay = isNhkNewsArticleUrl(currentUrl) ? 1200 : 400;
-        window.setTimeout(() => void loadReader(currentUrl), delay);
+        window.clearTimeout(readerTimer);
+        const url = readerUrl.current;
+        readerTimer = window.setTimeout(() => void loadReader(url), delay);
       }
     };
     const onFail = (e: Event) => {
@@ -514,6 +540,7 @@ export function useImmersion() {
       // Null means this event is not THIS page failing — a subframe, or a load the user's own
       // next navigation aborted. Reporting either would be a fabricated error, not a missing one.
       if (!failure) return;
+      readerRequest.current += 1;
       loadFailure.current = failure;
       setLoading(false);
       setReaderHtml('');
@@ -530,6 +557,11 @@ export function useImmersion() {
     const onNav = (e: Event) => {
       const u = (e as { url?: string }).url;
       if (u && /^https?:\/\//i.test(u)) {
+        if (readerUrl.current !== u) {
+          readerRequest.current += 1;
+          readerUrl.current = u;
+          setReaderHtml('');
+        }
         setCurrentUrl(u);
         setUrlInput(u);
         activeStatsId.current = immersionStatsId(u);
@@ -549,6 +581,7 @@ export function useImmersion() {
     wv.addEventListener('did-navigate-in-page', onNav);
     wv.addEventListener('new-window', onNewWindow);
     return () => {
+      window.clearTimeout(readerTimer);
       wv.removeEventListener('did-start-loading', onStart);
       wv.removeEventListener('did-stop-loading', onStop);
       wv.removeEventListener('did-fail-load', onFail);
@@ -823,7 +856,7 @@ export function useImmersion() {
     urlInput, setUrlInput, siteQuery, setSiteQuery, filteredSites,
     currentUrl, title, mode, loading, error, status, setStatus,
     readerHtml, readerHtmlProp,
-    sites, history, histIdx, popup, setPopup,
+    sites, sitesStatus, history, histIdx, popup, setPopup,
     captureBusy, railOpen, setRailOpen,
     liveLookup, setLiveLookup,
     showChrome, showReader, showWebview, splitView, showRail,
@@ -1155,6 +1188,44 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
 export const IMMERSION_SITE_ROW_HEIGHT = 53;
 
 /**
+ * Shared by the classic/Blanc rail and Aero's own rail. Failed reads retain
+ * any sites already shown and must never claim the saved library is empty.
+ *
+ * `messageClassName` is how Aero keeps its own rail typography without this
+ * component knowing a shell's tokens — the same seam `ImmersionStage` uses for
+ * `stageClassName`. It is the ONLY status line either rail renders: a caller
+ * that also keeps its own `sites.length === 0` paragraph prints the empty
+ * message twice, and prints it *under* "Loading…" while the read is still in
+ * flight, which is the contradiction this component exists to remove.
+ */
+export function ImmersionSitesStatus(
+  { state, messageClassName = 'immersion-rail-empty' }:
+  { state: ImmersionState; messageClassName?: string },
+) {
+  const { t, sites, sitesStatus, refreshSites } = state;
+  if (sitesStatus === 'loading') {
+    // Sites already on screen are the better answer than a spinner over them:
+    // only an empty rail has nothing to show while a refresh is running.
+    return sites.length === 0
+      ? <p className={messageClassName} role="status">{t('common.loading')}</p>
+      : null;
+  }
+  if (sitesStatus === 'error') {
+    return (
+      <div className="immersion-sites-error">
+        <p className={messageClassName} role="alert">{t('immersion.rail.loadFailed')}</p>
+        <button type="button" className="btn btn-sm lq-hit" onClick={() => void refreshSites()}>
+          {t('immersion.rail.retry')}
+        </button>
+      </div>
+    );
+  }
+  return sites.length === 0
+    ? <p className={`muted ${messageClassName}`} role="status">{t('immersion.rail.empty')}</p>
+    : null;
+}
+
+/**
  * The saved-sites rail, as the CONTENT of an L6 reading tool.
  *
  * No `<aside>` and no head of its own: `ReadingCanvas` renders both, and a
@@ -1196,11 +1267,14 @@ export function ImmersionSiteSearch({ state }: { state: ImmersionState }) {
 }
 
 export function ImmersionSiteList({ state }: { state: ImmersionState }) {
-  const { t, sites, currentUrl, filteredSites, siteQuery } = state;
+  // `sites` is deliberately not read here any more: the rail's empty/loading/error
+  // copy belongs to `ImmersionSitesStatus`, which is the only thing allowed to
+  // describe the saved library's state.
+  const { t, currentUrl, filteredSites, siteQuery } = state;
   return (
     <div className="immersion-rail">
       <ImmersionSiteSearch state={state} />
-      {sites.length === 0 && <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>}
+      <ImmersionSitesStatus state={state} />
       <VirtualList
         /* Was `key={normalizedQuery}`, which reset the scroll offset by REMOUNTING the
            scroller and every windowed row on every keystroke. `resetScrollKey` is the

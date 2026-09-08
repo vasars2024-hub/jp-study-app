@@ -5976,6 +5976,8 @@ export const zh: Catalog = {
   'immersion.openPageToBegin': '打开一个页面开始沉浸式阅读。',
   'immersion.hint': '搜索会以实时模式打开 · F8 切换模式 · F6 专注 · Ctrl+L 定位地址栏',
   'immersion.sites': '站点',
+  'immersion.rail.loadFailed': '无法加载已保存的网站。已显示的网站会保留。',
+  'immersion.rail.retry': '重试',
   'immersion.rail.empty': '已保存的站点会显示在这里。为任意页面添加书签即可。',
   'immersion.rail.destinations': '推荐站点',
   'immersion.refreshSites': '刷新站点',

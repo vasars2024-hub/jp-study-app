@@ -34,7 +34,11 @@ const EMPTY_RESULT = new Proxy({}, { get: () => [] });
 
 function installApiStub(): void {
   const api: Record<string, unknown> = {
-    immersionListSites: async () => [],
+    // `ImmersionSitesStore`, not a bare array. This used to return `[]`, whose
+    // `.sites.map` throws — and the rail's old `catch {}` swallowed that and
+    // rendered "Saved sites appear here" anyway, so the stub's wrong shape was
+    // invisible. The rail now reports a failed read, which is what exposed it.
+    immersionListSites: async () => ({ sites: [] }),
     toolsList: async () => ({ tools: [] }),
   };
   (window as unknown as { api: unknown }).api = new Proxy(api, {
@@ -259,6 +263,20 @@ describe('ImmersionView Aero shell renders in the interface language', () => {
     expect(text).toContain(catalog['immersion.aero.status.ready'] as string);
     expect(text).toContain(catalog['immersion.aero.newPage'] as string);
     expect(text).toContain(catalog['immersion.rail.empty'] as string);
+  });
+
+  /**
+   * The Aero rail used to render its own `sites.length === 0` paragraph BESIDE
+   * the shared `ImmersionSitesStatus`, so an empty library printed the empty
+   * message twice — and printed it under "Loading…" while the read was still
+   * running, i.e. two contradictory answers stacked. One status line, always.
+   */
+  it('states the saved-sites situation exactly once', async () => {
+    await render('en');
+    const rail = host.querySelector('.aero-immersion-rail');
+    expect(rail, 'the Aero sites rail did not render').toBeTruthy();
+    expect(rail!.querySelectorAll('.aero-immersion-rail-empty')).toHaveLength(1);
+    expect(rail!.querySelectorAll('.immersion-rail-empty')).toHaveLength(0);
   });
 
   it.each(['ja', 'zh', 'ru'] as const)('drops every English menu label in %s', async (lang) => {

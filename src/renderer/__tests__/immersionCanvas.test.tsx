@@ -246,15 +246,23 @@ describe('the Immersion toolbar names why its history buttons are disabled', () 
     // narrower selector would have reported as "Close page stopped explaining itself".
     const nav = [...h.container.querySelectorAll('.immersion-toolbar button')]
       .filter((b): b is HTMLButtonElement => b instanceof HTMLButtonElement && b.disabled);
-    // FOUR since 2026-08-26, not two. History starts empty on mount AND no page is
-    // open, so Back, Forward, Reload and Close page are all disabled — the last two
-    // by the same absent page. The loop below is what actually matters: every one of
-    // them must explain itself and keep its name, however many there are.
-    expect(nav.length, 'expected Back, Forward, Reload and Close page disabled on a fresh mount').toBe(4);
+    // TEN since D395 (`3b172b31`), which disabled the six overflow page actions that
+    // used to be enabled and silently do nothing with no page open. This assertion
+    // was pinned at FOUR and went red the moment that landed — the count is a floor
+    // against the whole row losing its disabled states, not a census, which is why
+    // it is now `toBeGreaterThanOrEqual` and why the loop below is what matters:
+    // every disabled control must explain itself and keep its name, however many
+    // there are.
+    expect(nav.length, 'expected at least Back, Forward, Reload and Close page disabled on a fresh mount')
+      .toBeGreaterThanOrEqual(4);
     for (const button of nav) {
       const title = button.getAttribute('title') ?? '';
-      const label = button.getAttribute('aria-label') ?? '';
-      expect(label, 'an icon-only button lost its accessible name').not.toBe('');
+      // The overflow page actions carry a visible text label instead of an
+      // `aria-label`, which is a legitimate second way to have an accessible
+      // name — and demanding `aria-label` of them would push a redundant one
+      // onto controls that already read correctly.
+      const label = button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '';
+      expect(label, 'a disabled toolbar control has no accessible name at all').not.toBe('');
       expect(title, 'the title is still the label, not the reason').not.toBe(label);
       // The category-8 harness's own bar for what counts as an explanation.
       expect(title.length, `"${title}" is too short to be an explanation`)
