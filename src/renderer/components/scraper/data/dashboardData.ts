@@ -20,7 +20,6 @@ import type {
   DownloadRow,
   ScrapeJobSummary,
   SourceStatus,
-  SystemStats,
 } from '../../../../shared/scraperResults';
 import { TERMINAL_SCRAPE_STAGES } from '../../../../shared/scraperResults';
 import type { ScraperSchedulerState } from '../../../../shared/scraperIpc';
@@ -149,7 +148,12 @@ export interface DashboardSnapshot {
   jobs: ScrapeJobSummary[];
   sources: SourceStatus[];
   downloads: DownloadRow[];
-  stats: SystemStats | null;
+  /**
+   * Memory/CPU/active-jobs deliberately do NOT live here. They change every few
+   * seconds and this snapshot is read once per page mount, so a copy kept here
+   * would sit frozen beside the rail's live sample. The shell owns that reading
+   * and pages take it from `ScraperController.systemStats`.
+   */
   scheduler: ScraperSchedulerState | null;
   /** Episode totals, summed across the results of recent jobs. */
   episodes: { indexed: number; japanese: number };
@@ -165,7 +169,6 @@ export const EMPTY_SNAPSHOT: DashboardSnapshot = {
   jobs: [],
   sources: [],
   downloads: [],
-  stats: null,
   scheduler: null,
   episodes: { indexed: 0, japanese: 0 },
   live: false,

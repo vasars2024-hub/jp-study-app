@@ -64,6 +64,7 @@ function controller(railCollapsed: boolean): ScraperController {
     resultJobId: null,
     openStoredResult: vi.fn(),
     clearStoredResult: vi.fn(),
+    systemStats: { memoryMb: 0, cpuPercent: 0, activeJobs: 0 },
     dashboardJobActive: false,
     cancelDashboardJob: vi.fn(),
     sourceId: null,

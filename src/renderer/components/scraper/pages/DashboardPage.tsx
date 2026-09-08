@@ -140,12 +140,11 @@ export default function DashboardPage() {
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const [capabilities, sources, jobs, downloads, stats] = await Promise.all([
+      const [capabilities, sources, jobs, downloads] = await Promise.all([
         port.backendCapabilities().catch(() => [] as readonly string[]),
         port.listSources().catch(() => []),
         port.listJobs().catch(() => []),
         port.listDownloads().catch(() => []),
-        port.systemStats().catch(() => null),
       ]);
       if (!alive) return;
       // Episode totals need each job's result; cap the fan-out so a long history
@@ -159,7 +158,6 @@ export default function DashboardPage() {
         jobs,
         sources,
         downloads,
-        stats,
         scheduler: null,
         episodes: {
           indexed: episodeRows.length,
@@ -483,15 +481,15 @@ export default function DashboardPage() {
         <ScrCard id="runtime" title={sx('dash.runtime')} statusId="set.performance">
           <div className="scr-mini-stats">
             <div>
-              <span className="scr-mini-value">{snap.stats ? `${snap.stats.memoryMb}` : '—'}</span>
+              <span className="scr-mini-value">{`${ctl.systemStats.memoryMb}`}</span>
               <span className="scr-mini-label">{sx('dash.runtime.memory')}</span>
             </div>
             <div>
-              <span className="scr-mini-value">{snap.stats ? `${snap.stats.cpuPercent}%` : '—'}</span>
+              <span className="scr-mini-value">{`${ctl.systemStats.cpuPercent}%`}</span>
               <span className="scr-mini-label">{sx('dash.runtime.cpu')}</span>
             </div>
             <div>
-              <span className="scr-mini-value">{snap.stats ? String(snap.stats.activeJobs) : '—'}</span>
+              <span className="scr-mini-value">{String(ctl.systemStats.activeJobs)}</span>
               <span className="scr-mini-label">{sx('dash.runtime.jobs')}</span>
             </div>
           </div>

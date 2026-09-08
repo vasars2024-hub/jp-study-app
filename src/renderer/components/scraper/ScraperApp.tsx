@@ -247,6 +247,14 @@ export default function ScraperApp() {
   }, [navigate]);
   const clearSource = useCallback(() => setSourceId(null), []);
   const activeJobCount = countActiveScraperJobs(dashboardJobActive, transientJobActive);
+  // One composed reading, handed to the rail AND to every page through the
+  // controller. Pages used to take their own one-shot `systemStats()` at mount
+  // and never re-read it, so the Dashboard's runtime card sat frozen at the
+  // moment it was opened while the rail two inches away kept sampling.
+  const systemStats = useMemo<ScraperSystemStats>(
+    () => ({ ...stats, activeJobs: activeJobCount }),
+    [stats, activeJobCount],
+  );
 
   // Turning Advanced off while sitting on an advanced-only page would strand
   // the user on a screen the rail no longer lists.
@@ -299,6 +307,8 @@ export default function ScraperApp() {
       openResultSeries,
       clearResultSeries,
 
+      systemStats,
+
       dashboardJobActive,
       cancelDashboardJob,
 
@@ -319,6 +329,7 @@ export default function ScraperApp() {
       resultSeriesId,
       openResultSeries,
       clearResultSeries,
+      systemStats,
       dashboardJobActive,
       cancelDashboardJob,
       sourceId,
@@ -460,7 +471,7 @@ export default function ScraperApp() {
           </nav>
         )}
         <div className="scr-body">
-          <ScraperNav stats={{ ...stats, activeJobs: activeJobCount }} />
+          <ScraperNav stats={systemStats} />
           <main className="scr-main" key={shell.page}>
             <Suspense fallback={<div className="scr-loading">{sx('nav.statusRunning')}…</div>}>
               {body}

@@ -7,6 +7,7 @@ import type {
   ScraperShellState,
   ScraperSortDir,
 } from '../../../shared/scraperShell';
+import type { SystemStats } from '../../../shared/scraperResults';
 import type { ScraperTextKey } from './strings';
 
 export type { ScraperPageId, ScraperResultTab, ScraperColumnId };
@@ -107,6 +108,13 @@ export interface ScraperController {
   resultSeriesId: string | null;
   openResultSeries: (seriesId: string) => void;
   clearResultSeries: () => void;
+
+  /**
+   * The shell's live memory/CPU/job sample, re-read on its own interval. Pages
+   * read it from here rather than taking their own one-shot reading, so the
+   * rail and a page cannot report two different numbers for one quantity.
+   */
+  systemStats: SystemStats;
 
   /** Shared fixture-job state so Dashboard, rail, and footer cannot disagree. */
   dashboardJobActive: boolean;
