@@ -75,6 +75,7 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.a11y.roundAudio': '第 {current} 题，共 {total} 题：请先听音频再作答',
   'games.verdict.correct': '正确',
   'games.verdict.answer': '答案：',
+  'games.match.instruction': '请将每个日语单词与其词义配对。',
   'games.match.pick': '选择词义',
   'games.coverage.label': '本等级的牌组覆盖率',
   'games.coverage.count': '本等级词表中有{have}/{total}在你的牌组里 · {pct}%',

@@ -131,6 +131,22 @@ export interface RoundBase {
   level: LevelTier;
   sourceLang: SourceLang;
   prompt: string;
+  /**
+   * The language `prompt` is actually written in. Half these games ask their
+   * question in the player's own language — Sentence Builder and Speed Type
+   * show the meaning and want the Japanese back — so a blanket `lang="ja"` on
+   * the prompt element announced English in a Japanese voice and picked the
+   * Japanese font stack for Latin text. Required, not optional, so a new game
+   * cannot be added without answering the question.
+   */
+  promptLang: 'ja' | SourceLang;
+  /**
+   * Set when the prompt is fixed UI chrome rather than study material. The
+   * renderer resolves it through the catalog and ignores `prompt`, which stays
+   * English because it is also the mining payload (`makeMistake`). A round with
+   * a key renders in the UI language, so it carries no `lang` override at all.
+   */
+  promptKey?: string;
   jp: string;
   reading?: string;
   mineMeaning: string;
@@ -373,6 +389,7 @@ export function buildGameRound(
       sourceLang,
       // Audio-first: showing the sentence would make listening unnecessary.
       prompt: speak ? '' : mined.masked,
+      promptLang: 'ja',
       jp: mined.sentence,
       reading: mined.reading,
       mineMeaning: mined.hint,
@@ -393,6 +410,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: word.word,
+      promptLang: 'ja',
       jp: word.word,
       reading: word.reading,
       mineMeaning: word.meaning,
@@ -410,6 +428,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: word.word,
+      promptLang: 'ja',
       jp: word.word,
       reading: word.reading,
       mineMeaning: word.meaning,
@@ -430,6 +449,8 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: 'Match each Japanese word to its meaning.',
+      promptLang: 'en',
+      promptKey: 'games.match.instruction',
       jp: pairs.map((p) => p.jp).join(' / '),
       reading: pairs.map((p) => p.reading).join(' / '),
       mineMeaning: pairs.map((p) => p.meaning).join(' / '),
@@ -447,6 +468,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: sourceText(sentence, sourceLang),
+      promptLang: sourceLang,
       jp: sentence.jp,
       reading: sentence.reading,
       mineMeaning: sourceText(sentence, sourceLang),
@@ -464,6 +486,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: sourceText(sentence, sourceLang),
+      promptLang: sourceLang,
       jp: sentence.jp,
       reading: sentence.reading,
       mineMeaning: sourceText(sentence, sourceLang),
@@ -490,6 +513,8 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: 'Match each Japanese word to its meaning.',
+      promptLang: 'en',
+      promptKey: 'games.match.instruction',
       jp: safePairs.map((p) => p.jp).join(' / '),
       reading: safePairs.map((p) => p.reading).join(' / '),
       mineMeaning: safePairs.map((p) => p.meaning).join(' / '),
@@ -508,6 +533,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: kana.kana,
+      promptLang: 'ja',
       jp: kana.kana,
       mineMeaning: kana.romaji,
       answer: kana.romaji,
@@ -525,6 +551,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: item.word,
+      promptLang: 'ja',
       jp: item.word,
       reading: item.reading,
       mineMeaning: item.meaning[sourceLang] || item.meaning.en,
@@ -548,6 +575,7 @@ export function buildGameRound(
       // The bundled cloze already carries its own blank; swap it for the same
       // blank the mined path uses so both look identical to the player.
       prompt: speak ? '' : item.prompt.replace('___', CLOZE_BLANK),
+      promptLang: 'ja',
       jp: full,
       mineMeaning: item.translations[sourceLang] || item.translations.en,
       answer: item.answer,
@@ -567,6 +595,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: item.prompt.replace('___', CLOZE_BLANK),
+      promptLang: 'ja',
       jp: item.prompt.replace('___', item.answer),
       mineMeaning: item.hint[sourceLang] || item.hint.en,
       answer: item.answer,
@@ -586,6 +615,7 @@ export function buildGameRound(
       level,
       sourceLang,
       prompt: `${item.number} ${object}`,
+      promptLang: sourceLang,
       jp: item.jp,
       reading: item.reading,
       mineMeaning: `${item.number} ${object}`,
@@ -604,6 +634,7 @@ export function buildGameRound(
     level,
     sourceLang,
     prompt: sentence.jp,
+    promptLang: 'ja',
     jp: sentence.jp,
     reading: sentence.reading,
     mineMeaning: sourceText(sentence, sourceLang),

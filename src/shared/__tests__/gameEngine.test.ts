@@ -204,3 +204,77 @@ describe('Game Arena round transitions', () => {
     expect(JSON.stringify(start)).toBe(snapshot);
   });
 });
+
+/**
+ * D330: the prompt element carried a fixed `lang="ja"`, so Sentence Builder's
+ * `I eat dinner together with my family.` was announced in a Japanese voice and
+ * set in the Japanese font stack. `promptLang` is the round's own answer to
+ * "what language did I just ask this in", and it has to stay true for every
+ * game, level and source language — not only the two the DOM suite drives.
+ */
+describe('every round declares the language its prompt is written in', () => {
+  const KANA = /[぀-ヿ]/;
+  const JAPANESE = /[぀-ヿ㐀-鿿]/;
+  const fast = GAME_DEFINITIONS.filter((g) => g.mode === 'fast');
+
+  it('never names a language the round is not played in', () => {
+    for (const source of ['en', 'ru', 'zh'] as const) {
+      for (const game of fast) {
+        for (let seed = 0; seed < 6; seed++) {
+          const round = buildGameRound(game.id, ((seed % 7) + 1) as 1, source, seed);
+          // A displayed prompt is either the Japanese under study or the
+          // player's own source language — never a third one. A keyed prompt
+          // is the exception and is checked on its own terms below: its
+          // `prompt` is the English mining literal, whatever the source is.
+          const allowed = round.promptKey ? ['en'] : ['ja', source];
+          expect(allowed, `${game.id}/${source}/${seed}`).toContain(round.promptLang);
+        }
+      }
+    }
+  });
+
+  // Mutation control: flip any constructor's `promptLang` to `'ja'` and this
+  // case goes red for that game — a Latin or Cyrillic prompt has no kana in it.
+  it('marks a source-language prompt as the source language', () => {
+    let checked = 0;
+    for (const source of ['en', 'ru'] as const) {
+      for (const game of fast) {
+        for (let seed = 0; seed < 6; seed++) {
+          const round = buildGameRound(game.id, ((seed % 7) + 1) as 1, source, seed);
+          // A keyed prompt is UI chrome; `prompt` stays English as the mining
+          // payload, so its script says nothing about what the player reads.
+          if (round.promptKey || round.promptLang === 'ja') continue;
+          checked++;
+          expect(round.prompt, `${game.id}/${source}/${seed}`).not.toMatch(KANA);
+        }
+      }
+    }
+    // Guard against the check silently covering nothing.
+    expect(checked, 'no source-language prompt was reached at all').toBeGreaterThan(10);
+  });
+
+  // The other direction, so "mark everything as the source language" is not a
+  // way to pass the case above.
+  it('marks a Japanese prompt as Japanese', () => {
+    let checked = 0;
+    for (const source of ['en', 'ru', 'zh'] as const) {
+      for (const game of fast) {
+        for (let seed = 0; seed < 6; seed++) {
+          const round = buildGameRound(game.id, ((seed % 7) + 1) as 1, source, seed);
+          if (round.promptLang !== 'ja') continue;
+          // An audio round deliberately shows nothing.
+          if (!round.prompt) continue;
+          checked++;
+          expect(round.prompt, `${game.id}/${source}/${seed}`).toMatch(JAPANESE);
+        }
+      }
+    }
+    expect(checked, 'no Japanese prompt was reached at all').toBeGreaterThan(10);
+  });
+
+  it('gives the fixed match instruction a catalog key instead of an English literal', () => {
+    const round = buildGameRound('word-match', 3, 'ru', 0);
+    expect(round.kind).toBe('match');
+    expect(round.promptKey).toBe('games.match.instruction');
+  });
+});
