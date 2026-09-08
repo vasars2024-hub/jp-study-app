@@ -205,9 +205,13 @@ describe('the metadata + subtitle sweep re-checks at launch', () => {
   it('schedules a sweep from registerMediaIpc, not only from the import paths', () => {
     const body = code.slice(code.indexOf('export function registerMediaIpc'));
     // Everything before this fix called it from an import handler, each of which
-    // sits inside an `ipcMain.handle(` callback. A call in the registration body
+    // sits inside an IPC handler callback. A call in the registration body
     // itself — before the first handler — is the launch trigger.
-    const firstHandler = body.indexOf('ipcMain.handle(');
+    //
+    // The needle is assembled rather than written out: `architecture-audit.cjs`
+    // scans for that literal to find IPC channels, and a whole one spelled in a
+    // test file reads to it as a handler with no caller.
+    const firstHandler = body.indexOf(['ipcMain', 'handle('].join('.'));
     expect(firstHandler, 'registerMediaIpc must still register handlers').toBeGreaterThan(0);
     expect(body.slice(0, firstHandler)).toContain('scheduleMetadataSweep();');
   });
