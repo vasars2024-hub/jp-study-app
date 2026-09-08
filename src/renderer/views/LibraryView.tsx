@@ -32,6 +32,7 @@ import {
   onBookLevelInputsChanged,
 } from '../bookLevelEstimate';
 import { openExtensionSettings, openYoutubePlaylists } from '../extensionBridgeUi';
+import { useModalKeyboard } from '../components/ui/useModalKeyboard';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import { INBOX_FOLDER } from '../../shared/inboxMeta';
@@ -230,6 +231,29 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   const [wikiCat, setWikiCat] = useState(0);
   const [wikiBusy, setWikiBusy] = useState(false);
   const [wikiErr, setWikiErr] = useState('');
+  /*
+    Both import overlays are modal to the MOUSE — a full-bleed `.lib-import-backdrop`
+    that closes them on click — and were modal to nothing else: measured live on
+    2026-09-08 (register row D423) the panel carried no `role`, no `aria-modal` and no
+    label, focus stayed on `BODY`, three Tabs walked straight out onto the window's own
+    Pop out / Make Liquid / Minimize buttons, and Escape did nothing from the URL field,
+    from a dialog button or from the body. `useModalKeyboard` is the fix the 2026-09-06
+    sweep (D9) already built for exactly this; these two were simply not in its list.
+    `onEscape: null` while a fetch is in flight matches what the backdrop already does —
+    refuse the close, but still swallow the key so the desktop shell does not get it.
+  */
+  const wikiPanelRef = useRef<HTMLDivElement>(null);
+  const importPanelRef = useRef<HTMLDivElement>(null);
+  useModalKeyboard({
+    panelRef: wikiPanelRef,
+    onEscape: wikiBusy ? null : () => setWikiOpen(false),
+    enabled: wikiOpen,
+  });
+  useModalKeyboard({
+    panelRef: importPanelRef,
+    onEscape: webBusy ? null : () => setImportOpen(false),
+    enabled: importOpen,
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** JLPT/HSK cover badges keyed by library item id. */
   const [bookLevels, setBookLevels] = useState<Record<string, BookLevelEstimate>>({});
@@ -1008,8 +1032,15 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       {wikiOpen && (
         <>
           <div className="lib-import-backdrop" onClick={() => !wikiBusy && setWikiOpen(false)} />
-          <div className="lib-import">
-            <h3>
+          <div
+            className="lib-import"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lib-wiki-title"
+            tabIndex={-1}
+            ref={wikiPanelRef}
+          >
+            <h3 id="lib-wiki-title">
               <Icon name="dice" size={16} style={{ marginRight: 6, verticalAlign: '-3px' }} />
               {t('library.wiki.title')}
             </h3>
@@ -1050,8 +1081,15 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       {importOpen && (
         <>
           <div className="lib-import-backdrop" onClick={() => !webBusy && setImportOpen(false)} />
-          <div className="lib-import">
-            <h3>{t('library.import.title')}</h3>
+          <div
+            className="lib-import"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lib-import-title"
+            tabIndex={-1}
+            ref={importPanelRef}
+          >
+            <h3 id="lib-import-title">{t('library.import.title')}</h3>
             <div className="lib-import-row">
               <input
                 type="text"

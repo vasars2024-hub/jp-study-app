@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { confirmDialog } from './ui';
+import { useModalKeyboard } from './ui/useModalKeyboard';
 import type { ProfileId } from '../../shared/profiles';
 import { PROFILE_GROUPS } from '../../shared/seedProfiles';
 import {
@@ -38,6 +39,18 @@ function CreateProfileModal({
   const { t } = useT();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  /*
+    Same gap as the two Library import overlays (register row D423): modal to the
+    mouse via `.nov-modal-backdrop`, modal to nothing else. `autoFocus` on the name
+    field covered the initial-focus half only — there was no `role`, no `aria-modal`,
+    no Tab trap, no focus restore and no Escape. `initialFocusRef` IS passed, and the
+    hook's own header says why: `autoFocus` loses the race — React applies it during
+    commit and the effect steals focus back to the panel on the very next tick, so the
+    only way to keep the caret in the name field is to name that field here.
+  */
+  const panelRef = useRef<HTMLDivElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  useModalKeyboard({ panelRef, onEscape: busy ? null : onClose, initialFocusRef: nameRef });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -57,18 +70,29 @@ function CreateProfileModal({
 
   return (
     <div className="nov-modal-backdrop" onClick={onClose}>
-      <div className="set-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="set-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-create-title"
+        tabIndex={-1}
+        ref={panelRef}
+        onClick={(e) => e.stopPropagation()}
+      >
         <button className="nov-modal-x" onClick={onClose} aria-label={t('common.close')}>
           ×
         </button>
         <div className="set-modal-body">
-          <h3 className="set-modal-title">{t('settings.study.profile.createTitle')}</h3>
+          <h3 className="set-modal-title" id="profile-create-title">
+            {t('settings.study.profile.createTitle')}
+          </h3>
           <p className="set-row-desc muted">{t('settings.study.profile.createDesc')}</p>
           <form onSubmit={submit}>
             <div className="field-row">
               <label htmlFor="profile-name">{t('settings.study.profile.nameLabel')}</label>
               <input
                 id="profile-name"
+                ref={nameRef}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('settings.study.profile.namePlaceholder')}
