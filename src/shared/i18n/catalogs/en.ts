@@ -6184,8 +6184,24 @@ export const en: Catalog = {
   'flash.match.again': 'New round',
   'flash.match.exit': 'Leave match',
   'flash.match.progress': 'Matched {matched} of {pairs}.',
-  'flash.match.done': 'All {pairs} pairs matched in {seconds}s, with {misses} wrong picks.',
-  'flash.match.skipped': '{count} cards were left out: no meaning, or the same word or meaning twice.',
+  // `{count}` rather than `{misses}` because the plural arm is selected on
+  // `count` alone (core.ts): the round always has at least two pairs, but one
+  // miss is ordinary and used to read "with 1 wrong picks".
+  'flash.match.done': {
+    one: 'All {pairs} pairs matched in {seconds}s, with {count} wrong pick.',
+    other: 'All {pairs} pairs matched in {seconds}s, with {count} wrong picks.',
+  },
+  // Spoken while the round is still running, so the count is IN the sentence:
+  // an unchanged polite live region announces nothing, and two misses in a row
+  // would otherwise render identical text.
+  'flash.match.miss': {
+    one: 'Not a pair. {count} wrong pick so far.',
+    other: 'Not a pair. {count} wrong picks so far.',
+  },
+  'flash.match.skipped': {
+    one: '{count} card was left out: no meaning, or the same word or meaning twice.',
+    other: '{count} cards were left out: no meaning, or the same word or meaning twice.',
+  },
   'flash.match.tooFewCards': 'Match needs at least two cards that each have a word and a meaning. This deck has fewer.',
   'flash.match.noUsablePairs': 'No card in this deck has both a word and a meaning, so there is nothing to match.',
   'flash.match.about': 'Pair words with their meanings.',
@@ -6204,7 +6220,7 @@ export const en: Catalog = {
   'flash.write.askJapanese': 'Write the Japanese',
   'flash.write.askMeaning': 'Write the meaning',
   'flash.write.hint': 'Reading: {hint}',
-  'flash.write.length': '{count} characters.',
+  'flash.write.length': { one: '{count} character.', other: '{count} characters.' },
   'flash.write.answerLabel': 'Your answer',
   'flash.write.check': 'Check',
   'flash.write.progress': '{correct} correct out of {answered} answered.',
@@ -6233,7 +6249,10 @@ export const en: Catalog = {
   'flash.learn.skip': 'I do not know it yet',
   'flash.learn.progress': '{mastered} of {total} mastered.',
   'flash.learn.typingOnly': 'Too few cards for multiple choice, so this sitting is typing only.',
-  'flash.learn.skipped': '{count} cards were left out: nothing to ask, or the same word or meaning twice.',
+  'flash.learn.skipped': {
+    one: '{count} card was left out: nothing to ask, or the same word or meaning twice.',
+    other: '{count} cards were left out: nothing to ask, or the same word or meaning twice.',
+  },
   'flash.learn.done': 'All {total} cards mastered.',
   'flash.learn.askChoice': 'Pick the meaning',
   'flash.learn.askRecall': 'Write it from memory',
@@ -6250,7 +6269,10 @@ export const en: Catalog = {
   'flash.test.noUsableCards': 'A test needs a card with both a word and a meaning. This deck has none.',
   'flash.test.position': 'Question {position} of {total}',
   'flash.test.answered': '{answered} of {total} answered.',
-  'flash.test.skipped': '{count} cards were left out: nothing to ask, or the same word or meaning twice.',
+  'flash.test.skipped': {
+    one: '{count} card was left out: nothing to ask, or the same word or meaning twice.',
+    other: '{count} cards were left out: nothing to ask, or the same word or meaning twice.',
+  },
   'flash.test.kinds': 'This paper asks: {kinds}.',
   'flash.test.kindWritten': 'written answers',
   'flash.test.kindChoice': 'multiple choice',
@@ -6265,9 +6287,15 @@ export const en: Catalog = {
   'flash.test.next': 'Next',
   'flash.test.handIn': 'Hand in',
   'flash.test.handInAnyway': 'Hand in anyway',
-  'flash.test.blanksWarning': '{count} questions are still blank. Handing in now leaves them unanswered.',
+  'flash.test.blanksWarning': {
+    one: '{count} question is still blank. Handing in now leaves it unanswered.',
+    other: '{count} questions are still blank. Handing in now leaves them unanswered.',
+  },
   'flash.test.score': '{correct} of {total} correct — {percent}%.',
-  'flash.test.closeNote': '{count} near misses, counted as neither right nor wrong.',
+  'flash.test.closeNote': {
+    one: '{count} near miss, counted as neither right nor wrong.',
+    other: '{count} near misses, counted as neither right nor wrong.',
+  },
   'flash.test.wrongNote': '{count} wrong.',
   'flash.test.blankNote': '{count} left blank.',
   'flash.test.outcomeCorrect': 'Correct',

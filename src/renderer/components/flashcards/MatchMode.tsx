@@ -109,11 +109,32 @@ export default function MatchMode({ onExit, deck = 'all' }: {
         })}
       </div>
 
+      {/*
+        A miss used to be a border style and nothing else: `is-wrong` changed a
+        tile's border, `misses` was counted and then held back until the round
+        ended, and the progress line below reads the SAME text it read before
+        the miss — so a polite live region that has not changed announces
+        nothing. Measured live 2026-09-08 (register row D347): 魚 + dog set
+        `is-wrong` on one tile, `Matched 1 of 4.` did not move, and the two live
+        regions carried nothing new. Learn already does this right one file
+        over ("Not this one. The meaning is cat."), which is what makes Match
+        the outlier rather than the house style.
+
+        The running count is in the sentence on purpose: two misses in a row
+        would otherwise render identical text, and an unchanged live region is
+        silent however wrong the answer was.
+      */}
+      <p className="auto-reading-options__report" aria-live="polite">
+        {wrong && !score.done ? t('flash.match.miss', { count: misses }) : ''}
+      </p>
+
       <p className="auto-reading-options__report" aria-live="polite">
         {score.done
           ? t('flash.match.done', {
             pairs: score.pairs,
-            misses: score.misses,
+            // `count`, not `misses`: the plural arm is chosen on `count` alone,
+            // and this string used to read "with 1 wrong picks".
+            count: score.misses,
             seconds: Math.round(score.elapsedMs / 1000),
           })
           : t('flash.match.progress', { matched: score.matched, pairs: score.pairs })}
