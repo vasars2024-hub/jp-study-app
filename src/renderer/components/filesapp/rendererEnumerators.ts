@@ -608,18 +608,28 @@ export function withRendererItems(snapshot: FilesIndexSnapshot): FilesIndexSnaps
   // failure here must cost the mined flags and nothing else, and it is reported
   // rather than swallowed so "no source is mined" stays distinguishable from
   // "the deck could not be read".
-  const derivedStarted = Date.now();
   let derived = items;
+  let reported = reports;
   try {
     derived = deriveMinedFlags(items, minedSourceIdsFromDeck());
   } catch (err) {
-    reports.push({
-      source: 'local-deck-mined',
-      itemCount: 0,
-      elapsedMs: Date.now() - derivedStarted,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    // Attached to the deck's OWN report rather than minted as a new source.
+    // This *is* the deck reader failing, and gate 6 counts one enumerator per
+    // `source:` literal in this file — a second one here would claim a route
+    // that does not exist.
+    const message = err instanceof Error ? err.message : String(err);
+    // `'local-deck'` is the registry entry above. The existing parity test pins
+    // the exact report list, so renaming it there without renaming it here
+    // fails that test rather than silently swallowing this error.
+    reported = reports.map((report) =>
+      report.source === 'local-deck' && !report.error ? { ...report, error: message } : report,
+    );
   }
 
-  return { ...snapshot, items: derived, counts: countByCategory(derived), enumerators: reports };
+  return {
+    ...snapshot,
+    items: derived,
+    counts: countByCategory(derived),
+    enumerators: reported,
+  };
 }
