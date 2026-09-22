@@ -3097,3 +3097,14 @@ Recovery gates so far: targeted Vitest 3 files / 33 tests passed; i18n 13,025 ke
 all locales present; architecture no new findings (2 known pending); eslint 0 errors,
 15 existing warnings in the recovered test. Full-suite and fresh live checks pending.
 Coverage remains 18/25 surfaces done; Immersion remains partial. No gate closed here.
+
+Recovery follow-up, 2026-09-22 (codexA): fresh classic verification on Electron pid 25476,
+window 1 reproduced the post-fix NHK Easy message, button/tabIndex 0, 12px font and Enter
+dismissal (bridge receipt delivered=1). Aero's separate live-region omission is now repaired.
+The same five capture/status cases run through both hosts: before fix 9 passed / 1 failed
+(Aero missing region); after fix 4 suites / 60 passed. Fresh Aero capture showed identical
+banner/live-region text, delivered Enter dismissed it, no Vite overlay. Material attribute and
+broadcast restored to their original null/default state; no theme preference was persisted.
+The first expanded test run overlapped cold app startup and timed out during module import;
+a settled rerun isolated the single real failure above. No timeout or assertion was weakened.
+Visual-novel store remains 53 bytes, last written 2026-08-26; it is not a live VN subject.

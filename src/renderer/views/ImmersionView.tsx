@@ -282,6 +282,7 @@ export default function ImmersionView() {
               <div className="aero-immersion-surface">
                 {loading && <div className="aero-immersion-banner">{t('immersion.loading')}</div>}
                 {error && <div className="aero-immersion-banner error">{error}</div>}
+                <div className="sr-only" role="status" aria-live="polite">{status ?? ''}</div>
                 {status && (
                   <button type="button" className="aero-immersion-banner status" onClick={() => state.setStatus(null)}>
                     {status}
