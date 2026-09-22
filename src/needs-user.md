@@ -258,3 +258,15 @@ Do not run 11–15 unattended or inside a suite. Do not supply, guess or synthes
 credential. Do not change settings on the user's live qBittorrent client. Do not substitute a
 fixture for the real pre-existing torrent in gate 14 — the gate's whole content is that it is
 real. Recording a blocker here is the correct outcome; quietly working around one is not.
+
+## 2026-09-22 — codexA acts on the 2026-09-07 media-acquisition authorization
+
+The user lifted the agent's video-acquisition restriction in full on 2026-09-07 at 09:55.
+Gate 11 may acquire a matching real video; no further user attendance or approval is owed.
+Gate 12 still asserts that the product's subtitle-only Route B requests no video, and existing
+user torrents and categories outside jp-study / jp-study-subtitles remain protected.
+This turn uses the real Movie 01 index result (56b01bb0, 1.5 GiB, 2 seeders) for the known
+Conan Movies 01-26 subtitle pack. The 11 baseline transfers contain no copy of this video.
+The first qBittorrent startup used an unsupported CLI flag and stopped at "Bad command line";
+only that owned process was stopped. Plain startup connected through the stored API-key mode.
+No credential was read or changed, and no persisted scraper setting was changed.

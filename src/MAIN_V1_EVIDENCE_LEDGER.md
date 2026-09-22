@@ -28227,3 +28227,17 @@ was supplied"*, and with a bare profile *"No torrent index is enabled in this pr
 is a product defect; `debug/g14-live.cjs` injects a real nyaa index on the request and writes
 nothing to settings. Drive it from **PowerShell** — Git Bash turns the `/qb` base path into
 `C:/Program Files/Git/qb`.
+
+## 2026-09-22 (codexA) — gate 11 resumed after interrupted-work recovery
+
+Recovered Immersion HEAD 3d7850f7 into cbccdbca and completed its Aero announcement seam
+in e115c2dd (60 focused tests, fresh Electron status/capture/Enter proof). Gate 11 then
+re-derived: 39 media items, zero Conan; the real index still nominates 22d2e2e6.
+The live qBittorrent API was initially unreachable. Started the installed client, which
+rejected optional startup flags; restarted only that owned process without flags. Result:
+connected v5.2.3 / apiKey / 32 ms. Existing baseline: 11 torrents, all paused, preserved.
+Selected smallest seeded Movie 01 video returned by the index: 56b01bb0, 1.5 GiB, 2 seeders,
+absent from baseline. Product scraperQbitSend: sent 1 / skipped 0 / failed 0, category jp-study,
+savePath Downloads/jp-study. Transfer observed downloading with 1 connected seed; import and
+render proof pending. This is Movie 01, not an unrelated TV episode. No gate closes yet.
+Authorization lift dated 2026-09-07 is recorded in needs-user.md; no credentials read/changed.
