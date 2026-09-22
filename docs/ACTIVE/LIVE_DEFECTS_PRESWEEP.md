@@ -3079,3 +3079,21 @@ for the walk was closed, and the desk is back to the 8 windows it booted with.
 `[...btns].find(b => b.textContent.trim() === '日本語')` matched nothing while the same button's
 `textContent` read back as exactly `"日本語"` (length 3). Select such a control **by index**, never
 by its own label. This is the `/type` Japanese trap in a route nobody had hit it in yet.
+
+### 2026-09-22 — codexA interrupted-work recovery of 3d7850f7
+
+Recovery evidence: HEAD is 3d7850f7, index empty; last handoff/register stop at D425.
+Dirty product mtimes stop before HEAD, with no September 22 product edits. The interrupted
+slice therefore has a committed product boundary but lacks its defect rows and final gates.
+The following two rows recover the original worker's live observations from the commit body;
+they are not a claim of fresh live verification on September 22.
+
+| id | surface | what is wrong | evidence | sev | status |
+|---|---------|--------------|----------|-----|--------|
+| D426 | immersion / Capture video | Capturing an ordinary news page displays raw English yt-dlp output instead of explaining that the page has no video. | Original live repro recorded in 3d7850f7: NHK Easy, Capture video to Media, 2.1 seconds later `Download failed: ERROR: Unsupported URL: https://news.web.nhk/news/easy/`. After fix the same action displayed the translated no-video message. | P2 | fixed 3d7850f7; original worker verified live on 2026-09-08, pid 22788, window 1. Recovery focused suites pass 33/33 on 2026-09-22. |
+| D427 | immersion / page-action status | Page-action outcomes cannot be dismissed with the keyboard and are not announced to screen readers. | Original live repro recorded in 3d7850f7: status was a clickable div. After fix: button, tabIndex 0, persistent live region, Enter dismissed the banner, font size 12px. | P3 | fixed 3d7850f7 for classic Study OS and reused Blanc content; original live proof 2026-09-08. Aero's separate banner still lacks the persistent live region: recovery follow-up pending, not covered by the original test. |
+
+Recovery gates so far: targeted Vitest 3 files / 33 tests passed; i18n 13,025 keys,
+all locales present; architecture no new findings (2 known pending); eslint 0 errors,
+15 existing warnings in the recovered test. Full-suite and fresh live checks pending.
+Coverage remains 18/25 surfaces done; Immersion remains partial. No gate closed here.
