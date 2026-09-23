@@ -32,3 +32,12 @@ describe('Translate history keeps its controls reachable (D12)', () => {
     expect(actions).toMatch(/background:\s*var\(--bg\)/);
   });
 });
+
+describe('Resources keeps its filters and search reachable (D15)', () => {
+  it('pins the whole command surface to the top of the window body', () => {
+    const bar = rule('.res-view > .res-command-surface');
+    expect(bar).toMatch(/position:\s*sticky/);
+    expect(bar).toMatch(/top:\s*-16px/);
+    expect(bar).toMatch(/background:\s*var\(--bg\)/);
+  });
+});
