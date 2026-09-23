@@ -22,7 +22,12 @@
 
 export const CONTENT_SECURITY_POLICY_DIRECTIVES: readonly string[] = [
   "default-src 'self' app: media: playfile: localfile:",
-  "script-src 'self'",
+  // `'wasm-unsafe-eval'` lets WebAssembly compile and nothing else — it is not `'unsafe-eval'`,
+  // which would also allow JS `eval`/`new Function`. The media workspace's libass renderer
+  // (styled .ass subtitles and MKV text tracks) is WebAssembly; without this every packaged
+  // open showed "Error initializing libass renderer: CompileError ... violates the following
+  // Content Security policy directive" (measured 2026-09-23 on a non-anime MKV).
+  "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   // Discovery artwork is provider-owned and rendered directly. Keep this
   // allow-list narrow rather than opening all HTTPS image hosts.

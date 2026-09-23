@@ -29,13 +29,19 @@ describe('packaged Content-Security-Policy', () => {
   it('never allows eval, in any directive', () => {
     // The single most likely regression: a bundler or a dependency that "just needs" eval.
     // Electron's own dev warning is about exactly this, and it is easy to silence wrongly.
-    expect(contentSecurityPolicyHeader()).not.toContain('unsafe-eval');
+    // `'wasm-unsafe-eval'` is a different, narrower source (WebAssembly compilation only), so
+    // this checks for the exact `'unsafe-eval'` token rather than the substring.
+    for (const directive of CONTENT_SECURITY_POLICY_DIRECTIVES) {
+      expect(directive.split(/\s+/)).not.toContain("'unsafe-eval'");
+    }
+    expect(contentSecurityPolicyHeader()).not.toMatch(/(^|\s)'unsafe-eval'/);
   });
 
   it('executes only its own scripts', () => {
     // Not `default-src`'s fallback — `script-src` must say it, or a later `default-src`
     // widening for images or fonts would quietly widen script execution too.
-    expect(cspDirectiveSources('script-src')).toEqual(["'self'"]);
+    // Plus WebAssembly compilation for the libass subtitle renderer — no JS eval, no hosts.
+    expect(cspDirectiveSources('script-src')).toEqual(["'self'", "'wasm-unsafe-eval'"]);
   });
 
   it('cannot reach an off-machine host except the ones named in review', () => {

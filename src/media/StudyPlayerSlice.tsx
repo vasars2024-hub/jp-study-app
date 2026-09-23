@@ -753,6 +753,53 @@ function StudyPlayerSession({
    * is parked here and the HTTP branch prefers it when the request ids agree.
    */
   const statedAbortRef = React.useRef<{ requestId: number; text: string } | null>(null);
+  const latestRequestRef = React.useRef(playbackRequest);
+  /** The request now playing (or opening) straight from disk; see `openDirect`. */
+  const directRequestRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    latestRequestRef.current = playbackRequest;
+  }, [playbackRequest]);
+
+  /** See `./directLocalPlayback.ts`: the file plays from disk when the sidecar will not. */
+  const openDirect = React.useCallback(
+    async (request: Extract<MediaWorkspacePlaybackRequest, { kind: 'local' }>, stated: string) => {
+      // The sidecar refuses one open TWICE (socket `abort-open` and the POST's 500), sometimes
+      // again seconds later. Only the first may hand off: a second would reset a video that is
+      // already playing, and the POST's refusal would paint an error screen over it.
+      if (directRequestRef.current === request.requestId) return;
+      directRequestRef.current = request.requestId;
+      let streamUrl: string | null = null;
+      try {
+        streamUrl = await window.api.mediaFileUrl(request.localFilePath);
+      } catch {
+        streamUrl = null;
+      }
+      if (latestRequestRef.current?.requestId !== request.requestId) return;
+      if (!streamUrl) {
+        setState({ active: true, playbackInfo: null, playbackError: stated, loadingState: null });
+        return;
+      }
+      const info = directLocalPlaybackInfo({
+        requestId: request.requestId,
+        localFilePath: request.localFilePath,
+        streamUrl,
+      });
+      const startAtSec = request.startAtSec ?? loadResumePosition(info);
+      setState({
+        active: true,
+        playbackInfo: directLocalPlaybackInfo({
+          requestId: request.requestId,
+          localFilePath: request.localFilePath,
+          streamUrl,
+          startAtSec,
+        }),
+        playbackError: null,
+        loadingState: null,
+      });
+    },
+    [setState],
+  );
+
   /**
    * Stage 2, armed by the `watch` payload — where stage 1 disarms. Separate record because
    * the two stages measure different things: stage 1 watches the SIDECAR's silence, stage 2
@@ -966,7 +1013,13 @@ function StudyPlayerSession({
         // frees the channel; see the hole named at the top of `directstreamOpenChannel.ts`.
         settleDirectstreamOpen(ticket);
         if (!response.ok) {
-          throw new Error(describeLocalOpenFailure(response.status, await response.text()));
+          const body = await response.text();
+          if (sidecarCannotServeFile(body)) {
+            openProgressRef.current = null;
+            void openDirect(localRequest, describeLocalOpenFailure(response.status, body));
+            return;
+          }
+          throw new Error(describeLocalOpenFailure(response.status, body));
         }
       })
       .catch((error: unknown) => {
@@ -983,6 +1036,7 @@ function StudyPlayerSession({
         settleDirectstreamOpen(ticket);
         // A refused open reports itself, so the silence watchdog has nothing left to do.
         openProgressRef.current = null;
+        if (directRequestRef.current === localRequest.requestId) return;
         // The status code is a guess about the cause; the sidecar's own abort reason is not.
         // When both describe this same open, the words win.
         const stated = statedAbortRef.current;
@@ -1003,7 +1057,7 @@ function StudyPlayerSession({
         launchedRequestRef.current = null;
       }
     };
-  }, [clientId, conn, connected, identityConfirmed, playbackRequest, proofConfig]);
+  }, [clientId, conn, connected, identityConfirmed, openDirect, playbackRequest, proofConfig]);
 
   /**
    * The recovery. A local open that the sidecar cancelled mid-preparation answers 200 and
@@ -1276,46 +1330,6 @@ function StudyPlayerSession({
    * The request the slice is showing NOW, for async work that must not land on a later one.
    * Written in an effect rather than during render so a discarded render cannot move it.
    */
-  const latestRequestRef = React.useRef(playbackRequest);
-  React.useEffect(() => {
-    latestRequestRef.current = playbackRequest;
-  }, [playbackRequest]);
-
-  /** See `./directLocalPlayback.ts`: the file plays from disk when the sidecar will not. */
-  const openDirect = React.useCallback(
-    async (request: Extract<MediaWorkspacePlaybackRequest, { kind: 'local' }>, stated: string) => {
-      let streamUrl: string | null = null;
-      try {
-        streamUrl = await window.api.mediaFileUrl(request.localFilePath);
-      } catch {
-        streamUrl = null;
-      }
-      if (latestRequestRef.current?.requestId !== request.requestId) return;
-      if (!streamUrl) {
-        setState({ active: true, playbackInfo: null, playbackError: stated, loadingState: null });
-        return;
-      }
-      const info = directLocalPlaybackInfo({
-        requestId: request.requestId,
-        localFilePath: request.localFilePath,
-        streamUrl,
-      });
-      const startAtSec = request.startAtSec ?? loadResumePosition(info);
-      setState({
-        active: true,
-        playbackInfo: directLocalPlaybackInfo({
-          requestId: request.requestId,
-          localFilePath: request.localFilePath,
-          streamUrl,
-          startAtSec,
-        }),
-        playbackError: null,
-        loadingState: null,
-      });
-    },
-    [setState],
-  );
-
   const onMessage = React.useCallback(
     (message: ServerMessage) => {
       // Every native-player message is a sign of life for the open in flight, whatever it
@@ -1409,6 +1423,8 @@ function StudyPlayerSession({
         case 'abort-open': {
           // The sidecar said so out loud, so there is nothing for the watchdog to find.
           openProgressRef.current = null;
+          // Playing from disk: the sidecar has no stream of ours left to abort.
+          if (playbackRequest && directRequestRef.current === playbackRequest.requestId) break;
           const stated = describeDirectstreamAbort(message.payload);
           if (!stated) {
             // A reasonless abort is the sidecar retiring a stream a newer open replaced.
