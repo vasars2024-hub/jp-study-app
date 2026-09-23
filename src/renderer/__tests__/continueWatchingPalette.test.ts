@@ -56,7 +56,7 @@ afterEach(() => {
 /** Stands in for `MediaWorkspaceHost`'s closed state — the launcher button it renders. */
 function mountHostMarker(): void {
   hostMarker = document.createElement('button');
-  hostMarker.className = 'seanime-host-launcher';
+  hostMarker.className = 'seanime-host-present';
   document.body.append(hostMarker);
 }
 

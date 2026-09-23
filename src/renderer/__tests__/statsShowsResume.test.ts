@@ -39,7 +39,7 @@ function seed(shows: Record<string, { title: string; seconds: number; lastWatche
 /** Mounts the marker `mediaWorkspaceHostIsMounted()` looks for. */
 function mountHostMarker(): void {
   const marker = document.createElement('div');
-  marker.className = 'seanime-host-launcher';
+  marker.className = 'seanime-host-present';
   document.body.append(marker);
 }
 

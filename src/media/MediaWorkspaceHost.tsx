@@ -190,13 +190,23 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     return () => window.removeEventListener('keydown', onKey);
   }, [close, open]);
 
-  // Move focus into the workspace on open and hand it back to the launcher on close, so
-  // a keyboard user is never left tabbing through the desktop behind a full-screen layer.
-  const launcherRef = useRef<HTMLButtonElement | null>(null);
+  // Move focus into the workspace on open and hand it back to whatever held it before on
+  // close, so a keyboard user is never left tabbing through the desktop behind a
+  // full-screen layer. (It went back to the corner launcher until that was removed.)
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
-    if (open) closeRef.current?.focus();
-    else launcherRef.current?.focus({ preventScroll: true });
+    if (open) {
+      const active = document.activeElement;
+      returnFocusRef.current = active instanceof HTMLElement && active !== document.body
+        ? active
+        : null;
+      closeRef.current?.focus();
+      return;
+    }
+    const back = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (back?.isConnected) back.focus({ preventScroll: true });
   }, [open]);
 
   /* ----------------------------------------------------------------------------------- *
@@ -233,19 +243,12 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     : t('desktop.makeLiquid');
 
   if (!open) {
-    return (
-      <button
-        ref={launcherRef}
-        type="button"
-        className="seanime-host-launcher"
-        data-sidecar={status.kind}
-        onClick={() => setOpen(true)}
-      >
-        <span className="seanime-host-dot" aria-hidden="true" />
-        {t('mediaWorkspace.launcher')}
-        <span className="seanime-host-launcher-state">{statusLabel}</span>
-      </button>
-    );
+    // No corner launcher: it sat over the desktop's bottom-right as a permanent "Media
+    // workspace · stopped" pill the user did not want (2026-09-23), and every way into the
+    // workspace — the Video app, an episode, Continue watching, Resume last — already opens
+    // it through `MEDIA_WORKSPACE_OPEN_EVENT`. This invisible marker keeps "a host is mounted
+    // and its sidecar is not disabled" answerable from the DOM (`mediaWorkspaceHostIsMounted`).
+    return <span className="seanime-host-present" data-sidecar={status.kind} hidden />;
   }
 
   const retryable = status.kind === 'failed' || status.kind === 'offline'

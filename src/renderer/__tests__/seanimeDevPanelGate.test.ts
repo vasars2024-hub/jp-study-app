@@ -99,22 +99,13 @@ describe('what counts as a development runtime', () => {
   });
 });
 
-describe('the launcher offset follows the panel that causes it', () => {
+describe('the removed corner launcher leaves no offset behind', () => {
   const CSS = readFileSync(resolve(__dirname, '..', 'styles.css'), 'utf8');
 
-  it('places the launcher above the taskbar by default', () => {
-    // Not a hardcoded 190px. That number existed to clear the dev panel, and became
-    // 190px of empty desktop the moment the panel stopped rendering in production.
-    const rule = CSS.slice(CSS.indexOf('\n.seanime-host-launcher {'));
-    // Comments first: the rule's own comment *explains* the old 190px by quoting it,
-    // and a naive substring check reads that prose as a live declaration.
-    const block = rule.slice(0, rule.indexOf('}')).replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(block).toContain('bottom: calc(var(--taskbar-h, 48px) + 12px)');
-    expect(block).not.toContain('bottom: 190px');
-  });
-
-  it('restores the offset only while the dev panel marks the document', () => {
+  it('has no launcher rule to step over the dev panel', () => {
+    // The media workspace's corner pill was removed (2026-09-23); its dev-panel offset went
+    // with it, and nothing else may be left positioned for it.
     expect(DEV_PANEL_ATTR).toBe('data-seanime-dev-panel');
-    expect(CSS).toContain(`html[${DEV_PANEL_ATTR}] .seanime-host-launcher`);
+    expect(CSS).not.toContain('.seanime-host-launcher');
   });
 });

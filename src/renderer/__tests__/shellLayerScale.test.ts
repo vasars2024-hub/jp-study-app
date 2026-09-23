@@ -182,7 +182,6 @@ describe('shell layer scale', () => {
       ['.cbh-panel', 'overlay'],
       ['.os-toast-host', 'feedback'],
       ['.seanime-host', 'view'],
-      ['.seanime-host-launcher', 'viewAffordance'],
       ['.consent', 'blocking'],
       ['.os-taskbar', 'chrome'],
       ['.lockscreen', 'lock'],

@@ -83,9 +83,11 @@ async function openOn(view: 'library' | 'readiness' | 'review'): Promise<HTMLDiv
   await act(async () => {
     root.render(createElement(MediaWorkspaceHost, {}));
   });
-  // Closed, the host is just its launcher button.
-  const launcher = host.querySelector<HTMLButtonElement>('.seanime-host-launcher');
-  await act(async () => { launcher?.click(); });
+  // Closed, the host is only a hidden presence marker.
+  // There is no launcher button any more; every real entry point opens through this event.
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent('seanime:media-workspace-open'));
+  });
   if (view !== 'library') {
     const label = view === 'review' ? 'Review' : 'Readiness';
     const button = [...host.querySelectorAll<HTMLButtonElement>('.seanime-host-views button')]
@@ -183,11 +185,11 @@ describe('MediaWorkspaceHost — a review focus raised from outside opens the ho
   it('opens on Review, focused, from a closed host', async () => {
     // Slice 6 only ever raised this event from a readiness row inside an already-open
     // workspace, so opening was a no-op there. Slice 7's desktop widget raises it from
-    // outside: without the open, the segment changes behind a launcher the user is still
-    // looking at, which reads as a button that does nothing.
+    // outside: without the open, the segment changes behind a closed workspace the user
+    // cannot see, which reads as a button that does nothing.
     stubApi(STOPPED);
     const el = await mountClosed();
-    expect(el.querySelector('.seanime-host-launcher')).not.toBeNull();
+    expect(el.querySelector('.seanime-host-present')).not.toBeNull();
 
     await act(async () => {
       window.dispatchEvent(new CustomEvent('seanime:study-review-focus', {
@@ -196,7 +198,7 @@ describe('MediaWorkspaceHost — a review focus raised from outside opens the ho
     });
     await flush();
 
-    expect(el.querySelector('.seanime-host-launcher')).toBeNull();
+    expect(el.querySelector('.seanime-host-present')).toBeNull();
     expect(el.querySelector('.study-loop')).not.toBeNull();
     expect(el.querySelector('.study-loop-focus')?.textContent).toContain('The Big O');
   });
@@ -210,7 +212,7 @@ describe('MediaWorkspaceHost — a review focus raised from outside opens the ho
       }));
     });
     await flush();
-    expect(el.querySelector('.seanime-host-launcher')).not.toBeNull();
+    expect(el.querySelector('.seanime-host-present')).not.toBeNull();
   });
 });
 

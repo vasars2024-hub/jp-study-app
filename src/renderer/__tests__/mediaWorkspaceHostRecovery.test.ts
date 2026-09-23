@@ -134,8 +134,10 @@ async function openOnReady(): Promise<HTMLDivElement> {
   document.body.append(host);
   const root = createRoot(host);
   await act(async () => { root.render(createElement(MediaWorkspaceHost, {})); });
-  const launcher = host.querySelector<HTMLButtonElement>('.seanime-host-launcher');
-  await act(async () => { launcher?.click(); });
+  // There is no launcher button any more; every real entry point opens through this event.
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent('seanime:media-workspace-open'));
+  });
   await flush();
   return host;
 }

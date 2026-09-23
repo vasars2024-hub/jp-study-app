@@ -53,7 +53,7 @@ const scenario = params.get('state') ?? 'mixed';
  */
 if (params.get('host') !== 'off') {
   const marker = document.createElement('div');
-  marker.className = 'seanime-host-launcher';
+  marker.className = 'seanime-host-present';
   marker.style.display = 'none';
   document.body.append(marker);
 }

@@ -77,7 +77,7 @@ export function readContinueWatching(
  * `mediaWorkspaceHostExists()` for that, and `mediaWorkspaceIsAvailable()` for the sidecar.
  */
 export function mediaWorkspaceHostIsMounted(): boolean {
-  return document.querySelector('.seanime-host-launcher, .seanime-host') != null;
+  return document.querySelector('.seanime-host-present, .seanime-host') != null;
 }
 
 /** Why a resume attempt did nothing, so the caller can say so instead of failing silently. */

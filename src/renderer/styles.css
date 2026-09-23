@@ -19340,7 +19340,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   lighter glass it was designed with — this is a response to what is behind it,
   not a second opinion about the palette. Applies to `.cbh-panel` for the same
   reason; `.seanime-host` exists only while the workspace is open (the closed
-  state renders `.seanime-host-launcher`, a different class).
+  state renders only a hidden `.seanime-host-present` marker).
 */
 #root:has(.seanime-host) .palette,
 #root:has(.seanime-host) .cbh-panel {
@@ -27284,43 +27284,6 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
 /* Media workspace host chrome. Lives in the shell stylesheet, not mediaWorkspace.css:
    this is the layer *around* #media-workspace, and every selector in that file must be
    #media-workspace-scoped (check-media-css-containment.mjs enforces it). */
-.seanime-host-launcher {
-  position: fixed;
-  right: 12px;
-  /*
-    Sits just above the taskbar. This was a hardcoded `bottom: 190px` to clear the
-    dev panel — which stopped rendering in production when that panel's gate moved to
-    import.meta.env.DEV, leaving the launcher floating in 190px of empty desktop for
-    the only people who ever see it. The dev panel now marks <html> while it is up
-    (DEV_PANEL_ATTR), so the offset applies exactly when the thing it avoids exists.
-  */
-  bottom: calc(var(--taskbar-h, 48px) + 12px);
-  z-index: var(--z-shell-view-affordance, 9998);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 11px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--font-size-xs, 12px);
-  cursor: pointer;
-}
-.seanime-host-launcher:hover {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  background: var(--surface-3);
-}
-/* Development only: step over the dev panel (fixed at right 16 / bottom 16). */
-html[data-seanime-dev-panel] .seanime-host-launcher {
-  bottom: 190px;
-}
-.seanime-host-launcher-state {
-  color: var(--muted);
-  font-size: var(--font-size-2xs, 11px);
-}
-
 /* Status is carried by a dot *and* a text label — never colour alone (WCAG 1.4.1). */
 .seanime-host-dot {
   width: 7px;

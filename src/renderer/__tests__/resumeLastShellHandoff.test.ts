@@ -136,7 +136,7 @@ describe('a shell with a host', () => {
     window.addEventListener('seanime:media-workspace-open', onOpen);
     const { runCommand } = await import('../keyboardShortcuts');
 
-    expect(document.querySelector('.seanime-host-launcher')).toBeNull();
+    expect(document.querySelector('.seanime-host-present')).toBeNull();
     runCommand('video.resumeLast');
     await settle();
 
