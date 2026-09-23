@@ -2566,12 +2566,12 @@ export default function NovelReader({ item, onClose }: Props) {
   const readerMenus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('novel.reader.menu.file'),
       items: [
-        { id: 'library', label: 'Return to library', icon: <Icon name="library" size={14} />, onSelect: onClose },
+        { id: 'library', label: t('novel.reader.returnToLibrary'), icon: <Icon name="library" size={14} />, onSelect: onClose },
         {
           id: 'book',
-          label: 'Back to book',
+          label: t('novel.reader.backToBook'),
           icon: <Icon name="novels" size={14} />,
           disabled: !linkView,
           onSelect: exitLinkViewToBook,
@@ -2580,25 +2580,25 @@ export default function NovelReader({ item, onClose }: Props) {
     },
     {
       id: 'navigate',
-      label: 'Navigate',
+      label: t('novel.reader.menu.navigate'),
       items: [
         {
           id: 'previous',
-          label: 'Previous',
+          label: t('novel.reader.previous'),
           icon: <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />,
           disabled: !!linkView || !loaded,
           onSelect: () => flip(-1),
         },
         {
           id: 'next',
-          label: 'Next',
+          label: t('novel.reader.next'),
           icon: <Icon name="chevron" size={14} />,
           disabled: !!linkView || !loaded,
           onSelect: () => flip(1),
         },
         {
           id: 'back-link',
-          label: 'Back through article history',
+          label: t('novel.reader.articleBack'),
           disabled: !linkView && !canLinkBack,
           onSelect: leaveLinkView,
         },
@@ -2606,23 +2606,23 @@ export default function NovelReader({ item, onClose }: Props) {
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('novel.reader.menu.view'),
       items: [
         {
           id: 'settings',
-          label: settingsOpen ? 'Hide reading settings' : 'Reading settings',
+          label: t(settingsOpen ? 'novel.reader.hideSettings' : 'novel.tool.readerSettings'),
           icon: <Icon name="settings" size={14} />,
           onSelect: () => setSettingsOpen((o) => !o),
         },
         {
           id: 'bookmarks',
-          label: bookmarksOpen ? 'Hide bookmarks' : 'Bookmarks',
+          label: t(bookmarksOpen ? 'novel.reader.hideBookmarks' : 'novel.tool.bookmarks'),
           icon: <Icon name="bookmark" size={14} />,
           onSelect: () => setBookmarksOpen((o) => !o),
         },
         {
           id: 'collection',
-          label: collectionOpen ? 'Hide collection' : 'Flashcard collection',
+          label: t(collectionOpen ? 'novel.reader.hideCollection' : 'novel.reader.collection'),
           icon: <Icon name="flashcards" size={14} />,
           onSelect: () => setCollectionOpen((o) => !o),
         },
@@ -2630,25 +2630,22 @@ export default function NovelReader({ item, onClose }: Props) {
     },
     {
       id: 'study',
-      label: 'Study',
+      label: t('novel.tool.studyTools'),
       items: [
         {
           id: 'bookmark-current',
-          label: 'Bookmark current position',
+          label: t('novel.reader.bookmarkPosition'),
           icon: <Icon name="bookmark" size={14} />,
           disabled: !loaded || !!linkView,
           onSelect: addCurrent,
         },
         {
           id: 'collect-selection',
-          label: 'Collect selection',
+          label: t('novel.reader.collectSelection'),
           icon: <Icon name="flashcards" size={14} />,
           onSelect: () => addSelectionToCollection('selection'),
         },
         {
-          // Translated even though its neighbours in this menu are not: the repo
-          // rule is that new UI text goes through the catalog from the moment it
-          // is written, so this does not join the hardcoded-string backlog.
           id: 'ask-agent-selection',
           label: t('epub.askAgent'),
           icon: <Icon name="sparkle" size={14} />,
@@ -2674,9 +2671,9 @@ export default function NovelReader({ item, onClose }: Props) {
   ];
   const readerStatus = (
     <>
-      <StatusBarField>{linkView ? 'Article view' : loaded ? 'Book view' : 'Loading'}</StatusBarField>
-      <StatusBarField>{vertical ? 'Vertical' : 'Horizontal'}</StatusBarField>
-      <StatusBarField>{paged ? 'Pages' : 'Scroll'}</StatusBarField>
+      <StatusBarField>{t(linkView ? 'novel.reader.articleView' : loaded ? 'novel.reader.bookView' : 'common.loading')}</StatusBarField>
+      <StatusBarField>{t(vertical ? 'novel.reader.vertical' : 'novel.reader.horizontal')}</StatusBarField>
+      <StatusBarField>{t(paged ? 'novel.reader.pages' : 'novel.reader.scroll')}</StatusBarField>
       <StatusBarSpacer />
       {paged && pageCount > 1 && <StatusBarField>{page + 1}/{pageCount}</StatusBarField>}
       <StatusBarField>{Math.round((seek ?? progress) * 100)}%</StatusBarField>
@@ -2959,24 +2956,24 @@ export default function NovelReader({ item, onClose }: Props) {
             "Library". Rubric category 5 Q2 scored this surface NO with backAffordances 0 while
             the way back was sitting in the top-left corner. A role in the class name is the
             same fix `.reader-btn-liquid` already got, for the same reason. */}
-        <button className="btn reader-back" onClick={onClose} title="Return to library">
+        <button className="btn reader-back" onClick={onClose} title={t('novel.reader.returnToLibrary')}>
           <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
-          Library
+          {t('novel.reader.library')}
         </button>
         {(linkView || canLinkBack) && (
           <button
             type="button"
             className="btn"
-            title="Back to previous page or book (Alt+← / Backspace / Esc)"
+            title={t('novel.reader.backShortcut')}
             onClick={leaveLinkView}
           >
             <Icon name="chevron" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-            Back
+            {t('common.back')}
           </button>
         )}
         {linkView && (
-          <button type="button" className="btn" title="Close article and return to the book" onClick={exitLinkViewToBook}>
-            Book
+          <button type="button" className="btn" title={t('novel.reader.closeArticle')} onClick={exitLinkViewToBook}>
+            {t('novel.reader.book')}
           </button>
         )}
         <div className="reader-title">{title}</div>
@@ -2995,10 +2992,10 @@ export default function NovelReader({ item, onClose }: Props) {
             unreachable and still satisfy a one-sided check.
           */}
           <button className="btn" data-paged-control="prev" onClick={() => flip(-1)}>
-            ‹ Prev
+            ‹ {t('novel.reader.prevShort')}
           </button>
           <button className="btn" data-paged-control="next" onClick={() => flip(1)}>
-            Next ›
+            {t('novel.reader.next')} ›
           </button>
             </>
           )}
@@ -3131,10 +3128,10 @@ export default function NovelReader({ item, onClose }: Props) {
           <button
             type="button"
             className="btn small"
-            title="Add selection to collection (Ctrl+Shift+S)"
+            title={t('novel.reader.collectShortcut')}
             onClick={() => addSelectionToCollection('selection')}
           >
-            Collect
+            {t('novel.reader.collect')}
           </button>
           {/*
             The AppChrome "Study" menu carries this action too, but that menu bar
@@ -3170,7 +3167,7 @@ export default function NovelReader({ item, onClose }: Props) {
           <button
             type="button"
             className={`btn ${collectionOpen ? 'active' : ''}`}
-            title="Flashcard collection"
+            title={t('novel.reader.collection')}
             onClick={() => setCollectionOpen((o) => !o)}
           >
             <Icon name="flashcards" size={14} />
@@ -3193,12 +3190,12 @@ export default function NovelReader({ item, onClose }: Props) {
         {loading && !linkView && (
           <div className="reader-msg">
             {pdfProgress != null
-              ? `Reading PDF… ${Math.round(pdfProgress * 100)}%`
-              : 'Opening book…'}
+              ? t('novel.reader.readingPdf', { progress: Math.round(pdfProgress * 100) })
+              : t('novel.reader.openingBook')}
           </div>
         )}
         {error && !linkView && <div className="reader-msg error">{error}</div>}
-        {linkBusy && <div className="reader-msg">Importing article…</div>}
+        {linkBusy && <div className="reader-msg">{t('novel.reader.importingArticle')}</div>}
         {linkStatus && !linkBusy && (
           <div className="reader-link-status" role="status">
             {linkStatus}
@@ -3314,11 +3311,11 @@ export default function NovelReader({ item, onClose }: Props) {
         <select
           className="chapter-select"
           value=""
-          title="Jump to chapter"
+          title={t('novel.reader.jumpToChapter')}
           onChange={(e) => e.target.value !== '' && goTo(Number(e.target.value), 0)}
         >
           <option value="" disabled>
-            {loaded?.toc.length ? 'Jump to chapter…' : 'Chapters'}
+            {t(loaded?.toc.length ? 'novel.reader.jumpToChapterEllipsis' : 'novel.reader.chapters')}
           </option>
           {loaded?.toc.map((t, i) => (
             <option key={i} value={t.chapterIndex}>
