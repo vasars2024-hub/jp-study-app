@@ -8961,6 +8961,7 @@ export const en: Catalog = {
 
   // ---- Media Center shell ----
   'mediaCenter.nav.label': 'Media Center',
+  'mediaCenter.nav.tagline': 'Japanese immersion',
   'mediaCenter.tile.openTitled': 'Open {title}',
   'mediaCenter.discover.inspectTitled': 'Inspect {title}',
   'mediaCenter.nav.home': 'Home',

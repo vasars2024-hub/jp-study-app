@@ -8506,6 +8506,7 @@ export const ja: Catalog = {
 
   // ---- Media Center shell ----
   'mediaCenter.nav.label': 'メディアセンター',
+  'mediaCenter.nav.tagline': '日本語に浸る',
   'mediaCenter.tile.openTitled': '{title} を開く',
   'mediaCenter.discover.inspectTitled': '{title} の詳細',
   'mediaCenter.nav.home': 'ホーム',

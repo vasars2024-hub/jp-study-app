@@ -9332,6 +9332,7 @@ export const ru: Catalog = {
 
   // ---- Media Center shell ----
   'mediaCenter.nav.label': 'Медиацентр',
+  'mediaCenter.nav.tagline': 'Погружение в японский',
   'mediaCenter.tile.openTitled': 'Открыть «{title}»',
   'mediaCenter.discover.inspectTitled': 'Подробнее о «{title}»',
   'mediaCenter.nav.home': 'Главная',

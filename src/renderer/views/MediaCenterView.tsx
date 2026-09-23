@@ -445,6 +445,7 @@ function EmptyShelf({
   detail: string;
   action: () => void;
 }) {
+  const { t } = useT();
   return (
     <div className="mc-empty-shelf">
       <span className="mc-empty-shelf-icon"><Icon name="folder-open" size={24} /></span>
@@ -453,7 +454,7 @@ function EmptyShelf({
         <p>{detail}</p>
       </div>
       <button type="button" className="mc-button mc-button-primary" onClick={action}>
-        <Icon name="plus" size={13} /> Add media
+        <Icon name="plus" size={13} /> {t('study.empty.addMedia')}
       </button>
     </div>
   );
@@ -1979,7 +1980,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
 
   const status = (
     <>
-      <StatusBarField>Media Center</StatusBarField>
+      <StatusBarField>{t('mediaCenter.nav.label')}</StatusBarField>
       <StatusBarField>{t('mediaCenter.shell.itemCount', { count: media.items.length })}</StatusBarField>
       <StatusBarField>{t('mediaCenter.shell.songCount', { count: music.baseSongs.length })}</StatusBarField>
       <StatusBarSpacer />
@@ -2054,7 +2055,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         <ContextualSurface as="aside" className="mc-sidebar">
           <div className="mc-brand">
             <span className="mc-brand-mark"><Icon name="player" size={16} /></span>
-            <span><strong>Media Center</strong><small>日本語 immersion</small></span>
+            <span><strong>{t('mediaCenter.nav.label')}</strong><small>{t('mediaCenter.nav.tagline')}</small></span>
           </div>
 
           {/*
@@ -2152,7 +2153,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
               </button>
             </div>
             <div className="mc-breadcrumb">
-              <span>Media Center</span><Icon name="chevron" size={9} /><strong>{nav.find((item) => item.id === tab)?.label}</strong>
+              <span>{t('mediaCenter.nav.label')}</span><Icon name="chevron" size={9} /><strong>{nav.find((item) => item.id === tab)?.label}</strong>
             </div>
             <GlobalSearchField
               value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}

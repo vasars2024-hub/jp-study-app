@@ -8460,6 +8460,7 @@ export const zh: Catalog = {
 
   // ---- Media Center shell ----
   'mediaCenter.nav.label': '媒体中心',
+  'mediaCenter.nav.tagline': '日语沉浸学习',
   'mediaCenter.tile.openTitled': '打开 {title}',
   'mediaCenter.discover.inspectTitled': '查看 {title}',
   'mediaCenter.nav.home': '首页',
