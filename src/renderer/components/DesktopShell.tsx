@@ -4296,7 +4296,7 @@ const FloatingWindow = memo(function FloatingWindow({
           </div>
         </>
       )}
-      {isNote && liquid && (
+      {isNote && (
         <div className="desk-note-palette lq-contextual" role="toolbar" aria-label={t('theme.group.color')}>
           {NOTE_COLORS.map((color, index) => (
             <button
