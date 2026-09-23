@@ -65,6 +65,7 @@ import {
   type DirectstreamOpenTicket,
 } from '../shared/directstreamOpenChannel';
 import { installSeanimeMediaAuth } from './seanimeMediaAuth';
+import { directLocalPlaybackInfo, sidecarCannotServeFile } from './directLocalPlayback';
 import {
   ensureTranscodeEnabled,
   isTranscodableMediaError,
@@ -1271,6 +1272,50 @@ function StudyPlayerSession({
     void manager.onSubtitleEvents(batch);
   }, [manager]);
 
+  /**
+   * The request the slice is showing NOW, for async work that must not land on a later one.
+   * Written in an effect rather than during render so a discarded render cannot move it.
+   */
+  const latestRequestRef = React.useRef(playbackRequest);
+  React.useEffect(() => {
+    latestRequestRef.current = playbackRequest;
+  }, [playbackRequest]);
+
+  /** See `./directLocalPlayback.ts`: the file plays from disk when the sidecar will not. */
+  const openDirect = React.useCallback(
+    async (request: Extract<MediaWorkspacePlaybackRequest, { kind: 'local' }>, stated: string) => {
+      let streamUrl: string | null = null;
+      try {
+        streamUrl = await window.api.mediaFileUrl(request.localFilePath);
+      } catch {
+        streamUrl = null;
+      }
+      if (latestRequestRef.current?.requestId !== request.requestId) return;
+      if (!streamUrl) {
+        setState({ active: true, playbackInfo: null, playbackError: stated, loadingState: null });
+        return;
+      }
+      const info = directLocalPlaybackInfo({
+        requestId: request.requestId,
+        localFilePath: request.localFilePath,
+        streamUrl,
+      });
+      const startAtSec = request.startAtSec ?? loadResumePosition(info);
+      setState({
+        active: true,
+        playbackInfo: directLocalPlaybackInfo({
+          requestId: request.requestId,
+          localFilePath: request.localFilePath,
+          streamUrl,
+          startAtSec,
+        }),
+        playbackError: null,
+        loadingState: null,
+      });
+    },
+    [setState],
+  );
+
   const onMessage = React.useCallback(
     (message: ServerMessage) => {
       // Every native-player message is a sign of life for the open in flight, whatever it
@@ -1372,6 +1417,17 @@ function StudyPlayerSession({
             break;
           }
           statedAbortRef.current = { requestId: playbackRequest?.requestId ?? -1, text: stated };
+          if (playbackRequest?.kind === 'local' && sidecarCannotServeFile(message.payload)) {
+            // Not an anime the sidecar has matched — play it from disk instead of failing.
+            setState({
+              active: false,
+              playbackInfo: null,
+              playbackError: null,
+              loadingState: translateUi('mediaWorkspace.openingLocal'),
+            });
+            void openDirect(playbackRequest, stated);
+            break;
+          }
           setState({
             active: true,
             playbackInfo: null,
@@ -1393,7 +1449,7 @@ function StudyPlayerSession({
           break;
       }
     },
-    [conn, manager, playbackRequest, proofConfig],
+    [conn, manager, openDirect, playbackRequest, proofConfig],
   );
 
   useWebsocketMessageListener<ServerMessage>({
