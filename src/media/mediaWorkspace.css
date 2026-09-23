@@ -414,6 +414,14 @@
   color: transparent;
 }
 
+/* And the libass (JASSUB) canvas: once the CSP let its WebAssembly run it painted the same
+   line again over the seek bar, in its single bundled Latin face (boxes for every kana).
+   Before that it never rendered at all, so hiding it keeps what viewers have always seen —
+   one line, the study overlay's, which the overlay already reads from the libass track. */
+#media-workspace:has(.study-cue-overlay) canvas.JASSUB {
+  visibility: hidden;
+}
+
 #media-workspace .study-cue-overlay {
   position: absolute;
   /* Centred in the picture that is actually free, not in the whole slice. With
