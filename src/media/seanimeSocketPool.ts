@@ -24,7 +24,12 @@ import {
   seanimeSocketKey,
   type SeanimeSocketPoolState,
 } from '../shared/seanimeSocketOwnership';
-import { getClientIdentity, setClientIdentity } from '@/lib/server/client-id';
+import {
+  getClientIdentity,
+  setClientIdentity,
+  subscribeToClientIdentity,
+} from '@/lib/server/client-id';
+import { socketIdentityToRestore, type SocketIdentity } from './socketIdentityGuard';
 import { WSEvents } from '@/lib/server/ws-events';
 import { __clientPlatform__ } from '@/types/constants';
 import {
@@ -71,6 +76,8 @@ type Connection = {
   heartbeatState: SeanimeHeartbeatState;
   identityConfirmed: boolean;
   identityTimer: number | null;
+  /** The id the server named in `CLIENT_IDENTITY` — the one it routes to. See `socketIdentityGuard.ts`. */
+  socketIdentity: SocketIdentity | null;
   disposed: boolean;
   listeners: Set<SeanimeSocketListener>;
 };
@@ -78,6 +85,32 @@ type Connection = {
 let leases: SeanimeSocketPoolState = EMPTY_SEANIME_SOCKET_POOL;
 const connections = new Map<string, Connection>();
 let subscriberSeq = 0;
+let releaseIdentityGuard: (() => void) | null = null;
+
+/**
+ * Hold the shared identity to the socket's once the socket has named one. Installed on the
+ * first `CLIENT_IDENTITY`, not at import, so a window that never connects never subscribes.
+ *
+ * The write-back waits a microtask. The adopted emitter hands every listener ONE snapshot
+ * taken before its loop, so a synchronous write-back would reach the listeners after this one
+ * and then be followed by the stale id the loop was still delivering — a provider mounted
+ * after the guard would end on the wrong id. Deferred, every listener sees stale-then-socket.
+ * The re-check at that point also makes it re-entrant: the write-back emits the socket's own
+ * id, which `socketIdentityToRestore` answers with null.
+ */
+function ensureIdentityGuard(): void {
+  if (releaseIdentityGuard) return;
+  releaseIdentityGuard = subscribeToClientIdentity(() => {
+    queueMicrotask(() => {
+      for (const entry of connections.values()) {
+        if (entry.disposed) continue;
+        const restore = socketIdentityToRestore(getClientIdentity(), entry.socketIdentity);
+        if (restore) setClientIdentity(restore.clientId, restore.clientIdProof);
+        return;
+      }
+    });
+  });
+}
 
 function websocketUrl(conn: SeanimeConnection): string {
   const url = new URL('/events', conn.baseUrl);
@@ -212,7 +245,11 @@ function connect(entry: Connection): void {
         const nextProof = message.payload?.proof?.trim() ?? '';
         // Confirm AFTER the write, never before: a subscriber that opens a stream the moment
         // it sees `confirmed` must read the new id, not the one this message replaces.
-        if (nextClientId) setClientIdentity(nextClientId, nextProof);
+        if (nextClientId) {
+          entry.socketIdentity = { clientId: nextClientId, clientIdProof: nextProof };
+          setClientIdentity(nextClientId, nextProof);
+          ensureIdentityGuard();
+        }
         confirmIdentity(entry);
       }
     } catch {
@@ -284,6 +321,7 @@ export function joinSeanimeSocket(
       heartbeatState: acknowledgeSeanimePong(),
       identityConfirmed: false,
       identityTimer: null,
+      socketIdentity: null,
       disposed: false,
       listeners: new Set(),
     };
@@ -325,4 +363,6 @@ export function __resetSeanimeSocketPoolForTests(): void {
   connections.clear();
   leases = EMPTY_SEANIME_SOCKET_POOL;
   subscriberSeq = 0;
+  releaseIdentityGuard?.();
+  releaseIdentityGuard = null;
 }
