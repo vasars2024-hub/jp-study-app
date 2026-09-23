@@ -13,33 +13,10 @@
 import { Button } from '../../ui';
 import { useT } from '../../../i18n';
 import { dispatchMediaStudyAction } from '../MediaStudyActions';
-import {
-  buildMediaStudyActions,
-  type MediaStudyActionId,
-  type MediaStudyContext,
-} from '../../../../shared/mediaStudyIntegration';
+import { buildMediaStudyActions, type MediaStudyContext } from '../../../../shared/mediaStudyIntegration';
+import { mediaStudyActionLabel, mediaStudyActionReason } from '../mediaStudyActionsText';
 import { hasJapaneseSubtitles, isJapaneseSubtitleLang } from '../../../../shared/subtitleRecord';
 import type { MediaItem } from '../../../../shared/types';
-
-const STATE_LABEL_KEYS: Record<string, string> = {
-  'Waiting for transcription': 'media.study.action.waitingTranscription',
-  'Analyze generated transcript': 'media.study.action.analyzeGenerated',
-  'Transcribe & Analyze': 'media.study.action.transcribeAndAnalyze',
-};
-
-const LABEL_KEYS: Record<MediaStudyActionId, string> = {
-  'study-episode': 'media.study.action.studyEpisode',
-  'mine-vocabulary': 'media.study.action.mineVocabulary',
-  'create-flashcards': 'media.study.action.createFlashcards',
-  'review-sentences': 'media.study.action.reviewSentences',
-  'analyze-japanese': 'media.study.action.analyzeJapanese',
-};
-
-/** Reason copy, for the same reason the labels are keyed. */
-const REASON_KEYS: Partial<Record<MediaStudyActionId, string>> = {
-  'review-sentences': 'media.study.reason.needsSubtitles',
-  'analyze-japanese': 'media.study.reason.willTranscribe',
-};
 
 export interface MediaStudyPanelProps {
   item: MediaItem;
@@ -64,9 +41,6 @@ export default function MediaStudyPanel({ item, context, transcriptionPending }:
   return (
     <div className="medialib-study">
       {actions.map((action) => {
-        // A state-specific label wins over the action's default one.
-        const key = STATE_LABEL_KEYS[action.label] ?? LABEL_KEYS[action.id];
-        const reasonKey = action.reason ? REASON_KEYS[action.id] : undefined;
         return (
           <Button
             key={action.id}
@@ -74,10 +48,10 @@ export default function MediaStudyPanel({ item, context, transcriptionPending }:
             size="sm"
             variant={action.id === 'study-episode' ? 'primary' : 'default'}
             disabled={!action.enabled}
-            title={reasonKey ? t(reasonKey) : action.reason}
+            title={mediaStudyActionReason(action, t)}
             onClick={() => dispatchMediaStudyAction(item, action.id)}
           >
-            {key ? t(key) : action.label}
+            {mediaStudyActionLabel(action, t)}
           </Button>
         );
       })}

@@ -27,6 +27,7 @@ import { useT } from '../../i18n';
 import MediaLanguageProfileCard from './MediaLanguageProfileCard';
 import MediaStudyAssistantPanel from './MediaStudyAssistantPanel';
 import { clearHandoff, peekHandoff } from '../../pendingHandoff';
+import { mediaStudyActionLabel, mediaStudyActionReason } from './mediaStudyActionsText';
 
 /**
  * Result-list caps. Both headings above these lists print the FULL length
@@ -292,8 +293,8 @@ export default function MediaStudyMode({
       });
     }
     const message = added
-      ? `Added ${added} cards to the Media folder.`
-      : 'No new vocabulary cards were needed.';
+      ? t('media.study.cardsAdded', { count: added })
+      : t('media.study.noCardsNeeded');
     setStatus(message);
     window.dispatchEvent(new CustomEvent('os:toast', {
       detail: { message, kind: added ? 'ok' : 'info' },
@@ -301,10 +302,10 @@ export default function MediaStudyMode({
   };
 
   return (
-    <section className="media-study-mode" aria-label="Media study mode">
+    <section className="media-study-mode" aria-label={t('media.study.mode')}>
       <div className="media-study-mode-heading">
         <div>
-          <span className="media-study-mode-kicker">Study mode</span>
+          <span className="media-study-mode-kicker">{t('media.study.mode')}</span>
           <h3>{request.title}</h3>
         </div>
         <button
@@ -314,46 +315,46 @@ export default function MediaStudyMode({
             clearPendingRequest();
             setRequest(null);
           }}
-          aria-label="Close study mode"
+          aria-label={t('media.study.closeMode')}
         >
-          Close
+          {t('common.close')}
         </button>
       </div>
-      <p className="muted">Choose a learning action for this media item.</p>
+      <p className="muted">{t('media.study.chooseAction')}</p>
       <div className="media-study-mode-actions">
         {actions.map((action) => (
           <button
             key={action.id}
             type="button"
             disabled={!action.enabled}
-            title={action.reason}
+            title={mediaStudyActionReason(action, t)}
             aria-pressed={request.action === action.id}
             onClick={() => {
               setRequest({ ...request, action: action.id, requestedAt: Date.now() });
               dispatchMediaStudyAction(item, action.id);
             }}
           >
-            {action.label}
+            {mediaStudyActionLabel(action, t)}
           </button>
         ))}
       </div>
-      {current?.id !== item.id && <p className="muted">Loading this media item…</p>}
+      {current?.id !== item.id && <p className="muted">{t('media.study.loadingItem')}</p>}
       {request.action === 'study-episode' && (
         <p className="muted">{t('media.study.openingInPlayer')}</p>
       )}
       {needsAnalysis && current?.id === item.id && cues.length === 0 && (
         <div className="media-study-empty">
-          <p className="muted">Load or generate Japanese subtitles to use the study tools.</p>
-          <button type="button" onClick={() => void onLoadSubtitles()}>Load subtitles</button>
+          <p className="muted">{t('media.study.subtitlesNeeded')}</p>
+          <button type="button" onClick={() => void onLoadSubtitles()}>{t('media.study.loadSubtitles')}</button>
         </div>
       )}
-      {busy && <p className="muted" role="status">Analyzing subtitle text…</p>}
+      {busy && <p className="muted" role="status">{t('media.study.analyzing')}</p>}
       {error && <p className="media-error" role="alert">{error}</p>}
       {analysis && (request.action === 'mine-vocabulary' || request.action === 'create-flashcards') && (
         <div className="media-study-results">
           <div className="media-study-result-head">
-            <strong>{analysis.vocabulary.length} vocabulary candidates</strong>
-            <button type="button" onClick={createFlashcards}>Create up to 30 flashcards</button>
+            <strong>{t('media.study.vocabularyCandidates', { count: analysis.vocabulary.length })}</strong>
+            <button type="button" onClick={createFlashcards}>{t('media.study.createUpToCards', { count: 30 })}</button>
           </div>
           <ol className="media-study-vocabulary">
             {analysis.vocabulary.slice(0, VOCAB_ROWS).map((entry) => (
@@ -376,7 +377,7 @@ export default function MediaStudyMode({
       )}
       {analysis && request.action === 'review-sentences' && (
         <div className="media-study-results">
-          <strong>{analysis.sentences.length} Japanese subtitle sentences</strong>
+          <strong>{t('media.study.subtitleSentences', { count: analysis.sentences.length })}</strong>
           <ol className="media-study-sentences">
             {analysis.sentences.slice(0, SENTENCE_ROWS).map((sentence, index) => (
               <li key={`${sentence.start}-${index}`}>
@@ -406,14 +407,14 @@ export default function MediaStudyMode({
       {analysis && request.action === 'analyze-japanese' && (
         <div className="media-study-results">
           <div className="media-study-metrics">
-            <div><strong>{analysis.level?.label ?? 'Not set'}</strong><span>Estimated JLPT</span></div>
-            <div><strong>{Math.round(analysis.comprehensibility.knownRatio * 100)}%</strong><span>Known coverage</span></div>
-            <div><strong>{analysis.vocabulary.length}</strong><span>Vocabulary</span></div>
-            <div><strong>{analysis.kanji.length}</strong><span>Kanji</span></div>
+            <div><strong>{analysis.level?.label ?? t('media.study.notSet')}</strong><span>{t('media.study.estimatedJlpt')}</span></div>
+            <div><strong>{Math.round(analysis.comprehensibility.knownRatio * 100)}%</strong><span>{t('media.study.knownCoverage')}</span></div>
+            <div><strong>{analysis.vocabulary.length}</strong><span>{t('media.study.vocabulary')}</span></div>
+            <div><strong>{analysis.kanji.length}</strong><span>{t('media.study.kanji')}</span></div>
           </div>
           {analysis.grammar.length > 0 && (
             <div>
-              <strong>Grammar signals</strong>
+              <strong>{t('media.study.grammarSignals')}</strong>
               <ul className="media-study-grammar">
                 {analysis.grammar.map((hit) => (
                   <li key={hit.id}>
@@ -424,7 +425,7 @@ export default function MediaStudyMode({
               </ul>
             </div>
           )}
-          {analysis.truncated && <p className="muted">Analysis used a bounded subtitle sample.</p>}
+          {analysis.truncated && <p className="muted">{t('media.study.sampleLimited')}</p>}
           <MediaStudyAssistantPanel
             mediaId={item.id}
             mediaTitle={item.title}
