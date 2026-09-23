@@ -670,6 +670,27 @@ function ResumeTracker({
         // Continuity is best-effort; playback itself must never fail on storage errors.
       }
     };
+    /*
+     * The library's copy of the same progress (`media:reportPlayback`), so episode ticks,
+     * progress bars, "Play next" and the Library's Continue shelf work for video — nothing
+     * wrote them before. Every 10 s of play, plus every pause, finish and teardown.
+     */
+    const libraryPath = playbackInfo.localFile?.path ?? null;
+    let lastReportedSec = -1;
+    const reportToLibrary = (finished = false): void => {
+      if (!libraryPath || typeof window.api?.reportMediaPlayback !== 'function') return;
+      if (!hasMedia() && !finished) return;
+      const positionSec = video.currentTime;
+      const durationSec = video.duration;
+      if (!Number.isFinite(positionSec) || !Number.isFinite(durationSec) || durationSec <= 0) return;
+      lastReportedSec = positionSec;
+      void window.api.reportMediaPlayback({
+        path: libraryPath,
+        positionSec,
+        durationSec,
+        finished,
+      }).catch(() => undefined);
+    };
     const handleTimeUpdate = (): void => {
       watch = watchTimeSample(watch, {
         atMs: Date.now(),
@@ -678,6 +699,7 @@ function ResumeTracker({
       });
       if (watchTimeShouldFlush(watch)) flushWatch();
       if (Math.abs(video.currentTime - lastSavedSec) >= 2) persist();
+      if (Math.abs(video.currentTime - lastReportedSec) >= 10) reportToLibrary();
     };
     // `pause` and `ended` are the transition itself, so the interval ending at them was
     // playing for all of it — `watchTimeStop` says so rather than losing the fragment.
@@ -685,11 +707,13 @@ function ResumeTracker({
       watch = watchTimeStop(watch, { atMs: Date.now(), positionSec: video.currentTime });
       flushWatch();
       persist();
+      reportToLibrary();
     };
     const handleEnded = (): void => {
       watch = watchTimeStop(watch, { atMs: Date.now(), positionSec: video.currentTime });
       flushWatch();
       persist(true);
+      reportToLibrary(true);
     };
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('pause', handlePause);
@@ -703,6 +727,7 @@ function ResumeTracker({
       watch = watchTimeInterrupt(watch);
       flushWatch();
       persist();
+      reportToLibrary();
     };
   }, [disabled, playbackInfo, video]);
 
@@ -973,6 +998,27 @@ function StudyPlayerSession({
         playbackError: translateUi('mediaWorkspace.fileMissing', { path: localRequest.localFilePath }),
         loadingState: null,
       });
+      return;
+    }
+    /*
+      Not an anime? Then the sidecar cannot stream it — its directstream only serves files it
+      has matched to an anime series — and asking it first cost a full library scan of the
+      folder (7-11 s measured for a drama or a film) before it refused and the file played
+      from disk anyway. The app's own library already says what the file is, so a file it
+      knows as non-anime, with no AniList/MAL id, goes straight to disk playback.
+    */
+    const libraryItem = typeof window.api?.listMedia === 'function'
+      ? await window.api.listMedia()
+        .then((items) => {
+          const wanted = normalizeLibraryPath(localRequest.localFilePath);
+          return items.find((item) => normalizeLibraryPath(item.path ?? '') === wanted) ?? null;
+        })
+        .catch(() => null)
+      : null;
+    if (controller.signal.aborted) return;
+    const category = (libraryItem as { category?: string } | null)?.category;
+    if (libraryItem && !libraryItem.anilistId && !libraryItem.malId && category !== 'anime') {
+      void openDirect(localRequest, '');
       return;
     }
     /*

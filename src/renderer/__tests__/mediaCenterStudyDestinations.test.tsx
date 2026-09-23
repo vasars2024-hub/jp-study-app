@@ -173,7 +173,7 @@ describe('the Media Center sidebar carries both study destinations', () => {
     expect(source).toContain("id: 'readiness'");
     expect(source).toContain("id: 'review'");
     expect(source).toContain('<SeanimeStudyLibraryPanel');
-    expect(source).toContain('<SeanimeWatchLoopPanel />');
+    expect(source).toContain('<SeanimeWatchLoopPanel focus={reviewFocus}');
   });
 
   it('reuses the overlay label keys, so the same destination is not called two things', () => {
@@ -195,8 +195,11 @@ describe('the Media Center sidebar carries both study destinations', () => {
   });
 
   it('leaves the readiness loader in exactly one place', () => {
+    // The player workspace no longer carries a Readiness pane (2026-09-23), so the Media
+    // Center is the only caller left — and the host must not grow a second one back.
     const host = read('media/MediaWorkspaceHost.tsx');
-    expect(host).toContain("useStudyReadiness(view === 'readiness')");
+    expect(source).toContain("useStudyReadiness(tab === 'readiness')");
+    expect(host).not.toContain('useStudyReadiness');
     for (const [path, text] of [
       ['renderer/views/MediaCenterView.tsx', source],
       ['media/MediaWorkspaceHost.tsx', host],

@@ -1644,6 +1644,41 @@ export function registerMediaIpc(): void {
     }
   });
 
+  /*
+   * The video player's progress, by file path. Before this nothing wrote a video's position
+   * or duration into the library (the old player's `saveProgress` died with its <video>),
+   * so every watched state built on them — episode ticks, progress bars, "Play next", the
+   * Library's Continue shelf — was dead for video (inventory 2026-09-23). A finished video
+   * is stored at its full length, which is what "watched" (≥92%) reads.
+   */
+  let playbackBroadcastTimer: NodeJS.Timeout | null = null;
+  ipcMain.handle('media:reportPlayback', (_e, report: unknown) => {
+    const r = report as {
+      path?: unknown; positionSec?: unknown; durationSec?: unknown; finished?: unknown;
+    } | null;
+    if (!r || typeof r.path !== 'string' || !r.path.trim()) return false;
+    const norm = (value: string): string => value.trim().replace(/\\/g, '/').toLowerCase();
+    const wanted = norm(r.path);
+    const db = readDb();
+    const item = db.items.find((i) => norm(i.path ?? '') === wanted);
+    if (!item) return false;
+    const durationSec = Number(r.durationSec);
+    const positionSec = Number(r.positionSec);
+    if (Number.isFinite(durationSec) && durationSec > 0) item.durationSec = Math.round(durationSec);
+    if (r.finished === true && item.durationSec) item.positionSec = item.durationSec;
+    else if (Number.isFinite(positionSec) && positionSec >= 0) item.positionSec = positionSec;
+    item.lastPlayedAt = Date.now();
+    writeDb(db);
+    // Coalesced: the player reports every few seconds; the library only needs to redraw
+    // its progress bars now and then, and at once on a finish.
+    if (playbackBroadcastTimer) clearTimeout(playbackBroadcastTimer);
+    playbackBroadcastTimer = setTimeout(() => {
+      playbackBroadcastTimer = null;
+      broadcastMedia();
+    }, r.finished === true ? 0 : 5_000);
+    return true;
+  });
+
   ipcMain.handle('media:setSubOffset', (_e, id: string, sec: number) => {
     const db = readDb();
     const item = db.items.find((i) => i.id === id);

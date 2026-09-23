@@ -80,10 +80,9 @@ describe('Media Center video progressive disclosure', () => {
     expect(topbar.length).toBeGreaterThan(0);
     expect(topbar).not.toMatch(/\{t\('mediaWorkspace\.launcher'\)\}/);
 
-    // Both surviving routes must still exist, or this stopped being a de-duplication and
-    // became a deletion. The rail keeps the destination's name; the stage keeps the action.
-    expect(SOURCE).toContain("className=\"mc-seanime-link\"");
-    expect(SOURCE.match(/t\('mediaWorkspace\.launcher'\)/g)).toHaveLength(1);
+    // The stage keeps the action. The rail's separate "Media workspace" link is gone with the
+    // workspace's own library (2026-09-23): the Media Center is the library.
+    expect(SOURCE).not.toContain('mc-seanime-link');
     expect(SOURCE).toContain("t('mediaCenter.video.openInWorkspace')");
     // Comments stripped, for the same reason the CSS guard above strips them: the note left
     // where the button stood quotes the handler verbatim, and counting raw text read two.

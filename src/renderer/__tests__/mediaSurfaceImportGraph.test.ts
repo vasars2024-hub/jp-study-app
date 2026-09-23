@@ -189,29 +189,26 @@ describe('MediaPlayerSurface — the pure capability', () => {
     expect(reachable.filter((p) => p.includes('components/media/MediaContent'))).toEqual([]);
   });
 
-  it('is NOT materially smaller than the full workspace, and that is recorded here', () => {
-    // Pinned so the next session cannot re-derive the plan's original hope from a shallow
-    // read. If a future change genuinely separates the trees, this fails and should be
-    // updated WITH a new measurement — not deleted.
+  it('matches the full workspace now that the workspace is player-only', () => {
+    // 2026-09-23: the Media Center became the one media library and `MediaWorkspace` dropped
+    // the adopted anime library screen, so the two trees are the same player. Measured here
+    // rather than assumed, as the note this replaced asked.
     const ws = reachableFrom('src/media/MediaWorkspace.tsx');
     const ps = reachableFrom('src/media/MediaPlayerSurface.tsx');
     const avoided = [...ws].filter((f) => !ps.has(f));
 
-    expect(ws.size).toBeGreaterThan(400);
-    expect(avoided.length).toBeLessThan(20);
-    // The player surface sheds the library screen and its exclusive deps, nothing more.
-    expect(asRepoPaths(new Set(avoided)).some((p) => p.includes('library-view'))).toBe(true);
-    expect(ps.size / ws.size).toBeGreaterThan(0.95);
+    expect(asRepoPaths(ws).some((p) => p.includes('library-view'))).toBe(false);
+    expect(avoided.length).toBeLessThan(5);
   });
 });
 
 describe('the walker can actually see the thing it reports on', () => {
-  it('finds the library subtree from MediaWorkspace', () => {
+  it('finds the library subtree from the library screen itself', () => {
     // The control. A resolver that silently returned null for everything would make the
-    // assertions above pass on any input; this fails if the walk stops working.
-    const hits = libraryHits('src/media/MediaWorkspace.tsx');
-    expect(hits.length).toBeGreaterThan(0);
-    expect(hits.some((p) => p.includes('library-view'))).toBe(true);
+    // assertions above pass on any input; this fails if the walk stops working. (It used to
+    // start at MediaWorkspace, which no longer reaches the library at all.)
+    const hits = libraryHits('vendor/seanime-web/app/(main)/_features/anime-library/_screens/library-view.tsx');
+    expect(hits.some((p) => p.includes('library-collection'))).toBe(true);
   });
 
   it('confirms video-core is what drags the rest in, not the library', () => {

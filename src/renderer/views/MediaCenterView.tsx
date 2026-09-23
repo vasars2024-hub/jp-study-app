@@ -27,6 +27,7 @@ import {
 } from '../components/media/MediaContent';
 import SeanimeStudyLibraryPanel from '../components/reading/SeanimeStudyLibraryPanel';
 import SeanimeWatchLoopPanel from '../components/reading/SeanimeWatchLoopPanel';
+import { onMediaCenterIntent, takeMediaCenterIntent } from '../mediaCenterIntent';
 import { useStudyReadiness } from '../useStudyReadiness';
 import MediaLibraryShell from '../components/media/library/MediaLibraryShell';
 import MediaArtwork from '../components/media/library/MediaArtwork';
@@ -77,6 +78,7 @@ import {
 import {
   mediaWorkspaceHostExists,
   type MediaWorkspaceOpenRequest,
+  type StudyReviewFocusRequest,
 } from '../../shared/mediaWorkspace';
 import * as player from '../playerBus';
 import {
@@ -1809,11 +1811,6 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   const readiness = useStudyReadiness(tab === 'readiness');
   const workspace = useMediaWorkspaceAvailability();
   const seanimeAvailable = workspace === 'available';
-  const seanimeActionTitle = workspace === 'pending'
-    ? t('mediaWorkspace.connecting')
-    : workspace === 'unavailable'
-      ? t('mediaWorkspace.resumeLast.unavailable')
-      : undefined;
 
   /**
    * The local library and the adopted Seanime library are two providers of the
@@ -1874,6 +1871,25 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   const navigate = (next: MediaCenterTab): void => {
     setTab(next);
   };
+
+  /*
+   * Hand-offs from elsewhere in the window (`renderer/mediaCenterIntent.ts`): the player
+   * workspace no longer has its own Library / Review panes, so "open the library" and
+   * "review this file" (a readiness row, the desktop Continue-watching widget) land here.
+   * Taken once on mount — the request may have opened this window — and on every new one.
+   */
+  const [reviewFocus, setReviewFocus] = useState<StudyReviewFocusRequest | null>(null);
+  useEffect(() => {
+    const apply = (): void => {
+      const intent = takeMediaCenterIntent();
+      if (!intent) return;
+      if (intent.tab === 'review') setReviewFocus(intent.focus ?? null);
+      setTab(intent.tab);
+    };
+    apply();
+    return onMediaCenterIntent(apply);
+    // `setTab` only ever writes through a functional state update, so the first one is enough.
+  }, []);
 
   /**
    * One destination button, rendered identically whichever group it lands in — the primary
@@ -2064,7 +2080,9 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     // (`new CustomEvent(…, { detail })`, not cancelable), and `MediaWorkspaceHost` already
     // answers it. Two shells answering one event would open the overlay on top of this one.
     // So the focused route stays exactly where it is, and this is the browsable destination.
-    if (tab === 'review') return <SeanimeWatchLoopPanel />;
+    if (tab === 'review') return (
+      <SeanimeWatchLoopPanel focus={reviewFocus} onClearFocus={() => setReviewFocus(null)} />
+    );
     if (tab === 'discover') return <DiscoverPanel state={discovery} />;
     return <SettingsPanel state={media} provenance={discovery.provenance} />;
   }, [
@@ -2139,18 +2157,6 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 <span>{t('mediaCenter.shell.studyTools')}</span>
               </summary>
               {nav.filter((item) => SECONDARY_NAV.includes(item.id)).map((item) => navLink(item))}
-              <button
-                type="button"
-                className="mc-seanime-link"
-                data-media-source="seanime"
-                data-sidecar={workspace}
-                disabled={!seanimeAvailable}
-                title={seanimeActionTitle}
-                onClick={() => openSeanime()}
-              >
-                <Icon name="globe" size={15} />
-                <span><strong>{t('mediaWorkspace.launcher')}</strong><small>{t('mediaWorkspace.viewLibrary')}</small></span>
-              </button>
             </details>
           </ContextualSurface>
 

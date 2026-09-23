@@ -136,7 +136,11 @@ async function openOnReady(): Promise<HTMLDivElement> {
   await act(async () => { root.render(createElement(MediaWorkspaceHost, {})); });
   // There is no launcher button any more; every real entry point opens through this event.
   await act(async () => {
-    window.dispatchEvent(new CustomEvent('seanime:media-workspace-open'));
+    // The host is player-only (2026-09-23): it opens for a file, and a bare open goes to
+    // the Media Center instead.
+    window.dispatchEvent(new CustomEvent('seanime:media-workspace-open', {
+      detail: { localFilePath: 'c:/media/ep1.mkv' },
+    }));
   });
   await flush();
   return host;

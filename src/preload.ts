@@ -1828,6 +1828,13 @@ const api = {
   clearMediaLibrary: (): Promise<MediaItem[]> => ipcRenderer.invoke('media:clearAll'),
   setMediaPosition: (id: string, sec: number): Promise<void> =>
     ipcRenderer.invoke('media:setPosition', id, sec),
+  /** The video player's progress for a library file (position, length, finished). */
+  reportMediaPlayback: (report: {
+    path: string;
+    positionSec: number;
+    durationSec: number;
+    finished?: boolean;
+  }): Promise<boolean> => ipcRenderer.invoke('media:reportPlayback', report),
   setMediaSubOffset: (id: string, sec: number): Promise<void> =>
     ipcRenderer.invoke('media:setSubOffset', id, sec),
   /** Decode a file's audio to 16 kHz mono PCM (for Whisper), via ffmpeg. */

@@ -27,7 +27,8 @@ describe('Media Center integration contract', () => {
     expect(source).toContain('mediaWorkspaceHostExists');
     expect(source).toContain('openMediaWorkspace(request)');
     expect(source).toContain("window.api.popOut('player')");
-    expect(source).toContain('data-media-source="seanime"');
+    // No second library link: the Media Center IS the library, the workspace is the player.
+    expect(source).not.toContain('mc-seanime-link');
     expect(source).not.toContain('legacyMediaTabsHidden');
   });
 
@@ -47,16 +48,15 @@ describe('Media Center integration contract', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
     expect(source).toContain("id: 'library'");
     expect(source).toContain("id: 'video'");
-    expect(source).toContain('data-media-source="seanime"');
+    // No second library link: the Media Center IS the library, the workspace is the player.
+    expect(source).not.toContain('mc-seanime-link');
     expect(source).not.toContain('legacyMediaTabsHidden');
   });
 
   it('keeps the Seanime action truthful while the sidecar is unavailable', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
     expect(source).toContain("const seanimeAvailable = workspace === 'available'");
-    expect(source).toContain("disabled={!seanimeAvailable}");
-    expect(source).toContain("workspace === 'pending'");
-    expect(source).toContain("workspace === 'unavailable'");
+    expect(source).toContain('if (!seanimeAvailable) return false;');
   });
 
   it('decides "is there a workspace?" in exactly one place', () => {
@@ -133,7 +133,6 @@ describe('Media Center integration contract', () => {
     expect(read('renderer/views/GlobalSearchField.tsx')).toContain('className="mc-global-search"');
     expect(source).toContain('<MediaLibraryShell');
     expect(source).toContain('<DiscoveryControls');
-    expect(source).toContain('data-media-source="seanime"');
     expect(source).toContain('openSeanime');
   });
 

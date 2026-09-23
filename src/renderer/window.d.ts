@@ -1099,6 +1099,13 @@ declare global {
       pruneMedia(): Promise<{ removed: number; items: MediaItem[] }>;
       clearMediaLibrary(): Promise<MediaItem[]>;
       setMediaPosition(id: string, sec: number): Promise<void>;
+      /** The video player's progress for a library file, by path (see `media:reportPlayback`). */
+      reportMediaPlayback(report: {
+        path: string;
+        positionSec: number;
+        durationSec: number;
+        finished?: boolean;
+      }): Promise<boolean>;
       setMediaSubOffset(id: string, sec: number): Promise<void>;
       extractAudio(url: string): Promise<ArrayBuffer>;
       seanimeExtractAudio(localFilePath: string): Promise<ArrayBuffer>;
