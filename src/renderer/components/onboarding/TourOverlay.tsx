@@ -36,6 +36,7 @@ import {
   shouldRunTour,
 } from '../../onboardingStore';
 import { useT } from '../../i18n';
+import { TELEMETRY_CONSENT_DECIDED_EVENT, telemetryConsentPending } from '../../../shared/stats';
 import './onboarding.css';
 
 /** Padding around the spotlit element so the hole does not clip its own border. */
@@ -83,7 +84,9 @@ function resumeIndex(): number {
 
 export default function TourOverlay() {
   const { t } = useT();
-  const [active, setActive] = useState(() => shouldRunTour());
+  // On a first boot the consent card is also up; the tour opening over it hid the
+  // card's text behind the bubble. Wait for the card's answer, then start.
+  const [active, setActive] = useState(() => shouldRunTour() && !telemetryConsentPending());
   const [index, setIndex] = useState(resumeIndex);
   const [rect, setRect] = useState<Rect | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -141,6 +144,16 @@ export default function TourOverlay() {
       }),
     [],
   );
+
+  useEffect(() => {
+    const onConsentDecided = (): void => {
+      if (!shouldRunTour()) return;
+      setIndex(resumeIndex());
+      setActive(true);
+    };
+    window.addEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onConsentDecided);
+    return () => window.removeEventListener(TELEMETRY_CONSENT_DECIDED_EVENT, onConsentDecided);
+  }, []);
 
   // Esc must work from any step, so it is bound at the window rather than on the
   // bubble — the bubble may not hold focus if the user clicked into the app.

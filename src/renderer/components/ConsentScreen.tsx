@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
+import { TELEMETRY_CONSENT_DECIDED_EVENT, TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 import { useT } from '../i18n';
 import { sendTelemetryPingIfNeeded } from '../telemetryPing';
 
@@ -23,6 +23,8 @@ export default function ConsentScreen() {
       /* storage unavailable — just dismiss */
     }
     setDone(true);
+    // The first-boot tour waits for this card instead of opening on top of it.
+    window.dispatchEvent(new Event(TELEMETRY_CONSENT_DECIDED_EVENT));
   };
 
   return (

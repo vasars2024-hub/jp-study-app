@@ -21,6 +21,7 @@ import { UI_LANGS } from '../../shared/i18n/core';
 import { loadOnboarding, markTourComplete, replayTour, shouldRunTour } from '../onboardingStore';
 import TourOverlay from '../components/onboarding/TourOverlay';
 import { leakedKeys } from './helpers/i18nLeak';
+import { TELEMETRY_CONSENT_DECIDED_EVENT, TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 
 let root: Root | null = null;
 let host: HTMLDivElement;
@@ -29,7 +30,12 @@ beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
-beforeEach(() => localStorage.clear());
+// Every case below is about the tour itself, so the first-launch consent card has
+// already been answered; the waiting-for-consent behaviour has its own describe.
+beforeEach(() => {
+  localStorage.clear();
+  localStorage.setItem(TELEMETRY_CONSENT_KEY, 'no');
+});
 
 afterEach(() => {
   root?.unmount();
@@ -232,6 +238,35 @@ describe('first-boot tour', () => {
   it('renders no raw catalog key', async () => {
     await mount();
     expect(leakedKeys(host)).toEqual([]);
+  });
+});
+
+describe('first-boot tour and the consent card', () => {
+  it('waits while the consent card is unanswered, so it never covers it', async () => {
+    localStorage.removeItem(TELEMETRY_CONSENT_KEY);
+    await mount();
+    expect(bubble(), 'tour opened on top of the consent card').toBeNull();
+  });
+
+  it('starts as soon as the consent card records a choice', async () => {
+    localStorage.removeItem(TELEMETRY_CONSENT_KEY);
+    await mount();
+    await act(async () => {
+      localStorage.setItem(TELEMETRY_CONSENT_KEY, 'yes');
+      window.dispatchEvent(new Event(TELEMETRY_CONSENT_DECIDED_EVENT));
+    });
+    expect(bubble(), 'tour did not start after the consent answer').toBeTruthy();
+  });
+
+  it('does not start from a consent answer once the tour is complete', async () => {
+    localStorage.removeItem(TELEMETRY_CONSENT_KEY);
+    markTourComplete();
+    await mount();
+    await act(async () => {
+      localStorage.setItem(TELEMETRY_CONSENT_KEY, 'no');
+      window.dispatchEvent(new Event(TELEMETRY_CONSENT_DECIDED_EVENT));
+    });
+    expect(bubble()).toBeNull();
   });
 });
 
