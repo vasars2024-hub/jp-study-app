@@ -1573,7 +1573,7 @@ export const ja: Catalog = {
   'settings.appearance.css.lookReset': '外観をリセットしました。',
   'settings.appearance.css.editor': 'エディター',
   // Settings > Display/Desktop/Lock (ja)
-  'settings.display.zoom.reset': 'ズームを 100% に戻す',
+  'settings.display.zoom.reset': 'ズームを 80% に戻す',
   'settings.display.label.size': 'サイズ',
   'settings.display.boldText': 'UI テキストを太字にする',
   'settings.display.label.contrast': 'コントラスト',
@@ -3213,7 +3213,7 @@ export const ja: Catalog = {
   'commands.window.closeAll': 'すべてのウィンドウを閉じる',
   'commands.window.zoomIn': '拡大',
   'commands.window.zoomOut': '縮小',
-  'commands.window.zoomReset': 'ズームを100%に戻す',
+  'commands.window.zoomReset': 'ズームを80%に戻す',
   'commands.flashcards.flip': 'カードをめくる / 表示',
   'commands.flashcards.again': '評価: もう一度',
   'commands.flashcards.hard': '評価: 難しい',

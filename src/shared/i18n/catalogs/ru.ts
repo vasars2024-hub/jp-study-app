@@ -1735,7 +1735,7 @@ export const ru: Catalog = {
   'settings.appearance.css.lookReset': 'Вид сброшен.',
   'settings.appearance.css.editor': 'редактор',
   // Settings > Display/Desktop/Lock (ru)
-  'settings.display.zoom.reset': 'Сбросить масштаб до 100%',
+  'settings.display.zoom.reset': 'Сбросить масштаб до 80%',
   'settings.display.label.size': 'Размер',
   'settings.display.boldText': 'Жирный текст интерфейса',
   'settings.display.label.contrast': 'Контраст',
@@ -3442,7 +3442,7 @@ export const ru: Catalog = {
   'commands.window.closeAll': 'Закрыть все окна',
   'commands.window.zoomIn': 'Увеличить масштаб',
   'commands.window.zoomOut': 'Уменьшить масштаб',
-  'commands.window.zoomReset': 'Сбросить масштаб до 100%',
+  'commands.window.zoomReset': 'Сбросить масштаб до 80%',
   'commands.flashcards.flip': 'Показать / перевернуть карточку',
   'commands.flashcards.again': 'Оценка: снова',
   'commands.flashcards.hard': 'Оценка: трудно',

@@ -1564,7 +1564,7 @@ export const zh: Catalog = {
   'settings.appearance.css.lookReset': '外观已重置。',
   'settings.appearance.css.editor': '编辑器',
   // Settings > Display/Desktop/Lock (zh)
-  'settings.display.zoom.reset': '将缩放重置为 100%',
+  'settings.display.zoom.reset': '将缩放重置为 80%',
   'settings.display.label.size': '大小',
   'settings.display.boldText': '加粗界面文字',
   'settings.display.label.contrast': '对比度',
@@ -3198,7 +3198,7 @@ export const zh: Catalog = {
   'commands.window.closeAll': '关闭所有窗口',
   'commands.window.zoomIn': '放大',
   'commands.window.zoomOut': '缩小',
-  'commands.window.zoomReset': '缩放重置为 100%',
+  'commands.window.zoomReset': '缩放重置为 80%',
   'commands.flashcards.flip': '翻开 / 翻转卡片',
   'commands.flashcards.again': '评分：重来',
   'commands.flashcards.hard': '评分：困难',

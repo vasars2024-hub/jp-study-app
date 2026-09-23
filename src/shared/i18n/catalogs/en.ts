@@ -1709,7 +1709,7 @@ export const en: Catalog = {
   'settings.preview.icon.dictionary': 'Dictionary',
   'settings.preview.icon.library': 'Library',
   // Settings > Display/Desktop/Lock (en)
-  'settings.display.zoom.reset': 'Reset zoom to 100%',
+  'settings.display.zoom.reset': 'Reset zoom to 80%',
   'settings.display.label.size': 'Size',
   'settings.display.boldText': 'Bold UI text',
   'settings.display.label.contrast': 'Contrast',
@@ -3107,7 +3107,7 @@ export const en: Catalog = {
   'commands.window.closeAll': 'Close all windows',
   'commands.window.zoomIn': 'Zoom in',
   'commands.window.zoomOut': 'Zoom out',
-  'commands.window.zoomReset': 'Reset zoom to 100%',
+  'commands.window.zoomReset': 'Reset zoom to 80%',
   'commands.flashcards.flip': 'Reveal / flip card',
   'commands.flashcards.again': 'Rate Again',
   'commands.flashcards.hard': 'Rate Hard',
