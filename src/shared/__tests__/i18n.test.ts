@@ -19,6 +19,18 @@ beforeEach(() => {
 });
 
 describe('translate', () => {
+  it('renders the Anki destination summary with punctuation for each locale', () => {
+    const vars = { deck: 'JP Study', model: 'Basic', tag: 'jp-study-app' };
+    expect(t('anki.manualCard.destinationSummary', 'en', vars))
+      .toBe('Goes into JP Study as Basic, tagged jp-study-app.');
+    expect(t('anki.manualCard.destinationSummary', 'ja', vars))
+      .toBe('追加先：JP Study／ノートタイプ：Basic／タグ：jp-study-app。');
+    expect(t('anki.manualCard.destinationSummary', 'zh', vars))
+      .toBe('将添加到 JP Study，笔记类型为 Basic，标签为 jp-study-app。');
+    expect(t('anki.manualCard.destinationSummary', 'ru', vars))
+      .toBe('Карточка будет добавлена в колоду JP Study с типом заметки Basic и тегом jp-study-app.');
+  });
+
   it('resolves a key in each language', () => {
     expect(t('common.download', 'en')).toBe('Download');
     expect(t('common.download', 'ja')).toBe('ダウンロード');

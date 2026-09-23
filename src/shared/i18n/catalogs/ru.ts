@@ -5956,6 +5956,7 @@ export const ru: Catalog = {
   'anki.goesIntoPrefix': 'Попадёт в',
   'anki.goesIntoAs': 'как',
   'anki.goesIntoTagged': 'с тегом',
+  'anki.manualCard.destinationSummary': 'Карточка будет добавлена в колоду {deck} с типом заметки {model} и тегом {tag}.',
   'anki.msg.noteTypeReady': 'Тип заметки «{model}» готов в Anki.',
   'anki.msg.noteTypeCreateFailed': 'Не удалось создать тип заметки.',
   'anki.msg.cardAdded': 'Карточка добавлена в Anki.',

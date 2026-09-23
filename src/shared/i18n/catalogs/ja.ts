@@ -5422,6 +5422,7 @@ export const ja: Catalog = {
   'anki.goesIntoPrefix': '追加先：',
   'anki.goesIntoAs': '／ノートタイプ：',
   'anki.goesIntoTagged': '／タグ：',
+  'anki.manualCard.destinationSummary': '追加先：{deck}／ノートタイプ：{model}／タグ：{tag}。',
   'anki.msg.noteTypeReady': 'ノートタイプ「{model}」はAnkiで準備できています。',
   'anki.msg.noteTypeCreateFailed': 'ノートタイプを作成できませんでした。',
   'anki.msg.cardAdded': 'Ankiにカードを追加しました。',

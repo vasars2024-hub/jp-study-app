@@ -5388,6 +5388,7 @@ export const zh: Catalog = {
   'anki.goesIntoPrefix': '将添加到',
   'anki.goesIntoAs': '，笔记类型为',
   'anki.goesIntoTagged': '，标签为',
+  'anki.manualCard.destinationSummary': '将添加到 {deck}，笔记类型为 {model}，标签为 {tag}。',
   'anki.msg.noteTypeReady': '笔记类型"{model}"已在 Anki 中就绪。',
   'anki.msg.noteTypeCreateFailed': '无法创建该笔记类型。',
   'anki.msg.cardAdded': '卡片已添加到 Anki。',

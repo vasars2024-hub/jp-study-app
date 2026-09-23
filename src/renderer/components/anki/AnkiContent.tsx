@@ -516,8 +516,7 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
       </button>
       {addMsg && <div className={`form-msg ${addMsg.kind}`}>{addMsg.text}</div>}
       <p className="muted anki-sub">
-        {t('anki.goesIntoPrefix')} <b>{deck || '—'}</b> {t('anki.goesIntoAs')}{' '}
-        <b>{model || '—'}</b>, {t('anki.goesIntoTagged')} <code>jp-study-app</code>.
+        {t('anki.manualCard.destinationSummary', { deck: deck || '—', model: model || '—', tag: 'jp-study-app' })}
       </p>
     </form>
   );

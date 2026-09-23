@@ -5438,6 +5438,7 @@ export const en: Catalog = {
   'anki.goesIntoPrefix': 'Goes into',
   'anki.goesIntoAs': 'as',
   'anki.goesIntoTagged': 'tagged',
+  'anki.manualCard.destinationSummary': 'Goes into {deck} as {model}, tagged {tag}.',
   'anki.msg.noteTypeReady': 'Note type "{model}" is ready in Anki.',
   'anki.msg.noteTypeCreateFailed': 'Could not create the note type.',
   'anki.msg.cardAdded': 'Card added to Anki.',
