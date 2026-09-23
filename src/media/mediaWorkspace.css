@@ -295,7 +295,10 @@
 
 #media-workspace .study-player-slice {
   position: fixed;
-  inset: 0;
+  /* Starts under the host bar (`--seanime-host-bar-h`, measured by MediaWorkspaceHost), not
+     at the top of the window: from y=0 the picture ran under the bar, so the bar's title sat
+     on the player's own episode title and Close sat on the Card preview (audit 2026-09-23). */
+  inset: var(--seanime-host-bar-h, 0px) 0 0 0;
   z-index: 80;
   display: grid;
   place-items: stretch;
@@ -317,7 +320,21 @@
      panels that reach DOWN to the subtitle band count: the grammar card and the
      full-height transcript rail do, the mining panel at the top of the rail
      does not. */
-  --study-dock-height: 3.5rem;
+  /*
+     The bottom stack, from the edge up: the adopted player's own transport (seek bar, then
+     play/pause, time, volume, tracks, fullscreen), then the study bar on top of it. The
+     study bar used to sit ON the transport, inside the band where VideoCore listens for the
+     pointer, so hovering the bottom of the picture never raised play/pause at all and only
+     the thin seek line peeked out under the bar (audit 2026-09-23). `--study-transport-height`
+     is the transport's own height (48px main section + 32px seek row = 5rem).
+
+     `--study-dock-height` keeps its meaning for every consumer — how far above the bar
+     layer's historical 0.8rem baseline the top of the bar now is — so docks, the cue line and
+     the rails all clear the transport too without each learning about it.
+  */
+  --study-transport-height: 5rem;
+  --study-bar-height: 3.5rem;
+  --study-dock-height: calc(var(--study-transport-height) + var(--study-bar-height) - 0.45rem);
   --study-column: 24rem;
   --study-gutter: calc(var(--study-column) + 1rem);
   --study-left-gutter: 0rem;

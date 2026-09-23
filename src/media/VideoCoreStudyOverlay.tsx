@@ -91,6 +91,7 @@ import {
 import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
 import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
+import { formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import {
   mediaCaptionCues,
   normalizeMediaCaptionTracks,
@@ -431,22 +432,26 @@ export default function VideoCoreStudyOverlay({
     if (!dock) return;
     const slice = dock.closest('.study-player-slice') ?? dock.parentElement;
     if (!(slice instanceof HTMLElement)) return;
+    // Published as `--study-bar-height`; the stylesheet adds the player's own transport
+    // beneath it to make `--study-dock-height` (mediaWorkspace.css). `offsetHeight`, not the
+    // bounding box: the box is in painted pixels, which under the app's zoom (0.8 by default)
+    // are 20% smaller than the CSS pixels the value is read back in.
     const publish = (): void => {
-      const height = Math.round(dock.getBoundingClientRect().height);
-      if (height > 0) slice.style.setProperty('--study-dock-height', `${height}px`);
+      const height = dock.offsetHeight;
+      if (height > 0) slice.style.setProperty('--study-bar-height', `${height}px`);
     };
     publish();
     // jsdom has no ResizeObserver. Falling back to the one-shot measurement is
     // right rather than fatal: the stylesheet's own default is the collapsed
     // height, so the worst case is the layout this change replaced.
     if (typeof ResizeObserver !== 'function') return () => {
-      slice.style.removeProperty('--study-dock-height');
+      slice.style.removeProperty('--study-bar-height');
     };
     const observer = new ResizeObserver(publish);
     observer.observe(dock);
     return () => {
       observer.disconnect();
-      slice.style.removeProperty('--study-dock-height');
+      slice.style.removeProperty('--study-bar-height');
     };
   }, []);
 
@@ -2524,9 +2529,8 @@ export default function VideoCoreStudyOverlay({
           <span className="study-cue-timing">
             {t('mediaWorkspace.mining.cueMeta', {
               cue: activeCue.index + 1,
-              track: activeCue.trackNumber,
-              start: activeCue.startMs,
-              end: activeCue.endMs,
+              start: formatWatchLoopTimestamp(activeCue.startMs),
+              end: formatWatchLoopTimestamp(activeCue.endMs),
             })}
           </span>
         )}

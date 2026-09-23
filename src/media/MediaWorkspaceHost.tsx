@@ -176,19 +176,92 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     resetHostLocation();
   }, []);
 
-  // Escape closes the workspace, but never out from under an active player: the adopted
-  // VideoCore owns that layer and its own exit path, and yanking the host would drop a
-  // live directstream. `data-study-player` is the slice's existing published state.
+  /*
+   * Is a video on screen? Read from the slice's own published state (`data-study-player`)
+   * rather than from `playbackRequest`, which outlives a player VideoCore closed by itself
+   * (its error screen's Close Player). Watched with a MutationObserver because the slice is
+   * lazy and deep inside the adopted surface.
+   */
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [playerActive, setPlayerActive] = useState(false);
+  useEffect(() => {
+    const root = hostRef.current;
+    if (!open || !root) {
+      setPlayerActive(false);
+      return undefined;
+    }
+    const read = (): void => {
+      setPlayerActive(root.querySelector('.study-player-slice[data-study-player="active"]') != null);
+    };
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-study-player'],
+    });
+    return () => observer.disconnect();
+  }, [open, status?.kind]);
+
+  /*
+   * The player's way out that is not "close everything". Before this the only exits from a
+   * playing video were Close (the whole workspace) or the error screen's Close Player; the
+   * Library segment kept the player on screen (audit 2026-09-23). Withdrawing the request
+   * stops the player (`StudyPlayerSlice` ends the stream when its request goes away).
+   */
+  const backToLibrary = useCallback(() => {
+    setPlaybackRequest(null);
+    setView('library');
+    resetHostLocation();
+  }, []);
+
+  // The host bar's height, for the player that starts under it (`--seanime-host-bar-h`,
+  // mediaWorkspace.css). `offsetHeight` is in CSS pixels, which is what the player's `top`
+  // is read in; a bounding box would be in painted pixels under the app's zoom.
+  useEffect(() => {
+    const root = hostRef.current;
+    const bar = root?.querySelector<HTMLElement>('.seanime-host-bar');
+    if (!open || !root || !bar) return undefined;
+    const publish = (): void => {
+      root.style.setProperty('--seanime-host-bar-h', `${bar.offsetHeight}px`);
+    };
+    publish();
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [open, status?.kind]);
+
+  // Escape steps back one level: from a playing video to the library, and from the library
+  // out of the workspace. It never acts while the user is typing (a card field, a search
+  // box), while a menu, sheet or dialog inside the player is open (those close first), or in
+  // fullscreen, where Escape belongs to the browser.
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
-      if (document.querySelector('.study-player-slice[data-study-player="active"]')) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement
+        && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      ) return;
+      if (document.fullscreenElement) return;
+      if (document.querySelector('.study-player-slice[data-study-player="active"]')) {
+        const busy = document.querySelector(
+          '.study-bar-layer:not([data-study-sheet-open="none"]), '
+          + '#media-workspace [role="menu"], #media-workspace [role="dialog"], '
+          + '#media-workspace [data-state="open"]',
+        );
+        if (busy) return;
+        backToLibrary();
+        return;
+      }
       close();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [close, open]);
+  }, [backToLibrary, close, open]);
 
   // Move focus into the workspace on open and hand it back to whatever held it before on
   // close, so a keyboard user is never left tabbing through the desktop behind a
@@ -256,6 +329,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
 
   return (
     <div
+      ref={hostRef}
       className={`seanime-host${presentation.liquid ? ' workspace-liquid' : ''}`}
       role="dialog"
       aria-modal="true"
@@ -267,15 +341,32 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
           the primitive is inert in conventional presentation, and
           `theme/liquid-window.css` paints it only under `.workspace-liquid`. */}
       <ContextualSurface as="header" className="seanime-host-bar">
+        {playerActive ? (
+          <button
+            type="button"
+            className="seanime-host-btn seanime-host-back"
+            onClick={backToLibrary}
+            title={t('mediaWorkspace.backToLibraryHint')}
+          >
+            <span aria-hidden="true">←</span> {t('mediaWorkspace.backToLibrary')}
+          </button>
+        ) : null}
         <strong className="seanime-host-title">{t('mediaWorkspace.launcher')}</strong>
+        {/* Silent when all is well: "Adopted library · sidecar ready" on every open said
+            nothing a learner could use (audit 2026-09-23). A server that is starting, stopped
+            or failed still says so here, beside the body's own explanation. */}
         <span
           className="seanime-host-status"
           data-sidecar={status.kind}
           role="status"
           aria-live="polite"
         >
-          <span className="seanime-host-dot" aria-hidden="true" />
-          {t('mediaWorkspace.status', { status: statusLabel })}
+          {status.kind === 'ready' ? null : (
+            <>
+              <span className="seanime-host-dot" aria-hidden="true" />
+              {t('mediaWorkspace.status', { status: statusLabel })}
+            </>
+          )}
         </span>
         <button
           type="button"
@@ -301,13 +392,10 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
             type="button"
             className="seanime-host-btn"
             aria-pressed={view === 'library'}
-            // Also clears the in-host route. Without this, pressing Library while an entry
-            // is open is a control that visibly does nothing: `view` is already 'library',
-            // so the state never changes and the entry keeps the pane.
-            onClick={() => {
-              setView('library');
-              resetHostLocation();
-            }}
+            // Also clears the in-host route and stops a playing video. Without this, pressing
+            // Library while an entry or the player is up is a control that visibly does
+            // nothing: `view` is already 'library', so the state never changes.
+            onClick={backToLibrary}
           >
             {t('mediaWorkspace.viewLibrary')}
           </button>

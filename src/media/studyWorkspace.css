@@ -187,13 +187,28 @@
 #media-workspace .study-bar-layer {
   position: absolute;
   right: 1rem;
-  bottom: 0.8rem;
+  /* On top of the player's transport, never over it — see `--study-transport-height`. */
+  bottom: calc(var(--study-transport-height, 0rem) + 0.35rem);
   left: 1rem;
   z-index: 92;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
   pointer-events: none;
+}
+
+/*
+ * Whenever the study bar is up, the transport under it is up too, and whole: play/pause and
+ * time included, not VideoCore's "time range only" half-state (a 48px translate that left
+ * the buttons below the window's edge). In Watch Mode the bar fades on idle and the
+ * transport is left to VideoCore's own hide, so the two appear and disappear together.
+ */
+#media-workspace .study-player-slice:has(.study-bar-layer[data-study-bar-hidden='false']) [data-vc-element='control-bar'] {
+  transform: none !important;
+  opacity: 1 !important;
+}
+#media-workspace .study-player-slice:has(.study-bar-layer[data-study-bar-hidden='false']) [data-vc-element='control-bar-gradient-bottom'] {
+  opacity: 1 !important;
 }
 
 /*

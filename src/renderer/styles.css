@@ -27320,6 +27320,9 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
   flex: 0 0 auto;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
+  /* Opaque: the player starts below the bar now, but nothing may show through it either —
+     in a light theme a see-through bar put dark "Close" text on the dark picture. */
+  background: var(--bg);
   color: var(--muted);
   font-size: var(--font-size-xs, 12px);
   /*

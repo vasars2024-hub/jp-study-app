@@ -175,18 +175,30 @@ describe('the dock publishes its height instead of being guessed at', () => {
     expect(overlay).toMatch(/barRef=\{dockRef\}/);
     expect(bar).toMatch(/ref=\{props\.barRef\}/);
     expect(overlay).toMatch(/new ResizeObserver\(publish\)/);
-    expect(overlay).toMatch(/setProperty\('--study-dock-height'/);
+    // The BAR's height; the stylesheet adds the player's transport under it.
+    expect(overlay).toMatch(/setProperty\('--study-bar-height'/);
+    // CSS pixels, not the zoomed bounding box (0.8 app zoom under-measured it by 20%).
+    expect(overlay).toMatch(/dock\.offsetHeight/);
     // On the slice, so a pop-out workspace cannot overwrite the main window's.
     expect(overlay).toMatch(/closest\('\.study-player-slice'\)/);
   });
 
   it('removes it on unmount, so no stale height outlives the dock', () => {
-    expect(overlay).toMatch(/removeProperty\('--study-dock-height'\)/);
+    expect(overlay).toMatch(/removeProperty\('--study-bar-height'\)/);
   });
 
   it('degrades to the collapsed height when there is no observer', () => {
     const slice = block(css, '#media-workspace .study-player-slice');
-    expect(slice).toMatch(/--study-dock-height:\s*3\.5rem/);
+    expect(slice).toMatch(/--study-bar-height:\s*3\.5rem/);
+  });
+
+  it('stacks the study bar on the player transport, never over it', () => {
+    // Over it, the bar sat in VideoCore's hover band: play/pause never came up (2026-09-23).
+    const slice = block(css, '#media-workspace .study-player-slice');
+    expect(slice).toMatch(/--study-transport-height:\s*5rem/);
+    expect(slice).toMatch(
+      /--study-dock-height:\s*calc\(var\(--study-transport-height\) \+ var\(--study-bar-height\)/,
+    );
   });
 });
 

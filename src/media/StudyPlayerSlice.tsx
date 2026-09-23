@@ -760,6 +760,28 @@ function StudyPlayerSession({
     latestRequestRef.current = playbackRequest;
   }, [playbackRequest]);
 
+  /*
+   * The host withdrew the request (its "Back to the library", the Library segment, Escape):
+   * stop the player. Clearing `playbackInfo` is what VideoCore itself treats as the end of a
+   * stream — it pauses, unloads the element and tells the sidecar `video-terminated` — so
+   * this is the same exit as its own Close Player, reached from the host.
+   */
+  const hadRequestRef = React.useRef(false);
+  React.useEffect(() => {
+    if (proofConfig) return;
+    if (playbackRequest) {
+      hadRequestRef.current = true;
+      return;
+    }
+    if (!hadRequestRef.current) return;
+    hadRequestRef.current = false;
+    openProgressRef.current = null;
+    statedAbortRef.current = null;
+    directRequestRef.current = null;
+    launchedRequestRef.current = null;
+    setState(initialState);
+  }, [playbackRequest, proofConfig, setState]);
+
   /** See `./directLocalPlayback.ts`: the file plays from disk when the sidecar will not. */
   const openDirect = React.useCallback(
     async (request: Extract<MediaWorkspacePlaybackRequest, { kind: 'local' }>, stated: string) => {

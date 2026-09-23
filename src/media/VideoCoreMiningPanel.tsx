@@ -19,7 +19,7 @@ import {
   type VideoCoreStudyCue,
 } from '../shared/videoCoreStudy';
 import { videoClipFilename } from '../shared/videoClip';
-import { findMinedCueEntry } from '../shared/seanimeWatchLoop';
+import { findMinedCueEntry, formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import { MINING_HISTORY_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
 import { t as translateUi, useT } from '../renderer/i18n';
 // Moved to a module of their own in slice 18, typed on HTMLMediaElement, so the music
@@ -456,11 +456,12 @@ export default function VideoCoreMiningPanel({
    */
   const alreadyMined = findMinedCueEntry(history, source, selectedCue);
 
+  // "Line 3 · 0:12–0:15": the line's number and its place in the video. The track number
+  // and raw milliseconds it used to print meant nothing to a learner (audit 2026-09-23).
   const cueMeta = t('mediaWorkspace.mining.cueMeta', {
     cue: selectedCue.index + 1,
-    track: selectedCue.trackNumber,
-    start: selectedCue.startMs,
-    end: selectedCue.endMs,
+    start: formatWatchLoopTimestamp(selectedCue.startMs),
+    end: formatWatchLoopTimestamp(selectedCue.endMs),
   });
   const missingTerm = !draft.term.trim();
 
@@ -686,12 +687,7 @@ export default function VideoCoreMiningPanel({
           <dd>{source.episodeTitle || source.episodeNumber || t('mediaWorkspace.mining.localFile')}</dd>
           <dt>{t('mediaWorkspace.mining.cue')}</dt>
           <dd>
-            {t('mediaWorkspace.mining.cueMeta', {
-              cue: selectedCue.index,
-              track: selectedCue.trackNumber,
-              start: selectedCue.startMs,
-              end: selectedCue.endMs,
-            })}
+            {cueMeta}
           </dd>
           <dt>{t('mediaWorkspace.mining.rawText')}</dt><dd>{selectedCue.text}</dd>
           <dt>{t('mediaWorkspace.mining.assets')}</dt>
