@@ -2515,15 +2515,17 @@ export default function VideoCoreStudyOverlay({
             }}
             onMouseUp={handleLookupMouseUp}
           />
-        ) : (
-          <span className="study-cue-status">
-            {t(
-              preferences.dictationMode && activeCue
-                ? 'mediaWorkspace.study.listenType'
-                : 'mediaWorkspace.study.waitingSubtitle',
-            )}
+        ) : preferences.dictationMode && activeCue ? (
+          <span className="study-cue-status">{t('mediaWorkspace.study.listenType')}</span>
+        ) : !activeCue && allCues.length === 0 && !externalSubtitlePending ? (
+          /* A file with no subtitle track says so once and then fades (CSS), rather than
+             standing faint grey text over the picture for the whole video. Between two
+             lines there is nothing to say: "Waiting for subtitle" in every pause in the
+             dialogue read as something being wrong (audit 2026-09-23). */
+          <span className="study-cue-status" data-study-cue-status="none">
+            {t('mediaWorkspace.study.transcriptEmpty')}
           </span>
-        )}
+        ) : null}
 
         {activeCue && preferences.cueTimingReadout && (
           <span className="study-cue-timing">

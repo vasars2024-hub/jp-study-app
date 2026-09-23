@@ -895,7 +895,10 @@ function VideoPanel({
             sidecar is not `disabled` (`mediaWorkspaceAvailability.ts`), and the workspace host
             renders `stopped`/`starting`/`offline`/`failed` itself once it opens.
           */}
-          {stage === 'workspace' ? (
+          {/* Only with a source. Without one this block shared grid cell 1/1 with "Choose what
+              to watch" below, so its text showed through as ghost lines and the up-next shelf
+              covered its button (audit 2026-09-23). No video chosen → one message, one choice. */}
+          {!state.src ? null : stage === 'workspace' ? (
             <div className="mc-video-empty" role="status">
               <span><Icon name="player" size={30} /></span>
               <strong>{t('mediaCenter.video.workspacePlayerTitle')}</strong>

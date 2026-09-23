@@ -180,6 +180,16 @@ type ServerMutationProps<R, V = void> = UseMutationOptions<R | undefined, SeaErr
 }
 
 /**
+ * Gum: raw Go internals — a request that went out with an undefined id, a parse failure —
+ * are not something a learner can act on, and they surfaced as toasts beside the subtitles
+ * ("Error: strconv.Atoi: parsing "undefined": invalid syntax" on an empty library, audit
+ * 2026-09-23). They go to the console instead; worded server errors still toast.
+ */
+export function isInternalServerError(message: string): boolean {
+    return /strconv\.|invalid syntax|parsing "undefined"|runtime error|nil pointer|unexpected end of JSON/i.test(message)
+}
+
+/**
  * Create mutation hook to the server
  * - First generic: Return type
  * - Second generic: Params/Data type
@@ -205,6 +215,7 @@ export function useServerMutation<R = void, V = void>(
                 toast.warning("This feature is disabled")
                 return
             }
+            if (isInternalServerError(errorMsg)) return
             toast.error(errorMsg)
         },
         mutationFn: async (variables) => {
@@ -269,7 +280,7 @@ export function useServerQuery<R, V = any>(
             if (errorMsg.includes("feature disabled")) {
                 return
             }
-            if (!!errorMsg) {
+            if (!!errorMsg && !isInternalServerError(errorMsg)) {
                 toast.error(errorMsg)
             }
         }

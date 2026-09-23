@@ -256,12 +256,15 @@ export function useVideoCorePlaylist() {
     const playEpisode = (which: "previous" | "next" | string) => {
         if (isWatchPartyPeer) return
 
+        // Gum: a plain local file (a drama, a download) has no episode list, and auto-next
+        // runs this at the end of every video — it toasted "Unexpected error: No playlist
+        // state" for each one (audit 2026-09-23). Nothing to play next is not an error.
         if (!playlistState) {
-            toast.error("Unexpected error: No playlist state")
+            log.info("No playlist for this file, nothing to play", which)
             return
         }
         if (!animeEntry) {
-            toast.error("Unexpected error: No entry")
+            log.info("No anime entry for this file, nothing to play", which)
             return
         }
 

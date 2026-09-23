@@ -798,7 +798,16 @@ function StudyPlayerSession({
       }
       if (latestRequestRef.current?.requestId !== request.requestId) return;
       if (!streamUrl) {
-        setState({ active: true, playbackInfo: null, playbackError: stated, loadingState: null });
+        // `mediaFileUrl` answers null for a path that is not on disk. The sidecar's own
+        // reason ("not matched to a media") is true but beside the point for a file that is
+        // gone, and sent the viewer to fix metadata for a video that no longer exists.
+        void stated;
+        setState({
+          active: true,
+          playbackInfo: null,
+          playbackError: translateUi('mediaWorkspace.fileMissing', { path: request.localFilePath }),
+          loadingState: null,
+        });
         return;
       }
       const info = directLocalPlaybackInfo({

@@ -446,6 +446,18 @@
 }
 
 #media-workspace .study-cue-timing,
+#media-workspace .study-cue-status[data-study-cue-status='none'] {
+  animation: study-cue-status-fade 600ms ease 6s forwards;
+}
+@keyframes study-cue-status-fade {
+  to { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #media-workspace .study-cue-status[data-study-cue-status='none'] {
+    animation-duration: 1ms;
+  }
+}
+
 #media-workspace .study-cue-status {
   display: block;
   margin-top: 0.35rem;
