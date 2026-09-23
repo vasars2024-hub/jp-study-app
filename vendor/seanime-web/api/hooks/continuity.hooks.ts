@@ -25,7 +25,10 @@ export function useGetContinuityWatchHistoryItem(mediaId: Nullish<number | strin
         endpoint: API_ENDPOINTS.CONTINUITY.GetContinuityWatchHistoryItem.endpoint.replace("{id}", String(mediaId)),
         method: API_ENDPOINTS.CONTINUITY.GetContinuityWatchHistoryItem.methods[0],
         queryKey: [API_ENDPOINTS.CONTINUITY.GetContinuityWatchHistoryItem.key, String(mediaId)],
-        enabled: serverStatus?.settings?.library?.enableWatchContinuity && !!mediaId,
+        // Gum: `!!(…)`. With no server status yet the `&&` chain is `undefined`, which React
+        // Query treats as ENABLED, so an idle player fetched `/continuity/item/undefined` and
+        // the sidecar answered "strconv.Atoi: parsing "undefined"" (audit 2026-09-23).
+        enabled: !!(serverStatus?.settings?.library?.enableWatchContinuity && mediaId),
     })
 }
 

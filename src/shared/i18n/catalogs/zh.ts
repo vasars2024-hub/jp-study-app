@@ -8788,6 +8788,7 @@ export const zh: Catalog = {
   'mediaWorkspace.viewLibrary': '媒体库',
   'mediaWorkspace.backToLibrary': '返回媒体库',
   'mediaWorkspace.backToLibraryHint': '停止视频并返回媒体库（Esc）',
+  'mediaWorkspace.backHint': '停止视频并返回（Esc）',
   'mediaWorkspace.viewReadiness': '就绪状态',
   'mediaWorkspace.viewReview': '复习',
   'mediaWorkspace.openLocal': '打开本地视频',

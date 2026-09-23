@@ -27311,6 +27311,16 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  /* It popped in within one frame (transition audit 2026-09-23). A short fade says "a new
+     place" without slowing anyone down. */
+  animation: seanime-host-in 160ms ease-out;
+}
+@keyframes seanime-host-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .seanime-host { animation: none; }
 }
 
 .seanime-host-bar {

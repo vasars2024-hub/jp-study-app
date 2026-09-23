@@ -61,6 +61,9 @@ const SeanimeWatchLoopPanel = React.lazy(
  */
 type HostView = 'library' | 'readiness' | 'review';
 
+/** How long a stopped sidecar may be "auto-start is on its way" before it is explained. */
+const STOPPED_GRACE_MS = 4000;
+
 function sidecarStatusLabel(
   kind: SeanimeStatus['kind'],
   t: ReturnType<typeof useT>['t'],
@@ -74,6 +77,15 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   const [playbackRequest, setPlaybackRequest] =
     useState<MediaWorkspacePlaybackRequest | null>(null);
   const [view, setView] = useState<HostView>('library');
+  /*
+   * Where "Back" goes. A video handed in from outside (the Media Center, the Video app,
+   * Continue watching) opened this workspace only to play it, so leaving the video returns
+   * there — the Media Center is the user's library. A video picked from this workspace's own
+   * library returns to that library. Held in refs: the open listener is registered once.
+   */
+  const openRef = useRef(false);
+  const openedForPlaybackRef = useRef(false);
+  const [openedForPlayback, setOpenedForPlayback] = useState(false);
   /** Set when a readiness row hands off to Review focused on one file. */
   const [reviewFocus, setReviewFocus] = useState<StudyReviewFocusRequest | null>(null);
   // Status tracking, the connection bootstrap and the auto-start now live in
@@ -99,9 +111,14 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     // show anything is a different question, answered by `mediaWorkspaceIsAvailable()`.
     const releaseHost = registerMediaWorkspaceHost();
     const bringForward = (detail?: MediaWorkspaceOpenRequest): void => {
+      const wasOpen = openRef.current;
       setOpen(true);
       const request = normalizeMediaWorkspaceOpenRequest(detail);
       if (!request) return;
+      if (!wasOpen) {
+        openedForPlaybackRef.current = true;
+        setOpenedForPlayback(true);
+      }
       setPlaybackRequest(request);
       // The player lives in the library pane, and that pane is hidden — never unmounted —
       // whenever another segment shows. So a request arriving while the user sits on
@@ -169,10 +186,19 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     return () => setMediaWorkspaceOpen(false);
   }, [open]);
 
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
   // Closing drops the in-host route too, so reopening lands on the library rather than on
-  // whatever entry happened to be showing when the user shut the workspace an hour ago.
+  // whatever entry happened to be showing when the user shut the workspace an hour ago. It
+  // also drops the video: kept, a bare reopen remounted the player and it replayed the last
+  // file (or its error screen) on its own (transition audit 2026-09-23).
   const close = useCallback(() => {
     setOpen(false);
+    setPlaybackRequest(null);
+    openedForPlaybackRef.current = false;
+    setOpenedForPlayback(false);
     resetHostLocation();
   }, []);
 
@@ -191,7 +217,9 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
       return undefined;
     }
     const read = (): void => {
-      setPlayerActive(root.querySelector('.study-player-slice[data-study-player="active"]') != null);
+      setPlayerActive(root.querySelector(
+        '.study-player-slice:is([data-study-player="active"], [data-study-player="loading"])',
+      ) != null);
     };
     read();
     const observer = new MutationObserver(read);
@@ -213,8 +241,15 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   const backToLibrary = useCallback(() => {
     setPlaybackRequest(null);
     setView('library');
+    openedForPlaybackRef.current = false;
+    setOpenedForPlayback(false);
     resetHostLocation();
   }, []);
+  /** "Back" from a video: to wherever it was opened from (see `openedForPlaybackRef`). */
+  const leavePlayer = useCallback(() => {
+    if (openedForPlaybackRef.current) close();
+    else backToLibrary();
+  }, [backToLibrary, close]);
 
   // The host bar's height, for the player that starts under it (`--seanime-host-bar-h`,
   // mediaWorkspace.css). `offsetHeight` is in CSS pixels, which is what the player's `top`
@@ -233,6 +268,30 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     return () => observer.disconnect();
   }, [open, status?.kind]);
 
+  /*
+   * A stopped sidecar is normally a moment: opening the workspace auto-starts it
+   * (`useSeanimeConnection`), so for that moment it shows the loader, not "stopped" and a
+   * Start button. If it is STILL stopped after a few seconds the auto-start did not take,
+   * and the words and the button come back — a loader must never spin on a server nobody
+   * is starting.
+   */
+  const [stoppedTooLong, setStoppedTooLong] = useState(false);
+  useEffect(() => {
+    setStoppedTooLong(false);
+    if (!open || status?.kind !== 'stopped') return undefined;
+    const timer = window.setTimeout(() => setStoppedTooLong(true), STOPPED_GRACE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, status?.kind]);
+
+  // Readiness and Review hide the library pane — and the player inside it, which kept
+  // playing out loud with no picture and no transport (transition audit 2026-09-23). Leaving
+  // the pane pauses it; coming back leaves it paused, where the viewer left it.
+  useEffect(() => {
+    if (view === 'library') return;
+    const video = hostRef.current?.querySelector<HTMLVideoElement>('#media-workspace video');
+    if (video && !video.paused) video.pause();
+  }, [view]);
+
   // Escape steps back one level: from a playing video to the library, and from the library
   // out of the workspace. It never acts while the user is typing (a card field, a search
   // box), while a menu, sheet or dialog inside the player is open (those close first), or in
@@ -247,21 +306,23 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
         && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
       ) return;
       if (document.fullscreenElement) return;
-      if (document.querySelector('.study-player-slice[data-study-player="active"]')) {
+      if (document.querySelector(
+        '.study-player-slice:is([data-study-player="active"], [data-study-player="loading"])',
+      )) {
         const busy = document.querySelector(
           '.study-bar-layer:not([data-study-sheet-open="none"]), '
           + '#media-workspace [role="menu"], #media-workspace [role="dialog"], '
           + '#media-workspace [data-state="open"]',
         );
         if (busy) return;
-        backToLibrary();
+        leavePlayer();
         return;
       }
       close();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [backToLibrary, close, open]);
+  }, [close, leavePlayer, open]);
 
   // Move focus into the workspace on open and hand it back to whatever held it before on
   // close, so a keyboard user is never left tabbing through the desktop behind a
@@ -345,10 +406,11 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
           <button
             type="button"
             className="seanime-host-btn seanime-host-back"
-            onClick={backToLibrary}
-            title={t('mediaWorkspace.backToLibraryHint')}
+            onClick={leavePlayer}
+            title={openedForPlayback ? t('mediaWorkspace.backHint') : t('mediaWorkspace.backToLibraryHint')}
           >
-            <span aria-hidden="true">←</span> {t('mediaWorkspace.backToLibrary')}
+            <span aria-hidden="true">←</span>{' '}
+            {openedForPlayback ? t('common.back') : t('mediaWorkspace.backToLibrary')}
           </button>
         ) : null}
         <strong className="seanime-host-title">{t('mediaWorkspace.launcher')}</strong>
@@ -470,7 +532,17 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
 
         {/* A sidecar notice is only information when the view actually needs the sidecar.
             Beside the Review panel it would be a standing error about nothing. */}
-        {view === 'review' ? null : status.kind !== 'ready' ? (
+        {/* One loader from "server stopped" to "library drawn": the same swirl the pane's
+            Suspense uses. A cold open used to cycle 5-7 looks — "The media server is stopped"
+            with a Start button for a frame (auto-start was already on its way), "starting",
+            "Connecting…", then the swirl (transition audit 2026-09-23). Real failures still
+            get words and a retry below. */}
+        {view === 'review' ? null
+          : (status.kind === 'stopped' && !stoppedTooLong)
+            || status.kind === 'starting'
+            || (status.kind === 'ready' && !conn) ? (
+            <LiquidLoading layout="library" />
+          ) : status.kind !== 'ready' ? (
           <div className="seanime-host-state" role="status">
             <p>{t('mediaWorkspace.serverState', { status: statusLabel })}</p>
             {status.error ? <p className="seanime-host-state-detail">{status.error}</p> : null}
@@ -484,11 +556,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
               </button>
             ) : null}
           </div>
-        ) : !conn ? (
-          <div className="seanime-host-state" role="status">
-            <p>{t('mediaWorkspace.connecting')}</p>
-          </div>
-        ) : !conn.baseUrl ? (
+        ) : !conn ? null : !conn.baseUrl ? (
           <div className="seanime-host-state" role="status">
             <p>{t('mediaWorkspace.notRunning')}</p>
           </div>

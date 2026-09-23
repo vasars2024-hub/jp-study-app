@@ -9296,6 +9296,7 @@ export const en: Catalog = {
   'mediaWorkspace.viewLibrary': 'Library',
   'mediaWorkspace.backToLibrary': 'Back to the library',
   'mediaWorkspace.backToLibraryHint': 'Stop the video and go back to the library (Esc)',
+  'mediaWorkspace.backHint': 'Stop the video and go back (Esc)',
   'mediaWorkspace.viewReadiness': 'Readiness',
   'mediaWorkspace.viewReview': 'Review',
   'mediaWorkspace.openLocal': 'Open local video',

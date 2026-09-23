@@ -9663,6 +9663,7 @@ export const ru: Catalog = {
   'mediaWorkspace.viewLibrary': 'Медиатека',
   'mediaWorkspace.backToLibrary': 'Назад в медиатеку',
   'mediaWorkspace.backToLibraryHint': 'Остановить видео и вернуться в медиатеку (Esc)',
+  'mediaWorkspace.backHint': 'Остановить видео и вернуться назад (Esc)',
   'mediaWorkspace.viewReadiness': 'Готовность',
   'mediaWorkspace.viewReview': 'Повторение',
   'mediaWorkspace.openLocal': 'Открыть локальное видео',

@@ -120,10 +120,21 @@ describe('MediaWorkspaceHost — Review is not gated behind the sidecar', () => 
     expect(labels).toEqual(['Library', 'Readiness', 'Review']);
   });
 
-  it('still explains a stopped sidecar on the Library view', async () => {
-    stubApi(STOPPED);
-    const el = await openOn('library');
-    expect(sidecarNotice(el)).not.toBeNull();
+  it('still explains a stopped sidecar on the Library view, once auto-start has had its moment', async () => {
+    // For the first few seconds a stopped sidecar is one that auto-start is bringing up,
+    // so it shows the single loader rather than "stopped" and a Start button for a frame.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      stubApi(STOPPED);
+      const el = await openOn('library');
+      expect(sidecarNotice(el)).toBeNull();
+      expect(el.querySelector('.lq-loading')).not.toBeNull();
+      await act(async () => { vi.advanceTimersByTime(4100); });
+      await flush();
+      expect(sidecarNotice(el)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders the Review panel with the sidecar STOPPED', async () => {

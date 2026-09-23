@@ -8834,6 +8834,7 @@ export const ja: Catalog = {
   'mediaWorkspace.viewLibrary': 'ライブラリ',
   'mediaWorkspace.backToLibrary': 'ライブラリに戻る',
   'mediaWorkspace.backToLibraryHint': '動画を止めてライブラリに戻る（Esc）',
+  'mediaWorkspace.backHint': '動画を止めて前の画面に戻る（Esc）',
   'mediaWorkspace.viewReadiness': '学習準備',
   'mediaWorkspace.viewReview': '復習',
   'mediaWorkspace.openLocal': 'ローカル動画を開く',

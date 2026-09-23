@@ -719,6 +719,9 @@ function StudyPlayerSession({
   surface: StudySurfaceKind;
 }): React.ReactElement {
   const [state, setState] = React.useState<VideoCoreLifecycleState>(initialState);
+  /** Read by the socket handler without re-subscribing it on every state change. */
+  const stateRef = React.useRef(state);
+  stateRef.current = state;
   /**
    * The element the workspace measures and watches for pointer activity.
    *
@@ -946,6 +949,17 @@ function StudyPlayerSession({
     }
 
     const localRequest = playbackRequest;
+    // Say "opening" the moment the request lands, not after the library scan below: that
+    // scan can take seconds (11 s measured for a folder the sidecar had never seen), and
+    // until a loading state existed the old video sat frozen, or the library showed, with no
+    // sign anything was happening (transition audit 2026-09-23). Clearing `playbackInfo` here
+    // also retires the previous stream BEFORE the new POST, not in a race with it.
+    setState({
+      active: false,
+      playbackInfo: null,
+      playbackError: null,
+      loadingState: translateUi('mediaWorkspace.openingLocal'),
+    });
     void (async () => {
     /*
       The sidecar resolves a local path against its OWN `local_files` table, not
@@ -1460,6 +1474,10 @@ function StudyPlayerSession({
           if (!stated) {
             // A reasonless abort is the sidecar retiring a stream a newer open replaced.
             // Showing an error screen for it would invent a failure the viewer did not have.
+            // And while that newer open is still loading, going idle would flash the library
+            // between the two videos (103 ms measured on an episode switch), so the loader
+            // stays up.
+            if (stateRef.current.loadingState) break;
             setState(initialState);
             break;
           }
@@ -1528,7 +1546,10 @@ function StudyPlayerSession({
       <section
         ref={sliceRef}
         className="study-player-slice"
-        data-study-player={state.active ? 'active' : 'idle'}
+        // `loading` keeps the slice — and VideoCore's own loading overlay — on screen while a
+        // stream is prepared. Hidden then, the viewer got no feedback at all for an open, and
+        // the library flashed between two videos.
+        data-study-player={state.active ? 'active' : state.loadingState ? 'loading' : 'idle'}
         data-cue-proof-phase={proofWindow().__SEANIME_CUE_PROOF__?.phase ?? 'idle'}
       >
         <VideoCore

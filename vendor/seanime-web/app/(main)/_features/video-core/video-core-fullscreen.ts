@@ -173,14 +173,19 @@ export class VideoCoreFullscreenManager extends EventTarget {
                 }
             }
 
-            if (this.containerElement.requestFullscreen) {
-                await this.containerElement.requestFullscreen()
-            } else if ((this.containerElement as any).webkitRequestFullscreen) {
-                await (this.containerElement as any).webkitRequestFullscreen()
-            } else if ((this.containerElement as any).mozRequestFullScreen) {
-                await (this.containerElement as any).mozRequestFullScreen()
-            } else if ((this.containerElement as any).msRequestFullscreen) {
-                await (this.containerElement as any).msRequestFullscreen()
+            // Gum: fullscreen the whole study slice when the player sits in one. The subtitle
+            // line, card and study bar are the slice's children, not the container's, so a
+            // fullscreened container dropped every one of them (transition audit 2026-09-23).
+            const target = (this.containerElement.closest?.(".study-player-slice") as HTMLElement | null)
+                ?? this.containerElement
+            if (target.requestFullscreen) {
+                await target.requestFullscreen()
+            } else if ((target as any).webkitRequestFullscreen) {
+                await (target as any).webkitRequestFullscreen()
+            } else if ((target as any).mozRequestFullScreen) {
+                await (target as any).mozRequestFullScreen()
+            } else if ((target as any).msRequestFullscreen) {
+                await (target as any).msRequestFullscreen()
             }
             log.info("Entered fullscreen")
             this._focusVideo()
