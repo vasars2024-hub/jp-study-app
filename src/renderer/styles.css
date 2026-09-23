@@ -27389,6 +27389,26 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
 }
 .seanime-host-close { margin-left: auto; }
 
+/* Takes the free middle of the bar, so its text never pushes the controls around. */
+.seanime-host-now {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seanime-host-now + .seanime-host-close { margin-left: 0; }
+/* The bar names what is playing, so the adopted player's own top-left title strip would say
+   it a second time, and differently. Here, not in mediaWorkspace.css, because the condition
+   is the host's attribute — that file only holds `#media-workspace`-rooted rules. */
+.seanime-host[data-now-playing='true'] #media-workspace [data-vc-element='top-playback-info'] {
+  display: none;
+}
+
 .seanime-host-body {
   flex: 1 1 auto;
   min-height: 0;

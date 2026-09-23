@@ -85,11 +85,35 @@ function Dock({
   hiddenIds: ReadonlySet<StudyBlockId>;
 }): React.ReactElement | null {
   const rendered = blocks.filter((block) => renderers[block.blockId] !== undefined);
-  if (!rendered.length) return null;
   // A dock holding only kept-mounted, hidden blocks must not reserve a column.
   const anyVisible = rendered.some((block) => !hiddenIds.has(block.blockId));
+  const dockRef = React.useRef<HTMLDivElement | null>(null);
+  /*
+    The bottom dock publishes its height, as the bar does, so the subtitle line can sit
+    above it. Practice's shadowing panel and Listening's panel live here, and without this
+    the line was printed over the drill that is about that very line (audit 2026-09-23).
+    CSS pixels (`offsetHeight`), for the same zoom reason as the bar's measurement.
+  */
+  React.useEffect(() => {
+    if (side !== 'bottom') return undefined;
+    const dock = dockRef.current;
+    const slice = dock?.closest('.study-player-slice');
+    if (!dock || !(slice instanceof HTMLElement)) return undefined;
+    const publish = (): void => {
+      slice.style.setProperty('--study-bottom-dock-height', `${dock.offsetHeight}px`);
+    };
+    publish();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(publish) : null;
+    observer?.observe(dock);
+    return () => {
+      observer?.disconnect();
+      slice.style.removeProperty('--study-bottom-dock-height');
+    };
+  }, [side, anyVisible, rendered.length]);
+  if (!rendered.length) return null;
   return (
     <div
+      ref={dockRef}
       className="study-dock"
       data-dock={side}
       data-empty={anyVisible ? 'false' : 'true'}

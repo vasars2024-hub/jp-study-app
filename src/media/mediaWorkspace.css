@@ -343,7 +343,9 @@
      transport bar, which is taller than the collapsed dock — so it is the floor,
      and the dock only pushes the line up when expanded past it. Named because
      the narrow rail stacks on top of this band and must not guess at it. */
-  --study-cue-bottom: max(9.25rem, calc(var(--study-dock-height) + 2.05rem));
+  /* Above the bottom dock too, when one holds a panel (`--study-bottom-dock-height`,
+     published by StudyDocks; 0 when there is none). */
+  --study-cue-bottom: max(9.25rem, calc(var(--study-dock-height) + var(--study-bottom-dock-height, 0px) + 2.05rem));
 }
 
 /*
@@ -1606,7 +1608,7 @@
 
 @media (max-width: 760px) {
   #media-workspace .study-player-slice {
-    --study-cue-bottom: max(11rem, calc(var(--study-dock-height) + 2.05rem));
+    --study-cue-bottom: max(11rem, calc(var(--study-dock-height) + var(--study-bottom-dock-height, 0px) + 2.05rem));
   }
 
   #media-workspace .study-cue-overlay {

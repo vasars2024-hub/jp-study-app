@@ -692,9 +692,15 @@ export function VideoCore(props: VideoCoreProps) {
 
     const { width: windowWidth } = useWindowSize()
     const [isMobilePlayer, setIsMobilePlayer] = useAtom(vc_isMobile)
+    // Gum: narrow is not mobile. On a desktop with a mouse, a window under 1024px (a laptop
+    // half-screen) switched to the touch transport — no play/pause button, controls under
+    // the study panels (design audit 2026-09-23). Only a coarse (touch) pointer gets it.
+    const coarsePointer = typeof window !== "undefined"
+        && typeof window.matchMedia === "function"
+        && window.matchMedia("(pointer: coarse)").matches
     React.useEffect(() => {
-        setIsMobilePlayer(windowWidth < 1024)
-    }, [windowWidth < 1024])
+        setIsMobilePlayer(windowWidth < 1024 && coarsePointer)
+    }, [windowWidth < 1024, coarsePointer])
 
     const [videoElement, setVideoElement] = useAtom(vc_videoElement)
     const setRealVideoSize = useSetAtom(vc_realVideoSize)

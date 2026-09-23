@@ -255,6 +255,42 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     else backToLibrary();
   }, [backToLibrary, close]);
 
+  /*
+   * What is playing, named the way the Media Center names it ("Midnight Kitchen · Episode 1",
+   * 第1話 in Japanese), in this bar. The adopted player's own title strip named anime only —
+   * a drama had no title anywhere — and named them differently from the library ("Yuru
+   * Camp△" there, "Laid-Back Camp" in the Media Center). Falls back to the file name.
+   */
+  const [nowPlayingTitle, setNowPlayingTitle] = useState<string | null>(null);
+  useEffect(() => {
+    if (!playbackRequest || playbackRequest.kind !== 'local') {
+      setNowPlayingTitle(null);
+      return undefined;
+    }
+    const path = playbackRequest.localFilePath;
+    const norm = (value: string): string => value.replace(/\\/g, '/').toLowerCase();
+    const base = path.slice(Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')) + 1)
+      .replace(/\.[^.]+$/, '');
+    setNowPlayingTitle(base);
+    let cancelled = false;
+    // Guarded like the status calls: a window or harness without the library API keeps the
+    // file-name title rather than throwing out of an effect.
+    if (typeof window.api?.listMedia !== 'function') return undefined;
+    void window.api.listMedia().then((items) => {
+      if (cancelled) return;
+      const item = items.find((entry) => norm(entry.path ?? '') === norm(path));
+      if (!item) return;
+      const series = item.seriesTitle || item.title || base;
+      const episode = item.episode && item.episode > 0
+        ? t('mediaWorkspace.episode', { number: item.episode })
+        : '';
+      setNowPlayingTitle(episode ? `${series} · ${episode}` : series);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [playbackRequest, t]);
+
   // The host bar's height, for the player that starts under it (`--seanime-host-bar-h`,
   // mediaWorkspace.css). `offsetHeight` is in CSS pixels, which is what the player's `top`
   // is read in; a bounding box would be in painted pixels under the app's zoom.
@@ -396,6 +432,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     <div
       ref={hostRef}
       className={`seanime-host${presentation.liquid ? ' workspace-liquid' : ''}`}
+      data-now-playing={playerActive && nowPlayingTitle ? 'true' : undefined}
       role="dialog"
       aria-modal="true"
       aria-label={t('mediaWorkspace.launcher')}
@@ -493,6 +530,10 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
             {t('mediaWorkspace.viewReview')}
           </button>
         </div>
+        {/* The flexible middle of the bar, so it appearing and going moves nothing else. */}
+        <span className="seanime-host-now" title={nowPlayingTitle ?? undefined}>
+          {playerActive ? nowPlayingTitle : null}
+        </span>
         {/* `seanime-host-close` carries the `margin-left: auto` that pushes the
             right-hand group off the segment switch, so the Liquid toggle sits
             AFTER it rather than before — otherwise the toggle takes the gap and
