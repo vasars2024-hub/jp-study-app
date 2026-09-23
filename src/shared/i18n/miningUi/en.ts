@@ -22,7 +22,7 @@ export const MINING_UI_EN: Catalog = {
   'dict.view.status.zh': 'Chinese',
   'dict.view.source.ja': 'JMdict / Jisho',
   'dict.view.source.zh': 'CC-CEDICT',
-  'dict.view.desc.ja': 'Search Japanese or English — powered by Jisho (JMdict).',
+  'dict.view.desc.ja': 'Search Japanese or English — offline JMdict dictionaries.',
   'dict.view.desc.zh': 'Search Chinese or English — offline, powered by CC-CEDICT.',
   'dict.view.placeholder.ja': 'Type a word, e.g. 食べる or “eat”…',
   'dict.view.placeholder.zh': 'Type a word, e.g. 你好 or “hello”…',

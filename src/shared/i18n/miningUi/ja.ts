@@ -9,7 +9,7 @@ export const MINING_UI_JA: Catalog = {
   'dict.view.status.zh': '中国語',
   'dict.view.source.ja': 'JMdict / Jisho',
   'dict.view.source.zh': 'CC-CEDICT',
-  'dict.view.desc.ja': '日本語または英語で検索します（Jisho / JMdict）。',
+  'dict.view.desc.ja': '日本語または英語で検索します（オフラインの JMdict 辞書）。',
   'dict.view.desc.zh': '中国語または英語で検索します。CC-CEDICT によるオフライン辞書です。',
   'dict.view.placeholder.ja': '単語を入力（例：食べる、「eat」）…',
   'dict.view.placeholder.zh': '単語を入力（例：你好、「hello」）…',
