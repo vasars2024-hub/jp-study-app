@@ -48,7 +48,7 @@ export default function SettingsHome() {
   const aero = useAeroMaterials();
   const [diagArmed, setDiagArmed] = useState(false);
   const [diagCode, setDiagCode] = useState('');
-  const [diagMessage, setDiagMessage] = useState('SERVICE PORT SEALED');
+  const [diagMessage, setDiagMessage] = useState<{ key: string; count?: number }>({ key: 'settings.home.diag.sealed' });
   const diagClickRef = useRef({ count: 0, last: 0 });
   const recent = getRecentPages();
   // Same lookup as Settings > Appearance: the translated name first, then the engine's own
@@ -105,7 +105,7 @@ export default function SettingsHome() {
       </section>
 
       {aero && (
-        <section className={`wired-access-card${diagArmed ? ' is-armed' : ''}`} aria-label="CRT diagnostic access">
+        <section className={`wired-access-card${diagArmed ? ' is-armed' : ''}`} aria-label={t('settings.home.diag.aria')}>
           <button
             type="button"
             className="wired-access-tile"
@@ -116,16 +116,16 @@ export default function SettingsHome() {
               diagClickRef.current = { count, last: now };
               if (count >= 3) {
                 setDiagArmed(true);
-                setDiagMessage('LAYER ACCESS PORT OPEN');
+                setDiagMessage({ key: 'settings.home.diag.open' });
               } else {
-                setDiagMessage(`CRT DIAG PULSE ${count}/3`);
+                setDiagMessage({ key: 'settings.home.diag.pulse', count });
               }
             }}
           >
             <Icon name="monitor" size={18} />
             <span>
-              <strong>CRT DIAG / LAYER ACCESS</strong>
-              <small>{diagMessage}</small>
+              <strong>{t('settings.home.diag.title')}</strong>
+              <small>{t(diagMessage.key, { count: diagMessage.count ?? 0 })}</small>
             </span>
           </button>
           {diagArmed && (
@@ -134,15 +134,15 @@ export default function SettingsHome() {
               onSubmit={(event) => {
                 event.preventDefault();
                 if (diagCode.trim().toUpperCase() === 'WIRED') {
-                  setDiagMessage('SUBSYSTEM HANDOFF ACCEPTED');
+                  setDiagMessage({ key: 'settings.home.diag.accepted' });
                   requestWiredArchiveEntry();
                 } else {
-                  setDiagMessage('ACCESS CODE REJECTED');
+                  setDiagMessage({ key: 'settings.home.diag.rejected' });
                   setDiagCode('');
                 }
               }}
             >
-              <label htmlFor="wired-access-command">SERVICE COMMAND</label>
+              <label htmlFor="wired-access-command">{t('settings.home.diag.command')}</label>
               <div>
                 <span aria-hidden="true">&gt;</span>
                 <input
@@ -151,9 +151,9 @@ export default function SettingsHome() {
                   autoComplete="off"
                   spellCheck={false}
                   onChange={(event) => setDiagCode(event.currentTarget.value)}
-                  placeholder="ENTER CODE"
+                  placeholder={t('settings.home.diag.enterCode')}
                 />
-                <button type="submit">RUN</button>
+                <button type="submit">{t('settings.home.diag.run')}</button>
               </div>
             </form>
           )}
