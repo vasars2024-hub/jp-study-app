@@ -309,7 +309,7 @@ export default function BlancShell({
   );
 
   useEffect(() => {
-    // The renderer's index.html title ("日本語 Study") would otherwise override
+    // The renderer's index.html title ("Gum") would otherwise override
     // the BrowserWindow title, making the side window indistinguishable.
     document.title = 'Blanc Toolbox';
   }, []);
@@ -2829,7 +2829,7 @@ function AutomationBuilderPanel() {
       <fieldset>
         <legend>Migration</legend>
         <p className="blanc-note">
-          Config folder: <code>{AUTOMATION_BUILDER.configDir}</code>. This is separate from Blanc memory and from the main Study OS settings.
+          Config folder: <code>{AUTOMATION_BUILDER.configDir}</code>. This is separate from Blanc memory and from the main Gum settings.
         </p>
         <ul className="blanc-plain-list">
           {AUTOMATION_BUILDER.migrationNotes.map((note) => (

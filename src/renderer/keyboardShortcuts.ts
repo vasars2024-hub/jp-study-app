@@ -536,16 +536,16 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'calendar.open', label: 'Open calendar', category: 'Utility', defaultKeys: '' },
   {
     id: 'app.toggle',
-    label: 'Hide / show GrammarX',
+    label: 'Hide / show Gum',
     category: 'Utility',
     defaultKeys: 'Ctrl+Alt+Shift+G',
     global: true,
     note:
-      'System-wide. With the Windows Startup helper enabled (Settings → Shortcuts), this works even when GrammarX is fully quit — press to start, press again to hide. Without the helper, it only works while the app is running. Rebind anytime in Shortcuts; the helper picks up the new chord automatically.',
+      'System-wide. With the Windows Startup helper enabled (Settings → Shortcuts), this works even when Gum is fully quit — press to start, press again to hide. Without the helper, it only works while the app is running. Rebind anytime in Shortcuts; the helper picks up the new chord automatically.',
   },
   {
     id: 'app.restart',
-    label: 'Fully restart GrammarX',
+    label: 'Fully restart Gum',
     category: 'Utility',
     defaultKeys: 'Ctrl+Alt+Shift+R',
     global: true,
@@ -950,7 +950,7 @@ function syncAppToggleGlobalShortcut(): void {
       if (result && !result.ok && result.error) {
         window.dispatchEvent(
           new CustomEvent('os:toast', {
-            detail: { message: `Hide/show GrammarX shortcut: ${result.error}`, kind: 'muted' },
+            detail: { message: `Hide/show Gum shortcut: ${result.error}`, kind: 'muted' },
           }),
         );
       }

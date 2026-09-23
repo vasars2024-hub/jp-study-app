@@ -314,7 +314,7 @@ public class GxHotkeyForm : Form {
     foreach (var b in _bindings) {
       if (!RegisterHotKey(Handle, b.Id, b.Mods, b.Vk)) {
         throw new InvalidOperationException(
-          "RegisterHotKey failed for id " + b.Id + " — the shortcut is already in use (close GrammarX or pick another chord).");
+          "RegisterHotKey failed for id " + b.Id + " — the shortcut is already in use (close Gum or pick another chord).");
       }
     }
   }
@@ -521,7 +521,7 @@ function startHelperProcess(): { ok: boolean; error?: string } {
     return {
       ok: false,
       error:
-        'Helper did not stay running. If GrammarX still holds the shortcut, remove and reinstall the helper.',
+        'Helper did not stay running. If Gum still holds the shortcut, remove and reinstall the helper.',
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

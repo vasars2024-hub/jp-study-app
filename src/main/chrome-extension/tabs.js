@@ -204,7 +204,7 @@ async function runBulk(action) {
 
   busy = false;
   updateChrome();
-  const queuedNote = queued ? ` (${queued} queued — will sync when GrammarX is open)` : '';
+  const queuedNote = queued ? ` (${queued} queued — will sync when Gum is open)` : '';
   if (failures === 0) {
     setStatus(`Done — ${done}/${total} saved${queuedNote}.`, 'ok');
   } else {

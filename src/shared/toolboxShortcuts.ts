@@ -66,7 +66,7 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
   {
     id: 'toolbox.open',
     name: 'Open Toolbox',
-    description: 'Open the compact Blanc Toolbox beside the main Study OS.',
+    description: 'Open the compact Blanc Toolbox beside the main Gum window.',
     category: 'Toolbox',
     feature: 'toolbox',
     defaultShortcut: 'Ctrl+Alt+B',
@@ -390,7 +390,7 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
   {
     id: 'toolbox.openCalendar',
     name: 'Open Calendar',
-    description: 'Open the shared Study OS calendar.',
+    description: 'Open the shared Gum calendar.',
     category: 'Productivity',
     feature: 'calendar',
     defaultShortcut: '',

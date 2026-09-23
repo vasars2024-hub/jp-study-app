@@ -67,7 +67,7 @@ export interface ApplyThemeOptions {
 
 /** The 13 built-in themes (formerly the `THEMES` array in theme.ts). */
 const BASE_THEMES: Theme[] = [
-  { id: 'study-os', label: 'GrammarX Default', kind: 'base', version: 1, light: false, swatch: { bg: '#0f0e13', text: '#f5f4f7', border: '#2d2b37' } },
+  { id: 'study-os', label: 'Gum Default', kind: 'base', version: 1, light: false, swatch: { bg: '#0f0e13', text: '#f5f4f7', border: '#2d2b37' } },
   { id: 'classic-light', label: 'Classic Light', kind: 'base', version: 1, light: true, swatch: { bg: '#ffffff', text: '#1e1e1e', border: '#e0e0e0' } },
   { id: 'dark-nebula', label: 'Dark Nebula', kind: 'base', version: 1, light: false, swatch: { bg: '#0d0d1a', text: '#c0caf5', border: '#2a2a4a' } },
   { id: 'soft-sepia', label: 'Soft Sepia', kind: 'base', version: 1, light: true, swatch: { bg: '#fbf3e8', text: '#5b4637', border: '#d4c5a9' } },

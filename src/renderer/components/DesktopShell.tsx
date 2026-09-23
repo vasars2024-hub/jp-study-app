@@ -3102,7 +3102,7 @@ export default function DesktopShell({
                 e.stopPropagation();
               }}
             >
-              <div className="os-start-title">GrammarX</div>
+              <div className="os-start-title">Gum</div>
               <div className="os-start-hint">
                 {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
               </div>
@@ -3252,7 +3252,7 @@ export default function DesktopShell({
                   <Icon name="logo" size={24} />
                 </span>
                 <div className="os-start-aero-id">
-                  <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret GrammarX'}</div>
+                  <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret Gum'}</div>
                   <div className="os-start-aero-sub">
                     {wired
                       ? startAppDragging

@@ -1,4 +1,4 @@
-/* GrammarX content styles — reader popup, wheel, page panel, OCR, toasts.
+/* Gum content styles — reader popup, wheel, page panel, OCR, toasts.
  * Everything lives at maximum z-index and uses explicit properties so host
  * pages can't easily restyle it. One restrained accent (#9c2b3d). */
 
@@ -42,7 +42,7 @@ html.jp-study-theme-gray video {
   color: inherit !important;
 }
 
-/* GrammarX UI elements attach to <html>, outside <body>, so the theme
+/* Gum UI elements attach to <html>, outside <body>, so the theme
  * repaint selectors above (scoped to `body *`) never affect them. */
 
 /* ------------------------- lookup + user highlights ------------------------ */

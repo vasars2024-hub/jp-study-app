@@ -1,7 +1,7 @@
 /*
  * extension/background.js — the offline retry queue.
  *
- * This is the whole of "saving works even when GrammarX is closed": every save
+ * This is the whole of "saving works even when Gum is closed": every save
  * path catches its own failure, drops the payload into
  * `chrome.storage.local.jpStudyRetryQueue`, and tells the user it is queued. A
  * one-minute alarm and every later successful save drain it.
@@ -144,7 +144,7 @@ describe('retry queue — a save the app could not take', () => {
     // survives the browser restart, which is why it lives in storage.local.
     expect(res.queued).toBe(true);
     expect(res.ok).toBe(true);
-    expect(h.shared.formatSaveResultMessage(res)).toBe('Queued “猫が好き” — will sync when GrammarX is open');
+    expect(h.shared.formatSaveResultMessage(res)).toBe('Queued “猫が好き” — will sync when Gum is open');
   });
 
   it('stores the request whole, under the key the popup reads', async () => {
@@ -365,7 +365,7 @@ describe('retry queue — what a full queue discards', () => {
     const h = bootBackground({ responder: APP_DOWN });
     const results: SaveResult[] = [];
     for (let i = 0; i < MAX_QUEUE + 5; i++) results.push(await saveWord(h, `save ${i}`));
-    // Every one of the 45 saves was answered "Queued — will sync when GrammarX
+    // Every one of the 45 saves was answered "Queued — will sync when Gum
     // is open", including the five whose payloads no longer exist.
     expect(results.every((r) => r.queued === true)).toBe(true);
     expect(new Set(results.map((r) => h.shared.formatSaveResultMessage(r).split('“')[0]))).toEqual(
@@ -604,7 +604,7 @@ describe('retry queue — storage that refuses the write', () => {
     expect(res.queued).toBeUndefined();
     expect(res.ok).toBe(false);
     expect(res.error).toBe(
-      'Local storage is full — open GrammarX to sync the queued items, then retry.',
+      'Local storage is full — open Gum to sync the queued items, then retry.',
     );
     expect(h.queue()).toHaveLength(0);
   });
@@ -639,7 +639,7 @@ describe('retry queue — which failures queue and which just fail', () => {
 
     const res = (await h.send({ type: 'capture' })) as SaveResult;
     expect(res.queued).toBe(true);
-    expect(h.shared.formatCaptureResultMessage(res)).toBe('Page queued — will sync when GrammarX is open');
+    expect(h.shared.formatCaptureResultMessage(res)).toBe('Page queued — will sync when Gum is open');
     expect(h.queue().map((q) => q.kind)).toEqual(['capture']);
   });
 
@@ -647,7 +647,7 @@ describe('retry queue — which failures queue and which just fail', () => {
     const h = bootBackground({ responder: APP_DOWN });
     const res = (await h.send({ type: 'clipboard-text', text: 'メモ' })) as SaveResult;
     expect(res.queued).toBe(true);
-    expect(h.shared.formatClipboardResultMessage(res)).toBe('Queued — will sync when GrammarX is open');
+    expect(h.shared.formatClipboardResultMessage(res)).toBe('Queued — will sync when Gum is open');
     expect(h.queue().map((q) => q.kind)).toEqual(['clipboard']);
   });
 
@@ -663,7 +663,7 @@ describe('retry queue — which failures queue and which just fail', () => {
     // (a download is long-running, so silence would be worse), but it means
     // the toast says failure while the queue says it will happen.
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('GrammarX is not running — open the app, then retry.');
+    expect(res.error).toBe('Gum is not running — open the app, then retry.');
     expect(h.queue().map((q) => q.kind)).toEqual(['download']);
   });
 
@@ -677,7 +677,7 @@ describe('retry queue — which failures queue and which just fail', () => {
     });
     const res = (await h.send({ type: 'run-command', command: 'capture.audio.save' })) as SaveResult;
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('GrammarX is not running — open the app, then retry.');
+    expect(res.error).toBe('Gum is not running — open the app, then retry.');
     expect(h.queue().map((q) => q.kind)).toEqual(['audio-save']);
   });
 

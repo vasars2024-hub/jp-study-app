@@ -709,7 +709,7 @@ export class MalSyncClient {
           : '';
         throw new MalSyncError(
           'not-configured',
-          `MyAnimeList rejected the request to ${what}. If the GrammarX application is ` +
+          `MyAnimeList rejected the request to ${what}. If the Gum application is ` +
             `registered as "confidential" rather than "public", it requires a client secret — ` +
             `set JP_STUDY_MAL_CLIENT_SECRET and authorize again.${detail}`,
         );

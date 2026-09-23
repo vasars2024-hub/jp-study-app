@@ -15855,6 +15855,14 @@ html[data-taskbar-size='large'] .os-tray-btn {
   /* Extra bottom pad so last card isn't flush against scroll edge / taskbar */
   scroll-padding-bottom: 24px;
 }
+/* The pane scrolls; its sections must never shrink to fit it. A flex column shrinks an
+   overflowing child down to its min-height, and the liquid page head (and any card whose
+   theme sets `overflow: hidden`) has a min-height of 0 — measured in the packaged build: the
+   page head collapsed to 0px and its title painted over the first card on every Settings page,
+   and that card was cut to the pane's height. */
+.os-set-pane-v2 > * {
+  flex-shrink: 0;
+}
 /* Every rule in this block restates a declaration made above it at the same or higher
    specificity and wins on source order; `styles.css` carries another track's unstaged hunks,
    so an appended block is what can be committed here without absorbing them.

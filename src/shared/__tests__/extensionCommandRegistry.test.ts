@@ -283,7 +283,7 @@ describe('save destination — the honest two-value model', () => {
 
   it('says what it is about to do before the request goes out', () => {
     expect(shared.saveWorkingMessage('both')).toBe('Creating card…');
-    expect(shared.saveWorkingMessage('app')).toBe('Saving to GrammarX…');
+    expect(shared.saveWorkingMessage('app')).toBe('Saving to Gum…');
     expect(shared.saveWorkingMessage('app', true)).toBe('Creating card…');
   });
 });
@@ -299,40 +299,40 @@ describe('result messages — what the user is told after an action', () => {
         profileName: 'JP',
         deckName: 'Mining',
       }),
-    ).toBe('Card created in Anki “猫” (JP / Mining) · saved in GrammarX');
+    ).toBe('Card created in Anki “猫” (JP / Mining) · saved in Gum');
   });
 
   it('reads the Anki result out of the nested destinations shape too', () => {
     expect(
       shared.formatSaveResultMessage({ ok: true, mode: 'word', term: '猫', destinations: { anki: { ok: true } } }),
-    ).toBe('Card created in Anki “猫” · saved in GrammarX');
+    ).toBe('Card created in Anki “猫” · saved in Gum');
   });
 
   it('distinguishes a saved word from a saved sentence', () => {
     expect(shared.formatSaveResultMessage({ ok: true, mode: 'word', term: '猫' })).toBe(
-      'Word saved “猫” to GrammarX',
+      'Word saved “猫” to Gum',
     );
     expect(shared.formatSaveResultMessage({ ok: true, mode: 'sentence', term: '猫が好き' })).toBe(
-      'Sentence saved “猫が好き” to GrammarX',
+      'Sentence saved “猫が好き” to Gum',
     );
   });
 
   it('surfaces an Anki failure only when Anki was actually attempted', () => {
     const anki = { ok: false, error: 'AnkiConnect refused' };
     expect(shared.formatSaveResultMessage({ ok: true, mode: 'word', term: '猫', anki, forceAnki: true })).toBe(
-      'Word saved “猫” to GrammarX · Anki unavailable: AnkiConnect refused',
+      'Word saved “猫” to Gum · Anki unavailable: AnkiConnect refused',
     );
     expect(shared.formatSaveResultMessage({ ok: true, mode: 'word', term: '猫', anki, preferAnki: true })).toBe(
-      'Word saved “猫” to GrammarX · Anki unavailable: AnkiConnect refused',
+      'Word saved “猫” to Gum · Anki unavailable: AnkiConnect refused',
     );
     // No intent to use Anki → no scary line about Anki.
     expect(shared.formatSaveResultMessage({ ok: true, mode: 'word', term: '猫', anki })).toBe(
-      'Word saved “猫” to GrammarX',
+      'Word saved “猫” to Gum',
     );
     // An explicit ankiAttempted:false wins over the inference.
     expect(
       shared.formatSaveResultMessage({ ok: true, mode: 'word', term: '猫', anki, forceAnki: true, ankiAttempted: false }),
-    ).toBe('Word saved “猫” to GrammarX');
+    ).toBe('Word saved “猫” to Gum');
   });
 
   it('stays quiet when Anki was deliberately skipped', () => {
@@ -344,18 +344,18 @@ describe('result messages — what the user is told after an action', () => {
         forceAnki: true,
         anki: { ok: false, error: 'skipped' },
       }),
-    ).toBe('Word saved “猫” to GrammarX');
+    ).toBe('Word saved “猫” to Gum');
   });
 
   it('promises a queued save will sync rather than claiming success', () => {
     expect(shared.formatSaveResultMessage({ queued: true, mode: 'word', term: '猫' })).toBe(
-      'Queued “猫” — will sync when GrammarX is open',
+      'Queued “猫” — will sync when Gum is open',
     );
     expect(shared.formatCaptureResultMessage({ queued: true })).toBe(
-      'Page queued — will sync when GrammarX is open',
+      'Page queued — will sync when Gum is open',
     );
     expect(shared.formatClipboardResultMessage({ queued: true })).toBe(
-      'Queued — will sync when GrammarX is open',
+      'Queued — will sync when Gum is open',
     );
   });
 
@@ -376,14 +376,14 @@ describe('result messages — what the user is told after an action', () => {
 
   it('names the media it captured', () => {
     expect(shared.formatCaptureResultMessage({ ok: true, action: 'playlist' })).toBe(
-      'Playlist saved to GrammarX',
+      'Playlist saved to Gum',
     );
-    expect(shared.formatCaptureResultMessage({ ok: true, action: 'video' })).toBe('Video saved to GrammarX');
+    expect(shared.formatCaptureResultMessage({ ok: true, action: 'video' })).toBe('Video saved to Gum');
     expect(shared.formatCaptureResultMessage({ ok: true, action: 'video', duplicate: true })).toBe(
-      'Video is already in GrammarX',
+      'Video is already in Gum',
     );
-    expect(shared.formatCaptureResultMessage({ ok: true })).toBe('Page saved to your GrammarX inbox');
-    expect(shared.formatClipboardResultMessage({ ok: true })).toBe('Added to GrammarX clipboard history');
+    expect(shared.formatCaptureResultMessage({ ok: true })).toBe('Page saved to your Gum inbox');
+    expect(shared.formatClipboardResultMessage({ ok: true })).toBe('Added to Gum clipboard history');
   });
 });
 

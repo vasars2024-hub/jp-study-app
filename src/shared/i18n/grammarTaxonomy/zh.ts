@@ -250,7 +250,7 @@ export const GRAMMAR_TAXONOMY_ZH: Catalog = {
   'grammar.filter.hasExamples': '有例句',
   'grammar.filter.levels.jlpt': 'JLPT 等级',
   'grammar.filter.levels.hsk': 'HSK 等级',
-  'grammar.filter.unofficialLevel': 'HSK10 是 GrammarX 自设的阶段，并非官方等级。',
+  'grammar.filter.unofficialLevel': 'HSK10 是 Gum 自设的阶段，并非官方等级。',
   'grammar.register.neutral': '中性',
   'grammar.register.casual': '口语',
   'grammar.register.business': '正式',

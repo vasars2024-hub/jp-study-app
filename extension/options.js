@@ -276,7 +276,7 @@ async function renderShortcuts() {
     return;
   }
   const NAMES = {
-    'save-page': 'Save page to GrammarX',
+    'save-page': 'Save page to Gum',
     'dictionary-popup': 'Look up selection / word under cursor',
     'mine-selection': 'Save selection (word or sentence)',
     'action-wheel': 'Open the action wheel',
@@ -308,12 +308,12 @@ async function testConnection(silent) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     state.textContent = 'app reachable';
     state.className = 'conn-state ok';
-    if (!silent) showStatus('GrammarX is reachable.', 'ok');
+    if (!silent) showStatus('Gum is reachable.', 'ok');
     return true;
   } catch {
     state.textContent = 'app not running';
     state.className = 'conn-state err';
-    if (!silent) showStatus('GrammarX is not running or the port is wrong.', 'err');
+    if (!silent) showStatus('Gum is not running or the port is wrong.', 'err');
     return false;
   }
 }
@@ -353,7 +353,7 @@ document.getElementById('pull-app').addEventListener('click', async () => {
       showStatus('App responded but sent no token — copy it manually from Settings.', 'err');
     }
   } catch {
-    showStatus('Could not pull — open GrammarX and paste the token manually.', 'err');
+    showStatus('Could not pull — open Gum and paste the token manually.', 'err');
   }
 });
 
@@ -362,7 +362,7 @@ document.querySelectorAll('button[data-open]').forEach((btn) => {
     const target = btn.dataset.open;
     const res = await bg({ type: 'ui-open', target });
     showStatus(
-      res?.ok ? 'Opened in GrammarX.' : res?.error || 'GrammarX is not running.',
+      res?.ok ? 'Opened in Gum.' : res?.error || 'Gum is not running.',
       res?.ok ? 'ok' : 'err',
     );
   });

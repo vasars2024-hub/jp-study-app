@@ -10,10 +10,15 @@
 
 const KEY = 'jp-app-zoom';
 
-export const ZOOM_MIN = 0.8;
+export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 2.0;
 export const ZOOM_STEP = 0.1;
-export const ZOOM_DEFAULT = 1;
+// 80%: at 100% the shell read as zoomed-in on a 1280x720 (150%-scaled) laptop screen. Only a
+// profile that never chose a zoom gets this; a saved `jp-app-zoom` is kept as is. The minimum
+// sits below it so "smaller than the default" is still reachable.
+export const ZOOM_DEFAULT = 0.8;
+/** The factor when no zoom is applied at all — what coordinate maths must fall back to. */
+const UNZOOMED = 1;
 
 const EVENT = 'app-zoom-changed';
 
@@ -56,7 +61,7 @@ export function getZoomFactor(): number {
   } catch {
     /* ignore */
   }
-  return ZOOM_DEFAULT;
+  return UNZOOMED;
 }
 
 /**

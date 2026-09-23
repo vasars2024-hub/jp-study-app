@@ -376,7 +376,7 @@ describe('gate 11 — the extension actually asks for the count', () => {
     expect(popup).toContain('followTranscription(res.videoId, res.queuedAt)');
     // And the counter reads the queue's timestamp rather than the poll's.
     expect(popup).toContain('Number.isFinite(res.queuedAt)');
-    expect(popup).toContain('Already transcribing in GrammarX');
+    expect(popup).toContain('Already transcribing in Gum');
   });
 
   it('control: notStarted and failed do not share a sentence in the popup', () => {

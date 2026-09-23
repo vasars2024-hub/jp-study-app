@@ -139,7 +139,7 @@ function beginEntry(reason: SecretLifecycleReason = 'entry'): void {
     phase: 'preboot',
     reason,
     canSkip: false,
-    message: reason === 'restart' ? 'Restarting Secret GrammarX' : 'Preparing Secret GrammarX',
+    message: reason === 'restart' ? 'Restarting Secret Gum' : 'Preparing Secret Gum',
     sequenceId: id,
     startedAt: Date.now(),
   });
@@ -154,7 +154,7 @@ function beginEntry(reason: SecretLifecycleReason = 'entry'): void {
   });
   after(welcomeAt, () => {
     if (state.sequenceId !== id) return;
-    publish({ phase: 'welcome', canSkip: true, message: 'Welcome to Secret GrammarX' });
+    publish({ phase: 'welcome', canSkip: true, message: 'Welcome to Secret Gum' });
   });
   after(revealAt, () => {
     if (state.sequenceId !== id) return;

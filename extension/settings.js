@@ -71,7 +71,7 @@ const JP_DEFAULT_SETTINGS = {
   popupCompact: false,
   popupPinOnClick: true,
   // Saving
-  saveDestination: 'both', // 'app' (GrammarX only) | 'both' (GrammarX + Anki)
+  saveDestination: 'both', // 'app' (Gum only) | 'both' (Gum + Anki)
   folderLabel: 'Extension',
   confirmBeforeCard: true, // show the card preview before Create card sends
   // Media

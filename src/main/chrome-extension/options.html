@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>GrammarX — Extension settings</title>
+    <title>Gum — Extension settings</title>
     <style>
       :root {
         --bg: #13151b;
@@ -229,7 +229,7 @@
   <body>
     <div class="layout">
       <nav class="side" id="nav">
-        <div class="brand">GrammarX</div>
+        <div class="brand">Gum</div>
         <input id="search" type="search" placeholder="Search settings…" aria-label="Search settings" />
         <div class="search-empty" id="search-empty">No settings match.</div>
         <button data-pane="lookup" data-keywords="hover shift key delay scan dictionary popup activation hold editable click">Hover lookup</button>
@@ -301,7 +301,7 @@
               <span class="range-val" id="ai-min-chars-val"></span>
             </div>
             <p class="desc">What the analysis contains, which deck cards go to, and automatic
-              notebook snapshots are set in GrammarX &rarr; Settings &rarr; Study &rarr; AI analysis.
+              notebook snapshots are set in Gum &rarr; Settings &rarr; Study &rarr; AI analysis.
               An API key is required (Flashcards &rarr; AI Card Studio).</p>
           </div>
         </section>
@@ -338,19 +338,19 @@
               <label class="name">When I save a word or sentence</label>
               <div class="radio-group" id="dest-group">
                 <label class="radio-card"><input type="radio" name="dest" value="both" />
-                  <span><b>GrammarX + Anki card</b><span class="sub">Creates an Anki card when Anki is running; a copy is always kept in your GrammarX library.</span></span></label>
+                  <span><b>Gum + Anki card</b><span class="sub">Creates an Anki card when Anki is running; a copy is always kept in your Gum library.</span></span></label>
                 <label class="radio-card"><input type="radio" name="dest" value="app" />
-                  <span><b>GrammarX only</b><span class="sub">Saves to your GrammarX library. “Create card” still sends to Anki explicitly.</span></span></label>
+                  <span><b>Gum only</b><span class="sub">Saves to your Gum library. “Create card” still sends to Anki explicitly.</span></span></label>
               </div>
             </div>
             <label class="check"><input type="checkbox" id="confirm-card" />
-              <span>Preview before creating a card<span class="sub">Shows the text, card type, and destination before sending. Card fields are filled by GrammarX from its dictionaries and your Anki field mapping.</span></span></label>
+              <span>Preview before creating a card<span class="sub">Shows the text, card type, and destination before sending. Card fields are filled by Gum from its dictionaries and your Anki field mapping.</span></span></label>
             <div class="field">
               <label class="name" for="folder-label">Library folder label</label>
-              <p class="desc">Saves from the extension appear under this folder in GrammarX flashcards.</p>
+              <p class="desc">Saves from the extension appear under this folder in Gum flashcards.</p>
               <input id="folder-label" type="text" maxlength="40" />
             </div>
-            <p class="hint">Deck, note type, and field mapping live in the GrammarX app — see <b>Connection</b> for direct links.</p>
+            <p class="hint">Deck, note type, and field mapping live in the Gum app — see <b>Connection</b> for direct links.</p>
           </div>
         </section>
 
@@ -406,7 +406,7 @@
             <div class="field">
               <label class="name" for="yt-mode">Saving a YouTube page</label>
               <select id="yt-mode">
-                <option value="download">Download the media into GrammarX</option>
+                <option value="download">Download the media into Gum</option>
                 <option value="metadata">Save metadata only (track the video/playlist)</option>
               </select>
             </div>
@@ -419,12 +419,12 @@
         <!-- Connection -->
         <section class="pane" id="pane-connection">
           <h1>Connection</h1>
-          <p class="lead">Pairing with the GrammarX desktop app. Everything else — Anki mapping, mining rules, clipboard history — lives in the app itself.</p>
+          <p class="lead">Pairing with the Gum desktop app. Everything else — Anki mapping, mining rules, clipboard history — lives in the app itself.</p>
           <div class="group">
             <h3>Pairing <span class="conn-state" id="conn-state" style="margin-left:10px">unknown</span></h3>
             <div class="field">
               <label class="name" for="token">Pairing token</label>
-              <p class="desc">Copy it from GrammarX → Settings → Study → Chrome extension, or pull it automatically while the app is open.</p>
+              <p class="desc">Copy it from Gum → Settings → Study → Chrome extension, or pull it automatically while the app is open.</p>
               <input id="token" type="password" autocomplete="off" />
             </div>
             <div class="field">
@@ -438,7 +438,7 @@
             </div>
           </div>
           <div class="group">
-            <h3>Open in the GrammarX app</h3>
+            <h3>Open in the Gum app</h3>
             <div class="row">
               <button type="button" class="btn" data-open="anki">Anki &amp; field mapping</button>
               <button type="button" class="btn" data-open="profile-rules">Saving rules (profiles)</button>
@@ -476,7 +476,7 @@
           <p class="lead">Data, migration, and everything that doesn't need to be on by default.</p>
           <div class="group">
             <label class="check"><input type="checkbox" id="log-immersion" />
-              <span>Log reading time to GrammarX<span class="sub">Counts active time on pages with Japanese text toward your immersion statistics.</span></span></label>
+              <span>Log reading time to Gum<span class="sub">Counts active time on pages with Japanese text toward your immersion statistics.</span></span></label>
             <div class="field">
               <label class="name" for="notes">Notes</label>
               <textarea id="notes" placeholder="Optional notes for yourself"></textarea>

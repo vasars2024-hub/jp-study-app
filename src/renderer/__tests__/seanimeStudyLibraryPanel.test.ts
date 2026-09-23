@@ -189,7 +189,7 @@ describe('SeanimeStudyLibraryPanel', () => {
     stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] }, []);
     const html = await render();
     expect(html).toContain('Not imported');
-    expect(html).toContain('Import this file into Study OS');
+    expect(html).toContain('Import this file into Gum');
   });
 
   it('surfaces the no-Japanese-subtitle case, which is 29 of 30 real items', async () => {
@@ -293,12 +293,12 @@ describe('SeanimeStudyLibraryPanel', () => {
   it('offers Import only where importing is the stated next action', async () => {
     stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] }, []);
     const unlinked = await render();
-    expect(unlinked).toContain('aria-label="Import Sousou no Frieren - 01.mkv into Study OS"');
+    expect(unlinked).toContain('aria-label="Import Sousou no Frieren - 01.mkv into Gum"');
 
     // Already in Study OS: an Import button here would do nothing and say nothing.
     stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] }, [mediaItem()]);
     const linked = await render();
-    expect(linked).not.toContain('into Study OS');
+    expect(linked).not.toContain('into Gum');
   });
 
   it('imports through the committed addMediaPaths contract and re-resolves the row', async () => {

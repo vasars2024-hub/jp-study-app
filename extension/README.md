@@ -1,6 +1,6 @@
-# GrammarX Chrome extension (Reader Companion)
+# Gum Chrome extension (Reader Companion)
 
-A Japanese browser-reading companion for the GrammarX desktop app: hover lookup
+A Japanese browser-reading companion for the Gum desktop app: hover lookup
 with grammar and sentence analysis, saving words/sentences to your library,
 Anki card creation, OCR, and page capture.
 
@@ -18,10 +18,10 @@ Reload the extension after updates (`chrome://extensions` → Reload).
 | Verb | Meaning |
 |------|---------|
 | **Look up** | Hold **Shift** (configurable) and hover/click/select Japanese text → reader popup with Meaning / Grammar / Sentence / Kanji / Examples / More tabs |
-| **Save** | Store a word or sentence in your GrammarX library (and Anki, if enabled) |
+| **Save** | Store a word or sentence in your Gum library (and Anki, if enabled) |
 | **Create card** | Explicitly make a flashcard — previews text, type, and destination first |
 | **Capture** | Save a page, OCR a region, import manga pages, record audio |
-| **Open GrammarX** | Jump into the app (inbox, grammar practice, Anki mapping, …) |
+| **Open Gum** | Jump into the app (inbox, grammar practice, Anki mapping, …) |
 
 “Mine” from older versions is now simply **Save** — old settings and wheel
 layouts migrate automatically.

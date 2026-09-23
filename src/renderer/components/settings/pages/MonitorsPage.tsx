@@ -13,13 +13,7 @@ import { useT } from '../../../i18n';
 import { confirmDialog } from '../../ui';
 import type { DisplaySummary } from '../../../../main/displays';
 import type { DisplayAssignment, TaskbarMode } from '../../../../shared/desktop';
-import { MAX_DESKTOPS } from '../../../../shared/desktop';
-import {
-  getAssignments,
-  getDesktopCount,
-  getDesktopName,
-  onDesktopChanged,
-} from '../../../desktopState';
+import { getAssignments, onDesktopChanged } from '../../../desktopState';
 import {
   loadDisplayPrefs,
   onDisplayPrefsChanged,
@@ -34,7 +28,6 @@ export default function MonitorsPage() {
   const { seg, focusSettingId } = useSettings();
   const [displays, setDisplays] = useState<DisplaySummary[]>([]);
   const [assignments, setAssignments] = useState<DisplayAssignment[]>(getAssignments);
-  const [desktopCount, setDesktopCount] = useState(getDesktopCount);
   const [virtualCount, setVirtualCount] = useState(0);
   const [prefs, setPrefs] = useState<DisplayPrefs>(loadDisplayPrefs);
 
@@ -53,7 +46,6 @@ export default function MonitorsPage() {
   useEffect(() => {
     const sync = (): void => {
       setAssignments(getAssignments());
-      setDesktopCount(getDesktopCount());
     };
     sync();
     return onDesktopChanged(sync);
@@ -65,11 +57,6 @@ export default function MonitorsPage() {
   const patch = (displayKey: string, next: Partial<DisplayAssignment>): void => {
     void window.api.deskwinSetOptions({ displayKey, ...next });
   };
-
-  const desktopOptions = Array.from(
-    { length: Math.min(MAX_DESKTOPS, Math.max(desktopCount, 2)) },
-    (_, i) => i,
-  );
 
   return (
     <>
@@ -133,22 +120,9 @@ export default function MonitorsPage() {
                     </span>
                   </label>
 
-                  <label className="os-monitor-field">
-                    <span>{t('settings.monitors.hostsDesktop')}</span>
-                    <select
-                      value={assignment?.desktopIndex ?? 0}
-                      onChange={(e) => {
-                        void window.api.deskwinAssign(display.key, Number(e.target.value));
-                      }}
-                    >
-                      {desktopOptions.map((index) => (
-                        <option key={index} value={index}>
-                          {getDesktopName(index)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
+                  {/* No "Hosts desktop" picker: the app has one desktop per screen today, so it
+                      only offered a choice with nothing behind it. Assignments are still kept
+                      (`deskwinAssign`) and the picker can come back with multi-desktop. */}
                   <div className="os-monitor-field">
                     <span>{t('settings.monitors.taskbar')}</span>
                     <div className="os-viz-row">

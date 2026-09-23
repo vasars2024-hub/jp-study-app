@@ -290,7 +290,7 @@
       ? S.saveWorkingMessage(cfg.saveDestination, forceAnki)
       : forceAnki || cfg.saveDestination === 'both'
         ? 'Creating card…'
-        : 'Saving to GrammarX…';
+        : 'Saving to Gum…';
   }
 
   function formatSaveToast(res) {
@@ -529,7 +529,7 @@
     popup = document.createElement('div');
     popup.id = 'jp-study-popup';
     popup.setAttribute('role', 'dialog');
-    popup.setAttribute('aria-label', 'GrammarX lookup');
+    popup.setAttribute('aria-label', 'Gum lookup');
     popup.innerHTML = `
       <div class="rp-head">
         <button type="button" class="rp-back" data-act="back" title="Back to previous lookup" aria-label="Back" hidden>‹</button>
@@ -568,7 +568,7 @@
         <button type="button" data-act="clip">Add to clipboard history</button>
         <button type="button" data-act="translate">Translate sentence</button>
         <button type="button" data-act="copy">Copy sentence</button>
-        <button type="button" data-act="open-app">Open GrammarX</button>
+        <button type="button" data-act="open-app">Open Gum</button>
       </div>
     `;
     popup.addEventListener('pointerenter', () => {
@@ -717,7 +717,7 @@
     const hit = currentHit;
     if (!hit.entries || !hit.entries.length) {
       const offlineNote = hit.lookupOffline
-        ? 'GrammarX is not running — dictionaries live in the app. Open GrammarX and try again.'
+        ? 'Gum is not running — dictionaries live in the app. Open Gum and try again.'
         : 'No dictionary entries found.';
       body.innerHTML = `<div class="rp-empty">${esc(offlineNote)}</div>`;
       return;
@@ -791,7 +791,7 @@
     if (!res?.ok) {
       body.innerHTML = `<div class="rp-empty">${esc(
         res?.offline
-          ? 'GrammarX is not running — grammar matching needs the app.'
+          ? 'Gum is not running — grammar matching needs the app.'
           : res?.error || 'Grammar matching failed.',
       )}</div><div class="rp-row"><button type="button" class="rp-mini" data-act="retry-grammar">Retry</button></div>`;
       return;
@@ -822,7 +822,7 @@
     body.innerHTML = `
       <div class="rp-sentence-line" lang="ja">${highlightGrammarSpans(sentence, matches, hit.term)}</div>
       ${items}
-      <div class="rp-note">Matches are found by GrammarX's pattern rules on this sentence's text. When several overlap, judgement is yours — open grammar practice for full explanations.</div>
+      <div class="rp-note">Matches are found by Gum's pattern rules on this sentence's text. When several overlap, judgement is yours — open grammar practice for full explanations.</div>
       <div class="rp-row">
         <button type="button" class="rp-mini" data-act="open-grammar">Open grammar practice</button>
         <button type="button" class="rp-mini" data-act="save-sentence">Save sentence</button>
@@ -922,7 +922,7 @@
     }
     bits.push(`<span class="rp-stat">${sentence.length} chars</span>`);
     if ((level && level.offline) || (comp && !comp.ok && !level?.badge)) {
-      bits.push('<span class="rp-dim">GrammarX offline — stats unavailable</span>');
+      bits.push('<span class="rp-dim">Gum offline — stats unavailable</span>');
     }
     statsEl.innerHTML = bits.join(' · ');
   }
@@ -971,7 +971,7 @@
       results.push({ ch, entry: res?.ok && res.entries && res.entries[0] ? res.entries[0] : null, offline: !!res?.offline });
     }
     if (results.every((r) => r.offline)) {
-      body.innerHTML = '<div class="rp-empty">GrammarX is not running — kanji data needs the app.</div>';
+      body.innerHTML = '<div class="rp-empty">Gum is not running — kanji data needs the app.</div>';
       return;
     }
     body.innerHTML = results
@@ -1059,9 +1059,9 @@
       <div class="rp-row">
         <button type="button" class="rp-mini" data-act="translate">Translate sentence</button>
         <button type="button" class="rp-mini" data-act="clip">Add to clipboard history</button>
-        <button type="button" class="rp-mini" data-act="open-app">Open GrammarX</button>
+        <button type="button" class="rp-mini" data-act="open-app">Open Gum</button>
       </div>
-      <div class="rp-note">All dictionary, grammar, and difficulty data comes from your GrammarX desktop app over the local bridge.</div>`;
+      <div class="rp-note">All dictionary, grammar, and difficulty data comes from your Gum desktop app over the local bridge.</div>`;
   }
 
   /* ----- popup event handling ----- */
@@ -1131,12 +1131,12 @@
         return;
       case 'open-app':
         void safeRuntimeSend({ type: 'ui-open', target: 'inbox' }).then((res) => {
-          if (!res?.ok) toast(res?.error || 'GrammarX is not running', 'err');
+          if (!res?.ok) toast(res?.error || 'Gum is not running', 'err');
         });
         return;
       case 'open-grammar':
         void safeRuntimeSend({ type: 'ui-open', target: 'grammar' }).then((res) => {
-          if (!res?.ok) toast(res?.error || 'GrammarX is not running', 'err');
+          if (!res?.ok) toast(res?.error || 'Gum is not running', 'err');
         });
         return;
       case 'retry-grammar':
@@ -1256,7 +1256,7 @@
     const res = await safeRuntimeSend({ type: 'known-level', term: t, level });
     if (res?.invalidated) return;
     if (!res?.ok) {
-      toast(res?.error || 'Could not update known status — is GrammarX running?', 'err');
+      toast(res?.error || 'Could not update known status — is Gum running?', 'err');
       return;
     }
     if (currentHit) currentHit.knownLevel = level;
@@ -1306,7 +1306,7 @@
     if (host && host.isConnected) {
       host.innerHTML = res?.ok
         ? `<div class="rp-more-row"><span class="rp-more-k">Translation</span><span class="rp-more-v">${esc(out || '(empty)')}</span></div>`
-        : `<div class="rp-empty">${esc(res?.error || 'Translation failed — is the model installed in GrammarX?')}</div>`;
+        : `<div class="rp-empty">${esc(res?.error || 'Translation failed — is the model installed in Gum?')}</div>`;
     } else if (res?.ok) {
       toast(out.slice(0, 140) || 'Translated', 'ok');
     } else {
@@ -1808,7 +1808,7 @@
         <textarea class="cp-text" rows="3" lang="ja" aria-label="Card text"></textarea>
         <div class="cp-source"></div>
         <div class="cp-dest"></div>
-        <div class="cp-note">GrammarX fills the card fields (reading, definition, audio) from its dictionaries and your Anki field mapping.</div>
+        <div class="cp-note">Gum fills the card fields (reading, definition, audio) from its dictionaries and your Anki field mapping.</div>
         <div class="cp-actions">
           <button type="button" class="rp-act" data-act="cancel">Cancel</button>
           <button type="button" class="rp-act rp-primary" data-act="send">Create card</button>
@@ -1883,8 +1883,8 @@
     el.querySelector('.cp-source').textContent = `Source: ${document.title || location.href}`;
     el.querySelector('.cp-dest').innerHTML =
       cfg.saveDestination === 'both'
-        ? 'Destination: <b>Anki</b> (falls back to GrammarX if Anki is closed) · copy kept in GrammarX'
-        : 'Destination: <b>GrammarX flashcards</b> — Anki is attempted because you asked for a card';
+        ? 'Destination: <b>Anki</b> (falls back to Gum if Anki is closed) · copy kept in Gum'
+        : 'Destination: <b>Gum flashcards</b> — Anki is attempted because you asked for a card';
     el.classList.add('open');
     el.querySelector('.cp-text').focus();
   }
@@ -1951,7 +1951,7 @@
     wheelEl = document.createElement('div');
     wheelEl.id = 'jp-study-wheel';
     wheelEl.setAttribute('role', 'menu');
-    wheelEl.setAttribute('aria-label', 'GrammarX actions');
+    wheelEl.setAttribute('aria-label', 'Gum actions');
     document.documentElement.appendChild(wheelEl);
     wheelEl.addEventListener('pointermove', onWheelPointerMove);
     wheelEl.addEventListener('pointerup', onWheelPointerUp);
@@ -2319,15 +2319,15 @@
           toast(msg, res?.ok || res?.queued ? 'ok' : 'err', captureToastAction(res));
         } else if (id === 'capture.manga') {
           toast(
-            res?.ok ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into GrammarX Manga` : res?.error || 'Import failed',
+            res?.ok ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into Gum Manga` : res?.error || 'Import failed',
             res?.ok ? 'ok' : 'err',
           );
         } else if (id === 'media.download') {
-          toast(res?.ok ? 'Download queued in GrammarX' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
+          toast(res?.ok ? 'Download queued in Gum' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
         } else if (id === 'tabs.picker') {
           if (!res?.ok) toast(res?.error || 'Could not open the reading list', 'err');
         } else if (id === 'app.open') {
-          if (!res?.ok) toast(res?.error || 'GrammarX is not running', 'err');
+          if (!res?.ok) toast(res?.error || 'Gum is not running', 'err');
         } else {
           toast(res?.ok || res?.queued ? 'Done' : res?.error || 'Failed', res?.ok || res?.queued ? 'ok' : 'err');
         }
@@ -2499,7 +2499,7 @@
     fab.dataset.corner = cfg.fabCorner || 'bottom-right';
     fab.innerHTML = `
       <div class="jp-fab-pills">
-        <span id="jp-study-level-badge" title="Estimated page difficulty (JLPT / HSK bands from your GrammarX settings)">—</span>
+        <span id="jp-study-level-badge" title="Estimated page difficulty (JLPT / HSK bands from your Gum settings)">—</span>
         <span id="jp-study-comp-badge" title="Share of sampled words you already know">—</span>
         <button type="button" class="jp-fab-toggle" data-act="toggle" title="Expand page tools" aria-label="Expand page tools">▾</button>
       </div>
@@ -2662,7 +2662,7 @@
     el.dataset.lang = meta?.lang || '';
     el.classList.toggle('offline', next === '—' || !!meta?.offline);
     el.title = meta?.offline
-      ? 'Difficulty estimate unavailable — GrammarX is not running'
+      ? 'Difficulty estimate unavailable — Gum is not running'
       : next === 'X' || next === '—'
         ? 'No Japanese or Chinese text detected on this page'
         : `Estimated page difficulty: ${next} (vocabulary-band estimate, not an official rating)`;
@@ -2838,7 +2838,7 @@
         const reader = new FileReader();
         reader.onload = () => {
           audioClipboardDataUrl = String(reader.result || '');
-          toast('Recording ready — use Save audio to send it to GrammarX', 'ok');
+          toast('Recording ready — use Save audio to send it to Gum', 'ok');
         };
         reader.onerror = () => toast('Could not read the recording', 'err');
         reader.readAsDataURL(blob);
@@ -3204,7 +3204,7 @@
       <div class="jp-actions">
         <button type="button" class="rp-act rp-primary" data-act="analyze">AI analysis</button>
         <button type="button" class="rp-act" data-act="lookup">Look up</button>
-        <button type="button" class="rp-act" data-act="save">Save to GrammarX</button>
+        <button type="button" class="rp-act" data-act="save">Save to Gum</button>
         <button type="button" class="rp-act" data-act="retry">Re-select</button>
       </div>
     `;
@@ -3285,7 +3285,7 @@
       hint.textContent =
         res?.error ||
         (res?.available === false
-          ? 'OCR models are not installed. Open GrammarX → Settings → Models & dictionaries.'
+          ? 'OCR models are not installed. Open Gum → Settings → Models & dictionaries.'
           : 'OCR failed.');
       el.classList.add('open');
       return;
@@ -3600,11 +3600,11 @@
       const rawErr = (res && res.error) || '';
       aiState.error =
         (res && res.needsKey
-          ? 'AI analysis needs an API key. Add one in GrammarX → Flashcards → AI Card Studio.'
+          ? 'AI analysis needs an API key. Add one in Gum → Flashcards → AI Card Studio.'
           : res && res.needsLocalModel
-            ? 'AI analysis needs the local Qwen model. Install Qwen3-1.7B via GrammarX → Translate, or switch to Cloud in Flashcards → AI Card Studio.'
+            ? 'AI analysis needs the local Qwen model. Install Qwen3-1.7B via Gum → Translate, or switch to Cloud in Flashcards → AI Card Studio.'
             : rawErr === 'Not found'
-              ? 'GrammarX is outdated or not fully started — restart the app, then reload this extension.'
+              ? 'Gum is outdated or not fully started — restart the app, then reload this extension.'
               : rawErr) || 'The analysis failed.';
     }
     renderAiAnalysis();

@@ -371,7 +371,7 @@ function refreshTrayMenu(): void {
       click: () => triggerFromClipboard(),
     },
     { type: 'separator' },
-    { label: 'Open Study OS', click: () => focusMainWindow() },
+    { label: 'Open Gum', click: () => focusMainWindow() },
     { label: 'Quit', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);

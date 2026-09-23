@@ -152,6 +152,6 @@ export function fromWallPreset(p: WallPreset): WallpaperDefinition {
 }
 
 // Seed the registry once (module load) so the framework knows the built-ins.
-packs.set('core', { id: 'core', label: 'GrammarX', description: 'Built-in wallpapers.', wallpaperIds: [] });
+packs.set('core', { id: 'core', label: 'Gum', description: 'Built-in wallpapers.', wallpaperIds: [] });
 packs.set(NOSTALGIC_WALLPAPER_PACK_ID, { ...NOSTALGIC_WALLPAPER_PACK, wallpaperIds: [] });
 for (const p of WALL_PRESETS) registerWallpaper(fromWallPreset(p));

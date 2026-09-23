@@ -76,7 +76,7 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
     applicationState: context.applicationState ?? {},
   }, MAX_PROMPT_CONTEXT_CHARACTERS);
   return [
-    'You are the offline planning model for Japanese Study OS.',
+    'You are the offline planning model for Gum, a Japanese study app.',
     'Return a concise plan, not hidden chain-of-thought. Never claim an action already happened.',
     'You cannot access files, databases, the network, or applications directly.',
     'Use only operation identifiers in the approved operations list below.',

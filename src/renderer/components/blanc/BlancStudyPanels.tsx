@@ -779,7 +779,7 @@ export function BlancNotebookPanel() {
         <legend>Timeline</legend>
         {unreachable && (
           <p className="blanc-note">
-            Blanc has no surface for “{unreachable}” — open it from the Study OS window.
+            Blanc has no surface for “{unreachable}” — open it from the main Gum window.
           </p>
         )}
         <NotebookTimeline state={state} onOpen={onOpen} />

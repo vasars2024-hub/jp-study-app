@@ -173,7 +173,7 @@ const UI_OPEN_TARGETS = new Set([
   'special',
 ]);
 
-/** Focus a GrammarX window and tell the renderer to open an in-app surface. */
+/** Focus a Gum window and tell the renderer to open an in-app surface. */
 function broadcastUiOpen(target: string, extra?: Record<string, unknown>): boolean {
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) return false;
@@ -197,7 +197,7 @@ function requestKnownLevels(terms: string[]): Promise<KnownLevelsBridgeResult> {
   if (!list.length) return Promise.resolve({ ok: true, levels: {} });
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) {
-    return Promise.resolve({ ok: false, error: 'GrammarX window is not open', levels: {} });
+    return Promise.resolve({ ok: false, error: 'Gum window is not open', levels: {} });
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -220,7 +220,7 @@ function requestLevelEstimate(text: string): Promise<LevelEstimateBridgeResult> 
     return Promise.resolve({
       ok: false,
       badge: '—',
-      error: 'GrammarX window is not open',
+      error: 'Gum window is not open',
     });
   }
   const id = crypto.randomUUID();
@@ -240,7 +240,7 @@ function requestClipboardList(): Promise<ClipboardListBridgeResult> {
   const id = crypto.randomUUID();
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) {
-    return Promise.resolve({ ok: false, error: 'GrammarX window is not open', entries: [] });
+    return Promise.resolve({ ok: false, error: 'Gum window is not open', entries: [] });
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -257,7 +257,7 @@ function requestClipboardList(): Promise<ClipboardListBridgeResult> {
 function requestSetKnownLevel(term: string, level: number): Promise<{ ok: boolean; error?: string }> {
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) {
-    return Promise.resolve({ ok: false, error: 'GrammarX window is not open' });
+    return Promise.resolve({ ok: false, error: 'Gum window is not open' });
   }
   const id = crypto.randomUUID();
   return new Promise((resolve) => {
@@ -282,7 +282,7 @@ function requestComprehensibility(text: string): Promise<{
   const sample = String(text || '').slice(0, MAX_LEVEL_ESTIMATE_CHARS);
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) {
-    return Promise.resolve({ ok: false, error: 'GrammarX window is not open' });
+    return Promise.resolve({ ok: false, error: 'Gum window is not open' });
   }
   const id = crypto.randomUUID();
   return new Promise((resolve) => {
@@ -306,7 +306,7 @@ function requestGrammarMatch(text: string): Promise<{
   if (!sample) return Promise.resolve({ ok: false, error: 'text required', matches: [] });
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) {
-    return Promise.resolve({ ok: false, error: 'GrammarX window is not open', matches: [] });
+    return Promise.resolve({ ok: false, error: 'Gum window is not open', matches: [] });
   }
   const id = crypto.randomUUID();
   return new Promise((resolve) => {
@@ -326,7 +326,7 @@ function requestWhisperTranscribe(pcm: ArrayBuffer): Promise<{ ok: boolean; text
   const id = crypto.randomUUID();
   const windows = BrowserWindow.getAllWindows();
   if (!windows.length) {
-    return Promise.resolve({ ok: false, error: 'GrammarX window is not open — open the app to transcribe.' });
+    return Promise.resolve({ ok: false, error: 'Gum window is not open — open the app to transcribe.' });
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -697,7 +697,7 @@ async function handleMine(body: {
   audioBase64?: string;
   audioFilename?: string;
   audioDataUrl?: string;
-  /** When false, skip AnkiConnect and save only to GrammarX flashcards. */
+  /** When false, skip AnkiConnect and save only to Gum flashcards. */
   preferAnki?: boolean;
   /** Force Anki attempt regardless of preferAnki (dictionary “Add to Anki”). */
   forceAnki?: boolean;
@@ -858,7 +858,7 @@ async function handleMine(body: {
         error: anki.error,
         noteId: anki.noteId,
       },
-      app: { ok: true, folder, label: 'GrammarX' },
+      app: { ok: true, folder, label: 'Gum' },
     },
   };
 }
@@ -1640,7 +1640,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         lang: body.lang,
       });
       if (!opened) {
-        json(res, 503, { ok: false, error: 'GrammarX window is not open' });
+        json(res, 503, { ok: false, error: 'Gum window is not open' });
         return;
       }
       json(res, 200, { ok: true, target });

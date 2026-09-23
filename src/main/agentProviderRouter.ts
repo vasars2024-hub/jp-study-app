@@ -80,7 +80,7 @@ export interface AgentProviderExecutionResult {
  * having opened a surface would be that claim, produced by us rather than by it.
  */
 const MODE_PRESETS: Partial<Record<AgentWorkspaceMode, string>> = {
-  navigate: 'Answer as Study OS navigation help. Name the exact app, page and control the user needs, and give the steps to reach it in order. You cannot open surfaces yourself, so describe the route rather than claiming to have opened anything.',
+  navigate: 'Answer as Gum navigation help. Name the exact app, page and control the user needs, and give the steps to reach it in order. You cannot open surfaces yourself, so describe the route rather than claiming to have opened anything.',
   study: 'Answer as a Japanese study assistant. Explain the language in the material — readings, grammar and usage — and keep explanations concrete enough to act on rather than general advice.',
   analyze: 'Break the material down before answering: identify its parts, what each one does, and only then give the conclusion. Say which parts of the material you are drawing on, and say plainly when the material does not settle the question.',
   create: 'Produce the requested material itself rather than describing how it might be written. Match any format, length or style the request names, and mark anything you had to invent where the request left it unspecified.',
@@ -240,7 +240,7 @@ function promptWithContext(
   });
   const contextSuffix = context.length === 0
     ? ''
-    : `\n\nSelected Study OS context:\n${rows.join('\n\n')}`;
+    : `\n\nSelected Gum context:\n${rows.join('\n\n')}`;
   const attachmentsSuffix = attachmentSuffix(attachments);
   const withoutHistory = `${head}${contextSuffix}${attachmentsSuffix}`;
   // The user's retained-chat policy narrows the built-in ceiling and never the

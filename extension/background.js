@@ -19,13 +19,13 @@ import './settings.js';
 
 const S = globalThis.jpStudyShared || {};
 if (!S.resolveCommandId) {
-  console.error('[GrammarX] shared.js did not publish jpStudyShared in the service worker.');
+  console.error('[Gum] shared.js did not publish jpStudyShared in the service worker.');
 }
 
 /** Throw a diagnosable error instead of a bare TypeError when shared.js is missing. */
 function assertSharedLoaded() {
   if (S.resolveCommandId) return;
-  throw new Error('Extension scripts failed to load — reload GrammarX in chrome://extensions');
+  throw new Error('Extension scripts failed to load — reload Gum in chrome://extensions');
 }
 const SETTINGS = globalThis.jpStudySettings || null;
 const DEFAULT_PORT = S.DEFAULT_PORT || 18765;
@@ -56,7 +56,7 @@ async function getSettings() {
 }
 
 /**
- * Routes that older GrammarX builds lack — a bare 404 means restart/update the app.
+ * Routes that older Gum builds lack — a bare 404 means restart/update the app.
  *
  * The boundary is load-bearing: unanchored, this also claimed any future
  * `/v1/sentence-analysis-v2` or `-batch` route, so a 404 from a genuinely missing
@@ -66,11 +66,11 @@ async function getSettings() {
 const APP_UPDATE_PATHS = /^\/v1\/sentence-analysis(?:[/?]|$)/;
 
 const APP_OUTDATED_MSG =
-  'GrammarX is outdated or not fully started — restart the app, then reload this extension.';
+  'Gum is outdated or not fully started — restart the app, then reload this extension.';
 
 /** A reachable app that rejects our token. Waiting never fixes it; re-pairing does. */
 const AUTH_FAILED_MSG =
-  'GrammarX rejected this extension — re-pair it from the app\'s Companions settings.';
+  'Gum rejected this extension — re-pair it from the app\'s Companions settings.';
 
 async function apiFetch(path, opts = {}) {
   const { token, port } = await getConfig();
@@ -84,7 +84,7 @@ async function apiFetch(path, opts = {}) {
       body: opts.body,
     });
   } catch (err) {
-    const offline = new Error('GrammarX is not running — open the app, then retry.');
+    const offline = new Error('Gum is not running — open the app, then retry.');
     offline.status = 0;
     offline.offline = true;
     offline.cause = err;
@@ -174,7 +174,7 @@ async function enqueue(kind, payload) {
     await chrome.storage.local.set({ [QUEUE_KEY]: queue });
   } catch (err) {
     const quota = new Error(
-      'Local storage is full — open GrammarX to sync the queued items, then retry.',
+      'Local storage is full — open Gum to sync the queued items, then retry.',
     );
     quota.quota = true;
     quota.cause = err;
@@ -419,8 +419,8 @@ function saveQueuedResponse(payload, mode, text) {
 }
 
 /**
- * Save text to the GrammarX library, optionally creating an Anki card.
- * The bridge always keeps the GrammarX copy; `preferAnki` additionally
+ * Save text to the Gum library, optionally creating an Anki card.
+ * The bridge always keeps the Gum copy; `preferAnki` additionally
  * attempts an Anki card, `forceAnki` requires the attempt.
  */
 async function saveText(tab, text, mode, opts = {}) {
@@ -1112,9 +1112,9 @@ const CONTEXT_MENU_ITEMS = [
   { id: 'save.sentence', title: 'Save sentence', contexts: ['selection'] },
   { id: 'card.create', title: 'Create flashcard', contexts: ['selection'] },
   { id: 'sep-1', type: 'separator', contexts: ['page', 'selection'] },
-  { id: 'capture.page', title: 'Save page to GrammarX', contexts: ['page'] },
+  { id: 'capture.page', title: 'Save page to Gum', contexts: ['page'] },
   { id: 'capture.ocr', title: 'OCR capture (drag a box)', contexts: ['page', 'image'] },
-  { id: 'app.open', title: 'Open GrammarX', contexts: ['page'] },
+  { id: 'app.open', title: 'Open Gum', contexts: ['page'] },
 ];
 
 function rebuildContextMenus() {
@@ -1172,7 +1172,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (msg) await toastOnTab(tab, msg, res?.ok || res?.queued ? 'ok' : 'err');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn('[GrammarX extension]', err);
+    console.warn('[Gum extension]', err);
     await toastOnTab(tab, msg || 'Action failed', 'err');
   }
 });
@@ -1208,7 +1208,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn('[GrammarX extension]', err);
+    console.warn('[Gum extension]', err);
     await toastOnTab(tab, msg || 'Command failed', 'err');
   }
 });
@@ -1231,14 +1231,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             running: true,
             paired: auth ? false : undefined,
             status: res.status,
-            error: auth ? AUTH_FAILED_MSG : `GrammarX answered HTTP ${res.status}.`,
+            error: auth ? AUTH_FAILED_MSG : `Gum answered HTTP ${res.status}.`,
           });
           return;
         }
         sendResponse({ ok: true, running: true, paired: true, data: await res.json() });
       } catch {
         // Nothing answered on the port — this is the genuine not-running case.
-        sendResponse({ ok: false, running: false, error: 'GrammarX is not running.' });
+        sendResponse({ ok: false, running: false, error: 'Gum is not running.' });
       }
       return;
     }

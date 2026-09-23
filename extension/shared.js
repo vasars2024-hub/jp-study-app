@@ -284,7 +284,7 @@ const COMMANDS = [
     id: 'save.word',
     label: 'Save word',
     shortLabel: 'Word',
-    description: 'Save the selected word to your GrammarX library.',
+    description: 'Save the selected word to your Gum library.',
     category: 'save',
     contexts: ['selection'],
     wheel: true,
@@ -294,7 +294,7 @@ const COMMANDS = [
     id: 'save.sentence',
     label: 'Save sentence',
     shortLabel: 'Sentence',
-    description: 'Save the selected or detected sentence to your GrammarX library.',
+    description: 'Save the selected or detected sentence to your Gum library.',
     category: 'save',
     contexts: ['selection'],
     wheel: true,
@@ -304,7 +304,7 @@ const COMMANDS = [
     id: 'card.create',
     label: 'Create card',
     shortLabel: 'Card',
-    description: 'Create a flashcard from the selection (Anki when available; a copy always stays in GrammarX).',
+    description: 'Create a flashcard from the selection (Anki when available; a copy always stays in Gum).',
     category: 'card',
     contexts: ['selection'],
     wheel: true,
@@ -314,7 +314,7 @@ const COMMANDS = [
     id: 'capture.page',
     label: 'Save page',
     shortLabel: 'Page',
-    description: 'Save this page (article, video, or playlist) into GrammarX.',
+    description: 'Save this page (article, video, or playlist) into Gum.',
     category: 'capture',
     contexts: ['page'],
     wheel: true,
@@ -344,7 +344,7 @@ const COMMANDS = [
     id: 'capture.audio.save',
     label: 'Save audio',
     shortLabel: 'Audio',
-    description: 'Save the last recording into GrammarX.',
+    description: 'Save the last recording into Gum.',
     category: 'capture',
     contexts: ['page'],
     wheel: true,
@@ -354,7 +354,7 @@ const COMMANDS = [
     id: 'capture.manga',
     label: 'Import manga pages',
     shortLabel: 'Manga',
-    description: 'Scan a long-strip / webtoon page and import the panels into GrammarX.',
+    description: 'Scan a long-strip / webtoon page and import the panels into Gum.',
     category: 'capture',
     contexts: ['page:manga'],
     wheel: true,
@@ -364,7 +364,7 @@ const COMMANDS = [
     id: 'media.download',
     label: 'Download video',
     shortLabel: 'Download',
-    description: 'Download the current YouTube video or playlist into GrammarX.',
+    description: 'Download the current YouTube video or playlist into Gum.',
     category: 'capture',
     contexts: ['page:youtube'],
     wheel: true,
@@ -387,7 +387,7 @@ const COMMANDS = [
     id: 'clipboard.send',
     label: 'Send to clipboard history',
     shortLabel: 'Clip',
-    description: 'Add the selection to the GrammarX clipboard history.',
+    description: 'Add the selection to the Gum clipboard history.',
     category: 'save',
     contexts: ['selection'],
     wheel: true,
@@ -397,7 +397,7 @@ const COMMANDS = [
     id: 'translate.selection',
     label: 'Translate',
     shortLabel: 'Translate',
-    description: 'Translate the selection with the GrammarX translation model.',
+    description: 'Translate the selection with the Gum translation model.',
     category: 'read',
     contexts: ['selection'],
     wheel: true,
@@ -455,9 +455,9 @@ const COMMANDS = [
   },
   {
     id: 'app.open',
-    label: 'Open GrammarX',
+    label: 'Open Gum',
     shortLabel: 'App',
-    description: 'Bring the GrammarX desktop app to the front.',
+    description: 'Bring the Gum desktop app to the front.',
     category: 'app',
     contexts: ['page'],
     wheel: true,
@@ -467,7 +467,7 @@ const COMMANDS = [
     id: 'settings.special',
     label: 'Special modules',
     shortLabel: 'Special',
-    description: 'Open the hidden Special modules settings page in GrammarX.',
+    description: 'Open the hidden Special modules settings page in Gum.',
     category: 'app',
     contexts: ['page'],
     wheel: true,
@@ -545,7 +545,7 @@ function commandAvailableOnPage(id, pageKind, category) {
 /* ----------------------------------------------------------------------------
  * Save destinations
  *
- * The bridge always keeps a copy in the GrammarX library. The only real
+ * The bridge always keeps a copy in the Gum library. The only real
  * choice is whether Anki cards are also created. Keep the model that honest.
  * -------------------------------------------------------------------------- */
 
@@ -558,7 +558,7 @@ function savePrimaryDestination(destination, forceAnki) {
 function saveWorkingMessage(destination, forceAnki) {
   return savePrimaryDestination(destination, forceAnki) === 'anki'
     ? 'Creating card…'
-    : 'Saving to GrammarX…';
+    : 'Saving to Gum…';
 }
 
 /** Human-readable save / card result for toasts and popup status. */
@@ -570,16 +570,16 @@ function formatSaveResultMessage(res) {
   const term = res.term ? ` “${String(res.term).slice(0, 40)}”` : '';
 
   if (res.queued) {
-    return `Queued${term} — will sync when GrammarX is open`;
+    return `Queued${term} — will sync when Gum is open`;
   }
 
   const anki = res.anki || (res.destinations && res.destinations.anki) || null;
   if (anki && anki.ok) {
     const deck = [res.profileName, res.deckName].filter(Boolean).join(' / ');
-    return `Card created in Anki${term}${deck ? ` (${deck})` : ''} · saved in GrammarX`;
+    return `Card created in Anki${term}${deck ? ` (${deck})` : ''} · saved in Gum`;
   }
 
-  const parts = [`${kind} saved${term} to GrammarX`];
+  const parts = [`${kind} saved${term} to Gum`];
   const ankiAttempted =
     res.ankiAttempted === true ||
     (res.ankiAttempted !== false &&
@@ -594,16 +594,16 @@ function formatSaveResultMessage(res) {
 
 function formatClipboardResultMessage(res) {
   if (!res?.ok && !res?.queued) return res?.error || 'Could not add to clipboard history';
-  if (res.queued) return 'Queued — will sync when GrammarX is open';
-  return 'Added to GrammarX clipboard history';
+  if (res.queued) return 'Queued — will sync when Gum is open';
+  return 'Added to Gum clipboard history';
 }
 
 function formatCaptureResultMessage(res) {
   if (!res?.ok && !res?.queued) return res?.error || 'Could not save this page';
-  if (res.queued) return 'Page queued — will sync when GrammarX is open';
-  if (res.action === 'playlist') return 'Playlist saved to GrammarX';
-  if (res.action === 'video') return res.duplicate ? 'Video is already in GrammarX' : 'Video saved to GrammarX';
-  return 'Page saved to your GrammarX inbox';
+  if (res.queued) return 'Page queued — will sync when Gum is open';
+  if (res.action === 'playlist') return 'Playlist saved to Gum';
+  if (res.action === 'video') return res.duplicate ? 'Video is already in Gum' : 'Video saved to Gum';
+  return 'Page saved to your Gum inbox';
 }
 
 /* ---------------------------------------------------------------------------- */

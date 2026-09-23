@@ -496,7 +496,7 @@ describe('workflow-preset modes', () => {
     expect(routed.indexOf(agentModePreset('navigate'))).toBe(0);
     expect(routed.indexOf('Where is it?'))
       .toBeGreaterThan(routed.indexOf(agentModePreset('navigate')));
-    expect(routed.indexOf('Selected Study OS context:'))
+    expect(routed.indexOf('Selected Gum context:'))
       .toBeGreaterThan(routed.indexOf('Where is it?'));
   });
 
@@ -590,7 +590,7 @@ describe('workflow-preset modes', () => {
     expect(routed).not.toContain('must not be sent');
     expect(routed.indexOf('turn-2')).toBeLessThan(routed.indexOf('turn-13'));
     expect(routed.indexOf('turn-13')).toBeLessThan(routed.indexOf('Current user request:'));
-    expect(routed.indexOf('Continue.')).toBeLessThan(routed.indexOf('Selected Study OS context:'));
+    expect(routed.indexOf('Continue.')).toBeLessThan(routed.indexOf('Selected Gum context:'));
     expect(result.provider.historyMessageIds)
       .toEqual(Array.from({ length: 12 }, (_, index) => `history-${index + 2}`));
     expect(result.provider.inputChars).toBe(routed.length);

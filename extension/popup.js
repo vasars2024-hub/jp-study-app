@@ -134,7 +134,7 @@ async function refreshPage() {
 }
 
 /**
- * What GrammarX already knows about THIS video's audio, before anything is
+ * What Gum already knows about THIS video's audio, before anything is
  * clicked.
  *
  * `/v1/transcribe/status` knew all of this already and nothing asked it except
@@ -158,7 +158,7 @@ async function showTranscriptionPill() {
   if (!res || res.state === 'notStarted') return;
   let pill = null;
   if (res.state === 'transcribed') {
-    pill = `<span class="pill" title="Already in the GrammarX catalogue — mine it without returning here">Transcribed · ${escapeHtml(String(res.cueCount))} cues</span>`;
+    pill = `<span class="pill" title="Already in the Gum catalogue — mine it without returning here">Transcribed · ${escapeHtml(String(res.cueCount))} cues</span>`;
   } else if (res.state === 'pending') {
     const secs = Number.isFinite(res.queuedAt) ? Math.round((Date.now() - res.queuedAt) / 1000) : null;
     pill = `<span class="pill">Transcribing${secs === null ? '' : ` · ${secs}s`}</span>`;
@@ -194,7 +194,7 @@ function renderActions() {
   const scriptable = !!detect?.scriptable;
   let items;
   if (!scriptable) {
-    items = [{ id: 'open-app', label: 'Open GrammarX', primary: true }];
+    items = [{ id: 'open-app', label: 'Open Gum', primary: true }];
   } else if (kind === 'youtube-video' || kind === 'youtube-playlist') {
     items = [
       { id: 'capture-page', label: kind === 'youtube-playlist' ? 'Save playlist' : 'Save video', primary: true },
@@ -250,9 +250,9 @@ actionsEl.addEventListener('click', async (e) => {
     } else if (action === 'download') {
       feedback('Queueing download…', 'pending');
       const res = await send({ type: 'run-command', command: 'media.download' });
-      feedback(res?.ok ? 'Download queued in GrammarX.' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
+      feedback(res?.ok ? 'Download queued in Gum.' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
     } else if (action === 'transcribe') {
-      feedback('Asking GrammarX to transcribe…', 'pending');
+      feedback('Asking Gum to transcribe…', 'pending');
       const res = await send({ type: 'run-command', command: 'media.transcribe' });
       feedback(formatTranscribe(res), res?.ok ? 'ok' : 'err');
       // Not awaited: the job runs for minutes and the button must not stay
@@ -269,13 +269,13 @@ actionsEl.addEventListener('click', async (e) => {
       const res = await send({ type: 'scan-strip' });
       feedback(
         res?.ok
-          ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into GrammarX Manga.`
+          ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into Gum Manga.`
           : res?.error || 'Import failed',
         res?.ok ? 'ok' : 'err',
       );
     } else if (action === 'open-app') {
       const res = await send({ type: 'ui-open', target: 'inbox' });
-      if (!res?.ok) feedback(res?.error || 'GrammarX is not running', 'err');
+      if (!res?.ok) feedback(res?.error || 'Gum is not running', 'err');
       else window.close();
     }
   } finally {
@@ -294,10 +294,10 @@ const TRANSCRIBE_REFUSALS = {
   notAVideoPage: 'Open a video page first — there is no audio on this one.',
   noVideoId: 'This YouTube URL has no video in it.',
   notDownloaded: 'Download this video first — Whisper reads the file, not the page.',
-  audioMissing: 'GrammarX has a record of this video but its file is gone.',
-  transcriberOffline: 'GrammarX is running but its transcriber is not ready yet.',
-  'host-not-registered': 'GrammarX is running but its transcriber is not ready yet.',
-  'item-not-found': 'GrammarX no longer has this video in its media library.',
+  audioMissing: 'Gum has a record of this video but its file is gone.',
+  transcriberOffline: 'Gum is running but its transcriber is not ready yet.',
+  'host-not-registered': 'Gum is running but its transcriber is not ready yet.',
+  'item-not-found': 'Gum no longer has this video in its media library.',
 };
 
 /**
@@ -350,9 +350,9 @@ async function followTranscription(videoId, startedAt) {
       feedback('Nothing has been downloaded for this video yet, so no transcription has run.', 'err');
       return;
     }
-    feedback(`Transcribing in GrammarX… ${elapsed()}`, 'pending');
+    feedback(`Transcribing in Gum… ${elapsed()}`, 'pending');
   }
-  feedback('Still transcribing in GrammarX — it will appear in the catalogue.', 'pending');
+  feedback('Still transcribing in Gum — it will appear in the catalogue.', 'pending');
 }
 
 function formatTranscribe(res) {
@@ -360,14 +360,14 @@ function formatTranscribe(res) {
   if (res.state === 'transcribed') {
     return `Already transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`;
   }
-  if (res.state === 'queued') return 'Transcribing in GrammarX — it will appear in the catalogue.';
+  if (res.state === 'queued') return 'Transcribing in Gum — it will appear in the catalogue.';
   // A second click on a job already running. Saying "queued" here would claim a
   // new job was started; nothing was, and `enqueueTranscription` deduplicated.
   if (res.state === 'running') {
     const secs = Number.isFinite(res.queuedAt) ? Math.round((Date.now() - res.queuedAt) / 1000) : null;
     return secs === null
-      ? 'Already transcribing in GrammarX — nothing new was queued.'
-      : `Already transcribing in GrammarX for ${secs}s — nothing new was queued.`;
+      ? 'Already transcribing in Gum — nothing new was queued.'
+      : `Already transcribing in Gum for ${secs}s — nothing new was queued.`;
   }
   if (res.state === 'refused') {
     return TRANSCRIBE_REFUSALS[res.reason] || res.reason || 'Transcription refused';
@@ -378,18 +378,18 @@ function formatTranscribe(res) {
 function formatSave(res) {
   if (!res) return 'Save failed';
   if (!res.ok && !res.queued) return res.error || 'Save failed';
-  if (res.queued) return 'Queued — will sync when GrammarX is open.';
-  if (res.anki?.ok) return 'Card created in Anki · saved in GrammarX.';
-  return 'Saved to GrammarX.';
+  if (res.queued) return 'Queued — will sync when Gum is open.';
+  if (res.anki?.ok) return 'Card created in Anki · saved in Gum.';
+  return 'Saved to Gum.';
 }
 
 function formatCapture(res) {
   if (!res) return 'Could not save this page';
   if (!res.ok && !res.queued) return res.error || 'Could not save this page';
-  if (res.queued) return 'Page queued — will sync when GrammarX is open.';
-  if (res.action === 'playlist') return 'Playlist saved to GrammarX.';
-  if (res.action === 'video') return res.duplicate ? 'Video is already in GrammarX.' : 'Video saved to GrammarX.';
-  return 'Page saved to your GrammarX inbox.';
+  if (res.queued) return 'Page queued — will sync when Gum is open.';
+  if (res.action === 'playlist') return 'Playlist saved to Gum.';
+  if (res.action === 'video') return res.duplicate ? 'Video is already in Gum.' : 'Video saved to Gum.';
+  return 'Page saved to your Gum inbox.';
 }
 
 /* --------------------------------- recent ---------------------------------- */
@@ -432,7 +432,7 @@ document.getElementById('nav-tabs').addEventListener('click', async () => {
 document.getElementById('nav-app').addEventListener('click', async () => {
   const res = await send({ type: 'ui-open', target: 'inbox' });
   if (res?.ok) window.close();
-  else feedback(res?.error || 'GrammarX is not running — start the desktop app.', 'err');
+  else feedback(res?.error || 'Gum is not running — start the desktop app.', 'err');
 });
 
 document.getElementById('nav-settings').addEventListener('click', () => {

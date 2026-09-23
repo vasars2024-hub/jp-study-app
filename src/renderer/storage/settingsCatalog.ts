@@ -355,7 +355,7 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     id: 'game-arena-progress',
     label: 'Game Arena progress',
     description:
-      'XP, streaks, high scores, and per-game seen-item coverage — intentionally separate from study memory; not shared between Blanc and Study OS beyond being the same install.',
+      'XP, streaks, high scores, and per-game seen-item coverage — intentionally separate from study memory; not shared between Blanc and the main Gum window beyond being the same install.',
     category: 'Data',
     lsPrefixes: ['jp-game-'],
     clearable: true,

@@ -5,8 +5,8 @@
  * 35-line function, and every user-visible failure string in the companion is
  * produced by it. It classifies four situations:
  *
- *   fetch rejects          → "GrammarX is not running", offline = true, status 0
- *   404 on an app-update   → "GrammarX is outdated…",  offline = false
+ *   fetch rejects          → "Gum is not running", offline = true, status 0
+ *   404 on an app-update   → "Gum is outdated…",  offline = false
  *     path (/v1/sentence-analysis*)
  *   any other !res.ok      → the app's own `error`, or `HTTP <status>`
  *   res.ok                 → the parsed body, or null if it did not parse
@@ -23,11 +23,11 @@
 import { describe, expect, it } from 'vitest';
 import { bootBackground, readExtensionFile, type BackgroundHarness, type Responder } from './extensionHarness';
 
-const OFFLINE_MSG = 'GrammarX is not running — open the app, then retry.';
+const OFFLINE_MSG = 'Gum is not running — open the app, then retry.';
 const OUTDATED_MSG =
-  'GrammarX is outdated or not fully started — restart the app, then reload this extension.';
+  'Gum is outdated or not fully started — restart the app, then reload this extension.';
 /** What a 401/403 reads as, whatever the app's own wording was. */
-const AUTH_MSG = "GrammarX rejected this extension — re-pair it from the app's Companions settings.";
+const AUTH_MSG = "Gum rejected this extension — re-pair it from the app's Companions settings.";
 
 const APP_DOWN: Responder = () => 'network-error';
 
@@ -332,7 +332,7 @@ describe('the health probe does not use apiFetch, and says so differently', () =
     // this remains unfixed. What is new is `running`, which lets a caller tell
     // this apart from the reachable-but-refusing case below without parsing the
     // sentence — so the duplication no longer costs anyone a diagnosis.
-    expect(health).toEqual({ ok: false, running: false, error: 'GrammarX is not running.' });
+    expect(health).toEqual({ ok: false, running: false, error: 'Gum is not running.' });
     expect(health.error).not.toBe(OFFLINE_MSG);
   });
 
@@ -356,7 +356,7 @@ describe('the health probe does not use apiFetch, and says so differently', () =
     // A 500 is neither closed nor unpaired, so `paired` stays undetermined
     // rather than accusing a working pairing.
     const res = (await h.send({ type: 'health' })) as ApiResult & { running?: boolean; paired?: boolean };
-    expect(res).toMatchObject({ ok: false, running: true, status: 500, error: 'GrammarX answered HTTP 500.' });
+    expect(res).toMatchObject({ ok: false, running: true, status: 500, error: 'Gum answered HTTP 500.' });
     expect(res.paired).toBeUndefined();
   });
 

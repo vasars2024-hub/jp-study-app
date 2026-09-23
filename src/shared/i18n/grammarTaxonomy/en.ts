@@ -277,7 +277,7 @@ export const GRAMMAR_TAXONOMY_EN: Catalog = {
   'grammar.filter.hasExamples': 'Has examples',
   'grammar.filter.levels.jlpt': 'JLPT level',
   'grammar.filter.levels.hsk': 'HSK level',
-  'grammar.filter.unofficialLevel': 'HSK10 is a GrammarX progression step, not an official band.',
+  'grammar.filter.unofficialLevel': 'HSK10 is a Gum-specific step, not an official band.',
   'grammar.register.neutral': 'Neutral',
   'grammar.register.casual': 'Casual',
   'grammar.register.business': 'Formal',
