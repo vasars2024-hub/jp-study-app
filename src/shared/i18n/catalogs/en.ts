@@ -10450,6 +10450,9 @@ export const en: Catalog = {
     'This read no longer records where its file was.',
   'ankiWorkbench.sessions.covered': '{covered} of {total} notes read',
   'ankiWorkbench.sessions.discard': 'Discard',
+  'ankiWorkbench.sessions.discardConfirm.title': 'Discard recent read?',
+  'ankiWorkbench.sessions.discardConfirm.message': 'Discard the saved reading progress for {label}? You can read the file again later.',
+  'ankiWorkbench.sessions.discardFailed': 'Could not discard this recent read. Try again.',
   'ankiWorkbench.sessions.resume': 'Resume from note {offset}',
   'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'This read has nothing left to continue.',
   'ankiWorkbench.sessions.resumeRefused.source-changed':

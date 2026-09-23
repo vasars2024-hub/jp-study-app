@@ -9942,6 +9942,9 @@ export const ja: Catalog = {
     'この読み込みはファイルの場所を記録していません。',
   'ankiWorkbench.sessions.covered': '{total} 件中 {covered} 件を読み込み済み',
   'ankiWorkbench.sessions.discard': '破棄',
+  'ankiWorkbench.sessions.discardConfirm.title': '読み込み履歴を破棄しますか？',
+  'ankiWorkbench.sessions.discardConfirm.message': '{label} の保存済み読み込み進捗を破棄しますか？ファイルは後で再び読み込めます。',
+  'ankiWorkbench.sessions.discardFailed': '読み込み履歴を破棄できませんでした。もう一度お試しください。',
   'ankiWorkbench.sessions.resume': 'ノート {offset} から再開',
   'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'この読み込みに続きはありません。',
   'ankiWorkbench.sessions.resumeRefused.source-changed':

@@ -10887,6 +10887,9 @@ export const ru: Catalog = {
     'Это чтение больше не хранит расположение своего файла.',
   'ankiWorkbench.sessions.covered': 'Прочитано заметок: {covered} из {total}',
   'ankiWorkbench.sessions.discard': 'Отбросить',
+  'ankiWorkbench.sessions.discardConfirm.title': 'Удалить запись о чтении?',
+  'ankiWorkbench.sessions.discardConfirm.message': 'Удалить сохранённый прогресс чтения «{label}»? Файл можно будет прочитать снова.',
+  'ankiWorkbench.sessions.discardFailed': 'Не удалось удалить запись о чтении. Попробуйте ещё раз.',
   'ankiWorkbench.sessions.resume': 'Продолжить с заметки {offset}',
   'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'В этом чтении не осталось ничего для продолжения.',
   'ankiWorkbench.sessions.resumeRefused.source-changed':

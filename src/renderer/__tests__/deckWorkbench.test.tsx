@@ -17,6 +17,8 @@ vi.mock('../i18n', () => ({
 const loadDeckAsAnkiDraft = vi.fn();
 vi.mock('../flashcardDeck', () => ({ loadDeckAsAnkiDraft: () => loadDeckAsAnkiDraft() }));
 vi.mock('../components/anki/deckWorkbench.css', () => ({}));
+const confirmDialog = vi.fn();
+vi.mock('../components/ui/dialogService', () => ({ confirmDialog: (...args: unknown[]) => confirmDialog(...args) }));
 
 import type { AnkiDraft, AnkiDraftDiagnostic, AnkiDraftNote } from '../../shared/ankiDraft';
 import DeckWorkbench from '../components/anki/DeckWorkbench';
@@ -201,6 +203,8 @@ beforeEach(() => {
   for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft, cancelAnkiConnectCommit, readAnkiCsvDraft]) m.mockReset();
   ankiDraftSessionList.mockResolvedValue([]);
   ankiDraftSessionDelete.mockResolvedValue(true);
+  confirmDialog.mockReset();
+  confirmDialog.mockResolvedValue(true);
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft, cancelAnkiConnectCommit, readAnkiCsvDraft },
@@ -579,8 +583,31 @@ describe('DeckWorkbench', () => {
 
     ankiDraftSessionList.mockResolvedValue([]);
     await click(buttonBy('ankiWorkbench.sessions.discard'));
+    expect(confirmDialog).toHaveBeenCalledWith(expect.objectContaining({
+      danger: true,
+      message: 'ankiWorkbench.sessions.discardConfirm.message:Live collection',
+    }));
     expect(ankiDraftSessionDelete).toHaveBeenCalledWith('s1');
     expect(host.textContent).toContain('ankiWorkbench.sessions.none');
+  });
+
+  it('keeps a recent read when discard is cancelled or deletion fails', async () => {
+    ankiDraftSessionList.mockResolvedValue([{
+      session: { id: 's1', label: 'Live collection', status: 'interrupted' },
+      progress: { status: 'interrupted', covered: 1, totalNotes: 5, resumable: true },
+    }]);
+    await mount();
+    confirmDialog.mockResolvedValueOnce(false);
+    await click(buttonBy('ankiWorkbench.sessions.discard'));
+    expect(ankiDraftSessionDelete).not.toHaveBeenCalled();
+    ankiDraftSessionDelete.mockResolvedValueOnce(false);
+    await click(buttonBy('ankiWorkbench.sessions.discard'));
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('ankiWorkbench.sessions.discardFailed');
+    expect(host.textContent).toContain('Live collection');
+    ankiDraftSessionDelete.mockRejectedValueOnce(new Error('offline'));
+    await click(buttonBy('ankiWorkbench.sessions.discard'));
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('ankiWorkbench.sessions.discardFailed');
+    expect(host.textContent).toContain('Live collection');
   });
 
   it('resumes a session by id, never by path, and picks up at the uncovered offset', async () => {

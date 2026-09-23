@@ -50,6 +50,7 @@ import {
 import { setLevel, type WkLevel } from '../../knownWords';
 import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../ui/dialogService';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
 import DeckWorkbenchTray, {
   ENRICH_ACTION_KINDS,
@@ -172,6 +173,7 @@ export default function DeckWorkbench() {
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState<WorkbenchStepId | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   /** Every draft edit, oldest first, with its own before-image. */
   const [journal, setJournal] = useState<AnkiDraftEditJournal>(createEditJournal);
   /**
@@ -544,11 +546,27 @@ export default function DeckWorkbench() {
   }, []);
 
   const discardSession = useCallback(
-    async (id: string) => {
-      await window.api.ankiDraftSessionDelete(id);
-      await refreshSessions();
+    async (session: SessionRow['session']) => {
+      const confirmed = await confirmDialog({
+        title: t('ankiWorkbench.sessions.discardConfirm.title'),
+        message: t('ankiWorkbench.sessions.discardConfirm.message', { label: session.label }),
+        confirmLabel: t('ankiWorkbench.sessions.discard'),
+        cancelLabel: t('common.cancel'),
+        danger: true,
+      });
+      if (!confirmed) return;
+      setSessionError(null);
+      try {
+        if (!await window.api.ankiDraftSessionDelete(session.id)) {
+          setSessionError(t('ankiWorkbench.sessions.discardFailed'));
+          return;
+        }
+        await refreshSessions();
+      } catch {
+        setSessionError(t('ankiWorkbench.sessions.discardFailed'));
+      }
     },
-    [refreshSessions],
+    [refreshSessions, t],
   );
 
   /**
@@ -802,6 +820,7 @@ export default function DeckWorkbench() {
               )}
 
               <h3>{t('ankiWorkbench.sessions.title')}</h3>
+              {sessionError && <p className="deck-workbench-error" role="alert">{sessionError}</p>}
               {sessions.length === 0 ? (
                 <p className="muted">{t('ankiWorkbench.sessions.none')}</p>
               ) : (
@@ -859,7 +878,7 @@ export default function DeckWorkbench() {
                         type="button"
                         className="btn"
                         aria-label={`${t('ankiWorkbench.sessions.discard')} — ${session.label}`}
-                        onClick={() => void discardSession(session.id)}
+                        onClick={() => void discardSession(session)}
                       >
                         {t('ankiWorkbench.sessions.discard')}
                       </button>
