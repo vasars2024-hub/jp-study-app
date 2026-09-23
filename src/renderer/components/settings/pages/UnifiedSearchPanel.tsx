@@ -14,6 +14,7 @@ import { projectMergedResultsIntoUnifiedSearchSession } from '../../../unifiedSe
 import { loadMediaTrackingDocument } from '../../../mediaTrackingStore';
 import { persistUnifiedSearchTrackingMutation, type UnifiedSearchTrackingMutation } from '../../../unifiedSearchTrackingMutation';
 import type { UnifiedSearchMergedResult } from '../../../unifiedSearchMergedAdapter';
+import type { MediaTrackingStatus } from '../../../../shared/mediaTracking';
 
 const PROVIDER_STATUS_KEY: Record<UnifiedSearchProviderExecutionStatus, string> = {
   queued: 'unifiedSearch.provider.queued',
@@ -21,6 +22,14 @@ const PROVIDER_STATUS_KEY: Record<UnifiedSearchProviderExecutionStatus, string> 
   succeeded: 'unifiedSearch.provider.succeeded',
   failed: 'unifiedSearch.provider.failed',
   cancelled: 'unifiedSearch.provider.cancelled',
+};
+
+const TRACKING_STATUS_KEY: Record<MediaTrackingStatus, string> = {
+  planned: 'unifiedSearch.tracking.planned',
+  watching: 'unifiedSearch.tracking.watching',
+  completed: 'unifiedSearch.tracking.completed',
+  'on-hold': 'unifiedSearch.tracking.onHold',
+  dropped: 'unifiedSearch.tracking.dropped',
 };
 
 /**
@@ -253,13 +262,13 @@ export default function UnifiedSearchPanel() {
                       )}
                       {result.trackingProgress && (
                         <span className="muted">
-                          {result.trackingRecord?.status} · {result.trackingProgress.watchedCount}/{result.trackingProgress.totalCount ?? '—'}
+                          {result.trackingRecord && t(TRACKING_STATUS_KEY[result.trackingRecord.status])} · {result.trackingProgress.watchedCount}/{result.trackingProgress.totalCount ?? '—'}
                         </span>
                       )}
                     </div>
-                    <div className="sp-seg" role="group" aria-label={`Tracking actions for ${result.title}`}>
-                      <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'planned' })}>Plan</button>
-                      <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'on-hold' })}>Pause</button>
+                    <div className="sp-seg" role="group" aria-label={t('unifiedSearch.tracking.actionsFor', { title: result.title })}>
+                      <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'planned' })}>{t('unifiedSearch.tracking.plan')}</button>
+                      <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'on-hold' })}>{t('unifiedSearch.tracking.pause')}</button>
                       {result.trackingProgress?.kind === 'episodic' && (
                         <button type="button" className="btn" onClick={() => mutateTracking(result, {
                           type: 'progress/update',
@@ -267,12 +276,12 @@ export default function UnifiedSearchPanel() {
                             season: result.trackingProgress?.furthestEpisode?.season ?? 1,
                             episode: (result.trackingProgress?.furthestEpisode?.episode ?? 0) + 1,
                           },
-                        })}>+1 episode</button>
+                        })}>{t('unifiedSearch.tracking.oneEpisode')}</button>
                       )}
                       {result.trackingProgress?.kind === 'unit' && !result.trackingProgress.isComplete && (
-                        <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'progress/update', watched: true })}>Watched</button>
+                        <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'progress/update', watched: true })}>{t('unifiedSearch.tracking.watched')}</button>
                       )}
-                      <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'completed' })}>Complete</button>
+                      <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'completed' })}>{t('unifiedSearch.tracking.complete')}</button>
                     </div>
                   </li>
                 ))}
