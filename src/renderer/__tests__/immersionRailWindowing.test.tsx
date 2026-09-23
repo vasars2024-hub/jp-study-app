@@ -218,7 +218,9 @@ describe('the Immersion sites rail under real load', () => {
     const h = await mountImmersion();
     const input = await searchSites(h, 'no-such-saved-site');
     expect(rows(h)).toHaveLength(0);
-    expect(h.container.querySelector('[role="status"]')?.textContent).toContain('No saved sites match');
+    // Scoped to the rail: the view also keeps an always-mounted sr-only capture announcer
+    // (role=status) ahead of it in the DOM, which is empty here.
+    expect(h.container.querySelector('.immersion-rail-empty[role="status"]')?.textContent).toContain('No saved sites match');
     await act(async () => {
       input.focus();
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
@@ -228,7 +230,7 @@ describe('the Immersion sites rail under real load', () => {
     expect(document.activeElement).toBe(input);
     expect(h.container.querySelector('.immersion-rail')).not.toBeNull();
     expect(rows(h)).toHaveLength(20);
-    expect(h.container.querySelector('[role="status"]')).toBeNull();
+    expect(h.container.querySelector('.immersion-rail-empty')).toBeNull();
   });
 
   it('the completion bar costs no height, so every slot is the same row', async () => {
