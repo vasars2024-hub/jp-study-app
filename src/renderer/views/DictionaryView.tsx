@@ -128,18 +128,18 @@ export default function DictionaryView() {
   const dictMenus: MenuBarMenu[] = [
     {
       id: 'view',
-      label: 'View',
+      label: t('dict.view.menu.view'),
       items: [
-        { id: 'ja', label: '日本語 (Japanese)', onSelect: () => pickLang('ja') },
-        { id: 'zh', label: '中文 (Chinese)', onSelect: () => pickLang('zh') },
+        { id: 'ja', label: t('dict.view.menu.ja'), onSelect: () => pickLang('ja') },
+        { id: 'zh', label: t('dict.view.menu.zh'), onSelect: () => pickLang('zh') },
       ],
     },
   ];
   const dictStatus = (
     <>
-      <StatusBarField>{isZh ? 'Chinese' : 'Japanese'}</StatusBarField>
+      <StatusBarField>{t(isZh ? 'dict.view.status.zh' : 'dict.view.status.ja')}</StatusBarField>
       <StatusBarSpacer />
-      <StatusBarField>{isZh ? 'CC-CEDICT' : 'JMdict / Jisho'}</StatusBarField>
+      <StatusBarField>{t(isZh ? 'dict.view.source.zh' : 'dict.view.source.ja')}</StatusBarField>
     </>
   );
 
@@ -177,7 +177,7 @@ export default function DictionaryView() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={isZh ? 'Type a word, e.g. 你好 or “hello”…' : 'Type a word, e.g. 食べる or “eat”…'}
+          placeholder={t(isZh ? 'dict.view.placeholder.zh' : 'dict.view.placeholder.ja')}
           lang={lang}
         />
         <button
@@ -186,7 +186,7 @@ export default function DictionaryView() {
           disabled={!input.trim()}
           title={input.trim() ? undefined : t('dict.view.reason.needsQuery')}
         >
-          Search
+          {t('dict.view.search')}
         </button>
       </form>
 
