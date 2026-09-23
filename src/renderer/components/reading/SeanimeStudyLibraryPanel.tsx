@@ -57,7 +57,7 @@ import {
   normalizeVideoCoreMiningHistory,
   VIDEO_CORE_MINING_HISTORY_KEY,
 } from '../../../shared/videoCoreMining';
-import { translateAnkiReason } from '../../../shared/anki';
+import { ANKI_UNREACHABLE_MSG, translateAnkiReason } from '../../../shared/anki';
 import type { MediaItem } from '../../../shared/types';
 import { useT } from '../../i18n';
 import Icon from '../Icons';
@@ -163,6 +163,30 @@ const NO_FINGERPRINTS: StudyReadinessFingerprints = {
   levelListsFingerprint: '',
   frequencyListsFingerprint: '',
 };
+
+/**
+ * The unreachable-Anki line, saying the fact once.
+ *
+ * The heartbeat's stock reason is itself "Can't reach Anki. Open Anki desktop…", so
+ * appending it to "Anki is not reachable…" printed the same fact twice in one line. For
+ * that reason only the remedy is new, so only the remedy is added; any other reason is
+ * real extra information and is kept after the dash.
+ */
+function ankiDisconnectedLine(
+  reason: string | undefined,
+  t: (key: string) => string,
+): string {
+  const base = t('studyLibrary.anki.disconnected');
+  if (!reason) return base;
+  if (reason === ANKI_UNREACHABLE_MSG) return `${base} ${t('studyLibrary.anki.disconnectedFix')}`;
+  // Same reason as SeanimeWatchLoopPanel: main authors this in English.
+  return `${base} — ${translateAnkiReason(reason, t)}`;
+}
+
+/** `C:\Anime\Frieren - 01.mkv` → `Frieren - 01.mkv`. */
+function fileNameOf(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
 
 export default function SeanimeStudyLibraryPanel({
   orchestrator,
@@ -511,8 +535,7 @@ export default function SeanimeStudyLibraryPanel({
                         : anki.profileId ?? '',
                     })
                   : anki.problem === 'disconnected'
-                    ? // Same reason as SeanimeWatchLoopPanel: main authors this in English.
-                      `${t('studyLibrary.anki.disconnected')}${anki.reason ? ` — ${translateAnkiReason(anki.reason, t)}` : ''}`
+                    ? ankiDisconnectedLine(anki.reason, t)
                     : anki.problem === 'no-decks'
                       ? t('studyLibrary.anki.noDecks')
                       : t('studyLibrary.anki.noProfile')}
@@ -614,19 +637,23 @@ function Row({
 }) {
   const { t } = useT();
   const coverage = entry.readiness?.knownCoverage;
+  // Episode 0 is the media server's "no episode" for a film or a drama it could not number,
+  // so it is left out like a missing one — as is the old "No episode number", which told a
+  // film's viewer nothing they could act on.
+  const meta = [
+    typeof entry.episode === 'number' && entry.episode > 0
+      ? t('studyLibrary.episode', { number: entry.episode })
+      : '',
+    entry.readiness?.contentLevel ?? '',
+    typeof coverage === 'number'
+      ? t('studyLibrary.coverage', { percent: Math.round(coverage * 100) })
+      : '',
+  ].filter(Boolean).join(' · ');
   return (
     <li className="study-lib-row" data-state={entry.state}>
       <div className="study-lib-row-main">
         <strong title={entry.title}>{entry.title}</strong>
-        <span className="study-lib-row-meta">
-          {entry.episode != null
-            ? t('studyLibrary.episode', { number: entry.episode })
-            : t('studyLibrary.noEpisode')}
-          {entry.readiness?.contentLevel ? ` · ${entry.readiness.contentLevel}` : ''}
-          {typeof coverage === 'number'
-            ? ` · ${t('studyLibrary.coverage', { percent: Math.round(coverage * 100) })}`
-            : ''}
-        </span>
+        {meta ? <span className="study-lib-row-meta">{meta}</span> : null}
         {/* What watching this already produced. Rendered only when there is something to
             say — a permanent "0 cards mined" on every row is noise, and its absence is
             already the honest answer. */}
@@ -648,8 +675,9 @@ function Row({
               : ''}
           </button>
         ) : null}
-        {/* The path is the join key; showing it makes an unexpected `unlinked` debuggable. */}
-        <small className="study-lib-row-path" title={entry.path}>{entry.path}</small>
+        {/* The file name, with the full path (the join key) on hover: enough to debug an
+            unexpected `unlinked` without a wall of drive letters on every row. */}
+        <small className="study-lib-row-path" title={entry.path}>{fileNameOf(entry.path)}</small>
       </div>
       <div className="study-lib-row-state">
         <span className="study-lib-badge">{t(FILTER_KEY[entry.state])}</span>
@@ -675,7 +703,9 @@ function Row({
           {onAnalyse && (entry.state === 'unanalyzed' || entry.state === 'stale') ? (
             <button
               type="button"
-              className="study-lib-analyse"
+              // `study-lib-open` for the look: `study-lib-analyse` has no rule of its own,
+              // so it rendered as a bare browser button beside a styled Open.
+              className="study-lib-open study-lib-analyse"
               disabled={busy}
               aria-label={t('studyLibrary.analyseNamed', { title: entry.title })}
               onClick={() => onAnalyse(entry)}

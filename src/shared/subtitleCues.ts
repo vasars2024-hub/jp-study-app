@@ -33,18 +33,43 @@ export function toSeconds(stamp: string): number {
 export function cleanLine(s: string): string {
   return s.replace(/<[^>]+>/g, '').replace(/\{[^}]*\}/g, '').replace(/\\N/gi, '\n').trim();
 }
+/** The standard `[Events]` column order, used when a file declares no `Format:` line. */
+const ASS_DEFAULT_EVENT_FORMAT = [
+  'layer', 'start', 'end', 'style', 'name', 'marginl', 'marginr', 'marginv', 'effect', 'text',
+];
+
 export function parseAss(raw: string): Cue[] {
   const cues: Cue[] = [];
+  // Columns come from the `[Events]` section's own `Format:` line. Almost every file uses the
+  // standard ten, but the format lets a file declare fewer, and a fixed "text is field 10"
+  // read dropped every line of such a file without a word (2026-09-23). `Text` is always
+  // last, so it takes the rest of the line, commas included.
+  let columns = ASS_DEFAULT_EVENT_FORMAT;
+  let inEvents = false;
   for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('[')) {
+      inEvents = /^\[events\]$/i.test(trimmed);
+      continue;
+    }
+    if (inEvents && /^format\s*:/i.test(trimmed)) {
+      const declared = trimmed.slice(trimmed.indexOf(':') + 1).split(',').map((c) => c.trim().toLowerCase());
+      if (declared.includes('text') && declared.includes('start') && declared.includes('end')) {
+        columns = declared;
+      }
+      continue;
+    }
     if (!line.startsWith('Dialogue:')) continue;
     const f = line.slice('Dialogue:'.length).split(',');
-    if (f.length < 10) continue;
-    const text = cleanLine(f.slice(9).join(','));
-    // Field 3 is the style name in the standard `Format:` order that every ASS
-    // file in the wild uses. Trimmed and dropped when blank so consumers can
-    // treat "no style" and "empty style" as the same thing.
-    const style = f[3]?.trim();
-    if (text) cues.push({ start: toSeconds(f[1]), end: toSeconds(f[2]), text, ...(style ? { style } : {}) });
+    if (f.length < columns.length) continue;
+    const text = cleanLine(f.slice(columns.indexOf('text')).join(','));
+    // Trimmed and dropped when blank so consumers can treat "no style" and "empty style"
+    // as the same thing.
+    const styleAt = columns.indexOf('style');
+    const style = styleAt >= 0 ? f[styleAt]?.trim() : undefined;
+    const start = toSeconds(f[columns.indexOf('start')]);
+    const end = toSeconds(f[columns.indexOf('end')]);
+    if (text) cues.push({ start, end, text, ...(style ? { style } : {}) });
   }
   return cues;
 }

@@ -203,7 +203,10 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   // 'chat', not 'sparkle': the Agent is a conversation workspace, and the
   // Scraper already owns 'sparkle' for its title proposals.
   { id: 'agent', labelKey: 'palette.section.agent', glyph: 'chat' },
-  { id: 'player', labelKey: 'palette.section.player', glyph: 'player' },
+  // "Watch", not "Media": the one Start entry into the Media Center (see
+  // START_HIDDEN_SECTIONS). The 'video' camera glyph, because YouTube below
+  // owns the play triangle and two identical icons read as one app.
+  { id: 'player', labelKey: 'palette.section.watch', glyph: 'video' },
   { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
   { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
@@ -236,16 +239,25 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
 ];
 
 const START_PRIMARY_SECTIONS: WinSection[] = [
+  'player',
   'immersion',
   'library',
   'dictionary',
   'grammar',
   'flashcards',
   'anki',
-  'video',
   'youtube',
-  'player',
 ];
+/**
+ * Apps kept in `APPS` (window titles, taskbar glyphs, saved layouts and
+ * `os:open` callers all still resolve them) but not offered as a Start entry.
+ *
+ * `video` opened the same Media Center as `player`, only on another tab, so
+ * Start showed two ways into one app — "Media" and "Video" — with nothing to
+ * choose between them. `player` is the one kept, relabelled "Watch"; the Video
+ * tab is one click away in the Media Center's own sidebar.
+ */
+const START_HIDDEN_SECTIONS: ReadonlySet<WinSection> = new Set<WinSection>(['video']);
 /**
  * D189 — these are the subtitle under every app name in the Aero start menu,
  * and they were English literals in every language. A module-level map cannot
@@ -457,13 +469,15 @@ function appListForDesktop(_desktopIndex: DesktopIndex): { id: WinSection; label
  * adding an app to `APPS` can never make it disappear from the launcher.
  */
 const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] = [
+  // First, and one row of four: below Study's two rows it sat under the fold
+  // and the app's main way to watch something needed a scroll to find.
+  { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'youtube', 'music', 'scraper'] },
   {
     id: 'study',
     labelKey: 'desktop.startCategory.study',
     sections: ['agent', 'dictionary', 'grammar', 'reading', 'translate', 'files', 'anki', 'flashcards'],
   },
   { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
-  { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'video', 'youtube', 'music', 'scraper'] },
   { id: 'progress', labelKey: 'desktop.startCategory.progress', sections: ['stats', 'calendar'] },
   { id: 'system', labelKey: 'desktop.startCategory.system', sections: ['games', 'resources', 'city', 'settings'] },
 ];
@@ -472,7 +486,8 @@ type StartApp = { id: WinSection; labelKey: string; glyph: IconName };
 
 /** Bucket the catalog into the display groups above, preserving catalog order. */
 function groupStartApps(apps: StartApp[]): { id: string; labelKey: string; apps: StartApp[] }[] {
-  const claimed = new Set<WinSection>();
+  // Claimed up front, so a hidden app cannot fall through to `other` either.
+  const claimed = new Set<WinSection>(START_HIDDEN_SECTIONS);
   const groups = START_GROUPS.map((g) => {
     const inGroup = apps.filter((a) => g.sections.includes(a.id));
     inGroup.forEach((a) => claimed.add(a.id));
@@ -2708,7 +2723,9 @@ export default function DesktopShell({
   const startPrimaryApps = START_PRIMARY_SECTIONS
     .map((id) => desktopApps.find((app) => app.id === id))
     .filter((app): app is AppMeta => !!app);
-  const startPlaceApps = desktopApps.filter((app) => !START_PRIMARY_SECTIONS.includes(app.id));
+  const startPlaceApps = desktopApps.filter(
+    (app) => !START_PRIMARY_SECTIONS.includes(app.id) && !START_HIDDEN_SECTIONS.has(app.id),
+  );
 
   const renderAeroStartApp = (app: AppMeta, tone: 'program' | 'place') => {
     const pinned = isAppPinned(app.id);

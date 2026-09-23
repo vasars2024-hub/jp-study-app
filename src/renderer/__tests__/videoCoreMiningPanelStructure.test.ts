@@ -88,6 +88,9 @@ afterEach(() => {
 async function render(
   history: VideoCoreMiningHistoryEntry[] = [],
   cue: VideoCoreStudyCue = CUE,
+  // The full form: what these structure tests are about. The panel's own default is the
+  // collapsed one-line card (2026-09-23), covered by its own test below.
+  defaultExpanded = true,
 ): Promise<string> {
   if (history.length) {
     store.set(VIDEO_CORE_MINING_HISTORY_KEY, JSON.stringify(history));
@@ -103,6 +106,7 @@ async function render(
       source: SOURCE,
       video: null,
       subtitleDelaySec: 0,
+      defaultExpanded,
     }));
   });
   return host.innerHTML;
@@ -116,6 +120,15 @@ describe('VideoCoreMiningPanel structure', () => {
     expect(html).toContain('class="study-mining-message"');
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('role="status"');
+  });
+
+  it('opens as one line with Mine beside it unless the layout asks for the form', async () => {
+    // The full form covered a third of the picture in Watch and put Mine below the fold.
+    const html = await render([], CUE, false);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('class="study-mining-quick"');
+    expect(html).toContain('data-study-action="mine-card"');
+    expect(html).not.toContain('class="study-mining-body"');
   });
 
   it('exposes a labelled collapse toggle rather than a bare heading', async () => {

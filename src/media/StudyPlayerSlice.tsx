@@ -961,6 +961,20 @@ function StudyPlayerSession({
       loadingState: translateUi('mediaWorkspace.openingLocal'),
     });
     void (async () => {
+    // A file that is not on disk is known in one call; without this it waited out the whole
+    // library scan below (11.4 s measured) before saying so (transition audit 2026-09-23).
+    // `mediaFileUrl` answers null for a missing path — the same test `openDirect` relies on.
+    const onDisk = await window.api.mediaFileUrl(localRequest.localFilePath).catch(() => null);
+    if (controller.signal.aborted) return;
+    if (!onDisk) {
+      setState({
+        active: true,
+        playbackInfo: null,
+        playbackError: translateUi('mediaWorkspace.fileMissing', { path: localRequest.localFilePath }),
+        loadingState: null,
+      });
+      return;
+    }
     /*
       The sidecar resolves a local path against its OWN `local_files` table, not
       the disk, so a folder it has never scanned answers 200 and then aborts the

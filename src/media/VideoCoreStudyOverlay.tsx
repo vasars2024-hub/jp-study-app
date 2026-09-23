@@ -2302,6 +2302,7 @@ export default function VideoCoreStudyOverlay({
         */
         translationText={preferences.dualSubs ? secondaryText : ''}
         mineSignal={mineSignal}
+        defaultExpanded={workspace.layout.mode === 'mining'}
       />
     ),
     transcript: (
@@ -2478,6 +2479,20 @@ export default function VideoCoreStudyOverlay({
     review: <StudyAppOwnedBlock blockId="review" titleKey="studyWorkspace.block.review" />,
   };
 
+  /*
+   * "No subtitle track is loaded." only once that is settled: a track mounts a moment after
+   * the video does, so the bare condition was true for 0.5-1.9 s on EVERY open and flashed
+   * the notice over files that do have subtitles (transition audit 2026-09-23).
+   */
+  const noCuesNow = !activeCue && allCues.length === 0 && !externalSubtitlePending;
+  const [noSubtitlesSettled, setNoSubtitlesSettled] = React.useState(false);
+  React.useEffect(() => {
+    setNoSubtitlesSettled(false);
+    if (!noCuesNow) return undefined;
+    const timer = window.setTimeout(() => setNoSubtitlesSettled(true), 3000);
+    return () => window.clearTimeout(timer);
+  }, [noCuesNow, playbackInfo?.id]);
+
   return (
     <StudyDetachContext.Provider value={detach}>
       <aside
@@ -2517,7 +2532,7 @@ export default function VideoCoreStudyOverlay({
           />
         ) : preferences.dictationMode && activeCue ? (
           <span className="study-cue-status">{t('mediaWorkspace.study.listenType')}</span>
-        ) : !activeCue && allCues.length === 0 && !externalSubtitlePending ? (
+        ) : noCuesNow && noSubtitlesSettled ? (
           /* A file with no subtitle track says so once and then fades (CSS), rather than
              standing faint grey text over the picture for the whole video. Between two
              lines there is nothing to say: "Waiting for subtitle" in every pause in the

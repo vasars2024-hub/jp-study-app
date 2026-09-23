@@ -76,10 +76,21 @@ interface SettingsRow {
 }
 
 /** Section id → glyph and i18n key. Built once; labels resolve through t() at
- * render/merge time so a language switch relabels without reloading data. */
-const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
-  { id: 'player', labelKey: 'palette.section.player', glyph: 'player' },
-  { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
+ * render/merge time so a language switch relabels without reloading data.
+ * `terms` / `termsKey` are matched but never shown — see `Item.terms`. */
+const SECTIONS: { id: string; labelKey: string; glyph: IconName; terms?: string; termsKey?: string }[] = [
+  // One "Watch" entry, as in Start. `video` is no longer listed: it opened the same
+  // Media Center on another tab, so "Media" and "Video" were two rows for one app.
+  // The old names stay findable through the terms: English always, plus the UI
+  // language's own words from the catalog. 動画 is in the fixed list too — this
+  // is a Japanese study app, so a learner may type it whatever the UI language.
+  {
+    id: 'player',
+    labelKey: 'palette.section.watch',
+    glyph: 'video',
+    terms: 'watch video media player 動画',
+    termsKey: 'palette.section.watchTerms',
+  },
   { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
@@ -288,6 +299,9 @@ export default function CommandPalette() {
           sub: t('palette.openApp'),
           group: t('palette.group.pages'),
           glyph: s.glyph,
+          ...(s.terms || s.termsKey
+            ? { terms: `${s.terms ?? ''} ${s.termsKey ? t(s.termsKey) : ''}` }
+            : {}),
           run: () => openSection(s.id),
         });
       }

@@ -227,11 +227,38 @@ describe('SeanimeStudyLibraryPanel', () => {
     expect(html).toContain('aria-label="Filter by readiness"');
   });
 
-  it('shows the joined path, so an unexpected `unlinked` is debuggable', async () => {
+  it('shows the file name, with the joined path on hover so an unexpected `unlinked` is debuggable', async () => {
     stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] }, []);
+    await render();
+    const small = host?.querySelector<HTMLElement>('.study-lib-row-path');
+    // Changed on purpose (design audit): the row printed the raw full path. The name is
+    // what a learner recognises; the path, the join key, is still one hover away.
+    expect(small?.textContent).toBe('Sousou no Frieren - 01.mkv');
+    expect(small?.getAttribute('title')).toBe(PATH);
+  });
+
+  it('says what the list holds without claiming the whole media server', async () => {
+    // Opening a file adds its folder to the sidecar and scans it (`src/media/seanimeLibrary.ts`),
+    // so the list is the opened videos and their folder-mates — not "every file it knows".
+    stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] }, [mediaItem()]);
     const html = await render();
-    expect(html).toContain('class="study-lib-row-path"');
-    expect(html).toContain('Sousou no Frieren - 01.mkv');
+    expect(html).toContain('Videos you’ve opened in the player');
+    expect(html).not.toContain('Every file the media server knows about');
+  });
+
+  it('hides an episode number of 0 instead of printing "Episode 0"', async () => {
+    // A drama or film the media server could not number arrives as episode 0.
+    stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 0 }] }, [mediaItem()]);
+    await render();
+    expect(host?.innerHTML).not.toContain('Episode 0');
+    // Nothing else to say on this row, so the meta line is not rendered empty either.
+    expect(host?.querySelector('.study-lib-row-meta')).toBeNull();
+  });
+
+  it('still numbers a real episode', async () => {
+    stubApi({ ok: true, files: [{ path: PATH, mediaId: 1, episode: 3 }] }, [mediaItem()]);
+    await render();
+    expect(host?.querySelector('.study-lib-row-meta')?.textContent).toBe('Episode 3');
   });
 
   it('renders no readiness score when no orchestrator document is supplied', async () => {
@@ -276,6 +303,24 @@ describe('SeanimeStudyLibraryPanel', () => {
     expect(html).toContain('data-ok="false"');
     // Subtitle work is still actionable without Anki — the list must survive.
     expect(html).toContain('class="study-lib-list"');
+  });
+
+  it('says "not reachable" once for the heartbeat’s stock reason, and keeps its fix', async () => {
+    // The stock reason is itself "Can't reach Anki. Open Anki desktop…", so appending it
+    // printed the same fact twice in one line (design audit).
+    const { ANKI_UNREACHABLE_MSG } = await import('../../shared/anki');
+    stubApi(
+      { ok: true, files: [{ path: PATH, mediaId: 1, episode: 1 }] },
+      [mediaItem()],
+      async () => [mediaItem()],
+      { connected: false, decks: [], error: ANKI_UNREACHABLE_MSG },
+    );
+    await render();
+    const line = host?.querySelector('.study-lib-anki')?.textContent ?? '';
+    expect(line).toBe(
+      'Anki is not reachable, so nothing can be mined yet. Open Anki and check that the AnkiConnect add-on is installed.',
+    );
+    expect(line).not.toContain('reach Anki');
   });
 
   it('separates "connected but no decks" from "unreachable"', async () => {
@@ -451,6 +496,8 @@ describe('SeanimeStudyLibraryPanel', () => {
       await render({ onAnalyse: async () => ({ status: 'prepared', candidateCount: 3 }) });
       const button = host?.querySelector<HTMLButtonElement>('.study-lib-analyse');
       expect(button?.textContent).toBe('Analyse');
+      // Same look as Open beside it: `study-lib-analyse` has no styling of its own.
+      expect(button?.classList.contains('study-lib-open')).toBe(true);
       // Named by title for the same reason Open and Import are — "Analyse" repeated down
       // a list gives a screen reader nothing to choose between.
       expect(button?.getAttribute('aria-label')).toBe(

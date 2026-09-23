@@ -50,7 +50,9 @@ export const ICON_PRESETS: IconPreset[] = [
     id: 'media',
     labelKey: 'settings.desktop.preset.media',
     descKey: 'settings.desktop.preset.media.desc',
-    sections: ['player', 'video', 'youtube', 'music', 'scraper', 'library'],
+    // No 'video': it is the same Media Center as 'player' ("Watch") on another tab,
+    // and Start no longer offers it either (DesktopShell START_HIDDEN_SECTIONS).
+    sections: ['player', 'youtube', 'music', 'scraper', 'library'],
     columns: 2,
   },
   {
@@ -58,7 +60,7 @@ export const ICON_PRESETS: IconPreset[] = [
     labelKey: 'settings.desktop.preset.everything',
     descKey: 'settings.desktop.preset.everything.desc',
     sections: [
-      'player', 'video', 'youtube', 'music', 'dictionary', 'immersion', 'scraper',
+      'player', 'youtube', 'music', 'dictionary', 'immersion', 'scraper',
       'library', 'novels', 'reading', 'translate', 'grammar', 'files', 'anki',
       'flashcards', 'games', 'stats', 'calendar', 'resources', 'settings', 'city',
     ],

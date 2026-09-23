@@ -115,10 +115,10 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
       setOpen(true);
       const request = normalizeMediaWorkspaceOpenRequest(detail);
       if (!request) return;
-      if (!wasOpen) {
-        openedForPlaybackRef.current = true;
-        setOpenedForPlayback(true);
-      }
+      // Decided per video: one started from inside an open workspace belongs to its
+      // library, even if the workspace itself was first opened from outside.
+      openedForPlaybackRef.current = !wasOpen;
+      setOpenedForPlayback(!wasOpen);
       setPlaybackRequest(request);
       // The player lives in the library pane, and that pane is hidden — never unmounted —
       // whenever another segment shows. So a request arriving while the user sits on
@@ -238,12 +238,16 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
    * Library segment kept the player on screen (audit 2026-09-23). Withdrawing the request
    * stops the player (`StudyPlayerSlice` ends the stream when its request goes away).
    */
+  const libraryButtonRef = useRef<HTMLButtonElement | null>(null);
   const backToLibrary = useCallback(() => {
     setPlaybackRequest(null);
     setView('library');
     openedForPlaybackRef.current = false;
     setOpenedForPlayback(false);
     resetHostLocation();
+    // The Back button unmounts under the focus; hand it to the library's own tab rather
+    // than letting it fall to <body>.
+    window.requestAnimationFrame(() => libraryButtonRef.current?.focus({ preventScroll: true }));
   }, []);
   /** "Back" from a video: to wherever it was opened from (see `openedForPlaybackRef`). */
   const leavePlayer = useCallback(() => {
@@ -402,18 +406,23 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
           the primitive is inert in conventional presentation, and
           `theme/liquid-window.css` paints it only under `.workspace-liquid`. */}
       <ContextualSurface as="header" className="seanime-host-bar">
-        {playerActive ? (
-          <button
-            type="button"
-            className="seanime-host-btn seanime-host-back"
-            onClick={leavePlayer}
-            title={openedForPlayback ? t('mediaWorkspace.backHint') : t('mediaWorkspace.backToLibraryHint')}
-          >
-            <span aria-hidden="true">←</span>{' '}
-            {openedForPlayback ? t('common.back') : t('mediaWorkspace.backToLibrary')}
-          </button>
-        ) : null}
-        <strong className="seanime-host-title">{t('mediaWorkspace.launcher')}</strong>
+        {/* One fixed-width slot for the title or, while a video is up, the way back — so
+            nothing to its right jumps sideways when playback starts or stops. */}
+        <span className="seanime-host-lead">
+          {playerActive ? (
+            <button
+              type="button"
+              className="seanime-host-btn seanime-host-back"
+              onClick={leavePlayer}
+              title={openedForPlayback ? t('mediaWorkspace.backHint') : t('mediaWorkspace.backToLibraryHint')}
+            >
+              <span aria-hidden="true">←</span>{' '}
+              {openedForPlayback ? t('common.back') : t('mediaWorkspace.backToLibrary')}
+            </button>
+          ) : (
+            <strong className="seanime-host-title">{t('mediaWorkspace.launcher')}</strong>
+          )}
+        </span>
         {/* Silent when all is well: "Adopted library · sidecar ready" on every open said
             nothing a learner could use (audit 2026-09-23). A server that is starting, stopped
             or failed still says so here, beside the body's own explanation. */}
@@ -457,7 +466,13 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
             // Also clears the in-host route and stops a playing video. Without this, pressing
             // Library while an entry or the player is up is a control that visibly does
             // nothing: `view` is already 'library', so the state never changes.
-            onClick={backToLibrary}
+            ref={libraryButtonRef}
+            // From Readiness or Mined cards, Library goes back to the pane as it was — a
+            // paused video included. Pressed while already on Library, it stops the video.
+            onClick={() => {
+              if (view !== 'library') setView('library');
+              else backToLibrary();
+            }}
           >
             {t('mediaWorkspace.viewLibrary')}
           </button>

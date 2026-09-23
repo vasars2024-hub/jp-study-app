@@ -34,6 +34,13 @@ import MediaStudyMode from '../components/media/MediaStudyMode';
 import StudyOrchestratorWorkspace from '../components/media/StudyOrchestratorWorkspace';
 import { useLegacyStudyMediaSurface } from '../components/media/legacyStudyMediaSurface';
 import { orderUpNext, isStarted } from '../components/media/upNext';
+import {
+  ContinueWatchingTile,
+  continueWatchingOpenRequest,
+  mediaEpisodeBadge,
+  useContinueWatchingRows,
+  type ContinueWatchingRow,
+} from '../components/media/ContinueWatchingShelf';
 import { studyPlaybackPosition } from '../../shared/studyMediaSurface';
 import { dispatchMediaStudyAction } from '../components/media/MediaStudyActions';
 import {
@@ -410,9 +417,7 @@ function MediaTile({
   // number is the only thing that tells two of those tiles apart, so it goes on
   // the artwork rather than in the caption underneath it — the caption is the
   // series name, which is the part that is already the same on every tile.
-  const episode = item.episode != null
-    ? `${item.season != null && item.season !== 1 ? `S${item.season} ` : ''}E${String(item.episode).padStart(2, '0')}`
-    : null;
+  const episode = mediaEpisodeBadge(item);
   return (
     <button
       type="button"
@@ -464,18 +469,22 @@ function HomePanel({
   state,
   music,
   onNavigate,
+  onOpenSeanime,
+  workspace,
 }: {
   state: MediaState;
   music: MusicState;
   onNavigate: (tab: MediaCenterTab) => void;
+  onOpenSeanime: OpenSeanimeWorkspace;
+  workspace: MediaWorkspaceAvailability;
 }) {
   const { t } = useT();
   const videos = state.items.filter((item) => item.kind !== 'audio' && item.kind !== 'audiobook');
   const audio = state.items.filter((item) => item.kind === 'audio' || item.kind === 'audiobook');
-  const continueItems = [...state.items]
-    .filter((item) => (item.positionSec ?? 0) > 0)
-    .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0));
+  // Both resume stores, not just `MediaItem.positionSec` — see `ContinueWatchingShelf`.
+  const continueRows = useContinueWatchingRows(state.items);
   const recent = [...state.items].sort((a, b) => b.addedAt - a.addedAt);
+  const heroResume = continueRows[0];
   const queue = state.items.filter((item) => item.studyQueue);
   const subtitleReady = state.items.filter((item) => (item.subtitles?.length ?? 0) > 0).length;
   const minutes = Math.round(state.items.reduce((sum, item) => sum + (item.durationSec ?? 0), 0) / 60);
@@ -488,6 +497,26 @@ function HomePanel({
     }
     void state.playItem(item.id);
     onNavigate('video');
+  };
+
+  /**
+   * Resume through the same open path every other workspace handoff in this view uses,
+   * carrying the rewound position explicitly. Audio is the exception: its position comes
+   * from the library's own music player, and the workspace plays video only.
+   */
+  const resume = ({ entry, item }: ContinueWatchingRow): void => {
+    if (item && (item.kind === 'audio' || item.kind === 'audiobook')) {
+      playItem(item);
+      return;
+    }
+    if (onOpenSeanime(continueWatchingOpenRequest(entry))) return;
+    // Said, not swallowed: a tile that silently does nothing reads as a broken shelf.
+    showToast({
+      message: t(workspace === 'pending'
+        ? 'mediaWorkspace.connecting'
+        : 'mediaWorkspace.resumeLast.unavailable'),
+      kind: 'warning',
+    });
   };
 
   return (
@@ -507,10 +536,12 @@ function HomePanel({
           </div>
         </div>
         <div className="mc-hero-art">
-          {continueItems[0] || recent[0] ? (
+          {heroResume || recent[0] ? (
             <MediaArtwork
-              id={(continueItems[0] ?? recent[0]).id}
-              title={(continueItems[0] ?? recent[0]).title}
+              // A file the workspace played but Study OS never imported has no item, and
+              // `null` is MediaArtwork's own "draw the title fallback" input.
+              id={heroResume ? heroResume.item?.id ?? null : recent[0].id}
+              title={heroResume ? heroResume.entry.title : recent[0].title}
               variant="banner"
               ratio="16 / 9"
               // The hero copy sits INSIDE this element — the `strong` below is a
@@ -520,8 +551,8 @@ function HomePanel({
             >
               <span className="mc-hero-art-shade" />
               <span className="mc-hero-art-copy">
-                <small>{continueItems[0] ? t('mediaCenter.home.continueStudying') : t('mediaCenter.home.recent')}</small>
-                <strong>{(continueItems[0] ?? recent[0]).title}</strong>
+                <small>{heroResume ? t('mediaCenter.home.continueStudying') : t('mediaCenter.home.recent')}</small>
+                <strong>{heroResume ? heroResume.entry.title : recent[0].title}</strong>
               </span>
             </MediaArtwork>
           ) : (
@@ -547,14 +578,14 @@ function HomePanel({
               <div><span className="mc-eyebrow">{t('mediaCenter.home.continueEyebrow')}</span><h2>{t('mediaCenter.home.continue')}</h2></div>
               <button type="button" onClick={() => onNavigate('library')}>{t('mediaCenter.action.viewLibrary')} <Icon name="chevron" size={11} /></button>
             </div>
-            {continueItems.length > 0 ? (
+            {continueRows.length > 0 ? (
               <div className="mc-tile-row">
-                {continueItems.slice(0, 5).map((item) => (
-                  <MediaTile
-                    key={item.id}
-                    item={item}
-                    active={state.current?.id === item.id}
-                    onPlay={() => playItem(item)}
+                {continueRows.slice(0, 5).map((row) => (
+                  <ContinueWatchingTile
+                    key={row.entry.pathKey}
+                    row={row}
+                    active={row.item != null && state.current?.id === row.item.id}
+                    onResume={resume}
                   />
                 ))}
               </div>
@@ -1993,7 +2024,15 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   );
 
   const body = useMemo(() => {
-    if (tab === 'home') return <HomePanel state={media} music={music} onNavigate={navigate} />;
+    if (tab === 'home') return (
+      <HomePanel
+        state={media}
+        music={music}
+        onNavigate={navigate}
+        onOpenSeanime={openSeanime}
+        workspace={workspace}
+      />
+    );
     if (tab === 'library') return (
       <LibraryPanel
         state={media}

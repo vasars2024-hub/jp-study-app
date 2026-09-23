@@ -1444,6 +1444,44 @@
   align-items: center;
 }
 
+#media-workspace .study-mining-quick {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  min-width: 0;
+}
+
+#media-workspace .study-mining-quick-line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(var(--color-gray-200) / 1);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#media-workspace .study-mining-quick button {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid rgb(var(--color-brand-500) / 0.7);
+  border-radius: 0.45rem;
+  background: rgb(var(--color-brand-500) / 0.22);
+  color: rgb(var(--color-gray-50) / 1);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#media-workspace .study-mining-quick button:hover:not(:disabled) {
+  background: rgb(var(--color-brand-500) / 0.34);
+}
+
+#media-workspace .study-mining-quick button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 #media-workspace .study-mining-heading {
   justify-content: space-between;
   color: rgb(var(--color-gray-50) / 1);

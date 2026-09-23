@@ -5875,11 +5875,16 @@
 }
 
 /*
- * A seven-stage pipeline is legitimately wide, so below ~760px it scrolls
+ * A seven-stage pipeline is legitimately wide, so below ~620px it scrolls
  * rather than shrinking its stations into unreadable slivers. `overflow-x` has
- * to live on the wrapper, not here: this element *is* the 720px-wide content,
+ * to live on the wrapper, not here: this element *is* the wide content,
  * so scrolling it scrolls nothing — the parent clipped it instead, which is how
  * the last two stations were being cut off with no way to reach them.
+ *
+ * The floor was 720px (7 x 92px + slack), so any Study page a little narrower
+ * than that left the last station half-scrolled out of view — the design audit
+ * read it as a clipped "Anki hand…". Labels wrap (see below), so 84px columns
+ * hold every station name; 7 x 84 = 588.
  */
 .study-production-track-scroll {
   overflow-x: auto;
@@ -5888,8 +5893,8 @@
 
 .study-production-track {
   display: grid;
-  grid-template-columns: repeat(7, minmax(92px, 1fr));
-  min-width: 720px;
+  grid-template-columns: repeat(7, minmax(84px, 1fr));
+  min-width: 588px;
   padding: 6px 2px 4px;
 }
 
@@ -5907,7 +5912,9 @@
   justify-items: center;
   min-height: 78px;
   min-width: 0;
-  padding: 0 8px;
+  /* 4px, not 8px: the step names are whole phrases now ("Words checked against
+     what you know"), and every pixel of a narrow column is a line of wrap saved. */
+  padding: 0 4px;
   position: relative;
   text-align: center;
 }

@@ -7,7 +7,7 @@
 // those would have gone into a Japanese frequency table.
 
 import { describe, expect, it } from 'vitest';
-import { keepJapaneseStyleCues, parseStudySubtitles, parseSubtitles, type Cue } from '../subtitleCues';
+import { keepJapaneseStyleCues, parseAss, parseStudySubtitles, parseSubtitles, type Cue } from '../subtitleCues';
 
 const cue = (text: string, style?: string, start = 0): Cue => ({
   start,
@@ -185,5 +185,26 @@ describe('parseStudySubtitles — what the player is asked to render', () => {
     const split = parseStudySubtitles(withSign);
     expect(split.dropped).toBe(1);
     expect(split.styles).toEqual(['Sign']);
+  });
+});
+
+describe('parseAss reads the columns the file declares', () => {
+  it('parses an [Events] section with fewer than the standard ten columns', () => {
+    // Valid ASS: `Format:` may declare any subset ending in Text. A fixed "text is field 10"
+    // read returned zero lines for this file, and the player then said it had no subtitles.
+    const raw = [
+      '[Script Info]',
+      'ScriptType: v4.00+',
+      '',
+      '[Events]',
+      'Format: Layer, Start, End, Style, Text',
+      'Dialogue: 0,0:00:01.00,0:00:04.00,Default,昨日は雨が降っていたので、家で本を読みました。',
+      'Dialogue: 0,0:00:04.50,0:00:08.00,Default,どんな本を, 読んだんですか？',
+    ].join('\n');
+    const cues = parseAss(raw);
+    expect(cues).toHaveLength(2);
+    expect(cues[0]).toEqual({ start: 1, end: 4, text: '昨日は雨が降っていたので、家で本を読みました。', style: 'Default' });
+    // Text is last, so a comma inside it stays part of the line.
+    expect(cues[1].text).toBe('どんな本を, 読んだんですか？');
   });
 });

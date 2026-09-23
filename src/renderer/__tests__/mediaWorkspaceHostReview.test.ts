@@ -89,7 +89,7 @@ async function openOn(view: 'library' | 'readiness' | 'review'): Promise<HTMLDiv
     window.dispatchEvent(new CustomEvent('seanime:media-workspace-open'));
   });
   if (view !== 'library') {
-    const label = view === 'review' ? 'Review' : 'Readiness';
+    const label = view === 'review' ? 'Mined cards' : 'Readiness';
     const button = [...host.querySelectorAll<HTMLButtonElement>('.seanime-host-views button')]
       .find((element) => element.textContent === label);
     await act(async () => { button?.click(); });
@@ -117,7 +117,7 @@ describe('MediaWorkspaceHost — Review is not gated behind the sidecar', () => 
     const el = await openOn('library');
     const labels = [...el.querySelectorAll('.seanime-host-views button')]
       .map((b) => b.textContent);
-    expect(labels).toEqual(['Library', 'Readiness', 'Review']);
+    expect(labels).toEqual(['Library', 'Readiness', 'Mined cards']);
   });
 
   it('still explains a stopped sidecar on the Library view, once auto-start has had its moment', async () => {

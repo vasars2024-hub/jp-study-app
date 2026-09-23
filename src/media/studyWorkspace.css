@@ -297,6 +297,12 @@
   color: rgb(var(--color-gray-50));
 }
 
+#media-workspace .study-bar-workspace-label {
+  color: rgb(var(--color-gray-400));
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
 #media-workspace .study-bar-workspace {
   padding: 0.28rem 0.4rem;
   border: 1px solid rgb(var(--color-gray-700) / 0.9);

@@ -27349,6 +27349,13 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
   z-index: 100;
 }
 
+.seanime-host-lead {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 12rem;
+}
+
 .seanime-host-title {
   color: var(--text);
   font-size: var(--font-size-2xs, 11px);

@@ -1751,9 +1751,13 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
             <strong>{t('study.empty.heading')}</strong>
             <p>{t('study.empty.body')}</p>
           </div>
-          <button type="button" className="mc-button mc-button-primary" onClick={() => void surface.openFile()}>
-            {t('study.empty.addMedia')}
-          </button>
+          {/* Only for an empty library. With titles already there the missing step is
+              queueing or preparing one, and a primary "Add media" pointed away from it. */}
+          {surface.items.length === 0 && (
+            <button type="button" className="mc-button mc-button-primary" onClick={() => void surface.openFile()}>
+              {t('study.empty.addMedia')}
+            </button>
+          )}
         </section>
       )}
 
@@ -2976,8 +2980,9 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
       <div className="study-workbench">
         <section className="study-vocabulary">
           <div className="study-section-heading">
+            {/* One plain heading. It was "Reversible workspace · Vocabulary funnel" —
+                two pieces of pipeline jargon for what is, to a learner, a word list. */}
             <div>
-              <span className="mc-eyebrow">{t('study.funnel.eyebrow')}</span>
               <h2>{t('study.funnel.heading')}</h2>
             </div>
             {workspace && (

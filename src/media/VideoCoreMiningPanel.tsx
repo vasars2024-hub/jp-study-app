@@ -54,6 +54,12 @@ interface Props {
    * that never falls back.
    */
   mineSignal?: number;
+  /**
+   * Open as the full form? Only where the card IS the layout (Mining). Everywhere else it
+   * opens as one line with Mine beside it: the full form covered a third of the picture in
+   * Watch and put Mine below the panel's fold (design audit 2026-09-23).
+   */
+  defaultExpanded?: boolean;
 }
 
 function loadHistory(): VideoCoreMiningHistoryEntry[] {
@@ -155,6 +161,7 @@ export default function VideoCoreMiningPanel({
   subtitleDelaySec,
   translationText = '',
   mineSignal = 0,
+  defaultExpanded = false,
 }: Props): React.ReactElement {
   const { t } = useT();
   const [draft, setDraft] = React.useState<VideoCoreMiningDraft | null>(null);
@@ -166,7 +173,9 @@ export default function VideoCoreMiningPanel({
   // The panel is an absolute overlay on the video. It has always been open, always this
   // tall, and always in the way; collapsing it is the difference between a study player
   // and a form sitting on top of one.
-  const [expanded, setExpanded] = React.useState(true);
+  const [expanded, setExpanded] = React.useState(defaultExpanded);
+  // A layout switch re-decides it; the toggle still overrides it within a layout.
+  React.useEffect(() => setExpanded(defaultExpanded), [defaultExpanded]);
   /** The last value this component itself wrote into `draft.translation`. */
   const autoTranslationRef = React.useRef('');
 
@@ -511,6 +520,27 @@ export default function VideoCoreMiningPanel({
           })}
         </p>
       ) : null}
+
+      {expanded ? null : (
+        // Collapsed: the line the card would be made from, and the one action that matters.
+        // The full form is a click on the heading away.
+        <div className="study-mining-quick">
+          <span className="study-mining-quick-line" title={draft.sentence}>
+            {draft.sentence.trim() || draft.term}
+          </span>
+          <button
+            type="button"
+            data-study-action="mine-card"
+            disabled={busy != null || missingTerm}
+            title={missingTerm ? t('mediaWorkspace.mining.missingText') : undefined}
+            onClick={() => void onMine()}
+          >
+            {busy === 'mine'
+              ? t('mediaWorkspace.mining.mining')
+              : t('mediaWorkspace.mining.mine')}
+          </button>
+        </div>
+      )}
 
       {!expanded ? null : (
       // Own scroll container, so the heading and the result message stay pinned instead

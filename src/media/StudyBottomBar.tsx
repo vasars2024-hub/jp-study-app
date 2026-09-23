@@ -802,17 +802,27 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
             control that is keyboard-operable, screen-reader-labelled and does not need
             its own popover lifecycle beside four that already exist.
           */}
+          {/* Named on screen: "Watch ▾" alone read as a fifth category beside Playback,
+              Study, Practice and AI, not as the choice of layout it is (audit 2026-09-23). */}
+          <span className="study-bar-workspace-label" aria-hidden="true">
+            {t('studyWorkspace.layoutLabel')}
+          </span>
           <select
             className="study-bar-workspace"
             data-study-action="switch-workspace"
-            aria-label={t('studyWorkspace.workspaces')}
+            aria-label={t('studyWorkspace.layoutLabel')}
             value={doc.activeWorkspaceId}
             onChange={(event) => {
               close();
               dispatch({ type: 'switch-workspace', workspaceId: event.currentTarget.value });
             }}
           >
-            {doc.workspaces.map((entry) => (
+            {/* The built-in Review layout drew the same screen as Watch minus the card and
+                shared its name with the host's Review tab, so it is not offered — only kept
+                reachable for a document that already has it active. */}
+            {doc.workspaces.filter((entry) => (
+              entry.id !== 'review' || doc.activeWorkspaceId === 'review'
+            )).map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.name ?? (entry.nameKey ? t(entry.nameKey) : entry.id)}
               </option>
