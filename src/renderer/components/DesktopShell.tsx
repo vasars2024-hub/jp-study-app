@@ -320,11 +320,11 @@ const WALLPAPERS = SELECTABLE_WALL_PRESETS;
 
 const NOTE_COLORS = ['#fff3a3', '#ffd6a5', '#ffb3ba', '#c9f2c7', '#cfe0ff'];
 const NOTE_COLOR_LABEL_KEYS = [
-  'lens.read.color.yellow',
-  'lens.read.color.orange',
-  'lens.read.color.red',
-  'lens.read.color.green',
-  'lens.read.color.blue',
+  'desktop.noteColor.yellow',
+  'desktop.noteColor.orange',
+  'desktop.noteColor.red',
+  'desktop.noteColor.green',
+  'desktop.noteColor.blue',
 ] as const;
 // BOOK_DROP / MEDIA_DROP removed with the two-bucket drop handler. The extension
 // tables now live in `shared/mediaKind.ts`, one copy, consulted by
