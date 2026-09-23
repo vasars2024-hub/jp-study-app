@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_RU } from '../mooncapLore/ru';
 import { MINING_UI_RU } from '../miningUi/ru';
 import { MAL_SYNC_RU } from '../malSync/ru';
 import { SCRAPER_UI_RU } from '../scraperUi/ru';
+import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
 import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 
 export const ru: Catalog = {
@@ -790,6 +791,7 @@ export const ru: Catalog = {
   ...MINING_UI_RU,
   ...MAL_SYNC_RU,
   ...SCRAPER_UI_RU,
+  ...SCRAPER_DRAWER_RU,
   ...ANIME_SCHEDULE_RU,
   ...GRAMMAR_TAXONOMY_RU,
 
@@ -3281,6 +3283,16 @@ export const ru: Catalog = {
   'yt.plan.empty': 'Список «К просмотру» пуст. Выберите видео и добавьте их.',
   'yt.action.surprise': 'Удиви меня',
   'yt.surprise.empty': 'Нет видео для случайного выбора.',
+  'yt.refusal.invalidPlaylistUrl': 'Введите адрес плейлиста YouTube с параметром list=.',
+  'yt.refusal.removedDuringSync': 'Этот плейлист был удалён во время синхронизации.',
+  'yt.refusal.playlistNotFound': 'Плейлист не найден.',
+  'yt.refusal.channelNotFound': 'Канал не найден.',
+  'yt.refusal.invalidVideoUrl': 'Введите корректный адрес видео YouTube.',
+  'yt.refusal.videoNotFound': 'Видео не найдено.',
+  'yt.refusal.ytDlpMissing': 'yt-dlp не найден в PATH.',
+  'yt.refusal.missingVideoId': 'Отсутствует идентификатор видео.',
+  'yt.refusal.ytDlpExit': 'yt-dlp завершился с кодом {code}.',
+  'yt.refusal.providerError': 'Не удалось выполнить запрос к YouTube: {detail}',
   // Quick settings + command palette (ru)
   'quickSettings.title': 'Быстрые настройки',
   'quickSettings.allSettings': 'Все настройки',
@@ -4493,6 +4505,48 @@ export const ru: Catalog = {
   'playlistEditor.reset.title': 'Сбросить Day cycle',
   'playlistEditor.reset.message': 'Сбросить плейлист Day cycle и стандартные правила по времени?',
   'playlistEditor.reset.confirm': 'Сбросить',
+  'playlistEditor.field.playlist': 'Плейлист',
+  'playlistEditor.field.transition': 'Переход',
+  'playlistEditor.field.duration': 'Длительность',
+  'playlistEditor.action.new': 'Создать',
+  'playlistEditor.action.rename': 'Переименовать',
+  'playlistEditor.action.delete': 'Удалить',
+  'playlistEditor.action.resetDayCycle': 'Сбросить дневной цикл',
+  'playlistEditor.action.moveUp': 'Переместить выше',
+  'playlistEditor.action.moveDown': 'Переместить ниже',
+  'playlistEditor.action.up': 'Вверх',
+  'playlistEditor.action.down': 'Вниз',
+  'playlistEditor.transition.crossfade': 'Плавное наложение',
+  'playlistEditor.transition.fade': 'Затухание',
+  'playlistEditor.transition.cut': 'Мгновенно',
+  'playlistEditor.wallKind.preset': 'Готовый фон',
+  'playlistEditor.wallKind.image': 'Изображение',
+  'playlistEditor.wallKind.video': 'Видео',
+  'playlistEditor.walls.title': 'Фоны в этом плейлисте',
+  'playlistEditor.walls.empty': 'Фонов нет. Добавьте готовый вариант ниже.',
+  'playlistEditor.walls.addPreset': 'Добавить готовый фон',
+  'playlistEditor.walls.choosePreset': 'Выберите фон…',
+  'playlistEditor.walls.allAdded': 'Все готовые фоны добавлены',
+  'playlistEditor.walls.addMedia': 'Добавить изображение или видео…',
+  'playlistEditor.rules.title': 'Правила смены фона',
+  'playlistEditor.rules.hint': 'Действует правило с наивысшим приоритетом. Время указано в 24-часовом формате. Для правил календаря включите «Фоны календаря».',
+  'playlistEditor.rules.when': 'Условие',
+  'playlistEditor.rules.timeOfDay': 'Время суток',
+  'playlistEditor.rules.calendarCategory': 'Категория календаря',
+  'playlistEditor.rules.playlistCycle': 'Цикл плейлиста (резерв)',
+  'playlistEditor.rules.from': 'С',
+  'playlistEditor.rules.to': 'До',
+  'playlistEditor.rules.category': 'Категория',
+  'playlistEditor.rules.wall': 'Фон',
+  'playlistEditor.rules.missingItem': 'Элемент не найден ({id})',
+  'playlistEditor.rules.priority': 'Приоритет',
+  'playlistEditor.rules.addTime': 'Добавить правило времени',
+  'playlistEditor.rules.addCalendar': 'Добавить правило календаря',
+  'playlistEditor.category.exam': 'Экзамен',
+  'playlistEditor.category.study': 'Учёба',
+  'playlistEditor.category.assignment': 'Задание',
+  'playlistEditor.category.reminder': 'Напоминание',
+  'playlistEditor.category.personal': 'Личное',
 
 
 

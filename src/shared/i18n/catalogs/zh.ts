@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_ZH } from '../mooncapLore/zh';
 import { MINING_UI_ZH } from '../miningUi/zh';
 import { MAL_SYNC_ZH } from '../malSync/zh';
 import { SCRAPER_UI_ZH } from '../scraperUi/zh';
+import { SCRAPER_DRAWER_ZH } from '../scraperDrawerUi/zh';
 import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 
 export const zh: Catalog = {
@@ -666,6 +667,7 @@ export const zh: Catalog = {
   ...MINING_UI_ZH,
   ...MAL_SYNC_ZH,
   ...SCRAPER_UI_ZH,
+  ...SCRAPER_DRAWER_ZH,
   ...ANIME_SCHEDULE_ZH,
   ...GRAMMAR_TAXONOMY_ZH,
 
@@ -3037,6 +3039,16 @@ export const zh: Catalog = {
   'yt.plan.empty': '计划观看还是空的。选中视频后添加即可。',
   'yt.action.surprise': '随机推荐',
   'yt.surprise.empty': '没有可供随机推荐的视频。',
+  'yt.refusal.invalidPlaylistUrl': '请输入包含 list= 的 YouTube 播放列表网址。',
+  'yt.refusal.removedDuringSync': '同步期间，该播放列表已被删除。',
+  'yt.refusal.playlistNotFound': '找不到播放列表。',
+  'yt.refusal.channelNotFound': '找不到频道。',
+  'yt.refusal.invalidVideoUrl': '请输入有效的 YouTube 视频网址。',
+  'yt.refusal.videoNotFound': '找不到视频。',
+  'yt.refusal.ytDlpMissing': '在 PATH 中找不到 yt-dlp。',
+  'yt.refusal.missingVideoId': '缺少视频 ID。',
+  'yt.refusal.ytDlpExit': 'yt-dlp 已退出，退出代码为 {code}。',
+  'yt.refusal.providerError': 'YouTube 请求失败：{detail}',
   // Quick settings + command palette (zh)
   'quickSettings.title': '快速设置',
   'quickSettings.allSettings': '所有设置',
@@ -4150,6 +4162,48 @@ export const zh: Catalog = {
   'playlistEditor.reset.title': '重置 Day cycle',
   'playlistEditor.reset.message': '重置 Day cycle 播放列表和默认时间规则？',
   'playlistEditor.reset.confirm': '重置',
+  'playlistEditor.field.playlist': '播放列表',
+  'playlistEditor.field.transition': '切换效果',
+  'playlistEditor.field.duration': '切换时长',
+  'playlistEditor.action.new': '新建',
+  'playlistEditor.action.rename': '重命名',
+  'playlistEditor.action.delete': '删除',
+  'playlistEditor.action.resetDayCycle': '重置每日循环',
+  'playlistEditor.action.moveUp': '上移',
+  'playlistEditor.action.moveDown': '下移',
+  'playlistEditor.action.up': '向上',
+  'playlistEditor.action.down': '向下',
+  'playlistEditor.transition.crossfade': '交叉淡化',
+  'playlistEditor.transition.fade': '淡入淡出',
+  'playlistEditor.transition.cut': '直接切换',
+  'playlistEditor.wallKind.preset': '预设',
+  'playlistEditor.wallKind.image': '图片',
+  'playlistEditor.wallKind.video': '视频',
+  'playlistEditor.walls.title': '此播放列表中的壁纸',
+  'playlistEditor.walls.empty': '还没有壁纸。请在下方添加预设。',
+  'playlistEditor.walls.addPreset': '添加预设壁纸',
+  'playlistEditor.walls.choosePreset': '选择预设…',
+  'playlistEditor.walls.allAdded': '已添加所有预设',
+  'playlistEditor.walls.addMedia': '添加图片或视频…',
+  'playlistEditor.rules.title': '轮换规则',
+  'playlistEditor.rules.hint': '优先级最高的匹配规则生效。时间采用24小时制。日历规则需要启用“日历壁纸”。',
+  'playlistEditor.rules.when': '触发条件',
+  'playlistEditor.rules.timeOfDay': '时段',
+  'playlistEditor.rules.calendarCategory': '日历类别',
+  'playlistEditor.rules.playlistCycle': '播放列表循环（后备）',
+  'playlistEditor.rules.from': '从',
+  'playlistEditor.rules.to': '到',
+  'playlistEditor.rules.category': '类别',
+  'playlistEditor.rules.wall': '壁纸',
+  'playlistEditor.rules.missingItem': '项目不存在（{id}）',
+  'playlistEditor.rules.priority': '优先级',
+  'playlistEditor.rules.addTime': '添加时段规则',
+  'playlistEditor.rules.addCalendar': '添加日历规则',
+  'playlistEditor.category.exam': '考试',
+  'playlistEditor.category.study': '学习',
+  'playlistEditor.category.assignment': '作业',
+  'playlistEditor.category.reminder': '提醒',
+  'playlistEditor.category.personal': '个人',
 
 
 

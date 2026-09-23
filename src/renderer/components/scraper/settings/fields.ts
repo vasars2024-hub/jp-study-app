@@ -7,10 +7,9 @@
 // field, and validation bounds that come from the same numbers the settings
 // model clamps to.
 //
-// TEXT NOTE: this file owns user-facing label/hint text, making it the second
-// text-owning module after strings.ts (which says so). Keeping labels beside
-// their bounds is what stops the two drifting; the deferred i18n sweep moves
-// both maps into the catalogs together.
+// English labels and hints remain beside their bounds for search and review.
+// The drawer resolves display text by stable field path from the four
+// scraperDrawerUi catalogs; fieldLocale.ts keeps the source model unchanged.
 
 import type { IconName } from '../../Icons';
 import type { ScraperSettingActionId } from './settingActions';

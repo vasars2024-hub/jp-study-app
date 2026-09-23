@@ -12,6 +12,7 @@ import { useModalKeyboard } from '../../ui/useModalKeyboard';
 import { AnchorSurface, ContextualSurface } from '../../liquid/LiquidSurface';
 import StatusDot from '../StatusDot';
 import FieldRow from './FieldRow';
+import { localizeScraperField } from './fieldLocale';
 import {
   SCRAPER_SETTINGS_GROUPS,
   fieldsForGroup,
@@ -26,6 +27,7 @@ import { useScraper } from '../ScraperContext';
 import { SCRAPER_SETTINGS_DRAWER_ID } from '../drawerId';
 import { sx, sxs } from '../strings';
 import { useScraperPort } from '../data/scraperPort';
+import { useT } from '../../../i18n';
 import {
   chooseScraperPreset,
   loadScraperSettingsDocument,
@@ -72,6 +74,7 @@ interface CredentialEditorState {
 }
 
 export default function ScraperSettingsDrawer() {
+  const { t } = useT();
   const ctl = useScraper();
   const port = useScraperPort();
   const [doc, setDoc] = useState<ScraperSettingsDocument>(() => loadScraperSettingsDocument());
@@ -317,7 +320,7 @@ export default function ScraperSettingsDrawer() {
                 }}
               >
                 <Icon name={group.icon} size={15} />
-                <span className="scr-drawer-cat-label">{group.label}</span>
+                <span className="scr-drawer-cat-label">{t(`scraperDrawer.group.${group.id}.label`)}</span>
                 <StatusDot id={group.statusId} />
               </button>
             );
@@ -329,16 +332,16 @@ export default function ScraperSettingsDrawer() {
             <header className="scr-drawer-pane-head">
               <h3 className="scr-drawer-pane-title">{sx('set.searchResults')}</h3>
               <p className="scr-drawer-pane-desc">
-                {results.length ? `${results.length} matching settings.` : sx('app.searchEmpty')}
+                {results.length ? t('scraperDrawer.search.matching', { count: results.length }) : sx('app.searchEmpty')}
               </p>
             </header>
           ) : (
             <header className="scr-drawer-pane-head">
               <h3 className="scr-drawer-pane-title">
-                {meta?.label ?? 'Network'}
+                {t(`scraperDrawer.group.${meta?.id ?? 'network'}.label`)}
                 <StatusDot id={meta?.statusId ?? 'set.network'} />
               </h3>
-              <p className="scr-drawer-pane-desc">{meta?.description ?? 'Configure scraper behavior.'}</p>
+              <p className="scr-drawer-pane-desc">{t(`scraperDrawer.group.${meta?.id ?? 'network'}.description`)}</p>
             </header>
           )}
 
@@ -346,7 +349,7 @@ export default function ScraperSettingsDrawer() {
             {fields.map((field) => (
               <FieldRow
                 key={`${field.path}-${field.label}`}
-                field={field}
+                field={localizeScraperField(field, t)}
                 settings={settings}
                 onChange={change}
                 onAction={runAction}
@@ -356,19 +359,19 @@ export default function ScraperSettingsDrawer() {
             {!searching && category === 'profiles' && (
               <div className="scr-drawer-special">
                 <div className="scr-setting-metric-grid">
-                  <span><small>Saved profiles</small><b>{doc.profiles.length}</b></span>
-                  <span><small>Active preset</small><b>{activeProfile?.preset ?? 'custom'}</b></span>
-                  <span><small>Revisions</small><b>{doc.profiles.reduce((sum, profile) => sum + profile.history.length, 0)}</b></span>
-                  <span><small>Site overrides</small><b>{Object.keys(doc.siteOverrides).length}</b></span>
+                  <span><small>{t('scraperDrawer.special.savedProfiles')}</small><b>{doc.profiles.length}</b></span>
+                  <span><small>{t('scraperDrawer.special.activePreset')}</small><b>{activeProfile?.preset ?? 'custom'}</b></span>
+                  <span><small>{t('scraperDrawer.special.revisions')}</small><b>{doc.profiles.reduce((sum, profile) => sum + profile.history.length, 0)}</b></span>
+                  <span><small>{t('scraperDrawer.special.siteOverrides')}</small><b>{Object.keys(doc.siteOverrides).length}</b></span>
                 </div>
                 <label className="scr-special-field">
-                  <span>Active profile</span>
+                  <span>{t('scraperDrawer.special.activeProfile')}</span>
                   <select className="scr-input" value={doc.activeProfileId} onChange={(event) => selectProfile(event.target.value)}>
                     {doc.profiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>{profile.name}</option>
                     ))}
                   </select>
-                  <small>Changing profile swaps every scraper behavior setting as one revisioned unit.</small>
+                  <small>{t('scraperDrawer.special.activeProfileHint')}</small>
                 </label>
                 <div className="scr-setting-profile-list">
                   {doc.profiles.map((profile) => (
@@ -379,7 +382,7 @@ export default function ScraperSettingsDrawer() {
                       onClick={() => selectProfile(profile.id)}
                     >
                       <span><b>{profile.name}</b><small>{profile.description}</small></span>
-                      <span>{profile.history.length} revisions</span>
+                      <span>{t('scraperDrawer.special.revisionCount', { count: profile.history.length })}</span>
                     </button>
                   ))}
                 </div>
@@ -391,57 +394,57 @@ export default function ScraperSettingsDrawer() {
                     ctl.navigate('profiles');
                   }}
                 >
-                  Open profile manager
+                  {t('scraperDrawer.special.openProfileManager')}
                 </Button>
               </div>
             )}
             {!searching && category === 'ui' && (
               <div className="scr-drawer-special">
                 <div className="scr-setting-metric-grid">
-                  <span><small>Window mode</small><b>{ctl.compact ? 'Compact' : 'Full'}</b></span>
-                  <span><small>Table density</small><b>{ctl.density}</b></span>
-                  <span><small>Page size</small><b>{ctl.pageSize}</b></span>
-                  <span><small>Visible columns</small><b>{ctl.visibleColumns.length}</b></span>
+                  <span><small>{t('scraperDrawer.special.windowMode')}</small><b>{t(ctl.compact ? 'scraperDrawer.special.compact' : 'scraperDrawer.special.full')}</b></span>
+                  <span><small>{t('scraperDrawer.special.tableDensity')}</small><b>{t(`scraperDrawer.special.${ctl.density}`)}</b></span>
+                  <span><small>{t('scraperDrawer.special.pageSize')}</small><b>{ctl.pageSize}</b></span>
+                  <span><small>{t('scraperDrawer.special.visibleColumns')}</small><b>{ctl.visibleColumns.length}</b></span>
                 </div>
                 <label className="scr-special-toggle">
-                  <span><b>Compact scraper window</b><small>Use the narrow standalone layout from the compact reference.</small></span>
+                  <span><b>{t('scraperDrawer.special.compactWindow')}</b><small>{t('scraperDrawer.special.compactWindowHint')}</small></span>
                   <Toggle checked={ctl.compact} onChange={(event) => ctl.setCompact(event.target.checked)} />
                 </label>
                 <label className="scr-special-toggle">
-                  <span><b>Collapsed navigation rail</b><small>Keep icons visible while reclaiming workspace width.</small></span>
+                  <span><b>{t('scraperDrawer.special.collapsedRail')}</b><small>{t('scraperDrawer.special.collapsedRailHint')}</small></span>
                   <Toggle checked={ctl.railCollapsed} onChange={() => ctl.toggleRail()} />
                 </label>
                 <label className="scr-special-toggle">
-                  <span><b>Advanced controls</b><small>Show expert-only settings and diagnostic pages.</small></span>
+                  <span><b>{t('scraperDrawer.special.advancedControls')}</b><small>{t('scraperDrawer.special.advancedControlsHint')}</small></span>
                   <Toggle checked={ctl.advancedMode} onChange={(event) => ctl.setAdvancedMode(event.target.checked)} />
                 </label>
                 <div className="scr-special-field-grid">
                   <label className="scr-special-field">
-                    <span>Result density</span>
+                    <span>{t('scraperDrawer.special.resultDensity')}</span>
                     <select className="scr-input" value={ctl.density} onChange={(event) => ctl.setDensity(event.target.value as 'compact' | 'cozy')}>
-                      <option value="cozy">Cozy</option>
-                      <option value="compact">Compact</option>
+                      <option value="cozy">{t('scraperDrawer.special.cozy')}</option>
+                      <option value="compact">{t('scraperDrawer.special.compact')}</option>
                     </select>
                   </label>
                   <label className="scr-special-field">
-                    <span>Rows per page</span>
+                    <span>{t('scraperDrawer.special.rowsPerPage')}</span>
                     <select className="scr-input" value={ctl.pageSize} onChange={(event) => ctl.setPageSize(Number(event.target.value))}>
                       {[10, 25, 50, 100, 200].map((size) => <option key={size} value={size}>{size}</option>)}
                     </select>
                   </label>
                   <label className="scr-special-field">
-                    <span>Default result tab</span>
+                    <span>{t('scraperDrawer.special.defaultResultTab')}</span>
                     <select className="scr-input" value={ctl.resultTab} onChange={(event) => ctl.setResultTab(event.target.value as typeof ctl.resultTab)}>
                       {['episodes', 'details', 'streams', 'torrents', 'images', 'metadata', 'logs'].map((tab) => (
-                        <option key={tab} value={tab}>{tab[0].toUpperCase() + tab.slice(1)}</option>
+                        <option key={tab} value={tab}>{t(`scraperDrawer.special.tab.${tab}`)}</option>
                       ))}
                     </select>
                   </label>
                   <div className="scr-special-field">
-                    <span>Recent destinations</span>
+                    <span>{t('scraperDrawer.special.recentDestinations')}</span>
                     <div className="scr-recent-setting-list">
                       {ctl.recentPages.slice(0, 4).map((page) => <code key={page}>{page}</code>)}
-                      {!ctl.recentPages.length && <small>No recent pages yet</small>}
+                      {!ctl.recentPages.length && <small>{t('scraperDrawer.special.noRecentPages')}</small>}
                     </div>
                   </div>
                 </div>
@@ -477,15 +480,15 @@ export default function ScraperSettingsDrawer() {
             className="scr-pair-editor"
             role="dialog"
             aria-modal="true"
-            aria-label={`Edit ${pairEditor.title}`}
+            aria-label={t('scraperDrawer.editor.edit', { title: pairEditor.title })}
           >
             <header className="scr-pair-editor-head">
               <div>
                 <h3>{pairEditor.title}</h3>
                 <p>
                   {pairEditor.kind === 'headers'
-                    ? 'Headers are sent with every request in this profile.'
-                    : 'Cookies are stored in the standard name/value header format.'}
+                    ? t('scraperDrawer.editor.headersHint')
+                    : t('scraperDrawer.editor.cookiesHint')}
                 </p>
               </div>
               <IconButton label={sx('common.close')} size="sm" onClick={() => setPairEditor(null)}>
@@ -494,8 +497,8 @@ export default function ScraperSettingsDrawer() {
             </header>
 
             <div className="scr-pair-editor-labels" aria-hidden>
-              <span>{pairEditor.kind === 'headers' ? 'Header' : 'Cookie'}</span>
-              <span>Value</span>
+              <span>{t(pairEditor.kind === 'headers' ? 'scraperDrawer.editor.header' : 'scraperDrawer.editor.cookie')}</span>
+              <span>{t('scraperDrawer.editor.value')}</span>
             </div>
             <div className="scr-pair-editor-rows">
               {pairEditor.rows.map((row, index) => (
@@ -503,19 +506,19 @@ export default function ScraperSettingsDrawer() {
                   <input
                     className="scr-input"
                     value={row.key}
-                    aria-label={`${pairEditor.title} name ${index + 1}`}
+                    aria-label={t('scraperDrawer.editor.rowName', { title: pairEditor.title, count: index + 1 })}
                     placeholder={pairEditor.kind === 'headers' ? 'Accept-Language' : 'session'}
                     onChange={(event) => updatePair(row.id, { key: event.target.value })}
                   />
                   <input
                     className="scr-input"
                     value={row.value}
-                    aria-label={`${pairEditor.title} value ${index + 1}`}
+                    aria-label={t('scraperDrawer.editor.rowValue', { title: pairEditor.title, count: index + 1 })}
                     placeholder={pairEditor.kind === 'headers' ? 'ja,en;q=0.8' : 'value'}
                     onChange={(event) => updatePair(row.id, { value: event.target.value })}
                   />
                   <IconButton
-                    label={`Remove row ${index + 1}`}
+                    label={t('scraperDrawer.editor.removeRow', { count: index + 1 })}
                     size="sm"
                     onClick={() =>
                       setPairEditor((current) => current && {
@@ -549,7 +552,7 @@ export default function ScraperSettingsDrawer() {
                 })
               }
             >
-              Add row
+              {t('scraperDrawer.editor.addRow')}
             </Button>
 
             <footer className="scr-pair-editor-foot">
@@ -557,7 +560,7 @@ export default function ScraperSettingsDrawer() {
                 {sx('common.cancel')}
               </Button>
               <Button size="sm" variant="primary" onClick={savePairs}>
-                Save {pairEditor.title}
+                {t('scraperDrawer.editor.save', { title: pairEditor.title })}
               </Button>
             </footer>
           </section>
@@ -572,7 +575,7 @@ export default function ScraperSettingsDrawer() {
             className="scr-pair-editor"
             role="dialog"
             aria-modal="true"
-            aria-label={`Edit ${listEditor.title}`}
+            aria-label={t('scraperDrawer.editor.edit', { title: listEditor.title })}
           >
             <header className="scr-pair-editor-head">
               <div>
@@ -649,7 +652,7 @@ export default function ScraperSettingsDrawer() {
             className="scr-pair-editor"
             role="dialog"
             aria-modal="true"
-            aria-label={`Edit ${credentialEditor.title}`}
+            aria-label={t('scraperDrawer.editor.edit', { title: credentialEditor.title })}
           >
             <header className="scr-pair-editor-head">
               <div>

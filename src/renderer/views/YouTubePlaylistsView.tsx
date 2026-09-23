@@ -7,6 +7,7 @@ import VirtualList from '../components/VirtualList';
 import { AppChrome, StatusBarField, StatusBarSpacer, confirmDialog, type MenuBarMenu } from '../components/ui';
 import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
+import { localizeYtPlaylistError } from '../ytPlaylistErrors';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import { setStudyLang } from '../studyEnvironment';
 import { openExtensionSettings, openLibraryInbox } from '../extensionBridgeUi';
@@ -128,12 +129,12 @@ export default function YouTubePlaylistsView() {
         setError(
           t('yt.news.partialErrors', {
             count: errors.length,
-            first: errors[0]?.error ?? '',
+            first: localizeYtPlaylistError(errors[0]?.error ?? '', t),
           }),
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(localizeYtPlaylistError(err instanceof Error ? err.message : String(err), t));
     } finally {
       setBusy('');
       setRefreshProgress(null);
@@ -245,7 +246,7 @@ export default function YouTubePlaylistsView() {
     const r = await window.api.ytAddPlaylist(url);
     setBusy('');
     if ('error' in r) {
-      setError(r.error);
+      setError(localizeYtPlaylistError(r.error, t));
       return;
     }
     applyStore(r.store);
@@ -261,7 +262,7 @@ export default function YouTubePlaylistsView() {
     const r = await window.api.ytRefreshPlaylist(playlist.id);
     setBusy('');
     if ('error' in r) {
-      setError(r.error);
+      setError(localizeYtPlaylistError(r.error, t));
       return;
     }
     applyStore(r.store);
@@ -276,7 +277,7 @@ export default function YouTubePlaylistsView() {
     setDlProgress(null);
     applyStore(r.store);
     const fail = r.results.find((x) => !x.ok);
-    if (fail?.error) setError(fail.error);
+    if (fail?.error) setError(localizeYtPlaylistError(fail.error, t));
     setSelectedVideoIds(new Set());
   };
 
@@ -333,28 +334,28 @@ export default function YouTubePlaylistsView() {
       ? current.filter((s) => s !== sub)
       : [...current, sub];
     const r = await window.api.ytSetPlaylistPrefs(playlist.id, { preferSubs: next.length ? next : [sub] });
-    if ('error' in r) setError(r.error);
+    if ('error' in r) setError(localizeYtPlaylistError(r.error, t));
     else applyStore(r);
   };
 
   const setLang = async (studyLang: YtStudyLang): Promise<void> => {
     if (!playlist) return;
     const r = await window.api.ytSetPlaylistPrefs(playlist.id, { lang: studyLang });
-    if ('error' in r) setError(r.error);
+    if ('error' in r) setError(localizeYtPlaylistError(r.error, t));
     else applyStore(r);
   };
 
   const setAutoUpdate = async (autoUpdate: boolean): Promise<void> => {
     if (!playlist) return;
     const r = await window.api.ytSetPlaylistPrefs(playlist.id, { autoUpdate });
-    if ('error' in r) setError(r.error);
+    if ('error' in r) setError(localizeYtPlaylistError(r.error, t));
     else applyStore(r);
   };
 
   const setPlaylistField = async (patch: Parameters<typeof window.api.ytSetPlaylistPrefs>[1]): Promise<void> => {
     if (!playlist) return;
     const r = await window.api.ytSetPlaylistPrefs(playlist.id, patch);
-    if ('error' in r) setError(r.error);
+    if ('error' in r) setError(localizeYtPlaylistError(r.error, t));
     else applyStore(r);
   };
 
@@ -362,7 +363,7 @@ export default function YouTubePlaylistsView() {
     setSort(sortDefault);
     if (!playlist) return;
     const r = await window.api.ytSetPlaylistPrefs(playlist.id, { sortDefault });
-    if ('error' in r) setError(r.error);
+    if ('error' in r) setError(localizeYtPlaylistError(r.error, t));
     else applyStore(r);
   };
 
@@ -377,7 +378,7 @@ export default function YouTubePlaylistsView() {
   const moveToFolder = async (folderId: string | null): Promise<void> => {
     if (!playlist) return;
     const r = await window.api.ytSetPlaylistPrefs(playlist.id, { folderId });
-    if ('error' in r) setError(r.error);
+    if ('error' in r) setError(localizeYtPlaylistError(r.error, t));
     else applyStore(r);
   };
 
@@ -403,7 +404,7 @@ export default function YouTubePlaylistsView() {
     const r = await window.api.ytRefreshChannel(playlist.channelId);
     setBusy('');
     if ('error' in r) {
-      setError(r.error);
+      setError(localizeYtPlaylistError(r.error, t));
       return;
     }
     applyStore(r.store);

@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_JA } from '../mooncapLore/ja';
 import { MINING_UI_JA } from '../miningUi/ja';
 import { MAL_SYNC_JA } from '../malSync/ja';
 import { SCRAPER_UI_JA } from '../scraperUi/ja';
+import { SCRAPER_DRAWER_JA } from '../scraperDrawerUi/ja';
 import { ANIME_SCHEDULE_JA } from '../animeSchedule/ja';
 
 export const ja: Catalog = {
@@ -668,6 +669,7 @@ export const ja: Catalog = {
   ...MINING_UI_JA,
   ...MAL_SYNC_JA,
   ...SCRAPER_UI_JA,
+  ...SCRAPER_DRAWER_JA,
   ...ANIME_SCHEDULE_JA,
   ...GRAMMAR_TAXONOMY_JA,
 
@@ -3052,6 +3054,16 @@ export const ja: Catalog = {
   'yt.plan.empty': '視聴予定はまだありません。動画を選んで追加してください。',
   'yt.action.surprise': 'おまかせ',
   'yt.surprise.empty': 'おまかせで選べる動画がありません。',
+  'yt.refusal.invalidPlaylistUrl': 'list= を含む YouTube プレイリストの URL を入力してください。',
+  'yt.refusal.removedDuringSync': '同期中にこのプレイリストが削除されました。',
+  'yt.refusal.playlistNotFound': 'プレイリストが見つかりません。',
+  'yt.refusal.channelNotFound': 'チャンネルが見つかりません。',
+  'yt.refusal.invalidVideoUrl': '有効な YouTube 動画の URL を入力してください。',
+  'yt.refusal.videoNotFound': '動画が見つかりません。',
+  'yt.refusal.ytDlpMissing': 'PATH 上に yt-dlp が見つかりません。',
+  'yt.refusal.missingVideoId': '動画 ID がありません。',
+  'yt.refusal.ytDlpExit': 'yt-dlp が終了コード {code} で終了しました。',
+  'yt.refusal.providerError': 'YouTube へのリクエストに失敗しました: {detail}',
   // Quick settings + command palette (ja)
   'quickSettings.title': 'クイック設定',
   'quickSettings.allSettings': 'すべての設定',
@@ -4170,6 +4182,48 @@ export const ja: Catalog = {
   'playlistEditor.reset.title': 'Day cycle をリセット',
   'playlistEditor.reset.message': 'Day cycle プレイリストと既定の時間ルールをリセットしますか？',
   'playlistEditor.reset.confirm': 'リセット',
+  'playlistEditor.field.playlist': 'プレイリスト',
+  'playlistEditor.field.transition': '切り替え効果',
+  'playlistEditor.field.duration': '切り替え時間',
+  'playlistEditor.action.new': '新規作成',
+  'playlistEditor.action.rename': '名前を変更',
+  'playlistEditor.action.delete': '削除',
+  'playlistEditor.action.resetDayCycle': '一日のサイクルをリセット',
+  'playlistEditor.action.moveUp': '上へ移動',
+  'playlistEditor.action.moveDown': '下へ移動',
+  'playlistEditor.action.up': '上へ',
+  'playlistEditor.action.down': '下へ',
+  'playlistEditor.transition.crossfade': 'クロスフェード',
+  'playlistEditor.transition.fade': 'フェード',
+  'playlistEditor.transition.cut': '即時切り替え',
+  'playlistEditor.wallKind.preset': 'プリセット',
+  'playlistEditor.wallKind.image': '画像',
+  'playlistEditor.wallKind.video': '動画',
+  'playlistEditor.walls.title': 'このプレイリストの壁紙',
+  'playlistEditor.walls.empty': '壁紙がありません。下からプリセットを追加してください。',
+  'playlistEditor.walls.addPreset': 'プリセット壁紙を追加',
+  'playlistEditor.walls.choosePreset': 'プリセットを選択…',
+  'playlistEditor.walls.allAdded': 'すべてのプリセットを追加済みです',
+  'playlistEditor.walls.addMedia': '画像または動画を追加…',
+  'playlistEditor.rules.title': '切り替えルール',
+  'playlistEditor.rules.hint': '優先度が最も高いルールが適用されます。時刻は24時間表記です。カレンダーのルールには「カレンダー壁紙」を有効にしてください。',
+  'playlistEditor.rules.when': '条件',
+  'playlistEditor.rules.timeOfDay': '時刻',
+  'playlistEditor.rules.calendarCategory': 'カレンダーのカテゴリ',
+  'playlistEditor.rules.playlistCycle': 'プレイリストの順番（既定）',
+  'playlistEditor.rules.from': '開始',
+  'playlistEditor.rules.to': '終了',
+  'playlistEditor.rules.category': 'カテゴリ',
+  'playlistEditor.rules.wall': '壁紙',
+  'playlistEditor.rules.missingItem': '見つからない項目（{id}）',
+  'playlistEditor.rules.priority': '優先度',
+  'playlistEditor.rules.addTime': '時刻ルールを追加',
+  'playlistEditor.rules.addCalendar': 'カレンダールールを追加',
+  'playlistEditor.category.exam': '試験',
+  'playlistEditor.category.study': '学習',
+  'playlistEditor.category.assignment': '課題',
+  'playlistEditor.category.reminder': 'リマインダー',
+  'playlistEditor.category.personal': '個人',
 
 
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useT } from '../i18n';
+import { localizeArcadeText } from './arcadeText';
 import type { SourceLang } from './types';
 import { recordGameResult } from '../stats';
 
@@ -105,17 +106,18 @@ function ArcadeShell({
   onReset,
   children,
 }: ArcadeShellProps) {
+  const { t } = useT();
   return (
     <div className={`arcade-game arcade-game--${theme} arcade-game--${gameId}`}>
       <div className="arcade-game__head">
         <div>
-          <b>{title}</b>
-          <span>{subtitle}</span>
+          <b>{localizeArcadeText(title, t)}</b>
+          <span>{localizeArcadeText(subtitle, t)}</span>
         </div>
         <div className="arcade-game__hud">
-          <span>Score {score}</span>
-          <span>{theme === 'wired' ? 'Signal' : 'Lives'} {lives}</span>
-          <span>Stage {stage}</span>
+          <span>{t('games.arcade.hud.score', { score })}</span>
+          <span>{t(theme === 'wired' ? 'games.arcade.hud.signal' : 'games.arcade.hud.lives', { lives })}</span>
+          <span>{t('games.arcade.hud.stage', { stage })}</span>
         </div>
       </div>
       {children}
@@ -126,10 +128,10 @@ function ArcadeShell({
         drawn, not described — so this is the only place the outcome exists as
         text, and it has to announce itself.
       */}
-      <div className="arcade-game__status" role="status" aria-live="polite">{status}</div>
+      <div className="arcade-game__status" role="status" aria-live="polite">{localizeArcadeText(status, t)}</div>
       {complete && (
         <button type="button" className="btn primary" onClick={onReset}>
-          Restart
+          {t('games.arcade.restart')}
         </button>
       )}
     </div>

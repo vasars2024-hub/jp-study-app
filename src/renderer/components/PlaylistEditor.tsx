@@ -18,13 +18,7 @@ import {
 import type { CalendarCategory } from '../environment/types';
 import { useT } from '../i18n';
 
-const CAL_CATS: { id: CalendarCategory; label: string }[] = [
-  { id: 'exam', label: 'Exam' },
-  { id: 'study', label: 'Study' },
-  { id: 'assignment', label: 'Assignment' },
-  { id: 'reminder', label: 'Reminder' },
-  { id: 'personal', label: 'Personal' },
-];
+const CAL_CATS: CalendarCategory[] = ['exam', 'study', 'assignment', 'reminder', 'personal'];
 
 function isDirectMediaRef(ref: string): boolean {
   return /^(app:|data:|blob:|file:|https?:|\/)/i.test(ref);
@@ -262,7 +256,7 @@ export default function PlaylistEditor({
     <div className={`pl-editor ${disabled ? 'is-disabled' : ''}`}>
       <div className="pl-toolbar">
         <label className="pl-field">
-          <span className="muted">Playlist</span>
+          <span className="muted">{t('playlistEditor.field.playlist')}</span>
           <select
             className="set-select"
             value={activeId}
@@ -277,7 +271,7 @@ export default function PlaylistEditor({
           </select>
         </label>
         <button type="button" className="btn small" disabled={disabled} onClick={createPlaylist}>
-          New
+          {t('playlistEditor.action.new')}
         </button>
         <button
           type="button"
@@ -288,13 +282,13 @@ export default function PlaylistEditor({
             setRenaming(true);
           }}
         >
-          Rename
+          {t('playlistEditor.action.rename')}
         </button>
         <button type="button" className="btn small" disabled={disabled} onClick={deletePlaylist}>
-          Delete
+          {t('playlistEditor.action.delete')}
         </button>
         <button type="button" className="btn small" disabled={disabled} onClick={resetDayCycle}>
-          Reset day cycle
+          {t('playlistEditor.action.resetDayCycle')}
         </button>
       </div>
 
@@ -310,21 +304,17 @@ export default function PlaylistEditor({
             autoFocus
           />
           <button type="button" className="btn small primary" onClick={commitRename}>
-            Save
+            {t('common.save')}
           </button>
           <button type="button" className="btn small" onClick={() => setRenaming(false)}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       )}
 
       <div className="os-viz-row">
-        <span className="os-viz-label muted">Transition</span>
-        {([
-          ['crossfade', 'Crossfade'],
-          ['fade', 'Fade'],
-          ['cut', 'Cut'],
-        ] as [TransitionKind, string][]).map(([id, label]) => (
+        <span className="os-viz-label muted">{t('playlistEditor.field.transition')}</span>
+        {(['crossfade', 'fade', 'cut'] as TransitionKind[]).map((id) => (
           <button
             key={id}
             type="button"
@@ -333,12 +323,12 @@ export default function PlaylistEditor({
             disabled={disabled}
             onClick={() => updateActive({ transition: id })}
           >
-            {label}
+            {t(`playlistEditor.transition.${id}`)}
           </button>
         ))}
       </div>
       <div className="os-viz-row">
-        <span className="os-viz-label muted">Duration</span>
+        <span className="os-viz-label muted">{t('playlistEditor.field.duration')}</span>
         <input
           type="range"
           min={200}
@@ -352,19 +342,19 @@ export default function PlaylistEditor({
         <span className="muted">{active.transitionMs}ms</span>
       </div>
 
-      <p className="muted os-set-hint pl-section-title">Walls in this playlist</p>
+      <p className="muted os-set-hint pl-section-title">{t('playlistEditor.walls.title')}</p>
       <ul className="pl-items">
         {active.items.map((it, index) => (
           <li key={it.id} className="pl-item">
             <div
               className="pl-swatch"
               style={itemSwatchStyle(it)}
-              title={it.kind}
+              title={t(`playlistEditor.wallKind.${it.kind}`)}
             />
             <div className="pl-item-meta">
               <span className="pl-item-name">{itemLabel(it)}</span>
               <span className="muted pl-item-sub">
-                {it.kind}
+                {t(`playlistEditor.wallKind.${it.kind}`)}
                 {it.tags?.length ? ` · ${it.tags.join(', ')}` : ''}
               </span>
             </div>
@@ -373,19 +363,19 @@ export default function PlaylistEditor({
                 type="button"
                 className="btn small"
                 disabled={disabled || index === 0}
-                title="Move up"
+                title={t('playlistEditor.action.moveUp')}
                 onClick={() => moveItem(index, -1)}
               >
-                Up
+                {t('playlistEditor.action.up')}
               </button>
               <button
                 type="button"
                 className="btn small"
                 disabled={disabled || index >= active.items.length - 1}
-                title="Move down"
+                title={t('playlistEditor.action.moveDown')}
                 onClick={() => moveItem(index, 1)}
               >
-                Down
+                {t('playlistEditor.action.down')}
               </button>
               <button
                 type="button"
@@ -393,17 +383,17 @@ export default function PlaylistEditor({
                 disabled={disabled}
                 onClick={() => setItems(active.items.filter((x) => x.id !== it.id))}
               >
-                Remove
+                {t('common.remove')}
               </button>
             </div>
           </li>
         ))}
-        {!active.items.length && <li className="muted pl-empty">No walls — add a preset below.</li>}
+        {!active.items.length && <li className="muted pl-empty">{t('playlistEditor.walls.empty')}</li>}
       </ul>
 
       <div className="pl-add-row">
         <label className="pl-field grow">
-          <span className="muted">Add preset wall</span>
+          <span className="muted">{t('playlistEditor.walls.addPreset')}</span>
           <select
             className="set-select"
             disabled={disabled || !availablePresets.length}
@@ -415,7 +405,7 @@ export default function PlaylistEditor({
               }
             }}
           >
-            <option value="">{availablePresets.length ? 'Choose preset…' : 'All presets already added'}</option>
+            <option value="">{t(availablePresets.length ? 'playlistEditor.walls.choosePreset' : 'playlistEditor.walls.allAdded')}</option>
             {availablePresets.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
@@ -424,13 +414,13 @@ export default function PlaylistEditor({
           </select>
         </label>
         <button type="button" className="btn small" disabled={disabled} onClick={() => void addImage()}>
-          Add image / video…
+          {t('playlistEditor.walls.addMedia')}
         </button>
       </div>
 
-      <p className="muted os-set-hint pl-section-title">Rotation rules</p>
+      <p className="muted os-set-hint pl-section-title">{t('playlistEditor.rules.title')}</p>
       <p className="muted os-set-hint">
-        Highest priority match wins. Time-of-day uses 24h hours. Calendar rules need “Calendar walls” enabled.
+        {t('playlistEditor.rules.hint')}
       </p>
       <ul className="pl-rules">
         {sortedRules.map((r) => {
@@ -439,7 +429,7 @@ export default function PlaylistEditor({
             <li key={r.id} className={`pl-rule ${itemOk ? '' : 'pl-rule-warn'}`}>
               <div className="pl-rule-grid">
                 <label className="pl-field">
-                  <span className="muted">When</span>
+                  <span className="muted">{t('playlistEditor.rules.when')}</span>
                   <select
                     className="set-select"
                     disabled={disabled}
@@ -457,16 +447,16 @@ export default function PlaylistEditor({
                       }
                     }}
                   >
-                    <option value="timeOfDay">Time of day</option>
-                    <option value="calendarCategory">Calendar category</option>
-                    <option value="playlistCycle">Playlist cycle (fallback slot)</option>
+                    <option value="timeOfDay">{t('playlistEditor.rules.timeOfDay')}</option>
+                    <option value="calendarCategory">{t('playlistEditor.rules.calendarCategory')}</option>
+                    <option value="playlistCycle">{t('playlistEditor.rules.playlistCycle')}</option>
                   </select>
                 </label>
 
                 {r.when.type === 'timeOfDay' && (
                   <>
                     <label className="pl-field">
-                      <span className="muted">From</span>
+                      <span className="muted">{t('playlistEditor.rules.from')}</span>
                       <input
                         type="number"
                         min={0}
@@ -486,7 +476,7 @@ export default function PlaylistEditor({
                       />
                     </label>
                     <label className="pl-field">
-                      <span className="muted">To</span>
+                      <span className="muted">{t('playlistEditor.rules.to')}</span>
                       <input
                         type="number"
                         min={0}
@@ -510,7 +500,7 @@ export default function PlaylistEditor({
 
                 {r.when.type === 'calendarCategory' && (
                   <label className="pl-field">
-                    <span className="muted">Category</span>
+                    <span className="muted">{t('playlistEditor.rules.category')}</span>
                     <select
                       className="set-select"
                       disabled={disabled}
@@ -524,9 +514,9 @@ export default function PlaylistEditor({
                         })
                       }
                     >
-                      {CAL_CATS.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.label}
+                      {CAL_CATS.map((category) => (
+                        <option key={category} value={category}>
+                          {t(`playlistEditor.category.${category}`)}
                         </option>
                       ))}
                     </select>
@@ -534,7 +524,7 @@ export default function PlaylistEditor({
                 )}
 
                 <label className="pl-field">
-                  <span className="muted">Wall</span>
+                  <span className="muted">{t('playlistEditor.rules.wall')}</span>
                   <select
                     className="set-select"
                     disabled={disabled}
@@ -547,13 +537,13 @@ export default function PlaylistEditor({
                       </option>
                     ))}
                     {!itemOk && (
-                      <option value={r.itemId}>Missing item ({r.itemId})</option>
+                      <option value={r.itemId}>{t('playlistEditor.rules.missingItem', { id: r.itemId })}</option>
                     )}
                   </select>
                 </label>
 
                 <label className="pl-field">
-                  <span className="muted">Priority</span>
+                  <span className="muted">{t('playlistEditor.rules.priority')}</span>
                   <input
                     type="number"
                     min={0}
@@ -570,7 +560,7 @@ export default function PlaylistEditor({
                   disabled={disabled}
                   onClick={() => removeRule(r.id)}
                 >
-                  Remove
+                  {t('common.remove')}
                 </button>
               </div>
             </li>
@@ -579,10 +569,10 @@ export default function PlaylistEditor({
       </ul>
       <div className="pl-add-row">
         <button type="button" className="btn small" disabled={disabled || !active.items.length} onClick={addTimeRule}>
-          Add time rule
+          {t('playlistEditor.rules.addTime')}
         </button>
         <button type="button" className="btn small" disabled={disabled || !active.items.length} onClick={addCalRule}>
-          Add calendar rule
+          {t('playlistEditor.rules.addCalendar')}
         </button>
       </div>
     </div>

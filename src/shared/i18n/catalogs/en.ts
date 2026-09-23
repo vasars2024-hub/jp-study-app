@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_EN } from '../mooncapLore/en';
 import { MINING_UI_EN } from '../miningUi/en';
 import { MAL_SYNC_EN } from '../malSync/en';
 import { SCRAPER_UI_EN } from '../scraperUi/en';
+import { SCRAPER_DRAWER_EN } from '../scraperDrawerUi/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 
 export const en: Catalog = {
@@ -768,6 +769,7 @@ export const en: Catalog = {
   ...MINING_UI_EN,
   ...MAL_SYNC_EN,
   ...SCRAPER_UI_EN,
+  ...SCRAPER_DRAWER_EN,
   ...ANIME_SCHEDULE_EN,
   ...GRAMMAR_TAXONOMY_EN,
 
@@ -2946,6 +2948,16 @@ export const en: Catalog = {
   'yt.plan.empty': 'Nothing in Plan to watch yet. Select videos and add them.',
   'yt.action.surprise': 'Surprise me',
   'yt.surprise.empty': 'No videos available for a surprise pick.',
+  'yt.refusal.invalidPlaylistUrl': 'Enter a YouTube playlist URL containing list=.',
+  'yt.refusal.removedDuringSync': 'That playlist was removed while it was syncing.',
+  'yt.refusal.playlistNotFound': 'Playlist not found.',
+  'yt.refusal.channelNotFound': 'Channel not found.',
+  'yt.refusal.invalidVideoUrl': 'Enter a valid YouTube video URL.',
+  'yt.refusal.videoNotFound': 'Video not found.',
+  'yt.refusal.ytDlpMissing': 'yt-dlp was not found on your PATH.',
+  'yt.refusal.missingVideoId': 'The video ID is missing.',
+  'yt.refusal.ytDlpExit': 'yt-dlp exited with code {code}.',
+  'yt.refusal.providerError': 'YouTube request failed: {detail}',
   // Quick settings + command palette (en)
   'quickSettings.title': 'Quick settings',
   'quickSettings.allSettings': 'All settings',
@@ -4110,6 +4122,48 @@ export const en: Catalog = {
   'playlistEditor.reset.title': 'Reset Day cycle',
   'playlistEditor.reset.message': 'Reset Day cycle playlist and default time rules?',
   'playlistEditor.reset.confirm': 'Reset',
+  'playlistEditor.field.playlist': 'Playlist',
+  'playlistEditor.field.transition': 'Transition',
+  'playlistEditor.field.duration': 'Duration',
+  'playlistEditor.action.new': 'New',
+  'playlistEditor.action.rename': 'Rename',
+  'playlistEditor.action.delete': 'Delete',
+  'playlistEditor.action.resetDayCycle': 'Reset day cycle',
+  'playlistEditor.action.moveUp': 'Move up',
+  'playlistEditor.action.moveDown': 'Move down',
+  'playlistEditor.action.up': 'Up',
+  'playlistEditor.action.down': 'Down',
+  'playlistEditor.transition.crossfade': 'Crossfade',
+  'playlistEditor.transition.fade': 'Fade',
+  'playlistEditor.transition.cut': 'Cut',
+  'playlistEditor.wallKind.preset': 'Preset',
+  'playlistEditor.wallKind.image': 'Image',
+  'playlistEditor.wallKind.video': 'Video',
+  'playlistEditor.walls.title': 'Walls in this playlist',
+  'playlistEditor.walls.empty': 'No walls — add a preset below.',
+  'playlistEditor.walls.addPreset': 'Add preset wall',
+  'playlistEditor.walls.choosePreset': 'Choose preset…',
+  'playlistEditor.walls.allAdded': 'All presets already added',
+  'playlistEditor.walls.addMedia': 'Add image or video…',
+  'playlistEditor.rules.title': 'Rotation rules',
+  'playlistEditor.rules.hint': 'The highest priority match wins. Times use a 24-hour clock. Calendar rules require Calendar walls to be enabled.',
+  'playlistEditor.rules.when': 'When',
+  'playlistEditor.rules.timeOfDay': 'Time of day',
+  'playlistEditor.rules.calendarCategory': 'Calendar category',
+  'playlistEditor.rules.playlistCycle': 'Playlist cycle (fallback)',
+  'playlistEditor.rules.from': 'From',
+  'playlistEditor.rules.to': 'To',
+  'playlistEditor.rules.category': 'Category',
+  'playlistEditor.rules.wall': 'Wall',
+  'playlistEditor.rules.missingItem': 'Missing item ({id})',
+  'playlistEditor.rules.priority': 'Priority',
+  'playlistEditor.rules.addTime': 'Add time rule',
+  'playlistEditor.rules.addCalendar': 'Add calendar rule',
+  'playlistEditor.category.exam': 'Exam',
+  'playlistEditor.category.study': 'Study',
+  'playlistEditor.category.assignment': 'Assignment',
+  'playlistEditor.category.reminder': 'Reminder',
+  'playlistEditor.category.personal': 'Personal',
 
 
 
