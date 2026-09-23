@@ -40,26 +40,26 @@ type ArcadeGameId = 'star-invaders' | 'comet-courier' | 'capsule-sorter' | 'sign
 
 const WIRED_GAME_MODULES: {
   id: ArcadeGameId;
-  title: string;
-  desc: string;
+  titleKey: string;
+  descKey: string;
   command: string;
 }[] = [
-  { id: 'star-invaders', command: 'invaders', title: 'NAVI Space Invaders', desc: 'Pygame-style alien waves, bunkers, laser fire, and a passing carrier in terminal dress.' },
-  { id: 'comet-courier', command: 'lander', title: 'Terminal LanderSim', desc: 'Compact thrust, gravity, attitude, fuel, and touchdown limits for a real landing sim.' },
-  { id: 'capsule-sorter', command: 'capsules', title: 'NAVI Dr. Capsule', desc: 'A bottle puzzle with falling capsules, color chains, and terminal virus blocks.' },
-  { id: 'signal-simon', command: 'mines', title: 'Terminal Minesweeper', desc: 'Recursive board clearing and flagging dressed like a clean command console.' },
+  { id: 'star-invaders', command: 'invaders', titleKey: 'special.game.wired.invaders.title', descKey: 'special.game.wired.invaders.desc' },
+  { id: 'comet-courier', command: 'lander', titleKey: 'special.game.wired.lander.title', descKey: 'special.game.wired.lander.desc' },
+  { id: 'capsule-sorter', command: 'capsules', titleKey: 'special.game.wired.capsules.title', descKey: 'special.game.wired.capsules.desc' },
+  { id: 'signal-simon', command: 'mines', titleKey: 'special.game.wired.mines.title', descKey: 'special.game.wired.mines.desc' },
 ];
 
 const AERO_GAME_MODULES: {
   id: ArcadeGameId;
-  title: string;
-  desc: string;
+  titleKey: string;
+  descKey: string;
   command: string;
 }[] = [
-  { id: 'star-invaders', command: 'breakout', title: 'Aero Breakout', desc: 'Glossy paddle-and-brick arcade play based on an open-source JavaScript Breakout.' },
-  { id: 'comet-courier', command: 'blocks', title: 'Aero Blocks', desc: 'Frosted-glass Tetris-style line clearing from an open-source JavaScript classic.' },
-  { id: 'capsule-sorter', command: 'pong', title: 'Aero Pong', desc: 'Clean glass paddles and a center court based on an open-source JavaScript Pong.' },
-  { id: 'signal-simon', command: 'snake', title: 'Aero Snake', desc: 'Vista ribbon tiles, food pips, and classic open-source Snake rules.' },
+  { id: 'star-invaders', command: 'breakout', titleKey: 'special.game.aero.breakout.title', descKey: 'special.game.aero.breakout.desc' },
+  { id: 'comet-courier', command: 'blocks', titleKey: 'special.game.aero.blocks.title', descKey: 'special.game.aero.blocks.desc' },
+  { id: 'capsule-sorter', command: 'pong', titleKey: 'special.game.aero.pong.title', descKey: 'special.game.aero.pong.desc' },
+  { id: 'signal-simon', command: 'snake', titleKey: 'special.game.aero.snake.title', descKey: 'special.game.aero.snake.desc' },
 ];
 
 // Module-level catalogs can't call useT() at declaration time, so each entry
@@ -366,7 +366,7 @@ export default function SpecialPage() {
       <SettingsCard
         id="blanc-mode"
         title={t('special.blancMode')}
-        description="Plain toolbox shell for reading, mining, media, flashcards, statistics, automation, and practical utilities."
+        description={t('special.blanc.desc')}
         highlight={focusSettingId === 'blanc-mode'}
       >
         <label className="os-toggle">
@@ -375,18 +375,18 @@ export default function SpecialPage() {
             checked={blancMode.enabled}
             onChange={(event) => {
               const next = event.currentTarget.checked;
-              setBlancMsg(next ? 'Opening the Blanc toolbox beside GrammarX.' : 'Closing the Blanc toolbox window.');
+              setBlancMsg(t(next ? 'special.blanc.opening' : 'special.blanc.closing'));
               void setBlancModeEnabled(next)
                 .then(setBlancMode)
                 .catch((error) => {
-                  setBlancMsg(error instanceof Error ? error.message : 'Could not open the Blanc toolbox.');
+                  setBlancMsg(error instanceof Error ? error.message : t('special.blanc.openFailed'));
                 });
             }}
           />
           <span>{t('special.useBlancMode')}</span>
         </label>
         <p className="muted os-set-hint">
-          This opens Blanc as a compact parallel toolbox window. Mini Mode, Focus Mode, and the main GrammarX are left alone.
+          {t('special.blanc.hint')}
         </p>
         {blancMsg && <p className="muted os-set-hint">{blancMsg}</p>}
       </SettingsCard>
@@ -415,12 +415,12 @@ export default function SpecialPage() {
       {showLockedState && (
         <SettingsCard
           id="special-locked"
-          title="Special modules locked"
-          description="WIRED and Aero modules appear here after those modes are discovered."
+          title={t('special.locked.title')}
+          description={t('special.locked.desc')}
           highlight={focusSettingId === 'special-locked' || anchorsModules('special-locked')}
         >
           <p className="muted os-set-hint">
-            Find synced lyrics in WIRED mode to unlock the NAVI terminal. Secret Aero unlocks its matching XP/Vista gadget lab.
+            {t('special.locked.hint')}
           </p>
         </SettingsCard>
       )}
@@ -428,8 +428,8 @@ export default function SpecialPage() {
       {(wired || isWiredDiscovered) && (
         <SettingsCard
           id="wired-archive"
-          title="WIRED ARCHIVE service"
-          description="CRT signal, boot replay, and terminal sensory controls."
+          title={t('special.wired.service')}
+          description={t('special.wired.serviceDesc')}
           highlight={focusSettingId === 'wired-archive' || anchorsModules('wired-archive')}
         >
           <div className="os-viz-row">
@@ -506,7 +506,7 @@ export default function SpecialPage() {
               requestWiredArchiveRestart();
             }}
           >
-            Replay WIRED boot now
+            {t('special.wired.replayNow')}
           </button>
         </SettingsCard>
       )}
@@ -514,8 +514,8 @@ export default function SpecialPage() {
       {isWiredDiscovered && (
         <SettingsCard
           id="wired-finding-terminal"
-          title="NAVI terminal"
-          description="Finding-mode modules unlocked by recovered lyrics."
+          title={t('special.wired.naviTerminal')}
+          description={t('special.wired.naviDesc')}
           highlight={focusSettingId === 'wired-finding-terminal'}
         >
           <label className="os-toggle">
@@ -524,7 +524,7 @@ export default function SpecialPage() {
               checked={wiredSettings.findingOverlayEnabled}
               onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ findingOverlayEnabled: e.currentTarget.checked }))}
             />
-            <span>Show finding overlay when synced lyrics are active</span>
+            <span>{t('special.wired.findingOverlay')}</span>
           </label>
 
           <form
@@ -549,12 +549,12 @@ export default function SpecialPage() {
                 onChange={(event) => setWiredCommand(event.currentTarget.value)}
                 placeholder={t('special.term.wiredPlaceholder')}
               />
-              <button type="submit">RUN</button>
+              <button type="submit">{t('special.term.run')}</button>
             </div>
             <div className="wired-settings-terminal-actions">
-              <button type="button" onClick={() => runWiredCommand('quiet')}>QUIET</button>
-              <button type="button" onClick={() => runWiredCommand('scan')}>SCAN</button>
-              <button type="button" onClick={() => runWiredCommand('all')}>ALL</button>
+              <button type="button" onClick={() => runWiredCommand('quiet')}>{t('special.term.quiet')}</button>
+              <button type="button" onClick={() => runWiredCommand('scan')}>{t('special.term.scan')}</button>
+              <button type="button" onClick={() => runWiredCommand('all')}>{t('special.term.all')}</button>
               <button type="button" onClick={summonWiredShimeji}>
                 {wiredSummonOn ? t('special.term.dismiss') : t('special.term.summon')}
               </button>
@@ -586,8 +586,8 @@ export default function SpecialPage() {
       {isWiredDiscovered && (
         <SettingsCard
           id="wired-arcade"
-          title="WIRED games"
-          description="Unlocked sci-fi micro-games. Collapsed here so the settings page stays calm."
+          title={t('special.game.wired.title')}
+          description={t('special.game.wired.desc')}
           highlight={focusSettingId === 'wired-arcade'}
         >
           <button
@@ -596,8 +596,8 @@ export default function SpecialPage() {
             aria-expanded={wiredGamesOpen}
             onClick={() => setWiredGamesOpen((open) => !open)}
           >
-            <span>{wiredGamesOpen ? 'Hide' : 'Show'} WIRED game modules</span>
-            <code>{WIRED_GAME_MODULES.length} online</code>
+            <span>{t(wiredGamesOpen ? 'special.game.wired.hide' : 'special.game.wired.show')}</span>
+            <code>{t('special.game.online', { count: WIRED_GAME_MODULES.length })}</code>
           </button>
           {wiredGamesOpen && (
             <div className="special-game-grid special-game-grid--wired">
@@ -611,11 +611,11 @@ export default function SpecialPage() {
                     </div>
                   </div>
                   <div>
-                    <strong>{game.title}</strong>
-                    <small>{game.desc}</small>
+                    <strong>{t(game.titleKey)}</strong>
+                    <small>{t(game.descKey)}</small>
                   </div>
                   <button type="button" className="btn small" onClick={() => openArenaGame(game.id, 'wired')}>
-                    Launch
+                    {t('special.game.launch')}
                   </button>
                   <code>{game.command}</code>
                 </article>
@@ -628,8 +628,8 @@ export default function SpecialPage() {
       {isAeroDiscovered && (
         <SettingsCard
           id="aero-gadget-lab"
-          title="Aero gadget lab"
-          description="XP/Vista-era alternatives for the lyric finding modules."
+          title={t('special.aero.gadgetLab')}
+          description={t('special.aero.gadgetLabDesc')}
           highlight={focusSettingId === 'aero-gadget-lab' || anchorsModules('aero-gadget-lab')}
         >
           <label className="os-toggle">
@@ -663,12 +663,12 @@ export default function SpecialPage() {
                 onChange={(event) => setAeroCommand(event.currentTarget.value)}
                 placeholder={t('special.term.aeroPlaceholder')}
               />
-              <button type="submit">RUN</button>
+              <button type="submit">{t('special.term.run')}</button>
             </div>
             <div className="aero-settings-terminal-actions">
-              <button type="button" onClick={() => runAeroCommand('quiet')}>QUIET</button>
-              <button type="button" onClick={() => runAeroCommand('scan')}>SCAN</button>
-              <button type="button" onClick={() => runAeroCommand('all')}>ALL</button>
+              <button type="button" onClick={() => runAeroCommand('quiet')}>{t('special.term.quiet')}</button>
+              <button type="button" onClick={() => runAeroCommand('scan')}>{t('special.term.scan')}</button>
+              <button type="button" onClick={() => runAeroCommand('all')}>{t('special.term.all')}</button>
               <button type="button" onClick={summonAeroBuddy}>
                 {aeroSummonOn ? t('special.term.dismiss') : t('special.term.summon')}
               </button>
@@ -694,15 +694,15 @@ export default function SpecialPage() {
               );
             })}
           </div>
-          {!aero && <p className="muted os-set-hint">These gadgets render inside Secret Aero after you enter that desktop.</p>}
+          {!aero && <p className="muted os-set-hint">{t('special.aero.gadgetHint')}</p>}
         </SettingsCard>
       )}
 
       {isAeroDiscovered && (
         <SettingsCard
           id="aero-arcade"
-          title="Aero games"
-          description="XP/Vista-flavored launchers for the same cute sci-fi arcade modules."
+          title={t('special.game.aero.title')}
+          description={t('special.game.aero.desc')}
           highlight={focusSettingId === 'aero-arcade'}
         >
           <button
@@ -711,8 +711,8 @@ export default function SpecialPage() {
             aria-expanded={aeroGamesOpen}
             onClick={() => setAeroGamesOpen((open) => !open)}
           >
-            <span>{aeroGamesOpen ? 'Hide' : 'Show'} Aero game modules</span>
-            <code>{AERO_GAME_MODULES.length} ready</code>
+            <span>{t(aeroGamesOpen ? 'special.game.aero.hide' : 'special.game.aero.show')}</span>
+            <code>{t('special.game.ready', { count: AERO_GAME_MODULES.length })}</code>
           </button>
           {aeroGamesOpen && (
             <div className="special-game-grid special-game-grid--aero">
@@ -726,11 +726,11 @@ export default function SpecialPage() {
                     </div>
                   </div>
                   <div>
-                    <strong>{game.title}</strong>
-                    <small>{game.desc}</small>
+                    <strong>{t(game.titleKey)}</strong>
+                    <small>{t(game.descKey)}</small>
                   </div>
                   <button type="button" className="btn small" onClick={() => openArenaGame(game.id, 'aero')}>
-                    Launch
+                    {t('special.game.launch')}
                   </button>
                   <code>{game.command}</code>
                 </article>
