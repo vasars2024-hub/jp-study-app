@@ -427,7 +427,9 @@ export function createBuiltInWorkspaces(): StudyWorkspace[] {
       blockInstance('waveform', { placement: 'bottom', size: 'm', presence: 'hidden', order: 3 }),
       blockInstance('pronunciation', { placement: 'bottom', size: 's', presence: 'hidden', order: 4 }),
       blockInstance('dictation', { placement: 'bottom', size: 'm', presence: 'hidden', order: 2 }),
-      blockInstance('transcript', { placement: 'right', size: 'xs', presence: 'compact' }),
+      // `s`, not `xs`: at 14% of the dock its header, deck line and search spilled out of
+      // the panel (design audit 2026-09-23).
+      blockInstance('transcript', { placement: 'right', size: 's', presence: 'compact' }),
     ], { icon: 'mic', practiceKind: 'shadowing' }),
 
     // ── Review: the card is the whole point. ─────────────────────────────────────

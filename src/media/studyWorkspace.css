@@ -134,6 +134,24 @@
 #media-workspace .study-dock[data-dock='left'] > .study-block[data-size='auto'],
 #media-workspace .study-dock[data-dock='right'] > .study-block[data-size='auto'] { flex: 1 1 auto; min-height: min(8rem, 100%); }
 
+/* The Card preview collapsed to its one line (VideoCoreMiningPanel `defaultExpanded`) is one
+   line tall: its block would otherwise keep the dock's share and stand as a 360px empty dark
+   box over the picture. */
+#media-workspace .study-dock[data-dock] > .study-block[data-size]:has(.study-mining-panel[data-study-mining-expanded='false']) {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+#media-workspace .study-block-body:has(> .study-mining-panel[data-study-mining-expanded='false']),
+#media-workspace .study-mining-panel[data-study-mining-expanded='false'] {
+  flex: 0 0 auto;
+}
+#media-workspace .study-mining-panel[data-study-mining-expanded='false'] {
+  grid-template-rows: auto;
+  align-content: start;
+}
+
 /* Collapsed keeps the block present and readable as a title, never as an empty card. */
 #media-workspace .study-block[data-presence='collapsed'] {
   flex: 0 0 auto;
