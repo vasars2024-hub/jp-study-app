@@ -17,6 +17,7 @@ import {
 import { sx } from '../strings';
 import type { ScraperSettingActionId } from './settingActions';
 import type { ScraperSettings } from '../../../../shared/scraperSettings';
+import { useT } from '../../../i18n';
 
 function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -54,6 +55,7 @@ export default function FieldRow({
   onAction: (action: ScraperSettingActionId, field: ScraperFieldDef) => void;
   highlight?: boolean;
 }) {
+  const { t } = useT();
   const value = readField(settings, field.path);
 
   // Text inputs are kept local while typing: committing every keystroke to the
@@ -170,7 +172,7 @@ export default function FieldRow({
                 <button
                   type="button"
                   className="scr-tag-x"
-                  aria-label={`Remove ${item}`}
+                  aria-label={t('scraperDrawer.field.removeTag', { item })}
                   onClick={() => onChange(field.path, list.filter((_, i) => i !== index))}
                 >
                   <Icon name="close" size={10} />
@@ -180,8 +182,8 @@ export default function FieldRow({
             <input
               type="text"
               className="scr-tag-input"
-              placeholder="Add…"
-              aria-label={`Add to ${field.label}`}
+              placeholder={t('scraperDrawer.field.addPlaceholder')}
+              aria-label={t('scraperDrawer.field.addTo', { label: field.label })}
               onKeyDown={(e) => {
                 if (e.key !== 'Enter') return;
                 const next = e.currentTarget.value.trim();
@@ -210,7 +212,7 @@ export default function FieldRow({
               min={field.min}
               max={field.max}
               step={field.step ?? 1}
-              aria-label={`${field.label} — from`}
+              aria-label={t('scraperDrawer.field.from', { label: field.label })}
               onChange={(e) =>
                 onChange(field.path, isClock ? e.target.value : Number(e.target.value))
               }
@@ -225,7 +227,7 @@ export default function FieldRow({
               min={field.min}
               max={field.max}
               step={field.step ?? 1}
-              aria-label={`${field.label} — to`}
+              aria-label={t('scraperDrawer.field.to', { label: field.label })}
               onChange={(e) =>
                 onChange(toPath, isClock ? e.target.value : Number(e.target.value))
               }
@@ -251,14 +253,14 @@ export default function FieldRow({
         return (
           <div className="scr-field-status">
             <span className={`scr-conn scr-conn--${text || 'unknown'}`}>
-              {text ? text.replace(/-/g, ' ') : 'not set'}
+              {text ? t(`scraperDrawer.status.${text}`) : t('scraperDrawer.field.notSet')}
             </span>
             <Button
               size="sm"
               disabled={!field.action}
               onClick={() => field.action && onAction(field.action, field)}
             >
-              {field.action === 'qbit-test' ? 'Test' : 'Change'}
+              {t(field.action === 'qbit-test' ? 'scraperDrawer.field.test' : 'scraperDrawer.field.change')}
             </Button>
           </div>
         );
@@ -282,7 +284,7 @@ export default function FieldRow({
               disabled={!field.action}
               onClick={() => field.action && onAction(field.action, field)}
             >
-              {presence === 'unset' ? 'Set' : 'Change'}
+              {t(presence === 'unset' ? 'scraperDrawer.field.set' : 'scraperDrawer.field.change')}
             </Button>
           </div>
         );

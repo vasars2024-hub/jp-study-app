@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_RU } from '../mooncapLore/ru';
 import { MINING_UI_RU } from '../miningUi/ru';
 import { MAL_SYNC_RU } from '../malSync/ru';
 import { SCRAPER_UI_RU } from '../scraperUi/ru';
+import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
 import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 
 export const ru: Catalog = {
@@ -790,6 +791,7 @@ export const ru: Catalog = {
   ...MINING_UI_RU,
   ...MAL_SYNC_RU,
   ...SCRAPER_UI_RU,
+  ...SCRAPER_DRAWER_RU,
   ...ANIME_SCHEDULE_RU,
   ...GRAMMAR_TAXONOMY_RU,
 

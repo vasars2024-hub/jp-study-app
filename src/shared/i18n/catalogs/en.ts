@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_EN } from '../mooncapLore/en';
 import { MINING_UI_EN } from '../miningUi/en';
 import { MAL_SYNC_EN } from '../malSync/en';
 import { SCRAPER_UI_EN } from '../scraperUi/en';
+import { SCRAPER_DRAWER_EN } from '../scraperDrawerUi/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 
 export const en: Catalog = {
@@ -768,6 +769,7 @@ export const en: Catalog = {
   ...MINING_UI_EN,
   ...MAL_SYNC_EN,
   ...SCRAPER_UI_EN,
+  ...SCRAPER_DRAWER_EN,
   ...ANIME_SCHEDULE_EN,
   ...GRAMMAR_TAXONOMY_EN,
 
