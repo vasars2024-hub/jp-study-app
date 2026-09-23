@@ -404,6 +404,16 @@
   display: none;
 }
 
+/* The same line a third time: the browser's own rendering of the text track inside the
+   <video> element, in a face with no kana (every glyph a box). It sat hidden under the study
+   bar until the bar moved up onto the transport (2026-09-23). Hidden rather than switching
+   the track's mode, so its `cuechange` clock — which the overlay reads — is untouched. */
+#media-workspace:has(.study-cue-overlay) video::cue {
+  visibility: hidden;
+  background: transparent;
+  color: transparent;
+}
+
 #media-workspace .study-cue-overlay {
   position: absolute;
   /* Centred in the picture that is actually free, not in the whole slice. With
