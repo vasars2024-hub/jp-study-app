@@ -2444,6 +2444,7 @@ export const ru: Catalog = {
   'mining.vars.frequency.hint': 'Ранг частоты (из импортированного/встроенного словаря)',
   'mining.vars.audio.hint': 'Аудио носителя [sound:…]',
   'mining.vars.image.hint': 'Изображение из буфера обмена',
+  'mining.vars.clip.hint': 'Воспроизводимый фрагмент с моментом произнесения предложения',
   'dict.results.lookingUp': 'Поиск…',
   'dict.results.noMatch': 'Нет словарного совпадения для «{query}».',
   'dict.results.approximate': 'Точного совпадения для «{query}» нет. Показаны близкие написания.',

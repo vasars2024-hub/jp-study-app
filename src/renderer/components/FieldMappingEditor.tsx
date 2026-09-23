@@ -281,7 +281,7 @@ export default function FieldMappingEditor({
               key={v.key}
               type="button"
               className="fm-chip"
-              title={v.hint}
+              title={t(`mining.vars.${v.key}.hint`)}
               onClick={() => insertVar(v.key)}
             >
               {`{${v.key}}`}

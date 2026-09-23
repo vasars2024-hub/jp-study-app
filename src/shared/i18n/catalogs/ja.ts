@@ -2268,6 +2268,7 @@ export const ja: Catalog = {
   'mining.vars.frequency.hint': '頻度ランク（インポート／同梱辞書）',
   'mining.vars.audio.hint': 'ネイティブ音声 [sound:…]',
   'mining.vars.image.hint': 'クリップボードから取得した画像',
+  'mining.vars.clip.hint': '文が話された場面を再生できる動画クリップ',
   'dict.results.lookingUp': '検索中…',
   'dict.results.noMatch': '「{query}」に一致する辞書項目がありません。',
   'dict.results.approximate': '「{query}」に完全一致はありません。表記の近い候補を表示します。',

@@ -2255,6 +2255,7 @@ export const zh: Catalog = {
   'mining.vars.frequency.hint': '词频排名（来自导入／内置词典）',
   'mining.vars.audio.hint': '母语者音频 [sound:…]',
   'mining.vars.image.hint': '从剪贴板抓取的图片',
+  'mining.vars.clip.hint': '可播放的句子发声片段',
   'dict.results.lookingUp': '查询中…',
   'dict.results.noMatch': '没有与“{query}”匹配的词典条目。',
   'dict.results.approximate': '没有与“{query}”完全匹配的条目。显示拼写相近的结果。',

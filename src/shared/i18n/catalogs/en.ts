@@ -2420,6 +2420,7 @@ export const en: Catalog = {
   'mining.vars.frequency.hint': 'Frequency rank (from an imported/bundled dictionary)',
   'mining.vars.audio.hint': 'Native-speaker audio [sound:…]',
   'mining.vars.image.hint': 'Image grabbed from your clipboard',
+  'mining.vars.clip.hint': 'The moment the sentence was said, as a playable clip',
   'dict.results.lookingUp': 'Looking up…',
   'dict.results.noMatch': 'No dictionary match for “{query}”.',
   'dict.results.approximate': 'No exact match for “{query}”. Showing close spellings.',

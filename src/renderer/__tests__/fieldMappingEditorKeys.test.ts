@@ -23,6 +23,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { ensureCatalog, catalogFor } from '../../shared/i18n/catalogs';
 import { translate } from '../../shared/i18n/core';
+import { MINING_VARS } from '../../shared/anki';
 
 const REPO = resolve(__dirname, '../../..');
 const LANGS = ['en', 'ja', 'zh', 'ru'] as const;
@@ -55,6 +56,20 @@ beforeAll(async () => {
 });
 
 describe('the fm.* module and its consumer are connected in both directions', () => {
+  it('shows a translated tooltip for every base variable in the palette', () => {
+    expect(SOURCE).toContain('title={t(`mining.vars.${v.key}.hint`)}');
+    expect(MINING_VARS).toHaveLength(16);
+    for (const variable of MINING_VARS) {
+      const key = `mining.vars.${variable.key}.hint`;
+      expect(catalogFor('en')[key]).toBe(variable.hint);
+      for (const lang of ['ja', 'zh', 'ru'] as const) {
+        const label = catalogFor(lang)[key];
+        expect(typeof label, `${lang} lacks ${key}`).toBe('string');
+        expect(label, `${lang} left ${key} in English`).not.toBe(variable.hint);
+      }
+    }
+  });
+
   it('asks for a real number of keys, not a token one', () => {
     // The guard against a "fix" that wires two keys and leaves 34 orphaned.
     expect(requestedKeys().length).toBeGreaterThanOrEqual(30);
