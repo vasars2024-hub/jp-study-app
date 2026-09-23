@@ -281,7 +281,10 @@ export class MediaCaptionsManager extends EventTarget {
             isTranslated = true
         }
 
-        const index = this.tracks.length - 1
+        // jp-study-app: was `this.tracks.length - 1`, which gave the first added track index -1
+        // and every later one the previous track's index, while getTrackContent() reads by
+        // position. The new track's position is the current length.
+        const index = this.tracks.length
         track.index = index
         this.tracks.push(track)
         this.loadedTracks.push({

@@ -10,6 +10,8 @@ import { type NormalizedSkipData } from "@/app/(main)/_features/video-core/_lib/
 import { vc_anime4kOption, VideoCoreAnime4K } from "@/app/(main)/_features/video-core/video-core-anime-4k"
 import { Anime4KOption, VideoCoreAnime4KManager } from "@/app/(main)/_features/video-core/video-core-anime-4k-manager"
 import { vc_menuOpen } from "@/app/(main)/_features/video-core/video-core-atoms"
+// jp-study-app: the pinned sidecar cannot detect SRT; see video-core-srt.ts
+import { srtToWebVtt } from "@/app/(main)/_features/video-core/video-core-srt"
 import { vc_menuSectionOpen } from "@/app/(main)/_features/video-core/video-core-atoms"
 import { vc_hoveringControlBar } from "@/app/(main)/_features/video-core/video-core-atoms"
 import { vc_activePlayerId } from "@/app/(main)/_features/video-core/video-core-atoms"
@@ -1118,7 +1120,7 @@ export function VideoCore(props: VideoCoreProps) {
                     settings: settings,
                     fetchAndConvertToVTT: (url?: string, content?: string) => {
                         return new Promise((resolve, reject) => {
-                            convertSubs({ url: url ?? "", content: content ?? "", to: "vtt" }, {
+                            convertSubs({ url: url ?? "", content: srtToWebVtt(content) ?? "", to: "vtt" }, {
                                 onSuccess: (data) => resolve(data),
                                 onError: (error) => reject(error),
                             })
@@ -1152,7 +1154,7 @@ export function VideoCore(props: VideoCoreProps) {
                     settings: settings,
                     fetchAndConvertToASS: (url?: string, content?: string) => {
                         return new Promise((resolve, reject) => {
-                            convertSubs({ url: url ?? "", content: content ?? "", to: "ass" }, {
+                            convertSubs({ url: url ?? "", content: srtToWebVtt(content) ?? "", to: "ass" }, {
                                 onSuccess: (data) => resolve(data),
                                 onError: (error) => reject(error),
                             })
