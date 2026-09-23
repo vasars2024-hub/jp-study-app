@@ -151,9 +151,7 @@ export default function DictionaryView() {
           (§2’s first non-negotiable), so conventional pixels are unchanged. */}
       <ContextualSurface className="view-head">
         <p className="muted">
-          {isZh
-            ? 'Search Chinese or English — offline, powered by CC-CEDICT.'
-            : 'Search Japanese or English — powered by Jisho (JMdict).'}
+          {t(isZh ? 'dict.view.desc.zh' : 'dict.view.desc.ja')}
         </p>
         <div className="dict-lang-toggle">
           <button

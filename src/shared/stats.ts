@@ -14,6 +14,17 @@ export const STATS_COUNTS_URL = `${STATS_BASE}/counts`;
 
 // localStorage keys (renderer side).
 export const TELEMETRY_CONSENT_KEY = 'jp-telemetry-consent'; // 'yes' | 'no'
+/** Window event raised once the first-launch consent card records a choice. */
+export const TELEMETRY_CONSENT_DECIDED_EVENT = 'jp-telemetry-consent-decided';
+
+/** True while the first-launch consent card is still waiting for an answer. */
+export function telemetryConsentPending(): boolean {
+  try {
+    return localStorage.getItem(TELEMETRY_CONSENT_KEY) == null;
+  } catch {
+    return false; // storage unavailable: the card cannot record anything either
+  }
+}
 export const TELEMETRY_PINGED_KEY = 'jp-telemetry-pinged'; // '1' once pinged
 
 export type CountryCounts = Record<string, number>;

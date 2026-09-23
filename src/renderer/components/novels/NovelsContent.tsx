@@ -39,6 +39,7 @@ import {
   novelsJitenMineReason,
   novelsOpenSourceReason,
   novelsPlanReason,
+  type NovelsActionReason,
 } from '../../../shared/novelsActionReason';
 import {
   NOVELS,
@@ -403,8 +404,8 @@ export function useNovels() {
   const refreshNovels = useCallback(async () => {
     setRefreshingNovels(true);
     try {
-      const fresh = await window.api.novelsRefresh();
-      applyRemote(fresh);
+      const result = await window.api.novelsRefresh();
+      applyRemote(result.catalog);
     } catch {
       /* remote catalogue is optional */
     } finally {
@@ -1097,13 +1098,13 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
           {t('novels.action.jitenMine')}
         </button>
       </div>
-      {[['plan', planWhy, selectedPlan ? 'novels.action.remove' : 'novels.action.plan'],
+      {([['plan', planWhy, selectedPlan ? 'novels.action.remove' : 'novels.action.plan'],
         ['open', openSourceWhy, 'novels.action.openSource'],
         ['import', importFileWhy, 'novels.action.importFile'],
         ['download', downloadEpubWhy, 'novels.action.downloadEpub'],
         ['analyze', analyzeEpubWhy, 'novels.action.analyzeEpub'],
         ['mine', jitenMineWhy, 'novels.action.jitenMine'],
-      ].map(([id, reason, label]) => reason && (
+      ] as Array<[string, NovelsActionReason, string]>).map(([id, reason, label]) => reason && (
         <p key={id} id={`novels-reason-${id}`} className="muted jiten-action-reason">{t(label)}: {t(reason)}</p>
       ))}
 

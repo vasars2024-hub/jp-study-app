@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
-import { confirmDialog, showToast } from '../ui';
+import { alertDialog, confirmDialog, showToast } from '../ui';
 import { useT } from '../../i18n';
 import { listBlancToolboxModules } from '../../../shared/toolboxRegistry';
 import type {
@@ -27,7 +27,6 @@ import type {
 } from '../../../shared/collectedTools';
 import { readWorkspaces, WORKSPACE_LAUNCHER_KEY } from './BlancReadyToolPanels';
 import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
-import { useT } from '../../i18n';
 
 const MIGRATED_FLAG_KEY = `${WORKSPACE_LAUNCHER_KEY}.migrated`;
 
@@ -454,6 +453,7 @@ function ItemRow({
   state: AppDrawerState;
   folders: CollectedFolder[];
 }) {
+  const { t } = useT();
   return (
     <tr>
       <td>
@@ -471,7 +471,7 @@ function ItemRow({
             disabled={state.busy}
             onClick={() => {
               void state.launchItem(item).then((failure) => {
-                if (failure) window.alert(failure);
+                if (failure) void alertDialog({ title: t('desktop.dialog.openFailed'), message: failure });
               });
             }}
           >

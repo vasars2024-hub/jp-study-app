@@ -8633,6 +8633,20 @@ mark.lookup-mark,
 .res-view {
   max-width: 1040px;
 }
+/* D15 — the window body is the only scroller, so the category filters, Refresh and the search
+   box scrolled away with the catalogue (measured 2026-09-23: 4,557px to the bottom). The
+   command surface is a direct child of .res-view, which spans the whole content, so it can
+   stick for the entire scroll. `top: -16px` cancels the .fwin-body padding; opaque var(--bg)
+   so cards pass underneath. Costs ~170px (one filter row) to ~220px (two rows) of a small
+   window, against scrolling thousands of px back up to change the filter. */
+.res-view > .res-command-surface {
+  position: sticky;
+  top: -16px;
+  z-index: 3;
+  background: var(--bg);
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
 .res-controls {
   display: flex;
   flex-wrap: wrap;
@@ -25618,6 +25632,28 @@ html.lockscreen-widget-root #root {
 .tr-history-dst { margin: 0 0 8px; white-space: pre-wrap; font-size: 13px; }
 .tr-history-item-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .tr-history-actions { display: flex; justify-content: flex-end; }
+/* D12 — the window body (.fwin-body, 16px padding) is the only scroller, so a long history
+   carried the Translate/History tabs and "Clear history" thousands of px off the top
+   (measured 2026-09-23: tabs at -7,799px after 7,857px of scrolling, 60 entries). Both rows
+   stick instead; their parents (.tr-view, .tr-history) span the whole content, so the
+   sticky range is the entire scroll. `top: -16px` cancels the body padding; the head is
+   65px tall once the padding/margin swap below is applied, so the actions row sits at 49px.
+   Opaque var(--bg) so entries pass underneath rather than through. */
+.tr-view > .view-head {
+  position: sticky;
+  top: -16px;
+  z-index: 3;
+  background: var(--bg);
+  padding-top: 8px;
+  margin-top: -8px;
+}
+.tr-history > .tr-history-actions {
+  position: sticky;
+  top: 49px;
+  z-index: 2;
+  background: var(--bg);
+  padding-bottom: 6px;
+}
 
 @media (max-width: 900px) {
   .gx-practice-layout, .gx-notebook-body { grid-template-columns: 1fr; }

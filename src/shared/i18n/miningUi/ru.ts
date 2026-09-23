@@ -13,7 +13,7 @@ export const MINING_UI_RU: Catalog = {
   'dict.view.status.zh': 'Китайский',
   'dict.view.source.ja': 'JMdict / Jisho',
   'dict.view.source.zh': 'CC-CEDICT',
-  'dict.view.desc.ja': 'Поиск по японскому или английскому — на основе Jisho (JMdict).',
+  'dict.view.desc.ja': 'Поиск по японскому или английскому — офлайн-словари JMdict.',
   'dict.view.desc.zh': 'Поиск по китайскому или английскому — офлайн, на основе CC-CEDICT.',
   'dict.view.placeholder.ja': 'Введите слово, например 食べる или «eat»…',
   'dict.view.placeholder.zh': 'Введите слово, например 你好 или «hello»…',

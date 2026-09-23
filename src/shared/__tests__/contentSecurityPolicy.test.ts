@@ -56,11 +56,13 @@ describe('packaged Content-Security-Policy', () => {
     // The exact list, not a `toContain`: the property worth guarding is that
     // nothing gets added without someone editing this line and justifying it.
     // `cdn.jiten.moe` serves Jiten deck covers for Reading discovery results
-    // that have no locally cached art yet.
+    // that have no locally cached art yet. `artworks.thetvdb.com` serves the media
+    // workspace's episode thumbnails (blocked in packaged builds until 2026-09-23).
     expect(remote).toEqual([
       'https://cdn.myanimelist.net',
       'https://*.anilist.co',
       'https://cdn.jiten.moe',
+      'https://artworks.thetvdb.com',
     ]);
     // Every entry is still a concrete host. A bare `https:` here would silently
     // undo the whole directive, and reads almost identically in a diff.

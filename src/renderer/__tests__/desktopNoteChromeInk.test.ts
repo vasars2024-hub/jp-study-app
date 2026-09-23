@@ -138,7 +138,9 @@ describe('sticky-note title-bar ink', () => {
     // `overflow:hidden`, which category 2 scores as a scroll trap. Measured live 2026-09-03 on a
     // 260x220 note: scrollHeight 189 / clientHeight 185 before, 185 / 185 after.
     const css = readFileSync(resolve(REPO, 'src/renderer/styles.css'), 'utf8');
-    const rule = /\.desk-note-text \{([^}]*)\}/.exec(css);
+    // Anchored to the line start: D39 added `.fwin-note:not(.fwin-liquid) .desk-note-text {`
+    // above this rule, and an unanchored match read that one instead.
+    const rule = /^\.desk-note-text \{([^}]*)\}/m.exec(css);
     expect(rule).toBeTruthy();
     // Comments stripped: this rule carries prose that names `display: block` and `overflow:hidden`,
     // and a raw scan of it would pass on the explanation alone (`css-comment-fails-css-test`).

@@ -460,6 +460,9 @@ declare global {
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;
+      dictSetYomitanLang(id: string, lang: string): Promise<{ ok: boolean; error?: string }>;
+      /** Gloss languages served by the enabled dictionaries (e.g. ['en','ru']). */
+      dictAvailableLangs(): Promise<string[]>;
       dictMoveYomitan(id: string, dir: number): Promise<{ ok: boolean; error?: string }>;
       dictListSources(pair?: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<import('../shared/dictionarySources').DictionarySourceInfo[]>;
       dictListPairs(): Promise<import('../shared/dictionarySources').DictionaryLanguagePair[]>;
@@ -657,6 +660,18 @@ declare global {
       filesCleanupPlan(
         settings: import('../shared/filesApp/cleanup').FilesCleanupSettings,
       ): Promise<import('../shared/filesApp/cleanup').FilesCleanupReport>;
+      filesIndex(force?: boolean): Promise<import('../shared/filesApp/catalog').FilesIndexSnapshot>;
+      filesScan(
+        roots: string[],
+        options?: { stabilityMs?: number },
+      ): Promise<import('../shared/filesApp/archive').FilesScanReportWithArchives>;
+      filesReveal(
+        location: import('../shared/filesApp/catalog').FilesLocation,
+      ): Promise<{ ok: boolean; reasonKey?: string }>;
+      filesMineSource(
+        location: import('../shared/filesApp/catalog').FilesLocation,
+        kind: 'transcript' | 'subtitle' | 'book',
+      ): Promise<import('../shared/filesApp/mining').FilesMineSourceResult>;
       filesCleanupRun(
         request: import('../shared/filesApp/cleanup').FilesCleanupRunRequest,
       ): Promise<import('../shared/filesApp/cleanup').FilesCleanupRunResult>;
@@ -971,6 +986,20 @@ declare global {
        * this file never declared it, so every `malStatus` call was an error.
        */
       malStatus(): Promise<
+        import('../main/malSync').MalIpcResult<import('../main/malSync').MalAuthStatus>
+      >;
+      malBeginAuth(): Promise<
+        import('../main/malSync').MalIpcResult<import('../main/malSync').MalPendingAuth>
+      >;
+      malCompleteAuth(
+        code: string,
+        state: string,
+      ): Promise<import('../main/malSync').MalIpcResult<import('../main/malSync').MalAuthStatus>>;
+      malSetClientId(
+        clientId: string,
+        redirectUri?: string,
+      ): Promise<import('../main/malSync').MalIpcResult<import('../main/malSync').MalAuthStatus>>;
+      malSignOut(): Promise<
         import('../main/malSync').MalIpcResult<import('../main/malSync').MalAuthStatus>
       >;
       /** The user's list, optionally narrowed to one MAL status. Read-only. */
