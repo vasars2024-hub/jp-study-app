@@ -3,7 +3,8 @@ import Icon from '../Icons';
 import { groupLabelKey, pageMeta, SETTINGS_NAV } from './settingsRegistry';
 import { getRecentPages } from './settingsRecent';
 import { useSettings } from './SettingsContext';
-import { loadThemeId, THEMES } from '../../theme';
+import { loadThemeId } from '../../theme';
+import { getTheme } from '../../theme/engine';
 import type { SettingsPageId } from './types';
 import { useT } from '../../i18n';
 import { LANG_LABELS, LANG_TAGS } from '../../../shared/i18n/core';
@@ -50,7 +51,14 @@ export default function SettingsHome() {
   const [diagMessage, setDiagMessage] = useState('SERVICE PORT SEALED');
   const diagClickRef = useRef({ count: 0, last: 0 });
   const recent = getRecentPages();
-  const themeLabel = THEMES.find((th) => th.id === (s.theme || loadThemeId()))?.label ?? s.theme;
+  // Same lookup as Settings > Appearance: the translated name first, then the engine's own
+  // label. `THEMES` omits hidden themes, so Aero and Wired used to show their raw ids here.
+  const currentThemeId = s.theme || loadThemeId();
+  const themeKey = `settings.appearance.theme.${currentThemeId}`;
+  const translatedTheme = t(themeKey);
+  const themeLabel = translatedTheme !== themeKey
+    ? translatedTheme
+    : getTheme(currentThemeId)?.label ?? currentThemeId;
   const wallLabel =
     s.wall.kind === 'preset'
       ? s.presets.find((p) => p.id === s.wallPreset)?.label ?? s.wallPreset
