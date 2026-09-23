@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { LiquidLoading } from './components/liquid/LiquidLoading';
 import DesktopShell from './components/DesktopShell';
 import { parseDetachTarget } from '../shared/studyDetach';
 import { t as translateStatic, useT } from './i18n';
@@ -635,7 +636,7 @@ export default function App() {
   if (isBlancWindow()) {
     return (
       <>
-        <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
+        <Suspense fallback={<LiquidLoading layout="reading" />}>
           {locked ? (
             <BlancLockscreen onUnlocked={handleLockscreenUnlocked} />
           ) : (

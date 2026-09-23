@@ -21,6 +21,24 @@ const esbuild = require('esbuild');
 const CATALOGS_PATH = path.join(__dirname, '..', 'src', 'shared', 'i18n', 'catalogs', 'all.ts');
 const LANGS = ['en', 'ja', 'zh', 'ru'];
 
+// Keys whose translation is *byte-identical to English* and accepted as such.
+//
+// Added 2026-08-04 (audit F8). Comparing key presence only, this script reported
+// "all keys translated" while 309 keys — GAME_ARENA_CHROME (109) and
+// MOONCAP_PHASE_LORE (200) — rendered English under every UI language, because
+// a single shared English record had been spread into all four catalogs. Key
+// presence cannot see that; value identity can.
+//
+// The baseline exists because ~110 keys per language are *legitimately*
+// identical: product names (GrammarX, Anki, YouTube), pure format strings
+// ('{current}/{total}'), and the deliberately retro-English Frutiger Aero
+// easter egg. Failing on those would make the check noise and it would be
+// switched off. So: the baseline is what the tree had when the check was
+// written, and the gate fails on anything NEW. The count is printed on every
+// run, so the residue is visible rather than invisible — which was the actual
+// complaint. Shrinking it is a translator's job; growing it must be deliberate.
+const BASELINE_PATH = path.join(__dirname, 'i18n-untranslated-baseline.json');
+
 function loadCatalogs() {
   // Bundled rather than type-stripped: catalogs.ts pulls per-language blocks in
   // from sibling modules (see grammarTaxonomy.ts), which a single-file
@@ -50,19 +68,45 @@ function main() {
   /** @type {Record<string, string[]>} orphaned[lang] = keys lang has that en doesn't (likely a typo) */
   const orphaned = {};
 
+  /** @type {Record<string, string[]>} untranslated[lang] = keys whose value equals English and are not baselined */
+  const untranslated = {};
+  /** @type {Record<string, number>} how many baselined keys each language still carries */
+  const baselined = {};
+
+  const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+  // A plural entry is an object; compare it structurally so a plural form that
+  // was copied from English is caught the same way a bare string would be.
+  const valueOf = (entry) => (typeof entry === 'string' ? entry : JSON.stringify(entry));
+
   for (const lang of LANGS) {
     if (lang === 'en') continue;
     missing[lang] = enKeys.filter((k) => catalogs[lang][k] === undefined);
     orphaned[lang] = Object.keys(catalogs[lang]).filter((k) => catalogs.en[k] === undefined);
+
+    const accepted = new Set(baseline[lang] ?? []);
+    const identical = enKeys.filter(
+      (k) => catalogs[lang][k] !== undefined && valueOf(catalogs[lang][k]) === valueOf(catalogs.en[k]),
+    );
+    untranslated[lang] = identical.filter((k) => !accepted.has(k));
+    baselined[lang] = identical.length - untranslated[lang].length;
   }
 
   const totalMissing = Object.values(missing).reduce((n, a) => n + a.length, 0);
   const totalOrphaned = Object.values(orphaned).reduce((n, a) => n + a.length, 0);
+  const totalUntranslated = Object.values(untranslated).reduce((n, a) => n + a.length, 0);
+
+  const residue = LANGS.slice(1)
+    .map((l) => `${l} ${baselined[l]}`)
+    .join(', ');
 
   if (asJson) {
-    console.log(JSON.stringify({ missing, orphaned }, null, 2));
-  } else if (totalMissing === 0 && totalOrphaned === 0) {
+    console.log(JSON.stringify({ missing, orphaned, untranslated, baselined }, null, 2));
+  } else if (totalMissing === 0 && totalOrphaned === 0 && totalUntranslated === 0) {
     console.log(`i18n: all ${enKeys.length} English keys are translated in ${LANGS.slice(1).join('/')}. Nothing to do.`);
+    console.log(
+      `      ${residue} keys still render English verbatim and are baselined as accepted ` +
+        `(product names, format strings, the Aero easter egg) — tools/i18n-untranslated-baseline.json.`,
+    );
   } else {
     if (totalMissing > 0) {
       console.log('Missing translations (English key exists, target language falls back silently):\n');
@@ -85,14 +129,35 @@ function main() {
       }
       console.log('');
     }
+    if (totalUntranslated > 0) {
+      console.log(
+        'Untranslated (the key exists, but its value is byte-identical to English — it renders\n' +
+          'English under that UI language while every presence check passes):\n',
+      );
+      for (const lang of LANGS) {
+        if (lang === 'en' || untranslated[lang].length === 0) continue;
+        console.log(`  ${lang} — ${untranslated[lang].length} key(s):`);
+        for (const key of untranslated[lang]) {
+          const enVal = catalogs.en[key];
+          const preview = typeof enVal === 'string' ? enVal : JSON.stringify(enVal);
+          console.log(`    ${key}: ${preview}`);
+        }
+        console.log('');
+      }
+      console.log(
+        'If a key is genuinely the same in that language (a product name, a pure format\n' +
+          'string), add it to tools/i18n-untranslated-baseline.json. Do not add a block of\n' +
+          'them at once — that is exactly how audit F8 happened.\n',
+      );
+    }
     console.log(
-      `To fix: hand the "Missing translations" list above to an assistant and ask it to add ` +
-        `ja/zh/ru entries for those exact keys in src/shared/i18n/catalogs.ts, matching the style ` +
-        `of neighboring entries (see CLAUDE.md "i18n workflow"). Re-run this script to confirm.`,
+      `To fix: hand the lists above to an assistant and ask it to add ja/zh/ru entries for ` +
+        `those exact keys in src/shared/i18n/catalogs/{ja,zh,ru}.ts, matching the style of ` +
+        `neighboring entries (see CLAUDE.md "i18n workflow"). Re-run this script to confirm.`,
     );
   }
 
-  process.exitCode = totalMissing > 0 || totalOrphaned > 0 ? 1 : 0;
+  process.exitCode = totalMissing > 0 || totalOrphaned > 0 || totalUntranslated > 0 ? 1 : 0;
 }
 
 main();

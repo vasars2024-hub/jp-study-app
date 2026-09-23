@@ -53,7 +53,8 @@ describe('studyEnvironment', () => {
     expect(env.getStudyLang()).toBe('ja');
     env.setStudyLang('zh');
     expect(env.getStudyLang()).toBe('zh');
-    expect(localStorage.getItem(env.WHISPER_LANG_KEY)).toBe('zh');
+    // The whisper-lang mirror was retired (audit 6.1): a language switch no longer writes it.
+    expect(localStorage.getItem(env.RETIRED_WHISPER_LANG_KEY)).toBeNull();
     expect(whisper.loadWhisperModelTier()).toBe('whisper-small');
 
     env.setStudyLang('ja');

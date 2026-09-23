@@ -53,6 +53,8 @@ import {
   runSubtitleDiscovery,
 } from './subtitleDiscovery';
 import { registerSubtitleHarvestIpc } from './subtitleHarvest';
+import { estimateSubtitleOffset } from './subtitleSync';
+import type { SubtitleSyncEstimate } from '../shared/subtitleSync';
 import { mt } from './i18n';
 import type { ExternalPlayerProfile, PlaybackHandoff } from '../shared/externalPlayer';
 
@@ -62,10 +64,13 @@ const ffmpegPath = ffmpegStatic as unknown as string;
 // renderer only ever sees opaque tokens, never real disk paths.
 const mediaTokens = new Map<string, string>();
 
-const VIDEO_EXT = new Set(['.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.ogv', '.ts', '.flv', '.wmv']);
-const AUDIO_EXT = new Set(['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus']);
-const MEDIA_EXT = new Set([...VIDEO_EXT, ...AUDIO_EXT]);
-const SUBTITLE_EXT = ['srt', 'vtt', 'ass', 'ssa', 'lrc'];
+// These lists used to be declared here as well as in `shared/mediaKind.ts` and
+// `main/library.ts`. One copy now, so the drop router and the player cannot
+// disagree about what a media file is.
+import { AUDIO_EXT, MEDIA_EXT, SUBTITLE_EXT as SUBTITLE_EXT_SET, VIDEO_EXT } from '../shared/mediaKind';
+
+/** Bare, dot-less — this is what the dialog filter wants. */
+const SUBTITLE_EXT = [...SUBTITLE_EXT_SET].map((e) => e.slice(1));
 
 const MEDIA_MIME: Record<string, string> = {
   '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm',
@@ -1446,6 +1451,101 @@ export function registerMediaIpc(): void {
   });
 
   /**
+   * The same discovered track `media:open` hands the player, addressed by PATH and with
+   * none of that handler's side effects.
+   *
+   * ## Why this exists
+   *
+   * `media:open` is the retired player's entry point: it stamps `lastPlayedAt`, increments
+   * `listenCount` and writes the database. The adopted Seanime workspace never calls it —
+   * it opens a file through the sidecar's directstream, which knows only what it can parse
+   * out of the container. So for a file whose subtitles were *downloaded* rather than
+   * embedded, the workspace had no track at all, and old-player retirement quietly took the
+   * discovered-subtitle hand-off with it.
+   *
+   * Measured 2026-08-06 against `The Big O - 13`: `ffprobe` reports exactly two streams,
+   * `hevc` and `flac` — **no subtitle stream in the file** — while a 261-cue Jimaku track
+   * for it sits in `subtitles/<mediaId>/`. The player's subtitle manager logged
+   * `Selecting default track` with an empty list and called `setNoTrack()`, which is why no
+   * cue ever rendered and the transcript stayed empty.
+   *
+   * Routing is deliberately NOT restated here: `pickPlaybackSubtitle` decides, exactly as
+   * it does above, so the workspace and the retired player can never disagree about which
+   * of several downloaded tracks is the study one.
+   *
+   * Path-addressed because that is the only identifier the workspace has — it opens a file,
+   * not a library row. Comparison is case-insensitive and separator-normalized because a
+   * path that has been through the sidecar is not byte-identical to the stored one.
+   */
+  ipcMain.handle(
+    'media:subtitleForPath',
+    (_e, filePath: string): SubtitlePick | null => {
+      if (typeof filePath !== 'string' || !filePath.trim()) return null;
+      const key = (value: string): string =>
+        value.trim().replace(/\\/g, '/').toLowerCase();
+      const wanted = key(filePath);
+      const item = readDb().items.find((i) => key(i.path ?? '') === wanted);
+
+      if (item) {
+        const record = pickPlaybackSubtitle(
+          item.subtitles,
+          loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+          item.preferredSubtitleId,
+        );
+        if (record) {
+          const text = readSubtitleRecord(record);
+          if (text) {
+            return { name: record.label ?? `${record.lang} (${record.source})`, text };
+          }
+        }
+      }
+      // A file the library has never seen still deserves the sidecar-file fallback: the
+      // workspace can open a path the media database knows nothing about.
+      return pickSubtitleBeside(filePath, item?.lang ?? 'ja') ?? null;
+    },
+  );
+
+  /**
+   * How far a subtitle track has to move to line up with a file's audio.
+   *
+   * Split from `media:subtitleForPath` rather than folded into it because the two have
+   * completely different costs and failure modes: resolving the track is a database lookup
+   * and a file read, while this spawns four ffmpeg processes and takes a couple of seconds.
+   * A caller that only wants the text must not pay for the analysis.
+   *
+   * Cue intervals arrive already parsed. The renderer has `parseSubtitles` — the parser
+   * that decided these cues' timings in the first place — and a second parser here could
+   * disagree with it about the very numbers being corrected.
+   *
+   * See `shared/subtitleSync.ts` for the method and the measured confidence gates.
+   */
+  ipcMain.handle(
+    'media:subtitleSyncOffset',
+    async (
+      _e,
+      videoPath: string,
+      cues: { start: number; end: number }[],
+      durationSec?: number,
+    ): Promise<SubtitleSyncEstimate> => {
+      const nothing: SubtitleSyncEstimate = {
+        offsetSec: 0, score: 0, rivalScore: 0, confident: false,
+      };
+      if (typeof videoPath !== 'string' || !videoPath.trim()) return nothing;
+      if (!Array.isArray(cues) || !cues.length) return nothing;
+      const clean = cues.filter(
+        (c): c is { start: number; end: number } =>
+          !!c && Number.isFinite(c.start) && Number.isFinite(c.end) && c.end > c.start,
+      );
+      if (!clean.length) return nothing;
+      return estimateSubtitleOffset(
+        videoPath,
+        clean,
+        typeof durationSec === 'number' ? durationSec : 0,
+      );
+    },
+  );
+
+  /**
    * "Load subtitles" for YouTube-sourced media: prefer a sidecar file already
    * written next to the video (downloads now fetch every track), otherwise pull
    * them straight from YouTube with yt-dlp. Returns the subtitle text so the
@@ -1500,61 +1600,6 @@ export function registerMediaIpc(): void {
         ok: false,
         error: code === 0 ? 'No subtitles are available for this video.' : 'Could not fetch subtitles from YouTube.',
       };
-    },
-  );
-
-  /**
-   * The same discovered track `media:open` hands the player, addressed by PATH and with
-   * none of that handler's side effects.
-   *
-   * ## Why this exists
-   *
-   * `media:open` is the retired player's entry point: it stamps `lastPlayedAt`, increments
-   * `listenCount` and writes the database. The adopted Seanime workspace never calls it —
-   * it opens a file through the sidecar's directstream, which knows only what it can parse
-   * out of the container. So for a file whose subtitles were *downloaded* rather than
-   * embedded, the workspace had no track at all, and old-player retirement quietly took the
-   * discovered-subtitle hand-off with it.
-   *
-   * Measured 2026-08-06 against `The Big O - 13`: `ffprobe` reports exactly two streams,
-   * `hevc` and `flac` — **no subtitle stream in the file** — while a 261-cue Jimaku track
-   * for it sits in `subtitles/<mediaId>/`. The player's subtitle manager logged
-   * `Selecting default track` with an empty list and called `setNoTrack()`, which is why no
-   * cue ever rendered and the transcript stayed empty.
-   *
-   * Routing is deliberately NOT restated here: `pickPlaybackSubtitle` decides, exactly as
-   * it does above, so the workspace and the retired player can never disagree about which
-   * of several downloaded tracks is the study one.
-   *
-   * Path-addressed because that is the only identifier the workspace has — it opens a file,
-   * not a library row. Comparison is case-insensitive and separator-normalized because a
-   * path that has been through the sidecar is not byte-identical to the stored one.
-   */
-  ipcMain.handle(
-    'media:subtitleForPath',
-    (_e, filePath: string): SubtitlePick | null => {
-      if (typeof filePath !== 'string' || !filePath.trim()) return null;
-      const key = (value: string): string =>
-        value.trim().replace(/\\/g, '/').toLowerCase();
-      const wanted = key(filePath);
-      const item = readDb().items.find((i) => key(i.path ?? '') === wanted);
-
-      if (item) {
-        const record = pickPlaybackSubtitle(
-          item.subtitles,
-          loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
-          item.preferredSubtitleId,
-        );
-        if (record) {
-          const text = readSubtitleRecord(record);
-          if (text) {
-            return { name: record.label ?? `${record.lang} (${record.source})`, text };
-          }
-        }
-      }
-      // A file the library has never seen still deserves the sidecar-file fallback: the
-      // workspace can open a path the media database knows nothing about.
-      return pickSubtitleBeside(filePath, item?.lang ?? 'ja') ?? null;
     },
   );
 

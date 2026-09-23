@@ -13,6 +13,7 @@ import {
   NOVELS_URL,
   isNovelsCatalog,
   isResourcesCatalog,
+  type CatalogResult,
   type NovelsCatalog,
   type ResourcesCatalog,
 } from '../shared/resourcesCatalog';
@@ -100,16 +101,29 @@ export function registerResourcesCatalogIpc(): void {
   // Return the cached catalogue immediately (null if none) for a fast first paint.
   ipcMain.handle('catalog:get', () => readCache());
 
-  // Fetch fresh; fall back to cache on failure so the renderer always gets usable data.
-  ipcMain.handle('catalog:refresh', async () => {
+  /*
+   * Fetch fresh; fall back to cache on failure so the renderer always gets
+   * usable data — and say WHICH of the two happened.
+   *
+   * Returning a bare catalogue-or-null made the two failure modes
+   * indistinguishable downstream, and the renderer guessed "offline" for both.
+   * Since the catalogue repo is unpublished the cache can never exist, so that
+   * guess was wrong every single time (audit F23). Only the main process knows
+   * whether a saved copy is on disk, so only it can answer this.
+   */
+  ipcMain.handle('catalog:refresh', async (): Promise<CatalogResult<ResourcesCatalog>> => {
     const fresh = await fetchCatalog();
-    return fresh ?? readCache();
+    if (fresh) return { catalog: fresh, source: 'remote' };
+    const cached = readCache();
+    return cached ? { catalog: cached, source: 'cache' } : { catalog: null, source: 'builtin' };
   });
 
   // Remote levelled novels catalogue (same cache-first pattern).
   ipcMain.handle('novels:get', () => readNovelsCache());
-  ipcMain.handle('novels:refresh', async () => {
+  ipcMain.handle('novels:refresh', async (): Promise<CatalogResult<NovelsCatalog>> => {
     const fresh = await fetchNovels();
-    return fresh ?? readNovelsCache();
+    if (fresh) return { catalog: fresh, source: 'remote' };
+    const cached = readNovelsCache();
+    return cached ? { catalog: cached, source: 'cache' } : { catalog: null, source: 'builtin' };
   });
 }

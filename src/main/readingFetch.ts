@@ -66,6 +66,52 @@ export interface FetchReadingOptions {
   followPagination?: boolean;
 }
 
+/**
+ * The charset a page is actually encoded in.
+ *
+ * `Response.text()` always decodes UTF-8, so a Shift_JIS page came back as
+ * mojibake — measured live, a 9-character preview title with 8 × U+FFFD and
+ * zero CJK. 青空文庫 is in the app's own 24-site catalogue and the panel invites
+ * pasting a URL from it, so the app recommended a source it could not read.
+ * The corruption also sat upstream of `scoreTextComprehensibility`, making the
+ * "% of words you already know" it produced meaningless for such a page.
+ * Audit F18.
+ *
+ * Order matters and follows the HTML spec's own precedence: the HTTP header
+ * wins, because a server that states a charset knows better than a document
+ * that may have been transcoded in transit. Only then the in-document
+ * declaration, sniffed from the first bytes — which is where 青空文庫 puts it.
+ */
+function charsetFromContentType(contentType: string): string | null {
+  return /charset\s*=\s*["']?([\w-]+)/i.exec(contentType)?.[1]?.toLowerCase() ?? null;
+}
+
+function charsetFromMeta(bytes: Uint8Array): string | null {
+  // ASCII-decode a prefix only: the declaration is required to appear in the
+  // first 1024 bytes, and decoding the whole body here would be the very
+  // mistake this function exists to avoid.
+  const head = new TextDecoder('ascii').decode(bytes.subarray(0, 2048));
+  return (
+    /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i.exec(head)?.[1]?.toLowerCase()
+    ?? /<meta[^>]+content\s*=\s*["'][^"']*charset\s*=\s*([\w-]+)/i.exec(head)?.[1]?.toLowerCase()
+    ?? null
+  );
+}
+
+/** Decode with the declared charset, falling back to UTF-8 on anything unknown. */
+export function decodeHtml(bytes: Uint8Array, contentType: string): string {
+  const declared = charsetFromContentType(contentType) ?? charsetFromMeta(bytes);
+  if (!declared || /^utf-?8$/.test(declared)) return new TextDecoder('utf-8').decode(bytes);
+  try {
+    // Electron ships full ICU, so shift_jis / euc-jp / gb18030 / big5 all
+    // resolve. An unknown label throws rather than silently mis-decoding,
+    // which is why this is caught rather than trusted.
+    return new TextDecoder(declared).decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+}
+
 async function fetchHtml(url: string): Promise<{ html: string; url: string }> {
   const u = normalizeArticleFetchUrl(url);
   if (!/^https?:\/\//i.test(u)) throw new Error('Enter a full http(s):// address.');
@@ -76,7 +122,10 @@ async function fetchHtml(url: string): Promise<{ html: string; url: string }> {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     const ct = res.headers.get('content-type') ?? '';
     if (ct && !/html|xml|text/i.test(ct)) throw new Error(`Not a web page (${ct.split(';')[0]}).`);
-    const html = (await res.text()).slice(0, MAX_TOTAL_HTML);
+    // Bytes, not text: `res.text()` would have already destroyed a non-UTF-8
+    // document by the time we could look at the charset.
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const html = decodeHtml(bytes, ct).slice(0, MAX_TOTAL_HTML);
     if (html.length < 200) throw new Error('Page returned too little content.');
     return { html, url: res.url };
   } finally {

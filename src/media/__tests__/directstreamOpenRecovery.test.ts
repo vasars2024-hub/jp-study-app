@@ -511,8 +511,10 @@ describe('the open channel, as StudyPlayerSlice actually wires it', () => {
     // sidecar's bar and refuse the user's next real open.
     expect(slice.match(/directstreamOpenGenerationFor\(/g)).toHaveLength(1);
     // Both POSTs read the same number: the launch's, which is the equal case the sidecar
-    // accepts on purpose.
-    expect(slice.match(/openGenerations\.generation/g)).toHaveLength(2);
+    // accepts on purpose. The third read is the launch persisting that number before the
+    // POST, so a reloaded renderer cannot reissue it.
+    expect(slice).toContain('persistOpenGeneration(clientId, openGenerations.generation)');
+    expect(slice.match(/openGenerations\.generation/g)).toHaveLength(3);
     expect(slice).not.toContain('generation: playbackRequest.requestId');
   });
 

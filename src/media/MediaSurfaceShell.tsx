@@ -43,6 +43,9 @@ import { useT } from '../renderer/i18n';
 import SeanimeToastHost from './SeanimeToastHost';
 import StudyWebsocketProvider from './StudyWebsocketProvider';
 import './mediaWorkspace.css';
+// After the base sheet, deliberately: the workspace layer overrides the grammar
+// panel's own absolute corner, which only a later rule of higher specificity can do.
+import './studyWorkspace.css';
 
 /**
  * `retry: 0` because a dead sidecar should surface as an explicit offline state

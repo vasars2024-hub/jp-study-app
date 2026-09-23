@@ -51,10 +51,13 @@ import {
   type DirectstreamOpenProgress,
 } from './directstreamOpenRecovery';
 import {
+  DIRECTSTREAM_OPEN_GENERATION_STORAGE_KEY,
   directstreamOpenChannelIdle,
   directstreamOpenGenerationFor,
   directstreamOpenGenerationsIdle,
+  directstreamOpenGenerationsRestored,
   directstreamOpenRequest,
+  serializeDirectstreamOpenGeneration,
   directstreamOpenSettled,
   directstreamOpenSupersede,
   type DirectstreamOpenChannel,
@@ -62,6 +65,17 @@ import {
   type DirectstreamOpenTicket,
 } from '../shared/directstreamOpenChannel';
 import { installSeanimeMediaAuth } from './seanimeMediaAuth';
+import {
+  ensureTranscodeEnabled,
+  isTranscodableMediaError,
+  parseTranscodeMemo,
+  pathNeedsTranscode,
+  rememberTranscodePath,
+  requestTranscodeContainer,
+  serializeTranscodeMemo,
+  transcodeStreamUrl,
+  TRANSCODE_MEMO_STORAGE_KEY,
+} from '../shared/mediastreamTranscode';
 import {
   ensureSeanimeLibraryCovers,
   normalizeLibraryPath,
@@ -88,6 +102,7 @@ import {
 } from '../shared/seanimeWatchTime';
 import { recordWatching } from '../renderer/stats';
 import VideoCoreStudyOverlay from './VideoCoreStudyOverlay';
+import StudyWorkspaceProvider, { type StudySurfaceKind } from './StudyWorkspaceProvider';
 
 type ServerMessage = {
   type: string;
@@ -255,6 +270,59 @@ function loadResumePosition(
  */
 let openChannel: DirectstreamOpenChannel = directstreamOpenChannelIdle;
 let openGenerations: DirectstreamOpenGenerations = directstreamOpenGenerationsIdle;
+
+/**
+ * The counter's realm lifetime is SHORTER than the client id's, and the sidecar orders by
+ * client id — so a reload that rewinds the counter has every later open refused for the life
+ * of that sidecar. See {@link DIRECTSTREAM_OPEN_GENERATION_STORAGE_KEY} for the measured
+ * sequence. These two functions are the storage half; the rules are pure and live there.
+ *
+ * Both swallow. `localStorage` throws on a blocked or full store, and a persistence detail
+ * must never be the reason the user's play button fails — the worst an absent read can do is
+ * restore the behaviour that existed before this was written.
+ */
+function readStoredOpenGeneration(): string | null {
+  try {
+    return localStorage.getItem(DIRECTSTREAM_OPEN_GENERATION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Which local files have already proven undecodable, so a second open of one does not
+ * replay the ~1.8s of failed playback before switching. Swallows for the same reason the
+ * generation slot above does — a storage detail must never be why a file will not play.
+ */
+function readTranscodeMemo(): string[] {
+  try {
+    return parseTranscodeMemo(localStorage.getItem(TRANSCODE_MEMO_STORAGE_KEY));
+  } catch {
+    return [];
+  }
+}
+
+function persistTranscodeMemo(filePath: string): void {
+  try {
+    localStorage.setItem(
+      TRANSCODE_MEMO_STORAGE_KEY,
+      serializeTranscodeMemo(rememberTranscodePath(readTranscodeMemo(), filePath)),
+    );
+  } catch {
+    // See above.
+  }
+}
+
+function persistOpenGeneration(clientId: string, generation: number): void {
+  try {
+    localStorage.setItem(
+      DIRECTSTREAM_OPEN_GENERATION_STORAGE_KEY,
+      serializeDirectstreamOpenGeneration(clientId, generation),
+    );
+  } catch {
+    // See above.
+  }
+}
 
 /**
  * The server answered the POST this ticket issued — with a 200, a 500, or a transport error
@@ -457,8 +525,21 @@ function CueProofDriver({ conn }: { conn: SeanimeConnection }): React.ReactEleme
 
 function StudyOverlay({
   playbackInfo,
+  localFilePath,
 }: {
   playbackInfo: VideoCore_VideoPlaybackInfo | null;
+  /**
+   * The path the USER asked for, threaded down rather than read back off the sidecar's
+   * reply. `localFile` is optional on the reply
+   * (`vendor/seanime-web/api/generated/types.ts:1573`), so anything that must have a path
+   * should take it from the request, which always has one — it is what the open was
+   * issued for.
+   *
+   * Not, so far as anything measured shows, the reason the overlay's external-subtitle
+   * mount does not fire: threading this changed nothing in the live run of 2026-08-06.
+   * That remains open. This is the more robust source either way.
+   */
+  localFilePath: string | null;
 }): React.ReactElement {
   const onManagerReady = React.useCallback((managerClass: string): void => {
     publishProof({ managerClass });
@@ -488,6 +569,7 @@ function StudyOverlay({
   return (
     <VideoCoreStudyOverlay
       playbackInfo={playbackInfo}
+      localFilePath={localFilePath}
       onManagerReady={onManagerReady}
       onCueChange={onCueChange}
     />
@@ -629,11 +711,21 @@ function ResumeTracker({
 function StudyPlayerSession({
   conn,
   playbackRequest,
+  surface,
 }: {
   conn: SeanimeConnection;
   playbackRequest: MediaWorkspacePlaybackRequest | null;
+  surface: StudySurfaceKind;
 }): React.ReactElement {
   const [state, setState] = React.useState<VideoCoreLifecycleState>(initialState);
+  /**
+   * The element the workspace measures and watches for pointer activity.
+   *
+   * The slice, not the window: Blanc's toolbox player is 560×460 inside a window that
+   * may be 3440 wide, and a workspace that recomposed on the screen's width would give
+   * that player two 24rem docks it has no room for.
+   */
+  const sliceRef = React.useRef<HTMLElement | null>(null);
   const manager = useAtomValue(vc_subtitleManager);
   const clientId = useAtomValue(clientIdAtom);
   const connected = useAtomValue(websocketConnectedAtom);
@@ -841,9 +933,21 @@ function StudyPlayerSession({
       kind: 'launch',
     };
     openChannel = directstreamOpenSupersede(openChannel, ticket);
+    // Seeded from storage before the first mint of this realm, and a no-op on every mint
+    // after it. The sidecar outlives a renderer reload and orders by CLIENT ID, which also
+    // outlives one; only the counter used to reset, so a reloaded renderer minted 1 against
+    // a bar of 3 and had every open refused thereafter.
+    openGenerations = directstreamOpenGenerationsRestored(
+      openGenerations,
+      clientId,
+      readStoredOpenGeneration(),
+    );
     // Minted here and ONLY here. Every recovery for this request re-sends this same number,
     // which is the equal-generation case `AcceptOpenGeneration` accepts on purpose.
     openGenerations = directstreamOpenGenerationFor(openGenerations, localRequest.requestId);
+    // Written before the POST, not after: the number is spent the moment it goes on the wire,
+    // and a crash between the two must not let the next realm reissue it.
+    persistOpenGeneration(clientId, openGenerations.generation);
 
     // Cleared before the POST goes out, never after: the sidecar's abort can only arrive
     // once this request is on the wire, so a later clear would erase the reason it carries.
@@ -899,11 +1003,6 @@ function StudyPlayerSession({
       }
     };
   }, [clientId, conn, connected, identityConfirmed, playbackRequest, proofConfig]);
-
-  React.useEffect(
-    () => installSeanimeMediaAuth({ baseUrl: conn.baseUrl, token: conn.token }),
-    [conn.baseUrl, conn.token],
-  );
 
   /**
    * The recovery. A local open that the sidecar cancelled mid-preparation answers 200 and
@@ -998,6 +1097,109 @@ function StudyPlayerSession({
       controller.abort();
     };
   }, [clientId, conn, playbackRequest, proofConfig]);
+
+  /**
+   * The browser could not decode the file. Re-open it through Seanime's transcoder.
+   *
+   * `The Big O - 13` is HEVC + **FLAC**, and Chromium dies ~1.8s in with
+   * `PIPELINE_ERROR_DECODE` on an audio packet. The adopted player's own reaction is to
+   * try HLS against the same non-HLS URL, fail unrecoverably, and tear the surface down —
+   * so an audio codec took out the transcript and the mining panel with it. See
+   * `../shared/mediastreamTranscode.ts` for the measurement and for why the trigger is a
+   * real error rather than a codec table.
+   *
+   * Swapping `streamUrl` is the whole switch: the adopted HLS hook keys on the `.m3u8`
+   * extension or on `streamType === 'hls'` (`video-core-hls.ts:41,88`), and both are set.
+   * Position is carried across so the switch is invisible apart from a short rebuffer.
+   */
+  const transcodeAttemptedRef = React.useRef<string | null>(null);
+  /*
+    HLS.js issues the playlist and segment requests itself and the sidecar's mediastream
+    endpoints answer 401 without a token, so the header goes on inside the request. Bound
+    to this component's lifetime rather than to the transcode switch: the fallback can fire
+    from an event handler at any moment, and installing it there would race the first
+    fetch. See `./seanimeMediaAuth.ts` for why there is no supported hook to use instead.
+  */
+  React.useEffect(
+    () => installSeanimeMediaAuth({ baseUrl: conn.baseUrl, token: conn.token }),
+    [conn.baseUrl, conn.token],
+  );
+
+  React.useEffect(() => {
+    if (proofConfig || !video || !playbackRequest || playbackRequest.kind !== 'local') {
+      return undefined;
+    }
+    const localPath = playbackRequest.localFilePath;
+
+    const switchToTranscode = (resumeSec: number): void => {
+      // Once per file per mount. The element raises `error` again while the replacement
+      // source loads, and a second request would restart the transcoder underneath the
+      // first one.
+      if (transcodeAttemptedRef.current === localPath) return;
+      transcodeAttemptedRef.current = localPath;
+
+      void (async () => {
+        const api = (path: string, init?: RequestInit): Promise<Response> =>
+          fetch(`${conn.baseUrl}${path}`, {
+            ...init,
+            headers: {
+              'X-Seanime-Token': conn.token,
+              'X-Seanime-Client-Id': clientId ?? '',
+              'X-Seanime-Client-Id-Proof': getClientIdProof(),
+              'X-Seanime-Client-Platform': __clientPlatform__,
+              'Content-Type': 'application/json',
+              ...init?.headers,
+            },
+          });
+        // The transcoder ships disabled and the sidecar datadir is disposable, so this
+        // path establishes what it needs rather than assuming it.
+        const enabled = await ensureTranscodeEnabled(api).catch(() => false);
+        if (!enabled) return;
+        const container = await requestTranscodeContainer(
+          api,
+          localPath,
+          clientId ?? '',
+        ).catch(() => null);
+        // A failed rescue leaves the original decode error on screen rather than
+        // replacing it with a second, less relevant one.
+        if (!container) return;
+
+        persistTranscodeMemo(localPath);
+        setState((previous) => {
+          if (!previous.playbackInfo) return previous;
+          return {
+            ...previous,
+            active: true,
+            playbackError: null,
+            playbackInfo: {
+              ...previous.playbackInfo,
+              streamUrl: transcodeStreamUrl(conn.baseUrl, container.streamUrl),
+              streamType: 'hls',
+              ...(resumeSec > 0 ? { initialState: { currentTime: resumeSec } } : {}),
+            },
+          };
+        });
+      })();
+    };
+
+    // Already known undecodable — switch before the element wastes a second failing, so
+    // a file the user returns to just plays.
+    if (pathNeedsTranscode(readTranscodeMemo(), localPath)) {
+      switchToTranscode(
+        playbackRequest.startAtSec && playbackRequest.startAtSec > 0
+          ? playbackRequest.startAtSec
+          : 0,
+      );
+      return undefined;
+    }
+
+    const onError = (): void => {
+      if (!isTranscodableMediaError(video.error?.code)) return;
+      switchToTranscode(Number.isFinite(video.currentTime) ? video.currentTime : 0);
+    };
+    video.addEventListener('error', onError);
+    return () => video.removeEventListener('error', onError);
+  }, [clientId, conn, playbackRequest, proofConfig, video]);
 
   /**
    * STAGE 2 — the `watch` arrived and no media followed. REPORT ONLY.
@@ -1221,6 +1423,7 @@ function StudyPlayerSession({
         replayed. The slice is hidden by CSS while idle instead.
       */}
       <section
+        ref={sliceRef}
         className="study-player-slice"
         data-study-player={state.active ? 'active' : 'idle'}
         data-cue-proof-phase={proofWindow().__SEANIME_CUE_PROOF__?.phase ?? 'idle'}
@@ -1264,7 +1467,22 @@ function StudyPlayerSession({
             }, 250);
           }}
         />
-        {state.active && <StudyOverlay playbackInfo={state.playbackInfo} />}
+        {/*
+          The workspace engine wraps the overlay, never the player. `<VideoCore>` above
+          stays outside it and stays unconditionally mounted — that rule is older than
+          this redesign and unmounting it drops `vc_activePlayerId`, which silently
+          disables the DOM listeners that start subtitle streaming.
+        */}
+        {state.active && (
+          <StudyWorkspaceProvider surface={surface} hostRef={sliceRef}>
+            <StudyOverlay
+              playbackInfo={state.playbackInfo}
+              localFilePath={
+                playbackRequest?.kind === 'local' ? playbackRequest.localFilePath : null
+              }
+            />
+          </StudyWorkspaceProvider>
+        )}
       </section>
     </>
   );
@@ -1273,13 +1491,24 @@ function StudyPlayerSession({
 export default function StudyPlayerSlice({
   conn,
   playbackRequest,
+  surface = 'workspace',
 }: {
   conn: SeanimeConnection;
   playbackRequest: MediaWorkspacePlaybackRequest | null;
+  /**
+   * Which surface this slice is. Two can be mounted in one window, and the workspace
+   * layout is stored per surface so the small toolbox player cannot overwrite the
+   * arrangement of the full one.
+   */
+  surface?: StudySurfaceKind;
 }): React.ReactElement {
   return (
     <VideoCoreProvider id="study-media">
-      <StudyPlayerSession conn={conn} playbackRequest={playbackRequest} />
+      <StudyPlayerSession
+        conn={conn}
+        playbackRequest={playbackRequest}
+        surface={surface}
+      />
     </VideoCoreProvider>
   );
 }

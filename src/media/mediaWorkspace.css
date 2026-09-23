@@ -329,11 +329,24 @@
   --study-cue-bottom: max(9.25rem, calc(var(--study-dock-height) + 2.05rem));
 }
 
-#media-workspace .study-player-slice:has(.study-grammar-panel) {
+/*
+ * The gutters are asked of the DOCKS, not of the panels.
+ *
+ * These two rules used to name `.study-grammar-panel` and `.study-transcript-panel`
+ * directly, because each panel was its own column. Under the workspace a panel can be
+ * in the left dock, the right dock, the bottom sheet, floating or overlaid, and only a
+ * dock that is actually holding something reaches down to the subtitle band — so the
+ * dock is the only thing that can answer "how much of the picture is taken".
+ *
+ * `:not([hidden])` is load-bearing: `StudyDocks` keeps the card editor mounted while
+ * invisible so the mine shortcut still has something to fire into, and a hidden dock
+ * that still reserved 24rem would be the old defect with none of the old panels.
+ */
+#media-workspace .study-player-slice:has(.study-dock[data-dock='left']:not([hidden])) {
   --study-left-gutter: var(--study-gutter);
 }
 
-#media-workspace .study-player-slice:has(.study-transcript-panel) {
+#media-workspace .study-player-slice:has(.study-dock[data-dock='right']:not([hidden])) {
   --study-right-gutter: var(--study-gutter);
 }
 
@@ -353,6 +366,25 @@
 #media-workspace .study-video-core {
   min-width: 0;
   min-height: 0;
+}
+
+/*
+ * The study overlay owns the subtitle, so VideoCore's own caption layer is hidden while
+ * that overlay is mounted.
+ *
+ * Not cosmetic de-duplication: `MediaCaptionsManager` exposes no timing control (see
+ * `seanime-boundary.d.ts`), so the native layer always paints the track exactly as the
+ * file stored it. On a release whose subtitles are measurably late — 9.05 s for the
+ * `The Big O` BDRip — leaving it visible means a stale copy of every line sitting under
+ * the corrected one. It is also inert: no word segmentation, no dictionary lookup, and
+ * deaf to the size and font settings, all of which live on `.study-cue-text`.
+ *
+ * Scoped with `:has()` rather than applied flatly so the native captions come back by
+ * themselves anywhere the overlay is absent — a plain non-study playback surface keeps
+ * subtitles instead of silently losing them.
+ */
+#media-workspace:has(.study-cue-overlay) :where([data-part='captions']) {
+  display: none;
 }
 
 #media-workspace .study-cue-overlay {

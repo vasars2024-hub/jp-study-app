@@ -3,22 +3,50 @@
  */
 
 import { setBlancAdvanced, isBlancWindow } from './blancMode';
-import { setHandoff } from './pendingHandoff';
+import { setHandoff, setHandoffJson } from './pendingHandoff';
 
 export function openAppSection(section: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: section }));
 }
 
-export function openGrammarPractice(detail?: {
+/**
+ * Everything `parsePracticeDeepLink` accepts.
+ *
+ * `query` and `pointId` are here because `StudyOrchestratorWorkspace` sends
+ * them; `pointId` is deliberately dropped downstream — that is tested design
+ * (`grammarPracticeDeepLink.test.ts:5-16`), not an oversight — but the sender
+ * still passes it, so the type has to admit it rather than being cast past.
+ */
+export type GrammarPracticeLink = {
   functions?: string | string[];
   level?: string;
   levels?: string[];
   lang?: string;
-}): void {
+  query?: string;
+  pointId?: string;
+};
+
+/**
+ * Open Grammar on Practice with the given filters.
+ *
+ * Writes the handoff BEFORE dispatching `os:open`, then fires the live event
+ * as well. Both paths are needed and neither is redundant:
+ *
+ *  - The handoff covers a **cold** `GrammarView` — it lives in a `lazy()` chunk
+ *    behind `Suspense`, so on first use in a session its listener does not
+ *    exist yet and a `CustomEvent`, which is not queued, is delivered to
+ *    nobody. That was audit F22: dispatch at T+93 ms, mount at T+691 ms, link
+ *    silently lost, app left on Grammar points.
+ *  - The event covers an **already-mounted** view, which would otherwise not
+ *    re-run its mount effect and so would never read the handoff.
+ *
+ * `takeHandoff` reads-and-clears, so the two cannot both fire: whichever the
+ * view reaches first consumes it.
+ */
+export function openGrammarPractice(detail?: GrammarPracticeLink): void {
+  setHandoffJson('grammarPractice', detail ?? {});
   openAppSection('grammar');
-  window.setTimeout(() => {
-    window.dispatchEvent(new CustomEvent('grammar:open-practice', { detail: detail ?? {} }));
-  }, 80);
+  window.dispatchEvent(new CustomEvent('grammar:open-practice', { detail: detail ?? {} }));
 }
 
 /** Opens Settings → Study → Chrome extension (token / bridge). */

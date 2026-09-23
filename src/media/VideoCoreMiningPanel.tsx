@@ -5,6 +5,7 @@ import {
   createVideoCoreMiningDraft,
   createVideoCoreMiningHistoryEntry,
   markVideoCoreMiningHistoryUndone,
+  mergeVideoCoreMiningHistory,
   normalizeVideoCoreMiningHistory,
   VIDEO_CORE_MINING_HISTORY_KEY,
   withVideoCoreMiningAsset,
@@ -37,6 +38,16 @@ interface Props {
   source: VideoCoreMiningSource | null;
   video: HTMLVideoElement | null;
   subtitleDelaySec: number;
+  /**
+   * The second subtitle line for the current cue, in whichever language the study
+   * overlay is set to show — an actual secondary track when the release has one,
+   * otherwise a translation of the primary. Seeds the card's translation field.
+   *
+   * Arrives late and can arrive empty: a translated line is only ready once the
+   * translator has answered, which is why the panel watches it rather than reading
+   * it once when the draft is built.
+   */
+  translationText?: string;
   /**
    * Incremented by the `video.mineCurrentLine` shortcut. A counter rather than a
    * boolean so mining the same line twice in a row is two events, not one edge
@@ -142,6 +153,7 @@ export default function VideoCoreMiningPanel({
   source,
   video,
   subtitleDelaySec,
+  translationText = '',
   mineSignal = 0,
 }: Props): React.ReactElement {
   const { t } = useT();
@@ -155,6 +167,8 @@ export default function VideoCoreMiningPanel({
   // tall, and always in the way; collapsing it is the difference between a study player
   // and a form sitting on top of one.
   const [expanded, setExpanded] = React.useState(true);
+  /** The last value this component itself wrote into `draft.translation`. */
+  const autoTranslationRef = React.useRef('');
 
   React.useEffect(() => {
     if (!source) {
@@ -172,13 +186,45 @@ export default function VideoCoreMiningPanel({
         && current.provenance.cue.startMs === cue.startMs
         && current.provenance.source.playbackId === source.playbackId
       ) return current;
-      return createVideoCoreMiningDraft(cue, displayText, source);
+      return createVideoCoreMiningDraft(cue, displayText, source, Date.now(), translationText);
     });
+    autoTranslationRef.current = translationText;
     setMessage('');
+    // `translationText` is deliberately not a dependency: it lands after the draft for a
+    // cue whose translation is still being produced, and re-running here would rebuild the
+    // draft and discard any capture or edit already made against that line. The effect
+    // below is what carries a late arrival in.
   }, [cue?.endMs, cue?.index, cue?.startMs, cue?.trackNumber, displayText, sourceKey(source)]);
 
+  /**
+   * Carry a late-arriving second line into the translation field.
+   *
+   * Guarded so it only ever overwrites its own previous value: once the user has typed in
+   * this field, or corrected what was filled in, their text outranks the subtitle — the
+   * point of the field is that it is editable. Changing the dual-subtitle language mid-cue
+   * therefore updates an untouched field and leaves an edited one alone.
+   */
   React.useEffect(() => {
-    localStorage.setItem(VIDEO_CORE_MINING_HISTORY_KEY, JSON.stringify(history));
+    if (!translationText) return;
+    const previousAuto = autoTranslationRef.current;
+    autoTranslationRef.current = translationText;
+    setDraft((current) => {
+      if (!current) return current;
+      if (current.translation && current.translation !== previousAuto) return current;
+      return { ...current, translation: translationText };
+    });
+  }, [translationText]);
+
+  React.useEffect(() => {
+    // Audit 6.2. `history` is seeded once at mount and this panel never subscribes, so
+    // writing it back wholesale erased anything a second owner appended in the meantime —
+    // `useMusicMining` mines into this same log with a fresh read every time. Fold against
+    // what is actually in storage instead; the union is well defined because both owners
+    // only append and every entry carries an id.
+    localStorage.setItem(
+      VIDEO_CORE_MINING_HISTORY_KEY,
+      JSON.stringify(mergeVideoCoreMiningHistory(history, loadHistory())),
+    );
   }, [history]);
 
   React.useEffect(() => {

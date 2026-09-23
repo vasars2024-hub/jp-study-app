@@ -409,6 +409,8 @@ export interface MalSyncDeps {
   config?: () => MalSyncConfig;
   now?: () => number;
   randomBytes?: (size: number) => Buffer;
+  /** Which profile the token lands in — see `defaultProfileIdentity` (MAL-7). */
+  profile?: () => ProfileIdentity;
 }
 
 /** Refresh this far ahead of expiry rather than waiting for the 401. */
@@ -431,6 +433,14 @@ const PAGE_SIZE = 100;
  * below ends a pathological one. This is the backstop behind both.
  */
 const MAX_PAGES = 200;
+/**
+ * How long an in-flight sign-in stays completable (MAL-3).
+ *
+ * Ten minutes: long enough for a hand-copied code from a dead callback page
+ * (MAL-2), short enough that a verifier is not sitting exchangeable in memory
+ * for the whole session — which is what actually happened before this existed.
+ */
+const PENDING_TTL_MS = 10 * 60_000;
 
 export interface MalAuthStatus {
   configured: boolean;
@@ -439,11 +449,60 @@ export interface MalAuthStatus {
   /** False means the token on disk is plaintext — the UI must say so. */
   tokensEncrypted: boolean;
   expiresAt?: number;
+  /**
+   * Where the token will be written — i.e. *which profile* is being authorized.
+   *
+   * Added 2026-08-04 for `docs/KNOWN_ISSUES.md` MAL-7. The grant on MyAnimeList's
+   * side is permanent and account-wide; the credential is per-profile and dies
+   * with the profile's `userData`. On 2026-08-04 an audit run authorized the
+   * user's real MAL account from a throwaway Electron profile in `%TEMP%`, which
+   * was then deleted — a permanent write-scope grant with no surviving token,
+   * and nothing in the UI ever named the profile. The panel now does.
+   */
+  profileDir: string;
+  /**
+   * False when `userData` has been redirected away from the per-user default —
+   * a `--user-data-dir` override, a portable/scratch profile, or a test harness.
+   * The UI must warn before authorizing, because that grant will outlive it.
+   */
+  defaultProfile: boolean;
 }
 
 export interface MalPendingAuth {
   authorizeUrl: string;
   state: string;
+}
+
+export interface ProfileIdentity {
+  /** Absolute `userData` directory the token will be written into. */
+  dir: string;
+  /** True when that is Electron's per-user default for this app. */
+  isDefault: boolean;
+}
+
+/**
+ * Which profile is about to be bound to a real MyAnimeList account (MAL-7).
+ *
+ * Electron's default `userData` is `<appData>/<appName>`. Anything else means a
+ * `--user-data-dir` override, a portable install, or a throwaway harness profile
+ * — the case that actually happened: a temp profile took a permanent write-scope
+ * grant on the user's account and was then deleted.
+ *
+ * Injectable so the check is testable without an Electron app object; the
+ * default reads the live paths.
+ */
+export function defaultProfileIdentity(): ProfileIdentity {
+  const dir = app.getPath('userData');
+  let expected = '';
+  try {
+    expected = path.join(app.getPath('appData'), app.getName());
+  } catch {
+    // getName() throws outside a packaged/initialised app — treat as unknown
+    // rather than claiming the profile is default, since MAL-7's whole point is
+    // that silence here is the defect.
+    return { dir, isDefault: false };
+  }
+  return { dir, isDefault: path.resolve(dir) === path.resolve(expected) };
 }
 
 export interface MalListSyncResult {
@@ -467,11 +526,20 @@ export class MalSyncClient {
   private readonly config: () => MalSyncConfig;
   private readonly now: () => number;
   private readonly randomBytes: (size: number) => Buffer;
+  private readonly profile: () => ProfileIdentity;
 
   /**
-   * The in-flight PKCE verifier and CSRF state. Memory only — this is valid for
-   * the seconds between opening the browser and the callback, and writing it to
-   * disk would persist a credential-equivalent past the flow that needs it.
+   * The in-flight PKCE verifier and CSRF state. Memory only — writing it to disk
+   * would persist a credential-equivalent past the flow that needs it.
+   *
+   * It is also **enforced** to be short-lived, by `PENDING_TTL_MS` below. The
+   * comment here used to say it "is valid for the seconds between opening the
+   * browser and the callback", and `startedAt` was assigned and read nowhere —
+   * so `pending` actually survived for the entire life of the main process.
+   * Verified live during the first real OAuth run: the flow was begun and the
+   * app then ran 25+ minutes with the verifier still exchangeable.
+   * `docs/KNOWN_ISSUES.md` MAL-3. A comment describing a guarantee the code does
+   * not provide is worse than no comment, so the code now provides it.
    */
   private pending: { state: string; codeVerifier: string; startedAt: number } | null = null;
 
@@ -481,6 +549,7 @@ export class MalSyncClient {
     this.config = deps.config ?? (() => readMalSyncConfig());
     this.now = deps.now ?? Date.now;
     this.randomBytes = deps.randomBytes ?? crypto.randomBytes;
+    this.profile = deps.profile ?? defaultProfileIdentity;
   }
 
   // -- status ---------------------------------------------------------------
@@ -488,12 +557,15 @@ export class MalSyncClient {
   status(): MalAuthStatus {
     const config = this.config();
     const tokens = this.store.read();
+    const profile = this.profile();
     return {
       configured: config.clientId.length > 0,
       connected: Boolean(tokens?.accessToken),
       username: tokens?.username,
       tokensEncrypted: this.store.encrypted(),
       expiresAt: tokens?.expiresAt || undefined,
+      profileDir: profile.dir,
+      defaultProfile: profile.isDefault,
     };
   }
 
@@ -541,6 +613,25 @@ export class MalSyncClient {
     if (!pending) {
       throw new MalSyncError('request-failed', 'There is no sign-in in progress to complete.');
     }
+    /*
+     * The TTL the header on `pending` has always claimed (MAL-3).
+     *
+     * Generous, because the flow is hand-driven: the user reads a code off a
+     * dead callback page and pastes it back (MAL-2), and rushing them would
+     * turn a documentation defect into a usability one. The point is that a
+     * verifier cannot sit exchangeable in memory for the life of the process.
+     *
+     * Its own error says the deadline passed, rather than reusing "there is no
+     * sign-in in progress" — a user who has just pasted a code needs to be told
+     * it expired, not that they never started.
+     */
+    if (this.now() - pending.startedAt > PENDING_TTL_MS) {
+      this.pending = null;
+      throw new MalSyncError(
+        'request-failed',
+        'That sign-in took too long and has expired. Start it again.',
+      );
+    }
     if (!state || state !== pending.state) {
       this.pending = null;
       throw new MalSyncError('request-failed', 'The sign-in response did not match the request.');
@@ -557,7 +648,7 @@ export class MalSyncClient {
     if (clientSecret) body.set('client_secret', clientSecret);
     if (redirectUri) body.set('redirect_uri', redirectUri);
 
-    const tokens = await this.postToken(body, 'sign in');
+    const tokens = await this.postToken(body, 'sign in', 'exchange');
     this.store.write(tokens);
     // Best-effort: a name makes the connected state legible, but failing to
     // read it must not undo a sign-in that already succeeded.
@@ -572,8 +663,21 @@ export class MalSyncClient {
     return this.status();
   }
 
-  /** POSTs the token endpoint and normalises both flavours of failure. */
-  private async postToken(body: URLSearchParams, what: string): Promise<MalTokens> {
+  /**
+   * POSTs the token endpoint and normalises both flavours of failure.
+   *
+   * `phase` exists for the MAL-4 client-secret hint below, and only the initial
+   * exchange may ever raise it: a confidential registration missing its secret
+   * fails *that* exchange, so a refresh token could never have been issued in
+   * the first place. Raising it on the refresh path would be both wrong and
+   * harmful — it moves the code off `reauth-required`, which is the only code
+   * `refreshTokens` clears dead tokens on.
+   */
+  private async postToken(
+    body: URLSearchParams,
+    what: string,
+    phase: 'exchange' | 'refresh',
+  ): Promise<MalTokens> {
     const response = await this.transport({
       url: MAL_TOKEN_URL,
       method: 'POST',
@@ -585,6 +689,31 @@ export class MalSyncClient {
       throw new MalSyncError('transient', `MyAnimeList could not be reached to ${what}.`);
     }
     if (response.status !== 200) {
+      // MAL-4: a *confidential* registration must send `client_secret`, and this
+      // app only ever reads one from the environment. When it is unset, the
+      // exchange fails here — after the user has already approved in the browser
+      // and burned that authorization code — and the message used to say only
+      // "MyAnimeList rejected the request", which points at nothing actionable.
+      //
+      // Deliberately phrased as a possible cause, not a diagnosis: this code
+      // cannot see how the client is registered on MAL's side (that needs the
+      // Edit page, which is MAL-5's manual check). MAL's own error string is
+      // included when it sends one, since `invalid_client` is the tell.
+      // Only the initial exchange can be failing for want of a secret; on the
+      // refresh path this must fall through to `reauth-required` so that the
+      // dead token is actually cleared.
+      const secretMissing = phase === 'exchange' && !this.config().clientSecret;
+      if (secretMissing && (response.status === 400 || response.status === 401)) {
+        const detail = /invalid_client|client_secret/i.test(response.body)
+          ? ` MyAnimeList said: ${response.body.slice(0, 200)}`
+          : '';
+        throw new MalSyncError(
+          'not-configured',
+          `MyAnimeList rejected the request to ${what}. If the GrammarX application is ` +
+            `registered as "confidential" rather than "public", it requires a client secret — ` +
+            `set JP_STUDY_MAL_CLIENT_SECRET and authorize again.${detail}`,
+        );
+      }
       throw new MalSyncError('reauth-required', `MyAnimeList rejected the request to ${what}.`);
     }
 
@@ -633,7 +762,7 @@ export class MalSyncClient {
 
     let refreshed: MalTokens;
     try {
-      refreshed = await this.postToken(body, 'renew the session');
+      refreshed = await this.postToken(body, 'renew the session', 'refresh');
     } catch (error) {
       if (error instanceof MalSyncError && error.code === 'reauth-required') {
         this.store.clear();

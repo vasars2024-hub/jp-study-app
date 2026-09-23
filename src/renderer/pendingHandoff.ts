@@ -28,6 +28,23 @@ const HANDOFFS = {
   studyMediaId: { key: 'jp-pending-study-media-id', backing: 'session' },
   studyMediaRequest: { key: 'jp-pending-study-media-request', backing: 'session' },
   libraryFocusFolder: { key: 'jp-library-focus-folder', backing: 'session' },
+  /*
+   * "Practice this" deep links into Grammar.
+   *
+   * `session`, not `local`: a deep link expresses what the user wants *now*,
+   * and one that survived a restart would open Practice with filters they set
+   * days ago.
+   *
+   * This exists because the dispatchers used to do `os:open` → fixed
+   * `setTimeout(…, 80)` → `dispatchEvent`, while the listener is registered by
+   * `GrammarView`'s effect inside a `lazy()` chunk behind `Suspense`. A
+   * `CustomEvent` is not queued, so on a cold chunk the link was delivered to
+   * nobody — measured at 93 ms dispatch against a 691 ms mount, 598 ms before
+   * its listener existed, leaving the app on Grammar points with nothing said.
+   * A warm run passed, so the failure was exactly first-use-in-a-session.
+   * Audit F22. Raising the timeout re-tunes the race; the handoff removes it.
+   */
+  grammarPractice: { key: 'jp-pending-grammar-practice', backing: 'session' },
 } as const satisfies Record<string, { key: string; backing: Backing }>;
 
 export type PendingHandoff = keyof typeof HANDOFFS;

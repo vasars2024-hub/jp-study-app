@@ -8,6 +8,7 @@ import {
   type SeanimeStatus,
 } from './shared/seanime';
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
+import type { SubtitleSyncEstimate } from './shared/subtitleSync';
 import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
 // Kept below FILES_DELETE_CHANNEL, not above it, so the whole Files-app block sits
 // behind a line that already exists on feat/nyaa-subtitles. Another track inserts
@@ -925,7 +926,7 @@ const api = {
   desktopResetAssignments: (): Promise<DesktopLayoutSnapshot> =>
     ipcRenderer.invoke('desktop:resetAssignments'),
 
-  // ----- Multi-monitor: displays and secondary desktop windows -----
+  // ----- Multi-monitor: displays, secondary desktop windows, cross-monitor drag -----
   displayList: (): Promise<DisplaySummary[]> => ipcRenderer.invoke('display:list'),
   displaySetVirtualCount: (count: number): Promise<DisplaySummary[]> =>
     ipcRenderer.invoke('display:setVirtualCount', count),
@@ -1135,6 +1136,71 @@ const api = {
   /** Control the calling pop-out window (its custom min/max/close buttons). */
   popoutControl: (action: 'minimize' | 'maximize' | 'close'): Promise<void> =>
     ipcRenderer.invoke('popout:control', action),
+
+  // ----- Detached Study Blocks (one panel of the player, in its own window) --------
+  // Contract and payload shapes: `shared/studyDetach.ts`.
+  studyBlockOpen: (
+    blockId: string,
+    surface: string,
+    displayKey?: string,
+  ): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('studyblock:open', { blockId, surface, displayKey }),
+  studyBlockClose: (blockId: string, surface: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('studyblock:close', { blockId, surface }),
+  studyBlockList: (): Promise<import('./shared/studyDetach').DetachedWindowInfo[]> =>
+    ipcRenderer.invoke('studyblock:list'),
+  /** Move a detached block — or the app pop-out a block opened — to a monitor. */
+  studyBlockSendToDisplay: (payload: {
+    blockId?: string;
+    surface?: string;
+    section?: string;
+    displayKey: string;
+  }): Promise<{ ok: boolean }> => ipcRenderer.invoke('studyblock:moveToDisplay', payload),
+  onStudyBlockWindowsChanged: (
+    cb: (info: import('./shared/studyDetach').DetachedWindowInfo[]) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      info: import('./shared/studyDetach').DetachedWindowInfo[],
+    ): void => cb(info);
+    ipcRenderer.on('studyblock:changed', handler);
+    return () => ipcRenderer.removeListener('studyblock:changed', handler);
+  },
+  /** Host -> detached windows. `send`, not `invoke`: this runs several times a second. */
+  studyBlockPublish: (snapshot: import('./shared/studyDetach').StudyDetachSnapshot): void => {
+    ipcRenderer.send('studyblock:publish', snapshot);
+  },
+  studyBlockRequestSnapshot: (
+    surface: string,
+  ): Promise<import('./shared/studyDetach').StudyDetachSnapshot | null> =>
+    ipcRenderer.invoke('studyblock:requestSnapshot', surface),
+  onStudyBlockSync: (
+    cb: (snapshot: import('./shared/studyDetach').StudyDetachSnapshot) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      snapshot: import('./shared/studyDetach').StudyDetachSnapshot,
+    ): void => cb(snapshot);
+    ipcRenderer.on('studyblock:sync', handler);
+    return () => ipcRenderer.removeListener('studyblock:sync', handler);
+  },
+  /** Detached window -> host. Routed to the publishing window only. */
+  studyBlockSendCommand: (
+    surface: string,
+    command: import('./shared/studyDetach').StudyDetachCommand,
+  ): void => {
+    ipcRenderer.send('studyblock:command', { surface, command });
+  },
+  onStudyBlockCommand: (
+    cb: (command: import('./shared/studyDetach').StudyDetachCommand) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      command: import('./shared/studyDetach').StudyDetachCommand,
+    ): void => cb(command);
+    ipcRenderer.on('studyblock:command', handler);
+    return () => ipcRenderer.removeListener('studyblock:command', handler);
+  },
 
   /** Floating Mini Widget Mode — borderless transparent always-on-top craft window. */
   miniOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
@@ -1656,6 +1722,7 @@ const api = {
     ipcRenderer.invoke('credentials:set', id, field, secret),
   clearCredential: (id: string): Promise<import('./main/credentials/ipc').CredentialVaultSnapshot> =>
     ipcRenderer.invoke('credentials:clear', id),
+
   /** Which providers need a key and whether one is stored. Never the key itself. */
   subtitleProviderCredentials: (): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]> =>
     ipcRenderer.invoke('subtitleDiscovery:credentials'),
@@ -1773,6 +1840,8 @@ const api = {
     ipcRenderer.on('media:youtubeProgress', handler);
     return () => ipcRenderer.removeListener('media:youtubeProgress', handler);
   },
+  /** Open a file dialog and return the chosen subtitle file's text. */
+  pickSubtitle: (): Promise<SubtitlePick | null> => ipcRenderer.invoke('media:pickSubtitle'),
   /**
    * The discovered subtitle track for a local video, by path and without side effects.
    *
@@ -1791,8 +1860,16 @@ const api = {
    */
   subtitleFallbackFont: (lang: string): Promise<SubtitleFallbackFont | null> =>
     ipcRenderer.invoke('media:subtitleFallbackFont', lang),
-  /** Open a file dialog and return the chosen subtitle file's text. */
-  pickSubtitle: (): Promise<SubtitlePick | null> => ipcRenderer.invoke('media:pickSubtitle'),
+  /**
+   * How far these cues are out of sync with that file's audio. Costs a couple of
+   * seconds of ffmpeg — see `media:subtitleSyncOffset`.
+   */
+  subtitleSyncOffset: (
+    videoPath: string,
+    cues: { start: number; end: number }[],
+    durationSec?: number,
+  ): Promise<SubtitleSyncEstimate> =>
+    ipcRenderer.invoke('media:subtitleSyncOffset', videoPath, cues, durationSec),
   fetchYoutubeSubs: (
     id: string,
     preferLang?: string,
@@ -2085,14 +2162,14 @@ const api = {
   },
   // The card-batch staging slot. `flashcard.generate-cards` stages the batch it
   // produced; AI Card Studio claims it into its own preview editor. One slot,
-  // single-use, main memory only - see shared/agentCardBatchStaging.ts.
+  // single-use, main memory only — see shared/agentCardBatchStaging.ts.
   agentCardBatchStage: (
     request: AgentCardBatchStageRequest,
   ): Promise<AgentCardBatchStageResult> =>
     ipcRenderer.invoke(AGENT_CARD_BATCH_STAGING_CHANNELS.stage, request),
   agentCardBatchTake: (): Promise<AgentCardBatchTakeResult> =>
     ipcRenderer.invoke(AGENT_CARD_BATCH_STAGING_CHANNELS.take),
-  // Fires for every accepted batch and carries NOTHING - the cards stay in main
+  // Fires for every accepted batch and carries NOTHING — the cards stay in main
   // until a window claims them. It exists for the order the studio's own mount
   // cannot cover: Flashcards already open while the Agent generates elsewhere.
   onAgentCardBatchStaged: (cb: () => void): (() => void) => {
@@ -2158,11 +2235,6 @@ const api = {
     ipcRenderer.on('readingLists:reminder', handler);
     return () => ipcRenderer.removeListener('readingLists:reminder', handler);
   },
-  onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
-    const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
-    ipcRenderer.on('agentOperational:changed', handler);
-    return () => ipcRenderer.removeListener('agentOperational:changed', handler);
-  },
   agentExecutionLeaseAcquire: (
     request: AgentExecutionLeaseAcquireRequest,
   ): Promise<AgentExecutionLeaseAcquireResult> =>
@@ -2183,6 +2255,11 @@ const api = {
     request: AgentExecutionLeaseRecoverRequest,
   ): Promise<AgentExecutionLeaseRecoverResult> =>
     ipcRenderer.invoke('agentExecutionLease:recover', request),
+  onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
+    const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
+    ipcRenderer.on('agentOperational:changed', handler);
+    return () => ipcRenderer.removeListener('agentOperational:changed', handler);
+  },
   agentExecutionRun: (request: AgentExecutionRequest): Promise<AgentExecutionResult> =>
     ipcRenderer.invoke('agentExecution:run', request),
   agentExecutionCancel: (requestId: string): Promise<AgentExecutionCancelResult> =>

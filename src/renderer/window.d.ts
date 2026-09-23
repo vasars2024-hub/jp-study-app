@@ -675,6 +675,39 @@ declare global {
       popoutListOpen(): Promise<string[]>;
       onPopoutChanged(cb: (sections: string[]) => void): () => void;
       popoutControl(action: 'minimize' | 'maximize' | 'close'): Promise<void>;
+
+      // Detached Study Blocks — see `shared/studyDetach.ts`.
+      studyBlockOpen(
+        blockId: string,
+        surface: string,
+        displayKey?: string,
+      ): Promise<{ ok: boolean }>;
+      studyBlockClose(blockId: string, surface: string): Promise<{ ok: boolean }>;
+      studyBlockList(): Promise<import('../shared/studyDetach').DetachedWindowInfo[]>;
+      studyBlockSendToDisplay(payload: {
+        blockId?: string;
+        surface?: string;
+        section?: string;
+        displayKey: string;
+      }): Promise<{ ok: boolean }>;
+      onStudyBlockWindowsChanged(
+        cb: (info: import('../shared/studyDetach').DetachedWindowInfo[]) => void,
+      ): () => void;
+      studyBlockPublish(snapshot: import('../shared/studyDetach').StudyDetachSnapshot): void;
+      studyBlockRequestSnapshot(
+        surface: string,
+      ): Promise<import('../shared/studyDetach').StudyDetachSnapshot | null>;
+      onStudyBlockSync(
+        cb: (snapshot: import('../shared/studyDetach').StudyDetachSnapshot) => void,
+      ): () => void;
+      studyBlockSendCommand(
+        surface: string,
+        command: import('../shared/studyDetach').StudyDetachCommand,
+      ): void;
+      onStudyBlockCommand(
+        cb: (command: import('../shared/studyDetach').StudyDetachCommand) => void,
+      ): () => void;
+
       miniOpen(size?: { width?: number; height?: number }): Promise<{ ok: boolean }>;
       miniClose(): Promise<{ ok: boolean }>;
       miniSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
@@ -930,6 +963,14 @@ declare global {
       saveSubtitleDiscoverySettings(
         settings: import('../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
       ): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
+      /**
+       * MAL connection state. Declared here because the API Keys page reads it
+       * for the MyAnimeList row; `preload.ts:1131` has exposed it all along but
+       * this file never declared it, so every `malStatus` call was an error.
+       */
+      malStatus(): Promise<
+        import('../main/malSync').MalIpcResult<import('../main/malSync').MalAuthStatus>
+      >;
       /** The user's list, optionally narrowed to one MAL status. Read-only. */
       malFetchList(
         status?: import('../shared/malSync').MalListStatus,
@@ -952,6 +993,14 @@ declare global {
         entries: import('../shared/malLibrary').MalLibraryEntry[];
         summary: import('../shared/malLibrary').MalLibrarySummary;
       }>;
+      /** Phase 0 credentials vault. No channel returns a secret — by design. */
+      credentialStatus(): Promise<import('../main/credentials/ipc').CredentialVaultSnapshot>;
+      setCredentialSecret(
+        id: string,
+        field: string,
+        secret: string,
+      ): Promise<import('../main/credentials/ipc').CredentialWriteResponse>;
+      clearCredential(id: string): Promise<import('../main/credentials/ipc').CredentialVaultSnapshot>;
       subtitleProviderCredentials(): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
       setSubtitleProviderKey(
         id: string,
@@ -1030,12 +1079,6 @@ declare global {
       convertMedia(url: string): Promise<MediaOpen | null>;
       downloadYouTube(url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | MediaDownloadError>;
       onYoutubeProgress(cb: (p: { stage: string; percent: number }) => void): () => void;
-      /**
-       * The discovered subtitle track for a local video, by path and side-effect free.
-       * The adopted workspace has only a path, and the sidecar only sees inside the
-       * container — see `media:subtitleForPath` for the measurement.
-       */
-      subtitleForPath(filePath: string): Promise<SubtitlePick | null>;
       pickSubtitle(): Promise<SubtitlePick | null>;
       /**
        * A CJK-capable system font for the libass renderer, or null when the machine
@@ -1044,6 +1087,22 @@ declare global {
       subtitleFallbackFont(
         lang: string,
       ): Promise<import('../shared/types').SubtitleFallbackFont | null>;
+      /**
+       * The discovered subtitle track for a local video, by path and side-effect free.
+       * The adopted workspace has only a path, and the sidecar only sees inside the
+       * container — see `media:subtitleForPath` for the measurement.
+       */
+      subtitleForPath(filePath: string): Promise<SubtitlePick | null>;
+      /**
+       * How far these cues have to move to line up with that file's audio. Spawns
+       * ffmpeg — see `media:subtitleSyncOffset` for the method and its confidence
+       * gates. `offsetSec` is 0 whenever `confident` is false.
+       */
+      subtitleSyncOffset(
+        videoPath: string,
+        cues: { start: number; end: number }[],
+        durationSec?: number,
+      ): Promise<import('../shared/subtitleSync').SubtitleSyncEstimate>;
       fetchYoutubeSubs(
         id: string,
         preferLang?: string,
@@ -1277,7 +1336,6 @@ declare global {
       ): Promise<ReadingReminderSettings>;
       readingRemindersSilence(kind: ReadingReminderKind): Promise<ReadingReminderSettings>;
       onReadingReminder(cb: (reminder: ReadingReminder) => void): () => void;
-      onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
       agentExecutionLeaseAcquire(
         request: AgentExecutionLeaseAcquireRequest,
       ): Promise<AgentExecutionLeaseAcquireResult>;
@@ -1293,6 +1351,7 @@ declare global {
       agentExecutionLeaseRecover(
         request: AgentExecutionLeaseRecoverRequest,
       ): Promise<AgentExecutionLeaseRecoverResult>;
+      onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
       agentExecutionRun(request: AgentExecutionRequest): Promise<AgentExecutionResult>;
       agentExecutionCancel(requestId: string): Promise<AgentExecutionCancelResult>;
       onAgentExecutionEvent(cb: (event: AgentExecutionEvent) => void): () => void;
@@ -1697,6 +1756,8 @@ declare global {
           url?: string;
           title?: string;
           folder?: string;
+          audioDataUrl?: string;
+          profileId?: string;
           anki: { ok: boolean; noteId?: number; error?: string };
         }) => void,
       ): () => void;
@@ -1973,4 +2034,3 @@ declare global {
 }
 
 export {};
-

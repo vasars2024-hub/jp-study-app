@@ -97,8 +97,9 @@ export function registerLocalFileProtocol(): void {
   });
 }
 
-const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.bmp']);
-const ARCHIVE_EXT = new Set(['.cbz', '.zip']);
+// Single copy in `shared/mediaKind.ts` — the drop router classifies against the
+// same sets the importers accept, so the two cannot drift.
+import { ARCHIVE_EXT, IMAGE_EXT, WALL_EXT } from '../shared/mediaKind';
 
 interface Config {
   watchFolder?: string;
@@ -1508,7 +1509,8 @@ export function registerLibraryIpc(): void {
 
   // ----- desktop wallpaper (custom image stored in userData) -----
 
-  const WALL_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+  // WALL_EXT hoisted to `shared/mediaKind.ts` — it was function-local here, so
+  // nothing outside could tell which images the wallpaper pipeline accepts.
   const wallpaperFile = (): string | null => {
     for (const ext of WALL_EXT) {
       const p = path.join(app.getPath('userData'), `wallpaper${ext}`);

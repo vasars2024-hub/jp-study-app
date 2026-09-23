@@ -16,8 +16,17 @@ import { defaultWhisperTier } from '../shared/whisperModels';
 import { setWhisperModelTier } from './whisperSettings';
 
 export const STUDY_LANG_KEY = 'jp-study-dict-lang';
-export const WHISPER_LANG_KEY = 'jp-study-whisper-lang';
 export const STUDY_LANG_EVENT = 'study-lang-changed';
+
+/**
+ * Retired 2026-08-07 (audit item 6.1). `jp-study-whisper-lang` was written here on every
+ * language switch and read by nothing — the transcription language is `getStudyLang()`
+ * everywhere it is needed (`VideoCoreStudyOverlay.tsx:346`), so the key could never hold
+ * anything the dict-lang key did not already say. Copies already sitting in profiles are
+ * inert (nothing reads them) and are cleared by the settings reset, which still lists the
+ * key in `storage/settingsCatalog.ts`.
+ */
+export const RETIRED_WHISPER_LANG_KEY = 'jp-study-whisper-lang';
 
 export type { StudyLang };
 
@@ -38,7 +47,6 @@ export function setStudyLang(lang: StudyLang): void {
   const prev = getStudyLang();
   try {
     localStorage.setItem(STUDY_LANG_KEY, next);
-    localStorage.setItem(WHISPER_LANG_KEY, next);
   } catch {
     /* storage unavailable */
   }

@@ -41,7 +41,9 @@ export default function MediaPlayerSurface({
 }): React.ReactElement {
   return (
     <MediaSurfaceShell conn={conn} surface="player" className={className}>
-      <StudyPlayerSlice conn={conn} playbackRequest={playbackRequest} />
+      {/* `surface="player"` also keys the workspace layout, so this bounded frame keeps
+          its own arrangement instead of sharing the full workspace's. */}
+      <StudyPlayerSlice conn={conn} playbackRequest={playbackRequest} surface="player" />
     </MediaSurfaceShell>
   );
 }

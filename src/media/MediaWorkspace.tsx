@@ -21,6 +21,7 @@ import {
   type MediaWorkspacePlaybackRequest,
 } from '../shared/mediaWorkspace';
 import { useT } from '../renderer/i18n';
+import { LiquidLoading } from '../renderer/components/liquid/LiquidLoading';
 import MediaSurfaceShell from './MediaSurfaceShell';
 import StudyPlayerSlice from './StudyPlayerSlice';
 import { LocalPlaybackProvider } from './seanimeLocalPlayback';
@@ -98,11 +99,7 @@ function RoutedLibrary(): React.ReactElement {
             {t('mediaWorkspace.backToLibrary')}
           </button>
           <React.Suspense
-            fallback={
-              <div className="seanime-host-state" role="status">
-                <p>{t('common.loading')}</p>
-              </div>
-            }
+            fallback={<LiquidLoading layout="library" />}
           >
             <AnimeEntryScreen />
           </React.Suspense>

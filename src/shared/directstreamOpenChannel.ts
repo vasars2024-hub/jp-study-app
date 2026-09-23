@@ -320,3 +320,88 @@ export function directstreamOpenGenerationFor(
     ? state
     : { requestId, generation: state.generation + 1 };
 }
+
+/* ------------------------------------------------------------------------------------- *
+ * SURVIVING A RENDERER RELOAD — why the counter cannot start at 0 again.
+ * ------------------------------------------------------------------------------------- */
+
+/**
+ * Where the high-water generation is kept, so a reload does not rewind it.
+ *
+ * ## The defect this closes
+ *
+ * The two halves of the protocol have **different lifetimes**, and that asymmetry is the
+ * whole bug:
+ *
+ *  - The **client id** lives in `localStorage` (`seanime-client-id`,
+ *    `vendor/seanime-web/lib/server/client-id.ts:1,30`). It survives a reload.
+ *  - The **counter** is module state in the renderer realm
+ *    (`StudyPlayerSlice.tsx`'s `openGenerations`). It resets to 0 on a reload.
+ *  - The **sidecar's bar** is in-memory per client id, and the sidecar does not reload
+ *    when the renderer does (`AcceptOpenGeneration`,
+ *    `patches/seanime/0004-directstream-open-generation.patch`).
+ *
+ * So a renderer that had reached generation 3 reloads, mints 1 for the user's next play,
+ * and the sidecar refuses it: *stale open request: generation 1 is older than one already
+ * accepted for this client*. Every subsequent open is refused too, because a refusal does
+ * not move the bar — the play button stops working for the life of that sidecar, and the
+ * error blames the file. Observed live 2026-08-06 after three renderer reloads.
+ *
+ * The rule that fixes it: **generations must be monotonic per client id, not per realm**,
+ * and the client id is the thing that persists, so the counter has to persist with it.
+ *
+ * Storing the id alongside the number is what makes it safe. A stored counter belonging to
+ * a *different* client id says nothing about this one — `AcceptOpenGeneration` orders each
+ * client id independently — so it is discarded rather than adopted.
+ */
+export const DIRECTSTREAM_OPEN_GENERATION_STORAGE_KEY = 'jp:directstream-open-generation';
+
+/** What goes into storage. Paired, because a bare number cannot be attributed to a client. */
+export function serializeDirectstreamOpenGeneration(
+  clientId: string,
+  generation: number,
+): string {
+  return JSON.stringify({ clientId, generation });
+}
+
+/**
+ * Seed a fresh realm's counter from the last generation this client id is known to have
+ * sent, so the next mint is strictly newer than the sidecar's bar.
+ *
+ * Refuses to touch a counter that has already minted in this realm (`generation > 0`).
+ * That is not caution about a rare case — it is the only thing standing between a stale
+ * write from another window and a *rewind*, which is precisely the failure being fixed.
+ * The seed is a one-time floor, never an ongoing source of truth.
+ *
+ * Anything unreadable, mis-shaped, non-positive, non-integral, or belonging to another
+ * client id leaves the state alone: the field is advisory, and an absent one must behave
+ * exactly as before this existed.
+ */
+export function directstreamOpenGenerationsRestored(
+  state: DirectstreamOpenGenerations,
+  clientId: string,
+  stored: string | null | undefined,
+): DirectstreamOpenGenerations {
+  if (state.generation > 0) return state;
+  if (!clientId || !stored) return state;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    return state;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return state;
+  const record = parsed as { clientId?: unknown; generation?: unknown };
+  if (record.clientId !== clientId) return state;
+  const generation = record.generation;
+  if (
+    typeof generation !== 'number'
+    || !Number.isSafeInteger(generation)
+    || generation <= 0
+  ) {
+    return state;
+  }
+  // `requestId: null` on purpose: this realm has issued no open yet, so the very next
+  // mint must be `generation + 1` rather than a reuse of the stored number.
+  return { requestId: null, generation };
+}

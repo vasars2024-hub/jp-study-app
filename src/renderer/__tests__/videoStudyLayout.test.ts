@@ -198,13 +198,16 @@ describe('the surface declares its geometry once', () => {
     expect(slice).toMatch(/--study-gutter:\s*calc\(var\(--study-column\) \+ 1rem\)/);
   });
 
-  it('starts with no gutter and claims one per panel that reaches the cue band', () => {
+  it('starts with no gutter and claims one per visible dock that reaches the cue band', () => {
     expect(slice).toMatch(/--study-left-gutter:\s*0rem/);
     expect(slice).toMatch(/--study-right-gutter:\s*0rem/);
-    expect(block(css, '#media-workspace .study-player-slice:has(.study-grammar-panel)'))
+    // Panels can live in either dock, a sheet, or float, so the gutter is asked of the dock.
+    // `:not([hidden])`: a dock kept mounted but hidden must not reserve a column.
+    expect(block(css, "#media-workspace .study-player-slice:has(.study-dock[data-dock='left']:not([hidden]))"))
       .toMatch(/--study-left-gutter:\s*var\(--study-gutter\)/);
-    expect(block(css, '#media-workspace .study-player-slice:has(.study-transcript-panel)'))
+    expect(block(css, "#media-workspace .study-player-slice:has(.study-dock[data-dock='right']:not([hidden]))"))
       .toMatch(/--study-right-gutter:\s*var\(--study-gutter\)/);
+    expect(css, 'a panel-named gutter rule came back').not.toMatch(/:has\(\.study-grammar-panel\)\s*\{/);
   });
 
   it('centres the subtitle between the gutters rather than in the slice', () => {

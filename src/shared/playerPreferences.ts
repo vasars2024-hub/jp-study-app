@@ -36,6 +36,32 @@ export const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
   subtitleOverlayBackground: 35,
 };
 
+/**
+ * What to persist for a key that has a second owner with a wider schema. Audit item 6.2.
+ *
+ * `jp-media-player-preferences-v1` is written by this player *and* by the VideoCore study
+ * overlay, which declares the same literal under its own constant in `shared/videoCoreStudy.ts`.
+ * The schemas overlap but are not equal: nine fields — `subtitleBgOpacity`,
+ * `subtitleFontFamily`, `subtitleFontWeight`, `subtitleOutline`, `cueTimingReadout`,
+ * `secondarySubLang`, `grammarHighlight`, `seekStepSec`, `transcriptPanel` — exist only on the
+ * overlay's type.
+ *
+ * `normalizeVideoCoreStudyPreferences` returns `{ ...raw, ...normalized }`, so the overlay
+ * already preserves this player's fields. `normalizePlayerPreferences` returns a fixed
+ * 14-field object, so this player erased all nine of the overlay's. The asymmetry is the whole
+ * defect; this restores it. Both readers normalize on load, so carrying the other owner's
+ * fields through is inert for this player and load-bearing for the other.
+ */
+export function mergeStoredPlayerPreferences(
+  stored: unknown,
+  next: PlayerPreferences,
+): Record<string, unknown> {
+  const base = stored && typeof stored === 'object' && !Array.isArray(stored)
+    ? (stored as Record<string, unknown>)
+    : {};
+  return { ...base, ...next };
+}
+
 export function normalizePlayerPreferences(value: unknown): PlayerPreferences {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { ...DEFAULT_PLAYER_PREFERENCES };

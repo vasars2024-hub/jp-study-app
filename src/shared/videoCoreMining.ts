@@ -147,11 +147,20 @@ function provenance(value: unknown): VideoCoreCueProvenance | null {
   };
 }
 
+/**
+ * `translation` seeds the card's sentence-translation field, and is last in the parameter
+ * list purely so the existing `capturedAt` callers keep working unchanged.
+ *
+ * It carries the second subtitle line — whatever language the study overlay is showing
+ * underneath the Japanese — so that the line the user was reading along with is the one
+ * that lands on the card, rather than the field starting empty and being retyped.
+ */
 export function createVideoCoreMiningDraft(
   cue: VideoCoreStudyCue,
   displayText: string,
   source: VideoCoreMiningSource,
   capturedAt = Date.now(),
+  translation = '',
 ): VideoCoreMiningDraft {
   const sentence = displayText.trim();
   const cueProvenance: VideoCoreCueProvenance = {
@@ -173,7 +182,7 @@ export function createVideoCoreMiningDraft(
     term: sentence,
     reading: '',
     meaning: '',
-    translation: '',
+    translation: translation.trim(),
     sentence,
     deckName: '',
     provenance: cueProvenance,
@@ -333,4 +342,34 @@ export function appendVideoCoreMiningHistory(
   entry: VideoCoreMiningHistoryEntry,
 ): VideoCoreMiningHistoryEntry[] {
   return [...history, entry].slice(-VIDEO_CORE_MINING_HISTORY_LIMIT);
+}
+
+/**
+ * Fold a list held in memory together with the one currently in storage. Audit item 6.2.
+ *
+ * This log has two owners. `useMusicMining` appends with a fresh read every time, so it never
+ * loses anything. `VideoCoreMiningPanel` is the opposite: it seeds `history` into React state
+ * once at mount, never subscribes, and writes the **whole array** back on every change. So a
+ * note mined from the music player while the video panel is open is erased by the panel's very
+ * next append or undo — the panel writes the snapshot it took before that note existed.
+ *
+ * A log is the one shape where the merge is unambiguous: an entry is identified by `id`, both
+ * owners only ever add, and an entry that exists on either side belongs in the result. `mine`
+ * wins on conflict because the only in-place edit is `markVideoCoreMiningHistoryUndone`, which
+ * is a deliberate user action taken against the copy the user is looking at.
+ *
+ * Ordering is by `createdAt` so a merged entry lands in real chronological position rather
+ * than at whichever end it happened to be appended, and the cap is applied last — trimming
+ * before the union would drop the oldest entries of one side while keeping the other's.
+ */
+export function mergeVideoCoreMiningHistory(
+  mine: readonly VideoCoreMiningHistoryEntry[],
+  live: readonly VideoCoreMiningHistoryEntry[],
+): VideoCoreMiningHistoryEntry[] {
+  const byId = new Map<string, VideoCoreMiningHistoryEntry>();
+  for (const entry of live) byId.set(entry.id, entry);
+  for (const entry of mine) byId.set(entry.id, entry);
+  return [...byId.values()]
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    .slice(-VIDEO_CORE_MINING_HISTORY_LIMIT);
 }

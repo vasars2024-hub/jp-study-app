@@ -1,11 +1,38 @@
 // Shared types + remote catalogue URL constants for the Resources app 1.01 overhaul.
-// Style mirrors src/shared/release.ts. Catalog JSON is hosted in a public GitHub repo
-// so content updates never require an app release (raw CDN refreshes within ~5 min).
+// Style mirrors src/shared/release.ts.
+//
+// THE CATALOGUE REPO IS NOT PUBLISHED. Both URLs below 404 today — this file's
+// comment used to assert the JSON "is hosted in a public GitHub repo", which
+// was never true. The consequence was audit F23: every fetch failed, no cache
+// could ever be written (it is only written on success), and the app told
+// every user on every launch "Offline — showing saved copy" when it was
+// neither offline nor showing a saved copy. It was showing bundled data.
+//
+// The remote path is kept live and correct so that publishing the repo is the
+// only step needed to switch it on. Until then `catalogSource` reports
+// `'builtin'` and the UI says so.
 
 export const CATALOG_BASE =
   'https://raw.githubusercontent.com/vasars2024-hub/jp-study-app-catalog/main';
 export const CATALOG_URL = `${CATALOG_BASE}/catalog.json`;
 export const NOVELS_URL = `${CATALOG_BASE}/novels.json`;
+
+/**
+ * Where the catalogue the user is looking at actually came from.
+ *
+ * The three are genuinely different claims and must not be collapsed:
+ *  - `remote`  — fetched from the catalogue repo just now.
+ *  - `cache`   — a previous fetch succeeded and was saved; this one did not.
+ *                Only this state may be described as offline, because only
+ *                this state has a saved copy to show.
+ *  - `builtin` — the bundled `CATALOG_FALLBACK`. Never fetched, never saved.
+ */
+export type CatalogSource = 'remote' | 'cache' | 'builtin';
+
+export interface CatalogResult<T> {
+  catalog: T | null;
+  source: CatalogSource;
+}
 
 export type Cost = 'Free' | 'Freemium' | 'Paid';
 

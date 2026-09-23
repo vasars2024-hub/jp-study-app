@@ -56,6 +56,45 @@ export function mediaWorkspaceHostExists(): boolean {
   return mountedHosts > 0;
 }
 
+/*
+ * Whether the workspace overlay is actually on screen right now.
+ *
+ * A THIRD fact, and the one that was missing. `mediaWorkspaceHostExists()` is a
+ * shell fact and `mediaWorkspaceIsAvailable()` is a sidecar fact; neither
+ * answers "is the overlay open in front of me". `MediaWorkspaceSectionView` had
+ * to answer exactly that and could only reach the sidecar fact, so it collapsed
+ * `stopped` / `starting` / `offline` / `failed` into "available" and told the
+ * user, byte-identically in all four, that the workspace was open in front of
+ * the window — including immediately after they closed it themselves, from two
+ * windows at once. Audit F15.
+ *
+ * The host owns `open` as local state and is mounted once per shell, so it
+ * publishes here rather than the section reaching into it. Subscribers are
+ * notified synchronously: a section that repainted a tick late would show the
+ * previous claim, which is the same defect with a shorter lifetime.
+ */
+let workspaceOpen = false;
+const openListeners = new Set<() => void>();
+
+/** Called by `MediaWorkspaceHost` whenever its `open` state changes. */
+export function setMediaWorkspaceOpen(next: boolean): void {
+  if (workspaceOpen === next) return;
+  workspaceOpen = next;
+  for (const listener of [...openListeners]) listener();
+}
+
+export function mediaWorkspaceIsOpen(): boolean {
+  return workspaceOpen;
+}
+
+/** Subscribe to overlay open/close. Returns unsubscribe. */
+export function onMediaWorkspaceOpenChanged(cb: () => void): () => void {
+  openListeners.add(cb);
+  return () => {
+    openListeners.delete(cb);
+  };
+}
+
 /**
  * The desktop sections that hand off to the adopted workspace instead of the legacy
  * Media Center — old-player retirement, step 2.

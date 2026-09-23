@@ -1,0 +1,78 @@
+/* Liquid Workplace — shared loading state (LiquidLoading.tsx).
+   Colour comes only from shell tokens; the swirl is two counter-rotating arcs
+   over a faint track. */
+
+.lq-loading {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--lq-space-3, 12px);
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 160px;
+  color: var(--lq-liquid-text-muted, var(--muted));
+}
+
+.lq-loading[data-layout='study'] {
+  min-block-size: 240px;
+}
+
+.lq-loading__swirl {
+  inline-size: 44px;
+  block-size: 44px;
+  overflow: visible;
+}
+
+.lq-loading__track,
+.lq-loading__arc {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.lq-loading__track {
+  stroke: color-mix(in srgb, currentColor 18%, transparent);
+  stroke-width: 3;
+}
+
+.lq-loading__arc {
+  stroke: var(--accent, currentColor);
+  stroke-width: 3;
+  /* circumference 2πr ≈ 125.7 at r=20: a ~quarter arc */
+  stroke-dasharray: 32 94;
+  transform-origin: 24px 24px;
+  animation: lq-loading-spin 1.1s linear infinite;
+}
+
+.lq-loading__arc--inner {
+  stroke: var(--accent-2, var(--accent, currentColor));
+  stroke-width: 2.5;
+  /* circumference ≈ 75.4 at r=12 */
+  stroke-dasharray: 20 56;
+  opacity: 0.75;
+  animation-duration: 1.6s;
+  animation-direction: reverse;
+}
+
+.lq-loading__label {
+  font-size: var(--font-size-sm, 13px);
+  /* Visible label kept quiet; the swirl carries the state visually. */
+  opacity: 0.85;
+}
+
+@keyframes lq-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes lq-loading-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lq-loading__arc {
+    animation: lq-loading-pulse 1.8s ease-in-out infinite;
+  }
+}
+
+:root.reduce-motion .lq-loading__arc {
+  animation: lq-loading-pulse 1.8s ease-in-out infinite;
+}

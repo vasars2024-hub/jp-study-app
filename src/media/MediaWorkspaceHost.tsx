@@ -16,6 +16,7 @@ import {
   MEDIA_WORKSPACE_OPEN_EVENT,
   normalizeMediaWorkspaceOpenRequest,
   registerMediaWorkspaceHost,
+  setMediaWorkspaceOpen,
   STUDY_REVIEW_FOCUS_EVENT,
   type MediaWorkspaceOpenRequest,
   type MediaWorkspacePlaybackRequest,
@@ -24,6 +25,7 @@ import {
 import { SIDECAR_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
 import { useT } from '../renderer/i18n';
 import { ContextualSurface } from '../renderer/components/liquid/LiquidSurface';
+import { LiquidLoading } from '../renderer/components/liquid/LiquidLoading';
 import { useWorkspacePresentation } from '../renderer/workspacePresentation';
 // The readiness loader, shared with the Media Center's sidebar. It keeps the orchestrator
 // behind an `await import()`, so the boot bundle is unchanged — the invariant this file's
@@ -157,6 +159,15 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
       window.removeEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
     };
   }, []);
+
+  // Publish the overlay's real open state so the `player`/`video` sections behind
+  // it can describe it truthfully instead of inferring it from sidecar
+  // availability — which said "open in front of this window" while it was
+  // stopped, starting, offline, failed, or freshly closed (audit F15).
+  useEffect(() => {
+    setMediaWorkspaceOpen(open);
+    return () => setMediaWorkspaceOpen(false);
+  }, [open]);
 
   // Closing drops the in-host route too, so reopening lands on the library rather than on
   // whatever entry happened to be showing when the user shut the workspace an hour ago.
@@ -356,11 +367,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
         {view === 'review' ? (
           <div className="seanime-host-pane" data-active="true">
             <Suspense
-              fallback={
-                <div className="seanime-host-state" role="status">
-                  <p>{t('common.loading')}</p>
-                </div>
-              }
+              fallback={<LiquidLoading layout="study" />}
             >
               <SeanimeWatchLoopPanel
                 focus={reviewFocus}
@@ -410,11 +417,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
               hidden={view !== 'library'}
             >
               <Suspense
-                fallback={
-                  <div className="seanime-host-state" role="status">
-                    <p>{t('common.loading')}</p>
-                  </div>
-                }
+                fallback={<LiquidLoading layout="library" />}
               >
                 <MediaWorkspace
                   key={`seanime-${status.pid ?? 'none'}-${status.port}`}
@@ -426,11 +429,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
             {view === 'readiness' ? (
               <div className="seanime-host-pane" data-active="true">
                 <Suspense
-                  fallback={
-                    <div className="seanime-host-state" role="status">
-                      <p>{t('common.loading')}</p>
-                    </div>
-                  }
+                  fallback={<LiquidLoading layout="library" />}
                 >
                   <SeanimeStudyLibraryPanel
                     orchestrator={studyDocument}

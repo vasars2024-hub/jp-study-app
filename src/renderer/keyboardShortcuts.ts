@@ -142,6 +142,28 @@ export const COMMAND_CATALOG: AppCommand[] = [
     note: 'Cycles through open apps and switches to full screen.',
   },
   {
+    id: 'window.moveToNextMonitor',
+    label: 'Move window to next monitor',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Shift+ArrowRight',
+    note: 'Sends the focused window to the desktop on the next configured display.',
+  },
+  {
+    id: 'window.moveToPrevMonitor',
+    label: 'Move window to previous monitor',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Shift+ArrowLeft',
+    note: 'Sends the focused window to the desktop on the previous configured display.',
+  },
+  {
+    id: 'window.focusNextMonitor',
+    label: 'Focus next monitor',
+    category: 'Window',
+    // Not Ctrl+Alt+ArrowRight — that is already `window.snapRight`.
+    defaultKeys: 'Ctrl+Alt+M',
+    note: 'Raises the desktop window on the next display without moving anything.',
+  },
+  {
     id: 'window.maximize',
     label: 'Maximize / restore window',
     category: 'Window',
@@ -661,6 +683,55 @@ export const COMMAND_CATALOG: AppCommand[] = [
     category: 'Video',
     defaultKeys: '',
     note: 'Reopens the most recently watched file at the second you stopped. Needs the media server enabled.',
+  },
+  /*
+    Liquid Study Workspace. All unbound by default, for the reason the rows above give:
+    every free single letter belongs to the adopted player's own keymap, and a default
+    that collides is worse than one the user binds deliberately.
+
+    They are registered by `VideoCoreStudyOverlay` while a video is open, so they are
+    live exactly when they mean something — the same ownership rule the `video.*` rows
+    follow, and the one that stopped the catalog pointing at a retired player's handlers.
+  */
+  {
+    id: 'workspace.customize',
+    label: 'Customize workspace',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Shows block outlines, drag handles and the block library. Escape leaves it.',
+  },
+  {
+    id: 'workspace.reset',
+    label: 'Reset the current workspace',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Restores the preset this workspace was built from. Custom workspaces are untouched.',
+  },
+  {
+    id: 'workspace.nextMode',
+    label: 'Next workspace',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Cycles Watch → Transcript → Mining → Practice → Review → Listening → Immersion.',
+  },
+  {
+    id: 'workspace.toggleTranscript',
+    label: 'Toggle the transcript block',
+    category: 'Video',
+    defaultKeys: '',
+  },
+  {
+    id: 'workspace.toggleAi',
+    label: 'Toggle the AI workspace block',
+    category: 'Video',
+    defaultKeys: '',
+  },
+  {
+    id: 'workspace.focusVideo',
+    label: 'Focus the video',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Closes every temporary panel and returns the picture to full attention.',
   },
   ...TOOLBOX_SHORTCUT_COMMANDS.map((command): AppCommand => ({
     id: command.id,
@@ -1512,6 +1583,14 @@ function builtinHandler(id: string): Handler | null {
         void window.dispatchEvent(
           new CustomEvent('os:window', { detail: id.slice('window.'.length) }),
         );
+    // Multi-monitor. Same one-event pattern: DesktopShell owns the window
+    // model and the display it is on, so it does the work.
+    case 'window.moveToNextMonitor':
+      return () => void window.dispatchEvent(new CustomEvent('os:move-to-monitor', { detail: 1 }));
+    case 'window.moveToPrevMonitor':
+      return () => void window.dispatchEvent(new CustomEvent('os:move-to-monitor', { detail: -1 }));
+    case 'window.focusNextMonitor':
+      return () => void window.dispatchEvent(new CustomEvent('os:focus-monitor', { detail: 1 }));
     case 'window.zoomIn':
       return () => void bumpZoom(ZOOM_STEP);
     case 'window.zoomOut':
