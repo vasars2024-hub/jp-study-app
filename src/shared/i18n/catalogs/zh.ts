@@ -5448,6 +5448,8 @@ export const zh: Catalog = {
   'anki.collectionUnavailableReason': 'Anki 已打开，但卡片集尚未加载。应用会每隔几秒自动重试。如果一直如此，请关闭所有 Anki 窗口（也检查任务管理器），重新打开 Anki，等待卡组出现。',
   'anki.intro': '通过 AnkiConnect 在你真正的 Anki 卡组中创建卡片。',
   'anki.recheck': '重新检查',
+  'anki.menu.recheckConnection': '重新检查连接',
+  'anki.status.profile': '配置：{label}',
   'anki.checking': '检查中…',
   'anki.checkingConnection': '正在检查 Anki 连接…',
   'anki.waitingCollection': '正在等待 Anki 卡组集合…',

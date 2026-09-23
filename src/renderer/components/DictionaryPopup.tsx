@@ -132,9 +132,9 @@ export default function DictionaryPopup({
           <button
             type="button"
             className="dict-tts"
-            title="Play pronunciation"
+            title={t('commands.dictionary.playPronunciation')}
             onClick={playPronunciation}
-            aria-label="Play pronunciation"
+            aria-label={t('commands.dictionary.playPronunciation')}
           >
             <Icon name="volume" size={14} />
           </button>
@@ -150,7 +150,7 @@ export default function DictionaryPopup({
         >
           <Icon name="sparkle" size={14} />
         </button>
-        <button className="dict-x" onClick={onClose} aria-label="Close">
+        <button className="dict-x" onClick={onClose} aria-label={t('common.close')}>
           ×
         </button>
       </div>

@@ -25,7 +25,7 @@ export default function AnkiView() {
       id: 'anki',
       label: 'Anki',
       items: [
-        { id: 'recheck', label: 'Recheck connection', disabled: loading, onSelect: state.check },
+        { id: 'recheck', label: t('anki.menu.recheckConnection'), disabled: loading, onSelect: state.check },
       ],
     },
   ];
@@ -33,7 +33,7 @@ export default function AnkiView() {
     <>
       <StatusBarField live>{connLabel}</StatusBarField>
       <StatusBarSpacer />
-      {active.label && <StatusBarField>Profile: {active.label}</StatusBarField>}
+      {active.label && <StatusBarField>{t('anki.status.profile', { label: active.label })}</StatusBarField>}
     </>
   );
 

@@ -6012,6 +6012,8 @@ export const ru: Catalog = {
   'anki.collectionUnavailableReason': 'Anki открыт, но коллекция ещё не загружена. Приложение будет автоматически повторять попытку каждые несколько секунд. Если это не проходит, закройте все окна Anki (проверьте и диспетчер задач), откройте Anki заново и дождитесь появления колод.',
   'anki.intro': 'Создавайте карточки прямо в вашей коллекции Anki через AnkiConnect.',
   'anki.recheck': 'Проверить снова',
+  'anki.menu.recheckConnection': 'Проверить подключение',
+  'anki.status.profile': 'Профиль: {label}',
   'anki.checking': 'Проверка…',
   'anki.checkingConnection': 'Проверка подключения к Anki…',
   'anki.waitingCollection': 'Ожидание коллекции Anki…',

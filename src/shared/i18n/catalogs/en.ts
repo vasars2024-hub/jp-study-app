@@ -5494,6 +5494,8 @@ export const en: Catalog = {
   'anki.collectionUnavailableReason': 'Anki is open but the collection is not loaded yet. The app will retry automatically every few seconds. If this persists, close every Anki window (check Task Manager), reopen Anki, and wait until your decks appear.',
   'anki.intro': 'Create cards in your real Anki collection via AnkiConnect.',
   'anki.recheck': 'Recheck',
+  'anki.menu.recheckConnection': 'Recheck connection',
+  'anki.status.profile': 'Profile: {label}',
   'anki.checking': 'Checking…',
   'anki.checkingConnection': 'Checking your Anki connection…',
   'anki.waitingCollection': 'Waiting for Anki collection…',

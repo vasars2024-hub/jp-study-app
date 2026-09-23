@@ -425,7 +425,7 @@ export default function ScraperApp() {
       >
         <ScraperTopBar />
         {shell.compact && (
-          <nav className="scr-compact-tabs" aria-label="Compact scraper sections">
+          <nav className="scr-compact-tabs" aria-label={sx('nav.ariaCategories')}>
             <button
               type="button"
               className={shell.page === 'new-scrape' && !shell.drawerOpen ? 'is-active' : ''}

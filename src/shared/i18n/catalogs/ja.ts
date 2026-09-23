@@ -5478,6 +5478,8 @@ export const ja: Catalog = {
   'anki.collectionUnavailableReason': 'Anki は起動していますが、コレクションがまだ読み込まれていません。数秒ごとに自動で再試行します。解決しない場合は、すべての Anki ウィンドウを閉じ（タスクマネージャーも確認）、Anki を開き直してデッキが表示されるまで待ってください。',
   'anki.intro': 'AnkiConnect経由で実際のAnkiコレクションにカードを作成します。',
   'anki.recheck': '再確認',
+  'anki.menu.recheckConnection': '接続を再確認',
+  'anki.status.profile': 'プロファイル: {label}',
   'anki.checking': '確認中…',
   'anki.checkingConnection': 'Ankiとの接続を確認中…',
   'anki.waitingCollection': 'Ankiコレクションを待機中…',
