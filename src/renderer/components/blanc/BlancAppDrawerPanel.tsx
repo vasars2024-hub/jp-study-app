@@ -453,6 +453,7 @@ function ItemRow({
   state: AppDrawerState;
   folders: CollectedFolder[];
 }) {
+  const { t } = useT();
   return (
     <tr>
       <td>
@@ -470,7 +471,7 @@ function ItemRow({
             disabled={state.busy}
             onClick={() => {
               void state.launchItem(item).then((failure) => {
-                if (failure) void alertDialog({ title: 'Could not open', message: failure });
+                if (failure) void alertDialog({ title: t('desktop.dialog.openFailed'), message: failure });
               });
             }}
           >
