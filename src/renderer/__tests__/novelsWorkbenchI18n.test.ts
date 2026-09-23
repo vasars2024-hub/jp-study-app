@@ -112,6 +112,23 @@ function shown(): string {
 }
 
 describe('the Novels workbench speaks the UI language', () => {
+  it('keeps unavailable actions keyboard reachable with a visible, linked reason', async () => {
+    await act(async () => state?.setQuery(''));
+    const candidate = state?.candidates.find((item) => !item.jitenDeckId);
+    expect(candidate).toBeDefined();
+    await act(async () => state?.selectCandidate(candidate?.id ?? ''));
+    const button = [...host.querySelectorAll<HTMLButtonElement>('.jiten-actions button')]
+      .find((item) => item.textContent?.includes('Jiten'));
+    expect(button?.disabled).toBe(false);
+    expect(button?.getAttribute('aria-disabled')).toBe('true');
+    const reasonId = button?.getAttribute('aria-describedby');
+    expect(reasonId).toBe('novels-reason-mine');
+    expect(host.querySelector(`#${reasonId}`)?.textContent).toContain('Jiten');
+    const mine = vi.spyOn(state as NonNullable<typeof state>, 'mineJitenSelected');
+    await act(async () => button?.click());
+    expect(mine).not.toHaveBeenCalled();
+  });
+
   it('renders the filter rail, table head and empty states in English by default', () => {
     // The control: without it, a component that renders nothing at all would
     // pass every "no English" assertion below.

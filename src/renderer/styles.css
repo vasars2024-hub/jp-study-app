@@ -11053,6 +11053,14 @@ mark.lookup-mark,
   justify-content: center;
   min-height: 32px;
 }
+.jiten-actions .btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.jiten-action-reason {
+  margin: 4px 0;
+  font-size: 12px;
+}
 .jiten-source-pick {
   display: flex;
   flex-direction: column;
