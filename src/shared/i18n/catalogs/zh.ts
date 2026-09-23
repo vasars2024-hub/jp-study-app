@@ -685,6 +685,13 @@ export const zh: Catalog = {
   'settings.menu.showAdvanced': '显示高级页面',
   'settings.menu.page': '页面',
   'settings.menu.commandsAria': '设置命令',
+  'settings.toolbar.home': '主页',
+  'settings.toolbar.find': '查找',
+  'settings.toolbar.display': '显示',
+  'settings.toolbar.lock': '锁定',
+  'settings.status.advancedVisible': '正在显示高级页面',
+  'settings.status.standardPages': '标准页面',
+  'settings.status.theme': '主题：{theme}',
 
   'settings.nav.ariaCategories': '设置分类',
   'settings.nav.home': '主页',

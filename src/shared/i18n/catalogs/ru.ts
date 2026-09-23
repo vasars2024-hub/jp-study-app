@@ -809,6 +809,13 @@ export const ru: Catalog = {
   'settings.menu.showAdvanced': 'Показать расширенные страницы',
   'settings.menu.page': 'Страница',
   'settings.menu.commandsAria': 'Команды настроек',
+  'settings.toolbar.home': 'Главная',
+  'settings.toolbar.find': 'Поиск',
+  'settings.toolbar.display': 'Экран',
+  'settings.toolbar.lock': 'Блокировка',
+  'settings.status.advancedVisible': 'Дополнительные страницы показаны',
+  'settings.status.standardPages': 'Обычные страницы',
+  'settings.status.theme': 'Тема: {theme}',
 
   'settings.nav.ariaCategories': 'Категории настроек',
   'settings.nav.home': 'Главная',

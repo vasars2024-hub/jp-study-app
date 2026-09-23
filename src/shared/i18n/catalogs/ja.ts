@@ -687,6 +687,13 @@ export const ja: Catalog = {
   'settings.menu.showAdvanced': '詳細ページを表示',
   'settings.menu.page': 'ページ',
   'settings.menu.commandsAria': '設定コマンド',
+  'settings.toolbar.home': 'ホーム',
+  'settings.toolbar.find': '検索',
+  'settings.toolbar.display': '表示',
+  'settings.toolbar.lock': 'ロック',
+  'settings.status.advancedVisible': '詳細設定ページを表示中',
+  'settings.status.standardPages': '標準ページ',
+  'settings.status.theme': 'テーマ: {theme}',
 
   'settings.nav.ariaCategories': '設定カテゴリー',
   'settings.nav.home': 'ホーム',

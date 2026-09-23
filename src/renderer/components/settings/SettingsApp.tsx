@@ -531,8 +531,8 @@ export default function SettingsApp(props: SettingsWallProps) {
       <StatusBarField>{pageLabel}</StatusBarField>
       <StatusBarField>{pageGroup}</StatusBarField>
       <StatusBarSpacer />
-      <StatusBarField>{advancedMode ? 'Advanced pages visible' : 'Standard pages'}</StatusBarField>
-      <StatusBarField title={`Theme: ${theme}`}>{theme}</StatusBarField>
+      <StatusBarField>{t(advancedMode ? 'settings.status.advancedVisible' : 'settings.status.standardPages')}</StatusBarField>
+      <StatusBarField title={t('settings.status.theme', { theme })}>{theme}</StatusBarField>
       <StatusBarField>{Math.round(zoom * 100)}%</StatusBarField>
     </>
   );
@@ -571,10 +571,10 @@ export default function SettingsApp(props: SettingsWallProps) {
                   leftIcon={<Icon name="settings" size={14} />}
                   onClick={() => navigate('home')}
                 >
-                  Home
+                  {t('settings.toolbar.home')}
                 </Button>
                 <Button size="sm" leftIcon={<Icon name="search" size={14} />} onClick={focusSearch}>
-                  Find
+                  {t('settings.toolbar.find')}
                 </Button>
                 <Button
                   size="sm"
@@ -582,7 +582,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                   leftIcon={<Icon name="monitor" size={14} />}
                   onClick={() => navigate('display')}
                 >
-                  Display
+                  {t('settings.toolbar.display')}
                 </Button>
                 <Button
                   size="sm"
@@ -590,7 +590,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                   leftIcon={<Icon name="lock" size={14} />}
                   onClick={() => navigate('lockscreen')}
                 >
-                  Lock
+                  {t('settings.toolbar.lock')}
                 </Button>
                 <ToolbarSpacer />
                 <Button
@@ -600,7 +600,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                   onClick={toggleAdvanced}
                   aria-pressed={advancedMode}
                 >
-                  Advanced
+                  {t('settings.card.advancedBadge')}
                 </Button>
               </Toolbar>
             )}

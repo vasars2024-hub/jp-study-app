@@ -790,6 +790,13 @@ export const en: Catalog = {
   'settings.menu.showAdvanced': 'Show advanced pages',
   'settings.menu.page': 'Page',
   'settings.menu.commandsAria': 'Settings commands',
+  'settings.toolbar.home': 'Home',
+  'settings.toolbar.find': 'Find',
+  'settings.toolbar.display': 'Display',
+  'settings.toolbar.lock': 'Lock',
+  'settings.status.advancedVisible': 'Advanced pages visible',
+  'settings.status.standardPages': 'Standard pages',
+  'settings.status.theme': 'Theme: {theme}',
 
   'settings.nav.ariaCategories': 'Settings categories',
   'settings.nav.home': 'Home',
