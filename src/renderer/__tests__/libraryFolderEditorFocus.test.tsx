@@ -50,7 +50,7 @@ afterEach(() => {
 
 async function render(): Promise<void> {
   await act(async () => {
-    root.render(<LibraryView onOpen={() => {}} />);
+    root.render(<LibraryView onOpen={() => undefined} />);
     await Promise.resolve();
   });
   await act(async () => {

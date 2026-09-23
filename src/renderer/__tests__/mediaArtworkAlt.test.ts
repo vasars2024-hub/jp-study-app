@@ -68,7 +68,7 @@ async function render(node: Parameters<Root['render']>[0]): Promise<HTMLElement>
   await act(async () => root?.render(node));
   // A second empty act flushes the `.then` that sets the resolved URL. Without it every case
   // below measures the loading state and case 1 passes for the wrong reason.
-  await act(async () => {});
+  await act(async () => undefined);
   return host;
 }
 
@@ -126,7 +126,7 @@ describe('MediaArtwork alt decision', () => {
 
   it('4. a poster card names the CARD, not the image — the shipped, correct pattern', async () => {
     const el = await render(createElement(MediaPosterCard, {
-      artworkId: 'card-4', title: 'Fixture Title 1', onOpen: () => {},
+      artworkId: 'card-4', title: 'Fixture Title 1', onOpen: () => undefined,
     }));
     const card = el.querySelector('.medialib-card');
     expect(card?.getAttribute('role')).toBe('button');

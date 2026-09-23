@@ -26,9 +26,9 @@ vi.mock('../storage/db', () => ({
     idb.set(key, value);
   },
 }));
-vi.mock('../annotations', () => ({ restoreAnnotationsFromIdb: async () => {} }));
-vi.mock('../bookmarks', () => ({ restoreBookmarksFromIdb: async () => {} }));
-vi.mock('../levelLists', () => ({ restoreLevelListsFromIdb: async () => {} }));
+vi.mock('../annotations', () => ({ restoreAnnotationsFromIdb: async () => undefined }));
+vi.mock('../bookmarks', () => ({ restoreBookmarksFromIdb: async () => undefined }));
+vi.mock('../levelLists', () => ({ restoreLevelListsFromIdb: async () => undefined }));
 
 import { STORAGE_MIGRATION_VERSION, planStorageMigration } from '../../shared/storageMigrationBoundary';
 import { runStorageMigrations } from '../storage/migrationRunner';

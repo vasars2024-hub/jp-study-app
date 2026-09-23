@@ -4,6 +4,7 @@
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { searchForWorkspaceRoot } from 'vite';
+// eslint-disable-next-line import/no-unresolved -- resolved through vitest's package "exports", which eslint-import-resolver-node does not read
 import { defineConfig } from 'vitest/config';
 
 // Vite refuses to transform a file outside `server.fs.allow`, whose default is the

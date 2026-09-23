@@ -215,6 +215,7 @@ export interface GuestIpc {
  * It reads the DOM and sends `IMMERSION_LOOKUP_CHANNEL` messages. It renders
  * nothing, injects no stylesheet, and adds no node to the guest document.
  */
+/* eslint-disable no-var -- serialized with toString() into the guest; kept in its original, self-contained form */
 export function immersionGuestBody(ipc: GuestIpc, win: any): void {
   var CH_LOOKUP = 'jp-study:immersion-lookup';
   var CH_CONFIG = 'jp-study:immersion-config';
@@ -361,6 +362,7 @@ export function immersionGuestBody(ipc: GuestIpc, win: any): void {
     }
   });
 }
+/* eslint-enable no-var */
 
 /**
  * The full preload source, ready to write to disk. Built from

@@ -31,10 +31,11 @@ import crypto from 'node:crypto';
 // `await import()` after the consts is the older idiom here but costs a TS1378
 // top-level-await error under this tsconfig.
 const { tmpRoot } = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- hoisted above imports
+  /* eslint-disable @typescript-eslint/no-var-requires -- hoisted above imports */
   const nfs = require('node:fs') as typeof import('node:fs');
   const nos = require('node:os') as typeof import('node:os');
   const npath = require('node:path') as typeof import('node:path');
+  /* eslint-enable @typescript-eslint/no-var-requires */
   return { tmpRoot: nfs.mkdtempSync(npath.join(nos.tmpdir(), 'downloads-integrity-')) };
 });
 

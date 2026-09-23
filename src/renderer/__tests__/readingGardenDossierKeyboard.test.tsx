@@ -27,9 +27,9 @@ beforeAll(() => {
   // contract, so they are stubbed rather than guarded in product code.
   if (typeof globalThis.ResizeObserver === 'undefined') {
     (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
+      observe(): void { /* no-op */ }
+      unobserve(): void { /* no-op */ }
+      disconnect(): void { /* no-op */ }
     };
   }
 });

@@ -24,7 +24,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Progress = { status?: string; file?: string; progress?: number };
 
 /** The single main→renderer emitter the preload binding wraps. */
-let emit: (p: Progress) => void = () => {};
+let emit: (p: Progress) => void = () => undefined;
 
 async function loadTranslator() {
   vi.resetModules();
@@ -37,7 +37,7 @@ async function loadTranslator() {
       listeners.add(cb);
       return () => listeners.delete(cb);
     },
-    onTranslatePartial: () => () => {},
+    onTranslatePartial: () => () => undefined,
   };
   return import('../translator');
 }
@@ -103,7 +103,7 @@ describe('onModelProgress fans out to every subscriber', () => {
   it('a listener unsubscribing a later one mid-broadcast does not skip it', async () => {
     const { onModelProgress } = await loadTranslator();
     const later: Progress[] = [];
-    let offLater: () => void = () => {};
+    let offLater: () => void = () => undefined;
     onModelProgress(() => offLater());
     offLater = onModelProgress((p) => later.push(p));
 
@@ -115,16 +115,16 @@ describe('onModelProgress fans out to every subscriber', () => {
 
   it('subscribes to the preload binding exactly once, however many callers register', async () => {
     vi.resetModules();
-    const hook = vi.fn(() => () => {});
+    const hook = vi.fn(() => () => undefined);
     (window as unknown as { api: unknown }).api = {
       onTranslateModelProgress: hook,
-      onTranslatePartial: () => () => {},
+      onTranslatePartial: () => () => undefined,
     };
     const { onModelProgress } = await import('../translator');
 
-    onModelProgress(() => {});
-    onModelProgress(() => {});
-    onModelProgress(() => {});
+    onModelProgress(() => undefined);
+    onModelProgress(() => undefined);
+    onModelProgress(() => undefined);
 
     expect(hook).toHaveBeenCalledTimes(1);
   });

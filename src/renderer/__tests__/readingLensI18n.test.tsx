@@ -57,7 +57,7 @@ function installApiStub(): void {
     get: (target, prop: string | symbol) => {
       if (prop === 'then') return undefined;
       if (typeof prop === 'string' && prop in target) return target[prop];
-      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): void => {};
+      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): void => undefined;
       return async (): Promise<unknown> => EMPTY_RESULT;
     },
   });
@@ -113,8 +113,8 @@ async function renderIn(lang: UiLang, node: React.ReactElement): Promise<string>
   });
   // Flush the effects that read lensGetInit / lensGetSettings and the analysis
   // request, so the panels settle into their loaded state before assertion.
-  await act(async () => {});
-  await act(async () => {});
+  await act(async () => undefined);
+  await act(async () => undefined);
   return host.textContent ?? '';
 }
 
@@ -138,8 +138,8 @@ const SURFACES: Array<{ name: string; node: () => React.ReactElement; minChars: 
       <AnalysisPanel
         text="今日は良い天気ですね"
         region={{ x: 100, y: 100, width: 400, height: 80 }}
-        onLookup={() => {}}
-        onClose={() => {}}
+        onLookup={() => undefined}
+        onClose={() => undefined}
       />
     ),
     minChars: 32,
@@ -147,7 +147,7 @@ const SURFACES: Array<{ name: string; node: () => React.ReactElement; minChars: 
   {
     name: 'LensReaderPanel',
     node: () => (
-      <ReaderPanel query="天気" context="今日は良い天気ですね" tokens={[]} x={200} y={200} onClose={() => {}} />
+      <ReaderPanel query="天気" context="今日は良い天気ですね" tokens={[]} x={200} y={200} onClose={() => undefined} />
     ),
     minChars: 16,
   },
