@@ -61,6 +61,8 @@ export default function ResourcesView() {
         ? t('resources.offline')
         : refreshState === 'cached'
           ? t('resources.cached')
+        : refreshState === 'builtin'
+          ? t('resources.builtin')
         : refreshState === 'updated'
           ? t('resources.updatedRecently')
           : '';

@@ -20,12 +20,13 @@ import type {
   ResourcesCatalog,
 } from '../../../shared/resourcesCatalog';
 import type { CollectedTool } from '../../../shared/collectedTools';
+import { isResourcesCatalog } from '../../../shared/resourcesCatalog';
 import { useT } from '../../i18n';
 import { showToast } from '../ui';
 import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
 
 export type Filter = 'All' | string;
-export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'cached' | 'offline';
+export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'cached' | 'builtin' | 'offline';
 
 export function hostOf(url: string): string {
   try {
@@ -213,7 +214,7 @@ export function useResources() {
     void (async () => {
       try {
         const cached = await window.api.catalogGet();
-        if (alive && cached) setCatalog(cached);
+        if (alive && isResourcesCatalog(cached)) setCatalog(cached);
       } catch {
         /* ignore */
       }
@@ -222,8 +223,8 @@ export function useResources() {
       try {
         const result = await window.api.catalogRefresh();
         if (!alive) return;
-        if (result.catalog) setCatalog(result.catalog);
-        setRefreshState(result.source === 'remote' ? 'updated' : result.source === 'cache' ? 'cached' : 'offline');
+        if (isResourcesCatalog(result.catalog)) setCatalog(result.catalog);
+        setRefreshState(result.source === 'remote' ? 'updated' : result.source === 'cache' ? 'cached' : 'builtin');
       } catch {
         if (alive) setRefreshState('offline');
       }
@@ -237,8 +238,8 @@ export function useResources() {
     setRefreshState('refreshing');
     try {
       const result = await window.api.catalogRefresh();
-      if (result.catalog) setCatalog(result.catalog);
-      setRefreshState(result.source === 'remote' ? 'updated' : result.source === 'cache' ? 'cached' : 'offline');
+      if (isResourcesCatalog(result.catalog)) setCatalog(result.catalog);
+      setRefreshState(result.source === 'remote' ? 'updated' : result.source === 'cache' ? 'cached' : 'builtin');
     } catch {
       setRefreshState('offline');
     }
