@@ -1,0 +1,425 @@
+{
+ "id": 13017,
+ "url": "https://www.tvmaze.com/shows/13017/naoki-hanzawa",
+ "name": "Naoki Hanzawa",
+ "type": "Scripted",
+ "language": "Japanese",
+ "genres": [
+  "Drama"
+ ],
+ "status": "Ended",
+ "runtime": 54,
+ "averageRuntime": 52,
+ "premiered": "2013-07-07",
+ "ended": "2020-09-27",
+ "officialSite": "https://www.tbs.co.jp/hanzawa_naoki/",
+ "schedule": {
+  "time": "21:00",
+  "days": [
+   "Sunday"
+  ]
+ },
+ "rating": {
+  "average": null
+ },
+ "weight": 57,
+ "network": {
+  "id": 159,
+  "name": "TBS",
+  "country": {
+   "name": "Japan",
+   "code": "JP",
+   "timezone": "Asia/Tokyo"
+  },
+  "officialSite": "https://www.tbs.co.jp/"
+ },
+ "webChannel": null,
+ "dvdCountry": null,
+ "externals": {
+  "tvrage": null,
+  "thetvdb": 271310,
+  "imdb": "tt2930136"
+ },
+ "image": {
+  "medium": "https://static.tvmaze.com/uploads/images/medium_portrait/44/111597.jpg",
+  "original": "https://static.tvmaze.com/uploads/images/original_untouched/44/111597.jpg"
+ },
+ "summary": "<p>It follows the story of Naoki Hanzawa, a banker working for the largest bank in Japan, Tokyo Chuo Bank. He faces numerous obstacles from upper management as he climbs his way up the ranks.</p>",
+ "updated": 1704794891,
+ "_embedded": {
+  "episodes": [
+   {
+    "id": 615863,
+    "url": "https://www.tvmaze.com/episodes/615863/naoki-hanzawa-1x01-payback-in-twofold-in-standing-up-to-the-evil-boss-a-new-hero-is-born-can-the-500-million-be-recovered-the-war-amongst-the-wives-at-the-company-housing-a-promotion-friendship",
+    "name": "Payback in twofold! In standing up to the evil boss, a new hero is born!! Can the 500 million be recovered? The war amongst the wives at the company housing, a promotion? Friendship?",
+    "season": 1,
+    "number": 1,
+    "type": "regular",
+    "airdate": "2013-07-07",
+    "airtime": "",
+    "airstamp": "2013-07-07T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615864,
+    "url": "https://www.tvmaze.com/episodes/615864/naoki-hanzawa-1x02-shaking-off-false-accusations-by-the-boss-to-repay-evil-twofold-in-kind",
+    "name": "Shaking off false accusations by the boss! To repay evil twofold in kind",
+    "season": 1,
+    "number": 2,
+    "type": "regular",
+    "airdate": "2013-07-14",
+    "airtime": "",
+    "airstamp": "2013-07-14T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615865,
+    "url": "https://www.tvmaze.com/episodes/615865/naoki-hanzawa-1x03-payback-in-twofold-to-the-damn-boss-to-save-the-subordinate-in-a-bind-a-traitor-appears",
+    "name": "Payback in twofold to the damn boss! To save the subordinate in a bind!? A traitor appears",
+    "season": 1,
+    "number": 3,
+    "type": "regular",
+    "airdate": "2013-07-28",
+    "airtime": "",
+    "airstamp": "2013-07-28T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615866,
+    "url": "https://www.tvmaze.com/episodes/615866/naoki-hanzawa-1x04-payback-in-tenfold-the-betrayal-between-the-boss-and-the-subordinate",
+    "name": "Payback in tenfold! The betrayal between the boss and the subordinate",
+    "season": 1,
+    "number": 4,
+    "type": "regular",
+    "airdate": "2013-08-04",
+    "airtime": "",
+    "airstamp": "2013-08-04T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615867,
+    "url": "https://www.tvmaze.com/episodes/615867/naoki-hanzawa-1x05-hanzawa-gets-transferred-a-fight-for-survival",
+    "name": "Hanzawa gets transferred...!? A fight for survival",
+    "season": 1,
+    "number": 5,
+    "type": "regular",
+    "airdate": "2013-08-11",
+    "airtime": "",
+    "airstamp": "2013-08-11T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615868,
+    "url": "https://www.tvmaze.com/episodes/615868/naoki-hanzawa-1x06-from-500-million-to-12-billion-payback-in-twofold-in-tokyo-too-having-been-transferred-to-tokyo-hanzawa-faces-battle-with-a-giant-enemy",
+    "name": "From 500 million to 12 billion! Payback in twofold in Tokyo too? Having been transferred to Tokyo, Hanzawa faces battle with a giant enemy!!",
+    "season": 1,
+    "number": 6,
+    "type": "regular",
+    "airdate": "2013-08-25",
+    "airtime": "",
+    "airstamp": "2013-08-25T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615869,
+    "url": "https://www.tvmaze.com/episodes/615869/naoki-hanzawa-1x07-hanzawa-kneels-to-beg-driven-to-a-corner",
+    "name": "Hanzawa kneels to beg! Driven to a corner",
+    "season": 1,
+    "number": 7,
+    "type": "regular",
+    "airdate": "2013-09-01",
+    "airtime": "",
+    "airstamp": "2013-09-01T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615870,
+    "url": "https://www.tvmaze.com/episodes/615870/naoki-hanzawa-1x08-a-tough-rival-appears-losing-means-getting-shipped-out",
+    "name": "A tough rival appears! Losing means getting shipped out",
+    "season": 1,
+    "number": 8,
+    "type": "regular",
+    "airdate": "2013-09-08",
+    "airtime": "",
+    "airstamp": "2013-09-08T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615871,
+    "url": "https://www.tvmaze.com/episodes/615871/naoki-hanzawa-1x09-the-final-decisive-battle-an-fsa-audit-with-jobs-in-the-balance",
+    "name": "The final decisive battle!! ~An FSA audit with jobs in the balance",
+    "season": 1,
+    "number": 9,
+    "type": "regular",
+    "airdate": "2013-09-15",
+    "airtime": "",
+    "airstamp": "2013-09-15T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 615872,
+    "url": "https://www.tvmaze.com/episodes/615872/naoki-hanzawa-1x10-payback-in-a-hundredfold-who-will-be-kneeling-down-in-the-end-a-shocking-end-friendship-betrayal",
+    "name": "Payback in a hundredfold? Who will be kneeling down in the end! ~A shocking end!! Friendship? Betrayal?",
+    "season": 1,
+    "number": 10,
+    "type": "regular",
+    "airdate": "2013-09-22",
+    "airtime": "",
+    "airstamp": "2013-09-22T03:00:00+00:00",
+    "runtime": 50,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": ""
+   },
+   {
+    "id": 1919087,
+    "url": "https://www.tvmaze.com/episodes/1919087/naoki-hanzawa-2x01-episode-1",
+    "name": "Episode 1",
+    "season": 2,
+    "number": 1,
+    "type": "regular",
+    "airdate": "2020-07-19",
+    "airtime": "21:00",
+    "airstamp": "2020-07-19T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919088,
+    "url": "https://www.tvmaze.com/episodes/1919088/naoki-hanzawa-2x02-episode-2",
+    "name": "Episode 2",
+    "season": 2,
+    "number": 2,
+    "type": "regular",
+    "airdate": "2020-07-26",
+    "airtime": "21:00",
+    "airstamp": "2020-07-26T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919089,
+    "url": "https://www.tvmaze.com/episodes/1919089/naoki-hanzawa-2x03-episode-3",
+    "name": "Episode 3",
+    "season": 2,
+    "number": 3,
+    "type": "regular",
+    "airdate": "2020-08-02",
+    "airtime": "21:00",
+    "airstamp": "2020-08-02T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919090,
+    "url": "https://www.tvmaze.com/episodes/1919090/naoki-hanzawa-2x04-episode-4",
+    "name": "Episode 4",
+    "season": 2,
+    "number": 4,
+    "type": "regular",
+    "airdate": "2020-08-09",
+    "airtime": "21:00",
+    "airstamp": "2020-08-09T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919091,
+    "url": "https://www.tvmaze.com/episodes/1919091/naoki-hanzawa-2x05-episode-5",
+    "name": "Episode 5",
+    "season": 2,
+    "number": 5,
+    "type": "regular",
+    "airdate": "2020-08-16",
+    "airtime": "21:00",
+    "airstamp": "2020-08-16T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919092,
+    "url": "https://www.tvmaze.com/episodes/1919092/naoki-hanzawa-2x06-episode-6",
+    "name": "Episode 6",
+    "season": 2,
+    "number": 6,
+    "type": "regular",
+    "airdate": "2020-08-23",
+    "airtime": "21:00",
+    "airstamp": "2020-08-23T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919093,
+    "url": "https://www.tvmaze.com/episodes/1919093/naoki-hanzawa-2x07-episode-7",
+    "name": "Episode 7",
+    "season": 2,
+    "number": 7,
+    "type": "regular",
+    "airdate": "2020-08-30",
+    "airtime": "21:00",
+    "airstamp": "2020-08-30T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919094,
+    "url": "https://www.tvmaze.com/episodes/1919094/naoki-hanzawa-2x08-episode-8",
+    "name": "Episode 8",
+    "season": 2,
+    "number": 8,
+    "type": "regular",
+    "airdate": "2020-09-13",
+    "airtime": "21:00",
+    "airstamp": "2020-09-13T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1919095,
+    "url": "https://www.tvmaze.com/episodes/1919095/naoki-hanzawa-2x09-episode-9",
+    "name": "Episode 9",
+    "season": 2,
+    "number": 9,
+    "type": "regular",
+    "airdate": "2020-09-20",
+    "airtime": "21:00",
+    "airstamp": "2020-09-20T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   },
+   {
+    "id": 1921752,
+    "url": "https://www.tvmaze.com/episodes/1921752/naoki-hanzawa-2x10-episode-10",
+    "name": "Episode 10",
+    "season": 2,
+    "number": 10,
+    "type": "regular",
+    "airdate": "2020-09-27",
+    "airtime": "21:00",
+    "airstamp": "2020-09-27T12:00:00+00:00",
+    "runtime": 54,
+    "rating": {
+     "average": null
+    },
+    "image": null,
+    "summary": null
+   }
+  ],
+  "akas": [],
+  "images": [
+   {
+    "id": 110447,
+    "type": "poster",
+    "main": true,
+    "resolutions": {
+     "original": {
+      "url": "https://static.tvmaze.com/uploads/images/original_untouched/44/111597.jpg",
+      "width": 680,
+      "height": 1000
+     },
+     "medium": {
+      "url": "https://static.tvmaze.com/uploads/images/medium_portrait/44/111597.jpg",
+      "width": 210,
+      "height": 295
+     }
+    }
+   },
+   {
+    "id": 549279,
+    "type": "background",
+    "main": false,
+    "resolutions": {
+     "original": {
+      "url": "https://static.tvmaze.com/uploads/images/original_untouched/221/552834.jpg",
+      "width": 1920,
+      "height": 1080
+     }
+    }
+   }
+  ]
+ }
+}

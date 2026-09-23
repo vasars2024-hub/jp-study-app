@@ -38,7 +38,7 @@ export type MediaProviderRole = 'anime' | 'drama' | 'movie' | 'metadata' | 'user
 export type MediaProviderAvailability = 'available' | 'degraded' | 'unavailable' | 'unknown';
 
 /** External ID systems a provider can supply. Stored for later resolution, not resolved here. */
-export type MediaIdentifierNamespace = 'tmdb' | 'imdb' | 'anilist' | 'mal' | 'tvdb' | 'custom';
+export type MediaIdentifierNamespace = 'tmdb' | 'imdb' | 'anilist' | 'mal' | 'tvdb' | 'tvmaze' | 'custom';
 
 /** Fixed capability flags — the heart of provider-capability modeling. */
 export interface MediaProviderCapabilities {
@@ -158,7 +158,37 @@ const CONTENT_TYPES: MediaContentType[] = [
 ];
 const ROLES: MediaProviderRole[] = ['anime', 'drama', 'movie', 'metadata', 'user-added', 'community'];
 const AVAILABILITY: MediaProviderAvailability[] = ['available', 'degraded', 'unavailable', 'unknown'];
-const NAMESPACES: MediaIdentifierNamespace[] = ['tmdb', 'imdb', 'anilist', 'mal', 'tvdb', 'custom'];
+const NAMESPACES: MediaIdentifierNamespace[] = ['tmdb', 'imdb', 'anilist', 'mal', 'tvdb', 'tvmaze', 'custom'];
+
+/** The provider ids the metadata sweep stores on a library item. */
+export interface StoredProviderIds {
+  malId?: number;
+  anilistId?: number;
+  tvmazeId?: number;
+  tmdbId?: number;
+  tmdbType?: 'movie' | 'tv';
+  imdbId?: string;
+}
+
+/**
+ * A library item's stored provider ids as identifier refs — the form the §7
+ * identity engine keys on. TMDB's value carries its namespace (`movie/129`,
+ * `tv/1399`) because TMDB movie and TV ids collide. Pure projection: nothing
+ * is resolved or verified here.
+ */
+export function identifiersFromProviderIds(ids: StoredProviderIds): MediaIdentifierRef[] {
+  const refs: MediaIdentifierRef[] = [];
+  const positive = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isInteger(value) && value > 0;
+  if (positive(ids.malId)) refs.push({ namespace: 'mal', value: String(ids.malId) });
+  if (positive(ids.anilistId)) refs.push({ namespace: 'anilist', value: String(ids.anilistId) });
+  if (positive(ids.tvmazeId)) refs.push({ namespace: 'tvmaze', value: String(ids.tvmazeId) });
+  if (positive(ids.tmdbId)) refs.push({ namespace: 'tmdb', value: `${ids.tmdbType ?? 'movie'}/${ids.tmdbId}` });
+  if (typeof ids.imdbId === 'string' && /^tt\d+$/.test(ids.imdbId.trim())) {
+    refs.push({ namespace: 'imdb', value: ids.imdbId.trim() });
+  }
+  return refs;
+}
 const CAPABILITY_KEYS: MediaProviderCapability[] = ['search', 'metadata', 'episodes', 'artwork', 'tracking', 'subtitles'];
 
 function isRecord(value: unknown): value is UnknownRecord {

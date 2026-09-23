@@ -204,6 +204,11 @@ export default function App() {
 
   useEffect(() => onFocusModeChanged(setFocusModeState), []);
   useEffect(() => onBlancModeChanged(setBlanc), []);
+  // Media ingest: main imports finished torrents on its own, so it needs the
+  // qBittorrent profile. Loaded lazily — the settings store is not boot-critical.
+  useEffect(() => {
+    void import('./scraperSettingsStore').then((store) => store.syncScraperQbitToMain()).catch(() => undefined);
+  }, []);
   useEffect(() => {
     if (!blanc.enabled || popout || isBlancWindow()) return;
     void window.api.blancOpen({ width: 560, height: 460 });

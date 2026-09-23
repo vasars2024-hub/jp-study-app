@@ -1,4 +1,5 @@
 import { app, ipcMain, dialog, protocol, BrowserWindow } from 'electron';
+import { readWatchLibrary } from './watchLibrary';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -44,6 +45,7 @@ import { resolveSubtitleFallbackFont } from './subtitleFallbackFont';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
 import { registerMediaDiscoveryIpc } from './mediaDiscovery';
 import { registerTranscriptionIpc } from './transcriptionJobs';
+import { getMediaIngest, registerMediaIngest } from './mediaIngest';
 import {
   clearSubtitleCache,
   loadDiscoverySettings,
@@ -53,6 +55,12 @@ import {
   runSubtitleDiscovery,
 } from './subtitleDiscovery';
 import { registerSubtitleHarvestIpc } from './subtitleHarvest';
+import {
+  registerSubtitleAutoIpc,
+  requestSubtitlePreparation,
+  secondarySubtitleForItem,
+} from './subtitleDiscoveryAuto';
+import type { SecondarySubtitlePick } from '../shared/subtitleDiscoveryStatus';
 import { estimateSubtitleOffset } from './subtitleSync';
 import type { SubtitleSyncEstimate } from '../shared/subtitleSync';
 import { mt } from './i18n';
@@ -378,6 +386,8 @@ export async function downloadYoutubeUrl(
       const youtubeId = extractYoutubeVideoId(trimmed);
       const item = addOrGetItem(file, true, { sourceUrl: trimmed, youtubeId });
       broadcastMedia();
+      // Announced like every other finished download (`media:ingested`).
+      getMediaIngest()?.announceDownloaded([item]);
       resolve({
         item,
         url: `playfile://${tokenFor(item.path)}`,
@@ -500,7 +510,7 @@ function pruneMissingItems(): { removed: number; items: MediaItem[] } {
 }
 
 function clearAllMedia(): MediaItem[] {
-  stopWatching();
+  getMediaIngest()?.onLibraryCleared();
   const db = readDb();
   db.items = [];
   delete db.watchFolder;
@@ -858,10 +868,10 @@ function findDownloadedSubtitle(mediaFile: string, lang: YouTubeSubtitleLang | u
   }
 }
 
-// ----- watch folder -----
-
-let watcher: fs.FSWatcher | undefined;
-let watchTimer: NodeJS.Timeout | undefined;
+// ----- folder import -----
+// Watch folders moved to `mediaIngest.ts`: a list rather than one folder,
+// started in main at launch, with settle detection, and importing through
+// `addOrGetItem` so a watched file is sorted like any other import.
 
 function collectMediaFilesInDir(root: string, maxDepth = 4): string[] {
   const found: string[] = [];
@@ -884,48 +894,6 @@ function collectMediaFilesInDir(root: string, maxDepth = 4): string[] {
   walk(root, 0);
   found.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   return found;
-}
-
-function scanWatchFolder(): MediaItem[] {
-  const db = readDb();
-  if (!db.watchFolder || !fs.existsSync(db.watchFolder)) return db.items;
-  const known = new Set(db.items.map((i) => i.path));
-  const found = collectMediaFilesInDir(db.watchFolder).filter((full) => !known.has(full));
-  if (found.length === 0) return db.items;
-  for (const f of found) {
-    db.items.push({
-      id: crypto.randomUUID(),
-      title: cleanTitle(f),
-      path: f,
-      fileName: path.basename(f),
-      addedAt: Date.now(),
-      kind: classifyMediaKind(path.basename(f)),
-    });
-  }
-  writeDb(db);
-  return db.items;
-}
-
-function startWatching(): void {
-  stopWatching();
-  const db = readDb();
-  if (!db.watchFolder || !fs.existsSync(db.watchFolder)) return;
-  try {
-    watcher = fs.watch(db.watchFolder, { recursive: true }, () => {
-      clearTimeout(watchTimer);
-      watchTimer = setTimeout(() => {
-        const before = readDb().items.length;
-        const items = scanWatchFolder();
-        if (items.length !== before) broadcastMedia();
-      }, 1200);
-    });
-  } catch {
-    /* some folders can't be watched recursively — the manual rescan still works */
-  }
-}
-function stopWatching(): void {
-  watcher?.close();
-  watcher = undefined;
 }
 
 // ----- IPC -----
@@ -1011,6 +979,11 @@ export function registerMediaIpc(): void {
     listItems: () => readDb().items,
     patchItems,
   });
+  // Per-episode automation on play / Watching: helper line, translation, status.
+  registerSubtitleAutoIpc({
+    listItems: () => readDb().items,
+    patchItems,
+  });
   // Harvest is the sibling of discovery: same provider clients and credential
   // store, but keyed on an AniList id rather than on local media, so it takes
   // no host. Registered here rather than in main.ts to keep both subtitle
@@ -1023,6 +996,19 @@ export function registerMediaIpc(): void {
   // Discovery reads the same two provider APIs but touches nothing in the
   // library, so it gets no host at all — it can only search and browse.
   registerMediaDiscoveryIpc();
+  // Automatic ingest: watch folders and finished downloads. Like the metadata
+  // job it gets the store's operations, not the store.
+  registerMediaIngest({
+    addOrGetItem: (absPath) => addOrGetItem(absPath, false),
+    listItems: () => readDb().items,
+    patchEachItem,
+    broadcast: broadcastMedia,
+    // The import trigger for every automatic route and for `media:addAcquired`.
+    scheduleMetadataSweep: () => {
+      scheduleMetadataSweep();
+    },
+    legacyWatchFolder: () => readDb().watchFolder,
+  });
 
   /**
    * D265 — re-check the library once at launch.
@@ -1158,19 +1144,42 @@ export function registerMediaIpc(): void {
    * the bridge is both slow and permanently resident, while the token protocol
    * streams them and lets Chromium cache them like any other image.
    */
-  ipcMain.handle('media:artwork', async (_e, id: string, variant: 'poster' | 'banner' | 'still' = 'poster'): Promise<string | null> => {
+  /*
+   * Art for a TRACKED title (the watch library) — one imported from MAL or Letterboxd that
+   * may have no file on this PC. The metadata pass stores it userData-relative, like a media
+   * item's; served through the same playfile tokens so the page's CSP never meets a remote
+   * image host.
+   */
+  ipcMain.handle('watch:artwork', (_e, id: unknown, variant: unknown): string | null => {
+    if (typeof id !== 'string') return null;
+    const title = readWatchLibrary().titles.find((entry) => entry.id === id);
+    if (!title) return null;
+    const stored = variant === 'banner' ? title.bannerPath ?? title.backdropPath
+      : variant === 'backdrop' ? title.backdropPath ?? title.bannerPath
+        : title.posterPath;
+    if (!stored) return null;
+    const file = path.join(app.getPath('userData'), stored);
+    return fs.existsSync(file) ? `playfile://${tokenFor(file)}` : null;
+  });
+
+  ipcMain.handle('media:artwork', async (_e, id: string, variant: 'poster' | 'banner' | 'backdrop' | 'still' = 'poster'): Promise<string | null> => {
     const item = readDb().items.find((i) => i.id === id);
     if (!item) return null;
 
     // Provider art, when a metadata pass has fetched some. Stored as a
     // userData-relative path, so the token is minted here rather than persisted.
-    const provided = variant === 'banner' ? item.bannerPath : variant === 'poster' ? item.posterPath : undefined;
+    // `still` is the file's own episode still (TVmaze); `backdrop` the 16:9
+    // image, falling back to the hero banner (mediaMetadata.ts writes both).
+    const provided = variant === 'banner' ? item.bannerPath
+      : variant === 'backdrop' ? item.backdropPath ?? item.bannerPath
+        : variant === 'poster' ? item.posterPath
+          : item.stillPath;
     if (provided) {
       const file = path.join(app.getPath('userData'), provided);
       if (fs.existsSync(file)) return `playfile://${tokenFor(file)}`;
     }
     // A banner has no local substitute — the caller falls back to the poster.
-    if (variant === 'banner') return null;
+    if (variant === 'banner' || variant === 'backdrop') return null;
 
     try {
       const file = await ensureMediaArtwork({
@@ -1380,43 +1389,15 @@ export function registerMediaIpc(): void {
    *
    * It reads the path and nothing else — it cannot start, resume or query a
    * transfer, so a caller cannot use it to reach the torrent client.
+   *
+   * Runs through the ingest (`mediaIngest.ts`), so an info hash the Scraper
+   * handed off brings its catalogue identity with it, samples are skipped, and
+   * the arrival is announced like any automatic one.
    */
-  ipcMain.handle('media:addAcquired', (_e, target: unknown): MediaAcquiredImport => {
-    const empty = (outcome: MediaAcquiredImport['outcome']): MediaAcquiredImport =>
-      ({ items: readDb().items, found: 0, added: 0, outcome });
-    if (typeof target !== 'string' || !target.trim()) return empty('invalid-path');
-    const root = target.trim();
-    let isDirectory = false;
-    try {
-      isDirectory = fs.statSync(root).isDirectory();
-    } catch {
-      // The daemon's save path is its own truth; the file can have been moved
-      // or deleted since. Say so rather than reporting an empty success.
-      return empty('missing');
-    }
-    const files = isDirectory
-      ? collectMediaFilesInDir(root)
-      : (MEDIA_EXT.has(path.extname(root).toLowerCase()) ? [root] : []);
-    const before = new Set(readDb().items.map((i) => i.path));
-    let added = 0;
-    for (const filePath of files) {
-      try {
-        addOrGetItem(filePath, false);
-        if (!before.has(filePath)) added += 1;
-      } catch {
-        /* unreadable file — skip it, and do not count it as added */
-      }
-    }
-    if (added > 0) {
-      broadcastMedia();
-      scheduleMetadataSweep();
-    }
-    return {
-      items: readDb().items,
-      found: files.length,
-      added,
-      outcome: files.length ? 'ok' : 'no-media',
-    };
+  ipcMain.handle('media:addAcquired', async (_e, target: unknown, options?: unknown): Promise<MediaAcquiredImport> => {
+    const ingest = getMediaIngest();
+    if (ingest) return ingest.ingestAcquired(target, options);
+    return { items: readDb().items, found: 0, added: 0, outcome: 'invalid-path' };
   });
 
   ipcMain.handle('media:open', (_e, id: string): MediaOpen | null => {
@@ -1477,14 +1458,26 @@ export function registerMediaIpc(): void {
    * not a library row. Comparison is case-insensitive and separator-normalized because a
    * path that has been through the sidecar is not byte-identical to the stored one.
    */
+  const itemForPath = (filePath: string): MediaItem | undefined => {
+    const key = (value: string): string =>
+      value.trim().replace(/\\/g, '/').toLowerCase();
+    const wanted = key(filePath);
+    return readDb().items.find((i) => key(i.path ?? '') === wanted);
+  };
   ipcMain.handle(
     'media:subtitleForPath',
-    (_e, filePath: string): SubtitlePick | null => {
+    (_e, filePath: string, options?: { intent?: 'play' }): SubtitlePick | null => {
       if (typeof filePath !== 'string' || !filePath.trim()) return null;
-      const key = (value: string): string =>
-        value.trim().replace(/\\/g, '/').toLowerCase();
-      const wanted = key(filePath);
-      const item = readDb().items.find((i) => key(i.path ?? '') === wanted);
+      const item = itemForPath(filePath);
+
+      // The player says `intent: 'play'` when it mounts; nothing else does (the
+      // lexicon search walks the whole library through this same handler, and a
+      // search must not queue a translation per file). That is the lazy trigger:
+      // an episode's helper line and any missing study line are prepared in the
+      // background the first time it is watched. See `subtitleDiscoveryAuto.ts`.
+      if (item && options && typeof options === 'object' && options.intent === 'play') {
+        requestSubtitlePreparation([item.id], 'play');
+      }
 
       if (item) {
         const record = pickPlaybackSubtitle(
@@ -1502,6 +1495,22 @@ export function registerMediaIpc(): void {
       // A file the library has never seen still deserves the sidecar-file fallback: the
       // workspace can open a path the media database knows nothing about.
       return pickSubtitleBeside(filePath, item?.lang ?? 'ja') ?? null;
+    },
+  );
+
+  /**
+   * The helper line (English unless the user chose another language) for a local
+   * video, by path, side-effect free. Picked together with the study track, so it
+   * is never the same track; `machineTranslated` says when it is the automation's
+   * translation rather than a human subtitle. Null when there is none yet — the
+   * `subtitleAuto:status` event says when one arrives.
+   */
+  ipcMain.handle(
+    'media:secondarySubtitleForPath',
+    (_e, filePath: string): SecondarySubtitlePick | null => {
+      if (typeof filePath !== 'string' || !filePath.trim()) return null;
+      const item = itemForPath(filePath);
+      return item ? secondarySubtitleForItem(item) : null;
     },
   );
 
@@ -1731,31 +1740,18 @@ export function registerMediaIpc(): void {
     }
   });
 
-  // Watch folder
-  ipcMain.handle('media:getWatchFolder', () => readDb().watchFolder ?? null);
-  ipcMain.handle('media:setWatchFolder', async () => {
-    const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: mt('dialog.autoAddVideosFolder.title'),
-      properties: ['openDirectory'],
-    });
-    if (res.canceled || !res.filePaths[0]) return { folder: readDb().watchFolder ?? null, items: readDb().items };
-    const db = readDb();
-    db.watchFolder = res.filePaths[0];
-    writeDb(db);
-    const items = scanWatchFolder();
-    startWatching();
-    return { folder: db.watchFolder, items };
+  // Watch folder — the single-folder surfaces, answered from the ingest's list
+  // (`mediaIngest:*` is the list itself). Choosing adds a folder; stopping
+  // removes the one shown. Watching and the launch catch-up run in the ingest.
+  ipcMain.handle('media:getWatchFolder', () => getMediaIngest()?.firstWatchFolder() ?? null);
+  ipcMain.handle('media:setWatchFolder', async (e) => {
+    const ingest = getMediaIngest();
+    await ingest?.addFolderFromDialog(BrowserWindow.fromWebContents(e.sender) ?? focusedWindow());
+    return { folder: ingest?.firstWatchFolder() ?? null, items: readDb().items };
   });
   ipcMain.handle('media:clearWatchFolder', () => {
-    const db = readDb();
-    delete db.watchFolder;
-    writeDb(db);
-    stopWatching();
+    getMediaIngest()?.removeFirstFolder();
     broadcastMedia();
     return null;
   });
-
-  // Catch up on the watch folder at launch.
-  scanWatchFolder();
-  startWatching();
 }

@@ -185,22 +185,24 @@ describe('ContinueWatchingTile', () => {
 
 /**
  * `MediaCenterView` pulls the whole media stack at module eval, so the wiring is pinned
- * from source: the shelf reads the shared rows, and resumes through the view's own
- * workspace open path rather than the legacy `playItem`.
+ * from source: Home's Continue watching reads the shared rows, and resumes through the
+ * view's own workspace open path rather than the legacy `playItem`. (The shelf itself is
+ * now `GumHome`'s episode row; the row data and the resume path are unchanged.)
  */
-describe('HomePanel wiring', () => {
+describe('Home wiring', () => {
   const view = readFileSync(resolve(__dirname, '../views/MediaCenterView.tsx'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '');
 
   it('builds the shelf from both resume stores', () => {
-    expect(view).toContain('const continueRows = useContinueWatchingRows(state.items);');
+    expect(view).toContain('const continueRows = useContinueWatchingRows(media.items);');
+    expect(view).toMatch(/<GumHome[\s\S]*?continueRows=\{continueRows\}/);
     // The old single-store filter must be gone, not merely unused.
     expect(view).not.toMatch(/\.filter\(\(item\) => \(item\.positionSec \?\? 0\) > 0\)/);
   });
 
-  it('resumes video through onOpenSeanime with the rewound request', () => {
-    expect(view).toContain('if (onOpenSeanime(continueWatchingOpenRequest(entry))) return;');
-    expect(view).toMatch(/<HomePanel[\s\S]*?onOpenSeanime=\{openSeanime\}[\s\S]*?workspace=\{workspace\}/);
+  it('resumes video through the workspace with the rewound request', () => {
+    expect(view).toContain('if (openSeanime(continueWatchingOpenRequest(entry))) return;');
+    expect(view).toMatch(/<GumHome[\s\S]*?onResumeRow=\{resumeRow\}/);
   });
 });

@@ -69,6 +69,10 @@ interface ProviderScript {
   };
   /** Text returned for a chosen candidate. `null` models a failed download. */
   fetchText: string | null;
+  /** The download is refused on OpenSubtitles' daily quota. */
+  fetchQuota: boolean;
+  /** What the audio-sync estimator reports for a downloaded track. */
+  sync: { offsetSec: number; score: number; rivalScore: number; confident: boolean };
   keys: Record<string, boolean>;
 }
 
@@ -77,22 +81,30 @@ const script: ProviderScript = {} as ProviderScript;
 const asked: string[] = [];
 /** The arguments each Jimaku call carried, in order. */
 const jimakuAsked: { anilistId?: number; title?: string; episode?: number | null }[] = [];
+/** Every OpenSubtitles query the tiered search sent, in order. */
+const osQueries: { languages: string[]; episode: number | null; title: string }[] = [];
+/** When set, Jimaku does not answer until it resolves — holds a sweep open. */
+let jimakuGate: Promise<void> | null = null;
+resetScript();
 
 function resetScript(): void {
   script.jimaku = { candidates: [], down: false, downStatus: 200 };
   script.opensubtitles = { candidates: [], down: false, downStatus: 200 };
   script.nyaa = { availability: { ok: true }, candidates: [] };
   script.fetchText = '1\n00:00:01,000 --> 00:00:02,000\nテスト\n';
+  script.fetchQuota = false;
+  script.sync = { offsetSec: 0, score: 0, rivalScore: 0, confident: false };
   script.keys = { jimaku: true, opensubtitles: true };
   asked.length = 0;
+  osQueries.length = 0;
 }
-resetScript();
 
 vi.mock('../subtitleProviderClients', () => ({
   hasSubtitleProviderKey: (id: string) => script.keys[id] === true,
   setSubtitleProviderKey: () => undefined,
   testSubtitleProvider: async () => ({ ok: true }),
   jimakuSearchDetailed: async (anilistId?: number, title?: string, episode?: number | null) => {
+    if (jimakuGate) await jimakuGate;
     asked.push('jimaku');
     // The question actually asked, not just that one was. D266 is a defect
     // entirely about WHICH entry and WHICH episode number went over the wire,
@@ -100,11 +112,17 @@ vi.mock('../subtitleProviderClients', () => ({
     jimakuAsked.push({ anilistId, title, episode });
     return { ...script.jimaku, entry: null, basis: 'anilist', rejectedEntry: null };
   },
-  openSubtitlesSearchDetailed: async () => {
+  openSubtitlesSearchDetailed: async (query: { languages: string[]; episode: number | null; title: string }) => {
     asked.push('opensubtitles');
+    osQueries.push(query);
     return script.opensubtitles;
   },
+  // The tiered search keys its per-run listing cache on the query string.
+  openSubtitlesSearchParams: (query: unknown) => JSON.stringify(query),
   fetchSubtitleCandidate: async () => script.fetchText,
+  fetchSubtitleCandidateDetailed: async () => (script.fetchQuota
+    ? { text: null, quotaExceeded: true, resetAt: null, remaining: 0 }
+    : { text: script.fetchText, quotaExceeded: false, resetAt: null, remaining: null }),
 }));
 
 vi.mock('../subtitleNyaaSource', () => ({
@@ -139,6 +157,9 @@ vi.mock('../subtitleLocalSources', () => ({
 
 vi.mock('../osdbHash', () => ({ osdbHashFile: async () => null }));
 
+// The audio-sync estimator spawns ffmpeg; its answer is scripted instead.
+vi.mock('../subtitleSync', () => ({ estimateSubtitleOffset: async () => script.sync }));
+
 const transcriptionQueue: unknown[] = [];
 vi.mock('../transcriptionJobs', () => ({
   enqueueTranscription: (job: unknown) => { transcriptionQueue.push(job); },
@@ -147,6 +168,7 @@ vi.mock('../transcriptionJobs', () => ({
 vi.mock('../subtitleHarvest', () => ({ storedMalFacts: () => null }));
 
 const { registerSubtitleDiscoveryIpc, runSubtitleDiscovery } = await import('../subtitleDiscovery');
+const { resetSubtitleNoticesForTests, activeSubtitleNotices } = await import('../subtitleDiscoveryNotices');
 
 // ------------------------------------------------------------------- the driver
 
@@ -248,6 +270,7 @@ const reasons = (failures: SubtitleSearchFailure[], providerId: string): string[
 beforeEach(() => {
   resetScript();
   transcriptionQueue.length = 0;
+  resetSubtitleNoticesForTests();
 });
 
 // ------------------------------------------------------------------------ cases
@@ -554,5 +577,165 @@ describe('a folder holding two seasons', () => {
     // No boundary, no "outside" it. This is most of the library.
     await sweep(episode26({ episodeCount: undefined } as Partial<MediaItem>));
     expect(jimakuAsked).toEqual([{ anilistId: 567, title: 'The Big O', episode: 26 }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Subtitle automation (2026-09-23): the helper line, per-series batching, the
+// download quota, machine translations, and timing correction.
+// ---------------------------------------------------------------------------
+
+describe('the helper line is wanted everywhere but downloaded per episode', () => {
+  it('a library sweep asks OpenSubtitles for Japanese only', async () => {
+    await sweep(mediaItem({ anilistId: undefined } as Partial<MediaItem>));
+    expect(osQueries.map((query) => query.languages)).toEqual([['ja']]);
+  });
+
+  it('a targeted request (a played episode, "Search now") fetches English too', async () => {
+    script.opensubtitles = {
+      candidates: [
+        osCandidate(),
+        osCandidate({ providerItemId: 'opensubtitles:2', language: 'en', releaseName: 'The Big O - 07 [BDRip]' }),
+      ],
+      down: false,
+      downStatus: 200,
+    };
+    const out = await sweep(mediaItem(), { mediaIds: ['m1'] });
+    expect(osQueries[0].languages).toEqual(['ja', 'en']);
+    expect(out.records.map((record) => record.lang).sort()).toEqual(['en', 'ja']);
+  });
+
+  it('does not re-walk an item that has Japanese just because English is missing', async () => {
+    const out = await sweep(mediaItem({
+      subtitles: [{ id: 'j', lang: 'ja', source: 'provider', format: 'srt', path: 'p', addedAt: 1 }],
+    } as Partial<MediaItem>));
+    expect(out.asked).toEqual([]);
+  });
+
+  it('does not count a machine translation as having the language', async () => {
+    const out = await sweep(mediaItem({
+      subtitles: [{
+        id: 'mt', lang: 'ja', source: 'generated', derivation: 'machine-translation', format: 'srt', path: 'p', addedAt: 1,
+      }],
+    } as Partial<MediaItem>));
+    expect(out.asked).toContain('jimaku');
+    // …and a forced or unforced search never throws it away: it cannot be rediscovered.
+    expect(out.records.map((record) => (record as { id?: string }).id)).toContain('mt');
+  });
+});
+
+describe('OpenSubtitles is asked once per series, not once per episode', () => {
+  it('two episodes of one season in one sweep share one listing', async () => {
+    script.keys = { jimaku: false, opensubtitles: true };
+    script.opensubtitles = {
+      candidates: [
+        osCandidate({ providerItemId: 'opensubtitles:7', episode: 7 }),
+        osCandidate({ providerItemId: 'opensubtitles:8', episode: 8, releaseName: 'The Big O - 08 [BDRip]' }),
+      ],
+      down: false,
+      downStatus: 200,
+    };
+    let library = [
+      mediaItem({ id: 'e7' } as Partial<MediaItem>),
+      mediaItem({ id: 'e8', episode: 8, title: 'The Big O - 08', fileName: 'The Big O - 08.mkv' } as Partial<MediaItem>),
+    ];
+    registerSubtitleDiscoveryIpc({
+      listItems: () => library,
+      patchItems: (ids, patch) => {
+        library = library.map((entry) => (ids.includes(entry.id) ? { ...entry, ...patch } : entry));
+      },
+    });
+    await runSubtitleDiscovery({});
+    expect(osQueries).toHaveLength(1);
+    expect(osQueries[0].episode).toBeNull();
+    const ids = library.map((entry) => entry.subtitles?.map((record) => record.providerItemId));
+    expect(ids).toEqual([['opensubtitles:7'], ['opensubtitles:8']]);
+  });
+});
+
+describe('the OpenSubtitles download quota', () => {
+  it('is not stored as a failed download, and raises the panel notice', async () => {
+    script.fetchQuota = true;
+    script.opensubtitles = { candidates: [osCandidate()], down: false, downStatus: 200 };
+    const out = await sweep(mediaItem());
+    expect(out.records).toEqual([]);
+    // `quota` is non-evidential: nothing is kept that would suppress tomorrow's retry.
+    expect(reasons(out.failures, 'opensubtitles')).toEqual([]);
+    expect(activeSubtitleNotices([], { hasOpenSubtitlesKey: true, translationAvailable: true }).active)
+      .toEqual(['opensubtitles-quota']);
+  });
+
+  it('says once that OpenSubtitles needs a key, only when it would have been asked', async () => {
+    script.keys = { jimaku: true, opensubtitles: false };
+    await sweep(mediaItem());
+    expect(activeSubtitleNotices([], { hasOpenSubtitlesKey: false, translationAvailable: true }).active)
+      .toEqual(['opensubtitles-key-missing']);
+  });
+});
+
+describe('a downloaded track is moved onto this file\'s audio', () => {
+  const video = path.join(tmpRoot, 'The Big O - 07.real.mkv');
+  const cues = Array.from({ length: 12 }, (_, i) =>
+    `${i + 1}\n00:00:${String(10 + i * 3).padStart(2, '0')},000 --> 00:00:${String(11 + i * 3).padStart(2, '0')},000\n台詞${i}\n`).join('\n');
+
+  it('shifts the stored file when the estimate is confident', async () => {
+    fs.writeFileSync(video, 'not really a video');
+    script.fetchText = cues;
+    script.sync = { offsetSec: -2, score: 0.3, rivalScore: 0.05, confident: true };
+    script.jimaku = {
+      candidates: [{
+        providerId: 'jimaku', providerItemId: 'jimaku:1:e07.srt', language: 'ja', format: 'srt',
+        releaseName: 'The Big O.E07.srt', season: null, episode: 7, releaseGroup: null,
+        hearingImpaired: false, hashMatch: false, downloads: null, fetchToken: 'x',
+      }],
+      down: false,
+      downStatus: 200,
+    };
+    const out = await sweep(mediaItem({ path: video } as Partial<MediaItem>));
+    const record = out.records[0] as unknown as { path: string; syncOffsetSec?: number };
+    expect(record.syncOffsetSec).toBe(-2);
+    const stored = fs.readFileSync(path.join(tmpRoot, record.path), 'utf-8');
+    expect(stored).toContain('00:00:08,000 --> 00:00:09,000');
+  });
+
+  it('leaves a hash-matched track exactly as served', async () => {
+    fs.writeFileSync(video, 'not really a video');
+    script.keys = { jimaku: false, opensubtitles: true };
+    script.fetchText = cues;
+    script.sync = { offsetSec: -2, score: 0.3, rivalScore: 0.05, confident: true };
+    script.opensubtitles = { candidates: [osCandidate({ hashMatch: true })], down: false, downStatus: 200 };
+    const out = await sweep(mediaItem({ path: video } as Partial<MediaItem>));
+    const record = out.records[0] as unknown as { path: string; syncOffsetSec?: number };
+    expect(record.syncOffsetSec).toBeUndefined();
+    expect(fs.readFileSync(path.join(tmpRoot, record.path), 'utf-8')).toContain('00:00:10,000 --> 00:00:11,000');
+  });
+});
+
+describe('an import that lands while a sweep is running', () => {
+  it('is searched by one follow-up sweep, not left until the next launch', async () => {
+    script.keys = { jimaku: true, opensubtitles: false };
+    let library = [mediaItem({ id: 'a' } as Partial<MediaItem>)];
+    registerSubtitleDiscoveryIpc({
+      listItems: () => library,
+      patchItems: (ids, patch) => {
+        library = library.map((entry) => (ids.includes(entry.id) ? { ...entry, ...patch } : entry));
+      },
+    });
+    let release: () => void = () => undefined;
+    jimakuGate = new Promise<void>((resolve) => { release = resolve; });
+    jimakuAsked.length = 0;
+
+    const first = runSubtitleDiscovery({});
+    // A watch folder imports episode 8 while episode 7 is being searched.
+    library = [...library, mediaItem({ id: 'b', episode: 8 } as Partial<MediaItem>)];
+    const refused = await runSubtitleDiscovery({});
+    expect(refused).toMatchObject({ ok: false });
+
+    jimakuGate = null;
+    release();
+    await first;
+    await vi.waitFor(() => {
+      expect(jimakuAsked.map((call) => call.episode)).toEqual([7, 8]);
+    });
   });
 });

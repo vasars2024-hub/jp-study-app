@@ -50,6 +50,7 @@ import { registerReadingIpc } from './main/reading';
 import { registerSeanimeIpc, stopSeanime } from './main/seanime';
 import { registerMalSyncIpc } from './main/malSync';
 import { registerMalLibraryIpc } from './main/malLibrary';
+import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -1822,6 +1823,9 @@ app.whenReady().then(async () => {
   // Where a fetched list is kept once the user asks for it to be kept. Local
   // disk only — this module has no MAL client, so it cannot sync on its own.
   registerMalLibraryIpc();
+  // The watch-tracking library (anime / TV / films, owned or not) and its
+  // MyAnimeList / Letterboxd export importers. Local disk only.
+  registerWatchLibraryIpc();
   registerReleaseIpc();
   registerResourcesCatalogIpc();
   registerCollectedToolsIpc();

@@ -28,7 +28,17 @@ import {
   validateScraperQbittorrentSettings,
 } from '../../shared/scraperSourceSettings';
 import type { ScraperQbitInput, ScraperQbitSendInput } from '../../shared/scraperIpc';
+import {
+  hasRenamePlaceholders,
+  infoHashFromMagnet,
+  ingestTagsForHint,
+  normalizeIngestHandoff,
+  renameForTorrent,
+  type QbitTorrentSnapshot,
+  type ScraperIngestHandoff,
+} from '../../shared/mediaIngest';
 import { getScraperSecret } from './credentials';
+import { emitAcquisitionHandoff } from './handoffs';
 import { MAX_BODY_BYTES_CEILING, scraperRequest } from './http';
 import { scraperLog } from './logBus';
 
@@ -195,6 +205,8 @@ interface QbitTorrentInfo {
   category?: string;
   tags?: string;
   save_path?: string;
+  /** The torrent's file or root folder, absolute. qBittorrent 4.4+. */
+  content_path?: string;
   size?: number;
   downloaded?: number;
   uploaded?: number;
@@ -232,6 +244,10 @@ export function mapTransfer(info: QbitTorrentInfo): QbitTransferRow {
     category: info.category ?? '',
     tags: (info.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean),
     savePath: info.save_path ?? '',
+    // Kept rather than rebuilt from `savePath + name`: with a content layout of
+    // "No subfolder", a renamed torrent or a single-file release the two differ,
+    // and the guess is what sent "Add to library" to a folder that did not exist.
+    contentPath: info.content_path ?? '',
     sizeBytes: info.size ?? 0,
     downloadedBytes: info.downloaded ?? 0,
     uploadedBytes: info.uploaded ?? 0,
@@ -615,16 +631,35 @@ export async function qbitTransfers(rawInput: ScraperQbitInput): Promise<QbitTra
   }
 }
 
+/** Per-send overrides on top of the profile. */
+export interface QbitAddOptions {
+  /** A destination chosen for this send. Wins over the profile's save path. */
+  savePath?: string;
+  /** Added to the profile's tags (deduplicated). */
+  extraTags?: readonly string[];
+  /**
+   * The torrent name to set. `undefined` means "decide from the profile":
+   * a literal template is sent only for a single magnet, and a template with
+   * placeholders is never sent unfilled.
+   */
+  rename?: string;
+}
+
 /** The `torrents/add` form, built from the profile's send options. */
 export function buildAddForm(
   config: ScraperQbittorrentSettings,
   magnets: string[],
+  options: QbitAddOptions = {},
 ): URLSearchParams {
   const form = new URLSearchParams();
   form.set('urls', magnets.join('\n'));
   if (config.category) form.set('category', config.category);
-  if (config.tags.length) form.set('tags', config.tags.join(','));
-  if (config.savePath) form.set('savepath', config.savePath);
+  const tags = [...new Set([...(config.tags ?? []), ...(options.extraTags ?? [])]
+    .map((tag) => tag.trim())
+    .filter((tag) => tag && !tag.includes(',')))];
+  if (tags.length) form.set('tags', tags.join(','));
+  const savePath = options.savePath?.trim() || config.savePath;
+  if (savePath) form.set('savepath', savePath);
   form.set('paused', config.addMode === 'paused' ? 'true' : 'false');
   if (config.addMode === 'forced') form.set('forceStart', 'true');
   form.set('contentLayout', {
@@ -635,7 +670,11 @@ export function buildAddForm(
   form.set('sequentialDownload', String(config.sequentialDownload));
   form.set('firstLastPiecePrio', String(config.firstLastPiecePriority));
   form.set('skip_checking', String(config.skipHashCheck));
-  form.set('autoTMM', String(config.autoTmm));
+  // Automatic Torrent Management places a torrent by its category and ignores
+  // `savepath` outright, so a destination the user named was silently dropped
+  // with the profile's default of `autoTmm: true`. A save path means "put it
+  // here", which only manual management honours.
+  form.set('autoTMM', savePath ? 'false' : String(config.autoTmm));
   if (config.ratioLimit >= 0) form.set('ratioLimit', String(config.ratioLimit));
   if (config.seedingTimeLimitMin >= 0) {
     form.set('seedingTimeLimit', String(config.seedingTimeLimitMin));
@@ -643,7 +682,15 @@ export function buildAddForm(
   // qBittorrent takes bytes per second; the profile stores KiB/s.
   if (config.uploadLimitKbps > 0) form.set('upLimit', String(config.uploadLimitKbps * 1_024));
   if (config.downloadLimitKbps > 0) form.set('dlLimit', String(config.downloadLimitKbps * 1_024));
-  if (config.renameTemplate) form.set('rename', config.renameTemplate);
+  const rename = options.rename !== undefined
+    ? options.rename
+    // `{series} - {episode}` used to reach qBittorrent literally — as the name of
+    // every torrent in the batch. Unfilled placeholders are never sent, and a
+    // literal name only ever names one torrent.
+    : (config.renameTemplate && !hasRenamePlaceholders(config.renameTemplate) && magnets.length === 1
+      ? config.renameTemplate
+      : '');
+  if (rename) form.set('rename', rename);
   return form;
 }
 
@@ -818,10 +865,22 @@ async function sendToQbit(
     }
   }
 
-  if (sendable.length) {
-    // One request for the batch: qBittorrent's add endpoint takes a newline
-    // separated list, and a per-row request would mean a login round-trip each.
-    const form = buildAddForm(input.config, sendable.map((row) => row.magnet));
+  // What the surface knew about these releases, if it said. Only a handoff that
+  // carries this is tagged and remembered, so every older caller's form is unchanged.
+  const ingest = normalizeIngestHandoff(input.ingest);
+  const accepted: TorrentRow[] = [];
+
+  for (const group of addGroups(input.config.renameTemplate ?? '', sendable, ingest)) {
+    // One request per group, normally one for the whole batch: qBittorrent's add
+    // endpoint takes a newline separated list, and a per-row request would mean a
+    // login round-trip each. Only a per-torrent name splits a batch, because
+    // `rename` applies to every magnet in its request.
+    const groupRows = group.rows;
+    const form = buildAddForm(input.config, groupRows.map((row) => row.magnet), {
+      savePath: ingest?.savePath,
+      extraTags: ingest ? ingestTagsForHint(ingest.hint) : undefined,
+      rename: group.rename,
+    });
     const response = await authed(input, '/api/v2/torrents/add', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -829,12 +888,16 @@ async function sendToQbit(
     });
     if ('error' in response) {
       const reason = response.error.message;
-      for (const row of sendable) details.push({ name: row.name, outcome: 'failed', reason });
+      for (const row of groupRows) details.push({ name: row.name, outcome: 'failed', reason });
       scraperLog('error', 'qbit', `Send failed: ${reason}`);
     } else if (response.status === 200) {
-      details.push(...settleAddedRows(sendable, parseAddOutcome(response.body)));
-      const sentNow = details.filter((d) => d.outcome === 'sent').length;
-      scraperLog('info', 'qbit', `Sent ${sentNow} of ${sendable.length} torrent(s) to qBittorrent.`);
+      const settled = settleAddedRows(groupRows, parseAddOutcome(response.body));
+      details.push(...settled);
+      settled.forEach((detail, index) => {
+        if (detail.outcome === 'sent') accepted.push(groupRows[index]);
+      });
+      const sentNow = settled.filter((d) => d.outcome === 'sent').length;
+      scraperLog('info', 'qbit', `Sent ${sentNow} of ${groupRows.length} torrent(s) to qBittorrent.`);
     } else {
       // A 409 means the daemon added *nothing* from this batch, and v5.2.3's body
       // is the literal word "Conflict" — no cause, so `addFailureReason` alone
@@ -842,7 +905,7 @@ async function sendToQbit(
       // is the common one: the torrent is already in the transfer list.
       const already = response.status === 409 ? await presentHashes(input) : new Set<string>();
       const generic = addFailureReason(response.status, response.body);
-      for (const row of sendable) {
+      for (const row of groupRows) {
         const hash = magnetInfoHash(row.magnet);
         const reason = hash && already.has(hash)
           ? 'Already in qBittorrent.'
@@ -853,6 +916,18 @@ async function sendToQbit(
     }
   }
 
+  if (ingest && accepted.length) {
+    emitAcquisitionHandoff({
+      target: 'qbittorrent',
+      rows: accepted.map((row) => ({
+        id: row.id,
+        name: row.name,
+        infoHash: (row.infoHash || infoHashFromMagnet(row.magnet)).toLowerCase(),
+      })),
+      ingest,
+    });
+  }
+
   return {
     sent: details.filter((d) => d.outcome === 'sent').length,
     skipped: details.filter((d) => d.outcome === 'skipped').length,
@@ -861,9 +936,111 @@ async function sendToQbit(
   };
 }
 
+/**
+ * Splits a send into add requests. Rows share a request unless the rename
+ * template gives them different names; with no template (the default) the
+ * whole batch is one request, exactly as before.
+ */
+function addGroups(
+  template: string,
+  rows: readonly TorrentRow[],
+  ingest: ScraperIngestHandoff | undefined,
+): Array<{ rename: string | undefined; rows: TorrentRow[] }> {
+  if (!rows.length) return [];
+  if (!hasRenamePlaceholders(template)) return [{ rename: undefined, rows: [...rows] }];
+  const groups = new Map<string, TorrentRow[]>();
+  for (const row of rows) {
+    const name = renameForTorrent(template, row.name, ingest?.hint, ingest?.rowEpisodes?.[row.id]);
+    const bucket = groups.get(name) ?? [];
+    bucket.push(row);
+    groups.set(name, bucket);
+  }
+  // Two torrents that would get the same name keep their own instead.
+  return [...groups.entries()].map(([name, grouped]) => ({
+    rename: grouped.length === 1 ? name : '',
+    rows: grouped,
+  }));
+}
+
 /** Test seam — drops every cached session. */
 export function resetQbitSessions(): void {
   sessions.clear();
+}
+
+// ------------------------------------------------------ completion polling ---
+//
+// The media ingest poller's two reads. Separate from `qbitTransfers` because a
+// background poll must not write a warning to the scraper log every 30 seconds
+// while qBittorrent is closed, and because it needs to tell "refused the
+// credential" (stop — a retried bad password gets the WebUI to ban this
+// machine) from "not answering" (back off and try again).
+
+export type QbitPollOutcome<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: string; status: 'unauthorized' | 'unreachable' | 'unknown' };
+
+function pollFailure(
+  response: { error: LoginResult } | { status: number; body: string },
+  endpoint: string,
+): { ok: false; reason: string; status: 'unauthorized' | 'unreachable' | 'unknown' } {
+  if ('error' in response) {
+    const status = response.error.status === 'unauthorized' ? 'unauthorized'
+      : response.error.status === 'unreachable' ? 'unreachable' : 'unknown';
+    return { ok: false, reason: response.error.message, status };
+  }
+  return {
+    ok: false,
+    reason: `qBittorrent answered ${response.status} to ${endpoint}.`,
+    status: response.status === 401 || response.status === 403 ? 'unauthorized' : 'unknown',
+  };
+}
+
+export function snapshotOf(info: QbitTorrentInfo): QbitTorrentSnapshot {
+  return {
+    hash: (info.hash ?? '').toLowerCase(),
+    name: info.name ?? '',
+    rawState: info.state ?? '',
+    progress: Math.max(0, Math.min(1, info.progress ?? 0)),
+    savePath: info.save_path ?? '',
+    contentPath: info.content_path ?? '',
+    category: info.category ?? '',
+    tags: (info.tags ?? '').split(',').map((tag) => tag.trim()).filter(Boolean),
+  };
+}
+
+/** Every torrent, as the completion poller needs it. Quiet on failure. */
+export async function qbitPollTorrents(
+  rawInput: ScraperQbitInput,
+): Promise<QbitPollOutcome<QbitTorrentSnapshot[]>> {
+  const input = normalizeQbitInput(rawInput);
+  if (!input.config.enabled) return { ok: false, reason: 'qBittorrent is not enabled.', status: 'unknown' };
+  const response = await authed(input, '/api/v2/torrents/info', { maxBytes: MAX_BODY_BYTES_CEILING });
+  if ('error' in response || response.status !== 200) return pollFailure(response, 'torrents/info');
+  try {
+    const parsed = JSON.parse(response.body) as QbitTorrentInfo[];
+    return { ok: true, value: Array.isArray(parsed) ? parsed.map(snapshotOf).filter((row) => row.hash) : [] };
+  } catch {
+    return { ok: false, reason: 'The torrent list was not valid JSON.', status: 'unknown' };
+  }
+}
+
+/**
+ * Where qBittorrent saves by default (`app/preferences` → `save_path`), which
+ * the ingest registers as a watch folder. `''` when the daemon does not say.
+ */
+export async function qbitDefaultSavePath(
+  rawInput: ScraperQbitInput,
+): Promise<QbitPollOutcome<string>> {
+  const input = normalizeQbitInput(rawInput);
+  if (!input.config.enabled) return { ok: false, reason: 'qBittorrent is not enabled.', status: 'unknown' };
+  const response = await authed(input, '/api/v2/app/preferences');
+  if ('error' in response || response.status !== 200) return pollFailure(response, 'app/preferences');
+  try {
+    const parsed = JSON.parse(response.body) as { save_path?: unknown };
+    return { ok: true, value: typeof parsed?.save_path === 'string' ? parsed.save_path.trim() : '' };
+  } catch {
+    return { ok: false, reason: 'The preferences were not valid JSON.', status: 'unknown' };
+  }
 }
 
 // --------------------------------------------------- selective subtitle fetch ---

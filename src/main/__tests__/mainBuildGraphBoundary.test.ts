@@ -139,12 +139,12 @@ describe('main/preload build graph boundary', () => {
     // THE NEGATIVE CONTROL, and it uses the exact specifier the false report named. Walking
     // from a renderer surface must FLAG what walking from src/main.ts finds nothing of;
     // otherwise `forbidden: []` above is a property of the walker, not of the main graph.
-    expect(existsSync(resolve(REPO, 'src/media/MediaWorkspace.tsx'))).toBe(true);
-    const control = walk('src/media/MediaWorkspace.tsx');
+    // (It walked MediaWorkspace.tsx until 2026-09-23, when the workspace became player-only
+    // and stopped importing the anime library; the shell still imports `@/` directly.)
+    expect(existsSync(resolve(REPO, 'src/media/MediaSurfaceShell.tsx'))).toBe(true);
+    const control = walk('src/media/MediaSurfaceShell.tsx');
     expect(control.forbidden.length).toBeGreaterThan(0);
-    expect(control.forbidden.map((f) => f.specifier)).toContain(
-      '@/app/(main)/_features/anime-library/_lib/handle-library-collection',
-    );
+    expect(control.forbidden.map((f) => f.specifier)).toContain('@/api/client/server-url');
   });
 
   it('src/main.ts reaches no renderer-only module', () => {

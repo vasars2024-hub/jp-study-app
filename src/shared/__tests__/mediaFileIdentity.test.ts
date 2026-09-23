@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  filmFolderIdentity,
+  hasAnimeReleaseHints,
   PARSER_OWNED_IDENTITY,
   RELEASE_IDENTITY_VERSION,
   inferMediaCategory,
@@ -333,5 +335,35 @@ describe('refreshReleaseIdentity', () => {
    */
   it('owns exactly the four fields no provider writes', () => {
     expect([...PARSER_OWNED_IDENTITY]).toEqual(['seriesKey', 'season', 'episode', 'episodeKind']);
+  });
+});
+
+describe('film folders', () => {
+  it('reads the Plex/Jellyfin `Title (Year)` convention, with an optional TMDB tag', () => {
+    expect(filmFolderIdentity('D:/Films/Spirited Away (2001)/spirited.away.1080p.mkv')).toEqual({ title: 'Spirited Away', year: 2001 });
+    expect(filmFolderIdentity('D:\\Films\\Dune (2021) [tmdbid-438631]\\Dune.mkv')).toEqual({ title: 'Dune', year: 2021, tmdbId: 438631 });
+    expect(filmFolderIdentity('/films/Perfect.Blue.[1997]/pb.mkv')).toEqual({ title: 'Perfect Blue', year: 1997 });
+  });
+
+  it('is not fooled by season, disc or yearless folders', () => {
+    expect(filmFolderIdentity('D:/Shows/Season 1 (2019)/e01.mkv')).toBeNull();
+    expect(filmFolderIdentity('D:/Films/Spirited Away/sa.mkv')).toBeNull();
+    expect(filmFolderIdentity('sa.mkv')).toBeNull();
+  });
+
+  it('files a name-only video in a film folder as a movie, and only then', () => {
+    expect(inferMediaCategory(item('a', 'spirited.away.1080p.mkv', { path: 'D:/Films/Spirited Away (2001)/spirited.away.1080p.mkv' }))).toBe('movie');
+    // An episode inside such a folder is still an episode.
+    expect(inferMediaCategory(item('b', 'Show.S01E02.mkv', { path: 'D:/TV/Show (2019)/Show.S01E02.mkv' }))).toBe('tv');
+    // Without the folder the unplaceable file stays in the inbox, as before.
+    expect(inferMediaCategory(item('c', 'spirited.away.1080p.mkv'))).toBe('inbox');
+  });
+});
+
+describe('hasAnimeReleaseHints', () => {
+  it('sees fansub brackets and Japanese script, not a plain film name', () => {
+    expect(hasAnimeReleaseHints({ title: '', fileName: '[Group] Kimi no Na wa (2016).mkv' })).toBe(true);
+    expect(hasAnimeReleaseHints({ title: '君の名は', fileName: 'x.mkv' })).toBe(true);
+    expect(hasAnimeReleaseHints({ title: 'Inception', fileName: 'Inception (2010) 1080p.mkv' })).toBe(false);
   });
 });

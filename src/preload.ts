@@ -332,8 +332,11 @@ const api = {
   addMediaPaths: (paths: string[]): Promise<MediaItem[]> =>
     ipcRenderer.invoke('media:addPaths', paths),
   /** Bring a finished download into the library — see `media:addAcquired`. */
-  addAcquiredMedia: (target: string): Promise<import('./shared/types').MediaAcquiredImport> =>
-    ipcRenderer.invoke('media:addAcquired', target),
+  addAcquiredMedia: (
+    target: string,
+    options?: { infoHash?: string },
+  ): Promise<import('./shared/types').MediaAcquiredImport> =>
+    ipcRenderer.invoke('media:addAcquired', target, options),
   getWallpaper: (): Promise<string | null> => ipcRenderer.invoke('desktop:getWallpaper'),
   pickWallpaper: (): Promise<{
     id: string;
@@ -1600,7 +1603,7 @@ const api = {
    * grabbed ~10% in for video. Generated and disk-cached on first ask; null means
    * the file has no usable image, and that answer is cached too.
    */
-  mediaArtwork: (id: string, variant?: 'poster' | 'banner' | 'still'): Promise<string | null> =>
+  mediaArtwork: (id: string, variant?: 'poster' | 'banner' | 'backdrop' | 'still'): Promise<string | null> =>
     ipcRenderer.invoke('media:artwork', id, variant),
   // ---- metadata sweep (Jikan / AniList) ----
   runMediaMetadata: (
@@ -1680,6 +1683,39 @@ const api = {
     entries: import('./shared/malLibrary').MalLibraryEntry[];
     summary: import('./shared/malLibrary').MalLibrarySummary;
   }> => ipcRenderer.invoke('mal:libraryList'),
+  // ---- watch-tracking library (anime / TV / films, owned or not) ----
+  // Local disk only: imports read export files the user picked; nothing signs
+  // in to MyAnimeList or Letterboxd. See main/watchLibrary.ts.
+  watchList: (
+    query?: import('./shared/watchLibrary').WatchQuery,
+  ): Promise<import('./shared/watchLibrary').WatchQueryResult> => ipcRenderer.invoke('watch:list', query),
+  watchGet: (id: string): Promise<import('./shared/watchLibrary').WatchTitleView | null> =>
+    ipcRenderer.invoke('watch:get', id),
+  watchAdd: (
+    input: import('./shared/watchLibrary').WatchAddInput,
+  ): Promise<import('./main/watchLibrary').WatchAddResult> => ipcRenderer.invoke('watch:add', input),
+  watchUpdate: (
+    id: string,
+    patch: import('./shared/watchLibrary').WatchTitlePatch,
+  ): Promise<import('./main/watchLibrary').WatchUpdateResult> => ipcRenderer.invoke('watch:update', id, patch),
+  watchRemove: (id: string): Promise<{ ok: true } | import('./main/watchLibrary').WatchIpcError> =>
+    ipcRenderer.invoke('watch:remove', id),
+  watchRecordLocalProgress: (
+    input: import('./main/watchLibrary').WatchLocalProgressInput,
+  ): Promise<import('./main/watchLibrary').WatchLocalProgressResult> =>
+    ipcRenderer.invoke('watch:recordLocalProgress', input),
+  watchImportFile: (filePath: string): Promise<import('./main/watchLibrary').WatchImportResult> =>
+    ipcRenderer.invoke('watch:importFile', filePath),
+  watchChooseImportFile: (): Promise<string | null> => ipcRenderer.invoke('watch:chooseImportFile'),
+  watchImportHistory: (): Promise<import('./shared/watchLibrary').WatchImportRecord[]> =>
+    ipcRenderer.invoke('watch:importHistory'),
+  onWatchChanged: (
+    cb: (event: import('./main/watchLibrary').WatchChangedEvent) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, event: import('./main/watchLibrary').WatchChangedEvent): void => cb(event);
+    ipcRenderer.on('watch:changed', handler);
+    return () => ipcRenderer.removeListener('watch:changed', handler);
+  },
   malUpdateEntry: (
     animeId: number,
     update: import('./shared/malSync').MalListStatusUpdate,
@@ -1695,6 +1731,17 @@ const api = {
     ): void => cb(p);
     ipcRenderer.on('mediaMetadata:progress', handler);
     return () => ipcRenderer.removeListener('mediaMetadata:progress', handler);
+  },
+  /** Items a metadata sweep just wrote; `artwork` when their images changed. */
+  onMediaMetadataUpdated: (
+    cb: (update: import('./shared/mediaMetadataIpc').MediaMetadataUpdate) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      update: import('./shared/mediaMetadataIpc').MediaMetadataUpdate,
+    ): void => cb(update);
+    ipcRenderer.on('media:metadataUpdated', handler);
+    return () => ipcRenderer.removeListener('media:metadataUpdated', handler);
   },
   // ---- subtitle discovery (embedded / sidecar / Jimaku / OpenSubtitles) ----
   runSubtitleDiscovery: (
@@ -1829,6 +1876,9 @@ const api = {
   setMediaPosition: (id: string, sec: number): Promise<void> =>
     ipcRenderer.invoke('media:setPosition', id, sec),
   /** The video player's progress for a library file (position, length, finished). */
+  /** Stored art for a tracked title (poster / banner / backdrop), or null. */
+  watchArtwork: (titleId: string, variant: 'poster' | 'banner' | 'backdrop'): Promise<string | null> =>
+    ipcRenderer.invoke('watch:artwork', titleId, variant),
   reportMediaPlayback: (report: {
     path: string;
     positionSec: number;
@@ -1859,8 +1909,45 @@ const api = {
    * the container — so a downloaded (Jimaku/OpenSubtitles) track was invisible to it. See
    * the handler for the measurement.
    */
-  subtitleForPath: (filePath: string): Promise<SubtitlePick | null> =>
-    ipcRenderer.invoke('media:subtitleForPath', filePath),
+  subtitleForPath: (filePath: string, options?: { intent?: 'play' }): Promise<SubtitlePick | null> =>
+    ipcRenderer.invoke('media:subtitleForPath', filePath, options),
+  /** The helper line (English by default) for a local video; see `media:secondarySubtitleForPath`. */
+  secondarySubtitleForPath: (
+    filePath: string,
+  ): Promise<import('./shared/subtitleDiscoveryStatus').SecondarySubtitlePick | null> =>
+    ipcRenderer.invoke('media:secondarySubtitleForPath', filePath),
+  // ---- subtitle automation (per-episode prep on play / Watching; status) ----
+  subtitleAutoStatus: (
+    mediaIds?: string[],
+  ): Promise<import('./shared/subtitleDiscoveryStatus').SubtitleAutoStatus[]> =>
+    ipcRenderer.invoke('subtitleAuto:status', mediaIds),
+  prepareSubtitles: (request: {
+    mediaIds?: string[];
+    seriesKey?: string;
+    reason?: 'play' | 'watching' | 'manual';
+  }): Promise<{ queued: number }> => ipcRenderer.invoke('subtitleAuto:prepare', request),
+  subtitleAutoNotices: (): Promise<import('./shared/subtitleDiscoveryStatus').SubtitleAutoNotices> =>
+    ipcRenderer.invoke('subtitleAuto:notices'),
+  dismissSubtitleAutoNotice: (
+    id: string,
+  ): Promise<import('./shared/subtitleDiscoveryStatus').SubtitleAutoNotices> =>
+    ipcRenderer.invoke('subtitleAuto:dismissNotice', id),
+  onSubtitleAutoStatus: (
+    cb: (status: import('./shared/subtitleDiscoveryStatus').SubtitleAutoStatus) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, status: import('./shared/subtitleDiscoveryStatus').SubtitleAutoStatus): void =>
+      cb(status);
+    ipcRenderer.on('subtitleAuto:status', handler);
+    return () => ipcRenderer.removeListener('subtitleAuto:status', handler);
+  },
+  onSubtitleAutoNotices: (
+    cb: (notices: import('./shared/subtitleDiscoveryStatus').SubtitleAutoNotices) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, notices: import('./shared/subtitleDiscoveryStatus').SubtitleAutoNotices): void =>
+      cb(notices);
+    ipcRenderer.on('subtitleAuto:notices', handler);
+    return () => ipcRenderer.removeListener('subtitleAuto:notices', handler);
+  },
   /**
    * A CJK-capable system font for the libass renderer, or null when the machine has none.
    *
@@ -1894,6 +1981,36 @@ const api = {
     const handler = (_e: unknown, items: MediaItem[]): void => cb(items);
     ipcRenderer.on('media:changed', handler);
     return () => ipcRenderer.removeListener('media:changed', handler);
+  },
+  // Automatic media ingest — watch folders and finished downloads (`main/mediaIngest.ts`).
+  mediaIngestState: (): Promise<import('./shared/mediaIngest').MediaIngestState> =>
+    ipcRenderer.invoke('mediaIngest:getState'),
+  mediaIngestAddFolder: (): Promise<import('./shared/mediaIngest').MediaIngestState> =>
+    ipcRenderer.invoke('mediaIngest:addFolder'),
+  mediaIngestRemoveFolder: (folder: string): Promise<import('./shared/mediaIngest').MediaIngestState> =>
+    ipcRenderer.invoke('mediaIngest:removeFolder', folder),
+  mediaIngestSetAutoImport: (on: boolean): Promise<import('./shared/mediaIngest').MediaIngestState> =>
+    ipcRenderer.invoke('mediaIngest:setAutoImport', on),
+  mediaIngestRescan: (): Promise<import('./shared/mediaIngest').MediaIngestState> =>
+    ipcRenderer.invoke('mediaIngest:rescan'),
+  /** Hands main the active qBittorrent profile so it can import finished torrents. */
+  mediaIngestSyncQbit: (
+    config: import('./shared/scraperSourceSettings').ScraperQbittorrentSettings | null,
+  ): Promise<void> => ipcRenderer.invoke('mediaIngest:syncQbit', config),
+  onMediaIngestState: (
+    cb: (state: import('./shared/mediaIngest').MediaIngestState) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, state: import('./shared/mediaIngest').MediaIngestState): void => cb(state);
+    ipcRenderer.on('mediaIngest:state', handler);
+    return () => ipcRenderer.removeListener('mediaIngest:state', handler);
+  },
+  /** New items landed in the library from a watch folder or a finished download. */
+  onMediaIngested: (
+    cb: (event: import('./shared/mediaIngest').MediaIngestedEvent) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, event: import('./shared/mediaIngest').MediaIngestedEvent): void => cb(event);
+    ipcRenderer.on('media:ingested', handler);
+    return () => ipcRenderer.removeListener('media:ingested', handler);
   },
 
   // YouTube immersion playlists (metadata sync; download is explicit)

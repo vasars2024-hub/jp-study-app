@@ -37,7 +37,7 @@ export type CredentialKind =
   /** A browser round-trip; the row links out rather than taking a paste. */
   | 'oauth';
 
-export type CredentialCategory = 'ai' | 'subtitles' | 'reading' | 'sync';
+export type CredentialCategory = 'ai' | 'subtitles' | 'reading' | 'media' | 'sync';
 
 /** Which module holds the bytes at rest. See the file header. */
 export type CredentialStore = 'vault' | 'mining' | 'subtitleProviders' | 'malSync';
@@ -223,6 +223,32 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     refusesWhenUnencrypted: true,
   },
   {
+    // Read by `main/providers/tmdb.ts` for film posters, backdrops and
+    // details, and a better backdrop for TV series. One field takes either of
+    // TMDB's formats — the v3 API key or the v4 read access token — because
+    // the TMDB settings page shows both; the client tells them apart. Anime and
+    // TV metadata (MyAnimeList, AniList, TVmaze) need no key at all.
+    id: 'tmdb',
+    label: 'TMDB',
+    descKey: 'credential.tmdb.desc',
+    kind: 'apiKey',
+    category: 'media',
+    fields: [
+      {
+        name: 'apiKey',
+        labelKey: 'credential.field.tmdbKey',
+        secret: true,
+        placeholderKey: 'credential.field.tmdbKey.placeholder',
+      },
+    ],
+    signupUrl: 'https://www.themoviedb.org/settings/api',
+    freeTierKey: 'credential.tmdb.freeTier',
+    testable: false,
+    usedByKeys: ['credential.use.filmArtwork', 'credential.use.tvBackdrops'],
+    store: 'vault',
+    refusesWhenUnencrypted: true,
+  },
+  {
     id: 'mal',
     label: 'MyAnimeList',
     descKey: 'credential.mal.desc',
@@ -249,12 +275,13 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
 ];
 
 /** Category rendering order. Categories absent from the registry render nothing. */
-export const CREDENTIAL_CATEGORY_ORDER: CredentialCategory[] = ['ai', 'reading', 'subtitles', 'sync'];
+export const CREDENTIAL_CATEGORY_ORDER: CredentialCategory[] = ['ai', 'reading', 'media', 'subtitles', 'sync'];
 
 const CATEGORY_LABEL_KEYS: Record<CredentialCategory, string> = {
   ai: 'credential.category.ai',
   subtitles: 'credential.category.subtitles',
   reading: 'credential.category.reading',
+  media: 'credential.category.media',
   sync: 'credential.category.sync',
 };
 

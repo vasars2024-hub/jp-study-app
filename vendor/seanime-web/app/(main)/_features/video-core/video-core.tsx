@@ -1016,7 +1016,11 @@ export function VideoCore(props: VideoCoreProps) {
             setInSightData(null)
             log.info("New stream loaded", state.playbackInfo)
             setStreamType(state.playbackInfo.streamType)
-            vc_logGeneralInfo(videoRef.current)
+            // Gum: debug logging only, and not free. Its `navigator.gpu.requestAdapter()` and
+            // WebGL context probe made the video's load wait on the GPU process for
+            // 450-2000 ms on the first play of a session (profiled 2026-09-23, A/B: hiding
+            // `navigator.gpu` removed the freeze). Kept for development builds.
+            if (import.meta.env?.DEV) vc_logGeneralInfo(videoRef.current)
             dispatchVideoLoadedEvent()
         }
     }, [state.playbackInfo?.id, waitForWatchHistory, shouldWaitForWatchHistory])

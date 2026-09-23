@@ -206,7 +206,7 @@ describe('reading a secret that cannot be decrypted', () => {
     fs.writeFileSync(vaultFile(), 'not json at all', 'utf-8');
     expect(readSecret('jiten')).toBe('');
     expect(vaultStatuses()).toEqual(
-      ['gemini', 'deepseek', 'jimaku', 'opensubtitles', 'jiten', 'mal'].map((id) => ({
+      ['gemini', 'deepseek', 'jimaku', 'opensubtitles', 'jiten', 'tmdb', 'mal'].map((id) => ({
         id,
         configured: false,
         lastTestedAt: 0,
@@ -284,6 +284,8 @@ describe('the renderer-facing shape', () => {
       'jimaku',
       'opensubtitles',
       'jiten',
+      // TMDB (films and TV backdrops) was born in the vault.
+      'tmdb',
       'mal',
     ]);
   });

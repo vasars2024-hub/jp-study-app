@@ -55,6 +55,11 @@ export function __setMalLibraryPathForTests(next: (() => string) | null): void {
   libraryPath = next ?? defaultLibraryPath;
 }
 
+/** Where the library lives — for a reader (the watch library) that only needs to stat it. */
+export function malLibraryFilePath(): string {
+  return libraryPath();
+}
+
 export function readMalLibrary(): MalLibraryDocument {
   let raw: unknown;
   try {

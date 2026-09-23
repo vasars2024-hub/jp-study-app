@@ -156,6 +156,16 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     clearConfirm: 'Clear music likes and widget settings?',
   },
   {
+    id: 'media-library-layout',
+    label: 'Media library layout',
+    description:
+      'Home section order, sizes, pinned and hidden sections; Library sort and filters per status tab, poster size, badges, saved views; the Just added list.',
+    category: 'Media',
+    lsPrefixes: ['jp-gum-'],
+    clearable: true,
+    clearConfirm: 'Reset the media library layout, sorts, filters and saved views?',
+  },
+  {
     id: 'lyrics-cache',
     label: 'Lyrics cache',
     description: 'Cached lyric lookups per media id.',

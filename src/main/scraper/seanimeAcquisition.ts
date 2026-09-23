@@ -29,6 +29,8 @@ import type {
   AcquisitionTorrentTransfer,
 } from '../../shared/acquisition';
 import { seanimeApi, SeanimeUnavailableError } from '../seanime/client';
+import { infoHashFromMagnet, normalizeIngestHandoff } from '../../shared/mediaIngest';
+import { emitAcquisitionHandoff } from './handoffs';
 import { scraperLog } from './logBus';
 
 const STATUS_ROUTE = '/api/v1/status';
@@ -344,6 +346,21 @@ export async function runSeanimeAcquisitionAction(
           smartSelect: { enabled: false, missingEpisodeNumbers: [] },
         };
     const accepted = await seanimeApi<boolean>(route, { method: 'POST', body });
+    if (accepted) {
+      // Recorded for the media ingest: Seanime's client may be the same
+      // qBittorrent the poller watches, or the files may land in a watched
+      // folder — either way the identity travels with the info hash.
+      emitAcquisitionHandoff({
+        target: action.target === 'debrid' ? 'seanime-debrid' : 'seanime-torrent-client',
+        rows: rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          infoHash: (row.infoHash || infoHashFromMagnet(row.magnet)).toLowerCase(),
+        })),
+        ingest: normalizeIngestHandoff(action.ingest) ?? { via: 'seanime' },
+        destination: destination || undefined,
+      });
+    }
     const result = actionResult(
       Boolean(accepted),
       accepted

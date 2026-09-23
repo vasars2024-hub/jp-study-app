@@ -27400,6 +27400,14 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.seanime-font-warm {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  opacity: 0;
+  pointer-events: none;
+  font: 600 16px "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif;
+}
 .seanime-host-trail {
   display: inline-flex;
   flex: 0 0 auto;

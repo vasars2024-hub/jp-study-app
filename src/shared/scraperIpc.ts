@@ -210,6 +210,13 @@ export interface ScraperQbitInput {
 
 export interface ScraperQbitSendInput extends ScraperQbitInput {
   rows: TorrentRow[];
+  /**
+   * Who these releases are, from the surface that found them, plus the
+   * destination it chose. Present → the torrents are tagged `gum`, their
+   * identity is recorded for the media ingest, and a `savePath` turns
+   * Automatic Torrent Management off so the destination is honoured.
+   */
+  ingest?: import('./mediaIngest').ScraperIngestHandoff;
 }
 
 /**

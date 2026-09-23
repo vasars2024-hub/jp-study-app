@@ -172,6 +172,19 @@ export interface ProviderSubtitleCandidate {
   downloads: number | null;
   /** Opaque token the client needs to fetch the bytes. */
   fetchToken: string;
+  /** The work's title as the provider files it — the show's, for an episode. */
+  featureTitle?: string | null;
+  /** The work's year, when the provider states one. */
+  year?: number | null;
+  /**
+   * How the search that produced this was keyed. Set by the caller that knows:
+   * a hash search, an IMDb/TMDB id search, or a title query.
+   */
+  matchBasis?: 'hash' | 'id' | 'query';
+  /** The provider marks it machine- or AI-translated. */
+  machineTranslated?: boolean;
+  /** Uploaded by a source the provider vouches for. */
+  trusted?: boolean;
 }
 
 const FORMATS: SubtitleRecordFormat[] = ['srt', 'ass', 'ssa', 'vtt', 'lrc'];
@@ -382,18 +395,40 @@ interface OsSubtitle {
     hearing_impaired?: boolean;
     download_count?: number;
     moviehash_match?: boolean;
-    feature_details?: { season_number?: number | null; episode_number?: number | null };
+    ai_translated?: boolean;
+    machine_translated?: boolean;
+    from_trusted?: boolean;
+    feature_details?: {
+      season_number?: number | null;
+      episode_number?: number | null;
+      title?: string | null;
+      movie_name?: string | null;
+      parent_title?: string | null;
+      year?: number | null;
+    };
     files?: Array<{ file_id?: number; file_name?: string }>;
   };
 }
 
 export interface OpenSubtitlesQuery {
+  /** Free-text title. Empty sends no `query` — an id or hash search needs none. */
   title: string;
   season: number | null;
   episode: number | null;
   languages: string[];
   /** OSDb hash; when present the provider can guarantee timing. */
   movieHash?: string | null;
+  /** IMDb id of a film (or of one episode), `tt0245429` or `245429`. */
+  imdbId?: string | number | null;
+  /** TMDB id of a film. */
+  tmdbId?: string | number | null;
+  /** IMDb id of the SHOW an episode belongs to. */
+  parentImdbId?: string | number | null;
+  /** TMDB id of the SHOW an episode belongs to. */
+  parentTmdbId?: string | number | null;
+  year?: number | null;
+  /** 1-based results page. */
+  page?: number | null;
 }
 
 /** The same reply Jimaku gives: candidates, plus whether the request was answered at all. */
@@ -407,6 +442,83 @@ export interface OpenSubtitlesMatch {
   down: boolean;
   /** The status that made `down` true, for the log. 0 when nothing answered. */
   downStatus: number;
+  /** Pages the provider holds for this query; absent when it did not say. */
+  totalPages?: number;
+}
+
+/** `tt0245429` → `245429`: the API takes the bare number without leading zeros. */
+function imdbNumber(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const digits = String(value).trim().replace(/^tt/i, '').replace(/^0+/, '');
+  return /^\d{1,10}$/.test(digits) ? digits : null;
+}
+
+function positiveId(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return /^\d{1,10}$/.test(text) && Number(text) > 0 ? String(Number(text)) : null;
+}
+
+/**
+ * The query string for one search, built the way the API asks for it: parameter
+ * names in alphabetical order and values in lower case. A request that is not
+ * normalised is answered with a redirect to the normalised one — a wasted round
+ * trip per search — and misses the provider's cache.
+ */
+export function openSubtitlesSearchParams(query: OpenSubtitlesQuery): string {
+  const params: [string, string][] = [];
+  const add = (name: string, value: string | null | undefined): void => {
+    if (value !== null && value !== undefined && value !== '') params.push([name, value]);
+  };
+  add('episode_number', query.episode !== null && query.episode !== undefined ? String(query.episode) : null);
+  add('imdb_id', imdbNumber(query.imdbId));
+  add('languages', query.languages.length
+    ? [...new Set(query.languages.map((lang) => lang.trim().toLowerCase()).filter(Boolean))].sort().join(',')
+    : null);
+  add('moviehash', query.movieHash ? query.movieHash.trim().toLowerCase() : null);
+  add('page', query.page && query.page > 1 ? String(Math.floor(query.page)) : null);
+  add('parent_imdb_id', imdbNumber(query.parentImdbId));
+  add('parent_tmdb_id', positiveId(query.parentTmdbId));
+  add('query', query.title.trim() ? query.title.trim().toLowerCase() : null);
+  add('season_number', query.season !== null && query.season !== undefined ? String(query.season) : null);
+  add('tmdb_id', positiveId(query.tmdbId));
+  add('year', query.year ? String(query.year) : null);
+  params.sort(([a], [b]) => a.localeCompare(b));
+  return params.map(([name, value]) => `${name}=${encodeURIComponent(value)}`).join('&');
+}
+
+/** Parses one `/subtitles` page into candidates. Exported for the fixture tests. */
+export function openSubtitlesCandidatesFromReply(response: { data?: OsSubtitle[] } | null): ProviderSubtitleCandidate[] {
+  const out: ProviderSubtitleCandidate[] = [];
+  for (const entry of response?.data ?? []) {
+    const attributes = entry.attributes;
+    const file = attributes?.files?.find((candidate) => Number.isFinite(candidate.file_id));
+    if (!attributes || !file?.file_id) continue;
+    const name = file.file_name?.trim() || attributes.release?.trim() || `opensubtitles-${file.file_id}`;
+    const feature = attributes.feature_details;
+    const year = Number(feature?.year);
+    out.push({
+      providerId: 'opensubtitles',
+      providerItemId: `opensubtitles:${file.file_id}`,
+      language: (attributes.language ?? '').trim().toLowerCase() || 'und',
+      // The download endpoint converts to SRT regardless of the source format.
+      format: 'srt',
+      releaseName: attributes.release?.trim() || name,
+      season: feature?.season_number ?? null,
+      episode: feature?.episode_number ?? episodeFromName(name),
+      releaseGroup: groupFromName(name),
+      hearingImpaired: attributes.hearing_impaired === true,
+      hashMatch: attributes.moviehash_match === true,
+      downloads: Number.isFinite(attributes.download_count) ? Number(attributes.download_count) : null,
+      fetchToken: String(file.file_id),
+      // For an episode the feature is the episode ("Pilot"); the show is the parent.
+      featureTitle: (feature?.parent_title || feature?.movie_name || feature?.title || '').trim() || null,
+      year: Number.isFinite(year) && year > 1800 ? year : null,
+      machineTranslated: attributes.ai_translated === true || attributes.machine_translated === true,
+      trusted: attributes.from_trusted === true,
+    });
+  }
+  return out;
 }
 
 export async function openSubtitlesSearchDetailed(query: OpenSubtitlesQuery): Promise<OpenSubtitlesMatch> {
@@ -415,45 +527,65 @@ export async function openSubtitlesSearchDetailed(query: OpenSubtitlesQuery): Pr
   // `no-key`. Reporting it as an outage would hide a fixable configuration.
   if (!key) return { candidates: [], down: false, downStatus: 0 };
 
-  const params = new URLSearchParams();
-  if (query.movieHash) params.set('moviehash', query.movieHash);
-  params.set('query', query.title);
-  if (query.season !== null) params.set('season_number', String(query.season));
-  if (query.episode !== null) params.set('episode_number', String(query.episode));
-  if (query.languages.length) params.set('languages', query.languages.join(','));
-
-  const reply = await requestJsonReply<{ data?: OsSubtitle[] }>(
-    `${OPENSUBTITLES}/subtitles?${params.toString()}`,
+  const reply = await requestJsonReply<{ data?: OsSubtitle[]; total_pages?: number }>(
+    `${OPENSUBTITLES}/subtitles?${openSubtitlesSearchParams(query)}`,
     { headers: { 'Api-Key': key } },
   );
   if (reply.value === null) {
     return { candidates: [], down: true, downStatus: reply.status };
   }
-  const response = reply.value;
+  const totalPages = Number(reply.value?.total_pages);
+  return {
+    candidates: openSubtitlesCandidatesFromReply(reply.value),
+    down: false,
+    downStatus: reply.status,
+    ...(Number.isFinite(totalPages) && totalPages > 0 ? { totalPages } : {}),
+  };
+}
 
-  const out: ProviderSubtitleCandidate[] = [];
-  for (const entry of response?.data ?? []) {
-    const attributes = entry.attributes;
-    const file = attributes?.files?.find((candidate) => Number.isFinite(candidate.file_id));
-    if (!attributes || !file?.file_id) continue;
-    const name = file.file_name?.trim() || attributes.release?.trim() || `opensubtitles-${file.file_id}`;
-    out.push({
-      providerId: 'opensubtitles',
-      providerItemId: `opensubtitles:${file.file_id}`,
-      language: (attributes.language ?? '').trim().toLowerCase() || 'und',
-      // The download endpoint converts to SRT regardless of the source format.
-      format: 'srt',
-      releaseName: attributes.release?.trim() || name,
-      season: attributes.feature_details?.season_number ?? null,
-      episode: attributes.feature_details?.episode_number ?? episodeFromName(name),
-      releaseGroup: groupFromName(name),
-      hearingImpaired: attributes.hearing_impaired === true,
-      hashMatch: attributes.moviehash_match === true,
-      downloads: Number.isFinite(attributes.download_count) ? Number(attributes.download_count) : null,
-      fetchToken: String(file.file_id),
-    });
+/** What a download attempt came back with, including whether the daily quota ran out. */
+export interface SubtitleFetchOutcome {
+  text: string | null;
+  /** The provider refused because the daily download allowance is spent. */
+  quotaExceeded: boolean;
+  /** When the allowance resets, epoch ms, when the provider said. */
+  resetAt: number | null;
+  /** Downloads left today after this one, when the provider said. */
+  remaining: number | null;
+}
+
+interface OsDownloadTicket {
+  link?: string;
+  remaining?: number;
+  message?: string;
+  reset_time_utc?: string;
+}
+
+/**
+ * Reads a `/download` reply. 406 is how the API refuses a download over the daily
+ * allowance (and 429 with nothing remaining is the same refusal from the rate
+ * limiter); either way the answer is "not today", which is not a fact about the
+ * subtitle and must not be stored as a failed download.
+ */
+export function readOpenSubtitlesTicket(status: number, body: string): {
+  link: string | null;
+  quotaExceeded: boolean;
+  resetAt: number | null;
+  remaining: number | null;
+} {
+  let ticket: OsDownloadTicket = {};
+  try {
+    ticket = JSON.parse(body) as OsDownloadTicket;
+  } catch {
+    /* a non-JSON refusal still carries its status */
   }
-  return { candidates: out, down: false, downStatus: reply.status };
+  const remaining = Number.isFinite(ticket.remaining) ? Number(ticket.remaining) : null;
+  const reset = ticket.reset_time_utc ? Date.parse(ticket.reset_time_utc) : NaN;
+  const quotaExceeded = status === 406
+    || (status === 429 && remaining !== null && remaining <= 0)
+    || (status >= 400 && /allowed \d+ subtitles|download limit|quota/i.test(ticket.message ?? ''));
+  const link = status >= 200 && status < 300 ? ticket.link?.trim() || null : null;
+  return { link, quotaExceeded, resetAt: Number.isFinite(reset) ? reset : null, remaining };
 }
 
 /**
@@ -461,22 +593,29 @@ export async function openSubtitlesSearchDetailed(query: OpenSubtitlesQuery): Pr
  * then fetch it. The quota that matters is counted at the first step, which is why
  * this is only ever called for a candidate that has already been chosen.
  */
-async function openSubtitlesFetch(fileId: string): Promise<string | null> {
+async function openSubtitlesFetch(fileId: string): Promise<SubtitleFetchOutcome> {
+  const none: SubtitleFetchOutcome = { text: null, quotaExceeded: false, resetAt: null, remaining: null };
   const key = keyFor('opensubtitles');
-  if (!key) return null;
-  const ticket = await requestJson<{ link?: string }>(`${OPENSUBTITLES}/download`, {
-    method: 'POST',
-    headers: { 'Api-Key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file_id: Number(fileId) }),
-  });
-  const link = ticket?.link?.trim();
-  if (!link) return null;
+  if (!key) return none;
+  let ticket: ReturnType<typeof readOpenSubtitlesTicket>;
   try {
-    const response = await request(link);
-    if (response.status < 200 || response.status >= 300) return null;
-    return decodeSubtitle(response.body);
+    const response = await request(`${OPENSUBTITLES}/download`, {
+      method: 'POST',
+      headers: { 'Api-Key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ file_id: Number(fileId) }),
+    });
+    ticket = readOpenSubtitlesTicket(response.status, response.body.toString('utf-8'));
   } catch {
-    return null;
+    return none;
+  }
+  const meta = { quotaExceeded: ticket.quotaExceeded, resetAt: ticket.resetAt, remaining: ticket.remaining };
+  if (!ticket.link) return { text: null, ...meta };
+  try {
+    const response = await request(ticket.link);
+    if (response.status < 200 || response.status >= 300) return { text: null, ...meta };
+    return { text: decodeSubtitle(response.body), ...meta };
+  } catch {
+    return { text: null, ...meta };
   }
 }
 
@@ -511,9 +650,22 @@ function decodeSubtitle(body: Buffer): string | null {
 
 /** Fetches a chosen candidate's text, routing to the provider that offered it. */
 export async function fetchSubtitleCandidate(candidate: ProviderSubtitleCandidate): Promise<string | null> {
-  if (candidate.providerId === 'jimaku') return jimakuFetch(candidate.fetchToken);
+  return (await fetchSubtitleCandidateDetailed(candidate)).text;
+}
+
+/**
+ * The same fetch, keeping what the plain form drops: whether the provider
+ * refused on its daily quota. Discovery needs that to avoid filing "quota spent"
+ * as a failed download, which would suppress the provider for a week.
+ */
+export async function fetchSubtitleCandidateDetailed(
+  candidate: ProviderSubtitleCandidate,
+): Promise<SubtitleFetchOutcome> {
+  if (candidate.providerId === 'jimaku') {
+    return { text: await jimakuFetch(candidate.fetchToken), quotaExceeded: false, resetAt: null, remaining: null };
+  }
   if (candidate.providerId === 'opensubtitles') return openSubtitlesFetch(candidate.fetchToken);
-  return null;
+  return { text: null, quotaExceeded: false, resetAt: null, remaining: null };
 }
 
 /** Cheap reachability + credential check for the settings panel. */

@@ -384,10 +384,12 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
     // human-sourced one, which always outranks a transcript anyway, and keeps a
     // fused track, which is a different artifact rather than an older version of
     // this one. Records written before `derivation` existed are this kind.
+    // Likewise a machine translation (`subtitleDiscoveryAuto`): a different
+    // artifact, and the one the helper line may be reading right now.
     const kept = (item.subtitles ?? []).filter(
       (entry) => !(entry.source === 'generated'
         && entry.lang === job.lang
-        && entry.derivation !== 'en-ja-fusion'),
+        && (entry.derivation ?? 'whisper') === 'whisper'),
     );
     host.patchItems([job.mediaId], {
       subtitles: [...kept, record],
@@ -1048,7 +1050,7 @@ export function transcriptionArtifactStatus(mediaId: string): {
   const queuedAt = job?.queuedAt ?? null;
   const item = host?.listItems().find((entry) => entry.id === mediaId);
   const record = [...(item?.subtitles ?? [])]
-    .filter((entry) => entry.source === 'generated' && entry.derivation !== 'en-ja-fusion')
+    .filter((entry) => entry.source === 'generated' && (entry.derivation ?? 'whisper') === 'whisper')
     .sort((a, b) => b.addedAt - a.addedAt)[0];
   if (!record) return { cueCount: null, active, queuedAt };
   try {

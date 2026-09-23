@@ -61,6 +61,8 @@ vi.mock('../mediaArtwork', () => ({
 vi.mock('../mediaMetadata', () => ({
   registerMediaMetadataIpc: () => undefined,
   runMediaMetadata: () => Promise.resolve(undefined),
+  // Read by media ingest (`mediaIngest.ts`) to defer its sweep while one is running.
+  mediaMetadataRunning: () => false,
 }));
 vi.mock('../mediaDiscovery', () => ({ registerMediaDiscoveryIpc: () => undefined }));
 vi.mock('../transcriptionJobs', () => ({ registerTranscriptionIpc: () => undefined }));

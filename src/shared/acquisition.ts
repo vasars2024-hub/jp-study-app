@@ -167,6 +167,8 @@ export type AcquisitionAction =
       torrentIds: string[];
       destination: string;
       torrents: AcquisitionTorrentCandidate[];
+      /** Who these releases are, so the finished download is filed without guessing. */
+      ingest?: import('./mediaIngest').ScraperIngestHandoff;
     };
 
 export interface AcquisitionActionResult {

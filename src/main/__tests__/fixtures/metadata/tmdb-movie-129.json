@@ -1,0 +1,26 @@
+{
+ "adult": false,
+ "backdrop_path": "/Ab8mkHmkYADjU7wQiOkia9BzGvS.jpg",
+ "genres": [
+  { "id": 16, "name": "Animation" },
+  { "id": 10751, "name": "Family" },
+  { "id": 14, "name": "Fantasy" }
+ ],
+ "id": 129,
+ "imdb_id": "tt0245429",
+ "origin_country": ["JP"],
+ "original_language": "ja",
+ "original_title": "千と千尋の神隠し",
+ "overview": "A young girl, Chihiro, becomes trapped in a strange new world of spirits. When her parents undergo a mysterious transformation, she must call upon the courage she never knew she had to free her family.",
+ "popularity": 98.2,
+ "poster_path": "/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg",
+ "production_countries": [{ "iso_3166_1": "JP", "name": "Japan" }],
+ "release_date": "2001-07-20",
+ "runtime": 125,
+ "status": "Released",
+ "tagline": "",
+ "title": "Spirited Away",
+ "video": false,
+ "vote_average": 8.5,
+ "vote_count": 17000
+}

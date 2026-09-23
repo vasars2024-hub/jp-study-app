@@ -436,6 +436,54 @@ const ANIME_HINT = /\b(anime|ova|oad|raw|sub(?:bed|s)?|fansub)\b|[぀-ヿ㐀-鿿
 const FANSUB_CONVENTION = /^\s*\[[^\]]+\]/;
 
 /**
+ * Whether a file name reads like an anime release — the same evidence
+ * {@link inferMediaCategory} uses to tell anime from live-action episodes.
+ * The metadata sweep asks it about films, which the category alone cannot
+ * split: `[Group] Kimi no Na wa (2016).mkv` is worth a MyAnimeList lookup,
+ * `Inception (2010).mkv` is not.
+ */
+export function hasAnimeReleaseHints(item: Pick<MediaItem, 'title' | 'fileName'>): boolean {
+  const haystack = `${item.title ?? ''} ${item.fileName ?? ''}`;
+  return ANIME_HINT.test(haystack) || FANSUB_CONVENTION.test(item.fileName ?? '');
+}
+
+/**
+ * `Title (Year)` — the folder convention Plex, Jellyfin and Kodi all use for a
+ * film, optionally followed by release or id tags
+ * (`Spirited Away (2001) [tmdbid-129]`, `Dune (2021) {tmdb-438631}`).
+ */
+const FILM_FOLDER = /^(.+?)[\s._]*[([]((?:19|20)\d{2})[)\]](.*)$/;
+const TMDB_TAG = /[[{]tmdb(?:id)?-(\d+)[\]}]/i;
+/** Folder names that carry a year but are not a film's title. */
+const NOT_A_FILM_FOLDER = /^(season|series|staffel|disc|disk|cd|part|vol(?:ume)?|s\d+|specials?|extras?)\b/i;
+
+export interface FilmFolderIdentity {
+  title: string;
+  year: number;
+  /** An explicit TMDB id tag in the folder name, when present. */
+  tmdbId?: number;
+}
+
+/**
+ * The film a file's parent folder names, or `null` when it names none.
+ * Pure string work on the path — both separators, no filesystem access.
+ */
+export function filmFolderIdentity(filePath: string | null | undefined): FilmFolderIdentity | null {
+  if (typeof filePath !== 'string' || !filePath) return null;
+  const parts = filePath.split(/[\\/]+/).filter(Boolean);
+  if (parts.length < 2) return null;
+  const folder = (parts[parts.length - 2] ?? '').trim();
+  const match = FILM_FOLDER.exec(folder);
+  if (!match) return null;
+  const title = (match[1] ?? '').replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!title || NOT_A_FILM_FOLDER.test(title)) return null;
+  const identity: FilmFolderIdentity = { title, year: Number(match[2]) };
+  const tmdb = TMDB_TAG.exec(match[3] ?? '');
+  if (tmdb) identity.tmdbId = Number(tmdb[1]);
+  return identity;
+}
+
+/**
  * The Hub's classifier, one step stronger than {@link mediaCategory}: it consults the
  * parsed release evidence before falling back. This matters because `mediaCategory`
  * alone cannot see a movie — a bare `Your Name (2016) 1080p.mkv` has no keyword it
@@ -459,7 +507,15 @@ export function inferMediaCategory(
     const fansub = FANSUB_CONVENTION.test(item.fileName ?? '');
     return ANIME_HINT.test(haystack) || fansub ? 'anime' : 'tv';
   }
-  return mediaCategory(item);
+  const fallback = mediaCategory(item);
+  // A file with no release evidence of its own, inside a `Title (Year)` folder,
+  // is that film — `Spirited Away (2001)/spirited.away.1080p.mkv` has no year in
+  // its name, so the parser alone left it in the inbox. Only the inbox answer
+  // is overruled: a keyword the baseline classifier did recognise stands.
+  if (fallback === 'inbox' && filmFolderIdentity(item.path)) {
+    return 'movie';
+  }
+  return fallback;
 }
 
 /**

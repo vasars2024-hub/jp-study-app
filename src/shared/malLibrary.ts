@@ -253,6 +253,46 @@ export function mergeMalListEntries(
   );
 }
 
+/**
+ * Merges rows from MyAnimeList's XML list export — the no-account path — into
+ * the same library the OAuth sync writes.
+ *
+ * `mergeMalListEntries` is wrong for these, and silently so: an export row has
+ * no aliases, no poster and no `updated_at`, and applying it wholesale would
+ * blank the `altTitles` the subtitle harvest searches release indexes by. So
+ * here anything the export does not carry is kept from the stored row, MAL's
+ * "0 episodes" (unknown) never overwrites a known count, and a stored row that
+ * MAL itself stamped *after* the export was made keeps its list fields — an old
+ * export must not roll back a newer sync.
+ */
+export function mergeMalExportEntries(
+  document: MalLibraryDocument,
+  entries: readonly MalListEntry[],
+  now: number,
+  exportedAt?: number,
+): MalLibraryMergeResult {
+  return mergeInto(
+    document,
+    entries.map((entry) => fromListEntry(entry, 'anime')),
+    now,
+    (stored, next) => {
+      const storedAt = stored.malUpdatedAt ? Date.parse(stored.malUpdatedAt) : Number.NaN;
+      const storedIsNewer = exportedAt !== undefined && Number.isFinite(storedAt) && storedAt > exportedAt;
+      const list = storedIsNewer ? stored : next;
+      return {
+        ...stored,
+        title: next.title || stored.title,
+        status: list.status ?? stored.status,
+        episodesWatched: list.episodesWatched,
+        score: list.score,
+        rewatching: list.rewatching,
+        totalEpisodes: next.totalEpisodes ? next.totalEpisodes : stored.totalEpisodes ?? next.totalEpisodes,
+        origin: 'list',
+      };
+    },
+  );
+}
+
 function fromDerivative(derivative: MalDerivative, media: MalLibraryMedia): MalLibraryEntry {
   return {
     malId: derivative.animeId,

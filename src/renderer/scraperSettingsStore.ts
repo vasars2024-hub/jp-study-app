@@ -13,6 +13,7 @@ import {
   // every v3 patch.
   type ScraperSettingsPatch,
 } from '../shared/scraperSettings';
+import { syncQbitConfigToMain } from './mediaIngestBridge';
 
 export const SCRAPER_SETTINGS_STORAGE_KEY = 'jp-scraper-settings-v1';
 const CHANGED_EVENT = 'jp-scraper-settings-changed';
@@ -55,7 +56,16 @@ export function saveScraperSettingsDocument(input: unknown): ScraperSettingsDocu
     // Keep the validated value in memory when storage is unavailable or full.
   }
   dispatchChanged(document);
+  syncQbitConfigToMain(document);
   return document;
+}
+
+/**
+ * Hands main the active qBittorrent profile at start-up, so finished torrents
+ * are imported without the Scraper ever being opened. See `mediaIngestBridge`.
+ */
+export function syncScraperQbitToMain(): void {
+  syncQbitConfigToMain(loadScraperSettingsDocument());
 }
 
 export function updateActiveScraperSettings(

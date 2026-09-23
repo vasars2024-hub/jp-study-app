@@ -144,13 +144,15 @@ export default function StudyWorkspaceProvider({
         setViewport({ width: Math.round(rect.width), height: Math.round(rect.height) });
       }
     };
-    measure();
     if (typeof ResizeObserver !== 'function') {
+      measure();
       // jsdom has none. The one-shot measurement above still gives the wide layout,
       // which is the behaviour that existed before responsive rules — degrade, not fail.
       window.addEventListener('resize', measure);
       return () => window.removeEventListener('resize', measure);
     }
+    // No synchronous first measure here: it forced a layout inside the mount commit
+    // (7-29 ms, profiled 2026-09-23). The observer's first callback, after layout, has it.
     const observer = new ResizeObserver(measure);
     observer.observe(host);
     return () => observer.disconnect();

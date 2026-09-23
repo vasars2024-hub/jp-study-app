@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+		<!--
+		 Created by XML Export feature at MyAnimeList.net
+		 Version 1.1.0
+		 Sample fixture for tests: invented user, public series data only.
+		-->
+
+		<myanimelist>
+
+			<myinfo>
+				<user_id>9999999</user_id>
+				<user_name>sample_user</user_name>
+				<user_export_type>1</user_export_type>
+				<user_total_anime>9</user_total_anime>
+				<user_total_watching>1</user_total_watching>
+				<user_total_completed>4</user_total_completed>
+				<user_total_onhold>1</user_total_onhold>
+				<user_total_dropped>1</user_total_dropped>
+				<user_total_plantowatch>1</user_total_plantowatch>
+			</myinfo>
+
+				<anime>
+					<series_animedb_id>5081</series_animedb_id>
+					<series_title><![CDATA[Bakemonogatari]]></series_title>
+					<series_type>TV</series_type>
+					<series_episodes>15</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>15</my_watched_episodes>
+					<my_start_date>0000-00-00</my_start_date>
+					<my_finish_date>2020-05-00</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>9</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>Completed</my_status>
+					<my_comments><![CDATA[]]></my_comments>
+					<my_times_watched>1</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags><![CDATA[monogatari, shaft]]></my_tags>
+					<my_rewatching>0</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>1</series_animedb_id>
+					<series_title><![CDATA[Cowboy Bebop]]></series_title>
+					<series_type>TV</series_type>
+					<series_episodes>26</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>12</my_watched_episodes>
+					<my_start_date>2024-01-03</my_start_date>
+					<my_finish_date>0000-00-00</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>0</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>Watching</my_status>
+					<my_comments><![CDATA[]]></my_comments>
+					<my_times_watched>0</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags><![CDATA[]]></my_tags>
+					<my_rewatching>0</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>32281</series_animedb_id>
+					<series_title><![CDATA[Kimi no Na wa.]]></series_title>
+					<series_type>Movie</series_type>
+					<series_episodes>1</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>1</my_watched_episodes>
+					<my_start_date>2017-02-11</my_start_date>
+					<my_finish_date>2017-02-11</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>8</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>Completed</my_status>
+					<my_comments><![CDATA[]]></my_comments>
+					<my_times_watched>0</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags><![CDATA[]]></my_tags>
+					<my_rewatching>0</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>16498</series_animedb_id>
+					<series_title><![CDATA[Shingeki no Kyojin]]></series_title>
+					<series_type>TV</series_type>
+					<series_episodes>25</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>0</my_watched_episodes>
+					<my_start_date>0000-00-00</my_start_date>
+					<my_finish_date>0000-00-00</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>0</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>Plan to Watch</my_status>
+					<my_comments><![CDATA[]]></my_comments>
+					<my_times_watched>0</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags><![CDATA[]]></my_tags>
+					<my_rewatching>0</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>37999</series_animedb_id>
+					<series_title><![CDATA[Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen]]></series_title>
+					<series_type>TV</series_type>
+					<series_episodes>12</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>4</my_watched_episodes>
+					<my_start_date>2021-07-00</my_start_date>
+					<my_finish_date>0000-00-00</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>7</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>On-Hold</my_status>
+					<my_comments><![CDATA[Paused at ep 4 <b>on purpose</b> & will resume. Not the end: </anime> is text here.]]></my_comments>
+					<my_times_watched>0</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>MEDIUM</my_priority>
+					<my_tags><![CDATA[romcom]]></my_tags>
+					<my_rewatching>0</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>790</series_animedb_id>
+					<series_title>Ergo Proxy</series_title>
+					<series_type>TV</series_type>
+					<series_episodes>23</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>5</my_watched_episodes>
+					<my_start_date>2019-00-00</my_start_date>
+					<my_finish_date>0000-00-00</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>5</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>Dropped</my_status>
+					<my_comments>Too slow &amp; too grey &#8212; maybe later</my_comments>
+					<my_times_watched>0</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags></my_tags>
+					<my_rewatching>0</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>457</series_animedb_id>
+					<series_title><![CDATA[Mushishi]]></series_title>
+					<series_type>TV</series_type>
+					<series_episodes>26</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>26</my_watched_episodes>
+					<my_start_date>2015-04-01</my_start_date>
+					<my_finish_date>2015-06-20</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>10</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>Completed</my_status>
+					<my_comments><![CDATA[]]></my_comments>
+					<my_times_watched>2</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags><![CDATA[iyashikei, favourites]]></my_tags>
+					<my_rewatching>1</my_rewatching>
+					<my_rewatching_ep>3</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id>199</series_animedb_id>
+					<series_title><![CDATA[Sen to Chihiro no Kamikakushi]]></series_title>
+					<series_type>3</series_type>
+					<series_episodes>1</series_episodes>
+					<my_id>0</my_id>
+					<my_watched_episodes>1</my_watched_episodes>
+					<my_start_date>0000-00-00</my_start_date>
+					<my_finish_date>0000-00-00</my_finish_date>
+					<my_rated></my_rated>
+					<my_score>10</my_score>
+					<my_storage></my_storage>
+					<my_storage_value>0.00</my_storage_value>
+					<my_status>2</my_status>
+					<my_comments><![CDATA[]]></my_comments>
+					<my_times_watched>0</my_times_watched>
+					<my_rewatch_value></my_rewatch_value>
+					<my_priority>LOW</my_priority>
+					<my_tags><![CDATA[]]></my_tags>
+					<my_rewatching>NO</my_rewatching>
+					<my_rewatching_ep>0</my_rewatching_ep>
+					<my_discuss>1</my_discuss>
+					<my_sns>default</my_sns>
+					<update_on_import>0</update_on_import>
+				</anime>
+
+				<anime>
+					<series_animedb_id></series_animedb_id>
+					<series_title><![CDATA[Row with no id]]></series_title>
+					<series_type>TV</series_type>
+					<series_episodes>0</series_episodes>
+					<my_watched_episodes>0</my_watched_episodes>
+					<my_status>Watching</my_status>
+				</anime>
+
+		</myanimelist>

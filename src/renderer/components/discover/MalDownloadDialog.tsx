@@ -44,6 +44,7 @@ import { qbitCredentialGap, qbitCredentialRef } from '../../../shared/subtitleNy
 import type { DiscoveryCandidate } from '../../../shared/mediaDiscovery';
 import type { ReadingMangaProvider } from '../../../shared/readingIpc';
 import type { TorrentRow } from '../../../shared/scraperResults';
+import type { MediaIngestHint, ScraperIngestHandoff } from '../../../shared/mediaIngest';
 import type { LibraryItem } from '../../../shared/types';
 import {
   isLocalOnlyMangaProvider,
@@ -682,6 +683,37 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
     [pickedReleases, pickingReleases, plan, queuedHashes, releases],
   );
 
+  /**
+   * Who these releases are, handed off with them so the finished download is
+   * filed under this catalogue entry — ids, title, poster and, in episode mode,
+   * which episodes each torrent covers — instead of being guessed back out of a
+   * release name. Also carries the destination, which for qBittorrent is now
+   * honoured (Automatic Torrent Management off for that send).
+   */
+  const ingestHandoff = useCallback((): ScraperIngestHandoff => {
+    const handoff: ScraperIngestHandoff = { via: 'mal-dialog' };
+    const savePath = destination.trim();
+    if (savePath) handoff.savePath = savePath;
+    if (!target) return handoff;
+    const hint: MediaIngestHint = { provider: target.provider === 'anilist' ? 'anilist' : 'mal' };
+    if (target.provider === 'anilist') hint.anilistId = target.id;
+    else hint.malId = target.id;
+    if (target.title) hint.title = target.title;
+    if (target.nativeTitle) hint.nativeTitle = target.nativeTitle;
+    if (target.posterUrl) hint.posterUrl = target.posterUrl;
+    if (target.contentType === 'anime') hint.category = 'anime';
+    handoff.hint = hint;
+    if (!pickingReleases && plan) {
+      const rowEpisodes: Record<string, number[]> = {};
+      for (const match of plan.matches) {
+        if (!match.release) continue;
+        (rowEpisodes[match.release.id] ??= []).push(match.unit.number);
+      }
+      if (Object.keys(rowEpisodes).length) handoff.rowEpisodes = rowEpisodes;
+    }
+    return handoff;
+  }, [destination, pickingReleases, plan, target]);
+
   const sendReleases = useCallback(async () => {
     if (!sendable.length) return;
     setSendState('sending');
@@ -694,7 +726,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
         const chosen = releases.filter((row) => ids.includes(row.id));
         const send = window.api?.scraperQbitSend;
         if (typeof send !== 'function') throw new Error(t('malDownload.error.noBackend'));
-        const report = await send({ rows: chosen, config: settings.qbittorrent });
+        const report = await send({ rows: chosen, config: settings.qbittorrent, ingest: ingestHandoff() });
         if (!aliveRef.current) return;
         const message = t('malDownload.sent.qbit', {
           sent: report.sent,
@@ -723,6 +755,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
         torrentIds: ids,
         destination: destination.trim(),
         torrents: releases,
+        ingest: ingestHandoff(),
       });
       if (!aliveRef.current) return;
       setSendMessage(result.message);
@@ -737,7 +770,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
       setSendMessage(errorText(error));
       setSendState('error');
     }
-  }, [destination, releases, sendable, sendTarget, t]);
+  }, [destination, ingestHandoff, releases, sendable, sendTarget, t]);
 
   // ------------------------------------------------------------ manga batch ---
 
@@ -1336,7 +1369,12 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
               </p>
             ) : null}
 
-            {(plan || (pickingReleases && releases.length > 0)) && sendTarget !== 'qbittorrent' ? (
+            {/*
+              Shown for qBittorrent too, now that the send honours it: a
+              destination turns Automatic Torrent Management off for that send,
+              which is what used to make qBittorrent ignore the folder.
+            */}
+            {(plan || (pickingReleases && releases.length > 0)) && availableTargets.length > 0 ? (
               <input
                 className="scr-input mal-dl-destination"
                 value={destination}

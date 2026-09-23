@@ -12,7 +12,7 @@
 
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { ScrapeJobSummary, ScrapeResult } from '../../shared/scraperResults';
+import type { ScrapeJobSummary, ScrapeResult, SeriesMetadata } from '../../shared/scraperResults';
 import { scraperLog } from './logBus';
 import { readScraperJson, scraperStorePath, writeScraperJson } from './store';
 
@@ -149,6 +149,32 @@ export async function storedResult(jobId: string): Promise<ScrapeResult | null> 
   } catch {
     return null;
   }
+}
+
+/**
+ * The series each info hash was found under, from stored results, newest run
+ * first. This is the Scraper's own identification of a torrent — catalogue ids
+ * and titles — for a handoff (the Torrent Manager's free-text search) that did
+ * not carry one. Hashes no stored run listed are absent from the map.
+ */
+export async function seriesForInfoHashes(
+  hashes: readonly string[],
+): Promise<Map<string, SeriesMetadata>> {
+  const wanted = new Set(hashes.map((hash) => hash.toLowerCase()).filter(Boolean));
+  const found = new Map<string, SeriesMetadata>();
+  if (!wanted.size) return found;
+  const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
+  const jobs = scraperHistoryJobsFromStoredDocument(file).sort((a, b) => b.finishedAt - a.finishedAt);
+  for (const job of jobs) {
+    if (found.size === wanted.size) break;
+    const result = await storedResult(job.id);
+    if (!result?.metadata) continue;
+    for (const torrent of result.torrents ?? []) {
+      const hash = (torrent.infoHash ?? '').toLowerCase();
+      if (wanted.has(hash) && !found.has(hash)) found.set(hash, result.metadata);
+    }
+  }
+  return found;
 }
 
 /** Test seam — removes the index and every stored result. */

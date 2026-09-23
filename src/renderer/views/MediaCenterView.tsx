@@ -36,12 +36,33 @@ import StudyOrchestratorWorkspace from '../components/media/StudyOrchestratorWor
 import { useLegacyStudyMediaSurface } from '../components/media/legacyStudyMediaSurface';
 import { orderUpNext, isStarted } from '../components/media/upNext';
 import {
-  ContinueWatchingTile,
   continueWatchingOpenRequest,
   mediaEpisodeBadge,
   useContinueWatchingRows,
   type ContinueWatchingRow,
 } from '../components/media/ContinueWatchingShelf';
+import GumHome, { type GumBrowseRequest } from '../components/media/gum/GumHome';
+import GumLibrary from '../components/media/gum/GumLibrary';
+import GumTitlePage from '../components/media/gum/GumTitlePage';
+import GumImport from '../components/media/gum/GumImport';
+import GumDownloads from '../components/media/gum/GumDownloads';
+import GumArrivalToast from '../components/media/gum/GumArrivalToast';
+import GumPopover from '../components/media/gum/GumPopover';
+import GumIcon from '../components/media/gum/GumIcons';
+import { buildGumTitles, nextEpisodeOf, type GumTitle } from '../components/media/gum/gumModel';
+import {
+  useArrivals,
+  useIngestState,
+  useWatchLibrary,
+} from '../components/media/gum/gumBackend';
+import { useHomeLayout, useLibraryPrefs, useSavedViews } from '../components/media/gum/useGumPrefs';
+import '../components/media/gum/gum.css';
+import MalDownloadDialog from '../components/discover/MalDownloadDialog';
+import { invalidateMediaArtwork } from '../components/media/library/useMediaArtwork';
+import { isWatched, type LibraryEntry } from '../../shared/mediaLibraryEntries';
+import type { MediaMetadataSearchHit } from '../../shared/mediaMetadataIpc';
+import { navigateScraperShell } from '../scraperShellStore';
+import { openSectionSurface } from '../sectionSurface';
 import { studyPlaybackPosition } from '../../shared/studyMediaSurface';
 import { dispatchMediaStudyAction } from '../components/media/MediaStudyActions';
 import {
@@ -52,7 +73,7 @@ import {
   useDiscovery,
   type DiscoveryState,
 } from '../components/discover/DiscoverContent';
-import type { DiscoveryFeedProvenance } from '../../shared/mediaDiscovery';
+import type { DiscoveryCandidate, DiscoveryFeedProvenance } from '../../shared/mediaDiscovery';
 import { loadExternalPlayerPreferences } from '../externalPlayerStore';
 import { loadVideoServerProfilesDocument } from '../videoServerProfilesStore';
 import { isLiked, toggleLiked } from '../likedSongs';
@@ -95,6 +116,10 @@ import './mediaCenter.css';
 export type MediaCenterTab =
   | 'home'
   | 'library'
+  | 'downloads'
+  | 'title'
+  | 'import'
+  | 'files'
   | 'video'
   | 'music'
   | 'study'
@@ -111,13 +136,15 @@ type OpenSeanimeWorkspace = (request?: MediaWorkspaceOpenRequest) => boolean;
 
 const NAV: Array<{ id: MediaCenterTab; labelKey: string; icon: IconName; hintKey: string }> = [
   { id: 'home', labelKey: 'mediaCenter.nav.home', icon: 'app', hintKey: 'mediaCenter.nav.homeHint' },
-  { id: 'library', labelKey: 'mediaCenter.nav.library', icon: 'library', hintKey: 'mediaCenter.nav.libraryHint' },
-  { id: 'video', labelKey: 'mediaCenter.nav.video', icon: 'video', hintKey: 'mediaCenter.nav.videoHint' },
+  { id: 'library', labelKey: 'mediaCenter.nav.library', icon: 'library', hintKey: 'gum.nav.libraryHint' },
+  { id: 'downloads', labelKey: 'gum.nav.downloads', icon: 'download', hintKey: 'gum.nav.downloadsHint' },
+  { id: 'discover', labelKey: 'mediaCenter.nav.discover', icon: 'globe', hintKey: 'mediaCenter.nav.discoverHint' },
   { id: 'music', labelKey: 'mediaCenter.nav.music', icon: 'music', hintKey: 'mediaCenter.nav.musicHint' },
+  { id: 'video', labelKey: 'mediaCenter.nav.video', icon: 'video', hintKey: 'mediaCenter.nav.videoHint' },
   { id: 'study', labelKey: 'mediaCenter.nav.study', icon: 'sparkle', hintKey: 'mediaCenter.nav.studyHint' },
   /*
     Readiness and Review existed only inside the adopted workspace overlay, which covers this
-    sidebar entirely — so the shell that owns Media navigation could not reach two of its own
+    shell entirely — so the shell that owns Media navigation could not reach two of its own
     destinations. They sit after Study because the three are one arc: prepare, watch, come back.
 
     Their labels are the overlay's own keys, deliberately: the same destination reached from
@@ -131,38 +158,21 @@ const NAV: Array<{ id: MediaCenterTab; labelKey: string; icon: IconName; hintKey
   */
   { id: 'readiness', labelKey: 'mediaWorkspace.viewReadiness', icon: 'check', hintKey: 'studyLibrary.title' },
   { id: 'review', labelKey: 'mediaWorkspace.viewReview', icon: 'repeat', hintKey: 'studyLoop.eyebrow' },
-  { id: 'discover', labelKey: 'mediaCenter.nav.discover', icon: 'globe', hintKey: 'mediaCenter.nav.discoverHint' },
+  // Every file, audio included, with the per-file tools — the previous library, kept whole.
+  { id: 'files', labelKey: 'gum.nav.files', icon: 'folder', hintKey: 'gum.nav.filesHint' },
+  { id: 'import', labelKey: 'gum.nav.import', icon: 'download', hintKey: 'gum.nav.importHint' },
   { id: 'settings', labelKey: 'mediaCenter.nav.settings', icon: 'settings', hintKey: 'mediaCenter.nav.settingsHint' },
 ];
 
 /**
- * The sidebar renders `NAV` in two groups: the five media modes always visible, and the
- * secondary destinations behind one collapsed disclosure. `settings` is in neither — it has
- * its own control at the foot of the sidebar.
- *
- * This is Q4's answer on this surface ("advanced tools discoverable without cluttering"),
- * and it is disclosure rather than removal: `Ctrl+6..8` still reach the secondary three with
- * the group closed, because the shortcut is a root `keydown` handler that indexes `NAV`
- * directly and never touches these buttons.
+ * The top bar shows the four places a viewer goes (the approved design's Home · Library ·
+ * Downloads · Discover); everything else — Music, the Video study player, Study, Readiness,
+ * Review, All files, Import, Media settings — sits in one "More" menu. Disclosure, not
+ * removal: `Ctrl+1..9` still reach the first nine `NAV` entries whatever is open, because the
+ * shortcut is a root `keydown` handler that indexes `NAV` directly.
  */
-const PRIMARY_NAV: MediaCenterTab[] = ['home', 'library', 'video', 'music', 'study'];
-const SECONDARY_NAV: MediaCenterTab[] = ['readiness', 'review', 'discover'];
-
-/**
- * Open/closed is a preference, so it survives a reload. Stored as one boolean rather than
- * merged over a defaults map, because there is exactly one group — if a second is ever added,
- * copy `readRailGroupState`'s per-key merge instead of widening this.
- */
-const NAV_TOOLS_KEY = 'jp-mc-nav-tools-open';
-
-function readNavToolsOpen(): boolean {
-  try {
-    return localStorage.getItem(NAV_TOOLS_KEY) === 'true';
-  } catch {
-    // A corrupt or unavailable store must not cost the user their navigation.
-    return false;
-  }
-}
+const PRIMARY_NAV: MediaCenterTab[] = ['home', 'library', 'downloads', 'discover'];
+const SECONDARY_NAV: MediaCenterTab[] = ['music', 'video', 'study', 'readiness', 'review', 'files', 'import', 'settings'];
 
 /**
  * The apps downstream of the Media Center — the ones that receive what mining
@@ -209,11 +219,21 @@ function openSettings(): void {
  * menu both use it); the short delay is what those callers use too, so the
  * listener exists by the time the event fires.
  */
-function openSettingsAt(page: 'scraper', settingId: string): void {
+function openSettingsAt(page: 'scraper' | 'api-keys', settingId?: string): void {
   openSettings();
   window.setTimeout(() => {
     window.dispatchEvent(new CustomEvent('settings:navigate', { detail: { page, settingId } }));
   }, 80);
+}
+
+/**
+ * The Scraper's Torrent Manager — where transfers (qBittorrent) and torrent search live.
+ * The shell state is written before the section opens, the same order
+ * `openScraperSettings` documents, so a cold Scraper mount still lands on the page.
+ */
+function openTorrentManager(): void {
+  navigateScraperShell('torrents');
+  openSectionSurface('scraper');
 }
 
 type NetworkSubtitleProviderId = 'jimaku' | 'opensubtitles';
@@ -379,29 +399,6 @@ function SubtitleProviderQuickSetup() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  detail,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  detail: string;
-  icon: IconName;
-}) {
-  return (
-    <div className="mc-stat-card">
-      <div className="mc-stat-icon"><Icon name={icon} size={16} /></div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </div>
-    </div>
-  );
-}
-
 function MediaTile({
   item,
   active,
@@ -466,226 +463,6 @@ function EmptyShelf({
     </div>
   );
 }
-
-function HomePanel({
-  state,
-  music,
-  onNavigate,
-  onOpenSeanime,
-  workspace,
-}: {
-  state: MediaState;
-  music: MusicState;
-  onNavigate: (tab: MediaCenterTab) => void;
-  onOpenSeanime: OpenSeanimeWorkspace;
-  workspace: MediaWorkspaceAvailability;
-}) {
-  const { t } = useT();
-  const videos = state.items.filter((item) => item.kind !== 'audio' && item.kind !== 'audiobook');
-  const audio = state.items.filter((item) => item.kind === 'audio' || item.kind === 'audiobook');
-  // Both resume stores, not just `MediaItem.positionSec` — see `ContinueWatchingShelf`.
-  const continueRows = useContinueWatchingRows(state.items);
-  const recent = [...state.items].sort((a, b) => b.addedAt - a.addedAt);
-  const heroResume = continueRows[0];
-  const queue = state.items.filter((item) => item.studyQueue);
-  const subtitleReady = state.items.filter((item) => (item.subtitles?.length ?? 0) > 0).length;
-  const minutes = Math.round(state.items.reduce((sum, item) => sum + (item.durationSec ?? 0), 0) / 60);
-
-  const playItem = (item: MediaItem): void => {
-    if (item.kind === 'audio' || item.kind === 'audiobook') {
-      void music.play(item);
-      onNavigate('music');
-      return;
-    }
-    void state.playItem(item.id);
-    onNavigate('video');
-  };
-
-  /**
-   * Resume through the same open path every other workspace handoff in this view uses,
-   * carrying the rewound position explicitly. Audio is the exception: its position comes
-   * from the library's own music player, and the workspace plays video only.
-   */
-  const resume = ({ entry, item }: ContinueWatchingRow): void => {
-    if (item && (item.kind === 'audio' || item.kind === 'audiobook')) {
-      playItem(item);
-      return;
-    }
-    if (onOpenSeanime(continueWatchingOpenRequest(entry))) return;
-    // Said, not swallowed: a tile that silently does nothing reads as a broken shelf.
-    showToast({
-      message: t(workspace === 'pending'
-        ? 'mediaWorkspace.connecting'
-        : 'mediaWorkspace.resumeLast.unavailable'),
-      kind: 'warning',
-    });
-  };
-
-  return (
-    <div className="mc-page mc-home">
-      <section className="mc-hero">
-        <div className="mc-hero-copy">
-          <span className="mc-eyebrow">{t('mediaCenter.home.eyebrow')}</span>
-          <h1>{t('mediaCenter.home.title')}</h1>
-          <p>{t('mediaCenter.home.detail')}</p>
-          <div className="mc-hero-actions">
-            <button type="button" className="mc-button mc-button-primary" onClick={() => void state.openFile()}>
-              <Icon name="folder-open" size={14} /> {t('mediaCenter.action.openMedia')}
-            </button>
-            <button type="button" className="mc-button" onClick={() => onNavigate('discover')}>
-              <Icon name="globe" size={14} /> {t('mediaCenter.action.findStudy')}
-            </button>
-          </div>
-        </div>
-        <div className="mc-hero-art">
-          {heroResume || recent[0] ? (
-            <MediaArtwork
-              // A file the workspace played but Study OS never imported has no item, and
-              // `null` is MediaArtwork's own "draw the title fallback" input.
-              id={heroResume ? heroResume.item?.id ?? null : recent[0].id}
-              title={heroResume ? heroResume.entry.title : recent[0].title}
-              variant="banner"
-              ratio="16 / 9"
-              // The hero copy sits INSIDE this element — the `strong` below is a
-              // child of the artwork — so the title is announced from the same
-              // block the image is in.
-              decorative
-            >
-              <span className="mc-hero-art-shade" />
-              <span className="mc-hero-art-copy">
-                <small>{heroResume ? t('mediaCenter.home.continueStudying') : t('mediaCenter.home.recent')}</small>
-                <strong>{heroResume ? heroResume.entry.title : recent[0].title}</strong>
-              </span>
-            </MediaArtwork>
-          ) : (
-            <div className="mc-hero-art-empty">
-              <Icon name="video" size={34} />
-              <span>{t('mediaCenter.home.emptyHero')}</span>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="mc-stat-grid" aria-label={t('mediaCenter.home.libraryOverview')}>
-        <StatCard label={t('mediaCenter.nav.library')} value={state.items.length} detail={t('mediaCenter.home.mediaCounts', { videos: videos.length, audio: audio.length })} icon="library" />
-        <StatCard label={t('mediaCenter.home.studyReady')} value={subtitleReady} detail={t('mediaCenter.home.subtitleTitles')} icon="caption" />
-        <StatCard label={t('mediaCenter.common.studyQueue')} value={queue.length} detail={t('mediaCenter.home.savedLater')} icon="bookmark" />
-        <StatCard label={t('mediaCenter.home.runtime')} value={minutes ? `${minutes}m` : '—'} detail={t('mediaCenter.home.indexedMedia')} icon="chart-bar" />
-      </section>
-
-      <div className="mc-home-columns">
-        <div className="mc-home-main">
-          <section className="mc-shelf">
-            <div className="mc-section-head">
-              <div><span className="mc-eyebrow">{t('mediaCenter.home.continueEyebrow')}</span><h2>{t('mediaCenter.home.continue')}</h2></div>
-              <button type="button" onClick={() => onNavigate('library')}>{t('mediaCenter.action.viewLibrary')} <Icon name="chevron" size={11} /></button>
-            </div>
-            {continueRows.length > 0 ? (
-              <div className="mc-tile-row">
-                {continueRows.slice(0, 5).map((row) => (
-                  <ContinueWatchingTile
-                    key={row.entry.pathKey}
-                    row={row}
-                    active={row.item != null && state.current?.id === row.item.id}
-                    onResume={resume}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyShelf
-                title={t('mediaCenter.home.nothingInProgress')}
-                detail={t('mediaCenter.home.progressEmptyDetail')}
-                action={() => void state.openFile()}
-              />
-            )}
-          </section>
-
-          <section className="mc-shelf">
-            <div className="mc-section-head">
-              <div><span className="mc-eyebrow">{t('mediaCenter.home.recentEyebrow')}</span><h2>{t('mediaCenter.home.recent')}</h2></div>
-              <button type="button" onClick={() => onNavigate('library')}>{t('mediaCenter.action.seeAll')} <Icon name="chevron" size={11} /></button>
-            </div>
-            {recent.length > 0 ? (
-              <div className="mc-tile-row">
-                {recent.slice(0, 5).map((item) => (
-                  <MediaTile
-                    key={item.id}
-                    item={item}
-                    onPlay={() => playItem(item)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyShelf title={t('mediaCenter.home.buildLibrary')} detail={t('mediaCenter.home.buildLibraryDetail')} action={() => void state.openFolder()} />
-            )}
-          </section>
-        </div>
-
-        <aside className="mc-home-aside">
-          <div className="mc-aside-card">
-            <div className="mc-section-head">
-              <div><span className="mc-eyebrow">{t('mediaCenter.home.studyEyebrow')}</span><h2>{t('mediaCenter.common.studyQueue')}</h2></div>
-              <button type="button" onClick={() => onNavigate('study')}>{t('common.open')}</button>
-            </div>
-            {queue.length > 0 ? queue.slice(0, 4).map((item, index) => (
-              <button
-                type="button"
-                className="mc-queue-row"
-                key={item.id}
-                onClick={() => {
-                  dispatchMediaStudyAction(item, 'study-episode');
-                  onNavigate('study');
-                }}
-              >
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <div><strong>{item.title}</strong><small>{item.jlptLevel ?? t('mediaCenter.study.levelUnknown')} · {mediaKindLabel(item)}</small></div>
-                <Icon name="chevron" size={11} />
-              </button>
-            )) : (
-              <div className="mc-aside-empty">
-                <Icon name="bookmark" size={21} />
-                <p>{t('mediaCenter.home.studyEmpty')}</p>
-              </div>
-            )}
-          </div>
-
-          {/*
-            * This slot used to hold a "browse catalogues" card whose only
-            * action was `onNavigate('discover')` — the row directly below it in
-            * the sidebar. A duplicate route dressed as a destination.
-            *
-            * The Media Center produces mined sentences, cards and study time,
-            * and until now none of the three apps that consume them was
-            * reachable from here: the whole surface deep-linked to exactly one
-            * other app in the desktop, Settings. These are the handoffs a
-            * learner actually needs after finishing an episode.
-            */}
-          <div className="mc-aside-card">
-            <div className="mc-section-head">
-              <div>
-                <span className="mc-eyebrow">{t('mediaCenter.home.handoffEyebrow')}</span>
-                <h2>{t('mediaCenter.home.handoffTitle')}</h2>
-              </div>
-            </div>
-            {STUDY_HANDOFFS.map(({ app, labelKey, hintKey, icon }) => (
-              <button
-                type="button"
-                className="mc-queue-row"
-                key={app}
-                onClick={() => window.dispatchEvent(new CustomEvent('os:open', { detail: app }))}
-              >
-                <span><Icon name={icon} size={14} /></span>
-                <div><strong>{t(labelKey)}</strong><small>{t(hintKey)}</small></div>
-                <Icon name="external" size={11} />
-              </button>
-            ))}
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
 
 function LibraryPanel({
   state,
@@ -1459,10 +1236,21 @@ function useSourceRows(provenance: DiscoveryFeedProvenance | null) {
   return { catalogueRows, profileRows };
 }
 
-function SettingsPanel({ state, provenance }: { state: MediaState; provenance: DiscoveryFeedProvenance | null }) {
+function SettingsPanel({
+  state,
+  provenance,
+  onOpenAutomation,
+}: {
+  state: MediaState;
+  provenance: DiscoveryFeedProvenance | null;
+  /** Watch folders and auto-import moved to Import & automation (`MediaWatchFoldersPanel`). */
+  onOpenAutomation: () => void;
+}) {
   const { t } = useT();
   const currentRate = state.playbackRate;
   const { catalogueRows, profileRows } = useSourceRows(provenance);
+  const ingest = useIngestState().state;
+  const activeFolders = ingest?.folders.filter((folder) => folder.active).length ?? 0;
 
   /**
    * Which whole-library job is in flight, or null.
@@ -1623,13 +1411,15 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
         <SettingsSection icon="library" title={t('mediaCenter.settings.library')} detail={t('mediaCenter.settings.libraryDetail')}>
           <div className="mc-setting-summary">
             <span><strong>{state.items.length}</strong><small>{t('mediaCenter.settings.mediaItems')}</small></span>
-            <span><strong>{state.watchFolder ? t('mediaCenter.settings.on') : t('mediaCenter.settings.off')}</strong><small>{t('mediaCenter.settings.folderWatching')}</small></span>
+            {/* Read from the ingest pipeline's own state (`onMediaIngestState`), not the
+                legacy single `watchFolder`, which the folder list replaced. */}
+            <span><strong>{activeFolders}</strong><small>{t('gum.settings.watchedFolders')}</small></span>
             <span><strong>{state.items.filter((item) => item.posterPath).length}</strong><small>{t('mediaCenter.settings.providerPosters')}</small></span>
           </div>
           <div className="mc-settings-actions mc-settings-actions-stack">
             <button type="button" onClick={() => void state.openFile()}><Icon name="file" size={12} /> {t('mediaCenter.settings.importFiles')}</button>
             <button type="button" onClick={() => void state.openFolder()}><Icon name="folder-open" size={12} /> {t('mediaCenter.settings.importFolder')}</button>
-            <button type="button" onClick={() => void state.chooseWatchFolder()}><Icon name="eye" size={12} /> {state.watchFolder ? t('mediaCenter.settings.changeWatch') : t('mediaCenter.settings.chooseWatch')}</button>
+            <button type="button" onClick={onOpenAutomation}><Icon name="eye" size={12} /> {t('gum.settings.automation')}</button>
             <button type="button" onClick={() => void refreshMetadata()} disabled={libraryJob !== null} aria-busy={libraryJob === 'metadata'}>
               <Icon name="refresh" size={12} /> {libraryJob === 'metadata' ? t('mediaCenter.settings.working') : t('mediaCenter.settings.refreshMetadata')}
             </button>
@@ -1637,7 +1427,6 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
               <Icon name="caption" size={12} /> {libraryJob === 'subtitles' ? t('media.subtitles.searching') : t('mediaCenter.settings.findSubtitles')}
             </button>
           </div>
-          {state.watchFolder && <p className="mc-path-note" title={state.watchFolder}>{state.watchFolder}</p>}
         </SettingsSection>
 
         <SettingsSection icon="globe" title={t('mediaCenter.settings.sources')} detail={t('mediaCenter.settings.sourcesDetail')}>
@@ -1836,20 +1625,24 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     [t, lang],
   );
 
-  const [navToolsOpen, setNavToolsOpen] = useState<boolean>(readNavToolsOpen);
-  useEffect(() => {
-    try {
-      localStorage.setItem(NAV_TOOLS_KEY, String(navToolsOpen));
-    } catch {
-      // Preference only; a full or blocked store must not break navigation.
-    }
-  }, [navToolsOpen]);
-  /**
-   * A collapsed group must never be the thing hiding the current destination. Forced open
-   * for the render rather than written back to the preference, so arriving at Discover via
-   * `Ctrl+8` does not silently re-open a group the user closed once they leave again.
+  /*
+   * The media library's data: tracked titles (`watch:list`, re-read on `watch:changed`)
+   * joined with the local files `useMedia` already holds, plus the viewer's arrangement.
+   * One `titles` list feeds Home, Library, the title page and the toast.
    */
-  const toolsOpen = navToolsOpen || SECONDARY_NAV.includes(tab);
+  const watch = useWatchLibrary();
+  const arrivalFeed = useArrivals();
+  const ingestState = useIngestState().state;
+  const [savedViews, setSavedViews] = useSavedViews();
+  const homeLayout = useHomeLayout(savedViews.map((view) => view.id));
+  const [libraryPrefs, setLibraryPrefs] = useLibraryPrefs();
+  // Metadata sweeps land through `media:changed` (the items) and `watch:changed` (the
+  // tracked titles); replaced artwork re-asks through `useMediaArtwork`'s own listener.
+  const titles = useMemo(() => buildGumTitles(watch.views, media.items), [watch.views, media.items]);
+  const continueRows = useContinueWatchingRows(media.items);
+  const [titleId, setTitleId] = useState<string | null>(null);
+  const [downloadFor, setDownloadFor] = useState<DiscoveryCandidate | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   /** Jump to a tab, truncating any forward trail — the browser convention. */
   const setTab = (next: MediaCenterTab): void => {
@@ -1892,11 +1685,11 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   }, []);
 
   /**
-   * One destination button, rendered identically whichever group it lands in — the primary
-   * list or the collapsed disclosure. The `Ctrl+N` hint is derived from the item's index in
-   * `NAV`, never from its index within a group, because the shortcut handler indexes `NAV`.
+   * One destination button, rendered identically whichever group it lands in — the top bar
+   * or the More menu. The `Ctrl+N` hint is derived from the item's index in `NAV`, never
+   * from its index within a group, because the shortcut handler indexes `NAV`.
    */
-  const navLink = (item: typeof nav[number]) => {
+  const navLink = (item: typeof nav[number], onPick?: () => void) => {
     const shortcut = NAV.findIndex((entry) => entry.id === item.id) + 1;
     const queued = item.id === 'study' ? media.items.filter((entry) => entry.studyQueue).length : 0;
     return (
@@ -1904,16 +1697,17 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         type="button"
         key={item.id}
         className={tab === item.id ? 'is-active' : ''}
-        // These sit inside the `mc-nav` landmark and choose the destination the shell is
-        // showing, so the state is `aria-current="page"`, not a pressed toggle. Without it
-        // all eight destinations announce identically and the rail's only account of where
-        // you are is a class name.
+        // These choose the destination the shell is showing, so the state is
+        // `aria-current="page"`, not a pressed toggle. Without it every destination
+        // announces identically and the bar's only account of where you are is a class name.
         aria-current={tab === item.id ? 'page' : undefined}
-        onClick={() => navigate(item.id)}
-        title={`${item.hint} (Ctrl+${shortcut})`}
+        onClick={() => {
+          navigate(item.id);
+          onPick?.();
+        }}
+        title={shortcut <= 9 ? `${item.hint} (Ctrl+${shortcut})` : item.hint}
       >
-        <Icon name={item.icon} size={15} />
-        <span><strong>{item.label}</strong><small>{item.hint}</small></span>
+        <span>{item.label}</span>
         {queued > 0 && <em>{queued}</em>}
       </button>
     );
@@ -1939,7 +1733,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
    * The Navigate menu was the only keyboard route between sections, and
    * `AppChrome` renders the menu bar only under the Aero and Wired material
    * sets — so in the default theme there was no keyboard way to change section
-   * at all. Ctrl+1…7 follow the sidebar order; Alt+Left/Right walk the history
+   * at all. Ctrl+1…9 follow `NAV`'s order; Alt+Left/Right walk the history
    * trail, matching the arrows in the top bar.
    *
    * The listener is on this instance's own root, not on `window`. Media, Video
@@ -1966,7 +1760,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
       }
       if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
       const index = Number(event.key) - 1;
-      if (!Number.isInteger(index) || index < 0 || index >= NAV.length) return;
+      if (!Number.isInteger(index) || index < 0 || index >= Math.min(9, NAV.length)) return;
       event.preventDefault();
       navigate(NAV[index].id);
     };
@@ -1978,7 +1772,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     ? t('mediaCenter.search.music')
     : tab === 'discover'
       ? t('mediaCenter.search.discover')
-      : t('mediaCenter.search.library');
+      : t('gum.search.placeholder');
 
   /*
    * Stable by construction, or `GlobalSearchField`'s memo is decorative: the whole point is that
@@ -1992,10 +1786,170 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
       media.setQuery(next);
       // Focusing a global control must not change context (keyboard users encounter it while
       // tabbing). The first actual library query owns the navigation instead, so search remains
-      // immediate without a focus trap.
-      if (tab !== 'library') setTab('library');
+      // immediate without a focus trap. All files keeps its own search, so it stays put.
+      if (tab !== 'library' && tab !== 'files' && next.trim()) setTab('library');
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Playing and opening
+  // -------------------------------------------------------------------------
+
+  /**
+   * Play one file. Video goes to the player workspace with `startAtSec` when resuming;
+   * audio stays in this window's music player. Without a workspace the file loads into
+   * the Video tab's legacy stage, said rather than swallowed.
+   */
+  const playItem = useStableCallback((item: MediaItem, startAtSec?: number) => {
+    if (item.kind === 'audio' || item.kind === 'audiobook') {
+      void music.play(item);
+      setTab('music');
+      return;
+    }
+    if (openSeanime(startAtSec && startAtSec > 0 ? { localFilePath: item.path, startAtSec } : { localFilePath: item.path })) return;
+    showToast({
+      message: t(workspace === 'pending' ? 'mediaWorkspace.connecting' : 'mediaWorkspace.resumeLast.unavailable'),
+      kind: 'warning',
+    });
+    void media.playItem(item.id);
+    setTab('video');
+  });
+
+  /** A file's resume position from the shared resume store (the workspace writes it). */
+  const resumeAt = useStableCallback((item: MediaItem): number | undefined => {
+    const row = continueRows.find((candidate) => candidate.item?.id === item.id);
+    if (row) return continueWatchingOpenRequest(row.entry).startAtSec;
+    return item.positionSec && !isWatched(item) ? item.positionSec : undefined;
+  });
+
+  /**
+   * Resume a Continue-watching row through the same open path every other workspace
+   * handoff in this view uses, carrying the rewound position explicitly. Audio is the
+   * exception: its position comes from the library's own music player.
+   */
+  const resumeRow = useStableCallback((row: ContinueWatchingRow) => {
+    const { entry, item } = row;
+    if (item && (item.kind === 'audio' || item.kind === 'audiobook')) {
+      playItem(item);
+      return;
+    }
+    if (openSeanime(continueWatchingOpenRequest(entry))) return;
+    // Said, not swallowed: a tile that silently does nothing reads as a broken shelf.
+    showToast({
+      message: t(workspace === 'pending'
+        ? 'mediaWorkspace.connecting'
+        : 'mediaWorkspace.resumeLast.unavailable'),
+      kind: 'warning',
+    });
+  });
+
+  const playTitle = useStableCallback((title: GumTitle) => {
+    const next = nextEpisodeOf(title);
+    if (next) playItem(next, resumeAt(next));
+  });
+
+  const openTitle = useStableCallback((title: GumTitle) => {
+    setTitleId(title.id);
+    setTab('title');
+  });
+
+  const browse = useStableCallback((request: GumBrowseRequest) => {
+    setLibraryPrefs((current) => {
+      const status = request.status ?? 'all';
+      return {
+        ...current,
+        status,
+        type: request.type ?? 'all',
+        byStatus: request.filters
+          ? { ...current.byStatus, [status]: { ...current.byStatus[status], filters: request.filters } }
+          : current.byStatus,
+      };
+    });
+    setTab('library');
+  });
+
+  /**
+   * "Find download": an anime with a MyAnimeList id opens the Scraper's download chooser
+   * for exactly that show (the same dialog Discover uses); anything else opens the
+   * Scraper's Torrent Manager, where the search lives.
+   */
+  const findDownload = useStableCallback((title: GumTitle) => {
+    if (title.anime && title.malId) {
+      setDownloadFor({
+        provider: 'jikan',
+        id: title.malId,
+        mediaType: 'anime',
+        title: title.title,
+        nativeTitle: title.originalTitle,
+        year: title.year,
+        episodeCount: title.episodeCount,
+        genres: title.genres,
+      });
+      return;
+    }
+    openTorrentManager();
+  });
+
+  const current = titleId ? titles.find((title) => title.id === titleId) ?? null : null;
+  // An untracked title that just got tracked changes id (`local:…` → the watch id): follow
+  // it through its first file, so setting a status does not strand the page.
+  const [lastTitle, setLastTitle] = useState<GumTitle | null>(null);
+  useEffect(() => {
+    if (current) setLastTitle(current);
+  }, [current]);
+  useEffect(() => {
+    if (current || !lastTitle) return;
+    const firstItem = lastTitle.items[0]?.id;
+    const replacement = firstItem ? titles.find((title) => title.items.some((item) => item.id === firstItem)) : undefined;
+    if (replacement && replacement.id !== titleId) setTitleId(replacement.id);
+  }, [titles, current, lastTitle, titleId]);
+  const shownTitle = current ?? (lastTitle && lastTitle.id === titleId ? lastTitle : null);
+
+  const previousTab = history.at > 0 ? history.trail[history.at - 1] : 'library';
+  const backLabel = t(previousTab === 'home' ? 'gum.back.home' : previousTab === 'title' ? 'gum.back.title' : 'gum.back.library');
+  const goBack = (): void => {
+    if (history.at > 0) step(-1);
+    else setTab('library');
+  };
+
+  const fileTools = {
+    currentId: media.current?.id ?? null,
+    activeSubtitleName: media.subName,
+    onToggleFavorite: async (entry: LibraryEntry, next: boolean) => {
+      await Promise.all([...entry.items, ...entry.extras].map((item) => window.api.setMediaItemState(item.id, { favorite: next })));
+      showToast({ message: t(next ? 'media.toast.favorited' : 'media.toast.unfavorited', { title: entry.title }), kind: 'success' });
+    },
+    onToggleStudyQueue: async (entry: LibraryEntry, next: boolean) => {
+      await Promise.all([...entry.items, ...entry.extras].map((item) => window.api.setMediaItemState(item.id, { studyQueue: next })));
+      showToast({ message: t(next ? 'media.toast.queued' : 'media.toast.dequeued', { title: entry.title }), kind: 'success' });
+    },
+    onNoteChange: async (item: MediaItem, note: string) => {
+      await window.api.setMediaItemState(item.id, { note });
+      showToast({ message: t('media.toast.noteSaved'), kind: 'success' });
+    },
+    onRematch: async (entry: LibraryEntry, hit: MediaMetadataSearchHit) => {
+      try {
+        const result = await window.api.runMediaMetadata({
+          mediaIds: [...entry.items, ...entry.extras].map((item) => item.id),
+          force: true,
+          override: { provider: hit.provider, id: hit.id },
+        });
+        if (!result.ok) throw new Error(result.error ?? 'unknown');
+        // Cached artwork for these ids is now the previous match's.
+        invalidateMediaArtwork();
+        showToast({ message: t('media.toast.rematched', { title: hit.title }), kind: 'success' });
+      } catch (error) {
+        showToast({ message: t('media.toast.saveFailed', { reason: error instanceof Error ? error.message : String(error) }), kind: 'error' });
+      }
+    },
+    onUseSubtitle: async (mediaId: string, recordId: string) => {
+      const pick = await window.api.readSubtitleRecord(mediaId, recordId);
+      if (!pick) throw new Error(t('mediaCenter.library.subtitleMissing'));
+      await window.api.setMediaItemState(mediaId, { preferredSubtitleId: recordId });
+      const item = media.items.find((entry) => entry.id === mediaId);
+      if (item) playItem(item, resumeAt(item));
+    },
+  };
 
   const mediaMenus: MenuBarMenu[] = [
     {
@@ -2004,7 +1958,8 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
       items: [
         { id: 'open', label: t('mediaCenter.menu.openMedia'), icon: <Icon name="folder-open" size={14} />, onSelect: media.openFile },
         { id: 'folder', label: t('mediaCenter.menu.addFolder'), icon: <Icon name="folder" size={14} />, onSelect: media.openFolder },
-        { id: 'watch', label: media.watchFolder ? t('mediaCenter.menu.changeWatch') : t('mediaCenter.menu.setWatch'), onSelect: media.chooseWatchFolder },
+        { id: 'watch', label: t('gum.menu.watchFolders'), onSelect: () => setTab('import') },
+        { id: 'import', label: t('gum.nav.import'), onSelect: () => setTab('import') },
       ],
     },
     {
@@ -2028,28 +1983,98 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     },
   ];
 
+  const activeFolders = ingestState?.folders.filter((folder) => folder.active).length ?? 0;
   const status = (
     <>
       <StatusBarField>{t('mediaCenter.nav.label')}</StatusBarField>
-      <StatusBarField>{t('mediaCenter.shell.itemCount', { count: media.items.length })}</StatusBarField>
+      <StatusBarField>{t('gum.library.titleCount', { count: titles.length })}</StatusBarField>
       <StatusBarField>{t('mediaCenter.shell.songCount', { count: music.baseSongs.length })}</StatusBarField>
       <StatusBarSpacer />
-      <StatusBarField>{nav.find((item) => item.id === tab)?.label ?? tab}</StatusBarField>
-      {media.watchFolder && <StatusBarField>{t('mediaCenter.shell.watchingFolder')}</StatusBarField>}
+      <StatusBarField>{nav.find((item) => item.id === tab)?.label ?? shownTitle?.title ?? tab}</StatusBarField>
+      {activeFolders > 0 && <StatusBarField>{t('gum.status.watchingFolders', { count: activeFolders })}</StatusBarField>}
     </>
   );
 
-  const body = useMemo(() => {
+  const loading = !watch.ready;
+  // Home and the title page run their backdrop under the translucent top bar.
+  const bleed = tab === 'home' || (tab === 'title' && !!shownTitle);
+
+  const body = (() => {
     if (tab === 'home') return (
-      <HomePanel
-        state={media}
-        music={music}
-        onNavigate={navigate}
-        onOpenSeanime={openSeanime}
-        workspace={workspace}
+      <GumHome
+        titles={titles}
+        continueRows={continueRows}
+        arrivals={arrivalFeed.arrivals}
+        savedViews={savedViews}
+        layout={homeLayout.layout}
+        setLayout={homeLayout.setLayout}
+        onResetLayout={homeLayout.reset}
+        loading={loading}
+        onOpenTitle={openTitle}
+        onPlayTitle={playTitle}
+        onPlayItem={playItem}
+        onResumeRow={resumeRow}
+        onBrowse={browse}
+        onAddFiles={() => void media.openFile()}
+        onAddFolder={() => void media.openFolder()}
+        onImport={() => setTab('import')}
       />
     );
     if (tab === 'library') return (
+      <GumLibrary
+        titles={titles}
+        loading={loading}
+        search={media.query}
+        prefs={libraryPrefs}
+        setPrefs={setLibraryPrefs}
+        savedViews={savedViews}
+        setSavedViews={setSavedViews}
+        homeLayout={homeLayout.layout}
+        setHomeLayout={homeLayout.setLayout}
+        onOpenTitle={openTitle}
+        onPlayTitle={playTitle}
+        onClearSearch={() => media.setQuery('')}
+        onImport={() => setTab('import')}
+        onAddFolder={() => void media.openFolder()}
+      />
+    );
+    if (tab === 'title') return shownTitle ? (
+      <GumTitlePage
+        title={shownTitle}
+        onBack={goBack}
+        backLabel={backLabel}
+        onPlayItem={playItem}
+        resumeAt={resumeAt}
+        onFindDownload={findDownload}
+        onOpenSubtitleSettings={() => openSettingsAt('scraper', 'subtitle-providers')}
+        onOpenApiKeys={() => openSettingsAt('api-keys')}
+        fileTools={fileTools}
+      />
+    ) : (
+      <div className="gum-page gum-empty" role="status">
+        <strong>{t('gum.title.gone')}</strong>
+        <button type="button" className="gum-btn gum-btn--ghost" onClick={() => setTab('library')}>{t('gum.back.library')}</button>
+      </div>
+    );
+    if (tab === 'downloads') return (
+      <GumDownloads
+        titles={titles}
+        arrivals={arrivalFeed.arrivals}
+        onOpenTorrents={openTorrentManager}
+        onOpenTitle={openTitle}
+        onPlayItem={(item) => playItem(item)}
+        onImport={() => setTab('import')}
+      />
+    );
+    if (tab === 'import') return (
+      <GumImport
+        titles={titles}
+        onBack={goBack}
+        backLabel={backLabel}
+        onOpenSettings={(settingId) => openSettingsAt('scraper', settingId)}
+      />
+    );
+    if (tab === 'files') return (
       <LibraryPanel
         state={media}
         music={music}
@@ -2084,13 +2109,10 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
       <SeanimeWatchLoopPanel focus={reviewFocus} onClearFocus={() => setReviewFocus(null)} />
     );
     if (tab === 'discover') return <DiscoverPanel state={discovery} />;
-    return <SettingsPanel state={media} provenance={discovery.provenance} />;
-  }, [
-    tab, media, music, discovery, readiness, openSeanime, seanimeAvailable,
-    // `seanimeAvailable` collapses three availability states into two, so on its own it
-    // holds a stale panel across `pending` → `unavailable`.
-    workspace,
-  ]);
+    return <SettingsPanel state={media} provenance={discovery.provenance} onOpenAutomation={() => setTab('import')} />;
+  })();
+
+  const moreActive = SECONDARY_NAV.includes(tab);
 
   return (
     <AppChrome menus={mediaMenus} status={status} className="mc-app-chrome">
@@ -2102,7 +2124,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         * something unfocusable.
         */}
       <div
-        className="mc-root"
+        className="mc-root gum-root"
         ref={rootRef}
         tabIndex={-1}
         onPointerDown={() => {
@@ -2112,75 +2134,21 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
           });
         }}
       >
-        <ContextualSurface as="aside" className="mc-sidebar">
-          <div className="mc-brand">
-            <span className="mc-brand-mark"><Icon name="player" size={16} /></span>
-            <span><strong>{t('mediaCenter.nav.label')}</strong><small>{t('mediaCenter.nav.tagline')}</small></span>
-          </div>
-
+        <div className="mc-workspace gum-workspace" data-bleed={bleed ? 'true' : undefined} data-scrolled={scrolled ? 'true' : undefined}>
           {/*
-            Filtered by id, not `slice(0, 6)`. That count silently meant "everything
-            except Settings", which has its own control below — so the moment retirement
-            hid Video and Library the slice stopped excluding anything and Settings
-            rendered twice.
-
-            `index` is the position in the FULL `nav` array, not in whichever group the
-            item renders into, because the `Ctrl+N` hint has to keep naming the shortcut
-            `NAV[index]` actually binds (`onKey` above indexes `NAV`, not this list).
+            The approved design's top bar replaces the 206px sidebar: four destinations, a
+            More menu for the rest, search, and Import. It is a Liquid contextual surface —
+            glass in Liquid presentation, the shell's own translucent bar otherwise.
           */}
-          <ContextualSurface as="nav" className="mc-nav" aria-label={t('mediaCenter.nav.label')}>
-            <span className="mc-nav-label">{t('mediaCenter.shell.browse')}</span>
-            {nav.filter((item) => PRIMARY_NAV.includes(item.id)).map((item) => navLink(item))}
-
-            {/*
-              PROGRESSIVE DISCLOSURE, not deletion. Readiness, Review, Discover and the
-              workspace launcher are the shell's secondary destinations: each is still one
-              click and one Enter away, `Ctrl+6..8` still reach them with the group closed
-              because the shortcut is a root keydown handler rather than a click on these
-              buttons, and a group holding the ACTIVE destination is forced open below —
-              the same three rules `MediaLibrarySidebar` already established for its rail.
-            */}
-            <details
-              className="mc-nav-group"
-              open={toolsOpen}
-              onToggle={(event) => setNavToolsOpen((event.currentTarget as HTMLDetailsElement).open)}
-            >
-              {/*
-                NOT `.mc-nav-label`, even though it looks like one. The ≤820px container rule
-                sets `.mc-nav-label { display: none }` to collapse the sidebar to a 58px icon
-                rail — which would delete the only control that opens this group and strand
-                three destinations behind it. Its own class keeps the chevron at every width
-                and drops just the wordmark.
-              */}
-              <summary className="mc-nav-group__heading" title={t('mediaCenter.shell.studyTools')}>
-                <Icon name="chevron" size={11} />
-                <span>{t('mediaCenter.shell.studyTools')}</span>
-              </summary>
-              {nav.filter((item) => SECONDARY_NAV.includes(item.id)).map((item) => navLink(item))}
-            </details>
-          </ContextualSurface>
-
-          <div className="mc-sidebar-spacer" />
-
-          <div className="mc-sidebar-library">
-            <span className="mc-nav-label">{t('mediaCenter.shell.libraryStatus')}</span>
-            <div><span className="mc-storage-ring">{media.items.length}</span><p><strong>{t('mediaCenter.shell.localItems')}</strong><small>{media.watchFolder ? t('mediaCenter.shell.watchActive') : t('mediaCenter.shell.manualImports')}</small></p></div>
-          </div>
-
-          <button type="button" className={`mc-settings-link${tab === 'settings' ? ' is-active' : ''}`} onClick={() => setTab('settings')}>
-            <Icon name="settings" size={15} /><span><strong>{t('mediaCenter.nav.settings')}</strong><small>{t('mediaCenter.nav.settingsHint')}</small></span>
-          </button>
-        </ContextualSurface>
-
-        <div className="mc-workspace">
-          <ContextualSurface as="header" className="mc-topbar">
-            {/* Both are icon-only and disabled on a fresh trail, so `title="Back"` named the
-                button and never explained the grey. The title carries the REASON while
-                disabled and the label while enabled; unlike Immersion's pair these already
-                had `aria-label`, so the accessible name never rode on `title` here and does
-                not move. The trail walks Media Center SECTIONS, not web pages — the wording
-                follows the thing being navigated. */}
-            <div className="mc-history-buttons">
+          <ContextualSurface as="header" className="gum-topnav">
+            <div className="gum-brand">
+              <span className="gum-brand__mark" aria-hidden="true"><Icon name="player" size={13} /></span>
+              <span className="gum-brand__name">{t('mediaCenter.nav.label')}</span>
+            </div>
+            {/* Both are icon-only and disabled on a fresh trail, so the title carries the
+                REASON while disabled and the label while enabled; `aria-label` holds the
+                name either way. The trail walks Media Center SECTIONS, not web pages. */}
+            <div className="mc-history-buttons gum-history">
               <button
                 type="button"
                 title={noBack ? t('mediaCenter.shell.reason.noBack') : t('mediaCenter.shell.back')}
@@ -2200,9 +2168,36 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 <Icon name="chevron" size={12} />
               </button>
             </div>
-            <div className="mc-breadcrumb">
-              <span>{t('mediaCenter.nav.label')}</span><Icon name="chevron" size={9} /><strong>{nav.find((item) => item.id === tab)?.label}</strong>
-            </div>
+            <nav className="gum-nav" aria-label={t('mediaCenter.nav.label')}>
+              {nav.filter((item) => PRIMARY_NAV.includes(item.id)).map((item) => navLink(item))}
+              <GumPopover
+                className="gum-nav-more"
+                label={<span>{moreActive ? nav.find((item) => item.id === tab)?.label : t('gum.nav.more')}</span>}
+                active={moreActive}
+              >
+                {(close) => (
+                  <div className="gum-menu gum-menu--nav">
+                    {nav.filter((item) => SECONDARY_NAV.includes(item.id)).map((item) => navLink(item, close))}
+                    <div className="gum-menu__sep" role="separator" />
+                    <span className="gum-menu__label">{t('mediaCenter.home.handoffTitle')}</span>
+                    {STUDY_HANDOFFS.map(({ app, labelKey }) => (
+                      <button
+                        type="button"
+                        key={app}
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('os:open', { detail: app }));
+                          close();
+                        }}
+                      >
+                        <span>{t(labelKey)}</span>
+                        <Icon name="external" size={11} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </GumPopover>
+            </nav>
+            <div className="gum-topnav__spacer" />
             <GlobalSearchField
               value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}
               // Which store owns `value` right now. Three tabs read three different queries, so
@@ -2213,25 +2208,28 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
               onCommit={commitSearch}
               onEnter={tab === 'discover' ? discovery.submitQuery : undefined}
             />
-            {/*
-              `Open media` keeps its topbar slot because it is the only visible way to add a
-              file from Home, Music, Study, Readiness, Review and Discover — the library
-              toolbar's `Add` exists only on Library. A settings button stood beside it and
-              ran the identical `setTab('settings')` as `.mc-settings-link` in the sidebar,
-              which is present at every width (the ≤820px rule hides its `> span`, not the
-              button). Two persistent controls, one destination; the sidebar owns it, because
-              that is the one carrying the active state.
-            */}
-            <button type="button" className="mc-top-action" title={t('mediaCenter.action.openMedia')} aria-label={t('mediaCenter.action.openMedia')} onClick={() => void media.openFile()}><Icon name="plus" size={14} /></button>
+            <button
+              type="button"
+              className="gum-btn gum-btn--outline gum-topnav__import"
+              aria-current={tab === 'import' ? 'page' : undefined}
+              onClick={() => setTab('import')}
+            >
+              <GumIcon name="import" size={14} /> <span>{t('gum.nav.import')}</span>
+            </button>
           </ContextualSurface>
 
-          <main className="mc-content">{body}</main>
+          <main
+            className="mc-content gum-content"
+            onScroll={(event) => {
+              const next = event.currentTarget.scrollTop > 24;
+              if (next !== scrolled) setScrolled(next);
+            }}
+          >
+            {body}
+          </main>
           {/*
             * A "persistent" player with nothing in it is not persistent, it is
-            * furniture. It was spending 60px at the bottom of Settings,
-            * Discover, Study and Video to say "Nothing playing / Choose music
-            * from your library" beside five disabled transport buttons and two
-            * dead sliders. It appears the moment there is a track — and then it
+            * furniture. It appears the moment there is a track — and then it
             * genuinely does follow you across every tab — and on Music, where
             * the transport is the point of the page.
             */}
@@ -2240,6 +2238,14 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
           )}
         </div>
 
+        <GumArrivalToast
+          event={arrivalFeed.latest}
+          titles={titles}
+          onDismiss={arrivalFeed.dismiss}
+          onPlay={(item) => playItem(item)}
+          onOpenTitle={openTitle}
+        />
+        {downloadFor && <MalDownloadDialog candidate={downloadFor} onClose={() => setDownloadFor(null)} />}
         <MediaLookupPopup state={media} />
       </div>
     </AppChrome>

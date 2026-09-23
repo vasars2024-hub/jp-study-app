@@ -125,7 +125,10 @@ describe('Media Center integration contract', () => {
 
   it('keeps search, local library, discovery, and the Seanime source in the shell', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
-    expect(source).toContain('className="mc-sidebar"');
+    // The approved media-library design replaced the 206px sidebar with a top bar
+    // (Home · Library · Downloads · Discover + More); it is still the shell's one nav landmark.
+    expect(source).toContain('className="gum-topnav"');
+    expect(source).toContain('<nav className="gum-nav"');
     // The field's own markup moved to `views/GlobalSearchField.tsx` so its 70 ms race could be
     // mounted (boss audit 2026-09-02, Finding 4). Both halves are asserted, or "the shell still
     // has a search field" passes on a component nothing renders.

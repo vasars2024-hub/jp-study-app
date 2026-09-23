@@ -114,13 +114,54 @@ export interface SubtitleDiscoverySettings {
   providers: SubtitleProviderSetting[];
   /** Days before a failed search for the same language is retried. */
   retryAfterDays: number;
+  /**
+   * The helper line's language: the second subtitle line shown under the
+   * Japanese study line. `null` turns the helper line's automation off.
+   *
+   * Deliberately separate from `autoDownloadLanguages`. The import sweep only
+   * takes this language from sources that cost nothing (embedded streams and
+   * files beside the video); the network is asked for it when an episode is
+   * first played or its title is marked Watching. OpenSubtitles' daily download
+   * quota is small, and the study line must never lose it to the helper line.
+   */
+  helperLanguage: string | null;
+  /**
+   * Machine-translate a missing track in the background: the Japanese track
+   * into the helper language, or — when only a helper-language track exists and
+   * the audio is not Japanese — the other way. Runs per episode on first play or
+   * Watching, never over the whole library.
+   */
+  autoTranslate: boolean;
+  /**
+   * `auto`: a configured cloud key (Gemini / DeepSeek), else the offline model.
+   * `cloud` / `local`: only that engine.
+   */
+  translationEngine: SubtitleTranslationEnginePreference;
+  /**
+   * When only helper-language subtitles exist, build a Japanese study track:
+   * Whisper on the Japanese audio, aligned to the helper track's timing (EN→JA
+   * fusion), or a translation of it when the audio is not Japanese.
+   */
+  autoStudyTrack: boolean;
+  /** Subtitle-panel notices the user has dismissed; each is shown at most once. */
+  dismissedNotices: string[];
 }
+
+export type SubtitleTranslationEnginePreference = 'auto' | 'cloud' | 'local';
+export const SUBTITLE_TRANSLATION_ENGINE_PREFERENCES: readonly SubtitleTranslationEnginePreference[] = [
+  'auto', 'cloud', 'local',
+];
 
 export const DEFAULT_SUBTITLE_DISCOVERY_SETTINGS: SubtitleDiscoverySettings = {
   autoDiscover: true,
   autoDownloadLanguages: ['ja'],
   minConfidence: 70,
   autoTranscribe: false,
+  helperLanguage: 'en',
+  autoTranslate: true,
+  translationEngine: 'auto',
+  autoStudyTrack: true,
+  dismissedNotices: [],
   providers: [
     // Local sources first: they are free, instant, and already in sync with the
     // exact file, so a network round trip is only worth making when they fail.
@@ -157,6 +198,13 @@ export interface SubtitleDiscoveryRequest {
   force?: boolean;
   /** Restrict to these languages instead of the configured set. */
   languages?: string[];
+  /**
+   * Of `languages`, the ones the network may be asked for. Omitted: a targeted
+   * request (≤ 3 `mediaIds`) may fetch every language; a library-wide sweep
+   * only `autoDownloadLanguages`, so the helper language is taken from local
+   * sources there and fetched later, per episode, when it is played.
+   */
+  remoteLanguages?: string[];
   /**
    * Scraper configuration for the `nyaa` provider: torrent indexes to search
    * and the qBittorrent to fetch through.
@@ -427,6 +475,23 @@ export function normalizeSubtitleDiscoverySettings(input: unknown): SubtitleDisc
   const confidence = Number(raw.minConfidence);
   const retryDays = Number(raw.retryAfterDays);
 
+  // `null` is a real answer ("no helper line"); only a missing or malformed value
+  // takes the default.
+  const helperLanguage = raw.helperLanguage === null
+    ? null
+    : typeof raw.helperLanguage === 'string' && raw.helperLanguage.trim()
+      ? raw.helperLanguage.trim().toLowerCase().slice(0, 16)
+      : defaults.helperLanguage;
+  const engine = SUBTITLE_TRANSLATION_ENGINE_PREFERENCES.includes(
+    raw.translationEngine as SubtitleTranslationEnginePreference,
+  )
+    ? raw.translationEngine as SubtitleTranslationEnginePreference
+    : defaults.translationEngine;
+  const dismissed = Array.isArray(raw.dismissedNotices)
+    ? [...new Set(raw.dismissedNotices.filter((id): id is string => typeof id === 'string' && !!id.trim()))]
+      .slice(0, 32)
+    : [];
+
   return {
     autoDiscover: raw.autoDiscover !== false,
     autoDownloadLanguages: languages,
@@ -434,7 +499,36 @@ export function normalizeSubtitleDiscoverySettings(input: unknown): SubtitleDisc
     autoTranscribe: raw.autoTranscribe === true,
     providers: [...byId.values()].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)),
     retryAfterDays: Number.isFinite(retryDays) ? Math.min(365, Math.max(0, retryDays)) : defaults.retryAfterDays,
+    helperLanguage,
+    autoTranslate: raw.autoTranslate !== false,
+    translationEngine: engine,
+    autoStudyTrack: raw.autoStudyTrack !== false,
+    dismissedNotices: dismissed,
   };
+}
+
+/**
+ * Which languages a discovery run wants, and which of those it may ask the
+ * network for. Pure so the split — the part that protects the download quota —
+ * is testable without a sweep.
+ */
+export function planDiscoveryLanguages(
+  settings: Pick<SubtitleDiscoverySettings, 'autoDownloadLanguages' | 'helperLanguage'>,
+  request: Pick<SubtitleDiscoveryRequest, 'languages' | 'remoteLanguages' | 'mediaIds'> = {},
+): { languages: string[]; remote: string[] } {
+  const clean = (list: readonly string[] | undefined): string[] => [...new Set(
+    (list ?? []).map((lang) => (typeof lang === 'string' ? lang.trim().toLowerCase() : '')).filter(Boolean),
+  )];
+  const languages = request.languages?.length
+    ? clean(request.languages)
+    : clean([...settings.autoDownloadLanguages, ...(settings.helperLanguage ? [settings.helperLanguage] : [])]);
+  const targeted = !!request.mediaIds?.length && request.mediaIds.length <= 3;
+  const remote = request.remoteLanguages?.length
+    ? clean(request.remoteLanguages).filter((lang) => languages.includes(lang))
+    : targeted
+      ? languages
+      : languages.filter((lang) => settings.autoDownloadLanguages.includes(lang));
+  return { languages, remote };
 }
 
 /** Enabled network+local providers in the order discovery should try them. */

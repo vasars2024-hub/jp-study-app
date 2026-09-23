@@ -120,6 +120,13 @@ export default function ApiKeysPage() {
           setVaultStatuses(response.snapshot.statuses);
           setCanStore(response.snapshot.canStore);
           setResult(spec.id, response.ok, response.messageKey);
+          // A new TMDB key re-opens every film the library could not look up;
+          // sweep now rather than at the next launch. Fire-and-forget: the
+          // sweep reports through its own progress channel, and one already
+          // running simply declines (the next launch catches up).
+          if (response.ok && spec.id === 'tmdb') {
+            void window.api.runMediaMetadata?.({}).catch(() => undefined);
+          }
           break;
         }
         case 'mining': {

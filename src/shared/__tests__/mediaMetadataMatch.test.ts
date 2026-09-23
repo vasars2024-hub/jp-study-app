@@ -34,6 +34,13 @@ describe('titleSimilarity', () => {
     expect(score).toBeLessThan(1);
   });
 
+  it('accepts the same words in another order — romaji family-name order', () => {
+    // `Hanzawa Naoki` on the file, `Naoki Hanzawa` on TVmaze.
+    const score = titleSimilarity('Hanzawa Naoki', 'Naoki Hanzawa');
+    expect(score).toBeGreaterThanOrEqual(0.82);
+    expect(score).toBeLessThan(titleSimilarity('Naoki Hanzawa', 'Naoki Hanzawa'));
+  });
+
   it('scores unrelated titles at or near zero', () => {
     expect(titleSimilarity('The Big O', 'Frieren')).toBe(0);
   });

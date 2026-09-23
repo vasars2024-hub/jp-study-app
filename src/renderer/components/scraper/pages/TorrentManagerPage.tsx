@@ -232,7 +232,10 @@ export default function TorrentManagerPage() {
   const send = async () => {
     const rows = results.filter((r) => selected.has(r.id));
     if (!rows.length) return;
-    setSendReport(await port.qbitSend(rows, qbit));
+    // A free-text search knows no catalogue ids, but the handoff still tags the
+    // torrents `gum` and records them, so main can find the Scraper's own
+    // identification (job history) and import them when they finish.
+    setSendReport(await port.qbitSend(rows, qbit, { via: 'torrent-manager' }));
   };
 
   const toggle = (id: string) => {
@@ -304,10 +307,14 @@ export default function TorrentManagerPage() {
     }
     setAddingHash(transfer.hash);
     try {
-      // Forward slash on purpose: Node accepts it on Windows too, and the
-      // renderer has no `path.join` to reach for.
-      const target = `${transfer.savePath.replace(/[\\/]+$/, '')}/${transfer.name}`;
-      const report = await window.api.addAcquiredMedia(target);
+      // qBittorrent's own `content_path` first: `savePath + name` is wrong for a
+      // renamed torrent or a "no subfolder" layout. The guess stays as the
+      // fallback for daemons older than 4.4, which do not report it. Forward
+      // slash on purpose: Node accepts it on Windows too.
+      const target = transfer.contentPath?.trim()
+        || `${transfer.savePath.replace(/[\\/]+$/, '')}/${transfer.name}`;
+      // The hash lets main use the identity recorded when the torrent was sent.
+      const report = await window.api.addAcquiredMedia(target, { infoHash: transfer.hash });
       if (report.outcome === 'missing') setTransferNotice(sx('torrent.addMissing'));
       else if (report.outcome !== 'ok') setTransferNotice(sx('torrent.addNoMedia'));
       else if (report.added === 0) setTransferNotice(sxn('torrent.alreadyInLibrary', report.found));

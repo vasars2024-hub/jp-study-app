@@ -35,6 +35,7 @@ import {
   normalizeSubtitleAttachText,
   normalizeSubtitleDiscoverySettings,
   orderedSubtitleProviders,
+  planDiscoveryLanguages,
   SUBTITLE_PROVIDER_IDS,
   type NyaaSubtitleAcceptResult,
   type NyaaSubtitleListResult,
@@ -44,10 +45,17 @@ import {
   type SubtitleDiscoveryResult,
   type SubtitleDiscoverySettings,
   type SubtitleProviderCredentialState,
-  type SubtitleProviderExecutionId,
 } from '../shared/subtitleDiscoveryIpc';
 import { QBIT_CANCELLED_REASON } from './scraper/qbittorrent';
-import type { SubtitleRecord, SubtitleSearchFailure } from '../shared/subtitleRecord';
+import {
+  isMachineTranslatedSubtitle,
+  type SubtitleRecord,
+  type SubtitleRecordFormat,
+  type SubtitleSearchFailure,
+} from '../shared/subtitleRecord';
+import { pickStudySubtitle } from '../shared/subtitleDiscoveryPick';
+import { parseSubtitles } from '../shared/subtitleCues';
+import { shiftSubtitleText, worthShifting } from '../shared/subtitleDiscoveryTiming';
 import {
   SUBTITLE_DISCOVERY_SETTINGS_FILE,
   SUBTITLE_LIBRARY_DIRECTORY,
@@ -63,14 +71,24 @@ import {
   normalizeStreamLanguage,
 } from './subtitleLocalSources';
 import {
-  fetchSubtitleCandidate,
+  fetchSubtitleCandidateDetailed,
   hasSubtitleProviderKey,
   jimakuSearchDetailed,
-  openSubtitlesSearchDetailed,
   setSubtitleProviderKey,
   testSubtitleProvider,
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
+import {
+  createOpenSubtitlesBatch,
+  searchOpenSubtitlesForItem,
+  type OpenSubtitlesBatch,
+} from './subtitleDiscoveryOpenSubtitles';
+import {
+  noteOpenSubtitlesQuota,
+  openSubtitlesQuotaActive,
+  raiseSubtitleNotice,
+} from './subtitleDiscoveryNotices';
+import { estimateSubtitleOffset } from './subtitleSync';
 import {
   emptyRankDrops,
   nyaaAvailability,
@@ -119,11 +137,68 @@ let host: SubtitleDiscoveryHost | null = null;
 const running = new Set<string>();
 const cancelled = new Set<string>();
 let sweeping = false;
+/** A library-wide sweep was asked for while one ran; run it once this one ends. */
+let followUpSweep = false;
+
+/**
+ * In-process listeners: the automation queue (`subtitleDiscoveryAuto.ts`) needs to
+ * know when an item is being searched and when its records changed, to keep the
+ * per-item status and the persisted picks current. A listener rather than an
+ * import, because that module imports this one.
+ */
+type DiscoveryEvent =
+  | { type: 'progress'; progress: SubtitleDiscoveryProgress }
+  | { type: 'records'; mediaIds: readonly string[] }
+  | { type: 'idle' };
+const eventListeners = new Set<(event: DiscoveryEvent) => void>();
+
+export function onSubtitleDiscoveryEvent(listener: (event: DiscoveryEvent) => void): () => void {
+  eventListeners.add(listener);
+  return () => eventListeners.delete(listener);
+}
+
+function emitEvent(event: DiscoveryEvent): void {
+  for (const listener of eventListeners) {
+    try {
+      listener(event);
+    } catch {
+      /* a listener's failure must not break discovery */
+    }
+  }
+}
 
 function broadcast(progress: SubtitleDiscoveryProgress): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('subtitleDiscovery:progress', progress);
   }
+  emitEvent({ type: 'progress', progress });
+}
+
+/** Ids discovery is working on right now. */
+export function subtitleDiscoveryActiveIds(): string[] {
+  return [...running];
+}
+
+/**
+ * Resolves once no sweep is running (immediately when none is), or after
+ * `timeoutMs`. The on-play preparation waits on this rather than starting a
+ * second search over an item the sweep may be patching at the same moment.
+ */
+export function whenSubtitleSweepIdle(timeoutMs = 10 * 60_000): Promise<boolean> {
+  if (!sweeping) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let timer: NodeJS.Timeout | null = null;
+    const stop = onSubtitleDiscoveryEvent((event) => {
+      if (event.type !== 'idle') return;
+      if (timer) clearTimeout(timer);
+      stop();
+      resolve(true);
+    });
+    timer = setTimeout(() => {
+      stop();
+      resolve(false);
+    }, timeoutMs);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +219,9 @@ export function loadDiscoverySettings(): SubtitleDiscoverySettings {
 
 export function saveDiscoverySettings(input: unknown): SubtitleDiscoverySettings {
   const settings = normalizeSubtitleDiscoverySettings(input);
+  // Dismissed notices only accumulate. The settings page saves its whole copy of
+  // this object, and a copy read before a dismissal must not bring the notice back.
+  settings.dismissedNotices = [...new Set([...loadDiscoverySettings().dismissedNotices, ...settings.dismissedNotices])];
   try {
     fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2), 'utf-8');
   } catch {
@@ -161,7 +239,7 @@ function cacheDirFor(mediaId: string): string {
 }
 
 /** Writes a cue file into the cache and returns its userData-relative path. */
-function writeSubtitleFile(mediaId: string, name: string, text: string): string | null {
+export function writeSubtitleFile(mediaId: string, name: string, text: string): string | null {
   const relativeDir = cacheDirFor(mediaId);
   const absoluteDir = path.join(app.getPath('userData'), relativeDir);
   const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
@@ -205,28 +283,10 @@ export function pickPlaybackSubtitle(
   preferredLang = 'ja',
   chosenId?: string,
 ): SubtitleRecord | null {
-  if (!records?.length) return null;
-  if (chosenId) {
-    const chosen = records.find((record) => record.id === chosenId);
-    if (chosen) return chosen;
-  }
-  const base = preferredLang.slice(0, 2).toLowerCase();
-  const sourceRank: Record<SubtitleRecord['source'], number> = {
-    embedded: 0,
-    sidecar: 1,
-    provider: 2,
-    generated: 3,
-  };
-  return [...records].sort((a, b) => {
-    const aPreferred = a.lang.toLowerCase().startsWith(base) ? 0 : 1;
-    const bPreferred = b.lang.toLowerCase().startsWith(base) ? 0 : 1;
-    if (aPreferred !== bPreferred) return aPreferred - bPreferred;
-    const bySource = sourceRank[a.source] - sourceRank[b.source];
-    if (bySource !== 0) return bySource;
-    // Higher confidence first; records without one (embedded/sidecar) are not
-    // penalised, since they already won on source.
-    return (b.confidence ?? 0) - (a.confidence ?? 0);
-  })[0] ?? null;
+  // One ranking, in shared, so the status the library shows and the track the
+  // player mounts cannot disagree. Among generated tracks it also orders a fused
+  // track before a plain Whisper pass before a machine translation.
+  return pickStudySubtitle(records, preferredLang, chosenId);
 }
 
 /** Drops cached subtitle files for the given media ids. */
@@ -427,6 +487,9 @@ export function retainedOnForce(records: readonly SubtitleRecord[] | undefined):
 const NON_EVIDENTIAL_FAILURES = new Set<string>([
   'no-key',
   'provider-down',
+  // OpenSubtitles' daily download allowance ran out. "Not today" is a fact about
+  // this machine's quota, not about the show, and it resets within a day.
+  'quota',
   ...NYAA_UNAVAILABLE_REASONS,
 ]);
 
@@ -464,9 +527,56 @@ function keptFailures(failures: readonly SubtitleSearchFailure[]): SubtitleSearc
   return failures.filter((failure) => !NON_EVIDENTIAL_FAILURES.has(failure.reason));
 }
 
+/**
+ * Whether a language is already covered. A machine translation does not count:
+ * it is the fallback made because nothing better was found, and counting it
+ * would stop every later sweep from finding the human track that replaces it.
+ */
 function hasLanguage(records: readonly SubtitleRecord[], lang: string): boolean {
   const base = lang.slice(0, 2);
-  return records.some((record) => record.lang.startsWith(base));
+  return records.some((record) => record.lang.startsWith(base) && !isMachineTranslatedSubtitle(record));
+}
+
+/** The OSDb hash, or null for a file too small, missing, or unreadable to hash. */
+async function fileHash(filePath: string): Promise<string | null> {
+  try {
+    return (await osdbHashFile(filePath))?.hash ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Moves a downloaded track onto this file's audio when it is measurably off.
+ *
+ * A track from a hash match is timed to these bytes already and is never touched.
+ * Anything else was timed against *some* release, and "some" is off by seconds
+ * often enough to matter (measured: a Jimaku file 9.05 s late). The player makes
+ * the same correction at mount, but only for the one track it mounts; writing it
+ * into the file is what makes the transcript, mining, the lexicon search and a
+ * machine translation built from this track all agree with the audio too.
+ */
+async function alignToAudio(
+  item: MediaItem,
+  text: string,
+  format: SubtitleRecordFormat,
+): Promise<{ text: string; offsetSec: number } | null> {
+  if (!item.path || !fs.existsSync(item.path)) return null;
+  const cues = parseSubtitles(text);
+  // Too few cues and the estimator's own gates decline anyway; skip the ffmpeg work.
+  if (cues.length < 10) return null;
+  try {
+    const estimate = await estimateSubtitleOffset(
+      item.path,
+      cues.map((cue) => ({ start: cue.start, end: cue.end })),
+      item.durationSec ?? 0,
+    );
+    if (!worthShifting(estimate)) return null;
+    const offsetSec = Math.round(estimate.offsetSec * 1000) / 1000;
+    return { text: shiftSubtitleText(text, format, offsetSec), offsetSec };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -482,6 +592,14 @@ function hasUnattachedSidecar(item: MediaItem): boolean {
     !!sidecar.language && !known.has(sidecar.path) && !hasLanguage(records, sidecar.language));
 }
 
+/** Per-run state shared by every item of one discovery run. */
+interface DiscoveryRun {
+  /** Languages the network may be asked for in this run (see `planDiscoveryLanguages`). */
+  remote: readonly string[];
+  /** OpenSubtitles listings already fetched this run, shared across a series. */
+  openSubtitles: OpenSubtitlesBatch;
+}
+
 async function discoverForItem(
   item: MediaItem,
   settings: SubtitleDiscoverySettings,
@@ -489,6 +607,7 @@ async function discoverForItem(
   force: boolean,
   emit: (phase: SubtitleDiscoveryPhase, extra?: Partial<SubtitleDiscoveryProgress>) => void,
   acquisition?: NyaaAcquisitionConfig,
+  run: DiscoveryRun = { remote: languages, openSubtitles: createOpenSubtitlesBatch() },
 ): Promise<{ records: SubtitleRecord[]; failures: SubtitleSearchFailure[]; files: number }> {
   // A forced re-search rediscovers everything the pipeline can produce, so those
   // records are dropped and rebuilt. Machine transcripts are the exception: this
@@ -512,7 +631,18 @@ async function discoverForItem(
     // language is already present is what left EN→JA fusion unable to see an
     // English track lying beside the Japanese one it was asked to fuse from.
     const missing = languages.filter((lang) => !hasLanguage(records, lang));
-    if (missing.length === 0 && isRemoteSubtitleProvider(providerId)) continue;
+    // Only the languages this run may download. The helper line's language is
+    // wanted everywhere but fetched per episode on play, not across a library.
+    const remoteMissing = missing.filter((lang) => run.remote.includes(lang));
+    if (remoteMissing.length === 0 && isRemoteSubtitleProvider(providerId)) continue;
+    // An untagged track is claimed by guesswork, and the guess only has one answer
+    // when exactly one STUDY language is missing. The helper language is left out
+    // of it: with Japanese already attached, "the one missing language" would
+    // otherwise make the untagged Japanese stream look like the English one.
+    const helperOnly = (lang: string): boolean =>
+      lang === settings.helperLanguage && !settings.autoDownloadLanguages.includes(lang);
+    const guessable = missing.filter((lang) => !helperOnly(lang));
+    const guess = guessable.length === 1 ? guessable[0] : null;
 
     if (providerId === 'embedded') {
       emit('probing-embedded');
@@ -521,8 +651,11 @@ async function discoverForItem(
         const lang = normalizeStreamLanguage(stream.language);
         // An untagged stream is kept only when we still need something: it is
         // usually the main track in a single-subtitle release.
-        const target = lang ?? (missing.length === 1 ? missing[0] : null);
+        const target = lang ?? guess;
         if (!target || !missing.includes(target)) continue;
+        // A forced (signs-only) stream is not a helper line: it would satisfy the
+        // language and leave nine lines in ten with nothing under them.
+        if (stream.forced && helperOnly(target)) continue;
         const text = await extractEmbeddedSubtitle(item.path, stream.subtitleIndex);
         if (!text) continue;
         const relative = writeSubtitleFile(item.id, `embedded-${stream.subtitleIndex}-${target}.srt`, text);
@@ -550,7 +683,7 @@ async function discoverForItem(
         // that language was not asked for — it is already on disk. An *unnamed*
         // file is still only claimed when exactly one wanted language is missing,
         // because that is the only case where the guess has a single answer.
-        const target = sidecar.language ?? (missing.length === 1 ? missing[0] : null);
+        const target = sidecar.language ?? guess;
         if (!target || hasLanguage(records, target) || known.has(sidecar.path)) continue;
         known.add(sidecar.path);
         files += 1;
@@ -603,7 +736,11 @@ async function discoverForItem(
     if (isManualOnlySubtitleProvider(providerId)) continue;
 
     if (isNetworkSubtitleProvider(providerId) && !hasSubtitleProviderKey(providerId)) {
-      failures.push({ providerId, lang: missing.join(','), attemptedAt: Date.now(), reason: 'no-key' });
+      failures.push({ providerId, lang: remoteMissing.join(','), attemptedAt: Date.now(), reason: 'no-key' });
+      // Said once, in the subtitle panel — not per episode. Only for a language
+      // Jimaku cannot supply: an anime library with no OpenSubtitles key and all
+      // its Japanese from Jimaku has nothing to be told.
+      if (providerId === 'opensubtitles') raiseSubtitleNotice('opensubtitles-key-missing');
       continue;
     }
     if (providerId === 'nyaa') {
@@ -611,7 +748,7 @@ async function discoverForItem(
       if (!available.ok) {
         failures.push({
           providerId,
-          lang: missing.join(','),
+          lang: remoteMissing.join(','),
           attemptedAt: Date.now(),
           reason: available.reason,
         });
@@ -625,16 +762,22 @@ async function discoverForItem(
     // stored records and marked the item eligible, then this gate skipped the
     // provider anyway, so a forced re-search silently searched nothing.
     const wanted = force
-      ? missing
-      : missing.filter((lang) => !recentlyFailed(item, providerId, lang, settings.retryAfterDays));
+      ? remoteMissing
+      : remoteMissing.filter((lang) => !recentlyFailed(item, providerId, lang, settings.retryAfterDays));
     if (wanted.length === 0) continue;
 
     emit('searching-providers', { providerId });
     let candidates: ProviderSubtitleCandidate[] = [];
+    // OpenSubtitles arrives already scored per language by the tiered search
+    // (`subtitleDiscoveryOpenSubtitles.ts`); the other providers are scored below.
+    let scoredByLanguage: Map<string, ScoredCandidate[]> | null = null;
     // Set when the provider itself did not answer — a rate limit, a 5xx, a
     // timeout. Kept separate from an empty candidate list because they are not
     // the same claim, and only one of them is about this show.
     let providerDown = false;
+    // Some tier of a multi-request search went unanswered: a language it did not
+    // settle is unknown, not absent.
+    let partlyDown = false;
     // D266. Set when this item's episode number is past the matched entry's own
     // run length and no sequel accounts for it, so an empty answer is a fact
     // about the QUESTION rather than about the show. Only Jimaku sets it: it is
@@ -695,20 +838,23 @@ async function discoverForItem(
           languages: wanted,
         });
       } else {
-        const hashed = await osdbHashFile(item.path);
-        // `…Detailed` for the same reason as Jimaku above: the plain form
-        // returns `[]` for a 429, a 5xx and a timeout alike, and this loop turns
-        // an empty list into an evidential `no-match` that suppresses the
-        // provider for `retryAfterDays`.
-        const reply = await openSubtitlesSearchDetailed({
-          title: providerSearchTitle(item.seriesTitle ?? item.title),
-          season: item.season ?? null,
-          episode: item.episode ?? null,
-          languages: wanted,
-          movieHash: hashed?.hash ?? null,
-        });
-        candidates = reply.candidates;
-        providerDown = reply.down;
+        // Hash, then IMDb/TMDB id, then title — each tier only while a language
+        // is still open, and the id/title listings shared across the series for
+        // this run. The client's `down` flag is carried through for the same
+        // reason as Jimaku's above: an outage must not become `no-match`.
+        const reply = await searchOpenSubtitlesForItem(
+          item,
+          wanted,
+          await fileHash(item.path),
+          run.openSubtitles,
+          settings.minConfidence,
+        );
+        scoredByLanguage = new Map([...reply.byLanguage].map(([lang, scored]) => [
+          lang,
+          scored.map((entry) => ({ candidate: entry.candidate, score: entry.score })),
+        ]));
+        providerDown = reply.down && reply.byLanguage.size === 0;
+        partlyDown = reply.down;
       }
     } catch (error) {
       failures.push({
@@ -742,7 +888,9 @@ async function discoverForItem(
     emit('matching', { providerId });
 
     for (const lang of wanted) {
-      const scored = scoreCandidates(candidates, item, lang, settings.minConfidence);
+      const scored = scoredByLanguage
+        ? (scoredByLanguage.get(lang) ?? [])
+        : scoreCandidates(candidates, item, lang, settings.minConfidence);
       const best = scored.find((entry) => !known.has(entry.candidate.providerItemId));
       if (!best) {
         // `no-match` is a claim about the catalogue. When the episode is past
@@ -754,12 +902,15 @@ async function discoverForItem(
           providerId,
           lang,
           attemptedAt: Date.now(),
-          reason: outOfRange ? `episode-out-of-range:${outOfRange}` : 'no-match',
+          reason: partlyDown
+            ? 'provider-down'
+            : outOfRange ? `episode-out-of-range:${outOfRange}` : 'no-match',
         });
         continue;
       }
-      // Only attach automatically for languages the user opted into.
-      if (!settings.autoDownloadLanguages.includes(lang)) continue;
+      // Only attach automatically for languages this run may download
+      // (`planDiscoveryLanguages`); `wanted` is already narrowed to them.
+      if (!run.remote.includes(lang)) continue;
       // Some providers are never attached without the user picking the result,
       // regardless of the language opt-in. A candidate from a torrent index is
       // a name match with no curation behind it; auto-attaching one means the
@@ -768,18 +919,33 @@ async function discoverForItem(
         failures.push({ providerId, lang, attemptedAt: Date.now(), reason: 'manual-only' });
         continue;
       }
+      // Spent for today. Asking again only repeats the refusal.
+      if (providerId === 'opensubtitles' && openSubtitlesQuotaActive()) {
+        failures.push({ providerId, lang, attemptedAt: Date.now(), reason: 'quota' });
+        continue;
+      }
 
       emit('downloading', { providerId });
-      const text = await fetchSubtitleCandidate(best.candidate);
-      if (!text) {
-        failures.push({ providerId, lang, attemptedAt: Date.now(), reason: 'download-failed' });
+      const fetched = await fetchSubtitleCandidateDetailed(best.candidate);
+      if (fetched.quotaExceeded) noteOpenSubtitlesQuota(fetched.resetAt);
+      else if (fetched.remaining !== null && fetched.remaining <= 0) noteOpenSubtitlesQuota(fetched.resetAt);
+      if (!fetched.text) {
+        failures.push({
+          providerId,
+          lang,
+          attemptedAt: Date.now(),
+          reason: fetched.quotaExceeded ? 'quota' : 'download-failed',
+        });
         continue;
       }
       known.add(best.candidate.providerItemId);
+      const aligned = best.candidate.hashMatch
+        ? null
+        : await alignToAudio(item, fetched.text, best.candidate.format);
       const relative = writeSubtitleFile(
         item.id,
         `${providerId}-${lang}-${best.candidate.providerItemId.replace(/[^a-zA-Z0-9]/g, '')}.${best.candidate.format}`,
-        text,
+        aligned?.text ?? fetched.text,
       );
       if (!relative) continue;
       files += 1;
@@ -794,6 +960,7 @@ async function discoverForItem(
         label: best.candidate.releaseName,
         confidence: Math.round(best.score * 10) / 10,
         hearingImpaired: best.candidate.hearingImpaired,
+        ...(aligned ? { syncOffsetSec: aligned.offsetSec } : {}),
         addedAt: Date.now(),
       });
     }
@@ -819,7 +986,7 @@ export function subtitleDiscoveryRunning(): boolean {
 }
 
 /** Video-ish items only; an audiobook has no subtitle track to find. */
-function eligible(item: MediaItem): boolean {
+export function subtitleDiscoveryEligible(item: MediaItem): boolean {
   return (item.kind ?? 'video') === 'video' && !item.sourceUrl;
 }
 
@@ -827,12 +994,21 @@ export async function runSubtitleDiscovery(
   request: SubtitleDiscoveryRequest = {},
 ): Promise<SubtitleDiscoveryResult> {
   if (!host) return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'Subtitle discovery host is not registered.' };
-  if (sweeping) return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'A subtitle sweep is already running.' };
+  if (sweeping) {
+    // A library-wide request that lands mid-sweep is almost always an import
+    // (a watch folder, a finished download) whose new files the running sweep
+    // selected before they existed. Refusing it outright left them unsearched
+    // until the next launch; one follow-up sweep after this one picks them up,
+    // and costs nothing for the items this sweep already answered.
+    if (!request.mediaIds?.length && !request.force && request.acquisition === undefined) followUpSweep = true;
+    return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'A subtitle sweep is already running.' };
+  }
 
   const settings = loadDiscoverySettings();
-  const languages = (request.languages?.length ? request.languages : settings.autoDownloadLanguages)
-    .map((lang) => lang.trim().toLowerCase())
-    .filter(Boolean);
+  // The study languages plus the helper line's language — but the network is
+  // only asked for the helper language on a targeted request (a played episode,
+  // a per-episode "Search now"), never across a whole library.
+  const { languages, remote } = planDiscoveryLanguages(settings, request);
   if (languages.length === 0) return { ok: true, attached: 0, empty: 0, unreachable: 0, files: 0 };
 
   const only = request.mediaIds?.length ? new Set(request.mediaIds) : undefined;
@@ -854,9 +1030,12 @@ export async function runSubtitleDiscovery(
 
   const items = host.listItems().filter((item) => {
     if (only && !only.has(item.id)) return false;
-    if (!eligible(item)) return false;
+    if (!subtitleDiscoveryEligible(item)) return false;
     if (request.force) return true;
-    if (!languages.every((lang) => hasLanguage(item.subtitles ?? [], lang))) return true;
+    // Selected on the languages this run can actually fetch. An item missing only
+    // the helper language is not re-walked on every launch for a language the
+    // sweep would not download anyway; the first play takes care of it.
+    if (!remote.every((lang) => hasLanguage(item.subtitles ?? [], lang))) return true;
     // Every wanted language is present, but a sidecar the user placed beside the
     // file can still be unattached, and the language filter alone would never
     // reach it. One readdir per item, and only for items we would otherwise skip.
@@ -867,6 +1046,9 @@ export async function runSubtitleDiscovery(
 
   sweeping = true;
   const startedAt = Date.now();
+  // One per run: the OpenSubtitles listing for a series/season is fetched once
+  // and every episode of it in this run picks from the same answer.
+  const run: DiscoveryRun = { remote, openSubtitles: createOpenSubtitlesBatch() };
   let attached = 0;
   let empty = 0;
   // Of `empty`, the ones that were empty because nobody answered. See
@@ -901,6 +1083,7 @@ export async function runSubtitleDiscovery(
           request.force === true,
           emit,
           asAcquisitionConfig(request.acquisition),
+          run,
         );
         if (cancelled.has(item.id)) {
           emit('cancelled');
@@ -910,7 +1093,14 @@ export async function runSubtitleDiscovery(
         // Nothing found and the user asked for a fallback: queue Whisper. This is
         // the only thing that makes the autoTranscribe setting do anything.
         const foundJapanese = outcome.records.some((record) => /^ja/i.test(record.lang));
-        if (!foundJapanese && settings.autoTranscribe && languages.some((lang) => lang.startsWith('ja'))) {
+        // With a helper-language track in hand, the better fallback is the fused
+        // track (Whisper on the helper track's timing), which the automation queue
+        // builds when the episode is first played. A plain grid transcript here
+        // would be twenty minutes of Whisper spent on the worse of the two.
+        const fusable = settings.autoStudyTrack && !!settings.helperLanguage
+          && outcome.records.some((record) => record.source !== 'generated'
+            && record.lang.startsWith((settings.helperLanguage ?? '').slice(0, 2)));
+        if (!foundJapanese && !fusable && settings.autoTranscribe && languages.some((lang) => lang.startsWith('ja'))) {
           enqueueTranscription({ mediaId: item.id, lang: 'ja' });
         }
 
@@ -958,6 +1148,13 @@ export async function runSubtitleDiscovery(
     sweeping = false;
     running.clear();
     cancelled.clear();
+    emitEvent({ type: 'idle' });
+    if (followUpSweep) {
+      followUpSweep = false;
+      setTimeout(() => {
+        void runSubtitleDiscovery({}).catch(() => undefined);
+      }, 0);
+    }
   }
 
   return { ok: true, attached, empty, unreachable, files };
@@ -1386,7 +1583,17 @@ export function detachSubtitleRecord(mediaId: unknown, recordId: unknown): NyaaS
 }
 
 export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHost): void {
-  host = discoveryHost;
+  // Every path in this file that changes an item's tracks goes through
+  // `host.patchItems` — the sweep, nyaa accept, attach, detach — so wrapping it
+  // once is what lets the automation keep its picks and status current without
+  // each path remembering to announce itself.
+  host = {
+    listItems: () => discoveryHost.listItems(),
+    patchItems: (ids, patch) => {
+      discoveryHost.patchItems(ids, patch);
+      if ('subtitles' in patch) emitEvent({ type: 'records', mediaIds: [...ids] });
+    },
+  };
 
   ipcMain.handle('subtitleDiscovery:run', (_e, request?: SubtitleDiscoveryRequest) =>
     runSubtitleDiscovery(request ?? {}));

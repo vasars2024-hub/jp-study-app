@@ -11,6 +11,7 @@
  * panel only ever learns whether one is present.
  */
 
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../../i18n';
 import SettingsCard from '../SettingsCard';
@@ -18,11 +19,14 @@ import { listSupportedSubtitleLanguages, type SubtitlePreferences } from '../../
 import { loadSubtitleManagementDocument, updateSubtitlePreferences } from '../../../subtitleStore';
 import {
   DEFAULT_SUBTITLE_DISCOVERY_SETTINGS,
+  SUBTITLE_TRANSLATION_ENGINE_PREFERENCES,
   isNetworkSubtitleProvider,
   type SubtitleDiscoverySettings,
   type SubtitleProviderCredentialState,
   type SubtitleProviderExecutionId,
+  type SubtitleTranslationEnginePreference,
 } from '../../../../shared/subtitleDiscoveryIpc';
+import type { SubtitleAutoNotices } from '../../../../shared/subtitleDiscoveryStatus';
 
 const STYLES: SubtitlePreferences['style'][] = ['full', 'signs-songs', 'forced'];
 
@@ -33,13 +37,14 @@ const KEY_URLS: Partial<Record<SubtitleProviderExecutionId, string>> = {
 };
 
 export default function SubtitleProviderPanel() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [management, setManagement] = useState(loadSubtitleManagementDocument);
   const [settings, setSettings] = useState<SubtitleDiscoverySettings>(DEFAULT_SUBTITLE_DISCOVERY_SETTINGS);
   const [credentials, setCredentials] = useState<SubtitleProviderCredentialState[]>([]);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; detail?: string }>>({});
+  const [notices, setNotices] = useState<SubtitleAutoNotices>({ active: [], quotaResetAt: null });
 
   const preferences = management.preferences;
   const languages = listSupportedSubtitleLanguages(preferences);
@@ -49,7 +54,22 @@ export default function SubtitleProviderPanel() {
   useEffect(() => {
     void window.api.getSubtitleDiscoverySettings().then(setSettings).catch(() => undefined);
     void window.api.subtitleProviderCredentials().then(setCredentials).catch(() => undefined);
+    // Fixable conditions the automation ran into — no translation engine, no
+    // OpenSubtitles key, the daily quota — said here once, not as a toast per episode.
+    void window.api.subtitleAutoNotices?.().then(setNotices).catch(() => undefined);
+    return window.api.onSubtitleAutoNotices?.(setNotices);
   }, []);
+
+  const dismissNotice = (id: string): void => {
+    void window.api.dismissSubtitleAutoNotice(id)
+      .then((next) => {
+        setNotices(next);
+        // The dismissal is stored in the same settings file this panel saves
+        // whole; re-read it so the next toggle does not write the notice back.
+        return window.api.getSubtitleDiscoverySettings().then(setSettings);
+      })
+      .catch(() => undefined);
+  };
 
   /** Persists immediately; a settings page that needs a Save button gets stale. */
   const persist = useCallback((next: SubtitleDiscoverySettings) => {
@@ -105,6 +125,16 @@ export default function SubtitleProviderPanel() {
 
   return (
     <SettingsCard id="subtitle-providers" title={t('subtitle.title')} description={t('subtitle.desc')}>
+      {notices.active.map((id) => (
+        <div key={id} role="status" className="credential-warning subtitle-auto-notice">
+          <span>
+            {t(`subtitle.notice.${id}`, {
+              time: notices.quotaResetAt ? new Date(notices.quotaResetAt).toLocaleString(LANG_TAGS[lang]) : '',
+            })}
+          </span>
+          <button type="button" onClick={() => dismissNotice(id)}>{t('subtitle.notice.dismiss')}</button>
+        </div>
+      ))}
       <fieldset className="unified-search-controls">
         <legend>{t('subtitle.providers')}</legend>
         <ol className="subtitle-provider-list">
@@ -248,6 +278,66 @@ export default function SubtitleProviderPanel() {
             type="checkbox"
             checked={settings.autoTranscribe}
             onChange={(e) => persist({ ...settings, autoTranscribe: e.currentTarget.checked })}
+          />
+        </label>
+
+        <div className="field-row">
+          <label htmlFor="subtitle-helper-language">{t('subtitle.helperLanguage')}</label>
+          <select
+            id="subtitle-helper-language"
+            className="media-model-select"
+            value={settings.helperLanguage ?? ''}
+            onChange={(e) => persist({ ...settings, helperLanguage: e.currentTarget.value || null })}
+          >
+            <option value="">{t('subtitle.helperNone')}</option>
+            {[...new Set(['en', ...(settings.helperLanguage ? [settings.helperLanguage] : []), ...languages])]
+              .filter((lang) => lang !== 'ja')
+              .map((language) => (
+              <option key={language} value={language}>{language}</option>
+            ))}
+          </select>
+        </div>
+        <small className="muted">{t('subtitle.helperLanguageDesc')}</small>
+
+        <label className="os-set-toggle-row">
+          <span>
+            <strong>{t('subtitle.autoTranslate')}</strong>
+            <small className="muted">{t('subtitle.autoTranslateDesc')}</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={settings.autoTranslate}
+            onChange={(e) => persist({ ...settings, autoTranslate: e.currentTarget.checked })}
+          />
+        </label>
+
+        <div className="field-row">
+          <label htmlFor="subtitle-translation-engine">{t('subtitle.translationEngine')}</label>
+          <select
+            id="subtitle-translation-engine"
+            className="media-model-select"
+            value={settings.translationEngine}
+            disabled={!settings.autoTranslate}
+            onChange={(e) => persist({
+              ...settings,
+              translationEngine: e.currentTarget.value as SubtitleTranslationEnginePreference,
+            })}
+          >
+            {SUBTITLE_TRANSLATION_ENGINE_PREFERENCES.map((engine) => (
+              <option key={engine} value={engine}>{t(`subtitle.translationEngine.${engine}`)}</option>
+            ))}
+          </select>
+        </div>
+
+        <label className="os-set-toggle-row">
+          <span>
+            <strong>{t('subtitle.autoStudyTrack')}</strong>
+            <small className="muted">{t('subtitle.autoStudyTrackDesc')}</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={settings.autoStudyTrack}
+            onChange={(e) => persist({ ...settings, autoStudyTrack: e.currentTarget.checked })}
           />
         </label>
 

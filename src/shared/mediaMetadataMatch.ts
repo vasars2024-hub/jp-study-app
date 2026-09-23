@@ -92,6 +92,11 @@ export function titleSimilarity(a: string, b: string): number {
   if (leftTokens.size === 0 || rightTokens.size === 0) return 0;
   let shared = 0;
   for (const token of leftTokens) if (rightTokens.has(token)) shared += 1;
+  // The same words in another order. Romanised Japanese names flip between
+  // family-first and given-first (`Hanzawa Naoki` on the file, `Naoki Hanzawa`
+  // on TVmaze), and plain Dice capped that at 0.7 — below the accept line for
+  // the one title the words prove. Still under an exact match.
+  if (shared === leftTokens.size && shared === rightTokens.size && shared >= 2) return 0.84;
   return clamp01((2 * shared) / (leftTokens.size + rightTokens.size) * 0.7);
 }
 

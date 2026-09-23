@@ -232,8 +232,15 @@ export interface ExampleResult {
   // next launch; `media:artwork` mints one from these at request time instead.
   /** Provider poster (2:3), e.g. `artwork/poster-<key>.jpg`. */
   posterPath?: string;
-  /** Provider banner/backdrop, used by the detail drawer's hero. */
+  /**
+   * The best wide hero image, used by the detail drawer's hero: AniList's banner
+   * strip for anime, otherwise the 16:9 backdrop below. Always set when either is.
+   */
   bannerPath?: string;
+  /** 16:9 backdrop (TMDB backdrop / TVmaze background), when a provider has one. */
+  backdropPath?: string;
+  /** This file's own episode still (TVmaze), served by `media:artwork` 'still'. */
+  stillPath?: string;
 
   // ----- Provider metadata (Phase 2) ---------------------------------------
   /** Original-language title, shown under the display title in the drawer. */
@@ -267,6 +274,25 @@ export interface ExampleResult {
    * pretending a guess is a fact.
    */
   metadataConfidence?: number;
+  /** TVmaze show id, when TVmaze identified the series. */
+  tvmazeId?: number;
+  /** TMDB id; `tmdbType` names its namespace, because movie and TV ids collide. */
+  tmdbId?: number;
+  tmdbType?: 'movie' | 'tv';
+  /** IMDb id (`tt0123456`), from TVmaze's externals or TMDB. */
+  imdbId?: string;
+  /** Minutes: the film's running time, or a typical episode's for a series. */
+  runtimeMin?: number;
+  /** Broadcaster or streaming service (TVmaze network / web channel). */
+  network?: string;
+  /**
+   * The series' full episode run from the provider, including episodes the
+   * library lacks. Same list on every file of the series; capped at
+   * `EPISODE_GUIDE_LIMIT`. A file's own title stays in `episodeTitles`.
+   */
+  episodeGuide?: import('./mediaMetadataIpc').MediaEpisodeGuideEntry[];
+  /** What the last lookup tried — drives the `unmatched` retry window. */
+  metadataAttempt?: import('./mediaMetadataIpc').MediaMetadataAttempt;
 
   // ----- Subtitles (Phase 3) ------------------------------------------------
   /**
@@ -297,6 +323,12 @@ export interface ExampleResult {
    * falls back to the ranking.
    */
   preferredSubtitleId?: string;
+  /**
+   * Subtitle automation's own state: the study/helper tracks it picked, when the
+   * episode was last prepared, and what it tried (so a failed translation is not
+   * retried on every play). See `main/subtitleDiscoveryAuto.ts`.
+   */
+  subtitleAuto?: import('./subtitleDiscoveryStatus').SubtitleAutoState;
   }
 
 /**

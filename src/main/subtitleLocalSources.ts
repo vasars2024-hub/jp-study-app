@@ -127,6 +127,28 @@ export function parseSubtitleStreams(stderr: string): EmbeddedSubtitleStream[] {
   return streams;
 }
 
+/** `Stream #0:1(jpn): Audio: flac, 48000 Hz, stereo` — the language tag is optional. */
+const AUDIO_STREAM_LINE = /Stream #\d+:\d+(?:\[[^\]]*\])?(?:\(([^)]*)\))?:\s*Audio:/gi;
+
+/**
+ * The language tag of every audio stream, in container order; `null` for an
+ * untagged stream. Read from the same ffmpeg banner as the subtitle streams.
+ */
+export function parseAudioStreamLanguages(stderr: string): (string | null)[] {
+  const out: (string | null)[] = [];
+  for (const match of stderr.matchAll(AUDIO_STREAM_LINE)) {
+    out.push(normalizeStreamLanguage(match[1]));
+  }
+  return out;
+}
+
+/** Audio stream languages for a file; empty when it cannot be probed. */
+export async function listAudioStreamLanguages(file: string): Promise<(string | null)[]> {
+  if (!file || !fs.existsSync(file)) return [];
+  const { stderr } = await runFfmpeg(['-hide_banner', '-i', file]);
+  return parseAudioStreamLanguages(stderr);
+}
+
 /** Enumerates the text subtitle streams inside a media container. */
 export async function listEmbeddedSubtitleStreams(file: string): Promise<EmbeddedSubtitleStream[]> {
   if (!file || !fs.existsSync(file)) return [];

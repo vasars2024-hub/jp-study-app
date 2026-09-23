@@ -92,6 +92,7 @@ import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
 import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import { formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
+import { pretokenizeInIdle } from '../renderer/tokenizer';
 import {
   mediaCaptionCues,
   normalizeMediaCaptionTracks,
@@ -456,6 +457,13 @@ export default function VideoCoreStudyOverlay({
   }, []);
 
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
+  // Tokenize the whole track in idle time, so a line is ready when it appears instead of
+  // costing 4-53 ms on the main thread at that moment (profiled 2026-09-23). The cue line
+  // tokenizes exactly this text when no grammar annotation splits it.
+  React.useEffect(
+    () => pretokenizeInIdle(allCues.map((cue) => stripAssCueText(cue.text))),
+    [allCues],
+  );
   const trackSecondaryText = activeSecondaryCues
     .map((cue) => stripAssCueText(cue.text))
     .filter(Boolean)
@@ -828,6 +836,8 @@ export default function VideoCoreStudyOverlay({
    * A third state is the whole fix: the wait is honest, the assertion was not.
    */
   const [externalSubtitlePending, setExternalSubtitlePending] = React.useState(false);
+  /** The automation's English helper track, once mounted (see the helper-line effect). */
+  const helperTrackRef = React.useRef<{ key: string; trackNumber: number } | null>(null);
   React.useEffect(
     () => window.api.onMediaChanged(() => setMediaRevision((revision) => revision + 1)),
     [],
@@ -847,10 +857,16 @@ export default function VideoCoreStudyOverlay({
           : null;
         // A container track outranks a downloaded sidecar. Our own previously mounted track is
         // excluded so a changed library selection can replace it instead of becoming write-only.
-        if (manager.getTracks().some((track) => track.number !== mounted?.trackNumber)) return;
+        // Our own English helper track (below) is not a container track either.
+        const helperNumber = helperTrackRef.current?.trackNumber;
+        if (manager.getTracks().some((track) => (
+          track.number !== mounted?.trackNumber && track.number !== helperNumber
+        ))) return;
         let pick: { name: string; text: string } | null = null;
         try {
-          pick = await window.api.subtitleForPath(localPath);
+          // `intent: 'play'` tells the subtitle automation this episode is being watched,
+          // which is what starts its per-episode work (the English line, translations).
+          pick = await window.api.subtitleForPath(localPath, { intent: 'play' });
         } catch {
           return;
         }
@@ -941,6 +957,70 @@ export default function VideoCoreStudyOverlay({
       setExternalSubtitlePending(false);
     };
   }, [manager, localFilePath, mediaRevision, playbackInfo?.localFile?.path]);
+
+  /*
+   * The helper line: the automation's English track for this file (a downloaded English
+   * subtitle, or a machine translation of the Japanese one), mounted BESIDE the study track
+   * and never selected — the secondary-track picker below offers it by language, so dual
+   * subtitles show English without a click. Re-asked whenever the automation reports a
+   * status change, because a translation can finish while the episode is already playing.
+   */
+  const [helperRevision, setHelperRevision] = React.useState(0);
+  React.useEffect(() => {
+    if (typeof window.api?.onSubtitleAutoStatus !== 'function') return undefined;
+    return window.api.onSubtitleAutoStatus(() => setHelperRevision((revision) => revision + 1));
+  }, []);
+  React.useEffect(() => {
+    const localPath = localFilePath || playbackInfo?.localFile?.path;
+    if (!manager || !localPath || typeof window.api?.secondarySubtitleForPath !== 'function') {
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const helper = await window.api.secondarySubtitleForPath(localPath).catch(() => null);
+        if (cancelled || !helper?.text) return;
+        const key = `${localPath}|${helper.recordId ?? helper.name}`;
+        if (helperTrackRef.current?.key === key) return;
+        const parsed = parseSubtitles(helper.text);
+        if (!parsed.length) return;
+        const offsetSec = await resolveSubtitleSyncOffset(localPath, parsed, video?.duration);
+        if (cancelled) return;
+        const trackNumber = nextVideoCoreWhisperTrackNumber(
+          manager.getTracks().map((track) => track.number),
+        );
+        const events = whisperCuesToVideoCoreEvents(
+          shiftCues(parsed, offsetSec),
+          trackNumber,
+        ) as MKVParser_SubtitleEvent[];
+        if (!events.length) return;
+        try {
+          await manager.addEventTrack({
+            number: trackNumber,
+            uid: trackNumber,
+            type: 'subtitle',
+            codecID: 'S_TEXT/ASS',
+            name: helper.name,
+            language: helper.lang || 'en',
+            languageIETF: helper.lang || 'en',
+            default: false,
+            forced: false,
+            enabled: true,
+          } as MKVParser_TrackInfo);
+          await manager.onSubtitleEvents(events);
+          if (cancelled) return;
+          helperTrackRef.current = { key, trackNumber };
+          setTracks(manager.getTracks());
+        } catch {
+          // The study line plays on without its helper; nothing to break playback over.
+        }
+      })();
+    }, EXTERNAL_SUBTITLE_GRACE_MS + 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [manager, localFilePath, mediaRevision, helperRevision, playbackInfo?.localFile?.path, video]);
 
   /**
    * The cue clock for a libass **file track**, which the manager renders but never indexes.
@@ -2497,6 +2577,9 @@ export default function VideoCoreStudyOverlay({
     <StudyDetachContext.Provider value={detach}>
       <aside
         className="study-cue-overlay"
+        // The study language, so the line takes a Japanese face rather than a per-glyph
+        // fallback (Noto Sans SC was measured drawing Japanese text, 2026-09-23).
+        lang={studyLang}
         data-study-active-cue={activeCue ? 'present' : 'none'}
         data-cue-index={activeCue?.index}
         data-cue-track={activeCue?.trackNumber}

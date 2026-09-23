@@ -117,7 +117,9 @@ export function MediaCoreControlBarView(props: MediaCoreControlBarViewProps) {
             containerRectRef.current = containerElement.getBoundingClientRect()
         }
 
-        updateContainerRect()
+        // Gum: no synchronous first read — it forced style + layout inside the mount commit
+        // (11-44 ms, profiled 2026-09-23). The observer's first callback delivers the size
+        // after layout, and `pointerenter` refreshes it before any pointer math needs it.
         const resizeObserver = new ResizeObserver(updateContainerRect)
         resizeObserver.observe(containerElement)
 

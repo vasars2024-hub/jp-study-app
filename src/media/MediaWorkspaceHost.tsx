@@ -192,8 +192,12 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     const publish = (): void => {
       root.style.setProperty('--seanime-host-bar-h', `${bar.offsetHeight}px`);
     };
-    publish();
-    if (typeof ResizeObserver !== 'function') return undefined;
+    // The observer's first callback (after layout) publishes it; a synchronous first read
+    // forced a layout in the open commit (36-47 ms, profiled 2026-09-23).
+    if (typeof ResizeObserver !== 'function') {
+      publish();
+      return undefined;
+    }
     const observer = new ResizeObserver(publish);
     observer.observe(bar);
     return () => observer.disconnect();
@@ -238,6 +242,12 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     return () => window.removeEventListener('keydown', onKey);
   }, [close, open]);
 
+  const [fontWarmReady, setFontWarmReady] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFontWarmReady(true), 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   // Move focus into the player on open and hand it back to whatever held it before on close,
   // so a keyboard user is never left tabbing through the desktop behind a full-screen layer.
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -258,6 +268,16 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
 
   if (!status || status.kind === 'disabled') return null;
 
+  /*
+   * Warm the subtitle face. The 14.7 MB Yu Gothic UI semibold file was loaded the moment the
+   * first line appeared, and again on each warm open (30-60 ms each, more from a cold disk;
+   * profiled 2026-09-23). A few Japanese characters in that face, laid out off-screen a
+   * moment after start-up, load it while nothing is watching.
+   */
+  const fontWarm = fontWarmReady ? (
+    <span className="seanime-font-warm" lang="ja" aria-hidden="true">あ漢字カナ</span>
+  ) : null;
+
   const statusLabel = sidecarStatusLabel(status.kind, t);
   // The other three hosts' own strings, reused verbatim so one enable flow reads
   // the same wherever it is met.
@@ -268,7 +288,12 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   if (!open) {
     // Nothing on screen while closed. This invisible marker keeps "a host is mounted and its
     // sidecar is not disabled" answerable from the DOM (`mediaWorkspaceHostIsMounted`).
-    return <span className="seanime-host-present" data-sidecar={status.kind} hidden />;
+    return (
+      <>
+        <span className="seanime-host-present" data-sidecar={status.kind} hidden />
+        {fontWarm}
+      </>
+    );
   }
 
   const retryable = status.kind === 'failed' || status.kind === 'offline'
@@ -369,6 +394,7 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
           </Suspense>
         )}
       </div>
+      {fontWarm}
     </div>
   );
 }

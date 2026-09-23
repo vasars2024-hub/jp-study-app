@@ -86,12 +86,19 @@ export default function MediaArtwork(props: MediaArtworkProps) {
   // rather than absent — an absent alt makes a screen reader read the file name.
   const alt = props.decorative === true ? '' : props.alt;
   const primary = useMediaArtwork(id, variant);
-  // A banner is provider-only; without one the hero uses the poster rather than
-  // dropping to a flat gradient, which reads as "no art" when there is art.
-  const fallback = useMediaArtwork(variant === 'banner' && primary.url === null ? id : null, 'poster');
-  const { url, loading } = primary.url === null && variant === 'banner' && !primary.loading
-    ? fallback
-    : primary;
+  // Wide art is provider-only, so a hero walks down: backdrop (16:9) → banner →
+  // poster, rather than dropping to a flat gradient, which reads as "no art" when
+  // there is art. Each step is only asked once the one above it has said "none".
+  const primaryMissing = primary.url === null && !primary.loading;
+  const banner = useMediaArtwork(variant === 'backdrop' && primaryMissing ? id : null, 'banner');
+  const bannerMissing = variant === 'banner' ? primaryMissing : banner.url === null && !banner.loading;
+  const wide = variant === 'banner' || variant === 'backdrop';
+  const fallback = useMediaArtwork(wide && primaryMissing && bannerMissing ? id : null, 'poster');
+  const { url, loading } = !wide || !primaryMissing
+    ? primary
+    : variant === 'backdrop' && !bannerMissing
+      ? banner
+      : fallback;
   const [failed, setFailed] = useState(false);
 
   const fallbackStyle = useMemo(() => {

@@ -245,6 +245,7 @@ declare global {
       /** Bring a finished download into the library — see `media:addAcquired`. */
       addAcquiredMedia(
         target: string,
+        options?: { infoHash?: string },
       ): Promise<import('../shared/types').MediaAcquiredImport>;
       getWallpaper(): Promise<string | null>;
       pickWallpaper(): Promise<{
@@ -963,7 +964,7 @@ declare global {
       mediaPathExists(filePath: string): Promise<boolean>;
       coverArt(id: string): Promise<string | null>;
       /** Library artwork as a `playfile://` URL; null when there is none. */
-      mediaArtwork(id: string, variant?: 'poster' | 'banner' | 'still'): Promise<string | null>;
+      mediaArtwork(id: string, variant?: 'poster' | 'banner' | 'backdrop' | 'still'): Promise<string | null>;
       setMediaItemState(
         id: string,
         patch: Partial<Pick<
@@ -1024,6 +1025,31 @@ declare global {
         entries: import('../shared/malLibrary').MalLibraryEntry[];
         summary: import('../shared/malLibrary').MalLibrarySummary;
       }>;
+      /**
+       * Watch-tracking library (anime / TV / films, owned or not). Local disk
+       * only; imports read export files, nothing signs in anywhere.
+       */
+      watchList(
+        query?: import('../shared/watchLibrary').WatchQuery,
+      ): Promise<import('../shared/watchLibrary').WatchQueryResult>;
+      watchGet(id: string): Promise<import('../shared/watchLibrary').WatchTitleView | null>;
+      watchAdd(
+        input: import('../shared/watchLibrary').WatchAddInput,
+      ): Promise<import('../main/watchLibrary').WatchAddResult>;
+      watchUpdate(
+        id: string,
+        patch: import('../shared/watchLibrary').WatchTitlePatch,
+      ): Promise<import('../main/watchLibrary').WatchUpdateResult>;
+      watchRemove(id: string): Promise<{ ok: true } | import('../main/watchLibrary').WatchIpcError>;
+      /** Player hook. Cheap below 90% (returns before touching disk). */
+      watchRecordLocalProgress(
+        input: import('../main/watchLibrary').WatchLocalProgressInput,
+      ): Promise<import('../main/watchLibrary').WatchLocalProgressResult>;
+      /** MAL `.xml`/`.xml.gz`, Letterboxd `.zip`/folder/single `.csv` — detected by content. */
+      watchImportFile(filePath: string): Promise<import('../main/watchLibrary').WatchImportResult>;
+      watchChooseImportFile(): Promise<string | null>;
+      watchImportHistory(): Promise<import('../shared/watchLibrary').WatchImportRecord[]>;
+      onWatchChanged(cb: (event: import('../main/watchLibrary').WatchChangedEvent) => void): () => void;
       /** Phase 0 credentials vault. No channel returns a secret — by design. */
       credentialStatus(): Promise<import('../main/credentials/ipc').CredentialVaultSnapshot>;
       setCredentialSecret(
@@ -1091,6 +1117,10 @@ declare global {
       onMediaMetadataProgress(
         cb: (p: import('../shared/mediaMetadataIpc').MediaMetadataProgress) => void,
       ): () => void;
+      /** Items a metadata sweep just wrote; `artwork` when their images changed. */
+      onMediaMetadataUpdated(
+        cb: (update: import('../shared/mediaMetadataIpc').MediaMetadataUpdate) => void,
+      ): () => void;
       pickMedia(): Promise<MediaOpen | null>;
       addMediaFolder(): Promise<{ items: MediaItem[]; added: number }>;
       openMedia(id: string): Promise<MediaOpen | null>;
@@ -1100,6 +1130,8 @@ declare global {
       clearMediaLibrary(): Promise<MediaItem[]>;
       setMediaPosition(id: string, sec: number): Promise<void>;
       /** The video player's progress for a library file, by path (see `media:reportPlayback`). */
+      /** Stored art for a tracked title (poster / banner / backdrop), or null. */
+      watchArtwork(titleId: string, variant: 'poster' | 'banner' | 'backdrop'): Promise<string | null>;
       reportMediaPlayback(report: {
         path: string;
         positionSec: number;
@@ -1130,7 +1162,39 @@ declare global {
        * The adopted workspace has only a path, and the sidecar only sees inside the
        * container — see `media:subtitleForPath` for the measurement.
        */
-      subtitleForPath(filePath: string): Promise<SubtitlePick | null>;
+      subtitleForPath(filePath: string, options?: { intent?: 'play' }): Promise<SubtitlePick | null>;
+      /**
+       * The helper line (English unless the user chose another) for a local video,
+       * never the same track as `subtitleForPath`'s. `machineTranslated` marks the
+       * automation's translation. Null until one exists — `onSubtitleAutoStatus`
+       * announces when it does.
+       */
+      secondarySubtitleForPath(
+        filePath: string,
+      ): Promise<import('../shared/subtitleDiscoveryStatus').SecondarySubtitlePick | null>;
+      /** Per-item subtitle status: `{ ja, en, source, primaryId, secondaryId, notice }`. */
+      subtitleAutoStatus(
+        mediaIds?: string[],
+      ): Promise<import('../shared/subtitleDiscoveryStatus').SubtitleAutoStatus[]>;
+      /**
+       * Queue per-episode preparation (helper line, translation, fusion). `watching`
+       * with a `seriesKey` or a series' ids prepares only the next few unplayed episodes.
+       */
+      prepareSubtitles(request: {
+        mediaIds?: string[];
+        seriesKey?: string;
+        reason?: 'play' | 'watching' | 'manual';
+      }): Promise<{ queued: number }>;
+      subtitleAutoNotices(): Promise<import('../shared/subtitleDiscoveryStatus').SubtitleAutoNotices>;
+      dismissSubtitleAutoNotice(
+        id: string,
+      ): Promise<import('../shared/subtitleDiscoveryStatus').SubtitleAutoNotices>;
+      onSubtitleAutoStatus(
+        cb: (status: import('../shared/subtitleDiscoveryStatus').SubtitleAutoStatus) => void,
+      ): () => void;
+      onSubtitleAutoNotices(
+        cb: (notices: import('../shared/subtitleDiscoveryStatus').SubtitleAutoNotices) => void,
+      ): () => void;
       /**
        * How far these cues have to move to line up with that file's audio. Spawns
        * ffmpeg — see `media:subtitleSyncOffset` for the method and its confidence
@@ -1149,6 +1213,18 @@ declare global {
       setMediaWatchFolder(): Promise<{ folder: string | null; items: MediaItem[] }>;
       clearMediaWatchFolder(): Promise<null>;
       onMediaChanged(cb: (items: MediaItem[]) => void): () => void;
+      /** Automatic media ingest — watch folders and finished downloads (`main/mediaIngest.ts`). */
+      mediaIngestState(): Promise<import('../shared/mediaIngest').MediaIngestState>;
+      mediaIngestAddFolder(): Promise<import('../shared/mediaIngest').MediaIngestState>;
+      mediaIngestRemoveFolder(folder: string): Promise<import('../shared/mediaIngest').MediaIngestState>;
+      mediaIngestSetAutoImport(on: boolean): Promise<import('../shared/mediaIngest').MediaIngestState>;
+      mediaIngestRescan(): Promise<import('../shared/mediaIngest').MediaIngestState>;
+      mediaIngestSyncQbit(
+        config: import('../shared/scraperSourceSettings').ScraperQbittorrentSettings | null,
+      ): Promise<void>;
+      onMediaIngestState(cb: (state: import('../shared/mediaIngest').MediaIngestState) => void): () => void;
+      /** New items landed in the library from a watch folder or a finished download. */
+      onMediaIngested(cb: (event: import('../shared/mediaIngest').MediaIngestedEvent) => void): () => void;
       ytList(): Promise<import('../shared/ytPlaylists').YtPlaylistsStore>;
       ytListChannels(): Promise<import('../shared/ytPlaylists').YtChannel[]>;
       ytSaveFolders(

@@ -468,8 +468,13 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     const frame = (now: number) => {
       if (!running) return;
       frameN++;
-      // Yield while user drags windows/icons
-      if (document.documentElement.classList.contains('os-interacting')) {
+      // Yield while user drags windows/icons, and while the full-screen media player covers
+      // the desktop (companions are invisible behind it; the loop's size reads below forced
+      // layouts mid-frame during playback — 27-145 ms per ~9 s, profiled 2026-09-23).
+      if (
+        document.documentElement.classList.contains('os-interacting')
+        || document.querySelector('.seanime-host') !== null
+      ) {
         last = now;
         raf = requestAnimationFrame(frame);
         return;
@@ -482,6 +487,11 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
       const dt = Math.min(0.08, (now - last) / 1000);
       last = now;
+      // Nothing to move, nothing to measure.
+      if (!listRef.current.length) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       const root = rootRef.current;
       const w = root?.clientWidth ?? 900;
       const h = root?.clientHeight ?? 500;

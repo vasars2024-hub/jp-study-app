@@ -141,6 +141,11 @@ export interface QbitTransferRow {
   category: string;
   tags: string[];
   savePath: string;
+  /**
+   * The torrent's file or root folder on disk (qBittorrent 4.4+). Optional so
+   * sample rows and older daemons still type-check; `''` when unknown.
+   */
+  contentPath?: string;
   sizeBytes: number;
   downloadedBytes: number;
   uploadedBytes: number;

@@ -353,21 +353,43 @@ describe('MalDownloadDialog — anime', () => {
   });
 
   // Measured live on gate 2: with qBittorrent the only reachable target, the
-  // picker is suppressed (it needs >1) *and* the destination input is hidden
-  // (it renders only when the target is not qBittorrent), so "Send 7 torrents"
-  // named no destination anywhere on the dialog.
+  // picker is suppressed (it needs >1) *and* the destination input was hidden
+  // (qBittorrent ignored it under Automatic Torrent Management), so "Send 7
+  // torrents" named no destination anywhere on the dialog.
   it('names the destination when exactly one target is reachable', async () => {
-    qbitSettings = qbitReady();
+    qbitSettings = qbitReady({ savePath: 'D:\\Anime' });
     stubApi({ scraperSearchTorrents: vi.fn(async () => [frierenRelease()]) });
     await open(anime);
     await act(async () => button('Find releases').click());
     const only = must(document.querySelector('.mal-dl-target-only'), 'the single-target line');
     expect(only.textContent).toContain('Send to');
     expect(only.textContent).toContain('qBittorrent');
-    // The discriminator: this is the branch with no picker, so the line is the
-    // only thing carrying the destination.
+    // The discriminator: this is the branch with no picker.
     expect(document.querySelector('.mal-dl select')).toBeNull();
-    expect(document.querySelector('.mal-dl-destination')).toBeNull();
+    // The folder is now honoured for qBittorrent, so it is shown and seeded
+    // from the profile rather than hidden.
+    const field = must(document.querySelector<HTMLInputElement>('.mal-dl-destination'), 'the destination field');
+    expect(field.value).toBe('D:\\Anime');
+  });
+
+  // The Scraper knew exactly which show and episode this is; the send carries
+  // that, so the finished file is filed under it instead of guessed at.
+  it('hands qBittorrent the catalogue identity, the episode and the destination', async () => {
+    qbitSettings = qbitReady({ savePath: 'D:\\Anime' });
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperQbitSend: vi.fn(async () => ({ sent: 1, skipped: 0, failed: 0, details: [] })),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    await act(async () => button('Send').click());
+    const input = api().scraperQbitSend.mock.calls[0][0] as { ingest?: Record<string, unknown> };
+    expect(input.ingest).toMatchObject({
+      via: 'mal-dialog',
+      savePath: 'D:\\Anime',
+      hint: { provider: 'mal', malId: 52_991, title: 'Frieren', category: 'anime' },
+      rowEpisodes: { t1: [1] },
+    });
   });
 
   // The other half of the same guard: two targets must still get the picker,

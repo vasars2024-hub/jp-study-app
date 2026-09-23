@@ -1,0 +1,204 @@
+[
+ {
+  "score": 0.66420454,
+  "show": {
+   "id": 13017,
+   "name": "Naoki Hanzawa",
+   "type": "Scripted",
+   "language": "Japanese",
+   "genres": [
+    "Drama"
+   ],
+   "premiered": "2013-07-07",
+   "network": {
+    "id": 159,
+    "name": "TBS",
+    "country": {
+     "name": "Japan",
+     "code": "JP",
+     "timezone": "Asia/Tokyo"
+    },
+    "officialSite": "https://www.tbs.co.jp/"
+   },
+   "webChannel": null,
+   "externals": {
+    "tvrage": null,
+    "thetvdb": 271310,
+    "imdb": "tt2930136"
+   },
+   "image": {
+    "medium": "https://static.tvmaze.com/uploads/images/medium_portrait/44/111597.jpg",
+    "original": "https://static.tvmaze.com/uploads/images/original_untouched/44/111597.jpg"
+   },
+   "summary": "<p>It follows the story of Naoki Hanzawa, a banker working for the largest bank in Japan, Tokyo Chuo Bank. He faces numerous obstacles from upper management as he climbs his way up the ranks.</p>",
+   "rating": {
+    "average": null
+   },
+   "averageRuntime": 52,
+   "status": "Ended",
+   "weight": 57
+  }
+ },
+ {
+  "score": 0.52151763,
+  "show": {
+   "id": 64639,
+   "name": "Meitantei Conan: Hannin no Hanzawa-san",
+   "type": "Animation",
+   "language": "Japanese",
+   "genres": [
+    "Comedy",
+    "Anime",
+    "Mystery"
+   ],
+   "premiered": "2022-10-04",
+   "network": null,
+   "webChannel": {
+    "id": 1,
+    "name": "Netflix",
+    "country": null,
+    "officialSite": "https://www.netflix.com/"
+   },
+   "externals": {
+    "tvrage": null,
+    "thetvdb": 416846,
+    "imdb": null
+   },
+   "image": {
+    "medium": "https://static.tvmaze.com/uploads/images/medium_portrait/427/1069664.jpg",
+    "original": "https://static.tvmaze.com/uploads/images/original_untouched/427/1069664.jpg"
+   },
+   "summary": "<p>A comedy about the black silhouette used to portray an unknown intruder in Detective Conan.</p>",
+   "rating": {
+    "average": null
+   },
+   "averageRuntime": 9,
+   "status": "Ended",
+   "weight": 65
+  }
+ },
+ {
+  "score": 0.26292312,
+  "show": {
+   "id": 37383,
+   "name": "Bara no nai Hanaya",
+   "type": "Scripted",
+   "language": "Japanese",
+   "genres": [
+    "Drama",
+    "Romance"
+   ],
+   "premiered": "2008-01-14",
+   "network": {
+    "id": 131,
+    "name": "Fuji TV",
+    "country": {
+     "name": "Japan",
+     "code": "JP",
+     "timezone": "Asia/Tokyo"
+    },
+    "officialSite": null
+   },
+   "webChannel": null,
+   "externals": {
+    "tvrage": null,
+    "thetvdb": 90891,
+    "imdb": null
+   },
+   "image": {
+    "medium": "https://static.tvmaze.com/uploads/images/medium_portrait/159/398935.jpg",
+    "original": "https://static.tvmaze.com/uploads/images/original_untouched/159/398935.jpg"
+   },
+   "summary": "<p>Shiomi Eiji is forced to become a single father when his girlfriend passes away while giving birth to their daughter, Shizuku. Desolate after the loss of the woman he loved, Eiji has little time or desire to even consider remarrying, working part-time jobs just to make ends meet. The one thing that gives meaning and joy to his life is Shizuku, but even that begins to trouble him when Shizuku begins acting strange, hiding her face by putting a cloth over her head when around other people.</p><p>One day after opening his flower shop, Eiji comes across a blind woman standing by the door, taking shelter from the rain. When he invites her to come inside the shop, she at first refuses, but later gives in to Eiji's kindness. They become intimate friends and she slowly grows to depend on Eiji's sincerity and goodheartedness. After rescuing her a following evening when she walks into the street and is nearly struck by traffic, Eiji himself inexplicably discovers the cold of winter that has saddled his heart all these years slowly melting away...</p>",
+   "rating": {
+    "average": null
+   },
+   "averageRuntime": 60,
+   "status": "Ended",
+   "weight": 61
+  }
+ },
+ {
+  "score": 0.24692863,
+  "show": {
+   "id": 51762,
+   "name": "Hanada Shounen-shi",
+   "type": "Animation",
+   "language": "Japanese",
+   "genres": [
+    "Anime",
+    "Supernatural"
+   ],
+   "premiered": "2002-10-01",
+   "network": {
+    "id": 137,
+    "name": "NTV",
+    "country": {
+     "name": "Japan",
+     "code": "JP",
+     "timezone": "Asia/Tokyo"
+    },
+    "officialSite": null
+   },
+   "webChannel": null,
+   "externals": {
+    "tvrage": null,
+    "thetvdb": 81098,
+    "imdb": null
+   },
+   "image": {
+    "medium": "https://static.tvmaze.com/uploads/images/medium_portrait/281/703844.jpg",
+    "original": "https://static.tvmaze.com/uploads/images/original_untouched/281/703844.jpg"
+   },
+   "summary": "<p>The story revolves around a 9-year old boy by the name of Hanada Ichiro living in a small-town in rural Japan. He is a menace in the area in which he lives in and one day, he gets knocked down by a car when he`s up to his dirty pranks. After that accident, apart from getting a nasty scar and going bald, he is able to see ghosts and monsters. They usually have some requests for him to fulfill which annoys Ichiro, but he does fulfill them willingly or unwillingly. He is accompanied in his adventures by his friends Souta and Kei-chan, and his dog Jiro. The story is poignant and very touching.</p>",
+   "rating": {
+    "average": null
+   },
+   "averageRuntime": 30,
+   "status": "Ended",
+   "weight": 25
+  }
+ },
+ {
+  "score": 0.23703358,
+  "show": {
+   "id": 54783,
+   "name": "LADY ～Saigo no Hanzai Profile～",
+   "type": "Scripted",
+   "language": "Japanese",
+   "genres": [
+    "Drama",
+    "Action",
+    "Adventure"
+   ],
+   "premiered": "2011-01-07",
+   "network": {
+    "id": 159,
+    "name": "TBS",
+    "country": {
+     "name": "Japan",
+     "code": "JP",
+     "timezone": "Asia/Tokyo"
+    },
+    "officialSite": "https://www.tbs.co.jp/"
+   },
+   "webChannel": null,
+   "externals": {
+    "tvrage": null,
+    "thetvdb": 224551,
+    "imdb": "tt1768940"
+   },
+   "image": {
+    "medium": "https://static.tvmaze.com/uploads/images/medium_portrait/308/771099.jpg",
+    "original": "https://static.tvmaze.com/uploads/images/original_untouched/308/771099.jpg"
+   },
+   "summary": "<p><b>LADY</b> focuses on a team of profilers in the CPS, a fictional police division that deals with analyzing criminal behavior. Kitagawa plays the part of Shoko, a gifted profiler who returns to Japan after working with the FBI in the United States. Her character is described as a \"crime maniac,\" as she is overly knowledgeable about past crimes, while also being unskilled in matters of romance</p><p><br /> </p>",
+   "rating": {
+    "average": null
+   },
+   "averageRuntime": 60,
+   "status": "Ended",
+   "weight": 46
+  }
+ }
+]

@@ -1,5 +1,7 @@
 /**
  * Metadata provider clients: Jikan (the unofficial MyAnimeList API) and AniList.
+ * TVmaze and TMDB live beside them in `providers/`, sharing the same plumbing
+ * (`providers/providerHttp.ts`) and returning the same {@link ProviderWork}.
  *
  * Execution lives here rather than in `src/shared` on purpose. The shared layer is
  * contractually pure — no I/O, no clock, no network — and a previous phase
@@ -21,8 +23,36 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import type { MediaMetadataProviderId } from '../shared/mediaMetadataIpc';
 import type { RelatedWork } from '../shared/mediaSeasons';
+import {
+  FEED_CACHE_TTL_MS,
+  RateLimiter,
+  REQUEST_TIMEOUT_MS,
+  USER_AGENT,
+  clearMetadataCache,
+  num,
+  readCache,
+  requestJson,
+  text,
+  writeCache,
+} from './providers/providerHttp';
 
-/** What a provider hands back, normalized across the two. */
+// Re-exported so existing importers keep one door into the provider layer.
+export { clearMetadataCache };
+
+/** One episode of a run, as a provider lists it. */
+export interface ProviderEpisode {
+  /** Season number; absent when the provider numbers the run absolutely. */
+  season?: number;
+  number: number;
+  title?: string;
+  /** Original air date, epoch ms. */
+  airedAt?: number;
+  runtimeMin?: number;
+  /** Remote still. Downloaded into the artwork cache, never persisted as a URL. */
+  stillUrl?: string;
+}
+
+/** What a provider hands back, normalized across every provider. */
 export interface ProviderWork {
   provider: MediaMetadataProviderId;
   id: number;
@@ -48,201 +78,53 @@ export interface ProviderWork {
    */
   relatedWorks?: RelatedWork[];
   posterUrl?: string;
+  /** Wide hero art. AniList's banner strip; TV/film providers fill `backdropUrl`. */
   bannerUrl?: string;
+  /** 16:9 background art (TMDB backdrop, TVmaze background). */
+  backdropUrl?: string;
   malId?: number;
   anilistId?: number;
+  /** TVmaze show id. */
+  tvmazeId?: number;
+  /** TMDB id, in the namespace `tmdbType` names — TMDB movie and TV ids collide. */
+  tmdbId?: number;
+  tmdbType?: 'movie' | 'tv';
+  /** IMDb id (`tt0123456`). */
+  imdbId?: string;
+  /** Minutes: a film's running time, or a typical episode's. */
+  runtimeMin?: number;
+  /** Broadcaster or streaming service. */
+  network?: string;
+  /** Original language, lower-cased as the provider words it (`japanese`, `ja`). */
+  language?: string;
+  /** ISO 3166 country of origin (`JP`), when the provider states one. */
+  country?: string;
+  /**
+   * Whether the provider says this is animation. `undefined` when it does not
+   * say — Jikan and AniList list nothing else, so for them it is simply true.
+   */
+  animation?: boolean;
+  /** TVmaze's show type, lower-cased: `scripted`, `animation`, `reality`, … */
+  showType?: string;
+  /** The episode run, when the provider lists one in the same answer (TVmaze). */
+  episodes?: ProviderEpisode[];
 }
 
 // ---------------------------------------------------------------------------
 // Rate limiting
 // ---------------------------------------------------------------------------
 
-/**
- * Token-bucket-ish limiter honouring both a per-second and a per-minute budget.
- * Jikan enforces 3/s and 60/min; exceeding either returns 429, so both windows
- * have to be respected rather than just the tighter one.
- */
-class RateLimiter {
-  private recent: number[] = [];
-
-  constructor(
-    private readonly perSecond: number,
-    private readonly perMinute: number,
-  ) {}
-
-  async take(): Promise<void> {
-    for (;;) {
-      const now = Date.now();
-      this.recent = this.recent.filter((at) => now - at < 60_000);
-      const inLastSecond = this.recent.filter((at) => now - at < 1_000).length;
-      if (inLastSecond < this.perSecond && this.recent.length < this.perMinute) {
-        this.recent.push(now);
-        return;
-      }
-      // Wait for whichever window frees a slot first.
-      const oldestInSecond = this.recent.filter((at) => now - at < 1_000)[0] ?? now;
-      const waitSecond = inLastSecond >= this.perSecond ? 1_000 - (now - oldestInSecond) : 0;
-      const waitMinute = this.recent.length >= this.perMinute
-        ? 60_000 - (now - (this.recent[0] ?? now))
-        : 0;
-      await delay(Math.max(50, waitSecond, waitMinute));
-    }
-  }
-}
-
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 const jikanLimiter = new RateLimiter(3, 60);
-// AniList publishes 90/min; kept well under, and it is only a fallback.
+// AniList publishes 90/min; kept well under. Every anime match now costs one
+// AniList request (the `idMal` enrichment), so this is the budget that bounds a
+// large first sweep — 60/min is still a third below the published ceiling.
 const anilistLimiter = new RateLimiter(2, 60);
-
-// ---------------------------------------------------------------------------
-// HTTP
-// ---------------------------------------------------------------------------
-
-const USER_AGENT = 'jp-study-app (personal media library)';
-const REQUEST_TIMEOUT_MS = 15_000;
-
 /**
- * Fetch through Electron's `net` module rather than global `fetch`.
- *
- * `net` uses Chromium's stack, so it inherits the app's proxy configuration and
- * system certificate store — which a user behind a corporate proxy needs, and
- * Node's fetch does not do.
+ * Image CDNs are not the rate-limited APIs, but a first sweep over a big library
+ * downloads hundreds of posters and episode stills — kept polite and, above all,
+ * off the AniList API budget it used to share.
  */
-function request(
-  url: string,
-  options: { method?: string; body?: string; headers?: Record<string, string> } = {},
-): Promise<{ status: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (fn: () => void): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      fn();
-    };
-
-    const req = net.request({ url, method: options.method ?? 'GET' });
-    req.setHeader('User-Agent', USER_AGENT);
-    req.setHeader('Accept', 'application/json');
-    for (const [key, value] of Object.entries(options.headers ?? {})) req.setHeader(key, value);
-
-    const timer = setTimeout(() => {
-      finish(() => {
-        try {
-          req.abort();
-        } catch {
-          /* already finished */
-        }
-        reject(new Error('The metadata provider took too long to respond.'));
-      });
-    }, REQUEST_TIMEOUT_MS);
-
-    req.on('response', (response) => {
-      const chunks: Buffer[] = [];
-      response.on('data', (chunk: Buffer) => {
-        // Bounded so a hostile or broken response cannot exhaust memory.
-        if (chunks.reduce((n, c) => n + c.length, 0) < 8_000_000) chunks.push(chunk);
-      });
-      response.on('end', () => {
-        finish(() => resolve({
-          status: response.statusCode ?? 0,
-          body: Buffer.concat(chunks).toString('utf-8'),
-        }));
-      });
-      response.on('error', (error: Error) => finish(() => reject(error)));
-    });
-    req.on('error', (error) => finish(() => reject(error)));
-
-    if (options.body !== undefined) req.write(options.body, 'utf-8');
-    req.end();
-  });
-}
-
-/** GET/POST JSON with one retry on 429 or 5xx, honouring Retry-After crudely. */
-async function requestJson<T>(
-  url: string,
-  limiter: RateLimiter,
-  options: { method?: string; body?: string; headers?: Record<string, string> } = {},
-): Promise<T | null> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await limiter.take();
-    let response: { status: number; body: string };
-    try {
-      response = await request(url, options);
-    } catch {
-      if (attempt === 1) return null;
-      await delay(1_000);
-      continue;
-    }
-    if (response.status === 429 || response.status >= 500) {
-      if (attempt === 1) return null;
-      await delay(2_000);
-      continue;
-    }
-    if (response.status < 200 || response.status >= 300) return null;
-    try {
-      return JSON.parse(response.body) as T;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Disk cache
-// ---------------------------------------------------------------------------
-
-/** Provider answers change rarely; a month keeps a sweep offline-fast. */
-const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-function cacheDir(): string {
-  return path.join(app.getPath('userData'), 'metadata-cache');
-}
-
-function cacheFile(key: string): string {
-  const hash = crypto.createHash('sha1').update(key).digest('hex');
-  return path.join(cacheDir(), `${hash}.json`);
-}
-
-/**
- * Discovery feeds ("airing now", "top rated") are a view over a moving list
- * rather than a fact about one work, so they get their own short window. Long
- * enough that clicking between feed tabs is instant, short enough that a new
- * season shows up the same day.
- */
-const FEED_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-
-function readCache<T>(key: string, ttlMs: number = CACHE_TTL_MS): T | null {
-  try {
-    const file = cacheFile(key);
-    const stat = fs.statSync(file);
-    if (Date.now() - stat.mtimeMs > ttlMs) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) as T;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key: string, value: unknown): void {
-  try {
-    fs.mkdirSync(cacheDir(), { recursive: true });
-    fs.writeFileSync(cacheFile(key), JSON.stringify(value), 'utf-8');
-  } catch {
-    /* an uncacheable answer is still a usable answer */
-  }
-}
-
-/** Clears cached provider answers, so a refresh really re-asks. */
-export function clearMetadataCache(): void {
-  try {
-    fs.rmSync(cacheDir(), { recursive: true, force: true });
-  } catch {
-    /* nothing to clear */
-  }
-}
+const artLimiter = new RateLimiter(4, 150);
 
 // ---------------------------------------------------------------------------
 // Jikan (MyAnimeList)
@@ -271,16 +153,22 @@ interface JikanAnime {
   genres?: Array<{ name?: string }>;
   studios?: Array<{ name?: string }>;
   relations?: Array<{ entry?: Array<{ name?: string }> }>;
+  /** Free text: `24 min per ep`, `1 hr 45 min`, `Unknown`. */
+  duration?: string;
 }
 
-const text = (value: unknown): string | undefined => {
+/**
+ * Minutes out of Jikan's prose duration (`24 min per ep`, `1 hr 45 min`,
+ * `2 hr`), or undefined for `Unknown` and anything unreadable.
+ */
+export function parseJikanDuration(value: unknown): number | undefined {
   if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
-};
-
-const num = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  const hours = /(\d+)\s*hr/i.exec(value);
+  const minutes = /(\d+)\s*min/i.exec(value);
+  if (!hours && !minutes) return undefined;
+  const total = Number(hours?.[1] ?? 0) * 60 + Number(minutes?.[1] ?? 0);
+  return total > 0 ? total : undefined;
+}
 
 function jikanToWork(anime: JikanAnime): ProviderWork {
   const titles = [
@@ -317,6 +205,9 @@ function jikanToWork(anime: JikanAnime): ProviderWork {
         .filter((v): v is string => !!v),
     )].slice(0, 12),
     posterUrl: text(anime.images?.jpg?.large_image_url) ?? text(anime.images?.jpg?.image_url),
+    runtimeMin: parseJikanDuration(anime.duration),
+    // MyAnimeList lists nothing but animation.
+    animation: true,
   };
 }
 
@@ -465,6 +356,8 @@ const ANILIST_FIELDS = `
   format
   status
   episodes
+  duration
+  countryOfOrigin
   genres
   averageScore
   popularity
@@ -484,6 +377,10 @@ interface AnilistMedia {
   format?: string | null;
   status?: string | null;
   episodes?: number | null;
+  /** Minutes per episode (or the film's length). */
+  duration?: number | null;
+  /** ISO 3166 country (`JP`, `CN`, `KR`). */
+  countryOfOrigin?: string | null;
   genres?: string[];
   averageScore?: number | null;
   popularity?: number | null;
@@ -558,6 +455,10 @@ function anilistToWork(media: AnilistMedia): ProviderWork {
       .slice(0, 12),
     posterUrl: text(media.coverImage?.extraLarge) ?? text(media.coverImage?.large),
     bannerUrl: text(media.bannerImage),
+    runtimeMin: num(media.duration ?? undefined),
+    country: text(media.countryOfOrigin),
+    // AniList's ANIME type is animation by definition.
+    animation: true,
   };
 }
 
@@ -728,11 +629,54 @@ export async function anilistById(id: number): Promise<ProviderWork | null> {
   return data?.Media ? anilistToWork(data.Media) : null;
 }
 
+/**
+ * The AniList entry for a MyAnimeList id — the enrichment every Jikan match now
+ * gets.
+ *
+ * Jikan answers with a poster and nothing wider, and AniList used to be asked
+ * only when Jikan found nothing at all, so almost no title ever got a banner or
+ * an AniList id (which is what Jimaku matches subtitles on). One request per
+ * series, cached for a month like any other work. `null` covers both "not
+ * listed" (AniList answers an unknown `idMal` with a 404) and "not answered":
+ * either way the Jikan match stands on its own.
+ */
+export async function anilistByMalId(malId: number): Promise<ProviderWork | null> {
+  if (!Number.isInteger(malId) || malId <= 0) return null;
+  const data = await anilistQuery<{ Media?: AnilistMedia }>(
+    `query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { ${ANILIST_FIELDS} } }`,
+    { idMal: malId },
+    `anilist:mal:${malId}`,
+  );
+  return data?.Media ? anilistToWork(data.Media) : null;
+}
+
 // ---------------------------------------------------------------------------
 // Artwork download
 // ---------------------------------------------------------------------------
 
-const ART_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(myanimelist\.net|anilist\.co|cdn\.myanimelist\.net)\//i;
+/**
+ * Hosts artwork may be downloaded from. TVmaze serves every image from
+ * `static.tvmaze.com` and TMDB from `image.tmdb.org`; nothing wider is needed.
+ */
+const ART_HOSTS =
+  /^https:\/\/([a-z0-9-]+\.)*(myanimelist\.net|anilist\.co|cdn\.myanimelist\.net)\/|^https:\/\/(static\.tvmaze\.com|image\.tmdb\.org)\//i;
+
+/** Whether {@link downloadArtwork} would fetch this URL at all. */
+export function artworkUrlAllowed(url: string): boolean {
+  return typeof url === 'string' && ART_HOSTS.test(url);
+}
+
+/**
+ * JPEG, PNG or WebP by magic number. A CDN answering 200 with an HTML error page
+ * must not be written into the cache as `poster.jpg` — it would be served as a
+ * broken image forever, because the download short-circuits on an existing file.
+ */
+export function looksLikeImage(bytes: Buffer): boolean {
+  if (bytes.length < 12) return false;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return true;
+  if (bytes[0] === 0x89 && bytes.toString('latin1', 1, 4) === 'PNG') return true;
+  return bytes.toString('latin1', 0, 4) === 'RIFF' && bytes.toString('latin1', 8, 12) === 'WEBP';
+}
 
 /**
  * Download provider artwork into the artwork cache and return the path relative
@@ -743,14 +687,14 @@ const ART_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(myanimelist\.net|anilist\.co|cdn\.
  * from anywhere it likes.
  */
 export async function downloadArtwork(url: string, name: string): Promise<string | null> {
-  if (!ART_HOSTS.test(url)) return null;
+  if (!artworkUrlAllowed(url)) return null;
   const extension = /\.(jpe?g|png|webp)(?:\?|$)/i.exec(url)?.[1]?.toLowerCase() ?? 'jpg';
   const relative = path.join('artwork', `${name}.${extension === 'jpeg' ? 'jpg' : extension}`);
   const absolute = path.join(app.getPath('userData'), relative);
   try {
     if (fs.existsSync(absolute) && fs.statSync(absolute).size > 0) return relative;
     fs.mkdirSync(path.dirname(absolute), { recursive: true });
-    await anilistLimiter.take();
+    await artLimiter.take();
     const response = await new Promise<Buffer | null>((resolve) => {
       const chunks: Buffer[] = [];
       const req = net.request({ url, method: 'GET' });
@@ -787,7 +731,7 @@ export async function downloadArtwork(url: string, name: string): Promise<string
       });
       req.end();
     });
-    if (!response || response.length === 0) return null;
+    if (!response || !looksLikeImage(response)) return null;
     fs.writeFileSync(absolute, response);
     return relative;
   } catch {

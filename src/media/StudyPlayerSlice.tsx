@@ -690,6 +690,15 @@ function ResumeTracker({
         durationSec,
         finished,
       }).catch(() => undefined);
+      // And the tracking library: past 90% an episode counts, advancing the title's progress
+      // and status (plan → watching → completed). Below that it returns without touching disk.
+      if (typeof window.api?.watchRecordLocalProgress === 'function') {
+        void window.api.watchRecordLocalProgress({
+          path: libraryPath,
+          positionSec: finished ? durationSec : positionSec,
+          durationSec,
+        }).catch(() => undefined);
+      }
     };
     const handleTimeUpdate = (): void => {
       watch = watchTimeSample(watch, {

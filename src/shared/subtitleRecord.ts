@@ -54,7 +54,20 @@ export interface SubtitleRecord {
    * generated track for its language, and the two derivations must not evict each
    * other — they are different artifacts with different timing.
    */
-  derivation?: 'whisper' | 'en-ja-fusion';
+  derivation?: 'whisper' | 'en-ja-fusion' | 'machine-translation';
+  /**
+   * For `derivation: 'machine-translation'`: the record whose cues were
+   * translated. Kept so a translation made from a track that is no longer the
+   * study track can be recognised as stale and redone.
+   */
+  translatedFromId?: string;
+  /** Which engine produced a machine translation (`gemini-2.5-flash`, `local-qwen`, …). */
+  translationEngine?: string;
+  /**
+   * Seconds the cue times were shifted onto this file's audio when the track was
+   * downloaded (`shared/subtitleSync.ts`). Absent when no shift was applied.
+   */
+  syncOffsetSec?: number;
   /** True once the user has corrected a generated transcript. */
   edited?: boolean;
   /** Stream index, for a track extracted from the container. */
@@ -73,6 +86,11 @@ export interface SubtitleSearchFailure {
   /** Epoch ms. Callers apply their own staleness window before retrying. */
   attemptedAt: number;
   reason: string;
+}
+
+/** A track this app machine-translated from another language's track. */
+export function isMachineTranslatedSubtitle(record: Pick<SubtitleRecord, 'derivation'>): boolean {
+  return record.derivation === 'machine-translation';
 }
 
 export function isJapaneseSubtitleLang(lang: string): boolean {

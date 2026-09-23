@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createEmptyMediaProvidersDocument,
+  identifiersFromProviderIds,
   MEDIA_PROVIDER_MODEL_VERSION,
   normalizeMediaProvidersDocument,
   planMediaProviderCapabilities,
@@ -163,5 +164,30 @@ describe('local mutation helpers', () => {
     const pruned = removeMediaProvider(doc, 'PROV-A');
     expect(pruned.providers.map((item) => item.id)).toEqual(['prov-b']);
     expect(pruned.descriptors.map((item) => item.providerId)).toEqual(['prov-b']);
+  });
+});
+
+describe('identifiersFromProviderIds', () => {
+  it('projects the ids the metadata sweep stores, TMDB with its namespace', () => {
+    expect(identifiersFromProviderIds({
+      malId: 52991, anilistId: 154587, tvmazeId: 69956, tmdbId: 209867, tmdbType: 'tv', imdbId: 'tt22248376',
+    })).toEqual([
+      { namespace: 'mal', value: '52991' },
+      { namespace: 'anilist', value: '154587' },
+      { namespace: 'tvmaze', value: '69956' },
+      { namespace: 'tmdb', value: 'tv/209867' },
+      { namespace: 'imdb', value: 'tt22248376' },
+    ]);
+  });
+
+  it('drops malformed ids and defaults TMDB to the movie namespace', () => {
+    expect(identifiersFromProviderIds({ malId: 0, tmdbId: 129, imdbId: '0245429' })).toEqual([
+      { namespace: 'tmdb', value: 'movie/129' },
+    ]);
+  });
+
+  it('keeps tvmaze as a namespace a stored document may use', () => {
+    const { value } = normalizeMediaProvidersDocument({ providers: [provider({ identifierNamespaces: ['tvmaze', 'tmdb'] })] });
+    expect(value.providers[0].identifierNamespaces).toEqual(['tvmaze', 'tmdb']);
   });
 });

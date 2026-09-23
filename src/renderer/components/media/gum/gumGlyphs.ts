@@ -1,0 +1,21 @@
+/** The names of the Gum library's own inline glyphs (`GumIcons.tsx`) — identifiers, not UI text. */
+export type GumGlyph =
+  | 'grip'
+  | 'sort'
+  | 'grid'
+  | 'list'
+  | 'sliders'
+  | 'play'
+  | 'download'
+  | 'check'
+  | 'chevron-down'
+  | 'arrow-up'
+  | 'arrow-down'
+  | 'pin'
+  | 'eye-off'
+  | 'plus'
+  | 'minus'
+  | 'close'
+  | 'star'
+  | 'import'
+  | 'more';

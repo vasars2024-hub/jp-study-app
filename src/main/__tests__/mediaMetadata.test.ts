@@ -28,11 +28,34 @@ vi.mock('../mediaProviderClients', () => ({
   anilistSearch: async () => providerScript.anilist,
   jikanById: async () => null,
   anilistById: async () => null,
+  anilistByMalId: async () => null,
   jikanEpisodeInfo: async () => ({}),
   downloadArtwork: async () => null,
   artworkName: (prefix: string, key: string) => `${prefix}-${key}`,
   clearMetadataCache: () => undefined,
 }));
+
+// TVmaze answers "no such show" and TMDB has no key, so the anime-database
+// outage cases below are decided by Jikan and AniList alone, as they were
+// written. The TVmaze/TMDB paths have their own suite (mediaMetadataSweep).
+vi.mock('../providers/tvmaze', () => ({
+  findTvmazeShow: async () => ({ match: null, down: false }),
+  tvmazeSearch: async () => [],
+  tvmazeShowById: async () => null,
+}));
+vi.mock('../providers/tmdb', () => ({
+  findTmdbMovie: async () => ({ match: null, down: true }),
+  findTmdbTv: async () => ({ match: null, down: true }),
+  tmdbAvailable: () => false,
+  tmdbMovieById: async () => null,
+  tmdbSearchMovie: async () => null,
+}));
+vi.mock('../watchLibraryMetadata', () => ({
+  cancelWatchLibraryMetadata: () => undefined,
+  registerWatchLibraryMetadata: () => undefined,
+  scheduleWatchLibraryMetadata: () => undefined,
+}));
+vi.mock('../mediaArtwork', () => ({ findLocalArtwork: async () => ({}) }));
 
 const { groupTitles, alreadyFetched, needsEpisodeBackfill } = __mediaMetadataTestables;
 

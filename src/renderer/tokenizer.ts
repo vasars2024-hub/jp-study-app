@@ -118,7 +118,57 @@ function isContent(t: IpadicFeatures): boolean {
 }
 
 /** Tokenize a run of Japanese text (tokenizer must already be built). */
+/**
+ * Results by text. Subtitle lines are tokenized when they appear (4-53 ms each on the main
+ * thread, profiled 2026-09-23) and again by the transcript, the analyser and mining; the
+ * same line never tokenizes differently, so it is done once. Bounded, oldest out first.
+ */
+const TOKENIZE_CACHE_MAX = 4000;
+const tokenizeCache = new Map<string, JpToken[]>();
+
 export function tokenizeSync(text: string): JpToken[] {
+  if (!tok) return [];
+  const cached = tokenizeCache.get(text);
+  if (cached) return cached;
+  const tokens = tokenizeUncached(text);
+  if (tokenizeCache.size >= TOKENIZE_CACHE_MAX) {
+    const oldest = tokenizeCache.keys().next().value;
+    if (oldest !== undefined) tokenizeCache.delete(oldest);
+  }
+  tokenizeCache.set(text, tokens);
+  return tokens;
+}
+
+/**
+ * Tokenize `texts` a few at a time in idle periods, so the lines of a subtitle file are ready
+ * before they are shown. Returns a cancel function. A no-op until the tokenizer is loaded.
+ */
+export function pretokenizeInIdle(texts: readonly string[]): () => void {
+  let cancelled = false;
+  let index = 0;
+  const idle = (cb: () => void): void => {
+    const ric = (window as unknown as {
+      requestIdleCallback?: (fn: () => void, opts?: { timeout: number }) => number;
+    }).requestIdleCallback;
+    if (typeof ric === 'function') ric(cb, { timeout: 2000 });
+    else window.setTimeout(cb, 50);
+  };
+  const step = (): void => {
+    if (cancelled || !tok) return;
+    const until = performance.now() + 8;
+    while (index < texts.length && performance.now() < until) {
+      tokenizeSync(texts[index]);
+      index += 1;
+    }
+    if (index < texts.length) idle(step);
+  };
+  void getTokenizer().then(() => idle(step)).catch(() => undefined);
+  return () => {
+    cancelled = true;
+  };
+}
+
+function tokenizeUncached(text: string): JpToken[] {
   if (!tok) return [];
   return tok.tokenize(text).map((t) => ({
     surface: t.surface_form,

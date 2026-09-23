@@ -29,6 +29,7 @@ import type {
   TorrentRow,
 } from '../../../../shared/scraperResults';
 import type { ScraperQbittorrentSettings } from '../../../../shared/scraperSourceSettings';
+import type { ScraperIngestHandoff } from '../../../../shared/mediaIngest';
 import type { ScraperSchedulerSettings } from '../../../../shared/scraperOutputSettings';
 import type { ScraperSchedulerState } from '../../../../shared/scraperIpc';
 import type {
@@ -109,7 +110,15 @@ export interface ScraperPort {
   searchTorrents(query: TorrentQuery): Promise<TorrentRow[]>;
   qbitTest(config: ScraperQbittorrentSettings): Promise<QbitStatusReport>;
   qbitTransfers(): Promise<QbitTransfersResult>;
-  qbitSend(rows: TorrentRow[], config: ScraperQbittorrentSettings): Promise<QbitSendReport>;
+  /**
+   * `ingest` says who the releases are (and where to put them), so main can tag
+   * them `gum` and file the finished download under the right show.
+   */
+  qbitSend(
+    rows: TorrentRow[],
+    config: ScraperQbittorrentSettings,
+    ingest?: ScraperIngestHandoff,
+  ): Promise<QbitSendReport>;
 
   listDownloads(): Promise<DownloadRow[]>;
   listExports(): Promise<ExportRecord[]>;

@@ -219,10 +219,10 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
         () => fallback.qbitTransfers(),
       ),
 
-    qbitSend: (rows, config) =>
+    qbitSend: (rows, config, ingest) =>
       route(
         'qbitSend',
-        () => window.api.scraperQbitSend({ rows, config }),
+        () => window.api.scraperQbitSend({ rows, config, ingest }),
         () => fallback.qbitSend(rows, config),
       ),
 

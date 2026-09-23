@@ -153,3 +153,14 @@ describe('environment variable names', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 });
+
+describe('TMDB', () => {
+  it('is a vault-held key in the media category, linking to the TMDB API settings page', () => {
+    const tmdb = credentialSpec('tmdb');
+    expect(tmdb).toMatchObject({ kind: 'apiKey', category: 'media', store: 'vault', refusesWhenUnencrypted: true });
+    expect(tmdb?.signupUrl).toBe('https://www.themoviedb.org/settings/api');
+    expect(tmdb?.fields.map((field) => field.name)).toEqual(['apiKey']);
+    expect(tmdb?.fields[0]?.secret).toBe(true);
+    expect(populatedCredentialCategories()).toContain('media');
+  });
+});

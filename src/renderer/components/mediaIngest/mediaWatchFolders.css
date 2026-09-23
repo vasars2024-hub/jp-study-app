@@ -1,0 +1,113 @@
+/* Watch folders panel — sits inside the Media Center's Library settings and
+   leans on its `.mc-toggle` / `.mc-settings-actions` / `.mc-setting-note`
+   styling. Only the folder list is its own. */
+
+.mi-panel {
+  margin-top: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--mc-line, rgba(255, 255, 255, 0.08));
+}
+
+.mi-qbit {
+  margin-top: 6px;
+}
+
+.mi-folders-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 12px;
+}
+
+.mi-folders-head strong {
+  color: var(--mc-row-ink, #d9dbe1);
+  font-size: var(--mc-fs-body, 13px);
+  font-weight: 600;
+}
+
+.mi-folders-head small {
+  color: var(--mc-dim, #8b8f9a);
+  font-size: var(--mc-fs-micro, 11px);
+}
+
+.mi-folder-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mi-folder {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--mc-line, rgba(255, 255, 255, 0.08));
+  color: var(--mc-row-ink, #d9dbe1);
+}
+
+.mi-folder > svg {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+.mi-folder.is-idle {
+  opacity: 0.6;
+}
+
+.mi-folder-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mi-folder-text strong {
+  overflow: hidden;
+  font-size: var(--mc-fs-meta, 12px);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mi-folder-text small {
+  overflow: hidden;
+  color: var(--mc-dim, #8b8f9a);
+  font-family: Consolas, monospace;
+  font-size: var(--mc-fs-micro, 11px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mi-folder-text em {
+  margin-top: 1px;
+  color: var(--mc-dim, #8b8f9a);
+  font-size: var(--mc-fs-micro, 11px);
+  font-style: normal;
+}
+
+.mi-folder-remove {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mc-dim, #8b8f9a);
+  cursor: pointer;
+}
+
+.mi-folder-remove:hover,
+.mi-folder-remove:focus-visible {
+  border-color: var(--mc-line, rgba(255, 255, 255, 0.12));
+  color: var(--mc-row-ink, #d9dbe1);
+}
+
+.mi-folder-remove:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

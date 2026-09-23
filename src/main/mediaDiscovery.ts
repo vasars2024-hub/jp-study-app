@@ -41,7 +41,9 @@ const FEED_LIMIT = 25;
 /** Projects a provider record down to the fields the console shows or scores. */
 function toCandidate(work: ProviderWork): DiscoveryCandidate {
   return {
-    provider: work.provider,
+    // Discovery only ever asks the two anime databases; the provider union
+    // grew TVmaze and TMDB for the library sweep.
+    provider: work.provider === 'anilist' ? 'anilist' : 'jikan',
     id: work.id,
     mediaType: 'anime',
     title: work.displayTitle || work.titles[0] || '',
