@@ -38,7 +38,13 @@ export const CONTENT_SECURITY_POLICY_DIRECTIVES: readonly string[] = [
   // actually planned is still downloaded by main and served over `media://`
   // (`main/jiten.ts`'s `cacheDeckCover`) so it survives offline — this entry is
   // for the not-yet-planned search results that have no local copy to serve.
-  "img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co https://cdn.jiten.moe",
+  //
+  // `artworks.thetvdb.com` is the adopted media workspace's episode artwork: the sidecar's
+  // episode metadata carries thumbnail URLs on that host, and a packaged build logged every
+  // one as `blocked=csp` (measured 2026-09-23, e.g. `/banners/episodes/330692/…jpg` for
+  // Laid-Back Camp), so episode lists and the player header showed empty frames. Same rule
+  // as above: one more named provider host, not a step toward blanket `https:`.
+  "img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co https://cdn.jiten.moe https://artworks.thetvdb.com",
   // The sidecar origin appears here as well as in `connect-src`, and the two are
   // NOT interchangeable: `connect-src` governs the `fetch()` that prepares the
   // stream, `media-src` governs the `<video>` element that then loads it from
