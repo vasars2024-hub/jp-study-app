@@ -10890,6 +10890,7 @@ export const ru: Catalog = {
   'ankiWorkbench.sessions.discardConfirm.title': 'Удалить запись о чтении?',
   'ankiWorkbench.sessions.discardConfirm.message': 'Удалить сохранённый прогресс чтения «{label}»? Файл можно будет прочитать снова.',
   'ankiWorkbench.sessions.discardFailed': 'Не удалось удалить запись о чтении. Попробуйте ещё раз.',
+  'dict.results.copyFailed': 'Не удалось скопировать в буфер обмена. Попробуйте ещё раз.',
   'ankiWorkbench.sessions.resume': 'Продолжить с заметки {offset}',
   'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'В этом чтении не осталось ничего для продолжения.',
   'ankiWorkbench.sessions.resumeRefused.source-changed':

@@ -9896,6 +9896,7 @@ export const zh: Catalog = {
   'ankiWorkbench.sessions.discardConfirm.title': '丢弃最近的读取记录？',
   'ankiWorkbench.sessions.discardConfirm.message': '丢弃 {label} 已保存的读取进度？之后仍可重新读取该文件。',
   'ankiWorkbench.sessions.discardFailed': '无法丢弃这条读取记录，请重试。',
+  'dict.results.copyFailed': '无法复制到剪贴板，请重试。',
   'ankiWorkbench.sessions.resume': '从第 {offset} 条笔记继续',
   'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': '此次读取没有可继续的内容。',
   'ankiWorkbench.sessions.resumeRefused.source-changed': '该文件在此次读取开始后已更改。请重新打开以从头开始。',
