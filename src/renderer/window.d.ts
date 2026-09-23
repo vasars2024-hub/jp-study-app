@@ -568,6 +568,8 @@ declare global {
         fingerprint?: string,
       ): Promise<import('../main/anki/draftSessionStore').DraftSessionResumeResult>;
       ankiDraftSessionDelete(id: string): Promise<boolean>;
+      ankiDraftSessionClear(): Promise<import('../shared/ankiDraftSession').AnkiDraftSession[]>;
+      ankiDraftSessionRestore(sessions: import('../shared/ankiDraftSession').AnkiDraftSession[]): Promise<number>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;
       desktopCommitLayout(

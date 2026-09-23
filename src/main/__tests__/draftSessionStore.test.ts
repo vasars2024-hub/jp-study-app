@@ -243,4 +243,19 @@ describe('the file itself', () => {
     restart();
     expect(store.listDraftSessions()).toEqual([]);
   });
+
+  it('shows only the latest read of a file and restores all cleared reads', () => {
+    const first = store.beginDraftSession(CSV_REQUEST);
+    store.cancelDraftSession(first.id);
+    const second = store.beginDraftSession(CSV_REQUEST);
+    expect(store.listDraftSessions()).toHaveLength(2);
+    expect(store.summarizeDraftSessions().map((row) => row.session.id)).toEqual([second.id]);
+    const removed = store.clearDraftSessions();
+    expect(removed).toHaveLength(2);
+    restart();
+    expect(store.listDraftSessions()).toEqual([]);
+    expect(store.restoreDraftSessions(removed)).toBe(2);
+    restart();
+    expect(store.summarizeDraftSessions().map((row) => row.session.id)).toEqual([second.id]);
+  });
 });

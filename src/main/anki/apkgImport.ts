@@ -36,6 +36,8 @@ import {
   beginDraftSession,
   cancelDraftSession,
   deleteDraftSession,
+  clearDraftSessions,
+  restoreDraftSessions,
   failDraftSession,
   getDraftSession,
   recordDraftSessionPage,
@@ -464,4 +466,6 @@ export function registerApkgIpc(): void {
     resumeDraftSession(id, fingerprint),
   );
   ipcMain.handle('anki:draftSessionDelete', (_e, id: string) => deleteDraftSession(id));
+  ipcMain.handle('anki:draftSessionClear', () => clearDraftSessions());
+  ipcMain.handle('anki:draftSessionRestore', (_e, sessions: import('../../shared/ankiDraftSession').AnkiDraftSession[]) => restoreDraftSessions(sessions));
 }
