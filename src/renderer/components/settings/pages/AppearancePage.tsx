@@ -152,8 +152,8 @@ export default function AppearancePage() {
 
       <SettingsCard
         id="blanc-mode"
-        title="Blanc Mode"
-        description="A compact plain toolbox window for reading, mining, media, flashcards, stats, and utilities."
+        title={t('special.blancMode')}
+        description={t('settings.appearance.blanc.description')}
         highlight={focusSettingId === 'blanc-mode'}
       >
         <label className="os-toggle">
@@ -162,17 +162,17 @@ export default function AppearancePage() {
             checked={blancMode.enabled}
             onChange={(e) => {
               const next = e.target.checked;
-              setBlancMsg(next ? 'Opening the Blanc toolbox beside Study OS.' : 'Closing the Blanc toolbox window.');
+              setBlancMsg(t(next ? 'settings.appearance.blanc.opening' : 'settings.appearance.blanc.closing'));
               void setBlancModeEnabled(next)
                 .then(setBlancMode)
                 .catch((error) => {
-                  setBlancMsg(error instanceof Error ? error.message : 'Could not open the Blanc toolbox.');
+                  setBlancMsg(error instanceof Error ? error.message : t('settings.appearance.blanc.openError'));
                 });
             }}
           />
-          <span>Use Blanc Mode</span>
+          <span>{t('special.useBlancMode')}</span>
         </label>
-        <p className="muted os-set-hint">Blanc opens as a smaller parallel toolbox window; the main Study OS stays open.</p>
+        <p className="muted os-set-hint">{t('settings.appearance.blanc.hint')}</p>
         {blancMsg && <p className="muted os-set-hint">{blancMsg}</p>}
       </SettingsCard>
 
