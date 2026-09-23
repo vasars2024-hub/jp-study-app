@@ -281,12 +281,15 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     expect(SHELL_CODE.match(/const canGoLiquid =/g) ?? []).toHaveLength(1);
   });
 
-  it('keeps Note paper conventional until opt-in, then exposes a reversible color palette', () => {
-    expect(SHELL).toContain('{isNote && liquid && (');
+  it('offers Note colours in both standard and Liquid presentation', () => {
+    expect(SHELL).toContain('{isNote && (');
     expect(SHELL).toContain('className="desk-note-palette lq-contextual"');
     expect(SHELL).toContain('aria-pressed={noteColor === color}');
     expect(SHELL).toContain('onClick={() => onNoteColor?.(color)}');
     expect(SHELL).toMatch(/style=\{isNote && noteColor && !liquid/);
+    const standardCss = readFileSync(resolve(__dirname, '..', 'styles.css'), 'utf8');
+    expect(standardCss).toContain('.fwin-note:not(.fwin-liquid) .desk-note-palette');
+    expect(standardCss).toContain('.fwin-note:not(.fwin-liquid) .desk-note-color[aria-pressed=');
   });
 
   it('confirms Note deletion and serializes multi-window destructive prompts', () => {

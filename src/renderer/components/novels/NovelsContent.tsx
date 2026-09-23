@@ -1021,8 +1021,7 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
   if (!selectedCandidate) {
     return <div className="jiten-empty">{t('novels.inspector.selectPrompt')}</div>;
   }
-  // Category 8: `disabled` is DERIVED from the reason, never asserted beside it, so a button
-  // that is grey with nothing saying why cannot be written here by accident.
+  // Keep unavailable actions in the tab order so their reason can be read.
   const actionState = {
     busy,
     hasSelectedLink: !!selectedLink,
@@ -1067,37 +1066,46 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
 
       <div className="jiten-actions">
         {selectedPlan ? (
-          <button type="button" className="btn subtle" disabled={!!planWhy} title={planWhy ? t(planWhy) : undefined} onClick={() => void state.removeFromPlan(selectedPlan)}>
+          <button type="button" className="btn subtle" aria-disabled={!!planWhy} aria-describedby={planWhy ? 'novels-reason-plan' : undefined} onClick={() => { if (!planWhy) void state.removeFromPlan(selectedPlan); }}>
             <Icon name="close" size={14} />
             {t('novels.action.remove')}
           </button>
         ) : (
-          <button type="button" className="btn primary" disabled={!!planWhy} title={planWhy ? t(planWhy) : undefined} onClick={() => void state.planSelected()}>
+          <button type="button" className="btn primary" aria-disabled={!!planWhy} aria-describedby={planWhy ? 'novels-reason-plan' : undefined} onClick={() => { if (!planWhy) void state.planSelected(); }}>
             <Icon name="star" size={14} />
             {t('novels.action.plan')}
           </button>
         )}
-        <button type="button" className="btn" disabled={!!openSourceWhy} title={openSourceWhy ? t(openSourceWhy) : undefined} onClick={() => selectedLink && openLink(selectedLink.url)}>
+        <button type="button" className="btn" aria-disabled={!!openSourceWhy} aria-describedby={openSourceWhy ? 'novels-reason-open' : undefined} onClick={() => { if (!openSourceWhy && selectedLink) openLink(selectedLink.url); }}>
           <Icon name="external" size={14} />
           {t('novels.action.openSource')}
         </button>
-        <button type="button" className="btn" disabled={!!importFileWhy} title={importFileWhy ? t(importFileWhy) : undefined} onClick={() => void state.importLocalSelected()}>
+        <button type="button" className="btn" aria-disabled={!!importFileWhy} aria-describedby={importFileWhy ? 'novels-reason-import' : undefined} onClick={() => { if (!importFileWhy) void state.importLocalSelected(); }}>
           <Icon name="library" size={14} />
           {t('novels.action.importFile')}
         </button>
-        <button type="button" className="btn" disabled={!!downloadEpubWhy} title={downloadEpubWhy ? t(downloadEpubWhy) : undefined} onClick={() => void state.importDirectSelected()}>
+        <button type="button" className="btn" aria-disabled={!!downloadEpubWhy} aria-describedby={downloadEpubWhy ? 'novels-reason-download' : undefined} onClick={() => { if (!downloadEpubWhy) void state.importDirectSelected(); }}>
           <Icon name="download" size={14} />
           {t('novels.action.downloadEpub')}
         </button>
-        <button type="button" className="btn primary" disabled={!!analyzeEpubWhy} title={analyzeEpubWhy ? t(analyzeEpubWhy) : undefined} onClick={() => void state.analyzeSelected()}>
+        <button type="button" className="btn primary" aria-disabled={!!analyzeEpubWhy} aria-describedby={analyzeEpubWhy ? 'novels-reason-analyze' : undefined} onClick={() => { if (!analyzeEpubWhy) void state.analyzeSelected(); }}>
           <Icon name="scan" size={14} />
           {t('novels.action.analyzeEpub')}
         </button>
-        <button type="button" className="btn" disabled={!!jitenMineWhy} title={jitenMineWhy ? t(jitenMineWhy) : undefined} onClick={() => void state.mineJitenSelected()}>
+        <button type="button" className="btn" aria-disabled={!!jitenMineWhy} aria-describedby={jitenMineWhy ? 'novels-reason-mine' : undefined} onClick={() => { if (!jitenMineWhy) void state.mineJitenSelected(); }}>
           <Icon name="flashcards" size={14} />
           {t('novels.action.jitenMine')}
         </button>
       </div>
+      {[['plan', planWhy, selectedPlan ? 'novels.action.remove' : 'novels.action.plan'],
+        ['open', openSourceWhy, 'novels.action.openSource'],
+        ['import', importFileWhy, 'novels.action.importFile'],
+        ['download', downloadEpubWhy, 'novels.action.downloadEpub'],
+        ['analyze', analyzeEpubWhy, 'novels.action.analyzeEpub'],
+        ['mine', jitenMineWhy, 'novels.action.jitenMine'],
+      ].map(([id, reason, label]) => reason && (
+        <p key={id} id={`novels-reason-${id}`} className="muted jiten-action-reason">{t(label)}: {t(reason)}</p>
+      ))}
 
       <section className="jiten-source-pick">
         <b>{t('novels.sourceLinks')}</b>

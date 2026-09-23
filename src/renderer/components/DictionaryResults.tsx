@@ -295,6 +295,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const [active, setActive] = useState<StudyProfile>(getActiveProfile);
   const [addState, setAddState] = useState<Record<number, AddState>>({});
   const [addErr, setAddErr] = useState<Record<number, string>>({});
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [savedSet, setSavedSet] = useState<Set<string>>(() => new Set(loadSaved().map((w) => w.word)));
   const [studyLang, setStudyLang] = useState(getStudyLang);
   // A counter rather than a copy of the store: `cycleLevel` and an Anki sync
@@ -696,11 +697,16 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     }
   }
 
-  function copyDictionaryEntry(entry: DictEntry) {
+  async function copyDictionaryEntry(entry: DictEntry) {
     const reading = entry.reading && entry.reading !== entry.word ? entry.reading : undefined;
     const meaning = plainMeaning(entry);
-    const rec = recordDictionaryEntry(entry.word, reading, meaning);
-    if (rec) void navigator.clipboard.writeText(rec.text);
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText([entry.word, reading, meaning].filter(Boolean).join(' — '));
+      recordDictionaryEntry(entry.word, reading, meaning);
+    } catch {
+      setCopyError(t('dict.results.copyFailed'));
+    }
   }
 
   function toggleSave(entry: DictEntry) {
@@ -930,6 +936,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
   return (
     <div className={`dict-results ${variant}`}>
+      {copyError && <div role="alert" className="dict-empty">{copyError}</div>}
       {query.trim() && !result && <div className="dict-loading">{t('dict.results.lookingUp')}</div>}
       {result?.error && <div className="dict-empty">{result.error}</div>}
       {result && !result.error && entries.length === 0 && (

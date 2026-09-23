@@ -165,3 +165,27 @@ describe('the catalogs answer every key the menu bar can ask for', () => {
     }
   });
 });
+
+describe('D98 Settings toolbar and status chrome', () => {
+  const keys = [
+    'settings.toolbar.home', 'settings.toolbar.find', 'settings.toolbar.display',
+    'settings.toolbar.lock', 'settings.status.advancedVisible',
+    'settings.status.standardPages', 'settings.status.theme',
+  ];
+
+  it('resolves each toolbar and status string through the catalog', () => {
+    for (const key of keys) expect(SOURCE).toContain(`'${key}'`);
+    for (const literal of ['>Home<', '>Find<', '>Display<', '>Lock<',
+      "'Advanced pages visible'", "'Standard pages'", 'title={`Theme: ${theme}`}']) {
+      expect(SOURCE).not.toContain(literal);
+    }
+  });
+
+  it.each(LANGS)('has translations for every new string in %s', (lang) => {
+    for (const key of keys) {
+      const value = catalogFor(lang)[key];
+      expect(typeof value).toBe('string');
+      if (lang !== 'en') expect(value).not.toBe(catalogFor('en')[key]);
+    }
+  });
+});

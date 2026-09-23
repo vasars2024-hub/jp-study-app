@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnkiDraft, AnkiDraftSourceKind } from '../../../shared/ankiDraft';
+import type { AnkiDraftSession } from '../../../shared/ankiDraftSession';
 import { ANKI_DRAFT_PAGE_SIZE, APKG_READ_CANCELLED } from '../../../shared/ankiDraft';
 import {
   WORKBENCH_STEP_IDS,
@@ -50,6 +51,7 @@ import {
 import { setLevel, type WkLevel } from '../../knownWords';
 import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../ui/dialogService';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
 import DeckWorkbenchTray, {
   ENRICH_ACTION_KINDS,
@@ -172,6 +174,14 @@ export default function DeckWorkbench() {
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState<WorkbenchStepId | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [undoSessions, setUndoSessions] = useState<AnkiDraftSession[] | null>(null);
+
+  useEffect(() => {
+    if (!undoSessions) return;
+    const timer = window.setTimeout(() => setUndoSessions(null), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [undoSessions]);
   /** Every draft edit, oldest first, with its own before-image. */
   const [journal, setJournal] = useState<AnkiDraftEditJournal>(createEditJournal);
   /**
@@ -544,12 +554,51 @@ export default function DeckWorkbench() {
   }, []);
 
   const discardSession = useCallback(
-    async (id: string) => {
-      await window.api.ankiDraftSessionDelete(id);
-      await refreshSessions();
+    async (session: SessionRow['session']) => {
+      const confirmed = await confirmDialog({
+        title: t('ankiWorkbench.sessions.discardConfirm.title'),
+        message: t('ankiWorkbench.sessions.discardConfirm.message', { label: session.label }),
+        confirmLabel: t('ankiWorkbench.sessions.discard'),
+        cancelLabel: t('common.cancel'),
+        danger: true,
+      });
+      if (!confirmed) return;
+      setSessionError(null);
+      try {
+        if (!await window.api.ankiDraftSessionDelete(session.id)) {
+          setSessionError(t('ankiWorkbench.sessions.discardFailed'));
+          return;
+        }
+        await refreshSessions();
+      } catch {
+        setSessionError(t('ankiWorkbench.sessions.discardFailed'));
+      }
     },
-    [refreshSessions],
+    [refreshSessions, t],
   );
+
+  const clearSessions = useCallback(async () => {
+    setSessionError(null);
+    try {
+      const removed = await window.api.ankiDraftSessionClear();
+      if (removed.length === 0 && sessions.length > 0) throw new Error('clear returned no sessions');
+      setUndoSessions(removed);
+      await refreshSessions();
+    } catch {
+      setSessionError(t('ankiWorkbench.sessions.clearFailed'));
+    }
+  }, [refreshSessions, sessions.length, t]);
+
+  const restoreSessions = useCallback(async () => {
+    if (!undoSessions) return;
+    try {
+      await window.api.ankiDraftSessionRestore(undoSessions);
+      setUndoSessions(null);
+      await refreshSessions();
+    } catch {
+      setSessionError(t('ankiWorkbench.sessions.restoreFailed'));
+    }
+  }, [refreshSessions, t, undoSessions]);
 
   /**
    * Pick a package back up where the last read stopped.
@@ -802,6 +851,9 @@ export default function DeckWorkbench() {
               )}
 
               <h3>{t('ankiWorkbench.sessions.title')}</h3>
+              {sessions.length > 0 && <button type="button" className="btn" onClick={() => void clearSessions()}>{t('ankiWorkbench.sessions.clear')}</button>}
+              {undoSessions && <p role="status">{t('ankiWorkbench.sessions.cleared')} <button type="button" className="btn" onClick={() => void restoreSessions()}>{t('ankiWorkbench.sessions.undoClear')}</button></p>}
+              {sessionError && <p className="deck-workbench-error" role="alert">{sessionError}</p>}
               {sessions.length === 0 ? (
                 <p className="muted">{t('ankiWorkbench.sessions.none')}</p>
               ) : (
@@ -859,7 +911,7 @@ export default function DeckWorkbench() {
                         type="button"
                         className="btn"
                         aria-label={`${t('ankiWorkbench.sessions.discard')} — ${session.label}`}
-                        onClick={() => void discardSession(session.id)}
+                        onClick={() => void discardSession(session)}
                       >
                         {t('ankiWorkbench.sessions.discard')}
                       </button>

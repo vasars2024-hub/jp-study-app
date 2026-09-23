@@ -715,6 +715,9 @@ const api = {
     ipcRenderer.invoke('anki:draftSessionResume', id, fingerprint),
   ankiDraftSessionDelete: (id: string): Promise<boolean> =>
     ipcRenderer.invoke('anki:draftSessionDelete', id),
+  ankiDraftSessionClear: (): Promise<import('./shared/ankiDraftSession').AnkiDraftSession[]> => ipcRenderer.invoke('anki:draftSessionClear'),
+  ankiDraftSessionRestore: (sessions: import('./shared/ankiDraftSession').AnkiDraftSession[]): Promise<number> =>
+    ipcRenderer.invoke('anki:draftSessionRestore', sessions),
   dictListYomitan: (): Promise<YomitanDictInfo[]> => ipcRenderer.invoke('dict:listYomitan'),
   dictRemoveYomitan: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:removeYomitan', id),

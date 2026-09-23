@@ -210,6 +210,22 @@ export function deleteDraftSession(id: string): boolean {
   return true;
 }
 
+/** Remove the complete history, including older reads hidden by display deduplication. */
+export function clearDraftSessions(): AnkiDraftSession[] {
+  const removed = [...load()];
+  if (removed.length > 0) commit([]);
+  return removed;
+}
+
+/** Restore a just-cleared history without replacing reads made in the meantime. */
+export function restoreDraftSessions(sessions: AnkiDraftSession[]): number {
+  const current = load();
+  const ids = new Set(current.map((session) => session.id));
+  const restored = sessions.filter((session) => isUsable(session) && !ids.has(session.id));
+  if (restored.length > 0) commit([...current, ...restored]);
+  return restored.length;
+}
+
 export interface DraftSessionResumeResult {
   plan: ResumePlan;
   session?: AnkiDraftSession;
@@ -241,7 +257,15 @@ export interface DraftSessionSummary {
 
 /** What a surface lists: every session with its derived progress alongside. */
 export function summarizeDraftSessions(): DraftSessionSummary[] {
-  return listDraftSessions().map((session) => ({
+  const seen = new Set<string>();
+  return listDraftSessions().filter((session) => {
+    const source = session.request.filePath;
+    if (!source) return true;
+    const key = `${session.sourceKind}:${path.normalize(source).toLocaleLowerCase('en-US')}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map((session) => ({
     session,
     progress: describeSessionProgress(session),
   }));

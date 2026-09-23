@@ -11053,6 +11053,14 @@ mark.lookup-mark,
   justify-content: center;
   min-height: 32px;
 }
+.jiten-actions .btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.jiten-action-reason {
+  margin: 4px 0;
+  font-size: 12px;
+}
 .jiten-source-pick {
   display: flex;
   flex-direction: column;
@@ -15159,6 +15167,37 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
 }
 .fwin-note {
   border-color: rgba(0, 0, 0, 0.35);
+}
+.fwin-note:not(.fwin-liquid) .desk-note-palette {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+.fwin-note:not(.fwin-liquid) .desk-note-color {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.fwin-note:not(.fwin-liquid) .desk-note-color[aria-pressed='true'] {
+  border-color: #2b2517;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.fwin-note:not(.fwin-liquid) .desk-note-color:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.fwin-note:not(.fwin-liquid) .desk-note-text {
+  padding-right: 52px;
 }
 .fwin-body-note {
   padding: 0;

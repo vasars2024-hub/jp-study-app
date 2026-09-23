@@ -25,7 +25,7 @@ import { showToast } from '../ui';
 import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
 
 export type Filter = 'All' | string;
-export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'offline';
+export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'cached' | 'offline';
 
 export function hostOf(url: string): string {
   try {
@@ -220,14 +220,10 @@ export function useResources() {
       if (!alive) return;
       setRefreshState('refreshing');
       try {
-        const fresh = await window.api.catalogRefresh();
+        const result = await window.api.catalogRefresh();
         if (!alive) return;
-        if (fresh) {
-          setCatalog(fresh);
-          setRefreshState('updated');
-        } else {
-          setRefreshState('offline');
-        }
+        if (result.catalog) setCatalog(result.catalog);
+        setRefreshState(result.source === 'remote' ? 'updated' : result.source === 'cache' ? 'cached' : 'offline');
       } catch {
         if (alive) setRefreshState('offline');
       }
@@ -240,13 +236,9 @@ export function useResources() {
   const doRefresh = useCallback(async () => {
     setRefreshState('refreshing');
     try {
-      const fresh = await window.api.catalogRefresh();
-      if (fresh) {
-        setCatalog(fresh);
-        setRefreshState('updated');
-      } else {
-        setRefreshState('offline');
-      }
+      const result = await window.api.catalogRefresh();
+      if (result.catalog) setCatalog(result.catalog);
+      setRefreshState(result.source === 'remote' ? 'updated' : result.source === 'cache' ? 'cached' : 'offline');
     } catch {
       setRefreshState('offline');
     }

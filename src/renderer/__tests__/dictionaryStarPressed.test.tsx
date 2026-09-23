@@ -22,6 +22,7 @@ vi.mock('../i18n', () => ({ useT: () => ({ t: (key: string) => key, lang: 'en' }
 vi.mock('../translator', () => ({ translateTo: async () => '' }));
 
 import DictionaryResults from '../components/DictionaryResults';
+import { loadClipboardHistory } from '../clipboardHistory';
 import { savedWordsKey } from '../savedWords';
 
 const ENTRY = {
@@ -115,5 +116,19 @@ describe('the Flashcards star', () => {
     await render(<DictionaryResults query="食べる" variant="page" lang="ja" />);
 
     expect(star().getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+describe('dictionary clipboard copy', () => {
+  it('reports a rejected clipboard write and records no false history entry', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard locked'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    await render(<DictionaryResults query="食べる" variant="page" lang="ja" />);
+    const copy = host.querySelector<HTMLButtonElement>('[title="dict.results.copyClipboard"]');
+    expect(copy).not.toBeNull();
+    await act(async () => copy?.click());
+    expect(writeText).toHaveBeenCalledOnce();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('dict.results.copyFailed');
+    expect(loadClipboardHistory()).toEqual([]);
   });
 });
