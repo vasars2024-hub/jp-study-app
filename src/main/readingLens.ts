@@ -225,6 +225,26 @@ function preloadPath(): string {
   return path.join(__dirname, 'preload.js');
 }
 
+/**
+ * Make the overlay cover exactly `bounds` (one display, in DIP).
+ *
+ * Electron on Windows sizes a window that lands on a monitor whose scale factor differs from
+ * the one it was created or last shown on in the wrong DIPs. Measured on a 1280×720 @150%
+ * primary with a 1920×1080 @100% second monitor: the overlay for the second monitor came up
+ * 1280×720, so the right and bottom thirds of that screen could not be selected. Once the
+ * window is on the target monitor, setting the same bounds again sticks.
+ */
+export function coverDisplay(
+  win: Pick<BrowserWindow, 'setBounds' | 'getBounds'>,
+  bounds: Electron.Rectangle,
+): void {
+  win.setBounds(bounds);
+  const got = win.getBounds();
+  if (got.x !== bounds.x || got.y !== bounds.y || got.width !== bounds.width || got.height !== bounds.height) {
+    win.setBounds(bounds);
+  }
+}
+
 function displayUnderCursor(): Electron.Display {
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 }
@@ -297,7 +317,7 @@ function openLens(requestedMode: LensOpenMode): void {
   };
 
   if (lens && !lens.isDestroyed()) {
-    lens.setBounds(bounds);
+    coverDisplay(lens, bounds);
     // Selecting needs the mouse; the renderer relaxes to click-through once pinned.
     lens.setIgnoreMouseEvents(false);
     lens.webContents.send('lens:open', pendingInit);
@@ -338,6 +358,8 @@ function openLens(requestedMode: LensOpenMode): void {
 
   win.once('ready-to-show', () => {
     if (!win.isDestroyed()) {
+      // The constructor's bounds are the ones a scale-factor change can distort.
+      coverDisplay(win, bounds);
       win.show();
       win.focus();
     }

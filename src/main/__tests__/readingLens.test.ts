@@ -44,6 +44,8 @@ const h = vi.hoisted(() => {
       { id: 7, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
       { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 },
     ] as Array<{ id: number; bounds: Electron.Rectangle; scaleFactor: number }>,
+    // Electron's cross-scale-factor placement: the next placement lands this many times too small.
+    shrinkNextPlacement: 0,
   };
   const sent: Array<{ channel: string; payload: unknown }> = [];
 
@@ -62,7 +64,15 @@ const h = vi.hoisted(() => {
     webContents = new FakeWebContents();
     constructor(public opts: unknown) {
       FakeWindow.all.push(this);
+      const o = opts as { x?: number; y?: number; width?: number; height?: number };
+      this.bounds = FakeWindow.place({ x: o.x ?? 0, y: o.y ?? 0, width: o.width ?? 0, height: o.height ?? 0 });
     }
+    static place(b: Electron.Rectangle): Electron.Rectangle {
+      const k = env.shrinkNextPlacement;
+      env.shrinkNextPlacement = 0;
+      return k ? { ...b, width: Math.round(b.width / k), height: Math.round(b.height / k) } : b;
+    }
+    getBounds = (): Electron.Rectangle => this.bounds as Electron.Rectangle;
     setAlwaysOnTop = (): void => undefined;
     setVisibleOnAllWorkspaces = (): void => undefined;
     once = (_e: string, cb: () => void): void => {
@@ -83,7 +93,7 @@ const h = vi.hoisted(() => {
       this.destroyed = true;
     };
     setBounds = (b: unknown): void => {
-      this.bounds = b;
+      this.bounds = FakeWindow.place(b as Electron.Rectangle);
     };
     setIgnoreMouseEvents = (...a: unknown[]): void => {
       this.ignoreMouse = a;
@@ -202,6 +212,7 @@ beforeEach(() => {
     { id: 7, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
     { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 },
   ];
+  h.env.shrinkNextPlacement = 0;
   clearState();
 });
 
@@ -746,6 +757,25 @@ describe('repeat region', () => {
     // Control: an ordinary open on the same state follows the cursor to 7.
     await h.ipc.handlers.get('lens:open')!({}, 'select');
     expect(init().bounds).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+  });
+
+  it('covers the whole second monitor even when Electron places it at the wrong scale', async () => {
+    // Measured: 1280×720 @150% primary + 1920×1080 @100% second monitor → a 1280×720 overlay.
+    await booted();
+    h.env.displays = [
+      { id: 7, bounds: { x: 0, y: 0, width: 1280, height: 720 }, scaleFactor: 1.5 },
+      { id: 9, bounds: { x: 1280, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
+    ];
+    h.env.displays.reverse(); // the stub's cursor is on displays[0]
+    h.env.shrinkNextPlacement = 1.5;
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    const lensWin = h.FakeWindow.all.filter((w) => !w.destroyed).pop()!;
+    expect(lensWin.getBounds()).toEqual({ x: 1280, y: 0, width: 1920, height: 1080 });
+    // Moving the open overlay to the other monitor goes through the same correction.
+    h.env.displays.reverse();
+    h.env.shrinkNextPlacement = 1 / 1.5;
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    expect(lensWin.getBounds()).toEqual({ x: 0, y: 0, width: 1280, height: 720 });
   });
 
   it('degrades to an ordinary selection when the region’s monitor is gone', async () => {
