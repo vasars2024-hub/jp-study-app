@@ -41,7 +41,23 @@ import { localDueForecast, type LocalDueForecast } from '../../../shared/reviewF
 import { getActiveProfile, onProfileChanged } from '../../profileState';
 import { syncKnowledgeFromAnki } from '../../ankiSync';
 import { LevelMeter } from '../LevelMeter';
-import { getLevelEstimate, onLevelChange } from '../../levelService';
+import {
+  getActiveStudyLang,
+  getLevelEstimate,
+  getTargetProgress,
+  onLevelChange,
+  type TargetProgress,
+} from '../../levelService';
+import { loadFamiliarity, onFamiliarityChanged } from '../../grammarFamiliarity';
+import {
+  getLoadedGrammarCorpus,
+  grammarLevelProgress,
+  grammarReviewedSince,
+  loadGrammarCorpus,
+  reviewWindows,
+} from '../../grammarProgress';
+import type { NormalizedGrammarPoint } from '../../data/grammar/normalize';
+import type { StudyLang } from '../../../shared/levelScale';
 import { badgeKeyForTier, type LevelEstimate } from '../../../shared/levelEstimate';
 import { useT } from '../../i18n';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
@@ -157,10 +173,172 @@ export function EstimatedLevelBadge() {
         <span className="stats-level-title">{t('stats.level.title')}</span>
         <span className="stats-level-hint muted">{t('stats.level.hint')}</span>
         {target && estimate.lang === 'ja' && (
-          <span className="stats-level-hint muted">{t('stats.level.goal', { level: target })}</span>
+          <>
+            <span className="stats-level-hint muted">{t('stats.level.goal', { level: target })}</span>
+            <GoalProgress target={target} />
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+/** The grammar corpus, loaded on demand; null until it arrives. */
+function useGrammarCorpus(): NormalizedGrammarPoint[] | null {
+  const [corpus, setCorpus] = useState<NormalizedGrammarPoint[] | null>(() => getLoadedGrammarCorpus());
+  useEffect(() => {
+    if (corpus) return undefined;
+    let alive = true;
+    void loadGrammarCorpus().then(
+      (points) => {
+        if (alive) setCorpus(points);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [corpus]);
+  return corpus;
+}
+
+function formatPercent(value: number, lang: UiLang): string {
+  return new Intl.NumberFormat(LANG_TAGS[lang], { style: 'percent', maximumFractionDigits: 0 }).format(value);
+}
+
+/**
+ * How far along the profile's JLPT goal is: vocabulary coverage of that
+ * level's word list and the known share of that level's grammar, side by side.
+ */
+export function GoalProgress({ target }: { target: 'N5' | 'N4' | 'N3' | 'N2' | 'N1' }) {
+  const { t, lang } = useT();
+  const corpus = useGrammarCorpus();
+  const [progress, setProgress] = useState<TargetProgress>(() => getTargetProgress(target, corpus));
+  useEffect(() => {
+    const refresh = (): void => setProgress(getTargetProgress(target, corpus));
+    refresh();
+    return onLevelChange(refresh);
+  }, [target, corpus]);
+
+  const vocab = progress.vocabulary.total > 0
+    ? t('stats.level.goalVocab', {
+      pct: formatPercent(progress.vocabulary.pct / 100, lang),
+      learned: formatNumber(progress.vocabulary.learned),
+      total: formatNumber(progress.vocabulary.total),
+    })
+    : t('stats.level.goalVocabNoList', { level: target });
+  const grammar = progress.grammar && progress.grammar.total > 0
+    ? t('stats.level.goalGrammar', {
+      pct: formatPercent(progress.grammar.pct / 100, lang),
+      known: formatNumber(progress.grammar.known),
+      total: formatNumber(progress.grammar.total),
+    })
+    : null;
+
+  return (
+    <span className="stats-level-hint stats-level-goal">
+      <span>{vocab}</span>
+      {grammar && <span>{grammar}</span>}
+    </span>
+  );
+}
+
+function useStudyLang(): StudyLang {
+  const [studyLang, setStudyLang] = useState<StudyLang>(() => getActiveStudyLang());
+  useEffect(() => {
+    const h = (): void => setStudyLang(getActiveStudyLang());
+    window.addEventListener('study-lang-changed', h);
+    return () => window.removeEventListener('study-lang-changed', h);
+  }, []);
+  return studyLang;
+}
+
+/**
+ * Grammar: points known and being learned at each JLPT (or HSK) level, and how
+ * many were reviewed today and over the last seven days. Familiarity comes
+ * from `grammarFamiliarity.ts`; answer counts from the review log.
+ */
+export function StatsGrammar() {
+  const { t } = useT();
+  const studyLang = useStudyLang();
+  const corpus = useGrammarCorpus();
+  const [familiarity, setFamiliarity] = useState(() => loadFamiliarity());
+  const [log, setLog] = useState<ReviewLogSummary | null>(null);
+
+  useEffect(() => onFamiliarityChanged(() => setFamiliarity(loadFamiliarity())), []);
+  useEffect(() => {
+    let alive = true;
+    const refresh = (): void => {
+      void loadReviewLog().then((entries) => {
+        if (alive) setLog(summarizeReviewLog(entries, 30));
+      });
+    };
+    refresh();
+    const off = onReviewLogChanged(refresh);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
+  const rows = useMemo(
+    () => (corpus ? grammarLevelProgress(corpus, familiarity, studyLang) : null),
+    [corpus, familiarity, studyLang],
+  );
+  const windows = reviewWindows();
+  const today = grammarReviewedSince(corpus, familiarity, windows.today, studyLang);
+  const week = grammarReviewedSince(corpus, familiarity, windows.week, studyLang);
+  const known = rows?.reduce((sum, row) => sum + row.known, 0) ?? 0;
+
+  return (
+    <section className="stats-section stats-grammar" aria-label={t('stats.grammar.title')}>
+      <h2>{t('stats.grammar.title')}</h2>
+      <div className="stats-cards">
+        <div className="stats-card">
+          <span className="stats-card-val">{formatNumber(today)}</span>
+          <span className="stats-card-lbl">{t('stats.grammar.reviewedToday')}</span>
+        </div>
+        <div className="stats-card">
+          <span className="stats-card-val">{formatNumber(week)}</span>
+          <span className="stats-card-lbl">{t('stats.grammar.reviewedWeek')}</span>
+        </div>
+        <div className="stats-card">
+          <span className="stats-card-val">{rows ? formatNumber(known) : '—'}</span>
+          <span className="stats-card-lbl">{t('stats.grammar.known')}</span>
+        </div>
+      </div>
+      {rows ? (
+        <div className="stats-grammar-levels" role="list">
+          {rows.map((row) => {
+            const name = row.level.replace(/^HSK/, 'HSK ');
+            const label = t('stats.grammar.levelCount', {
+              known: formatNumber(row.known),
+              learning: formatNumber(row.learning),
+              total: formatNumber(row.total),
+            });
+            const knownPct = row.total ? (row.known / row.total) * 100 : 0;
+            const learningPct = row.total ? (row.learning / row.total) * 100 : 0;
+            return (
+              <div key={row.level} className="stats-grammar-level" role="listitem" aria-label={`${name}: ${label}`}>
+                <span className="stats-grammar-name">{name}</span>
+                <div className="stats-grammar-track" aria-hidden="true">
+                  <div className="stats-grammar-known" style={{ width: `${knownPct}%` }} />
+                  <div className="stats-grammar-learning" style={{ width: `${learningPct}%` }} />
+                </div>
+                <span className="stats-grammar-count muted">{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="muted stats-reviews-note">{t('stats.grammar.loading')}</p>
+      )}
+      <p className="muted stats-reviews-note">
+        {log && log.grammarAnswers > 0
+          ? t('stats.grammar.answers', { count: log.grammarAnswers, correct: log.grammarCorrect })
+          : t('stats.grammar.note')}
+      </p>
+    </section>
   );
 }
 
