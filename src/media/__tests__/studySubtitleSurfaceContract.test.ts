@@ -159,3 +159,13 @@ describe('per-file subtitle memory (audit 8c, 6a)', () => {
     expect(loadSubtitleDelay('file:x')).toBe(0);
   });
 });
+
+describe('the second line for a file that is not in the library', () => {
+  it('falls back to the file\'s own English sidecar when the automation has no record', () => {
+    const at = OVERLAY.indexOf('window.api.secondarySubtitleForPath(localPath)');
+    expect(at).toBeGreaterThanOrEqual(0);
+    const effect = OVERLAY.slice(at, at + 900);
+    expect(effect).toMatch(/window\.api\.subtitleForPath\(localPath, \{ lang: 'en' \}\)/);
+    expect(effect).toMatch(/if \(!helper\?\.text && typeof window\.api\.subtitleForPath === 'function'\)/);
+  });
+});

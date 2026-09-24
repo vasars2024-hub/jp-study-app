@@ -1054,7 +1054,14 @@ export default function VideoCoreStudyOverlay({
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
-        const helper = await window.api.secondarySubtitleForPath(localPath).catch(() => null);
+        let helper: { text: string; name: string; lang?: string; recordId?: string } | null =
+          await window.api.secondarySubtitleForPath(localPath).catch(() => null);
+        // A file opened from disk has no library record for the automation to answer for;
+        // its own English sidecar (`.en.srt`, `.eng.ass`…) is still the second line.
+        if (!helper?.text && typeof window.api.subtitleForPath === 'function') {
+          const sidecar = await window.api.subtitleForPath(localPath, { lang: 'en' }).catch(() => null);
+          if (sidecar?.text) helper = { text: sidecar.text, name: sidecar.name, lang: 'en' };
+        }
         if (cancelled || !helper?.text) return;
         const key = `${localPath}|${helper.recordId ?? helper.name}`;
         if (helperTrackRef.current?.key === key) return;
