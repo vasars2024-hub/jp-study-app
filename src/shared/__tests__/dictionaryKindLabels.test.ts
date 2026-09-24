@@ -14,6 +14,7 @@ const KINDS_WRITTEN = {
   term: 'dictionary/migrate.ts (legacy terms) + the cedict/dsl/stardict/wiktextract importers',
   pitch: 'dictionary/migrate.ts, a legacy store with hasPitch and no terms',
   freq: 'dictionary/migrate.ts, a legacy frequency-only store',
+  ipa: 'dictionary/migrate.ts, a Yomitan IPA-only store',
   name: 'importers/jmnedict.ts',
   character: 'importers/kanjidic.ts',
   examples: 'importers/tatoeba.ts',
