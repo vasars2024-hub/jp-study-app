@@ -1866,7 +1866,27 @@ const api = {
   addMediaFolder: (): Promise<{ items: MediaItem[]; added: number }> => ipcRenderer.invoke('media:addFolder'),
   /** Re-open a saved library item by id. */
   openMedia: (id: string): Promise<MediaOpen | null> => ipcRenderer.invoke('media:open', id),
+  /**
+   * Opens a file in a configured external player. Only `profile.id` is used — main
+   * looks the program up in its own saved profile list. Resolves null on success,
+   * else a translated error message.
+   */
   handoffMedia: (handoff: import('./shared/externalPlayer').PlaybackHandoff, profile: import('./shared/externalPlayer').ExternalPlayerProfile): Promise<string | null> => ipcRenderer.invoke('media:handoff', handoff, profile),
+  /** The saved external-player profiles (main-owned `external-players.json`). */
+  externalPlayersGet: (): Promise<import('./shared/externalPlayer').ExternalPlayerPreferences> =>
+    ipcRenderer.invoke('externalPlayer:get'),
+  /** Saves the profile list; a profile whose program path is not a real executable is refused. */
+  externalPlayersSave: (
+    preferences: import('./shared/externalPlayer').ExternalPlayerPreferences,
+  ): Promise<import('./main/externalPlayer').ExternalPlayerSaveResult> => ipcRenderer.invoke('externalPlayer:save', preferences),
+  externalPlayerChooseExecutable: (): Promise<string | null> => ipcRenderer.invoke('externalPlayer:chooseExecutable'),
+  onExternalPlayersChanged: (
+    cb: (preferences: import('./shared/externalPlayer').ExternalPlayerPreferences) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, preferences: import('./shared/externalPlayer').ExternalPlayerPreferences): void => cb(preferences);
+    ipcRenderer.on('externalPlayer:changed', handler);
+    return () => ipcRenderer.removeListener('externalPlayer:changed', handler);
+  },
   removeMedia: (id: string): Promise<MediaItem[]> => ipcRenderer.invoke('media:remove', id),
   /** Drop library entries whose files no longer exist on disk. */
   pruneMedia: (): Promise<{ removed: number; items: MediaItem[] }> =>

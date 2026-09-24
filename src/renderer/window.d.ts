@@ -1124,7 +1124,16 @@ declare global {
       pickMedia(): Promise<MediaOpen | null>;
       addMediaFolder(): Promise<{ items: MediaItem[]; added: number }>;
       openMedia(id: string): Promise<MediaOpen | null>;
+      /** Opens a file in a configured player (looked up by `profile.id` in main). Null on success, else a message. */
       handoffMedia(handoff: import('../shared/externalPlayer').PlaybackHandoff, profile: import('../shared/externalPlayer').ExternalPlayerProfile): Promise<string | null>;
+      externalPlayersGet(): Promise<import('../shared/externalPlayer').ExternalPlayerPreferences>;
+      externalPlayersSave(
+        preferences: import('../shared/externalPlayer').ExternalPlayerPreferences,
+      ): Promise<import('../main/externalPlayer').ExternalPlayerSaveResult>;
+      externalPlayerChooseExecutable(): Promise<string | null>;
+      onExternalPlayersChanged(
+        cb: (preferences: import('../shared/externalPlayer').ExternalPlayerPreferences) => void,
+      ): () => void;
       removeMedia(id: string): Promise<MediaItem[]>;
       pruneMedia(): Promise<{ removed: number; items: MediaItem[] }>;
       clearMediaLibrary(): Promise<MediaItem[]>;

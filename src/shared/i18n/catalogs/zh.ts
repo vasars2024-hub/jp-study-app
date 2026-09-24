@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_ZH } from '../mooncapLore/zh';
 import { MINING_UI_ZH } from '../miningUi/zh';
 import { MAL_SYNC_ZH } from '../malSync/zh';
 import { WATCH_LIBRARY_ZH } from '../watchLibrary/zh';
+import { MEDIA_HUB_ZH } from '../mediaHub/zh';
 import { GUM_LIBRARY_ZH } from '../gumLibrary/zh';
 import { SCRAPER_UI_ZH } from '../scraperUi/zh';
 import { SCRAPER_DRAWER_ZH } from '../scraperDrawerUi/zh';
@@ -669,6 +670,7 @@ export const zh: Catalog = {
   ...MINING_UI_ZH,
   ...MAL_SYNC_ZH,
   ...WATCH_LIBRARY_ZH,
+  ...MEDIA_HUB_ZH,
   ...GUM_LIBRARY_ZH,
   ...SCRAPER_UI_ZH,
   ...SCRAPER_DRAWER_ZH,

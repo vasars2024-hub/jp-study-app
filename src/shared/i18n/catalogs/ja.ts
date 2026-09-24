@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_JA } from '../mooncapLore/ja';
 import { MINING_UI_JA } from '../miningUi/ja';
 import { MAL_SYNC_JA } from '../malSync/ja';
 import { WATCH_LIBRARY_JA } from '../watchLibrary/ja';
+import { MEDIA_HUB_JA } from '../mediaHub/ja';
 import { GUM_LIBRARY_JA } from '../gumLibrary/ja';
 import { SCRAPER_UI_JA } from '../scraperUi/ja';
 import { SCRAPER_DRAWER_JA } from '../scraperDrawerUi/ja';
@@ -671,6 +672,7 @@ export const ja: Catalog = {
   ...MINING_UI_JA,
   ...MAL_SYNC_JA,
   ...WATCH_LIBRARY_JA,
+  ...MEDIA_HUB_JA,
   ...GUM_LIBRARY_JA,
   ...SCRAPER_UI_JA,
   ...SCRAPER_DRAWER_JA,

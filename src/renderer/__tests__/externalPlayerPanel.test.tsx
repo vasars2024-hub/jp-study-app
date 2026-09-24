@@ -23,6 +23,9 @@ import type { SettingsController } from '../components/settings/types';
 vi.mock('../externalPlayerStore', () => ({
   loadExternalPlayerPreferences: () => ({ profiles: [], defaultProfileId: null, contentTypeProfileIds: {}, lastUsedProfileId: null }),
   saveExternalPlayerPreferences: (value: unknown) => value,
+  commitExternalPlayerPreferences: async (value: unknown) => ({ preferences: value, rejected: [] }),
+  hydrateExternalPlayerPreferences: async () => ({ profiles: [], defaultProfileId: null, contentTypeProfileIds: {}, lastUsedProfileId: null }),
+  onExternalPlayerPreferencesChanged: () => () => undefined,
 }));
 
 /**

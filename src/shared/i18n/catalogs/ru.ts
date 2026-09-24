@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_RU } from '../mooncapLore/ru';
 import { MINING_UI_RU } from '../miningUi/ru';
 import { MAL_SYNC_RU } from '../malSync/ru';
 import { WATCH_LIBRARY_RU } from '../watchLibrary/ru';
+import { MEDIA_HUB_RU } from '../mediaHub/ru';
 import { GUM_LIBRARY_RU } from '../gumLibrary/ru';
 import { SCRAPER_UI_RU } from '../scraperUi/ru';
 import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
@@ -793,6 +794,7 @@ export const ru: Catalog = {
   ...MINING_UI_RU,
   ...MAL_SYNC_RU,
   ...WATCH_LIBRARY_RU,
+  ...MEDIA_HUB_RU,
   ...GUM_LIBRARY_RU,
   ...SCRAPER_UI_RU,
   ...SCRAPER_DRAWER_RU,
