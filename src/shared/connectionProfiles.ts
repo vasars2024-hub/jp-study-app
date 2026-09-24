@@ -922,6 +922,46 @@ export function resolveConnectionSettingsForSite(
   return resolveConnectionSettings(document, profileForSite(document, site), base);
 }
 
+/** The groups the request layer applies per host. */
+export type ScraperHostConnection = Pick<ScraperSettings, 'network' | 'safety' | 'cache' | 'session'>;
+
+export interface ConnectionScope {
+  /** The run's settings under the active connection profile — what unassigned hosts use. */
+  settings: ScraperSettings;
+  /** Per assigned host: the network, safety, cache and session its own profile resolves to. */
+  hosts: Record<string, ScraperHostConnection>;
+}
+
+/**
+ * What a run actually applies from §2.
+ *
+ * The active profile is layered over the scraper profile for the whole run, and
+ * every host with an explicit assignment gets its own profile's request groups
+ * (network, safety, cache, session) — the four the request layer reads per
+ * request. Browser overrides have no consumer (this app has no browser
+ * automation), and extraction/episode handling are per-run, so an assignment
+ * does not change those.
+ */
+export function resolveConnectionScope(
+  document: ConnectionProfilesDocument,
+  base: ScraperSettings,
+): ConnectionScope {
+  const settings = resolveConnectionSettings(document, document.activeProfileId, base);
+  const hosts: Record<string, ScraperHostConnection> = {};
+  for (const [site, profileId] of Object.entries(document.siteAssignments)) {
+    const host = normalizeScraperSite(site);
+    if (!host) continue;
+    const resolved = resolveConnectionSettings(document, profileId, base);
+    hosts[host] = {
+      network: resolved.network,
+      safety: resolved.safety,
+      cache: resolved.cache,
+      session: resolved.session,
+    };
+  }
+  return { settings, hosts };
+}
+
 // ---------------------------------------------------------------------------
 // Profile mutations
 // ---------------------------------------------------------------------------

@@ -2073,6 +2073,12 @@ declare global {
       scraperQbitSend(
         input: import('../shared/scraperIpc').ScraperQbitSendInput,
       ): Promise<import('../shared/scraperResults').QbitSendReport>;
+      scraperQbitAction(
+        input: import('../shared/scraperIpc').ScraperQbitActionInput,
+      ): Promise<import('../shared/scraperIpc').ScraperQbitActionReport>;
+      scraperFreeSpace(
+        input: import('../shared/scraperIpc').ScraperQbitInput,
+      ): Promise<import('../shared/scraperIpc').ScraperFreeSpaceReport>;
       scraperSetCredential(
         ref: string,
         secret: string,

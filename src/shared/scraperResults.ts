@@ -275,6 +275,15 @@ export interface SourceStatus {
   requiresAuth: boolean;
   /** 0..1 success rate samples, oldest first. */
   history: number[];
+  /**
+   * What the last probe saw beyond its health word — "Anti-bot challenge.",
+   * "Authentication required.", "Rate limited." — or '' when there was
+   * nothing to say. A health signal only: nothing tries to get past a
+   * challenge. Absent on sample rows.
+   */
+  note?: string;
+  /** When the last probe ran, ISO; null when never probed. */
+  lastCheckedAt?: string | null;
 }
 
 export interface DownloadRow {
@@ -288,6 +297,11 @@ export interface DownloadRow {
   speedBps: number;
   etaSec: number | null;
   destination: string;
+  /**
+   * The file or folder the transfer wrote, as qBittorrent reports it — what a
+   * player is handed. Absent on daemons older than 4.4 and on sample rows.
+   */
+  contentPath?: string;
   error: string;
 }
 

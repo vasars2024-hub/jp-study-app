@@ -19,6 +19,7 @@ import type {
 import type { ScraperTorrentQuery, ScraperTorrentSearchInput } from '../../shared/scraperIpc';
 import { scraperRequest } from './http';
 import { scraperLog } from './logBus';
+import { fallbackChain } from '../../shared/scraperSourceOrder';
 
 /** Trackers attached to a magnet when the feed does not carry its own. */
 export const DEFAULT_TRACKERS = [
@@ -265,6 +266,51 @@ export function buildIndexUrl(host: string, query: ScraperTorrentQuery): string 
   return `https://${host}/?${params.toString()}`;
 }
 
+/** One index's answer: its rows, or null when it could not be searched. */
+async function queryIndex(
+  entry: ScraperSourceEntry,
+  input: ScraperTorrentSearchInput,
+  trackers: string[],
+): Promise<TorrentRow[] | null> {
+  const url = buildIndexUrl(entry.host, input.query);
+  try {
+    const response = await scraperRequest(url, {
+      timeoutMs: input.timeoutMs,
+      correlationId: 'torrents',
+    });
+    if (response.status !== 200) {
+      scraperLog('warn', 'torrents', `${entry.label} answered ${response.status}.`, {
+        correlationId: 'torrents',
+      });
+      return null;
+    }
+    const rows = parseTorrentFeed(response.body, { tracker: entry.label, trackers });
+    scraperLog('info', 'torrents', `${entry.label}: ${rows.length} results.`, {
+      correlationId: 'torrents',
+    });
+    return rows;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    scraperLog('error', 'torrents', `${entry.label} failed: ${message}`, {
+      correlationId: 'torrents',
+    });
+    return null;
+  }
+}
+
+/**
+ * Searches every enabled index at once — a search is interactive, and waiting
+ * on each index in turn would multiply the wait — but keeps the Source
+ * Manager's promises about order:
+ *
+ *   - rows are merged in priority order, so when two indexes list the same
+ *     release the higher one is the copy kept, and equal-ranked rows keep that
+ *     order through the preference sort;
+ *   - an index that fails (no answer, or a non-200) hands over to its own
+ *     `fallbackIds`, in order, up to `maxFallbackDepth` hops. A fallback that
+ *     is already being searched as a primary is not asked twice, and a disabled
+ *     source is never contacted.
+ */
 export async function searchTorrents(input: ScraperTorrentSearchInput): Promise<TorrentRow[]> {
   const indexers = input.indexers.filter(
     (entry: ScraperSourceEntry) => entry.enabled && entry.kind === 'torrent',
@@ -278,34 +324,27 @@ export async function searchTorrents(input: ScraperTorrentSearchInput): Promise<
     ...DEFAULT_TRACKERS,
     ...input.torrents.extraTrackers.filter((t) => t.enabled).map((t) => t.url),
   ];
+  const pool = input.pool ?? [];
+  const depth = Math.max(0, input.maxFallbackDepth ?? 0);
+  // Shared across the parallel walks, so two failed primaries naming the same
+  // fallback do not both query it.
+  const tried = new Set(indexers.map((entry) => entry.id));
 
   const perIndex = await Promise.all(
     indexers.map(async (entry) => {
-      const url = buildIndexUrl(entry.host, input.query);
-      try {
-        const response = await scraperRequest(url, {
-          timeoutMs: input.timeoutMs,
+      const rows = await queryIndex(entry, input, trackers);
+      if (rows) return rows;
+      for (const fallback of fallbackChain(entry, pool, depth, new Set(tried))) {
+        if (tried.has(fallback.id)) continue;
+        tried.add(fallback.id);
+        scraperLog('info', 'torrents', `${entry.label} failed; trying ${fallback.label}.`, {
           correlationId: 'torrents',
         });
-        if (response.status !== 200) {
-          scraperLog('warn', 'torrents', `${entry.label} answered ${response.status}.`, {
-            correlationId: 'torrents',
-          });
-          return [];
-        }
-        const rows = parseTorrentFeed(response.body, { tracker: entry.label, trackers });
-        scraperLog('info', 'torrents', `${entry.label}: ${rows.length} results.`, {
-          correlationId: 'torrents',
-        });
-        return rows;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        scraperLog('error', 'torrents', `${entry.label} failed: ${message}`, {
-          correlationId: 'torrents',
-        });
-        // One dead index must not empty the table when another answered.
-        return [];
+        const fallbackRows = await queryIndex(fallback, input, trackers);
+        if (fallbackRows) return fallbackRows;
       }
+      // One dead index must not empty the table when another answered.
+      return [];
     }),
   );
 

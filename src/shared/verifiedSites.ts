@@ -294,3 +294,86 @@ export function promoteVerifiedSite(document: VerifiedSitesDocument, id: string,
     issues: [],
   };
 }
+
+/** What one real probe of a site reported — the shape the source probe answers with. */
+export interface VerifiedSiteProbe {
+  health: 'ok' | 'degraded' | 'blocked' | 'offline' | 'unknown';
+  latencyMs: number;
+  /** 1 = a probe succeeded, 0 = it did not, oldest first (the rolling window). */
+  history: number[];
+  /** "Anti-bot challenge.", "Authentication required.", … or ''. */
+  note?: string;
+}
+
+/**
+ * Records a compatibility test. Reliability, success rate and last-verified
+ * were typed into the editor by hand; they are now only ever written here,
+ * from a real request.
+ *
+ *   - success rate is the share of passing probes in the rolling window;
+ *   - reliability is that rate, as the 0–100 score the list shows;
+ *   - last verified moves only on a passing test;
+ *   - a challenge or an auth wall is recorded in the compatibility flags as a
+ *     health signal — nothing tries to get past either;
+ *   - a verified site that fails its test is marked broken, so the list never
+ *     shows "verified" over a site that just stopped answering.
+ */
+export function recordVerifiedSiteTest(
+  document: VerifiedSitesDocument,
+  id: string,
+  probe: VerifiedSiteProbe,
+  now = new Date().toISOString(),
+): { document: VerifiedSitesDocument; passed: boolean } {
+  const passed = probe.health === 'ok';
+  const samples = probe.history.filter((value) => value === 0 || value === 1);
+  const successRate = samples.length
+    ? Math.round((samples.reduce((sum, value) => sum + value, 0) / samples.length) * 100)
+    : (passed ? 100 : 0);
+  const note = (probe.note ?? '').toLowerCase();
+  return {
+    passed,
+    document: {
+      ...document,
+      sites: document.sites.map((site) => site.id !== id ? site : {
+        ...site,
+        successRate,
+        reliabilityScore: successRate,
+        lastVerifiedAt: passed ? now : site.lastVerifiedAt,
+        status: !passed && site.status === 'verified' ? 'broken' : site.status,
+        compatibility: {
+          ...site.compatibility,
+          cloudflareDetected: note.includes('anti-bot') ? true : passed ? false : site.compatibility.cloudflareDetected,
+          loginRequired: note.includes('authentication') ? true : passed ? false : site.compatibility.loginRequired,
+        },
+        updatedAt: now,
+      }),
+    },
+  };
+}
+
+function hostOf(value: string): string {
+  try {
+    const url = new URL(value.includes('://') ? value : `https://${value}`);
+    return url.host.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The Verified Sites record a scraper source points at: its explicit link when
+ * it has one that still exists, otherwise the record on the same host. This is
+ * what fills a source's `verifiedSiteId`, which nothing used to set.
+ */
+export function verifiedSiteForSource(
+  document: VerifiedSitesDocument,
+  source: { host: string; verifiedSiteId: string },
+): VerifiedSiteRecord | null {
+  if (source.verifiedSiteId) {
+    const linked = document.sites.find((site) => site.id === source.verifiedSiteId);
+    if (linked) return linked;
+  }
+  const host = hostOf(source.host);
+  if (!host) return null;
+  return document.sites.find((site) => hostOf(site.baseUrl) === host) ?? null;
+}

@@ -81,6 +81,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   await fsp.rm(scraperStorePath('scheduler-state.json'), { force: true });
+  await fsp.rm(scraperStorePath('scheduler-config.json'), { force: true });
 });
 
 afterEach(async () => {
@@ -509,6 +510,60 @@ describe('persistence', () => {
     const record = after.entries.find((item) => item.id === 'nightly');
     expect(record?.lastRunAt).toBe(before?.lastRunAt);
     expect(record?.lastJobId).toBe('job-test-1');
+  });
+
+  it('fires after a restart with no sync from the renderer', async () => {
+    attach();
+    await sync([entry({ cron: '0 3 * * *' })]);
+    await scheduler.whenSchedulerPersisted();
+
+    // A restart: memory is gone, nothing re-syncs — no window has opened the
+    // Scheduled Tasks page. The run must still happen on time.
+    scheduler.resetScheduler();
+    attach();
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 0));
+    expect(started.map((job) => job.targetUrl)).toEqual([
+      'https://anilist.co/anime/21/ONE-PIECE',
+    ]);
+    expect(scheduler.schedulerState().entries.map((item) => item.id)).toEqual(['nightly']);
+  });
+
+  it('runs once on return for a slot missed while the app was closed', async () => {
+    attach();
+    await sync([entry({ cron: '0 3 * * *' })], { missedRunPolicy: 'run-once' });
+    await scheduler.whenSchedulerPersisted();
+
+    // Closed from 02:00 to 06:00, so the 03:00 slot passed with no process.
+    scheduler.resetScheduler();
+    attach();
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 6, 0));
+    expect(started).toHaveLength(1);
+    // Once, not once per tick.
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 6, 1));
+    expect(started).toHaveLength(1);
+  });
+
+  it('skips a missed slot after a restart when told to', async () => {
+    attach();
+    await sync([entry({ cron: '0 3 * * *' })], { missedRunPolicy: 'skip' });
+    await scheduler.whenSchedulerPersisted();
+
+    scheduler.resetScheduler();
+    attach();
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 6, 0));
+    expect(started).toEqual([]);
+  });
+
+  it('does not fire from a config file that is not the shape a sync writes', async () => {
+    await fsp.mkdir(path.dirname(scraperStorePath('scheduler-config.json')), { recursive: true });
+    await fsp.writeFile(
+      scraperStorePath('scheduler-config.json'),
+      JSON.stringify({ scheduler: { enabled: true, entries: 'nightly' } }),
+      'utf-8',
+    );
+    attach();
+    await scheduler.tickSchedulerAt(at(2026, 7, 27, 3, 0));
+    expect(started).toEqual([]);
   });
 
   it('discards a corrupt state file instead of firing on every tick', async () => {
