@@ -9,11 +9,10 @@
  * the first item. The real question underneath survives, though, and had no test: does the
  * number of rendered cards stay bounded as the library grows?
  *
- * It does, on one precondition, and the precondition is the interesting part. `VirtualGrid`
- * renders EVERY row while its viewport height is still 0 — deliberately, so a collapsed flex
- * parent shows a grid rather than nothing (`VirtualGrid.tsx:68`). So "virtualised" is true
- * once ResizeObserver has reported, and false before that. Both halves are pinned below,
- * because a test for only the happy half would leave the scale hazard undocumented.
+ * It does, before and after the first measurement. `VirtualGrid` used to render EVERY row
+ * while its viewport height was still 0, so a 1,400-title library painted in full before it
+ * measured itself; it now renders about two screens until it knows its height (measured in a
+ * layout effect, before paint). Both halves are pinned below.
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { act, createElement } from 'react';
@@ -133,15 +132,34 @@ describe('VirtualGrid at library scale', () => {
     expect(spacer?.style.height).toBe(`${Math.ceil(5_000 / 3) * 200}px`);
   });
 
-  it('renders EVERY row while the viewport height is still unknown — the documented trade-off', async () => {
-    // `VirtualGrid.tsx:68`: until ResizeObserver reports, `visibleRows` falls back to the whole
-    // row count so a collapsed flex parent shows a grid instead of nothing. That is a real
-    // scale hazard and not a bug to fix blindly — a library opened into a zero-height parent
-    // renders in full. Pinned so a future change to that fallback is a decision, not a
-    // surprise, and so the bound above is read as conditional on a measured viewport.
+  it('renders a bounded slice while the viewport height is still unknown', async () => {
+    // The old fallback rendered EVERY row until ResizeObserver reported, so a 1,400-title
+    // library painted 1,400 cards before its first measurement (a 4-5 s main-thread freeze
+    // on open and on every Back). It now renders about two screens: jsdom's window is 768px
+    // tall, so 2 x 768 / 200 -> 8 rows, plus overscan 2 either side -> 12 rows of 3.
     installLayout(800, 0);
     const el = await renderGrid(300);
-    expect(el.querySelectorAll('.card').length).toBe(300);
+    const count = el.querySelectorAll('.card').length;
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(12 * 3);
+  });
+
+  it('renders a bounded number of cards for a 1,400-item grid before anything is measured', async () => {
+    // No ResizeObserver and a 0x0 box: the state a grid is in on its very first render.
+    class SilentResizeObserver {
+      observe(): void { /* never reports */ }
+      unobserve(): void { /* no-op */ }
+      disconnect(): void { /* no-op */ }
+    }
+    vi.stubGlobal('ResizeObserver', SilentResizeObserver);
+    const el = await renderGrid(1_400);
+    const count = el.querySelectorAll('.card').length;
+    // Width unknown -> one column at minColWidth; two 768px screens of 200px rows + overscan.
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(12);
+    // The scroll surface still describes the whole library.
+    const spacer = el.firstElementChild?.firstElementChild as HTMLElement | null;
+    expect(spacer?.style.height).toBe(`${1_400 * 200}px`);
   });
 });
 

@@ -474,8 +474,21 @@ export function foldSearch(value: string): string {
   return value.normalize('NFKC').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim();
 }
 
+/**
+ * Folded once per title object, not once per filter pass: `foldSearch` is two Unicode
+ * normalisations, and the tab counts and the filter each ran it over all 1,400 titles
+ * on every keystroke and every tab switch. Titles are rebuilt (new objects) whenever
+ * their data changes, so a WeakMap keyed by the object can never serve a stale name.
+ */
+const HAYSTACKS = new WeakMap<GumTitle, string>();
+
 function searchHaystack(title: GumTitle): string {
-  return foldSearch([title.title, title.originalTitle ?? '', ...title.items.slice(0, 1).map((item) => item.seriesTitle ?? '')].join('\n'));
+  let folded = HAYSTACKS.get(title);
+  if (folded === undefined) {
+    folded = foldSearch([title.title, title.originalTitle ?? '', ...title.items.slice(0, 1).map((item) => item.seriesTitle ?? '')].join('\n'));
+    HAYSTACKS.set(title, folded);
+  }
+  return folded;
 }
 
 function anyOf<T>(wanted: readonly T[] | undefined, value: T | undefined): boolean {
@@ -646,25 +659,32 @@ export interface GumFilterChip {
   key?: string;
   vars?: Record<string, string | number>;
   label?: string;
+  /**
+   * A chip whose value alone does not say what it constrains ("14–26", "In progress")
+   * is wrapped in this template, which names the field: "Episodes: 14–26". The
+   * template takes the resolved value as `{value}`.
+   */
+  field?: string;
 }
 
 export function activeFilterChips(filters: GumFilters): GumFilterChip[] {
   const chips: GumFilterChip[] = [];
-  for (const genre of filters.genres ?? []) chips.push({ id: `genre:${genre}`, label: genre });
+  for (const genre of filters.genres ?? []) chips.push({ id: `genre:${genre}`, label: genre, field: 'gum.chip.genre' });
   if (filters.yearMin !== undefined || filters.yearMax !== undefined) {
-    chips.push({ id: 'year', key: 'gum.chip.years', vars: { from: filters.yearMin ?? '…', to: filters.yearMax ?? '…' } });
+    // Strings, not numbers: a year formatted as a quantity reads "2,010".
+    chips.push({ id: 'year', key: 'gum.chip.years', vars: { from: filters.yearMin !== undefined ? String(filters.yearMin) : '…', to: filters.yearMax !== undefined ? String(filters.yearMax) : '…' } });
   }
   if (filters.unrated) chips.push({ id: 'score', key: 'gum.chip.unrated' });
   else if (filters.scoreMin !== undefined || filters.scoreMax !== undefined) {
     chips.push({ id: 'score', key: 'gum.chip.myScore', vars: { from: filters.scoreMin ?? 0, to: filters.scoreMax ?? 10 } });
   }
   if (filters.providerMin !== undefined) chips.push({ id: 'provider', key: 'gum.chip.provider', vars: { min: filters.providerMin } });
-  for (const bucket of filters.runtime ?? []) chips.push({ id: `runtime:${bucket}`, key: `gum.filter.runtime.${bucket}` });
-  for (const bucket of filters.episodes ?? []) chips.push({ id: `episodes:${bucket}`, key: `gum.filter.episodes.${bucket}` });
-  for (const lang of filters.language ?? []) chips.push({ id: `language:${lang}`, key: `gum.filter.language.${lang}` });
-  for (const source of filters.sources ?? []) chips.push({ id: `source:${source}`, key: `gum.filter.source.${source}` });
+  for (const bucket of filters.runtime ?? []) chips.push({ id: `runtime:${bucket}`, key: `gum.filter.runtime.${bucket}`, field: 'gum.chip.runtime' });
+  for (const bucket of filters.episodes ?? []) chips.push({ id: `episodes:${bucket}`, key: `gum.filter.episodes.${bucket}`, field: 'gum.chip.episodes' });
+  for (const lang of filters.language ?? []) chips.push({ id: `language:${lang}`, key: `gum.filter.language.${lang}`, field: 'gum.chip.language' });
+  for (const source of filters.sources ?? []) chips.push({ id: `source:${source}`, key: `gum.filter.source.${source}`, field: 'gum.chip.source' });
   if (filters.onDisk !== undefined) chips.push({ id: 'onDisk', key: filters.onDisk ? 'gum.filter.onDisk' : 'gum.filter.notDownloaded' });
-  for (const state of filters.watch ?? []) chips.push({ id: `watch:${state}`, key: `gum.filter.watch.${state}` });
+  for (const state of filters.watch ?? []) chips.push({ id: `watch:${state}`, key: `gum.filter.watch.${state}`, field: 'gum.chip.watchState' });
   if (filters.subsJa !== undefined) chips.push({ id: 'subsJa', key: filters.subsJa ? 'gum.filter.subsJa' : 'gum.filter.noSubsJa' });
   if (filters.subsEn !== undefined) chips.push({ id: 'subsEn', key: filters.subsEn ? 'gum.filter.subsEn' : 'gum.filter.noSubsEn' });
   if (filters.liked !== undefined) chips.push({ id: 'liked', key: 'gum.filter.liked' });
@@ -782,11 +802,34 @@ export function episodesBySeasonOf(title: GumTitle): Array<{ season: number; ite
     }));
 }
 
-/** The episode to play next: the in-progress one, else the first unwatched, else the first. */
+/**
+ * Whether an episode on disk counts as seen: the file says so, or — for a tracked
+ * one-season run — the tracker's progress covers it (a MAL row at 12/26 has seen
+ * episodes 1–12 whether or not those files were ever played here).
+ */
+export function isEpisodeSeen(title: Pick<GumTitle, 'tracked' | 'progress' | 'seasons'>, item: MediaItem): boolean {
+  if (isWatched(item)) return true;
+  if (!title.tracked || title.progress <= 0 || title.seasons.length > 1 || typeof item.episode !== 'number') return false;
+  return item.episode <= title.progress;
+}
+
+/** A title's files in order, specials and OVAs left out (they are not "the next episode"). */
+export function orderedEpisodes(title: GumTitle): MediaItem[] {
+  return episodesBySeasonOf(title)
+    .flatMap((season) => season.items)
+    .filter((item) => item.episodeKind !== 'special' && item.episodeKind !== 'ova');
+}
+
+/**
+ * The episode to play next: the in-progress one, else the LOWEST unseen episode on
+ * disk, else the first. Lowest, not newest: Home's hero used to offer the file that
+ * arrived last ("Play E3" on a show whose E1 and E2 were unwatched).
+ */
 export function nextEpisodeOf(title: GumTitle): MediaItem | undefined {
   if (title.inProgressItem) return title.inProgressItem;
-  const ordered = episodesBySeasonOf(title).flatMap((season) => season.items);
-  return ordered.find((item) => !isWatched(item)) ?? ordered[0];
+  const ordered = orderedEpisodes(title);
+  const all = ordered.length ? ordered : episodesBySeasonOf(title).flatMap((season) => season.items);
+  return all.find((item) => !isEpisodeSeen(title, item)) ?? all[0];
 }
 
 /** "S1 · E3" / "E4" / null. */

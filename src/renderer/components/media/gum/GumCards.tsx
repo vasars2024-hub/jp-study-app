@@ -10,9 +10,9 @@ import { watchedFraction } from '../../../../shared/mediaLibraryEntries';
 import { useT } from '../../../i18n';
 import MediaArtwork from '../library/MediaArtwork';
 import { useMediaArtwork, type MediaArtworkVariant } from '../library/useMediaArtwork';
-import GumIcon from './GumIcons';
+import GumIcon, { type GumGlyph } from './GumIcons';
 import { useTitleArtUrl } from './gumBackend';
-import type { GumBadge } from './gumLayout';
+import type { GumBadge, GumRatingDisplay } from './gumLayout';
 import type { GumTitle } from './gumModel';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -24,14 +24,49 @@ export function formatRuntime(t: Translate, minutes: number | undefined): string
   return h > 0 ? t('gum.runtime.hm', { h, m: String(m).padStart(2, '0') }) : t('gum.runtime.m', { m });
 }
 
-/** "★ 8" on the ten scale, "★★★½" for Letterboxd stars, '' when unrated. */
-export function formatScore(title: Pick<GumTitle, 'score' | 'stars'>): string {
-  if (title.stars !== undefined) {
-    const whole = Math.floor(title.stars);
-    return `${'★'.repeat(whole)}${title.stars - whole >= 0.5 ? '½' : ''}`;
+/** The viewer's rating on the 0–10 scale every source is stored in (stars × 2). */
+export function scoreOutOfTen(title: Pick<GumTitle, 'score' | 'stars'>): number | undefined {
+  if (title.score !== undefined) return title.score;
+  if (title.stars !== undefined) return title.stars * 2;
+  return undefined;
+}
+
+/**
+ * One scale for every title, the one the viewer chose: "★ 8" out of ten, or
+ * "★★★★½" in stars. A MyAnimeList score and a Letterboxd rating used to print in
+ * their own scales side by side ("★ 10" next to "★★★★★"), which reads as two
+ * different ratings. '' when unrated.
+ */
+export function formatScore(
+  title: Pick<GumTitle, 'score' | 'stars'>,
+  display: GumRatingDisplay = 'ten',
+  lang?: string,
+): string {
+  const ten = scoreOutOfTen(title);
+  if (ten === undefined) return '';
+  if (display === 'stars') {
+    const halves = Math.max(1, Math.round(ten));
+    const whole = Math.floor(halves / 2);
+    return `${'★'.repeat(whole)}${halves % 2 ? '½' : ''}`;
   }
-  if (title.score !== undefined) return `★ ${Number.isInteger(title.score) ? title.score : title.score.toFixed(1)}`;
-  return '';
+  let value: string;
+  try {
+    value = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(ten);
+  } catch {
+    value = Number.isInteger(ten) ? String(ten) : ten.toFixed(1);
+  }
+  return `★ ${value}`;
+}
+
+/**
+ * "Play episode 3" / "Resume episode 3" by number; a later season keeps the compact
+ * "S2 · E4" label, which already says both. The hero and the title page share it, so
+ * neither prints a label inside a sentence that repeats it ("Episode E3").
+ */
+export function gumPlayLabel(t: Translate, resuming: boolean, n: number | null, seasonLabel?: string | null): string {
+  if (seasonLabel) return t(resuming ? 'gum.hero.resumeEpisode' : 'gum.hero.playEpisode', { episode: seasonLabel });
+  if (n === null) return t(resuming ? 'gum.hero.resume' : 'gum.hero.play');
+  return t(resuming ? 'gum.episode.resume' : 'gum.episode.play', { n });
 }
 
 export function typeLabelKey(title: Pick<GumTitle, 'kind' | 'anime'>): string {
@@ -89,20 +124,50 @@ function hue(value: string): number {
  * and 300 identical glyph tiles read as "broken"; 300 typographic posters read as
  * a designed shelf, and the title is legible without the caption.
  */
+const CJK = /[぀-ヿ㐀-鿿가-힯]/u;
+
+/**
+ * The title's type size, in container-width units, chosen so its LONGEST WORD fits
+ * on one line and a long title still fits the clamp. The fixed 11.5cqw it replaces
+ * broke single words mid-word ("Bakemonogat/ari", "Spirite/d") because
+ * `overflow-wrap: anywhere` was the only thing stopping them overflowing.
+ * CJK text breaks between characters, so it only counts its Latin runs.
+ */
+export function typoFontSize(text: string): number {
+  const words = text.split(/\s+/u).flatMap((word) => word.split(CJK)).filter(Boolean);
+  const longest = words.reduce((max, word) => Math.max(max, [...word].length), 1);
+  const length = [...text].length;
+  const byLength = length <= 14 ? 11.5 : length <= 28 ? 10 : length <= 48 ? 8.6 : 7.4;
+  // ~0.64em per character of an 800-weight Latin face; 80cqw is the box less its padding.
+  const byWord = 80 / (longest * 0.64);
+  return Math.round(Math.max(5.5, Math.min(byLength, byWord)) * 10) / 10;
+}
+
+/** One or two letters for a thumbnail too small to set the title in: "SA", "B", "ゆ". */
+export function monogram(text: string): string {
+  const words = text.trim().split(/\s+/u).filter((word) => /[\p{L}\p{N}]/u.test(word));
+  const first = (word: string): string => [...word.replace(/^[^\p{L}\p{N}]+/u, '')][0] ?? '';
+  if (!words.length) return '';
+  if (CJK.test(first(words[0]))) return first(words[0]);
+  return words.slice(0, 2).map(first).join('').toUpperCase();
+}
+
 export function TypoPoster({ title }: { title: Pick<GumTitle, 'title' | 'year' | 'originalTitle'> }) {
   const h = hue(title.title);
   return (
     <div
       className="gum-typo"
       aria-hidden="true"
-      style={{ '--gum-typo-h': h, '--gum-typo-h2': (h + 32) % 360 } as CSSProperties}
+      style={{ '--gum-typo-h': h, '--gum-typo-h2': (h + 32) % 360, '--gum-typo-fs': typoFontSize(title.title) } as CSSProperties}
     >
+      {/* In the flow above the title, not pinned to the top corner the type badge covers. */}
       <span className="gum-typo__rule" />
       <strong className="gum-typo__title">{title.title}</strong>
       {title.originalTitle && title.originalTitle !== title.title && (
         <span className="gum-typo__native" lang="ja">{title.originalTitle}</span>
       )}
       {title.year && <span className="gum-typo__year">{title.year}</span>}
+      <span className="gum-typo__mono">{monogram(title.title)}</span>
     </div>
   );
 }
@@ -162,11 +227,14 @@ export interface GumPosterCardProps {
   onPlay?: (title: GumTitle) => void;
   /** A corner badge that overrides the type badge (Just added: "NEW EP"). */
   flag?: string;
+  /** The one scale ratings print in. */
+  ratingDisplay?: GumRatingDisplay;
 }
 
-export const GumPosterCard = memo(function GumPosterCard({ title, badges, layout = 'card', onOpen, onPlay, flag }: GumPosterCardProps) {
-  const { t } = useT();
-  const score = badges.score ? formatScore(title) : '';
+export const GumPosterCard = memo(function GumPosterCard({ title, badges, layout = 'card', onOpen, onPlay, flag, ratingDisplay = 'ten' }: GumPosterCardProps) {
+  const { t, lang } = useT();
+  const score = badges.score ? formatScore(title, ratingDisplay, lang) : '';
+  const ten = scoreOutOfTen(title);
   const meta = metaLine(t, title);
   const ratio = title.progressRatio ?? (title.watchState === 'progress' ? 0.02 : undefined);
   const showProgress = badges.progress && ratio !== undefined && ratio > 0 && ratio < 1;
@@ -196,7 +264,11 @@ export const GumPosterCard = memo(function GumPosterCard({ title, badges, layout
             {score && (
               <em className="gum-card__score">
                 <span aria-hidden="true">{score}</span>
-                <span className="gum-sr">{t('gum.card.score', { score: title.score ?? 0 })}</span>
+                <span className="gum-sr">
+                  {ratingDisplay === 'stars'
+                    ? t('gum.card.scoreStars', { score: Math.max(1, Math.round(ten ?? 0)) / 2 })
+                    : t('gum.card.score', { score: ten ?? 0 })}
+                </span>
               </em>
             )}
           </span>
@@ -242,6 +314,12 @@ export interface GumEpisodeCardProps {
   onPlay: () => void;
   onOpen?: () => void;
   playLabel: string;
+  /** The glyph on the art: play, or download for an episode that is not on this PC. */
+  playIcon?: GumGlyph;
+  /** A line under the name when there is no time left to show ("12 of 26 watched"). */
+  note?: string;
+  /** A visible text action under the name ("Find episode 13"). */
+  action?: { label: string; onClick: () => void };
 }
 
 export const GumEpisodeCard = memo(function GumEpisodeCard({
@@ -256,10 +334,13 @@ export const GumEpisodeCard = memo(function GumEpisodeCard({
   onPlay,
   onOpen,
   playLabel,
+  playIcon = 'play',
+  note,
+  action,
 }: GumEpisodeCardProps) {
   const { t } = useT();
   const fraction = percent ?? (item ? watchedFraction(item) : null);
-  const left = positionSec > 0 ? timeLeft(t, item, positionSec, durationSec) : null;
+  const left = (positionSec > 0 ? timeLeft(t, item, positionSec, durationSec) : null) ?? note ?? null;
   const art = item ? (
     <MediaArtwork id={item.id} title={name} variant="still" ratio="16 / 9" decorative>
       <EpisodeOverlay caption={caption} kindLabel={kindLabel} fraction={fraction} />
@@ -277,7 +358,7 @@ export const GumEpisodeCard = memo(function GumEpisodeCard({
     <div className="gum-ep-card">
       <button type="button" className="gum-ep-card__hit" onClick={onPlay} aria-label={playLabel}>
         {art}
-        <span className="gum-ep-card__play" aria-hidden="true"><GumIcon name="play" size={18} /></span>
+        <span className="gum-ep-card__play" aria-hidden="true" data-icon={playIcon}><GumIcon name={playIcon} size={18} /></span>
       </button>
       <div className="gum-ep-card__copy">
         {onOpen ? (
@@ -286,6 +367,11 @@ export const GumEpisodeCard = memo(function GumEpisodeCard({
           <strong className="gum-ep-card__name">{name}</strong>
         )}
         {left && <small>{left}</small>}
+        {action && (
+          <button type="button" className="gum-link gum-link--accent gum-ep-card__action" onClick={action.onClick}>
+            <GumIcon name="download" size={12} /> {action.label}
+          </button>
+        )}
       </div>
     </div>
   );

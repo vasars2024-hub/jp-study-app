@@ -80,8 +80,14 @@
   color: #fff;
 }
 
-.gum-history {
+/* The back/forward pair. Scoped to the bar, and always a row: the title page's
+   watch-history list used to share this class, and its column layout stacked the
+   arrows vertically. */
+.gum-history,
+.gum-topnav .gum-history {
   display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
   gap: 2px;
 }
 
@@ -107,14 +113,31 @@
   cursor: default;
 }
 
+/* The destinations never shrink or overlap: `MediaCenterView` measures how many fit
+   (`gumTopNav.ts`) and folds the rest into More, so the nav is exactly as wide as
+   what it shows. */
 .gum-nav {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
+  flex: 0 0 auto;
+}
+
+/* The same destinations at their natural widths, off screen, for that measurement. */
+.gum-nav.gum-nav--measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .gum-nav > button,
+.gum-nav--measure > .gum-nav__probe,
 .gum-nav-more > .gum-pop__trigger {
   height: 34px;
   padding: 0 14px;
@@ -159,22 +182,111 @@
 }
 
 .gum-topnav__spacer {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Search takes what the nav leaves, between 200 and 320px; below that it folds to an
+   icon button (`data-collapsed`) that opens the field over the bar. */
+.gum-search {
+  flex: 0 1 320px;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+}
+
+.gum-search[data-collapsed='true'] {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .gum-topnav .mc-global-search {
-  width: clamp(160px, 24cqw, 320px);
+  width: 100%;
+  min-width: 0;
   height: 38px;
+  margin-left: 0;
   border-radius: 10px;
+}
+
+.gum-search[data-collapsed='true']:not([data-open='true']) .mc-global-search {
+  display: none;
+}
+
+.gum-search[data-collapsed='true'][data-open='true'] .mc-global-search {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: var(--gum-gutter);
+  width: min(420px, calc(100% - 2 * var(--gum-gutter)));
+  transform: translateY(-50%);
+  background: var(--mc-surface);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+.gum-search__toggle {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--mc-line-strong);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--mc-text);
+  cursor: pointer;
+}
+
+.gum-search__toggle:hover {
+  background: color-mix(in srgb, var(--mc-text) 8%, transparent);
+}
+
+/* A search is still filtering the library while the field is folded away. */
+.gum-search__toggle[data-active='true']::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mc-accent);
+}
+
+/* One ring, on the rounded field, drawn only for keyboard focus. The input inside
+   used to draw its own square ring (the global `:focus-visible`), and Aero painted
+   the bare input as a white box inside the field. */
+.gum-root .gum-topnav .mc-global-search input,
+.gum-root .gum-topnav .mc-global-search input:focus,
+.gum-root .gum-topnav .mc-global-search input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mc-text);
+}
+
+.gum-root .gum-topnav .mc-global-search:focus-within {
+  box-shadow: none;
+}
+
+.gum-root .gum-topnav .mc-global-search:has(input:focus-visible) {
+  outline: var(--focus-ring-width, 2px) solid var(--mc-accent-2);
+  outline-offset: 2px;
 }
 
 .gum-topnav__import {
   flex: 0 0 auto;
 }
 
+.gum-root :is(.gum-search__toggle, .gum-row-nudge):focus-visible {
+  outline: 2px solid var(--mc-accent-2);
+  outline-offset: 2px;
+}
+
 @container mc (max-width: 900px) {
   .gum-brand__name,
-  .gum-history {
+  .gum-topnav .gum-history {
     display: none;
   }
 }
@@ -184,6 +296,7 @@
     display: none;
   }
   .gum-nav > button,
+  .gum-nav--measure > .gum-nav__probe,
   .gum-nav-more > .gum-pop__trigger {
     padding: 0 10px;
   }
@@ -522,10 +635,10 @@
   overflow: hidden;
 }
 
+/* In the flow, just above the title: pinned to the top-left corner it poked out
+   from under the corner type badge. */
 .gum-typo__rule {
-  position: absolute;
-  top: 10cqw;
-  left: 9cqw;
+  flex: 0 0 auto;
   width: 22cqw;
   height: 1.6cqw;
   min-height: 2px;
@@ -533,17 +646,46 @@
   background: hsl(var(--gum-typo-h) 70% 72%);
 }
 
+/* Sized per title (`typoFontSize`: the longest word fits one line), so words wrap
+   whole. `break-word` only splits a word that cannot fit a line on its own — the
+   last resort `anywhere` used to be the first. */
 .gum-typo__title {
-  font-size: clamp(12px, 11.5cqw, 34px);
-  line-height: 1.04;
+  font-size: clamp(9px, calc(var(--gum-typo-fs, 11.5) * 1cqw), 34px);
+  line-height: 1.06;
   font-weight: 800;
   letter-spacing: -0.02em;
   display: -webkit-box;
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
   text-wrap: balance;
+}
+
+/* A thumbnail too small to set the title in (list rows, arrivals, the toast) shows
+   a monogram instead of a few broken letters. */
+.gum-typo__mono {
+  display: none;
+  font-size: 40cqw;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+@container (max-width: 96px) {
+  .gum-typo {
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+  }
+  .gum-typo > :not(.gum-typo__mono) {
+    display: none;
+  }
+  .gum-typo__mono {
+    display: block;
+  }
 }
 
 .gum-typo__native {
@@ -692,15 +834,8 @@
   transform: none !important;
 }
 
-.gum-card--row .gum-badge,
-.gum-card--row .gum-typo__native,
-.gum-card--row .gum-typo__year,
-.gum-card--row .gum-typo__rule {
+.gum-card--row .gum-badge {
   display: none;
-}
-
-.gum-card--row .gum-typo__title {
-  font-size: 9px;
 }
 
 .gum-card--row .gum-card__copy {
@@ -831,6 +966,21 @@
 .gum-ep-card__copy small {
   color: var(--mc-muted);
   font-size: 12px;
+}
+
+.gum-ep-card__action {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* A download glyph reads as an action, not a hover hint: always shown. */
+.gum-ep-card__play[data-icon='download'],
+.gum-ep-card__play[data-icon='more'] {
+  opacity: 0.92;
+  transform: scale(0.92);
 }
 
 /* ------------------------------------------------------------- hero ---- */
@@ -1075,11 +1225,31 @@
   color: var(--mc-muted);
 }
 
+/* Customise: every section is one compact bar of the same height, so drag targets
+   are uniform and the keyboard moves exactly one slot per press. */
 .gum-section[data-editing='true'] {
-  padding: 10px;
+  padding: 4px;
+  gap: 0;
   border-radius: 16px;
   border: 1px dashed var(--mc-line-strong);
   background: color-mix(in srgb, var(--mc-surface) 55%, transparent);
+}
+
+.gum-home[data-editing='true'] .gum-home__body {
+  gap: 10px;
+}
+
+.gum-section[data-editing='true'] .gum-section__edit-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 36px;
+}
+
+.gum-section[data-editing='true'] .gum-section__edit-title :is(h2, small) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gum-section[data-hidden='true'] {
@@ -1160,8 +1330,13 @@
   scroll-snap-type: x proximity;
   scroll-padding: 0 var(--gum-gutter);
   padding: 6px var(--gum-gutter) 12px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--mc-text) 16%, transparent) transparent;
+  /* No native bar under every shelf (at scale Home was striped with them); the
+     arrows page the row, and trackpads and Shift+wheel still scroll it. */
+  scrollbar-width: none;
+}
+
+.gum-row::-webkit-scrollbar {
+  display: none;
 }
 
 .gum-row--episode {
@@ -1197,8 +1372,13 @@
 .gum-row-nudge--prev { left: calc(var(--gum-gutter) - 14px); }
 .gum-row-nudge--next { right: calc(var(--gum-gutter) - 14px); }
 
-.gum-row-wrap:hover .gum-row-nudge {
+.gum-row-wrap:is(:hover, :focus-within) .gum-row-nudge:not(:disabled) {
   opacity: 1;
+}
+
+/* At its own end an arrow has nothing to page to: gone, not greyed. */
+.gum-row-nudge:disabled {
+  visibility: hidden;
 }
 
 .gum-subrows {
@@ -1263,6 +1443,21 @@
   padding: 26px var(--gum-gutter) 0;
 }
 
+/* Only the results flex. Every control row above them keeps its own height: as flex
+   items they used to shrink to fit the pane, so at 1266x683 the status tabs were
+   squeezed to 7-9px (1px with 1,418 titles) and the toolbar box to 0-22px under
+   82px of content — its second row sat on the result count and cards scrolled
+   over the controls. */
+.gum-library > * {
+  flex-shrink: 0;
+}
+
+.gum-library > .gum-library__results {
+  flex: 1 1 auto;
+  /* A floor, so a very short window scrolls the page rather than zeroing the grid. */
+  min-height: 260px;
+}
+
 .gum-library__head {
   display: flex;
   align-items: flex-end;
@@ -1281,10 +1476,16 @@
 
 .gum-tabs {
   display: flex;
+  flex-shrink: 0;
   gap: clamp(14px, 2cqw, 26px);
   border-bottom: 1px solid var(--mc-line);
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
+}
+
+.gum-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .gum-tabs button {
@@ -1292,7 +1493,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 0 12px;
+  min-height: 34px;
+  padding: 4px 0 12px;
+  white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -1361,23 +1564,53 @@
   place-items: center;
 }
 
+/* One row: the filters take what is left and wrap among themselves if they must;
+   Views, Sort and View options stay together at the end, so a narrow window never
+   pushes Sort out of sight. */
 .gum-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
-}
-
-.gum-toolbar__spacer {
-  flex: 1 1 auto;
 }
 
 .gum-filterbar {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 auto;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.gum-toolbar__end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.gum-fpanel--view {
+  min-width: 240px;
+}
+
+.gum-fpanel--view .gum-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@container mc (max-width: 980px) {
+  .gum-pop--view .gum-pop__label-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 .gum-active {
@@ -1511,6 +1744,24 @@
 
 .gum-pop__panel[data-wide='true'] {
   width: min(420px, 92cqw);
+}
+
+/* Portalled to the Gum root and placed by `GumPopover` (left/top/max-height set
+   inline, clamped inside the window): the in-place anchors do not apply, and the
+   panel scrolls itself instead of growing the page. */
+.gum-pop__panel[data-portal='true'] {
+  right: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.gum-pop__panel[data-portal='true'][data-placement='above'] {
+  animation-name: gum-pop-in-above;
+}
+
+@keyframes gum-pop-in-above {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes gum-pop-in {
@@ -1996,6 +2247,69 @@
   padding-right: 6px;
 }
 
+.gum-episode__action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Play, and beside it the "more ways to play" menu (external player). */
+.gum-title__play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gum-pop--icon > .gum-pop__trigger {
+  padding: 0;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.gum-pop--play-menu > .gum-pop__trigger {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--mc-text) 11%, transparent);
+}
+
+.gum-pop--row-menu > .gum-pop__trigger {
+  border-color: transparent;
+  background: transparent;
+  color: var(--mc-muted);
+}
+
+.gum-pop--row-menu > .gum-pop__trigger:hover {
+  color: var(--mc-text);
+  background: color-mix(in srgb, var(--mc-text) 8%, transparent);
+}
+
+.gum-menu__note {
+  padding: 6px 10px 2px;
+  font-size: 12px;
+  color: var(--mc-muted);
+}
+
+.gum-episode__find {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--mc-text);
+  background: color-mix(in srgb, var(--mc-text) 8%, transparent);
+}
+
+.gum-episodes__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
 .gum-details {
   display: flex;
   flex-direction: column;
@@ -2064,27 +2378,56 @@
   flex-wrap: wrap;
 }
 
-.gum-details__tools {
+.gum-facts__wide {
+  grid-column: 1 / -1;
+}
+
+.gum-details__files {
   align-items: stretch;
   width: 100%;
 }
 
-/* The file drawer, laid inline: same component and tools, no floating column. */
-.gum-tools-host {
-  position: relative;
-  border-radius: 14px;
-  border: 1px solid var(--mc-line);
-  overflow: hidden;
-  max-height: 720px;
+.gum-details__head {
   display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.gum-tools-host .medialib-drawer {
-  position: static;
-  width: 100%;
-  max-width: none;
-  border: 0;
-  box-shadow: none;
+/* The files on disk, as paths: selectable, one per row, the episode first. */
+.gum-files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gum-files li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--mc-surface);
+  font-size: 12px;
+}
+
+.gum-files__label {
+  font-weight: 700;
+  color: var(--mc-muted);
+}
+
+.gum-files__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mc-text);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  user-select: text;
 }
 
 .gum-subs-table {
@@ -2117,7 +2460,7 @@
   color: var(--mc-muted);
 }
 
-.gum-history {
+.gum-watch-history {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2127,7 +2470,7 @@
   max-width: 560px;
 }
 
-.gum-history li {
+.gum-watch-history li {
   display: flex;
   gap: 14px;
   padding: 8px 12px;
@@ -2136,7 +2479,7 @@
   font-size: 13px;
 }
 
-.gum-history li span {
+.gum-watch-history li span {
   color: var(--mc-muted);
 }
 
@@ -2423,6 +2766,13 @@
   align-items: stretch;
 }
 
+.gum-auto__lede {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mc-muted);
+}
+
 .gum-auto__copy {
   display: flex;
   flex-direction: column;
@@ -2654,6 +3004,18 @@
 
 :root[data-theme='high-contrast'] :is(.gum-hero__fade) {
   background: color-mix(in srgb, var(--mc-bg) 92%, transparent);
+}
+
+/* The typographic poster read grey-on-teal here: under high contrast it is white on
+   near-black, with the title's hue kept only as the rule and a thin frame. */
+:root[data-theme='high-contrast'] .gum-typo {
+  background: #000;
+  color: #fff;
+  box-shadow: inset 0 0 0 2px hsl(var(--gum-typo-h) 70% 60%);
+}
+
+:root[data-theme='high-contrast'] .gum-typo :is(.gum-typo__native, .gum-typo__year) {
+  opacity: 1;
 }
 
 :root[data-display-transparency='off'] :is(.gum-topnav, .gum-toast, .gum-row-nudge, .gum-btn--glass) {

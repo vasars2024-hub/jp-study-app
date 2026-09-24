@@ -11,9 +11,11 @@ import type { MediaItem } from '../../../../shared/types';
 import { isWatched } from '../../../../shared/mediaLibraryEntries';
 import type { ContinueWatchingRow } from '../ContinueWatchingShelf';
 import {
-  episodesBySeasonOf,
   filterGumTitles,
+  isEpisodeSeen,
   matchesType,
+  nextEpisodeOf,
+  orderedEpisodes,
   sortGumTitles,
   type GumTitle,
   type GumTypeTab,
@@ -32,8 +34,45 @@ export interface GumContinueCard {
   title?: GumTitle;
 }
 
+/**
+ * Resume rows whose file is still in the library. A row whose file has gone (deleted,
+ * or removed from the library) has nothing to resume and used to stay first in line
+ * for the hero, which kept offering to play a file that no longer existed.
+ */
 export function continueCards(rows: readonly ContinueWatchingRow[], index: ReadonlyMap<string, GumTitle>): GumContinueCard[] {
-  return rows.map((row) => ({ row, title: row.item ? index.get(row.item.id) : undefined }));
+  const out: GumContinueCard[] = [];
+  for (const row of rows) {
+    if (!row.item) continue;
+    out.push({ row, title: index.get(row.item.id) });
+  }
+  return out;
+}
+
+/**
+ * A tracked show you are watching whose next episode is not on this PC — a MAL row at
+ * 12/26 with no files, or with files only up to where you are. Only local resume
+ * positions used to count as "in progress", so such a show appeared nowhere on Home.
+ */
+export interface GumTrackedNextCard {
+  title: GumTitle;
+  /** The next episode number, one past the tracker's progress. */
+  episode: number;
+}
+
+export function trackedNextCards(
+  titles: readonly GumTitle[],
+  covered: ReadonlySet<string>,
+): GumTrackedNextCard[] {
+  const out: GumTrackedNextCard[] = [];
+  for (const title of titles) {
+    if (!title.tracked || !isWatchingStatus(title) || title.kind === 'film' || covered.has(title.id)) continue;
+    const episode = Math.max(0, title.progress) + 1;
+    if (title.episodeCount !== undefined && episode > title.episodeCount) continue;
+    // A file for that episode is Up next's (or Continue watching's) to offer.
+    if (title.items.some((item) => item.episode === episode && (item.season ?? 1) === (title.seasons[0] ?? 1))) continue;
+    out.push({ title, episode });
+  }
+  return out.sort((a, b) => (b.title.lastWatchedAt ?? b.title.addedAt) - (a.title.lastWatchedAt ?? a.title.addedAt));
 }
 
 export interface GumUpNextCard {
@@ -48,19 +87,20 @@ function isWatchingStatus(title: GumTitle): boolean {
 /**
  * The next unwatched episode of every show you are watching. An episode already
  * started is Continue watching's, not Up next's, so a show whose next episode is
- * in progress does not appear twice.
+ * in progress does not appear twice. "Watched" includes what the tracker counts
+ * (`isEpisodeSeen`), so a MAL show at 12/26 offers episode 13, not episode 1.
  */
 export function upNextCards(titles: readonly GumTitle[]): GumUpNextCard[] {
   const out: GumUpNextCard[] = [];
   for (const title of titles) {
     if (!isWatchingStatus(title) || title.kind === 'film' || !title.onDisk) continue;
-    const ordered = episodesBySeasonOf(title).flatMap((season) => season.items);
+    const ordered = orderedEpisodes(title);
     if (ordered.some((item) => (item.positionSec ?? 0) > 0 && !isWatched(item))) continue;
-    let lastWatched = -1;
+    let lastSeen = -1;
     ordered.forEach((item, index) => {
-      if (isWatched(item)) lastWatched = index;
+      if (isEpisodeSeen(title, item)) lastSeen = index;
     });
-    const next = ordered.slice(lastWatched + 1).find((item) => !isWatched(item));
+    const next = ordered.slice(lastSeen + 1).find((item) => !isEpisodeSeen(title, item));
     if (next) out.push({ title, item: next });
   }
   return out.sort((a, b) => (b.title.lastWatchedAt ?? 0) - (a.title.lastWatchedAt ?? 0));
@@ -197,18 +237,23 @@ export interface GumHeroPick {
 /**
  * The hero features the most relevant thing: what you are in the middle of, else a
  * new episode of a show you are watching, else the latest arrival.
+ *
+ * Outside a resume, the episode offered is the title's NEXT one (`nextEpisodeOf`:
+ * the lowest unseen episode on disk), never simply the file that arrived — a fresh
+ * show whose third episode landed last used to read "Play E3" with E1 and E2 unwatched.
  */
 export function pickHero(
   continueList: readonly GumContinueCard[],
   justAdded: readonly GumJustAddedCard[],
   titles: readonly GumTitle[],
 ): GumHeroPick | null {
-  const resume = continueList[0];
+  const resume = continueList.find((card) => card.row.item);
   if (resume) return { reason: 'continue', title: resume.title, item: resume.row.item, row: resume.row };
+  const next = (title: GumTitle, fallback?: MediaItem): MediaItem | undefined => nextEpisodeOf(title) ?? fallback;
   const fresh = justAdded.find((card) => card.badge === 'newEpisode');
-  if (fresh) return { reason: 'newEpisode', title: fresh.title, item: fresh.item };
+  if (fresh) return { reason: 'newEpisode', title: fresh.title, item: next(fresh.title, fresh.item) };
   const latest = justAdded[0];
-  if (latest) return { reason: 'recent', title: latest.title, item: latest.item };
+  if (latest) return { reason: 'recent', title: latest.title, item: next(latest.title, latest.item) };
   const onDisk = [...titles].filter((title) => title.onDisk).sort((a, b) => b.addedAt - a.addedAt)[0];
-  return onDisk ? { reason: 'recent', title: onDisk, item: onDisk.items[0] } : null;
+  return onDisk ? { reason: 'recent', title: onDisk, item: next(onDisk, onDisk.items[0]) } : null;
 }

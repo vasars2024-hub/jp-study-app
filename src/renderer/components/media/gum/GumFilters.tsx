@@ -113,7 +113,9 @@ function YearPicker({ filters, facets, onChange }: { filters: GumFilters; facets
             pressed={filters.yearMin === decade && filters.yearMax === decade + 9}
             onClick={() => setRange(decade, decade + 9)}
           >
-            {t('gum.filter.decade', { decade })}
+            {/* A string, not a number: the catalogue formats numbers with grouping, which
+                printed "2,020s". A year is a label, not a quantity. */}
+            {t('gum.filter.decade', { decade: String(decade) })}
           </Choice>
         ))}
       </div>

@@ -91,7 +91,11 @@ export default function GumDownloads({ titles, arrivals, onOpenTorrents, onOpenT
             <span>{state ? t(state.autoImport ? 'gum.downloads.autoOn' : 'gum.downloads.autoOff') : t('gum.downloads.checking')}</span>
             <small>{t('gum.downloads.folders', { count: state?.folders.length ?? 0 })}</small>
           </div>
-          <button type="button" className="gum-link" onClick={onImport}>{t('gum.auto.configure')}</button>
+          {/* "Set up" read wrong beside a switch that is already On: the link names what it
+              does in the state the card is in. */}
+          <button type="button" className="gum-link" onClick={onImport}>
+            {t(state?.autoImport ? 'gum.downloads.manage' : 'gum.downloads.turnOn')}
+          </button>
         </div>
       </div>
 

@@ -252,6 +252,14 @@ export interface GumTabPrefs {
 export const GUM_BADGES = ['type', 'progress', 'onDisk', 'score'] as const;
 export type GumBadge = (typeof GUM_BADGES)[number];
 
+/**
+ * The one scale every rating prints in. Scores are stored 0–10 whatever their
+ * source (a Letterboxd half-star rating is kept as stars × 2), so either display is
+ * exact; mixing them put "★ 10" beside "★★★★★" in the same list.
+ */
+export const GUM_RATING_DISPLAYS = ['ten', 'stars'] as const;
+export type GumRatingDisplay = (typeof GUM_RATING_DISPLAYS)[number];
+
 export interface GumLibraryPrefs {
   version: 1;
   status: GumStatusTab;
@@ -260,6 +268,7 @@ export interface GumLibraryPrefs {
   /** Poster column width in px. */
   posterSize: number;
   badges: Record<GumBadge, boolean>;
+  ratingDisplay: GumRatingDisplay;
   byStatus: Record<GumStatusTab, GumTabPrefs>;
 }
 
@@ -291,6 +300,7 @@ export function defaultLibraryPrefs(): GumLibraryPrefs {
     view: 'grid',
     posterSize: POSTER_SIZE_DEFAULT,
     badges: { type: true, progress: true, onDisk: true, score: true },
+    ratingDisplay: 'ten',
     byStatus,
   };
 }
@@ -359,6 +369,7 @@ export function normalizeLibraryPrefs(value: unknown): GumLibraryPrefs {
     view: raw.view === 'list' ? 'list' : 'grid',
     posterSize: size,
     badges,
+    ratingDisplay: raw.ratingDisplay === 'stars' ? 'stars' : 'ten',
     byStatus,
   };
 }

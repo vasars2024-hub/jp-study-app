@@ -1,5 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useElementSize } from '../hooks';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 // Same windowing idea as VirtualList, but for a responsive multi-column card
 // grid (mirrors `grid-template-columns: repeat(auto-fill, minmax(minColWidth, 1fr))`).
@@ -31,6 +30,96 @@ export interface VirtualGridProps<T> {
   emptyState?: ReactNode;
 }
 
+/**
+ * How much to render while the viewport height is still unknown (or measured as
+ * 0): about two screens. It used to be EVERY row, so a 1,400-title library painted
+ * 1,400 cards before its first measurement and froze the main thread for seconds
+ * on every open and every Back. Two screens still fill a collapsed flex parent
+ * that grows to its content, which is what the old fallback was protecting.
+ */
+function fallbackViewportHeight(): number {
+  const screen = typeof window !== 'undefined' && window.innerHeight > 0 ? window.innerHeight : 800;
+  return screen * 2;
+}
+
+/**
+ * The container's box, read before paint. `useLayoutEffect` rather than an effect
+ * so the first measured frame is the first painted one — no full-height flash, no
+ * second render after the browser has already laid out the fallback.
+ */
+function useMeasuredBox<E extends HTMLElement>(): [React.RefObject<E | null>, { width: number; height: number }] {
+  const ref = useRef<E | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const apply = (width: number, height: number): void => setSize((prev) => (
+      prev.width === width && prev.height === height ? prev : { width, height }
+    ));
+    apply(el.clientWidth, el.clientHeight);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (box) apply(box.width, box.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, size];
+}
+
+interface RowProps<T> {
+  row: number;
+  slice: T[];
+  top: number;
+  height: number;
+  columns: number;
+  template: string;
+  justify: string | undefined;
+  gap: number;
+  getKey: (item: T, index: number) => string | number;
+  renderItem: (item: T, index: number) => ReactNode;
+}
+
+/**
+ * A row is unchanged when it shows the same items in the same place. The slice is
+ * a fresh array whenever the window moves, so it is compared by element; `getKey`
+ * is left out because callers commonly pass an inline arrow for a pure lookup.
+ */
+function sameRow<T>(a: RowProps<T>, b: RowProps<T>): boolean {
+  if (a.row !== b.row || a.top !== b.top || a.height !== b.height || a.columns !== b.columns
+    || a.template !== b.template || a.justify !== b.justify || a.gap !== b.gap
+    || a.renderItem !== b.renderItem || a.slice.length !== b.slice.length) return false;
+  for (let i = 0; i < a.slice.length; i += 1) if (a.slice[i] !== b.slice[i]) return false;
+  return true;
+}
+
+/**
+ * One row, memoised: scrolling by a row re-renders the row that entered and the
+ * one that left, not every card on screen.
+ */
+const GridRow = memo(function GridRow<T>({ row, slice, top, height, columns, template, justify, gap, getKey, renderItem }: RowProps<T>) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top,
+        left: 0,
+        right: 0,
+        height,
+        display: 'grid',
+        gridTemplateColumns: template,
+        justifyContent: justify,
+        gap,
+      }}
+    >
+      {slice.map((item, i) => (
+        <div key={getKey(item, row * columns + i)}>{renderItem(item, row * columns + i)}</div>
+      ))}
+    </div>
+  );
+}, sameRow) as <T>(props: RowProps<T>) => ReactNode;
+
 export default function VirtualGrid<T>({
   items,
   minColWidth,
@@ -44,7 +133,7 @@ export default function VirtualGrid<T>({
   renderItem,
   emptyState,
 }: VirtualGridProps<T>) {
-  const [containerRef, size] = useElementSize<HTMLDivElement>();
+  const [containerRef, size] = useMeasuredBox<HTMLDivElement>();
   const [scrollTop, setScrollTop] = useState(0);
   const rafRef = useRef<number | null>(null);
 
@@ -81,14 +170,19 @@ export default function VirtualGrid<T>({
     typeof rowHeight === 'function' ? rowHeight(colWidth) : rowHeight,
   );
   const rowCount = Math.ceil(items.length / columns);
-  const viewportH = size.height || 0;
+  // Until a height is measured, render about two screens of rows — bounded, so the
+  // cost of a first paint does not grow with the library.
+  const viewportH = size.height > 0 ? size.height : fallbackViewportHeight();
   const startRow = Math.max(0, Math.floor(scrollTop / resolvedRowHeight) - overscan);
-  // Until ResizeObserver reports a height, render every row so a collapsed
-  // flex parent doesn't blank the grid (zero-height viewport → zero cards).
-  const visibleRows =
-    viewportH > 0 ? Math.ceil(viewportH / resolvedRowHeight) + overscan * 2 : Math.max(rowCount, 1);
+  const visibleRows = Math.ceil(viewportH / resolvedRowHeight) + overscan * 2;
   const endRow = Math.min(rowCount, startRow + visibleRows);
   const totalHeight = rowCount * resolvedRowHeight;
+  // `minmax(0, 1fr)`, not `1fr`: a `1fr` track is `minmax(auto, 1fr)` and floors at
+  // the card's min-content, so the media library's grid still scrolled sideways
+  // (129 > 100) in a pane narrower than one poster. The row height is fixed by the
+  // caller either way, so a track that follows the pane is the only correct one here.
+  const template = capped ? `repeat(${columns}, ${colWidth}px)` : `repeat(${columns}, minmax(0, 1fr))`;
+  const justify = capped ? 'center' : undefined;
 
   const rows = useMemo(() => {
     const out: { row: number; slice: T[] }[] = [];
@@ -105,31 +199,19 @@ export default function VirtualGrid<T>({
         : (
           <div style={{ height: totalHeight, position: 'relative' }}>
             {rows.map(({ row, slice }) => (
-              <div
+              <GridRow
                 key={row}
-                style={{
-                  position: 'absolute',
-                  top: row * resolvedRowHeight,
-                  left: 0,
-                  right: 0,
-                  height: resolvedRowHeight,
-                  display: 'grid',
-                  // `minmax(0, 1fr)`, not `1fr`: a `1fr` track is `minmax(auto, 1fr)`
-                  // and floors at the card's min-content, so the media library's
-                  // grid still scrolled sideways (129 > 100) in a pane narrower than
-                  // one poster. The row height is fixed by the caller either way, so
-                  // a track that follows the pane is the only correct one here.
-                  gridTemplateColumns: capped
-                    ? `repeat(${columns}, ${colWidth}px)`
-                    : `repeat(${columns}, minmax(0, 1fr))`,
-                  justifyContent: capped ? 'center' : undefined,
-                  gap,
-                }}
-              >
-                {slice.map((item, i) => (
-                  <div key={getKey(item, row * columns + i)}>{renderItem(item, row * columns + i)}</div>
-                ))}
-              </div>
+                row={row}
+                slice={slice}
+                top={row * resolvedRowHeight}
+                height={resolvedRowHeight}
+                columns={columns}
+                template={template}
+                justify={justify}
+                gap={gap}
+                getKey={getKey}
+                renderItem={renderItem}
+              />
             ))}
           </div>
         )}

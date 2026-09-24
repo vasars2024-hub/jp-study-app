@@ -2,10 +2,11 @@
  * One title: backdrop, poster, what it is, where you are, and every episode —
  * including the ones not downloaded yet, each with a way to go and get it.
  *
- * Tracking (status, rating, progress, history) edits the watch library; the file
- * tools (subtitle search / transcription / fusion, re-match, notes, favourites,
- * study queue, remove) are the existing `MediaDetailPanel`, folded into the
- * Details tab rather than cluttering the page.
+ * Tracking (status, rating, progress, history) edits the watch library. The
+ * Details tab is the title's facts (names, studio, runtime, ids, files on disk)
+ * set natively in this page's style; it used to embed the whole old file drawer —
+ * a second banner, title, Play button, synopsis and four tabs of its own inside
+ * this page's tab. The per-file tools stay one click away in All files.
  */
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import type { MediaItem } from '../../../../shared/types';
@@ -15,12 +16,22 @@ import { buildLibraryEntries, isWatched, providerEpisodeTitle, watchedFraction }
 import { confirmDialog, promptDialog, showToast } from '../../ui';
 import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { useT } from '../../../i18n';
+import type { LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import MediaArtwork from '../library/MediaArtwork';
-import MediaDetailPanel, { type MediaDetailPanelProps } from '../library/MediaDetailPanel';
 import GumIcon from './GumIcons';
-import { GumArt, formatRuntime, formatScore, typeLabelKey, useHeroArt } from './GumCards';
-import { updateGumTitle, useSubtitleNotice, useSubtitleStatuses, WatchEditError, type GumSubtitleStatus } from './gumBackend';
-import { episodesBySeasonOf, nextEpisodeOf, type GumTitle } from './gumModel';
+import { GumArt, formatRuntime, formatScore, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
+import {
+  externalPlayerProfile,
+  openInExternalPlayer,
+  updateGumTitle,
+  useSubtitleNotice,
+  useSubtitleStatuses,
+  WatchEditError,
+  type GumSubtitleStatus,
+} from './gumBackend';
+import GumPopover from './GumPopover';
+import type { GumRatingDisplay } from './gumLayout';
+import { episodesBySeasonOf, gumEpisodeLabel, nextEpisodeOf, type GumTitle } from './gumModel';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -29,11 +40,16 @@ const JA_AUTONYM = '日本語';
 
 export type GumTitleTab = 'episodes' | 'details' | 'subtitles' | 'history';
 
-/** The file tools the page hands to `MediaDetailPanel`. */
-export type GumFileTools = Pick<
-  MediaDetailPanelProps,
-  'onToggleFavorite' | 'onToggleStudyQueue' | 'onNoteChange' | 'onRematch' | 'onUseSubtitle' | 'activeSubtitleName'
-> & { currentId: string | null };
+/**
+ * The file tools the shell hands the page. Only the study-queue switch is drawn
+ * here; the rest (re-match, notes, subtitle tracks) live in All files, which the
+ * page links to rather than re-embedding the old drawer.
+ */
+export interface GumFileTools {
+  currentId: string | null;
+  activeSubtitleName?: string | null;
+  onToggleStudyQueue?: (entry: LibraryEntry, next: boolean) => Promise<void> | void;
+}
 
 export interface GumTitlePageProps {
   title: GumTitle;
@@ -48,6 +64,12 @@ export interface GumTitlePageProps {
   /** Settings ▸ API keys, where a translation engine or OpenSubtitles key is added. */
   onOpenApiKeys: () => void;
   fileTools: GumFileTools;
+  /** All files, where every per-file tool lives (re-match, notes, subtitle tracks). */
+  onOpenFiles?: () => void;
+  /** The one scale ratings print in (the Library's Customise choice). */
+  ratingDisplay?: GumRatingDisplay;
+  /** Settings > External players, offered when no external player is set up. */
+  onOpenExternalPlayerSettings?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,18 +175,150 @@ function formatDate(ms: number | undefined, lang: string): string | null {
   }
 }
 
+/** A stored `YYYY-MM-DD` (or `YYYY-MM`, `YYYY`) in the UI language, as written when it will not parse. */
+function formatIsoDate(value: string, lang: string): string {
+  const full = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const ms = Date.parse(full ? `${value}T12:00:00` : value);
+  if (!full || !Number.isFinite(ms)) return value;
+  try {
+    return new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' }).format(ms);
+  } catch {
+    return value;
+  }
+}
+
+function formatCount(n: number, lang: string): string {
+  try {
+    return new Intl.NumberFormat(lang).format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+function formatDecimal(n: number, lang: string): string {
+  try {
+    return new Intl.NumberFormat(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n);
+  } catch {
+    return n.toFixed(1);
+  }
+}
+
+/** What the Details tab lists beyond the title's own fields, gathered from its files. */
+export function titleFacts(title: GumTitle, lang: string): {
+  altTitles: string[];
+  studio: string | null;
+  network: string | null;
+  airing: string | null;
+  aired: string | null;
+} {
+  const first = <K extends keyof MediaItem>(key: K): MediaItem[K] | undefined =>
+    title.items.map((item) => item[key]).find((value) => value !== undefined && value !== null && value !== '');
+  const seen = new Set([title.title.trim().toLowerCase(), (title.originalTitle ?? '').trim().toLowerCase()]);
+  const altTitles: string[] = [];
+  for (const name of [...(title.view?.altTitles ?? []), ...title.items.map((item) => item.nativeTitle ?? '')]) {
+    const key = name.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    altTitles.push(name.trim());
+  }
+  const airedAt = title.items.map((item) => item.airedAt).filter((value): value is number => typeof value === 'number' && value > 0)
+    .sort((a, b) => a - b)[0];
+  let aired: string | null = null;
+  if (airedAt) {
+    try {
+      aired = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' }).format(airedAt);
+    } catch {
+      aired = null;
+    }
+  }
+  return {
+    altTitles: altTitles.slice(0, 12),
+    studio: (first('studio') as string | undefined) ?? null,
+    network: (first('network') as string | undefined) ?? null,
+    airing: (first('status') as string | undefined) ?? null,
+    aired,
+  };
+}
+
+/**
+ * "Open in <player>" for one file, through `media:handoff` with the file's path, its
+ * resume point and the chosen subtitle. The profile is read when the menu opens, so
+ * a player set up in Settings a moment ago is offered at once; with none configured
+ * the item is not shown and the menu links to Settings > External players instead.
+ */
+function ExternalPlayerMenu({
+  item,
+  resumeSec,
+  label,
+  compact,
+  onSetUp,
+}: {
+  item: MediaItem;
+  resumeSec?: number;
+  label: string;
+  compact?: boolean;
+  onSetUp?: () => void;
+}) {
+  const { t } = useT();
+  const run = async (profile: NonNullable<ReturnType<typeof externalPlayerProfile>>): Promise<void> => {
+    try {
+      const refused = await openInExternalPlayer(item, profile, resumeSec);
+      if (refused) {
+        showToast({ message: t('gum.external.failed', { reason: refused === 'unavailable' ? t('gum.external.unavailable') : refused }), kind: 'error' });
+      } else {
+        showToast({ message: t('gum.external.opened', { player: profile.name }), kind: 'success' });
+      }
+    } catch (error) {
+      showToast({ message: t('gum.external.failed', { reason: error instanceof Error ? error.message : String(error) }), kind: 'error' });
+    }
+  };
+  return (
+    <GumPopover
+      className={compact ? 'gum-pop--icon gum-pop--row-menu' : 'gum-pop--icon gum-pop--play-menu'}
+      label={<GumIcon name="more" size={compact ? 16 : 18} />}
+      ariaLabel={label}
+      chevron={false}
+      align={compact ? 'end' : 'start'}
+    >
+      {(close) => {
+        const profile = externalPlayerProfile();
+        return (
+          <div className="gum-menu" role="group" aria-label={label}>
+            {profile ? (
+              <button type="button" className="gum-menu__item" onClick={() => { close(); void run(profile); }}>
+                <span>{t('gum.external.openWith', { player: profile.name })}</span>
+              </button>
+            ) : (
+              <>
+                <span className="gum-menu__note">{t('gum.external.none')}</span>
+                {onSetUp && (
+                  <button type="button" className="gum-menu__item" onClick={() => { close(); onSetUp(); }}>
+                    <span>{t('gum.external.setUp')}</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        );
+      }}
+    </GumPopover>
+  );
+}
+
 function EpisodeCard({
   row,
   status,
   resumeAt,
   onPlay,
   onFind,
+  onSetUpExternal,
 }: {
   row: GumEpisodeRow;
   status?: GumSubtitleStatus;
   resumeAt?: number;
   onPlay: (item: MediaItem, startAt?: number) => void;
   onFind: (episode: number | null) => void;
+  onSetUpExternal?: () => void;
 }) {
   const { t, lang } = useT();
   const item = row.item;
@@ -214,6 +368,15 @@ function EpisodeCard({
         <small className="gum-episode__note" data-tone={tone}>{note}</small>
       </div>
       <div className="gum-episode__action">
+        {item && (
+          <ExternalPlayerMenu
+            compact
+            item={item}
+            resumeSec={inProgress ? resumeAt ?? item.positionSec : undefined}
+            label={row.number !== null ? t('gum.episode.options', { n: row.number }) : t('gum.episode.optionsExtra')}
+            onSetUp={onSetUpExternal}
+          />
+        )}
         {item ? (
           <button
             type="button"
@@ -224,8 +387,16 @@ function EpisodeCard({
             <GumIcon name="play" size={16} />
           </button>
         ) : (
-          <button type="button" className="gum-btn gum-btn--ghost gum-btn--sm" onClick={() => onFind(row.number)}>
-            <GumIcon name="download" size={13} /> {t('gum.episode.find')}
+          // One small icon per row; the list's own "Find missing episodes" is the big
+          // action. A full text button on each of 26 rows squeezed every title.
+          <button
+            type="button"
+            className="gum-icon-btn gum-episode__find"
+            onClick={() => onFind(row.number)}
+            aria-label={row.number !== null ? t('gum.episode.findN', { n: row.number }) : t('gum.episode.find')}
+            title={row.number !== null ? t('gum.episode.findN', { n: row.number }) : t('gum.episode.find')}
+          >
+            <GumIcon name="download" size={15} />
           </button>
         )}
       </div>
@@ -305,18 +476,22 @@ function Backdrop({ title }: { title: GumTitle }) {
   );
 }
 
-function externalLinks(title: GumTitle): Array<{ label: string; url: string }> {
+/**
+ * The title on other sites, each named through the catalogue with its id ("MyAnimeList
+ * (457)"). Ids are identifiers, not quantities, so they are passed as strings.
+ */
+function externalLinks(t: Translate, title: GumTitle): Array<{ key: string; label: string; url: string }> {
   const view = title.view;
-  const out: Array<{ label: string; url: string }> = [];
-  if (title.malId) out.push({ label: 'MyAnimeList', url: `https://myanimelist.net/anime/${title.malId}` });
-  if (title.anilistId) out.push({ label: 'AniList', url: `https://anilist.co/anime/${title.anilistId}` });
+  const out: Array<{ key: string; label: string; url: string }> = [];
+  if (title.malId) out.push({ key: 'mal', label: t('gum.link.mal', { id: String(title.malId) }), url: `https://myanimelist.net/anime/${title.malId}` });
+  if (title.anilistId) out.push({ key: 'anilist', label: t('gum.link.anilist', { id: String(title.anilistId) }), url: `https://anilist.co/anime/${title.anilistId}` });
   const tvmaze = view?.tvmazeId ?? title.items.find((item) => item.tvmazeId)?.tvmazeId;
-  if (tvmaze) out.push({ label: 'TVmaze', url: `https://www.tvmaze.com/shows/${tvmaze}` });
+  if (tvmaze) out.push({ key: 'tvmaze', label: t('gum.link.tvmaze', { id: String(tvmaze) }), url: `https://www.tvmaze.com/shows/${tvmaze}` });
   const tmdb = view?.tmdbId ?? title.items.find((item) => item.tmdbId)?.tmdbId;
-  if (tmdb) out.push({ label: 'TMDB', url: `https://www.themoviedb.org/${title.kind === 'film' ? 'movie' : 'tv'}/${tmdb}` });
+  if (tmdb) out.push({ key: 'tmdb', label: t('gum.link.tmdb', { id: String(tmdb) }), url: `https://www.themoviedb.org/${title.kind === 'film' ? 'movie' : 'tv'}/${tmdb}` });
   const imdb = view?.imdbId ?? title.items.find((item) => item.imdbId)?.imdbId;
-  if (imdb) out.push({ label: 'IMDb', url: `https://www.imdb.com/title/${imdb}/` });
-  if (view?.letterboxdUri) out.push({ label: 'Letterboxd', url: view.letterboxdUri });
+  if (imdb) out.push({ key: 'imdb', label: t('gum.link.imdb', { id: imdb }), url: `https://www.imdb.com/title/${imdb}/` });
+  if (view?.letterboxdUri) out.push({ key: 'letterboxd', label: t('gum.link.letterboxd'), url: view.letterboxdUri });
   return out;
 }
 
@@ -330,6 +505,9 @@ export default function GumTitlePage({
   onOpenSubtitleSettings,
   onOpenApiKeys,
   fileTools,
+  onOpenFiles,
+  ratingDisplay = 'ten',
+  onOpenExternalPlayerSettings,
 }: GumTitlePageProps) {
   const { t, lang } = useT();
   const rows = useMemo(() => episodeRows(title), [title]);
@@ -349,6 +527,7 @@ export default function GumTitlePage({
   const activeSeason = season ?? title.inProgressItem?.season ?? seasons[0] ?? 1;
   const next = nextEpisodeOf(title);
   const entry = useMemo(() => buildLibraryEntries(title.items)[0] ?? null, [title.items]);
+  const facts = useMemo(() => titleFacts(title, lang), [title, lang]);
 
   const edit = async (patch: WatchTitlePatch, success?: string): Promise<void> => {
     setBusy(true);
@@ -369,13 +548,9 @@ export default function GumTitlePage({
     onPlayItem(next, inProgress ? resumeAt(next) ?? next.positionSec : undefined);
   };
 
-  const episode = next && typeof next.episode === 'number'
-    ? (next.season && next.season > 1 ? `S${next.season} · E${next.episode}` : `E${next.episode}`)
-    : null;
   const resuming = next ? (next.positionSec ?? 0) > 0 && !isWatched(next) : false;
-  const playLabel = resuming
-    ? (episode ? t('gum.hero.resumeEpisode', { episode }) : t('gum.hero.resume'))
-    : (episode ? t('gum.hero.playEpisode', { episode }) : t('gum.hero.play'));
+  const nextNumber = next && typeof next.episode === 'number' && title.kind !== 'film' ? next.episode : null;
+  const playLabel = gumPlayLabel(t, resuming, nextNumber, nextNumber !== null && (next?.season ?? 1) > 1 ? gumEpisodeLabel(next) : null);
 
   const meta = [
     title.year ? String(title.year) : null,
@@ -390,6 +565,7 @@ export default function GumTitlePage({
 
   const tabs: GumTitleTab[] = isSeries ? ['episodes', 'details', 'subtitles', 'history'] : ['details', 'subtitles', 'history'];
   const visibleRows = rows.get(activeSeason) ?? [];
+  const missingCount = [...rows.values()].flat().filter((row) => !row.item && !row.trackedWatched).length;
 
   const toggleFilm = (): void => {
     const done = title.status === 'completed';
@@ -438,7 +614,7 @@ export default function GumTitlePage({
   };
 
   const view = title.view;
-  const links = externalLinks(title);
+  const links = externalLinks(t, title);
   const history = [...(view?.watchDates ?? [])].reverse();
   const localPlays = title.items
     .filter((item) => item.lastPlayedAt)
@@ -477,9 +653,17 @@ export default function GumTitlePage({
           {title.synopsis && <p className="gum-title__synopsis">{title.synopsis}</p>}
           <div className="gum-title__actions">
             {next && (
-              <button type="button" className="gum-btn gum-btn--primary gum-btn--lg" onClick={play}>
-                <GumIcon name="play" size={16} /> {playLabel}
-              </button>
+              <div className="gum-title__play">
+                <button type="button" className="gum-btn gum-btn--primary gum-btn--lg" onClick={play}>
+                  <GumIcon name="play" size={16} /> {playLabel}
+                </button>
+                <ExternalPlayerMenu
+                  item={next}
+                  resumeSec={resuming ? resumeAt(next) ?? next.positionSec : undefined}
+                  label={t('gum.title.playOptions')}
+                  onSetUp={onOpenExternalPlayerSettings}
+                />
+              </div>
             )}
             {!title.onDisk && (
               <button type="button" className="gum-btn gum-btn--primary gum-btn--lg" onClick={() => onFindDownload(title)}>
@@ -566,6 +750,14 @@ export default function GumTitlePage({
       </div>
 
       <div id="gum-title-panel" role="tabpanel" aria-labelledby={`gum-title-tab-${tab}`} className="gum-title__panel">
+        {tab === 'episodes' && missingCount > 0 && (
+          <div className="gum-episodes__bar">
+            <span className="gum-muted">{t('gum.title.missingCount', { count: missingCount })}</span>
+            <button type="button" className="gum-btn gum-btn--ghost gum-btn--sm" onClick={() => onFindDownload(title)}>
+              <GumIcon name="download" size={13} /> {t('gum.title.findMissing')}
+            </button>
+          </div>
+        )}
         {tab === 'episodes' && (
           visibleRows.length ? (
             <ul className="gum-episodes">
@@ -577,6 +769,7 @@ export default function GumTitlePage({
                   resumeAt={row.item ? resumeAt(row.item) : undefined}
                   onPlay={onPlayItem}
                   onFind={(n) => onFindDownload(title, n ?? undefined)}
+                  onSetUpExternal={onOpenExternalPlayerSettings}
                 />
               ))}
             </ul>
@@ -589,20 +782,36 @@ export default function GumTitlePage({
           <div className="gum-details">
             <dl className="gum-facts">
               <div><dt>{t('gum.facts.type')}</dt><dd>{t(typeLabelKey(title))}{title.format ? ` · ${title.format}` : ''}</dd></div>
-              {title.year && <div><dt>{t('gum.facts.year')}</dt><dd>{title.year}</dd></div>}
+              {title.year && <div><dt>{t('gum.facts.year')}</dt><dd>{String(title.year)}</dd></div>}
+              {facts.aired && <div><dt>{t('gum.facts.aired')}</dt><dd>{facts.aired}</dd></div>}
+              {facts.airing && <div><dt>{t('gum.facts.airing')}</dt><dd>{facts.airing}</dd></div>}
               {title.genres.length > 0 && <div><dt>{t('gum.facts.genres')}</dt><dd>{title.genres.join(', ')}</dd></div>}
-              {title.episodeCount && title.kind !== 'film' && <div><dt>{t('gum.facts.episodes')}</dt><dd>{title.episodeCount}</dd></div>}
-              {title.runtimeMin && <div><dt>{t('gum.facts.runtime')}</dt><dd>{formatRuntime(t, title.runtimeMin)}</dd></div>}
-              {title.score !== undefined && <div><dt>{t('gum.facts.myRating')}</dt><dd>{formatScore(title)}</dd></div>}
-              {title.providerScore && <div><dt>{t('gum.facts.providerRating')}</dt><dd>{title.providerScore.toFixed(1)}</dd></div>}
+              {title.episodeCount && title.kind !== 'film' && <div><dt>{t('gum.facts.episodes')}</dt><dd>{formatCount(title.episodeCount, lang)}</dd></div>}
+              {title.runtimeMin && (
+                <div>
+                  <dt>{t('gum.facts.runtime')}</dt>
+                  <dd>{title.kind === 'film' ? formatRuntime(t, title.runtimeMin) : t('gum.meta.perEpisode', { m: title.runtimeMin })}</dd>
+                </div>
+              )}
+              {facts.studio && <div><dt>{t('gum.facts.studio')}</dt><dd>{facts.studio}</dd></div>}
+              {facts.network && <div><dt>{t('gum.facts.network')}</dt><dd>{facts.network}</dd></div>}
+              {title.score !== undefined && <div><dt>{t('gum.facts.myRating')}</dt><dd>{formatScore(title, ratingDisplay, lang)}</dd></div>}
+              {title.providerScore && <div><dt>{t('gum.facts.providerRating')}</dt><dd>{formatDecimal(title.providerScore, lang)}</dd></div>}
               <div><dt>{t('gum.facts.onDisk')}</dt><dd>{title.onDisk ? t('gum.facts.files', { count: title.items.length }) : t('gum.episode.notDownloaded')}</dd></div>
               <div><dt>{t('gum.facts.sources')}</dt><dd>{title.sources.map((source) => t(`gum.filter.source.${source}`)).join(', ')}</dd></div>
+              {facts.altTitles.length > 0 && (
+                <div className="gum-facts__wide">
+                  <dt>{t('gum.facts.altTitles')}</dt>
+                  {/* Study content: shown as the sources wrote them. */}
+                  <dd>{facts.altTitles.join(' · ')}</dd>
+                </div>
+              )}
               {links.length > 0 && (
-                <div>
+                <div className="gum-facts__wide">
                   <dt>{t('gum.facts.links')}</dt>
                   <dd className="gum-links">
                     {links.map((link) => (
-                      <button type="button" key={link.label} className="gum-link" onClick={() => void window.api.openExternal(link.url)}>
+                      <button type="button" key={link.key} className="gum-link" title={link.url} onClick={() => void window.api.openExternal(link.url)}>
                         {link.label}
                       </button>
                     ))}
@@ -634,33 +843,40 @@ export default function GumTitlePage({
                     <span>{t('gum.filter.liked')}</span>
                   </label>
                 )}
+                {entry && fileTools.onToggleStudyQueue && (
+                  <label className="gum-check">
+                    <input
+                      type="checkbox"
+                      checked={title.items.some((item) => item.studyQueue)}
+                      onChange={(event) => void fileTools.onToggleStudyQueue?.(entry, event.target.checked)}
+                    />
+                    <span>{t('gum.title.studyQueue')}</span>
+                  </label>
+                )}
               </div>
               {title.watchId && (
                 <button type="button" className="gum-link gum-link--danger" onClick={() => void removeTitle()}>{t('gum.title.untrack')}</button>
               )}
             </section>
 
-            {entry && (
-              <section className="gum-details__block gum-details__tools">
-                <h2>{t('gum.title.fileTools')}</h2>
-                <p className="gum-muted">{t('gum.title.fileToolsDetail')}</p>
-                <div className="gum-tools-host">
-                  <MediaDetailPanel
-                    entry={entry}
-                    currentId={fileTools.currentId}
-                    onClose={() => setTab(isSeries ? 'episodes' : 'details')}
-                    onPlay={(id) => {
-                      const item = title.items.find((candidate) => candidate.id === id);
-                      if (item) onPlayItem(item, resumeAt(item));
-                    }}
-                    onToggleFavorite={fileTools.onToggleFavorite}
-                    onToggleStudyQueue={fileTools.onToggleStudyQueue}
-                    onNoteChange={fileTools.onNoteChange}
-                    onRematch={fileTools.onRematch}
-                    onUseSubtitle={fileTools.onUseSubtitle}
-                    activeSubtitleName={fileTools.activeSubtitleName}
-                  />
+            {title.items.length > 0 && (
+              <section className="gum-details__block gum-details__files" aria-labelledby="gum-title-files">
+                <div className="gum-details__head">
+                  <h2 id="gum-title-files">{t('gum.title.filesHeading')}</h2>
+                  {onOpenFiles && (
+                    <button type="button" className="gum-link" onClick={onOpenFiles}>{t('gum.title.openInFiles')}</button>
+                  )}
                 </div>
+                <ul className="gum-files">
+                  {episodesBySeasonOf(title).flatMap(({ items }) => items).map((item) => (
+                    <li key={item.id}>
+                      <span className="gum-files__label">
+                        {typeof item.episode === 'number' ? (gumEpisodeLabel(item) ?? '') : t('gum.episode.extra')}
+                      </span>
+                      <span className="gum-files__path" title={item.path}>{item.path}</span>
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
           </div>
@@ -672,9 +888,13 @@ export default function GumTitlePage({
               // One quiet, fixable notice at a time — the automation's own wording.
               <div className="gum-notice" role="status">
                 <p>
-                  {t(`subtitle.notice.${subtitleNotice.notice}`, subtitleNotice.quotaResetAt
-                    ? { time: new Date(subtitleNotice.quotaResetAt).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) }
-                    : undefined)}
+                  {/* The shared sentence says "Add one above", but here the button is beside
+                      it; this page words the missing-key notice for its own layout. */}
+                  {subtitleNotice.notice === 'opensubtitles-key-missing'
+                    ? t('gum.subs.notice.keyMissing')
+                    : t(`subtitle.notice.${subtitleNotice.notice}`, subtitleNotice.quotaResetAt
+                      ? { time: new Date(subtitleNotice.quotaResetAt).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) }
+                      : undefined)}
                 </p>
                 <div className="gum-notice__actions">
                   {subtitleNotice.notice !== 'opensubtitles-quota' && (
@@ -691,8 +911,8 @@ export default function GumTitlePage({
                 </button>
               )}
               <button type="button" className="gum-btn gum-btn--ghost" onClick={onOpenSubtitleSettings}>{t('gum.subs.providers')}</button>
-              {entry && (
-                <button type="button" className="gum-btn gum-btn--ghost" onClick={() => setTab('details')}>{t('gum.subs.moreTools')}</button>
+              {entry && onOpenFiles && (
+                <button type="button" className="gum-btn gum-btn--ghost" onClick={onOpenFiles}>{t('gum.subs.moreTools')}</button>
               )}
             </div>
             {title.items.length === 0 ? (
@@ -731,9 +951,9 @@ export default function GumTitlePage({
         {tab === 'history' && (
           <div className="gum-details">
             <dl className="gum-facts">
-              {view?.startedAt && <div><dt>{t('gum.history.started')}</dt><dd>{view.startedAt}</dd></div>}
-              {view?.finishedAt && <div><dt>{t('gum.history.finished')}</dt><dd>{view.finishedAt}</dd></div>}
-              {view?.rewatchCount ? <div><dt>{t('gum.history.rewatches')}</dt><dd>{view.rewatchCount}</dd></div> : null}
+              {view?.startedAt && <div><dt>{t('gum.history.started')}</dt><dd>{formatIsoDate(view.startedAt, lang)}</dd></div>}
+              {view?.finishedAt && <div><dt>{t('gum.history.finished')}</dt><dd>{formatIsoDate(view.finishedAt, lang)}</dd></div>}
+              {view?.rewatchCount ? <div><dt>{t('gum.history.rewatches')}</dt><dd>{formatCount(view.rewatchCount, lang)}</dd></div> : null}
               {title.lastWatchedAt && <div><dt>{t('gum.history.lastWatched')}</dt><dd>{formatDate(title.lastWatchedAt, lang)}</dd></div>}
               <div><dt>{t('gum.history.added')}</dt><dd>{formatDate(title.addedAt, lang) ?? '—'}</dd></div>
             </dl>
@@ -748,11 +968,11 @@ export default function GumTitlePage({
               </button>
             )}
             {history.length > 0 && (
-              <ul className="gum-history">
+              <ul className="gum-watch-history">
                 {history.map((date, index) => (
                   <li key={`${date.date}-${index}`}>
-                    <strong>{date.date}</strong>
-                    <span>{[date.rewatch ? t('gum.history.rewatch') : null, date.stars ? formatScore({ stars: date.stars }) : null, t(`gum.filter.source.${date.source}`)].filter(Boolean).join(' · ')}</span>
+                    <strong>{formatIsoDate(date.date, lang)}</strong>
+                    <span>{[date.rewatch ? t('gum.history.rewatch') : null, date.stars ? formatScore({ stars: date.stars }, ratingDisplay, lang) : null, t(`gum.filter.source.${date.source}`)].filter(Boolean).join(' · ')}</span>
                   </li>
                 ))}
               </ul>
@@ -760,7 +980,7 @@ export default function GumTitlePage({
             {localPlays.length > 0 && (
               <>
                 <h2 className="gum-details__sub">{t('gum.history.plays')}</h2>
-                <ul className="gum-history">
+                <ul className="gum-watch-history">
                   {localPlays.map((item) => (
                     <li key={item.id}>
                       <strong>{formatDate(item.lastPlayedAt, lang)}</strong>

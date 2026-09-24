@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MediaItem } from '../../shared/types';
 import { MEDIA_STUDY_EVENT } from '../../shared/mediaStudyIntegration';
 import Icon, { type IconName } from '../components/Icons';
@@ -56,11 +56,10 @@ import {
   useWatchLibrary,
 } from '../components/media/gum/gumBackend';
 import { useHomeLayout, useLibraryPrefs, useSavedViews } from '../components/media/gum/useGumPrefs';
+import { fitTopNav } from '../components/media/gum/gumTopNav';
 import '../components/media/gum/gum.css';
 import MalDownloadDialog from '../components/discover/MalDownloadDialog';
-import { invalidateMediaArtwork } from '../components/media/library/useMediaArtwork';
 import { isWatched, type LibraryEntry } from '../../shared/mediaLibraryEntries';
-import type { MediaMetadataSearchHit } from '../../shared/mediaMetadataIpc';
 import { navigateScraperShell } from '../scraperShellStore';
 import { openSectionSurface } from '../sectionSurface';
 import { studyPlaybackPosition } from '../../shared/studyMediaSurface';
@@ -1643,6 +1642,12 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   const [titleId, setTitleId] = useState<string | null>(null);
   const [downloadFor, setDownloadFor] = useState<DiscoveryCandidate | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const topnavRef = useRef<HTMLElement>(null);
+  const navMeasureRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const [navFit, setNavFit] = useState({ visible: PRIMARY_NAV.length, searchCollapsed: false });
+  const [searchOpen, setSearchOpen] = useState(false);
 
   /** Jump to a tab, truncating any forward trail — the browser convention. */
   const setTab = (next: MediaCenterTab): void => {
@@ -1912,42 +1917,14 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     else setTab('library');
   };
 
+  // The title page draws only the study-queue switch; the other per-file tools
+  // (re-match, notes, subtitle tracks) are in All files, which it links to.
   const fileTools = {
     currentId: media.current?.id ?? null,
     activeSubtitleName: media.subName,
-    onToggleFavorite: async (entry: LibraryEntry, next: boolean) => {
-      await Promise.all([...entry.items, ...entry.extras].map((item) => window.api.setMediaItemState(item.id, { favorite: next })));
-      showToast({ message: t(next ? 'media.toast.favorited' : 'media.toast.unfavorited', { title: entry.title }), kind: 'success' });
-    },
     onToggleStudyQueue: async (entry: LibraryEntry, next: boolean) => {
       await Promise.all([...entry.items, ...entry.extras].map((item) => window.api.setMediaItemState(item.id, { studyQueue: next })));
       showToast({ message: t(next ? 'media.toast.queued' : 'media.toast.dequeued', { title: entry.title }), kind: 'success' });
-    },
-    onNoteChange: async (item: MediaItem, note: string) => {
-      await window.api.setMediaItemState(item.id, { note });
-      showToast({ message: t('media.toast.noteSaved'), kind: 'success' });
-    },
-    onRematch: async (entry: LibraryEntry, hit: MediaMetadataSearchHit) => {
-      try {
-        const result = await window.api.runMediaMetadata({
-          mediaIds: [...entry.items, ...entry.extras].map((item) => item.id),
-          force: true,
-          override: { provider: hit.provider, id: hit.id },
-        });
-        if (!result.ok) throw new Error(result.error ?? 'unknown');
-        // Cached artwork for these ids is now the previous match's.
-        invalidateMediaArtwork();
-        showToast({ message: t('media.toast.rematched', { title: hit.title }), kind: 'success' });
-      } catch (error) {
-        showToast({ message: t('media.toast.saveFailed', { reason: error instanceof Error ? error.message : String(error) }), kind: 'error' });
-      }
-    },
-    onUseSubtitle: async (mediaId: string, recordId: string) => {
-      const pick = await window.api.readSubtitleRecord(mediaId, recordId);
-      if (!pick) throw new Error(t('mediaCenter.library.subtitleMissing'));
-      await window.api.setMediaItemState(mediaId, { preferredSubtitleId: recordId });
-      const item = media.items.find((entry) => entry.id === mediaId);
-      if (item) playItem(item, resumeAt(item));
     },
   };
 
@@ -1995,6 +1972,51 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     </>
   );
 
+  /*
+   * The top bar collapses progressively instead of overlapping itself: primary
+   * destinations move into More from the end (Discover first) as the bar narrows,
+   * then the search field shrinks to an icon that expands over the bar. Measured,
+   * not container-queried, because the widths are the labels' — "More" ran into the
+   * search box in Japanese at 1280px, and in English at 100% zoom.
+   */
+  const primaryNav = nav.filter((item) => PRIMARY_NAV.includes(item.id));
+  const shownPrimary = primaryNav.slice(0, navFit.visible);
+  const foldedPrimary = primaryNav.slice(navFit.visible);
+  // Import has its own button, which already shows it is current; More does not
+  // repeat it ("Import ▾" beside "Import").
+  const moreActive = (SECONDARY_NAV.includes(tab) && tab !== 'import') || foldedPrimary.some((item) => item.id === tab);
+  const moreLabel = moreActive ? nav.find((item) => item.id === tab)?.label ?? t('gum.nav.more') : t('gum.nav.more');
+  // Whether a search is filtering, for the folded search icon's dot. The field's own
+  // `value` below spells the same partition out in place (pinned by a source test).
+  const searchActive = (tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query).trim() !== '';
+  // Re-measured on resize, on a language switch and when More's label changes.
+  useLayoutEffect(() => {
+    const bar = topnavRef.current;
+    const probe = navMeasureRef.current;
+    if (!bar || !probe) return undefined;
+    const apply = (): void => {
+      const next = fitTopNav(bar, probe, PRIMARY_NAV.length);
+      setNavFit((prev) => (prev.visible === next.visible && prev.searchCollapsed === next.searchCollapsed ? prev : next));
+    };
+    apply();
+    // A window resize too: the bar can be re-laid-out without its own box changing size
+    // first (zoom), and ResizeObserver alone missed that in a backgrounded window.
+    window.addEventListener('resize', apply);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(apply);
+    ro?.observe(bar);
+    return () => {
+      window.removeEventListener('resize', apply);
+      ro?.disconnect();
+    };
+  }, [lang, moreLabel]);
+
+  useEffect(() => {
+    if (!navFit.searchCollapsed) setSearchOpen(false);
+  }, [navFit.searchCollapsed]);
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.querySelector('input')?.focus();
+  }, [searchOpen]);
+
   const loading = !watch.ready;
   // Home and the title page run their backdrop under the translucent top bar.
   const bleed = tab === 'home' || (tab === 'title' && !!shownTitle);
@@ -2010,11 +2032,13 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         setLayout={homeLayout.setLayout}
         onResetLayout={homeLayout.reset}
         loading={loading}
+        ratingDisplay={libraryPrefs.ratingDisplay}
         onOpenTitle={openTitle}
         onPlayTitle={playTitle}
         onPlayItem={playItem}
         onResumeRow={resumeRow}
         onBrowse={browse}
+        onFindDownload={findDownload}
         onAddFiles={() => void media.openFile()}
         onAddFolder={() => void media.openFolder()}
         onImport={() => setTab('import')}
@@ -2049,6 +2073,9 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         onOpenSubtitleSettings={() => openSettingsAt('scraper', 'subtitle-providers')}
         onOpenApiKeys={() => openSettingsAt('api-keys')}
         fileTools={fileTools}
+        onOpenFiles={() => setTab('files')}
+        ratingDisplay={libraryPrefs.ratingDisplay}
+        onOpenExternalPlayerSettings={() => openSettingsAt('scraper', 'external-players')}
       />
     ) : (
       <div className="gum-page gum-empty" role="status">
@@ -2112,7 +2139,6 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     return <SettingsPanel state={media} provenance={discovery.provenance} onOpenAutomation={() => setTab('import')} />;
   })();
 
-  const moreActive = SECONDARY_NAV.includes(tab);
 
   return (
     <AppChrome menus={mediaMenus} status={status} className="mc-app-chrome">
@@ -2140,15 +2166,15 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
             More menu for the rest, search, and Import. It is a Liquid contextual surface —
             glass in Liquid presentation, the shell's own translucent bar otherwise.
           */}
-          <ContextualSurface as="header" className="gum-topnav">
-            <div className="gum-brand">
+          <ContextualSurface as="header" className="gum-topnav" ref={topnavRef}>
+            <div className="gum-brand" data-topnav-fixed="">
               <span className="gum-brand__mark" aria-hidden="true"><Icon name="player" size={13} /></span>
               <span className="gum-brand__name">{t('mediaCenter.nav.label')}</span>
             </div>
             {/* Both are icon-only and disabled on a fresh trail, so the title carries the
                 REASON while disabled and the label while enabled; `aria-label` holds the
                 name either way. The trail walks Media Center SECTIONS, not web pages. */}
-            <div className="mc-history-buttons gum-history">
+            <div className="mc-history-buttons gum-history" data-topnav-fixed="">
               <button
                 type="button"
                 title={noBack ? t('mediaCenter.shell.reason.noBack') : t('mediaCenter.shell.back')}
@@ -2169,14 +2195,16 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
               </button>
             </div>
             <nav className="gum-nav" aria-label={t('mediaCenter.nav.label')}>
-              {nav.filter((item) => PRIMARY_NAV.includes(item.id)).map((item) => navLink(item))}
+              {shownPrimary.map((item) => navLink(item))}
               <GumPopover
                 className="gum-nav-more"
-                label={<span>{moreActive ? nav.find((item) => item.id === tab)?.label : t('gum.nav.more')}</span>}
+                label={<span>{moreLabel}</span>}
                 active={moreActive}
               >
                 {(close) => (
                   <div className="gum-menu gum-menu--nav">
+                    {foldedPrimary.map((item) => navLink(item, close))}
+                    {foldedPrimary.length > 0 && <div className="gum-menu__sep" role="separator" />}
                     {nav.filter((item) => SECONDARY_NAV.includes(item.id)).map((item) => navLink(item, close))}
                     <div className="gum-menu__sep" role="separator" />
                     <span className="gum-menu__label">{t('mediaCenter.home.handoffTitle')}</span>
@@ -2197,20 +2225,58 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 )}
               </GumPopover>
             </nav>
+            {/* The primary destinations and More at their natural widths, off screen, so
+                the fit is measured from real labels in the current language. */}
+            <div className="gum-nav gum-nav--measure" ref={navMeasureRef} aria-hidden="true">
+              {primaryNav.map((item) => <span key={item.id} className="gum-nav__probe" data-measure-item="">{item.label}</span>)}
+              <span className="gum-nav-more" data-measure-more="">
+                <span className="gum-pop__trigger">{moreLabel}<GumIcon name="chevron-down" size={12} /></span>
+              </span>
+            </div>
             <div className="gum-topnav__spacer" />
-            <GlobalSearchField
-              value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}
-              // Which store owns `value` right now. Three tabs read three different queries, so
-              // this is the only thing that changes when the owner does but the text does not.
-              contextKey={tab === 'music' ? 'music' : tab === 'discover' ? 'discover' : 'media'}
-              placeholder={searchPlaceholder}
-              deferMs={tab === 'music' || tab === 'discover' ? 0 : GLOBAL_SEARCH_COMMIT_MS}
-              onCommit={commitSearch}
-              onEnter={tab === 'discover' ? discovery.submitQuery : undefined}
-            />
+            <div
+              ref={searchRef}
+              className="gum-search"
+              data-collapsed={navFit.searchCollapsed ? 'true' : undefined}
+              data-open={searchOpen ? 'true' : undefined}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSearchOpen(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Escape' || !navFit.searchCollapsed || !searchOpen) return;
+                setSearchOpen(false);
+                searchToggleRef.current?.focus();
+              }}
+            >
+              {navFit.searchCollapsed && (
+                <button
+                  ref={searchToggleRef}
+                  type="button"
+                  className="gum-search__toggle"
+                  aria-label={t('gum.search.open')}
+                  title={t('gum.search.open')}
+                  aria-expanded={searchOpen}
+                  data-active={searchActive ? 'true' : undefined}
+                  onClick={() => setSearchOpen(true)}
+                >
+                  <Icon name="search" size={15} />
+                </button>
+              )}
+              <GlobalSearchField
+                value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}
+                // Which store owns `value` right now. Three tabs read three different queries, so
+                // this is the only thing that changes when the owner does but the text does not.
+                contextKey={tab === 'music' ? 'music' : tab === 'discover' ? 'discover' : 'media'}
+                placeholder={searchPlaceholder}
+                deferMs={tab === 'music' || tab === 'discover' ? 0 : GLOBAL_SEARCH_COMMIT_MS}
+                onCommit={commitSearch}
+                onEnter={tab === 'discover' ? discovery.submitQuery : undefined}
+              />
+            </div>
             <button
               type="button"
               className="gum-btn gum-btn--outline gum-topnav__import"
+              data-topnav-fixed=""
               aria-current={tab === 'import' ? 'page' : undefined}
               onClick={() => setTab('import')}
             >

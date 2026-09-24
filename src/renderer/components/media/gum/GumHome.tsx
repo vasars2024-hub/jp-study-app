@@ -8,7 +8,7 @@
  * the arrows move it, Space drops it and Escape puts it back; the up/down buttons
  * are the same move for anyone who never discovers that.
  */
-import { useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -17,10 +17,10 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type KeyboardCoordinateGetter,
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -31,7 +31,7 @@ import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { LiquidLoading } from '../../liquid/LiquidLoading';
 import type { ContinueWatchingRow } from '../ContinueWatchingShelf';
 import GumIcon from './GumIcons';
-import { GumArt, GumEpisodeCard, GumPosterCard, formatRuntime, typeLabelKey, useHeroArt } from './GumCards';
+import { GumArt, GumEpisodeCard, GumPosterCard, formatRuntime, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
 import {
   GUM_DENSITIES,
   arrangeSections,
@@ -46,6 +46,7 @@ import {
   type GumBadge,
   type GumDensity,
   type GumHomeLayout,
+  type GumRatingDisplay,
   type GumSavedView,
   type GumSectionId,
 } from './gumLayout';
@@ -60,6 +61,7 @@ import {
   planTitles,
   savedViewTitles,
   titleIndex,
+  trackedNextCards,
   typeShelf,
   upNextCards,
   type GumHeroPick,
@@ -85,11 +87,15 @@ export interface GumHomeProps {
   setLayout: (next: GumHomeLayout | ((current: GumHomeLayout) => GumHomeLayout)) => void;
   onResetLayout: () => void;
   loading: boolean;
+  /** The one scale ratings print in (the Library's Customise choice). */
+  ratingDisplay?: GumRatingDisplay;
   onOpenTitle: (title: GumTitle) => void;
   onPlayTitle: (title: GumTitle) => void;
   onPlayItem: (item: MediaItem, startAtSec?: number) => void;
   onResumeRow: (row: ContinueWatchingRow) => void;
   onBrowse: (request: GumBrowseRequest) => void;
+  /** Go and get an episode that is not on this PC (a tracked show's next one). */
+  onFindDownload?: (title: GumTitle, episode?: number) => void;
   onAddFiles: () => void;
   onAddFolder: () => void;
   onImport: () => void;
@@ -131,7 +137,11 @@ function GumHero({
   const item = pick.item;
   const name = title?.title ?? pick.row?.entry.title ?? item?.seriesTitle ?? item?.title ?? '';
   const native = title?.originalTitle;
+  // The label carries its own "E" ("E3", "S2 · E4"), so the sentences below take the
+  // NUMBER — "Episode {n}" used to read "Episode E3".
   const episode = gumEpisodeLabel(item);
+  const episodeNumber = typeof item?.episode === 'number' ? item.episode : null;
+  const laterSeason = episodeNumber !== null && (item?.season ?? 1) > 1 ? item?.season ?? null : null;
   const episodeName = item ? providerEpisodeTitle(item) : null;
   const percent = pick.row?.entry.percent ?? null;
   const duration = pick.row?.entry.durationSec ?? item?.durationSec;
@@ -144,14 +154,17 @@ function GumHero({
     item?.season && title?.kind !== 'film' ? t('gum.meta.season', { n: item.season }) : null,
     title?.kind === 'film' ? formatRuntime(t, title.runtimeMin) : null,
   ].filter(Boolean) as string[];
-  const synopsis = episode
-    ? [t('gum.hero.episodeLine', { episode }), episodeName ? `“${episodeName}”` : null].filter(Boolean).join(' · ')
+  const episodeLine = episodeNumber === null
+    ? null
+    : laterSeason !== null
+      ? t('gum.hero.episodeLineSeason', { season: laterSeason, n: episodeNumber })
+      : t('gum.hero.episodeLine', { n: episodeNumber });
+  const synopsis = episodeLine
+    ? [episodeLine, episodeName ? t('gum.hero.episodeName', { name: episodeName }) : null].filter(Boolean).join(' · ')
     : null;
   const subs = title ? [title.hasJa ? t('gum.subs.ja') : null, title.hasEn ? t('gum.subs.en') : null].filter(Boolean).join(' + ') : '';
   const eyebrow = t(`gum.hero.reason.${pick.reason}`);
-  const resumeLabel = pick.reason === 'continue'
-    ? (episode ? t('gum.hero.resumeEpisode', { episode }) : t('gum.hero.resume'))
-    : (episode ? t('gum.hero.playEpisode', { episode }) : t('gum.hero.play'));
+  const resumeLabel = gumPlayLabel(t, pick.reason === 'continue', episodeNumber, laterSeason !== null ? episode : null);
   return (
     <section className="gum-hero" aria-labelledby="gum-hero-title">
       <HeroBackdrop pick={pick} />
@@ -222,27 +235,79 @@ interface SectionModel {
   body: (density: GumDensity) => ReactNode;
 }
 
+/**
+ * A horizontal shelf. The native scrollbar is hidden (at library scale it drew a
+ * bar under every row); the arrows page it instead, and each hides at its own end
+ * so a row that fits shows none. A trackpad's sideways swipe and Shift+wheel scroll
+ * it natively; a plain vertical wheel is left to the page so Home never traps it.
+ */
 function Row({ children, kind = 'poster', label }: { children: ReactNode; kind?: 'poster' | 'episode'; label: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const { t } = useT();
+  const [edges, setEdges] = useState({ start: true, end: true });
+  const measure = useCallback((): void => {
+    const node = ref.current;
+    if (!node) return;
+    const start = node.scrollLeft <= 2;
+    const end = node.scrollLeft + node.clientWidth >= node.scrollWidth - 2;
+    setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
+  // Every commit: the children may have changed how wide the row is.
+  useLayoutEffect(measure);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [measure]);
   const scroll = (direction: number): void => {
     const node = ref.current;
     if (!node) return;
     node.scrollBy({ left: direction * node.clientWidth * 0.85, behavior: 'smooth' });
   };
   return (
-    <div className="gum-row-wrap">
-      <button type="button" className="gum-row-nudge gum-row-nudge--prev" onClick={() => scroll(-1)} aria-label={t('gum.row.prev')} tabIndex={-1}>
+    <div className="gum-row-wrap" data-at-start={edges.start ? 'true' : undefined} data-at-end={edges.end ? 'true' : undefined}>
+      <button type="button" className="gum-row-nudge gum-row-nudge--prev" onClick={() => scroll(-1)} aria-label={t('gum.row.prev')} tabIndex={-1} disabled={edges.start}>
         <GumIcon name="chevron-down" size={16} style={{ transform: 'rotate(90deg)' }} />
       </button>
-      <div ref={ref} className={`gum-row gum-row--${kind}`} role="list" aria-label={label}>
+      <div ref={ref} className={`gum-row gum-row--${kind}`} role="list" aria-label={label} onScroll={measure}>
         {children}
       </div>
-      <button type="button" className="gum-row-nudge gum-row-nudge--next" onClick={() => scroll(1)} aria-label={t('gum.row.next')} tabIndex={-1}>
+      <button type="button" className="gum-row-nudge gum-row-nudge--next" onClick={() => scroll(1)} aria-label={t('gum.row.next')} tabIndex={-1} disabled={edges.end}>
         <GumIcon name="chevron-down" size={16} style={{ transform: 'rotate(-90deg)' }} />
       </button>
     </div>
   );
+}
+
+/**
+ * The keyboard sensor's step: exactly one slot per arrow press, in the arranged
+ * order. dnd-kit's default picks the nearest rect in the pressed direction, which
+ * over sections of very different heights skipped a slot on the first press and
+ * moved five slots in three. The target is aligned the way the vertical strategy
+ * lays the list out (bottom edges meet when moving down), so `closestCenter`
+ * resolves the drop to exactly that section.
+ */
+function oneSlotCoordinates(order: MutableRefObject<string[]>): KeyboardCoordinateGetter {
+  return (event, { context }) => {
+    const down = event.code === 'ArrowDown' || event.code === 'ArrowRight';
+    const up = event.code === 'ArrowUp' || event.code === 'ArrowLeft';
+    if (!down && !up) return undefined;
+    event.preventDefault();
+    const { active, collisionRect, droppableRects, over } = context;
+    if (!active || !collisionRect) return undefined;
+    const ids = order.current;
+    const from = ids.indexOf(String(over?.id ?? active.id));
+    if (from < 0) return undefined;
+    const to = Math.max(0, Math.min(ids.length - 1, from + (down ? 1 : -1)));
+    if (to === from) return undefined;
+    const target = droppableRects.get(ids[to]);
+    if (!target) return undefined;
+    const activeIndex = ids.indexOf(String(active.id));
+    const y = to > activeIndex ? target.top + target.height - collisionRect.height : target.top;
+    return { x: collisionRect.left, y };
+  };
 }
 
 /** The cell that ends a capped row: says how many more there are, and opens them. */
@@ -277,7 +342,8 @@ interface SectionShellProps {
   editing: boolean;
   index: number;
   total: number;
-  onChange: (next: (layout: GumHomeLayout) => GumHomeLayout) => void;
+  /** `moved` names the section whose position changed, for the announcement. */
+  onChange: (next: (layout: GumHomeLayout) => GumHomeLayout, moved?: GumSectionId) => void;
 }
 
 function SortableSection({ model, layout, editing, index, total, onChange }: SectionShellProps) {
@@ -324,10 +390,10 @@ function SortableSection({ model, layout, editing, index, total, onChange }: Sec
             </small>
           </div>
           <div className="gum-section__edit-tools">
-            <button type="button" className="gum-icon-btn" onClick={() => onChange((l) => moveSection(l, model.id, -1))} disabled={index === 0} aria-label={t('gum.customise.moveUp', { section: model.title })}>
+            <button type="button" className="gum-icon-btn" onClick={() => onChange((l) => moveSection(l, model.id, -1), model.id)} disabled={index === 0} aria-label={t('gum.customise.moveUp', { section: model.title })}>
               <GumIcon name="arrow-up" size={14} />
             </button>
-            <button type="button" className="gum-icon-btn" onClick={() => onChange((l) => moveSection(l, model.id, 1))} disabled={index === total - 1} aria-label={t('gum.customise.moveDown', { section: model.title })}>
+            <button type="button" className="gum-icon-btn" onClick={() => onChange((l) => moveSection(l, model.id, 1), model.id)} disabled={index === total - 1} aria-label={t('gum.customise.moveDown', { section: model.title })}>
               <GumIcon name="arrow-down" size={14} />
             </button>
             <div className="gum-seg" role="radiogroup" aria-label={t('gum.customise.size', { section: model.title })}>
@@ -375,7 +441,10 @@ function SortableSection({ model, layout, editing, index, total, onChange }: Sec
           )}
         </header>
       )}
-      {(!editing || !hidden) && model.count > 0 && (
+      {/* While customising, every section is its handle bar and nothing else: one
+          uniform height, so a drag target is where it looks and each arrow press
+          moves one slot. The shelves come back on Done. */}
+      {!editing && model.count > 0 && (
         <div className="gum-section__body">{model.body(density)}</div>
       )}
     </section>
@@ -389,7 +458,8 @@ function SortableSection({ model, layout, editing, index, total, onChange }: Sec
 export default function GumHome(props: GumHomeProps) {
   const {
     titles, continueRows, arrivals, savedViews, layout, setLayout, onResetLayout, loading,
-    onOpenTitle, onPlayTitle, onPlayItem, onResumeRow, onBrowse, onAddFiles, onAddFolder, onImport,
+    onOpenTitle, onPlayTitle, onPlayItem, onResumeRow, onBrowse, onFindDownload, onAddFiles, onAddFolder, onImport,
+    ratingDisplay = 'ten',
   } = props;
   const { t, lang } = useT();
   const [editing, setEditing] = useState(false);
@@ -399,6 +469,14 @@ export default function GumHome(props: GumHomeProps) {
   const index = useMemo(() => titleIndex(titles), [titles]);
   const cont = useMemo(() => continueCards(continueRows, index), [continueRows, index]);
   const upNext = useMemo(() => upNextCards(titles), [titles]);
+  // Tracked shows you are watching whose next episode is not on this PC: they belong
+  // in Continue watching too, with a way to go and get that episode.
+  const trackedNext = useMemo(() => {
+    const covered = new Set<string>();
+    for (const card of cont) if (card.title) covered.add(card.title.id);
+    for (const card of upNext) covered.add(card.title.id);
+    return trackedNextCards(titles, covered);
+  }, [titles, cont, upNext]);
   const added = useMemo(() => justAddedCards(titles, arrivals, now), [titles, arrivals]);
   const plan = useMemo(() => planTitles(titles), [titles]);
   const completed = useMemo(() => completedTitles(titles), [titles]);
@@ -416,6 +494,7 @@ export default function GumHome(props: GumHomeProps) {
           <GumPosterCard
             title={title}
             badges={HOME_BADGES}
+            ratingDisplay={ratingDisplay}
             flag={flags?.get(title.id)}
             onOpen={onOpenTitle}
             onPlay={onPlayTitle}
@@ -424,15 +503,16 @@ export default function GumHome(props: GumHomeProps) {
       ))}
       {list.length > SHELF_LIMIT && <MoreTile count={list.length - SHELF_LIMIT} onClick={onMore} />}
     </Row>
-  ), [onOpenTitle, onPlayTitle]);
+  ), [onOpenTitle, onPlayTitle, ratingDisplay]);
 
   const models = useMemo((): Map<GumSectionId, SectionModel> => {
     const map = new Map<GumSectionId, SectionModel>();
     const continueLabel = t('gum.section.continue');
+    const continueTotal = cont.length + trackedNext.length;
     map.set('continue', {
       id: 'continue',
       title: continueLabel,
-      count: cont.length,
+      count: continueTotal,
       smartNote: t('gum.smart.continue'),
       seeAll: () => onBrowse({ status: 'watching' }),
       body: () => (
@@ -459,7 +539,29 @@ export default function GumHome(props: GumHomeProps) {
               </div>
             );
           })}
-          {cont.length > SHELF_LIMIT && <MoreTile count={cont.length - SHELF_LIMIT} onClick={() => onBrowse({ status: 'watching' })} />}
+          {trackedNext.slice(0, Math.max(0, SHELF_LIMIT - cont.length)).map(({ title, episode }) => {
+            const find = t('gum.continue.findEpisode', { n: episode });
+            return (
+              <div role="listitem" key={`tracked:${title.id}`} className="gum-row__cell">
+                <GumEpisodeCard
+                  name={title.title}
+                  caption={t('gum.episode.number', { n: episode })}
+                  fallbackTitle={title}
+                  percent={title.progressRatio ?? null}
+                  kindLabel={t(typeLabelKey(title))}
+                  note={title.episodeCount
+                    ? t('gum.continue.trackedOf', { n: title.progress, total: title.episodeCount })
+                    : t('gum.continue.tracked', { n: title.progress })}
+                  playIcon={onFindDownload ? 'download' : 'more'}
+                  onPlay={() => (onFindDownload ? onFindDownload(title, episode) : onOpenTitle(title))}
+                  onOpen={() => onOpenTitle(title)}
+                  playLabel={onFindDownload ? t('gum.continue.findEpisodeOf', { n: episode, title: title.title }) : t('gum.card.open', { title: title.title })}
+                  action={onFindDownload ? { label: find, onClick: () => onFindDownload(title, episode) } : undefined}
+                />
+              </div>
+            );
+          })}
+          {continueTotal > SHELF_LIMIT && <MoreTile count={continueTotal - SHELF_LIMIT} onClick={() => onBrowse({ status: 'watching' })} />}
         </Row>
       ),
     });
@@ -590,7 +692,7 @@ export default function GumHome(props: GumHomeProps) {
       });
     }
     return map;
-  }, [cont, upNext, added, plan, completed, lists, genres, anime, tv, films, savedViews, titles, lang, posterRow, onBrowse, onOpenTitle, onPlayItem, onResumeRow]);
+  }, [cont, trackedNext, upNext, added, plan, completed, lists, genres, anime, tv, films, savedViews, titles, lang, posterRow, onBrowse, onOpenTitle, onPlayItem, onResumeRow, onFindDownload]);
 
   const counts = useMemo(() => {
     const out: Partial<Record<GumSectionId, number>> = {};
@@ -600,24 +702,34 @@ export default function GumHome(props: GumHomeProps) {
 
   const arranged = arrangeSections(layout, {
     counts,
-    inProgress: cont.length > 0,
+    inProgress: cont.length + trackedNext.length > 0,
     freshImport: hasFreshImport(arrivals, now),
   }, editing);
 
+  // The keyboard step reads the order as it is at the moment of the key press.
+  const orderRef = useRef<string[]>(arranged);
+  orderRef.current = arranged;
+  const coordinateGetter = useMemo(() => oneSlotCoordinates(orderRef), []);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter }),
   );
 
   const titleOf = (id: string | number): string => models.get(String(id) as GumSectionId)?.title ?? String(id);
+  const slotOf = (id: string | number): number => arranged.indexOf(String(id) as GumSectionId) + 1;
+  // Positions, not neighbours: "Plan to watch is over Just added" did not say where it
+  // would land, and at the end it named the section it displaced, not the slot.
   const accessibility = {
     screenReaderInstructions: { draggable: t('gum.customise.dragInstructions') },
     announcements: {
-      onDragStart: ({ active }: { active: { id: string | number } }) => t('gum.customise.pickedUp', { section: titleOf(active.id) }),
+      onDragStart: ({ active }: { active: { id: string | number } }) =>
+        t('gum.customise.pickedUp', { section: titleOf(active.id), n: slotOf(active.id), total: arranged.length }),
       onDragOver: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? t('gum.customise.movedOver', { section: titleOf(active.id), over: titleOf(over.id) }) : undefined,
+        over ? t('gum.customise.movedOver', { section: titleOf(active.id), n: slotOf(over.id), total: arranged.length }) : undefined,
       onDragEnd: ({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) =>
-        over ? t('gum.customise.dropped', { section: titleOf(active.id), over: titleOf(over.id) }) : t('gum.customise.cancelled', { section: titleOf(active.id) }),
+        over
+          ? t('gum.customise.dropped', { section: titleOf(active.id), n: slotOf(over.id), total: arranged.length })
+          : t('gum.customise.cancelled', { section: titleOf(active.id) }),
       onDragCancel: ({ active }: { active: { id: string | number } }) => t('gum.customise.cancelled', { section: titleOf(active.id) }),
     },
   };
@@ -628,12 +740,13 @@ export default function GumHome(props: GumHomeProps) {
     setLayout((current) => moveSectionTo(current, active.id as GumSectionId, over.id as GumSectionId));
   };
 
-  const change = (next: (current: GumHomeLayout) => GumHomeLayout): void => {
+  const change = (next: (current: GumHomeLayout) => GumHomeLayout, moved?: GumSectionId): void => {
     setLayout((current) => {
       const updated = next(current);
-      if (updated.order !== current.order) {
-        const moved = updated.order.find((id, i) => current.order[i] !== id);
-        if (moved) setAnnouncement(t('gum.customise.position', { section: titleOf(moved), n: updated.order.indexOf(moved) + 1, total: updated.order.length }));
+      // Announce the section that was MOVED. The first index that differs is the
+      // neighbour it displaced when moving down, which is what used to be read out.
+      if (moved && updated.order !== current.order) {
+        setAnnouncement(t('gum.customise.position', { section: titleOf(moved), n: updated.order.indexOf(moved) + 1, total: updated.order.length }));
       }
       return updated;
     });

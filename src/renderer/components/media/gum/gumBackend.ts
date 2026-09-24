@@ -20,6 +20,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WatchQueryResult, WatchTitlePatch, WatchTitleView, WatchStatus } from '../../../../shared/watchLibrary';
 import type { MediaIngestedEvent, MediaIngestState } from '../../../../shared/mediaIngest';
 import type { SubtitleAutoNotice, SubtitleAutoNotices, SubtitleAutoStatus } from '../../../../shared/subtitleDiscoveryStatus';
+import type { MediaItem } from '../../../../shared/types';
+import {
+  createPlaybackHandoff,
+  selectExternalPlayerProfile,
+  type ExternalPlayerProfile,
+  type PlaybackHandoff,
+} from '../../../../shared/externalPlayer';
+import { loadExternalPlayerPreferences } from '../../../externalPlayerStore';
 import type { GumTitle } from './gumModel';
 import { GUM_JUST_ADDED_KEY, normalizeArrivals, recordArrival, type GumArrival } from './gumLayout';
 
@@ -303,6 +311,35 @@ export function useSubtitleNotice(): { notice: SubtitleAutoNotice | null; quotaR
 // ---------------------------------------------------------------------------
 
 const remoteCache = new Map<string, string | null>();
+/** Mounted `useTitleArtUrl` hooks, told when the cache is dropped so they re-ask. */
+const remoteListeners = new Set<() => void>();
+let remoteWired = false;
+
+/**
+ * A tracked title's art changes when the watch library does (an import, a metadata
+ * sweep, a poster found for a title that had none), and a cached "no art" used to
+ * outlive all of those until the renderer reloaded — covers never appeared after an
+ * import. `watch:changed` drops the whole cache and every mounted card re-asks.
+ */
+function wireRemoteInvalidation(): void {
+  if (remoteWired || typeof window === 'undefined') return;
+  const subscribe = window.api?.onWatchChanged;
+  if (typeof subscribe !== 'function') return;
+  remoteWired = true;
+  subscribe(() => invalidateTitleArt());
+}
+
+/** Drops every cached title poster/banner answer, misses included. */
+export function invalidateTitleArt(): void {
+  remoteCache.clear();
+  for (const listener of [...remoteListeners]) {
+    try {
+      listener();
+    } catch {
+      /* one card must not stop the others refreshing */
+    }
+  }
+}
 
 /**
  * The image hosts the renderer CSP admits (`shared/contentSecurityPolicy.ts`,
@@ -318,9 +355,18 @@ const CSP_IMAGE_HOSTS = /^https:\/\/(cdn\.myanimelist\.net|[\w-]+\.anilist\.co)\
  * typographic poster.
  */
 export function useTitleArtUrl(title: GumTitle, variant: 'poster' | 'banner' = 'poster'): string | null {
-  const cacheKey = `${variant}:${title.id}`;
+  // Keyed by the poster the tracking library knows as well as the title: a title whose
+  // poster path arrives (or changes) is a different question, never a cached miss.
+  const cacheKey = `${variant}:${title.id}:${title.posterRef ?? ''}`;
   const direct = title.posterRef && CSP_IMAGE_HOSTS.test(title.posterRef) && variant === 'poster' ? title.posterRef : null;
   const [url, setUrl] = useState<string | null>(remoteCache.get(cacheKey) ?? direct);
+  const [generation, setGeneration] = useState(0);
+  useEffect(() => {
+    wireRemoteInvalidation();
+    const bump = (): void => setGeneration((n) => n + 1);
+    remoteListeners.add(bump);
+    return () => { remoteListeners.delete(bump); };
+  }, []);
   useEffect(() => {
     if (title.artworkId) return undefined;
     const api = optionalApi();
@@ -342,6 +388,57 @@ export function useTitleArtUrl(title: GumTitle, variant: 'poster' | 'banner' = '
         if (live) setUrl(direct);
       });
     return () => { live = false; };
-  }, [cacheKey, title.artworkId, title.watchId, direct, variant]);
+  }, [cacheKey, title.artworkId, title.watchId, direct, variant, generation]);
   return title.artworkId ? null : url;
+}
+
+// ---------------------------------------------------------------------------
+// External player hand-off
+// ---------------------------------------------------------------------------
+
+/**
+ * The video profile Settings > External players would use, read when a menu opens
+ * (not cached) so a player added in Settings a moment ago is offered at once. Null
+ * when none is configured, and the menus offer the way to set one up instead.
+ */
+export function externalPlayerProfile(): ExternalPlayerProfile | null {
+  try {
+    return selectExternalPlayerProfile(loadExternalPlayerPreferences(), 'video');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The subtitle to hand over: the file the viewer chose for this item, else its first
+ * Japanese track — only when it is an absolute path an outside program can open
+ * (cached tracks live under the app's own storage by relative path).
+ */
+export function handoffSubtitlePath(item: MediaItem): string | null {
+  const records = item.subtitles ?? [];
+  // A drive path (D:/ or D:\), a POSIX path, or a UNC share (\\server\share).
+  const absolute = (path: string | undefined): path is string => !!path && (/^[a-z]:[\\/]/i.test(path) || path.startsWith('/') || path.startsWith('\\\\'));
+  const chosen = item.preferredSubtitleId ? records.find((record) => record.id === item.preferredSubtitleId) : undefined;
+  if (chosen && absolute(chosen.path)) return chosen.path;
+  const ja = records.find((record) => (record.lang ?? '').toLowerCase().startsWith('ja') && absolute(record.path));
+  return ja?.path ?? null;
+}
+
+/** What `media:handoff` is given for one file: path, resume point, subtitle, episode. */
+export function gumHandoff(item: MediaItem, resumeSec?: number): PlaybackHandoff {
+  const base = createPlaybackHandoff(item, handoffSubtitlePath(item));
+  return {
+    ...base,
+    episodeNumber: typeof item.episode === 'number' ? item.episode : null,
+    resumePositionSec: resumeSec && resumeSec > 0 ? Math.round(resumeSec) : base.resumePositionSec,
+  };
+}
+
+/**
+ * Opens a file in the external player through the preload API only. Resolves to the
+ * main process's refusal (a sentence) or null when the player was started.
+ */
+export async function openInExternalPlayer(item: MediaItem, profile: ExternalPlayerProfile, resumeSec?: number): Promise<string | null> {
+  if (typeof window.api?.handoffMedia !== 'function') return 'unavailable';
+  return window.api.handoffMedia(gumHandoff(item, resumeSec), profile);
 }

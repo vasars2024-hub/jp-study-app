@@ -63,8 +63,31 @@ function ImportCard({
 }) {
   const { t, lang } = useT();
   const [over, setOver] = useState(false);
-  const onDrop = (event: DragEvent<HTMLDivElement>): void => {
+  /*
+   * The zone CLAIMS the drag. The desktop's file-drop router (`DropRouter`) listens on
+   * `window` for the same four events, so without `stopPropagation` an export dropped
+   * here was imported AND handed to the router, which showed "Drop to file it away"
+   * and then asked where the file should go (offering the Dictionary). React's
+   * synthetic `stopPropagation` stops the native event at the root, before `window`.
+   */
+  const claim = (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault();
+    event.stopPropagation();
+  };
+  const onDragOver = (event: DragEvent<HTMLDivElement>): void => {
+    claim(event);
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    if (!over) setOver(true);
+  };
+  const onDragLeave = (event: DragEvent<HTMLDivElement>): void => {
+    claim(event);
+    // Leaving for a child of the zone is not leaving the zone.
+    const next = event.relatedTarget as Node | null;
+    if (next && event.currentTarget.contains(next)) return;
+    setOver(false);
+  };
+  const onDrop = (event: DragEvent<HTMLDivElement>): void => {
+    claim(event);
     setOver(false);
     const file = event.dataTransfer.files?.[0];
     if (!file) return;
@@ -99,8 +122,9 @@ function ImportCard({
         className="gum-drop"
         data-over={over ? 'true' : undefined}
         data-busy={busy ? 'true' : undefined}
-        onDragOver={(event) => { event.preventDefault(); setOver(true); }}
-        onDragLeave={() => setOver(false)}
+        onDragEnter={onDragOver}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
         <GumIcon name="import" size={24} style={{ transform: 'rotate(180deg)' }} />
@@ -247,11 +271,10 @@ export default function GumImport({ titles, onBack, backLabel, onOpenSettings }:
           {/* The ingest engineer's panel: the auto-import switch, the watch-folder list
               (auto-added folders marked) and the qBittorrent line, live on
               `onMediaIngestState`. It replaces the old single "Choose watch folder". */}
+          {/* The panel carries its own "Watch folders" heading and the auto-import switch,
+              so this card adds only the sentence that says what they cover. */}
           <div className="gum-auto gum-auto--panel">
-            <div className="gum-auto__copy">
-              <strong>{t('gum.auto.folders')}</strong>
-              <span>{t('gum.auto.downloadsDetail')}</span>
-            </div>
+            <p className="gum-auto__lede">{t('gum.auto.downloadsDetail')}</p>
             <MediaWatchFoldersPanel />
           </div>
           <AutoRow title={t('gum.auto.sort')} detail={t('gum.auto.sortDetail')}>

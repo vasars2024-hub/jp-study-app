@@ -19,6 +19,7 @@ import GumFilterBar from './GumFilters';
 import { GumPosterCard } from './GumCards';
 import {
   GUM_BADGES,
+  GUM_RATING_DISPLAYS,
   POSTER_SIZE_MAX,
   POSTER_SIZE_MIN,
   newSavedViewId,
@@ -49,6 +50,9 @@ import {
 const GRID_GAP = 20;
 const CAPTION_HEIGHT = 50;
 const LIST_ROW = 76;
+
+/** Module-level so the grid's row memo is not defeated by a new function each render. */
+const titleKey = (title: GumTitle): string => title.id;
 
 export interface GumLibraryProps {
   titles: GumTitle[];
@@ -95,6 +99,8 @@ export default function GumLibrary({
   const setFilters = useCallback((filters: GumFilters) => setTab((current) => ({ ...current, filters })), [setTab]);
 
   const counts = useMemo(() => countByStatus(titles, prefs.type, search), [titles, prefs.type, search]);
+  // "1,418" / "1 418" in the UI language, not a bare number.
+  const countFormat = useMemo(() => new Intl.NumberFormat(lang), [lang]);
   const facets = useMemo(() => gumFacets(titles), [titles]);
   const sourceCounts = useMemo(() => {
     const out: Partial<Record<GumSource, number>> = {};
@@ -103,10 +109,23 @@ export default function GumLibrary({
   }, [titles]);
   const presentSources = GUM_SOURCES.filter((source) => (sourceCounts[source] ?? 0) > 0);
 
-  const visible = useMemo(() => {
-    const matched = filterGumTitles(titles, { status: prefs.status, type: prefs.type, search, filters: tab.filters }, Date.now());
-    return sortGumTitles(matched, tab.sort, tab.dir);
-  }, [titles, prefs.status, prefs.type, search, tab]);
+  // Sorted once per (library, sort, direction) and then filtered — filtering keeps the
+  // order — so switching status tab or typing a search does not re-sort 1,400 titles
+  // with a collator every time. The cache is dropped with the library it sorted.
+  const sortCache = useMemo(() => new Map<string, GumTitle[]>(), [titles]);
+  const sorted = useMemo(() => {
+    const key = `${tab.sort}:${tab.dir}`;
+    let list = sortCache.get(key);
+    if (!list) {
+      list = sortGumTitles(titles, tab.sort, tab.dir);
+      sortCache.set(key, list);
+    }
+    return list;
+  }, [sortCache, titles, tab.sort, tab.dir]);
+  const visible = useMemo(
+    () => filterGumTitles(sorted, { status: prefs.status, type: prefs.type, search, filters: tab.filters }, Date.now()),
+    [sorted, prefs.status, prefs.type, search, tab.filters],
+  );
 
   const summary = useMemo(() => {
     const onDiskEpisodes = titles.reduce((sum, title) => sum + title.items.length, 0);
@@ -130,9 +149,14 @@ export default function GumLibrary({
 
   const chips = activeFilterChips(tab.filters);
   const chipLabel = (chip: ReturnType<typeof activeFilterChips>[number]): string => {
-    if (!chip.key) return chip.label ?? chip.id;
-    const vars = chip.vars?.period ? { ...chip.vars, period: t(`gum.filter.period.${chip.vars.period}`) } : chip.vars;
-    return t(chip.key, vars);
+    let value: string;
+    if (!chip.key) value = chip.label ?? chip.id;
+    else {
+      const vars = chip.vars?.period ? { ...chip.vars, period: t(`gum.filter.period.${chip.vars.period}`) } : chip.vars;
+      value = t(chip.key, vars);
+    }
+    // "14–26" and "In progress" do not say what they filter; the field template does.
+    return chip.field ? t(chip.field, { value }) : value;
   };
 
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
@@ -187,10 +211,12 @@ export default function GumLibrary({
       title={title}
       badges={prefs.badges}
       layout={prefs.view === 'list' ? 'row' : 'card'}
+      ratingDisplay={prefs.ratingDisplay}
       onOpen={onOpenTitle}
       onPlay={onPlayTitle}
     />
-  ), [prefs.badges, prefs.view, onOpenTitle, onPlayTitle]);
+  ), [prefs.badges, prefs.view, prefs.ratingDisplay, onOpenTitle, onPlayTitle]);
+  const rowHeight = useCallback((width: number) => Math.round(width * 1.5) + CAPTION_HEIGHT + GRID_GAP + 6, []);
 
   const filtered = hasGumFilters(tab.filters) || search.trim() !== '';
 
@@ -230,7 +256,7 @@ export default function GumLibrary({
             onClick={() => setPrefs((current) => ({ ...current, status }))}
           >
             {status === 'all' ? t('gum.status.all') : t(`watchLibrary.status.${status}`)}
-            <span className="gum-tabs__count">{counts[status]}</span>
+            <span className="gum-tabs__count">{countFormat.format(counts[status])}</span>
           </button>
         ))}
       </div>
@@ -243,7 +269,7 @@ export default function GumLibrary({
           sourceCounts={sourceCounts}
           onChange={setFilters}
         />
-        <div className="gum-toolbar__spacer" />
+        <div className="gum-toolbar__end">
         {savedViews.length > 0 && (
           <GumPopover label={<span>{t('gum.views.label')}</span>} align="end" wide>
             {(close) => (
@@ -303,28 +329,68 @@ export default function GumLibrary({
             </div>
           )}
         </GumPopover>
-        <div className="gum-seg gum-seg--icons" role="radiogroup" aria-label={t('gum.library.view')}>
-          <button type="button" role="radio" aria-checked={prefs.view === 'grid'} aria-label={t('gum.library.viewGrid')} onClick={() => setPrefs((current) => ({ ...current, view: 'grid' }))}>
-            <GumIcon name="grid" size={14} />
-          </button>
-          <button type="button" role="radio" aria-checked={prefs.view === 'list'} aria-label={t('gum.library.viewList')} onClick={() => setPrefs((current) => ({ ...current, view: 'list' }))}>
-            <GumIcon name="list" size={14} />
-          </button>
-        </div>
-        <GumPopover label={<span><GumIcon name="sliders" size={14} /> {t('gum.customise.open')}</span>} align="end">
+        {/* Layout and card options in ONE disclosure, so the toolbar is one row: the grid /
+            list toggle and a separate Customise used to wrap onto a second row that the
+            collapsed toolbar box could not hold, and it overlapped the result count. */}
+        <GumPopover
+          className="gum-pop--view"
+          label={(
+            <span>
+              <GumIcon name={prefs.view === 'list' ? 'list' : 'grid'} size={14} />
+              <span className="gum-pop__label-text">{t('gum.library.viewOptions')}</span>
+            </span>
+          )}
+          ariaLabel={t('gum.library.viewOptionsAria', { layout: t(prefs.view === 'list' ? 'gum.library.viewList' : 'gum.library.viewGrid') })}
+          align="end"
+        >
           {() => (
-            <div className="gum-fpanel">
-              <label className="gum-slider">
-                <span>{t('gum.library.posterSize')}</span>
-                <input
-                  type="range"
-                  min={POSTER_SIZE_MIN}
-                  max={POSTER_SIZE_MAX}
-                  step={4}
-                  value={prefs.posterSize}
-                  onChange={(event) => setPrefs((current) => ({ ...current, posterSize: Number(event.target.value) }))}
-                />
-              </label>
+            <div className="gum-fpanel gum-fpanel--view">
+              <fieldset className="gum-fgroup">
+                <legend>{t('gum.library.view')}</legend>
+                <div className="gum-seg" role="radiogroup" aria-label={t('gum.library.view')}>
+                  {(['grid', 'list'] as const).map((view) => (
+                    <button
+                      type="button"
+                      key={view}
+                      role="radio"
+                      aria-checked={prefs.view === view}
+                      onClick={() => setPrefs((current) => ({ ...current, view }))}
+                    >
+                      <GumIcon name={view} size={14} />
+                      <span>{t(view === 'list' ? 'gum.library.viewList' : 'gum.library.viewGrid')}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {prefs.view === 'grid' && (
+                <label className="gum-slider">
+                  <span>{t('gum.library.posterSize')}</span>
+                  <input
+                    type="range"
+                    min={POSTER_SIZE_MIN}
+                    max={POSTER_SIZE_MAX}
+                    step={4}
+                    value={prefs.posterSize}
+                    onChange={(event) => setPrefs((current) => ({ ...current, posterSize: Number(event.target.value) }))}
+                  />
+                </label>
+              )}
+              <fieldset className="gum-fgroup">
+                <legend>{t('gum.library.ratingDisplay')}</legend>
+                <div className="gum-seg" role="radiogroup" aria-label={t('gum.library.ratingDisplay')}>
+                  {GUM_RATING_DISPLAYS.map((display) => (
+                    <button
+                      type="button"
+                      key={display}
+                      role="radio"
+                      aria-checked={prefs.ratingDisplay === display}
+                      onClick={() => setPrefs((current) => ({ ...current, ratingDisplay: display }))}
+                    >
+                      {t(`gum.library.rating.${display}`)}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
               <fieldset className="gum-fgroup">
                 <legend>{t('gum.library.badges')}</legend>
                 <div className="gum-fgroup__choices">
@@ -343,6 +409,7 @@ export default function GumLibrary({
             </div>
           )}
         </GumPopover>
+        </div>
       </ContextualSurface>
 
       <div className="gum-active" aria-live="polite">
@@ -395,14 +462,18 @@ export default function GumLibrary({
             )}
           </div>
         ) : (
+          // No `maxColWidth`: the column count always comes from the pane width and cards
+          // start at the left. The capped mode drops tracks to the item count and centres
+          // them, which blew three search results up into huge centred posters.
+          // Keyed by the tab, so a new tab starts at the top instead of mid-list.
           <VirtualGrid
+            key={`${prefs.status}:${prefs.type}:${prefs.view}`}
             items={visible}
             className={`gum-grid gum-grid--${prefs.view}`}
             minColWidth={prefs.view === 'list' ? 520 : prefs.posterSize}
-            maxColWidth={prefs.view === 'list' ? undefined : Math.round(prefs.posterSize * 1.3)}
             gap={prefs.view === 'list' ? 8 : GRID_GAP}
-            rowHeight={prefs.view === 'list' ? LIST_ROW : (width) => Math.round(width * 1.5) + CAPTION_HEIGHT + GRID_GAP + 6}
-            getKey={(title) => title.id}
+            rowHeight={prefs.view === 'list' ? LIST_ROW : rowHeight}
+            getKey={titleKey}
             renderItem={renderCard}
           />
         )}
