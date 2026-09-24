@@ -40,6 +40,9 @@ export const MEDIA_HUB_ZH: Catalog = {
   'externalPlayer.error.not-absolute': '{name}：程序必须是完整路径，例如 C:\\Program Files\\VideoLAN\\VLC\\vlc.exe。',
   'externalPlayer.error.missing': '在 {path} 找不到 {name}，它可能已被移动或卸载。',
   'externalPlayer.error.not-executable': '{path} 不是本应用可以启动的程序（Windows 上应为 .exe）。',
+  'externalPlayer.error.interpreter': '{path} 用于运行脚本和命令，不是媒体播放器。请选择播放器程序本身。',
+  'externalPlayer.error.network': '{path} 位于网络位置。请选择安装在本机上的播放器。',
+  'externalPlayer.error.not-confirmed': '{name}：请通过“浏览…”选择程序，以便应用确认是你选择的。',
   'externalPlayer.error.launchFailed': '无法启动 {name}：{detail}',
   // Discover: the watch library is the list
   'discover.library.add': '加入资料库（计划观看）',

@@ -40,6 +40,9 @@ export const MEDIA_HUB_EN: Catalog = {
   'externalPlayer.error.not-absolute': '{name}: the program must be a full path, like C:\\Program Files\\VideoLAN\\VLC\\vlc.exe.',
   'externalPlayer.error.missing': '{name} was not found at {path}. It may have been moved or uninstalled.',
   'externalPlayer.error.not-executable': '{path} is not a program this app can start (a .exe on Windows).',
+  'externalPlayer.error.interpreter': '{path} runs scripts and commands, not media. Choose the player program itself.',
+  'externalPlayer.error.network': '{path} is on a network location. Choose a player installed on this PC.',
+  'externalPlayer.error.not-confirmed': '{name}: choose the program with Browse… so the app knows you picked it.',
   'externalPlayer.error.launchFailed': '{name} could not be started: {detail}',
   // Discover: the watch library is the list
   'discover.library.add': 'Add to library (Plan to watch)',

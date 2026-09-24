@@ -40,6 +40,9 @@ export const MEDIA_HUB_RU: Catalog = {
   'externalPlayer.error.not-absolute': '{name}: укажите полный путь к программе, например C:\\Program Files\\VideoLAN\\VLC\\vlc.exe.',
   'externalPlayer.error.missing': '{name} не найден по пути {path}. Возможно, программа перемещена или удалена.',
   'externalPlayer.error.not-executable': '{path} — не программа, которую приложение может запустить (в Windows нужен .exe).',
+  'externalPlayer.error.interpreter': '{path} запускает скрипты и команды, а не медиа. Выберите саму программу-плеер.',
+  'externalPlayer.error.network': '{path} находится в сетевом расположении. Выберите плеер, установленный на этом ПК.',
+  'externalPlayer.error.not-confirmed': '{name}: выберите программу через «Обзор…», чтобы приложение знало, что её выбрали вы.',
   'externalPlayer.error.launchFailed': 'Не удалось запустить {name}: {detail}',
   // Discover: the watch library is the list
   'discover.library.add': 'В библиотеку («Буду смотреть»)',

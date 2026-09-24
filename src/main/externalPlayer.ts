@@ -13,6 +13,14 @@
  * listener that is an uncaught exception in the main process, i.e. the whole
  * app going down because VLC moved. The launcher waits for `spawn` or `error`
  * and reports the latter to the caller instead.
+ *
+ * The list itself is written by the renderer, so on its own it proved nothing:
+ * a compromised renderer could save `cmd.exe`, PowerShell, `mshta` or a UNC
+ * path as a "player" and launch it. A program is now stored and started only
+ * when the user picked it in the main-process file dialog (`chooseExecutable`
+ * records it in `external-player-trust.json`, which only main writes), and
+ * script hosts and network paths are refused outright. Spawned with
+ * `shell: false`, so arguments are never parsed by a shell.
  */
 
 import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron';
@@ -31,15 +39,21 @@ import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
 
 const STORE_FILE = 'external-players.json';
+/** Programs the user picked in the main-process dialog. Main writes it; the renderer cannot. */
+const TRUST_FILE = 'external-player-trust.json';
 
 const defaultStorePath = (): string => path.join(app.getPath('userData'), STORE_FILE);
+const defaultTrustPath = (): string => path.join(app.getPath('userData'), TRUST_FILE);
 let storePath: () => string = defaultStorePath;
+let trustPath: () => string = defaultTrustPath;
 type Spawner = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
 let spawner: Spawner = nodeSpawn;
 
-export function __setExternalPlayerDepsForTests(next: { store?: () => string; spawn?: Spawner } | null): void {
+export function __setExternalPlayerDepsForTests(next: { store?: () => string; trust?: () => string; spawn?: Spawner } | null): void {
   storePath = next?.store ?? defaultStorePath;
+  trustPath = next?.trust ?? defaultTrustPath;
   spawner = next?.spawn ?? nodeSpawn;
+  confirmed = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,11 +92,25 @@ function resolveBundle(executable: string): string {
   }
 }
 
-export type ExternalPlayerPathProblem = 'not-absolute' | 'missing' | 'not-executable';
+export type ExternalPlayerPathProblem = 'not-absolute' | 'missing' | 'not-executable' | 'interpreter' | 'network' | 'not-confirmed';
+
+/**
+ * Programs that run scripts or other programs handed to them. None is a media
+ * player, and each would turn "launch a player" into "run anything".
+ */
+const INTERPRETERS = new Set(['cmd', 'powershell', 'powershell_ise', 'pwsh', 'wscript', 'cscript', 'mshta', 'rundll32', 'regsvr32', 'conhost', 'bash', 'wsl']);
+
+/** `\\server\share\x.exe`, `//server/...`, `\\?\UNC\...`: a network path can change under a saved profile. */
+function isNetworkPath(executablePath: string): boolean {
+  return /^[\\/]{2}/.test(executablePath);
+}
 
 /** Why a profile's executable cannot be launched, or null when it can. */
 export function externalPlayerPathProblem(executablePath: string, platform: NodeJS.Platform = process.platform): ExternalPlayerPathProblem | null {
   if (!executablePath || !path.isAbsolute(executablePath)) return 'not-absolute';
+  if (isNetworkPath(executablePath)) return 'network';
+  const stem = path.basename(executablePath).replace(/\.(exe|com)$/i, '').toLowerCase();
+  if (INTERPRETERS.has(stem)) return 'interpreter';
   const resolved = resolveBundle(executablePath);
   let stat: fs.Stats;
   try {
@@ -93,6 +121,57 @@ export function externalPlayerPathProblem(executablePath: string, platform: Node
   if (!stat.isFile()) return 'not-executable';
   if (platform === 'win32' && !WINDOWS_EXECUTABLE.test(resolved)) return 'not-executable';
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Confirmed programs
+// ---------------------------------------------------------------------------
+
+let confirmed: Set<string> | null = null;
+
+function trustKey(executablePath: string): string {
+  const resolved = path.resolve(executablePath);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+/**
+ * The confirmed set. The first time it is read (an upgrade from a version
+ * without it) the players already configured are carried over, so an existing
+ * setup keeps working; the interpreter and network checks still apply to them.
+ */
+function confirmedPaths(): Set<string> {
+  if (confirmed) return confirmed;
+  const stored = readJsonSync<{ paths?: unknown } | null>(trustPath(), null);
+  if (stored && Array.isArray(stored.paths)) {
+    confirmed = new Set(stored.paths.filter((entry): entry is string => typeof entry === 'string'));
+    return confirmed;
+  }
+  confirmed = new Set(readExternalPlayerPreferences().profiles.map((profile) => trustKey(profile.executablePath)));
+  writeTrust();
+  return confirmed;
+}
+
+function writeTrust(): void {
+  try {
+    writeJsonAtomicSync(trustPath(), { version: 1, paths: [...(confirmed ?? [])] });
+  } catch {
+    /* kept in memory for this session */
+  }
+}
+
+function confirmExecutable(executablePath: string): void {
+  const set = confirmedPaths();
+  const key = trustKey(executablePath);
+  if (set.has(key)) return;
+  set.add(key);
+  writeTrust();
+}
+
+/** `externalPlayerPathProblem`, plus: the user picked this program in the app's own dialog. */
+export function externalPlayerLaunchProblem(executablePath: string): ExternalPlayerPathProblem | null {
+  const problem = externalPlayerPathProblem(executablePath);
+  if (problem) return problem;
+  return confirmedPaths().has(trustKey(executablePath)) ? null : 'not-confirmed';
 }
 
 export interface ExternalPlayerSaveResult {
@@ -110,7 +189,7 @@ export function saveExternalPlayerPreferencesMain(input: unknown): ExternalPlaye
   const next = normalizeExternalPlayerPreferences(input);
   const rejected: ExternalPlayerSaveResult['rejected'] = [];
   const profiles = next.profiles.filter((profile) => {
-    const problem = externalPlayerPathProblem(profile.executablePath);
+    const problem = externalPlayerLaunchProblem(profile.executablePath);
     if (problem) rejected.push({ id: profile.id, problem });
     return !problem;
   });
@@ -173,7 +252,7 @@ export async function launchExternalPlayer(
   handoff = enrich(handoff);
   if (handoff.subtitlePath && !isExistingFile(handoff.subtitlePath)) handoff = { ...handoff, subtitlePath: null };
 
-  const problem = externalPlayerPathProblem(profile.executablePath);
+  const problem = externalPlayerLaunchProblem(profile.executablePath);
   if (problem) return mt(`externalPlayer.error.${problem}`, { name: profile.name, path: profile.executablePath });
 
   const args = buildExternalPlayerArguments(profile, handoff);
@@ -217,7 +296,12 @@ export async function launchExternalPlayer(
 // IPC
 // ---------------------------------------------------------------------------
 
-async function chooseExecutable(): Promise<string | null> {
+/**
+ * The one way a program becomes launchable: the user picks it here, in a
+ * dialog main owns. A pick that is not a startable program (a script host, a
+ * network path) is returned so the panel can show it, but is not confirmed.
+ */
+export async function chooseExternalPlayerExecutable(): Promise<string | null> {
   const owner = BrowserWindow.getFocusedWindow();
   const options: OpenDialogOptions = {
     title: mt('externalPlayer.chooseTitle'),
@@ -227,12 +311,14 @@ async function chooseExecutable(): Promise<string | null> {
       : [],
   };
   const picked = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
-  return picked.canceled || !picked.filePaths[0] ? null : picked.filePaths[0];
+  const file = picked.canceled || !picked.filePaths[0] ? null : picked.filePaths[0];
+  if (file && !externalPlayerPathProblem(file)) confirmExecutable(file);
+  return file;
 }
 
 /** `media:handoff` itself stays in `media.ts`, which knows the library the enricher reads. */
 export function registerExternalPlayerIpc(): void {
   ipcMain.handle('externalPlayer:get', () => readExternalPlayerPreferences());
   ipcMain.handle('externalPlayer:save', (_event, input: unknown) => saveExternalPlayerPreferencesMain(input));
-  ipcMain.handle('externalPlayer:chooseExecutable', () => chooseExecutable());
+  ipcMain.handle('externalPlayer:chooseExecutable', () => chooseExternalPlayerExecutable());
 }

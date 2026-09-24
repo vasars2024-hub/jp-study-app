@@ -40,6 +40,9 @@ export const MEDIA_HUB_JA: Catalog = {
   'externalPlayer.error.not-absolute': '{name}：プログラムはフルパスで指定してください（例：C:\\Program Files\\VideoLAN\\VLC\\vlc.exe）。',
   'externalPlayer.error.missing': '{name} が {path} に見つかりません。移動またはアンインストールされた可能性があります。',
   'externalPlayer.error.not-executable': '{path} はこのアプリが起動できるプログラムではありません（Windows では .exe）。',
+  'externalPlayer.error.interpreter': '{path} はスクリプトやコマンドを実行するプログラムで、メディアプレーヤーではありません。プレーヤー本体を選んでください。',
+  'externalPlayer.error.network': '{path} はネットワーク上の場所にあります。この PC にインストールされたプレーヤーを選んでください。',
+  'externalPlayer.error.not-confirmed': '{name}: 「参照…」でプログラムを選んでください。あなたが選んだことをアプリが確認できます。',
   'externalPlayer.error.launchFailed': '{name} を起動できませんでした：{detail}',
   // Discover: the watch library is the list
   'discover.library.add': 'ライブラリに追加（視聴予定）',
