@@ -230,12 +230,16 @@ describe('study bar — subtitle placement, colour, second line, resets', () => 
     expect(reset.disabled).toBe(true);
   });
 
-  it('the font list says "App font", not "App default"', async () => {
+  // "App font" and "Gothic" painted the same Yu Gothic UI face (subtitle audit 2): one option.
+  it('the font list offers three faces that look different, Gothic first', async () => {
     const host = await mount(<Harness />);
     const sheet = await openSheet(host, 'more');
     const select = sheet.querySelector<HTMLSelectElement>('select[data-study-pref="subtitleFontFamily"]')!;
     expect([...select.options].map((option) => option.text)).toEqual([
-      'App font', 'Gothic', 'Mincho', 'Universal Design',
+      'Gothic', 'Mincho', 'Universal Design',
+    ]);
+    expect([...select.options].map((option) => option.value)).toEqual([
+      'default', 'mincho', 'universal',
     ]);
   });
 

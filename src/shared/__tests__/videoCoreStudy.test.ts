@@ -379,8 +379,18 @@ describe('subtitle appearance and dual-subtitle language preferences', () => {
   });
 
   it('narrows a raw select value the same way the normalizer does', () => {
-    expect(toSubtitleFontChoice('gothic')).toBe('gothic');
+    expect(toSubtitleFontChoice('mincho')).toBe('mincho');
     expect(toSubtitleFontChoice('nonsense')).toBe('default');
+  });
+
+  it('keeps a stored "gothic" choice valid: it is the default Yu Gothic face', () => {
+    // Subtitle audit 2: "App font" and "Gothic" painted the same face and were merged.
+    expect(SUBTITLE_FONT_CHOICES).toEqual(['default', 'mincho', 'universal']);
+    expect(toSubtitleFontChoice('gothic')).toBe('default');
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontFamily: 'gothic' }).subtitleFontFamily)
+      .toBe('default');
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontFamily: 'mincho' }).subtitleFontFamily)
+      .toBe('mincho');
   });
 
   it('offers a stack for every font choice, each ending in a generic family', () => {

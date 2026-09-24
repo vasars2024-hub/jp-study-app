@@ -20,12 +20,18 @@ export interface VideoCoreStudyLoopState {
  * of to the browser default, and each names a Japanese-capable face first: a stack that
  * falls through to a Latin-only font renders study content as tofu, which is worse than
  * ignoring the setting. `default` is the empty string on purpose — it means "inherit the
- * stylesheet" rather than "impose a family", so the app's own font choice still wins for
- * anyone who never touches this control.
+ * stylesheet" (`--subtitle-font-stack`, a Yu Gothic UI stack) rather than "impose a family".
+ *
+ * `default` is offered as "Gothic", and the separate `gothic` choice is gone: it named the
+ * same Yu Gothic UI face, so the two options painted identical lines (subtitle audit 2).
+ * An "app font" that followed Settings > Appearance would not have differed either — every
+ * font offered there (Segoe, System, JP first) draws kana and kanji from Yu Gothic UI, and
+ * the cue deliberately does not inherit the theme's `--font-body`, which in the Aero themes
+ * is a Tahoma stack with no Japanese face at all. A stored `gothic` normalizes to `default`,
+ * the same face, so nobody's choice changes on screen.
  */
 export const SUBTITLE_FONT_STACKS = {
   default: '',
-  gothic: '"Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif',
   mincho: '"Yu Mincho", "MS Mincho", "Noto Serif JP", serif',
   universal: '"BIZ UDPGothic", "BIZ UDGothic", "Noto Sans JP", sans-serif',
 } as const;
