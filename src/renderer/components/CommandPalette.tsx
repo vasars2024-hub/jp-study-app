@@ -110,6 +110,7 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName; terms?: string;
   { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
   { id: 'files', labelKey: 'palette.section.files', glyph: 'folder' },
+  { id: 'visualnovels', labelKey: 'palette.section.visualnovels', glyph: 'visual-novel', termsKey: 'vnApp.paletteTerms' },
 ];
 
 function openSection(id: string): void {

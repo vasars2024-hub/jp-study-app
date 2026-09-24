@@ -140,7 +140,8 @@ type WinSection =
   | 'library' | 'novels' | 'dictionary' | 'grammar' | 'files' | 'translate'
   | 'player' | 'video' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
   | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube'
-  | 'scraper';
+  | 'scraper'
+  | 'visualnovels';
 
 interface Win {
   id: string;
@@ -212,6 +213,7 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
+  { id: 'visualnovels', labelKey: 'palette.section.visualnovels', glyph: 'visual-novel' },
   // 'sparkle', not 'scan' or 'search': Reading already owns 'scan' (the OCR
   // lens) and the Scraper's job is proposing titles, not reading one.
   { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
@@ -477,7 +479,7 @@ const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] =
     labelKey: 'desktop.startCategory.study',
     sections: ['agent', 'dictionary', 'grammar', 'reading', 'translate', 'files', 'anki', 'flashcards'],
   },
-  { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
+  { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion', 'visualnovels'] },
   { id: 'progress', labelKey: 'desktop.startCategory.progress', sections: ['stats', 'calendar'] },
   { id: 'system', labelKey: 'desktop.startCategory.system', sections: ['games', 'resources', 'city', 'settings'] },
 ];

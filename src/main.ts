@@ -169,7 +169,7 @@ let pendingOpenSection: string | null = null;
 const ARGV_OPEN_SECTIONS = new Set([
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube', 'scraper', 'files',
+  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels',
 ]);
 
 export function argvWantsToggle(argv: string[] = process.argv): boolean {
@@ -1431,7 +1431,7 @@ const POPOUT_SECTIONS = new Set([
   'agent',
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube', 'scraper', 'files',
+  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels',
 ]);
 
 // One real OS window per section, max. Keyed here (not just left to the

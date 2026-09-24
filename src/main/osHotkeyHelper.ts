@@ -94,6 +94,7 @@ const OPEN_SECTIONS = new Set([
   // Files section shipped without ever reaching this list, so `--open=files`
   // was rejected here while main.ts's own ARGV set accepted it.
   'files',
+  'visualnovels',
 ]);
 
 function helperDir(): string {

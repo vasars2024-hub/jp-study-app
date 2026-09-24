@@ -147,7 +147,9 @@ const REFUSAL_KEY_FOR_TARGET: Record<DropTargetId, string | null> = {
 const SECTION_FOR_KIND: Partial<Record<FilesItemKind, DesktopWinSection>> = {
   book: 'library',
   manga: 'library',
-  'visual-novel': 'novels',
+  // The Visual Novels app. This pointed at `novels` (the reading workspace's
+  // planner), which knows nothing about visual novels.
+  'visual-novel': 'visualnovels',
   video: 'player',
   audio: 'music',
   deck: 'flashcards',

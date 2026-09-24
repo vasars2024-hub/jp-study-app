@@ -117,6 +117,7 @@ const SECTION_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'city', titleKey: 'palette.section.city', terms: ['mooncap garden', 'city'] },
   { section: 'musicwidget', titleKey: 'settings.mini.app.musicwidget', terms: ['music widget', 'musicwidget'] },
   { section: 'immersion', titleKey: 'palette.section.immersion', terms: ['immersion'] },
+  { section: 'visualnovels', titleKey: 'palette.section.visualnovels', terms: ['visual novel', 'visual novels', 'vn', 'vndb', 'galge'] },
   { section: 'calendar', titleKey: 'palette.section.calendar', terms: ['calendar'] },
   // No bare `settings` section entry: `isAgentNavigationDestination` requires a
   // page for that one section, so "settings" resolves to the Home page below.

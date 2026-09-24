@@ -46,6 +46,10 @@ export const DESKTOP_WIN_SECTIONS = [
   'youtube',
   'scraper',
   'files',
+  // The Visual Novel platform (MASTER_PLAN section 15) as its own app. It was only
+  // reachable as Immersion > More > Visual novel library, with its open state held in
+  // a useState that reset on every close.
+  'visualnovels',
 ] as const;
 
 export type DesktopWinSection = (typeof DESKTOP_WIN_SECTIONS)[number];

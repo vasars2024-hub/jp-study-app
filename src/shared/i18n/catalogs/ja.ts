@@ -2537,6 +2537,7 @@ export const ja: Catalog = {
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': 'スクレイパー',
   'palette.section.files': 'ファイル',
+  'palette.section.visualnovels': 'ビジュアルノベル',
   'palette.section.agent': 'エージェント',
   'agent.shell.aria': 'エージェントワークスペース',
   'agent.rail.aria': '会話',

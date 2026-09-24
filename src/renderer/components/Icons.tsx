@@ -71,6 +71,7 @@ export type IconName =
   | 'lock'
   | 'city'
   | 'widgets'
+  | 'visual-novel'
   // ---- Shell objects, status and lifecycle (Phase 5 · M7) ----
   | 'folder-open'
   | 'file'
@@ -117,6 +118,8 @@ export const BASE_PATHS: Record<IconName, string> = {
   app: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
   city: 'M3 19h18 M6 12c0-4 2.7-7 6-7s6 3 6 7c0 1.2-.9 2-2 2h-2v5h-4v-5H8c-1.1 0-2-.8-2-2Z M9 10h.01 M13 8h.01 M16 11h.01',
   widgets: 'M4 4h7v7H4z M13 4h7v4h-7z M13 10h7v10h-7z M4 13h7v7H4z',
+  // A game screen with a dialogue box across its lower third.
+  'visual-novel': 'M3 4h18v16H3z M5 13h14v5H5z M7.5 15.5h6 M12 6.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
   logo: 'M12 3l7 4v10l-7 4-7-4V7z M12 8v8 M8.5 10l3.5 2 3.5-2',
   pause: 'M8 5h3v14H8z M13 5h3v14h-3z',
   'skip-back': 'M11 5 2 12l9 7z M21 5 12 12l9 7z',

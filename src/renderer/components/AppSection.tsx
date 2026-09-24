@@ -29,6 +29,7 @@ const CalendarView = lazy(() => import('../views/CalendarView'));
 const YouTubePlaylistsView = lazy(() => import('../views/YouTubePlaylistsView'));
 const SettingsApp = lazy(() => import('./settings/SettingsApp'));
 const FilesApp = lazy(() => import('./filesapp/FilesApp'));
+const VisualNovelsView = lazy(() => import('../views/VisualNovelsView'));
 
 function openVisualizerSettings(): void {
   openSectionSurface('settings');
@@ -140,6 +141,9 @@ export default function AppSection({
       break;
     case 'files':
       view = <FilesApp />;
+      break;
+    case 'visualnovels':
+      view = <VisualNovelsView />;
       break;
     default:
       // NOT `null`. A section the switch does not recognise used to render an
