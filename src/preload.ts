@@ -1721,6 +1721,10 @@ const api = {
   watchChooseImportFile: (): Promise<string | null> => ipcRenderer.invoke('watch:chooseImportFile'),
   watchImportHistory: (): Promise<import('./shared/watchLibrary').WatchImportRecord[]> =>
     ipcRenderer.invoke('watch:importHistory'),
+  /** Folds rows from the old tracking / shortlist stores in (see shared/watchLibraryLegacy.ts). */
+  watchImportLegacy: (
+    rows: import('./shared/watchLibraryLegacy').WatchLegacyRow[],
+  ): Promise<import('./main/watchLibrary').WatchLegacyImportResult> => ipcRenderer.invoke('watch:importLegacy', rows),
   onWatchChanged: (
     cb: (event: import('./main/watchLibrary').WatchChangedEvent) => void,
   ): (() => void) => {
@@ -1728,12 +1732,32 @@ const api = {
     ipcRenderer.on('watch:changed', handler);
     return () => ipcRenderer.removeListener('watch:changed', handler);
   },
+  /** The airing-schedule job (AniList next episodes): when it last ran, and a manual check. */
+  watchAiringStatus: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:status'),
+  watchAiringRefresh: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:refresh'),
+  /** Episodes of titles being watched that have just aired — once per episode. */
+  onWatchAiringAired: (
+    cb: (episodes: import('./shared/watchAiring').AiredEpisode[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, episodes: import('./shared/watchAiring').AiredEpisode[]): void => cb(episodes);
+    ipcRenderer.on('watchAiring:aired', handler);
+    return () => ipcRenderer.removeListener('watchAiring:aired', handler);
+  },
   malUpdateEntry: (
     animeId: number,
     update: import('./shared/malSync').MalListStatusUpdate,
   ): Promise<
     import('./main/malSync').MalIpcResult<import('./shared/malSync').MalListStatusUpdate>
   > => ipcRenderer.invoke('mal:updateEntry', animeId, update),
+  /** What differs between the watch library and the MAL list as last fetched. Local only. */
+  malPushPreview: (): Promise<
+    import('./main/malSync').MalIpcResult<import('./shared/malPush').MalPushPreview>
+  > => ipcRenderer.invoke('mal:pushPreview'),
+  /** Sends that diff (or just `animeIds`) to MAL — only ever from an explicit click. */
+  malPushChanges: (
+    animeIds?: number[],
+  ): Promise<import('./main/malSync').MalIpcResult<import('./main/malPush').MalPushResult>> =>
+    ipcRenderer.invoke('mal:pushChanges', animeIds),
   onMediaMetadataProgress: (
     cb: (p: import('./shared/mediaMetadataIpc').MediaMetadataProgress) => void,
   ): (() => void) => {
@@ -1878,7 +1902,27 @@ const api = {
   addMediaFolder: (): Promise<{ items: MediaItem[]; added: number }> => ipcRenderer.invoke('media:addFolder'),
   /** Re-open a saved library item by id. */
   openMedia: (id: string): Promise<MediaOpen | null> => ipcRenderer.invoke('media:open', id),
+  /**
+   * Opens a file in a configured external player. Only `profile.id` is used — main
+   * looks the program up in its own saved profile list. Resolves null on success,
+   * else a translated error message.
+   */
   handoffMedia: (handoff: import('./shared/externalPlayer').PlaybackHandoff, profile: import('./shared/externalPlayer').ExternalPlayerProfile): Promise<string | null> => ipcRenderer.invoke('media:handoff', handoff, profile),
+  /** The saved external-player profiles (main-owned `external-players.json`). */
+  externalPlayersGet: (): Promise<import('./shared/externalPlayer').ExternalPlayerPreferences> =>
+    ipcRenderer.invoke('externalPlayer:get'),
+  /** Saves the profile list; a profile whose program path is not a real executable is refused. */
+  externalPlayersSave: (
+    preferences: import('./shared/externalPlayer').ExternalPlayerPreferences,
+  ): Promise<import('./main/externalPlayer').ExternalPlayerSaveResult> => ipcRenderer.invoke('externalPlayer:save', preferences),
+  externalPlayerChooseExecutable: (): Promise<string | null> => ipcRenderer.invoke('externalPlayer:chooseExecutable'),
+  onExternalPlayersChanged: (
+    cb: (preferences: import('./shared/externalPlayer').ExternalPlayerPreferences) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, preferences: import('./shared/externalPlayer').ExternalPlayerPreferences): void => cb(preferences);
+    ipcRenderer.on('externalPlayer:changed', handler);
+    return () => ipcRenderer.removeListener('externalPlayer:changed', handler);
+  },
   removeMedia: (id: string): Promise<MediaItem[]> => ipcRenderer.invoke('media:remove', id),
   /** Drop library entries whose files no longer exist on disk. */
   pruneMedia: (): Promise<{ removed: number; items: MediaItem[] }> =>
@@ -1919,9 +1963,10 @@ const api = {
    *
    * The adopted workspace opens files through the sidecar, which only sees what is inside
    * the container — so a downloaded (Jimaku/OpenSubtitles) track was invisible to it. See
-   * the handler for the measurement.
+   * the handler for the measurement. `lang` asks for that language's track instead of the
+   * study pick — a library record, else a `<stem>.<lang>.srt|ass|vtt` sidecar beside the file.
    */
-  subtitleForPath: (filePath: string, options?: { intent?: 'play' }): Promise<SubtitlePick | null> =>
+  subtitleForPath: (filePath: string, options?: { intent?: 'play'; lang?: string }): Promise<SubtitlePick | null> =>
     ipcRenderer.invoke('media:subtitleForPath', filePath, options),
   /** The helper line (English by default) for a local video; see `media:secondarySubtitleForPath`. */
   secondarySubtitleForPath: (
@@ -2083,12 +2128,14 @@ const api = {
       }
     | { error: string }
   > => ipcRenderer.invoke('yt:refreshChannel', channelId),
+  /** `options.autoCaptions` (default true) also requests YouTube's auto-generated ja/en captions. */
   ytDownloadVideos: (
     videoIds: string[],
+    options?: import('./main/ytPlaylists').YtDownloadRequestOptions,
   ): Promise<{
     store: YtPlaylistsStore;
     results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
-  }> => ipcRenderer.invoke('yt:downloadVideos', videoIds),
+  }> => ipcRenderer.invoke('yt:downloadVideos', videoIds, options),
   ytFetchSubsOnly: (
     videoIds: string[],
   ): Promise<{

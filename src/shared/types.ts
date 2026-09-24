@@ -432,6 +432,12 @@ export interface YouTubeDownloadOptions {
    * Used by extension-initiated downloads so nothing is missed.
    */
   allSubs?: boolean;
+  /**
+   * Also request YouTube's auto-generated captions for `subtitleLang(s)`, so a
+   * video without creator subtitles still gets Japanese (and an English second
+   * line). Where both exist yt-dlp writes the creator track.
+   */
+  autoCaptions?: boolean;
 }
 
 // ----- Anki (AnkiConnect) -------------------------------------------------

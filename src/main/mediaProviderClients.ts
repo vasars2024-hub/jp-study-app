@@ -60,6 +60,10 @@ export interface ProviderWork {
   titles: string[];
   displayTitle: string;
   nativeTitle?: string;
+  /** The official English title, when the provider has one (AniList `title.english`, Jikan `title_english`). */
+  englishTitle?: string;
+  /** The romanised title (AniList `title.romaji`, MAL's own main title). */
+  romajiTitle?: string;
   synopsis?: string;
   year?: number;
   format?: string;
@@ -188,6 +192,8 @@ function jikanToWork(anime: JikanAnime): ProviderWork {
     titles: [...new Set(titles.map((t) => t.trim()))],
     displayTitle: text(anime.title_english) ?? text(anime.title) ?? titles[0] ?? '',
     nativeTitle: text(anime.title_japanese),
+    englishTitle: text(anime.title_english),
+    romajiTitle: text(anime.title),
     synopsis: text(anime.synopsis),
     year: num(anime.year) ?? (Number.isFinite(airedYear) ? airedYear : undefined),
     format: text(anime.type),
@@ -416,6 +422,8 @@ function anilistToWork(media: AnilistMedia): ProviderWork {
     titles: [...new Set(titles.map((t) => t.trim()))],
     displayTitle: text(media.title?.english) ?? text(media.title?.romaji) ?? titles[0] ?? '',
     nativeTitle: text(media.title?.native),
+    englishTitle: text(media.title?.english),
+    romajiTitle: text(media.title?.romaji),
     // AniList descriptions carry light HTML even with asHtml:false.
     synopsis: text(media.description?.replace(/<[^>]+>/g, '').replace(/\s+\n/g, '\n')),
     year: num(media.startDate?.year ?? undefined),
@@ -648,6 +656,47 @@ export async function anilistByMalId(malId: number): Promise<ProviderWork | null
     `anilist:mal:${malId}`,
   );
   return data?.Media ? anilistToWork(data.Media) : null;
+}
+
+/**
+ * Next-episode airing times for up to 50 anime at once, by MAL or AniList id —
+ * the watch library's airing-schedule job (`watchAiring.ts`). One request per
+ * batch through the shared AniList limiter; cached for 30 minutes, and an empty
+ * page is not cached (it is what a failing upstream looks like). `null` means
+ * AniList did not answer.
+ */
+export async function anilistAiringBatch(
+  ids: readonly number[],
+  by: 'mal' | 'anilist',
+): Promise<import('../shared/watchAiring').AiringRow[] | null> {
+  const clean = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50);
+  if (!clean.length) return [];
+  const argument = by === 'mal' ? 'idMal_in' : 'id_in';
+  const data = await anilistQuery<{ Page?: { media?: Array<{
+    id?: number; idMal?: number | null; status?: string | null;
+    nextAiringEpisode?: { episode?: number | null; airingAt?: number | null } | null;
+  }> } }>(
+    `query ($ids: [Int]) {
+      Page(page: 1, perPage: 50) {
+        media(${argument}: $ids, type: ANIME) { id idMal status nextAiringEpisode { episode airingAt } }
+      }
+    }`,
+    { ids: clean },
+    `anilist:airing:${by}:${clean.join(',')}`,
+    { ttlMs: 30 * 60_000, cacheEmpty: false },
+  );
+  if (!data) return null;
+  return (data.Page?.media ?? [])
+    .filter((media) => num(media?.id) !== undefined)
+    .map((media) => ({
+      anilistId: media.id as number,
+      malId: num(media.idMal ?? undefined),
+      status: text(media.status),
+      nextEpisode: num(media.nextAiringEpisode?.episode ?? undefined),
+      nextAiringAt: num(media.nextAiringEpisode?.airingAt ?? undefined) !== undefined
+        ? (media.nextAiringEpisode?.airingAt as number) * 1000
+        : undefined,
+    }));
 }
 
 // ---------------------------------------------------------------------------

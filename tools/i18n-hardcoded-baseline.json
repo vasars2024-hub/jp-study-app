@@ -4,7 +4,6 @@
   "src/renderer/components/FocusMusicBar.tsx": 17,
   "src/renderer/components/GlobalDictionaryOverlay.tsx": 6,
   "src/renderer/components/media/gum/GumIcons.tsx": 15,
-  "src/renderer/components/media/MediaTrackingSources.tsx": 26,
   "src/renderer/components/NoteCssEditor.tsx": 9,
   "src/renderer/components/PerfOverlay.tsx": 8,
   "src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx": 19,

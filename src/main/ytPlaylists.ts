@@ -12,7 +12,9 @@ import {
   ensureTrackedChannel,
   mergePlaylistVideos,
   normalizeYtStore,
+  parseYoutubeChannelUrl,
   parseYoutubePlaylistId,
+  youtubeUploadsPlaylistId,
   addPlanToWatchIds,
   removePlanToWatchIds,
   diffNewVideos,
@@ -32,6 +34,7 @@ import {
 } from '../shared/ytPlaylists';
 import type { YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
 import { countTranscriptCues } from '../shared/extensionTranscribe';
+import { mt } from './i18n';
 import {
   YOUTUBE_PLAYLIST_STORE_FILE,
   YOUTUBE_PLAYLIST_SUBTITLE_DIRECTORY,
@@ -315,8 +318,12 @@ interface PlaylistFetch {
  * point: awaiting it cannot strand a stale snapshot.
  */
 async function fetchPlaylist(url: string): Promise<PlaylistFetch | { error: string }> {
-  const listId = parseYoutubePlaylistId(url);
-  if (!listId) return { error: 'Not a valid YouTube playlist URL (missing list=…).' };
+  const playlistId = parseYoutubePlaylistId(url);
+  // A channel (`@handle`, `/channel/UC…`, `/c/…`, `/user/…`) is followed as its
+  // uploads: `/channel/UC…` maps straight to the `UU…` playlist, the other
+  // shapes to their `/videos` tab, which yt-dlp resolves to the channel.
+  const channel = playlistId ? null : parseYoutubeChannelUrl(url);
+  if (!playlistId && !channel) return { error: mt('ytManager.error.notPlaylistOrChannel') };
 
   const result = await ytDlpJson([
     '-J',
@@ -324,10 +331,27 @@ async function fetchPlaylist(url: string): Promise<PlaylistFetch | { error: stri
     '--no-download',
     '--playlist-end',
     '5000',
-    url.trim(),
+    channel ? channel.fetchUrl : url.trim(),
   ]);
   if (!result.ok) return { error: result.error };
-  return { listId, url: url.trim(), mapped: mapFlatEntries(result.data) };
+  const mapped = mapFlatEntries(result.data);
+  if (!channel) return { listId: playlistId as string, url: url.trim(), mapped };
+
+  const root = (result.data && typeof result.data === 'object' ? result.data : {}) as Record<string, unknown>;
+  const channelId = [root.channel_id, root.id].find((value): value is string => typeof value === 'string' && /^UC[\w-]{22}$/.test(value));
+  const uploads = channel.uploadsPlaylistId ?? (channelId ? youtubeUploadsPlaylistId(channelId) : null);
+  const listId = uploads ?? `channel:${channel.kind}:${channel.value}`;
+  return {
+    listId,
+    // Stored so a refresh fetches the same listing again.
+    url: channel.fetchUrl,
+    mapped: {
+      ...mapped,
+      youtubePlaylistId: listId,
+      // The `/videos` tab is titled "<Channel> - Videos"; the channel is the name.
+      title: mapped.channelTitle || mapped.title.replace(/\s+-\s+(Videos|Uploads)$/i, ''),
+    },
+  };
 }
 
 /**
@@ -413,19 +437,46 @@ async function syncAndCommit(
     synced = applyPlaylistSync(fresh, fetched, existingId);
     return synced ? synced.store : null;
   });
-  if (!synced) return { error: 'That playlist was removed while it was syncing.' };
+  if (!synced) return { error: mt('ytManager.error.removedWhileSyncing') };
   return { store, playlist: (synced as { playlist: YtPlaylist }).playlist };
 }
 
-function preferSubsToDownloadOptions(preferSubs: YtSubLang[]): YouTubeDownloadOptions {
-  const langs = preferSubs.filter((l): l is Exclude<YouTubeSubtitleLang, 'none'> =>
+/**
+ * Subtitle languages for a playlist download: the playlist's own preference,
+ * plus Japanese (the study line) and English (the second line), always. With
+ * `autoCaptions`, YouTube's auto-generated tracks are requested too, so a
+ * video with no creator subtitles still arrives with text; where both exist
+ * yt-dlp writes the creator track, and the pick after download ranks creator
+ * tracks first as before.
+ */
+export function preferSubsToDownloadOptions(preferSubs: YtSubLang[], autoCaptions = true): YouTubeDownloadOptions {
+  const preferred = preferSubs.filter((l): l is Exclude<YouTubeSubtitleLang, 'none'> =>
     l === 'ja' || l === 'zh' || l === 'en' || l === 'ru',
   );
+  const langs = [...new Set<Exclude<YouTubeSubtitleLang, 'none'>>([...preferred, 'ja', 'en'])];
   return {
     audioOnly: false,
     subtitleLang: langs[0] ?? 'none',
-    subtitleLangs: langs.length ? langs : undefined,
+    subtitleLangs: langs,
+    autoCaptions,
   };
+}
+
+export interface YtDownloadRequestOptions {
+  audioOnly?: boolean;
+  allSubs?: boolean;
+  /** Also request auto-generated captions (default true). */
+  autoCaptions?: boolean;
+}
+
+/** Re-validates download options that crossed the bridge. */
+export function sanitizeYtDownloadOptions(value: unknown): YtDownloadRequestOptions {
+  const r = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const out: YtDownloadRequestOptions = {};
+  if (typeof r.audioOnly === 'boolean') out.audioOnly = r.audioOnly;
+  if (typeof r.allSubs === 'boolean') out.allSubs = r.allSubs;
+  if (typeof r.autoCaptions === 'boolean') out.autoCaptions = r.autoCaptions;
+  return out;
 }
 
 /** Download YT playlist videos by internal ids (used by IPC and extension bridge). */
@@ -438,7 +489,7 @@ export async function downloadVideosByIds(
     stage: string;
     percent: number;
   }) => void,
-  downloadOpts?: { audioOnly?: boolean; allSubs?: boolean },
+  downloadOpts?: YtDownloadRequestOptions,
 ): Promise<{
   store: YtPlaylistsStore;
   results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
@@ -452,11 +503,11 @@ export async function downloadVideosByIds(
     const snapshot = readStore();
     const video = snapshot.videos.find((v) => v.id === videoId);
     if (!video) {
-      results.push({ videoId, ok: false, error: 'Video not found.' });
+      results.push({ videoId, ok: false, error: mt('ytManager.error.videoNotFound') });
       continue;
     }
     const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
-    const opts = preferSubsToDownloadOptions(pl?.preferSubs ?? ['ja']);
+    const opts = preferSubsToDownloadOptions(pl?.preferSubs ?? ['ja'], downloadOpts?.autoCaptions !== false);
     if (downloadOpts?.audioOnly === true) opts.audioOnly = true;
     if (downloadOpts?.allSubs === true) opts.allSubs = true;
     onProgress?.({
@@ -501,7 +552,7 @@ async function fetchSubsOnly(
   preferSubs: YtSubLang[],
 ): Promise<{ ok: true; hasSubs: boolean } | { ok: false; error: string }> {
   const bin = await findYtDlp();
-  if (!bin) return { ok: false, error: 'yt-dlp was not found on your PATH.' };
+  if (!bin) return { ok: false, error: mt('ytManager.error.noYtDlp') };
   const langs = preferSubsToDownloadOptions(preferSubs).subtitleLangs ?? [];
   if (!langs.length) return { ok: true, hasSubs: false };
   const subLangArgs = langs.flatMap((l) => ytDlpSubtitleLangs(l));
@@ -596,7 +647,7 @@ export async function addVideoByUrl(
   const trimmed = (url ?? '').trim();
   const { parseYoutubeVideoId } = await import('../shared/extensionCapture');
   const youtubeId = parseYoutubeVideoId(trimmed);
-  if (!youtubeId) return { ok: false, error: 'Not a valid YouTube video URL.' };
+  if (!youtubeId) return { ok: false, error: mt('ytManager.error.notVideo') };
 
   // Phase 1, synchronous: make sure the Extension playlist exists and decide
   // whether this capture is already complete. Committed before the fetch so the
@@ -855,7 +906,7 @@ export function registerYtPlaylistsIpc(): void {
 
   ipcMain.handle('yt:refreshPlaylist', async (_e, playlistId: string) => {
     const pl = readStore().playlists.find((p) => p.id === playlistId);
-    if (!pl) return { error: 'Playlist not found.' };
+    if (!pl) return { error: mt('ytManager.error.playlistNotFound') };
     const result = await syncAndCommit(pl.url, pl.id);
     if ('error' in result) return { error: result.error };
     return { store: result.store, playlist: result.playlist };
@@ -893,7 +944,7 @@ export function registerYtPlaylistsIpc(): void {
     ): YtPlaylistsStore | { error: string } => {
       const store = readStore();
       const pl = store.playlists.find((p) => p.id === playlistId);
-      if (!pl) return { error: 'Playlist not found.' };
+      if (!pl) return { error: mt('ytManager.error.playlistNotFound') };
       if (prefs.lang === 'ja' || prefs.lang === 'zh' || prefs.lang === 'en') pl.lang = prefs.lang;
       if (Array.isArray(prefs.preferSubs)) {
         pl.preferSubs = prefs.preferSubs.filter(
@@ -945,7 +996,7 @@ export function registerYtPlaylistsIpc(): void {
     ): YtPlaylistsStore | { error: string } => {
       const store = readStore();
       const channel = store.channels.find((c) => c.channelId === channelId);
-      if (!channel) return { error: 'Channel not found.' };
+      if (!channel) return { error: mt('ytManager.error.channelNotFound') };
       if (typeof prefs.title === 'string' && prefs.title.trim()) channel.title = prefs.title.trim();
       if (typeof prefs.iconUrl === 'string') channel.iconUrl = prefs.iconUrl.trim() || undefined;
       if (
@@ -981,7 +1032,7 @@ export function registerYtPlaylistsIpc(): void {
     > => {
       let store = readStore();
       const channel = store.channels.find((c) => c.channelId === channelId);
-      if (!channel) return { error: 'Channel not found.' };
+      if (!channel) return { error: mt('ytManager.error.channelNotFound') };
       const targets = store.playlists.filter((p) => p.channelId === channelId);
       const refreshedPlaylistIds: string[] = [];
       const errors: string[] = [];
@@ -1016,6 +1067,7 @@ export function registerYtPlaylistsIpc(): void {
     async (
       e,
       videoIds: string[],
+      options?: unknown,
     ): Promise<{
       store: YtPlaylistsStore;
       results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
@@ -1023,7 +1075,7 @@ export function registerYtPlaylistsIpc(): void {
       const sender = e.sender;
       return downloadVideosByIds(Array.isArray(videoIds) ? videoIds : [], (ev) => {
         sender.send('yt:downloadProgress', ev);
-      });
+      }, sanitizeYtDownloadOptions(options));
     },
   );
 
@@ -1038,7 +1090,7 @@ export function registerYtPlaylistsIpc(): void {
         const snapshot = readStore();
         const video = snapshot.videos.find((v) => v.id === videoId);
         if (!video) {
-          results.push({ videoId, ok: false, error: 'Video not found.' });
+          results.push({ videoId, ok: false, error: mt('ytManager.error.videoNotFound') });
           continue;
         }
         const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
@@ -1067,7 +1119,7 @@ export function registerYtPlaylistsIpc(): void {
       youtubeId: string,
       cuesJson: string,
     ): YtPlaylistsStore | { error: string } => {
-      if (typeof youtubeId !== 'string' || !youtubeId) return { error: 'Missing youtubeId.' };
+      if (typeof youtubeId !== 'string' || !youtubeId) return { error: mt('ytManager.error.notVideo') };
       try {
         writeFileAtomicSync(transcriptPath(youtubeId), typeof cuesJson === 'string' ? cuesJson : '[]', { backup: false });
       } catch (err) {

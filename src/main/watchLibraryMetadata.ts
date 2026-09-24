@@ -56,6 +56,7 @@ import { findTvmazeShow, tvmazeShowById } from './providers/tvmaze';
 import { findTmdbMovie, findTmdbTv, tmdbAvailable, tmdbMovieById } from './providers/tmdb';
 import {
   listWatchTitlesNeedingLookup,
+  mergeWatchLibraryDuplicates,
   onWatchLibraryChanged,
   readWatchLibrary,
   setWatchTitleMetadata,
@@ -72,7 +73,8 @@ export type WatchLookupStep =
   | 'tmdb-movie-by-id'
   | 'tmdb-movie-search'
   | 'tvmaze-search'
-  | 'anime-search';
+  | 'anime-search'
+  | 'anime-film-search';
 
 export interface WatchLookupPlan {
   step: WatchLookupStep;
@@ -100,7 +102,12 @@ export function watchLookupPlan(title: WatchTitle, context: { tmdb: boolean }): 
   switch (title.kind) {
     case 'film':
       if (context.tmdb) return { step: 'tmdb-movie-search', providers: ['tmdb'] };
-      return title.anime ? { step: 'anime-search', providers: ['jikan', 'anilist'] } : null;
+      if (title.anime) return { step: 'anime-search', providers: ['jikan', 'anilist'] };
+      // No TMDB key: a Letterboxd film may still be an anime film ("Spirited
+      // Away", "Your Name."), which AniList knows under every name — and that
+      // is what lets it merge with the same film from a MAL list. Only an
+      // exact year and a MOVIE format are accepted; anything else rests.
+      return title.year ? { step: 'anime-film-search', providers: ['anilist'] } : null;
     case 'tv':
       return { step: 'tvmaze-search', providers: ['tvmaze', ...tmdb] };
     case 'anime':
@@ -210,6 +217,13 @@ async function lookupTitle(title: WatchTitle, plan: WatchLookupPlan, context: { 
       const work = confident(found.match);
       return { work: work ? await withTmdbBackdrop(work, title, context) : null, down: found.down };
     }
+    case 'anime-film-search': {
+      const found = await anilistSearch(title.title);
+      const target: MetadataTarget = { title: title.title, year: title.year ?? null, format: 'movie' };
+      const films = (found ?? []).filter((work) => work.year === title.year && /^movie$/i.test(work.format ?? ''));
+      const work = confident(films.length ? pickMetadataMatch(target, films) : null);
+      return { work, down: found === null };
+    }
     case 'anime-search':
       return findAnimeByTitle({
         title: title.title,
@@ -250,6 +264,13 @@ async function patchFor(title: WatchTitle, work: ProviderWork): Promise<WatchMet
   if (!title.episodeCount && title.kind !== 'film' && work.episodeCount) meta.episodeCount = work.episodeCount;
   if (!title.year && work.year) meta.year = work.year;
   if (!title.originalTitle && work.nativeTitle) meta.originalTitle = work.nativeTitle;
+  // Every name the provider knows — English, romaji, native, synonyms — so the
+  // matcher (and the re-merge after this pass) can see that MAL's "Sen to
+  // Chihiro no Kamikakushi" is Letterboxd's "Spirited Away".
+  if (work.englishTitle) meta.englishTitle = work.englishTitle;
+  if (work.romajiTitle) meta.romajiTitle = work.romajiTitle;
+  if (work.titles.length) meta.altTitles = work.titles;
+  if ((work.provider === 'anilist' || work.provider === 'jikan') && !title.anime) meta.anime = true;
 
   const workKey = `${work.provider}:${work.id}`;
   const download = async (prefix: string, url: string | undefined): Promise<string | undefined> =>
@@ -340,6 +361,10 @@ export async function runWatchLibraryMetadata(now: () => number = Date.now): Pro
         dirty = false;
       }
     }
+    // What the lookups just learnt (AniList ids, English and romaji names,
+    // years) is what reveals two titles as one work. Folded even when this
+    // pass filled nothing: an import can have brought the second copy.
+    mergeWatchLibraryDuplicates(now());
   } catch {
     /* an unreadable watch library is the tracking module's to report */
   } finally {

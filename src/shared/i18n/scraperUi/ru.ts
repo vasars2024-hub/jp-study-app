@@ -705,10 +705,6 @@ export const SCRAPER_UI_RU: Catalog = {
   'trackingMgmt.noMatches': 'Подходящих отслеживаемых наименований нет.',
   'trackingMgmt.saved': 'Изменения отслеживания сохранены локально.',
   'trackingMgmt.rejected': 'Изменение отклонено: {reason}.',
-  'trackingMgmt.reason.partition-mismatch': 'раздел идентификатора не совпадает с типом содержимого',
-  'trackingMgmt.reason.not-found': 'эта запись больше не отслеживается',
-  'trackingMgmt.reason.content-type-mismatch': 'тип содержимого не совпадает с отслеживаемой записью',
-  'trackingMgmt.reason.invalid-progress': 'изменение не подходит к типу прогресса этой записи',
   'trackingMgmt.removed': 'Запись отслеживания удалена локально.',
   'trackingMgmt.offlineNote':
     'Только офлайн. Этот экран не обращается к поставщикам медиа и не запускает их.',

@@ -272,7 +272,9 @@ export default function YouTubePlaylistsView() {
     if (!ids.length) return;
     setBusy(t('yt.status.downloading'));
     setError('');
-    const r = await window.api.ytDownloadVideos(ids);
+    // Creator subtitles first, YouTube's auto-generated ja/en captions when a
+    // video has none — so every download arrives with a study line.
+    const r = await window.api.ytDownloadVideos(ids, { autoCaptions: true });
     setBusy('');
     setDlProgress(null);
     applyStore(r.store);
@@ -654,7 +656,7 @@ export default function YouTubePlaylistsView() {
                 value={addUrl}
                 onChange={(e) => setAddUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void addPlaylist()}
-                placeholder={t('yt.add.placeholder')}
+                placeholder={t('yt.add.placeholderChannel')}
                 disabled={!!whyBusy}
                 title={whyBusy}
               />

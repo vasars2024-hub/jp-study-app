@@ -63,9 +63,12 @@ import {
 } from './subtitleDiscoveryAuto';
 import type { SecondarySubtitlePick } from '../shared/subtitleDiscoveryStatus';
 import { estimateSubtitleOffset } from './subtitleSync';
+import { pickSidecarSubtitleForLanguage, sidecarTagMatches } from './subtitleSidecar';
 import type { SubtitleSyncEstimate } from '../shared/subtitleSync';
 import { mt } from './i18n';
-import type { ExternalPlayerProfile, PlaybackHandoff } from '../shared/externalPlayer';
+import type { PlaybackHandoff } from '../shared/externalPlayer';
+import { launchExternalPlayer, registerExternalPlayerIpc } from './externalPlayer';
+import { registerWatchAiring } from './watchAiring';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -314,7 +317,16 @@ export async function downloadYoutubeUrl(
     : opts.allSubs
       ? ['--write-subs', '--write-auto-subs', '--sub-langs', 'all', '--sub-format', 'vtt/srt/ass/best']
       : subtitleLangs.length > 0
-        ? ['--write-subs', '--sub-langs', subtitleLangs.join(','), '--sub-format', 'vtt/srt/ass/best']
+        ? [
+          '--write-subs',
+          // Auto captions only where asked for (the playlist manager asks): a
+          // video with no creator track still yields Japanese text.
+          ...(opts.autoCaptions ? ['--write-auto-subs'] : []),
+          '--sub-langs',
+          subtitleLangs.join(','),
+          '--sub-format',
+          'vtt/srt/ass/best',
+        ]
         : [];
   const args = await withYtDlpJsRuntime([
     trimmed,
@@ -965,6 +977,30 @@ function patchItems(ids: readonly string[], patch: Partial<MediaItem>): void {
   broadcastMedia();
 }
 
+/**
+ * What an external player should get beyond the file: the library's study
+ * subtitle (a file the player can load) and the saved resume point, when the
+ * caller did not supply them. A file the library does not know passes through.
+ */
+function enrichHandoffFromLibrary(handoff: PlaybackHandoff): PlaybackHandoff {
+  const key = (value: string): string => value.trim().replace(/\\/g, '/').toLowerCase();
+  const wanted = key(handoff.mediaPath);
+  const item = readDb().items.find((entry) => key(entry.path ?? '') === wanted);
+  if (!item) return handoff;
+  let subtitlePath = handoff.subtitlePath;
+  if (!subtitlePath) {
+    const record = pickPlaybackSubtitle(
+      item.subtitles,
+      loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+      item.preferredSubtitleId,
+    );
+    if (record?.path) subtitlePath = record.external ? record.path : path.join(app.getPath('userData'), record.path);
+  }
+  const resume = handoff.resumePositionSec
+    ?? (typeof item.positionSec === 'number' && item.positionSec > 0 ? item.positionSec : null);
+  return { ...handoff, subtitlePath, resumePositionSec: resume };
+}
+
 export function registerMediaIpc(): void {
   // The metadata job needs to read and stamp library items but must not own the
   // JSON store, so it is handed exactly those two operations.
@@ -1029,13 +1065,16 @@ export function registerMediaIpc(): void {
    */
   scheduleMetadataSweep();
 
-  ipcMain.handle('media:handoff', async (_e, handoff: PlaybackHandoff, profile: ExternalPlayerProfile): Promise<string | null> => {
-    if (!handoff || !profile || !path.isAbsolute(handoff.mediaPath) || !fs.existsSync(handoff.mediaPath) || !path.isAbsolute(profile.executablePath)) return 'Media and player paths must be existing absolute paths.';
-    const args = profile.arguments.map((arg) => arg.replaceAll('{media}', handoff.mediaPath).replaceAll('{subtitle}', handoff.subtitlePath ?? '').replaceAll('{title}', handoff.title));
-    const child = spawn(profile.executablePath, args, { detached: true, stdio: 'ignore', shell: false, windowsHide: true });
-    child.unref();
-    return null;
-  });
+  // Open in an external player. Only a profile saved in `external-players.json`
+  // can be started, looked up by `profile.id` — the path and arguments that
+  // arrive with the request are ignored (see `main/externalPlayer.ts`). A spawn
+  // failure is reported, never thrown: an `error` event with no listener used to
+  // take the whole app down when the player's path no longer existed.
+  registerExternalPlayerIpc();
+  // Next-episode times for the watch library, from AniList (see watchAiring.ts).
+  registerWatchAiring();
+  ipcMain.handle('media:handoff', (_e, handoff: unknown, profile: unknown): Promise<string | null> =>
+    launchExternalPlayer(handoff, profile, enrichHandoffFromLibrary));
   // Stream a token's file, honouring HTTP Range so the <video> can seek.
   protocol.handle('playfile', (request) => {
     try {
@@ -1464,9 +1503,26 @@ export function registerMediaIpc(): void {
   };
   ipcMain.handle(
     'media:subtitleForPath',
-    (_e, filePath: string, options?: { intent?: 'play' }): SubtitlePick | null => {
+    (_e, filePath: string, options?: { intent?: 'play'; lang?: string }): SubtitlePick | null => {
       if (typeof filePath !== 'string' || !filePath.trim()) return null;
       const item = itemForPath(filePath);
+
+      // `lang` asks for one language's track rather than the study pick — the
+      // player's second line (English under a Japanese video). A file the
+      // library has never seen can only answer from a sidecar beside it
+      // (`.en.srt`, `.eng.srt`, `.en.ass`), which the renderer cannot read.
+      const lang = options && typeof options === 'object' && typeof options.lang === 'string' ? options.lang.trim() : '';
+      if (lang) {
+        if (item) {
+          const record = pickPlaybackSubtitle(
+            (item.subtitles ?? []).filter((entry) => sidecarTagMatches(entry.lang ?? '', lang)),
+            lang,
+          );
+          const text = record ? readSubtitleRecord(record) : null;
+          if (record && text) return { name: record.label ?? `${record.lang} (${record.source})`, text };
+        }
+        return pickSidecarSubtitleForLanguage(filePath, lang);
+      }
 
       // The player says `intent: 'play'` when it mounts; nothing else does (the
       // lexicon search walks the whole library through this same handler, and a

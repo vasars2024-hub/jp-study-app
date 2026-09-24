@@ -1036,6 +1036,21 @@ declare global {
         entries: import('../shared/malLibrary').MalLibraryEntry[];
         summary: import('../shared/malLibrary').MalLibrarySummary;
       }>;
+      /** Writes one entry on the user's MAL list. Explicit user action only. */
+      malUpdateEntry(
+        animeId: number,
+        update: import('../shared/malSync').MalListStatusUpdate,
+      ): Promise<
+        import('../main/malSync').MalIpcResult<import('../shared/malSync').MalListStatusUpdate>
+      >;
+      /** What differs between the watch library and the MAL list as last fetched. Local only. */
+      malPushPreview(): Promise<
+        import('../main/malSync').MalIpcResult<import('../shared/malPush').MalPushPreview>
+      >;
+      /** Sends that diff (or just `animeIds`) to MAL — only from the "Push changes" button. */
+      malPushChanges(
+        animeIds?: number[],
+      ): Promise<import('../main/malSync').MalIpcResult<import('../main/malPush').MalPushResult>>;
       /**
        * Watch-tracking library (anime / TV / films, owned or not). Local disk
        * only; imports read export files, nothing signs in anywhere.
@@ -1060,7 +1075,16 @@ declare global {
       watchImportFile(filePath: string): Promise<import('../main/watchLibrary').WatchImportResult>;
       watchChooseImportFile(): Promise<string | null>;
       watchImportHistory(): Promise<import('../shared/watchLibrary').WatchImportRecord[]>;
+      /** Folds rows from the old tracking / shortlist localStorage stores into the library. */
+      watchImportLegacy(
+        rows: import('../shared/watchLibraryLegacy').WatchLegacyRow[],
+      ): Promise<import('../main/watchLibrary').WatchLegacyImportResult>;
       onWatchChanged(cb: (event: import('../main/watchLibrary').WatchChangedEvent) => void): () => void;
+      /** Airing-schedule job status (AniList next episodes) and a manual check. */
+      watchAiringStatus(): Promise<import('../main/watchAiring').WatchAiringStatus>;
+      watchAiringRefresh(): Promise<import('../main/watchAiring').WatchAiringStatus>;
+      /** Episodes of titles being watched that have just aired — once per episode. */
+      onWatchAiringAired(cb: (episodes: import('../shared/watchAiring').AiredEpisode[]) => void): () => void;
       /** Phase 0 credentials vault. No channel returns a secret — by design. */
       credentialStatus(): Promise<import('../main/credentials/ipc').CredentialVaultSnapshot>;
       setCredentialSecret(
@@ -1135,7 +1159,16 @@ declare global {
       pickMedia(): Promise<MediaOpen | null>;
       addMediaFolder(): Promise<{ items: MediaItem[]; added: number }>;
       openMedia(id: string): Promise<MediaOpen | null>;
+      /** Opens a file in a configured player (looked up by `profile.id` in main). Null on success, else a message. */
       handoffMedia(handoff: import('../shared/externalPlayer').PlaybackHandoff, profile: import('../shared/externalPlayer').ExternalPlayerProfile): Promise<string | null>;
+      externalPlayersGet(): Promise<import('../shared/externalPlayer').ExternalPlayerPreferences>;
+      externalPlayersSave(
+        preferences: import('../shared/externalPlayer').ExternalPlayerPreferences,
+      ): Promise<import('../main/externalPlayer').ExternalPlayerSaveResult>;
+      externalPlayerChooseExecutable(): Promise<string | null>;
+      onExternalPlayersChanged(
+        cb: (preferences: import('../shared/externalPlayer').ExternalPlayerPreferences) => void,
+      ): () => void;
       removeMedia(id: string): Promise<MediaItem[]>;
       pruneMedia(): Promise<{ removed: number; items: MediaItem[] }>;
       clearMediaLibrary(): Promise<MediaItem[]>;
@@ -1171,9 +1204,11 @@ declare global {
       /**
        * The discovered subtitle track for a local video, by path and side-effect free.
        * The adopted workspace has only a path, and the sidecar only sees inside the
-       * container — see `media:subtitleForPath` for the measurement.
+       * container — see `media:subtitleForPath` for the measurement. `lang` returns that
+       * language's track instead (library record, else a `.en.srt`/`.eng.srt`/`.en.ass`
+       * sidecar), for a second line under a file the library has never seen.
        */
-      subtitleForPath(filePath: string, options?: { intent?: 'play' }): Promise<SubtitlePick | null>;
+      subtitleForPath(filePath: string, options?: { intent?: 'play'; lang?: string }): Promise<SubtitlePick | null>;
       /**
        * The helper line (English unless the user chose another) for a local video,
        * never the same track as `subtitleForPath`'s. `machineTranslated` marks the
@@ -1300,7 +1335,8 @@ declare global {
           }
         | { error: string }
       >;
-      ytDownloadVideos(videoIds: string[]): Promise<{
+      /** `options.autoCaptions` (default true) also requests YouTube's auto-generated ja/en captions. */
+      ytDownloadVideos(videoIds: string[], options?: import('../main/ytPlaylists').YtDownloadRequestOptions): Promise<{
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
         results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
       }>;

@@ -1,58 +1,84 @@
-import { useEffect, useMemo, useState } from 'react';
-import { loadMediaTrackingSnapshot, type MediaTrackingLoadState } from '../../mediaTrackingStore';
-import { buildMediaTrackingDashboard, selectMediaTrackingCard } from '../../mediaTrackingDashboard';
+import { useMemo, useState } from 'react';
+import { buildWatchTrackingDashboard } from '../../mediaTrackingDashboard';
+import { watchKindLabelKey, type WatchTitleView } from '../../../shared/watchLibrary';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import { useT } from '../../i18n';
+import { useWatchTitles } from '../../useWatchTitles';
 import { MediaTrackingCalendar } from './MediaTrackingCalendar';
-import { MediaTrackingSources } from './MediaTrackingSources';
+import { WatchAiringStatus } from './WatchAiringStatus';
 
-export function MediaTrackingDashboard({ titleFor, onNavigate }: { titleFor?: (identityId: string) => string; onNavigate?: (identityId: string) => void }) {
-  const { t } = useT();
-  const [snapshot, setSnapshot] = useState<MediaTrackingLoadState | null>(null);
+/**
+ * The §11 tracking dashboard, over the watch library — the same list Gum
+ * shows, MAL and Letterboxd imports included. The old renderer-only tracking
+ * list is folded into it on first open (see `watchLegacyMigration.ts`).
+ */
+export function MediaTrackingDashboard({ onNavigate }: { onNavigate?: (titleId: string) => void }) {
+  const { t, lang } = useT();
+  const { titles, ready, error } = useWatchTitles();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  useEffect(() => { setSnapshot(loadMediaTrackingSnapshot()); }, []);
-  const sections = useMemo(() => buildMediaTrackingDashboard(snapshot?.document ?? { version: 1, records: [] }, titleFor), [snapshot, titleFor]);
-  const visible = sections.filter((section) => section.cards.length > 0);
+  const sections = useMemo(() => buildWatchTrackingDashboard(titles), [titles]);
+  const visible = sections.filter((section) => section.count > 0);
+  const total = titles.length;
+
+  const progressText = (card: WatchTitleView): string => (card.episodeCount
+    ? `${card.progress ?? 0}/${card.episodeCount}`
+    : t('media.tracking.watchedCount', { count: card.progress ?? 0 }));
+  const airingText = (card: WatchTitleView): string | null => {
+    if (!card.nextAiring) return null;
+    const when = new Date(card.nextAiring.at).toLocaleString(LANG_TAGS[lang], {
+      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    return t('media.tracking.nextAiring', { episode: card.nextAiring.episode, when });
+  };
+
   return (
-    <section className="media-tracking-dashboard" aria-label={t('media.tracking.label')} aria-busy={!snapshot}>
+    <section className="media-tracking-dashboard" aria-label={t('media.tracking.label')} aria-busy={!ready}>
       <div className="media-tracking-dashboard-head">
         <div>
-          <h2>{t('media.tracking.title')}</h2>
-          <p className="muted">{t('media.tracking.subtitle')}</p>
+          <p className="muted">{t('media.tracking.librarySubtitle')}</p>
         </div>
         <span className="media-tracking-dashboard-count" role="status" aria-live="polite">
-          {snapshot
-            ? t('media.tracking.entryCount', { count: sections.reduce((total, section) => total + section.count, 0) })
-            : t('media.tracking.loading')}
+          {ready ? t('media.tracking.entryCount', { count: total }) : t('media.tracking.loading')}
         </span>
       </div>
-      {!snapshot ? <p className="muted" role="status">{t('media.tracking.loadingLong')}</p> : snapshot.status === 'error' ? <p className="media-tracking-error" role="alert">{snapshot.error}</p> : visible.length === 0 ? <p className="muted">{t('media.tracking.empty')}</p> : (
-        <div className="media-tracking-shelves">
-          {visible.map((section) => (
-            <div className="media-tracking-shelf" key={section.id}>
-              <div className="media-tracking-shelf-head"><h3>{section.label}</h3><span className="muted">{section.count}</span></div>
-              <div className="media-tracking-cards">
-                {section.cards.map((card) => (
-                  <button type="button" className={`media-tracking-card ${selectedId === card.identityId ? 'is-selected' : ''}`} key={`${section.id}:${card.identityId}`} onClick={() => selectMediaTrackingCard(card.identityId, setSelectedId, onNavigate)} aria-label={t('media.tracking.openCard', { title: card.title })} aria-current={selectedId === card.identityId ? 'true' : undefined}>
-                    <strong>{card.title}</strong>
-                    <span className="muted">
-                      {card.contentType}
-                      {' · '}
-                      {card.progress.totalCount === null
-                        ? t('media.tracking.watchedCount', { count: card.progress.watchedCount })
-                        : `${card.progress.watchedCount}/${card.progress.totalCount}`}
-                    </span>
-                    {card.nextEpisodeNumber !== null && (
-                      <span className="muted">{t('media.tracking.nextEpisode', { episode: card.nextEpisodeNumber })}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
+      <WatchAiringStatus />
+      {!ready ? <p className="muted" role="status">{t('media.tracking.loadingLong')}</p>
+        : error ? <p className="media-tracking-error" role="alert">{error}</p>
+          : visible.length === 0 ? <p className="muted">{t('media.tracking.empty')}</p> : (
+            <div className="media-tracking-shelves">
+              {visible.map((section) => (
+                <div className="media-tracking-shelf" key={section.id}>
+                  <div className="media-tracking-shelf-head">
+                    <h3>{t(section.labelKey)}</h3>
+                    <span className="muted">{section.count}</span>
+                  </div>
+                  <div className="media-tracking-cards">
+                    {section.cards.map((card) => {
+                      const airing = airingText(card);
+                      return (
+                        <button
+                          type="button"
+                          className={`media-tracking-card ${selectedId === card.id ? 'is-selected' : ''}`}
+                          key={`${section.id}:${card.id}`}
+                          onClick={() => { setSelectedId(card.id); onNavigate?.(card.id); }}
+                          aria-label={t('media.tracking.openCard', { title: card.title })}
+                          aria-current={selectedId === card.id ? 'true' : undefined}
+                        >
+                          <strong>{card.title}</strong>
+                          <span className="muted">{t(watchKindLabelKey(card.kind))} · {progressText(card)}</span>
+                          {airing && <span className="muted">{airing}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {section.count > section.cards.length && (
+                    <span className="muted">{t('media.tracking.moreCount', { count: section.count - section.cards.length })}</span>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-      {snapshot?.status === 'ready' && <MediaTrackingCalendar document={snapshot.document} titleFor={titleFor} />}
-      {snapshot?.status === 'ready' && <MediaTrackingSources identityId={selectedId ?? undefined} titleFor={titleFor} />}
+          )}
+      {ready && !error && <MediaTrackingCalendar titles={titles} />}
     </section>
   );
 }

@@ -28,6 +28,14 @@ import { useSettings } from '../SettingsContext';
 import type { MalListEntry, MalListStatus } from '../../../../shared/malSync';
 import type { MalLibrarySummary } from '../../../../shared/malLibrary';
 import type { MalLibrarySyncReport } from '../../../../main/malLibrary';
+import type { MalPushPreview } from '../../../../shared/malPush';
+import type { MalPushResult } from '../../../../main/malPush';
+import { watchStatusFromMal, watchStatusLabelKey } from '../../../../shared/watchLibrary';
+
+/** Related-title walk budget per click — MAL's quota is the user's. */
+const RELATED_REQUEST_LIMIT = 60;
+/** Changes listed in the preview before "…and N more". */
+const PREVIEW_ROWS = 8;
 
 const REGISTER_URL = 'https://myanimelist.net/apiconfig';
 
@@ -67,6 +75,11 @@ export default function MalSyncPanel() {
   const [librarySummary, setLibrarySummary] = useState<MalLibrarySummary | null>(null);
   const [saveReport, setSaveReport] = useState<MalLibrarySyncReport | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pushPreview, setPushPreview] = useState<MalPushPreview | null>(null);
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<MalPushResult | null>(null);
+  const [relatedBusy, setRelatedBusy] = useState(false);
+  const [relatedResult, setRelatedResult] = useState<{ count: number; added: number; truncated: boolean } | null>(null);
 
   /**
    * Turns an IPC failure into a message.
@@ -90,6 +103,9 @@ export default function MalSyncPanel() {
     // whole reason this read is allowed to run without a click.
     const library = await window.api.malLibraryList().catch(() => null);
     if (library) setLibrarySummary(library.summary);
+    // Also local: the diff between the watch library and the stored MAL rows.
+    const preview = await window.api.malPushPreview?.().catch(() => null);
+    if (preview?.ok && preview.data) setPushPreview(preview.data);
   }, []);
 
   useEffect(() => {
@@ -175,6 +191,79 @@ export default function MalSyncPanel() {
       setSaving(false);
     }
   }, [describe, fetched]);
+
+  /**
+   * Sends the library's edits to MAL. The only write path in the panel, and it
+   * hangs off this click alone — the preview above it is what gets sent.
+   */
+  const pushChanges = useCallback(async (): Promise<void> => {
+    setPushing(true);
+    setError(null);
+    setPushResult(null);
+    try {
+      const result = await window.api.malPushChanges();
+      if (!result.ok || !result.data) setError(describe(result.errorCode, result.message));
+      else {
+        setPushResult(result.data);
+        if (result.data.stoppedBy) setError(describe(result.data.stoppedBy));
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : describe());
+    } finally {
+      setPushing(false);
+      void refresh();
+    }
+  }, [describe, refresh]);
+
+  /**
+   * Walks `related_anime` out from what the user finished or is watching and
+   * stores what it finds (as derivatives, not list entries). Read-only on MAL.
+   */
+  const includeRelated = useCallback(async (): Promise<void> => {
+    setRelatedBusy(true);
+    setError(null);
+    setRelatedResult(null);
+    try {
+      const library = await window.api.malLibraryList();
+      const seeds = library.entries
+        .filter((entry) => entry.origin === 'list' && entry.media === 'anime'
+          && (entry.status === 'completed' || entry.status === 'watching'))
+        .map((entry) => entry.malId);
+      if (!seeds.length) {
+        setError(t('malSync.relatedNeedsLibrary'));
+        return;
+      }
+      const walk = await window.api.malFetchDerivatives(seeds, { maxDepth: 1, maxRequests: RELATED_REQUEST_LIMIT });
+      if (!walk.ok || !walk.data) {
+        setError(describe(walk.errorCode, walk.message));
+        return;
+      }
+      const report = await window.api.malLibrarySync({ media: 'anime', derivatives: walk.data.derivatives });
+      setLibrarySummary(report.summary);
+      setRelatedResult({ count: walk.data.derivatives.length, added: report.added, truncated: walk.data.truncated });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : describe());
+    } finally {
+      setRelatedBusy(false);
+    }
+    // `t` is stable; `describe` carries the language dependency.
+  }, [describe, lang]);
+
+  const statusLabel = (value: unknown): string => {
+    const status = watchStatusFromMal(value as never);
+    return status ? t(watchStatusLabelKey(status)) : '—';
+  };
+  const fieldLines = (change: MalPushPreview['changes'][number]): string[] => {
+    const lines: string[] = [];
+    const u = change.update;
+    const b = change.before;
+    if (u.status !== undefined) lines.push(t('malSync.pushChangeLine', { field: t('malSync.pushField.status'), from: statusLabel(b.status), to: statusLabel(u.status) }));
+    if (u.score !== undefined) lines.push(t('malSync.pushChangeLine', { field: t('malSync.pushField.score'), from: b.score ?? 0, to: u.score }));
+    if (u.episodesWatched !== undefined) lines.push(t('malSync.pushChangeLine', { field: t('malSync.pushField.episodes'), from: b.episodesWatched ?? 0, to: u.episodesWatched }));
+    if (u.rewatching !== undefined) lines.push(t('malSync.pushChangeLine', { field: t('malSync.pushField.rewatching'), from: t(b.rewatching ? 'malSync.yes' : 'malSync.no'), to: t(u.rewatching ? 'malSync.yes' : 'malSync.no') }));
+    return lines;
+  };
+  const pending = pushPreview?.changes ?? [];
 
   return (
     <SettingsCard
@@ -285,7 +374,7 @@ export default function MalSyncPanel() {
         {/* Read-only, one click, no schedule. The note says so out loud because
             "connected to MyAnimeList" reasonably reads as "kept in sync", and
             here it does not. */}
-        <small className="muted">{t('malSync.noAutoSync')}</small>
+        <small className="muted">{t('malSync.noAutoSyncPush')}</small>
         <div className="field-row">
           {/* The IPC has accepted a status all along and the panel never sent
               one, so "completed only" — the view a study user actually wants —
@@ -357,6 +446,67 @@ export default function MalSyncPanel() {
           <small className="muted">
             {t('malSync.libraryDerivatives', { derivatives: librarySummary.derivatives })}
           </small>
+        )}
+      </fieldset>
+
+      <fieldset className="unified-search-controls">
+        <legend>{t('malSync.push')}</legend>
+        <small className="muted">{t('malSync.pushDesc')}</small>
+        {pushPreview?.needsFetch ? (
+          <p className="muted">{t('malSync.pushNeedsFetch')}</p>
+        ) : pending.length === 0 ? (
+          <p className="muted" role="status">{t('malSync.pushNone')}</p>
+        ) : (
+          <ul className="muted mal-push-preview">
+            {pending.slice(0, PREVIEW_ROWS).map((change) => (
+              <li key={change.animeId}>
+                <strong>{change.title}</strong>
+                {change.added ? ` · ${t('malSync.pushAdded')}` : ''}
+                {' · '}
+                {fieldLines(change).join(' · ')}
+              </li>
+            ))}
+            {pending.length > PREVIEW_ROWS && <li>{t('malSync.pushMore', { count: pending.length - PREVIEW_ROWS })}</li>}
+          </ul>
+        )}
+        <div className="field-row">
+          <button
+            type="button"
+            disabled={pushing || busy || !status.connected || pending.length === 0}
+            onClick={() => void pushChanges()}
+          >
+            {pushing ? t('malSync.pushPushing') : t('malSync.pushButton', { count: pending.length })}
+          </button>
+        </div>
+        {pushResult && (
+          <p role="status">
+            {t('malSync.pushResult', { sent: pushResult.sent, failed: pushResult.failed.length })}
+            {pushResult.remaining > 0 ? ` ${t('malSync.pushRemaining', { count: pushResult.remaining })}` : ''}
+          </p>
+        )}
+        {pushResult && pushResult.failed.length > 0 && (
+          <ul className="muted">
+            {pushResult.failed.slice(0, PREVIEW_ROWS).map((failure) => (
+              <li key={failure.animeId}>{failure.title}: {failure.code ? describe(failure.code, failure.message) : failure.message}</li>
+            ))}
+          </ul>
+        )}
+
+        <small className="muted">{t('malSync.relatedDesc', { limit: RELATED_REQUEST_LIMIT })}</small>
+        <div className="field-row">
+          <button
+            type="button"
+            disabled={relatedBusy || busy || !status.connected}
+            onClick={() => void includeRelated()}
+          >
+            {relatedBusy ? t('malSync.relatedWorking') : t('malSync.related')}
+          </button>
+        </div>
+        {relatedResult && (
+          <p role="status">
+            {t('malSync.relatedResult', { count: relatedResult.count, added: relatedResult.added })}
+            {relatedResult.truncated ? ` ${t('malSync.relatedTruncated')}` : ''}
+          </p>
         )}
       </fieldset>
 

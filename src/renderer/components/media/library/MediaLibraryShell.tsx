@@ -13,8 +13,6 @@ import Icon from '../../Icons';
 import { useT } from '../../../i18n';
 import MediaLibrarySidebar, { scopeKey, type LibraryScope, type LibraryShelfId } from './MediaLibrarySidebar';
 import { MediaTrackingDashboard } from '../MediaTrackingDashboard';
-import { buildLocalMediaTitleResolver } from '../../../mediaTrackingDashboard';
-import { loadMediaProvidersDocument } from '../../../mediaProviderStore';
 import MediaLibraryBrowser, { type LibraryViewMode } from './MediaLibraryBrowser';
 import MediaDetailPanel from './MediaDetailPanel';
 import MediaJobStrip from './MediaJobStrip';
@@ -24,6 +22,8 @@ import { mediaCategory, type MediaCategory } from '../../../../shared/mediaCateg
 import { searchMediaHub } from '../../../../shared/mediaHub';
 import { resolveSortForCategory, sortMediaItems, type MediaSortId } from '../../../../shared/mediaSorting';
 import type { MediaItem } from '../../../../shared/types';
+import { createPlaybackHandoff, orderExternalPlayerProfiles } from '../../../../shared/externalPlayer';
+import { loadExternalPlayerPreferences } from '../../../externalPlayerStore';
 import './mediaLibrary.css';
 
 const SCOPE_KEY = 'jp-medialib-scope';
@@ -338,6 +338,29 @@ export default function MediaLibraryShell({
     [items],
   );
 
+  /**
+   * "Open in <player>" for every configured external player that plays this
+   * kind of file, the remembered one first. Main starts only saved profiles and
+   * reports a missing program instead of failing silently.
+   */
+  const externalPlayerMenuItems = useCallback((item: MediaItem): MenuItem[] => {
+    const contentType = item.kind === 'audio' || item.kind === 'audiobook' ? 'audio' : 'video';
+    const profiles = orderExternalPlayerProfiles(loadExternalPlayerPreferences(), contentType);
+    return profiles.map((profile, index): MenuItem => ({
+      id: `external:${profile.id}`,
+      label: index === 0 && profiles.length === 1
+        ? t('externalPlayer.open')
+        : t('externalPlayer.openIn', { name: profile.name }),
+      onSelect: () => {
+        void window.api.handoffMedia(createPlaybackHandoff(item), profile).then((error) => {
+          showToast(error
+            ? { message: error, kind: 'error' }
+            : { message: t('externalPlayer.opened', { name: profile.name }), kind: 'success' });
+        });
+      },
+    }));
+  }, [t]);
+
   const menuItems = useMemo((): MenuItem[] => {
     const entry = cardMenu?.entry;
     if (!entry) return [];
@@ -349,6 +372,7 @@ export default function MediaLibraryShell({
         onSelect: () => onPlay(entry.primary.id),
       },
       { id: 'details', label: t('media.card.showDetails'), onSelect: () => setSelectedId(entry.id) },
+      ...externalPlayerMenuItems(entry.primary),
       { id: 'sep-1', label: '', separator: true },
       ...collectionNames.map((name): MenuItem => ({
         id: `collection:${name}`,
@@ -379,7 +403,7 @@ export default function MediaLibraryShell({
         onSelect: () => void removeEntry(entry),
       },
     ];
-  }, [cardMenu, collectionNames, onPlay, removeEntry, setCollections, t]);
+  }, [cardMenu, collectionNames, externalPlayerMenuItems, onPlay, removeEntry, setCollections, t]);
 
   const menu = useCallback((entry: LibraryEntry, anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect();
@@ -407,7 +431,7 @@ export default function MediaLibraryShell({
           // stacked above the grid, which is where it used to live and where it
           // pushed the actual library below the fold.
           <div className="medialib-browser medialib-browser--scroll">
-            <MediaTrackingDashboard titleFor={buildLocalMediaTitleResolver(loadMediaProvidersDocument())} />
+            <MediaTrackingDashboard />
           </div>
         ) : (
         <MediaLibraryBrowser

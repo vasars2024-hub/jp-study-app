@@ -33,8 +33,10 @@ import {
   buildWatchViews,
   countWatchStatuses,
   emptyWatchLibrary,
+  findWatchTitle,
   findWatchTitleForMedia,
   malLibraryEntriesToObservations,
+  mergeDuplicateWatchTitles,
   mergeWatchObservations,
   parseWatchLibraryDocument,
   queryWatchLibrary,
@@ -49,10 +51,12 @@ import {
   WATCH_COMPLETE_FRACTION,
   WATCH_LIBRARY_SCHEMA_VERSION,
   WATCH_LIBRARY_STORE_FILE,
+  type WatchDuplicateMergeResult,
   type WatchImportRecord,
   type WatchLibraryDocument,
   type WatchLinkableMedia,
   type WatchMetadataPatch,
+  type WatchNextAiring,
   type WatchObservation,
   type WatchPlaybackReason,
   type WatchQueryResult,
@@ -64,6 +68,7 @@ import {
   looksLikeMalExport,
   malExportRowsToListEntries,
   malExportRowsToObservations,
+  malExportLatestDate,
   malExportTimestampFromFileName,
   parseMalExportXml,
 } from '../shared/imports/malExport';
@@ -77,6 +82,7 @@ import {
   type LetterboxdFileKind,
 } from '../shared/imports/letterboxdExport';
 import { mergeMalExportEntries } from '../shared/malLibrary';
+import { sanitizeWatchLegacyRows, watchLegacyRowToObservation } from '../shared/watchLibraryLegacy';
 import { MEDIA_LIBRARY_STORE_FILE, mediaItemsFromStoredDocument } from '../shared/mediaLibraryEntries';
 import { malLibraryFilePath, readMalLibrary, writeMalLibrary } from './malLibrary';
 import { mt } from './i18n';
@@ -477,6 +483,47 @@ export function setWatchTitleMetadata(id: string, meta: WatchMetadataPatch, now:
   return next;
 }
 
+/**
+ * Stores the airing schedule the AniList job found (`null` clears it). One
+ * write for the batch. Not user data, so `updatedAt` is left alone — a
+ * schedule refresh must not reorder "recently updated".
+ */
+export function setWatchNextAiring(updates: ReadonlyMap<string, WatchNextAiring | null>, now: number = Date.now()): string[] {
+  if (!updates.size) return [];
+  const document = loadCurrent(now);
+  const changed: string[] = [];
+  const titles = document.titles.map((title) => {
+    if (!updates.has(title.id)) return title;
+    const next = updates.get(title.id) ?? null;
+    const current = title.nextAiring ?? null;
+    if (next?.episode === current?.episode && next?.at === current?.at) return title;
+    changed.push(title.id);
+    const copy: WatchTitle = { ...title };
+    if (next) copy.nextAiring = { ...next };
+    else delete copy.nextAiring;
+    return copy;
+  });
+  if (!changed.length) return [];
+  writeWatchLibrary({ ...document, titles });
+  broadcast({ reason: 'metadata', ids: changed, at: now });
+  return changed;
+}
+
+/**
+ * Folds titles that turned out to be one work — a MAL row and a Letterboxd
+ * film that metadata gave the same AniList id, or the same name and year once
+ * the MAL row learnt its English title. Runs after each metadata pass.
+ */
+export function mergeWatchLibraryDuplicates(now: number = Date.now()): WatchDuplicateMergeResult['merged'] {
+  const document = loadCurrent(now);
+  const result = mergeDuplicateWatchTitles(document, now);
+  if (!result.merged.length) return [];
+  writeWatchLibrary(result.document);
+  const ids = result.merged.flatMap((entry) => [entry.into, ...entry.from]);
+  broadcast({ reason: 'metadata', ids, at: now });
+  return result.merged;
+}
+
 /** Titles with no provider id at all — what a TMDB title+year search should visit. */
 export function listWatchTitlesNeedingLookup(): WatchTitle[] {
   return loadCurrent(Date.now()).titles.filter(watchTitleNeedsLookup);
@@ -511,7 +558,7 @@ export interface WatchImportSummary {
   source: 'mal-export' | 'letterboxd';
   format: WatchImportFormat;
   fileName: string;
-  /** When the export was made (from its file name, else the file's mtime). */
+  /** When the export was made (from its file name, else the newest date inside it). */
   exportedAt?: number;
   /** MAL user name / Letterboxd username, when the export names one. */
   username?: string;
@@ -691,7 +738,10 @@ export function importWatchFile(filePath: unknown, now: number = Date.now()): Wa
         ? failure('watchLibrary.import.error.mangaOnly')
         : failure('watchLibrary.import.error.empty');
     }
-    const exportedAt = malExportTimestampFromFileName(fileName) ?? (stat.mtimeMs || undefined);
+    // The export's own name, else the newest date inside it — never the file's
+    // mtime, which a copy resets to "now" and would let an old export overrule
+    // newer edits (the same rule the Letterboxd branch below follows).
+    const exportedAt = malExportTimestampFromFileName(fileName) ?? malExportLatestDate(parsed.anime);
     const observations = malExportRowsToObservations(parsed.anime, exportedAt);
     const merged = mergeWatchObservations(document, observations, now);
 
@@ -772,6 +822,47 @@ export function importWatchFile(filePath: unknown, now: number = Date.now()): Wa
   };
 }
 
+export interface WatchLegacyImportResult {
+  ok: true;
+  added: number;
+  updated: number;
+  unchanged: number;
+  /** Shortlist rows for titles already in the library — never re-statused to "plan". */
+  alreadyTracked: number;
+}
+
+/**
+ * Folds rows from the old renderer stores (`jp-media-tracking-v1`, the Discover
+ * shortlist) in as `manual` observations dated by their own last change, so a
+ * repeat is a fixed point and a newer library edit is never overruled. A
+ * shortlisted title the library already tracks is left alone: "I might watch
+ * this" must not turn a completed show back into plan-to-watch.
+ */
+export function importWatchLegacyRows(input: unknown, now: number = Date.now()): WatchLegacyImportResult {
+  const rows = sanitizeWatchLegacyRows(input);
+  let document = loadCurrent(now);
+  const index = buildWatchIndex(document.titles);
+  const observations: WatchObservation[] = [];
+  let alreadyTracked = 0;
+  for (const row of rows) {
+    const observation = watchLegacyRowToObservation(row);
+    if (row.origin === 'shortlist' && findWatchTitle(index, observation.identity)) {
+      alreadyTracked += 1;
+      continue;
+    }
+    observations.push(observation);
+  }
+  if (!observations.length) return { ok: true, added: 0, updated: 0, unchanged: 0, alreadyTracked };
+  const merged = mergeWatchObservations(document, observations, now);
+  document = merged.document;
+  if (merged.added || merged.updated) {
+    writeWatchLibrary(document);
+    const ids = merged.outcomes.map((entry) => entry.titleId).filter((id): id is string => !!id);
+    broadcast({ reason: 'import', ids, at: now });
+  }
+  return { ok: true, added: merged.added, updated: merged.updated, unchanged: merged.unchanged, alreadyTracked };
+}
+
 export function watchImportHistory(): WatchImportRecord[] {
   return readWatchLibrary().imports;
 }
@@ -808,4 +899,5 @@ export function registerWatchLibraryIpc(): void {
   ipcMain.handle('watch:importFile', (_event, filePath: unknown) => importWatchFile(filePath));
   ipcMain.handle('watch:chooseImportFile', () => chooseImportFile());
   ipcMain.handle('watch:importHistory', () => watchImportHistory());
+  ipcMain.handle('watch:importLegacy', (_event, rows: unknown) => importWatchLegacyRows(rows));
 }

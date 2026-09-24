@@ -40,7 +40,7 @@
  */
 
 import type { MalListEntry, MalListStatus } from '../malSync';
-import { normalizeWatchDate, uniqueStrings, type WatchKind, type WatchObservation, type WatchStatus } from '../watchLibrary';
+import { normalizeWatchDate, uniqueStrings, watchDateToMs, type WatchKind, type WatchObservation, type WatchStatus } from '../watchLibrary';
 import { stripBom } from './csv';
 
 export interface MalExportAnimeRow {
@@ -313,6 +313,23 @@ export function malExportTimestampFromFileName(fileName: string): number | undef
   if (!match) return undefined;
   const seconds = Number(match[1]);
   return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+}
+
+/**
+ * The newest `my_start_date` / `my_finish_date` in the file, as epoch ms — a
+ * lower bound on when the export was made, for a file whose name carries no
+ * timestamp. Never the file's mtime: copying an old export resets that to
+ * "now", which would let last year's list overwrite this week's edits.
+ */
+export function malExportLatestDate(rows: readonly MalExportAnimeRow[]): number | undefined {
+  let latest: number | undefined;
+  for (const row of rows) {
+    for (const date of [row.startDate, row.finishDate]) {
+      const ms = watchDateToMs(date);
+      if (ms !== undefined && (latest === undefined || ms > latest)) latest = ms;
+    }
+  }
+  return latest;
 }
 
 // ---------------------------------------------------------------------------

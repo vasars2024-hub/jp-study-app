@@ -64,3 +64,54 @@ export function projectMediaTrackingCalendar(
       daysFromNow: Math.max(0, Math.ceil((startOfDay(date) - from) / 86_400_000)),
     }));
 }
+
+/** The slice of a watch-library title the airing calendar reads. */
+export interface WatchAiringTitle {
+  id: string;
+  title: string;
+  status: string;
+  nextAiring?: { episode: number; at: number };
+}
+
+export interface WatchAiringCalendarEntry {
+  titleId: string;
+  title: string;
+  status: string;
+  episode: number;
+  /** Epoch ms. */
+  at: number;
+  daysFromNow: number;
+}
+
+/** Statuses whose next episode is worth a calendar row. */
+const CALENDAR_STATUSES = new Set(['watching', 'rewatching', 'plan', 'on_hold']);
+
+/**
+ * The upcoming episodes of the watch library's titles within `range`, soonest
+ * first. Reads `nextAiring`, which the airing-schedule job fills from AniList —
+ * nothing here is typed in by hand.
+ */
+export function projectWatchAiringCalendar(
+  titles: readonly WatchAiringTitle[],
+  range: MediaTrackingCalendarRange = 'week',
+  now = new Date(),
+): WatchAiringCalendarEntry[] {
+  const from = startOfDay(now);
+  const to = calendarRangeEnd(range, now).getTime();
+  return titles
+    .filter((title) => title.nextAiring && CALENDAR_STATUSES.has(title.status))
+    .map((title) => ({ title, at: (title.nextAiring as { at: number }).at }))
+    .filter(({ at }) => Number.isFinite(at) && at >= now.getTime() - 3_600_000 && at <= to)
+    .sort((a, b) => a.at - b.at || a.title.title.localeCompare(b.title.title))
+    .map(({ title, at }) => {
+      const date = new Date(at);
+      return {
+        titleId: title.id,
+        title: title.title,
+        status: title.status,
+        episode: (title.nextAiring as { episode: number }).episode,
+        at,
+        daysFromNow: Math.max(0, Math.ceil((startOfDay(date) - from) / 86_400_000)),
+      };
+    });
+}
