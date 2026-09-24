@@ -55,6 +55,7 @@ import { registerReleaseIpc } from './main/release';
 import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
 import { registerBackupIpc } from './main/backup/backupService';
 import { handleFatalMainError, registerCrashRecoveryIpc, watchRendererCrashes } from './main/crashRecovery';
+import { PDF_RASTER_SCHEME_PRIVILEGES } from './main/pdfRasterize';
 import { flushAllJsonWriters, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -280,6 +281,8 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  // Private to the sandboxed PDF-rasterizing window's own session (pdfRasterize.ts).
+  PDF_RASTER_SCHEME_PRIVILEGES,
 ]);
 
 /**
