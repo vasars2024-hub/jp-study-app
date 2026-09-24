@@ -33,7 +33,7 @@ import {
   type BackupManifest,
   type StagedRestore,
 } from './backupArchive';
-import { flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites } from '../atomicJson';
+import { flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites, writeJsonAtomicSync } from '../atomicJson';
 import { logDiagnostic } from '../errorLog';
 import { mt } from '../i18n';
 
@@ -99,8 +99,7 @@ function readState(): BackupState {
 
 function writeState(state: BackupState): void {
   try {
-    fs.mkdirSync(backupsDir(), { recursive: true });
-    fs.writeFileSync(statePath(), JSON.stringify(state, null, 2));
+    writeJsonAtomicSync(statePath(), state);
   } catch {
     /* status only */
   }

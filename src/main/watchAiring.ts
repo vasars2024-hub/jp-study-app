@@ -14,7 +14,6 @@
  */
 
 import { app, BrowserWindow, ipcMain, net } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
 import {
   airedEpisodesToAnnounce,
@@ -24,6 +23,7 @@ import {
   type AiredEpisode,
   type AiringRow,
 } from '../shared/watchAiring';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { anilistAiringBatch } from './mediaProviderClients';
 import { onWatchLibraryChanged, readWatchLibrary, listWatchTitlesNeedingLookup, setWatchNextAiring } from './watchLibrary';
 
@@ -84,7 +84,7 @@ export function __setWatchAiringDepsForTests(next: WatchAiringDeps | null): void
 
 function readState(): AiringState {
   try {
-    const raw = JSON.parse(fs.readFileSync(deps.statePath(), 'utf-8')) as Partial<AiringState>;
+    const raw = readJsonSync<Partial<AiringState>>(deps.statePath(), {});
     return {
       lastCheckedAt: typeof raw.lastCheckedAt === 'number' ? raw.lastCheckedAt : null,
       lastError: raw.lastError === 'offline' || raw.lastError === 'unreachable' ? raw.lastError : null,
@@ -98,11 +98,7 @@ function readState(): AiringState {
 
 function writeState(state: AiringState): void {
   try {
-    const target = deps.statePath();
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    const temp = `${target}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify(state), 'utf-8');
-    fs.renameSync(temp, target);
+    writeJsonAtomicSync(deps.statePath(), state, { space: 0 });
   } catch {
     /* an unwritten state only means a check or an announcement repeats */
   }

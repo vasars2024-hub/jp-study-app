@@ -27,6 +27,7 @@ import {
   type ExternalPlayerProfile,
   type PlaybackHandoff,
 } from '../shared/externalPlayer';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
 
 const STORE_FILE = 'external-players.json';
@@ -46,19 +47,12 @@ export function __setExternalPlayerDepsForTests(next: { store?: () => string; sp
 // ---------------------------------------------------------------------------
 
 export function readExternalPlayerPreferences(): ExternalPlayerPreferences {
-  try {
-    return normalizeExternalPlayerPreferences(JSON.parse(fs.readFileSync(storePath(), 'utf-8')));
-  } catch {
-    return createEmptyExternalPlayerPreferences();
-  }
+  // A damaged file is moved aside and its last-good copy served (atomicJson).
+  return normalizeExternalPlayerPreferences(readJsonSync<unknown>(storePath(), null));
 }
 
 function writeExternalPlayerPreferences(preferences: ExternalPlayerPreferences): void {
-  const target = storePath();
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  const temp = `${target}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(preferences, null, 2), 'utf-8');
-  fs.renameSync(temp, target);
+  writeJsonAtomicSync(storePath(), preferences);
 }
 
 function broadcast(preferences: ExternalPlayerPreferences): void {

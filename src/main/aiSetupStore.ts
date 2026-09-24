@@ -7,9 +7,9 @@
  * copy is safe, and atomically (temp file + rename), matching the Agent stores
  * beside it.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   normalizeAiFeatureSettings,
   type AiFeatureSettings,
@@ -30,7 +30,8 @@ export function createAiSetupStore(rootDirectory: string): AiSetupStore {
   const read = (): AiFeatureSettings => {
     if (cached) return cached;
     try {
-      cached = normalizeAiFeatureSettings(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+      // A damaged file is moved aside and its last-good copy served (atomicJson).
+      cached = normalizeAiFeatureSettings(readJsonSync<unknown>(filePath, null));
     } catch {
       cached = normalizeAiFeatureSettings(null);
     }
@@ -38,18 +39,7 @@ export function createAiSetupStore(rootDirectory: string): AiSetupStore {
   };
 
   const write = (next: AiFeatureSettings): AiFeatureSettings => {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-    try {
-      fs.writeFileSync(temporary, JSON.stringify(next, null, 2), { encoding: 'utf8', mode: 0o600 });
-      fs.renameSync(temporary, filePath);
-    } finally {
-      try {
-        fs.rmSync(temporary, { force: true });
-      } catch {
-        // Already renamed into place, or already gone.
-      }
-    }
+    writeJsonAtomicSync(filePath, next, { mode: 0o600 });
     cached = next;
     return next;
   };
