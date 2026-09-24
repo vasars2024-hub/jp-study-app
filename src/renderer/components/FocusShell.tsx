@@ -2,7 +2,7 @@
  * Focus Mode shell — library, reader, dictionary, Anki, mini music.
  * No desktop, living layer, widgets, or taskbar.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import Icon from './Icons';
 import FocusMusicBar from './FocusMusicBar';
@@ -10,8 +10,6 @@ import FocusLockBadge from './FocusLockBadge';
 import LibraryView from '../views/LibraryView';
 import DictionaryView from '../views/DictionaryView';
 import AnkiView from '../views/AnkiView';
-import NovelReader from '../views/NovelReader';
-import MangaReader from '../views/MangaReader';
 import {
   getInitialFocusTab,
   isFocusLocked,
@@ -23,6 +21,11 @@ import {
 } from '../focusMode';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { useT } from '../i18n';
+
+// Lazy for the same reason as in App.tsx: a static import here put both
+// readers in the boot preload set (audit robust #6).
+const NovelReader = lazy(() => import('../views/NovelReader'));
+const MangaReader = lazy(() => import('../views/MangaReader'));
 
 const TABS: { id: FocusTabId; labelKey: string; icon: 'library' | 'dictionary' | 'anki' }[] = [
   { id: 'library', labelKey: 'focus.tab.library', icon: 'library' },
@@ -144,11 +147,13 @@ export default function FocusShell({
           {exitBtn}
         </header>
         <main className="focus-reader">
-          {reading.kind === 'book' ? (
-            <NovelReader item={reading} onClose={closeBook} />
-          ) : (
-            <MangaReader item={reading} onClose={closeBook} />
-          )}
+          <Suspense fallback={null}>
+            {reading.kind === 'book' ? (
+              <NovelReader item={reading} onClose={closeBook} />
+            ) : (
+              <MangaReader item={reading} onClose={closeBook} />
+            )}
+          </Suspense>
         </main>
       </div>
     );

@@ -624,6 +624,36 @@ function forwardRendererConsole(win: BrowserWindow): void {
 
 /** Primary Study OS window (full desktop). Kept so Mini Widget can hide/show it. */
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * Boot work that is not needed for the first frame runs after it (audit
+ * robust #6). The renderer's own files are served by main (`app://`), so every
+ * synchronous millisecond spent here right after `createWindow()` — opening
+ * the 540 MB dictionary database, scanning model files, binding the extension
+ * server, registering hotkeys — was a millisecond the window waited for its
+ * HTML and chunks. Runs on the main window's first `ready-to-show`, or after a
+ * fallback delay if that never comes (hidden start, failed load).
+ */
+const afterFirstPaintQueue: Array<() => void> = [];
+let firstPaintDone = false;
+function runAfterFirstPaint(): void {
+  if (firstPaintDone) return;
+  firstPaintDone = true;
+  // One more macrotask so the show/paint itself is not competing.
+  setTimeout(() => {
+    for (const task of afterFirstPaintQueue.splice(0)) {
+      try {
+        task();
+      } catch (err) {
+        logDiagnostic('error', 'main', 'deferred-boot-task', errorDetail(err));
+      }
+    }
+  }, 50);
+}
+function afterFirstPaint(task: () => void): void {
+  if (firstPaintDone) setTimeout(task, 0);
+  else afterFirstPaintQueue.push(task);
+}
 /** Floating Mini craft widget — frameless, transparent, always-on-top. */
 let miniWidgetWindow: BrowserWindow | null = null;
 /** Compact Blanc Toolbox side window — parallel to the full Study OS. */
@@ -774,6 +804,7 @@ const createWindow = (restore?: {
     if (mainWindow && !mainWindow.isDestroyed() && restore?.visible !== false) {
       mainWindow.show();
     }
+    runAfterFirstPaint();
   });
 
   // Companion host is skipTaskbar; tear it down when the real main window closes
@@ -1873,26 +1904,30 @@ app.whenReady().then(async () => {
   });
   registerReadingLensIpc();
   createWindow();
-  // Assignments are seeded from `screen`, which is only live now. Run once the
-  // main window exists, so its own display is excluded from the secondaries.
-  syncDesktopWindows();
+  // Fallback: a hidden start or a failed load never fires ready-to-show.
+  setTimeout(runAfterFirstPaint, 8000);
   // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
   const coldOpen = argvOpenSection(process.argv);
   if (coldOpen) createPopoutWindow(coldOpen);
-  startExtensionServer();
-  // System-wide popup dictionary: registers its global hotkey + tray if enabled.
-  startSystemDictionary();
-  // Reading Lens: registers its own global hotkey (screen-region OCR reader).
-  startReadingLens();
-  // Provision + load offline dictionaries in the background so the window paints
-  // immediately. Consumers that need glosses (mining, the pop-up) await
-  // initYomitan() themselves, so they observe the loaded indices without any
-  // notification from here.
-  void initYomitan();
-  // Reconcile downloaded models against disk (and refresh the asset registry)
-  // in the background — consumers ask isInstalled() before touching a model, so
-  // a slow first pass degrades to "not installed yet", never to a crash.
-  void initDownloads();
+  afterFirstPaint(() => {
+    // Assignments are seeded from `screen`, which is only live now. Run once the
+    // main window exists, so its own display is excluded from the secondaries.
+    syncDesktopWindows();
+    startExtensionServer();
+    // System-wide popup dictionary: registers its global hotkey + tray if enabled.
+    startSystemDictionary();
+    // Reading Lens: registers its own global hotkey (screen-region OCR reader).
+    startReadingLens();
+    // Provision + load offline dictionaries in the background. Its first step
+    // opens the dictionary database synchronously, which is why it waits for
+    // the first frame. Consumers that need glosses (mining, the pop-up) await
+    // initYomitan() themselves, so an early lookup simply starts it.
+    void initYomitan();
+    // Reconcile downloaded models against disk (and refresh the asset registry)
+    // in the background — consumers ask isInstalled() before touching a model, so
+    // a slow first pass degrades to "not installed yet", never to a crash.
+    void initDownloads();
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

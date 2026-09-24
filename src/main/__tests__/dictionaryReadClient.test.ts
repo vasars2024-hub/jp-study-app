@@ -43,7 +43,7 @@ function fakeWorker(): FakeWorker {
   return worker;
 }
 
-function harness(options: { spawn?: () => ReadWorkerHandle; timeoutMs?: number; now?: () => number } = {}) {
+function harness(options: { spawn?: () => ReadWorkerHandle; timeoutMs?: number; now?: () => number; idleMs?: number } = {}) {
   const workers: FakeWorker[] = [];
   const inProcess = vi.fn(async (kind: string, query: unknown) => ({ via: 'in-process', kind, query }));
   const onFallback = vi.fn();
@@ -58,12 +58,45 @@ function harness(options: { spawn?: () => ReadWorkerHandle; timeoutMs?: number; 
     onFallback,
     timeoutMs: options.timeoutMs,
     now: options.now,
+    idleMs: options.idleMs,
   });
   return { client, workers, inProcess, onFallback };
 }
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('DictionaryReadClient — idle retirement (audit robust #6)', () => {
+  it('retires a quiet worker and spawns a fresh one on the next read, without counting a crash', async () => {
+    vi.useFakeTimers();
+    const { client, workers, onFallback } = harness({ idleMs: 1000 });
+    const first = client.read('frequency', { text: '猫' });
+    workers[0].reply({ type: 'readResult', id: 1, ok: true, value: { query: '猫', entries: [] } });
+    await first;
+    vi.advanceTimersByTime(999);
+    expect(workers[0].killed).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(workers[0].killed).toBe(true);
+    workers[0].exit();
+
+    const second = client.read('frequency', { text: '犬' });
+    expect(workers).toHaveLength(2);
+    workers[1].reply({ type: 'readResult', id: 2, ok: true, value: { query: '犬', entries: [] } });
+    await expect(second).resolves.toMatchObject({ query: '犬' });
+    expect(onFallback).not.toHaveBeenCalled();
+    expect(client.usingWorker()).toBe(true);
+  });
+
+  it('never retires a worker with a read in flight', () => {
+    vi.useFakeTimers();
+    const { client, workers } = harness({ idleMs: 1000, timeoutMs: 60_000 });
+    void client.read('frequency', { text: 'a' });
+    void client.read('frequency', { text: 'b' });
+    workers[0].reply({ type: 'readResult', id: 1, ok: true, value: { query: 'a', entries: [] } });
+    vi.advanceTimersByTime(5000);
+    expect(workers[0].killed).toBe(false);
+  });
 });
 
 describe('DictionaryReadClient', () => {
