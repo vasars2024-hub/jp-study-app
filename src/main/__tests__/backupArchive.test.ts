@@ -12,18 +12,24 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { finished } from 'node:stream/promises';
+import { Zip, ZipPassThrough } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   autoBackupDue,
   autoBackupName,
   commitStaged,
   createBackupArchive,
+  expectedDataEntries,
+  extractZipEntry,
   inventoryUserData,
   isRestorableRelPath,
   listAutoBackups,
   listZipEntries,
+  openZipWriter,
   pruneAutoBackups,
   stageArchive,
+  zipEndRecords,
   type CommitFs,
 } from '../backup/backupArchive';
 
@@ -203,6 +209,82 @@ describe('restore is all-or-nothing', () => {
     for (const good of ['library.json', 'immersion/sites.json', 'library/abc/book.epub', 'reading-lists-events.jsonl']) {
       expect(isRestorableRelPath(good)).toBe(true);
     }
+  });
+});
+
+describe('more than 65,535 entries', () => {
+  const MANY = 70_000;
+
+  it('writes Zip64 end records, and the reader lists every entry', async () => {
+    const zip = path.join(root, 'many.zip');
+    const writer = openZipWriter(fs.createWriteStream(zip));
+    const tiny = Buffer.from('x');
+    for (let i = 0; i < MANY; i++) writer.addData(`userdata/library/b/_ocr/${i}.json`, tiny, false);
+    await writer.end();
+
+    const entries = listZipEntries(zip);
+    expect(entries).toHaveLength(MANY);
+    expect(entries[MANY - 1].name).toBe(`userdata/library/b/_ocr/${MANY - 1}.json`);
+    const bytes = fs.readFileSync(zip);
+    // Plain end record says "see Zip64"; the Zip64 record holds the real count.
+    expect(bytes.readUInt16LE(bytes.length - 22 + 10)).toBe(0xffff);
+    const record = bytes.length - 22 - 20 - 56;
+    expect(bytes.readUInt32LE(record)).toBe(0x06064b50);
+    expect(Number(bytes.readBigUInt64LE(record + 32))).toBe(MANY);
+  }, 60_000);
+
+  it('lists every entry of an archive written before the fix (count wrapped, directory complete)', async () => {
+    const zip = path.join(root, 'old.zip');
+    const out = fs.createWriteStream(zip);
+    const legacy = new Zip((err, chunk, final) => {
+      if (err) throw err;
+      out.write(Buffer.from(chunk));
+      if (final) out.end();
+    });
+    for (let i = 0; i < MANY; i++) {
+      const f = new ZipPassThrough(`userdata/library/b/${i}.jpg`);
+      legacy.add(f);
+      f.push(new Uint8Array([1]), true);
+    }
+    legacy.end();
+    await finished(out);
+    const bytes = fs.readFileSync(zip);
+    expect(bytes.readUInt16LE(bytes.length - 22 + 10)).toBe(MANY % 0x10000); // what the old reader trusted
+    expect(listZipEntries(zip)).toHaveLength(MANY);
+  }, 60_000);
+
+  it('refuses a restore whose central directory disagrees with the manifest', async () => {
+    const zip = path.join(root, 'short.zip');
+    const created = await createBackupArchive({ userData: source, target: zip, includeBookFiles: true, trigger: 'manual', appVersion: '1', renderer: null });
+    expect(created.manifest.entries).toBe(created.manifest.stores.length + created.manifest.library.files);
+    expect((await stageArchive(zip, path.join(root, 'staging-ok'))).ok).toBe(true);
+
+    // Same manifest, one library file missing from the archive.
+    const short = path.join(root, 'short2.zip');
+    const writer = openZipWriter(fs.createWriteStream(short));
+    for (const entry of listZipEntries(zip)) {
+      if (entry.name === 'userdata/library/book-1/book.epub') continue;
+      const target = path.join(root, 'x', entry.name);
+      await extractZipEntry(zip, entry, target);
+      writer.addData(entry.name, fs.readFileSync(target), true);
+    }
+    await writer.end();
+    const staged = await stageArchive(short, path.join(root, 'staging'));
+    expect(staged.ok).toBe(false);
+    if (staged.ok) return;
+    expect(staged.errors.join('\n')).toMatch(/manifest lists/);
+    expect(fs.existsSync(path.join(root, 'staging'))).toBe(false);
+  });
+
+  it('checks archives from before the entries field against stores + library files', () => {
+    expect(expectedDataEntries({ stores: [{ path: 'a.json', bytes: 1 }], library: { files: 4, bytes: 0, bookFilesIncluded: true, bookFilesOmitted: 0 } } as never)).toBe(5);
+    expect(expectedDataEntries({ entries: 9, stores: [], library: { files: 0 } } as never)).toBe(9);
+  });
+
+  it('keeps the plain end record below the limit', () => {
+    const plain = zipEndRecords(3, 100, 2000);
+    expect(plain).toHaveLength(22);
+    expect(plain.readUInt16LE(10)).toBe(3);
   });
 });
 

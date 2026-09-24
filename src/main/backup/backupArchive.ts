@@ -189,6 +189,12 @@ export interface BackupManifest {
   library: { files: number; bytes: number; bookFilesIncluded: boolean; bookFilesOmitted: number };
   renderer: { localStorageKeys: number; indexedDbDatabases: string[] } | null;
   excluded: string[];
+  /**
+   * How many `userdata/` entries the archive holds (stores + library files).
+   * Restore refuses an archive whose central directory lists a different
+   * number. Absent in archives written before it existed.
+   */
+  entries?: number;
 }
 
 export interface CreateBackupOptions {
@@ -255,34 +261,11 @@ export async function createBackupArchive(options: CreateBackupOptions): Promise
   fs.mkdirSync(path.dirname(options.target), { recursive: true });
   const tmp = `${options.target}.${process.pid}.${Date.now().toString(36)}.tmp`;
   const out = fs.createWriteStream(tmp);
-  let zipError: Error | null = null;
-  const zip = new Zip((err, chunk, final) => {
-    if (err) {
-      zipError = err;
-      return;
-    }
-    out.write(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength));
-    if (final) out.end();
-  });
-  const addData = (name: string, data: Uint8Array, compress: boolean): void => {
-    const f = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
-    zip.add(f);
-    f.push(data, true);
-  };
-  const addFile = async (name: string, abs: string, compress: boolean): Promise<void> => {
-    const f = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
-    zip.add(f);
-    for await (const chunk of fs.createReadStream(abs, { highWaterMark: 1 << 20 })) {
-      const buf = chunk as Buffer;
-      f.push(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
-      if (out.writableNeedDrain) await once(out, 'drain');
-    }
-    f.push(new Uint8Array(0), true);
-  };
+  const writer = openZipWriter(out);
 
   try {
-    addData('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)), true);
-    if (rendererText != null) addData('renderer.json', Buffer.from(rendererText), true);
+    if (rendererText != null) writer.addData('renderer.json', Buffer.from(rendererText), true);
+    const writtenStores: BackupManifest['stores'] = [];
     for (const s of inv.stores) {
       let data: Buffer;
       try {
@@ -291,16 +274,29 @@ export async function createBackupArchive(options: CreateBackupOptions): Promise
         manifest.excluded.push(`${s.rel} (vanished during backup)`);
         continue;
       }
-      addData(`${USERDATA_PREFIX}${s.rel}`, data, true);
+      writer.addData(`${USERDATA_PREFIX}${s.rel}`, data, true);
+      writtenStores.push({ path: s.rel, bytes: data.length });
     }
+    let libraryFiles = 0;
+    let libraryBytes = 0;
     for (const s of library) {
-      if (!fs.existsSync(s.abs)) continue;
+      if (!fs.existsSync(s.abs)) {
+        manifest.excluded.push(`${s.rel} (vanished during backup)`);
+        continue;
+      }
       // Book files are already compressed (epub/cbz/pdf/jpg) — store them.
-      await addFile(`${USERDATA_PREFIX}${s.rel}`, s.abs, !s.bookFile);
+      await writer.addFile(`${USERDATA_PREFIX}${s.rel}`, s.abs, !s.bookFile);
+      libraryFiles += 1;
+      libraryBytes += s.bytes;
     }
-    zip.end();
-    await finished(out);
-    if (zipError) throw zipError;
+    // The manifest goes in last so it describes what was actually written;
+    // restore compares `entries` with the central directory.
+    manifest.stores = writtenStores;
+    manifest.library.files = libraryFiles;
+    manifest.library.bytes = libraryBytes;
+    manifest.entries = writtenStores.length + libraryFiles;
+    writer.addData('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)), true);
+    await writer.end();
     fs.renameSync(tmp, options.target);
   } catch (err) {
     out.destroy();
@@ -308,6 +304,99 @@ export async function createBackupArchive(options: CreateBackupOptions): Promise
     throw err;
   }
   return { path: options.target, bytes: fs.statSync(options.target).size, manifest };
+}
+
+/** Plain ZIP counts entries in 16 bits; past this the Zip64 end records are written. */
+export const ZIP16_MAX_ENTRIES = 0xffff;
+
+/**
+ * End-of-central-directory records for `count` entries.
+ *
+ * fflate writes only the plain 22-byte record, whose entry counts are 16-bit
+ * and wrap past 65,535: a library with many manga page images or OCR files got
+ * an archive whose reader saw a few thousand entries and restored only those.
+ * Above the limit this writes the Zip64 end record and its locator and sets the
+ * plain record's counts to 0xFFFF ("see Zip64"), as the spec asks. Sizes and
+ * offsets stay 32-bit: archives are capped below 4 GiB.
+ */
+export function zipEndRecords(count: number, cdSize: number, cdOffset: number): Buffer {
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  const zip64 = count > ZIP16_MAX_ENTRIES;
+  end.writeUInt16LE(zip64 ? 0xffff : count, 8);
+  end.writeUInt16LE(zip64 ? 0xffff : count, 10);
+  end.writeUInt32LE(cdSize, 12);
+  end.writeUInt32LE(cdOffset, 16);
+  if (!zip64) return end;
+  const record = Buffer.alloc(56);
+  record.writeUInt32LE(0x06064b50, 0);
+  record.writeBigUInt64LE(44n, 4);
+  record.writeUInt16LE(45, 12);
+  record.writeUInt16LE(45, 14);
+  record.writeBigUInt64LE(BigInt(count), 24);
+  record.writeBigUInt64LE(BigInt(count), 32);
+  record.writeBigUInt64LE(BigInt(cdSize), 40);
+  record.writeBigUInt64LE(BigInt(cdOffset), 48);
+  const locator = Buffer.alloc(20);
+  locator.writeUInt32LE(0x07064b50, 0);
+  locator.writeBigUInt64LE(BigInt(cdOffset + cdSize), 8);
+  locator.writeUInt32LE(1, 16);
+  return Buffer.concat([record, locator, end]);
+}
+
+export interface ZipWriter {
+  addData(name: string, data: Uint8Array, compress: boolean): void;
+  addFile(name: string, abs: string, compress: boolean): Promise<void>;
+  /** Finish the archive and wait until `out` has flushed. */
+  end(): Promise<void>;
+}
+
+/** fflate streaming ZIP into `out`, with correct end records for any entry count. */
+export function openZipWriter(out: fs.WriteStream): ZipWriter {
+  let zipError: Error | null = null;
+  let written = 0;
+  let count = 0;
+  const zip = new Zip((err, chunk, final) => {
+    if (err) {
+      zipError = err;
+      return;
+    }
+    if (!final) {
+      written += chunk.byteLength;
+      out.write(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength));
+      return;
+    }
+    // The final chunk is the central directory followed by fflate's 22-byte
+    // end record (no comment). Keep the directory; write our own end records.
+    const cdSize = chunk.byteLength - 22;
+    out.write(Buffer.from(chunk.buffer, chunk.byteOffset, cdSize));
+    out.write(zipEndRecords(count, cdSize, written));
+    out.end();
+  });
+  return {
+    addData(name, data, compress) {
+      const f = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
+      zip.add(f);
+      count += 1;
+      f.push(data, true);
+    },
+    async addFile(name, abs, compress) {
+      const f = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
+      zip.add(f);
+      count += 1;
+      for await (const chunk of fs.createReadStream(abs, { highWaterMark: 1 << 20 })) {
+        const buf = chunk as Buffer;
+        f.push(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+        if (out.writableNeedDrain) await once(out, 'drain');
+      }
+      f.push(new Uint8Array(0), true);
+    },
+    async end() {
+      zip.end();
+      await finished(out);
+      if (zipError) throw zipError;
+    },
+  };
 }
 
 // ── reading archives ─────────────────────────────────────────────────────────
@@ -332,13 +421,21 @@ function readAt(fd: number, position: number, length: number): Buffer {
   return buf.subarray(0, read);
 }
 
-/** Parse the central directory (random access; never loads the whole archive). */
+/**
+ * Parse the central directory (random access; never loads the whole archive).
+ *
+ * Entries are read until the directory's byte size is used up, never by the
+ * stored count: the plain end record holds only 16 bits, and archives written
+ * before the Zip64 fix carry a count wrapped modulo 65,536 over a complete
+ * directory. Zip64 end records are honoured when present.
+ */
 export function listZipEntries(zipPath: string): ZipEntry[] {
   const fd = fs.openSync(zipPath, 'r');
   try {
     const size = fs.fstatSync(fd).size;
     const tailLen = Math.min(size, 65557);
-    const tail = readAt(fd, size - tailLen, tailLen);
+    const tailStart = size - tailLen;
+    const tail = readAt(fd, tailStart, tailLen);
     let eocd = -1;
     for (let i = tail.length - 22; i >= 0; i--) {
       if (tail.readUInt32LE(i) === 0x06054b50) {
@@ -347,14 +444,25 @@ export function listZipEntries(zipPath: string): ZipEntry[] {
       }
     }
     if (eocd < 0) throw new Error('Not a ZIP archive (no end-of-directory record)');
-    const count = tail.readUInt16LE(eocd + 10);
-    const cdSize = tail.readUInt32LE(eocd + 12);
-    const cdOffset = tail.readUInt32LE(eocd + 16);
+    const stated = tail.readUInt16LE(eocd + 10);
+    let cdSize = tail.readUInt32LE(eocd + 12);
+    let cdOffset = tail.readUInt32LE(eocd + 16);
+    if (stated === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
+      const locatorAt = tailStart + eocd - 20;
+      const locator = locatorAt >= 0 ? readAt(fd, locatorAt, 20) : Buffer.alloc(0);
+      if (locator.length === 20 && locator.readUInt32LE(0) === 0x07064b50) {
+        const record = readAt(fd, Number(locator.readBigUInt64LE(8)), 56);
+        if (record.length < 56 || record.readUInt32LE(0) !== 0x06064b50) throw new Error('Damaged ZIP64 end-of-directory record');
+        cdSize = Number(record.readBigUInt64LE(40));
+        cdOffset = Number(record.readBigUInt64LE(48));
+      }
+    }
     const cd = readAt(fd, cdOffset, cdSize);
+    if (cd.length !== cdSize) throw new Error('Damaged ZIP central directory (truncated)');
     const entries: ZipEntry[] = [];
     let p = 0;
-    for (let i = 0; i < count; i++) {
-      if (cd.readUInt32LE(p) !== 0x02014b50) throw new Error('Damaged ZIP central directory');
+    while (p < cd.length) {
+      if (p + 46 > cd.length || cd.readUInt32LE(p) !== 0x02014b50) throw new Error('Damaged ZIP central directory');
       const method = cd.readUInt16LE(p + 10);
       const crc = cd.readUInt32LE(p + 16);
       const compressedSize = cd.readUInt32LE(p + 20);
@@ -363,6 +471,7 @@ export function listZipEntries(zipPath: string): ZipEntry[] {
       const extraLen = cd.readUInt16LE(p + 30);
       const commentLen = cd.readUInt16LE(p + 32);
       const localHeaderOffset = cd.readUInt32LE(p + 42);
+      if (p + 46 + nameLen > cd.length) throw new Error('Damaged ZIP central directory');
       const name = cd.subarray(p + 46, p + 46 + nameLen).toString('utf8');
       entries.push({ name, method, crc, compressedSize, size: uncompressed, localHeaderOffset });
       p += 46 + nameLen + extraLen + commentLen;
@@ -371,6 +480,17 @@ export function listZipEntries(zipPath: string): ZipEntry[] {
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * How many `userdata/` entries the manifest says the archive holds, or null
+ * when it does not say. Archives written before `entries` existed listed every
+ * store and library file they wrote in `stores` / `library.files`.
+ */
+export function expectedDataEntries(manifest: BackupManifest): number | null {
+  if (typeof manifest.entries === 'number' && Number.isFinite(manifest.entries)) return manifest.entries;
+  if (!Array.isArray(manifest.stores) || !manifest.library || typeof manifest.library.files !== 'number') return null;
+  return manifest.stores.length + manifest.library.files;
 }
 
 function dataStart(zipPath: string, entry: ZipEntry): number {
@@ -484,6 +604,14 @@ export async function stageArchive(zipPath: string, stagingDir: string): Promise
     manifest = parsed;
   } catch (err) {
     return { ok: false, errors: [`manifest.json: ${err instanceof Error ? err.message : String(err)}`] };
+  }
+  const dataEntries = entries.filter((e) => e.name.startsWith(USERDATA_PREFIX) && !e.name.endsWith('/')).length;
+  const expected = expectedDataEntries(manifest);
+  if (expected !== null && dataEntries !== expected) {
+    return {
+      ok: false,
+      errors: [`The archive holds ${dataEntries} files but its manifest lists ${expected}; it is incomplete or damaged, so nothing was restored`],
+    };
   }
 
   let renderer: unknown | null = null;
