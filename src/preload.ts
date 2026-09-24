@@ -1398,6 +1398,7 @@ const api = {
     ipcRenderer.invoke('shell:setWindowChromeMode', mode),
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   checkAppRelease: (): Promise<AppReleaseInfo | null> => ipcRenderer.invoke('release:check'),
+  releaseStatus: (): Promise<import('./shared/release').ReleaseStatus> => ipcRenderer.invoke('release:status'),
 
   // Remote Resources catalogue (fetched from GitHub, cached in userData)
   catalogGet: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
@@ -2772,6 +2773,26 @@ const api = {
     ipcRenderer.invoke('storage:saveIdbRecovery', dbName, json),
   storagePreserveIdbFiles: (dbName: string): Promise<string | null> =>
     ipcRenderer.invoke('storage:preserveIdbFiles', dbName),
+  diagnosticsRecent: (limit?: number): Promise<import('./main/crashRecovery').DiagnosticEntry[]> =>
+    ipcRenderer.invoke('diagnostics:recent', limit),
+  diagnosticsSummary: (): Promise<import('./main/crashRecovery').DiagnosticsSummary> =>
+    ipcRenderer.invoke('diagnostics:summary'),
+  diagnosticsOpenLogFolder: (): Promise<string> => ipcRenderer.invoke('diagnostics:openLogFolder'),
+  diagnosticsConsumeCrashRecovery: (): Promise<{ reason: string; crashes: number; safeMode: boolean } | null> =>
+    ipcRenderer.invoke('diagnostics:consumeCrashRecovery'),
+  // Backup & restore (main/backup/backupService.ts)
+  backupStatus: (): Promise<import('./main/backup/backupService').BackupStatus> => ipcRenderer.invoke('backup:status'),
+  backupCreate: (args: { includeBookFiles: boolean; renderer: unknown }): Promise<import('./main/backup/backupService').CreateBackupReply> =>
+    ipcRenderer.invoke('backup:create', args),
+  backupAutoDue: (): Promise<boolean> => ipcRenderer.invoke('backup:autoDue'),
+  backupCreateAuto: (args: { renderer: unknown }): Promise<unknown> => ipcRenderer.invoke('backup:createAuto', args),
+  backupRestoreChoose: (): Promise<import('./main/backup/backupService').RestoreChooseReply> =>
+    ipcRenderer.invoke('backup:restoreChoose'),
+  backupRestoreCommit: (token: string): Promise<import('./main/backup/backupService').RestoreCommitReply> =>
+    ipcRenderer.invoke('backup:restoreCommit', token),
+  backupRestoreDiscard: (): Promise<void> => ipcRenderer.invoke('backup:restoreDiscard'),
+  backupRelaunch: (): Promise<void> => ipcRenderer.invoke('backup:relaunch'),
+  backupOpenFolder: (): Promise<string> => ipcRenderer.invoke('backup:openFolder'),
 
   // System-wide popup dictionary (global hotkey + tray + floating overlay).
   sysDictGetSettings: (): Promise<{

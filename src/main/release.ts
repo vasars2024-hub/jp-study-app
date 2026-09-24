@@ -1,11 +1,15 @@
 import { app, ipcMain } from 'electron';
 import {
+  classifyRelease,
   compareVersions,
+  GITHUB_OWNER,
   GITHUB_RELEASES_LATEST,
+  GITHUB_REPO,
   normalizeVersion,
   parseExtensionVersionFromBody,
   parseReleaseHighlights,
   type AppReleaseInfo,
+  type ReleaseStatus,
 } from '../shared/release';
 import { readInstalledExtensionVersion } from './extensionInstall';
 
@@ -16,7 +20,13 @@ interface GitHubLatestPayload {
   html_url?: string;
 }
 
-async function fetchGithubLatest(): Promise<GitHubLatestPayload | null> {
+type LatestFetch =
+  | { kind: 'ok'; data: GitHubLatestPayload }
+  /** 404 from /releases/latest: the repository publishes no releases. */
+  | { kind: 'none' }
+  | { kind: 'failed' };
+
+async function fetchGithubLatestDetailed(): Promise<LatestFetch> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 15000);
   try {
@@ -27,13 +37,46 @@ async function fetchGithubLatest(): Promise<GitHubLatestPayload | null> {
         'User-Agent': 'jp-study-app',
       },
     });
-    if (!res.ok) return null;
-    return (await res.json()) as GitHubLatestPayload;
+    if (res.status === 404) return { kind: 'none' };
+    if (!res.ok) return { kind: 'failed' };
+    return { kind: 'ok', data: (await res.json()) as GitHubLatestPayload };
   } catch {
-    return null;
+    return { kind: 'failed' };
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchGithubLatest(): Promise<GitHubLatestPayload | null> {
+  const r = await fetchGithubLatestDetailed();
+  return r.kind === 'ok' ? r.data : null;
+}
+
+/**
+ * The honest answer for Settings > Help. The notification path below only
+ * speaks when there is something newer; this one also says "you are on the
+ * latest", "your build is newer than the latest release" (the audit found
+ * v1.0.1 locally vs v1.0.0 published, where the old check just stayed silent),
+ * or "this project publishes no releases" so the UI can hide the control.
+ */
+export async function getReleaseStatus(
+  current = app.getVersion(),
+  fetchLatest: () => Promise<LatestFetch> = fetchGithubLatestDetailed,
+): Promise<ReleaseStatus> {
+  const checkedAt = Date.now();
+  const r = await fetchLatest();
+  const cur = normalizeVersion(current);
+  if (r.kind === 'failed') return { kind: 'unavailable', current: cur, checkedAt };
+  if (r.kind === 'none') return { kind: 'no-releases', current: cur, checkedAt };
+  const latest = normalizeVersion(r.data.tag_name ?? '');
+  const kind = classifyRelease(cur, latest || null);
+  return {
+    kind,
+    current: cur,
+    latest: latest || undefined,
+    url: r.data.html_url ?? (latest ? `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/v${latest}` : undefined),
+    checkedAt,
+  };
 }
 
 /**
@@ -60,7 +103,7 @@ async function fetchLatestRelease(): Promise<AppReleaseInfo | null> {
 
   if (!appUpdate && !extensionUpdate) return null;
 
-  const url = data.html_url ?? `https://github.com/vasars2024-hub/jp-study-app/releases/tag/v${version}`;
+  const url = data.html_url ?? `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/v${version}`;
   return {
     version,
     title: data.name?.trim() || `v${version}`,
@@ -76,4 +119,5 @@ async function fetchLatestRelease(): Promise<AppReleaseInfo | null> {
 export function registerReleaseIpc(): void {
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('release:check', () => fetchLatestRelease());
+  ipcMain.handle('release:status', () => getReleaseStatus());
 }

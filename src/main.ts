@@ -53,6 +53,8 @@ import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
 import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
+import { registerBackupIpc } from './main/backup/backupService';
+import { handleFatalMainError, registerCrashRecoveryIpc, watchRendererCrashes } from './main/crashRecovery';
 import { flushAllJsonWriters, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -235,8 +237,9 @@ process.stderr?.on?.('error', (err) => {
 process.on('uncaughtException', (err) => {
   if (isEpipe(err)) return;
   console.error(err);
-  logDiagnostic('error', 'main', 'uncaughtException', errorDetail(err));
-  app.quit();
+  // Used to log and quit with no dialog — the app simply vanished. Now the user
+  // sees what happened, can copy the details, and chooses restart or quit.
+  handleFatalMainError(err, flushAllJsonWriters);
 });
 // Previously unhandled promise rejections in the main process were silent
 // (Node's default is a console warning at best) — log them so they're
@@ -728,12 +731,10 @@ function attachNavGuards(win: BrowserWindow): void {
     return { action: 'deny' };
   });
   // Every window goes through attachNavGuards, so this is one place to catch
-  // renderer crashes/hangs for all six window types (previously unmonitored —
-  // PHASE_6_5_AUDIT.md Phase 8 gap: a renderer crash just left a blank/frozen
-  // window with no log trail).
-  win.webContents.on('render-process-gone', (_e, details) => {
-    logDiagnostic('error', 'renderer', 'render-process-gone', `reason=${details.reason}`);
-  });
+  // renderer crashes/hangs for every window type. Logging alone left the window
+  // dead (a sweep saw reason=oom freeze the app for >10 minutes); crashed
+  // windows are now reloaded with backoff — see crashRecovery.ts.
+  watchRendererCrashes(win);
   win.on('unresponsive', () => {
     logDiagnostic('warn', 'renderer', 'unresponsive', win.getTitle());
   });
@@ -1486,6 +1487,10 @@ function createPopoutWindow(requested: string): boolean {
     },
   });
   if (mooncapWidget) win.setAspectRatio(4 / 5);
+  // Pop-outs host the same sections as the main window — including the
+  // Immersion browser's <webview> — so they get the same webview hardening and
+  // crash recovery. The inline guards below stay as the pop-out's own policy.
+  attachNavGuards(win);
   // Same guard as main window: never let EPUB / content links hijack the SPA.
   win.webContents.on('will-navigate', (e, url) => {
     const ok =
@@ -1752,7 +1757,9 @@ app.whenReady().then(async () => {
   });
   registerDictionaryIpc();
   registerDiagnosticsIpc();
+  registerCrashRecoveryIpc();
   registerStorageRecoveryIpc();
+  registerBackupIpc();
   registerShellIpc();
   registerAppLifecycleIpc();
   registerToolboxIpc();

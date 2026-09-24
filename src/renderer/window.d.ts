@@ -838,6 +838,8 @@ declare global {
       setWindowChromeMode(mode: 'standard' | 'borderless' | 'frameless'): Promise<'standard' | 'borderless' | 'frameless'>;
       appVersion(): Promise<string>;
       checkAppRelease(): Promise<AppReleaseInfo | null>;
+      /** Honest update status for Settings > Help (see shared/release.ts ReleaseStatusKind). */
+      releaseStatus(): Promise<import('../shared/release').ReleaseStatus>;
       catalogGet(): Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
       catalogRefresh(): Promise<
         import('../shared/resourcesCatalog').CatalogResult<
@@ -1749,6 +1751,20 @@ declare global {
       storageSaveIdbRecovery(dbName: string, json: string): Promise<string>;
       /** Copy the calling origin's raw IndexedDB files aside; null when nothing was copied. */
       storagePreserveIdbFiles(dbName: string): Promise<string | null>;
+      diagnosticsRecent(limit?: number): Promise<import('../main/crashRecovery').DiagnosticEntry[]>;
+      diagnosticsSummary(): Promise<import('../main/crashRecovery').DiagnosticsSummary>;
+      diagnosticsOpenLogFolder(): Promise<string>;
+      /** Non-null once, right after main reloaded this window from a crash. */
+      diagnosticsConsumeCrashRecovery(): Promise<{ reason: string; crashes: number; safeMode: boolean } | null>;
+      backupStatus(): Promise<import('../main/backup/backupService').BackupStatus>;
+      backupCreate(args: { includeBookFiles: boolean; renderer: unknown }): Promise<import('../main/backup/backupService').CreateBackupReply>;
+      backupAutoDue(): Promise<boolean>;
+      backupCreateAuto(args: { renderer: unknown }): Promise<unknown>;
+      backupRestoreChoose(): Promise<import('../main/backup/backupService').RestoreChooseReply>;
+      backupRestoreCommit(token: string): Promise<import('../main/backup/backupService').RestoreCommitReply>;
+      backupRestoreDiscard(): Promise<void>;
+      backupRelaunch(): Promise<void>;
+      backupOpenFolder(): Promise<string>;
 
       // System-wide popup dictionary
       sysDictGetSettings(): Promise<{
