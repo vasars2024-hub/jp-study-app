@@ -748,6 +748,7 @@ export function updateDeckCard(
       | 'ankiDeck'
       | 'ankiPending'
       | 'ankiDuplicate'
+      | 'ankiQueueGaveUp'
       | 'sourceUrl'
       | 'bookTitle'
     >

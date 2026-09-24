@@ -641,12 +641,12 @@ type LockRequest = (
  * second window start sending the same notes.
  */
 async function withDrainLock<T>(run: (renew: () => void) => Promise<T>, busy: () => T): Promise<T> {
-  const locks = (typeof navigator !== 'undefined'
-    ? (navigator as Navigator & { locks?: { request?: LockRequest } }).locks
-    : undefined);
-  if (typeof locks?.request === 'function') {
-    const request = locks.request.bind(locks) as LockRequest;
-    return (await request(DRAIN_LOCK, { ifAvailable: true }, async (lock) => (lock ? run(() => undefined) : busy()))) as T;
+  const locks = typeof navigator !== 'undefined'
+    ? (navigator as unknown as { locks?: { request?: LockRequest } }).locks
+    : undefined;
+  const request = locks?.request;
+  if (typeof request === 'function') {
+    return (await request.call(locks, DRAIN_LOCK, { ifAvailable: true }, async (lock: unknown) => (lock ? run(() => undefined) : busy()))) as T;
   }
   if (!acquireLease()) return busy();
   try {
