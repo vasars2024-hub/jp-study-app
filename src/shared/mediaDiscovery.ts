@@ -101,6 +101,12 @@ export interface DiscoveryProfile {
   genreAffinity: Record<string, number>;
   /** Normalized title keys already in the library, so owned titles rank down. */
   knownTitleKeys: string[];
+  /**
+   * `jikan:<malId>` / `anilist:<id>` of titles already tracked — the watch
+   * library, MAL imports included — matched against a candidate's own id, so a
+   * title is recognised whatever name the feed uses for it.
+   */
+  knownIds?: string[];
   /** Prefer short runs — the default for lower levels, where finishing matters. */
   preferShort: boolean;
 }
@@ -260,8 +266,12 @@ function clamp(value: number, min: number, max: number): number {
 /** The slice of a library item the profile builder reads. */
 export interface DiscoveryLibrarySignal {
   title?: string;
+  /** Every other name it goes by (watch-library alternates). */
+  altTitles?: string[];
   genres?: string[];
   jlptLevel?: string;
+  malId?: number;
+  anilistId?: number;
 }
 
 /**
@@ -278,9 +288,14 @@ export function buildDiscoveryProfile(
 ): DiscoveryProfile {
   const counts = new Map<string, number>();
   const knownTitleKeys = new Set<string>();
+  const knownIds = new Set<string>();
   for (const item of library) {
-    const key = discoveryTitleKey(item.title);
-    if (key) knownTitleKeys.add(key);
+    for (const name of [item.title, ...(item.altTitles ?? [])]) {
+      const key = discoveryTitleKey(name);
+      if (key) knownTitleKeys.add(key);
+    }
+    if (item.malId) knownIds.add(`jikan:${item.malId}`);
+    if (item.anilistId) knownIds.add(`anilist:${item.anilistId}`);
     for (const genre of item.genres ?? []) {
       const normalized = normalizeGenre(genre);
       if (!normalized) continue;
@@ -295,6 +310,7 @@ export function buildDiscoveryProfile(
     level,
     genreAffinity,
     knownTitleKeys: [...knownTitleKeys],
+    knownIds: [...knownIds],
     preferShort: levelOrdinal(level) <= 1,
   };
 }
@@ -434,7 +450,8 @@ export function scoreDiscoveryCandidate(
     });
   }
 
-  const inLibrary = profile.knownTitleKeys.includes(discoveryTitleKey(candidate.title))
+  const inLibrary = !!profile.knownIds?.includes(`${candidate.provider}:${candidate.id}`)
+    || profile.knownTitleKeys.includes(discoveryTitleKey(candidate.title))
     || (!!candidate.nativeTitle && profile.knownTitleKeys.includes(discoveryTitleKey(candidate.nativeTitle)));
   if (inLibrary) reasons.push({ code: 'already-in-library', points: -PENALTY_IN_LIBRARY });
 

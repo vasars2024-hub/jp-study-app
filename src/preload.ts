@@ -1709,12 +1709,27 @@ const api = {
   watchChooseImportFile: (): Promise<string | null> => ipcRenderer.invoke('watch:chooseImportFile'),
   watchImportHistory: (): Promise<import('./shared/watchLibrary').WatchImportRecord[]> =>
     ipcRenderer.invoke('watch:importHistory'),
+  /** Folds rows from the old tracking / shortlist stores in (see shared/watchLibraryLegacy.ts). */
+  watchImportLegacy: (
+    rows: import('./shared/watchLibraryLegacy').WatchLegacyRow[],
+  ): Promise<import('./main/watchLibrary').WatchLegacyImportResult> => ipcRenderer.invoke('watch:importLegacy', rows),
   onWatchChanged: (
     cb: (event: import('./main/watchLibrary').WatchChangedEvent) => void,
   ): (() => void) => {
     const handler = (_e: unknown, event: import('./main/watchLibrary').WatchChangedEvent): void => cb(event);
     ipcRenderer.on('watch:changed', handler);
     return () => ipcRenderer.removeListener('watch:changed', handler);
+  },
+  /** The airing-schedule job (AniList next episodes): when it last ran, and a manual check. */
+  watchAiringStatus: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:status'),
+  watchAiringRefresh: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:refresh'),
+  /** Episodes of titles being watched that have just aired — once per episode. */
+  onWatchAiringAired: (
+    cb: (episodes: import('./shared/watchAiring').AiredEpisode[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, episodes: import('./shared/watchAiring').AiredEpisode[]): void => cb(episodes);
+    ipcRenderer.on('watchAiring:aired', handler);
+    return () => ipcRenderer.removeListener('watchAiring:aired', handler);
   },
   malUpdateEntry: (
     animeId: number,

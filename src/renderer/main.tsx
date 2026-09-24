@@ -88,6 +88,7 @@ import './theme/flatten.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { registerWiredArchive } from './theme/wired-archive';
 import { installNotificationCapture } from './notificationStore';
+import { installWatchAiringNotifications } from './watchAiringNotifications';
 import { bootWallpaperFit } from './wallpaperFit';
 import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
@@ -265,6 +266,8 @@ registerAeroProofSoundPack();
 registerWiredArchiveSoundPack();
 // Capture transient toasts into the Notification Center history (Phase 2 · M6).
 installNotificationCapture();
+// New episodes of titles being watched, from the airing-schedule job.
+installWatchAiringNotifications();
 // Wallpaper fit (--wall-fit) pre-paint.
 bootWallpaperFit();
 bootAppBorderSettings();

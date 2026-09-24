@@ -658,6 +658,47 @@ export async function anilistByMalId(malId: number): Promise<ProviderWork | null
   return data?.Media ? anilistToWork(data.Media) : null;
 }
 
+/**
+ * Next-episode airing times for up to 50 anime at once, by MAL or AniList id —
+ * the watch library's airing-schedule job (`watchAiring.ts`). One request per
+ * batch through the shared AniList limiter; cached for 30 minutes, and an empty
+ * page is not cached (it is what a failing upstream looks like). `null` means
+ * AniList did not answer.
+ */
+export async function anilistAiringBatch(
+  ids: readonly number[],
+  by: 'mal' | 'anilist',
+): Promise<import('../shared/watchAiring').AiringRow[] | null> {
+  const clean = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50);
+  if (!clean.length) return [];
+  const argument = by === 'mal' ? 'idMal_in' : 'id_in';
+  const data = await anilistQuery<{ Page?: { media?: Array<{
+    id?: number; idMal?: number | null; status?: string | null;
+    nextAiringEpisode?: { episode?: number | null; airingAt?: number | null } | null;
+  }> } }>(
+    `query ($ids: [Int]) {
+      Page(page: 1, perPage: 50) {
+        media(${argument}: $ids, type: ANIME) { id idMal status nextAiringEpisode { episode airingAt } }
+      }
+    }`,
+    { ids: clean },
+    `anilist:airing:${by}:${clean.join(',')}`,
+    { ttlMs: 30 * 60_000, cacheEmpty: false },
+  );
+  if (!data) return null;
+  return (data.Page?.media ?? [])
+    .filter((media) => num(media?.id) !== undefined)
+    .map((media) => ({
+      anilistId: media.id as number,
+      malId: num(media.idMal ?? undefined),
+      status: text(media.status),
+      nextEpisode: num(media.nextAiringEpisode?.episode ?? undefined),
+      nextAiringAt: num(media.nextAiringEpisode?.airingAt ?? undefined) !== undefined
+        ? (media.nextAiringEpisode?.airingAt as number) * 1000
+        : undefined,
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Artwork download
 // ---------------------------------------------------------------------------

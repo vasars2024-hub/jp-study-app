@@ -26,7 +26,9 @@ const blank = (): ExternalPlayerProfile => ({
 });
 
 /** Placeholders are passed as variables so no catalog ever has to spell them. */
-const PLACEHOLDERS = { media: '{media}', subtitle: '{subtitle}', position: '{position}', title: '{title}' };
+const PLACEHOLDERS: Record<string, string> = Object.fromEntries(
+  ['media', 'subtitle', 'position', 'title'].map((name) => [name, `{${name}}`]),
+);
 
 export default function ExternalPlayerPanel() {
   const { t } = useT();
@@ -138,7 +140,6 @@ export default function ExternalPlayerPanel() {
         <input
           id="external-path"
           value={draft.executablePath}
-          placeholder="C:\\Program Files\\VideoLAN\\VLC\\vlc.exe"
           onChange={(e) => setPath(e.currentTarget.value)}
         />
         <button type="button" onClick={() => void browse()}>{t('externalPlayer.browse')}</button>

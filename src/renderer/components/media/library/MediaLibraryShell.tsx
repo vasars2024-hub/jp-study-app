@@ -13,8 +13,6 @@ import Icon from '../../Icons';
 import { useT } from '../../../i18n';
 import MediaLibrarySidebar, { scopeKey, type LibraryScope, type LibraryShelfId } from './MediaLibrarySidebar';
 import { MediaTrackingDashboard } from '../MediaTrackingDashboard';
-import { buildLocalMediaTitleResolver } from '../../../mediaTrackingDashboard';
-import { loadMediaProvidersDocument } from '../../../mediaProviderStore';
 import MediaLibraryBrowser, { type LibraryViewMode } from './MediaLibraryBrowser';
 import MediaDetailPanel from './MediaDetailPanel';
 import MediaJobStrip from './MediaJobStrip';
@@ -433,7 +431,7 @@ export default function MediaLibraryShell({
           // stacked above the grid, which is where it used to live and where it
           // pushed the actual library below the fold.
           <div className="medialib-browser medialib-browser--scroll">
-            <MediaTrackingDashboard titleFor={buildLocalMediaTitleResolver(loadMediaProvidersDocument())} />
+            <MediaTrackingDashboard />
           </div>
         ) : (
         <MediaLibraryBrowser

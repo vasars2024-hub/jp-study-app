@@ -41,4 +41,21 @@ export const MEDIA_HUB_ZH: Catalog = {
   'externalPlayer.error.missing': '在 {path} 找不到 {name}，它可能已被移动或卸载。',
   'externalPlayer.error.not-executable': '{path} 不是本应用可以启动的程序（Windows 上应为 .exe）。',
   'externalPlayer.error.launchFailed': '无法启动 {name}：{detail}',
+  // Discover: the watch library is the list
+  'discover.library.add': '加入资料库（计划观看）',
+  'discover.library.addRow': '将 {title} 以“计划观看”加入资料库',
+  'discover.library.removePlan': '从计划观看中移除',
+  'discover.library.removePlanRow': '将 {title} 从计划观看中移除',
+  'discover.library.inLibrary': '已在资料库 · {status}',
+  // Airing schedule (AniList next episodes) and new-episode notifications
+  'watchAiring.notify.title': '新剧集：{title}',
+  'watchAiring.notify.body': '第 {episode} 集已播出。',
+  'watchAiring.notify.source': '播出时间表',
+  'watchAiring.checking': '正在检查播出时间…',
+  'watchAiring.checkedAt': { other: '播出时间来自 AniList，{when} 检查 · 即将播出 {count} 集' },
+  'watchAiring.never': '尚未从 AniList 检查播出时间。',
+  'watchAiring.error.offline': '离线，稍后重试',
+  'watchAiring.error.unreachable': 'AniList 未响应，稍后重试',
+  'watchAiring.checkNow': '立即检查',
+  'discover.library.planEmpty': '还没有计划观看的作品。从“浏览”添加的作品会以“计划观看”加入资料库。',
 };

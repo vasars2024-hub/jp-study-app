@@ -1049,7 +1049,16 @@ declare global {
       watchImportFile(filePath: string): Promise<import('../main/watchLibrary').WatchImportResult>;
       watchChooseImportFile(): Promise<string | null>;
       watchImportHistory(): Promise<import('../shared/watchLibrary').WatchImportRecord[]>;
+      /** Folds rows from the old tracking / shortlist localStorage stores into the library. */
+      watchImportLegacy(
+        rows: import('../shared/watchLibraryLegacy').WatchLegacyRow[],
+      ): Promise<import('../main/watchLibrary').WatchLegacyImportResult>;
       onWatchChanged(cb: (event: import('../main/watchLibrary').WatchChangedEvent) => void): () => void;
+      /** Airing-schedule job status (AniList next episodes) and a manual check. */
+      watchAiringStatus(): Promise<import('../main/watchAiring').WatchAiringStatus>;
+      watchAiringRefresh(): Promise<import('../main/watchAiring').WatchAiringStatus>;
+      /** Episodes of titles being watched that have just aired — once per episode. */
+      onWatchAiringAired(cb: (episodes: import('../shared/watchAiring').AiredEpisode[]) => void): () => void;
       /** Phase 0 credentials vault. No channel returns a secret — by design. */
       credentialStatus(): Promise<import('../main/credentials/ipc').CredentialVaultSnapshot>;
       setCredentialSecret(

@@ -18,6 +18,7 @@ import {
   STUDY_LEVELS,
   buildDiscoveryProfile,
   discoveryCandidateId,
+  discoveryTitleKey,
   inferLevelFromLibrary,
   isStudyLevel,
   rankDiscoveryCandidates,
@@ -28,8 +29,12 @@ import {
   type DiscoveryRanking,
   type DiscoveryReason,
   type DiscoveryMediaType,
+  type DiscoveryLibrarySignal,
   type StudyLevel,
 } from '../../../shared/mediaDiscovery';
+import { watchStatusLabelKey, type WatchStatus, type WatchTitleView } from '../../../shared/watchLibrary';
+import { useWatchTitles } from '../../useWatchTitles';
+import { showToast } from '../ui';
 import {
   addToShortlist,
   loadMediaShortlist,
@@ -135,8 +140,11 @@ export interface DiscoveryState {
   searching: boolean;
   results: DiscoveryRanking[];
   /** Catalogue titles only; YouTube videos live on {@link youtube}. */
+  /** The Plan tab: watch-library plan-to-watch anime, or shortlisted manga. */
   shortlist: MediaShortlistEntry[];
   shortlistIds: Set<string>;
+  /** The watch-library status of a catalogue hit, or null when it is not tracked. */
+  libraryStatusFor: (candidate: DiscoveryCandidate) => WatchStatus | null;
   /** The YouTube console, rendered by the same three panels under its own tab. */
   youtube: YoutubeDiscoveryState;
   selected: DiscoveryRanking | null;
@@ -154,6 +162,46 @@ export interface DiscoveryState {
   closeDownload: () => void;
   refresh: () => void;
   libraryCount: number;
+}
+
+/** Watch-library titles by the keys a catalogue hit can be matched on. */
+function buildWatchLookup(titles: readonly WatchTitleView[]): Map<string, WatchTitleView> {
+  const out = new Map<string, WatchTitleView>();
+  for (const title of titles) {
+    if (title.malId) out.set(`jikan:${title.malId}`, title);
+    if (title.anilistId) out.set(`anilist:${title.anilistId}`, title);
+    for (const name of [title.title, title.originalTitle, title.englishTitle, title.romajiTitle, ...(title.altTitles ?? [])]) {
+      const key = discoveryTitleKey(name);
+      if (key && !out.has(`name:${key}`)) out.set(`name:${key}`, title);
+    }
+  }
+  return out;
+}
+
+function lookupWatchTitle(lookup: Map<string, WatchTitleView>, candidate: DiscoveryCandidate): WatchTitleView | undefined {
+  if (candidate.mediaType === 'manga') return undefined;
+  return lookup.get(`${candidate.provider}:${candidate.id}`)
+    ?? lookup.get(`name:${discoveryTitleKey(candidate.title)}`)
+    ?? (candidate.nativeTitle ? lookup.get(`name:${discoveryTitleKey(candidate.nativeTitle)}`) : undefined);
+}
+
+/** A plan-to-watch title as a catalogue candidate, so the Plan tab ranks it like any hit. */
+function candidateFromWatchTitle(title: WatchTitleView): DiscoveryCandidate | null {
+  const provider = title.malId ? 'jikan' : title.anilistId ? 'anilist' : null;
+  const id = title.malId ?? title.anilistId;
+  if (!provider || !id) return null;
+  return {
+    provider,
+    id,
+    mediaType: 'anime',
+    title: title.title,
+    nativeTitle: title.originalTitle,
+    year: title.year,
+    format: title.format,
+    episodeCount: title.episodeCount,
+    genres: title.genres ?? [],
+    posterUrl: title.posterUrl,
+  };
 }
 
 export function useDiscovery(enabled = true): DiscoveryState {
@@ -177,6 +225,10 @@ export function useDiscovery(enabled = true): DiscoveryState {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [downloadFor, setDownloadFor] = useState<DiscoveryCandidate | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  // The watch library is the list: "already in my library" and the Plan tab
+  // both read it, so 1,400 imported MAL titles are never recommended back.
+  const watch = useWatchTitles(enabled);
+  const watchLookup = useMemo(() => buildWatchLookup(watch.titles), [watch.titles]);
 
   // Every fetch stamps a token; a late reply from an abandoned feed or query is
   // dropped rather than overwriting the list the user is actually looking at.
@@ -266,25 +318,58 @@ export function useDiscovery(enabled = true): DiscoveryState {
       });
   }, [activeQuery, enabled, feed, mediaType, reloadToken]);
 
-  const profile = useMemo(
-    () => buildDiscoveryProfile(
-      library.map((item) => ({ title: item.title, genres: item.genres, jlptLevel: item.jlptLevel })),
-      level,
-    ),
-    [library, level],
-  );
+  const profile = useMemo(() => {
+    const signals: DiscoveryLibrarySignal[] = [
+      ...library.map((item) => ({ title: item.title, genres: item.genres, jlptLevel: item.jlptLevel })),
+      ...watch.titles.map((title) => ({
+        title: title.title,
+        altTitles: [title.originalTitle, title.englishTitle, title.romajiTitle, ...(title.altTitles ?? [])]
+          .filter((name): name is string => !!name),
+        // A dropped show says nothing good about its genres.
+        genres: title.status === 'dropped' ? [] : title.genres,
+        malId: title.malId,
+        anilistId: title.anilistId,
+      })),
+    ];
+    return buildDiscoveryProfile(signals, level);
+  }, [library, watch.titles, level]);
 
   const results = useMemo(
     () => rankDiscoveryCandidates(candidates, profile, { hideInLibrary: hideOwned }),
     [candidates, profile, hideOwned],
   );
 
-  const shortlistIds = useMemo(() => new Set(shortlist.map((entry) => entry.id)), [shortlist]);
+  // The Plan tab: anime come from the watch library's plan-to-watch titles;
+  // manga (not a watch title) still use the local shortlist.
+  const planEntries = useMemo((): MediaShortlistEntry[] => {
+    if (mediaType === 'manga') return shortlist.filter((entry) => entry.candidate.mediaType === 'manga');
+    return watch.titles
+      .filter((title) => title.status === 'plan')
+      .map((title) => {
+        const candidate = candidateFromWatchTitle(title);
+        return candidate ? { id: discoveryCandidateId(candidate), candidate, addedAt: title.addedAt } : null;
+      })
+      .filter((entry): entry is MediaShortlistEntry => entry !== null);
+  }, [mediaType, shortlist, watch.titles]);
+
+  const libraryStatusFor = useCallback(
+    (candidate: DiscoveryCandidate): WatchStatus | null => lookupWatchTitle(watchLookup, candidate)?.status ?? null,
+    [watchLookup],
+  );
 
   const shortlistRankings = useMemo(
-    () => rankDiscoveryCandidates(shortlist.map((entry) => entry.candidate), profile),
-    [shortlist, profile],
+    () => rankDiscoveryCandidates(planEntries.map((entry) => entry.candidate), profile),
+    [planEntries, profile],
   );
+
+  // "Pinned" = in the plan list: a plan-to-watch library title, or a shortlisted manga.
+  const shortlistIds = useMemo(() => {
+    const ids = new Set(shortlist.filter((entry) => entry.candidate.mediaType === 'manga').map((entry) => entry.id));
+    for (const entry of [...results, ...shortlistRankings]) {
+      if (libraryStatusFor(entry.candidate) === 'plan') ids.add(discoveryCandidateId(entry.candidate));
+    }
+    return ids;
+  }, [shortlist, results, shortlistRankings, libraryStatusFor]);
 
   const visible = tab === 'shortlist' ? shortlistRankings : results;
 
@@ -331,12 +416,40 @@ export function useDiscovery(enabled = true): DiscoveryState {
     setActiveQuery('');
   }, []);
 
+  /**
+   * Anime: add to the watch library as Plan to watch, or take a plan-to-watch
+   * title back off it. A title the library already tracks under another status
+   * is left alone — Discover must not turn a completed show back into a plan.
+   * Manga keeps the local shortlist.
+   */
   const toggleShortlist = useCallback((candidate: DiscoveryCandidate) => {
-    const id = discoveryCandidateId(candidate);
-    if (loadMediaShortlist().some((entry) => entry.id === id)) removeFromShortlist(id);
-    else addToShortlist(candidate);
-    setShortlist(loadMediaShortlist());
-  }, []);
+    if (candidate.mediaType === 'manga') {
+      const id = discoveryCandidateId(candidate);
+      if (loadMediaShortlist().some((entry) => entry.id === id)) removeFromShortlist(id);
+      else addToShortlist(candidate);
+      setShortlist(loadMediaShortlist());
+      return;
+    }
+    const existing = lookupWatchTitle(watchLookup, candidate);
+    if (existing && existing.status !== 'plan') return;
+    const request = existing
+      ? window.api?.watchRemove?.(existing.id)
+      : window.api?.watchAdd?.({
+        kind: /^movie$/i.test(candidate.format ?? '') ? 'film' : 'anime',
+        title: candidate.title,
+        originalTitle: candidate.nativeTitle,
+        year: candidate.year,
+        episodeCount: candidate.episodeCount,
+        malId: candidate.provider === 'jikan' ? candidate.id : undefined,
+        anilistId: candidate.provider === 'anilist' ? candidate.id : undefined,
+        status: 'plan',
+      });
+    void request?.then((result) => {
+      if (result && !result.ok) showToast({ message: result.error, kind: 'error' });
+    }).catch((error: unknown) => {
+      showToast({ message: error instanceof Error ? error.message : String(error), kind: 'error' });
+    });
+  }, [watchLookup]);
 
   const openDownload = useCallback((candidate: DiscoveryCandidate) => setDownloadFor(candidate), []);
   const closeDownload = useCallback(() => setDownloadFor(null), []);
@@ -373,8 +486,9 @@ export function useDiscovery(enabled = true): DiscoveryState {
     provenance,
     searching: activeQuery.length > 0,
     results: visible,
-    shortlist,
+    shortlist: planEntries,
     shortlistIds,
+    libraryStatusFor,
     youtube,
     selected,
     select,
@@ -548,11 +662,38 @@ export function DiscoveryControls({ state }: { state: DiscoveryState }) {
   );
 }
 
+/**
+ * What the plan button says. Anime: "Add to library (Plan to watch)", "Remove
+ * from Plan to watch", or — for a title the library tracks under another status
+ * — that status, disabled. Manga keep the shortlist wording.
+ */
+function pinLabels(
+  candidate: DiscoveryCandidate,
+  pinned: boolean,
+  status: WatchStatus | null,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { label: string; rowLabel: (title: string) => string; tracked: boolean } {
+  if (candidate.mediaType === 'manga') {
+    return {
+      label: pinned ? t('scraper.action.unshortlist') : t('scraper.action.shortlist'),
+      rowLabel: (title) => t(pinned ? 'scraper.action.unshortlistRow' : 'scraper.action.shortlistRow', { title }),
+      tracked: false,
+    };
+  }
+  if (status && status !== 'plan') {
+    const label = t('discover.library.inLibrary', { status: t(watchStatusLabelKey(status)) });
+    return { label, rowLabel: (title) => `${title} · ${label}`, tracked: true };
+  }
+  return status === 'plan'
+    ? { label: t('discover.library.removePlan'), rowLabel: (title) => t('discover.library.removePlanRow', { title }), tracked: false }
+    : { label: t('discover.library.add'), rowLabel: (title) => t('discover.library.addRow', { title }), tracked: false };
+}
+
 export function DiscoveryResults({ state }: { state: DiscoveryState }) {
   const { t } = useT();
   const {
     results, selected, select, loadState, loadMessage, tab, shortlistIds,
-    toggleShortlist, mediaType, downloadFor, openDownload, closeDownload, provenance,
+    toggleShortlist, mediaType, downloadFor, openDownload, closeDownload, provenance, libraryStatusFor,
   } = state;
 
   /**
@@ -600,7 +741,7 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
     return (
       <div className={`disc-placeholder${outage ? ' disc-placeholder-error' : ''}`}>
         {tab === 'shortlist'
-          ? t('scraper.state.shortlistEmpty')
+          ? t(mediaType === 'manga' ? 'scraper.state.shortlistEmpty' : 'discover.library.planEmpty')
           : outage
             ? t('scraper.state.providersDown', { providers: downProviders.join(' · ') })
             : t('scraper.state.empty')}
@@ -626,6 +767,7 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
       {results.map((entry, index) => {
         const id = discoveryCandidateId(entry.candidate);
         const shortlisted = shortlistIds.has(id);
+        const pin = pinLabels(entry.candidate, shortlisted, libraryStatusFor(entry.candidate), t);
         return (
           <div
             key={id}
@@ -677,13 +819,11 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
               </button>
               <button
                 type="button"
-                className={`disc-pin ${shortlisted ? 'active' : ''}`}
-                title={shortlisted ? t('scraper.action.unshortlist') : t('scraper.action.shortlist')}
-                aria-label={t(
-                  shortlisted ? 'scraper.action.unshortlistRow' : 'scraper.action.shortlistRow',
-                  { title: entry.candidate.title },
-                )}
+                className={`disc-pin ${shortlisted || pin.tracked ? 'active' : ''}`}
+                title={pin.label}
+                aria-label={pin.rowLabel(entry.candidate.title)}
                 aria-pressed={shortlisted}
+                disabled={pin.tracked}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleShortlist(entry.candidate);
@@ -702,7 +842,7 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
 
 export function DiscoveryInspector({ state }: { state: DiscoveryState }) {
   const { t } = useT();
-  const { selected, shortlistIds, toggleShortlist, level, openDownload, tab } = state;
+  const { selected, shortlistIds, toggleShortlist, level, openDownload, tab, libraryStatusFor } = state;
   const [showMangaSources, setShowMangaSources] = useState(false);
 
   // Sort only — the labels themselves are resolved through `t()` down in the
@@ -726,6 +866,7 @@ export function DiscoveryInspector({ state }: { state: DiscoveryState }) {
   const { candidate } = selected;
   const id = discoveryCandidateId(candidate);
   const shortlisted = shortlistIds.has(id);
+  const pin = pinLabels(candidate, shortlisted, libraryStatusFor(candidate), t);
   const sourceUrl = candidate.provider === 'jikan'
     ? `https://myanimelist.net/${candidate.mediaType === 'manga' ? 'manga' : 'anime'}/${candidate.id}`
     : `https://anilist.co/${candidate.mediaType === 'manga' ? 'manga' : 'anime'}/${candidate.id}`;
@@ -806,10 +947,11 @@ export function DiscoveryInspector({ state }: { state: DiscoveryState }) {
         <button
           type="button"
           className="disc-btn"
+          disabled={pin.tracked}
           onClick={() => toggleShortlist(candidate)}
         >
-          <Icon name="bookmark" size={12} />
-          {shortlisted ? t('scraper.action.unshortlist') : t('scraper.action.shortlist')}
+          <Icon name={pin.tracked ? 'check' : 'bookmark'} size={12} />
+          {pin.label}
         </button>
         <button
           type="button"
@@ -832,7 +974,7 @@ export function DiscoveryInspector({ state }: { state: DiscoveryState }) {
 
 export function DiscoveryTabs({ state }: { state: DiscoveryState }) {
   const { t } = useT();
-  const { tab, setTab, shortlist, youtube } = state;
+  const { tab, setTab, shortlist, youtube, mediaType } = state;
   return (
     <div className="disc-tabs" role="tablist">
       <button
@@ -863,7 +1005,7 @@ export function DiscoveryTabs({ state }: { state: DiscoveryState }) {
         className={`disc-tab ${tab === 'shortlist' ? 'active' : ''}`}
         onClick={() => setTab('shortlist')}
       >
-        {t('scraper.tab.shortlist')}
+        {t(mediaType === 'manga' ? 'scraper.tab.shortlist' : 'watchLibrary.status.plan')}
         {shortlist.length > 0 ? <span className="disc-tab-count">{shortlist.length}</span> : null}
       </button>
     </div>

@@ -41,4 +41,21 @@ export const MEDIA_HUB_JA: Catalog = {
   'externalPlayer.error.missing': '{name} が {path} に見つかりません。移動またはアンインストールされた可能性があります。',
   'externalPlayer.error.not-executable': '{path} はこのアプリが起動できるプログラムではありません（Windows では .exe）。',
   'externalPlayer.error.launchFailed': '{name} を起動できませんでした：{detail}',
+  // Discover: the watch library is the list
+  'discover.library.add': 'ライブラリに追加（視聴予定）',
+  'discover.library.addRow': '{title} を視聴予定としてライブラリに追加',
+  'discover.library.removePlan': '視聴予定から外す',
+  'discover.library.removePlanRow': '{title} を視聴予定から外す',
+  'discover.library.inLibrary': 'ライブラリ登録済み · {status}',
+  // Airing schedule (AniList next episodes) and new-episode notifications
+  'watchAiring.notify.title': '新しいエピソード：{title}',
+  'watchAiring.notify.body': '第{episode}話が放送されました。',
+  'watchAiring.notify.source': '放送スケジュール',
+  'watchAiring.checking': '放送時間を確認中…',
+  'watchAiring.checkedAt': { other: 'AniList の放送時間（{when} 確認）· 今後のエピソード {count} 件' },
+  'watchAiring.never': 'AniList の放送時間はまだ確認されていません。',
+  'watchAiring.error.offline': 'オフラインのため後で再試行します',
+  'watchAiring.error.unreachable': 'AniList が応答しないため後で再試行します',
+  'watchAiring.checkNow': '今すぐ確認',
+  'discover.library.planEmpty': '視聴予定はまだありません。「ブラウズ」から追加した作品は視聴予定としてライブラリに入ります。',
 };

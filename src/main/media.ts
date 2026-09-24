@@ -67,6 +67,7 @@ import type { SubtitleSyncEstimate } from '../shared/subtitleSync';
 import { mt } from './i18n';
 import type { PlaybackHandoff } from '../shared/externalPlayer';
 import { launchExternalPlayer, registerExternalPlayerIpc } from './externalPlayer';
+import { registerWatchAiring } from './watchAiring';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -1063,6 +1064,8 @@ export function registerMediaIpc(): void {
   // failure is reported, never thrown: an `error` event with no listener used to
   // take the whole app down when the player's path no longer existed.
   registerExternalPlayerIpc();
+  // Next-episode times for the watch library, from AniList (see watchAiring.ts).
+  registerWatchAiring();
   ipcMain.handle('media:handoff', (_e, handoff: unknown, profile: unknown): Promise<string | null> =>
     launchExternalPlayer(handoff, profile, enrichHandoffFromLibrary));
   // Stream a token's file, honouring HTTP Range so the <video> can seek.

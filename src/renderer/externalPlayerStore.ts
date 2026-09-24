@@ -23,7 +23,7 @@ let fallback: ExternalPlayerPreferences | null = null;
 export function loadExternalPlayerPreferences(): ExternalPlayerPreferences {
   // The first read anywhere (a menu opening, not only Settings) syncs with main,
   // so a list saved by an older build reaches the launcher before a click.
-  if (!hydration && typeof window !== 'undefined' && window.api?.externalPlayersGet) {
+  if (!hydration && typeof window !== 'undefined' && typeof window.api?.externalPlayersGet === 'function') {
     void hydrateExternalPlayerPreferences();
   }
   try {

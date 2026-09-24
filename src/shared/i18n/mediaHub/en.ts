@@ -41,4 +41,21 @@ export const MEDIA_HUB_EN: Catalog = {
   'externalPlayer.error.missing': '{name} was not found at {path}. It may have been moved or uninstalled.',
   'externalPlayer.error.not-executable': '{path} is not a program this app can start (a .exe on Windows).',
   'externalPlayer.error.launchFailed': '{name} could not be started: {detail}',
+  // Discover: the watch library is the list
+  'discover.library.add': 'Add to library (Plan to watch)',
+  'discover.library.addRow': 'Add {title} to the library as Plan to watch',
+  'discover.library.removePlan': 'Remove from Plan to watch',
+  'discover.library.removePlanRow': 'Remove {title} from Plan to watch',
+  'discover.library.inLibrary': 'In library · {status}',
+  // Airing schedule (AniList next episodes) and new-episode notifications
+  'watchAiring.notify.title': 'New episode: {title}',
+  'watchAiring.notify.body': 'Episode {episode} has aired.',
+  'watchAiring.notify.source': 'Airing schedule',
+  'watchAiring.checking': 'Checking airing times…',
+  'watchAiring.checkedAt': { one: 'Airing times from AniList, checked {when} · {count} upcoming episode', other: 'Airing times from AniList, checked {when} · {count} upcoming episodes' },
+  'watchAiring.never': 'Airing times from AniList have not been checked yet.',
+  'watchAiring.error.offline': 'offline, will retry',
+  'watchAiring.error.unreachable': 'AniList did not answer, will retry',
+  'watchAiring.checkNow': 'Check now',
+  'discover.library.planEmpty': 'Nothing planned yet. Titles you add from Browse land in your library as Plan to watch.',
 };

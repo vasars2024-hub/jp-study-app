@@ -41,4 +41,21 @@ export const MEDIA_HUB_RU: Catalog = {
   'externalPlayer.error.missing': '{name} не найден по пути {path}. Возможно, программа перемещена или удалена.',
   'externalPlayer.error.not-executable': '{path} — не программа, которую приложение может запустить (в Windows нужен .exe).',
   'externalPlayer.error.launchFailed': 'Не удалось запустить {name}: {detail}',
+  // Discover: the watch library is the list
+  'discover.library.add': 'В библиотеку («Буду смотреть»)',
+  'discover.library.addRow': 'Добавить «{title}» в библиотеку как «Буду смотреть»',
+  'discover.library.removePlan': 'Убрать из «Буду смотреть»',
+  'discover.library.removePlanRow': 'Убрать «{title}» из «Буду смотреть»',
+  'discover.library.inLibrary': 'В библиотеке · {status}',
+  // Airing schedule (AniList next episodes) and new-episode notifications
+  'watchAiring.notify.title': 'Новая серия: {title}',
+  'watchAiring.notify.body': 'Вышла серия {episode}.',
+  'watchAiring.notify.source': 'Расписание выхода',
+  'watchAiring.checking': 'Проверка расписания…',
+  'watchAiring.checkedAt': { one: 'Расписание AniList, проверено {when} · {count} предстоящая серия', few: 'Расписание AniList, проверено {when} · {count} предстоящие серии', many: 'Расписание AniList, проверено {when} · {count} предстоящих серий', other: 'Расписание AniList, проверено {when} · {count} предстоящей серии' },
+  'watchAiring.never': 'Расписание AniList ещё не проверялось.',
+  'watchAiring.error.offline': 'нет сети, повторим позже',
+  'watchAiring.error.unreachable': 'AniList не ответил, повторим позже',
+  'watchAiring.checkNow': 'Проверить сейчас',
+  'discover.library.planEmpty': 'Пока ничего не запланировано. Добавленное из «Обзора» попадает в библиотеку как «Буду смотреть».',
 };
