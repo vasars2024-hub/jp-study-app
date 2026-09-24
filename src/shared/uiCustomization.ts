@@ -7,7 +7,7 @@
  *
  * and explicitly **not** `AI → directly edits app files`. This module *is* that
  * Theme/UI API. Everything a request can change has to pass through the allow-list in
- * `UI_TOKENS` or `COMPONENT_SETTING_SPECS`; a request that names anything else is
+ * `UI_TOKENS` or the Appearance values in `UiLook`; a request that names anything else is
  * reported as unmatched rather than guessed at, and raw custom CSS goes through a
  * sanitizer that refuses to let anyone — user or assistant — hide the way back out.
  *
@@ -55,10 +55,31 @@ export type UiTokenGroup =
  * `theme/tokens.css` or the base `:root` in `styles.css` — this API only re-points
  * tokens the stylesheets already read, so a customization can restyle the app but can
  * never introduce a property nothing consumes (which would look like a silent no-op).
+ *
+ * **What is NOT on it, on purpose:** the tokens Settings > Appearance owns (listed in
+ * `APPEARANCE_OWNED_TOKENS`). They used to be here too, emitted `!important`, so
+ * applying a theme silently disabled the Appearance controls above it — the Accent
+ * swatch showed one colour while the app painted another, and Density did nothing. A
+ * theme now sets those as Appearance VALUES (`UiLook`, below), written through
+ * `osPersonalization`, so both panels always show what is actually on screen.
  */
+export const APPEARANCE_OWNED_TOKENS = [
+  'accent',
+  'accent-2',
+  'space-xs',
+  'space-sm',
+  'space-md',
+  'space-lg',
+  'space-xl',
+  'radius-sm',
+  'radius-md',
+  'radius-lg',
+  'shadow-card',
+  'shadow-toolbar',
+  'font-body',
+] as const;
+
 export const UI_TOKENS: UiTokenSpec[] = [
-  { token: 'accent', kind: 'color', group: 'color' },
-  { token: 'accent-2', kind: 'color', group: 'color' },
   { token: 'accent-weak', kind: 'color', group: 'color' },
   { token: 'bg', kind: 'color', group: 'color' },
   { token: 'panel', kind: 'color', group: 'color' },
@@ -70,7 +91,6 @@ export const UI_TOKENS: UiTokenSpec[] = [
   { token: 'glass-tint', kind: 'color', group: 'color' },
   { token: 'glass-border', kind: 'color', group: 'color' },
 
-  { token: 'font-body', kind: 'font', group: 'typography' },
   { token: 'font-display', kind: 'font', group: 'typography' },
   { token: 'font-mono', kind: 'font', group: 'typography' },
   /*
@@ -89,19 +109,8 @@ export const UI_TOKENS: UiTokenSpec[] = [
   { token: 'font-size-lg', kind: 'length', group: 'typography', min: 11, max: 34, unit: 'px' },
   { token: 'line-height-normal', kind: 'number', group: 'typography', min: 1, max: 2.4, unit: '' },
 
-  { token: 'space-xs', kind: 'length', group: 'spacing', min: 0, max: 24, unit: 'px' },
-  { token: 'space-sm', kind: 'length', group: 'spacing', min: 0, max: 32, unit: 'px' },
-  { token: 'space-md', kind: 'length', group: 'spacing', min: 0, max: 48, unit: 'px' },
-  { token: 'space-lg', kind: 'length', group: 'spacing', min: 0, max: 64, unit: 'px' },
-  { token: 'space-xl', kind: 'length', group: 'spacing', min: 0, max: 96, unit: 'px' },
-
-  { token: 'radius-sm', kind: 'length', group: 'radius', min: 0, max: 24, unit: 'px' },
-  { token: 'radius-md', kind: 'length', group: 'radius', min: 0, max: 32, unit: 'px' },
-  { token: 'radius-lg', kind: 'length', group: 'radius', min: 0, max: 48, unit: 'px' },
   { token: 'control-radius', kind: 'length', group: 'radius', min: 0, max: 32, unit: 'px' },
 
-  { token: 'shadow-card', kind: 'shadow', group: 'shadow' },
-  { token: 'shadow-toolbar', kind: 'shadow', group: 'shadow' },
   { token: 'glass-blur', kind: 'length', group: 'shadow', min: 0, max: 64, unit: 'px' },
 
   { token: 'motion-duration', kind: 'duration', group: 'motion', min: 0, max: 1_000, unit: 'ms' },
@@ -116,46 +125,97 @@ const TOKEN_BY_NAME = new Map(UI_TOKENS.map((spec) => [spec.token, spec]));
 export type UiTokenPatch = Record<string, string>;
 
 // ---------------------------------------------------------------------------
-// Component-level customization (§20 "Component-Level Customization")
+// Appearance values a theme sets (Settings > Appearance owns them)
 // ---------------------------------------------------------------------------
 
-export type UiComponentId = 'mediaCard' | 'subtitlePanel' | 'vocabularyCard';
+/*
+ * §20's "Component-Level Customization" card used to live here: twelve settings for a
+ * media card, a subtitle panel and a vocabulary card, emitted as `--ui-media-card-*`,
+ * `--ui-subtitle-panel-*` and `--ui-vocabulary-card-*`. Nothing in the app ever read
+ * one of those variables, so all twelve controls did nothing. They are removed rather
+ * than wired: the media card belongs to the Gum library; the subtitle panel already has
+ * real settings in the player (`VideoCoreStudyPreferences`), which "bigger subtitles"
+ * now writes; and "compact / spacious" now means Appearance > Density, which reaches
+ * every surface.
+ */
 
-export interface UiComponentSettingSpec {
-  component: UiComponentId;
-  key: string;
-  kind: 'enum' | 'number' | 'boolean';
-  values?: readonly string[];
-  min?: number;
-  max?: number;
+export const UI_LOOK_DENSITIES = ['compact', 'comfortable', 'spacious'] as const;
+export const UI_LOOK_RADII = ['sharp', 'soft', 'round'] as const;
+export const UI_LOOK_SHADOWS = ['none', 'soft', 'deep'] as const;
+export type UiLookDensity = (typeof UI_LOOK_DENSITIES)[number];
+export type UiLookRadius = (typeof UI_LOOK_RADII)[number];
+export type UiLookShadow = (typeof UI_LOOK_SHADOWS)[number];
+
+/**
+ * The Appearance values a theme carries. Applying a theme WRITES these into
+ * `osPersonalization` — the store the Accent, Density, Corners and Shadows controls
+ * edit — instead of overriding their tokens, so there is one current value and both
+ * panels show it. An absent field means "leave the user's choice alone".
+ */
+export interface UiLook {
+  /** `#rrggbb`. */
+  accent?: string;
+  density?: UiLookDensity;
+  radius?: UiLookRadius;
+  shadow?: UiLookShadow;
 }
 
-export const COMPONENT_SETTING_SPECS: UiComponentSettingSpec[] = [
-  { component: 'mediaCard', key: 'size', kind: 'enum', values: ['compact', 'regular', 'large'] },
-  { component: 'mediaCard', key: 'coverRatio', kind: 'enum', values: ['2:3', '3:4', '1:1', '16:9'] },
-  { component: 'mediaCard', key: 'showProgress', kind: 'boolean' },
-  { component: 'mediaCard', key: 'showDifficulty', kind: 'boolean' },
-
-  { component: 'subtitlePanel', key: 'position', kind: 'enum', values: ['bottom', 'top', 'side'] },
-  { component: 'subtitlePanel', key: 'fontScale', kind: 'number', min: 60, max: 250 },
-  { component: 'subtitlePanel', key: 'opacity', kind: 'number', min: 20, max: 100 },
-  { component: 'subtitlePanel', key: 'showFurigana', kind: 'boolean' },
-
-  { component: 'vocabularyCard', key: 'density', kind: 'enum', values: ['compact', 'comfortable', 'spacious'] },
-  { component: 'vocabularyCard', key: 'showReading', kind: 'boolean' },
-  { component: 'vocabularyCard', key: 'showSentence', kind: 'boolean' },
-  { component: 'vocabularyCard', key: 'showPitch', kind: 'boolean' },
-];
-
-export type UiComponentSettings = {
-  [K in UiComponentId]?: Record<string, string | number | boolean>;
+/** Appearance's own defaults (`osPersonalization` DEFAULTS), the base for relative steps. */
+export const UI_LOOK_DEFAULTS: Required<Omit<UiLook, 'accent'>> = {
+  density: 'comfortable',
+  radius: 'soft',
+  shadow: 'soft',
 };
 
-export const DEFAULT_COMPONENT_SETTINGS: Required<UiComponentSettings> = {
-  mediaCard: { size: 'regular', coverRatio: '2:3', showProgress: true, showDifficulty: true },
-  subtitlePanel: { position: 'bottom', fontScale: 100, opacity: 100, showFurigana: true },
-  vocabularyCard: { density: 'comfortable', showReading: true, showSentence: true, showPitch: false },
-};
+export function sanitizeUiLook(input: unknown): UiLook {
+  const out: UiLook = {};
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return out;
+  const raw = input as Record<string, unknown>;
+  if (typeof raw.accent === 'string' && /^#[0-9a-f]{6}$/i.test(raw.accent.trim())) {
+    out.accent = raw.accent.trim().toLowerCase();
+  }
+  if (UI_LOOK_DENSITIES.includes(raw.density as UiLookDensity)) out.density = raw.density as UiLookDensity;
+  if (UI_LOOK_RADII.includes(raw.radius as UiLookRadius)) out.radius = raw.radius as UiLookRadius;
+  if (UI_LOOK_SHADOWS.includes(raw.shadow as UiLookShadow)) out.shadow = raw.shadow as UiLookShadow;
+  return out;
+}
+
+function pxOf(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^(-?\d+(?:\.\d+)?)px$/i);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * A profile stored before themes wrote Appearance values carried them as raw tokens.
+ * Read those back into the nearest Appearance step once, so an existing theme keeps
+ * its look instead of silently losing it at the upgrade.
+ */
+export function lookFromLegacyTokens(tokens: unknown): UiLook {
+  if (typeof tokens !== 'object' || tokens === null || Array.isArray(tokens)) return {};
+  const raw = tokens as Record<string, unknown>;
+  const look: UiLook = {};
+  const space = pxOf(raw['space-md']);
+  if (space !== null) look.density = space <= 9 ? 'compact' : space >= 15 ? 'spacious' : 'comfortable';
+  const radius = pxOf(raw['radius-md']);
+  if (radius !== null) look.radius = radius <= 5 ? 'sharp' : radius >= 11 ? 'round' : 'soft';
+  if (typeof raw['shadow-card'] === 'string' && raw['shadow-card'].trim().toLowerCase() === 'none') {
+    look.shadow = 'none';
+  }
+  return { ...look, ...sanitizeUiLook({ accent: raw.accent }) };
+}
+
+function stepOf<T extends string>(ladder: readonly T[], current: T, step: number): T {
+  const at = Math.max(0, ladder.indexOf(current));
+  return ladder[Math.min(ladder.length - 1, Math.max(0, at + step))];
+}
+
+/**
+ * The player's subtitle size bounds and default, in px. They mirror
+ * `normalizeVideoCoreStudyPreferences` (`shared/videoCoreStudy.ts`), which is what the
+ * value is written through; a test pins the two together.
+ */
+export const UI_SUBTITLE_FONT_SIZE = { min: 16, max: 48, fallback: 26 } as const;
 
 // ---------------------------------------------------------------------------
 // Theme profiles
@@ -166,7 +226,7 @@ export interface UiThemeVersion {
   createdAt: string;
   reason: string;
   tokens: UiTokenPatch;
-  componentSettings: UiComponentSettings;
+  look: UiLook;
   customCss: string;
 }
 
@@ -175,7 +235,13 @@ export interface UiThemeProfile {
   name: string;
   builtIn: boolean;
   tokens: UiTokenPatch;
-  componentSettings: UiComponentSettings;
+  look: UiLook;
+  /**
+   * Kept for portability only. Settings > Appearance has ONE custom-CSS editor (the
+   * sandbox in `renderer/customCss.ts`); a profile's stylesheet is no longer rendered.
+   * The renderer moved the active profile's stylesheet into the sandbox once, and an
+   * imported theme's stylesheet is added there too.
+   */
   customCss: string;
   customCssEnabled: boolean;
   createdAt: string;
@@ -187,46 +253,34 @@ export interface UiCustomizationDocument {
   version: typeof UI_CUSTOMIZATION_VERSION;
   activeProfileId: string;
   profiles: UiThemeProfile[];
-  /** Developer mode reveals the token inspector and raw CSS editor. */
+  /** Developer mode reveals the generated stylesheet. */
   developerMode: boolean;
   /** A pending, previewed-but-unconfirmed plan. Nothing reaches the DOM from here. */
   preview: UiChangePlan | null;
 }
 
 /** §20's own list of theme profiles, minus "Custom user theme" (which the user creates). */
-export const BUILT_IN_UI_THEMES: Array<{ id: string; name: string; tokens: UiTokenPatch; componentSettings: UiComponentSettings }> = [
-  { id: 'default', name: 'Default', tokens: {}, componentSettings: {} },
+export const BUILT_IN_UI_THEMES: Array<{ id: string; name: string; tokens: UiTokenPatch; look: UiLook }> = [
+  // Default puts the layout values back to Appearance's defaults, so switching to it
+  // undoes another theme's density and corners. It never touches the accent.
+  { id: 'default', name: 'Default', tokens: {}, look: { ...UI_LOOK_DEFAULTS } },
   {
     id: 'macos-inspired',
     name: 'macOS inspired',
     tokens: {
-      'radius-sm': '8px',
-      'radius-md': '12px',
-      'radius-lg': '18px',
       'control-radius': '8px',
-      'space-md': '16px',
-      'space-lg': '24px',
-      'shadow-card': '0 1px 2px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.22)',
       'glass-blur': '30px',
       'line-height-normal': '1.5',
     },
-    componentSettings: { vocabularyCard: { density: 'spacious' } },
+    look: { radius: 'round', density: 'spacious', shadow: 'soft' },
   },
   {
     id: 'minimal',
     name: 'Minimal',
     tokens: {
-      'shadow-card': 'none',
-      'shadow-toolbar': 'none',
-      'radius-sm': '4px',
-      'radius-md': '6px',
-      'radius-lg': '8px',
       'glass-blur': '0px',
     },
-    componentSettings: {
-      mediaCard: { showDifficulty: false },
-      vocabularyCard: { density: 'compact', showSentence: false },
-    },
+    look: { radius: 'sharp', shadow: 'none' },
   },
   {
     id: 'japanese-study',
@@ -235,12 +289,8 @@ export const BUILT_IN_UI_THEMES: Array<{ id: string; name: string; tokens: UiTok
       'font-size-md': '16px',
       'font-size-lg': '20px',
       'line-height-normal': '1.9',
-      'space-md': '16px',
     },
-    componentSettings: {
-      subtitlePanel: { fontScale: 130, showFurigana: true },
-      vocabularyCard: { density: 'spacious', showReading: true, showSentence: true, showPitch: true },
-    },
+    look: { density: 'spacious' },
   },
   {
     id: 'dark-oled',
@@ -253,7 +303,7 @@ export const BUILT_IN_UI_THEMES: Array<{ id: string; name: string; tokens: UiTok
       border: '#1a1a1a',
       'glass-tint': 'rgba(0,0,0,0.72)',
     },
-    componentSettings: {},
+    look: {},
   },
 ];
 
@@ -327,26 +377,6 @@ export function sanitizeTokenPatch(patch: unknown): { tokens: UiTokenPatch; issu
     tokens[token] = value;
   }
   return { tokens, issues };
-}
-
-export function sanitizeComponentSettings(input: unknown): UiComponentSettings {
-  const out: UiComponentSettings = {};
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return out;
-  for (const spec of COMPONENT_SETTING_SPECS) {
-    const bucket = (input as Record<string, unknown>)[spec.component];
-    if (typeof bucket !== 'object' || bucket === null) continue;
-    const raw = (bucket as Record<string, unknown>)[spec.key];
-    if (raw === undefined) continue;
-    let value: string | number | boolean | null = null;
-    if (spec.kind === 'boolean' && typeof raw === 'boolean') value = raw;
-    if (spec.kind === 'enum' && typeof raw === 'string' && spec.values?.includes(raw)) value = raw;
-    if (spec.kind === 'number' && typeof raw === 'number' && Number.isFinite(raw)) {
-      value = Math.min(spec.max ?? raw, Math.max(spec.min ?? raw, Math.round(raw)));
-    }
-    if (value === null) continue;
-    out[spec.component] = { ...(out[spec.component] ?? {}), [spec.key]: value };
-  }
-  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -511,40 +541,24 @@ export function reviewCustomCss(input: unknown): UiCssReview {
 // ---------------------------------------------------------------------------
 
 /**
- * Renders a profile to a stylesheet. Tokens land on `:root` as custom properties;
- * component settings land as companion `--ui-*` variables so a component can read them
- * without any component needing to import this module.
+ * Renders a profile's tokens to a stylesheet on `:root`.
  *
- * **Why `!important`.** `renderer/osPersonalization.ts` writes ~20 of these same tokens
- * (`--space-*`, `--radius-*`, `--shadow-card`, `--font-body`, `--accent`, `--dur-*`, …)
- * as **inline styles on `documentElement`**, and an inline declaration beats any
- * selector in a stylesheet — so without this, more than half of a theme would be
- * silently ignored while the panel reported it applied. An important author declaration
- * does beat a normal inline one, which is exactly the case this is for. The scope stays
- * narrow because only tokens the user explicitly set are emitted at all: the stock
- * "Default" theme has no overrides and produces an empty stylesheet.
+ * **Why `!important`.** Themes (`theme/*.css`) declare these tokens under attribute
+ * selectors such as `:root[data-theme=…]`, which outrank a bare `:root`, and the motion
+ * preferences write `--dur-*` inline — without it a theme would be silently ignored
+ * while the panel reported it applied. What it must NOT override is Settings >
+ * Appearance, and it no longer can: the tokens Appearance owns are not on the
+ * allow-list (see `APPEARANCE_OWNED_TOKENS`); a theme sets those as Appearance values
+ * instead. The stock "Default" theme has no token overrides and emits nothing.
+ *
+ * A profile's own `customCss` is not rendered: Appearance has one custom-CSS editor.
  */
 export function profileToCss(profile: UiThemeProfile): string {
-  const lines: string[] = [];
   const declarations = Object.entries(profile.tokens)
     .filter(([token]) => TOKEN_BY_NAME.has(token))
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([token, value]) => `  --${token}: ${emittedTokenValue(token, value)} !important;`);
-
-  for (const spec of COMPONENT_SETTING_SPECS) {
-    const value = profile.componentSettings[spec.component]?.[spec.key];
-    if (value === undefined) continue;
-    declarations.push(`  --ui-${kebab(spec.component)}-${kebab(spec.key)}: ${cssValue(spec, value)};`);
-  }
-
-  if (declarations.length) lines.push(':root {', ...declarations, '}');
-  if (profile.customCssEnabled && profile.customCss.trim()) {
-    const review = reviewCustomCss(profile.customCss);
-    // A profile whose CSS stopped being safe (imported from elsewhere, or edited before
-    // a rule was added here) renders without it rather than shipping it unchecked.
-    if (review.safe) lines.push('', profile.customCss.trim());
-  }
-  return lines.join('\n');
+  return declarations.length ? [':root {', ...declarations, '}'].join('\n') : '';
 }
 
 /**
@@ -565,16 +579,6 @@ export function profileToCss(profile: UiThemeProfile): string {
 function emittedTokenValue(token: string, value: string): string {
   if (!token.startsWith('font-size-')) return value;
   return `calc(${value} * var(--display-font-scale, 1))`;
-}
-
-function kebab(value: string): string {
-  return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-}
-
-function cssValue(spec: UiComponentSettingSpec, value: string | number | boolean): string {
-  if (typeof value === 'boolean') return value ? '1' : '0';
-  if (spec.kind === 'number') return String(value);
-  return String(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,9 +610,14 @@ interface IntentRule {
   /** Every phrase is a lowercase substring test; the first match wins per phrase list. */
   phrases: string[];
   tokens?: UiTokenPatch;
-  componentSettings?: UiComponentSettings;
   /** Relative token nudges, resolved against the currently resolved value. */
   scale?: Record<string, number>;
+  /** Absolute Appearance values. */
+  look?: UiLook;
+  /** One step along an Appearance ladder, from the CURRENT Appearance value. */
+  lookStep?: { density?: number; radius?: number };
+  /** A factor on the player's current subtitle size. */
+  subtitleScale?: number;
 }
 
 /**
@@ -619,22 +628,25 @@ const INTENT_RULES: IntentRule[] = [
   {
     id: 'sidebar-narrower',
     phrases: ['sidebar smaller', 'smaller sidebar', 'narrow sidebar', 'sidebar narrower', 'shrink the sidebar'],
-    scale: { 'space-md': 0.75, 'space-lg': 0.75 },
+    lookStep: { density: -1 },
   },
   {
     id: 'sidebar-wider',
     phrases: ['sidebar bigger', 'bigger sidebar', 'wider sidebar', 'sidebar wider'],
-    scale: { 'space-md': 1.25, 'space-lg': 1.25 },
+    lookStep: { density: 1 },
   },
   {
+    // The player's own subtitle size, not a CSS variable nothing reads — "increase
+    // subtitle size" used to land on `--ui-subtitle-panel-font-scale`, which no
+    // stylesheet consumed, so it did nothing while reporting success.
     id: 'subtitle-larger',
     phrases: ['subtitle size', 'subtitles bigger', 'bigger subtitles', 'increase subtitle', 'larger subtitle'],
-    componentSettings: { subtitlePanel: { fontScale: 130 } },
+    subtitleScale: 1.25,
   },
   {
     id: 'subtitle-smaller',
     phrases: ['smaller subtitle', 'subtitles smaller', 'decrease subtitle', 'reduce subtitle'],
-    componentSettings: { subtitlePanel: { fontScale: 85 } },
+    subtitleScale: 0.85,
   },
   {
     id: 'darker-glass',
@@ -645,13 +657,10 @@ const INTENT_RULES: IntentRule[] = [
     id: 'macos-look',
     phrases: ['like macos', 'more like macos', 'mac os style', 'macos style', 'like a mac'],
     tokens: {
-      'radius-sm': '8px',
-      'radius-md': '12px',
-      'radius-lg': '18px',
       'control-radius': '8px',
-      'shadow-card': '0 1px 2px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.22)',
       'line-height-normal': '1.5',
     },
+    look: { radius: 'round', shadow: 'soft' },
   },
   {
     id: 'oled-black',
@@ -661,27 +670,29 @@ const INTENT_RULES: IntentRule[] = [
   {
     id: 'card-spacing-tighter',
     phrases: ['tighter card', 'less card spacing', 'tighter spacing', 'reduce card spacing', 'less spacing'],
-    scale: { 'space-sm': 0.75, 'space-md': 0.75 },
+    lookStep: { density: -1 },
   },
   {
     id: 'card-spacing-looser',
     phrases: ['more card spacing', 'looser spacing', 'increase card spacing', 'more spacing', 'more breathing room'],
-    scale: { 'space-sm': 1.3, 'space-md': 1.3 },
+    lookStep: { density: 1 },
   },
   {
     id: 'rounder-corners',
     phrases: ['rounder', 'more rounded', 'round the corners', 'softer corners'],
-    scale: { 'radius-sm': 1.6, 'radius-md': 1.6, 'radius-lg': 1.5, 'control-radius': 1.6 },
+    lookStep: { radius: 1 },
+    scale: { 'control-radius': 1.6 },
   },
   {
     id: 'sharper-corners',
     phrases: ['sharper corners', 'square corners', 'less rounded', 'squarer'],
-    scale: { 'radius-sm': 0.4, 'radius-md': 0.4, 'radius-lg': 0.4, 'control-radius': 0.4 },
+    lookStep: { radius: -1 },
+    scale: { 'control-radius': 0.4 },
   },
   {
     id: 'flatter',
     phrases: ['flatter', 'no shadows', 'remove shadows', 'flat design'],
-    tokens: { 'shadow-card': 'none', 'shadow-toolbar': 'none' },
+    look: { shadow: 'none' },
   },
   {
     id: 'less-motion',
@@ -719,18 +730,12 @@ const INTENT_RULES: IntentRule[] = [
   {
     id: 'compact-density',
     phrases: ['more compact', 'denser', 'compact mode', 'fit more'],
-    componentSettings: {
-      mediaCard: { size: 'compact' },
-      vocabularyCard: { density: 'compact' },
-    },
+    look: { density: 'compact' },
   },
   {
     id: 'spacious-density',
     phrases: ['more spacious', 'roomier', 'spacious mode'],
-    componentSettings: {
-      mediaCard: { size: 'large' },
-      vocabularyCard: { density: 'spacious' },
-    },
+    look: { density: 'spacious' },
   },
 ];
 
@@ -744,9 +749,24 @@ export interface UiChangePlan {
   request: string;
   intents: UiIntent[];
   tokens: UiTokenPatch;
-  componentSettings: UiComponentSettings;
+  /** Appearance values to write (Settings > Appearance), resolved to absolute values. */
+  look: UiLook;
+  /**
+   * The player's subtitle size to write, in px, when the request was about subtitles.
+   * Not stored on a profile: it is the player's own setting, and a theme switch must
+   * not silently resize the user's subtitles.
+   */
+  subtitleFontSize?: number;
   /** Words the interpreter could not map. Reported, never guessed at. */
   unmatched: string[];
+}
+
+/** What the interpreter resolves relative requests against. */
+export interface UiInterpretContext {
+  /** The CURRENT Appearance values (not a profile's stored seed). */
+  look?: UiLook;
+  /** The player's current subtitle size, px. */
+  subtitleFontSize?: number;
 }
 
 /**
@@ -755,14 +775,6 @@ export interface UiChangePlan {
  * instead of on `NaN`.
  */
 export const UI_TOKEN_BASELINE: UiTokenPatch = {
-  'space-xs': '4px',
-  'space-sm': '8px',
-  'space-md': '12px',
-  'space-lg': '16px',
-  'space-xl': '24px',
-  'radius-sm': '6px',
-  'radius-md': '10px',
-  'radius-lg': '14px',
   'control-radius': '8px',
   // These must mirror `renderer/theme/tokens.css`, because a relative nudge ("bigger text")
   // resolves from here whenever the profile has not set the token explicitly. `font-size-sm` said
@@ -791,15 +803,8 @@ function scaleToken(token: string, factor: number, current: UiTokenPatch): strin
   return normalizeTokenValue(token, `${Number(match[1]) * factor}${spec.unit ?? ''}`);
 }
 
-function mergeComponentSettings(
-  left: UiComponentSettings,
-  right: UiComponentSettings,
-): UiComponentSettings {
-  const out: UiComponentSettings = { ...left };
-  for (const [component, values] of Object.entries(right) as Array<[UiComponentId, Record<string, string | number | boolean>]>) {
-    out[component] = { ...(out[component] ?? {}), ...values };
-  }
-  return out;
+function clampSubtitleSize(value: number): number {
+  return Math.round(Math.max(UI_SUBTITLE_FONT_SIZE.min, Math.min(UI_SUBTITLE_FONT_SIZE.max, value)));
 }
 
 /**
@@ -810,10 +815,12 @@ function mergeComponentSettings(
 export function interpretUiRequest(
   request: string,
   current: UiTokenPatch = {},
+  context: UiInterpretContext = {},
 ): UiChangePlan {
   const text = String(request ?? '').toLowerCase();
-  const plan: UiChangePlan = { request: String(request ?? ''), intents: [], tokens: {}, componentSettings: {}, unmatched: [] };
+  const plan: UiChangePlan = { request: String(request ?? ''), intents: [], tokens: {}, look: {}, unmatched: [] };
   if (!text.trim()) return plan;
+  const currentLook = { ...UI_LOOK_DEFAULTS, ...sanitizeUiLook(context.look) };
 
   let consumed = text;
   for (const rule of INTENT_RULES) {
@@ -833,11 +840,16 @@ export function interpretUiRequest(
         if (value !== null) plan.tokens[token] = value;
       }
     }
-    if (rule.componentSettings) {
-      plan.componentSettings = mergeComponentSettings(
-        plan.componentSettings,
-        sanitizeComponentSettings(rule.componentSettings),
-      );
+    if (rule.look) Object.assign(plan.look, sanitizeUiLook(rule.look));
+    if (rule.lookStep?.density) {
+      plan.look.density = stepOf(UI_LOOK_DENSITIES, plan.look.density ?? currentLook.density, rule.lookStep.density);
+    }
+    if (rule.lookStep?.radius) {
+      plan.look.radius = stepOf(UI_LOOK_RADII, plan.look.radius ?? currentLook.radius, rule.lookStep.radius);
+    }
+    if (rule.subtitleScale) {
+      const base = plan.subtitleFontSize ?? context.subtitleFontSize ?? UI_SUBTITLE_FONT_SIZE.fallback;
+      plan.subtitleFontSize = clampSubtitleSize(base * rule.subtitleScale);
     }
   }
 
@@ -854,6 +866,13 @@ export function interpretUiRequest(
   return plan;
 }
 
+/** Whether a plan changes anything at all. */
+export function uiPlanHasChanges(plan: UiChangePlan): boolean {
+  return Object.keys(plan.tokens).length > 0
+    || Object.keys(plan.look).length > 0
+    || plan.subtitleFontSize !== undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Profiles: create / patch / preview / apply / history
 // ---------------------------------------------------------------------------
@@ -862,14 +881,14 @@ export function createUiThemeProfile(
   id: string,
   name: string,
   now: string,
-  seed: { tokens?: UiTokenPatch; componentSettings?: UiComponentSettings } = {},
+  seed: { tokens?: UiTokenPatch; look?: UiLook } = {},
 ): UiThemeProfile {
   return {
     id,
     name,
     builtIn: false,
     tokens: sanitizeTokenPatch(seed.tokens ?? {}).tokens,
-    componentSettings: sanitizeComponentSettings(seed.componentSettings ?? {}),
+    look: sanitizeUiLook(seed.look),
     customCss: '',
     customCssEnabled: false,
     createdAt: now,
@@ -925,7 +944,7 @@ function snapshot(profile: UiThemeProfile, reason: string, versionId: string, no
     createdAt: now,
     reason,
     tokens: { ...profile.tokens },
-    componentSettings: JSON.parse(JSON.stringify(profile.componentSettings)) as UiComponentSettings,
+    look: { ...profile.look },
     customCss: profile.customCss,
   };
   return [version, ...profile.history].slice(0, UI_THEME_HISTORY_LIMIT);
@@ -951,10 +970,7 @@ export function applyUiPlan(
     ...profile,
     history: snapshot(profile, 'assistant', options.versionId, options.now),
     tokens: { ...profile.tokens, ...sanitizeTokenPatch(plan.tokens).tokens },
-    componentSettings: mergeComponentSettings(
-      profile.componentSettings,
-      sanitizeComponentSettings(plan.componentSettings),
-    ),
+    look: { ...profile.look, ...sanitizeUiLook(plan.look) },
     updatedAt: options.now,
   }));
   return { ...next, preview: null };
@@ -976,54 +992,20 @@ export function patchUiTokens(
   return { document: next, issues };
 }
 
-export function setUiComponentSetting(
+/**
+ * Record the current Appearance values on a profile, so re-activating it later brings
+ * back the look the user had while it was active. Only called for a user theme; a
+ * built-in keeps its own seed.
+ */
+export function setUiProfileLook(
   document: UiCustomizationDocument,
   profileId: string,
-  component: UiComponentId,
-  key: string,
-  value: string | number | boolean,
-  options: { now: string; versionId: string },
-): UiCustomizationDocument {
-  const sanitized = sanitizeComponentSettings({ [component]: { [key]: value } });
-  if (!sanitized[component]) throw new Error(`"${key}" is not a customizable ${component} setting.`);
-  return withUiProfile(document, profileId, (profile) => ({
-    ...profile,
-    history: snapshot(profile, 'edit', options.versionId, options.now),
-    componentSettings: mergeComponentSettings(profile.componentSettings, sanitized),
-    updatedAt: options.now,
-  }));
-}
-
-export function setUiCustomCss(
-  document: UiCustomizationDocument,
-  profileId: string,
-  css: string,
-  options: { now: string; versionId: string },
-): { document: UiCustomizationDocument; review: UiCssReview } {
-  const review = reviewCustomCss(css);
-  if (!review.safe) {
-    // Refusing to *store* an unsafe stylesheet, not merely refusing to render it, is
-    // what stops it becoming active later through an import or a code change.
-    return { document, review };
-  }
-  const next = withUiProfile(document, profileId, (profile) => ({
-    ...profile,
-    history: snapshot(profile, 'css', options.versionId, options.now),
-    customCss: review.css,
-    updatedAt: options.now,
-  }));
-  return { document: next, review };
-}
-
-export function setUiCustomCssEnabled(
-  document: UiCustomizationDocument,
-  profileId: string,
-  enabled: boolean,
+  look: UiLook,
   now: string,
 ): UiCustomizationDocument {
   return withUiProfile(document, profileId, (profile) => ({
     ...profile,
-    customCssEnabled: enabled,
+    look: sanitizeUiLook(look),
     updatedAt: now,
   }));
 }
@@ -1046,13 +1028,13 @@ export function undoUiChange(
           createdAt: options.now,
           reason: 'undo',
           tokens: { ...profile.tokens },
-          componentSettings: JSON.parse(JSON.stringify(profile.componentSettings)) as UiComponentSettings,
+          look: { ...profile.look },
           customCss: profile.customCss,
         },
         ...rest,
       ].slice(0, UI_THEME_HISTORY_LIMIT),
       tokens: { ...previous.tokens },
-      componentSettings: JSON.parse(JSON.stringify(previous.componentSettings)) as UiComponentSettings,
+      look: { ...previous.look },
       customCss: previous.customCss,
       updatedAt: options.now,
     };
@@ -1070,7 +1052,7 @@ export function restoreUiDefaults(
       ...profile,
       history: snapshot(profile, 'reset', options.versionId, options.now),
       tokens: builtIn ? sanitizeTokenPatch(builtIn.tokens).tokens : {},
-      componentSettings: builtIn ? sanitizeComponentSettings(builtIn.componentSettings) : {},
+      look: builtIn ? sanitizeUiLook(builtIn.look) : {},
       customCss: '',
       customCssEnabled: false,
       updatedAt: options.now,
@@ -1136,7 +1118,7 @@ function normalizeProfile(value: unknown, now: string): UiThemeProfile | null {
           createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : now,
           reason: typeof entry.reason === 'string' ? entry.reason.slice(0, 40) : 'edit',
           tokens: sanitizeTokenPatch(entry.tokens).tokens,
-          componentSettings: sanitizeComponentSettings(entry.componentSettings),
+          look: entry.look !== undefined ? sanitizeUiLook(entry.look) : lookFromLegacyTokens(entry.tokens),
           customCss: reviewCustomCss(entry.customCss).safe && typeof entry.customCss === 'string'
             ? entry.customCss
             : '',
@@ -1147,7 +1129,9 @@ function normalizeProfile(value: unknown, now: string): UiThemeProfile | null {
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 80) : id,
     builtIn: BUILT_IN_UI_THEMES.some((theme) => theme.id === id),
     tokens: sanitizeTokenPatch(raw.tokens).tokens,
-    componentSettings: sanitizeComponentSettings(raw.componentSettings),
+    // A profile stored before themes wrote Appearance values has no `look`; its
+    // Appearance-owned tokens are read back into one instead of being dropped.
+    look: raw.look !== undefined ? sanitizeUiLook(raw.look) : lookFromLegacyTokens(raw.tokens),
     // Unsafe CSS is dropped at the boundary, not carried and filtered at render time.
     customCss: review.safe ? review.css : '',
     customCssEnabled: review.safe && raw.customCssEnabled === true,

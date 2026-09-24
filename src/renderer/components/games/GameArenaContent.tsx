@@ -355,9 +355,9 @@ export function GameArena() {
   return (
     <div className="game-arena">
       <ContextualSurface as="header" className="game-arena-top">
+        {/* No in-window "Game Arena" heading: the window title already names it
+            (CLAUDE.md window minimalism). The one-line description stays. */}
         <div>
-          <div className="game-arena-kicker">{t('games.kicker')}</div>
-          <h2>{t('games.title')}</h2>
           <p className="muted">{t('games.desc')}</p>
         </div>
         <div className="game-arena-progress" aria-label={t('games.progress')}>

@@ -63,6 +63,14 @@ type ScaffoldProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   children?: ReactNode;
   /** Temporary inspector. Rendered in a `complementary` landmark. */
   inspector?: ReactNode;
+  /**
+   * An inspector with nothing selected — a summary, a hint — shown only when the
+   * scaffold is `wide` and `inspector` is absent. Below `wide` it would take a
+   * 320px column from a canvas that has none to spare, which is how a medium
+   * window ended up with its list columns cut beside a panel saying "select
+   * something". A real `inspector` always wins and shows at every width.
+   */
+  ambientInspector?: ReactNode;
   /** Transport / command sheet pinned to the foot of the spine. */
   dock?: ReactNode;
   /**
@@ -130,7 +138,8 @@ export function LiquidAppScaffold({
   rail,
   toolbar,
   children,
-  inspector,
+  inspector: selectionInspector,
+  ambientInspector,
   dock,
   compactDock,
   railCollapsed,
@@ -143,6 +152,7 @@ export function LiquidAppScaffold({
   const ref = useRef<HTMLElement | null>(null);
   const measured = useMeasuredWidthClass(ref, widthClass === undefined);
   const effective = widthClass ?? measured ?? 'wide';
+  const inspector = selectionInspector ?? (effective === 'wide' ? ambientInspector : undefined);
 
   // A rail that is collapsed by the caller, or squeezed out by the breakpoint.
   // Below `medium` the spine has no room for one at all, and the app is

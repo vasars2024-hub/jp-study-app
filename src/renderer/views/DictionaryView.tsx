@@ -216,9 +216,7 @@ export default function DictionaryView() {
 
       {!query ? (
         <p className="dict-hint muted">
-          {isZh
-            ? 'Offline Chinese↔English dictionary (CC-CEDICT). Results show pinyin with tone marks. Highlight a word while reading to look it up, or tap the star icon to save it to Flashcards.'
-            : 'Tip: while reading a book you can highlight any word to look it up instantly. Tap the star icon on a result to save it to Flashcards.'}
+          {t(isZh ? 'dict.view.hint.zh' : 'dict.view.hint.ja')}
         </p>
       ) : (
         <LexiconWorkbenchResults

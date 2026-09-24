@@ -90,6 +90,23 @@ const ALL_COMPANION_DEFS: CompanionDef[] = [
   },
 ];
 
+/**
+ * A def with its name and blurb in the UI language. Keys are derived from the id
+ * (`settings.companions.type.<id>.name` / `.blurb`); a key that is not in the catalog —
+ * the secret companions' names, which are proper names — keeps the def's own text.
+ */
+export function localizedCompanionDef(def: CompanionDef, t: (key: string) => string): CompanionDef {
+  const resolve = (key: string, fallback: string): string => {
+    const out = t(key);
+    return out && out !== key ? out : fallback;
+  };
+  return {
+    ...def,
+    label: resolve(`settings.companions.type.${def.id}.name`, def.label),
+    blurb: resolve(`settings.companions.type.${def.id}.blurb`, def.blurb),
+  };
+}
+
 export function COMPANION_DEFS(): CompanionDef[] {
   const aero = hasDiscoveredAero();
   const wired = hasDiscoveredWired();

@@ -25,7 +25,8 @@
  * the same step list later without changing its shape.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { TOUR_STEPS } from '../../../shared/onboarding/tourScript';
+import { TOUR_STEPS, settingsPageNameKey } from '../../../shared/onboarding/tourScript';
+import { openSectionSurface } from '../../sectionSurface';
 import { prefersReducedMotion } from '../../motion/motionPrefs';
 import {
   announceTourStarted,
@@ -209,7 +210,26 @@ export default function TourOverlay() {
 
   const reduced = prefersReducedMotion();
   const title = t(step.titleKey);
-  const body = t(step.bodyKey);
+  // Page names come from the Settings sidebar's own labels, in the UI language.
+  const pageNames: Record<string, string> = {};
+  for (const [slot, page] of Object.entries(step.settingsPages ?? {})) pageNames[slot] = t(settingsPageNameKey(page));
+  const body = t(step.bodyKey, pageNames);
+  const destination = step.destination;
+  // The fewest-steps route to what the step describes. The tour ends (it stays
+  // replayable from Settings > Help) so it does not sit over the page it opened.
+  const takeMeThere = destination
+    ? () => {
+        finish();
+        openSectionSurface('settings');
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('settings:navigate', {
+              detail: { page: destination.page, settingId: destination.settingId },
+            }),
+          );
+        }, 80);
+      }
+    : null;
 
   return (
     <div className={`tour-root${reduced ? ' tour-root--static' : ''}`} data-tour-step={step.id}>
@@ -262,6 +282,11 @@ export default function TourOverlay() {
           <button type="button" className="btn" onClick={finish}>
             {t('tour.skip')}
           </button>
+          {takeMeThere ? (
+            <button type="button" className="btn" onClick={takeMeThere}>
+              {t('tour.takeMeThere')}
+            </button>
+          ) : null}
           <button type="button" className="btn" onClick={back} disabled={index === 0}>
             {t('tour.back')}
           </button>

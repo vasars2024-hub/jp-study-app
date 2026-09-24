@@ -14,6 +14,7 @@ import {
   CalendarNav,
   EventChip,
   EventModal,
+  fromKey,
   toKey,
   useCalendar,
   type ViewMode,
@@ -97,11 +98,9 @@ export default function CalendarView() {
   return (
     <AppChrome menus={calMenus} status={calStatus} className="aero-calendar-chrome">
     <div className={`calendar-view${aero ? ' aero-calendar' : ''}`}>
+      {/* No in-window "Calendar" heading: the window title and taskbar button
+          already say which app this is (CLAUDE.md window minimalism). */}
       <ContextualSurface as="header" className="view-head calendar-context-head">
-        <div>
-          <h1>{t('calendar.title')}</h1>
-          <p className="muted">{t('calendar.intro')}</p>
-        </div>
         <button type="button" className="btn primary" onClick={() => openNew(toKey(cursor))}>
           <Icon name="plus" size={14} /> {t('calendar.newEvent')}
         </button>
@@ -172,7 +171,7 @@ export default function CalendarView() {
             <ul className="aero-cal-list">
               {agendaUpcoming.slice(0, AGENDA_UPCOMING_ROWS).map((ev) => (
                 <li key={`upcoming-${ev.id}-${ev.occurrenceDate}`}>
-                  <span className="aero-cal-date">{new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
+                  <span className="aero-cal-date">{fromKey(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
                   <EventChip ev={ev} onClick={() => openEdit(ev)} />
                 </li>
               ))}

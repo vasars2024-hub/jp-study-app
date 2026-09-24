@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FilesIndexSnapshot } from '../../../shared/filesApp/catalog';
 import { onFilesIndexChanged } from '../../filesIndexBus';
-import { withRendererItems } from './rendererEnumerators';
+import { withRendererItemsAsync } from './rendererEnumerators';
 
 export type FilesIndexState =
   | { status: 'loading'; snapshot: null; error: null }
@@ -48,7 +48,9 @@ export function useFilesIndex(): UseFilesIndex {
       // Main cannot see the Notebook — it is in renderer localStorage, which is
       // why `outputs/notes` read a permanent 0 against a populated store. The
       // renderer layer is joined on arrival, not indexed separately.
-      const snapshot = withRendererItems(await api(force));
+      // Joined in chunks, yielding between them, so a large index never freezes
+      // the window while it is merged (D315/D345).
+      const snapshot = await withRendererItemsAsync(await api(force));
       setState({ status: 'ready', snapshot, error: null });
     } catch (err) {
       setState({

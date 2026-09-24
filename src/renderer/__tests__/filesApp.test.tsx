@@ -325,6 +325,18 @@ describe('Files app — the tree reports a count per category (gate 1)', () => {
     expect(railButton(/^Text$/)?.querySelector('.fa-tree-count')?.textContent).toBe('1');
     expect(railButton(/^Everything$/)?.querySelector('.fa-tree-count')?.textContent).toBe('4');
   });
+
+  it('every folder node carries a glyph, so the collapsed rail has icons rather than cut words', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    const nodes = Array.from(host?.querySelectorAll('.fa-tree-node') ?? []);
+    expect(nodes.length).toBeGreaterThan(20);
+    for (const node of nodes) {
+      expect(node.querySelector('svg.fa-tree-icon'), node.getAttribute('title') ?? '').not.toBeNull();
+      // The label stays in the DOM: it is the accessible name when collapsed.
+      expect(node.querySelector('.fa-tree-label')?.textContent).toBeTruthy();
+    }
+  });
 });
 
 describe('Files app — scope is a filter, not a mode (gate 5 shape)', () => {

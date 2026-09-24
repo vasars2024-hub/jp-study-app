@@ -539,6 +539,10 @@ export default function AppearancePage() {
               </button>
             </div>
             {cssMsg && <p className="muted os-set-hint">{cssMsg}</p>}
+            {/* The lockout guard, stated up front rather than discovered by being
+                blocked. This is the app's one custom-CSS editor; Theme Studio's
+                per-theme stylesheet was moved in here. */}
+            <p className="muted os-set-hint">{t('theme.lockoutNote')}</p>
           </>
         }
         advancedLabel={t('settings.appearance.css.editor')}
@@ -576,9 +580,9 @@ export default function AppearancePage() {
         }}
       />
 
-      {/* MASTER_PLAN §20 — theme profiles, the request interpreter, component-level
-          settings, and the guarded stylesheet editor. Appended rather than folded into
-          the cards above so the existing personalization controls are untouched. */}
+      {/* MASTER_PLAN §20 — theme profiles, the request interpreter and the token
+          editor. A theme's accent, density, corners and shadows are written into the
+          cards above rather than overriding them, so they always show the real value. */}
       <ThemeStudioPanel />
     </>
   );

@@ -21,6 +21,12 @@
   min-width: 0;
 }
 
+/* The header holds only the New event action now — the title it used to
+   repeat is the window's own. */
+.calendar-context-head {
+  justify-content: flex-end;
+}
+
 .calendar-context-head > .btn {
   flex: 0 0 auto;
 }

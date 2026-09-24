@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  APPEARANCE_OWNED_TOKENS,
   BUILT_IN_UI_THEMES,
-  COMPONENT_SETTING_SPECS,
   PROTECTED_UI_SELECTORS,
   UI_CUSTOMIZATION_VERSION,
   UI_CUSTOM_CSS_LIMIT,
+  UI_LOOK_DEFAULTS,
+  UI_SUBTITLE_FONT_SIZE,
   UI_TOKENS,
   activeUiProfile,
   addUiProfile,
@@ -23,17 +25,14 @@ import {
   profileToCss,
   restoreUiDefaults,
   reviewCustomCss,
-  sanitizeComponentSettings,
   sanitizeTokenPatch,
   setActiveUiProfile,
-  setUiComponentSetting,
-  setUiCustomCss,
-  setUiCustomCssEnabled,
   stageUiPlan,
   undoUiChange,
   type UiCustomizationDocument,
   type UiThemeProfile,
 } from '../uiCustomization';
+import { normalizeVideoCoreStudyPreferences } from '../videoCoreStudy';
 
 const NOW = '2026-07-25T12:00:00.000Z';
 const opts = { now: NOW, versionId: 'v1' };
@@ -57,21 +56,22 @@ describe('ui customization — the token allow-list', () => {
     ]);
     expect(document.profiles.every((profile) => profile.builtIn)).toBe(true);
     expect(activeUiProfile(document).id).toBe('default');
-    // "Default" must genuinely change nothing.
+    // "Default" overrides no token; it only puts Appearance's layout values back.
     expect(document.profiles[0].tokens).toEqual({});
+    expect(document.profiles[0].look).toEqual(UI_LOOK_DEFAULTS);
   });
 
   it('accepts a value only for a token on the list', () => {
-    expect(normalizeTokenValue('accent', '#ff2e4d')).toBe('#ff2e4d');
+    expect(normalizeTokenValue('bg', '#ff2e4d')).toBe('#ff2e4d');
     expect(normalizeTokenValue('not-a-token', '#fff')).toBeNull();
-    const { tokens, issues } = sanitizeTokenPatch({ accent: '#112233', 'z-max': '9999' });
-    expect(tokens).toEqual({ accent: '#112233' });
+    const { tokens, issues } = sanitizeTokenPatch({ bg: '#112233', 'z-max': '9999' });
+    expect(tokens).toEqual({ bg: '#112233' });
     expect(issues).toEqual([{ token: 'z-max', message: 'Not a customizable token.' }]);
   });
 
   it('clamps numeric tokens to their declared bounds', () => {
-    expect(normalizeTokenValue('space-md', '999px')).toBe('48px');
-    expect(normalizeTokenValue('space-md', '-40px')).toBe('0px');
+    expect(normalizeTokenValue('control-radius', '999px')).toBe('32px');
+    expect(normalizeTokenValue('control-radius', '-40px')).toBe('0px');
     expect(normalizeTokenValue('font-size-md', '18px')).toBe('18px');
     expect(normalizeTokenValue('line-height-normal', '1.75')).toBe('1.75');
   });
@@ -79,16 +79,16 @@ describe('ui customization — the token allow-list', () => {
   it('folds seconds into a millisecond token but rejects a mismatched unit', () => {
     expect(normalizeTokenValue('motion-duration', '0.2s')).toBe('200ms');
     expect(normalizeTokenValue('motion-duration', '200ms')).toBe('200ms');
-    expect(normalizeTokenValue('space-md', '2rem')).toBeNull();
+    expect(normalizeTokenValue('control-radius', '2rem')).toBeNull();
   });
 
   it('refuses a value that would escape its declaration', () => {
     // Every one of these is a way to turn "set a colour" into "write arbitrary CSS".
-    expect(normalizeTokenValue('accent', 'red; position: fixed')).toBeNull();
-    expect(normalizeTokenValue('accent', 'red} .os-taskbar{display:none')).toBeNull();
-    expect(normalizeTokenValue('font-body', 'x/*')).toBeNull();
-    expect(normalizeTokenValue('shadow-card', 'url(https://evil.example/x.png)')).toBeNull();
-    expect(normalizeTokenValue('shadow-card', 'expression(alert(1))')).toBeNull();
+    expect(normalizeTokenValue('bg', 'red; position: fixed')).toBeNull();
+    expect(normalizeTokenValue('bg', 'red} .os-taskbar{display:none')).toBeNull();
+    expect(normalizeTokenValue('font-display', 'x/*')).toBeNull();
+    expect(normalizeTokenValue('glass-tint', 'url(https://evil.example/x.png)')).toBeNull();
+    expect(normalizeTokenValue('glass-tint', 'expression(alert(1))')).toBeNull();
   });
 
   it('every listed token declares bounds when it is numeric', () => {
@@ -102,31 +102,43 @@ describe('ui customization — the token allow-list', () => {
   });
 });
 
-describe('ui customization — component settings', () => {
-  it('keeps only declared keys with in-range values', () => {
-    const settings = sanitizeComponentSettings({
-      mediaCard: { size: 'compact', coverRatio: 'nonsense', bogus: 1 },
-      subtitlePanel: { fontScale: 900, opacity: 55 },
-      nothing: { at: 'all' },
-    });
-    expect(settings).toEqual({
-      mediaCard: { size: 'compact' },
-      subtitlePanel: { fontScale: 250, opacity: 55 },
-    });
-  });
-
-  it('rejects an undeclared setting rather than storing it', () => {
-    expect(() => setUiComponentSetting(doc(), 'default', 'mediaCard', 'nope', 'x', opts))
-      .toThrow(/customizable/i);
-  });
-
-  it('every declared default is itself valid under the spec', () => {
-    for (const spec of COMPONENT_SETTING_SPECS) {
-      const sanitized = sanitizeComponentSettings({
-        [spec.component]: { [spec.key]: spec.kind === 'boolean' ? true : spec.values?.[0] ?? spec.min },
-      });
-      expect(sanitized[spec.component]?.[spec.key], `${spec.component}.${spec.key}`).toBeDefined();
+describe('ui customization — a theme writes Appearance values, it does not override them', () => {
+  it('none of the tokens Settings > Appearance owns is customizable here', () => {
+    for (const token of APPEARANCE_OWNED_TOKENS) {
+      expect(UI_TOKENS.some((spec) => spec.token === token), token).toBe(false);
     }
+    const { tokens, issues } = sanitizeTokenPatch({ accent: '#123456', 'space-md': '20px', 'radius-md': '4px' });
+    expect(tokens).toEqual({});
+    expect(issues.map((issue) => issue.token).sort()).toEqual(['accent', 'radius-md', 'space-md']);
+  });
+
+  it('no built-in theme emits an Appearance-owned token, so it can never mask those controls', () => {
+    for (const profile of doc().profiles) {
+      const css = profileToCss(profile);
+      for (const token of APPEARANCE_OWNED_TOKENS) {
+        expect(css, `${profile.id} emits --${token}`).not.toMatch(new RegExp(`--${token}:`));
+      }
+    }
+    expect(profileOf(doc(), 'macos-inspired').look).toEqual({ radius: 'round', density: 'spacious', shadow: 'soft' });
+  });
+
+  it('a stored theme from before keeps its look: its old tokens become Appearance values', () => {
+    const document = normalizeUiCustomizationDocument({
+      profiles: [{
+        id: 'mine',
+        name: 'Mine',
+        tokens: { accent: '#00DDAA', 'space-md': '16px', 'radius-md': '4px', 'shadow-card': 'none', bg: '#101010' },
+      }],
+    }, NOW);
+    const mine = profileOf(document, 'mine');
+    expect(mine.look).toEqual({ accent: '#00ddaa', density: 'spacious', radius: 'sharp', shadow: 'none' });
+    expect(mine.tokens).toEqual({ bg: '#101010' });
+  });
+
+  it('the subtitle size bounds are the player\'s own', () => {
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontSize: 1 }).subtitleFontSize).toBe(UI_SUBTITLE_FONT_SIZE.min);
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontSize: 999 }).subtitleFontSize).toBe(UI_SUBTITLE_FONT_SIZE.max);
+    expect(normalizeVideoCoreStudyPreferences({}).subtitleFontSize).toBe(UI_SUBTITLE_FONT_SIZE.fallback);
   });
 });
 
@@ -188,14 +200,6 @@ describe('ui customization — custom CSS safety', () => {
     expect(review.css).toBe('');
   });
 
-  it('refuses to store unsafe CSS at all, not merely to render it', () => {
-    const before = doc();
-    const { document: after, review } = setUiCustomCss(before, 'default', '.os-taskbar{display:none}', opts);
-    expect(review.safe).toBe(false);
-    expect(findUiProfile(after, 'default')?.customCss).toBe('');
-    expect(after).toBe(before);
-  });
-
   it('lists a protected selector for every escape route the shell needs', () => {
     // A regression guard: someone removing one of these from the list is removing a
     // lockout protection, and should have to change this test to do it.
@@ -207,27 +211,19 @@ describe('ui customization — custom CSS safety', () => {
 
 describe('ui customization — CSS generation', () => {
   it('emits only allow-listed tokens, sorted, on :root', () => {
-    const { document } = patchUiTokens(doc(), 'default', { accent: '#00ff88', 'space-md': '20px' }, opts);
+    const { document } = patchUiTokens(doc(), 'default', { bg: '#000000', 'control-radius': '12px' }, opts);
     const css = profileToCss(profileOf(document, 'default'));
-    expect(css).toContain('--accent: #00ff88 !important;');
-    expect(css).toContain('--space-md: 20px !important;');
-    expect(css.indexOf('--accent')).toBeLessThan(css.indexOf('--space-md'));
+    expect(css).toContain('--bg: #000000 !important;');
+    expect(css).toContain('--control-radius: 12px !important;');
+    expect(css.indexOf('--bg')).toBeLessThan(css.indexOf('--control-radius'));
   });
 
-  it('marks tokens important so they beat osPersonalization’s inline :root styles', () => {
-    // `osPersonalization` writes --space-*, --radius-*, --shadow-card, --font-body,
-    // --accent and --dur-* as inline styles on documentElement. A normal stylesheet
-    // declaration loses to an inline one, so without `!important` more than half of a
-    // theme would apply silently to nothing.
-    const { document } = patchUiTokens(doc(), 'default', {
-      'radius-md': '12px',
-      'shadow-card': 'none',
-      'font-body': 'Iosevka, monospace',
-    }, opts);
-    const css = profileToCss(profileOf(document, 'default'));
-    for (const token of ['radius-md', 'shadow-card', 'font-body']) {
-      expect(css, token).toMatch(new RegExp(`--${token}: [^;]+ !important;`));
-    }
+  it('drops an Appearance-owned token even when one reaches a profile by another route', () => {
+    const smuggled = { ...profileOf(doc(), 'default'), tokens: { accent: '#ff0000', 'space-md': '30px', bg: '#000000' } };
+    const css = profileToCss(smuggled);
+    expect(css).not.toContain('--accent');
+    expect(css).not.toContain('--space-md');
+    expect(css).toContain('--bg: #000000 !important;');
   });
 
   it('keeps a pinned font size riding the display base font, and scales nothing else', () => {
@@ -235,43 +231,27 @@ describe('ui customization — CSS generation', () => {
     // `calc(<step> * var(--display-font-scale, 1))` outright. Without re-applying the scale, a
     // profile that pins one step of the ladder would make Settings > Display > base font stop
     // working for exactly that step — the two text-size affordances would cancel rather than
-    // compose. Measured live: the base font reached 0 of Settings' 70 text elements before the
-    // ladder carried the scale.
+    // compose.
     const { document } = patchUiTokens(doc(), 'default', {
       'font-size-sm': '15px',
-      'space-md': '20px',
+      'control-radius': '10px',
       'line-height-normal': '1.8',
     }, opts);
     const css = profileToCss(profileOf(document, 'default'));
     expect(css).toContain('--font-size-sm: calc(15px * var(--display-font-scale, 1)) !important;');
-    // Layout and rhythm are not typography sizes: scaling them would turn a base-font
-    // preference into a whole-app zoom, which is a separate control.
-    expect(css).toContain('--space-md: 20px !important;');
+    expect(css).toContain('--control-radius: 10px !important;');
     expect(css).toContain('--line-height-normal: 1.8 !important;');
   });
 
   it('a theme with no overrides produces no stylesheet at all', () => {
-    // The scope guard for the `!important` above: stock Default must stay inert.
     expect(profileToCss(profileOf(doc(), 'default'))).toBe('');
   });
 
-  it('exposes component settings as variables so no component imports this module', () => {
-    const document = setUiComponentSetting(doc(), 'default', 'subtitlePanel', 'fontScale', 130, opts);
-    const css = profileToCss(profileOf(document, 'default'));
-    expect(css).toContain('--ui-subtitle-panel-font-scale: 130;');
-    const withBoolean = setUiComponentSetting(document, 'default', 'mediaCard', 'showProgress', false, opts);
-    expect(profileToCss(profileOf(withBoolean, 'default'))).toContain('--ui-media-card-show-progress: 0;');
-  });
-
-  it('omits custom CSS when it is disabled, and when it stopped being safe', () => {
-    let document = setUiCustomCss(doc(), 'default', '.novel-page { color: #eee; }', opts).document;
-    expect(profileToCss(profileOf(document, 'default'))).not.toContain('.novel-page');
-    document = setUiCustomCssEnabled(document, 'default', true, NOW);
-    expect(profileToCss(profileOf(document, 'default'))).toContain('.novel-page');
-
-    // Bypass the setter the way a hand-edited store or a future rule change would.
-    const smuggled = { ...profileOf(document, 'default'), customCss: '.os-taskbar{display:none}' };
-    expect(profileToCss(smuggled)).not.toContain('os-taskbar');
+  it('never renders a profile stylesheet — Appearance has the one custom-CSS editor', () => {
+    const withCss = { ...profileOf(doc(), 'default'), customCss: '.novel-page { color: #eee; }', customCssEnabled: true };
+    expect(profileToCss(withCss)).not.toContain('.novel-page');
+    // And no component variable nothing reads.
+    expect(profileToCss(profileOf(doc(), 'japanese-study'))).not.toContain('--ui-');
   });
 });
 
@@ -294,9 +274,23 @@ describe('ui customization — the request interpreter', () => {
 
   it('resolves relative nudges against the current values, not a fixed table', () => {
     const fromBaseline = interpretUiRequest('rounder');
-    expect(fromBaseline.tokens['radius-md']).toBe('16px');
-    const fromCurrent = interpretUiRequest('rounder', { 'radius-md': '4px' });
-    expect(fromCurrent.tokens['radius-md']).toBe('6px');
+    expect(fromBaseline.look.radius).toBe('round');
+    expect(fromBaseline.tokens['control-radius']).toBe('13px');
+    // The CURRENT Appearance value is the base, so "rounder" from Sharp is one step.
+    const fromCurrent = interpretUiRequest('rounder', { 'control-radius': '4px' }, { look: { radius: 'sharp' } });
+    expect(fromCurrent.look.radius).toBe('soft');
+    expect(fromCurrent.tokens['control-radius']).toBe('6px');
+    expect(interpretUiRequest('make the sidebar smaller', {}, { look: { density: 'compact' } }).look.density)
+      .toBe('compact');
+  });
+
+  it('routes a subtitle request to the player\'s real subtitle size', () => {
+    const plan = interpretUiRequest('Increase subtitle size', {}, { subtitleFontSize: 26 });
+    expect(plan.subtitleFontSize).toBe(33);
+    expect(plan.tokens).toEqual({});
+    expect(plan.look).toEqual({});
+    expect(interpretUiRequest('bigger subtitles', {}, { subtitleFontSize: 46 }).subtitleFontSize).toBe(48);
+    expect(interpretUiRequest('smaller subtitles', {}, { subtitleFontSize: 20 }).subtitleFontSize).toBe(17);
   });
 
   it('clamps a nudge that would leave the token’s safe range', () => {
@@ -307,7 +301,7 @@ describe('ui customization — the request interpreter', () => {
   it('combines independent intents in one request', () => {
     const plan = interpretUiRequest('make it flatter and use pure black');
     expect(plan.intents.map((intent) => intent.id).sort()).toEqual(['flatter', 'oled-black']);
-    expect(plan.tokens['shadow-card']).toBe('none');
+    expect(plan.look.shadow).toBe('none');
     expect(plan.tokens.bg).toBe('#000000');
   });
 
@@ -316,6 +310,7 @@ describe('ui customization — the request interpreter', () => {
     expect(plan.intents).toEqual([]);
     expect(plan.unmatched).toEqual(expect.arrayContaining(['blender', 'neon', 'wireframes']));
     expect(plan.tokens).toEqual({});
+    expect(plan.look).toEqual({});
   });
 
   it('does not report a matched phrase back as unmatched', () => {
@@ -324,7 +319,7 @@ describe('ui customization — the request interpreter', () => {
   });
 
   it('returns an empty plan for empty input', () => {
-    expect(interpretUiRequest('   ')).toMatchObject({ intents: [], tokens: {}, unmatched: [] });
+    expect(interpretUiRequest('   ')).toMatchObject({ intents: [], tokens: {}, look: {}, unmatched: [] });
   });
 
   it('a plan can only ever contain allow-listed tokens', () => {
@@ -355,20 +350,28 @@ describe('ui customization — preview, confirm, undo', () => {
     const plan = interpretUiRequest('rounder and bigger text');
     const document = applyUiPlan(stageUiPlan(doc(), plan), plan, opts);
     expect(document.preview).toBeNull();
-    expect(findUiProfile(document, 'default')?.tokens['radius-md']).toBe('16px');
+    expect(findUiProfile(document, 'default')?.look.radius).toBe('round');
     expect(findUiProfile(document, 'default')?.tokens['font-size-md']).toBe('16px');
   });
 
+  it('undo brings back the previous Appearance values too', () => {
+    const plan = interpretUiRequest('more compact');
+    let document = applyUiPlan(doc(), plan, opts);
+    expect(profileOf(document, 'default').look.density).toBe('compact');
+    document = undoUiChange(document, 'default', { now: NOW, versionId: 'v2' });
+    expect(profileOf(document, 'default').look.density).toBe('comfortable');
+  });
+
   it('undo restores the previous state and is itself reversible', () => {
-    let document = patchUiTokens(doc(), 'default', { accent: '#111111' }, opts).document;
-    document = patchUiTokens(document, 'default', { accent: '#222222' }, { now: NOW, versionId: 'v2' }).document;
-    expect(findUiProfile(document, 'default')?.tokens.accent).toBe('#222222');
+    let document = patchUiTokens(doc(), 'default', { bg: '#111111' }, opts).document;
+    document = patchUiTokens(document, 'default', { bg: '#222222' }, { now: NOW, versionId: 'v2' }).document;
+    expect(findUiProfile(document, 'default')?.tokens.bg).toBe('#222222');
 
     document = undoUiChange(document, 'default', { now: NOW, versionId: 'v3' });
-    expect(findUiProfile(document, 'default')?.tokens.accent).toBe('#111111');
+    expect(findUiProfile(document, 'default')?.tokens.bg).toBe('#111111');
 
     document = undoUiChange(document, 'default', { now: NOW, versionId: 'v4' });
-    expect(findUiProfile(document, 'default')?.tokens.accent).toBe('#222222');
+    expect(findUiProfile(document, 'default')?.tokens.bg).toBe('#222222');
   });
 
   it('undo on a untouched profile says so rather than silently doing nothing', () => {
@@ -376,23 +379,25 @@ describe('ui customization — preview, confirm, undo', () => {
   });
 
   it('restore defaults returns a built-in theme to its own baseline, not to empty', () => {
-    let document = patchUiTokens(doc(), 'macos-inspired', { accent: '#00ff00' }, opts).document;
-    document = setUiCustomCss(document, 'macos-inspired', '.x{color:red}', { now: NOW, versionId: 'v2' }).document;
+    let document = patchUiTokens(doc(), 'macos-inspired', { bg: '#00ff00' }, opts).document;
+    document = applyUiPlan(document, interpretUiRequest('more compact'), { profileId: 'macos-inspired', now: NOW, versionId: 'v2' });
     document = restoreUiDefaults(document, 'macos-inspired', { now: NOW, versionId: 'v3' });
 
     const profile = profileOf(document, 'macos-inspired');
-    expect(profile.tokens.accent).toBeUndefined();
-    expect(profile.tokens['radius-md']).toBe('12px');
+    expect(profile.tokens.bg).toBeUndefined();
+    expect(profile.tokens['control-radius']).toBe('8px');
+    expect(profile.look).toEqual({ radius: 'round', density: 'spacious', shadow: 'soft' });
     expect(profile.customCss).toBe('');
     expect(profile.customCssEnabled).toBe(false);
     // The state it replaced is still recoverable.
-    expect(profile.history[0].tokens.accent).toBe('#00ff00');
+    expect(profile.history[0].tokens.bg).toBe('#00ff00');
+    expect(profile.history[0].look.density).toBe('compact');
   });
 
   it('caps history rather than growing without bound', () => {
     let document = doc();
     for (let index = 0; index < 30; index += 1) {
-      document = patchUiTokens(document, 'default', { accent: '#111111' }, {
+      document = patchUiTokens(document, 'default', { bg: '#111111' }, {
         now: NOW,
         versionId: `v${index}`,
       }).document;
@@ -403,7 +408,7 @@ describe('ui customization — preview, confirm, undo', () => {
 
 describe('ui customization — profiles and portability', () => {
   it('creates, activates and deletes a user theme but protects built-ins', () => {
-    let document = addUiProfile(doc(), createUiThemeProfile('mine', 'Mine', NOW, { tokens: { accent: '#abcdef' } }));
+    let document = addUiProfile(doc(), createUiThemeProfile('mine', 'Mine', NOW, { look: { accent: '#abcdef' } }));
     document = setActiveUiProfile(document, 'mine');
     expect(activeUiProfile(document).id).toBe('mine');
     expect(() => deleteUiProfile(document, 'default')).toThrow(/built-in/i);
@@ -420,13 +425,14 @@ describe('ui customization — profiles and portability', () => {
   });
 
   it('round-trips a theme through export and import as a new, non-built-in profile', () => {
-    const source = patchUiTokens(doc(), 'default', { accent: '#123456' }, opts).document;
+    const source = patchUiTokens(doc(), 'default', { bg: '#123456' }, opts).document;
     const exported = exportUiTheme(source, 'default');
     expect(exported.version).toBe(UI_CUSTOMIZATION_VERSION);
 
     const { document } = importUiTheme(doc(), exported, { id: 'imported', now: NOW });
     const profile = profileOf(document, 'imported');
-    expect(profile.tokens.accent).toBe('#123456');
+    expect(profile.tokens.bg).toBe('#123456');
+    expect(profile.look).toEqual(UI_LOOK_DEFAULTS);
     expect(profile.builtIn).toBe(false);
     expect(profile.history).toEqual([]);
   });
@@ -474,8 +480,9 @@ describe('ui customization — profiles and portability', () => {
     expect(document.profiles.map((profile) => profile.id))
       .toEqual(['mine', ...BUILT_IN_UI_THEMES.map((theme) => theme.id)]);
     const mine = profileOf(document, 'mine');
-    expect(mine.tokens).toEqual({ accent: '#fff', 'space-md': '48px' });
-    expect(mine.componentSettings).toEqual({});
+    // `#fff` is not a six-digit accent, so only the spacing survives, as Density.
+    expect(mine.tokens).toEqual({});
+    expect(mine.look).toEqual({ density: 'spacious' });
     expect(mine.customCss).toBe('');
     expect(mine.customCssEnabled).toBe(false);
     expect(mine.builtIn).toBe(false);
@@ -491,8 +498,7 @@ describe('ui customization — purity', () => {
   it('never mutates the document it was given', () => {
     const before = doc();
     const snapshot = JSON.stringify(before);
-    patchUiTokens(before, 'default', { accent: '#123123' }, opts);
-    setUiComponentSetting(before, 'default', 'mediaCard', 'size', 'large', opts);
+    patchUiTokens(before, 'default', { bg: '#123123' }, opts);
     applyUiPlan(before, interpretUiRequest('rounder'), opts);
     restoreUiDefaults(before, 'default', opts);
     expect(JSON.stringify(before)).toBe(snapshot);

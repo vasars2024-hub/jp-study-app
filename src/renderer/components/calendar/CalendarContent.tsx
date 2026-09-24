@@ -15,7 +15,7 @@ import './calendarLiquid.css';
 import {
   addEvent,
   CATEGORY_COLORS,
-  CATEGORY_LABELS,
+  CATEGORY_LABEL_KEYS,
   deleteEvent,
   expandOccurrences,
   getOverdueReminders,
@@ -23,7 +23,10 @@ import {
   getUpcomingOccurrences,
   loadEvents,
   onCalendarChanged,
-  REMINDER_LABELS,
+  REMINDER_LABEL_KEYS,
+  REMINDER_OFFSETS,
+  resolveWeekStart,
+  startOfWeekOn,
   toDateKey,
   updateEvent,
   type CalendarEvent,
@@ -31,7 +34,9 @@ import {
   type EventOccurrence,
   type RecurrenceFreq,
   type ReminderOffset,
+  type WeekStartDay,
 } from '../../calendar';
+import { loadDesktopPrefs, onDesktopPrefsChanged } from '../../desktopPrefs';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 
@@ -44,10 +49,9 @@ export function fromKey(key: string): Date {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
-export function startOfWeek(d: Date): Date {
-  const out = new Date(d);
-  out.setDate(out.getDate() - out.getDay());
-  return out;
+/** The first day of `d`'s week; Sunday unless the caller says the week starts Monday. */
+export function startOfWeek(d: Date, weekStart: WeekStartDay = 0): Date {
+  return startOfWeekOn(d, weekStart);
 }
 
 const EMPTY_FORM = {
@@ -235,8 +239,8 @@ export function EventModal({
                   set('color', CATEGORY_COLORS[cat]);
                 }}
               >
-                {(Object.keys(CATEGORY_LABELS) as EventCategory[]).map((c) => (
-                  <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                {(Object.keys(CATEGORY_LABEL_KEYS) as EventCategory[]).map((c) => (
+                  <option key={c} value={c}>{t(CATEGORY_LABEL_KEYS[c])}</option>
                 ))}
               </select>
             </label>
@@ -249,8 +253,8 @@ export function EventModal({
           <label className="cal-field">
             <span>{t('calendar.modal.reminder')}</span>
             <select value={form.reminder} onChange={(e) => set('reminder', e.target.value as ReminderOffset)}>
-              {(Object.keys(REMINDER_LABELS) as ReminderOffset[]).map((r) => (
-                <option key={r} value={r}>{REMINDER_LABELS[r]}</option>
+              {REMINDER_OFFSETS.map((r) => (
+                <option key={r} value={r}>{t(REMINDER_LABEL_KEYS[r])}</option>
               ))}
             </select>
           </label>
@@ -323,6 +327,10 @@ export function useCalendar() {
   const [cursor, setCursor] = useState(() => new Date());
   const [jumpVal, setJumpVal] = useState(toKey(new Date()));
   const [modal, setModal] = useState<Partial<EventForm> | null>(null);
+  const [weekStartPref, setWeekStartPref] = useState(() => loadDesktopPrefs().weekStart);
+  useEffect(() => onDesktopPrefsChanged((prefs) => setWeekStartPref(prefs.weekStart)), []);
+  // Settings ▸ Desktop ▸ Week starts on; "Automatic" follows the UI language's locale.
+  const weekStart = resolveWeekStart(weekStartPref, LANG_TAGS[lang]);
 
   const today = new Date();
 
@@ -342,7 +350,7 @@ export function useCalendar() {
   const monthCells = useMemo(() => {
     if (mode !== 'month') return [];
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-    const gridStart = startOfWeek(first);
+    const gridStart = startOfWeek(first, weekStart);
     const out: Date[] = [];
     for (let i = 0; i < 42; i++) {
       const d = new Date(gridStart);
@@ -350,7 +358,7 @@ export function useCalendar() {
       out.push(d);
     }
     return out;
-  }, [mode, cursor]);
+  }, [mode, cursor, weekStart]);
 
   const rangeOccurrences = useMemo(() => {
     let start: Date;
@@ -359,7 +367,7 @@ export function useCalendar() {
       start = monthCells[0] ?? cursor;
       end = monthCells[41] ?? cursor;
     } else if (mode === 'week') {
-      start = startOfWeek(cursor);
+      start = startOfWeek(cursor, weekStart);
       end = new Date(start);
       end.setDate(end.getDate() + 6);
     } else {
@@ -367,7 +375,7 @@ export function useCalendar() {
       end = cursor;
     }
     return expandOccurrences(events, start, end);
-  }, [events, mode, cursor, monthCells]);
+  }, [events, mode, cursor, monthCells, weekStart]);
 
   const occsByDay = useMemo(() => {
     const map = new Map<string, EventOccurrence[]>();
@@ -396,7 +404,7 @@ export function useCalendar() {
     const locale = LANG_TAGS[lang];
     if (mode === 'month') return cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     if (mode === 'week') {
-      const s = startOfWeek(cursor);
+      const s = startOfWeek(cursor, weekStart);
       const e = new Date(s);
       e.setDate(e.getDate() + 6);
       return `${s.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}`;
@@ -405,7 +413,7 @@ export function useCalendar() {
     return t('calendar.mode.agenda');
     // `t` is intentionally left out of the deps: its identity is stable, `lang`
     // is what actually needs to trigger a redo.
-  }, [mode, cursor, lang]);
+  }, [mode, cursor, lang, weekStart]);
 
   const openNew = (date: string) => setModal({ ...EMPTY_FORM, date });
   const openEdit = (ev: EventOccurrence) =>
@@ -434,6 +442,7 @@ export function useCalendar() {
 
   return {
     events,
+    weekStart,
     mode,
     setMode,
     cursor,
@@ -584,8 +593,17 @@ function MonthGrid({ state }: { state: CalendarState }) {
         one column — checked live, not assumed.
       */}
       <div role="row" className="cal-month-row">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-          <div key={i} role="columnheader" className="cal-month-dow muted">{d}</div>
+        {monthCells.slice(0, 7).map((d, i) => (
+          // The locale's own narrow weekday, in the order the grid actually runs —
+          // this was a hard-coded English `S M T W T F S` that also assumed Sunday.
+          <div
+            key={i}
+            role="columnheader"
+            className="cal-month-dow muted"
+            aria-label={d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'long' })}
+          >
+            {d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'narrow' })}
+          </div>
         ))}
       </div>
       {Array.from({ length: Math.ceil(monthCells.length / 7) }, (_, week) => (
@@ -655,7 +673,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
     return (
       <div className="cal-week-grid">
         {Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(startOfWeek(cursor));
+          const d = new Date(startOfWeek(cursor, state.weekStart));
           d.setDate(d.getDate() + i);
           const key = toKey(d);
           const isToday = key === toKey(today);
@@ -687,7 +705,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
           <button type="button" key={`${ev.id}-${ev.occurrenceDate}`} className="cal-day-row" style={{ borderLeftColor: ev.color }} onClick={() => openEdit(ev)}>
             <span className="cal-day-time">{ev.allDay ? t('calendar.allDay') : `${ev.startTime ?? ''}${ev.endTime ? `–${ev.endTime}` : ''}`}</span>
             <span className="cal-day-title">{ev.title}</span>
-            <span className="cal-badge" style={{ background: ev.color }}>{CATEGORY_LABELS[ev.category]}</span>
+            <span className="cal-badge" style={{ background: ev.color }}>{t(CATEGORY_LABEL_KEYS[ev.category] ?? CATEGORY_LABEL_KEYS.personal)}</span>
           </button>
         ))}
         <button type="button" className="btn small" onClick={() => openNew(toKey(cursor))}>{t('calendar.addEvent')}</button>
@@ -715,7 +733,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
           <ul className="cal-agenda-list">
             {agendaUpcoming.map((ev) => (
               <li key={`${ev.id}-${ev.occurrenceDate}`}>
-                <span className="muted cal-agenda-date">{new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
+                <span className="muted cal-agenda-date">{fromKey(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
                 <EventChip ev={ev} onClick={() => openEdit(ev)} />
               </li>
             ))}

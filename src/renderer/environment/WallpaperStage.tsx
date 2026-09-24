@@ -64,6 +64,9 @@ async function hydrateMedia(layer: LayerStyle, item: WallpaperItem): Promise<Lay
   return layer;
 }
 
+/** The user's wallpaper fit as a background-size (set on <html> by wallpaperFit.ts). */
+const WALL_BACKGROUND_FIT = 'var(--wall-background-fit, cover)';
+
 export default function WallpaperStage({
   onActiveChange,
 }: {
@@ -241,12 +244,16 @@ export default function WallpaperStage({
         const layer = layers[i];
         if (!layer) return null;
         const on = front === i;
+        // Settings > Wallpaper > Fit applies to rotating and preset walls too, not
+        // only to a single image/video: `--wall-background-fit` is the
+        // background-size twin of `--wall-fit` (wallpaperFit.ts). An animated
+        // gradient keeps its own 400% canvas — its motion IS that oversize.
         const style: React.CSSProperties = {
           transitionDuration: mode === 'cut' ? '0ms' : `${ms}ms`,
           ...(layer.imageUrl
             ? {
                 backgroundImage: `url("${layer.imageUrl}")`,
-                backgroundSize: 'cover',
+                backgroundSize: WALL_BACKGROUND_FIT,
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
               }
@@ -255,7 +262,7 @@ export default function WallpaperStage({
                 ? { backgroundColor: layer.css }
                 : {
                     backgroundImage: layer.css,
-                    backgroundSize: layer.animated ? '400% 400%' : 'cover',
+                    backgroundSize: layer.animated ? '400% 400%' : WALL_BACKGROUND_FIT,
                     backgroundRepeat: layer.animated ? 'no-repeat' : undefined,
                   }
               : { backgroundColor: '#100f15' }),

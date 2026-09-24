@@ -133,7 +133,17 @@
    more prominent and never less: a transcript-derived card that reads like a
    human-subtitle one is the fusion track's defect repeated. */
 .mining-catalogue-provenance[data-machine='true']::before {
-  content: '⚙ ';
+  /* A small solid mark, not the gear emoji it used to be (no emojis, CLAUDE.md).
+     Drawn in the text colour so it keeps the prominence the plan requires. */
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-right: 0.35em;
+  border-radius: 1px;
+  background: currentcolor;
+  transform: rotate(45deg);
+  vertical-align: 0.1em;
 }
 
 .mining-catalogue-provenance[data-machine='true'] {

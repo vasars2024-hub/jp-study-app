@@ -554,6 +554,24 @@ function textField(item: FilesItem, column: FilesSortColumn): string {
 }
 
 /**
+ * One collator for every name comparison in the catalogue.
+ *
+ * D315/D345 — the 13-second freeze on opening Files and the 5-second one on
+ * Refresh — were this sort. `a.localeCompare(b, undefined, options)` builds a
+ * fresh ICU collator on EVERY call in V8 (only the no-arguments form is cached),
+ * and a 43,685-row index sorts in ~700,000 comparisons, each calling it once or
+ * twice. Measured in Node on 43,000 names: 14.6 s with `localeCompare(…, options)`
+ * against 0.5 s with one `Intl.Collator` doing the identical comparison. Same
+ * options, same order; the only thing that changes is that the collator is built
+ * once.
+ */
+const NAME_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+function compareIds(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
  * Stable sort with an explicit rule for missing values, which is the half of
  * gate 14 that is easy to get wrong: **a `null` always sorts last, in BOTH
  * directions.** Flipping the direction flips the order of the items that have a
@@ -582,19 +600,17 @@ export function sortItems(
       if (av !== bv) return (av - bv) * sign;
       return tieBreak(a, b);
     }
-    const cmp = textField(a, column).localeCompare(textField(b, column), undefined, {
-      numeric: true,
-      sensitivity: 'base',
-    });
+    const cmp = NAME_COLLATOR.compare(textField(a, column), textField(b, column));
     if (cmp !== 0) return cmp * sign;
-    return tieBreak(a, b);
+    // Sorting by name already compared the names; only the id is left to break the tie.
+    return column === 'name' ? compareIds(a.id, b.id) : tieBreak(a, b);
   });
 }
 
 function tieBreak(a: FilesItem, b: FilesItem): number {
-  const byName = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  const byName = NAME_COLLATOR.compare(a.name, b.name);
   if (byName !== 0) return byName;
-  return a.id.localeCompare(b.id);
+  return compareIds(a.id, b.id);
 }
 
 /* ------------------------------------------------------------------ *
@@ -624,19 +640,42 @@ function searchFold(text: string): string {
 }
 
 /**
+ * The folded name of each item, computed once per item object rather than once per
+ * keystroke. A search re-tests every row, and NFKC + kana folding 43,000 names on
+ * every character typed is most of what made the search box stutter. Keyed weakly
+ * on the item, which is immutable in this catalogue, so a rebuilt index simply
+ * starts a fresh cache.
+ */
+const foldedNames = new WeakMap<FilesItem, string>();
+
+function foldedName(item: FilesItem): string {
+  let folded = foldedNames.get(item);
+  if (folded === undefined) {
+    folded = searchFold(item.name);
+    foldedNames.set(item, folded);
+  }
+  return folded;
+}
+
+/** A query folded once, for callers that test many items against it. */
+export function foldFilesQuery(query: string): string {
+  return searchFold(query).trim();
+}
+
+/** `matchesQuery` for an already-folded query — the hot path of a list filter. */
+export function matchesFoldedQuery(item: FilesItem, folded: string): boolean {
+  if (!folded) return true;
+  return foldedName(item).includes(folded) || item.kind.includes(folded) || item.provenance.includes(folded);
+}
+
+/**
  * Matches name, kind and provenance. Empty query matches all.
  *
  * `kind` and `provenance` are compared folded too, but they are ASCII
  * identifiers, so the fold is a no-op on them and only the name benefits.
  */
 export function matchesQuery(item: FilesItem, query: string): boolean {
-  const q = searchFold(query).trim();
-  if (!q) return true;
-  return (
-    searchFold(item.name).includes(q) ||
-    item.kind.includes(q) ||
-    item.provenance.includes(q)
-  );
+  return matchesFoldedQuery(item, foldFilesQuery(query));
 }
 
 /* ------------------------------------------------------------------ *

@@ -49,22 +49,25 @@ describe('theme studio settings wiring', () => {
       'theme-studio-assistant',
       'theme-studio-profiles',
       'theme-studio-tokens',
-      'theme-studio-components',
-      'theme-studio-css',
       'theme-studio-developer',
     ]) {
       expect(html, `missing card ${card}`).toContain(`data-setting-id="${card}"`);
     }
+    // The twelve Components controls wrote variables nothing read, and the second
+    // custom-CSS editor competed with Appearance's. Both are gone.
+    expect(html).not.toContain('data-setting-id="theme-studio-components"');
+    expect(html).not.toContain('data-setting-id="theme-studio-css"');
+    expect(html).not.toContain('id="theme-css"');
     // Every §20 theme profile is offered, and Default is active.
     for (const name of ['Default', 'macOS inspired', 'Minimal', 'Japanese study mode', 'Dark OLED']) {
       expect(html).toContain(name);
     }
-    // The lockout guard is stated up front, not discovered by being blocked.
-    expect(html).toContain('theme.lockoutNote');
+    // Where a theme's accent / density / corners go is said, not discovered.
+    expect(html).toContain('theme.lookNote');
     // Developer mode is off by default, so the generated-CSS box stays hidden.
     expect(html).not.toContain('theme.generatedCss');
     // A token editor exists for each group.
-    for (const group of ['color', 'typography', 'spacing', 'radius', 'shadow', 'motion', 'density']) {
+    for (const group of ['color', 'typography', 'radius', 'shadow', 'motion', 'density']) {
       expect(html).toContain(`theme.group.${group}`);
     }
   });
@@ -77,11 +80,11 @@ describe('theme studio settings wiring', () => {
     document_ = shared.addUiProfile(
       document_,
       shared.createUiThemeProfile('mine', 'My theme', '2026-07-25T12:00:00.000Z', {
-        tokens: { accent: '#00ddaa' },
+        tokens: { bg: '#00ddaa' },
       }),
     );
     document_ = shared.setActiveUiProfile(document_, 'mine');
-    document_ = shared.patchUiTokens(document_, 'mine', { 'space-md': '20px' }, {
+    document_ = shared.patchUiTokens(document_, 'mine', { 'control-radius': '20px' }, {
       now: '2026-07-25T12:00:00.000Z',
       versionId: 'v1',
     }).document;
@@ -97,7 +100,9 @@ describe('theme studio settings wiring', () => {
     expect(html).toContain('theme.historyCount:1');
     // Developer mode on: the generated stylesheet is shown, and it is the real output.
     expect(html).toContain('theme.generatedCss');
-    expect(html).toContain('--accent: #00ddaa !important;');
+    expect(html).toContain('--bg: #00ddaa !important;');
+    // No token the Appearance cards own is ever emitted over them.
+    expect(html).not.toContain('--accent:');
   });
 });
 

@@ -557,6 +557,52 @@ export const RENDERER_FILES_ENUMERATORS: readonly {
  * ever points at a real path cannot silently double a row main already has.
  */
 export function withRendererItems(snapshot: FilesIndexSnapshot): FilesIndexSnapshot {
+  const steps = joinRendererItems(snapshot);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
+
+/** Rows merged between two chances to yield to the event loop. */
+const JOIN_CHUNK = 4000;
+/** How long one slice of the join may hold the renderer before it yields. */
+const JOIN_BUDGET_MS = 12;
+
+function nextTask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * The same join, handing the renderer back between enumerators and every
+ * `JOIN_CHUNK` rows inside one, so a large index never holds the window for the
+ * whole build (D345: `outputs/notes` alone was 41,677 rows, and the join ran in
+ * one synchronous pass on every open, Refresh and import). The result is
+ * identical to `withRendererItems` — same generator, just stepped with a pause.
+ */
+export async function withRendererItemsAsync(
+  snapshot: FilesIndexSnapshot,
+  yieldToUi: () => Promise<void> = nextTask,
+  budgetMs = JOIN_BUDGET_MS,
+  now: () => number = () => Date.now(),
+): Promise<FilesIndexSnapshot> {
+  const steps = joinRendererItems(snapshot);
+  let sliceStart = now();
+  let step = steps.next();
+  while (!step.done) {
+    // Only hand the thread back once a slice has actually taken a while: a small
+    // index finishes in one slice with no pause at all, a large one never holds
+    // the window for more than about a frame at a time.
+    if (now() - sliceStart >= budgetMs) {
+      await yieldToUi();
+      sliceStart = now();
+    }
+    step = steps.next();
+  }
+  return step.value;
+}
+
+
+function* joinRendererItems(snapshot: FilesIndexSnapshot): Generator<void, FilesIndexSnapshot, void> {
   const items = [...snapshot.items];
   const seen = new Set(items.map((item) => item.id));
   const seenPaths = new Set(
@@ -565,11 +611,29 @@ export function withRendererItems(snapshot: FilesIndexSnapshot): FilesIndexSnaps
   const reports = [...snapshot.enumerators];
 
   for (const enumerator of RENDERER_FILES_ENUMERATORS) {
+    yield;
     const started = Date.now();
+    let produced: FilesItem[];
+    try {
+      produced = enumerator.run();
+    } catch (err) {
+      reports.push({
+        source: enumerator.source,
+        itemCount: 0,
+        elapsedMs: Date.now() - started,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      continue;
+    }
     try {
       let kept = 0;
       let duplicatePaths = 0;
-      for (const item of enumerator.run()) {
+      let sinceYield = 0;
+      for (const item of produced) {
+        if (++sinceYield >= JOIN_CHUNK) {
+          sinceYield = 0;
+          yield;
+        }
         if (seen.has(item.id)) continue;
         const pathKey = filesItemPathKey(item);
         if (pathKey !== null && seenPaths.has(pathKey)) {

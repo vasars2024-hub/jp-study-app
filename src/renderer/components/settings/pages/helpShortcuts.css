@@ -1,0 +1,45 @@
+/* Settings > Help — the live shortcut list. Two columns: what it does, and the key. */
+.help-shortcuts-group + .help-shortcuts-group {
+  margin-top: var(--space-md, 12px);
+}
+
+.help-shortcuts-heading {
+  margin: 0 0 var(--space-xs, 4px);
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.help-shortcuts-list {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.help-shortcuts-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md, 12px);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-shortcuts-row dt {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.help-shortcuts-row dd {
+  margin: 0;
+  flex: none;
+}
+
+.help-shortcuts-row kbd {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs, 12px);
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--panel-2);
+}

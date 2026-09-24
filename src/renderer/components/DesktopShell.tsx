@@ -32,6 +32,7 @@ import {
 } from '../desktopLayoutFit';
 import { neighbourDisplayKey } from '../monitorRing';
 import {
+  FILES_DEFAULT_SIZE,
   canMaximizeSection,
   fitNewWindowRect,
   maximizedGeometry,
@@ -1821,10 +1822,15 @@ export default function DesktopShell({
       const { w: dw, h: dh } = deskSize();
       const n = ws.length % 6;
       const isMediaCenter = section === 'player' || section === 'video' || section === 'music';
+      // Files is a three-pane app (folder tree, list, details) whose toolbar alone
+      // needs ~670px; at the generic 820x580 it opened with its rail squeezed and
+      // its columns cut. 1180 is the smallest width at which the scaffold reaches
+      // its `wide` layout (1120px of content); `fitNewWindowRect` still shrinks it
+      // on a smaller desk, where the rail collapses to icons instead.
       const wantW =
-        section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : isMediaCenter ? 1080 : section === 'youtube' ? 980 : section === 'settings' ? 960 : section === 'city' ? 680 : section === 'games' ? 980 : 820;
+        section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : isMediaCenter ? 1080 : section === 'youtube' ? 980 : section === 'settings' ? 960 : section === 'city' ? 680 : section === 'games' ? 980 : section === 'files' ? FILES_DEFAULT_SIZE.w : 820;
       const wantH =
-        section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : isMediaCenter ? 700 : section === 'youtube' ? 640 : section === 'settings' ? 680 : section === 'city' ? 800 : section === 'games' ? 660 : 580;
+        section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : isMediaCenter ? 700 : section === 'youtube' ? 640 : section === 'settings' ? 680 : section === 'city' ? 800 : section === 'games' ? 660 : section === 'files' ? FILES_DEFAULT_SIZE.h : 580;
       const rect = fitNewWindowRect(
         { x: 60 + n * 34, y: 24 + n * 30, w: wantW, h: wantH },
         { w: dw, h: dh },
@@ -2540,7 +2546,8 @@ export default function DesktopShell({
     return {
       backgroundImage: preset.css,
       backgroundColor: '#0a0a0e',
-      backgroundSize: animated ? '400% 400%' : 'cover',
+      // Wallpaper fit applies to preset walls too (--wall-background-fit, wallpaperFit.ts).
+      backgroundSize: animated ? '400% 400%' : 'var(--wall-background-fit, cover)',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
     };
@@ -3129,7 +3136,7 @@ export default function DesktopShell({
                 e.stopPropagation();
               }}
             >
-              <div className="os-start-title">Gum</div>
+              <div className="os-start-title">{t('app.title')}</div>
               <div className="os-start-hint">
                 {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
               </div>

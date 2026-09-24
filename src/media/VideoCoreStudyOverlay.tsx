@@ -34,6 +34,7 @@ import {
   noteLookupPointerDown,
 } from '../renderer/wordLookup';
 import { translateTo } from '../renderer/translator';
+import { SUBTITLE_FONT_SIZE_EVENT } from '../renderer/subtitleSizeBridge';
 import { shiftCues, shiftCuesMs } from '../shared/subtitleSync';
 import {
   effectiveKeys,
@@ -665,6 +666,17 @@ export default function VideoCoreStudyOverlay({
   React.useEffect(() => {
     localStorage.setItem(PLAYER_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
   }, [preferences]);
+
+  // Settings' Theme Studio ("bigger subtitles") can change the size while the player
+  // is open. Only that one field is taken, so nothing else the player holds is lost.
+  React.useEffect(() => {
+    const onExternalSize = (event: Event) => {
+      const size = (event as CustomEvent<{ subtitleFontSize?: number }>).detail?.subtitleFontSize;
+      if (typeof size === 'number') updatePreference('subtitleFontSize', size);
+    };
+    window.addEventListener(SUBTITLE_FONT_SIZE_EVENT, onExternalSize);
+    return () => window.removeEventListener(SUBTITLE_FONT_SIZE_EVENT, onExternalSize);
+  }, [updatePreference]);
 
   React.useEffect(() => onWhisperDeviceChanged(setWhisperDevice), []);
   React.useEffect(() => onWhisperModelChanged(setWhisperModel), []);

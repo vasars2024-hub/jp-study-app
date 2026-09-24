@@ -43,6 +43,16 @@ export interface TourStep {
   bodyKey: string;
   advance: TourAdvance;
   /**
+   * Settings pages the body names, as `{placeholder}: pageId`. The body text says
+   * "Settings → {study}" and the overlay fills it with that page's REAL nav label
+   * (`settings.nav.<pageId>`), so the tour can never again name a page that does
+   * not exist — it said "Settings → Study" and "Settings → Storage" for pages
+   * called "Profile & dictionary" and "Models & dictionaries".
+   */
+  settingsPages?: Readonly<Record<string, string>>;
+  /** Where "Take me there" goes: a Settings page and, optionally, a card on it. */
+  destination?: { page: string; settingId?: string };
+  /**
    * Set when the step teaches something the user cannot discover by looking —
    * a global hotkey, a gesture. `TourOverlay` renders it as a key hint.
    */
@@ -72,6 +82,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     titleKey: 'tour.welcome.title',
     bodyKey: 'tour.welcome.body',
     advance: 'next',
+    settingsPages: { help: 'help' },
   },
   {
     id: 'start',
@@ -108,6 +119,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     titleKey: 'tour.language.title',
     bodyKey: 'tour.language.body',
     advance: 'next',
+    settingsPages: { appearance: 'appearance', study: 'study' },
+    destination: { page: 'appearance', settingId: 'ui-language' },
   },
   {
     id: 'assets',
@@ -115,6 +128,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     titleKey: 'tour.assets.title',
     bodyKey: 'tour.assets.body',
     advance: 'next',
+    settingsPages: { storage: 'storage' },
+    destination: { page: 'storage' },
   },
   {
     id: 'outro',
@@ -122,12 +137,22 @@ export const TOUR_STEPS: readonly TourStep[] = [
     titleKey: 'tour.outro.title',
     bodyKey: 'tour.outro.body',
     advance: 'next',
+    settingsPages: { help: 'help' },
   },
 ];
+
+/** The nav label key of a Settings page — the name the Settings sidebar shows. */
+export function settingsPageNameKey(pageId: string): string {
+  return `settings.nav.${pageId}`;
+}
 
 /** Every i18n key the tour renders — used by the catalog-coverage test. */
 export function tourI18nKeys(): string[] {
   const keys: string[] = [];
-  for (const step of TOUR_STEPS) keys.push(step.titleKey, step.bodyKey);
+  for (const step of TOUR_STEPS) {
+    keys.push(step.titleKey, step.bodyKey);
+    for (const page of Object.values(step.settingsPages ?? {})) keys.push(settingsPageNameKey(page));
+  }
+  if (TOUR_STEPS.some((step) => step.destination)) keys.push('tour.takeMeThere');
   return keys;
 }

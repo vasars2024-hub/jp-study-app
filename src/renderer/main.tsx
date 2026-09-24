@@ -1,4 +1,6 @@
 // (widget system loaded via App → DesktopShell)
+// FIRST, before react-dom evaluates: the dev-only `?noReactTrack` switch.
+import './reactTrackHatch';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -18,6 +20,7 @@ import { applyLangAttribute, initI18n } from './i18n';
 import { bootEnvironment } from './environment';
 import { installAmbientAudio } from './environment/ambientAudio';
 import { bootCustomCss } from './customCss';
+import { bootUiCustomization } from './uiCustomizationStore';
 import { runStorageMigrations } from './storage/migrationRunner';
 import { initProfileState } from './profileState';
 import { initDesktopState } from './desktopState';
@@ -91,6 +94,8 @@ import { registerFrutigerAero } from './theme/frutiger-aero';
 import { registerWiredArchive } from './theme/wired-archive';
 import { installNotificationCapture } from './notificationStore';
 import { installWatchAiringNotifications } from './watchAiringNotifications';
+import { installCalendarReminders } from './calendarReminders';
+import { deliverCalendarReminders } from './calendarReminderDelivery';
 import { bootWallpaperFit } from './wallpaperFit';
 import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
@@ -295,6 +300,9 @@ runWhenIdle(() => {
 
 if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader) {
   bootCustomCss();
+  // Theme Studio's active theme was painted only while Settings > Appearance was
+  // open, so a restart dropped it until then. Paint it at boot like the sandbox.
+  bootUiCustomization();
   // Reward confetti layer (Phase 4.5). Main window only — the companion host
   // is a click-through overlay and must never paint a full-screen canvas.
   installRewardBursts();
@@ -306,6 +314,10 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader) {
   installLocalAgentAutomationHost();
   // Finished VN sessions are timed in main; bank them in the shared study stats.
   installVisualNovelStudyTimeSync();
+  // Calendar reminders fire from the primary desktop window only (the function
+  // checks), so windows sharing localStorage never deliver one reminder twice.
+  // Not deferred: its first tick is the launch catch-up for anything missed.
+  installCalendarReminders(deliverCalendarReminders);
   runWhenIdle(() => {
     bootEnvironment();
     // Per-environment ambient soundscapes are dormant until a sound pack exists.

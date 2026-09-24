@@ -17,6 +17,7 @@ import {
   type NotificationKind,
 } from '../../notificationStore';
 import { openExtensionSettings } from '../../extensionBridgeUi';
+import { openSectionSurface } from '../../sectionSurface';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 
@@ -174,7 +175,7 @@ export default function NotificationCenter() {
                 )}
                 <span>{n.message}</span>
                 <div className="os-notif-time type-status">{wired ? new Date(n.ts).toLocaleTimeString(LANG_TAGS[lang]) : timeAgo(n.ts)}</div>
-                {n.actionUrl || n.clientAction === 'extension-settings' ? (
+                {n.actionUrl || n.clientAction ? (
                   <div className="os-notif-actions" style={{ marginTop: 8 }}>
                     <button
                       type="button"
@@ -185,12 +186,19 @@ export default function NotificationCenter() {
                           setOpen(false);
                           return;
                         }
+                        if (n.clientAction === 'open-calendar') {
+                          openSectionSurface('calendar');
+                          setOpen(false);
+                          return;
+                        }
                         if (n.actionUrl) void window.api.openExternal(n.actionUrl);
                       }}
                     >
                       {n.clientAction === 'extension-settings'
                         ? t('notifications.openExtensionSettings')
-                        : t('notifications.openLink')}
+                        : n.clientAction === 'open-calendar'
+                          ? t('calendar.reminder.open')
+                          : t('notifications.openLink')}
                     </button>
                   </div>
                 ) : null}

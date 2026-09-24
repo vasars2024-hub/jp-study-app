@@ -21,35 +21,74 @@ function notify(next: boolean): void {
   if (playing) startBeatLoop();
 }
 
-/** Route an audio element through the shared analyser (safe to call repeatedly). */
-export function attachAudio(el: HTMLMediaElement): void {
+/** Elements whose play/pause listeners are already installed. */
+const listened = new WeakSet<HTMLMediaElement>();
+
+/**
+ * Build the shared graph on first use. Returns false when Web Audio is missing
+ * or refuses (no output device, a sandboxed host) — playback then simply goes
+ * straight to the speakers without a visualizer.
+ */
+function ensureGraph(): boolean {
+  if (ctx && analyser) return true;
+  const AC =
+    typeof window === 'undefined'
+      ? undefined
+      : (window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+  if (!AC) return false;
   try {
-    if (!ctx) {
-      ctx = new AudioContext();
-      analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.8;
-      // Analyser must feed the speakers, or routed audio goes silent.
-      analyser.connect(ctx.destination);
-    }
-    if (!wired.has(el)) {
-      ctx.createMediaElementSource(el).connect(analyser!);
-      wired.add(el);
-    }
-    // A fresh AudioContext starts suspended (autoplay policy). Once routed
-    // through it, a suspended context means SILENCE — resume right away and
-    // again on every play, or the song appears to play with no sound.
-    void ctx.resume();
-    el.addEventListener('play', () => {
-      void ctx?.resume();
-      notify(true);
-    });
-    el.addEventListener('pause', () => notify(false));
-    el.addEventListener('ended', () => notify(false));
-  } catch (err) {
-    // Visualizer is decorative — never let it break playback.
-    console.error('audioBus attach failed', err);
+    const next = new AC();
+    const node = next.createAnalyser();
+    node.fftSize = 1024;
+    node.smoothingTimeConstant = 0.8;
+    // Analyser must feed the speakers, or routed audio goes silent.
+    node.connect(next.destination);
+    ctx = next;
+    analyser = node;
+    return true;
+  } catch {
+    return false;
   }
+}
+
+function wire(el: HTMLMediaElement): void {
+  if (wired.has(el) || !ensureGraph() || !ctx || !analyser) return;
+  ctx.createMediaElementSource(el).connect(analyser);
+  wired.add(el);
+}
+
+/**
+ * Route an audio element through the shared analyser (safe to call repeatedly).
+ *
+ * The AudioContext is created on the element's first PLAY, not here. `playerBus`
+ * attaches its element at module load, so creating the context eagerly opened an
+ * audio device on every launch — and on a machine with no output device Chromium
+ * logged "AudioContext encountered an error from the audio device" at boot, every
+ * time, for a visualizer nobody had asked for yet.
+ */
+export function attachAudio(el: HTMLMediaElement): void {
+  if (listened.has(el)) return;
+  listened.add(el);
+  const route = (): void => {
+    try {
+      wire(el);
+      // A fresh AudioContext starts suspended (autoplay policy). Once routed
+      // through it, a suspended context means SILENCE — resume on every play,
+      // or the song appears to play with no sound.
+      void ctx?.resume();
+    } catch (err) {
+      // Visualizer is decorative — never let it break playback.
+      console.warn('audioBus attach failed', err);
+    }
+  };
+  el.addEventListener('play', () => {
+    route();
+    notify(true);
+  });
+  el.addEventListener('pause', () => notify(false));
+  el.addEventListener('ended', () => notify(false));
+  if (!el.paused) route();
 }
 
 export function isPlaying(): boolean {
