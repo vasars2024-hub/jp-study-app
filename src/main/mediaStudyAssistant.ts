@@ -11,6 +11,7 @@ import {
 } from '../shared/mediaStudyAssistant';
 import { callAiProvider } from './aiProviderClient';
 import { getConfiguredAiProvider } from './mining';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 
 interface CacheFile {
   entries: Record<string, MediaStudyAssistantResult>;
@@ -51,11 +52,14 @@ export function registerMediaStudyAssistantIpc(): void {
     result?: MediaStudyAssistantResult;
     error?: string;
     cached?: boolean;
+    aiOff?: boolean;
+    needsKey?: boolean;
   }> => {
+    if (!aiFeaturesEnabled()) return { ok: false, aiOff: true, error: AI_FEATURES_OFF_MESSAGE };
     const request = normalizeMediaStudyAssistantRequest(input);
     if (!request) return { ok: false, error: 'A valid Japanese sentence is required.' };
     const { providerId, apiKey } = getConfiguredAiProvider();
-    if (!apiKey) return { ok: false, error: 'Configure an AI provider key in Settings to use this optional feature.' };
+    if (!apiKey) return { ok: false, needsKey: true, error: 'Add an AI provider key in Settings > AI to use this optional feature.' };
     const key = crypto.createHash('sha256')
       .update(`${providerId}\0${request.mode}\0${request.text}\0${request.context ?? ''}\0${request.jlptLevel ?? ''}`)
       .digest('hex')

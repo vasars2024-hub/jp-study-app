@@ -89,13 +89,22 @@ afterEach(() => {
 });
 
 describe('agent spend IPC', () => {
-  it('registers its three handlers exactly once', () => {
+  it('registers its three spend handlers and three rate handlers exactly once', () => {
     expect([...registry.handlers.keys()].sort()).toEqual([
       AGENT_SPEND_CHANNELS.clear,
       AGENT_SPEND_CHANNELS.load,
       AGENT_SPEND_CHANNELS.setBudget,
+      AGENT_SPEND_CHANNELS.pricingLoad,
+      AGENT_SPEND_CHANNELS.pricingSet,
+      AGENT_SPEND_CHANNELS.pricingMigrate,
     ].sort());
     expect(registry.duplicates).toEqual([]);
+  });
+
+  it('refuses a half price at the rate boundary instead of storing it', async () => {
+    const set = registry.handlers.get(AGENT_SPEND_CHANNELS.pricingSet)!;
+    const result = await set({ sender: { id: 1 } }, { providerId: 'gemini-2.5-flash', price: { inputPerMillionTokens: 1 } });
+    expect(result).toEqual({ ok: false, code: 'invalid-request' });
   });
 
   it('offers no save channel, so a stale window cannot write a total back', () => {

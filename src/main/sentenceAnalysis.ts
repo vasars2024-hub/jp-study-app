@@ -27,6 +27,7 @@ import {
 import type { AnalysisSnapshot } from '../shared/analysisSnapshot';
 import { callAiProvider } from './aiProviderClient';
 import { getConfiguredAiEngine, getConfiguredAiProvider } from './mining';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 
 export interface SentenceAnalyzeResponse {
   ok: boolean;
@@ -36,6 +37,8 @@ export interface SentenceAnalyzeResponse {
   needsKey?: boolean;
   /** True when local-qwen is selected but the GGUF file is missing. */
   needsLocalModel?: boolean;
+  /** True when "Use AI features" is off in Settings > AI; the surface hides itself. */
+  aiOff?: boolean;
   /** True when the result came from the on-disk cache (no cloud/local call was made). */
   cached?: boolean;
   /**
@@ -171,6 +174,9 @@ export async function analyzeSentence(
   }
   const lang = String(req.lang || 'ja').slice(0, 8);
   const explainIn = resolveExplainLang(prefs, String(req.explainIn || 'en').slice(0, 8));
+  if (!aiFeaturesEnabled()) {
+    return { ok: false, aiOff: true, error: AI_FEATURES_OFF_MESSAGE, prefs };
+  }
   const engine = getConfiguredAiEngine();
   const { providerId, apiKey } = getConfiguredAiProvider();
 
@@ -178,7 +184,7 @@ export async function analyzeSentence(
     return {
       ok: false,
       needsKey: true,
-      error: 'No AI API key configured. Add one in Flashcards → AI Card Studio.',
+      error: 'No AI API key configured. Add one in Settings > AI.',
       prefs,
     };
   }
@@ -188,8 +194,7 @@ export async function analyzeSentence(
       return {
         ok: false,
         needsLocalModel: true,
-        error:
-          'Local Qwen model not found. Install Qwen3-1.7B via Translate, or switch to Cloud in Flashcards → AI Card Studio.',
+        error: 'The offline AI model is not installed. Install it in Settings > AI, or switch to Cloud there.',
         prefs,
       };
     }

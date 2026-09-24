@@ -36,6 +36,7 @@ export type AgentExecutionFailureCode =
   | 'provider-failed'
   | 'vision-unsupported'
   | 'local-model-missing'
+  | 'ai-off'
   | 'bridge-unavailable';
 
 export interface AgentExecutionRequest {
@@ -162,6 +163,7 @@ const FAILURE_CODES = new Set<AgentExecutionFailureCode>([
   'provider-failed',
   'vision-unsupported',
   'local-model-missing',
+  'ai-off',
   'bridge-unavailable',
 ]);
 

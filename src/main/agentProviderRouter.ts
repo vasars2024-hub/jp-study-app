@@ -21,6 +21,7 @@ import {
   type AiProviderUsage,
 } from './providerRuntime';
 import { isLocalModelMissingError } from './localModelFiles';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 import { runLocalQwenPrompt } from './translate';
 
 export interface AgentProviderExecutionOptions {
@@ -374,6 +375,9 @@ export async function runAgentProviderPrompt(
   prompt: string,
   options: AgentProviderExecutionOptions = {},
 ): Promise<AgentProviderExecutionResult> {
+  // The master switch outranks every other refusal: a user who turned AI off
+  // should not be told about keys or budgets, and nothing may be sent.
+  if (!aiFeaturesEnabled()) throw new AiProviderRuntimeError(AI_FEATURES_OFF_MESSAGE, 'ai-off');
   const context = options.context ?? [];
   // The shared execution normalizer restricts this first slice to text and
   // document attachments. Keep the runtime guard too, so a future caller

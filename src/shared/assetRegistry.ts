@@ -522,6 +522,27 @@ export const ASSET_CATALOG: AssetSpec[] = [
     file: 'model_q4.onnx',
   },
   {
+    id: 'qwen3-1.7b',
+    name: 'Qwen3 1.7B',
+    description: 'The offline AI model: translation, AI cards, sentence analysis and the Agent without a cloud key.',
+    descriptionKey: 'storage.asset.qwen3.desc',
+    kind: 'llm',
+    lang: 'any',
+    // Qwen's own GGUF release (Apache-2.0), pinned to an immutable revision of
+    // https://huggingface.co/Qwen/Qwen3-1.7B-GGUF. Size and sha256 are the LFS
+    // object the repository API reports for that revision (read 2026-09-24),
+    // so the checksum is a real integrity check, not a guess. Q8_0 is the only
+    // quantisation Qwen publishes for 1.7B. The file name is one the shared
+    // model locator (`QWEN3_1_7B_FILE_NAMES`) knows, and `installDir` is the
+    // folder it searches — `DEFAULT_LOCAL_MODEL_ASSET_ID` names both.
+    url: 'https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/90862c4b9d2787eaed51d12237eafdfe7c5f6077/Qwen3-1.7B-Q8_0.gguf',
+    sizeBytes: 1_834_426_016,
+    sha256: '061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a',
+    version: '90862c4',
+    installDir: 'qwen3-1.7b',
+    file: 'Qwen3-1.7B-Q8_0.gguf',
+  },
+  {
     id: 'comic-text-detector',
     name: 'Comic text detector',
     description: 'Finds the speech bubbles that Manga OCR then reads.',

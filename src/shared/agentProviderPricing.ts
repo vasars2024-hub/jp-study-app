@@ -4,13 +4,14 @@ import { AI_PROVIDERS } from './aiProviders';
 /**
  * What a cloud provider charges, per million tokens, in US dollars.
  *
- * These numbers are **entered by the user**, not shipped in the repository, and
- * that is a deliberate constraint carried over from the provider runtime: a
- * hard-coded price table is a temporally unstable fact that would silently rot
- * into a confident lie the first time a provider changed its rates. The runtime
- * already refuses to guess (`estimateAiProviderCostUsd` returns `undefined`
- * without pricing); this module is where the user's own answer lives so that a
- * caller can finally supply one.
+ * The user's own figure wins, and every figure is editable. Until 2026-09 there
+ * was deliberately NO built-in figure, on the argument that a shipped price
+ * table rots into a confident lie. The cost of that argument turned out to be
+ * worse than the lie: an unpriced request is always allowed by the monthly
+ * limit, and none of the app's cloud callers outside the Agent composer passed
+ * rates, so the limit could not stop most of the spending it claimed to cap.
+ * `AGENT_PROVIDER_DEFAULT_PRICING` below is therefore a labelled ESTIMATE the
+ * surface shows as such, and a rate the user enters replaces it.
  *
  * Both halves are required together. A price with an input rate and no output
  * rate is not a cheaper price — it is an estimate that under-reports every
@@ -43,6 +44,43 @@ export const AGENT_COST_BUDGET_MAX_USD = 100;
 export const AGENT_COST_BUDGET_DEFAULT_USD = 0.05;
 
 export const EMPTY_AGENT_PROVIDER_PRICING: AgentProviderPricingTable = {};
+
+/**
+ * Built-in ESTIMATES, used only where the user has entered nothing, and shown in
+ * Settings > AI as estimates the user can edit.
+ *
+ * Read from each provider's published price page on 2026-09-24, taking the
+ * HIGHER published tier where there is more than one (DeepSeek's peak-hour
+ * rate, cache-miss input): an estimate that errs high refuses a request near the
+ * limit a little early, one that errs low lets the month end above it.
+ * - Gemini 2.5 Flash, standard paid tier: $0.30 input / $2.50 output (thinking included).
+ * - DeepSeek V4 Flash: $0.30 / $1.20. DeepSeek V4 Pro: $1.32 / $3.96.
+ */
+export const AGENT_PROVIDER_DEFAULT_PRICING: Readonly<Record<AiProviderId, AgentProviderPrice>> = {
+  'gemini-2.5-flash': { inputPerMillionTokens: 0.3, outputPerMillionTokens: 2.5 },
+  'deepseek-v4-flash': { inputPerMillionTokens: 0.3, outputPerMillionTokens: 1.2 },
+  'deepseek-v4-pro': { inputPerMillionTokens: 1.32, outputPerMillionTokens: 3.96 },
+};
+
+/** The user's rate for a provider, else the built-in estimate. */
+export function effectiveAgentProviderPrice(
+  userTable: AgentProviderPricingTable,
+  providerId: AiProviderId,
+): AgentProviderPrice | undefined {
+  return userTable[providerId] ?? AGENT_PROVIDER_DEFAULT_PRICING[providerId];
+}
+
+/** Every provider's governing rate: the user's figure where entered, the estimate elsewhere. */
+export function effectiveAgentProviderPricingTable(
+  userTable: AgentProviderPricingTable,
+): AgentProviderPricingTable {
+  const table: AgentProviderPricingTable = {};
+  for (const provider of AI_PROVIDERS) {
+    const price = effectiveAgentProviderPrice(userTable, provider.id);
+    if (price) table[provider.id] = price;
+  }
+  return table;
+}
 
 const PROVIDER_IDS: ReadonlySet<string> = new Set(AI_PROVIDERS.map((provider) => provider.id));
 
