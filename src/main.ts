@@ -56,6 +56,12 @@ import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
 import { registerBackupIpc } from './main/backup/backupService';
 import { handleFatalMainError, registerCrashRecoveryIpc, watchRendererCrashes } from './main/crashRecovery';
 import { PDF_RASTER_SCHEME_PRIVILEGES } from './main/pdfRasterize';
+import {
+  installIpcSenderGuard,
+  installPermissionPolicy,
+  installWebContentsHardening,
+  makeAppOriginPolicy,
+} from './main/securityHardening';
 import { flushAllJsonWriters, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -247,6 +253,17 @@ process.on('uncaughtException', (err) => {
 // diagnosable without a dev console attached (PHASE_6_5_AUDIT.md Phase 8 gap).
 process.on('unhandledRejection', (reason) => {
   logDiagnostic('error', 'main', 'unhandledRejection', errorDetail(reason));
+});
+// Hardening installed before any handler or window exists (securityHardening.ts):
+// every ipcMain handler registered from here on answers only the app's own
+// top-level frames, and every webContents gets navigation/window.open floors.
+const appOriginPolicy = makeAppOriginPolicy(isDevServer() ? MAIN_WINDOW_VITE_DEV_SERVER_URL : null);
+installIpcSenderGuard(ipcMain, appOriginPolicy, (channel, info) => {
+  logDiagnostic('warn', 'security', 'ipc-refused', `${channel} from ${info.senderType} ${info.frameOrigin ?? 'no-frame'}`);
+});
+installWebContentsHardening(app, appOriginPolicy, {
+  openExternal: (url) => void shell.openExternal(url),
+  onBlocked: (what, url) => logDiagnostic('warn', 'security', `blocked-${what}`, url.slice(0, 300)),
 });
 // A JSON store served from its last-good copy, or moved aside as damaged, is
 // something the Diagnostics view must be able to show.
@@ -1756,6 +1773,11 @@ function registerPlayerSyncIpc(): void {
 
 app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
+  // Electron grants every permission by default; these are allow-lists.
+  const onDenied = (permission: string, origin: string | null) =>
+    logDiagnostic('info', 'security', 'permission-denied', `${permission} for ${origin ?? 'unknown'}`);
+  installPermissionPolicy(session.defaultSession, 'app', appOriginPolicy, onDenied);
+  installPermissionPolicy(session.fromPartition('persist:immersion'), 'immersion', appOriginPolicy, onDenied);
   if (isDevServer()) startDebugBridge();
   ensureLibrary();
   if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'undefined' || !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
