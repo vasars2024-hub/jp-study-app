@@ -441,6 +441,41 @@ export async function kvCompareAndSet(
   }));
 }
 
+/**
+ * Read-modify-write in ONE readwrite transaction: `update` receives the stored
+ * value and returns the value to store, or `undefined` to leave it untouched.
+ * Resolves with what is stored afterwards. Nothing can land between the read
+ * and the write, so two windows merging into one key never lose each other's
+ * rows.
+ */
+export async function kvUpdate(key: string, update: (current: unknown) => unknown): Promise<unknown> {
+  if (writesBlocked) return kvGet(key);
+  return withTransaction('readwrite', (store) => new Promise<unknown>((resolve, reject) => {
+    const read = store.get(key);
+    read.onerror = () => reject(read.error ?? new Error('IndexedDB request failed'));
+    read.onsuccess = () => {
+      let next: unknown;
+      try {
+        next = update(read.result);
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      if (next === undefined) {
+        resolve(read.result);
+        return;
+      }
+      try {
+        const write = store.put(next, key);
+        write.onsuccess = () => resolve(next);
+        write.onerror = () => reject(write.error ?? new Error('IndexedDB request failed'));
+      } catch (err) {
+        reject(err);
+      }
+    };
+  }));
+}
+
 export async function kvDelete(key: string): Promise<void> {
   if (writesBlocked) return;
   await withStore('readwrite', (s) => s.delete(key));

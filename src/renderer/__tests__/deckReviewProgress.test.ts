@@ -17,6 +17,11 @@ vi.mock('../storage/db', () => ({
   kvSet: async (key: string, value: unknown) => {
     idb.set(key, JSON.parse(JSON.stringify(value)));
   },
+  kvUpdate: async (key: string, update: (current: unknown) => unknown) => {
+    const next = update(idb.get(key));
+    if (next !== undefined) idb.set(key, JSON.parse(JSON.stringify(next)));
+    return next ?? idb.get(key);
+  },
 }));
 
 import {
