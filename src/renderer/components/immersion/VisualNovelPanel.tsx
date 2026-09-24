@@ -769,8 +769,9 @@ export default function VisualNovelPanel({
 
   const saveSelectedSentence = (): void => {
     if (!selected || !selectedCapture) return;
-    const added = mineVisualNovelLine(selected, selectedCapture);
-    setStatus(added ? t('vnPanel.msg.sentenceSaved') : t('vnPanel.msg.sentenceExists'));
+    void mineVisualNovelLine(selected, selectedCapture)
+      .then((added) => setStatus(added ? t('vnPanel.msg.sentenceSaved') : t('vnPanel.msg.sentenceExists')))
+      .catch(() => undefined);
   };
 
   const onTextMouseUp = (event: React.MouseEvent): void => {

@@ -101,9 +101,10 @@ export default function VisualNovelReaderOverlay() {
 
   const mine = (line: VisualNovelTextCapture): void => {
     if (!entry) return;
-    const added = mineVisualNovelLine(entry, line);
-    setFlash({ id: line.id, key: added ? 'vnReader.mined' : 'vnReader.minedExists' });
-    window.setTimeout(() => setFlash((current) => (current?.id === line.id ? null : current)), 1800);
+    void mineVisualNovelLine(entry, line).then((added) => {
+      setFlash({ id: line.id, key: added ? 'vnReader.mined' : 'vnReader.minedExists' });
+      window.setTimeout(() => setFlash((current) => (current?.id === line.id ? null : current)), 1800);
+    });
   };
 
   const onTextMouseUp = (event: React.MouseEvent): void => {

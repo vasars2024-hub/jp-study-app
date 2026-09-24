@@ -28,12 +28,12 @@ import { enrichNewCards } from './flashcardAutoEnrich';
 import { getLevel, listKnownEntries } from './knownWords';
 import { getSlotList } from './levelLists';
 import {
-  addMediaStudySentenceFlashcard,
   mineableVocabulary,
   MINEABLE_BELOW_LEVEL,
   type MediaStudyAnalysis,
 } from './mediaStudyWorkflow';
 import { getTranslateTarget } from './translateTarget';
+import { mineToStudy } from './studyMining';
 
 /** The media-item shape the deck and study stores key VN cards by (`vn:<id>`). */
 export function visualNovelMediaItem(entry: Pick<VisualNovelEntry, 'id' | 'title' | 'executablePath' | 'language' | 'createdAt'>): MediaItem {
@@ -56,24 +56,36 @@ function captureContext(capture: VisualNovelTextCapture): string {
 
 /**
  * Mine one captured line as a sentence card, with its screenshot and voice clip
- * when it has them. Returns false when the line is already in the deck.
+ * when it has them. Resolves false when the line is already in the deck.
  *
- * MERGE POINT — mineToStudy. This is the ONLY place the VN surface writes a
- * single mined line. Another branch is adding a unified `mineToStudy` to
- * `flashcardDeck.ts`; once it is merged, replace the one call below with it
- * (keeping the same arguments: sentence, context, image, audio, source `vn:<id>`).
+ * Goes through `mineToStudy`, the one path every surface uses, so the card is
+ * deduplicated the same way and gets the same "saved" feedback. The VN surface
+ * keeps its Anki hand-off in the VN study deck export, so this is a local save.
  */
-export function mineVisualNovelLine(
+export async function mineVisualNovelLine(
   entry: Pick<VisualNovelEntry, 'id' | 'title' | 'executablePath' | 'language' | 'createdAt'>,
   capture: VisualNovelTextCapture,
-): boolean {
-  return addMediaStudySentenceFlashcard(
-    visualNovelMediaItem(entry),
-    capture.japanese,
-    captureContext(capture),
-    capture.screenshotPath,
-    capture.audioPath,
-  );
+): Promise<boolean> {
+  const item = visualNovelMediaItem(entry);
+  const japanese = capture.japanese.trim();
+  if (!japanese) return false;
+  // Lines mined before the unified path carry no mine key; match them on the
+  // same two facts the old path deduplicated on.
+  if (loadDeck().some((card) => card.bookId === item.id && card.sentence === japanese)) return false;
+  const context = captureContext(capture);
+  const mined = await mineToStudy({
+    word: japanese.slice(0, 80),
+    meaning: context,
+    sentence: japanese,
+    source: 'media',
+    sourceId: item.id,
+    sourceTitle: item.title,
+    folder: 'Media',
+    studyKind: 'sentence',
+    imagePath: capture.screenshotPath || undefined,
+    audioPath: capture.audioPath || undefined,
+  });
+  return mined.created;
 }
 
 /**
