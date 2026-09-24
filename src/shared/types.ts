@@ -65,6 +65,8 @@ export interface YomitanDictInfo {
   hasTerms: boolean;
   hasPitch: boolean;
   hasFreq: boolean;
+  /** Carries a Yomitan kanji bank (character readings / meanings / stats). */
+  hasKanji?: boolean;
   importedAt: number;
   bundled?: boolean;
   /** When false, the dictionary is kept but ignored by lookups/mining. */

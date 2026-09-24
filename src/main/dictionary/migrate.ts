@@ -31,6 +31,7 @@ import {
 import type { DictSense, YomitanDictInfo } from '../../shared/types';
 import type { SqliteDb } from './db';
 import { DEFAULT_SOURCE_LANG, resolveGlossLangs, resolveSourceLang } from './glossLang';
+import { rebuildCharacterProjection } from './importers/kanjidic';
 
 /**
  * Separator between term and reading in the legacy pitch/freq key format.
@@ -59,12 +60,24 @@ export interface LegacyPitchEntry {
   positions: number[];
 }
 
+export interface LegacyKanjiEntry {
+  onyomi?: string[];
+  kunyomi?: string[];
+  meanings?: string[];
+  strokes?: number;
+  jlpt?: string;
+  grade?: number;
+  freq?: number;
+}
+
 export interface LegacyDictIndex {
   version: 1;
   info: YomitanDictInfo;
   terms?: Record<string, LegacyGlossaryEntry[]>;
   pitch?: Record<string, LegacyPitchEntry>;
   freq?: Record<string, number>;
+  /** Yomitan kanji banks, keyed by character (stores written since kanji import). */
+  kanji?: Record<string, LegacyKanjiEntry>;
 }
 
 export interface ImportedCounts {
@@ -76,6 +89,8 @@ export interface ImportedCounts {
   freq: number;
   /** Cross-reference rows lifted out of the definition list. See `parseLegacyXref`. */
   xrefs: number;
+  /** Characters written to `char_sources` from a Yomitan kanji bank. */
+  kanji?: number;
 }
 
 /**
@@ -189,8 +204,15 @@ const BUNDLED_LEGACY_PROVENANCE: Readonly<Record<string, LegacySourceProvenance>
  * format itself resolves them: a store that has terms is a term dictionary even
  * if it also ships accents.
  */
-export function legacyKindOf(info: Pick<YomitanDictInfo, 'hasTerms' | 'hasPitch'>): 'term' | 'pitch' | 'freq' {
-  return info.hasTerms ? 'term' : info.hasPitch ? 'pitch' : 'freq';
+export function legacyKindOf(
+  info: Pick<YomitanDictInfo, 'hasTerms' | 'hasPitch'> & Partial<Pick<YomitanDictInfo, 'hasFreq' | 'hasKanji'>>,
+): 'term' | 'pitch' | 'freq' | 'character' {
+  if (info.hasTerms) return 'term';
+  if (info.hasPitch) return 'pitch';
+  // A kanji-only store is a character dictionary — the kind KANJIDIC2 imports
+  // as — never a frequency list that happens to hold no ranks.
+  if (info.hasKanji && !info.hasFreq) return 'character';
+  return 'freq';
 }
 
 /**
@@ -206,9 +228,10 @@ export function legacyKindOf(info: Pick<YomitanDictInfo, 'hasTerms' | 'hasPitch'
  * to be.
  */
 export function legacyEntryCount(
-  kind: 'term' | 'pitch' | 'freq',
-  counts: Pick<ImportedCounts, 'headwords' | 'pitch' | 'freq'>,
+  kind: 'term' | 'pitch' | 'freq' | 'character',
+  counts: Pick<ImportedCounts, 'headwords' | 'pitch' | 'freq'> & { kanji?: number },
 ): number {
+  if (kind === 'character') return counts.kanji ?? 0;
   if (kind === 'pitch') return counts.pitch;
   if (kind === 'freq') return counts.freq;
   return counts.headwords;
@@ -329,8 +352,14 @@ export function importLegacyIndex(
   const provenance = BUNDLED_LEGACY_PROVENANCE[dictId];
   const kind = legacyKindOf(info);
   const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0, xrefs: 0 };
+  // Characters this store owned before (re-import) and after: both need the
+  // `chars` projection recomputed, or a removed kanji keeps its stale row.
+  const touchedChars = new Set<string>();
 
   const run = db.transaction(() => {
+    for (const row of db.prepare('select char from char_sources where dict_id = ?').all(dictId) as Array<{ char: string }>) {
+      touchedChars.add(row.char);
+    }
     deleteLegacySourceRows(db, dictId, shouldCancel);
     db.prepare(`
       insert into dictionaries (id, title, revision, source_lang, target_langs, priority,
@@ -436,6 +465,34 @@ export function importLegacyIndex(
       counts.freq += 1;
     }
 
+    // Kanji banks go to the character table, exactly where KANJIDIC2 puts its
+    // rows, so the character panel reads both through one projection.
+    const kanjiRows = Object.entries(index.kanji ?? {});
+    if (kanjiRows.length) {
+      const insertChar = db.prepare(`
+        insert or replace into char_sources
+          (dict_id, lang, char, strokes, radical, components, readings, meanings, jlpt, grade, freq)
+        values (?, ?, ?, ?, null, '[]', ?, ?, ?, ?, ?)
+      `);
+      for (const [char, value] of kanjiRows) {
+        if (shouldCancel?.()) throw new LegacyMigrationCancelled();
+        insertChar.run(
+          dictId,
+          sourceLang,
+          char,
+          value.strokes ?? null,
+          JSON.stringify([...new Set([...(value.onyomi ?? []), ...(value.kunyomi ?? [])])]),
+          JSON.stringify([...new Set(value.meanings ?? [])]),
+          value.jlpt ?? null,
+          value.grade ?? null,
+          value.freq ?? null,
+        );
+        touchedChars.add(char);
+        counts.kanji = (counts.kanji ?? 0) + 1;
+      }
+    }
+    if (touchedChars.size) rebuildCharacterProjection(db, touchedChars);
+
     db.prepare('update dictionaries set entry_count = ? where id = ?')
       .run(legacyEntryCount(kind, counts), dictId);
   });
@@ -502,6 +559,12 @@ export function migrateLegacyYomitanStores(
   root: string,
   onProgress?: (progress: MigrationProgress) => void,
   shouldCancel?: () => boolean,
+  /**
+   * Import only these stores (directory name = dictionary id). A Yomitan
+   * import queues exactly the store it just wrote, instead of re-importing
+   * every dictionary the user has for one new file.
+   */
+  only?: ReadonlySet<string>,
 ): MigrationResult {
   const result: MigrationResult = { imported: [], skipped: [] };
   if (!fs.existsSync(root)) return result;
@@ -509,7 +572,8 @@ export function migrateLegacyYomitanStores(
   const dirs = fs
     .readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
+    .map((entry) => entry.name)
+    .filter((name) => !only || only.has(name));
 
   dirs.forEach((dirName, position) => {
     // Cancellation is per store, not per row: each store is its own transaction,

@@ -57,10 +57,44 @@ function pickableKind(value: unknown): PickableKind | null {
 
 let jobs: DictionaryImportJobs | null = null;
 
+/**
+ * Yomitan stores waiting for their database import. A store imported while
+ * another job holds the (single) import slot waits here and starts the moment
+ * that job settles, instead of waiting for the next app launch.
+ */
+const pendingStoreImports: string[] = [];
+
+function startNextStoreImport(manager: DictionaryImportJobs): void {
+  while (pendingStoreImports.length && !manager.running()) {
+    const dictId = pendingStoreImports.shift() as string;
+    const started = manager.start({ kind: 'legacy', dictId });
+    if (!started.ok) {
+      pendingStoreImports.unshift(dictId);
+      return;
+    }
+  }
+}
+
 function broadcast(snapshot: DictionaryImportJobSnapshot): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(DICTIONARY_IMPORT_CHANNELS.changed, snapshot);
   }
+  if (snapshot.status !== 'running' && jobs && pendingStoreImports.length) {
+    // Settled: the slot is free on the next tick (settle runs inside the job).
+    const manager = jobs;
+    setTimeout(() => startNextStoreImport(manager), 0);
+  }
+}
+
+/**
+ * Import one just-written Yomitan store into the dictionary database, now or
+ * as soon as the running import finishes. Progress arrives on the same
+ * `dictImport:changed` stream as every other import, so Settings shows it.
+ */
+export function queueYomitanStoreImport(dictId: string): void {
+  if (!dictId || pendingStoreImports.includes(dictId)) return;
+  pendingStoreImports.push(dictId);
+  startNextStoreImport(dictionaryImportJobs());
 }
 
 /**

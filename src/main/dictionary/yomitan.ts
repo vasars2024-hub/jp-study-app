@@ -12,7 +12,12 @@ import AdmZip from 'adm-zip';
 import type { DeinflectionInfo, DictEntry, DictResult, DictSense, YomitanDictInfo } from '../../shared/types';
 import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
-import { initDictionaryService } from './service';
+import {
+  initDictionaryService,
+  removeDictionarySource,
+  setDictionarySourceEnabled,
+  syncDictionarySourceOrder,
+} from './service';
 import { fetchProviderAudio } from './audio';
 import { normalizeAudioIdentity } from '../../shared/lexiconAudio';
 import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
@@ -36,6 +41,22 @@ interface StoredPitchEntry {
   positions: number[];
 }
 
+/**
+ * One character from a Yomitan kanji dictionary. These archives used to be
+ * refused ("no usable term or metadata banks") or, bundled with terms, had
+ * their kanji banks silently skipped; the unified database has a character
+ * table (`char_sources`) the migration now writes them into.
+ */
+export interface StoredKanjiEntry {
+  onyomi: string[];
+  kunyomi: string[];
+  meanings: string[];
+  strokes?: number;
+  jlpt?: string;
+  grade?: number;
+  freq?: number;
+}
+
 interface StoredDictIndex {
   version: 1;
   info: YomitanDictInfo;
@@ -45,6 +66,8 @@ interface StoredDictIndex {
   pitch?: Record<string, StoredPitchEntry>;
   /** key = term\x01reading → numeric rank (lower = more common) */
   freq?: Record<string, number>;
+  /** key = the character — a Yomitan kanji dictionary's `kanji_bank_*.json`. */
+  kanji?: Record<string, StoredKanjiEntry>;
   /**
    * The dictionary's own `tag_bank_*.json`, kept after the senses are resolved.
    * Nothing at lookup time reads it — `resolveSenseTags` bakes the readable
@@ -454,6 +477,41 @@ function loadAllIndices(): void {
 
 // ----- Zip import parsing ----------------------------------------------------
 
+function statNumber(value: unknown): number | undefined {
+  const n = typeof value === 'number' ? value : Number(String(value ?? '').trim());
+  return String(value ?? '').trim() !== '' && Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined;
+}
+
+/** Yomitan v3 kanji rows: [character, onyomi, kunyomi, tags, meanings, stats]. */
+export function parseKanjiBank(
+  entries: unknown[],
+  out: { kanji?: Record<string, StoredKanjiEntry>; info: { hasKanji?: boolean } },
+): void {
+  const split = (value: unknown): string[] =>
+    String(value ?? '').split(/\s+/).map((part) => part.trim()).filter(Boolean);
+  for (const row of entries) {
+    if (!Array.isArray(row) || row.length < 5) continue;
+    const char = String(row[0] ?? '').trim();
+    if (!char) continue;
+    const meanings = Array.isArray(row[4])
+      ? row[4].map((m) => String(m ?? '').trim()).filter(Boolean)
+      : [];
+    const stats = row[5] && typeof row[5] === 'object' ? (row[5] as Record<string, unknown>) : {};
+    const entry: StoredKanjiEntry = { onyomi: split(row[1]), kunyomi: split(row[2]), meanings };
+    const strokes = statNumber(stats.strokes);
+    const grade = statNumber(stats.grade);
+    const freq = statNumber(stats.freq);
+    const jlpt = String(stats.jlpt ?? '').trim();
+    if (strokes !== undefined) entry.strokes = strokes;
+    if (grade !== undefined) entry.grade = grade;
+    if (freq !== undefined) entry.freq = freq;
+    if (jlpt) entry.jlpt = /^\d$/.test(jlpt) ? `N${jlpt}` : jlpt.toUpperCase();
+    if (!out.kanji) out.kanji = {};
+    out.kanji[char] = entry;
+    out.info.hasKanji = true;
+  }
+}
+
 function parseTermBank(entries: unknown[], out: StoredDictIndex): void {
   if (!out.terms) out.terms = {};
   for (const row of entries) {
@@ -590,6 +648,9 @@ function parseYomitanZip(zipPath: string): StoredDictIndex {
     } else if (name.startsWith('term_meta_bank_') && name.endsWith('.json')) {
       const rows = JSON.parse(entry.getData().toString('utf-8')) as unknown[];
       if (Array.isArray(rows)) parseTermMetaBank(rows, stored);
+    } else if (name.startsWith('kanji_bank_') && name.endsWith('.json')) {
+      const rows = JSON.parse(entry.getData().toString('utf-8')) as unknown[];
+      if (Array.isArray(rows)) parseKanjiBank(rows, stored);
     } else if (name.startsWith('tag_bank_') && name.endsWith('.json')) {
       const rows = JSON.parse(entry.getData().toString('utf-8')) as unknown[];
       if (Array.isArray(rows)) {
@@ -600,8 +661,8 @@ function parseYomitanZip(zipPath: string): StoredDictIndex {
   }
   resolveSenseTags(stored);
 
-  if (!stored.info.hasTerms && !stored.info.hasPitch && !stored.info.hasFreq) {
-    throw new Error('The archive contains no usable term or metadata banks.');
+  if (!stored.info.hasTerms && !stored.info.hasPitch && !stored.info.hasFreq && !stored.info.hasKanji) {
+    throw new Error('The archive contains no usable term, kanji or metadata banks.');
   }
   if (stored.info.hasTerms) {
     stored.info.glossLangs = detectGlossLangs(stored, indexJson);
@@ -965,6 +1026,24 @@ export async function importYomitanZip(filePath?: string): Promise<{
   }
 }
 
+/**
+ * Apply a settings change to the unified database as well.
+ *
+ * Lookups read the SQLite database first and fall back to these JSON stores
+ * only when it has nothing, so a toggle, reorder or removal that touched only
+ * the JSON registry had no visible effect: a disabled dictionary kept answering.
+ * A store the database has not imported yet is simply absent there, and the
+ * database may be unavailable altogether — neither may fail the settings
+ * change the user just made.
+ */
+function applyToDatabase(change: () => void): void {
+  try {
+    change();
+  } catch (error) {
+    console.warn('[yomitan] database sync skipped:', error instanceof Error ? error.message : String(error));
+  }
+}
+
 /** Enable/disable a dictionary without removing it. */
 export function setYomitanEnabled(id: string, enabled: boolean): { ok: boolean; error?: string } {
   const reg = readRegistry();
@@ -973,6 +1052,7 @@ export function setYomitanEnabled(id: string, enabled: boolean): { ok: boolean; 
   d.enabled = enabled;
   writeRegistry(reg);
   loadAllIndices();
+  applyToDatabase(() => setDictionarySourceEnabled(id, enabled));
   return { ok: true };
 }
 
@@ -991,6 +1071,7 @@ export function moveYomitanDict(id: string, dir: number): { ok: boolean; error?:
   });
   writeRegistry(reg);
   loadAllIndices();
+  applyToDatabase(() => syncDictionarySourceOrder(arr.map((dict) => dict.id)));
   return { ok: true };
 }
 
@@ -1009,6 +1090,7 @@ export function removeYomitanDict(id: string): { ok: boolean; error?: string } {
     /* best effort */
   }
   loadAllIndices();
+  applyToDatabase(() => removeDictionarySource(id));
   return { ok: true };
 }
 
