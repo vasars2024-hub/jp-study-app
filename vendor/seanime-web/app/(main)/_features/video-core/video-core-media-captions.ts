@@ -129,6 +129,8 @@ export class MediaCaptionsManager extends EventTarget {
     private readonly sendTranslateRequest: (text?: string, track?: VideoCore_VideoSubtitleTrack) => void
     // Remember the translated file tracks to avoid re-fetching them
     private translatedTracks = new Map<number, { translating: boolean }>()
+    // Gum: one in-flight load per track, shared by selectTrack() and loadTrackContent().
+    private trackLoads = new Map<LoadedTrack, Promise<void>>()
 
     constructor(options: MediaCaptionsManagerOptions) {
         super()
@@ -244,15 +246,7 @@ export class MediaCaptionsManager extends EventTarget {
         this._onSelectedTrackChanged?.(index)
 
         if (this.renderer) {
-            if (!track.loaded) {
-                log.info("Loading track", index)
-                const res = await track.loadFn()
-                if (res) {
-                    track.cues = res.cues
-                    track.regions = res.regions
-                }
-                track.loaded = true
-            }
+            await this._ensureTrackLoaded(track)
             this.renderer.changeTrack({
                 cues: track.cues,
                 regions: track.regions,
@@ -451,6 +445,43 @@ export class MediaCaptionsManager extends EventTarget {
 
     getTrackContent(idx: number): string | null {
         return this.loadedTracks?.[idx]?.metadata?.content || null
+    }
+
+    /*
+     * Gum: a track's text is fetched and converted only when it is SELECTED, so
+     * getTrackContent() answered null for every other track. The study overlay's second
+     * line is by definition a track that is not selected (the English sidecar beside the
+     * Japanese one), and it stayed blank on this path while the same pair worked under
+     * SubtitleManager. This loads a track without selecting it; selectTrack() shares the
+     * same load, so neither fetches twice.
+     */
+    async loadTrackContent(idx: number): Promise<string | null> {
+        const track = this.loadedTracks?.[idx]
+        if (!track) return null
+        await this._ensureTrackLoaded(track)
+        return track.metadata?.content || null
+    }
+
+    private _ensureTrackLoaded(track: LoadedTrack): Promise<void> {
+        if (track.loaded) return Promise.resolve()
+        const pending = this.trackLoads.get(track)
+        if (pending) return pending
+        log.info("Loading track", track.index)
+        const load = (async () => {
+            try {
+                const res = await track.loadFn()
+                if (res) {
+                    track.cues = res.cues
+                    track.regions = res.regions
+                }
+                track.loaded = true
+            }
+            finally {
+                this.trackLoads.delete(track)
+            }
+        })()
+        this.trackLoads.set(track, load)
+        return load
     }
 
     public destroy() {

@@ -10038,6 +10038,7 @@ export const ru: Catalog = {
   'mediaWorkspace.study.resetSubtitleDelay': 'Сбросить задержку',
   'mediaWorkspace.study.subtitleDelayPerFile': 'Задержка запоминается для этого файла.',
   'mediaWorkspace.study.noSecondLine': 'Для этого файла нет субтитров на втором языке.',
+  'mediaWorkspace.study.secondLineFallback': 'Нет субтитров на языке «{language}», и переводчик недоступен. Вместо них показаны субтитры «{shown}».',
   'mediaWorkspace.study.grammarHighlight': 'Подсветка грамматики',
   'mediaWorkspace.study.grammarSource': 'Взято из видеоплеера',
   'mediaWorkspace.study.grammarLoading': 'Разбор строки…',

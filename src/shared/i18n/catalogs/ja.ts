@@ -9195,6 +9195,7 @@ export const ja: Catalog = {
   'mediaWorkspace.study.resetSubtitleDelay': '遅延をリセット',
   'mediaWorkspace.study.subtitleDelayPerFile': '遅延はこのファイルごとに記憶されます。',
   'mediaWorkspace.study.noSecondLine': 'このファイルには第二言語の字幕がありません。',
+  'mediaWorkspace.study.secondLineFallback': '{language}の字幕がなく、翻訳も使えません。代わりに{shown}を表示しています。',
   'mediaWorkspace.study.grammarHighlight': '文法ハイライト',
   'mediaWorkspace.study.grammarSource': '動画プレーヤーから取得',
   'mediaWorkspace.study.grammarLoading': 'この行を解析中…',

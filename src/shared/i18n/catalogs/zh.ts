@@ -9145,6 +9145,7 @@ export const zh: Catalog = {
   'mediaWorkspace.study.resetSubtitleDelay': '重置延迟',
   'mediaWorkspace.study.subtitleDelayPerFile': '延迟会针对此文件单独记住。',
   'mediaWorkspace.study.noSecondLine': '此文件没有第二语言字幕。',
+  'mediaWorkspace.study.secondLineFallback': '没有{language}字幕，翻译也不可用。改为显示{shown}。',
   'mediaWorkspace.study.grammarHighlight': '语法高亮',
   'mediaWorkspace.study.grammarSource': '取自视频播放器',
   'mediaWorkspace.study.grammarLoading': '正在解析这一行…',

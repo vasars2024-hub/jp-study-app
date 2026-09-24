@@ -73,6 +73,8 @@ import {
   PLAYER_PREFERENCES_STORAGE_KEY,
   resetSubtitleAppearance,
   secondaryLineUnavailable,
+  resolveSecondaryLine,
+  SECONDARY_SUB_LANG_LABELS,
   SUBTITLE_FONT_STACKS,
   subtitleOutlineShadow,
   subtitlePlacementStyle,
@@ -529,10 +531,22 @@ export default function VideoCoreStudyOverlay({
    */
   const [secondaryTranslateFailed, setSecondaryTranslateFailed] = React.useState(false);
   const secondaryTranslationCacheRef = React.useRef(new Map<string, string>());
+  const secondaryTrackEntry = tracks.find((entry) => entry.number === secondaryTrack);
+  const secondaryTrackLang = secondaryTrackEntry ? studyTrackLanguage(secondaryTrackEntry) : '';
+  // Asked before `secondaryTranslation` exists, so only the parts that decide it are known.
+  const secondaryLine = resolveSecondaryLine({
+    hasSecondaryTrack: secondaryTrack != null,
+    trackLang: secondaryTrackLang,
+    trackText: trackSecondaryText,
+    translation: '',
+    translatorFailed: secondaryTranslateFailed,
+    secondaryLang: preferences.secondarySubLang,
+  });
+  const secondaryNeedsTranslation = secondaryLine.translate;
   React.useEffect(() => {
     const target = preferences.secondarySubLang;
     const source = getStudyLang();
-    if (!preferences.dualSubs || trackSecondaryText || !plainText || target === source) {
+    if (!preferences.dualSubs || !secondaryNeedsTranslation || !plainText || target === source) {
       setSecondaryTranslation('');
       return;
     }
@@ -566,10 +580,17 @@ export default function VideoCoreStudyOverlay({
     plainText,
     preferences.dualSubs,
     preferences.secondarySubLang,
-    trackSecondaryText,
+    secondaryNeedsTranslation,
   ]);
 
-  const secondaryText = trackSecondaryText || secondaryTranslation;
+  const { text: secondaryText, fallback: secondaryIsFallback } = resolveSecondaryLine({
+    hasSecondaryTrack: secondaryTrack != null,
+    trackLang: secondaryTrackLang,
+    trackText: trackSecondaryText,
+    translation: secondaryTranslation,
+    translatorFailed: secondaryTranslateFailed,
+    secondaryLang: preferences.secondarySubLang,
+  });
   const miningSource = miningSourceFromPlayback(playbackInfo);
   /** Which file this is, for everything remembered per file (delay, track choice). */
   const subtitleSource = React.useMemo(
@@ -2920,6 +2941,23 @@ export default function VideoCoreStudyOverlay({
             data-study-secondary-status="unavailable"
           >
             {t('mediaWorkspace.study.noSecondLine')}
+          </span>
+        )}
+
+        {preferences.dualSubs && secondaryIsFallback && (
+          /* The second line is in another language than the one chosen: said once, faded
+             like the notice above, so the choice does not look silently ignored. */
+          <span
+            className="study-cue-status"
+            data-study-cue-status="none"
+            data-study-secondary-status="fallback"
+          >
+            {t('mediaWorkspace.study.secondLineFallback', {
+              language: SECONDARY_SUB_LANG_LABELS[preferences.secondarySubLang]
+                ?? preferences.secondarySubLang,
+              shown: SECONDARY_SUB_LANG_LABELS[secondaryTrackLang]
+                ?? (secondaryTrackEntry ? trackLabel(secondaryTrackEntry, t) : secondaryTrackLang),
+            })}
           </span>
         )}
 

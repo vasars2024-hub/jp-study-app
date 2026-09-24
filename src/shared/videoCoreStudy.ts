@@ -485,6 +485,41 @@ export function secondaryLineUnavailable(input: {
     || shortLangTag(input.secondaryLang) === shortLangTag(input.studyLang);
 }
 
+/**
+ * What the second line shows when a track is available for it.
+ *
+ * The track wins when it is in the chosen language, or when its language is unknown (a
+ * label the detector cannot read is still the track the user was offered). A track in
+ * ANOTHER language is only a stand-in: choosing Russian on a release that ships English
+ * used to show the English line as if the choice had been ignored, or, when the English
+ * track was still loading, nothing at all. The translator is asked first; while it works
+ * nothing is shown rather than an English line that turns Russian a moment later, and when
+ * it fails the English line is shown after all, with `fallback` set so the overlay can say
+ * once why the line is not in the chosen language.
+ */
+export function resolveSecondaryLine(input: {
+  hasSecondaryTrack: boolean;
+  /** `studyTrackLanguage` of the second-line track, `''` when unknown. */
+  trackLang: string;
+  trackText: string;
+  translation: string;
+  translatorFailed: boolean;
+  secondaryLang: string;
+}): { text: string; translate: boolean; fallback: boolean } {
+  const chosen = shortLangTag(input.secondaryLang);
+  const trackLang = shortLangTag(input.trackLang);
+  if (!input.hasSecondaryTrack || !trackLang || trackLang === chosen) {
+    // No track (translation is the only source), or the track IS the chosen language.
+    return { text: input.trackText || input.translation, translate: !input.trackText, fallback: false };
+  }
+  if (input.translation) return { text: input.translation, translate: true, fallback: false };
+  return {
+    text: input.translatorFailed ? input.trackText : '',
+    translate: true,
+    fallback: input.translatorFailed,
+  };
+}
+
 /* ------------------------------------------------------------------------------ *
  * Per-file subtitle delay
  * ------------------------------------------------------------------------------ */

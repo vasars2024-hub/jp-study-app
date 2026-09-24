@@ -282,6 +282,8 @@ declare module '@/app/(main)/_features/video-core/video-core-media-captions' {
   export class MediaCaptionsManager extends EventTarget {
     getTracks(): MediaCaptionsTrack[];
     getTrackContent(index: number): string | null;
+    /** Gum: fetch + convert a track WITHOUT selecting it (the second line's track). */
+    loadTrackContent?(index: number): Promise<string | null>;
     getSelectedTrackIndexOrNull(): number | null;
     selectTrack(index: number): Promise<void>;
     setNoTrack(): void;

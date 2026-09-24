@@ -9747,6 +9747,7 @@ export const en: Catalog = {
   'mediaWorkspace.study.resetSubtitleDelay': 'Reset delay',
   'mediaWorkspace.study.subtitleDelayPerFile': 'The delay is remembered for this file.',
   'mediaWorkspace.study.noSecondLine': 'No second-language subtitles for this file.',
+  'mediaWorkspace.study.secondLineFallback': 'No {language} subtitles, and no translator is available. Showing {shown} instead.',
   'mediaWorkspace.study.grammarHighlight': 'Grammar highlight',
   'mediaWorkspace.study.grammarSource': 'Captured from the video player',
   'mediaWorkspace.study.grammarLoading': 'Analyzing this line…',

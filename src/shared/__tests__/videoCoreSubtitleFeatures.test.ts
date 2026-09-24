@@ -12,6 +12,7 @@ import {
   nudgeSubtitlePosition,
   pickStudyPrimaryTrack,
   resetSubtitleAppearance,
+  resolveSecondaryLine,
   resolveVideoCoreSubtitleDelay,
   resolveVideoCoreTrackChoice,
   SECONDARY_SUB_SCALE_DEFAULT,
@@ -287,5 +288,41 @@ describe('The "no second line" hint', () => {
     expect(secondaryLineUnavailable({ ...base, translatorFailed: false })).toBe(false);
     // Second language = study language: the translator is never asked, nothing can come.
     expect(secondaryLineUnavailable({ ...base, translatorFailed: false, secondaryLang: 'ja' })).toBe(true);
+  });
+});
+
+describe('What the second line shows when a track can supply it', () => {
+  const base = {
+    hasSecondaryTrack: true,
+    trackLang: 'en',
+    trackText: 'Good morning.',
+    translation: '',
+    translatorFailed: false,
+    secondaryLang: 'en',
+  };
+
+  it('shows the track when it is in the chosen language, without asking the translator', () => {
+    expect(resolveSecondaryLine(base)).toEqual({ text: 'Good morning.', translate: false, fallback: false });
+    // A label the detector cannot read is still the track the user was offered.
+    expect(resolveSecondaryLine({ ...base, trackLang: '', secondaryLang: 'ru' }))
+      .toEqual({ text: 'Good morning.', translate: false, fallback: false });
+  });
+
+  it('with no track at all, the translation is the only source', () => {
+    expect(resolveSecondaryLine({ ...base, hasSecondaryTrack: false, trackLang: '', trackText: '', translation: 'Доброе утро.' }))
+      .toEqual({ text: 'Доброе утро.', translate: true, fallback: false });
+  });
+
+  it('Russian chosen on an English-only release: translated, not the English line as if ignored', () => {
+    const ru = { ...base, secondaryLang: 'ru' };
+    // While the translator works: nothing, rather than English that turns Russian later.
+    expect(resolveSecondaryLine(ru)).toEqual({ text: '', translate: true, fallback: false });
+    expect(resolveSecondaryLine({ ...ru, translation: 'Доброе утро.' }))
+      .toEqual({ text: 'Доброе утро.', translate: true, fallback: false });
+  });
+
+  it('Russian chosen, translator unavailable: the English line after all, flagged as a stand-in', () => {
+    expect(resolveSecondaryLine({ ...base, secondaryLang: 'ru', translatorFailed: true }))
+      .toEqual({ text: 'Good morning.', translate: true, fallback: true });
   });
 });

@@ -29,7 +29,12 @@ export async function mediaCaptionCues(
   manager: MediaCaptionsManager,
   trackNumber: number,
 ): Promise<VideoCoreActiveCue[]> {
-  const content = manager.getTrackContent(trackNumber);
+  // The provider fetches a track only when it is SELECTED. The second line reads the track
+  // beside the selected one, which on this path was never fetched: its content was null and
+  // the English line under a Japanese one stayed blank. Loading it here does not select it.
+  const content = typeof manager.loadTrackContent === 'function'
+    ? await manager.loadTrackContent(trackNumber)
+    : manager.getTrackContent(trackNumber);
   if (!content) return [];
   const parsed = await parseText(content);
   return parsed.cues.map((cue, index) => ({
