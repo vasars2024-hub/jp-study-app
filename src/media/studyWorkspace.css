@@ -453,6 +453,50 @@
   cursor: default;
 }
 
+/* Subtitle colour choices: Default, a few swatches, and a picker for anything else. */
+#media-workspace .study-tool-colors {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  color: rgb(var(--color-gray-300));
+}
+
+#media-workspace .study-tool-colors-label {
+  margin-right: 0.15rem;
+}
+
+#media-workspace .study-tool-group .study-tool-swatch {
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--color-gray-600) / 0.9);
+}
+
+#media-workspace .study-tool-group .study-tool-swatch[aria-pressed='true'],
+#media-workspace .study-tool-group .study-tool-swatch-default[aria-pressed='true'] {
+  outline: 2px solid rgb(var(--color-brand-400, 129 140 248));
+  outline-offset: 1px;
+}
+
+#media-workspace .study-tool-swatch-custom {
+  width: 1.8rem;
+  height: 1.45rem;
+  padding: 0;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.35rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+#media-workspace .study-tool-note {
+  flex-basis: 100%;
+  font-size: 0.68rem;
+  color: rgb(var(--color-gray-500));
+}
+
 /* ── Customize mode ─────────────────────────────────────────────────────────────── */
 
 /*

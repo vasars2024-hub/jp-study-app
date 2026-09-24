@@ -16,7 +16,7 @@ import type { VideoCore_VideoPlaybackInfo } from '@/app/(main)/_features/video-c
 import type {
   NormalizedTrackInfo,
   SubtitleManagerCueChangeEvent,
-  SubtitleManagerTrackSelectedEvent,
+  SubtitleManagerEventsAddedEvent,
   SubtitleManagerTracksLoadedEvent,
   VideoCoreActiveCue,
 } from '@/app/(main)/_features/video-core/video-core-subtitles';
@@ -35,7 +35,11 @@ import {
 } from '../renderer/wordLookup';
 import { translateTo } from '../renderer/translator';
 import { shiftCues, shiftCuesMs } from '../shared/subtitleSync';
-import { registerCommandHandler } from '../renderer/keyboardShortcuts';
+import {
+  effectiveKeys,
+  formatKeysDisplay,
+  registerCommandHandler,
+} from '../renderer/keyboardShortcuts';
 import { t as translateUi, useT } from '../renderer/i18n';
 import { getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
 import {
@@ -62,8 +66,15 @@ import {
   isCueEndTransition,
   nextVideoCoreWhisperTrackNumber,
   normalizeVideoCoreStudyPreferences,
+  studyTrackLanguage,
+  nudgeSubtitlePosition,
+  pickStudyPrimaryTrack,
   PLAYER_PREFERENCES_STORAGE_KEY,
+  resetSubtitleAppearance,
+  secondaryLineUnavailable,
   SUBTITLE_FONT_STACKS,
+  subtitleOutlineShadow,
+  subtitlePlacementStyle,
   recordVideoCoreComprehensionEvent,
   recordVideoCoreCueReplay,
   recordVideoCoreTimingAdjustment,
@@ -101,6 +112,14 @@ import VideoCoreMiningPanel from './VideoCoreMiningPanel';
 import VideoCoreGrammarPanel from './VideoCoreGrammarPanel';
 import VideoCoreTranscriptPanel from './VideoCoreTranscriptPanel';
 import { useCueAnalysis } from './useCueAnalysis';
+import {
+  loadStudyTrackChoice,
+  loadSubtitleDelay,
+  rememberStudyTrackChoice,
+  saveSubtitleDelay,
+  studySubtitleSource,
+  subtitleDelayKey,
+} from './studySubtitleMemory';
 import StudyBottomBar, { type PracticeMode } from './StudyBottomBar';
 import StudyDocks, { type BlockRenderers } from './StudyDocks';
 import {
@@ -199,10 +218,10 @@ interface Props {
  * subtitle does. The text shadow in the stylesheet is what keeps it legible over
  * a bright frame, which is why the background can be dropped entirely.
  *
- * Takes the whole preference object rather than one argument per knob: the secondary
- * line differs from the primary in exactly one of them, and a positional list long
- * enough to cover the rest is a list two callers can disagree about silently. The size
- * override is the one parameter, because it is the one real difference.
+ * Takes the whole preference object rather than one argument per knob: a positional list
+ * long enough to cover them is a list two callers can disagree about silently. The second
+ * line shares the typeface, weight, box and outline, and has its own size (a percentage of
+ * the primary's) and colour — hence the one `line` parameter.
  *
  * Only settings that depart from the stylesheet are emitted. `default` leaves the family
  * unset so the sheet's own choice still applies, and the outline is dropped rather than
@@ -210,15 +229,25 @@ interface Props {
  */
 function cueBoxStyle(
   preferences: VideoCoreStudyPreferences,
-  fontSizePx: number = preferences.subtitleFontSize,
+  line: 'primary' | 'secondary' = 'primary',
 ): React.CSSProperties {
+  const secondary = line === 'secondary';
+  const fontSizePx = secondary
+    ? Math.round(preferences.subtitleFontSize * (preferences.secondarySubScale / 100))
+    : preferences.subtitleFontSize;
   const style: React.CSSProperties = {
     fontSize: `${fontSizePx}px`,
     fontWeight: preferences.subtitleFontWeight,
   };
   const stack = SUBTITLE_FONT_STACKS[preferences.subtitleFontFamily];
   if (stack) style.fontFamily = stack;
+  // Each line has its own colour; '' leaves the stylesheet's (off-white / pale blue).
+  const color = secondary ? preferences.secondarySubColor : preferences.subtitleColor;
+  if (color) style.color = color;
   if (!preferences.subtitleOutline) style.textShadow = 'none';
+  else if (preferences.subtitleOutlineColor) {
+    style.textShadow = subtitleOutlineShadow(preferences.subtitleOutlineColor, secondary);
+  }
   if (preferences.subtitleBgOpacity > 0) {
     style.backgroundColor = `rgba(0, 0, 0, ${preferences.subtitleBgOpacity / 100})`;
     style.padding = '0.1em 0.4em';
@@ -234,6 +263,15 @@ function loadPreferences(): VideoCoreStudyPreferences {
     );
   } catch {
     return normalizeVideoCoreStudyPreferences(null);
+  }
+}
+
+/** The live binding of a command, for the bar's tooltips (`''` when unbound). */
+function shortcutKeysFor(commandId: string): string {
+  try {
+    return formatKeysDisplay(effectiveKeys(commandId));
+  } catch {
+    return '';
   }
 }
 
@@ -483,6 +521,12 @@ export default function VideoCoreStudyOverlay({
    * translator that is still loading its model is the ordinary reason for this.
    */
   const [secondaryTranslation, setSecondaryTranslation] = React.useState('');
+  /**
+   * The last translation attempt failed (no local model, no key). Not a reason to stop
+   * trying — a translator still loading its model fails the same way — but it is what lets
+   * the overlay say once that no second line is coming, instead of a silent blank.
+   */
+  const [secondaryTranslateFailed, setSecondaryTranslateFailed] = React.useState(false);
   const secondaryTranslationCacheRef = React.useRef(new Map<string, string>());
   React.useEffect(() => {
     const target = preferences.secondarySubLang;
@@ -507,8 +551,11 @@ export default function VideoCoreStudyOverlay({
         if (cancelled) return;
         secondaryTranslationCacheRef.current.set(key, text);
         setSecondaryTranslation(text);
+        setSecondaryTranslateFailed(false);
       } catch {
-        if (!cancelled) setSecondaryTranslation('');
+        if (cancelled) return;
+        setSecondaryTranslation('');
+        setSecondaryTranslateFailed(true);
       }
     })();
     return () => {
@@ -523,6 +570,14 @@ export default function VideoCoreStudyOverlay({
 
   const secondaryText = trackSecondaryText || secondaryTranslation;
   const miningSource = miningSourceFromPlayback(playbackInfo);
+  /** Which file this is, for everything remembered per file (delay, track choice). */
+  const subtitleSource = React.useMemo(
+    () => studySubtitleSource(playbackInfo, localFilePath),
+    [localFilePath, playbackInfo],
+  );
+  const delayKey = subtitleDelayKey(subtitleSource);
+  const delayKeyRef = React.useRef(delayKey);
+  delayKeyRef.current = delayKey;
   // Whose transcript this is. A Whisper track and a downloaded track both arrive
   // here as tracks, so naming the track is the only thing that tells them apart.
   const selectedTrackEntry = tracks.find((entry) => entry.number === selectedTrack);
@@ -672,14 +727,33 @@ export default function VideoCoreStudyOverlay({
       setTracks(event.detail.tracks);
       setSelectedTrack(manager.getSelectedTrackNumberOrNull());
     };
-    const handleTrackSelected = (event: SubtitleManagerTrackSelectedEvent): void => {
-      setSelectedTrack(event.detail.trackNumber);
+    /*
+      The manager's own answer, not the event's. Two selections in flight (the default pick
+      and the user's) used to announce out of order, and trusting `event.detail` let the
+      overlay settle on the track the user had just left (subtitle audit 6h). The manager
+      now finishes only the newest selection, and asking it rather than the event keeps this
+      side right even if an announcement is ever late again. The active cues are re-read
+      too: the manager re-derives them on selection, so the line switches with the track.
+    */
+    const handleTrackSelected = (): void => {
+      setSelectedTrack(manager.getSelectedTrackNumberOrNull());
       setAllCues(stableCueList(manager.getCues()));
+      setActiveCues(manager.getActiveCues());
     };
     const handleTrackDeselected = (): void => {
       setSelectedTrack(null);
       setAllCues([]);
       setActiveCues([]);
+    };
+    /*
+      Cues stream in while the file is read, so the whole-track list (the transcript, the
+      prev/next targets) grows after selection. It used to be re-read only on a `cuechange`,
+      so a batch that arrived between two lines left the transcript short until the next one.
+    */
+    const handleEventsAdded = (event: SubtitleManagerEventsAddedEvent): void => {
+      const current = manager.getSelectedTrackNumberOrNull();
+      if (current == null || !event.detail.trackNumbers.includes(current)) return;
+      setAllCues(stableCueList(manager.getCues()));
     };
 
     sync();
@@ -687,11 +761,13 @@ export default function VideoCoreStudyOverlay({
     manager.addEventListener('tracksloaded', handleTracksLoaded);
     manager.addEventListener('trackselected', handleTrackSelected);
     manager.addEventListener('trackdeselected', handleTrackDeselected);
+    manager.addEventListener('eventsadded', handleEventsAdded);
     return () => {
       manager.removeEventListener('cuechange', handleCueChange);
       manager.removeEventListener('tracksloaded', handleTracksLoaded);
       manager.removeEventListener('trackselected', handleTrackSelected);
       manager.removeEventListener('trackdeselected', handleTrackDeselected);
+      manager.removeEventListener('eventsadded', handleEventsAdded);
     };
   }, [
     manager,
@@ -982,6 +1058,13 @@ export default function VideoCoreStudyOverlay({
         if (cancelled || !helper?.text) return;
         const key = `${localPath}|${helper.recordId ?? helper.name}`;
         if (helperTrackRef.current?.key === key) return;
+        // A release that already carries a track in the helper's language (a muxed English
+        // stream) needs no copy of it: the second-line picker would list English twice.
+        const helperLang = shortLangTag(helper.lang || 'en');
+        if (manager.getTracks().some((track) => (
+          track.number !== helperTrackRef.current?.trackNumber
+          && studyTrackLanguage(track) === helperLang
+        ))) return;
         const parsed = parseSubtitles(helper.text);
         if (!parsed.length) return;
         const offsetSec = await resolveSubtitleSyncOffset(localPath, parsed, video?.duration);
@@ -1006,7 +1089,9 @@ export default function VideoCoreStudyOverlay({
             default: false,
             forced: false,
             enabled: true,
-          } as MKVParser_TrackInfo);
+            // `select: false`: upstream's addEventTrack SELECTS what it mounts, which made this
+            // English helper the study line and pushed the Japanese track into the second slot.
+          } as MKVParser_TrackInfo, { select: false });
           await manager.onSubtitleEvents(events);
           if (cancelled) return;
           helperTrackRef.current = { key, trackNumber };
@@ -1342,8 +1427,10 @@ export default function VideoCoreStudyOverlay({
       track.number !== selectedTrack
       && (!manager || track.type === 'event' || track.type === 'file')
     ));
+    // `studyTrackLanguage`, not the bare language field: a sidecar track has none, only a
+    // label like `… - 04.en`, and the English sidecar was never recognised as English.
     const preferred = candidates.find(
-      (track) => shortLangTag(track.language) === preferences.secondarySubLang,
+      (track) => studyTrackLanguage(track) === preferences.secondarySubLang,
     );
     setSecondaryTrack((current) => {
       if (preferred) return preferred.number;
@@ -1445,13 +1532,25 @@ export default function VideoCoreStudyOverlay({
       if (secondaryCuesRef.current.length) syncActive();
       else refreshTimeline();
     };
+    /*
+      Subtitle audit 6h: the second line's timeline used to be re-listed ONLY on the primary
+      track's `cuechange`. Its cues stream in while the file is read, so an English line
+      that reached the cache after the Japanese line's boundary waited for the NEXT boundary
+      — and on a track whose lines share timings, that is after the line is over. The
+      manager now says when a track grows, and the second line listens for its own track.
+    */
+    const handleEventsAdded = (event: SubtitleManagerEventsAddedEvent): void => {
+      if (event.detail.trackNumbers.includes(secondaryTrack)) refreshTimeline();
+    };
     refreshTimeline();
     manager?.addEventListener('cuechange', refreshTimeline);
+    manager?.addEventListener('eventsadded', handleEventsAdded);
     video.addEventListener('timeupdate', tick);
     video.addEventListener('seeked', tick);
     return () => {
       cancelled = true;
       manager?.removeEventListener('cuechange', refreshTimeline);
+      manager?.removeEventListener('eventsadded', handleEventsAdded);
       video.removeEventListener('timeupdate', tick);
       video.removeEventListener('seeked', tick);
     };
@@ -1614,6 +1713,8 @@ export default function VideoCoreStudyOverlay({
       subtitleDelayRef.current = next;
       setSubtitleDelaySec(next);
       void manager?.setSubtitleDelay(next);
+      // Remembered for THIS file: the release that is 0.4 s late is late every time.
+      saveSubtitleDelay(delayKeyRef.current, next);
       if (selectedTrack == null || !video) return;
       const positionSec = video.currentTime;
       setTimingSignal((current) =>
@@ -1621,6 +1722,32 @@ export default function VideoCoreStudyOverlay({
     },
     [manager, selectedTrack, subtitleDelaySec, video],
   );
+
+  /**
+   * Back to zero in one press. Not timing evidence (it records nothing for the drift
+   * tracker, and stops a running track): it is the user abandoning a correction, not making
+   * one. Clears the file's stored delay too.
+   */
+  const resetSubtitleDelay = React.useCallback((): void => {
+    setDriftTracking(false);
+    subtitleDelayRef.current = 0;
+    setSubtitleDelaySec(0);
+    void manager?.setSubtitleDelay(0);
+    saveSubtitleDelay(delayKeyRef.current, 0);
+  }, [manager]);
+
+  /*
+    The file's remembered delay, applied when a file opens and again when a manager is
+    (re)built — the manager's constructor applies VideoCore's own global delay setting, which
+    would otherwise silently replace this file's correction. The delay also used to leak from
+    one file to the next, because the overlay stays mounted across opens.
+  */
+  React.useEffect(() => {
+    const stored = loadSubtitleDelay(delayKey);
+    subtitleDelayRef.current = stored;
+    setSubtitleDelaySec(stored);
+    void manager?.setSubtitleDelay(stored);
+  }, [delayKey, manager]);
 
   /**
    * Study-loop keyboard shortcuts — registered as app commands, slice 19.
@@ -1672,6 +1799,22 @@ export default function VideoCoreStudyOverlay({
       registerCommandHandler('video.toggleFurigana', () => {
         updatePreference('furigana', !preferencesRef.current.furigana);
       }),
+      registerCommandHandler('video.toggleDualSubs', () => {
+        updatePreference('dualSubs', !preferencesRef.current.dualSubs);
+      }),
+      // One ladder for both keys (see `nudgeSubtitlePosition`): up past the highest lift
+      // reaches the top of the picture, and down from the top comes back.
+      registerCommandHandler('video.subPositionUp', () => {
+        const next = nudgeSubtitlePosition(preferencesRef.current, 1);
+        updatePreference('subtitlePosition', next.subtitlePosition);
+        updatePreference('subtitleAtTop', next.subtitleAtTop);
+      }),
+      registerCommandHandler('video.subPositionDown', () => {
+        const next = nudgeSubtitlePosition(preferencesRef.current, -1);
+        updatePreference('subtitlePosition', next.subtitlePosition);
+        updatePreference('subtitleAtTop', next.subtitleAtTop);
+      }),
+      registerCommandHandler('video.subDelayReset', () => resetSubtitleDelay()),
       /*
         Seeks are NOT marked programmatic. The comprehension tracker treats a
         backward seek as evidence the viewer did not follow the line, and a
@@ -1690,7 +1833,7 @@ export default function VideoCoreStudyOverlay({
       }),
     ];
     return () => offs.forEach((off) => off());
-  }, [changeSubtitleDelay, jumpCue, replayCue, seekBy, updatePreference]);
+  }, [changeSubtitleDelay, jumpCue, replayCue, resetSubtitleDelay, seekBy, updatePreference]);
 
   /**
    * Workspace commands — registered here for the same reason the `video.*` rows are.
@@ -1723,9 +1866,16 @@ export default function VideoCoreStudyOverlay({
         if (next) current.dispatch({ type: 'switch-workspace', workspaceId: next });
       }),
       registerCommandHandler('workspace.toggleTranscript', () => {
-        // Through the preference, not the block: the preference is what the checkbox,
-        // the panel's own close button and the persisted layout all read.
-        updatePreference('transcriptPanel', !preferencesRef.current.transcriptPanel);
+        // Toggles what is ON SCREEN. The Transcript layout shows the rail with the
+        // preference off, so flipping the preference alone could "open" a visible rail.
+        const current = workspaceRef.current;
+        if (current.isVisible('transcript')) {
+          updatePreference('transcriptPanel', false);
+          current.dispatch({ type: 'close-block', blockId: 'transcript' });
+        } else {
+          updatePreference('transcriptPanel', true);
+          current.trigger('transcript-open');
+        }
       }),
       registerCommandHandler('workspace.toggleAi', () => {
         workspaceRef.current.dispatch({ type: 'toggle-block', blockId: 'aiWorkspace' });
@@ -2169,10 +2319,22 @@ export default function VideoCoreStudyOverlay({
 
   const { dispatch: workspaceDispatch, trigger: workspaceTrigger } = workspace;
 
+  /*
+    The transcript preference OPENS the rail when it is on, and CLOSES it only when the user
+    turns it off. It used to close the block whenever the preference was off — including on
+    every mount — so the Transcript layout, whose rail is the layout's own and has nothing to
+    do with the preference, lost its transcript each time the player reopened (subtitle audit
+    7b). A layout decides what it shows; only the user's "off" takes the rail away.
+  */
+  const transcriptPreferenceRef = React.useRef<boolean | null>(null);
   React.useEffect(() => {
+    const previous = transcriptPreferenceRef.current;
+    transcriptPreferenceRef.current = preferences.transcriptPanel;
     if (preferences.transcriptPanel) {
-      workspaceDispatch({ type: 'open-block', blockId: 'transcript', placement: 'right' });
-    } else {
+      if (previous !== true && !workspaceRef.current.isVisible('transcript')) {
+        workspaceDispatch({ type: 'open-block', blockId: 'transcript', placement: 'right' });
+      }
+    } else if (previous === true) {
       workspaceDispatch({ type: 'close-block', blockId: 'transcript' });
     }
   }, [preferences.transcriptPanel, workspaceDispatch]);
@@ -2196,6 +2358,29 @@ export default function VideoCoreStudyOverlay({
       preferences.dictationMode ? 'dictation' : preferences.shadowingMode ? 'shadowing' : null,
     );
   }, [preferences.dictationMode, preferences.shadowingMode, setActivePractice]);
+
+  /*
+    A drill started from a layout that has no panel for it. The running drill is raised by
+    the layout resolver (priority 1), but only if the layout HAS that block — Watch has none,
+    so turning dictation on there hid the line and offered no way to type or reveal it
+    (subtitle audit 9d). The block is added to the layout HIDDEN: the resolver then shows it
+    exactly while the drill runs and hides it again when the drill stops, in whatever layout
+    the user is in, with no state here to fall out of step.
+  */
+  const practiceBlockId = preferences.dictationMode
+    ? 'dictation'
+    : preferences.shadowingMode ? 'shadowing' : null;
+  React.useEffect(() => {
+    if (!practiceBlockId) return;
+    const current = workspaceRef.current;
+    if (current.workspace.blocks.some((block) => block.blockId === practiceBlockId)) return;
+    current.dispatch({
+      type: 'open-block',
+      blockId: practiceBlockId,
+      placement: 'bottom',
+      presence: 'hidden',
+    });
+  }, [practiceBlockId, workspace.workspace.id]);
 
   /*
     A word lookup is what opens the dictionary block, so that the popup's position is a
@@ -2318,15 +2503,58 @@ export default function VideoCoreStudyOverlay({
     else void mediaCaptionsManager?.selectTrack(trackNumber);
   }, [manager, mediaCaptionsManager]);
 
+  /**
+   * A track the USER picked in the study bar: selected, and remembered for this file and its
+   * series so the next episode opens on it (see `pickStudyPrimaryTrack`).
+   */
+  const chooseSubtitleTrack = React.useCallback((trackNumber: number | null): void => {
+    selectSubtitleTrack(trackNumber);
+    const track = trackNumber == null
+      ? null
+      : tracks.find((entry) => entry.number === trackNumber) ?? null;
+    rememberStudyTrackChoice(subtitleSource, track);
+  }, [selectSubtitleTrack, subtitleSource, tracks]);
+
   /*
-    Same candidate rule as the effect that picks the default: event tracks only while
-    SubtitleManager drives, any track under MediaCaptions. A stricter filter in the
-    picker than in the chooser would leave the automatically chosen track absent from
-    its own list.
+    The study line is the STUDY language by default (subtitle audit 6a/6g: a release with a
+    Japanese and an English track opened on English, VideoCore's upstream preference). The
+    slice seeds VideoCore's preferred-language setting so its own first pick is already right;
+    this is the check behind it, and the only place a remembered per-file/series choice is
+    applied. It runs once per file and track list — a track mounted later (the sidecar, the
+    English helper) re-asks, a user's pick in any menu never meets a correction.
+
+    MediaCaptions picks its default only after loading its tracks, and a selection made
+    before then is dropped ("Track not loaded"), so under that manager this waits for its
+    first pick.
+  */
+  const trackCorrectionRef = React.useRef('');
+  React.useEffect(() => {
+    if (!tracks.length) return;
+    if (!manager && selectedTrack == null) return;
+    const signature = `${delayKey}|${tracks
+      .map((track) => `${track.number}:${track.language ?? ''}:${track.label ?? ''}`)
+      .join(',')}`;
+    if (trackCorrectionRef.current === signature) return;
+    trackCorrectionRef.current = signature;
+    const pick = pickStudyPrimaryTrack(
+      tracks,
+      studyLang,
+      loadStudyTrackChoice(subtitleSource),
+      selectedTrack,
+    );
+    if (pick === undefined || pick === selectedTrack) return;
+    selectSubtitleTrack(pick);
+  }, [delayKey, manager, selectSubtitleTrack, selectedTrack, studyLang, subtitleSource, tracks]);
+
+  /*
+    Same candidate rule as the effect that picks the default: event and file tracks while
+    SubtitleManager drives, any track under MediaCaptions. A stricter filter in the picker
+    than in the chooser left the automatically chosen track absent from its own list.
   */
   const secondaryTrackCandidates = React.useMemo(
     () => tracks.filter((track) => (
-      track.number !== selectedTrack && (!manager || track.type === 'event')
+      track.number !== selectedTrack
+      && (!manager || track.type === 'event' || track.type === 'file')
     )),
     [manager, selectedTrack, tracks],
   );
@@ -2393,7 +2621,11 @@ export default function VideoCoreStudyOverlay({
         trackLabel={selectedTrackLabel}
         trackNotice={transcriptTrackNotice}
         onSeek={seekTranscriptCue}
-        onClose={() => updatePreference('transcriptPanel', false)}
+        onClose={() => {
+          // The user closed it: that is the one "off" that hides a layout's own rail too.
+          updatePreference('transcriptPanel', false);
+          workspaceDispatch({ type: 'close-block', blockId: 'transcript' });
+        }}
       />
     ),
 
@@ -2566,6 +2798,16 @@ export default function VideoCoreStudyOverlay({
    */
   const noCuesNow = !activeCue && allCues.length === 0 && !externalSubtitlePending;
   const [noSubtitlesSettled, setNoSubtitlesSettled] = React.useState(false);
+  /** Dual subtitles on, but neither a track nor the translator can supply a second line. */
+  const showSecondaryUnavailable = secondaryLineUnavailable({
+    dualSubs: preferences.dualSubs,
+    hasCues: allCues.length > 0,
+    hasSecondaryTrack: secondaryTrack != null,
+    secondaryText,
+    translatorFailed: secondaryTranslateFailed,
+    secondaryLang: preferences.secondarySubLang,
+    studyLang,
+  });
   React.useEffect(() => {
     setNoSubtitlesSettled(false);
     if (!noCuesNow) return undefined;
@@ -2589,6 +2831,11 @@ export default function VideoCoreStudyOverlay({
         data-secondary-cue-count={secondaryCues.length}
         data-secondary-active-cue={activeSecondaryCues[0]?.index}
         data-grammar-highlight={annotated ? 'on' : 'off'}
+        // Where the band sits: lifted above its floor by the user's position setting, or at
+        // the top of the picture. The floor itself is CSS (`--study-cue-bottom`) and only
+        // ever gets added to — see `subtitlePlacementStyle`.
+        data-study-cue-position={preferences.subtitleAtTop ? 'top' : 'bottom'}
+        style={subtitlePlacementStyle(preferences) as React.CSSProperties}
       >
         {activeCue && preferences.primarySubs && (!preferences.dictationMode || dictationRevealed) ? (
           <SubtitleCueLine
@@ -2639,13 +2886,22 @@ export default function VideoCoreStudyOverlay({
           <p
             className="study-cue-secondary"
             lang={preferences.secondarySubLang}
-            style={cueBoxStyle(
-              preferences,
-              Math.round(preferences.subtitleFontSize * 0.8),
-            )}
+            style={cueBoxStyle(preferences, 'secondary')}
           >
             {secondaryText}
           </p>
+        )}
+
+        {showSecondaryUnavailable && (
+          /* Said once, then faded by the same rule as the no-subtitles notice: a blank where
+             the user switched on a second line reads as the feature being broken. */
+          <span
+            className="study-cue-status"
+            data-study-cue-status="none"
+            data-study-secondary-status="unavailable"
+          >
+            {t('mediaWorkspace.study.noSecondLine')}
+          </span>
         )}
 
 
@@ -2828,6 +3084,9 @@ export default function VideoCoreStudyOverlay({
         updatePreference={updatePreference}
         subtitleDelaySec={subtitleDelaySec}
         onChangeSubtitleDelay={changeSubtitleDelay}
+        onResetSubtitleDelay={resetSubtitleDelay}
+        onResetSubtitleAppearance={() => setPreferences(resetSubtitleAppearance)}
+        shortcutKeysFor={shortcutKeysFor}
         pauseOnLookup={pauseOnLookup}
         setPauseOnLookup={setPauseOnLookup}
         onTranslateLine={() => void translateCue()}
@@ -2848,7 +3107,7 @@ export default function VideoCoreStudyOverlay({
         }}
         tracks={tracks}
         selectedTrack={selectedTrack}
-        onSelectTrack={selectSubtitleTrack}
+        onSelectTrack={chooseSubtitleTrack}
         secondaryTrack={secondaryTrack}
         onSelectSecondaryTrack={setSecondaryTrack}
         secondaryTrackCandidates={secondaryTrackCandidates}

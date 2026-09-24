@@ -346,6 +346,9 @@
   /* Above the bottom dock too, when one holds a panel (`--study-bottom-dock-height`,
      published by StudyDocks; 0 when there is none). */
   --study-cue-bottom: max(9.25rem, calc(var(--study-dock-height) + var(--study-bottom-dock-height, 0px) + 2.05rem));
+  /* What the user's "Subtitle position" lift is a fraction of: the picture between the floor
+     above and this reserve at the top (the player's own title row). */
+  --study-cue-top-reserve: 5rem;
 }
 
 /*
@@ -385,6 +388,23 @@
 #media-workspace .study-video-core {
   min-width: 0;
   min-height: 0;
+}
+
+/*
+ * Fullscreen keeps the study surface on top of the picture.
+ *
+ * VideoCore's fullscreen now targets the whole slice (`video-core-fullscreen.ts`), but its
+ * inline container still adds `fixed z-[99999] inset-0` whenever it is fullscreen — written
+ * for upstream, where the container IS the fullscreen element. Inside the slice that z-index
+ * lifted the video over its own siblings: the subtitle (z 90), the second line and the study
+ * bar (z 92) were all still there, painted underneath it, and every click on the bar landed on
+ * the video (subtitle audit 11a: elementFromPoint at the line and the bar hit `video`).
+ * The slice is what fills the screen, so the container keeps its ordinary in-flow box.
+ */
+#media-workspace .study-player-slice [data-vc-element='inline-container'] {
+  position: relative;
+  inset: auto;
+  z-index: auto;
 }
 
 /*
@@ -433,7 +453,13 @@
     var(--study-left-gutter)
     + (100% - var(--study-left-gutter) - var(--study-right-gutter)) / 2
   );
-  bottom: var(--study-cue-bottom);
+  /* The floor, plus the user's lift as a fraction of the free picture above it. The lift is
+     ADDED to the floor, so no setting can put the line under the bar, the transport or a
+     bottom panel. */
+  bottom: calc(
+    var(--study-cue-bottom)
+    + (100% - var(--study-cue-bottom) - var(--study-cue-top-reserve, 5rem)) * var(--study-cue-lift, 0)
+  );
   z-index: 90;
   width: min(
     46rem,
@@ -443,6 +469,12 @@
   transform: translateX(-50%);
   text-align: center;
   pointer-events: auto;
+}
+
+/* "Top of screen": under the player's title row, clear of everything at the bottom. */
+#media-workspace .study-cue-overlay[data-study-cue-position='top'] {
+  top: var(--study-cue-top-reserve, 5rem);
+  bottom: auto;
 }
 
 #media-workspace .study-cue-text {
@@ -465,7 +497,9 @@
     0 3px 6px rgb(0 0 0 / 0.95);
 }
 
-#media-workspace .study-cue-timing,
+/* Only the one-off notices fade. The cue timing readout is a setting the user turned on to
+   read, and it changes every line — it faded once after 6 s and then stayed invisible for
+   every later line (subtitle audit 9c), so it is deliberately not in this rule. */
 #media-workspace .study-cue-status[data-study-cue-status='none'] {
   animation: study-cue-status-fade 600ms ease 6s forwards;
 }
@@ -485,6 +519,16 @@
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.025em;
+}
+
+#media-workspace .study-cue-timing {
+  display: block;
+  margin-top: 0.3rem;
+  color: rgb(var(--color-gray-300) / 1);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.025em;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.95);
 }
 
 #media-workspace .study-cue-translation {

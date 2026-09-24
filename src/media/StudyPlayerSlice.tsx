@@ -7,7 +7,7 @@
  * bridge without editing adopted source.
  */
 import React from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import type {
   MKVParser_SubtitleEvent,
   NativePlayer_PlaybackInfo,
@@ -27,9 +27,10 @@ import {
   vc_subtitleManager,
 } from '@/app/(main)/_features/video-core/video-core';
 import { vc_videoElement } from '@/app/(main)/_features/video-core/video-core-atoms';
-import type {
-  VideoCoreLifecycleState,
-  VideoCore_VideoPlaybackInfo,
+import {
+  vc_settingsRaw,
+  type VideoCoreLifecycleState,
+  type VideoCore_VideoPlaybackInfo,
 } from '@/app/(main)/_features/video-core/video-core.atoms';
 import type {
   SubtitleManagerCueChangeEvent,
@@ -86,11 +87,16 @@ import { t as translateUi } from '../renderer/i18n';
 import {
   normalizeVideoCoreResumePositions,
   resolveVideoCoreResumePosition,
+  seedPreferredSubtitleLanguage,
+  shortLangTag,
   stripAssCueText,
   upsertVideoCoreResumePosition,
   VIDEO_CORE_RESUME_STORAGE_KEY,
+  VIDEO_CORE_SUB_LANG_SEED_STORAGE_KEY,
   videoCoreResumeKey,
 } from '../shared/videoCoreStudy';
+import { getStudyLang } from '../renderer/studyEnvironment';
+import { rememberStudyTrackChoice, studySubtitleSource } from './studySubtitleMemory';
 import { resumeWriteAction } from './videoCoreResumeWrite';
 import {
   createWatchTimeState,
@@ -765,6 +771,37 @@ function StudyPlayerSession({
    */
   const sliceRef = React.useRef<HTMLElement | null>(null);
   const manager = useAtomValue(vc_subtitleManager);
+  /*
+    The study language leads VideoCore's preferred-subtitle-language order, once per study
+    language (`seedPreferredSubtitleLanguage`). Upstream's `en,eng,english` opened every
+    release that carries both a Japanese and an English track on the ENGLISH one (subtitle
+    audit 6a/6g) — the manager reads this setting when it is built, which is after this
+    effect, so its very first pick is already the study line. A user who later edits the
+    setting in VideoCore's own preferences keeps their edit.
+  */
+  const setVideoCoreSettings = useSetAtom(vc_settingsRaw);
+  React.useEffect(() => {
+    let seededFor: string | null = null;
+    try {
+      seededFor = localStorage.getItem(VIDEO_CORE_SUB_LANG_SEED_STORAGE_KEY);
+    } catch {
+      return;
+    }
+    const studyLang = getStudyLang();
+    setVideoCoreSettings((previous) => {
+      const next = seedPreferredSubtitleLanguage(
+        previous?.preferredSubtitleLanguage,
+        studyLang,
+        seededFor,
+      );
+      return next ? { ...previous, preferredSubtitleLanguage: next } : previous;
+    });
+    try {
+      localStorage.setItem(VIDEO_CORE_SUB_LANG_SEED_STORAGE_KEY, shortLangTag(studyLang));
+    } catch {
+      // The seed simply runs again next time.
+    }
+  }, [setVideoCoreSettings]);
   const clientId = useAtomValue(clientIdAtom);
   const connected = useAtomValue(websocketConnectedAtom);
   const identityConfirmed = useAtomValue(clientIdentityConfirmedAtom);
@@ -1627,6 +1664,17 @@ function StudyPlayerSession({
           inline
           inlineClassName="study-video-core"
           onTerminateStream={() => setState(initialState)}
+          // A pick in VideoCore's own CC menu is as explicit as one in the study bar, and is
+          // remembered for this file and its series the same way.
+          onSubtitlePreferenceChange={(selection) => {
+            rememberStudyTrackChoice(
+              studySubtitleSource(
+                stateRef.current.playbackInfo,
+                playbackRequest?.kind === 'local' ? playbackRequest.localFilePath : null,
+              ),
+              selection ? { language: selection.language, label: selection.label } : null,
+            );
+          }}
           onLoadedMetadata={(event) => {
             if (!proofConfig) return;
             const video = event.currentTarget;

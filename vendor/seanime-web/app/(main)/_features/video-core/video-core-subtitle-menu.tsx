@@ -1,4 +1,5 @@
 import { nativePlayer_stateAtom } from "@/app/(main)/_features/native-player/native-player.atoms"
+import { mediaCorePortalContainer } from "@/app/(main)/_features/media-core/media-core-menu" // Gum
 import { vc_subtitleManager } from "@/app/(main)/_features/video-core/video-core"
 import { vc_mediaCaptionsManager } from "@/app/(main)/_features/video-core/video-core"
 import { vc_menuOpen } from "@/app/(main)/_features/video-core/video-core-atoms"
@@ -118,7 +119,7 @@ export function VideoCoreSubtitleMenu({ inline, onPreferenceChange }: {
             <VideoCoreMenuTitle>Subtitles {(!!subtitleManager && !inline) && <Tooltip
                 trigger={<AiFillInfoCircle className="text-sm" />}
                 className="z-[150]"
-                portalContainer={isFullscreen ? (containerElement ?? undefined) : undefined}
+                portalContainer={mediaCorePortalContainer(isFullscreen, containerElement)} // Gum: see mediaCorePortalContainer
             >
                 You can add subtitles by dragging and dropping files onto the player.
             </Tooltip>}

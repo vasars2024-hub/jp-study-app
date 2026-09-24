@@ -1,6 +1,7 @@
 import { useSaveMediaPlayerSettings } from "@/api/hooks/settings.hooks"
 import { getSkipPatternError } from "@/app/(main)/_features/media-core/media-core-chapters"
 import { mediaCoreDefaultPreferences, mediaCorePreferencesAtom } from "@/app/(main)/_features/media-core/media-core-preferences"
+import { mediaCorePortalContainer } from "@/app/(main)/_features/media-core/media-core-menu" // Gum
 import { vc_subtitleManager } from "@/app/(main)/_features/video-core/video-core"
 import { vc_mediaCaptionsManager } from "@/app/(main)/_features/video-core/video-core"
 import { vc_audioManager } from "@/app/(main)/_features/video-core/video-core"
@@ -331,7 +332,8 @@ export function VideoCorePreferencesModal({ isWebPlayer }: { isWebPlayer: boolea
             onOpenChange={setOpen}
             contentClass="max-w-5xl focus:outline-none focus-visible:outline-none outline-none bg-[--background] backdrop-blur-sm z-[101]"
             overlayClass="z-[150] bg-black/50"
-            portalContainer={isFullscreen ? containerElement || undefined : undefined}
+            // Gum: inside the player in the media workspace too (see mediaCorePortalContainer).
+            portalContainer={mediaCorePortalContainer(isFullscreen, containerElement)}
         >
 
             <Tabs

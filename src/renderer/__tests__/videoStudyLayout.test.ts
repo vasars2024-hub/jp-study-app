@@ -231,8 +231,10 @@ describe('the surface declares its geometry once', () => {
 
   it('keeps the subtitle above the dock, with the transport bar as the floor', () => {
     expect(slice).toMatch(/--study-cue-bottom:\s*max\(9\.25rem,\s*calc\(var\(--study-dock-height\)/);
+    // The floor, plus the user's "Subtitle position" lift — added to the floor, never
+    // replacing it, so no setting can put the line under the dock.
     expect(block(css, '#media-workspace .study-cue-overlay'))
-      .toMatch(/bottom:\s*var\(--study-cue-bottom\)/);
+      .toMatch(/bottom:\s*calc\(\s*var\(--study-cue-bottom\)\s*\+/);
   });
 
   it('bounds the grammar card by the dock, not by the slice', () => {

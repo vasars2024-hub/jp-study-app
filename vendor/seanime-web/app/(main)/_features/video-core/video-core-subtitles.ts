@@ -80,6 +80,8 @@ export type VideoCoreActiveCue = {
 export type SubtitleManagerCueChangeEvent = CustomEvent<{ cues: VideoCoreActiveCue[], currentTimeMs: number }>
 export type SubtitleManagerDestroyedEvent = CustomEvent
 export type SubtitleManagerSettingsUpdatedEvent = CustomEvent<{ settings: VideoCoreSettings }>
+// Gum: new cues reached the event cache (see onSubtitleEvents).
+export type SubtitleManagerEventsAddedEvent = CustomEvent<{ trackNumbers: number[] }>
 
 interface VideoCoreSubtitleManagerEventMap {
     "trackselected": SubtitleManagerTrackSelectedEvent
@@ -89,6 +91,7 @@ interface VideoCoreSubtitleManagerEventMap {
     "destroyed": SubtitleManagerDestroyedEvent
     "settingsupdated": SubtitleManagerSettingsUpdatedEvent
     "cuechange": SubtitleManagerCueChangeEvent
+    "eventsadded": SubtitleManagerEventsAddedEvent
 }
 
 type CachedEvent = {
@@ -170,6 +173,8 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     private activeCues: VideoCoreActiveCue[] = []
     private activeCueKey = ""
     private readonly _onTimeUpdateForCues = () => this._updateActiveCues()
+    // Gum: bumped by every selectTrack/setNoTrack; only the newest selection may finish.
+    private _selectGeneration = 0
 
     constructor({
         videoElement,
@@ -339,7 +344,10 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
 
     // Sets the track to no track.
     setNoTrack() {
+        // Gum: "off" is a selection too, and it must cancel a pending one (see selectTrack).
+        this._selectGeneration += 1
         this.currentTrackNumber = NO_TRACK_NUMBER
+        this._updateActiveCues()
         this._disableNativeTextTracks()
         this.libassRenderer?.renderer?.setTrack(this.defaultSubtitleHeader)
         this.libassRenderer?.resize?.()
@@ -355,7 +363,19 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     // Selects a track by its number.
     async selectTrack(trackNumber: number) {
         subtitleLog.info("Track selection requested", trackNumber)
+        // Gum: selections race. The default pick made in the constructor awaits `_init()` (a
+        // JASSUB start-up that takes seconds on first use), and a user's pick made meanwhile
+        // awaits the same promise — so the OLDER call resumed first and then, after its own
+        // awaits, dispatched `trackselected` for the track the user had just left. The study
+        // overlay then believed the old track was primary while the manager rendered the new
+        // one (subtitle audit 6h: lines missing after switching the primary MKV track). Only
+        // the newest request may finish.
+        const generation = ++this._selectGeneration
         await this._init()
+        if (generation !== this._selectGeneration) {
+            subtitleLog.info("Track selection superseded", trackNumber)
+            return
+        }
 
         this.shouldTranslate = this.translationTargetLang
 
@@ -385,6 +405,10 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
         this._onSelectedTrackChanged?.(trackNumber)
 
         this.currentTrackNumber = track.number // update the current track number
+        // Gum: re-derive the on-screen cues NOW, from the new track. Without this the active
+        // cues (and the `cuechange` the study line reads) stayed the previous track's until
+        // the next `timeupdate` — forever, while paused.
+        this._updateActiveCues()
 
         /*
          * File track
@@ -394,7 +418,7 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
         // If it is, fetch/convert the content and add it to the libass renderer
         const fileTrack = this.fileTracks[trackNumber]
         if (fileTrack) {
-            this._handleFileTrack(trackNumber, fileTrack)
+            this._handleFileTrack(trackNumber, fileTrack, generation)
             return
         }
 
@@ -442,6 +466,8 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
             this.libassRenderer?.renderer?.setTrack(codecPrivate)
             // Apply customization to Default styles
             await this._applySubtitleCustomization()
+            // Gum: see the generation note at the top of this method.
+            if (generation !== this._selectGeneration) return
 
             this._populateEventTrack(trackNumber)
         }
@@ -588,6 +614,12 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     async onSubtitleEvents(events: MKVParser_SubtitleEvent[]) {
         const pgsEvents: any[] = []
         const assEvents: CachedEvent[] = []
+        // Gum: which tracks gained cues in this batch. The directstream sends events while it
+        // reads the file, so a line can reach the cache AFTER playback entered it. Nothing
+        // re-read the cache then: the active cues waited for the next `timeupdate` (never,
+        // while paused), and the study overlay's second line only re-listed its track on the
+        // PRIMARY track's `cuechange`, so a late English line could miss its whole slot.
+        const touched = new Set<number>()
 
         for (const event of events) {
             // Check if this is a PGS event
@@ -613,6 +645,7 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
             } else {
                 // Record the event
                 const { isNew, cachedEntry } = this._recordSubtitleEvent(event)
+                if (isNew) touched.add(event.trackNumber)
                 if (isNew && cachedEntry && event.trackNumber === this.currentTrackNumber && this.libassRenderer) {
                     assEvents.push(cachedEntry)
                 }
@@ -638,6 +671,13 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
                     this.libassRenderer.renderer.createEvent(cachedEntry.assEvent)
                 }
             }
+        }
+
+        // Gum: see `touched` above.
+        if (touched.size) {
+            if (touched.has(this.currentTrackNumber)) this._updateActiveCues()
+            const added: SubtitleManagerEventsAddedEvent = new CustomEvent("eventsadded", { detail: { trackNumbers: [...touched] } })
+            this.dispatchEvent(added)
         }
     }
 
@@ -749,12 +789,15 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
         this._onTracksLoaded?.(tracks)
     }
 
-    async addEventTrack(track: MKVParser_TrackInfo) {
+    // Gum: `select: false` mounts a track beside the current one. Gum's English helper line
+    // is a SECOND line; selecting it on mount (upstream's only behaviour) made it the study
+    // line and pushed the Japanese track the viewer was reading into the secondary slot.
+    async addEventTrack(track: MKVParser_TrackInfo, options?: { select?: boolean }) {
         subtitleLog.info("Subtitle track added", track)
         this._addEventTrack(track)
         this._storeEventTrackStyles()
         // Select the track
-        await this.selectTrack(track.number)
+        if (options?.select !== false) await this.selectTrack(track.number)
         this.libassRenderer?.resize?.()
         this.pgsRenderer?.resize()
 
@@ -1241,7 +1284,7 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
 
     // Fetches the track's content and converts it to ASS.
     // If the content is already fetched, it will load it.
-    private async _handleFileTrack(trackNumber: number, fileTrack: { info: VideoCore_VideoSubtitleTrack, content: string | null }) {
+    private async _handleFileTrack(trackNumber: number, fileTrack: { info: VideoCore_VideoSubtitleTrack, content: string | null }, generation?: number) {
         subtitleLog.info("Handling file track", trackNumber, fileTrack.info)
 
         if (!this.fetchAndConvertToASS) {
@@ -1256,6 +1299,13 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
             await this._applySubtitleCustomization()
             await this.libassRenderer?.resize?.()
             this.pgsRenderer?.resize()
+            // Gum: announce the re-selection too. This branch used to return without
+            // `trackselected`, so going back to a file track already loaded once left every
+            // listener (the study line, the transcript, the track pickers) on the track the
+            // user had just left.
+            if (generation !== undefined && generation !== this._selectGeneration) return
+            const reselectedEvent: SubtitleManagerTrackSelectedEvent = new CustomEvent("trackselected", { detail: { trackNumber, kind: "file" } })
+            this.dispatchEvent(reselectedEvent)
             return
         }
 
@@ -1298,6 +1348,9 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
                 toast.error("Failed to load subtitle track: " + error)
             }
         }
+
+        // Gum: a newer selection made during the fetch/convert above owns the announcement.
+        if (generation !== undefined && generation !== this._selectGeneration) return
 
         const selectedEvent: SubtitleManagerTrackSelectedEvent = new CustomEvent("trackselected", { detail: { trackNumber, kind: "file" } })
         this.dispatchEvent(selectedEvent)

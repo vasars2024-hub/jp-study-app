@@ -9,6 +9,25 @@ import { AiFillInfoCircle } from "react-icons/ai"
 import { LuCheck, LuChevronLeft, LuChevronRight } from "react-icons/lu"
 import { MediaCoreSelectOption } from "./media-core.types"
 
+/**
+ * Gum: where a player popover/modal portals to.
+ *
+ * Upstream portals into the player only in fullscreen and into `document.body` otherwise.
+ * In Gum the player lives inside `#media-workspace`, a fixed full-window layer (z 80) whose
+ * scoped stylesheet is the only place these Tailwind classes exist — so a body portal opened
+ * BEHIND the player, unstyled (subtitle audit 13: the CC menu and the settings menu with
+ * "Subtitle Delay" / "Caption Styles" were painted under the video). Inside the workspace the
+ * player's own container is always the right parent, fullscreen or not.
+ */
+export function mediaCorePortalContainer(
+    isFullscreen: boolean | undefined,
+    containerElement: HTMLElement | null | undefined,
+): HTMLElement | undefined {
+    if (!containerElement) return undefined
+    if (isFullscreen) return containerElement
+    return containerElement.closest?.("#media-workspace") ? containerElement : undefined
+}
+
 export interface MediaCoreMenuProps {
     name: string
     trigger: React.ReactElement
@@ -69,7 +88,7 @@ export function MediaCoreMenu(props: MediaCoreMenuProps) {
                     "bg-black/85 rounded-xl p-3 backdrop-blur-sm w-[20rem] z-[100]",
                     className,
                 )}
-                portalContainer={isFullscreen ? containerElement || undefined : undefined}
+                portalContainer={mediaCorePortalContainer(isFullscreen, containerElement)}
             >
                 <div className="h-auto" data-vc-element="menu-drawer-body">
                     {children}
@@ -94,7 +113,7 @@ export function MediaCoreMenu(props: MediaCoreMenuProps) {
                 "bg-black/85 rounded-xl p-3 backdrop-blur-sm w-[20rem] z-[100]",
                 className,
             )}
-            portalContainer={isFullscreen ? containerElement || undefined : undefined}
+            portalContainer={mediaCorePortalContainer(isFullscreen, containerElement)}
         >
             <div className="h-auto" data-vc-element="menu-body">
                 {children}
@@ -369,7 +388,7 @@ export function MediaCoreSettingSelect(props: MediaCoreSettingSelectProps) {
                                 {option.description && (
                                     <Tooltip
                                         trigger={<AiFillInfoCircle className="text-sm" />}
-                                        portalContainer={isFullscreen ? containerElement || undefined : undefined}
+                                        portalContainer={mediaCorePortalContainer(isFullscreen, containerElement)}
                                         className="z-[150]"
                                     >
                                         {option.description}

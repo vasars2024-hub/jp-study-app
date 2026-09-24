@@ -66,6 +66,47 @@ export const SUBTITLE_FONT_CHOICES = Object.keys(
 ) as SubtitleFontChoice[];
 
 /**
+ * The cue colours offered as one-click swatches. The picker beside them takes any other
+ * `#rrggbb`; the empty string means "the stylesheet's own off-white", which is what
+ * every user who never touches the control keeps.
+ *
+ * White, a subtitle yellow and a light blue are the three a subtitle user actually asks
+ * for: yellow survives a bright snow frame that white vanishes into, and light blue is
+ * the usual way to tell a second speaker or a second language apart.
+ */
+export const SUBTITLE_COLOR_PRESETS = ['#ffffff', '#ffe45c', '#9fd8ff'] as const;
+
+/** Outline colours that read as an outline, not as a second text colour. */
+export const SUBTITLE_OUTLINE_COLOR_PRESETS = ['#000000', '#1c2a4a', '#3a2a00'] as const;
+
+/**
+ * How far above its floor the subtitle band can be lifted, as a percentage of the picture
+ * that is still free above that floor. Past 40 % the line sits in the middle of the frame,
+ * where "Top of screen" is the better answer anyway.
+ */
+export const SUBTITLE_POSITION_MAX = 40;
+/** One press of the position shortcut. */
+export const SUBTITLE_POSITION_STEP = 5;
+
+/** Second-line size as a percentage of the primary line, and its bounds. */
+export const SECONDARY_SUB_SCALE_DEFAULT = 80;
+export const SECONDARY_SUB_SCALE_MIN = 50;
+export const SECONDARY_SUB_SCALE_MAX = 120;
+
+/**
+ * A stored colour, or `''` for "use the stylesheet".
+ *
+ * Only `#rrggbb` is accepted, lower-cased. `<input type="color">` produces exactly that, so
+ * the one real writer can never be refused, and a hand-edited `red` or `rgb(…)` in the stored
+ * JSON falls back to the default instead of reaching an inline style unchecked.
+ */
+export function normalizeSubtitleColor(value: unknown): string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim())
+    ? value.trim().toLowerCase()
+    : '';
+}
+
+/**
  * Narrow a raw `<select>` value to a font choice, falling back the same way the
  * preference normalizer does.
  *
@@ -119,6 +160,22 @@ export interface VideoCoreStudyPreferences {
   transcriptPanel: boolean;
   /** Seconds the rewind / fast-forward shortcuts move, 1–60. */
   seekStepSec: number;
+  /**
+   * Lift of the subtitle band above its floor, 0–`SUBTITLE_POSITION_MAX` percent of the
+   * picture still free above that floor. The floor itself (study bar, transport, bottom
+   * dock — `--study-cue-bottom`) is never negotiable: 0 means "as low as it may go".
+   */
+  subtitlePosition: number;
+  /** Put the subtitle band at the top of the picture instead. Overrides the lift. */
+  subtitleAtTop: boolean;
+  /** Cue text colour, `#rrggbb`, or `''` for the stylesheet's off-white. */
+  subtitleColor: string;
+  /** Outline colour, `#rrggbb`, or `''` for black. Ignored while the outline is off. */
+  subtitleOutlineColor: string;
+  /** Second line size as a percentage of the primary line, 50–120. */
+  secondarySubScale: number;
+  /** Second line colour, `#rrggbb`, or `''` for the stylesheet's pale blue-white. */
+  secondarySubColor: string;
   [key: string]: unknown;
 }
 
@@ -284,7 +341,438 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     seekStepSec: typeof raw.seekStepSec === 'number' && Number.isFinite(raw.seekStepSec)
       ? Math.round(Math.max(1, Math.min(60, raw.seekStepSec)))
       : 5,
+    subtitlePosition: typeof raw.subtitlePosition === 'number'
+      && Number.isFinite(raw.subtitlePosition)
+      ? Math.round(Math.max(0, Math.min(SUBTITLE_POSITION_MAX, raw.subtitlePosition)))
+      : 0,
+    subtitleAtTop: raw.subtitleAtTop === true,
+    subtitleColor: normalizeSubtitleColor(raw.subtitleColor),
+    subtitleOutlineColor: normalizeSubtitleColor(raw.subtitleOutlineColor),
+    secondarySubScale: typeof raw.secondarySubScale === 'number'
+      && Number.isFinite(raw.secondarySubScale)
+      ? Math.round(Math.max(
+        SECONDARY_SUB_SCALE_MIN,
+        Math.min(SECONDARY_SUB_SCALE_MAX, raw.secondarySubScale),
+      ))
+      : SECONDARY_SUB_SCALE_DEFAULT,
+    secondarySubColor: normalizeSubtitleColor(raw.secondarySubColor),
   };
+}
+
+/**
+ * Every preference that changes how the subtitle LOOKS or where it sits, and nothing that
+ * changes what it says or what the study tools do. This is exactly what "Reset subtitle
+ * appearance" puts back: a reset that also switched furigana off or cleared the second-line
+ * language would be a reset of the user's study setup, which nobody asked for.
+ */
+export const SUBTITLE_APPEARANCE_KEYS = [
+  'subtitleFontSize',
+  'subtitleBgOpacity',
+  'subtitleFontFamily',
+  'subtitleFontWeight',
+  'subtitleOutline',
+  'subtitlePosition',
+  'subtitleAtTop',
+  'subtitleColor',
+  'subtitleOutlineColor',
+  'secondarySubScale',
+  'secondarySubColor',
+] as const satisfies readonly (keyof VideoCoreStudyPreferences)[];
+
+/** The preferences with every appearance key back at its default and everything else kept. */
+export function resetSubtitleAppearance(
+  preferences: VideoCoreStudyPreferences,
+): VideoCoreStudyPreferences {
+  const defaults = normalizeVideoCoreStudyPreferences(null);
+  const next: VideoCoreStudyPreferences = { ...preferences };
+  for (const key of SUBTITLE_APPEARANCE_KEYS) {
+    (next as Record<string, unknown>)[key] = defaults[key];
+  }
+  return normalizeVideoCoreStudyPreferences(next);
+}
+
+/** True when any appearance key differs from its default — what enables the reset button. */
+export function subtitleAppearanceIsDefault(preferences: VideoCoreStudyPreferences): boolean {
+  const defaults = normalizeVideoCoreStudyPreferences(null);
+  return SUBTITLE_APPEARANCE_KEYS.every((key) => preferences[key] === defaults[key]);
+}
+
+/**
+ * One press of "subtitles up" (+1) or "down" (−1).
+ *
+ * The lift and the top placement read as one ladder: up past the highest lift goes to the
+ * top of the picture, and down from the top comes back to the highest lift, so the two
+ * shortcuts can reach every placement the sheet can and never strand the line at the top.
+ */
+export function nudgeSubtitlePosition(
+  preferences: Pick<VideoCoreStudyPreferences, 'subtitlePosition' | 'subtitleAtTop'>,
+  direction: 1 | -1,
+): { subtitlePosition: number; subtitleAtTop: boolean } {
+  if (preferences.subtitleAtTop) {
+    return direction > 0
+      ? { subtitlePosition: preferences.subtitlePosition, subtitleAtTop: true }
+      : { subtitlePosition: SUBTITLE_POSITION_MAX, subtitleAtTop: false };
+  }
+  if (direction > 0 && preferences.subtitlePosition >= SUBTITLE_POSITION_MAX) {
+    return { subtitlePosition: SUBTITLE_POSITION_MAX, subtitleAtTop: true };
+  }
+  const next = preferences.subtitlePosition + direction * SUBTITLE_POSITION_STEP;
+  return {
+    subtitlePosition: Math.max(0, Math.min(SUBTITLE_POSITION_MAX, next)),
+    subtitleAtTop: false,
+  };
+}
+
+/**
+ * The CSS custom properties the cue overlay is positioned with. See `mediaWorkspace.css`
+ * (`.study-cue-overlay`): the band's `bottom` is its floor plus this fraction of the free
+ * height above the floor, so no value here can put the line under the bar, the transport
+ * or a bottom panel — the floor is added, never replaced.
+ */
+export function subtitlePlacementStyle(
+  preferences: Pick<VideoCoreStudyPreferences, 'subtitlePosition' | 'subtitleAtTop'>,
+): Record<string, string> {
+  return {
+    '--study-cue-lift': String(
+      Math.max(0, Math.min(SUBTITLE_POSITION_MAX, preferences.subtitlePosition)) / 100,
+    ),
+  };
+}
+
+/**
+ * `text-shadow` for a subtitle line in a given outline colour: the four-corner outline plus
+ * the soft drop the stylesheet uses, so a coloured outline keeps the same weight and only
+ * changes hue. `thin` is the second line's lighter 1px outline.
+ */
+export function subtitleOutlineShadow(color: string, thin = false): string {
+  const hex = normalizeSubtitleColor(color) || '#000000';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const c = `rgb(${r} ${g} ${b} / 0.95)`;
+  const d = thin ? 1 : 2;
+  return [
+    `-${d}px -${d}px 2px ${c}`,
+    `${d}px -${d}px 2px ${c}`,
+    `-${d}px ${d}px 2px ${c}`,
+    `${d}px ${d}px 2px ${c}`,
+    `0 ${thin ? 2 : 3}px ${thin ? 5 : 6}px ${c}`,
+  ].join(', ');
+}
+
+/**
+ * Whether dual subtitles are on but no second line CAN appear, so the overlay should say so
+ * once instead of leaving a blank where the user expects a translation.
+ *
+ * "Can": no other track to show, and the translator either failed (no local model, no key)
+ * or has nothing to do because the chosen second language IS the study language. A second
+ * line that is merely between two cues is not this — `hasCues` is about the track, not the
+ * moment, so the notice is mounted once per file and its CSS fade runs once.
+ */
+export function secondaryLineUnavailable(input: {
+  dualSubs: boolean;
+  hasCues: boolean;
+  hasSecondaryTrack: boolean;
+  secondaryText: string;
+  translatorFailed: boolean;
+  secondaryLang: string;
+  studyLang: string;
+}): boolean {
+  if (!input.dualSubs || !input.hasCues || input.hasSecondaryTrack || input.secondaryText) {
+    return false;
+  }
+  return input.translatorFailed
+    || shortLangTag(input.secondaryLang) === shortLangTag(input.studyLang);
+}
+
+/* ------------------------------------------------------------------------------ *
+ * Per-file subtitle delay
+ * ------------------------------------------------------------------------------ */
+
+/**
+ * A subtitle delay belongs to a FILE, not to the player: the release that is 0.4 s late is
+ * late every time it is opened and no other file is. Keyed exactly like the resume position
+ * (`videoCoreResumeKey`), so the two can never disagree about which file this is.
+ */
+export const VIDEO_CORE_SUB_DELAY_STORAGE_KEY = 'jp-video-core-sub-delay-v1';
+export const VIDEO_CORE_SUB_DELAY_LIMIT = 200;
+
+export interface VideoCoreSubtitleDelayEntry {
+  key: string;
+  delaySec: number;
+  updatedAt: number;
+}
+
+export function normalizeVideoCoreSubtitleDelays(value: unknown): VideoCoreSubtitleDelayEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-VIDEO_CORE_SUB_DELAY_LIMIT).flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const raw = item as Partial<VideoCoreSubtitleDelayEntry>;
+    const key = resumeText(raw.key);
+    if (
+      !key
+      || typeof raw.delaySec !== 'number'
+      || !Number.isFinite(raw.delaySec)
+      || typeof raw.updatedAt !== 'number'
+      || !Number.isFinite(raw.updatedAt)
+    ) return [];
+    const delaySec = Math.round(
+      Math.max(-VIDEO_CORE_TIMING_MAX_DELAY_SEC, Math.min(VIDEO_CORE_TIMING_MAX_DELAY_SEC, raw.delaySec)) * 1000,
+    ) / 1000;
+    return [{ key, delaySec, updatedAt: Math.max(0, Math.round(raw.updatedAt)) }];
+  });
+}
+
+/**
+ * Store one file's delay. A delay of zero REMOVES the entry rather than storing a zero: a
+ * reset is the file going back to having no correction, and a list that filled with zeros
+ * would evict real corrections at the limit.
+ */
+export function upsertVideoCoreSubtitleDelay(
+  entries: readonly VideoCoreSubtitleDelayEntry[],
+  key: string,
+  delaySec: number,
+  now = Date.now(),
+): VideoCoreSubtitleDelayEntry[] {
+  const kept = normalizeVideoCoreSubtitleDelays(entries).filter((entry) => entry.key !== key);
+  const next = normalizeVideoCoreSubtitleDelays([{ key, delaySec, updatedAt: now }])[0];
+  if (!next || next.delaySec === 0) return kept;
+  return [...kept, next].slice(-VIDEO_CORE_SUB_DELAY_LIMIT);
+}
+
+export function resolveVideoCoreSubtitleDelay(
+  entries: readonly VideoCoreSubtitleDelayEntry[],
+  key: string,
+): number {
+  if (!key) return 0;
+  return normalizeVideoCoreSubtitleDelays(entries).find((entry) => entry.key === key)?.delaySec ?? 0;
+}
+
+/* ------------------------------------------------------------------------------ *
+ * Which track is the study line
+ * ------------------------------------------------------------------------------ */
+
+/** What a track looks like to the choice below — `NormalizedTrackInfo`, minus the vendor import. */
+export interface StudyTrackCandidate {
+  number: number;
+  language?: string;
+  languageIETF?: string;
+  label?: string;
+  default?: boolean;
+  forced?: boolean;
+}
+
+/**
+ * Language words that may appear in a track LABEL, per two-letter code. A sidecar track has
+ * no language field at all — its label is the file name (`… - 04.ja`, `… 01.en.srt`) — so
+ * the tag has to be read out of the name, the way every player reads `.ja.srt`.
+ */
+const LABEL_LANG_WORDS: Readonly<Record<string, readonly string[]>> = {
+  ja: ['ja', 'jp', 'jpn', 'japanese', 'jap'],
+  en: ['en', 'eng', 'english'],
+  zh: ['zh', 'chi', 'zho', 'chs', 'cht', 'chinese', 'sc', 'tc'],
+  ko: ['ko', 'kor', 'korean'],
+  ru: ['ru', 'rus', 'russian'],
+  es: ['es', 'spa', 'spanish'],
+  fr: ['fr', 'fre', 'fra', 'french'],
+  de: ['de', 'ger', 'deu', 'german'],
+};
+
+const LABEL_SCRIPT_LANGS: readonly [RegExp, string][] = [
+  [/日本語|にほんご|[぀-ヿ]/u, 'ja'],
+  [/中文|简体|繁體|繁体|简中|繁中/u, 'zh'],
+  [/한국어|[가-힯]/u, 'ko'],
+  [/русск/iu, 'ru'],
+];
+
+/**
+ * A track's language as a two-letter code, from its language field when it has one and from
+ * its label otherwise. `''` when neither says.
+ *
+ * The label is split on the punctuation file names use (`.`, `_`, `-`, spaces, brackets) and
+ * each piece compared whole, so `Camp` never reads as anything and `.ja` at the end of
+ * `[Test] Yuru Camp - 04.ja` does.
+ */
+export function studyTrackLanguage(track: StudyTrackCandidate): string {
+  const rawField = shortLangTag(track.language || track.languageIETF);
+  const fromField = rawField === 'jp' ? 'ja' : rawField;
+  // Only a code this list knows is trusted over the label: `und` (undetermined) is what an
+  // untagged Matroska stream carries, and it must not hide `Japanese` in the track's name.
+  if (fromField && fromField in LABEL_LANG_WORDS) return fromField;
+  const label = track.label ?? '';
+  for (const [pattern, code] of LABEL_SCRIPT_LANGS) {
+    if (pattern.test(label)) return code;
+  }
+  const pieces = label.toLowerCase().split(/[\s._\-[\]()]+/).filter(Boolean);
+  // From the END: a file name's language tag is its last word before the extension, and a
+  // series title earlier in the name (`Tokyo Sonata`) must not outvote it.
+  for (let i = pieces.length - 1; i >= 0; i -= 1) {
+    const piece = pieces[i];
+    if (piece === 'srt' || piece === 'ass' || piece === 'ssa' || piece === 'vtt') continue;
+    for (const [code, words] of Object.entries(LABEL_LANG_WORDS)) {
+      if (words.includes(piece)) return code;
+    }
+  }
+  return fromField === 'un' ? '' : fromField;
+}
+
+/** A user's explicit primary-track choice, remembered for a file or a series. */
+export interface VideoCoreTrackChoice {
+  key: string;
+  /** Two-letter language of the chosen track, `''` when it had none. */
+  lang: string;
+  /** The chosen track's label — the tiebreak between two tracks in one language. */
+  label: string;
+  /** The user switched subtitles OFF. */
+  off: boolean;
+  updatedAt: number;
+}
+
+export const VIDEO_CORE_TRACK_CHOICE_STORAGE_KEY = 'jp-video-core-sub-track-v1';
+export const VIDEO_CORE_TRACK_CHOICE_LIMIT = 200;
+
+export function normalizeVideoCoreTrackChoices(value: unknown): VideoCoreTrackChoice[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-VIDEO_CORE_TRACK_CHOICE_LIMIT).flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const raw = item as Partial<VideoCoreTrackChoice>;
+    const key = resumeText(raw.key);
+    if (!key || typeof raw.updatedAt !== 'number' || !Number.isFinite(raw.updatedAt)) return [];
+    return [{
+      key,
+      lang: typeof raw.lang === 'string' ? shortLangTag(raw.lang) : '',
+      label: resumeText(raw.label, 240),
+      off: raw.off === true,
+      updatedAt: Math.max(0, Math.round(raw.updatedAt)),
+    }];
+  });
+}
+
+/**
+ * The keys a choice is remembered under: the file, and the series it belongs to. A choice made
+ * on episode 3 then carries to episode 4 (same series), while a choice made for one file of a
+ * folder of unrelated videos still carries to its neighbours — which is what "series" means for
+ * a file the library has not matched to anything.
+ */
+export function videoCoreTrackChoiceKeys(source: VideoCoreResumeSource): string[] {
+  const fileKey = videoCoreResumeKey(source);
+  const keys = fileKey ? [fileKey] : [];
+  if (Number.isFinite(source.mediaId)) {
+    keys.push(`series:media:${Math.round(source.mediaId as number)}`);
+  } else {
+    const local = resumeText(source.localFilePath).replace(/\\/g, '/').toLocaleLowerCase('en-US');
+    const cut = local.lastIndexOf('/');
+    if (cut > 0) keys.push(`series:dir:${local.slice(0, cut)}`);
+  }
+  return keys;
+}
+
+export function upsertVideoCoreTrackChoice(
+  choices: readonly VideoCoreTrackChoice[],
+  keys: readonly string[],
+  choice: { lang: string; label: string; off: boolean },
+  now = Date.now(),
+): VideoCoreTrackChoice[] {
+  const wanted = new Set(keys.filter(Boolean));
+  const kept = normalizeVideoCoreTrackChoices(choices).filter((entry) => !wanted.has(entry.key));
+  const added = normalizeVideoCoreTrackChoices([...wanted].map((key) => ({ key, ...choice, updatedAt: now })));
+  return [...kept, ...added].slice(-VIDEO_CORE_TRACK_CHOICE_LIMIT);
+}
+
+/** The most specific remembered choice: the file's own, else its series'. */
+export function resolveVideoCoreTrackChoice(
+  choices: readonly VideoCoreTrackChoice[],
+  keys: readonly string[],
+): VideoCoreTrackChoice | null {
+  const normalized = normalizeVideoCoreTrackChoices(choices);
+  for (const key of keys) {
+    const hit = normalized.find((entry) => entry.key === key);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Which track should be the STUDY line: `null` for "subtitles off", a track number, or
+ * `undefined` for "no opinion — leave the player's pick alone".
+ *
+ * 1. The user's remembered choice for this file or series wins, matched by label first (the
+ *    same release names its tracks the same way episode to episode) and by language second.
+ * 2. Otherwise a track in the study language, preferring a full track over a forced
+ *    (signs-only) one and the muxer's default among equals.
+ * 3. Otherwise no opinion. A file with no study-language track keeps whatever VideoCore
+ *    chose, because a second guess among non-study tracks has nothing better to go on.
+ *
+ * With no remembered choice, a `current` track that is ALREADY in the study language is kept:
+ * a Whisper transcription or a downloaded Japanese track the user just switched to is as
+ * much the study line as the muxer's default, and swapping it back would undo their work.
+ */
+export function pickStudyPrimaryTrack(
+  tracks: readonly StudyTrackCandidate[],
+  studyLang: string,
+  remembered: Pick<VideoCoreTrackChoice, 'lang' | 'label' | 'off'> | null,
+  current: number | null = null,
+): number | null | undefined {
+  if (!tracks.length) return undefined;
+  if (remembered) {
+    if (remembered.off) return null;
+    const byLabel = remembered.label
+      ? tracks.find((track) => (track.label ?? '') === remembered.label)
+      : undefined;
+    if (byLabel) return byLabel.number;
+    const byLang = remembered.lang
+      ? tracks.find((track) => studyTrackLanguage(track) === remembered.lang && !track.forced)
+        ?? tracks.find((track) => studyTrackLanguage(track) === remembered.lang)
+      : undefined;
+    if (byLang) return byLang.number;
+  }
+  const study = shortLangTag(studyLang);
+  const inStudyLang = tracks.filter((track) => studyTrackLanguage(track) === study);
+  if (!inStudyLang.length) return undefined;
+  if (!remembered && current != null && inStudyLang.some((track) => track.number === current)) {
+    return undefined;
+  }
+  const full = inStudyLang.filter((track) => !track.forced);
+  const pool = full.length ? full : inStudyLang;
+  return (pool.find((track) => track.default) ?? pool[0]).number;
+}
+
+/**
+ * VideoCore's preferred-subtitle-language setting, led by the study language.
+ *
+ * Upstream ships `en,eng,english`, which is why a release carrying both a Japanese and an
+ * English track opened on the English one: exactly backwards for a study player. The study
+ * language goes first and whatever the setting already held stays behind it as the fallback,
+ * so a file with no study-language track still opens on the user's second choice rather than
+ * on nothing.
+ *
+ * Seeded ONCE per study language (`seededFor`): a user who then edits the setting in
+ * VideoCore's own preferences keeps their edit.
+ */
+const STUDY_LANG_SUBTITLE_PREFS: Readonly<Record<string, string>> = {
+  ja: 'ja,jpn,japanese',
+  zh: 'zh,chi,zho,chinese',
+};
+
+export const VIDEO_CORE_SUB_LANG_SEED_STORAGE_KEY = 'jp-video-core-sub-lang-seed-v1';
+
+export function seedPreferredSubtitleLanguage(
+  current: string | undefined,
+  studyLang: string,
+  seededFor: string | null,
+): string | null {
+  const study = shortLangTag(studyLang);
+  const lead = STUDY_LANG_SUBTITLE_PREFS[study];
+  if (!lead || seededFor === study) return null;
+  const existing = (current ?? 'en,eng,english')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const leadParts = lead.split(',');
+  const rest = existing.filter((part) => (
+    !leadParts.includes(part.toLowerCase()) && part.toLowerCase() !== 'none'
+  ));
+  return [...leadParts, ...rest].join(',');
 }
 
 /**

@@ -35,9 +35,16 @@ import { WHISPER_MODEL_SPECS, type WhisperModelTier } from '../shared/whisperMod
 import type { WhisperDevice } from '../renderer/whisperSettings';
 import {
   clampStudyPlaybackRate,
+  nudgeSubtitlePosition,
   SECONDARY_SUB_LANG_LABELS,
   SECONDARY_SUB_LANGS,
+  SECONDARY_SUB_SCALE_MAX,
+  SECONDARY_SUB_SCALE_MIN,
+  SUBTITLE_COLOR_PRESETS,
   SUBTITLE_FONT_CHOICES,
+  SUBTITLE_OUTLINE_COLOR_PRESETS,
+  SUBTITLE_POSITION_MAX,
+  subtitleAppearanceIsDefault,
   toSubtitleFontChoice,
   type VideoCoreStudyPreferences,
 } from '../shared/videoCoreStudy';
@@ -80,6 +87,16 @@ export interface StudyBottomBarProps {
   ) => void;
   subtitleDelaySec: number;
   onChangeSubtitleDelay: (delta: number) => void;
+  /** Back to 0 s, and forget this file's stored delay. Optional for older callers. */
+  onResetSubtitleDelay?: () => void;
+  /** Every subtitle-appearance preference back to its default (`resetSubtitleAppearance`). */
+  onResetSubtitleAppearance?: () => void;
+  /**
+   * The key a command is bound to right now (`''` when unbound), for tooltips. Passed in
+   * rather than imported: the shortcut store pulls the music bus, which talks to the main
+   * process at import, and this bar is imported by node-env tests for its pure helpers.
+   */
+  shortcutKeysFor?: (commandId: string) => string;
 
   /* study */
   pauseOnLookup: boolean;
@@ -168,6 +185,72 @@ export function cueControlTitleKey(
     : 'mediaWorkspace.study.transcriptEmpty';
 }
 
+/**
+ * One colour setting: "Default", the preset swatches, and a picker for any other colour.
+ *
+ * Buttons rather than a `<select>`: a colour is chosen by looking at it. `aria-pressed`
+ * marks the current swatch; the picker shows the current colour even when it is a preset.
+ */
+export function SubtitleColorChoice({
+  pref,
+  labelKey,
+  value,
+  presets,
+  fallback,
+  onChange,
+}: {
+  pref: string;
+  labelKey: string;
+  value: string;
+  presets: readonly string[];
+  /** What `''` looks like, so the picker opens on the colour actually on screen. */
+  fallback: string;
+  onChange: (value: string) => void;
+}): React.ReactElement {
+  const { t } = useT();
+  const label = t(labelKey);
+  return (
+    <div
+      className="study-tool-colors"
+      role="group"
+      aria-label={label}
+      data-study-pref={pref}
+      data-study-value={value || 'default'}
+    >
+      <span className="study-tool-colors-label">{label}</span>
+      <button
+        type="button"
+        className="study-tool-swatch-default"
+        aria-pressed={!value}
+        onClick={() => onChange('')}
+      >
+        {t('mediaWorkspace.study.colorDefault')}
+      </button>
+      {presets.map((color) => (
+        <button
+          key={color}
+          type="button"
+          className="study-tool-swatch"
+          data-color={color}
+          aria-pressed={value === color}
+          aria-label={label + ' ' + color}
+          title={color}
+          style={{ background: color }}
+          onClick={() => onChange(color)}
+        />
+      ))}
+      <input
+        type="color"
+        className="study-tool-swatch-custom"
+        aria-label={t('mediaWorkspace.study.colorCustomFor', { name: label })}
+        title={t('mediaWorkspace.study.colorCustom')}
+        value={value || fallback}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    </div>
+  );
+}
+
 export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactElement {
   const { t } = useT();
   const { doc, layout, idle, dispatch, trigger, isVisible, customizing } = useStudyWorkspace();
@@ -176,6 +259,22 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
   const {
     preferences, updatePreference, video, subtitleDelaySec, onChangeSubtitleDelay,
   } = props;
+
+  /**
+   * "Shortcut: X" for a bound command, nothing for an unbound one — read from the live
+   * shortcut store, so a user who rebinds a key sees their key.
+   */
+  const { shortcutKeysFor } = props;
+  const shortcutTitle = React.useCallback((commandId: string): string | undefined => {
+    const keys = shortcutKeysFor?.(commandId) ?? '';
+    return keys ? t('mediaWorkspace.study.shortcutHint', { key: keys }) : undefined;
+  }, [shortcutKeysFor, t]);
+
+  const movePosition = React.useCallback((direction: 1 | -1) => {
+    const next = nudgeSubtitlePosition(preferences, direction);
+    updatePreference('subtitlePosition', next.subtitlePosition);
+    updatePreference('subtitleAtTop', next.subtitleAtTop);
+  }, [preferences, updatePreference]);
 
   const toggle = React.useCallback((category: Category) => {
     setOpen((current) => (current === category ? null : category));
@@ -307,7 +406,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
             <div className="study-tool-cluster" role="group" aria-label={t('mediaWorkspace.study.subtitleOffset')}>
               <button
                 type="button"
-                title={t('mediaWorkspace.study.shortcutHint', { key: ';' })}
+                title={shortcutTitle('video.subEarlier')}
                 onClick={() => onChangeSubtitleDelay(-0.1)}
               >
                 {t('mediaWorkspace.study.subsOffsetStep', { amount: '−0.1' })}
@@ -317,12 +416,24 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               </output>
               <button
                 type="button"
-                title={t('mediaWorkspace.study.shortcutHint', { key: "'" })}
+                title={shortcutTitle('video.subLater')}
                 onClick={() => onChangeSubtitleDelay(0.1)}
               >
                 {t('mediaWorkspace.study.subsOffsetStep', { amount: '+0.1' })}
               </button>
             </div>
+            {props.onResetSubtitleDelay && (
+              <button
+                type="button"
+                data-study-action="reset-subtitle-delay"
+                disabled={subtitleDelaySec === 0}
+                title={shortcutTitle('video.subDelayReset')}
+                onClick={props.onResetSubtitleDelay}
+              >
+                {t('mediaWorkspace.study.resetSubtitleDelay')}
+              </button>
+            )}
+            <span className="study-tool-note">{t('mediaWorkspace.study.subtitleDelayPerFile')}</span>
           </StudyToolGroup>
         </StudyToolSheet>
       )}
@@ -337,14 +448,15 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.japaneseSubs')}
             </label>
-            <label>
+            <label title={shortcutTitle('video.toggleDualSubs')}>
               <input
                 type="checkbox"
+                data-study-pref="dualSubs"
                 checked={preferences.dualSubs}
                 onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.dualSubs')}
             </label>
-            <label>
+            <label title={shortcutTitle('video.toggleFurigana')}>
               <input
                 type="checkbox"
                 data-study-pref="furigana"
@@ -391,7 +503,9 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               <input
                 type="checkbox"
                 data-study-pref="transcriptPanel"
-                checked={preferences.transcriptPanel}
+                // What is on screen: the Transcript layout shows the rail with the
+                // preference off, and an unticked box beside a visible rail is a lie.
+                checked={preferences.transcriptPanel || isVisible('transcript')}
                 onChange={(event) => {
                   updatePreference('transcriptPanel', event.currentTarget.checked);
                   if (event.currentTarget.checked) trigger('transcript-open');
@@ -648,6 +762,106 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => updatePreference('cueTimingReadout', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.cueTimingReadout')}
             </label>
+            <SubtitleColorChoice
+              pref="subtitleColor"
+              labelKey="mediaWorkspace.study.subtitleColor"
+              value={preferences.subtitleColor}
+              presets={SUBTITLE_COLOR_PRESETS}
+              fallback="#f5f4f7"
+              onChange={(value) => updatePreference('subtitleColor', value)}
+            />
+            <SubtitleColorChoice
+              pref="subtitleOutlineColor"
+              labelKey="mediaWorkspace.study.subtitleOutlineColor"
+              value={preferences.subtitleOutlineColor}
+              presets={SUBTITLE_OUTLINE_COLOR_PRESETS}
+              fallback="#000000"
+              onChange={(value) => updatePreference('subtitleOutlineColor', value)}
+            />
+          </StudyToolGroup>
+
+          <StudyToolGroup labelKey="mediaWorkspace.study.subtitlePlacementGroup">
+            <label
+              className="study-tool-slider"
+              title={[shortcutTitle('video.subPositionUp'), shortcutTitle('video.subPositionDown')]
+                .filter(Boolean).join(' / ') || undefined}
+            >
+              {t('mediaWorkspace.study.subtitlePosition')}
+              <input
+                type="range"
+                min={0}
+                max={SUBTITLE_POSITION_MAX}
+                data-study-pref="subtitlePosition"
+                value={preferences.subtitlePosition}
+                disabled={preferences.subtitleAtTop}
+                onChange={(event) => updatePreference('subtitlePosition', Number(event.currentTarget.value))}
+                aria-label={t('mediaWorkspace.study.subtitlePosition')}
+              />
+              <span>{preferences.subtitlePosition}%</span>
+            </label>
+            <div className="study-tool-cluster" role="group" aria-label={t('mediaWorkspace.study.subtitlePosition')}>
+              <button
+                type="button"
+                data-study-action="subtitle-position-down"
+                title={shortcutTitle('video.subPositionDown')}
+                disabled={!preferences.subtitleAtTop && preferences.subtitlePosition === 0}
+                onClick={() => movePosition(-1)}
+              >
+                {t('mediaWorkspace.study.subtitleLower')}
+              </button>
+              <button
+                type="button"
+                data-study-action="subtitle-position-up"
+                title={shortcutTitle('video.subPositionUp')}
+                disabled={preferences.subtitleAtTop}
+                onClick={() => movePosition(1)}
+              >
+                {t('mediaWorkspace.study.subtitleHigher')}
+              </button>
+            </div>
+            <label>
+              <input
+                type="checkbox"
+                data-study-pref="subtitleAtTop"
+                checked={preferences.subtitleAtTop}
+                onChange={(event) => updatePreference('subtitleAtTop', event.currentTarget.checked)}
+              /> {t('mediaWorkspace.study.subtitleAtTop')}
+            </label>
+          </StudyToolGroup>
+
+          <StudyToolGroup labelKey="mediaWorkspace.study.secondLineGroup">
+            <label className="study-tool-slider">
+              {t('mediaWorkspace.study.secondarySubScale')}
+              <input
+                type="range"
+                min={SECONDARY_SUB_SCALE_MIN}
+                max={SECONDARY_SUB_SCALE_MAX}
+                step={5}
+                data-study-pref="secondarySubScale"
+                value={preferences.secondarySubScale}
+                onChange={(event) => updatePreference('secondarySubScale', Number(event.currentTarget.value))}
+                aria-label={t('mediaWorkspace.study.secondarySubScale')}
+              />
+              <span>{preferences.secondarySubScale}%</span>
+            </label>
+            <SubtitleColorChoice
+              pref="secondarySubColor"
+              labelKey="mediaWorkspace.study.secondarySubColor"
+              value={preferences.secondarySubColor}
+              presets={SUBTITLE_COLOR_PRESETS}
+              fallback="#e1e7ff"
+              onChange={(value) => updatePreference('secondarySubColor', value)}
+            />
+            {props.onResetSubtitleAppearance && (
+              <button
+                type="button"
+                data-study-action="reset-subtitle-appearance"
+                disabled={subtitleAppearanceIsDefault(preferences)}
+                onClick={props.onResetSubtitleAppearance}
+              >
+                {t('mediaWorkspace.study.resetSubtitleAppearance')}
+              </button>
+            )}
           </StudyToolGroup>
 
           <div

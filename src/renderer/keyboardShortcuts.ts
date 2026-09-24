@@ -645,7 +645,15 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'video.subLaterLarge', label: 'Subtitle later (+500 ms)', category: 'Video', defaultKeys: '' },
   { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: '' },
   { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: '' },
-  { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: '' },
+  // Subtitle display, on Shift chords. The adopted player ignores every modified key
+  // (`handleKeyboardShortcuts` returns on any of Ctrl/Shift/Alt/Meta), so Shift+letter and
+  // Shift+Arrow are free of its keymap by construction, and no other catalog row uses them.
+  // `Shift+F` / `Shift+D` read as Furigana / Dual; the arrows move the line the way they point.
+  { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: 'Shift+F' },
+  { id: 'video.toggleDualSubs', label: 'Toggle dual subtitles', category: 'Video', defaultKeys: 'Shift+D' },
+  { id: 'video.subPositionUp', label: 'Move subtitles up', category: 'Video', defaultKeys: 'Shift+ArrowUp' },
+  { id: 'video.subPositionDown', label: 'Move subtitles down', category: 'Video', defaultKeys: 'Shift+ArrowDown' },
+  { id: 'video.subDelayReset', label: 'Reset subtitle delay', category: 'Video', defaultKeys: '' },
   // Mining and seeking. Unbound by default for the same reason as the rows above:
   // every free single letter belongs to the adopted player's own keymap, and a
   // default that collides is worse than one the user binds deliberately.

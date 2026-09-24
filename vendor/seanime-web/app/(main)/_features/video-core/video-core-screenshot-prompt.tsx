@@ -1,6 +1,7 @@
 import { useSaveMediaPlayerSettings } from "@/api/hooks/settings.hooks"
 import { useVideoCoreSaveScreenshot } from "@/api/hooks/videocore.hooks"
 import { ScreenshotDirModal } from "@/app/(main)/_features/media-core/screenshot-dir-modal"
+import { mediaCorePortalContainer } from "@/app/(main)/_features/media-core/media-core-menu" // Gum
 import { useServerStatus } from "@/app/(main)/_hooks/use-server-status"
 import { useAtom, useAtomValue } from "jotai"
 import { useSetAtom } from "jotai/react"
@@ -80,7 +81,8 @@ export function VideoCoreScreenshotDirPrompt() {
                 setPendingScreenshot(null)
             }}
             onSave={handleSave}
-            portalContainer={isFullscreen ? containerElement : null}
+            // Gum: see mediaCorePortalContainer.
+            portalContainer={mediaCorePortalContainer(isFullscreen, containerElement) ?? null}
         />
     )
 }

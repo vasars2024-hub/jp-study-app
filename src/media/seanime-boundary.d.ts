@@ -127,7 +127,20 @@ declare module '@/app/websocket-provider' {
 }
 
 declare module '@/app/(main)/_features/video-core/video-core.atoms' {
+  import type { WritableAtom } from 'jotai';
   import type { VideoCore_VideoPlaybackInfo as AdoptedVideoCorePlaybackInfo } from '../../vendor/seanime/generated/types';
+
+  /** The part of VideoCore's stored settings Study OS writes: the subtitle-language order. */
+  export type VideoCoreStoredSettings = {
+    preferredSubtitleLanguage?: string;
+    [key: string]: unknown;
+  };
+  /** VideoCore's persisted settings (`sea-video-core-settings`). */
+  export const vc_settingsRaw: WritableAtom<
+    VideoCoreStoredSettings,
+    [VideoCoreStoredSettings | ((previous: VideoCoreStoredSettings) => VideoCoreStoredSettings)],
+    void
+  >;
 
   export type VideoCore_VideoPlaybackInfo = AdoptedVideoCorePlaybackInfo;
   export type VideoCoreLifecycleState = {
@@ -174,8 +187,11 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
   export type SubtitleManagerTracksLoadedEvent = CustomEvent<{
     tracks: NormalizedTrackInfo[];
   }>;
+  /** Gum: new cues reached the event cache, for these tracks. */
+  export type SubtitleManagerEventsAddedEvent = CustomEvent<{ trackNumbers: number[] }>;
   type SubtitleManagerEventMap = {
     cuechange: SubtitleManagerCueChangeEvent;
+    eventsadded: SubtitleManagerEventsAddedEvent;
     tracksloaded: SubtitleManagerTracksLoadedEvent;
     trackselected: SubtitleManagerTrackSelectedEvent;
     trackdeselected: CustomEvent;
@@ -215,7 +231,8 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
     setNoTrack(): void;
     setSubtitleDelay(subtitleDelay: number): Promise<void>;
     onSubtitleEvents(events: MKVParser_SubtitleEvent[]): Promise<void>;
-    addEventTrack(track: MKVParser_TrackInfo): Promise<void>;
+    /** `select: false` (Gum) mounts the track without making it the selected one. */
+    addEventTrack(track: MKVParser_TrackInfo, options?: { select?: boolean }): Promise<void>;
     addEventListener<K extends keyof SubtitleManagerEventMap>(
       type: K,
       listener: (event: SubtitleManagerEventMap[K]) => void,
@@ -309,6 +326,10 @@ declare module '@/app/(main)/_features/video-core/video-core' {
     onTerminateStream: () => void;
     onLoadedMetadata?: (
       event: React.SyntheticEvent<HTMLVideoElement, Event>,
+    ) => void;
+    /** The user picked a subtitle track (or Off, `null`) in VideoCore's own CC menu. */
+    onSubtitlePreferenceChange?: (
+      selection: { language?: string; label?: string } | null,
     ) => void;
   }): React.ReactElement;
 }
