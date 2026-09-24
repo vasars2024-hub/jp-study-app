@@ -2536,7 +2536,8 @@ export default function DesktopShell({
     return {
       backgroundImage: preset.css,
       backgroundColor: '#0a0a0e',
-      backgroundSize: animated ? '400% 400%' : 'cover',
+      // Wallpaper fit applies to preset walls too (--wall-background-fit, wallpaperFit.ts).
+      backgroundSize: animated ? '400% 400%' : 'var(--wall-background-fit, cover)',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
     };

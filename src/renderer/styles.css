@@ -14881,7 +14881,8 @@ body.companion-host-body #root {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* The rotating stage's videos follow Settings > Wallpaper > Fit like the base one. */
+  object-fit: var(--wall-fit, cover);
 }
 
 /* When rotation owns the wall, shell background stays neutral */
