@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import type { LibraryItem } from '../../shared/types';
 import {
@@ -62,6 +62,9 @@ import {
   type MangaReaderSettings,
 } from '../mangaReaderSettings';
 import { mangaPageFitStyles } from '../mangaPageFit';
+import { recordReading } from '../stats';
+import { recordEpubPageRead } from '../readingGardenProgress';
+import { createMangaReadingTracker, mokuroPageCharCount } from '../mangaReadingStats';
 
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
 
@@ -1062,6 +1065,85 @@ export default function MangaReader({ item, onClose }: Props) {
       ),
     );
   }, [idx, pages.length, item]);
+
+  // ----- reading time + characters + garden pages -> statistics -----
+  // The novel reader's accounting, which this reader never had: Statistics, the
+  // daily goal and the Reading Garden saw no manga at all.
+  const titleRef = useRef(item.title);
+  titleRef.current = item.title;
+  const pendingCharsRef = useRef(0);
+  const readStartRef = useRef(Date.now());
+  const activeReadingRef = useRef(true);
+  const tracker = useMemo(
+    () => createMangaReadingTracker({
+      addChars: (chars) => {
+        pendingCharsRef.current += chars;
+      },
+      creditGardenPage: (pageIndex) => {
+        recordEpubPageRead({ bookId: item.id, partIndex: 0, pageIndex });
+      },
+    }),
+    [item.id],
+  );
+  const trackerRef = useRef(tracker);
+  trackerRef.current = tracker;
+
+  // A page's characters are known once its OCR is on screen. Keyed on the OCR
+  // page changing, not on `idx`: for one render after a turn the previous
+  // page's OCR is still in state under the new index.
+  const notedOcrRef = useRef<MokuroPage | null>(null);
+  useEffect(() => {
+    if (!mokuroPage || mokuroPage === notedOcrRef.current) return;
+    notedOcrRef.current = mokuroPage;
+    trackerRef.current.notePageChars(idx, mokuroPageCharCount(mokuroPage));
+    // `idx` is read, not watched — see above.
+  }, [mokuroPage]);
+
+  // Credit pages on a forward turn — once each, never for a jump.
+  const lastIdxRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!pages.length) return;
+    const from = lastIdxRef.current;
+    lastIdxRef.current = idx;
+    if (from != null) trackerRef.current.turn(from, idx, spreadCount);
+  }, [idx, pages.length, spreadCount]);
+
+  useEffect(() => {
+    const flush = () => {
+      const now = Date.now();
+      let secs = (now - readStartRef.current) / 1000;
+      readStartRef.current = now;
+      if (!activeReadingRef.current || secs < 0 || secs > 3600) secs = 0;
+      const chars = pendingCharsRef.current;
+      pendingCharsRef.current = 0;
+      if (secs > 0 || chars > 0) recordReading(item.id, titleRef.current, secs, chars);
+    };
+    const setActive = (on: boolean) => {
+      if (on) {
+        activeReadingRef.current = true;
+        readStartRef.current = Date.now();
+      } else {
+        flush();
+        activeReadingRef.current = false;
+      }
+    };
+    activeReadingRef.current = true;
+    readStartRef.current = Date.now();
+    const iv = window.setInterval(flush, 20000);
+    const onFocus = () => setActive(true);
+    const onBlur = () => setActive(false);
+    const onVis = () => setActive(!document.hidden);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(iv);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVis);
+      flush();
+    };
+  }, [item.id]);
 
   useEffect(() => {
     setOcrStatus('idle');

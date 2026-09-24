@@ -9,6 +9,9 @@
  *      OCR error state — so the warning was never on screen.
  * D3 — every translation failure read "Translation failed.": the reason was
  *      dropped in main, and auto-translate is on by default.
+ *
+ * And the reading itself: only the novel reader recorded time, characters and
+ * Reading Garden pages, so manga never reached Statistics or the garden.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
@@ -141,3 +144,52 @@ describe('whole-volume translation outcome', () => {
     expect([...notice!.querySelectorAll('button')].some((b) => b.textContent === 'Try again')).toBe(true);
   });
 });
+
+describe('manga reading reaches Statistics and the Reading Garden', () => {
+  beforeEach(() => {
+    installResizeObserver();
+    localStorage.setItem('jp-manga-reader-settings', JSON.stringify({ autoTranslate: false }));
+  });
+
+  it('credits a turned page, its OCR characters and the time spent', async () => {
+    const page = {
+      version: '1.01',
+      img_width: 1000,
+      img_height: 1500,
+      blocks: [{ box: [0, 0, 10, 10], vertical: true, lines: ['おはようございます'], regionId: 'r1', kind: 'text' }],
+    };
+    installReadingSurfaceApi({
+      getMangaPages: async () => PAGES,
+      mangaOcrAvailable: async () => true,
+      onAssetStatus: () => () => undefined,
+      assetsList: async () => ({ assets: [], statuses: [] }),
+      mangaOcrLoadCache: async (_id: string, url: string) => (url === PAGES[0] ? page : null),
+      mangaOcrLoadTranslateCache: async () => null,
+      setProgress: async () => undefined,
+    });
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    const h = await mountReader();
+    await h.flush();
+
+    const { runCommand } = await import('../keyboardShortcuts');
+    now.mockReturnValue(1_030_000); // 30 s on page 1
+    await act(async () => {
+      runCommand('manga.nextPage');
+    });
+    await h.flush();
+
+    const garden = JSON.parse(localStorage.getItem('jp-reading-garden-v1') ?? 'null');
+    expect(garden?.pagesRead).toBe(1);
+    expect(garden?.lastBookId).toBe(ITEM.id);
+
+    // Closing the reader flushes what is pending, the way the novel reader does.
+    harness?.teardown();
+    harness = null;
+    const { statsKey } = await import('../stats');
+    const stats = JSON.parse(localStorage.getItem(statsKey()) ?? 'null');
+    expect(stats?.books?.[ITEM.id]?.chars).toBe(9);
+    expect(stats?.books?.[ITEM.id]?.seconds).toBeGreaterThan(0);
+  });
+});
+
