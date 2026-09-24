@@ -27,8 +27,11 @@
  * again are dropped by `subtitleEventRelay` and by the manager, both keyed the same way.
  *
  * "Run to the end" is inferred: the sidecar does not say when a read finishes, so a pass that
- * has gone `quietMs` without an event is taken as done. The settle delay leaves the read the
- * seek started a moment to send the cues around the playhead before the full pass replaces it.
+ * has gone `quietMs` without an event is taken as done. The ask itself waits until the read
+ * the seek started has gone `settleMs` without an event, i.e. has sent the cues from the
+ * playhead on: the whole-file pass replaces that read and reaches the playhead only after
+ * re-reading everything before it (a minute and more for a long file on a hard disk, while
+ * the video reads the same disk). Asking early would lose nothing, only delay those cues.
  */
 
 export interface SubtitleBackfillTimers {
@@ -39,7 +42,7 @@ export interface SubtitleBackfillTimers {
 export interface SubtitleBackfillOptions {
   /** Ask the sidecar to read the file's subtitles again from byte 0. */
   requestFullPass: () => void;
-  /** Quiet time after the last seek before the pass is requested. */
+  /** Quiet time (no seek, no event) after a seek before the pass is requested. */
   settleMs?: number;
   /** A requested pass with no event for this long is taken as finished. */
   quietMs?: number;
@@ -77,6 +80,7 @@ export function createSubtitleBackfill({
   let enabled = false;
   let complete = false;
   let passRunning = false;
+  let waiting = false;
   let requested = 0;
   let settleTimer: unknown = null;
   let quietTimer: unknown = null;
@@ -97,21 +101,26 @@ export function createSubtitleBackfill({
       complete = true;
     }, quietMs);
   };
-  // Every seek cancels the sidecar's read, a pass of ours included: wait for the seeks to
-  // stop, then ask again.
-  const schedule = () => {
-    if (!enabled || complete) return;
-    passRunning = false;
-    clearQuiet();
+  const armSettle = () => {
     clearSettle();
     settleTimer = timers.set(() => {
       settleTimer = null;
+      waiting = false;
       if (!enabled || complete) return;
       requested += 1;
       passRunning = true;
       requestFullPass();
       armQuiet();
     }, settleMs);
+  };
+  // Every seek cancels the sidecar's read, a pass of ours included: wait for the seeks, and
+  // the read the last one started, to go quiet, then ask again.
+  const schedule = () => {
+    if (!enabled || complete) return;
+    passRunning = false;
+    waiting = true;
+    clearQuiet();
+    armSettle();
   };
 
   return {
@@ -121,17 +130,20 @@ export function createSubtitleBackfill({
       enabled = nextEnabled;
       complete = false;
       passRunning = false;
+      waiting = false;
       requested = 0;
     },
     onStreamStarted: schedule,
     onSeeked: schedule,
     onEvents() {
       if (passRunning) armQuiet();
+      else if (waiting) armSettle();
     },
     dispose() {
       clearSettle();
       clearQuiet();
       enabled = false;
+      waiting = false;
     },
     get complete() {
       return complete;

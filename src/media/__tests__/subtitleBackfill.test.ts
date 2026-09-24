@@ -38,13 +38,16 @@ const EVENT_MS = 5;
  * The directstream sidecar's subtitle extraction as its log shows it: `video-loaded-metadata`
  * starts one read at byte 0 (once per stream); every `video-seeked` stops the read in
  * progress and starts a new one — at byte 0 for a seek to exactly 0, otherwise at the
- * cluster AFTER the one holding the seek position. A read sends one event every EVENT_MS.
+ * cluster AFTER the one holding the seek position. A read sends one event every `eventMs`.
  */
 class FakeSidecar {
   private readTimer: ReturnType<typeof setTimeout> | null = null;
   private metadataRead = false;
   readonly log: string[] = [];
-  constructor(private readonly send: (events: MKVParser_SubtitleEvent[]) => void) {}
+  constructor(
+    private readonly send: (events: MKVParser_SubtitleEvent[]) => void,
+    private readonly eventMs = EVENT_MS,
+  ) {}
 
   loadedMetadata(): void {
     if (this.metadataRead) return;
@@ -73,14 +76,14 @@ class FakeSidecar {
         return;
       }
       this.send([event]);
-      this.readTimer = setTimeout(next, EVENT_MS);
+      this.readTimer = setTimeout(next, this.eventMs);
     };
-    this.readTimer = setTimeout(next, EVENT_MS);
+    this.readTimer = setTimeout(next, this.eventMs);
   }
 }
 
 /** The slice's wiring: sidecar -> relay -> manager, and the video's own events -> backfill. */
-function setup({ backfillEnabled }: { backfillEnabled: boolean }) {
+function setup({ backfillEnabled, eventMs = EVENT_MS }: { backfillEnabled: boolean; eventMs?: number }) {
   const manager = new FakeManager();
   const relay = createSubtitleEventRelay<FakeManager>();
   // The slice sends `video-seeked` at 0 for a whole-file read.
@@ -88,7 +91,7 @@ function setup({ backfillEnabled }: { backfillEnabled: boolean }) {
   const sidecar = new FakeSidecar((events) => {
     relay.receive(events);
     backfill.onEvents();
-  });
+  }, eventMs);
   backfill.reset(backfillEnabled);
   relay.attach(manager);
   const player = {
@@ -144,11 +147,27 @@ describe('subtitle backfill', () => {
     expect(backfill.complete).toBe(true);
   });
 
+  it('lets the read a seek started finish before replacing it', () => {
+    // A slow disk: the read after the seek takes 6 x 400 ms to send cues 3-5.
+    const { manager, backfill, player } = setup({ backfillEnabled: true, eventMs: 400 });
+    player.loadedMetadata();
+    vi.advanceTimersByTime(7);
+    player.seek(0.023);
+    vi.advanceTimersByTime(2000);
+    expect(backfill.requested).toBe(0);
+    vi.advanceTimersByTime(2400 + 1200);
+    expect(backfill.requested).toBe(1);
+    vi.advanceTimersByTime(60_000);
+    expect(manager.lines(3)).toEqual(ALL_JA);
+    expect(manager.lines(4)).toEqual(ALL_EN);
+  });
+
   it('asks again when a seek cuts its whole-file read short', () => {
     const { manager, backfill, player } = setup({ backfillEnabled: true });
     player.loadedMetadata();
     vi.advanceTimersByTime(7);
-    // A resume far into the file: the restart after it sends only cue 5.
+    // A resume far into the file: the restart after it sends nothing, since the last cluster
+    // is the one holding 17 s.
     player.seek(17);
     vi.advanceTimersByTime(1200 + EVENT_MS * 1 + 1); // the backfill read has sent one event...
     expect(backfill.requested).toBe(1);
