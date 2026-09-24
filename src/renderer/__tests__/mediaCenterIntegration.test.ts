@@ -255,7 +255,10 @@ describe('Media Center integration contract', () => {
 
   it('translates every Media Center key in all four UI catalogues', () => {
     const keys = Object.keys(en).filter((key) => key.startsWith('mediaCenter.'));
-    expect(keys.length).toBeGreaterThan(225);
+    // 281 before the media-hub merge removed 85 keys whose Media Center home,
+    // study and shell copy its redesign deleted; the floor only proves the
+    // filter still finds the namespace.
+    expect(keys.length).toBeGreaterThan(190);
     for (const key of keys) {
       expect(ja[key], `missing ja key ${key}`).toBeTruthy();
       expect(ru[key], `missing ru key ${key}`).toBeTruthy();
