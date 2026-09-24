@@ -699,6 +699,18 @@ declare global {
        * must degrade to "nothing on the clipboard", not throw.
        */
       filesClipboardFolders?(): Promise<string[]>;
+      /**
+       * Gate 25. Watch these folders and announce what lands in them. Optional
+       * for the same reason as filesClipboardFolders.
+       */
+      filesWatchSet?(
+        roots: string[],
+        options?: { stabilityMs?: number },
+      ): Promise<import('../main/filesApp/ipc').FilesWatchStatus>;
+      filesWatchStatus?(): Promise<import('../main/filesApp/ipc').FilesWatchStatus>;
+      onFilesWatchArrival?(
+        cb: (arrivals: import('../main/filesApp/watch').FilesWatchArrival[]) => void,
+      ): () => void;
 
       popOut(section: string): Promise<boolean>;
       popoutListOpen(): Promise<string[]>;
