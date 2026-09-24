@@ -2768,6 +2768,10 @@ const api = {
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
   logRendererError: (payload: { subsystem?: string; operation?: string; detail?: string }): Promise<void> =>
     ipcRenderer.invoke('diagnostics:logRendererError', payload),
+  storageSaveIdbRecovery: (dbName: string, json: string): Promise<string> =>
+    ipcRenderer.invoke('storage:saveIdbRecovery', dbName, json),
+  storagePreserveIdbFiles: (dbName: string): Promise<string | null> =>
+    ipcRenderer.invoke('storage:preserveIdbFiles', dbName),
 
   // System-wide popup dictionary (global hotkey + tray + floating overlay).
   sysDictGetSettings: (): Promise<{

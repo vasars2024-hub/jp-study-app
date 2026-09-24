@@ -1745,6 +1745,10 @@ declare global {
       }>;
       clipboardReadText(): Promise<string>;
       logRendererError(payload: { subsystem?: string; operation?: string; detail?: string }): Promise<void>;
+      /** Write an IndexedDB recovery export to userData/recovery; resolves with the path. */
+      storageSaveIdbRecovery(dbName: string, json: string): Promise<string>;
+      /** Copy the calling origin's raw IndexedDB files aside; null when nothing was copied. */
+      storagePreserveIdbFiles(dbName: string): Promise<string | null>;
 
       // System-wide popup dictionary
       sysDictGetSettings(): Promise<{

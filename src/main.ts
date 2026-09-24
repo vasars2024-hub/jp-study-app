@@ -52,6 +52,7 @@ import { registerMalSyncIpc } from './main/malSync';
 import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
+import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
 import { registerStatsIpc } from './main/stats';
@@ -1754,6 +1755,7 @@ app.whenReady().then(async () => {
   });
   registerDictionaryIpc();
   registerDiagnosticsIpc();
+  registerStorageRecoveryIpc();
   registerShellIpc();
   registerAppLifecycleIpc();
   registerToolboxIpc();
