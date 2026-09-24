@@ -44,6 +44,7 @@ import { setAgentNavigationOpener } from './main/agentNavigationIpc';
 import { registerLocalAgentSchedulerIpc, stopLocalAgentScheduler } from './main/localAgentScheduler';
 import { registerMiningIpc } from './main/mining';
 import { registerImmersionIpc } from './main/immersion';
+import { configureVisualNovelReader } from './main/immersion/visualNovelReaderWindow';
 import { registerSystemMetricsIpc } from './main/systemMetrics';
 import { registerScraperIpc } from './main/scraper';
 import { registerReadingIpc } from './main/reading';
@@ -179,7 +180,7 @@ let pendingOpenSection: string | null = null;
 const ARGV_OPEN_SECTIONS = new Set([
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube', 'scraper', 'files',
+  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels',
 ]);
 
 export function argvWantsToggle(argv: string[] = process.argv): boolean {
@@ -1480,7 +1481,7 @@ const POPOUT_SECTIONS = new Set([
   'agent',
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube', 'scraper', 'files',
+  'calendar', 'settings', 'youtube', 'scraper', 'files', 'visualnovels',
 ]);
 
 // One real OS window per section, max. Keyed here (not just left to the
@@ -1928,6 +1929,13 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerReadingLensIpc();
+  // The VN reader window beside a running game (Visual Novels ▸ Launch).
+  configureVisualNovelReader({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+  });
   createWindow();
   // Fallback: a hidden start or a failed load never fires ready-to-show.
   setTimeout(runAfterFirstPaint, 8000);

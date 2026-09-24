@@ -48,4 +48,55 @@ describe('visual novel study card drafts', () => {
     expect(drafts.some((draft) => draft.studyKind === 'vocabulary')).toBe(false);
     expect(drafts.some((draft) => draft.studyKind === 'sentence')).toBe(true);
   });
+
+  it('puts the dictionary meaning on the card, not the example sentence', () => {
+    // The audit's card: back = sentence + "Scene: 岡部" + "Frequency: 1", meaning empty.
+    const [vocab] = buildVisualNovelStudyCardDrafts(
+      {
+        vocabulary: [{ word: '実験', surface: '実験', reading: 'じっけん', occurrences: 3, sentence: '実験を始めよう。', firstSeenAt: 0 }],
+        sentences: [{ text: '実験を始めよう。', start: 0, end: 1 }],
+        kanji: [],
+        grammar: [],
+      },
+      new Map([[0, 'Ch1 · Lab']]),
+      new Set(),
+      {},
+      { glosses: new Map([['実験', 'experiment']]), speakers: new Map([[0, '紅莉栖']]) },
+    );
+    expect(vocab).toMatchObject({
+      studyKind: 'vocabulary',
+      meaning: 'experiment',
+      reading: 'じっけん',
+      characterName: '紅莉栖',
+      sceneReference: 'Ch1 · Lab',
+    });
+    expect(vocab.back.split('\n\n')).toEqual(['experiment', 'じっけん', '実験を始めよう。', '紅莉栖 · Ch1 · Lab']);
+    expect(vocab.back).not.toContain('Frequency');
+  });
+
+  it('cards only the kanji of mined words the learner does not know, and caps grammar', () => {
+    const drafts = buildVisualNovelStudyCardDrafts(
+      {
+        vocabulary: [
+          { word: '実験', surface: '実験', reading: 'じっけん', occurrences: 1, sentence: 'a', firstSeenAt: 0 },
+          { word: '紅莉栖', surface: '紅莉栖', reading: 'くりす', occurrences: 4, sentence: 'b', firstSeenAt: 1, proper: true },
+          { word: '岡部', surface: '岡部', reading: 'おかべ', occurrences: 4, sentence: 'c', firstSeenAt: 2 },
+        ],
+        sentences: [{ text: 'a', start: 0, end: 1 }],
+        // Every kanji on screen, as the corpus reports them.
+        kanji: ['実', '験', '紅', '莉', '栖', '岡', '部', '始', '今', '日'].map((character) => ({ character, occurrences: 1 })),
+        grammar: [1, 2, 3, 4, 5, 6, 7].map((n) => ({ id: `g${n}`, title: `～文法${n}`, level: 'N3', meaning: `pattern ${n}` })),
+      },
+      new Map(),
+      new Set(),
+      {},
+      { knownKanji: new Set(['実']), characterNames: new Set(['岡部']) },
+    );
+    const of = (kind: string) => drafts.filter((draft) => draft.studyKind === kind).map((draft) => draft.word);
+    // Character names are never vocabulary, whether the tokenizer flagged them or the capture's speaker list did.
+    expect(of('vocabulary')).toEqual(['実験']);
+    // Only 験: 実 is known, and the names' kanji are not mined words.
+    expect(of('kanji')).toEqual(['験']);
+    expect(of('grammar')).toHaveLength(3);
+  });
 });

@@ -31,7 +31,7 @@ import {
   createWebview,
   useImmersion,
 } from '../components/immersion/ImmersionContent';
-import VisualNovelPanel from '../components/immersion/VisualNovelPanel';
+import { openSectionSurface } from '../sectionSurface';
 import { removeImmersionSiteWithConfirm } from '../components/immersion/immersionSiteActions';
 
 export default function ImmersionView() {
@@ -46,7 +46,6 @@ export default function ImmersionView() {
   // settle once it stops. Driven off `loading` so no extra webview listeners.
   const wired = useWiredMaterials();
   const [stageFx, setStageFx] = useState<'tuning' | 'settle' | null>(null);
-  const [visualNovelsOpen, setVisualNovelsOpen] = useState(false);
   const stageFxRef = useRef(stageFx);
   stageFxRef.current = stageFx;
   const stageFxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,6 +72,13 @@ export default function ImmersionView() {
    * The three mode items take `MODE_LABELS`, the same source the toolbar
    * segment below uses, so the checked item and the segment can never disagree.
    */
+  // Visual Novels is its own app now. It used to replace this view behind a
+  // `useState(false)` that reset on every close, so leaving the window lost the
+  // library selection and the open section with it.
+  const openVisualNovels = (): void => {
+    openSectionSurface('visualnovels');
+  };
+
   const immersionMenus: MenuBarMenu[] = [
     {
       id: 'file',
@@ -82,7 +88,7 @@ export default function ImmersionView() {
         { id: 'save-site', label: t('immersion.aero.menu.saveSite'), disabled: !currentUrl, onSelect: () => void state.saveCurrentSite() },
         { id: 'export-library', label: t('immersion.aero.menu.exportReaderPage'), disabled: !currentUrl, onSelect: () => void state.exportToLibrary() },
         { id: 'capture-video', label: t('immersion.aero.menu.captureVideo'), disabled: captureBusy || !currentUrl, onSelect: () => void state.captureVideo() },
-        { id: 'visual-novels', label: t('immersion.visualNovelLibrary'), onSelect: () => setVisualNovelsOpen(true) },
+        { id: 'visual-novels', label: t('immersion.visualNovelLibrary'), onSelect: openVisualNovels },
         { id: 'sep-file', separator: true, label: '' },
         { id: 'open-external', label: t('immersion.openInSystemBrowser'), disabled: !currentUrl, onSelect: state.openExternal },
       ],
@@ -141,18 +147,6 @@ export default function ImmersionView() {
       {currentUrl && <StatusBarField live>{currentUrl}</StatusBarField>}
     </>
   );
-
-  if (visualNovelsOpen) {
-    const panel = <VisualNovelPanel onClose={() => setVisualNovelsOpen(false)} />;
-    if (aero && showChrome) {
-      return (
-        <AppChrome menus={immersionMenus} status={immersionStatus} className="aero-immersion-chrome">
-          {panel}
-        </AppChrome>
-      );
-    }
-    return <div className="immersion-root">{panel}</div>;
-  }
 
   if (aero && showChrome) {
     return (
@@ -406,7 +400,7 @@ export default function ImmersionView() {
               className="btn small visual-novel-open"
               title={t('immersion.visualNovelLibrary')}
               aria-label={t('immersion.visualNovelLibrary')}
-              onClick={() => setVisualNovelsOpen(true)}
+              onClick={openVisualNovels}
             >
               <Icon name="novels" size={14} />
               <span>{t('immersion.visualNovelLibrary')}</span>

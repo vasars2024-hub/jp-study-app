@@ -14,6 +14,7 @@ import { GAME_ARENA_CHROME_RU } from '../gameArena/ru';
 import { MOONCAP_PHASE_LORE_RU } from '../mooncapLore/ru';
 import { MINING_UI_RU } from '../miningUi/ru';
 import { MAL_SYNC_RU } from '../malSync/ru';
+import { VISUAL_NOVEL_RU } from '../visualNovel/ru';
 import { WATCH_LIBRARY_RU } from '../watchLibrary/ru';
 import { GUM_LIBRARY_RU } from '../gumLibrary/ru';
 import { SCRAPER_UI_RU } from '../scraperUi/ru';
@@ -588,7 +589,6 @@ export const ru: Catalog = {
   'vnPanel.captureScreenText': 'Захватить текст с экрана',
   'vnPanel.stopHook': 'Остановить перехват текста',
   'vnPanel.startHook': 'Запустить перехват текста',
-  'vnPanel.clipboardCapture': 'Захват буфера обмена в реальном времени',
   'vnPanel.hookListening': 'Перехват активен · новых строк: {count}',
   'vnPanel.aria.miningScope': 'Область майнинга',
   'vnPanel.scope.all': 'Вся визуальная новелла',
@@ -635,7 +635,6 @@ export const ru: Catalog = {
     other: '{count} говорящих',
   },
   'vnPanel.commonSignals': 'Частые признаки: {signals}',
-  'vnPanel.msg.clipboardCaptured': 'Из буфера обмена захвачен новый японский текст.',
   'vnPanel.msg.added': 'Визуальная новелла добавлена в локальную библиотеку.',
   'vnPanel.msg.removed': '{title} удалена из локальной библиотеки.',
   'vnPanel.msg.removeFailed': '{title} осталась в локальной библиотеке.',
@@ -792,6 +791,7 @@ export const ru: Catalog = {
   ...MOONCAP_PHASE_LORE_RU,
   ...MINING_UI_RU,
   ...MAL_SYNC_RU,
+  ...VISUAL_NOVEL_RU,
   ...WATCH_LIBRARY_RU,
   ...GUM_LIBRARY_RU,
   ...SCRAPER_UI_RU,
@@ -2753,6 +2753,7 @@ export const ru: Catalog = {
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': 'Скрапер',
   'palette.section.files': 'Файлы',
+  'palette.section.visualnovels': 'Визуальные новеллы',
   'palette.section.agent': 'Агент',
   'agent.shell.aria': 'Рабочая область агента',
   'agent.rail.aria': 'Разговоры',

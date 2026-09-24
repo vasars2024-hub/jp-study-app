@@ -2664,8 +2664,20 @@ const api = {
     imported?: number;
     error?: string;
   }> => ipcRenderer.invoke('visual-novel:importScriptLines', id, lines),
-  visualNovelSessionState: (id: string): Promise<{ startedAt: number | null }> =>
+  visualNovelSessionState: (
+    id: string,
+  ): Promise<import('./shared/visualNovelCapture').VisualNovelSessionState> =>
     ipcRenderer.invoke('visual-novel:sessionState', id),
+  onVisualNovelSessionChanged: (
+    cb: (state: import('./shared/visualNovelCapture').VisualNovelSessionState) => void,
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: import('./shared/visualNovelCapture').VisualNovelSessionState,
+    ): void => cb(state);
+    ipcRenderer.on('visual-novel:sessionChanged', listener);
+    return () => ipcRenderer.removeListener('visual-novel:sessionChanged', listener);
+  },
   visualNovelStopSession: (id: string): Promise<{
     database: import('./shared/visualNovel').VisualNovelDatabase;
     stopped: boolean;
@@ -2720,6 +2732,63 @@ const api = {
     ipcRenderer.invoke('visual-novel:readCaptureAudio', filePath),
   visualNovelLaunch: (id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }> =>
     ipcRenderer.invoke('visual-novel:launch', id),
+  /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
+  visualNovelArt: (url: string): Promise<{ ok: boolean; url?: string; error?: string }> =>
+    ipcRenderer.invoke('visual-novel:art', url),
+  visualNovelCaptureState: (): Promise<import('./shared/visualNovelCapture').VisualNovelCaptureState> =>
+    ipcRenderer.invoke('visual-novel:captureState'),
+  visualNovelCaptureStart: (
+    id: string,
+    options?: { test?: boolean },
+  ): Promise<{
+    ok: boolean;
+    state?: import('./shared/visualNovelCapture').VisualNovelCaptureState;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:captureStart', id, options),
+  visualNovelCaptureStop: (): Promise<import('./shared/visualNovelCapture').VisualNovelCaptureState> =>
+    ipcRenderer.invoke('visual-novel:captureStop'),
+  onVisualNovelCaptureChanged: (
+    cb: (state: import('./shared/visualNovelCapture').VisualNovelCaptureState) => void,
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: import('./shared/visualNovelCapture').VisualNovelCaptureState,
+    ): void => cb(state);
+    ipcRenderer.on('visual-novel:captureChanged', listener);
+    return () => ipcRenderer.removeListener('visual-novel:captureChanged', listener);
+  },
+  visualNovelUpdateSettings: (
+    patch: import('./shared/visualNovel').VisualNovelSettingsPatch,
+  ): Promise<import('./shared/visualNovel').VisualNovelDatabase> =>
+    ipcRenderer.invoke('visual-novel:updateSettings', patch),
+  visualNovelPickLocaleEmulator: (): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    canceled?: boolean;
+  }> => ipcRenderer.invoke('visual-novel:pickLocaleEmulator'),
+  visualNovelReaderOpen: (id?: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('visual-novel:readerOpen', id),
+  visualNovelReaderClose: (): Promise<void> => ipcRenderer.invoke('visual-novel:readerClose'),
+  visualNovelReaderTarget: (): Promise<string> => ipcRenderer.invoke('visual-novel:readerTarget'),
+  onVisualNovelReaderTarget: (cb: (id: string) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, id: string): void => cb(id);
+    ipcRenderer.on('visual-novel:readerTarget', listener);
+    return () => ipcRenderer.removeListener('visual-novel:readerTarget', listener);
+  },
+  visualNovelDrainStudyTime: (): Promise<import('./shared/visualNovelCapture').VisualNovelStudyTime[]> =>
+    ipcRenderer.invoke('visual-novel:drainStudyTime'),
+  onVisualNovelStudyTime: (cb: () => void): (() => void) => {
+    const listener = (): void => cb();
+    ipcRenderer.on('visual-novel:studyTime', listener);
+    return () => ipcRenderer.removeListener('visual-novel:studyTime', listener);
+  },
+  visualNovelRecommendCandidates: (
+    request: import('./shared/visualNovelRecommendations').VisualNovelCandidateRequest,
+  ): Promise<{
+    ok: boolean;
+    results?: import('./shared/visualNovel').VisualNovelSourceResult[];
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:recommendCandidates', request),
   onVisualNovelChanged: (
     cb: (database: import('./shared/visualNovel').VisualNovelDatabase) => void,
   ): (() => void) => {

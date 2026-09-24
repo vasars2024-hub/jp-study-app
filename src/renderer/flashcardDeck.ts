@@ -58,6 +58,8 @@ export interface DeckFlashcard {
   frequency?: number;
   jlptLevel?: string;
   sceneReference?: string;
+  /** Who said the example line (visual novel captures carry a speaker). */
+  characterName?: string;
   /**
    * What `sceneReference` and `audioPath` are worth on a transcript-derived card.
    * Absent on every other source, and on transcript cards written before the

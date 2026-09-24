@@ -30,6 +30,7 @@ export const POPOUT_LABEL_KEYS: Partial<Record<DesktopWinSection, string>> = {
   // moving it. `ARGV_OPEN_SECTIONS` (main.ts) already lists 'files', so main would
   // open `?popout=files` and the renderer would refuse to recognise it.
   files: 'palette.section.files',
+  visualnovels: 'palette.section.visualnovels',
   player: 'mediaCenter.nav.label',
   scraper: 'palette.section.scraper',
   // D89: `youtube` was in main's POPOUT_SECTIONS but not here, and this object is the

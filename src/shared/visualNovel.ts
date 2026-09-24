@@ -1,5 +1,7 @@
 export const VISUAL_NOVEL_DATABASE_VERSION = 1;
 export const VISUAL_NOVEL_CAPTURE_LIMIT = 20_000;
+/** The library store, relative to userData. Main writes it; the Files app reads it. */
+export const VISUAL_NOVEL_DATABASE_FILE = 'immersion/visual-novels.json';
 
 export type VisualNovelEngine =
   | 'renpy'
@@ -8,8 +10,41 @@ export type VisualNovelEngine =
   | 'unity'
   | 'rpg-maker'
   | 'tyrano'
+  | 'bgi'
+  | 'siglus'
+  | 'artemis'
+  | 'catsystem2'
+  | 'yuris'
   | 'custom'
   | 'unknown';
+
+export const VISUAL_NOVEL_ENGINES: readonly VisualNovelEngine[] = [
+  'renpy', 'kirikiri', 'nscripter', 'unity', 'rpg-maker', 'tyrano',
+  'bgi', 'siglus', 'artemis', 'catsystem2', 'yuris', 'custom', 'unknown',
+];
+
+/**
+ * Product names, which are data rather than chrome and are never translated.
+ * `custom` and `unknown` are absent on purpose: those two are UI words and are
+ * resolved through the catalog by the picker.
+ */
+export const VISUAL_NOVEL_ENGINE_NAMES: Partial<Record<VisualNovelEngine, string>> = {
+  renpy: "Ren'Py",
+  kirikiri: 'KiriKiri',
+  nscripter: 'NScripter',
+  unity: 'Unity',
+  'rpg-maker': 'RPG Maker',
+  tyrano: 'TyranoBuilder',
+  bgi: 'BGI / Ethornell',
+  siglus: 'SiglusEngine',
+  artemis: 'Artemis',
+  catsystem2: 'CatSystem2',
+  yuris: 'YU-RIS',
+};
+
+export function isVisualNovelEngine(value: unknown): value is VisualNovelEngine {
+  return typeof value === 'string' && (VISUAL_NOVEL_ENGINES as readonly string[]).includes(value);
+}
 
 export type VisualNovelStatus = 'planned' | 'reading' | 'completed' | 'dropped' | 'replaying';
 export type VisualNovelRouteStatus = 'not-started' | 'reading' | 'completed';
@@ -101,9 +136,35 @@ export interface VisualNovelEntry {
   completionPct: number;
   totalPlaytimeSec: number;
   lastPlayedAt: number | null;
+  /** Watch the clipboard for game text while this novel runs. On unless turned off. */
+  clipboardCapture: boolean;
   createdAt: number;
   updatedAt: number;
 }
+
+export interface VisualNovelReaderSettings {
+  /** Window opacity, 0.35–1. */
+  opacity: number;
+  /** Line font size in px. */
+  fontSize: number;
+  /** Last position/size; null until the user moves it. */
+  bounds: { x: number; y: number; width: number; height: number } | null;
+  /** Open the reader next to the game on Launch. */
+  autoShow: boolean;
+}
+
+export interface VisualNovelSettings {
+  /** Connect to a user-run texthooker websocket during a capture session. */
+  websocketEnabled: boolean;
+  websocketUrl: string;
+  /** Optional user-installed Locale Emulator `LEProc.exe`; never bundled. */
+  localeEmulatorPath: string;
+  reader: VisualNovelReaderSettings;
+}
+
+export type VisualNovelSettingsPatch = Partial<Omit<VisualNovelSettings, 'reader'>> & {
+  reader?: Partial<VisualNovelReaderSettings>;
+};
 
 export interface VisualNovelTextCapture {
   id: string;
@@ -127,6 +188,12 @@ export interface VisualNovelDatabase {
   version: typeof VISUAL_NOVEL_DATABASE_VERSION;
   entries: VisualNovelEntry[];
   captures: VisualNovelTextCapture[];
+  /**
+   * Optional so a database written before capture settings existed (and the
+   * fixtures that stand in for one) still type-check; read it through
+   * `visualNovelSettings()`, which always answers.
+   */
+  settings?: VisualNovelSettings;
 }
 
 export interface VisualNovelCreateInput {
@@ -177,6 +244,7 @@ export interface VisualNovelMetadataPatch {
   engine?: VisualNovelEngine;
   version?: string;
   language?: string;
+  clipboardCapture?: boolean;
 }
 
 export interface VisualNovelSourceResult {
@@ -197,6 +265,8 @@ export interface VisualNovelSourceResult {
   communityRating: number | null;
   communityVoteCount: number;
   sourceUrl: string;
+  /** Languages the VN is available in (VNDB `languages`), when the source reports them. */
+  languages?: string[];
 }
 
 export interface VisualNovelSourceDetails {
@@ -273,27 +343,137 @@ const stringRecord = (value: unknown): Record<string, string> => {
   );
 };
 
-export function createEmptyVisualNovelDatabase(): VisualNovelDatabase {
-  return { version: VISUAL_NOVEL_DATABASE_VERSION, entries: [], captures: [] };
+export const DEFAULT_VISUAL_NOVEL_SETTINGS: VisualNovelSettings = {
+  websocketEnabled: false,
+  websocketUrl: 'ws://localhost:6677',
+  localeEmulatorPath: '',
+  reader: { opacity: 0.94, fontSize: 20, bounds: null, autoShow: true },
+};
+
+function finiteIn(value: unknown, min: number, max: number, fallback: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? Math.min(max, Math.max(min, numeric)) : fallback;
 }
 
+function normalizeBounds(value: unknown): VisualNovelReaderSettings['bounds'] {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const numbers = ['x', 'y', 'width', 'height'].map((key) => Number(raw[key]));
+  if (!numbers.every(Number.isFinite)) return null;
+  const [x, y, width, height] = numbers.map(Math.round);
+  if (width < 240 || height < 120 || width > 4000 || height > 3000) return null;
+  return { x, y, width, height };
+}
+
+/**
+ * Local websocket only — the rule `shared/visualNovelCapture.ts` enforces for
+ * the live client, repeated here so a hand-edited database cannot store a
+ * remote URL either.
+ */
+function normalizeWebsocketUrl(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) return DEFAULT_VISUAL_NOVEL_SETTINGS.websocketUrl;
+  const trimmed = value.trim();
+  const withScheme = /^wss?:\/\//i.test(trimmed) ? trimmed : `ws://${trimmed}`;
+  try {
+    const url = new URL(withScheme);
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((url.protocol !== 'ws:' && url.protocol !== 'wss:') || !local || url.username || url.password) {
+      return DEFAULT_VISUAL_NOVEL_SETTINGS.websocketUrl;
+    }
+    return `${url.protocol}//${url.host}${url.pathname === '/' ? '' : url.pathname}`;
+  } catch {
+    return DEFAULT_VISUAL_NOVEL_SETTINGS.websocketUrl;
+  }
+}
+
+export function normalizeVisualNovelSettings(value: unknown): VisualNovelSettings {
+  const raw = value && typeof value === 'object' ? value as Partial<VisualNovelSettings> : {};
+  const reader = raw.reader && typeof raw.reader === 'object'
+    ? raw.reader as Partial<VisualNovelReaderSettings>
+    : {};
+  const localeEmulatorPath = clean(raw.localeEmulatorPath);
+  return {
+    websocketEnabled: raw.websocketEnabled === true,
+    websocketUrl: normalizeWebsocketUrl(raw.websocketUrl),
+    localeEmulatorPath: /leproc\.exe$/i.test(localeEmulatorPath) ? localeEmulatorPath : '',
+    reader: {
+      opacity: finiteIn(reader.opacity, 0.35, 1, DEFAULT_VISUAL_NOVEL_SETTINGS.reader.opacity),
+      fontSize: Math.round(finiteIn(reader.fontSize, 12, 40, DEFAULT_VISUAL_NOVEL_SETTINGS.reader.fontSize)),
+      bounds: normalizeBounds(reader.bounds),
+      autoShow: reader.autoShow !== false,
+    },
+  };
+}
+
+/** The settings of a database that may predate them. */
+export function visualNovelSettings(
+  database: Pick<VisualNovelDatabase, 'settings'> | null | undefined,
+): VisualNovelSettings {
+  return normalizeVisualNovelSettings(database?.settings);
+}
+
+export function updateVisualNovelSettings(
+  database: VisualNovelDatabase,
+  patch: VisualNovelSettingsPatch,
+): VisualNovelDatabase {
+  const normalized = normalizeVisualNovelDatabase(database);
+  const current = visualNovelSettings(normalized);
+  return {
+    ...normalized,
+    settings: normalizeVisualNovelSettings({
+      ...current,
+      ...patch,
+      reader: { ...current.reader, ...(patch.reader ?? {}) },
+    }),
+  };
+}
+
+export function createEmptyVisualNovelDatabase(): VisualNovelDatabase {
+  return {
+    version: VISUAL_NOVEL_DATABASE_VERSION,
+    entries: [],
+    captures: [],
+    settings: normalizeVisualNovelSettings(undefined),
+  };
+}
+
+/**
+ * What the engine's label may honestly claim.
+ *
+ * `supported` used to be printed for Ren'Py, KiriKiri, NScripter and Tyrano,
+ * while script import only ever read PLAIN `.rpy/.ks/.txt/.scr/.csv` files —
+ * and a shipped KiriKiri game keeps its `.ks` inside `.xp3` archives, a shipped
+ * Ren'Py game usually only has compiled `.rpyc`. So no engine is "supported"
+ * outright any more:
+ *   - `partial` — script import works IF the plain script files are present;
+ *   - `manual`  — the scripts live in a proprietary archive this app does not
+ *                 (and will not) unpack; a text hooker or OCR is the way in.
+ */
 export function visualNovelEngineCompatibility(
   engine: VisualNovelEngine,
 ): VisualNovelEntry['engineCompatibility'] {
-  if (engine === 'renpy' || engine === 'kirikiri' || engine === 'nscripter' || engine === 'tyrano') return 'supported';
-  if (engine === 'unity' || engine === 'rpg-maker') return 'partial';
-  if (engine === 'custom') return 'manual';
-  return 'unknown';
+  if (engine === 'renpy' || engine === 'kirikiri' || engine === 'nscripter' || engine === 'tyrano') return 'partial';
+  if (engine === 'unknown') return 'unknown';
+  return 'manual';
 }
 
-/** Detects common VN engines from a bounded list of relative file names. */
+/**
+ * Detects VN engines from a bounded list of relative file names. Each rule is a
+ * file the engine's own runtime or packer is known to ship; nothing is opened.
+ * Order matters where engines share an extension (`.arc`, `.dat`).
+ */
 export function detectVisualNovelEngine(files: readonly string[]): VisualNovelEngine {
   const normalized = files.map((file) => file.replace(/\\/g, '/').toLowerCase());
   const has = (pattern: RegExp): boolean => normalized.some((file) => pattern.test(file));
-  if (has(/(^|\/)renpy(\/|$)|\.rpyc?$|(^|\/)script_version\.txt$/)) return 'renpy';
+  if (has(/(^|\/)renpy(\/|$)|\.rpyc?$|\.rpa$|(^|\/)script_version\.txt$/)) return 'renpy';
+  if (has(/(^|\/)siglusengine[^/]*\.exe$|(^|\/)scene\.pck$|(^|\/)gameexe\.dat$/)) return 'siglus';
+  if (has(/(^|\/)bgi\.exe$|(^|\/)bgi\.gdb$|(^|\/)sysgrp\.arc$|(^|\/)data\d{5}\.arc$/)) return 'bgi';
+  if (has(/(^|\/)cs2(conf)?\.(exe|dll)$|(^|\/)cs2[^/]*\.exe$|(^|\/)scene\.int$|(^|\/)config\.int$/)) return 'catsystem2';
+  if (has(/\.ypf$|(^|\/)yu-?ris[^/]*\.exe$|(^|\/)ysbin(\/|$)/)) return 'yuris';
+  if (has(/(^|\/)artemis[^/]*\.exe$|(^|\/)root\.pfs(\.\d{3})?$/)) return 'artemis';
   if (has(/\.xp3$|(^|\/)(krkr|kirikiri)[^/]*\.exe$/)) return 'kirikiri';
-  if (has(/(^|\/)(nscript\.dat|nscr_sec\.dat|0\.txt|onscripter[^/]*)$/)) return 'nscripter';
-  if (has(/(^|\/)tyrano(\/|$)|(^|\/)data\/scenario\/.+\.ks$/)) return 'tyrano';
+  if (has(/(^|\/)(nscript\.dat|nscr_sec\.dat|0\.txt|onscripter[^/]*|arc\.nsa)$/)) return 'nscripter';
+  if (has(/(^|\/)tyrano(\/|$)|(^|\/)data\/scenario\/.+\.ks$|(^|\/)tyrano[^/]*\.js$/)) return 'tyrano';
   if (has(/(^|\/)unityplayer\.dll$|(^|\/)gameassembly\.dll$|_data\/globalgamemanagers$/)) return 'unity';
   if (has(/(^|\/)www\/data\/system\.json$|(^|\/)game\.rgss\d+a$|(^|\/)rpg_.*\.dll$/)) return 'rpg-maker';
   return 'unknown';
@@ -406,12 +586,7 @@ function normalizeEntry(value: unknown): VisualNovelEntry | null {
   const id = clean(raw.id);
   const title = clean(raw.title);
   if (!id || !title) return null;
-  const engine = raw.engine;
-  const normalizedEngine: VisualNovelEngine = (
-    engine === 'renpy' || engine === 'kirikiri' || engine === 'nscripter'
-    || engine === 'unity' || engine === 'rpg-maker' || engine === 'tyrano'
-    || engine === 'custom' || engine === 'unknown'
-  ) ? engine : 'unknown';
+  const normalizedEngine: VisualNovelEngine = isVisualNovelEngine(raw.engine) ? raw.engine : 'unknown';
   const status = raw.status;
   return {
     id,
@@ -469,6 +644,7 @@ function normalizeEntry(value: unknown): VisualNovelEntry | null {
     completionPct: Math.min(100, nonNegative(raw.completionPct)),
     totalPlaytimeSec: nonNegative(raw.totalPlaytimeSec),
     lastPlayedAt: raw.lastPlayedAt == null ? null : nonNegative(raw.lastPlayedAt),
+    clipboardCapture: raw.clipboardCapture !== false,
     createdAt: nonNegative(raw.createdAt),
     updatedAt: nonNegative(raw.updatedAt),
   };
@@ -525,6 +701,7 @@ export function normalizeVisualNovelDatabase(value: unknown): VisualNovelDatabas
     version: VISUAL_NOVEL_DATABASE_VERSION,
     entries: entries.sort((a, b) => b.updatedAt - a.updatedAt),
     captures: captures.slice(0, VISUAL_NOVEL_CAPTURE_LIMIT),
+    settings: normalizeVisualNovelSettings(raw.settings),
   };
 }
 
@@ -658,6 +835,9 @@ export function updateVisualNovelMetadata(
         engineCompatibility: visualNovelEngineCompatibility(engine),
         version: patch.version === undefined ? entry.version : clean(patch.version),
         language: patch.language === undefined ? entry.language : clean(patch.language, 'ja'),
+        clipboardCapture: patch.clipboardCapture === undefined
+          ? entry.clipboardCapture
+          : patch.clipboardCapture !== false,
         updatedAt: now,
       };
     }).sort((a, b) => b.updatedAt - a.updatedAt),
@@ -842,5 +1022,6 @@ export function mergeVisualNovelDatabases(
     version: VISUAL_NOVEL_DATABASE_VERSION,
     entries,
     captures,
+    settings: base.settings,
   });
 }

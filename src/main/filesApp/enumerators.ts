@@ -48,6 +48,7 @@ import {
   mediaItemsFromStoredDocument,
 } from '../../shared/mediaLibraryEntries';
 import { AGENT_WORKSPACE_RELATIVE_PATH } from '../../shared/agentWorkspace';
+import { visualNovelEnumerator } from './visualNovelEnumerator';
 // Both of these come from `shared/`, not from their main-process owners: those
 // import `electron`, and this module is bundled and run outside Electron by
 // gate 1's census. The owners re-export every name, so there is still exactly
@@ -1118,6 +1119,7 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   scraperJobEnumerator,
   transcriptionQueueEnumerator,
   readingLensEnumerator,
+  visualNovelEnumerator,
 ];
 
 /**

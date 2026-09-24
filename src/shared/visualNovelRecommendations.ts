@@ -9,12 +9,29 @@ export interface VisualNovelLearnerContext {
   analyzedTitles: number;
 }
 
+/** A reason in catalog terms, for the UI to translate (`reasons` stays English for agents/logs). */
+export interface VisualNovelReasonCode {
+  key: string;
+  vars?: Record<string, string | number>;
+}
+
 export interface VisualNovelRecommendation<T> {
   item: T;
   score: number;
   reasons: string[];
+  reasonCodes: VisualNovelReasonCode[];
   difficultyScore: number | null;
   knownCoverage: number | null;
+  /** Where `difficultyScore` came from: the learner's own captured text, or VNDB data. */
+  difficultySource: 'captured' | 'vndb' | null;
+}
+
+/** What the renderer asks main for when it wants recommendations beyond the library. */
+export interface VisualNovelCandidateRequest {
+  /** Preferred tag NAMES, strongest first (main resolves them to VNDB ids). */
+  tags: string[];
+  /** VNDB ids already in the library, never recommended again. */
+  excludeProviderIds: string[];
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
@@ -80,6 +97,48 @@ export function buildVisualNovelLearnerContext(
   };
 }
 
+/**
+ * VNDB tags that reliably move the Japanese up or down. Native VNs sit around
+ * N2-N1 as a class; slice-of-life, romance and comedy titles use everyday
+ * speech, while science fiction, mystery, historical and philosophical ones
+ * carry specialist and literary vocabulary. Matched on lower-cased tag names.
+ */
+const EASIER_TAGS = [
+  'slice of life', 'moege', 'school life', 'comedy', 'romance', 'daily life',
+  'iyashikei', 'kinetic novel', 'childhood friend heroine',
+];
+const HARDER_TAGS = [
+  'science fiction', 'philosophy', 'mystery', 'detective', 'historical', 'politics',
+  'war', 'psychological', 'chuunibyou', 'military', 'time travel', 'conspiracy',
+  'religion', 'literature', 'dystopia', 'cyberpunk', 'horror', 'mythology', 'occult',
+];
+
+export function jlptForDifficultyScore(score: number): VisualNovelLearnerContext['targetJlpt'] {
+  return targetJlpt(score);
+}
+
+/**
+ * A difficulty PRIOR from VNDB data alone (tags and length), used before any of
+ * the learner's own text has been captured. Deliberately coarse, and always
+ * presented as an estimate.
+ */
+export function estimateVisualNovelDifficultyPrior(input: {
+  tags: readonly string[];
+  estimatedPlaytimeHours: number;
+}): { score: number; jlpt: VisualNovelLearnerContext['targetJlpt'] } {
+  const tags = input.tags.map(normalizedTag);
+  const hits = (list: readonly string[]): number => Math.min(
+    3,
+    list.filter((needle) => tags.some((tag) => tag.includes(needle))).length,
+  );
+  let score = 60 + hits(HARDER_TAGS) * 6 - hits(EASIER_TAGS) * 6;
+  const hours = input.estimatedPlaytimeHours;
+  if (hours > 0 && hours < 10) score -= 5;
+  else if (hours > 50) score += 4;
+  const bounded = Math.round(clamp(score, 25, 92));
+  return { score: bounded, jlpt: targetJlpt(bounded) };
+}
+
 function interestScore(tags: readonly string[], preferredTags: readonly string[]): {
   score: number;
   matches: string[];
@@ -119,6 +178,17 @@ export function rankVisualNovelEntries(
         : clamp(28 - Math.abs(knownCoverage - 0.83) * 90, 0, 28);
       const community = communityScore(entry.communityRating, entry.communityVoteCount);
       const statusBoost = entry.status === 'reading' ? 8 : entry.status === 'replaying' ? 4 : 6;
+      const prior = difficultyScore == null && (entry.tags.length || entry.estimatedPlaytimeHours)
+        ? estimateVisualNovelDifficultyPrior(entry)
+        : null;
+      const level = profile?.difficulty.jlptLevel ?? profile?.difficulty.band ?? prior?.jlpt ?? '';
+      const reasonCodes: VisualNovelReasonCode[] = [
+        ...(knownCoverage == null ? [] : [{ key: 'vnRecs.reason.known', vars: { percent: Math.round(knownCoverage * 100) } }]),
+        ...(level ? [{ key: prior ? 'vnRecs.reason.estimated' : 'vnRecs.reason.level', vars: { level } }] : []),
+        ...(interests.matches.length ? [{ key: 'vnRecs.reason.matches', vars: { tags: interests.matches.join(', ') } }] : []),
+        ...(entry.communityRating == null ? [] : [{ key: 'vnRecs.reason.rating', vars: { rating: entry.communityRating } }]),
+        ...(entry.status === 'reading' ? [{ key: 'vnRecs.reason.continue' }] : []),
+      ];
       const reasons = [
         ...(knownCoverage == null ? [] : [
           `${Math.round(knownCoverage * 100)}% known vocabulary`,
@@ -136,8 +206,10 @@ export function rankVisualNovelEntries(
         item: entry,
         score: Math.round(difficultyFit + coverageFit + interests.score + community + statusBoost),
         reasons: reasons.length ? reasons : ['Ready for language analysis'],
-        difficultyScore,
+        reasonCodes: reasonCodes.length ? reasonCodes : [{ key: 'vnRecs.reason.analyze' }],
+        difficultyScore: difficultyScore ?? prior?.score ?? null,
         knownCoverage,
+        difficultySource: difficultyScore != null ? 'captured' : prior ? 'vndb' : null,
       };
     })
     .sort((a, b) => b.score - a.score || a.item.title.localeCompare(b.item.title))
@@ -155,17 +227,46 @@ export function rankVisualNovelSourceResults(
     const lengthFit = item.estimatedPlaytimeHours
       ? clamp(12 - Math.abs(item.estimatedPlaytimeHours - 30) / 5, 0, 12)
       : 5;
+    // VNDB results used to ignore difficulty entirely. The prior is coarse, so it
+    // is weighted to break ties between interesting titles, not to dominate them.
+    const prior = estimateVisualNovelDifficultyPrior(item);
+    const difficultyFit = clamp(24 - Math.abs(prior.score - context.targetDifficultyScore) * 0.6, 0, 24);
+    // A title with no Japanese release cannot be read in Japanese.
+    const japaneseAvailable = !item.languages?.length || item.languages.includes('ja');
     const reasons = [
       ...(interests.matches.length ? [`Matches ${interests.matches.join(', ')}`] : []),
       ...(item.communityRating == null ? [] : [`${item.communityRating}/10 community rating`]),
       ...(item.estimatedPlaytimeHours ? [`About ${Math.round(item.estimatedPlaytimeHours)} hours`] : []),
     ];
+    const reasonCodes: VisualNovelReasonCode[] = [
+      { key: 'vnRecs.reason.estimated', vars: { level: prior.jlpt } },
+      ...(interests.matches.length ? [{ key: 'vnRecs.reason.matches', vars: { tags: interests.matches.join(', ') } }] : []),
+      ...(item.communityRating == null ? [] : [{ key: 'vnRecs.reason.rating', vars: { rating: item.communityRating } }]),
+      ...(item.estimatedPlaytimeHours ? [{ key: 'vnRecs.reason.hours', vars: { hours: Math.round(item.estimatedPlaytimeHours) } }] : []),
+    ];
     return {
       item,
-      score: Math.round(20 + interests.score + community + lengthFit),
+      score: Math.round((20 + interests.score + community + lengthFit + difficultyFit) * (japaneseAvailable ? 1 : 0.3)),
       reasons: reasons.length ? reasons : ['Candidate for metadata review'],
-      difficultyScore: null,
+      reasonCodes,
+      difficultyScore: prior.score,
       knownCoverage: null,
+      difficultySource: 'vndb',
     };
   }).sort((a, b) => b.score - a.score || a.item.title.localeCompare(b.item.title));
+}
+
+/**
+ * The request for VNDB candidates: tags weighted toward what the learner
+ * finished or is reading (`buildVisualNovelLearnerContext`), with every VNDB id
+ * already in the library excluded.
+ */
+export function visualNovelCandidateRequest(
+  entries: readonly VisualNovelEntry[],
+  context: VisualNovelLearnerContext,
+): VisualNovelCandidateRequest {
+  return {
+    tags: context.preferredTags.slice(0, 3),
+    excludeProviderIds: entries.flatMap((entry) => (entry.sourceIds.vndb ? [entry.sourceIds.vndb] : [])),
+  };
 }

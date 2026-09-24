@@ -1,4 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { execFile, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,10 @@ import {
   updateVisualNovelMetadata,
   updateVisualNovelProgress,
   updateVisualNovelRoutes,
+  updateVisualNovelSettings,
   upsertVisualNovelEntry,
+  visualNovelSettings,
+  VISUAL_NOVEL_DATABASE_FILE,
   type VisualNovelCaptureInput,
   type VisualNovelCaptureBatchOptions,
   type VisualNovelCapturePatch,
@@ -27,6 +31,7 @@ import {
   type VisualNovelMetadataPatch,
   type VisualNovelProgressPatch,
   type VisualNovelRouteInput,
+  type VisualNovelSettingsPatch,
   type VisualNovelSourceResult,
   type VisualNovelSourceDetails,
 } from '../../shared/visualNovel';
@@ -39,6 +44,26 @@ import {
   parseVisualNovelHookChunk,
   type VisualNovelHookState,
 } from '../../shared/visualNovelHook';
+import type { VisualNovelCandidateRequest } from '../../shared/visualNovelRecommendations';
+import type {
+  VisualNovelCaptureSource,
+  VisualNovelSessionState,
+  VisualNovelStudyTime,
+} from '../../shared/visualNovelCapture';
+import { cacheVndbArt, isVndbArtUrl, vndbQuery } from './vndbClient';
+import { createCaptureSession, type CaptureSocket } from './visualNovelCaptureSession';
+import {
+  candidateGameNames,
+  parseTasklistCsv,
+  trackGame,
+  type TrackedGame,
+} from './visualNovelProcess';
+import {
+  closeVisualNovelReader,
+  openVisualNovelReader,
+  readerTarget,
+  setReaderOpacity,
+} from './visualNovelReaderWindow';
 
 const MAX_SCAN_FILES = 3_000;
 const MAX_SCAN_DEPTH = 4;
@@ -52,6 +77,10 @@ const MAX_HOOK_READ_BYTES = 512 * 1024;
 const MAX_CAPTURE_SCREENSHOT_BYTES = 1024 * 1024;
 const MAX_CAPTURE_AUDIO_BYTES = 12 * 1024 * 1024;
 const activeReadingSessions = new Map<string, number>();
+/** The running game behind each reading session, when Launch started one. */
+const activeGames = new Map<string, TrackedGame>();
+/** Characters captured during each running session, for the shared study stats. */
+const sessionChars = new Map<string, number>();
 interface ActiveHookRelay {
   watcher: fs.FSWatcher;
   filePath: string;
@@ -63,11 +92,58 @@ interface ActiveHookRelay {
   remainder: string;
 }
 const activeHookRelays = new Map<string, ActiveHookRelay>();
-const VNDB_ENDPOINT = 'https://api.vndb.org/kana/vn';
-const VNDB_RELEASE_ENDPOINT = 'https://api.vndb.org/kana/release';
+export const VNDB_VN_FIELDS = [
+  'title',
+  'alttitle',
+  'aliases',
+  'titles{lang,title,latin,main,official}',
+  'released',
+  'platforms',
+  'languages',
+  'description',
+  'length_minutes',
+  'average',
+  'votecount',
+  'image{url,sexual}',
+  'screenshots{url,sexual}',
+  'developers{name,original}',
+  'va{character{id,name,original},staff{name,original}}',
+  'tags{name,rating,spoiler,category}',
+].join(',');
+
+/**
+ * VNDB image URLs that passed the adult-image filter (or that the user's own
+ * library stores). `visual-novel:art` caches nothing else, so a renderer cannot
+ * use the cache to fetch an image the filter dropped.
+ */
+const vettedArtUrls = new Set<string>();
+const MAX_VETTED_ART_URLS = 4_000;
+
+function vetVndbArt(urls: readonly string[]): void {
+  for (const url of urls) {
+    if (!isVndbArtUrl(url)) continue;
+    if (vettedArtUrls.size >= MAX_VETTED_ART_URLS) {
+      const oldest = vettedArtUrls.values().next().value;
+      if (oldest !== undefined) vettedArtUrls.delete(oldest);
+    }
+    vettedArtUrls.add(url);
+  }
+}
+
+function isVettedArt(url: string): boolean {
+  if (vettedArtUrls.has(url)) return true;
+  return loadDatabase().entries.some((entry) => (
+    entry.coverImageUrl === url || entry.screenshotUrls.includes(url) || entry.backgroundImageUrls.includes(url)
+  ));
+}
+
+/** The directory `media://` serves — the same root as library.ts's `libraryRoot()`. */
+function mediaRoot(): string {
+  return path.join(app.getPath('userData'), 'library');
+}
 
 function databasePath(): string {
-  return path.join(app.getPath('userData'), 'immersion', 'visual-novels.json');
+  return path.join(app.getPath('userData'), ...VISUAL_NOVEL_DATABASE_FILE.split('/'));
 }
 
 function captureImageDirectory(): string {
@@ -222,6 +298,7 @@ async function readHookRelay(id: string): Promise<void> {
         const added = next.captures.filter((capture) => !previousIds.has(capture.id)).length;
         if (added) {
           relay.capturedLines += added;
+          noteCaptured(id, next.captures.filter((capture) => !previousIds.has(capture.id)));
           saveDatabase(next);
           broadcastHookState(id);
         }
@@ -248,28 +325,215 @@ function scheduleHookRead(id: string): void {
   }, 100);
 }
 
+// ---- study time ---------------------------------------------------------
+//
+// The shared study statistics (`renderer/stats.ts` `recordReading`) live in
+// renderer storage, which main cannot write. A finished session is therefore
+// queued on disk and every app window drains the queue (`visual-novel:
+// drainStudyTime`); draining is atomic here, so exactly one window records it,
+// and a session that ends while no window is open is recorded on the next boot.
+
+
+function studyTimePath(): string {
+  return path.join(app.getPath('userData'), 'immersion', 'visual-novel-study-time.json');
+}
+
+function readStudyTimeQueue(): VisualNovelStudyTime[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(studyTimePath(), 'utf8')) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is VisualNovelStudyTime => (
+      !!item && typeof item === 'object'
+      && typeof (item as VisualNovelStudyTime).visualNovelId === 'string'
+      && Number.isFinite((item as VisualNovelStudyTime).seconds)
+    )).slice(-200) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStudyTimeQueue(queue: VisualNovelStudyTime[]): void {
+  const file = studyTimePath();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = `${file}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(queue.slice(-200)), 'utf8');
+  fs.renameSync(temporary, file);
+}
+
+function queueStudyTime(item: VisualNovelStudyTime): void {
+  if (item.seconds <= 0 && item.chars <= 0) return;
+  writeStudyTimeQueue([...readStudyTimeQueue(), item]);
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('visual-novel:studyTime');
+  }
+}
+
+export function drainStudyTimeQueue(): VisualNovelStudyTime[] {
+  const queue = readStudyTimeQueue();
+  if (queue.length) writeStudyTimeQueue([]);
+  return queue;
+}
+
+function noteCaptured(id: string, captures: ReadonlyArray<{ japanese: string }>): void {
+  if (!captures.length) return;
+  activeGames.get(id)?.noteActivity();
+  if (activeReadingSessions.has(id)) {
+    sessionChars.set(id, (sessionChars.get(id) ?? 0) + captures.reduce(
+      (total, capture) => total + [...capture.japanese].length,
+      0,
+    ));
+  }
+}
+
 function stopReadingSession(id: string, now = Date.now()): VisualNovelDatabase {
   const startedAt = activeReadingSessions.get(id);
+  activeGames.get(id)?.dispose();
+  activeGames.delete(id);
+  const live = captureSession.state();
+  if (live.visualNovelId === id && !live.test) captureSession.stop();
   if (!startedAt) return loadDatabase();
   activeReadingSessions.delete(id);
+  const chars = sessionChars.get(id) ?? 0;
+  sessionChars.delete(id);
   const elapsedSec = Math.max(0, Math.round((now - startedAt) / 1000));
-  return saveDatabase(updateVisualNovelProgress(loadDatabase(), id, {
+  const database = saveDatabase(updateVisualNovelProgress(loadDatabase(), id, {
     playtimeDeltaSec: elapsedSec,
     lastPlayedAt: now,
   }, now));
+  const entry = database.entries.find((candidate) => candidate.id === id);
+  queueStudyTime({ visualNovelId: id, title: entry?.title ?? '', seconds: elapsedSec, chars, endedAt: now });
+  broadcastSessionState(id);
+  return database;
 }
 
 function flushReadingSessions(now = Date.now()): void {
   if (!activeReadingSessions.size) return;
   let database = loadDatabase();
+  const queue: VisualNovelStudyTime[] = [];
   for (const [id, startedAt] of activeReadingSessions) {
+    const seconds = Math.max(0, Math.round((now - startedAt) / 1000));
     database = updateVisualNovelProgress(database, id, {
-      playtimeDeltaSec: Math.max(0, Math.round((now - startedAt) / 1000)),
+      playtimeDeltaSec: seconds,
       lastPlayedAt: now,
     }, now);
+    const entry = database.entries.find((candidate) => candidate.id === id);
+    queue.push({
+      visualNovelId: id,
+      title: entry?.title ?? '',
+      seconds,
+      chars: sessionChars.get(id) ?? 0,
+      endedAt: now,
+    });
   }
   activeReadingSessions.clear();
+  sessionChars.clear();
+  for (const game of activeGames.values()) game.dispose();
+  activeGames.clear();
   saveDatabase(database);
+  const pending = queue.filter((item) => item.seconds > 0 || item.chars > 0);
+  if (pending.length) writeStudyTimeQueue([...readStudyTimeQueue(), ...pending]);
+}
+
+
+function sessionState(id: string): VisualNovelSessionState {
+  return {
+    visualNovelId: id,
+    startedAt: activeReadingSessions.get(id) ?? null,
+    tracking: activeReadingSessions.has(id) ? activeGames.get(id)?.mode() ?? 'manual' : null,
+  };
+}
+
+function broadcastSessionState(id: string): void {
+  const state = sessionState(id);
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('visual-novel:sessionChanged', state);
+  }
+}
+
+// ---- live capture ----------------------------------------------------------
+
+function saveCapturedLines(
+  id: string,
+  lines: ReadonlyArray<{ japanese: string; speaker: string; kind: VisualNovelCaptureInput['kind'] }>,
+  source: VisualNovelCaptureSource,
+): number {
+  const database = loadDatabase();
+  const entry = database.entries.find((candidate) => candidate.id === id);
+  if (!entry) throw new Error('The visual novel does not exist.');
+  const next = appendVisualNovelCaptures(database, lines.map((line) => ({
+    visualNovelId: id,
+    japanese: line.japanese,
+    speaker: line.speaker,
+    kind: line.kind,
+    routeId: entry.currentRouteId,
+    chapter: entry.currentChapter,
+    scene: entry.currentScene,
+    // A websocket texthooker is a text hook too, so it stays within the stored union.
+    source: source === 'clipboard' ? 'clipboard' as const : 'hook' as const,
+  })), () => crypto.randomUUID());
+  const previousIds = new Set(database.captures.map((capture) => capture.id));
+  const added = next.captures.filter((capture) => !previousIds.has(capture.id));
+  if (added.length) {
+    noteCaptured(id, added);
+    saveDatabase(next);
+  }
+  return added.length;
+}
+
+function createNodeSocket(url: string): CaptureSocket {
+  // Node's global WebSocket in Electron's main process. Connecting from main
+  // keeps the renderer CSP's connect-src exactly as narrow as it is.
+  const Socket = (globalThis as { WebSocket?: new (url: string) => CaptureSocket }).WebSocket;
+  if (!Socket) throw new Error('WebSocket is unavailable in this build.');
+  return new Socket(url);
+}
+
+const captureSession = createCaptureSession({
+  readClipboard: () => clipboard.readText(),
+  createSocket: createNodeSocket,
+  saveLines: saveCapturedLines,
+  // While one of the app's own windows has focus the user is working in the
+  // app (copying a word from the dictionary popup, say), not playing; the
+  // hooker writes the clipboard while the GAME has focus.
+  clipboardFromApp: () => BrowserWindow.getFocusedWindow() !== null,
+  broadcast: (state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send('visual-novel:captureChanged', state);
+    }
+  },
+});
+
+function startCapture(id: string, test = false) {
+  const database = loadDatabase();
+  const entry = database.entries.find((candidate) => candidate.id === id);
+  if (!entry) throw new Error('The visual novel does not exist.');
+  const settings = visualNovelSettings(database);
+  return captureSession.start(id, {
+    // A test listens to both sources, so it can say which one is wired up.
+    clipboard: test || entry.clipboardCapture,
+    websocket: test || settings.websocketEnabled,
+    websocketUrl: settings.websocketUrl,
+    test,
+  });
+}
+
+function listProcessNames(): Promise<Set<string>> {
+  return new Promise((resolve, reject) => {
+    if (process.platform !== 'win32') {
+      reject(new Error('Process listing is Windows-only.'));
+      return;
+    }
+    execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true, timeout: 8_000 }, (error, stdout) => {
+      if (error) reject(error);
+      else resolve(parseTasklistCsv(String(stdout)));
+    });
+  });
+}
+
+function openReaderFor(id: string): void {
+  const settings = visualNovelSettings(loadDatabase());
+  openVisualNovelReader(id, settings.reader, (bounds) => {
+    saveDatabase(updateVisualNovelSettings(loadDatabase(), { reader: { bounds } }));
+  });
 }
 
 async function scanRelativeFiles(root: string): Promise<string[]> {
@@ -341,41 +605,18 @@ function decodeScript(buffer: Buffer): string {
 async function searchVndb(query: string): Promise<VisualNovelSourceResult[]> {
   const search = query.trim().slice(0, 160);
   if (search.length < 2) return [];
-  const response = await fetch(VNDB_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'JapaneseStudyOS/1.0',
-    },
-    body: JSON.stringify({
-      filters: ['search', '=', search],
-      fields: [
-        'title',
-        'alttitle',
-        'aliases',
-        'titles{lang,title,latin,main,official}',
-        'released',
-        'platforms',
-        'description',
-        'length_minutes',
-        'average',
-        'votecount',
-        'image{url,sexual}',
-        'screenshots{url,sexual}',
-        'developers{name,original}',
-        'va{character{id,name,original},staff{name,original}}',
-        'tags{name,rating,spoiler,category}',
-      ].join(','),
-      sort: 'searchrank',
-      results: 12,
-    }),
-    signal: AbortSignal.timeout(12_000),
-  });
-  if (!response.ok) {
-    throw new Error(`VNDB metadata search failed (${response.status}).`);
-  }
-  const payload = await response.json() as { results?: unknown[] };
-  return (payload.results ?? []).flatMap((value) => {
+  const payload = await vndbQuery('vn', {
+    filters: ['search', '=', search],
+    fields: VNDB_VN_FIELDS,
+    sort: 'searchrank',
+    results: 12,
+  }) as { results?: unknown[] };
+  return vndbResultsToSourceResults(payload.results ?? []);
+}
+
+/** Map raw VNDB `vn` rows to source results, applying the adult-image filter. */
+export function vndbResultsToSourceResults(rows: readonly unknown[]): VisualNovelSourceResult[] {
+  const results = rows.flatMap((value) => {
     if (!value || typeof value !== 'object') return [];
     const raw = value as Record<string, unknown>;
     const providerId = typeof raw.id === 'string' ? raw.id : '';
@@ -459,43 +700,83 @@ async function searchVndb(query: string): Promise<VisualNovelSourceResult[]> {
       communityRating: average == null ? null : Math.round((average > 10 ? average / 10 : average) * 10) / 10,
       communityVoteCount: typeof raw.votecount === 'number' ? raw.votecount : 0,
       sourceUrl: `https://vndb.org/${providerId}`,
+      languages: Array.isArray(raw.languages)
+        ? raw.languages.filter((item): item is string => typeof item === 'string')
+        : [],
     }];
   });
+  for (const result of results) {
+    vetVndbArt([result.coverImageUrl, ...result.screenshotUrls]);
+  }
+  return results;
+}
+
+const tagIdCache = new Map<string, string>();
+
+/** VNDB filters tags by id (`g123`), while the library stores tag NAMES. */
+async function vndbTagId(name: string): Promise<string> {
+  const key = name.trim().toLowerCase();
+  if (!key) return '';
+  const cached = tagIdCache.get(key);
+  if (cached !== undefined) return cached;
+  const payload = await vndbQuery('tag', {
+    filters: ['search', '=', name.trim()],
+    fields: 'name',
+    results: 5,
+  }) as { results?: Array<{ id?: unknown; name?: unknown }> };
+  const rows = payload.results ?? [];
+  const exact = rows.find((row) => typeof row.name === 'string' && row.name.toLowerCase() === key) ?? rows[0];
+  const id = typeof exact?.id === 'string' && /^g\d+$/.test(exact.id) ? exact.id : '';
+  tagIdCache.set(key, id);
+  return id;
+}
+
+/**
+ * Candidates for "what to read next": Japanese-original VNs available in
+ * Japanese that share tags with what the learner finished or liked, excluding
+ * anything already in the library. Ranking by difficulty happens in the
+ * renderer (`rankVisualNovelSourceResults`), which knows the learner's level.
+ */
+async function recommendVndbCandidates(request: VisualNovelCandidateRequest): Promise<VisualNovelSourceResult[]> {
+  const tagNames = [...new Set((request?.tags ?? []).map((tag) => String(tag).trim()).filter(Boolean))].slice(0, 3);
+  const tagIds = (await Promise.all(tagNames.map((name) => vndbTagId(name).catch(() => '')))).filter(Boolean);
+  const filters: unknown[] = ['and', ['olang', '=', 'ja'], ['lang', '=', 'ja'], ['votecount', '>=', 50]];
+  if (tagIds.length) filters.push(['or', ...tagIds.map((id) => ['tag', '=', id])]);
+  const payload = await vndbQuery('vn', {
+    filters,
+    fields: VNDB_VN_FIELDS,
+    sort: 'rating',
+    reverse: true,
+    results: 25,
+  }) as { results?: unknown[] };
+  const exclude = new Set((request?.excludeProviderIds ?? []).map((id) => String(id).toLowerCase()));
+  return vndbResultsToSourceResults(payload.results ?? [])
+    .filter((result) => !exclude.has(result.providerId.toLowerCase()));
 }
 
 async function fetchVndbSourceDetails(providerId: string): Promise<VisualNovelSourceDetails> {
   const id = providerId.trim();
   if (!/^v\d+$/i.test(id)) throw new Error('The VNDB visual novel ID is invalid.');
-  const response = await fetch(VNDB_RELEASE_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'JapaneseStudyOS/1.0',
-    },
-    body: JSON.stringify({
-      filters: ['vn', '=', ['id', '=', id]],
-      fields: [
-        'id',
-        'title',
-        'released',
-        'languages{lang,title,mtl,main}',
-        'platforms',
-        'engine',
-        'voiced',
-        'official',
-        'patch',
-        'freeware',
-        'vns{id,rtype}',
-        'producers{id,name,original,publisher,developer}',
-      ].join(','),
-      sort: 'released',
-      reverse: true,
-      results: 100,
-    }),
-    signal: AbortSignal.timeout(12_000),
-  });
-  if (!response.ok) throw new Error(`VNDB release lookup failed (${response.status}).`);
-  const payload = await response.json() as { results?: unknown[] };
+  const payload = await vndbQuery('release', {
+    filters: ['vn', '=', ['id', '=', id]],
+    fields: [
+      'id',
+      'title',
+      'released',
+      'languages{lang,title,mtl,main}',
+      'platforms',
+      'engine',
+      'voiced',
+      'official',
+      'patch',
+      'freeware',
+      'vns{id,rtype}',
+      'producers{id,name,original,publisher,developer}',
+    ].join(','),
+    sort: 'released',
+    reverse: true,
+    results: 100,
+  }) as { results?: unknown[] };
   const releases = (payload.results ?? []).flatMap((value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
     const raw = value as Record<string, unknown>;
@@ -628,6 +909,7 @@ async function addVisualNovel(input: VisualNovelCreateInput): Promise<VisualNove
 export function registerVisualNovelIpc(): void {
   app.once('before-quit', () => {
     flushReadingSessions();
+    captureSession.stop();
     for (const id of [...activeHookRelays.keys()]) stopHookRelay(id);
   });
   ipcMain.handle('visual-novel:list', async () => loadDatabase());
@@ -635,6 +917,25 @@ export function registerVisualNovelIpc(): void {
   ipcMain.handle('visual-novel:searchSource', async (_event, query: string) => {
     try {
       return { ok: true as const, results: await searchVndb(query) };
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('visual-novel:art', async (_event, url: string) => {
+    try {
+      if (!isVndbArtUrl(url) || !isVettedArt(url)) {
+        return { ok: false as const, error: 'That image is not in the visual novel library.' };
+      }
+      return { ok: true as const, url: await cacheVndbArt(url, mediaRoot()) };
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('visual-novel:recommendCandidates', async (_event, request: VisualNovelCandidateRequest) => {
+    try {
+      return { ok: true as const, results: await recommendVndbCandidates(request) };
     } catch (error) {
       return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
     }
@@ -812,6 +1113,9 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:remove', async (_event, id: string) => {
     activeReadingSessions.delete(id);
+    activeGames.get(id)?.dispose();
+    activeGames.delete(id);
+    if (captureSession.state().visualNovelId === id) captureSession.stop();
     if (activeHookRelays.has(id)) stopHookRelay(id);
     const database = loadDatabase();
     return saveDatabase({
@@ -948,12 +1252,65 @@ export function registerVisualNovelIpc(): void {
     }
   });
 
-  ipcMain.handle('visual-novel:sessionState', async (_event, id: string) => ({
-    startedAt: activeReadingSessions.get(id) ?? null,
-  }));
+  ipcMain.handle('visual-novel:sessionState', async (_event, id: string) => sessionState(id));
+
+  ipcMain.handle('visual-novel:captureState', async () => captureSession.state());
+
+  ipcMain.handle('visual-novel:captureStart', async (_event, id: string, options?: { test?: boolean }) => {
+    try {
+      return { ok: true as const, state: startCapture(id, options?.test === true) };
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('visual-novel:captureStop', async () => captureSession.stop());
+
+  ipcMain.handle('visual-novel:updateSettings', async (_event, patch: VisualNovelSettingsPatch) => {
+    const database = saveDatabase(updateVisualNovelSettings(loadDatabase(), patch ?? {}));
+    const settings = visualNovelSettings(database);
+    if (patch?.reader?.opacity !== undefined) setReaderOpacity(settings.reader.opacity);
+    // A websocket change applies to the running session at once.
+    const live = captureSession.state();
+    if (live.active && !live.test && (patch?.websocketEnabled !== undefined || patch?.websocketUrl !== undefined)) {
+      startCapture(live.visualNovelId);
+    }
+    return database;
+  });
+
+  ipcMain.handle('visual-novel:pickLocaleEmulator', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'LEProc.exe',
+      properties: ['openFile'],
+      filters: [{ name: 'LEProc.exe', extensions: ['exe'] }],
+    });
+    const picked = result.canceled ? '' : result.filePaths[0] ?? '';
+    if (!picked || !/leproc\.exe$/i.test(picked)) return { ok: false as const, canceled: result.canceled };
+    return {
+      ok: true as const,
+      database: saveDatabase(updateVisualNovelSettings(loadDatabase(), { localeEmulatorPath: picked })),
+    };
+  });
+
+  ipcMain.handle('visual-novel:readerOpen', async (_event, id?: string) => {
+    openReaderFor(typeof id === 'string' && id ? id : readerTarget());
+    return { ok: true as const };
+  });
+
+  ipcMain.handle('visual-novel:readerClose', async () => {
+    closeVisualNovelReader();
+  });
+
+  ipcMain.handle('visual-novel:readerTarget', async () => readerTarget()
+    || captureSession.state().visualNovelId
+    || [...activeReadingSessions.keys()][0]
+    || '');
+
+  ipcMain.handle('visual-novel:drainStudyTime', async () => drainStudyTimeQueue());
 
   ipcMain.handle('visual-novel:stopSession', async (_event, id: string) => {
     const stopped = activeReadingSessions.has(id);
+    // Stopping by hand forgets the game; it is not killed.
     return { database: stopReadingSession(id), stopped };
   });
 
@@ -1114,8 +1471,33 @@ export function registerVisualNovelIpc(): void {
     const entry = loadDatabase().entries.find((candidate) => candidate.id === id);
     if (!entry?.executablePath) return { ok: false as const, error: 'No executable is configured.' };
     if (!fs.existsSync(entry.executablePath)) return { ok: false as const, error: 'The executable could not be found.' };
-    const error = await shell.openPath(entry.executablePath);
-    if (error) return { ok: false as const, error };
+    const settings = visualNovelSettings(loadDatabase());
+    if (!activeGames.has(id)) {
+      const installPath = entry.installPath || path.dirname(entry.executablePath);
+      const files = await scanRelativeFiles(installPath).catch(() => [] as string[]);
+      try {
+        const game = trackGame({
+          executablePath: entry.executablePath,
+          candidateNames: candidateGameNames(entry.executablePath, files),
+          localeEmulatorPath: settings.localeEmulatorPath,
+        }, {
+          spawn,
+          listProcessNames,
+          // An executable whose manifest demands elevation cannot be spawned
+          // directly; the shell starts it with a UAC prompt and it is then
+          // followed by process name.
+          onSpawnError: () => {
+            void shell.openPath(entry.executablePath);
+          },
+        }, () => {
+          activeGames.delete(id);
+          stopReadingSession(id);
+        });
+        activeGames.set(id, game);
+      } catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
     const startedAt = activeReadingSessions.get(id) ?? Date.now();
     activeReadingSessions.set(id, startedAt);
     const database = updateVisualNovelProgress(loadDatabase(), id, {
@@ -1123,6 +1505,14 @@ export function registerVisualNovelIpc(): void {
       lastPlayedAt: startedAt,
     });
     saveDatabase(database);
+    // The reading loop starts with the game: capture on, reader beside it.
+    try {
+      startCapture(id);
+    } catch {
+      /* capture is best-effort; the game is already running */
+    }
+    if (settings.reader.autoShow) openReaderFor(id);
+    broadcastSessionState(id);
     return { ok: true as const, startedAt };
   });
 }

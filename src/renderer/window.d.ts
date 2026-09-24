@@ -1671,7 +1671,10 @@ declare global {
         imported?: number;
         error?: string;
       }>;
-      visualNovelSessionState(id: string): Promise<{ startedAt: number | null }>;
+      visualNovelSessionState(id: string): Promise<import('../shared/visualNovelCapture').VisualNovelSessionState>;
+      onVisualNovelSessionChanged(
+        cb: (state: import('../shared/visualNovelCapture').VisualNovelSessionState) => void,
+      ): () => void;
       visualNovelStopSession(id: string): Promise<{
         database: import('../shared/visualNovel').VisualNovelDatabase;
         stopped: boolean;
@@ -1719,6 +1722,42 @@ declare global {
         filePath: string,
       ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }>;
       visualNovelLaunch(id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }>;
+      /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
+      visualNovelArt(url: string): Promise<{ ok: boolean; url?: string; error?: string }>;
+      visualNovelCaptureState(): Promise<import('../shared/visualNovelCapture').VisualNovelCaptureState>;
+      visualNovelCaptureStart(
+        id: string,
+        options?: { test?: boolean },
+      ): Promise<{
+        ok: boolean;
+        state?: import('../shared/visualNovelCapture').VisualNovelCaptureState;
+        error?: string;
+      }>;
+      visualNovelCaptureStop(): Promise<import('../shared/visualNovelCapture').VisualNovelCaptureState>;
+      onVisualNovelCaptureChanged(
+        cb: (state: import('../shared/visualNovelCapture').VisualNovelCaptureState) => void,
+      ): () => void;
+      visualNovelUpdateSettings(
+        patch: import('../shared/visualNovel').VisualNovelSettingsPatch,
+      ): Promise<import('../shared/visualNovel').VisualNovelDatabase>;
+      visualNovelPickLocaleEmulator(): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        canceled?: boolean;
+      }>;
+      visualNovelReaderOpen(id?: string): Promise<{ ok: boolean }>;
+      visualNovelReaderClose(): Promise<void>;
+      visualNovelReaderTarget(): Promise<string>;
+      onVisualNovelReaderTarget(cb: (id: string) => void): () => void;
+      visualNovelDrainStudyTime(): Promise<import('../shared/visualNovelCapture').VisualNovelStudyTime[]>;
+      onVisualNovelStudyTime(cb: () => void): () => void;
+      visualNovelRecommendCandidates(
+        request: import('../shared/visualNovelRecommendations').VisualNovelCandidateRequest,
+      ): Promise<{
+        ok: boolean;
+        results?: import('../shared/visualNovel').VisualNovelSourceResult[];
+        error?: string;
+      }>;
       onVisualNovelChanged(
         cb: (database: import('../shared/visualNovel').VisualNovelDatabase) => void,
       ): () => void;

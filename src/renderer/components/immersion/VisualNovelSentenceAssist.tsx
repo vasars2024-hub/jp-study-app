@@ -11,6 +11,7 @@ import type {
 import { analyzeMediaStudyCues, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
 import VisualNovelAgentHandoffButton from './VisualNovelAgentHandoffButton';
 import { openGrammarPractice } from '../../extensionBridgeUi';
+import { getTranslateTarget } from '../../translateTarget';
 
 /**
  * Kanji-link cap. `vnAssist.kanjiCount` two lines above reads the full length, so the
@@ -97,7 +98,9 @@ export default function VisualNovelSentenceAssist({
       id: Date.now(),
       text: draft.japanese,
       source: 'ja',
-      target: 'en',
+      // The learner's translation language, shared with the Translate view and
+      // both readers — this was hard-coded to English.
+      target: getTranslateTarget(),
     });
     setBusy(false);
     if (!response.ok || !response.text) {

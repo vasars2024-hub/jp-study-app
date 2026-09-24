@@ -14,6 +14,7 @@ import { GAME_ARENA_CHROME_ZH } from '../gameArena/zh';
 import { MOONCAP_PHASE_LORE_ZH } from '../mooncapLore/zh';
 import { MINING_UI_ZH } from '../miningUi/zh';
 import { MAL_SYNC_ZH } from '../malSync/zh';
+import { VISUAL_NOVEL_ZH } from '../visualNovel/zh';
 import { WATCH_LIBRARY_ZH } from '../watchLibrary/zh';
 import { GUM_LIBRARY_ZH } from '../gumLibrary/zh';
 import { SCRAPER_UI_ZH } from '../scraperUi/zh';
@@ -529,7 +530,6 @@ export const zh: Catalog = {
   'vnPanel.captureScreenText': '采集屏幕文本',
   'vnPanel.stopHook': '停止文本钩子',
   'vnPanel.startHook': '启动文本钩子',
-  'vnPanel.clipboardCapture': '实时采集剪贴板',
   'vnPanel.hookListening': '钩子监听中 · 新增 {count} 行',
   'vnPanel.aria.miningScope': '挖掘范围',
   'vnPanel.scope.all': '整部视觉小说',
@@ -556,7 +556,6 @@ export const zh: Catalog = {
   'vnPanel.charactersHead': '角色说话风格',
   'vnPanel.speakers': '{count} 位说话人',
   'vnPanel.commonSignals': '常见句尾：{signals}',
-  'vnPanel.msg.clipboardCaptured': '已从剪贴板采集到新的日语文本。',
   'vnPanel.msg.added': '视觉小说已添加到本地库。',
   'vnPanel.msg.removed': '已从本地库中移除 {title}。',
   'vnPanel.msg.removeFailed': '{title} 仍在本地库中。',
@@ -668,6 +667,7 @@ export const zh: Catalog = {
   ...MOONCAP_PHASE_LORE_ZH,
   ...MINING_UI_ZH,
   ...MAL_SYNC_ZH,
+  ...VISUAL_NOVEL_ZH,
   ...WATCH_LIBRARY_ZH,
   ...GUM_LIBRARY_ZH,
   ...SCRAPER_UI_ZH,
@@ -2558,6 +2558,7 @@ export const zh: Catalog = {
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': '抓取器',
   'palette.section.files': '文件',
+  'palette.section.visualnovels': '视觉小说',
   'palette.section.agent': '智能体',
   'agent.shell.aria': '智能体工作区',
   'agent.rail.aria': '对话',

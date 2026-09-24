@@ -364,13 +364,14 @@ describe('VisualNovelPanel renders in the interface language', () => {
     const text = await render('ja');
     const catalog = catalogFor('ja');
     expect(text).toContain(catalog['vnPanel.status.reading'] as string);
-    // `normalizeVisualNovelDatabase` derives this from the engine: kirikiri is
-    // a supported engine, so the seed's compatibility is `supported`.
-    expect(text).toContain(catalog['vnPanel.compat.supported'] as string);
+    // `normalizeVisualNovelDatabase` derives this from the engine. KiriKiri is
+    // `partial`, not `supported`: script import reads only unpacked `.ks`, and a
+    // shipped KiriKiri game keeps its scripts inside `.xp3` archives.
+    expect(text).toContain(catalog['vnPanel.compat.partial'] as string);
     expect(text, 'the engine name is data and must survive').toContain('kirikiri');
     // `reading` also appears inside `Reading overlay`, so anchor on the token
     // in its own separator context rather than on the bare word.
-    expect(text).not.toContain('· supported ·');
+    expect(text).not.toContain('· partial ·');
   });
 });
 

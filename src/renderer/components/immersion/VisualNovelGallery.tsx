@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import type { VisualNovelEntry } from '../../../shared/visualNovel';
+import { useT } from '../../i18n';
+import VisualNovelArt from './VisualNovelArt';
 
 export default function VisualNovelGallery({ entry }: { entry: VisualNovelEntry }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const images = [
-    ...entry.backgroundImageUrls.map((url) => ({ url, kind: 'Background' })),
-    ...entry.screenshotUrls.map((url) => ({ url, kind: 'Screenshot' })),
+    ...entry.backgroundImageUrls.map((url) => ({ url, kind: 'background' as const })),
+    ...entry.screenshotUrls.map((url) => ({ url, kind: 'screenshot' as const })),
   ].slice(0, 24);
   const hasStoryMetadata = entry.themes.length || entry.chapters.length || entry.characters.length;
   if (!images.length && !hasStoryMetadata) return null;
@@ -17,8 +20,8 @@ export default function VisualNovelGallery({ entry }: { entry: VisualNovelEntry 
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        Story and gallery
-        <span>{images.length} images</span>
+        {t('vnApp.gallery.head')}
+        <span>{t('vnApp.gallery.count', { count: images.length })}</span>
       </summary>
       {open && (
         <>
@@ -35,11 +38,12 @@ export default function VisualNovelGallery({ entry }: { entry: VisualNovelEntry 
                 <button
                   key={`${image.kind}:${image.url}`}
                   type="button"
-                  title={`Open ${image.kind.toLocaleLowerCase()}`}
+                  title={t('vnApp.gallery.open')}
                   onClick={() => void window.api.openExternal(image.url)}
                 >
-                  <img src={image.url} alt="" loading="lazy" />
-                  <span>{image.kind}</span>
+                  {/* VNDB art is painted from main's media:// cache; the CSP blocks t.vndb.org. */}
+                  <VisualNovelArt src={image.url} />
+                  <span>{image.kind === 'background' ? t('vnApp.gallery.background') : t('vnApp.gallery.screenshot')}</span>
                 </button>
               ))}
             </div>

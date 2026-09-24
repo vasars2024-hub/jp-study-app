@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
-import type {
-  VisualNovelDatabase,
-  VisualNovelEngine,
-  VisualNovelEntry,
-  VisualNovelMetadataPatch,
+import {
+  VISUAL_NOVEL_ENGINE_NAMES,
+  VISUAL_NOVEL_ENGINES,
+  type VisualNovelDatabase,
+  type VisualNovelEngine,
+  type VisualNovelEntry,
+  type VisualNovelMetadataPatch,
 } from '../../../shared/visualNovel';
 
 interface MetadataDraft {
@@ -144,7 +146,11 @@ export default function VisualNovelMetadataEditor({
         <label>{t('vnMeta.chapters')}<input value={draft.chapters} onChange={(event) => field('chapters', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
         <label>{t('vnMeta.estimatedHours')}<input type="number" min="0" value={draft.estimatedPlaytimeHours} onChange={(event) => field('estimatedPlaytimeHours', event.target.value)} /></label>
         <label>{t('vnMeta.language')}<input value={draft.language} onChange={(event) => field('language', event.target.value)} /></label>
-        <label>{t('vnMeta.engine')}<select value={draft.engine} onChange={(event) => field('engine', event.target.value as VisualNovelEngine)}><option value="renpy">Ren'Py</option><option value="kirikiri">KiriKiri</option><option value="nscripter">NScripter</option><option value="unity">Unity</option><option value="rpg-maker">RPG Maker</option><option value="tyrano">TyranoBuilder</option><option value="custom">{t('vnMeta.engineCustom')}</option><option value="unknown">{t('vnMeta.engineUnknown')}</option></select></label>
+        <label>{t('vnMeta.engine')}<select value={draft.engine} onChange={(event) => field('engine', event.target.value as VisualNovelEngine)}>{VISUAL_NOVEL_ENGINES.map((engine) => (
+          <option key={engine} value={engine}>
+            {engine === 'custom' ? t('vnMeta.engineCustom') : engine === 'unknown' ? t('vnMeta.engineUnknown') : VISUAL_NOVEL_ENGINE_NAMES[engine]}
+          </option>
+        ))}</select></label>
         <label className="is-wide">{t('vnMeta.installPath')}<input value={draft.installPath} onChange={(event) => field('installPath', event.target.value)} /></label>
         <label className="is-wide">{t('vnMeta.executablePath')}<input value={draft.executablePath} onChange={(event) => field('executablePath', event.target.value)} /></label>
         <label className="is-wide">{t('vnMeta.coverImageUrl')}<input value={draft.coverImageUrl} onChange={(event) => field('coverImageUrl', event.target.value)} /></label>

@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MediaItem } from '../../../shared/types';
+import { useEffect, useMemo, useState } from 'react';
 import {
   capturesForVisualNovel,
   createEmptyVisualNovelDatabase,
@@ -20,7 +19,11 @@ import {
   analyzeVisualNovelCharacterSpeech,
   type VisualNovelCharacterSpeechProfile,
 } from '../../../shared/visualNovelLanguage';
-import { rankVisualNovelEntries } from '../../../shared/visualNovelRecommendations';
+import {
+  estimateVisualNovelDifficultyPrior,
+  rankVisualNovelEntries,
+} from '../../../shared/visualNovelRecommendations';
+import type { VisualNovelSessionState } from '../../../shared/visualNovelCapture';
 import {
   vnAddCapturedLineReason,
   vnAddEndingReason,
@@ -32,7 +35,8 @@ import {
   vnLaunchReason,
   type VnActionState,
 } from '../../../shared/vnActionReason';
-import { addMediaStudySentenceFlashcard, addVisualNovelStudyFlashcards, analyzeMediaStudyCues, createMediaLanguageProfile, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
+import { analyzeMediaStudyCues, createMediaLanguageProfile, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
+import { addVisualNovelStudyCards, mineVisualNovelLine, visualNovelMediaItem } from '../../visualNovelMining';
 import { addMediaStudySessionProgress, loadMediaStudyDatabase, onMediaStudyDatabaseChanged, saveMediaLanguageProfile, startMediaStudySession } from '../../mediaStudyStore';
 import { isLookupClick, lookupWordFromMouseUp, noteLookupPointerDown } from '../../wordLookup';
 import { CAPTURE_KIND_KEYS } from './captureKindKeys';
@@ -55,6 +59,9 @@ import VisualNovelReleaseCatalog from './VisualNovelReleaseCatalog';
 import VisualNovelScriptImportPanel from './VisualNovelScriptImportPanel';
 import VisualNovelSentenceAssist from './VisualNovelSentenceAssist';
 import VisualNovelSourcePanel from './VisualNovelSourcePanel';
+import VisualNovelArt from './VisualNovelArt';
+import { TRACKING_KEYS, VisualNovelCaptureBar, VisualNovelCaptureSetup } from './VisualNovelCaptureControls';
+import './visualNovel.css';
 
 interface ProgressDraft {
   status: VisualNovelStatus;
@@ -142,6 +149,63 @@ export function speechSummary(
   ].filter(Boolean).join('; ');
 }
 
+/**
+ * The workspace's sections. Reading comes first and is where the panel opens:
+ * it used to be the fourth thing down a 3,699 px column behind ten disclosures,
+ * below metadata, gallery and release editors that are touched once per title.
+ */
+export type VisualNovelTab = 'read' | 'study' | 'routes' | 'details' | 'setup';
+
+export const TAB_KEYS: Record<VisualNovelTab, string> = {
+  read: 'vnApp.tab.read',
+  study: 'vnApp.tab.study',
+  routes: 'vnApp.tab.routes',
+  details: 'vnApp.tab.details',
+  setup: 'vnApp.tab.setup',
+};
+
+const TABS = Object.keys(TAB_KEYS) as VisualNovelTab[];
+/** Tabs whose panels live in the primary (reading) column. */
+const PRIMARY_TABS: ReadonlySet<VisualNovelTab> = new Set(['read', 'study']);
+
+/**
+ * Minimum captured lines before the panel estimates difficulty from the
+ * learner's own text. Below this a VNDB prior is shown, labelled as one.
+ */
+export const AUTO_ANALYZE_MIN_LINES = 30;
+/** Re-estimate once this many new lines have arrived since the last estimate. */
+const AUTO_ANALYZE_STEP = 25;
+const AUTO_ANALYZE_WINDOW = 400;
+/** Line count at the last automatic estimate, per novel, for this session. */
+const autoAnalyzedLines = new Map<string, number>();
+
+/**
+ * What survives closing the window: the selected novel and the open tab. The
+ * section used to be a `useState(false)` inside the Immersion view, so every
+ * close threw both away.
+ */
+const PANEL_STATE_KEY = 'vn-panel-state';
+
+function readPanelState(): { selectedId: string; tab: VisualNovelTab } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PANEL_STATE_KEY) ?? '{}') as { selectedId?: unknown; tab?: unknown };
+    return {
+      selectedId: typeof raw.selectedId === 'string' ? raw.selectedId : '',
+      tab: TABS.includes(raw.tab as VisualNovelTab) ? raw.tab as VisualNovelTab : 'read',
+    };
+  } catch {
+    return { selectedId: '', tab: 'read' };
+  }
+}
+
+function writePanelState(state: { selectedId: string; tab: VisualNovelTab }): void {
+  try {
+    localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(state));
+  } catch {
+    /* storage unavailable: the panel still works, it just forgets */
+  }
+}
+
 const emptyProgress = (): ProgressDraft => ({
   status: 'planned',
   route: '',
@@ -149,25 +213,6 @@ const emptyProgress = (): ProgressDraft => ({
   scene: '',
   completion: '0',
 });
-
-function pseudoMediaItem(entry: {
-  id: string;
-  title: string;
-  executablePath: string;
-  language: string;
-  createdAt: number;
-}): MediaItem {
-  return {
-    id: `vn:${entry.id}`,
-    title: entry.title,
-    path: entry.executablePath,
-    fileName: entry.executablePath.split(/[\\/]/).pop() ?? entry.title,
-    addedAt: entry.createdAt,
-    kind: 'video',
-    lang: entry.language,
-    category: 'learning',
-  };
-}
 
 function displayCaptureContext(capture: VisualNovelTextCapture): string {
   return [capture.speaker, capture.chapter, capture.scene].filter(Boolean).join(' · ');
@@ -198,12 +243,21 @@ function formatDuration(totalSeconds: number, t: (key: string, vars?: TVars) => 
   return t('vnPanel.duration.m', { minutes });
 }
 
-export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
+export default function VisualNovelPanel({
+  onClose,
+  standalone = false,
+}: {
+  /** The way back to the Immersion browser; absent when the panel IS the app. */
+  onClose?: () => void;
+  /** Rendered as the Visual Novels app: the window title already names it. */
+  standalone?: boolean;
+}) {
   const { t } = useT();
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [database, setDatabase] = useState<VisualNovelDatabase>(createEmptyVisualNovelDatabase);
   const [studyProfiles, setStudyProfiles] = useState(() => loadMediaStudyDatabase().profiles);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(() => readPanelState().selectedId);
+  const [tab, setTab] = useState<VisualNovelTab>(() => readPanelState().tab);
   const [title, setTitle] = useState('');
   const [japaneseTitle, setJapaneseTitle] = useState('');
   const [executablePath, setExecutablePath] = useState('');
@@ -211,7 +265,6 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
   const [captureTranslation, setCaptureTranslation] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [captureKind, setCaptureKind] = useState<VisualNovelTextKind>('dialogue');
-  const [clipboardCapture, setClipboardCapture] = useState(false);
   const [hookState, setHookState] = useState<VisualNovelHookState | null>(null);
   const [routeName, setRouteName] = useState('');
   const [routeCharacter, setRouteCharacter] = useState('');
@@ -226,11 +279,13 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [sessionTracking, setSessionTracking] = useState<VisualNovelSessionState['tracking']>(null);
   const [clockNow, setClockNow] = useState(Date.now());
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [popup, setPopup] = useState<{ query: string; x: number; y: number; context?: string } | null>(null);
-  const lastClipboardText = useRef('');
+
+  useEffect(() => writePanelState({ selectedId, tab }), [selectedId, tab]);
 
   const reportStatus = (message: string, isError = false): void => {
     if (isError) {
@@ -378,11 +433,24 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
       setSessionStartedAt(null);
       return undefined;
     }
-    void window.api.visualNovelSessionState(selected.id).then((state) => {
-      if (active) setSessionStartedAt(state.startedAt);
+    const id = selected.id;
+    void window.api.visualNovelSessionState(id).then((state) => {
+      if (!active) return;
+      setSessionStartedAt(state.startedAt);
+      setSessionTracking(state.tracking ?? null);
     });
+    // The session now ends by itself when the game exits, so the panel follows
+    // main instead of assuming the timer runs until someone presses Stop.
+    const off = typeof window.api.onVisualNovelSessionChanged === 'function'
+      ? window.api.onVisualNovelSessionChanged((state) => {
+        if (!active || state.visualNovelId !== id) return;
+        setSessionStartedAt(state.startedAt);
+        setSessionTracking(state.tracking ?? null);
+      })
+      : () => undefined;
     return () => {
       active = false;
+      off();
     };
   }, [selected?.id]);
 
@@ -393,56 +461,40 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     return () => window.clearInterval(timer);
   }, [sessionStartedAt]);
 
+  // Clipboard capture used to be a timer HERE, so it stopped the moment this
+  // panel closed — i.e. when the user switched to the game. It now runs in main
+  // (`main/immersion/visualNovelCaptureSession.ts`), starts with Launch and
+  // stops when the game exits; `VisualNovelCaptureBar` shows and drives it.
+
+  /*
+   * Item 8: difficulty from the learner's own captured text, without asking.
+   * Once enough lines exist the profile is (re)built in the background, so the
+   * summary stops reading "Unrated" for a novel with hundreds of captured lines.
+   */
+  const selectedProfile = selected ? studyProfiles[`vn:${selected.id}`] : undefined;
   useEffect(() => {
-    if (!clipboardCapture || !selected) return undefined;
+    if (!selected || captures.length < AUTO_ANALYZE_MIN_LINES) return undefined;
+    const analyzed = autoAnalyzedLines.get(selected.id) ?? selectedProfile?.sentences.total ?? 0;
+    if (selectedProfile && captures.length - analyzed < AUTO_ANALYZE_STEP) return undefined;
+    const count = captures.length;
     let active = true;
-    let reading = false;
-    const poll = async (): Promise<void> => {
-      if (reading) return;
-      reading = true;
-      try {
-        const text = await window.api.visualNovelReadClipboard();
-        if (
-          active
-          && text
-          && text !== lastClipboardText.current
-          && /[\u3040-\u30ff\u3400-\u9fff]/u.test(text)
-        ) {
-          lastClipboardText.current = text;
-          const response = await window.api.visualNovelCaptureText({
-            visualNovelId: selected.id,
-            kind: captureKind,
-            japanese: text,
-            speaker,
-            routeId: progress.route,
-            chapter: progress.chapter,
-            scene: progress.scene,
-            source: 'clipboard',
-          });
-          if (active && response.ok && response.database) {
-            setDatabase(response.database);
-            setStatus(t('vnPanel.msg.clipboardCaptured'));
-          }
-        }
-      } finally {
-        reading = false;
-      }
-    };
-    void poll();
-    const timer = window.setInterval((): void => void poll(), 800);
+    const timer = window.setTimeout(() => {
+      const recent = captures.slice(-AUTO_ANALYZE_WINDOW);
+      void analyzeMediaStudyCues(recent.map((capture, index) => ({
+        start: index,
+        end: index + 1,
+        text: capture.japanese,
+      }))).then((value) => {
+        if (!active) return;
+        autoAnalyzedLines.set(selected.id, count);
+        saveMediaLanguageProfile(createMediaLanguageProfile(visualNovelMediaItem(selected), value));
+      }).catch(() => undefined);
+    }, 1_500);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
-  }, [
-    captureKind,
-    clipboardCapture,
-    progress.chapter,
-    progress.route,
-    progress.scene,
-    selected?.id,
-    speaker,
-  ]);
+  }, [selected?.id, captures.length, selectedProfile?.sentences.total]);
 
   const chooseExecutable = async (): Promise<void> => {
     const picked = await window.api.visualNovelPickExecutable();
@@ -539,6 +591,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     const result = await window.api.visualNovelStopSession(selected.id);
     setDatabase(result.database);
     setSessionStartedAt(null);
+    setSessionTracking(null);
     reportStatus(result.stopped ? t('vnPanel.msg.timeSaved') : t('vnPanel.msg.noTimer'));
   };
 
@@ -662,7 +715,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
         end: index + 1,
         text: capture.japanese,
       })));
-      const item = pseudoMediaItem(selected);
+      const item = visualNovelMediaItem(selected);
       if (miningScope === 'all') saveMediaLanguageProfile(createMediaLanguageProfile(item, value));
       const sessionId = startMediaStudySession({
         mediaId: item.id,
@@ -698,17 +751,11 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const createCards = (): void => {
+  const createCards = async (): Promise<void> => {
     if (!selected || !analysis) return;
-    const sceneReferences = new Map(scopedCaptures.map((capture, index) => [
-      index,
-      [capture.chapter, capture.scene, capture.speaker].filter(Boolean).join(' · '),
-    ]));
-    const added = addVisualNovelStudyFlashcards(
-      pseudoMediaItem(selected),
-      analysis,
-      sceneReferences,
-    );
+    setBusy(true);
+    const added = await addVisualNovelStudyCards(selected, analysis, scopedCaptures)
+      .finally(() => setBusy(false));
     setStatus(added.total
       ? t('vnPanel.msg.cardsAdded', {
         total: added.total,
@@ -722,17 +769,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
 
   const saveSelectedSentence = (): void => {
     if (!selected || !selectedCapture) return;
-    const context = [
-      selectedCapture.translation,
-      displayCaptureContext(selectedCapture),
-    ].filter(Boolean).join(' — ');
-    const added = addMediaStudySentenceFlashcard(
-      pseudoMediaItem(selected),
-      selectedCapture.japanese,
-      context,
-      selectedCapture.screenshotPath,
-      selectedCapture.audioPath,
-    );
+    const added = mineVisualNovelLine(selected, selectedCapture);
     setStatus(added ? t('vnPanel.msg.sentenceSaved') : t('vnPanel.msg.sentenceExists'));
   };
 
@@ -804,7 +841,13 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
         <VisualNovelRecommendationsPanel
           context={recommendationState.context}
           recommendations={recommendationState.recommendations}
+          entries={database.entries}
           onSelect={setSelectedId}
+          onAdded={(next, id) => {
+            setDatabase(next);
+            setSelectedId(id);
+          }}
+          onStatus={reportStatus}
         />
         {/* The library list is this panel's primary object list and had no class handle at all —
             its rows could only be found by their own (translated) title text, which is the same
@@ -829,27 +872,62 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     ),
   };
 
+  /*
+   * Difficulty, honestly sourced (item 8). The learner's own captured text wins
+   * once there is enough of it; before that a VNDB prior is shown and SAYS it is
+   * an estimate; with neither, the line says how many lines are still needed.
+   */
+  const difficultyLine = (() => {
+    if (!selected) return '';
+    const profile = selectedProfile && selectedProfile.sentences.total >= AUTO_ANALYZE_MIN_LINES
+      ? selectedProfile
+      : null;
+    if (profile) {
+      const coverage = t('vnApp.coverage', { percent: Math.round(profile.difficulty.knownRatio * 100) });
+      const level = profile.difficulty.jlptLevel;
+      return [
+        level
+          ? t('vnApp.difficulty.captured', { level, count: profile.sentences.total })
+          : t('vnApp.difficulty.capturedNoLevel', { count: profile.sentences.total }),
+        coverage,
+      ].join(' · ');
+    }
+    const needed = Math.max(0, AUTO_ANALYZE_MIN_LINES - captures.length);
+    const textLine = needed
+      ? t('vnApp.difficulty.needLines', { count: needed })
+      : t('vnApp.difficulty.pending');
+    if (selected.tags.length || selected.estimatedPlaytimeHours) {
+      const prior = estimateVisualNovelDifficultyPrior(selected);
+      return [t('vnApp.difficulty.prior', { level: prior.jlpt }), textLine].join(' · ');
+    }
+    return textLine;
+  })();
+  const primaryTab = PRIMARY_TABS.has(tab);
+  const tabId = (value: VisualNovelTab): string => `vn-tab-${value}`;
+  const panelId = (value: VisualNovelTab): string => `vn-tabpanel-${value}`;
+  const tabPanelProps = (value: VisualNovelTab) => ({
+    role: 'tabpanel' as const,
+    id: panelId(value),
+    'aria-labelledby': tabId(value),
+    className: `visual-novel-tabpanel visual-novel-tabpanel--${value}`,
+    hidden: tab !== value,
+  });
+
   return (
     <div className="visual-novel-panel">
       {/* The panel's own title-and-tools row is navigation/transport chrome, so §2.3 makes it a
-          contextual surface rather than a local header. Category 3 measured 2 eligible regions
-          here and only 1 treated: the reading tool beside it carries `.lq-liquid` and this one
-          carried nothing, so in Liquid presentation the panel's chrome stayed a flat plate. The
-          existing class keeps the conventional pixels; `.fwin-liquid` supplies the material. */}
+          contextual surface rather than a local header. In the Visual Novels app the window
+          title already names the surface, so the kicker and title are only drawn when this
+          panel is embedded in the Immersion window. */}
       <ContextualSurface as="header" className="visual-novel-panel-head">
-        <div>
-          <span className="media-study-mode-kicker">{t('vnPanel.kicker')}</span>
-          <strong>{t('vnPanel.title')}</strong>
-        </div>
-        {/* §10.4 Q1 and Q3 both measured ZERO on this surface: no entry point and no declared
-            primary action anywhere in the panel's top third, which on the shipped 820x580
-            Immersion window is everything above y=240. What the head offered was two chrome
-            toggles; the thing the surface exists for — open the novel you are studying — sat at
-            y=300 inside the workspace column, below the fold on a short window. The head now
-            carries one declared primary action. It MIRRORS the summary's Launch rather than
-            replacing it: the summary's own action row owes category 6 two buttons, so moving
-            it would trade one cell for another. With nothing selected it is the way to the
-            first entry instead, which is the honest action for an empty library. */}
+        {!standalone && (
+          <div>
+            <span className="media-study-mode-kicker">{t('vnPanel.kicker')}</span>
+            <strong>{t('vnPanel.title')}</strong>
+          </div>
+        )}
+        {/* One declared primary action in the head: Launch the selected novel, or with
+            nothing selected, the way to the first entry. It mirrors the summary's Launch. */}
         <button
           type="button"
           className="btn primary visual-novel-panel-primary"
@@ -870,7 +948,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           >
             {libraryOpen ? t('immersion.hideLibrary') : t('immersion.showLibrary')}
           </button>
-          <button type="button" onClick={onClose}>{t('vnPanel.backToBrowser')}</button>
+          {onClose && <button type="button" onClick={onClose}>{t('vnPanel.backToBrowser')}</button>}
         </div>
       </ContextualSurface>
       {(status || error) && <p className={error ? 'media-error' : 'muted'} role="status">{error || status}</p>}
@@ -880,17 +958,14 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
         policy={READING_CANVAS_FILL_POLICY}
         tools={libraryOpen ? [libraryTool] : []}
       >
-        <main className="visual-novel-workspace">
-          {/* `muted` is presentation; `visual-novel-empty` is what says this IS the empty state.
-              Without it the surface's one honest empty message is invisible to every consumer
-              that looks for one - a test, a theme, the category-8 state sweep - and the panel
-              reads as a surface with no empty state at all rather than one that names it. */}
+        <main className="visual-novel-workspace is-tabbed">
+          {/* `muted` is presentation; `visual-novel-empty` is what says this IS the empty state. */}
           {!selected && <p className="muted visual-novel-empty">{t('vnPanel.emptyPrompt')}</p>}
           {selected && (
             <>
               <div className="visual-novel-column visual-novel-column--primary">
               <div className="visual-novel-summary">
-                {selected.coverImageUrl && <img src={selected.coverImageUrl} alt="" loading="lazy" />}
+                {selected.coverImageUrl && <VisualNovelArt src={selected.coverImageUrl} />}
                 <div className="visual-novel-summary-title">
                   <strong>{selected.title}</strong>
                   <span>{selected.japaneseTitle}</span>
@@ -900,8 +975,9 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                       votes: selected.communityVoteCount,
                     })}</small>
                   )}
+                  <small className="visual-novel-difficulty">{difficultyLine}</small>
                 </div>
-                <span>
+                <span title={sessionTracking ? t(TRACKING_KEYS[sessionTracking]) : undefined}>
                   {selected.engine} · {t(COMPAT_KEYS[selected.engineCompatibility])} · {formatDuration(
                     selected.totalPlaytimeSec
                     + (sessionStartedAt ? Math.max(0, (clockNow - sessionStartedAt) / 1000) : 0),
@@ -915,22 +991,43 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   <button type="button" onClick={() => void removeEntry(selected.id, selected.title)}>{t('vnPanel.remove')}</button>
                 </div>
               </div>
-              {/* Screen capture is the path a reader actually uses while a novel is running;
-                  typing a line by hand, and wiring the text hook or the clipboard watcher, are
-                  the fallbacks. The composer used to occupy the whole box at rest — two
-                  textareas, a kind select, a speaker field and three more controls — so it
-                  carried seven of the surface's 36 scanned controls for a job most sessions
-                  never do. The disclosure sits INSIDE `.visual-novel-capture-actions` on
-                  purpose: category 6 scores this composer on `.visual-novel-capture select`,
-                  its two textareas and three action buttons, and every one of those is still a
-                  descendant of the element that row reads. */}
+              {/* Tabs rather than ten stacked disclosures. Every panel stays MOUNTED and is
+                  only `hidden`, so a half-typed route note or capture draft survives a tab
+                  switch, and the reading tab is where the panel opens. */}
+              <div className="visual-novel-tabs" role="tablist" aria-label={t('vnApp.aria.tabs')}>
+                {TABS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    id={tabId(value)}
+                    aria-controls={panelId(value)}
+                    aria-selected={tab === value}
+                    tabIndex={tab === value ? 0 : -1}
+                    className={tab === value ? 'is-active' : ''}
+                    onClick={() => setTab(value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+                      event.preventDefault();
+                      const step = event.key === 'ArrowRight' ? 1 : -1;
+                      const next = TABS[(TABS.indexOf(value) + step + TABS.length) % TABS.length];
+                      setTab(next);
+                      (event.currentTarget.parentElement?.querySelector(`#${tabId(next)}`) as HTMLElement | null)?.focus();
+                    }}
+                  >
+                    {t(TAB_KEYS[value])}
+                  </button>
+                ))}
+              </div>
+              <div {...tabPanelProps('read')}>
+              <VisualNovelCaptureBar entry={selected} />
+              {/* Automatic capture (above) is the everyday path; screen OCR, typing a line by
+                  hand and the hook-file relay are the fallbacks, so they stay compact here. */}
               <div className="visual-novel-capture">
                 <div className="visual-novel-capture-actions">
                   <button type="button" onClick={() => void captureScreenText()}>{t('vnPanel.captureScreenText')}</button>
                   <details className="visual-novel-capture-manual">
-                    {/* The text hook and the clipboard watcher keep running while this is shut,
-                        and a running relay the user cannot see is exactly the dishonest state
-                        category 8 scores. The summary reports it. */}
+                    {/* The hook relay keeps running while this is shut; the summary reports it. */}
                     <summary>
                       {t('vnPanel.addCapturedLine')}
                       {hookState?.active && <small>{t('vnPanel.hookListening', { count: hookState.capturedLines })}</small>}
@@ -951,13 +1048,6 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                         <button type="button" className={hookState?.active ? 'is-active' : ''} onClick={() => void toggleHookRelay()}>
                           {hookState?.active ? t('vnPanel.stopHook') : t('vnPanel.startHook')}
                         </button>
-                        <label>
-                          <input type="checkbox" checked={clipboardCapture} onChange={(event) => {
-                            lastClipboardText.current = '';
-                            setClipboardCapture(event.target.checked);
-                          }} />
-                          {t('vnPanel.clipboardCapture')}
-                        </label>
                         {hookState?.active && (
                           <small title={hookState.filePath}>
                             {t('vnPanel.hookListening', { count: hookState.capturedLines })}
@@ -969,6 +1059,35 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   </details>
                 </div>
               </div>
+              <section className="visual-novel-reading-overlay" aria-label={t('vnPanel.aria.overlay')}>
+                <div className="visual-novel-reading-head"><strong>{t('vnPanel.overlayHead')}</strong><span>{t('vnPanel.lines', { count: captures.length })}</span></div>
+                <div className="visual-novel-capture-list wk-on" data-dict-owner="" onPointerDown={noteLookupPointerDown} onMouseUp={onTextMouseUp}>
+                  {captures.map((capture) => (
+                    <button
+                      key={capture.id}
+                      type="button"
+                      className={`visual-novel-capture-row${capture.id === selectedCapture?.id ? ' is-selected' : ''}`}
+                      aria-current={capture.id === selectedCapture?.id ? 'true' : undefined}
+                      onClick={() => setSelectedCaptureId(capture.id)}
+                    >
+                      <small>{displayCaptureContext(capture) || t(CAPTURE_KIND_KEYS[capture.kind])}</small>
+                      <span>{capture.japanese}</span>
+                      {capture.translation && <em>{capture.translation}</em>}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              {selectedCapture && (
+                <VisualNovelSentenceAssist
+                  entry={selected}
+                  capture={selectedCapture}
+                  onDatabase={setDatabase}
+                  onStatus={reportStatus}
+                  onSaveCard={saveSelectedSentence}
+                />
+              )}
+              </div>
+              <div {...tabPanelProps('study')}>
               <div className="visual-novel-analysis-actions">
                 <select value={miningScope} onChange={(event) => setMiningScope(event.target.value as MiningScope)} aria-label={t('vnPanel.aria.miningScope')}>
                   <option value="all">{t('vnPanel.scope.all')}</option>
@@ -977,7 +1096,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   <option value="scenes" disabled={!sceneOptions.length}>{t('vnPanel.scope.scenes')}</option>
                 </select>
                 <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? t('vnPanel.analyzing') : t('vnPanel.analyzeScope', { scope: t(SCOPE_KEYS[miningScope]) })}</button>
-                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={createCards}>{t('vnPanel.createCards')}</button>
+                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={() => void createCards()}>{t('vnPanel.createCards')}</button>
                 <button type="button" onClick={() => setCollectionOpen(true)}>{t('vnPanel.openDeck')}</button>
               </div>
               {miningScope === 'scenes' && (
@@ -1007,33 +1126,6 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                     ))}
                   </div>
                 </details>
-              )}
-              <section className="visual-novel-reading-overlay" aria-label={t('vnPanel.aria.overlay')}>
-                <div className="visual-novel-reading-head"><strong>{t('vnPanel.overlayHead')}</strong><span>{t('vnPanel.lines', { count: captures.length })}</span></div>
-                <div className="visual-novel-capture-list wk-on" data-dict-owner="" onPointerDown={noteLookupPointerDown} onMouseUp={onTextMouseUp}>
-                  {captures.map((capture) => (
-                    <button
-                      key={capture.id}
-                      type="button"
-                      className={`visual-novel-capture-row${capture.id === selectedCapture?.id ? ' is-selected' : ''}`}
-                      aria-current={capture.id === selectedCapture?.id ? 'true' : undefined}
-                      onClick={() => setSelectedCaptureId(capture.id)}
-                    >
-                      <small>{displayCaptureContext(capture) || t(CAPTURE_KIND_KEYS[capture.kind])}</small>
-                      <span>{capture.japanese}</span>
-                      {capture.translation && <em>{capture.translation}</em>}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              {selectedCapture && (
-                <VisualNovelSentenceAssist
-                  entry={selected}
-                  capture={selectedCapture}
-                  onDatabase={setDatabase}
-                  onStatus={reportStatus}
-                  onSaveCard={saveSelectedSentence}
-                />
               )}
               {analysis && (
                 <div className="visual-novel-analysis-summary">
@@ -1067,7 +1159,9 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 />
               )}
               </div>
-              <div className="visual-novel-column visual-novel-column--setup">
+              </div>
+              <div className="visual-novel-column visual-novel-column--setup" hidden={primaryTab}>
+              <div {...tabPanelProps('details')}>
               <VisualNovelMetadataEditor
                 entry={selected}
                 onSaved={setDatabase}
@@ -1086,12 +1180,12 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 onDatabase={setDatabase}
                 onStatus={reportStatus}
               />
-              {/* Bookkeeping, not reading: six controls that are edited when a session ends.
-                  The disclosure wraps `.visual-novel-progress` rather than replacing it, so the
-                  five-column grid and its two responsive remaps are untouched and category 6's
-                  `.visual-novel-progress select` row still resolves through the closed box. */}
-              <details className="visual-novel-progress-disclosure">
-                <summary>{t('vnPanel.progressHead')}</summary>
+              </div>
+              <div {...tabPanelProps('routes')}>
+              {/* Bookkeeping: edited when a session ends. Its own tab now, so it no longer
+                  needs the disclosure it hid behind in the single long column. */}
+              <section className="visual-novel-progress-section" aria-label={t('vnPanel.progressHead')}>
+                <div className="visual-novel-reading-head"><strong>{t('vnPanel.progressHead')}</strong></div>
               <div className="visual-novel-progress">
                 <label>{t('vnPanel.statusLabel')}<select value={progress.status} onChange={(event) => setProgress((current) => ({ ...current, status: event.target.value as VisualNovelStatus }))}>{(Object.keys(STATUS_KEYS) as VisualNovelStatus[]).map((value) => <option key={value} value={value}>{t(STATUS_KEYS[value])}</option>)}</select></label>
                 <label>{t('vnPanel.route')}<select value={progress.route} onChange={(event) => setProgress((current) => ({ ...current, route: event.target.value }))}><option value="">{t('vnPanel.noRoute')}</option>{selected.routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}</select></label>
@@ -1100,7 +1194,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 <label>{t('vnPanel.completion')}<input type="number" min="0" max="100" value={progress.completion} onChange={(event) => setProgress((current) => ({ ...current, completion: event.target.value }))} /></label>
                 <button type="button" onClick={() => void saveProgress()}>{t('vnPanel.saveProgress')}</button>
               </div>
-              </details>
+              </section>
               <section className="visual-novel-routes" aria-label={t('vnPanel.aria.routes')}>
                 <div className="visual-novel-reading-head"><strong>{t('vnPanel.routesHead')}</strong><span>{t('vnPanel.routesCount', {
                   done: selected.routes.filter((route) => route.status === 'completed').length,
@@ -1216,11 +1310,15 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   ))}
                 </div>
               </section>
+              </div>
+              <div {...tabPanelProps('setup')}>
+              <VisualNovelCaptureSetup entry={selected} database={database} onDatabase={setDatabase} />
               <VisualNovelScriptImportPanel
                 entry={selected}
                 onImported={setDatabase}
                 onStatus={reportStatus}
               />
+              </div>
               </div>
             </>
           )}
