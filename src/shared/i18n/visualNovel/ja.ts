@@ -32,7 +32,7 @@ export const VISUAL_NOVEL_JA: Catalog = {
   'vnCapture.ws.connected': 'テキストフッカー：接続済み',
   'vnCapture.ws.error': 'テキストフッカー：{url} で待ち受けているサーバーがありません',
   'vnCapture.lines': '{count} 行を取得',
-  'vnCapture.test.waiting': '60 秒間、行を待っています。ゲームを 1 行進めるか、日本語の文をコピーしてください。',
+  'vnCapture.test.waiting': '60 秒間、行を待っています。ゲームを 1 行進めるか、別のアプリで日本語の文をコピーしてください。',
   'vnCapture.test.received': '取得できました：{source}から行が届きました。',
   'vnCapture.test.none': '行が届きませんでした。テキストフッカーがゲームにアタッチされ、クリップボードまたは WebSocket 出力がオンになっているか確認してください。',
   'vnCapture.source.clipboard': 'クリップボード',

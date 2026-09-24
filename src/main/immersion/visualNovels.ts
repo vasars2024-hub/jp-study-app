@@ -495,6 +495,10 @@ const captureSession = createCaptureSession({
   readClipboard: () => clipboard.readText(),
   createSocket: createNodeSocket,
   saveLines: saveCapturedLines,
+  // While one of the app's own windows has focus the user is working in the
+  // app (copying a word from the dictionary popup, say), not playing; the
+  // hooker writes the clipboard while the GAME has focus.
+  clipboardFromApp: () => BrowserWindow.getFocusedWindow() !== null,
   broadcast: (state) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send('visual-novel:captureChanged', state);

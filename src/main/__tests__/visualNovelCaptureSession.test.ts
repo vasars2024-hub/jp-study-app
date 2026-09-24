@@ -10,7 +10,7 @@ import type { VisualNovelCaptureState } from '../../shared/visualNovelCapture';
 import type { VisualNovelHookLine } from '../../shared/visualNovelHook';
 
 /** A hand-cranked clock and timer queue, so the session runs without real time. */
-function harness(initialClipboard = '') {
+function harness(initialClipboard = '', appFocused: () => boolean = () => false) {
   let now = 1_000;
   let clipboard = initialClipboard;
   let nextHandle = 1;
@@ -41,6 +41,7 @@ function harness(initialClipboard = '') {
       return lines.length;
     },
     broadcast: (state) => states.push(state),
+    clipboardFromApp: appFocused,
     now: () => now,
     setInterval: (fn, ms) => {
       const handle = nextHandle++;
@@ -113,6 +114,20 @@ describe('clipboard capture in main', () => {
     h.advance(CLIPBOARD_POLL_MS * 3);
     expect(h.saved).toEqual([]);
     expect(h.session.state().active).toBe(false);
+  });
+
+  it('skips what the user copies inside the app itself, such as a word from the dictionary popup', () => {
+    let focused = true;
+    const h = harness('', () => focused);
+    h.session.start('vn-1', { clipboard: true, websocket: false });
+    h.setClipboard('実験');
+    h.advance(CLIPBOARD_POLL_MS);
+    expect(h.saved).toEqual([]);
+    // Back in the game, the hooker's next line is captured as usual.
+    focused = false;
+    h.setClipboard('紅莉栖「次の行。」');
+    h.advance(CLIPBOARD_POLL_MS);
+    expect(h.saved).toHaveLength(1);
   });
 
   it('skips non-game clipboard content', () => {

@@ -25,6 +25,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   app: { getPath: () => fixture.root, once: vi.fn() },
   BrowserWindow: {
+    getFocusedWindow: () => null,
     getAllWindows: () => [{
       isDestroyed: () => false,
       webContents: { send: (channel: string, payload: unknown) => fixture.sent.push({ channel, payload }) },

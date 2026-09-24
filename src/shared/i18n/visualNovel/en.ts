@@ -43,7 +43,7 @@ export const VISUAL_NOVEL_EN: Catalog = {
     one: '{count} line captured',
     other: '{count} lines captured',
   },
-  'vnCapture.test.waiting': 'Waiting for a line for 60 seconds. Advance one line in the game, or copy any Japanese sentence.',
+  'vnCapture.test.waiting': 'Waiting for a line for 60 seconds. Advance one line in the game, or copy any Japanese sentence in another program.',
   'vnCapture.test.received': 'Capture works: a line arrived from {source}.',
   'vnCapture.test.none': 'No line arrived. Check that your text hooker is attached to the game and that its clipboard or websocket output is on.',
   'vnCapture.source.clipboard': 'the clipboard',

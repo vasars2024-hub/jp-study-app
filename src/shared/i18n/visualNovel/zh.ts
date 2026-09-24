@@ -32,7 +32,7 @@ export const VISUAL_NOVEL_ZH: Catalog = {
   'vnCapture.ws.connected': '文本钩子：已连接',
   'vnCapture.ws.error': '文本钩子：{url} 上没有正在监听的服务',
   'vnCapture.lines': '已获取 {count} 行',
-  'vnCapture.test.waiting': '正在等待 60 秒。请在游戏中推进一行，或复制任意日语句子。',
+  'vnCapture.test.waiting': '正在等待 60 秒。请在游戏中推进一行，或在其他程序中复制任意日语句子。',
   'vnCapture.test.received': '获取正常：已从{source}收到一行。',
   'vnCapture.test.none': '没有收到任何行。请确认文本钩子已附加到游戏，并已开启剪贴板或 WebSocket 输出。',
   'vnCapture.source.clipboard': '剪贴板',

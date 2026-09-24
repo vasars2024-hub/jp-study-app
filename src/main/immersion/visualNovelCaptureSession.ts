@@ -35,6 +35,12 @@ export interface CaptureSessionDeps {
   /** Persist lines; return how many were new. Not called for a test session. */
   saveLines: (visualNovelId: string, lines: VisualNovelHookLine[], source: VisualNovelCaptureSource) => number;
   broadcast: (state: VisualNovelCaptureState) => void;
+  /**
+   * True when a clipboard change came from the app itself — the user copying a
+   * word out of the dictionary popup or the reader — rather than from the game's
+   * text hooker. Such a change is skipped, never saved as a line.
+   */
+  clipboardFromApp?: () => boolean;
   now?: () => number;
   setInterval?: (fn: () => void, ms: number) => unknown;
   clearInterval?: (handle: unknown) => void;
@@ -113,6 +119,7 @@ export function createCaptureSession(deps: CaptureSessionDeps) {
     }
     if (!text || text === lastClipboard) return;
     lastClipboard = text;
+    if (deps.clipboardFromApp?.()) return;
     receive(text, 'clipboard');
   };
 
