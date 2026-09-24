@@ -40,6 +40,7 @@ import { LANG_TAGS } from '../../../shared/i18n/core';
 import { summarizeFolder } from './folderSummary';
 import { formatDate, formatSize } from './format';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
+import Icon, { type IconName } from '../Icons';
 import { LiquidDock } from '../liquid/LiquidDock';
 import { LiquidInspector } from '../liquid/LiquidInspector';
 import { type RailItem } from '../liquid/AdaptiveRail';
@@ -53,7 +54,8 @@ import {
   deleteModeFor,
   isFilesPanelCategory,
   isMachineDerived,
-  matchesQuery,
+  foldFilesQuery,
+  matchesFoldedQuery,
   revealTargetFor,
   sortItems,
   type FilesCategoryId,
@@ -264,6 +266,48 @@ export interface FilesAppProps {
   initialScope?: FilesCategoryId | null;
   /** Highlight this item on open, when the caller knows which one it means. */
   initialFocusItemId?: string | null;
+}
+
+/**
+ * One glyph per folder, so the rail can collapse to icons at medium width — the
+ * contract `LiquidAppScaffold` states for its rail. The Files tree had no icons at
+ * all, so at the width it usually opens at every node read as two letters and an
+ * ellipsis ("E…", "So…"). The label stays in the DOM (visually hidden when
+ * collapsed), so the accessible name never changes; `title` carries it for a
+ * pointer.
+ */
+const FILES_TREE_ICONS: Record<FilesCategoryId, IconName> = {
+  sources: 'folder',
+  'sources/books': 'library',
+  'sources/manga': 'novels',
+  'sources/visual-novels': 'window',
+  'sources/video': 'file-video',
+  'sources/audio': 'file-audio',
+  'sources/text': 'file-text',
+  outputs: 'folder',
+  'outputs/decks': 'flashcards',
+  'outputs/mined': 'sparkle',
+  'outputs/packages': 'download',
+  'outputs/exports': 'external',
+  'outputs/notes': 'note',
+  'outputs/highlights': 'bookmark',
+  'outputs/drafts': 'edit',
+  reference: 'folder',
+  'reference/dictionaries': 'dictionary',
+  'reference/models': 'disc',
+  'reference/artwork': 'file-image',
+  system: 'folder',
+  'system/memory': 'drive',
+  'system/statistics': 'stats',
+  'system/profiles': 'settings',
+  workspaces: 'folder',
+  'workspaces/studies': 'grammar',
+  'workspaces/queue': 'clipboard',
+  'workspaces/acquisitions': 'download',
+};
+
+function treeIcon(name: IconName) {
+  return <Icon name={name} size={16} className="fa-tree-icon" />;
 }
 
 export function FilesApp({ initialScope = null, initialFocusItemId = null }: FilesAppProps) {
@@ -509,7 +553,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       }
       return countByCategory(allItems);
     }
-    return countByCategory(allItems.filter((i) => matchesQuery(i, query)));
+    const folded = foldFilesQuery(query);
+    return countByCategory(allItems.filter((i) => matchesFoldedQuery(i, folded)));
     // `lang` is not read here; counts are numbers, not translated strings.
   }, [state.snapshot, allItems, query]);
 
@@ -538,15 +583,25 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     [smartScope, smartDoc],
   );
 
+  /**
+   * The whole index, sorted ONCE per column/direction and per index build.
+   *
+   * D315/D345: every keystroke in the search box and every change of folder used
+   * to re-sort the filtered rows from scratch. Filtering an already-sorted list
+   * keeps its order, so the derived views below filter this instead, and a sort
+   * only runs when the index or the sort itself changes.
+   */
+  const sortedAll = useMemo(
+    () => sortItems(allItems, sortColumn, sortDirection),
+    [allItems, sortColumn, sortDirection],
+  );
+
   const visible = useMemo(() => {
+    const folded = foldFilesQuery(query);
     if (scopedSmart) {
       // Recomputed from the live index every render: gate 19's "stays live" is
       // structural because there is no stored membership to go out of date.
-      return sortItems(
-        smartFolderMembers(allItems, scopedSmart.criteria).filter((i) => matchesQuery(i, query)),
-        sortColumn,
-        sortDirection,
-      );
+      return smartFolderMembers(sortedAll, scopedSmart.criteria).filter((i) => matchesFoldedQuery(i, folded));
     }
     if (scopedCollection) {
       // The user's own order is the folder's order, so the ids drive the walk
@@ -556,15 +611,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       const inFolder = scopedCollection.presentItemIds
         .map((id) => byId.get(id))
         .filter((i): i is FilesItem => Boolean(i))
-        .filter((i) => matchesQuery(i, query));
+        .filter((i) => matchesFoldedQuery(i, folded));
       return sortItems(inFolder, sortColumn, sortDirection);
     }
-    const filtered = allItems.filter(
+    if (scope === null && !folded) return sortedAll;
+    return sortedAll.filter(
       (item) =>
-        (scope === null || categoryContains(scope, item.categoryId)) && matchesQuery(item, query),
+        (scope === null || categoryContains(scope, item.categoryId)) && matchesFoldedQuery(item, folded),
     );
-    return sortItems(filtered, sortColumn, sortDirection);
-  }, [allItems, scope, scopedCollection, scopedSmart, query, sortColumn, sortDirection]);
+  }, [allItems, sortedAll, scope, scopedCollection, scopedSmart, query, sortColumn, sortDirection]);
 
   /** The selected row, so closing the inspector returns focus to what opened it. */
   const selectedRowRef = useRef<HTMLElement | null>(null);
@@ -1102,6 +1157,18 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const knownItemIds = useMemo(() => new Set(allItems.map((i) => i.id)), [allItems]);
 
   /**
+   * Every saved search's count, once per index build rather than on every render.
+   * Each is a full walk of the index, and they used to run inline in the rail — so
+   * selecting a row, typing, or hovering anything that re-rendered the window
+   * re-walked 43,000 rows once per smart folder.
+   */
+  const smartCounts = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const folder of allSmartFolders(smartDoc)) out.set(folder.id, smartFolderCount(allItems, folder.criteria));
+    return out;
+  }, [allItems, smartDoc]);
+
+  /**
    * D314. Every number in the rail is derived from the index, so before the index arrives they
    * are all a fabricated zero — and the rail asserted it as fact. Measured live on the user's
    * own 43,685-item index: for ~13 s of every open the sidebar read `Everything 0`, `Sources 0`,
@@ -1155,6 +1222,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           setSmartScope(null);
         }}
       >
+        {treeIcon('drive')}
         <span className="fa-tree-label">{t('filesApp.tree.everything')}</span>
         {treeCount(allItems.length)}
       </button>
@@ -1195,6 +1263,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             setFocusCardId(null);
           }}
         >
+          {treeIcon(FILES_TREE_ICONS[node.id] ?? 'folder')}
           <span className="fa-tree-label">{t(node.labelKey)}</span>
           {/* Shown even at 0: a category that reads 0 while items exist is a
               finding, and a hidden node cannot be seen to be wrong. The two
@@ -1235,7 +1304,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               setSavingSearch(true);
             }}
           >
-            {t('filesApp.smart.save')}
+            <Icon name="plus" size={16} className="fa-action-icon" />
+            <span className="fa-action-text">{t('filesApp.smart.save')}</span>
           </button>
         </div>
         {savingSearch ? (
@@ -1275,12 +1345,13 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               aria-pressed={smartScope === folder.id}
               onClick={() => onOpenSmart(folder.id)}
             >
+              {treeIcon('search')}
               <span className="fa-tree-label">
                 {folder.nameKey ? t(folder.nameKey) : (folder.name ?? '')}
               </span>
               {/* Counted from the live index on every render. There is no cached
                   membership anywhere, which is what gate 19 is really asking. */}
-              {treeCount(smartFolderCount(allItems, folder.criteria))}
+              {treeCount(smartCounts.get(folder.id) ?? 0)}
             </button>
             {/* A preset has no delete control at all — it is compiled in, and a
                 button that appears to remove it would be lying. The model
@@ -1320,11 +1391,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                 onToggleFavorite(scopeAsFavorite, favoriteLabel(scopeAsFavorite))
               }
             >
-              {t(
-                isPinned(favoritesDoc, scopeAsFavorite)
-                  ? 'filesApp.favorites.unpinLocation'
-                  : 'filesApp.favorites.pinLocation',
-              )}
+              <Icon name="pin" size={16} className="fa-action-icon" />
+              <span className="fa-action-text">
+                {t(
+                  isPinned(favoritesDoc, scopeAsFavorite)
+                    ? 'filesApp.favorites.unpinLocation'
+                    : 'filesApp.favorites.pinLocation',
+                )}
+              </span>
             </button>
           ) : null}
         </div>
@@ -1347,6 +1421,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                   disabled={isStale}
                   onClick={() => onOpenFavorite(favorite.target)}
                 >
+                  {treeIcon('star')}
                   <span className="fa-tree-label">{favoriteLabel(favorite.target)}</span>
                 </button>
                 <button
@@ -1383,7 +1458,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             title={t('filesApp.collections.new')}
             onClick={onNewFolder}
           >
-            {t('filesApp.collections.new')}
+            <Icon name="plus" size={16} className="fa-action-icon" />
+            <span className="fa-action-text">{t('filesApp.collections.new')}</span>
           </button>
         </div>
         {collectionRows.length === 0 ? (
@@ -1450,6 +1526,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                   if (item) addItemToFolder(collection.id, item);
                 }}
               >
+                {treeIcon('folder-open')}
                 <span className="fa-tree-label">{collection.name}</span>
                 {treeCount(resolveCollection(collection, knownItemIds).presentItemIds.length)}
               </button>
@@ -1477,7 +1554,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             title={t('filesApp.collections.rename')}
             onClick={onStartRename}
           >
-            {t('filesApp.collections.rename')}
+            <Icon name="edit" size={16} className="fa-action-icon" />
+            <span className="fa-action-text">{t('filesApp.collections.rename')}</span>
           </button>
           <button
             type="button"
@@ -1485,7 +1563,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             title={t('filesApp.collections.delete')}
             onClick={onRequestDelete}
           >
-            {t('filesApp.collections.delete')}
+            <Icon name="trash" size={16} className="fa-action-icon" />
+            <span className="fa-action-text">{t('filesApp.collections.delete')}</span>
           </button>
           <label className="fa-folder-move" title={t('filesApp.collections.moveTo')}>
             <span className="fa-visually-hidden">{t('filesApp.collections.moveTo')}</span>
@@ -2151,6 +2230,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * matters here -- without it focus falls to `document.body` and the next Tab
    * restarts the window from the top.
    */
+  const hasSelection = Boolean(selected && mineability);
   const inspector = selected && mineability ? (
     <LiquidInspector
       className="fa-details"
@@ -2562,7 +2642,13 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       // A panel occupies the whole canvas and has no per-row selection, so the
       // inspector is dropped rather than left showing "nothing selected" beside
       // a screen where selecting is not a thing that happens.
-      inspector={onPanel ? undefined : inspector}
+      //
+      // The folder summary is AMBIENT: shown only while the scaffold is wide.
+      // At medium width it took 320px from the list to say "select an item",
+      // cutting the columns it described; there the details pane appears once
+      // a row is selected.
+      inspector={onPanel || !hasSelection ? undefined : inspector}
+      ambientInspector={onPanel || hasSelection ? undefined : inspector}
       inspectorLabel={t('filesApp.details.label')}
       dock={dock}
       compactDock={compactDock}

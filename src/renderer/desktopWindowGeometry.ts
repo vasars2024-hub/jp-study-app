@@ -5,6 +5,13 @@ export interface DesktopRect {
   h: number;
 }
 
+/**
+ * The Files app's first-open size. Its scaffold goes `wide` (rail with names,
+ * list, details side by side) at 1120px of content; 1180 leaves room for the
+ * window frame and padding. At the generic 820x580 the toolbar alone overflowed.
+ */
+export const FILES_DEFAULT_SIZE = { w: 1180, h: 720 } as const;
+
 /** Keep a newly cascaded window inside the desktop work area at its actual origin. */
 export function fitNewWindowRect(
   requested: DesktopRect,
