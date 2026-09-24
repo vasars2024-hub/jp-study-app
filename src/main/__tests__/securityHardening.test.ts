@@ -86,12 +86,14 @@ describe('IPC sender guard', () => {
 });
 
 describe('permissions', () => {
-  it('app origins get the microphone (audio only), clipboard and fullscreen; nothing else', () => {
+  it('app origins get the microphone (audio only), clipboard, fullscreen and notifications; nothing else', () => {
     expect(permissionAllowed('app', 'media', 'app://bundle', packaged, ['audio'])).toBe(true);
     expect(permissionAllowed('app', 'media', 'app://bundle', packaged, ['audio', 'video'])).toBe(false);
     expect(permissionAllowed('app', 'clipboard-read', 'app://bundle', packaged)).toBe(true);
     expect(permissionAllowed('app', 'geolocation', 'app://bundle', packaged)).toBe(false);
-    expect(permissionAllowed('app', 'notifications', 'app://bundle', packaged)).toBe(false);
+    // Calendar reminders show an OS banner through the web Notification API.
+    expect(permissionAllowed('app', 'notifications', 'app://bundle', packaged)).toBe(true);
+    expect(permissionAllowed('app', 'notifications', 'https://evil.example', packaged)).toBe(false);
     expect(permissionAllowed('app', 'clipboard-read', 'https://evil.example', packaged)).toBe(false);
   });
 

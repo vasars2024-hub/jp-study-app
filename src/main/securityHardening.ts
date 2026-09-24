@@ -21,8 +21,9 @@
  *    <webview> attach is forced to safe preferences.
  * 3. `permissionAllowed`: an allow-list per session. App origins get what the
  *    app uses — microphone (audio only, shadowing recordings), clipboard
- *    read/write, fullscreen, local fonts (subtitle renderer). The Immersion
- *    session gets fullscreen and clipboard write. Everything else is denied.
+ *    read/write, fullscreen, local fonts (subtitle renderer), notifications
+ *    (calendar reminder banners). The Immersion session gets fullscreen and
+ *    clipboard write. Everything else is denied.
  */
 import type { App, IpcMain, IpcMainEvent, IpcMainInvokeEvent, Session, WebContents } from 'electron';
 
@@ -237,7 +238,9 @@ export function installWebContentsHardening(
 
 export type SessionKind = 'app' | 'immersion' | 'other';
 
-const APP_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'media', 'local-fonts']);
+// `notifications`: calendar reminders raise an OS banner through the web
+// Notification API when the app is not focused (calendarReminderDelivery.ts).
+const APP_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'media', 'local-fonts', 'notifications']);
 const IMMERSION_PERMISSIONS = new Set(['fullscreen', 'clipboard-sanitized-write']);
 
 export function permissionAllowed(
