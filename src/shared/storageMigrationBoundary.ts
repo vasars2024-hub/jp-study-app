@@ -1,3 +1,5 @@
+import { unwrapOverEncoded } from './overEncodedJson';
+
 export type StorageMigrationTier = 'localStorage' | 'indexeddb';
 
 export interface StorageMigrationEntry {
@@ -25,12 +27,23 @@ export interface StorageMigrationPlan {
     localStorage: StorageMigrationEntry[];
     indexedDb: StorageMigrationEntry[];
   };
+  /**
+   * Values that failed to parse into their key's shape. They are KEPT in
+   * `replace` (every retained key is heavy user data) — this list is only what
+   * the runner copies aside before a reader's fallback can overwrite them.
+   */
+  quarantine: {
+    localStorage: StorageMigrationEntry[];
+    indexedDb: StorageMigrationEntry[];
+  };
   issues: string[];
 }
 
 export interface StorageMigrationAdapter {
   readSnapshot(): Promise<StorageMigrationSnapshot>;
   replaceAtomic(next: StorageMigrationSnapshot): Promise<void>;
+  /** Copy damaged values aside. Optional: an adapter without it just keeps them. */
+  quarantine?(entries: StorageMigrationPlan['quarantine']): Promise<void>;
 }
 
 export const STORAGE_MIGRATION_VERSION = 5;
@@ -57,11 +70,23 @@ function snapshotFromEntries(entries: StorageMigrationEntry[]): Record<string, u
   return Object.fromEntries(entries.map((entry) => [entry.key, clone(entry.value)]));
 }
 
-function isCorruptValue(value: unknown): boolean {
+/**
+ * Every retained key holds a JSON object or array. A value is damaged only when
+ * it does not parse into one — never because of what its text says. The old
+ * check matched substrings like "corrupt" or "data lost" anywhere in the raw
+ * value, so a flashcard meaning "corruption" (汚職) made the runner delete the
+ * whole deck.
+ *
+ * localStorage values are the raw `getItem` text; IndexedDB values are
+ * structured clones (objects), though an old build may have stored JSON text.
+ * Over-encoded text is not damage: its readers peel the extra layers.
+ */
+export function isDamagedValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
-  if (typeof value !== 'string') return false;
-  const text = value.toLowerCase();
-  return text.includes('corrupt') || text.includes('missing file') || text.includes('data lost') || text.includes('unknownerror');
+  if (typeof value === 'object') return false;
+  if (typeof value !== 'string') return true;
+  const { value: parsed, layers } = unwrapOverEncoded<unknown>(value);
+  return layers === 0 || parsed === null || typeof parsed !== 'object';
 }
 
 export function planStorageMigration(
@@ -72,22 +97,16 @@ export function planStorageMigration(
   const localStorage = { ...snapshot.localStorage };
   const indexedDb = { ...snapshot.indexedDb };
 
-  const corruptedLocalKeys = Object.entries(localStorage)
-    .filter(([, value]) => isCorruptValue(value))
-    .map(([key]) => key);
-  const corruptedIdbKeys = Object.entries(indexedDb)
-    .filter(([, value]) => isCorruptValue(value))
-    .map(([key]) => key);
+  // Heavy stores are never dropped here: a value that does not parse is copied
+  // aside (quarantine) and left in place for its reader, which already treats
+  // it as empty — the copy is what survives if that reader later overwrites it.
+  const damagedLocal = normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS)
+    .filter((entry) => isDamagedValue(entry.value));
+  const damagedIdb = normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS)
+    .filter((entry) => isDamagedValue(entry.value));
 
-  const sanitizedLocal = Object.fromEntries(
-    Object.entries(localStorage).filter(([key]) => !corruptedLocalKeys.includes(key)),
-  );
-  const sanitizedIdb = Object.fromEntries(
-    Object.entries(indexedDb).filter(([key]) => !corruptedIdbKeys.includes(key)),
-  );
-
-  if (corruptedLocalKeys.length) issues.push(`Recovered ${corruptedLocalKeys.length} corrupted localStorage entr${corruptedLocalKeys.length === 1 ? 'y' : 'ies'}.`);
-  if (corruptedIdbKeys.length) issues.push(`Recovered ${corruptedIdbKeys.length} corrupted IndexedDB entr${corruptedIdbKeys.length === 1 ? 'y' : 'ies'}.`);
+  if (damagedLocal.length) issues.push(`Quarantined a copy of ${damagedLocal.length} unreadable localStorage entr${damagedLocal.length === 1 ? 'y' : 'ies'} (${damagedLocal.map((e) => e.key).join(', ')}).`);
+  if (damagedIdb.length) issues.push(`Quarantined a copy of ${damagedIdb.length} unreadable IndexedDB entr${damagedIdb.length === 1 ? 'y' : 'ies'} (${damagedIdb.map((e) => e.key).join(', ')}).`);
 
   return {
     version: currentVersion,
@@ -97,13 +116,14 @@ export function planStorageMigration(
       keepIndexedDbKeys: [...HEAVY_INDEXED_DB_KEYS],
     },
     replace: {
-      localStorage: normalizeEntries(sanitizedLocal, HEAVY_LOCAL_STORAGE_KEYS),
-      indexedDb: normalizeEntries(sanitizedIdb, HEAVY_INDEXED_DB_KEYS),
+      localStorage: normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS),
+      indexedDb: normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS),
     },
     recover: {
-      localStorage: normalizeEntries(sanitizedLocal, HEAVY_LOCAL_STORAGE_KEYS),
-      indexedDb: normalizeEntries(sanitizedIdb, HEAVY_INDEXED_DB_KEYS),
+      localStorage: normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS),
+      indexedDb: normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS),
     },
+    quarantine: { localStorage: damagedLocal, indexedDb: damagedIdb },
     issues,
   };
 }
@@ -114,6 +134,9 @@ export async function applyStorageMigration(
 ): Promise<StorageMigrationPlan> {
   const snapshot = await adapter.readSnapshot();
   const plan = planStorageMigration(snapshot, currentVersion);
+  if (adapter.quarantine && (plan.quarantine.localStorage.length || plan.quarantine.indexedDb.length)) {
+    await adapter.quarantine(plan.quarantine);
+  }
   await adapter.replaceAtomic({
     localStorage: snapshotFromEntries(plan.replace.localStorage),
     indexedDb: snapshotFromEntries(plan.replace.indexedDb),

@@ -41,7 +41,7 @@ vi.mock('../levelLists', () => ({ restoreLevelListsFromIdb: async () => undefine
 import { DB_NAME, KV_STORE, __resetDbForTests, kvGet, kvSet } from '../storage/db';
 import { runStorageMigrations } from '../storage/migrationRunner';
 import { IDB_KEYS, LS_KEYS } from '../storage/storage';
-import { addDeckCards, loadDeck, resetDeckMemoryForTests } from '../flashcardDeck';
+import { addDeckCards, loadDeck, resetDeckMemoryForTests, settleDeckWritesForTests } from '../flashcardDeck';
 import { STORAGE_MIGRATION_VERSION } from '../../shared/storageMigrationBoundary';
 
 let fake: FakeIndexedDb;
@@ -70,7 +70,11 @@ beforeEach(() => {
   vi.spyOn(console, 'info').mockImplementation(() => undefined);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Let this test's deck writes and their debounced mirror land now, not in
+  // the next test's fresh IndexedDB.
+  await settleDeckWritesForTests();
+  await new Promise((resolve) => setTimeout(resolve, 450));
   vi.restoreAllMocks();
 });
 
@@ -100,14 +104,34 @@ describe('storage migration runner vs. concurrent mining', () => {
     expect(idbDeckWords()).toEqual(['猫']);
   });
 
-  it('still drops a corrupt entry nobody touched', async () => {
+  it('keeps an unparseable entry nobody touched and copies it aside once', async () => {
     localStorage.setItem(LS_KEYS.flashcardDeck, 'corrupt');
     await kvSet(IDB_KEYS.flashcardDeck, 'corrupt: missing file');
 
     await runStorageMigrations();
 
     expect(await kvGet('storage-version')).toBe(STORAGE_MIGRATION_VERSION);
-    expect(localStorage.getItem(LS_KEYS.flashcardDeck)).toBeNull();
-    expect(IDB_KEYS.flashcardDeck in fake.rows(DB_NAME, KV_STORE)).toBe(false);
+    expect(localStorage.getItem(LS_KEYS.flashcardDeck)).toBe('corrupt');
+    const rows = fake.rows(DB_NAME, KV_STORE);
+    expect(rows[IDB_KEYS.flashcardDeck]).toBe('corrupt: missing file');
+    const copies = () => Object.keys(fake.rows(DB_NAME, KV_STORE)).filter((key) => key.includes('.quarantined-'));
+    expect(copies()).toHaveLength(2);
+
+    // A second boot sees the same values and does not copy them again.
+    await runStorageMigrations();
+    expect(copies()).toHaveLength(2);
+  });
+
+  it('keeps a healthy deck whose cards mention corruption', async () => {
+    const deck = { folders: [], cards: [{ id: 'c-1', word: '汚職', reading: 'おしょく', meaning: 'corruption', source: 'epub', addedAt: 1 }], savedAt: 5 };
+    localStorage.setItem(LS_KEYS.flashcardDeck, JSON.stringify(deck));
+    await kvSet(IDB_KEYS.flashcardDeck, deck);
+
+    await runStorageMigrations();
+
+    expect(await kvGet('storage-version')).toBe(STORAGE_MIGRATION_VERSION);
+    expect(localStorage.getItem(LS_KEYS.flashcardDeck)).toBe(JSON.stringify(deck));
+    expect(idbDeckWords()).toEqual(['汚職']);
+    expect(Object.keys(fake.rows(DB_NAME, KV_STORE)).filter((key) => key.includes('.quarantined-'))).toEqual([]);
   });
 });

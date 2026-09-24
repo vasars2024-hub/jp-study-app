@@ -2,8 +2,10 @@
  * Storage migration runner — runs once per boot, before React renders.
  *
  * The runner delegates all decision-making to a pure migration boundary. The
- * boundary computes an inert retention plan, removes corrupted values, and
- * keeps the remaining localStorage/IndexedDB data in deterministic order.
+ * boundary computes an inert retention plan and keeps every retained
+ * localStorage/IndexedDB value in deterministic order. A value that does not
+ * parse into its key's shape is never removed — a copy is quarantined into
+ * IndexedDB (`<key>.quarantined-<timestamp>`) and the original stays put.
  */
 
 import { kvCompareAndSet, kvGet, kvSet } from './db';
@@ -14,10 +16,48 @@ import { restoreLevelListsFromIdb } from '../levelLists';
 import {
   applyStorageMigration,
   type StorageMigrationAdapter,
+  type StorageMigrationPlan,
   type StorageMigrationSnapshot,
 } from '../../shared/storageMigrationBoundary';
 
 const VERSION_KEY = 'storage-version';
+/** source key -> fingerprint of the value last quarantined for it. */
+const QUARANTINE_INDEX_KEY = 'storage-quarantine-index';
+
+/** Cheap FNV-1a fingerprint, so a damaged value is copied aside once, not every boot. */
+export function quarantineFingerprint(value: unknown): string {
+  const text = typeof value === 'string' ? value : JSON.stringify(value) ?? '';
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${text.length}:${hash.toString(16)}`;
+}
+
+async function quarantineEntries(entries: StorageMigrationPlan['quarantine']): Promise<void> {
+  const index = ((await kvGet<Record<string, string>>(QUARANTINE_INDEX_KEY)) ?? {}) as Record<string, string>;
+  const stamp = Date.now();
+  let changed = false;
+  const all = [
+    ...entries.localStorage.map((entry) => ({ ...entry, source: `localStorage:${entry.key}` })),
+    ...entries.indexedDb.map((entry) => ({ ...entry, source: `indexedDb:${entry.key}` })),
+  ];
+  for (const entry of all) {
+    const fingerprint = quarantineFingerprint(entry.value);
+    if (index[entry.source] === fingerprint) continue;
+    const target = `${entry.source.startsWith('localStorage:') ? 'ls:' : ''}${entry.key}.quarantined-${stamp}`;
+    try {
+      await kvSet(target, entry.value);
+      index[entry.source] = fingerprint;
+      changed = true;
+      console.warn(`[storage] ${entry.source} does not parse; kept it in place and copied it to IndexedDB "${target}".`);
+    } catch (err) {
+      console.warn(`[storage] could not quarantine ${entry.source}:`, err instanceof Error ? err.message : String(err));
+    }
+  }
+  if (changed) await kvSet(QUARANTINE_INDEX_KEY, index);
+}
 
 function readLocal(key: string): string | null {
   try {
@@ -76,7 +116,8 @@ function sameValue(current: unknown, expected: unknown): boolean {
  * deck's `savedAt` stamps only recovered it on the next boot). Now:
  * - a key whose planned value equals what was read is not written at all —
  *   writing it back could only lose a newer value;
- * - a key the plan does change (a corrupt entry being dropped) is re-read
+ * - a key the plan does change (none today: damaged values are quarantined,
+ *   never dropped) is re-read
  *   immediately before the write and skipped if it no longer matches.
  *   localStorage is re-read synchronously right before `setItem`; IndexedDB
  *   goes through `kvCompareAndSet`, one transaction for check and write.
@@ -94,6 +135,7 @@ function createAdapter(): StorageMigrationAdapter {
       read.indexedDb = { ...snapshot.indexedDb };
       return snapshot;
     },
+    quarantine: quarantineEntries,
     async replaceAtomic(next) {
       const idbKeys = new Set(Object.values(IDB_KEYS));
       for (const key of idbKeys) {
