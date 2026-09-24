@@ -53,6 +53,7 @@ import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
 import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
+import { flushAllJsonWriters, setAtomicJsonLogger } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
 import { registerStatsIpc } from './main/stats';
@@ -243,6 +244,9 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   logDiagnostic('error', 'main', 'unhandledRejection', errorDetail(reason));
 });
+// A JSON store served from its last-good copy, or moved aside as damaged, is
+// something the Diagnostics view must be able to show.
+setAtomicJsonLogger((severity, operation, detail) => logDiagnostic(severity, 'json-store', operation, detail));
 
 if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined' && MAIN_WINDOW_VITE_DEV_SERVER_URL) {
   app.commandLine.appendSwitch('disable-http-cache');
@@ -1908,6 +1912,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  // Coalesced JSON saves (library page-turn progress, …) land before anything stops.
+  flushAllJsonWriters();
   stopSeanime();
   stopLocalAgentRuntime();
   stopLocalAgentScheduler();

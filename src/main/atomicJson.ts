@@ -485,5 +485,5 @@ export function __resetAtomicJsonForTests(): void {
   held.clear();
   frozen = false;
   chains.clear();
-  flushers.clear();
+  // `flushers` stays: modules register once at import time.
 }
