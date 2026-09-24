@@ -3561,7 +3561,7 @@ export const ja: Catalog = {
   'lens.empty.hint': '範囲を狭めるか、マンガモードに切り替えてください。',
   'lens.error.web': '画面OCRモデルがまだインストールされていません。',
   'lens.error.manga': 'マンガOCRモデルがまだインストールされていません。',
-  'lens.error.downloading': 'OCRモデルをダウンロード中です。少し待ってから再試行してください。',
+  'lens.error.downloading': 'OCRモデルをダウンロードしています。準備ができ次第、この範囲を読み取ります。',
   'lens.error.capture': '画面を取得できませんでした。',
   'lens.error.captureDisplay': 'この範囲がどのモニターにあるか判別できなかったため、取得を中止しました。もう一度お試しいただくか、ウィンドウをメインディスプレイに移動してください。',
   'lens.error.generic': '読み取り中に問題が発生しました。',

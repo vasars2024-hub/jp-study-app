@@ -12,6 +12,7 @@
  * are what the job DECIDES about, so they are the observation points.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { runBookOcr } from '../bookOcrJob';
 
 const h = vi.hoisted(() => ({
   installed: new Set<string>(),
@@ -67,8 +68,6 @@ vi.mock('../library', () => ({
 
 vi.mock('../pdfRasterize', () => ({ rasterizePdf: async () => undefined }));
 vi.mock('../translate', () => ({ translateForBook: async () => '' }));
-
-const { runBookOcr } = await import('../bookOcrJob');
 
 const WEB = ['paddle-ocr-det', 'paddle-ocr-ja', 'paddle-ocr-ja-keys'];
 const MANGA = ['manga-ocr', 'manga-ocr-decoder', 'manga-ocr-vocab', 'comic-text-detector'];

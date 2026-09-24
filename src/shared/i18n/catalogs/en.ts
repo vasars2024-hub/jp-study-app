@@ -3462,7 +3462,7 @@ export const en: Catalog = {
   'lens.empty.hint': 'Try a tighter region, or switch to Manga mode.',
   'lens.error.web': 'Screen OCR models are not installed yet.',
   'lens.error.manga': 'Manga OCR models are not installed yet.',
-  'lens.error.downloading': 'Downloading OCR models — try again in a moment.',
+  'lens.error.downloading': 'Downloading the OCR model. This region is read as soon as it is ready.',
   'lens.error.capture': 'Could not capture the screen.',
   'lens.error.captureDisplay': 'Could not tell which monitor this region is on, so nothing was captured. Try again, or move the window to your main display.',
   'lens.error.generic': 'Something went wrong while reading.',

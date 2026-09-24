@@ -68,13 +68,21 @@ const h = vi.hoisted(() => {
     sources: null as unknown[] | null,
   };
   const engines = { paddle: true, manga: true };
+  /** The download manager: per-asset state, and what `startDownload` was asked for. */
+  const downloads = {
+    states: {} as Record<string, string>,
+    started: [] as string[],
+    startResult: { ok: true } as { ok: boolean; error?: { key: string; vars?: Record<string, unknown> } },
+    /** What a successful start moves the requested asset (and its companions) to. */
+    startTo: 'queued',
+  };
   const ocr = {
     calls: [] as string[],
     impl: null as null | ((dataUrl: string) => unknown),
     throws: null as Error | null,
   };
 
-  return { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr };
+  return { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr, downloads };
 });
 
 vi.mock('electron', () => ({
@@ -91,7 +99,26 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../paddleOcr', () => ({ paddleOcrAvailable: () => h.engines.paddle }));
+vi.mock('../paddleOcr', () => ({
+  paddleOcrAvailable: () => h.engines.paddle,
+  paddleAssetsForLang: (lang: string) => [`paddle-ocr-${lang}`, `paddle-ocr-${lang}-keys`, 'paddle-ocr-det'],
+}));
+vi.mock('../downloads', () => ({
+  getAssetStatus: (id: string) => ({
+    id,
+    state: h.downloads.states[id] ?? 'not-installed',
+    receivedBytes: 0,
+    totalBytes: 100,
+    bytesPerSecond: 0,
+  }),
+  startDownload: async (id: string) => {
+    h.downloads.started.push(id);
+    if (h.downloads.startResult.ok) {
+      for (const dep of [id, `${id}-keys`, 'paddle-ocr-det']) h.downloads.states[dep] = h.downloads.startTo;
+    }
+    return h.downloads.startResult;
+  },
+}));
 vi.mock('../mangaOcr', () => ({ mangaOcrAvailable: () => h.engines.manga }));
 vi.mock('../ocrAuto', () => ({
   ocrAuto: async (dataUrl: string) => {
@@ -101,7 +128,7 @@ vi.mock('../ocrAuto', () => ({
   },
 }));
 
-const { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr } = h;
+const { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr, downloads } = h;
 /** The two-monitor default, restored per test — the display list is mutable. */
 const DEFAULT_DISPLAYS = displays.map((d) => ({ ...d }));
 const { regionToPixels, decideZoom, scaleLines, betterPass, medianGlyphPx, meanConfidence, totalChars } =
@@ -136,6 +163,10 @@ beforeEach(() => {
   ocr.throws = null;
   engines.paddle = true;
   engines.manga = true;
+  downloads.states = {};
+  downloads.started = [];
+  downloads.startResult = { ok: true };
+  downloads.startTo = 'queued';
   state.thumbnail = fakeImage(1920, 1080);
   state.sourcesThrow = null;
   state.sources = null;
@@ -299,7 +330,7 @@ describe('ocrRegion — engine availability', () => {
     expect(ocr.calls).toHaveLength(0);
   });
 
-  it('reports web models missing (and downloading) for auto', async () => {
+  it('starts the Japanese web pack when it is missing, and only then says downloading', async () => {
     engines.paddle = false;
     const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
     expect(res).toMatchObject({
@@ -308,8 +339,36 @@ describe('ocrRegion — engine availability', () => {
       available: false,
       downloading: true,
       error: 'web-models-missing',
+      missingAssets: { startIds: ['paddle-ocr-ja'] },
     });
+    // One request, for the parent — the manager queues the detector and charset.
+    expect(downloads.started).toEqual(['paddle-ocr-ja']);
     expect(ocr.calls).toHaveLength(0);
+  });
+
+  it('does not start a second download while one is already running', async () => {
+    engines.paddle = false;
+    downloads.states = { 'paddle-ocr-ja': 'downloading' };
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res.downloading).toBe(true);
+    expect(downloads.started).toEqual([]);
+  });
+
+  it('does not claim a download when the start was refused, and says why', async () => {
+    engines.paddle = false;
+    const error = { key: 'assetError.diskSpace', vars: { name: 'Web OCR' } };
+    downloads.startResult = { ok: false, error };
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res.downloading).toBe(false);
+    expect(res.missingAssets?.error).toEqual(error);
+  });
+
+  it('offers the manga install without starting a 550 MB download on its own', async () => {
+    engines.manga = false;
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1, { engine: 'manga' });
+    expect(res.downloading).toBeUndefined();
+    expect(res.missingAssets?.ids).toContain('manga-ocr');
+    expect(downloads.started).toEqual([]);
   });
 
   it('still runs manga when only the general engine is missing', async () => {

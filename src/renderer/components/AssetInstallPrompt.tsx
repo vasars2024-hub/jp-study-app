@@ -9,7 +9,7 @@
  * was. Status comes from the download manager's own events, so what this shows
  * is what is actually happening.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatBytes } from '../../shared/assetRegistry';
 import { summarizeAssetBundle } from '../../shared/assetBundleProgress';
 import { useAssetStatuses } from '../assetStore';
@@ -28,13 +28,32 @@ interface Props {
   /** Short line above the button saying what the download is for. */
   message?: string;
   className?: string;
+  /**
+   * Called once when a set that was reported missing finishes installing — the
+   * Lens re-scans then, so a first-use download ends in a read, not a prompt.
+   */
+  onInstalled?: () => void;
 }
 
-export default function AssetInstallPrompt({ ids, startIds, message, className = '' }: Props) {
+export default function AssetInstallPrompt({ ids, startIds, message, className = '', onInstalled }: Props) {
   const { t } = useT();
   const statuses = useAssetStatuses(ids);
   const summary = summarizeAssetBundle(statuses);
   const [starting, setStarting] = useState(false);
+  /** Only a real missing -> installed transition counts, never the first load. */
+  const sawMissing = useRef(false);
+  const reported = statuses.some((s) => s !== null);
+  useEffect(() => {
+    if (!reported) return;
+    if (summary.state !== 'installed') {
+      sawMissing.current = true;
+      return;
+    }
+    if (sawMissing.current) {
+      sawMissing.current = false;
+      onInstalled?.();
+    }
+  }, [reported, summary.state, onInstalled]);
 
   if (summary.state === 'installed') return null;
 

@@ -14,8 +14,11 @@
 
 import { desktopCapturer, screen } from 'electron';
 import crypto from 'node:crypto';
-import { paddleOcrAvailable, type PaddleLang } from './paddleOcr';
+import { paddleAssetsForLang, paddleOcrAvailable, type PaddleLang } from './paddleOcr';
 import { mangaOcrAvailable } from './mangaOcr';
+import { getAssetStatus, startDownload } from './downloads';
+import { summarizeAssetBundle } from '../shared/assetBundleProgress';
+import type { AssetError } from '../shared/assetRegistry';
 import { ocrAuto, type AutoOcrLine, type AutoOcrResult, type OcrEngineChoice } from './ocrAuto';
 import { orderReadingLensLines } from '../shared/readingLensLineOrder';
 
@@ -52,8 +55,23 @@ export interface LensOcrResult {
   alternate?: LensOcrAlternate;
   /** Whether the engine's models are installed. */
   available: boolean;
-  /** True when models are being fetched — caller should retry shortly. */
+  /**
+   * True only when a download of the missing models is actually queued or
+   * running. It used to be set whenever the web model was missing, with nothing
+   * started anywhere, so the Lens promised a download that never came.
+   */
   downloading?: boolean;
+  /**
+   * The assets the missing engine needs, so the Lens can show their live
+   * progress (or an install button) instead of a sentence.
+   */
+  missingAssets?: {
+    ids: string[];
+    /** What an install button should start: the parent of each requires-group. */
+    startIds: string[];
+    /** Why the automatic start was refused (e.g. not enough disk space). */
+    error?: AssetError;
+  };
   error?: string;
   /** Content hash of the captured crop, for change detection between scans. */
   hash: string;
@@ -69,6 +87,45 @@ export interface RegionRect {
   y: number;
   width: number;
   height: number;
+}
+
+/** Manga OCR's full set, and what starts it (the encoder pulls its decoder and vocab). */
+const MANGA_ASSETS = ['manga-ocr', 'manga-ocr-decoder', 'manga-ocr-vocab', 'comic-text-detector'];
+const MANGA_START = ['manga-ocr', 'comic-text-detector'];
+
+/**
+ * Queue the web-OCR pack for `lang` when it is missing and not already on its
+ * way, and report what the download manager says is actually happening.
+ *
+ * The web pack is ~15 MB and is what every Lens scan needs, so it is fetched on
+ * first use the same way the browser extension's OCR route does
+ * (`extensionServer.ts` ensureWebOcrModels). One language, and its parent id
+ * only: the manager queues the shared detector and the charset as `requires`,
+ * so there is no parallel fan-out to race on the detector's staging directory.
+ * Manga OCR is ~550 MB and is never started without the user asking.
+ */
+async function ensureWebOcrModels(lang: PaddleLang): Promise<{
+  downloading: boolean;
+  missingAssets: NonNullable<LensOcrResult['missingAssets']>;
+}> {
+  const ids = paddleAssetsForLang(lang);
+  const parent = `paddle-ocr-${lang}`;
+  const before = summarizeAssetBundle(ids.map((id) => getAssetStatus(id)));
+  let error: AssetError | undefined;
+  if (before.state !== 'busy' && before.state !== 'installed') {
+    try {
+      const started = await startDownload(parent);
+      if (!started.ok) error = started.error;
+    } catch (err) {
+      error = { key: 'assetError.generic', vars: { detail: err instanceof Error ? err.message : String(err) } };
+    }
+  }
+  const after = summarizeAssetBundle(ids.map((id) => getAssetStatus(id)));
+  const why = error ?? after.error;
+  return {
+    downloading: after.state === 'busy',
+    missingAssets: { ids, startIds: [parent], ...(why ? { error: why } : null) },
+  };
 }
 
 const EMPTY = (over: Partial<LensOcrResult>): LensOcrResult => ({
@@ -313,11 +370,25 @@ export async function ocrRegion(
   const engine = opts.engine ?? 'auto';
 
   if (engine === 'manga' && !mangaOcrAvailable()) {
-    return EMPTY({ engine: 'manga', available: false, hash, error: 'manga-models-missing' });
+    return EMPTY({
+      engine: 'manga',
+      available: false,
+      hash,
+      error: 'manga-models-missing',
+      missingAssets: { ids: MANGA_ASSETS, startIds: MANGA_START },
+    });
   }
   // 'auto' still needs the general engine, since that is the pass it decides from.
   if (engine !== 'manga' && !paddleOcrAvailable()) {
-    return EMPTY({ engine: 'web', available: false, downloading: true, hash, error: 'web-models-missing' });
+    const fetch = await ensureWebOcrModels('ja');
+    return EMPTY({
+      engine: 'web',
+      available: false,
+      downloading: fetch.downloading,
+      missingAssets: fetch.missingAssets,
+      hash,
+      error: 'web-models-missing',
+    });
   }
 
   let result: AutoOcrResult;

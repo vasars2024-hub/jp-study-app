@@ -3545,7 +3545,7 @@ export const zh: Catalog = {
   'lens.empty.hint': '请缩小框选范围，或切换到漫画模式。',
   'lens.error.web': '屏幕 OCR 模型尚未安装。',
   'lens.error.manga': '漫画 OCR 模型尚未安装。',
-  'lens.error.downloading': '正在下载 OCR 模型，请稍后重试。',
+  'lens.error.downloading': '正在下载 OCR 模型。准备就绪后会立即读取此区域。',
   'lens.error.capture': '无法捕获屏幕。',
   'lens.error.captureDisplay': '无法确定该区域位于哪台显示器，因此未进行捕获。请重试，或将窗口移到主显示器。',
   'lens.error.generic': '读取时出现问题。',
