@@ -203,6 +203,30 @@ describe('mineToStudy', () => {
     expect(loadDeck()[0].ankiNoteId).toBe(4242);
   });
 
+  it('replays the exact note main sent for an extension mine — audio, profile and tags — not one rebuilt from the card', async () => {
+    markAnkiSeen();
+    const sent: MineNoteRequest = {
+      term: '猫',
+      sentence: '猫が好きです。',
+      surface: '猫',
+      profileId: 'p-news',
+      audioBase64: 'QUJD',
+      audioFilename: 'clip.webm',
+      extraTags: ['jp-study-app::extension', 'jp-study-app::extension-audio'],
+    };
+    const result = await mineToStudy({
+      word: '猫',
+      source: 'extension',
+      ankiResult: { ok: false, error: ANKI_UNREACHABLE_MSG },
+      anki: sent,
+      notify: false,
+    });
+    expect(result.anki).toBe('queued');
+    linkState = 'connected';
+    await flushAnkiMineQueue();
+    expect(mined.at(-1)).toEqual(sent);
+  });
+
   it('stops draining when Anki goes away mid-queue and keeps the rest', async () => {
     markAnkiSeen();
     await mineCat({ anki: { ...request, term: '犬' }, word: '犬' });

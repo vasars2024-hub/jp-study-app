@@ -352,6 +352,8 @@ export default function App() {
               ? payload.audioDataUrl
               : undefined,
           ankiResult: payload.anki,
+          // Queued while Anki is down: replay this exact note (audio, deck, tags).
+          ...(payload.ankiRequest ? { anki: payload.ankiRequest } : {}),
         });
         const isAudio = folder === 'audio' || !!payload.audioDataUrl;
         appendNotebookEvent({

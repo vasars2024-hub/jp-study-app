@@ -3162,6 +3162,8 @@ const api = {
       audioDataUrl?: string;
       profileId?: string;
       anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
+      /** The exact note main sent; a queued mine is replayed from it. */
+      ankiRequest?: import('./shared/anki').MineNoteRequest;
     }) => void,
   ): (() => void) => {
     const handler = (
@@ -3179,6 +3181,7 @@ const api = {
         audioDataUrl?: string;
         profileId?: string;
         anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
+        ankiRequest?: import('./shared/anki').MineNoteRequest;
       },
     ): void => cb(payload);
     ipcRenderer.on('extension:mined', handler);

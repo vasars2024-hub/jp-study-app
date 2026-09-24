@@ -35,7 +35,7 @@ import { extensionContractManifest } from '../shared/extensionContract';
 import { extractReadableFromHtml, htmlToText } from './readabilityExtract';
 import { importGeneratedArticle, importMangaFromImageUrls } from './library';
 import { mineNote } from './anki';
-import type { MineNoteResult } from '../shared/anki';
+import type { MineNoteRequest, MineNoteResult } from '../shared/anki';
 import {
   ensureChromeExtensionFolder,
   getChromeExtensionFolder,
@@ -654,6 +654,12 @@ function broadcastMineQueued(payload: {
   url?: string;
   title?: string;
   anki: MineNoteResult;
+  /**
+   * The exact note that was sent (or refused). A mine queued while Anki is
+   * down is replayed from this — audio, profile/deck routing and tags — not
+   * rebuilt from the local card.
+   */
+  ankiRequest?: MineNoteRequest;
   folder?: string;
   audioDataUrl?: string;
   profileId?: string;
@@ -831,23 +837,24 @@ async function handleMine(body: {
   }
 
   let anki: MineNoteResult;
+  const ankiRequest: MineNoteRequest = {
+    term,
+    sentence,
+    ...(reading ? { reading } : {}),
+    ...(meaning ? { meaning } : {}),
+    surface: mode === 'word' ? term : undefined,
+    profileId: profileId || undefined,
+    audioBase64: audioBase64 || undefined,
+    audioFilename: body.audioFilename,
+    extraTags: [
+      'jp-study-app::extension',
+      mode === 'word' ? 'jp-study-app::extension-word' : 'jp-study-app::extension-sentence',
+      folder === 'audio' || source === 'audio' ? 'jp-study-app::extension-audio' : '',
+    ].filter(Boolean),
+  };
   if (ankiAttempted) {
     try {
-      anki = await mineNote({
-        term,
-        sentence,
-        ...(reading ? { reading } : {}),
-        ...(meaning ? { meaning } : {}),
-        surface: mode === 'word' ? term : undefined,
-        profileId: profileId || undefined,
-        audioBase64: audioBase64 || undefined,
-        audioFilename: body.audioFilename,
-        extraTags: [
-          'jp-study-app::extension',
-          mode === 'word' ? 'jp-study-app::extension-word' : 'jp-study-app::extension-sentence',
-          folder === 'audio' || source === 'audio' ? 'jp-study-app::extension-audio' : '',
-        ].filter(Boolean),
-      });
+      anki = await mineNote(ankiRequest);
     } catch (err) {
       anki = { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -865,6 +872,7 @@ async function handleMine(body: {
     url: body.url,
     title: body.title,
     anki,
+    ...(ankiAttempted ? { ankiRequest } : {}),
     folder,
     audioDataUrl: audioDataUrl || undefined,
     profileId: profileId || undefined,

@@ -2016,6 +2016,8 @@ declare global {
           audioDataUrl?: string;
           profileId?: string;
           anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
+          /** The exact note main sent; a queued mine is replayed from it. */
+          ankiRequest?: import('../shared/anki').MineNoteRequest;
         }) => void,
       ): () => void;
       onExtensionClipboardAppend(
