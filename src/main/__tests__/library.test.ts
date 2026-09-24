@@ -61,6 +61,9 @@ const {
   pickCoverPage,
   importMangaFromImageUrls,
   importProviderMangaChapter,
+  attachGeneratedEpub,
+  setLibraryOcrView,
+  getLibraryItem,
 } = await import('../library');
 
 afterEach(() => {
@@ -374,5 +377,68 @@ describe('importMangaFromImageUrls — a re-captured url updates its chapter', (
     expect(second.id).not.toBe(first.id);
     expect(rowsFor(a)).toHaveLength(1);
     expect(rowsFor(b)).toHaveLength(1);
+  });
+});
+
+/*
+ * Book OCR is reversible. Converting a manga used to flip `kind` to 'book' for
+ * good, so the manga reader was never offered for it again — and when the run
+ * had read nothing, the only way to the pages was gone with it.
+ */
+describe('OCR conversion keeps the original reachable', () => {
+  function seed(item: Record<string, unknown>): void {
+    const dbFile = path.join(tmpRoot, 'library.json');
+    const items = fs.existsSync(dbFile) ? JSON.parse(fs.readFileSync(dbFile, 'utf8')) : [];
+    items.push({ createdAt: 1, title: 'テスト', ...item });
+    fs.writeFileSync(dbFile, JSON.stringify(items));
+    const pages = path.join(tmpRoot, 'library', String(item.id), 'pages');
+    fs.mkdirSync(pages, { recursive: true });
+    fs.writeFileSync(path.join(pages, '0001.jpg'), 'x');
+  }
+
+  it('switches a converted manga back to its pages and forward again, keeping each position', () => {
+    seed({ id: 'ocr-manga', kind: 'manga', pageCount: 1, progress: { page: 7, percent: 0.5 } });
+    attachGeneratedEpub('ocr-manga', Buffer.from('epub'));
+    let it = getLibraryItem('ocr-manga')!;
+    expect(it).toMatchObject({ kind: 'book', epubFile: 'ocr.epub', ocrEpubFile: 'ocr.epub', ocrOriginal: { kind: 'manga' } });
+    // The manga page index is not handed to the novel reader.
+    expect(it.progress).toBeUndefined();
+
+    setLibraryOcrView('ocr-manga', 'original');
+    it = getLibraryItem('ocr-manga')!;
+    expect(it.kind).toBe('manga');
+    expect(it.epubFile).toBeUndefined();
+    expect(it.progress).toEqual({ page: 7, percent: 0.5 });
+    // Nothing was deleted on the way.
+    expect(fs.existsSync(path.join(tmpRoot, 'library', 'ocr-manga', 'ocr.epub'))).toBe(true);
+    expect(fs.existsSync(path.join(tmpRoot, 'library', 'ocr-manga', 'pages', '0001.jpg'))).toBe(true);
+
+    setLibraryOcrView('ocr-manga', 'text');
+    expect(getLibraryItem('ocr-manga')).toMatchObject({ kind: 'book', epubFile: 'ocr.epub' });
+  });
+
+  it('returns a scanned PDF to its PDF, and a re-run keeps the first record of the original', () => {
+    seed({ id: 'ocr-pdf', kind: 'book', epubFile: 'original.pdf' });
+    attachGeneratedEpub('ocr-pdf', Buffer.from('epub'));
+    attachGeneratedEpub('ocr-pdf', Buffer.from('epub2'), { fileName: 'ocr-bilingual.epub' });
+    expect(getLibraryItem('ocr-pdf')).toMatchObject({
+      epubFile: 'ocr-bilingual.epub',
+      ocrOriginal: { kind: 'book', epubFile: 'original.pdf' },
+    });
+    setLibraryOcrView('ocr-pdf', 'original');
+    expect(getLibraryItem('ocr-pdf')).toMatchObject({ kind: 'book', epubFile: 'original.pdf' });
+  });
+
+  it('recovers an item converted before conversion was reversible', () => {
+    seed({ id: 'ocr-legacy', kind: 'book', epubFile: 'ocr.epub', pageCount: 1 });
+    fs.writeFileSync(path.join(tmpRoot, 'library', 'ocr-legacy', 'ocr.epub'), 'epub');
+    setLibraryOcrView('ocr-legacy', 'original');
+    expect(getLibraryItem('ocr-legacy')).toMatchObject({ kind: 'manga', ocrEpubFile: 'ocr.epub' });
+  });
+
+  it('refuses for an item that was never converted', () => {
+    seed({ id: 'plain-book', kind: 'book', epubFile: 'original.epub' });
+    expect(setLibraryOcrView('plain-book', 'original')).toBeUndefined();
+    expect(getLibraryItem('plain-book')).toMatchObject({ kind: 'book', epubFile: 'original.epub' });
   });
 });

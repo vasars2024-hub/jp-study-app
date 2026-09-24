@@ -22,6 +22,7 @@ import type { LibraryItem } from '../../shared/types';
 import type { BookLevelEstimate } from '../../shared/bookLevelEstimate';
 import Icon from '../components/Icons';
 import BookOcrPanel from '../components/library/BookOcrPanel';
+import { bookOcrViewOf } from '../../shared/bookOcrIpc';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
 import { fetchReadableArticle, articleBodyHtml } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
@@ -1967,7 +1968,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       setSelectedId((current) => (current === it.id ? null : it.id));
                     }}
                   >
-                    {it.epubFile ? t('bookOcr.reconvert') : t('bookOcr.convert')}
+                    {bookOcrViewOf(it) ? t('bookOcr.reconvert') : t('bookOcr.convert')}
                   </button>
                 )}
                 {selectedId === it.id && canOcrToText(it) && (

@@ -382,6 +382,11 @@ const api = {
     ipcRenderer.invoke('bookOcr:cancel', itemId),
   bookOcrStatus: (itemId: string): Promise<{ running: boolean }> =>
     ipcRenderer.invoke('bookOcr:status', itemId),
+  /** Shelve a converted item as its original pages or as its OCR text; null when refused. */
+  librarySetOcrView: (
+    itemId: string,
+    view: import('./shared/bookOcrIpc').BookOcrView,
+  ): Promise<LibraryItem | null> => ipcRenderer.invoke('library:setOcrView', itemId, view),
   onBookOcrProgress: (
     cb: (p: import('./shared/bookOcrIpc').BookOcrProgress) => void,
   ): (() => void) => {

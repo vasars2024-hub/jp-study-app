@@ -282,6 +282,10 @@ declare global {
       ): Promise<import('../shared/bookOcrIpc').BookOcrResult>;
       bookOcrCancel(itemId: string): Promise<{ ok: boolean }>;
       bookOcrStatus(itemId: string): Promise<{ running: boolean }>;
+      librarySetOcrView(
+        itemId: string,
+        view: import('../shared/bookOcrIpc').BookOcrView,
+      ): Promise<LibraryItem | null>;
       onBookOcrProgress(
         cb: (p: import('../shared/bookOcrIpc').BookOcrProgress) => void,
       ): () => void;

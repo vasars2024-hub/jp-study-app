@@ -2660,6 +2660,10 @@ export const en: Catalog = {
   'assetError.emptyResponse': 'Download failed — the server sent nothing back.',
   'assetError.generic': 'Download failed: {detail}',
   'assetError.unknownAsset': 'Unknown asset.',
+  'assetInstall.download': 'Download ({size})',
+  'assetInstall.downloadPlain': 'Download',
+  'assetInstall.progress': 'Downloading… {percent}%',
+  'assetInstall.waiting': 'Starting download…',
 
   // Command palette (Ctrl+Space / Ctrl+P). Section labels are the palette's
   // own names for app pages; command/widget *content* comes from separate
@@ -5380,6 +5384,14 @@ export const en: Catalog = {
   'bookOcr.done': 'Converted {pages} pages at {percent}% confidence.',
   'bookOcr.cancelled': 'Conversion cancelled.',
   'bookOcr.failed': 'Conversion failed.',
+  'bookOcr.needsModel': 'Converting needs the Japanese text-recognition model. It is a one-time download.',
+  'bookOcr.error.modelsMissing': 'No Japanese OCR model is installed, so nothing was converted. Download it, then convert again.',
+  'bookOcr.error.mostlyEmpty': 'Only {read} of {total} pages came back with any text, so the item was left as it was. The pages may be too small or too stylized to read.',
+  'bookOcr.error.engine': 'The OCR engine could not read any page ({detail}). The item was left as it was.',
+  'bookOcr.error.noPages': 'This item has no pages to read.',
+  'bookOcr.view.label': 'Open as',
+  'bookOcr.view.original': 'Original pages',
+  'bookOcr.view.text': 'Converted text',
   'library.open': 'Open',
   'library.inspector.selectHint': 'Select an item to see details.',
   'library.watch.autoFrom': 'Auto-importing from',

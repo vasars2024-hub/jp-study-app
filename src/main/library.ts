@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import AdmZip from 'adm-zip';
 import type { LibraryItem, Progress } from '../shared/types';
+import { isGeneratedOcrEpub, type BookOcrView } from '../shared/bookOcrIpc';
 import { INBOX_FOLDER } from '../shared/inboxMeta';
 import { MANGA_FOLDER } from '../shared/libraryFolders';
 import { extractReadableFromUrl } from './readabilityExtract';
@@ -1259,14 +1260,82 @@ export function attachGeneratedEpub(
   if (!it) return undefined;
   const fileName = opts.fileName ?? 'ocr.epub';
   fs.writeFileSync(path.join(itemDir(id), fileName), epub);
-  it.epubFile = fileName;
-  it.kind = 'book';
+  // Remember how the item was shelved before the FIRST conversion, so the
+  // original stays reachable. A re-run keeps the record it already has — the
+  // item's current kind may by then be the converted one.
+  if (!it.ocrOriginal) {
+    it.ocrOriginal = { kind: it.kind, ...(it.epubFile ? { epubFile: it.epubFile } : null) };
+  }
+  // Read before `ocrEpubFile` moves: a bilingual re-run writes a new file name,
+  // and the view the reader is on must be judged against the old one.
+  const from = currentOcrView(it);
+  it.ocrEpubFile = fileName;
+  applyOcrView(it, 'text', from);
   // Record that page images are still on disk. Without this the item looks like
   // an ordinary EPUB once converted, and the UI would stop offering a re-run —
   // which is the only way to add a bilingual build after a first pass.
   const pages = listItemPagePaths(id).length;
   if (pages > 0) it.pageCount = pages;
   if (opts.title) it.title = opts.title;
+  writeDb(items);
+  broadcastLibrary(items);
+  return it;
+}
+
+/**
+ * Point an OCR-converted item at one of its two shelves. Nothing is written or
+ * deleted on disk: the page images, the original PDF and the generated EPUB
+ * all stay, and this only decides which one the reader opens.
+ */
+function currentOcrView(it: LibraryItem): BookOcrView {
+  return it.kind === 'book' && !!it.ocrEpubFile && it.epubFile === it.ocrEpubFile ? 'text' : 'original';
+}
+
+function applyOcrView(it: LibraryItem, view: BookOcrView, current = currentOcrView(it)): void {
+  if (current !== view) {
+    // Park the position under the view being left and restore the other's, so
+    // neither reader is handed a locator in the other format.
+    const kept = { ...(it.ocrViewProgress ?? {}) };
+    if (it.progress) kept[current] = it.progress;
+    else delete kept[current];
+    const restored = kept[view];
+    it.ocrViewProgress = kept;
+    if (restored) it.progress = restored;
+    else delete it.progress;
+  }
+  if (view === 'text') {
+    it.kind = 'book';
+    it.epubFile = it.ocrEpubFile;
+    return;
+  }
+  const original = it.ocrOriginal;
+  if (!original) return;
+  it.kind = original.kind;
+  if (original.epubFile) it.epubFile = original.epubFile;
+  else delete it.epubFile;
+}
+
+/**
+ * Switch a converted item between its original pages and its OCR text. Refuses
+ * (returns undefined) for an item that was never converted, or whose generated
+ * EPUB is no longer on disk.
+ */
+export function setLibraryOcrView(id: string, view: BookOcrView): LibraryItem | undefined {
+  const items = readDb();
+  const it = items.find((x) => x.id === id);
+  if (!it) return undefined;
+  if (view !== 'original' && view !== 'text') return undefined;
+  // Converted before conversion was reversible: the original was never
+  // recorded, but it is recoverable — a PDF import keeps `original.pdf`, and
+  // anything else came in as page images.
+  if (!it.ocrOriginal && isGeneratedOcrEpub(it.epubFile)) {
+    const pdf = fs.existsSync(path.join(itemDir(id), 'original.pdf'));
+    it.ocrOriginal = pdf ? { kind: 'book', epubFile: 'original.pdf' } : { kind: 'manga' };
+    it.ocrEpubFile = it.epubFile;
+  }
+  if (!it.ocrOriginal || !it.ocrEpubFile) return undefined;
+  if (view === 'text' && !fs.existsSync(path.join(itemDir(id), it.ocrEpubFile))) return undefined;
+  applyOcrView(it, view);
   writeDb(items);
   broadcastLibrary(items);
   return it;
@@ -1864,6 +1933,13 @@ export function registerLibraryIpc(): void {
       writeDb(items);
     }
     return items;
+  });
+
+  // Book OCR is reversible: switch a converted item back to its page images (or
+  // PDF) and forward again. Returns the updated item, or null when refused.
+  ipcMain.handle('library:setOcrView', (_e, id: unknown, view: unknown) => {
+    if (typeof id !== 'string' || (view !== 'original' && view !== 'text')) return null;
+    return setLibraryOcrView(id, view) ?? null;
   });
 
   ipcMain.handle('library:setCover', (_e, id: string, pageRelPath: string) => {

@@ -171,3 +171,32 @@ export function useAssetInstalled(id: string): { installed: boolean; status: Ass
 
   return { installed: status?.state === 'installed', status };
 }
+
+/**
+ * `useAssetInstalled` for a SET of assets, in the order given. A feature that
+ * needs a detector, a recognizer and a charset has to follow all three, or it
+ * shows 0% while a companion downloads. `null` = not reported yet.
+ */
+export function useAssetStatuses(ids: readonly string[]): Array<AssetStatus | null> {
+  const key = ids.join('|');
+  const [byId, setById] = useState<Record<string, AssetStatus>>({});
+
+  useEffect(() => {
+    let alive = true;
+    const wanted = new Set(key.split('|').filter(Boolean));
+    setById({});
+    void window.api.assetsList().then(({ statuses }) => {
+      if (!alive) return;
+      setById(Object.fromEntries(statuses.filter((s) => wanted.has(s.id)).map((s) => [s.id, s])));
+    }).catch(() => undefined);
+    const off = window.api.onAssetStatus((next) => {
+      if (wanted.has(next.id)) setById((prev) => ({ ...prev, [next.id]: next }));
+    });
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [key]);
+
+  return ids.map((id) => byId[id] ?? null);
+}

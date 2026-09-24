@@ -25724,6 +25724,49 @@ html.lockscreen-widget-root #root {
   color: var(--danger, #d05050);
 }
 
+/* Converted item: which shelf it reads from. Both copies stay on disk. */
+.book-ocr-view {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--font-size-sm, 0.85em);
+}
+
+.book-ocr-view .btn[aria-pressed='true'] {
+  border-color: var(--accent, #b3262d);
+}
+
+/* ---- Shared "this feature needs a download" prompt (AssetInstallPrompt) ---- */
+
+.asset-install-prompt {
+  display: grid;
+  gap: 6px;
+}
+
+.asset-install-message,
+.asset-install-error {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.85em);
+  line-height: 1.5;
+}
+
+.asset-install-error {
+  color: var(--danger, #d05050);
+}
+
+.asset-install-busy {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--font-size-sm, 0.85em);
+}
+
+.asset-install-busy > .ui-progress {
+  grid-column: 1 / -1;
+}
+
 .epub-translate-panel {
   width: min(360px, calc(100vw - 32px));
   display: grid;
