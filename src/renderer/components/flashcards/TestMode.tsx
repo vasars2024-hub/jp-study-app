@@ -24,6 +24,7 @@ import {
   type TestResult,
 } from '../../../shared/flashcardTest';
 import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
+import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
@@ -89,7 +90,13 @@ export default function TestMode({ onExit, deck = 'all' }: {
       setConfirming(true);
       return;
     }
-    setResult(gradeTestPaper(paper, responses));
+    const graded = gradeTestPaper(paper, responses);
+    // One review-log row per answered question: a test sitting is study too.
+    for (const line of graded.lines) {
+      if (line.outcome === 'unanswered') continue;
+      appendReviewLog({ mode: 'test', cardId: line.cardId, correct: line.outcome === 'correct' });
+    }
+    setResult(graded);
   }
 
   if (!paper) return null;

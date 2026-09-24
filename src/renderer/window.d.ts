@@ -1934,13 +1934,16 @@ declare global {
           mode: 'word' | 'sentence';
           term: string;
           sentence?: string;
+          /** Present when the extension sent them with the selection. */
+          reading?: string;
+          meaning?: string;
           text: string;
           url?: string;
           title?: string;
           folder?: string;
           audioDataUrl?: string;
           profileId?: string;
-          anki: { ok: boolean; noteId?: number; error?: string };
+          anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
         }) => void,
       ): () => void;
       onExtensionClipboardAppend(
@@ -2056,6 +2059,11 @@ declare global {
       flashcardReadAudio(
         filePath: string,
       ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;
+      /** Keep a mined card's audio clip or screenshot as a managed file. */
+      flashcardStoreMinedMedia(
+        base64: string,
+        filename: string,
+      ): Promise<import('../main/flashcardAudio').StoredMinedMedia>;
       flashcardReleaseAudio(
         paths: readonly string[],
       ): Promise<{ removed: number; skipped: number }>;

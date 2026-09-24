@@ -648,6 +648,8 @@ function broadcastMineQueued(payload: {
   mode: ExtensionMineMode;
   term: string;
   sentence?: string;
+  reading?: string;
+  meaning?: string;
   text: string;
   url?: string;
   title?: string;
@@ -711,6 +713,10 @@ async function handleInbox(body: {
 
 async function handleMine(body: {
   text?: string;
+  /** Optional context the extension may send with a single-word selection. */
+  sentence?: string;
+  reading?: string;
+  meaning?: string;
   url?: string;
   title?: string;
   mode?: ExtensionMineMode | 'auto';
@@ -753,7 +759,10 @@ async function handleMine(body: {
   const term = extractMineTerm(text, mode);
   if (!term) return { ok: false, error: 'Could not extract a term to mine' };
 
-  const sentence = mode === 'sentence' ? text.slice(0, 2000) : undefined;
+  const contextSentence = typeof body.sentence === 'string' ? body.sentence.trim().slice(0, 2000) : '';
+  const sentence = mode === 'sentence' ? text.slice(0, 2000) : contextSentence || undefined;
+  const reading = typeof body.reading === 'string' ? body.reading.trim().slice(0, 200) : '';
+  const meaning = typeof body.meaning === 'string' ? body.meaning.trim().slice(0, 2000) : '';
   const folder =
     typeof body.folder === 'string' && body.folder.trim() ? body.folder.trim().slice(0, 40) : 'Extension';
   const source: MineSource =
@@ -827,6 +836,8 @@ async function handleMine(body: {
       anki = await mineNote({
         term,
         sentence,
+        ...(reading ? { reading } : {}),
+        ...(meaning ? { meaning } : {}),
         surface: mode === 'word' ? term : undefined,
         profileId: profileId || undefined,
         audioBase64: audioBase64 || undefined,
@@ -848,6 +859,8 @@ async function handleMine(body: {
     mode,
     term,
     sentence,
+    ...(reading ? { reading } : {}),
+    ...(meaning ? { meaning } : {}),
     text: text.slice(0, 2000),
     url: body.url,
     title: body.title,

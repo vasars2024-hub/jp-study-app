@@ -143,6 +143,7 @@ import {
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
+  queueYomitanStoreImport,
   startSourceLangRelabel,
 } from './dictionary/importIpc';
 import { resolveCustomFrequencyRanks } from './mining';
@@ -1330,7 +1331,13 @@ export function registerDictionaryIpc(): void {
     }
     return importOfflineExamples(sentencesPath, linksPath);
   });
-  ipcMain.handle('dict:importYomitan', (_e, filePath?: string) => importYomitanZip(filePath));
+  ipcMain.handle('dict:importYomitan', async (_e, filePath?: string) => {
+    const result = await importYomitanZip(filePath);
+    // Lookups read the unified database first; queue this store's import now
+    // rather than leaving the new dictionary invisible there until next launch.
+    if (result.ok && result.info?.id) queueYomitanStoreImport(result.info.id);
+    return result;
+  });
   ipcMain.handle('dict:listYomitan', (): YomitanDictInfo[] => listYomitanDicts());
   ipcMain.handle('dict:removeYomitan', (_e, id: string) => removeYomitanDict(id));
   ipcMain.handle('dict:setYomitanEnabled', (_e, id: string, enabled: boolean) =>

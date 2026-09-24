@@ -63,6 +63,9 @@ import {
   removeBookGroup,
   renameBookGroup,
   reviewSessionCards,
+  dueDeckCards,
+  undoLastReview,
+  peekReviewUndo,
   searchDeckCards,
   setBookGroupFolder,
   setDeckCardFolder,
@@ -75,7 +78,6 @@ import {
   type BookGroup,
 } from '../../flashcardDeck';
 import {
-  filterLocalReviewsDue,
   LOCAL_SRS_RELEARN_MINUTES,
   type LocalSrsState,
   type LocalSrsRating,
@@ -96,6 +98,7 @@ import AutoReadingPreferencesPanel from './AutoReadingPreferences';
 import CardVoicePicker from './CardVoicePicker';
 import DeckAudioExport from './DeckAudioExport';
 import SchedulingPreferencesPanel from './SchedulingPreferences';
+import AnkiQueueStatus from './AnkiQueueStatus';
 import LearnMode from './LearnMode';
 import MatchMode from './MatchMode';
 import TestMode from './TestMode';
@@ -103,7 +106,7 @@ import WriteMode from './WriteMode';
 import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPractice';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { deckCardsToCsv } from '../../deckExport';
-import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
+import { loadSaved, loadSavedCards, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
   handOffToAgent,
   routeAgentContext,
@@ -294,6 +297,11 @@ export interface FlashcardsState {
   hard: () => void;
   easy: () => void;
   again: () => void;
+  /** Take back the last rating in this sitting (Ctrl+Z / Undo button). */
+  undoRating: () => void;
+  canUndoRating: boolean;
+  /** Dictionary saves a "Review dictionary" sitting would contain. */
+  dictionaryReviewCount: number;
   playCurrentAudio: () => Promise<void>;
   addAudioToCurrent: () => Promise<void>;
   addAudioToReviewPool: () => Promise<void>;
@@ -420,19 +428,15 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }, []);
   useEffect(refreshJitenCovers, []);
 
-  // Everything except the dictionary saves, which have their own two tabs.
+  // Every card in the deck, dictionary saves included.
   //
-  // Written as an exclusion rather than the allow-list it used to be, because
-  // the allow-list silently orphaned whole sources: `media` — every card the
-  // subtitle harvest, the visual-novel miner and Study Mode produce — was in
-  // the deck, counted by nothing and listed nowhere, and the sidebar's own
-  // "Media" folder chip read 0 while holding cards. `extension` was orphaned
-  // the same way. A new `FlashcardSource` now appears by default instead of
-  // vanishing until someone remembers this line.
-  const epubCards = useMemo(
-    () => deck.filter((c) => c.source !== 'dictionary'),
-    [deck],
-  );
+  // This used to exclude `source: 'dictionary'`, back when a dictionary save
+  // lived in its own store. That exclusion also hid every card Study Mode
+  // writes from lookup history (it labels them `dictionary`), so they appeared
+  // nowhere. Dictionary saves are real deck cards now (savedWords.ts), so they
+  // are listed, counted and reviewed like the rest; the Dictionary tab is a
+  // view of the same cards, not a second collection.
+  const epubCards = deck;
   const recentStrip = useMemo(() => epubCards.slice(0, 24), [epubCards]);
   // Search narrows the *visible* deck (explorer, counts, CSV export) but not the
   // review pool below — a session is scoped by folder + book picker, not by
@@ -454,10 +458,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     () => filterDeckCards(epubCards, folderFilter),
     [epubCards, folderFilter],
   );
-  const epubDueCards = useMemo(() => filterLocalReviewsDue(epubReviewPool), [epubReviewPool]);
+  // Due now, with the profile's new-cards-per-day allowance applied.
+  const epubDueCards = useMemo(() => dueDeckCards(epubReviewPool), [epubReviewPool]);
   const epubReviewCandidates = useMemo(() => {
     const pool = filterDeckByBook(epubReviewPool, reviewBookKey);
-    return reviewDueOnly ? filterLocalReviewsDue(pool) : pool;
+    return reviewDueOnly ? dueDeckCards(pool) : pool;
   }, [epubReviewPool, reviewBookKey, reviewDueOnly]);
   const epubReviewSessionCandidates = useMemo(
     () => reviewSessionCards(epubReviewPool, reviewBookKey, reviewDueOnly, reviewMode),
@@ -524,15 +529,15 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const current = sessionCards[reviewIndex] ?? null;
   const sessionComplete = sessionCards.length > 0 && masteredIds.size >= sessionCards.length;
 
-  function savedToReviewCards(words: SavedWord[]): ReviewCard[] {
-    return planFlashcardReview(words.map((w) => ({
-      id: `dict:${w.word}`,
-      word: w.word,
-      reading: w.reading,
-      meaning: w.meaning,
-      reviewGroup: 'dictionary',
-    })), { mode: 'text' });
-  }
+  /**
+   * The dictionary saves a "Review dictionary" sitting draws from. Due cards
+   * when the due filter is on (the saves are scheduled like any card now), so
+   * the sitting is a real review whose grades are kept.
+   */
+  const dictionaryReviewPool = useMemo(() => {
+    const cards = deck.filter((card) => card.source === 'dictionary' && saved.some((w) => w.word === card.word));
+    return reviewDueOnly ? dueDeckCards(cards) : cards;
+  }, [deck, saved, reviewDueOnly]);
 
   function deckToReviewCards(cards: DeckFlashcard[]): ReviewCard[] {
     return planFlashcardReview(cards.map((c) => ({
@@ -586,11 +591,17 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setTotal(ordered.length);
     setReviewed(initialMastered.size);
     setFlipped(false);
+    undoStackRef.current = [];
+    setUndoDepth(0);
     setMode('review');
   }
 
   function startReview(): void {
-    startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
+    // Dictionary saves are deck cards: reviewed through the deck path, so
+    // Again / Hard / Good / Easy are persisted like every other review. They
+    // used to be shown four buttons whose answers were thrown away.
+    const pool = dictionaryReviewPool.length ? dictionaryReviewPool : loadSavedCards();
+    startReviewSession(deckToReviewCards(pool), 'epub');
   }
 
   function startEpubReview(): void {
@@ -609,7 +620,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       startReviewSession(sessionCards, 'epub');
       return;
     }
-    startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
+    startReview();
   }
 
   function endReview(): void {
@@ -647,9 +658,57 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setFlipped((f) => !f);
   }
 
+  /**
+   * The sitting as it was before each persisted rating, newest last. Undo
+   * restores the card's schedule through `undoLastReview` and puts the sitting
+   * back exactly here, so the card is in front of the user again, flipped.
+   */
+  const undoStackRef = useRef<Array<{
+    cardId: string;
+    sessionCards: ReviewCard[];
+    reviewIndex: number;
+    masteredIds: Set<string>;
+    reviewed: number;
+  }>>([]);
+  const [undoDepth, setUndoDepth] = useState(0);
+
+  function rememberForUndo(cardId: string): void {
+    undoStackRef.current.push({
+      cardId,
+      sessionCards,
+      reviewIndex,
+      masteredIds: new Set(masteredIds),
+      reviewed,
+    });
+    if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+    setUndoDepth(undoStackRef.current.length);
+  }
+
+  function undoRating(): void {
+    const snapshot = undoStackRef.current[undoStackRef.current.length - 1];
+    // Only when the deck's last review is this sitting's last rating: an undo
+    // must never reach into a review made somewhere else.
+    if (!snapshot || peekReviewUndo()?.cardId !== snapshot.cardId) return;
+    const undone = undoLastReview();
+    undoStackRef.current.pop();
+    setUndoDepth(undoStackRef.current.length);
+    if (!undone) return;
+    setDeck(undone.cards);
+    const restored = undone.cards.find((c) => c.id === snapshot.cardId);
+    setSessionCards(snapshot.sessionCards.map((c) => (
+      c.id === snapshot.cardId ? { ...c, srs: restored?.srs } : c
+    )));
+    setReviewIndex(snapshot.reviewIndex);
+    setMasteredIds(snapshot.masteredIds);
+    setReviewed(snapshot.reviewed);
+    markExplored(snapshot.cardId);
+    setFlipped(true);
+  }
+
   function accept(rating: Exclude<LocalSrsRating, 'again'>): void {
     const card = sessionCards[reviewIndex];
     if (!card || masteredIds.has(card.id)) return;
+    if (reviewSource === 'epub') rememberForUndo(card.id);
     if (wiredFx) window.dispatchEvent(new CustomEvent('wired:sync-ok'));
     const nextMastered = new Set(masteredIds);
     nextMastered.add(card.id);
@@ -692,6 +751,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   function again(): void {
     const card = sessionCards[reviewIndex];
     if (!card) return;
+    if (reviewSource === 'epub') rememberForUndo(card.id);
     fireCardFx('resync', 260);
     if (reviewSource === 'epub') {
       const nextDeck = reviewDeckCard(card.id, 'again');
@@ -1024,6 +1084,10 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
         if (flipped) easy();
         else return false;
       }),
+      registerCommandHandler('flashcards.undo', () => {
+        if (undoStackRef.current.length) undoRating();
+        else return false;
+      }),
       // Not gated on `flipped`: in audio-only review the prompt IS the audio, so
       // replaying it before the answer is revealed is the whole point of the key.
       registerCommandHandler('flashcards.replayAudio', () => {
@@ -1122,6 +1186,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     hard,
     easy,
     again,
+    undoRating,
+    canUndoRating: undoDepth > 0,
+    dictionaryReviewCount: dictionaryReviewPool.length,
     playCurrentAudio,
     addAudioToCurrent,
     addAudioToReviewPool,
@@ -1465,6 +1532,18 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
             </button>
           </div>
         )}
+        {state.canUndoRating && (
+          <div className="flash-undo-row">
+            <button
+              type="button"
+              className="btn small flash-undo"
+              onClick={state.undoRating}
+              title={t('flash.undoRating.hint')}
+            >
+              {t('flash.undoRating')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1788,7 +1867,9 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             disabled={saved.length === 0}
             aria-describedby={saved.length === 0 ? 'flash-review-dict-blocked' : undefined}
           >
-            {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
+            {saved.length
+              ? t('flash.reviewDictionaryCount', { count: state.dictionaryReviewCount || saved.length })
+              : t('flash.reviewDictionary')}
           </button>
           {/*
             Five specialist entries used to sit flat beside the two the overview is
@@ -1833,6 +1914,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       </ContextualSurface>
 
       <TranscriptionCardDeckStatus />
+      <AnkiQueueStatus deck={state.deck} />
 
       {/*
         Five preference panels used to sit open, stacked, above the deck itself. Measured

@@ -58,6 +58,7 @@ import { parseStudySubtitles } from '../../subtitles';
 import { handOffToAgent, lexiconPassageAgentContext, routeAgentContext } from '../../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import './lexiconWorkbench.css';
+import { mineToStudy, requestStudyInput } from '../../studyMining';
 
 /** Gloss targets follow the imported dictionaries, not the source-side DictLang pair. */
 type GlossLang = string;
@@ -67,7 +68,7 @@ type GlossLang = string;
  * already studied — so it is kept distinct from `error`, which is the only
  * state that stays retryable.
  */
-type MineState = 'adding' | 'added' | 'dup' | 'error';
+type MineState = 'adding' | 'added' | 'dup' | 'saved' | 'queued' | 'error';
 
 type ConcordanceState = 'idle' | 'running' | 'done' | 'error';
 
@@ -81,6 +82,9 @@ const MINE_LABEL_KEYS: Record<MineState, string> = {
   adding: 'lexicon.harvest.mining',
   added: 'lexicon.harvest.mined',
   dup: 'lexicon.harvest.mineDuplicate',
+  // In the local deck; Anki not set up (`saved`) or not open yet (`queued`).
+  saved: 'lexicon.harvest.minedToDeck',
+  queued: 'lexicon.harvest.minedAnkiLater',
   // A failure returns the button to its offer: this is the one retryable state.
   error: 'lexicon.harvest.mine',
 };
@@ -629,11 +633,18 @@ function LexiconWorkbenchResults({
       setMineError((prev) => ({ ...prev, [item.key]: error }));
     };
     try {
-      const res = await window.api.ankiMineNote(buildHarvestMineRequest(item, pinned, { lang }));
-      if (res.ok) {
+      // Local study card first; the Anki half joins it now or when Anki opens.
+      const res = await mineToStudy(requestStudyInput(
+        buildHarvestMineRequest(item, pinned, { lang }),
+        'lexicon',
+        { studyLang: lang },
+      ));
+      if (res.anki === 'added') {
         setMined((prev) => ({ ...prev, [item.key]: 'added' }));
-      } else if (res.error === 'duplicate') {
+      } else if (res.anki === 'duplicate') {
         setMined((prev) => ({ ...prev, [item.key]: 'dup' }));
+      } else if (res.anki === 'queued' || res.anki === 'local') {
+        setMined((prev) => ({ ...prev, [item.key]: res.anki === 'queued' ? 'queued' : 'saved' }));
       } else {
         // AnkiConnect's own message is more useful than a generic one; the
         // generic string only covers a mine that threw before answering.
@@ -1248,7 +1259,7 @@ function LexiconWorkbenchResults({
                           // ::after is max(100%, 32px), so this stays 87x28 on
                           // screen and grows 2px above and below to a pointer.
                           className="lexicon-harvest-mine lq-hit"
-                          disabled={mineState === 'adding' || mineState === 'added' || mineState === 'dup'}
+                          disabled={mineState !== undefined && mineState !== 'error'}
                           onClick={() => void mineHarvestItem(item)}
                           type="button"
                         >

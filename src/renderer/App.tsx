@@ -133,6 +133,29 @@ function isLockscreenWindow(): boolean {
  * `main/debugBridge.ts` identifies it that way, so a second bare desktop would
  * break the `jp-bridge` harness (B6). Every secondary is tagged.
  */
+/**
+ * Reading and meaning for a single word the extension mined. The extension
+ * sends only the selection, so without this its local card was a bare word
+ * with an empty back. Offline dictionary only: mining must not wait on a
+ * network lookup, and a miss simply leaves the fields empty as before.
+ */
+async function extensionWordGloss(term: string): Promise<{ reading: string; meaning: string }> {
+  try {
+    if (typeof window.api?.lookupTermOffline !== 'function') return { reading: '', meaning: '' };
+    const result = await window.api.lookupTermOffline(term);
+    const entry = result?.entries?.find((e) => e.word === term) ?? result?.entries?.[0];
+    if (!entry) return { reading: '', meaning: '' };
+    const meaning = entry.senses
+      .slice(0, 2)
+      .map((sense) => sense.definitions.join('; '))
+      .filter(Boolean)
+      .join(' / ');
+    return { reading: entry.reading && entry.reading !== entry.word ? entry.reading : '', meaning };
+  } catch {
+    return { reading: '', meaning: '' };
+  }
+}
+
 function secondaryDesktop(): { desktopIndex: number; displayKey: string } | null {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('desk');
@@ -273,52 +296,88 @@ export default function App() {
   }, []);
 
   // Chrome extension selection mining → local flashcard collection (Phase 9).
+  //
+  // Main already tried Anki (extensionServer.handleMine); this keeps the local
+  // study copy through the same `mineToStudy` every in-app surface uses, so it
+  // carries the page title/URL, the sentence and — for a single word, where the
+  // extension sends only the selection — a reading and meaning from the local
+  // dictionary. A card that could not reach Anki joins the pending queue.
   useEffect(() => {
     return window.api.onExtensionMined((payload) => {
-      const text = (payload.text || '').trim();
-      const term =
-        (payload.term || '').trim() ||
-        text
-          .split(/[\s。．！？!?]+/)
-          .find((s) => s.trim().length > 0)
-          ?.trim()
-          .slice(0, 40) ||
-        text.slice(0, 40);
-      if (!term) return;
-      const mode =
-        payload.mode === 'word' || payload.mode === 'sentence'
-          ? payload.mode
-          : text.length > 40 || /[。．！？!?]/.test(text)
-            ? 'sentence'
-            : 'word';
-      const folder =
-        typeof payload.folder === 'string' && payload.folder.trim()
-          ? payload.folder.trim().slice(0, 40)
-          : 'Extension';
-      addDeckCards([
-        {
+      void (async () => {
+        const text = (payload.text || '').trim();
+        const term =
+          (payload.term || '').trim() ||
+          text
+            .split(/[\s。．！？!?]+/)
+            .find((s) => s.trim().length > 0)
+            ?.trim()
+            .slice(0, 40) ||
+          text.slice(0, 40);
+        if (!term) return;
+        const mode =
+          payload.mode === 'word' || payload.mode === 'sentence'
+            ? payload.mode
+            : text.length > 40 || /[。．！？!?]/.test(text)
+              ? 'sentence'
+              : 'word';
+        const folder =
+          typeof payload.folder === 'string' && payload.folder.trim()
+            ? payload.folder.trim().slice(0, 40)
+            : 'Extension';
+        let reading = (payload.reading || '').trim();
+        let meaning = (payload.meaning || '').trim();
+        if (mode === 'word' && (!reading || !meaning)) {
+          const found = await extensionWordGloss(term);
+          reading ||= found.reading;
+          meaning ||= found.meaning;
+        }
+        const sentence = mode === 'sentence'
+          ? (payload.sentence || text).slice(0, 2000)
+          : payload.sentence?.trim() && payload.sentence.trim() !== term
+            ? payload.sentence.trim().slice(0, 2000)
+            : undefined;
+        const { mineToStudy } = await import('./studyMining');
+        await mineToStudy({
           word: term.slice(0, 80),
-          reading: '',
-          meaning: '',
-          sentence: mode === 'sentence' ? (payload.sentence || text).slice(0, 2000) : undefined,
+          reading,
+          meaning,
+          sentence,
           source: 'extension',
           folder,
+          sourceTitle: payload.title?.trim() || undefined,
+          sourceUrl: payload.url?.trim() || undefined,
           audioDataUrl:
             typeof payload.audioDataUrl === 'string' && payload.audioDataUrl.startsWith('data:')
               ? payload.audioDataUrl
               : undefined,
-        },
-      ]);
-      const isAudio = folder === 'audio' || !!payload.audioDataUrl;
-      appendNotebookEvent({
-        stream: isAudio ? 'audio' : folder.toLowerCase().includes('ocr') ? 'ocr' : 'extension',
-        title: term.slice(0, 80),
-        detail: mode === 'sentence' ? (payload.sentence || text).slice(0, 400) : undefined,
-        folder: isAudio ? 'Audio' : folder.toLowerCase().includes('ocr') ? 'OCR' : 'Mined',
-        origin: 'extension',
-        href: 'flashcards',
-      });
+          ankiResult: payload.anki,
+        });
+        const isAudio = folder === 'audio' || !!payload.audioDataUrl;
+        appendNotebookEvent({
+          stream: isAudio ? 'audio' : folder.toLowerCase().includes('ocr') ? 'ocr' : 'extension',
+          title: term.slice(0, 80),
+          detail: sentence ? sentence.slice(0, 400) : undefined,
+          folder: isAudio ? 'Audio' : folder.toLowerCase().includes('ocr') ? 'OCR' : 'Mined',
+          origin: 'extension',
+          href: 'flashcards',
+        });
+      })();
     });
+  }, []);
+
+  // Pending-Anki queue: drains when Anki's link comes up; also reports a deck
+  // the localStorage cache could not hold.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let dead = false;
+    void import('./studyMining').then(({ installStudyMining }) => {
+      if (!dead) off = installStudyMining();
+    });
+    return () => {
+      dead = true;
+      off?.();
+    };
   }, []);
 
   // Extension audio → Whisper (installed model in renderer worker).

@@ -20,7 +20,8 @@
  * a card-level edit is refused by name rather than silently dropped, and without
  * a guid column the round trip is positional, which is stated before the button
  * because it decides whether the result merges in Anki or arrives as new notes.
- * A local deck is none of the three and offers no button at all.
+ * A local deck is the fourth: it writes the edited fields back into the app's
+ * own flashcards (`DeckWorkbenchLocalApply`), never into Anki.
  *
  * Gate 8's second clause lives here too: once something HAS been written, the
  * draft's undo is powerless, so a successful commit leaves a record and the
@@ -45,6 +46,7 @@ import {
 import type { AnkiCsvExportResult } from '../../../shared/ankiCsvExport';
 import type { ConnectCommitResult } from '../../../shared/ankiConnectCommit';
 import DeckWorkbenchParity from './DeckWorkbenchParity';
+import DeckWorkbenchLocalApply from './DeckWorkbenchLocalApply';
 import { useT } from '../../i18n';
 
 /** What a reversal reports, from either destination's own result shape. */
@@ -579,6 +581,10 @@ export default function DeckWorkbenchApply({
         )}
       </div>
     );
+  }
+
+  if (draft.source.kind === 'local-deck') {
+    return <DeckWorkbenchLocalApply draft={draft} journal={journal} />;
   }
 
   if (!isPackage) {

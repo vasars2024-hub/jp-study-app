@@ -790,6 +790,61 @@ export async function synthesizeFlashcardAudio(
   }
 }
 
+const MINED_MEDIA_EXTENSIONS = new Set([
+  '.webm', '.mp3', '.ogg', '.m4a', '.wav', '.mp4', '.png', '.jpg', '.jpeg', '.webp',
+]);
+/** A mined clip or screenshot; a larger payload is not a card asset. */
+const MINED_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+
+export interface StoredMinedMedia {
+  ok: boolean;
+  path?: string;
+  error?: string;
+}
+
+/**
+ * Keep a mined card's audio or screenshot as a managed file, so the LOCAL copy
+ * of a card mined from the player or the extension carries its media instead
+ * of a multi-megabyte data URL in localStorage. Files are content-addressed
+ * under the managed root, so mining the same line twice stores it once and the
+ * existing sweep can reclaim what no card references.
+ */
+export function storeMinedMedia(base64: string, filename: string): StoredMinedMedia {
+  const extension = path.extname(typeof filename === 'string' ? filename : '').toLowerCase();
+  if (!MINED_MEDIA_EXTENSIONS.has(extension)) return { ok: false, error: 'unsupported-type' };
+  const data = typeof base64 === 'string' ? base64.replace(/^data:[^,]*,/, '').trim() : '';
+  if (!data || !/^[A-Za-z0-9+/=\s]+$/.test(data)) return { ok: false, error: 'empty' };
+  const bytes = Buffer.from(data, 'base64');
+  if (!bytes.length) return { ok: false, error: 'empty' };
+  if (bytes.length > MINED_MEDIA_MAX_BYTES) return { ok: false, error: 'too-large' };
+  const directory = path.join(audioRoot(), 'mined');
+  const output = path.join(
+    directory,
+    `${crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 24)}${extension}`,
+  );
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+    if (!fs.existsSync(output)) fs.writeFileSync(output, bytes);
+    return { ok: true, path: output };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const MANAGED_MEDIA_MIME: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.aiff': 'audio/aiff',
+  '.aif': 'audio/aiff',
+  '.webm': 'audio/webm',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.mp4': 'video/mp4',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+};
+
 function readManagedAudio(filePath: string): FlashcardAudioResult {
   if (!isManagedFlashcardAudioPath(filePath) || !fs.existsSync(filePath)) {
     return {
@@ -799,11 +854,7 @@ function readManagedAudio(filePath: string): FlashcardAudioResult {
     };
   }
   const extension = path.extname(filePath).toLowerCase();
-  const mime = extension === '.mp3'
-    ? 'audio/mpeg'
-    : extension === '.aiff' || extension === '.aif'
-      ? 'audio/aiff'
-      : 'audio/wav';
+  const mime = MANAGED_MEDIA_MIME[extension] ?? 'audio/wav';
   return { ok: true, dataUrl: `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}` };
 }
 
@@ -857,6 +908,12 @@ export function registerFlashcardAudioIpc(): void {
     void shell.openPath(path.resolve(directory));
     return true;
   });
+  ipcMain.handle('flashcards:storeMinedMedia', (_event, base64?: unknown, filename?: unknown) => (
+    storeMinedMedia(
+      typeof base64 === 'string' ? base64 : '',
+      typeof filename === 'string' ? filename : '',
+    )
+  ));
   ipcMain.handle('flashcards:readAudio', (_event, filePath?: string) => (
     readManagedAudio(typeof filePath === 'string' ? filePath : '')
   ));

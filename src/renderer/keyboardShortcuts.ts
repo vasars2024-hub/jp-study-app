@@ -466,6 +466,13 @@ export const COMMAND_CATALOG: AppCommand[] = [
     note: 'After the card is flipped.',
   },
   {
+    id: 'flashcards.undo',
+    label: 'Undo last rating',
+    category: 'Flashcards',
+    defaultKeys: 'Ctrl+Z',
+    note: 'Active during review. Puts the last rated card back with its old schedule.',
+  },
+  {
     id: 'flashcards.replayAudio',
     label: 'Replay card audio',
     category: 'Flashcards',

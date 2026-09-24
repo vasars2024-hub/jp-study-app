@@ -15,6 +15,7 @@ import {
   StatsBooks,
   StatsCards,
   StatsChart,
+  StatsReviews,
   StatsShows,
   WordKnowledge,
   useStats,
@@ -164,6 +165,7 @@ export default function StatisticsView() {
 
             <aside className="aero-stats-knowledge">
               <WordKnowledge />
+              <StatsReviews />
             </aside>
           </div>
         </div>
@@ -217,6 +219,8 @@ export default function StatisticsView() {
       </ContextualSurface>
 
       <WordKnowledge />
+
+      <StatsReviews />
 
       {!hasData ? (
         <div className="stats-empty">

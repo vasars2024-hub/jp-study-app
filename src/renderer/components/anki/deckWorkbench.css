@@ -1491,3 +1491,21 @@
   font-size: 0.75rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* Autosave state: one quiet line under the progress, with Discard beside it. */
+.deck-workbench-autosave {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+/* The way past a paged source's first window. */
+.deck-workbench-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}

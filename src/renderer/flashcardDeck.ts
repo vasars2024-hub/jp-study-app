@@ -8,7 +8,17 @@ export type FlashcardSource =
   | 'csv'
   | 'jiten'
   | 'extension'
-  | 'media';
+  | 'media'
+  /** Video player subtitle line (VideoCore mining panel). */
+  | 'subtitle'
+  /** A lyric line mined from the music player. */
+  | 'lyrics'
+  /** Sentence analysis (app or Reading Lens host). */
+  | 'analysis'
+  /** Reading Lens reader panel glance. */
+  | 'reader'
+  /** Lexicon workbench harvest row. */
+  | 'lexicon';
 
 /**
  * Where a card's Japanese TEXT came from, which is a different question from
@@ -28,7 +38,9 @@ export type FlashcardTextProvenance =
   | 'book-text';
 
 import {
+  countIntroducedToday,
   filterLocalReviewsDue,
+  limitNewCards,
   type LocalSrsAlgorithm,
   type LocalSrsRating,
   type LocalSrsState,
@@ -90,6 +102,22 @@ export interface DeckFlashcard {
   ankiNoteId?: number;
   ankiExportError?: string;
   ankiDeck?: string;
+  /**
+   * Mined while Anki was unreachable: the local card is the study copy, and the
+   * Anki half is waiting in the mining queue (`studyMining.ts`). Cleared when
+   * the note is created, or when Anki reports it as a duplicate.
+   */
+  ankiPending?: boolean;
+  /** Anki already held a matching note when this card was pushed. */
+  ankiDuplicate?: boolean;
+  /** Page / file the card was mined from, when the surface knows one. */
+  sourceUrl?: string;
+  /** Normalised word + sentence + source identity; dedupes repeated mines. */
+  mineKey?: string;
+  /** Study language a dictionary save belongs to (absent = Japanese). */
+  studyLang?: string;
+  /** When the card was first reviewed — drives the new-cards-per-day cap. */
+  introducedAt?: number;
 }
 
 export type DeckFolderFilter = 'all' | 'unfiled' | string;
@@ -104,6 +132,13 @@ export type DeckFolderFilter = 'all' | 'unfiled' | string;
 export interface FlashcardDeckStore {
   folders: string[];
   cards: DeckFlashcard[];
+  /**
+   * Wall-clock stamp of the write that produced this copy. The deck has two
+   * homes (localStorage cache + IndexedDB) and boot reconciliation keeps
+   * whichever is newer, so a stale cache can never overwrite the durable copy.
+   * Absent on every store written before the stamp existed (reads as 0).
+   */
+  savedAt?: number;
 }
 
 import {
@@ -113,9 +148,15 @@ import {
 } from '../shared/ankiLocalDeck';
 import { stripFieldHtml } from '../shared/apkgParse';
 import { IDB_KEYS, mirrorToIdb } from './storage/storage';
+import { kvGet } from './storage/db';
 import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../shared/overEncodedJson';
 import { emitCompanionEvent } from './environment/companionEvents';
 import { logBlanc } from './blancConsole';
+import { levelForIntervalDays } from '../shared/anki';
+import { setInferredLevel, type WkLevel } from './knownWords';
+import { getActiveProfile } from './profileState';
+import { appendReviewLog, removeReviewLogEntry } from './reviewLog';
+import type { ReviewLogEntry } from '../shared/reviewLog';
 
 /** Stable localStorage key shared with read-only Files catalogue consumers. */
 export const FLASHCARD_DECK_STORAGE_KEY = 'jp-flashcard-deck';
@@ -148,6 +189,9 @@ export function parseFlashcardDeckStore(raw: string | null): ParsedFlashcardDeck
         cards: Array.isArray(parsed.cards)
           ? parsed.cards.filter((card): card is DeckFlashcard => !!card && typeof card.id === 'string')
           : [],
+        ...(typeof parsed.savedAt === 'number' && Number.isFinite(parsed.savedAt)
+          ? { savedAt: parsed.savedAt }
+          : {}),
       },
       layers,
     };
@@ -160,7 +204,32 @@ function newId(): string {
   return `fc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * The deck when localStorage could not hold it. Set when a cache write hits
+ * the quota (the durable IndexedDB copy still takes the write) and when boot
+ * reconciliation restores a durable copy the cache has no room for. While it
+ * is set it is the authoritative copy for this window: reading the cache would
+ * return the last value that happened to fit, and the next write would then
+ * mirror that stale value over the durable copy.
+ */
+let overflowStore: FlashcardDeckStore | null = null;
+/** True while boot reconciliation is deciding between the two copies. */
+let restoring = false;
+/** Cards created while reconciliation was reading the durable copy. */
+let createdWhileRestoring = new Set<string>();
+
+/** Emitted when a deck write could not reach localStorage (quota / blocked). */
+export const FLASHCARD_DECK_STORAGE_EVENT = 'flashcard-deck-storage';
+
+export interface FlashcardDeckStorageIssue {
+  kind: 'cache-full';
+  cards: number;
+}
+
 function readStore(): FlashcardDeckStore {
+  if (overflowStore) {
+    return { ...overflowStore, cards: overflowStore.cards, folders: overflowStore.folders };
+  }
   try {
     const raw = localStorage.getItem(FLASHCARD_DECK_STORAGE_KEY);
     if (!raw) return { folders: [], cards: [] };
@@ -192,16 +261,131 @@ function readStore(): FlashcardDeckStore {
   }
 }
 
-function writeStore(store: FlashcardDeckStore): void {
+/** Write the synchronous cache; false when it could not hold the deck. */
+function writeCache(store: FlashcardDeckStore): boolean {
   try {
     localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, JSON.stringify(store));
+    return true;
   } catch {
-    /* localStorage full — the IndexedDB mirror below still persists it */
+    return false;
+  }
+}
+
+function reportCacheFull(store: FlashcardDeckStore): void {
+  try {
+    window.dispatchEvent(new CustomEvent<FlashcardDeckStorageIssue>(FLASHCARD_DECK_STORAGE_EVENT, {
+      detail: { kind: 'cache-full', cards: store.cards.length },
+    }));
+  } catch {
+    /* non-browser context */
+  }
+}
+
+function writeStore(store: FlashcardDeckStore): void {
+  const previous = overflowStore?.savedAt ?? 0;
+  // Strictly increasing, so two writes in one millisecond still order.
+  store.savedAt = Math.max(Date.now(), previous + 1, (store.savedAt ?? 0) + 1);
+  if (writeCache(store)) {
+    overflowStore = null;
+  } else {
+    // localStorage full. Keep the deck in memory so the next read is not the
+    // stale cached value, and tell the user: silently degrading is how a deck
+    // used to lose cards.
+    overflowStore = store;
+    reportCacheFull(store);
   }
   // Write-through to IndexedDB: durable home for deck data. localStorage is
-  // just the synchronous cache (see storage/storage.ts).
-  mirrorToIdb(IDB_KEYS.flashcardDeck, store);
+  // just the synchronous cache (see storage/storage.ts). Held while boot
+  // reconciliation runs, which writes the winner to both homes itself.
+  if (!restoring) mirrorToIdb(IDB_KEYS.flashcardDeck, store);
   window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
+}
+
+function normalizeDurableDeck(raw: unknown): FlashcardDeckStore | null {
+  if (raw == null) return null;
+  const text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+  return parseFlashcardDeckStore(text).store;
+}
+
+export type DeckRestoreOutcome = 'durable' | 'local' | 'empty';
+
+/**
+ * Boot reconciliation between the localStorage cache and the IndexedDB copy.
+ *
+ * The deck used to be read from localStorage only: the IndexedDB copy was
+ * written on every change and never read back, so a cache that lost its value
+ * (cleared site data, a quota failure the write swallowed) showed an empty or
+ * stale deck, and the next write mirrored that over the durable copy.
+ *
+ * Rule: the copy with the newer `savedAt` wins. Stores written before the stamp
+ * existed both read as 0, and then the larger deck wins, because the only way
+ * the durable copy can be larger is that the cache lost cards. Cards created in
+ * this window while the durable copy was being read are merged into the winner.
+ */
+export async function restoreDeckFromIdb(
+  read: (key: string) => Promise<unknown> = kvGet,
+): Promise<DeckRestoreOutcome> {
+  if (restoring) return 'local';
+  restoring = true;
+  createdWhileRestoring = new Set();
+  const local = readStore();
+  const localStamp = local.savedAt ?? 0;
+  let durable: FlashcardDeckStore | null = null;
+  try {
+    durable = normalizeDurableDeck(await read(IDB_KEYS.flashcardDeck));
+  } catch {
+    durable = null;
+  }
+  try {
+    const durableStamp = durable?.savedAt ?? 0;
+    const durableWins = !!durable && (
+      durableStamp > localStamp
+      || (durableStamp === localStamp && durable.cards.length > local.cards.length)
+    );
+    const current = readStore();
+    if (!durable || !durableWins) {
+      if (!current.cards.length && !current.folders.length) return 'empty';
+      // The cache is the newer copy (or the only one): make sure the durable
+      // home has it, since a quota failure or an old build may never have
+      // mirrored it.
+      if (!durable || (current.savedAt ?? 0) > durableStamp) {
+        mirrorToIdb(IDB_KEYS.flashcardDeck, current);
+      }
+      return 'local';
+    }
+    const known = new Set(durable.cards.map((card) => card.id));
+    const createdMeanwhile = current.cards.filter(
+      (card) => !known.has(card.id) && createdWhileRestoring.has(card.id),
+    );
+    const durableFolders = durable.folders;
+    const winner: FlashcardDeckStore = {
+      folders: [...durableFolders, ...current.folders.filter((f) => !durableFolders.includes(f) && createdMeanwhile.some((c) => c.folder === f))],
+      cards: [...createdMeanwhile, ...durable.cards],
+      savedAt: Math.max(durableStamp, current.savedAt ?? 0),
+    };
+    if (writeCache(winner)) {
+      overflowStore = null;
+    } else {
+      overflowStore = winner;
+      reportCacheFull(winner);
+    }
+    if (createdMeanwhile.length) mirrorToIdb(IDB_KEYS.flashcardDeck, winner);
+    logBlanc('info', 'deck', 'Restored the local deck from its durable copy', {
+      cards: winner.cards.length,
+      cachedCards: local.cards.length,
+    });
+    window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
+    return 'durable';
+  } finally {
+    restoring = false;
+    createdWhileRestoring = new Set();
+  }
+}
+
+/** Test seam: forget the in-memory overflow copy. */
+export function resetDeckMemoryForTests(): void {
+  overflowStore = null;
+  restoring = false;
 }
 
 export function loadDeck(): DeckFlashcard[] {
@@ -269,6 +453,7 @@ export function addDeckCards(entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[]): 
     }
   }
   store.cards = [...created, ...store.cards];
+  if (restoring) for (const card of created) createdWhileRestoring.add(card.id);
   writeStore(store);
   // Pillar 5: every deck write is traceable. This is the "where did that card
   // go" question the console exists to answer, so it records the destination
@@ -332,6 +517,10 @@ export function updateDeckCard(
       | 'ankiNoteId'
       | 'ankiExportError'
       | 'ankiDeck'
+      | 'ankiPending'
+      | 'ankiDuplicate'
+      | 'sourceUrl'
+      | 'bookTitle'
     >
   >,
 ): DeckFlashcard[] {
@@ -339,6 +528,33 @@ export function updateDeckCard(
   store.cards = store.cards.map((c) => (c.id === id ? { ...c, ...patch } : c));
   writeStore(store);
   return store.cards;
+}
+
+/**
+ * Write the Deck Workbench's field edits back into the deck, in one persisted
+ * write. Only the six text fields a workbench edit can carry are accepted
+ * (`shared/ankiWorkbenchPersistence.ts` decides which); ids that are no longer
+ * in the deck are reported rather than recreated.
+ */
+export function applyDeckFieldPatches(
+  patches: ReadonlyArray<{
+    id: string;
+    patch: Partial<Pick<DeckFlashcard, 'word' | 'reading' | 'meaning' | 'sentence' | 'front' | 'back'>>;
+  }>,
+): { updated: string[]; missing: string[]; cards: DeckFlashcard[] } {
+  const store = readStore();
+  const byId = new Map(patches.map((entry) => [entry.id, entry.patch]));
+  const updated: string[] = [];
+  store.cards = store.cards.map((card) => {
+    const patch = byId.get(card.id);
+    if (!patch) return card;
+    updated.push(card.id);
+    return { ...card, ...patch };
+  });
+  const found = new Set(updated);
+  const missing = patches.map((entry) => entry.id).filter((id) => !found.has(id));
+  if (updated.length) writeStore(store);
+  return { updated, missing, cards: store.cards };
 }
 
 /** Attach generated/captured audio to many cards with one persisted deck write. */
@@ -393,6 +609,42 @@ export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
   return reviewDeckCard(id, known ? 'good' : 'again');
 }
 
+/**
+ * The known-word key a review may speak for, or null.
+ *
+ * Only single-word cards: a sentence, grammar or kanji card is not evidence
+ * about one lemma, and grading "猫が好きです" as a word would put a sentence
+ * into the knowledge store that every reader highlight then consults.
+ */
+export function reviewKnowledgeWord(card: Pick<DeckFlashcard, 'word' | 'sentence' | 'studyKind'>): string | null {
+  if (card.studyKind && card.studyKind !== 'vocabulary') return null;
+  const word = (card.word ?? '').trim();
+  if (!word || word.length > 16) return null;
+  if (/[\s。．、，！？!?「」『』()（）]/.test(word)) return null;
+  if (card.sentence && card.sentence.trim() === word && word.length > 6) return null;
+  return word;
+}
+
+/** What one review changed, kept so the review can be taken back. */
+export interface DeckReviewUndo {
+  cardId: string;
+  word: string;
+  rating: LocalSrsRating;
+  /** The card exactly as it was before the review. */
+  previous: DeckFlashcard;
+  log: ReviewLogEntry;
+  /** Knowledge level before the review changed it, when it did. */
+  knowledge?: { word: string; previous: WkLevel };
+}
+
+const REVIEW_UNDO_LIMIT = 50;
+let reviewUndoStack: DeckReviewUndo[] = [];
+
+/** The most recent review that can still be undone in this window. */
+export function peekReviewUndo(): DeckReviewUndo | null {
+  return reviewUndoStack[reviewUndoStack.length - 1] ?? null;
+}
+
 /** Persist one local review judgement and its next due time atomically. */
 export function reviewDeckCard(
   id: string,
@@ -400,24 +652,85 @@ export function reviewDeckCard(
   reviewedAt = Date.now(),
 ): DeckFlashcard[] {
   const store = readStore();
-  let reviewed = false;
-  store.cards = store.cards.map((card) => {
-    if (card.id !== id) return card;
-    reviewed = true;
-    return {
-      ...card,
-      known: rating !== 'again' || undefined,
-      // Through the seam, never a scheduler directly: the algorithm setting
-      // stops meaning anything on whichever path skips it.
-      srs: scheduleReview(card.srs, rating, loadSchedulingConfig(), reviewedAt),
-    };
-  });
-  if (!reviewed) return store.cards;
+  const index = store.cards.findIndex((card) => card.id === id);
+  if (index < 0) return store.cards;
+  const previous = store.cards[index];
+  const next: DeckFlashcard = {
+    ...previous,
+    known: rating !== 'again' || undefined,
+    // Through the seam, never a scheduler directly: the algorithm setting
+    // stops meaning anything on whichever path skips it.
+    srs: scheduleReview(previous.srs, rating, loadSchedulingConfig(), reviewedAt),
+    // First review ever: this card now counts against today's new-card cap.
+    ...(previous.srs === undefined && previous.introducedAt === undefined
+      ? { introducedAt: reviewedAt }
+      : {}),
+  };
+  store.cards = store.cards.map((card, i) => (i === index ? next : card));
   writeStore(store);
   // A real review action ("Got it"), distinct from folder/import edits — the
   // one flashcard-deck event the city bridge's telemetry collector counts.
   emitCompanionEvent('flashcard');
+
+  // A review is evidence about the word, exactly as an Anki review is: the
+  // same interval thresholds decide the level, and a level the user set by
+  // hand is never overridden (setInferredLevel skips manual entries).
+  let knowledge: DeckReviewUndo['knowledge'];
+  const word = reviewKnowledgeWord(next);
+  if (word) {
+    const level: WkLevel = rating === 'again'
+      ? 1
+      : levelForIntervalDays(next.srs?.intervalDays ?? 0, getActiveProfile().deckParams.thresholds);
+    const prior = setInferredLevel(word, level);
+    if (prior !== null) knowledge = { word, previous: prior };
+  }
+  const log = appendReviewLog({
+    at: reviewedAt,
+    mode: 'review',
+    cardId: id,
+    word: next.word,
+    rating,
+    correct: rating !== 'again',
+    prevIntervalDays: previous.srs?.intervalDays ?? 0,
+    intervalDays: next.srs?.intervalDays ?? 0,
+    ...(previous.srs === undefined ? { isNew: true } : {}),
+  });
+  reviewUndoStack.push({ cardId: id, word: next.word, rating, previous, log, knowledge });
+  if (reviewUndoStack.length > REVIEW_UNDO_LIMIT) reviewUndoStack = reviewUndoStack.slice(-REVIEW_UNDO_LIMIT);
   return store.cards;
+}
+
+/**
+ * Take back the most recent review: the card's schedule, its known flag, the
+ * review-log row and any knowledge level it moved all return to what they were.
+ * Returns the undone step (so a review surface can put the card back in front
+ * of the user), or null when there is nothing to undo.
+ */
+export function undoLastReview(): { undo: DeckReviewUndo; cards: DeckFlashcard[] } | null {
+  const undo = reviewUndoStack.pop();
+  if (!undo) return null;
+  const store = readStore();
+  let restored = false;
+  store.cards = store.cards.map((card) => {
+    if (card.id !== undo.cardId) return card;
+    restored = true;
+    // Only the fields the review wrote: an edit made since (a new meaning,
+    // attached audio) must survive the undo.
+    const next: DeckFlashcard = { ...card, known: undo.previous.known, srs: undo.previous.srs };
+    if (undo.previous.introducedAt === undefined) delete next.introducedAt;
+    if (next.known === undefined) delete next.known;
+    if (next.srs === undefined) delete next.srs;
+    return next;
+  });
+  if (restored) writeStore(store);
+  removeReviewLogEntry(undo.log);
+  if (undo.knowledge) setInferredLevel(undo.knowledge.word, undo.knowledge.previous);
+  return { undo, cards: store.cards };
+}
+
+/** Test seam. */
+export function resetReviewUndoForTests(): void {
+  reviewUndoStack = [];
 }
 
 export interface SchedulingSweepReport {
@@ -609,8 +922,24 @@ export function reviewSessionCards(
   mode: FlashcardReviewMode,
 ): DeckFlashcard[] {
   const byBook = filterDeckByBook(pool, bookKey);
-  const due = dueOnly ? filterLocalReviewsDue(byBook) : byBook;
+  const due = dueOnly ? dueDeckCards(byBook) : byBook;
   return mode === 'audio' ? due.filter((card) => card.audioDataUrl || card.audioPath) : due;
+}
+
+/**
+ * The cards due now, with today's new-card allowance applied.
+ *
+ * Reads the active study profile's `deckParams.newPerDay`, which the profile
+ * editor validated and nothing ever read. The allowance is deck-wide: cards
+ * introduced today in one folder use up the same daily budget as another.
+ */
+export function dueDeckCards<T extends { srs?: unknown }>(
+  cards: readonly T[],
+  now = Date.now(),
+  newPerDay: number | undefined = getActiveProfile().deckParams.newPerDay,
+  introducedToday: number = countIntroducedToday(loadDeck(), now),
+): T[] {
+  return limitNewCards(filterLocalReviewsDue(cards, now), newPerDay, introducedToday);
 }
 
 /**

@@ -189,10 +189,10 @@ describe('one audio recorder, not two — slice 18', () => {
     );
     expect(captureBlock).toContain('catch');
     // The mine call must sit OUTSIDE that try, i.e. after it. Anchored on
-    // `buildVideoCoreMineRequest`, which occurs exactly once — `ankiMineNote` also appears
-    // in the earlier desktop-only guard, so indexOf on it measured the wrong thing.
-    expect(captureBlock).not.toContain('buildVideoCoreMineRequest');
-    expect(source.indexOf('buildVideoCoreMineRequest('))
+    // `videoCoreStudyInput(` — the adapter that builds both the local study card and
+    // the Anki request (renderer/studyMining.ts) — which occurs exactly once.
+    expect(captureBlock).not.toContain('videoCoreStudyInput(');
+    expect(source.indexOf('videoCoreStudyInput('))
       .toBeGreaterThan(source.indexOf('const media ='));
   });
 });

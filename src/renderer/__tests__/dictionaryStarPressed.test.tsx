@@ -23,7 +23,7 @@ vi.mock('../translator', () => ({ translateTo: async () => '' }));
 
 import DictionaryResults from '../components/DictionaryResults';
 import { loadClipboardHistory } from '../clipboardHistory';
-import { savedWordsKey } from '../savedWords';
+import { loadSaved, savedWordsKey } from '../savedWords';
 
 const ENTRY = {
   word: '食べる',
@@ -92,8 +92,8 @@ describe('the Flashcards star', () => {
     await act(async () => star().click());
 
     expect(star().getAttribute('aria-pressed')).toBe('true');
-    expect(JSON.parse(localStorage.getItem(savedWordsKey('ja')) ?? '[]'))
-      .toEqual([expect.objectContaining({ word: '食べる' })]);
+    // A star is a deck card now (savedWords.ts), not a row in a third store.
+    expect(loadSaved()).toEqual([expect.objectContaining({ word: '食べる' })]);
   });
 
   it('follows the store back down when the word is unsaved again', async () => {
@@ -104,7 +104,7 @@ describe('the Flashcards star', () => {
     await act(async () => star().click());
 
     expect(star().getAttribute('aria-pressed')).toBe('false');
-    expect(JSON.parse(localStorage.getItem(savedWordsKey('ja')) ?? '[]')).toEqual([]);
+    expect(loadSaved()).toEqual([]);
   });
 
   it('starts pressed for a word that was already saved before this render', async () => {

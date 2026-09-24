@@ -291,6 +291,37 @@ export function moveDictionarySource(
   return { ok: true, sources: listDictionarySources(db) };
 }
 
+/**
+ * Make the database order the given sources the way `orderedIds` does, without
+ * moving any other source. The Yomitan settings list orders only Yomitan
+ * dictionaries, while the database also holds CC-CEDICT, KANJIDIC2 and the
+ * rest; those keep their slots, and the Yomitan ones are laid into the slots
+ * Yomitan dictionaries already occupy, in the settings order.
+ */
+export function syncDictionarySourceOrder(
+  orderedIds: readonly string[],
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  const sources = listDictionarySources(db);
+  const wanted = orderedIds.filter((id) => sources.some((source) => source.id === id));
+  const managed = new Set(wanted);
+  const slots = sources.map((source, index) => (managed.has(source.id) ? index : -1)).filter((index) => index >= 0);
+  const next = sources.map((source) => source.id);
+  slots.forEach((slot, i) => {
+    next[slot] = wanted[i];
+  });
+  if (next.every((id, index) => id === sources[index].id)) return { ok: true, sources };
+  db.transaction(() => {
+    const update = db.prepare('update dictionaries set priority = ? where id = ?');
+    next.forEach((id, priority) => update.run(priority, id));
+    const affected = db.prepare(
+      `select distinct char from char_sources where dict_id in (${wanted.map(() => '?').join(',')})`,
+    ).all(...wanted) as Array<{ char: string }>;
+    rebuildCharacterProjection(db, affected.map((row) => row.char));
+  })();
+  return { ok: true, sources: listDictionarySources(db) };
+}
+
 export function removeDictionarySource(
   id: string,
   db: SqliteDb = dictionaryDb(),

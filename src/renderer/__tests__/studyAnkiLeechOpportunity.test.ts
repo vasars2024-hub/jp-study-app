@@ -1,5 +1,22 @@
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import type { StudyAnkiLeechReview } from '../../shared/studyAnkiLeech';
+
+/**
+ * `mediaStudyOrchestrator` pulls a large module graph: measured at ~3.6 s to
+ * transform and import on a quiet machine, which is most of vitest's 5 s TEST
+ * budget and past it under a full parallel run — where this file timed out
+ * while asserting nothing slow. The import is paid once, here, under a hook
+ * budget sized for a cold transform; the tests themselves take milliseconds.
+ */
+let ankiLeechOpportunity: typeof import('../mediaStudyOrchestrator').ankiLeechOpportunity;
+
+beforeAll(async () => {
+  vi.stubGlobal('window', {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
+  ({ ankiLeechOpportunity } = await import('../mediaStudyOrchestrator'));
+}, 120_000);
 
 function review(patch: Partial<StudyAnkiLeechReview> = {}): StudyAnkiLeechReview {
   return {
@@ -30,12 +47,7 @@ function review(patch: Partial<StudyAnkiLeechReview> = {}): StudyAnkiLeechReview
   };
 }
 
-it('builds a localized read-only opportunity for the exact prepared cue', async () => {
-  vi.stubGlobal('window', {
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  });
-  const { ankiLeechOpportunity } = await import('../mediaStudyOrchestrator');
+it('builds a localized read-only opportunity for the exact prepared cue', () => {
 
   expect(ankiLeechOpportunity(review(), 300)).toMatchObject({
     id: 'study-opportunity-anki-leech-abc',
@@ -83,12 +95,7 @@ it('builds a localized read-only opportunity for the exact prepared cue', async 
   });
 });
 
-it('omits state evidence that is not present', async () => {
-  vi.stubGlobal('window', {
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  });
-  const { ankiLeechOpportunity } = await import('../mediaStudyOrchestrator');
+it('omits state evidence that is not present', () => {
   const opportunity = ankiLeechOpportunity(review({
     contexts: [{ ...review().contexts[0], suspended: false }],
     suspendedCount: 0,

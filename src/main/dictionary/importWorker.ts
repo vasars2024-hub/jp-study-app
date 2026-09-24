@@ -221,6 +221,9 @@ export function runDictionaryImport(
       legacyRoot,
       (progress) => deps.onProgress(progress.current, 'importing'),
       deps.shouldCancel,
+      // A `dictId` on a legacy request scopes it to that one store — the job a
+      // fresh Yomitan import queues for itself.
+      request.dictId ? new Set([request.dictId]) : undefined,
     );
     // Each store is its own transaction, so a cancelled legacy migration still
     // committed whole dictionaries. Reporting them is the honest answer; claiming
