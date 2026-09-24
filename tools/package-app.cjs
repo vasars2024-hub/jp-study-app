@@ -19,6 +19,7 @@
  * throughout; peak use is current + staging, not three copies).
  */
 'use strict';
+/* eslint-disable @typescript-eslint/no-var-requires -- a plain CommonJS build script */
 
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
