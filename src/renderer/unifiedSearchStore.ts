@@ -7,6 +7,7 @@ import {
   type UnifiedSearchMutationResult,
   type UnifiedSearchValidationResult,
 } from '../shared/unifiedSearch';
+import { BUILT_IN_UNIFIED_SEARCH_PROVIDERS } from './unifiedSearchBackends';
 
 export const UNIFIED_SEARCH_STORAGE_KEY = 'jp-unified-search-v1';
 export const LEGACY_UNIFIED_SEARCH_STORAGE_KEYS = ['jp-unified-search', 'jp-multi-source-search'] as const;
@@ -61,8 +62,9 @@ function readCandidate(key: string): UnifiedSearchDocument | null {
 export function loadUnifiedSearchDocument(): UnifiedSearchDocument {
   try {
     for (const key of [UNIFIED_SEARCH_STORAGE_KEY, ...LEGACY_UNIFIED_SEARCH_STORAGE_KEYS]) {
-      const document = readCandidate(key);
-      if (!document) continue;
+      const stored = readCandidate(key);
+      if (!stored) continue;
+      const document = withBuiltInProviders(stored);
       memoryFallback = document;
       if (key !== UNIFIED_SEARCH_STORAGE_KEY) {
         localStorage.setItem(UNIFIED_SEARCH_STORAGE_KEY, JSON.stringify(document));
@@ -70,7 +72,19 @@ export function loadUnifiedSearchDocument(): UnifiedSearchDocument {
       return document;
     }
   } catch { /* retain the last validated in-memory snapshot */ }
-  return memoryFallback ?? createEmptyUnifiedSearchDocument();
+  return memoryFallback ?? withBuiltInProviders(createEmptyUnifiedSearchDocument());
+}
+
+/**
+ * A document with no sources at all is given the three the app can actually
+ * search — the local library, the public catalogues and the torrent indexes —
+ * rather than a search box that can only ever answer "no sources". Only an
+ * empty document is seeded: a user who removed or reordered sources keeps
+ * exactly what they chose.
+ */
+function withBuiltInProviders(document: UnifiedSearchDocument): UnifiedSearchDocument {
+  if (document.providers.length) return document;
+  return { ...document, providers: BUILT_IN_UNIFIED_SEARCH_PROVIDERS.map((provider) => ({ ...provider })) };
 }
 
 export function saveUnifiedSearchDocument(input: unknown): UnifiedSearchValidationResult {

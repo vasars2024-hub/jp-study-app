@@ -15,6 +15,17 @@ import { loadMediaTrackingDocument } from '../../../mediaTrackingStore';
 import { persistUnifiedSearchTrackingMutation, type UnifiedSearchTrackingMutation } from '../../../unifiedSearchTrackingMutation';
 import type { UnifiedSearchMergedResult } from '../../../unifiedSearchMergedAdapter';
 import type { MediaTrackingStatus } from '../../../../shared/mediaTracking';
+import { mergeUnifiedSearchResults } from '../../../unifiedSearchBackends';
+
+/**
+ * The built-in sources carry an English name in the stored document; these two
+ * are chrome, so they are shown translated. The catalogue source is named after
+ * the two services it asks, which are not translated anywhere.
+ */
+const BUILT_IN_NAME_KEY: Record<string, string> = {
+  'local-library': 'unifiedSearch.builtin.localLibrary',
+  'torrent-indexes': 'unifiedSearch.builtin.torrentIndexes',
+};
 
 const PROVIDER_STATUS_KEY: Record<UnifiedSearchProviderExecutionStatus, string> = {
   queued: 'unifiedSearch.provider.queued',
@@ -39,8 +50,9 @@ const TRACKING_STATUS_KEY: Record<MediaTrackingStatus, string> = {
  * merge adapter; no provider execution is introduced by that integration.
  */
 export default function UnifiedSearchPanel() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { state, search, cancel, clear } = useUnifiedSearchSession();
+  const providerName = (id: string, name: string) => (BUILT_IN_NAME_KEY[id] ? t(BUILT_IN_NAME_KEY[id]) : name);
   const [query, setQuery] = useState('');
   const [document, setDocument] = useState(loadUnifiedSearchDocument);
   const [filters, setFilters] = useState<UnifiedSearchFilters>({ ...EMPTY_UNIFIED_SEARCH_FILTERS });
@@ -59,6 +71,17 @@ export default function UnifiedSearchPanel() {
     [filters, mergedResults, state, trackingDocument],
   );
   const suggestions = getUnifiedSearchSuggestions(query, history, management.favorites);
+  // One list across every source, deduplicated, each row badged with where it
+  // was found. The per-source lists below stay for progress and errors.
+  const merged = useMemo(
+    () => mergeUnifiedSearchResults(resultPartitions.map((partition, index) => ({
+      ...state.providers[index],
+      providerName: providerName(partition.providerId, partition.providerName),
+      results: partition.results,
+    }))),
+    // `lang` because providerName() calls t(); see CLAUDE.md i18n rule 6.
+    [resultPartitions, state.providers, lang],
+  );
 
   const submit = () => {
     if (!trimmed) return;
@@ -157,9 +180,9 @@ export default function UnifiedSearchPanel() {
           <div className="field-row" key={provider.id}>
             <label>
               <input type="checkbox" checked={provider.enabled} onChange={(event) => updateProvider(provider.id, event.currentTarget.checked)} />
-              {provider.name}
+              {providerName(provider.id, provider.name)}
             </label>
-            <div className="sp-seg" role="group" aria-label={t('unifiedSearch.sourceOrder', { name: provider.name })}>
+            <div className="sp-seg" role="group" aria-label={t('unifiedSearch.sourceOrder', { name: providerName(provider.id, provider.name) })}>
               <button type="button" className="btn" disabled={index === 0} onClick={() => moveProvider(index, -1)}>{t('unifiedSearch.moveUp')}</button>
               <button type="button" className="btn" disabled={index === document.providers.length - 1} onClick={() => moveProvider(index, 1)}>{t('unifiedSearch.moveDown')}</button>
             </div>
@@ -172,7 +195,7 @@ export default function UnifiedSearchPanel() {
           <label htmlFor="unified-search-source-filter">{t('unifiedSearch.source')}</label>
           <select id="unified-search-source-filter" value={filters.providerIds[0] ?? ''} onChange={(event) => setFilter('providerIds', event.currentTarget.value ? [event.currentTarget.value] : [])}>
             <option value="">{t('unifiedSearch.any')}</option>
-            {document.providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+            {document.providers.map((provider) => <option key={provider.id} value={provider.id}>{providerName(provider.id, provider.name)}</option>)}
           </select>
         </div>
         <div className="field-row">
@@ -291,12 +314,37 @@ export default function UnifiedSearchPanel() {
         </ul>
       )}
 
+      {merged.length > 0 && (
+        <section className="unified-search-provider" aria-label={t('unifiedSearch.merged')}>
+          <div className="unified-search-provider-heading">
+            <span className="unified-search-provider-name">{t('unifiedSearch.merged')}</span>
+            <span className="muted">{t('unifiedSearch.resultCount', { count: merged.length })}</span>
+          </div>
+          <ul className="unified-search-results">
+            {merged.map((row) => (
+              <li key={row.key} className="unified-search-result" data-provider-id={row.result.providerId}>
+                {row.result.coverUrl && <img className="unified-search-result-cover" src={row.result.coverUrl} alt="" loading="lazy" />}
+                <div className="unified-search-result-copy">
+                  <strong>{row.result.title}</strong>
+                  {row.result.japaneseTitle && <span className="muted">{row.result.japaneseTitle}</span>}
+                  <span className="unified-search-source-badges" aria-label={t('unifiedSearch.foundIn', { sources: row.sources.map((source) => source.providerName).join(', ') })}>
+                    {row.sources.map((source) => (
+                      <span key={source.providerId} className="os-set-adv-badge">{source.providerName}</span>
+                    ))}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {resultPartitions.length > 0 && (
         <ul className="unified-search-providers" aria-label={t('unifiedSearch.resultsLabel')}>
           {state.providers.map((provider, providerIndex) => (
             <li key={provider.providerId} className="unified-search-provider">
               <div className="unified-search-provider-heading">
-                <span className="unified-search-provider-name">{provider.providerName}</span>
+                <span className="unified-search-provider-name">{providerName(provider.providerId, provider.providerName)}</span>
                 <span className={`unified-search-provider-status status-${provider.status}`}>
                   {t(PROVIDER_STATUS_KEY[provider.status])}
                 </span>

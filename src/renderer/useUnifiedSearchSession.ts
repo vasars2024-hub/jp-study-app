@@ -6,6 +6,8 @@ import {
 } from './unifiedSearchController';
 import { loadDeck } from './flashcardDeck';
 import { createOfflineLocalLibraryExecutor } from './unifiedSearchLocalLibrary';
+import { createCatalogueExecutor, createTorrentIndexExecutor } from './unifiedSearchBackends';
+import { getActiveScraperSettings } from './scraperSettingsStore';
 import type { UnifiedSearchSession, UnifiedSearchSessionState } from './unifiedSearchSession';
 
 /**
@@ -38,6 +40,13 @@ export function useUnifiedSearchSession(
         listReaderLibrary: () => window.api.listLibrary(),
         listMediaLibrary: () => window.api.listMedia(),
       }),
+      // The catalogues and the Source Manager's torrent indexes — the two
+      // search backends the app already runs elsewhere.
+      metadata: createCatalogueExecutor((query) => window.api.searchDiscovery(query)),
+      sites: createTorrentIndexExecutor(
+        (input) => window.api.scraperSearchTorrents(input),
+        () => getActiveScraperSettings(),
+      ),
       ...options,
     });
   }

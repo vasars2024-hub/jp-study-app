@@ -16170,6 +16170,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .unified-search-result-cover { width: 40px; height: 56px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
 .unified-search-result-copy { display: grid; gap: 2px; min-width: 0; }
 .unified-search-result-copy strong, .unified-search-result-copy span { overflow-wrap: anywhere; }
+.unified-search-source-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .tracking-management-list { display: grid; gap: 12px; }
 .tracking-management-record { display: grid; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
 .tracking-management-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
