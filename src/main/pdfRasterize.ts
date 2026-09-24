@@ -29,7 +29,7 @@ const requireFrom = createRequire(import.meta.url);
  * exactly one protocol and no permissions. pdf.js, its worker and the one PDF
  * being rasterized are served by that protocol; pages come back as the return
  * value of `executeJavaScript`, so there is no IPC channel at all (the old
- * unauthenticated `ipcMain.on('pdf-raster-...')` listener is gone).
+ * unauthenticated pdf-raster IPC listener the old window used is gone).
  */
 export const PDF_RASTER_SCHEME = 'gumpdf';
 /** Registered with the other privileged schemes in main.ts, before app ready. */
