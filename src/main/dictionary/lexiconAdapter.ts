@@ -33,6 +33,7 @@ function toLegacyEntry(entry: LookupEntry): DictEntry {
     isCommon: entry.score > 0,
     jlpt: [],
     senses: entry.senses.map(toLegacySense),
+    ...(entry.ipa?.length ? { ipa: [...entry.ipa] } : {}),
     ...(glossaryHtml ? { glossaryHtml } : {}),
     source: entry.dictTitle,
     ...(sourceLangs.length ? { sourceLangs } : {}),
@@ -106,6 +107,11 @@ export function enrichLexiconResultMetadata(
       word: string,
       reading: string,
     ) => number | { rank: number; source?: string } | undefined;
+    /**
+     * IPA from the legacy in-memory stores. Consulted only when the database
+     * row carried none — a store imported but not yet migrated.
+     */
+    ipa?: (word: string, reading: string) => string[];
   },
 ): DictResult {
   return {
@@ -115,9 +121,11 @@ export function enrichLexiconResultMetadata(
       const freq = metadata.frequency(entry.word, entry.reading);
       const rank = typeof freq === 'number' ? freq : freq?.rank;
       const source = typeof freq === 'number' ? undefined : freq?.source;
+      const ipa = entry.ipa?.length ? entry.ipa : metadata.ipa?.(entry.word, entry.reading) ?? [];
       return {
         ...entry,
         ...(pitchHtml ? { pitchHtml } : {}),
+        ...(ipa.length ? { ipa } : {}),
         ...(rank !== undefined ? { frequency: rank } : {}),
         ...(source ? { frequencySource: source } : {}),
       };

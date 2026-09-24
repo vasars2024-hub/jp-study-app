@@ -148,6 +148,8 @@ export interface LookupEntry {
   sources: LookupSource[];
   /** Edit distance from the query, when `via` is 'fuzzy'. Closer ranks first. */
   fuzzyDistance?: number;
+  /** IPA transcriptions from enabled IPA sources; absent when none covers the word. */
+  ipa?: string[];
 }
 
 export interface CharacterSource {
@@ -775,7 +777,46 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   // limit`, which is equally true of a result that is exactly complete.
   if (result.entries.length > limit || saturated) result.truncated = true;
   result.entries = result.entries.slice(0, limit);
+  // Only the entries that will be shown pay for the probe.
+  for (const entry of result.entries) {
+    const ipa = readEntryIpa(db, entry);
+    if (ipa.length) entry.ipa = ipa;
+  }
   return result;
+}
+
+/**
+ * IPA transcriptions for one entry, from every enabled IPA source, highest
+ * priority first and deduplicated.
+ *
+ * Keyed like pitch (`yomitan.ts` `getPitch`): the written form with this
+ * reading first, then a row the dictionary stored without a distinct reading,
+ * then the reading as a kana headword. A database that predates migration 13
+ * has no `ipa` table — a readonly handle never migrates — and answers empty
+ * rather than failing the lookup.
+ */
+export function readEntryIpa(db: SqliteDb, entry: Pick<LookupEntry, 'lang' | 'text' | 'reading'>): string[] {
+  let rows: { transcriptions: string }[];
+  try {
+    rows = prepareCached(db, `
+      select i.transcriptions
+      from ipa i join dictionaries d on d.id = i.dict_id
+      where d.enabled = 1 and i.lang = @lang and (
+        (i.norm = @text and (i.reading = @reading or i.reading = i.norm or i.reading = ''))
+        or (@reading <> '' and i.norm = @reading and (i.reading = @reading or i.reading = ''))
+      )
+      order by (i.norm = @text and i.reading = @reading) desc, d.priority, d.id
+    `).all({ lang: entry.lang, text: entry.text, reading: entry.reading ?? '' }) as { transcriptions: string }[];
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  for (const row of rows) {
+    for (const ipa of jsonStringArray(row.transcriptions)) {
+      if (!out.includes(ipa)) out.push(ipa);
+    }
+  }
+  return out;
 }
 
 const KANA = /[ぁ-ゟ゠-ヿ]/;

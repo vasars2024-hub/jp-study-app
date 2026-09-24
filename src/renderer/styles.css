@@ -5376,6 +5376,10 @@ details.lib-filter-bar[open] .lib-filter-summary::after {
 .dict-pitch-pattern {
   font-weight: 600;
 }
+.dict-ipa-text {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
 /* Conjugation trace shown when a lookup matched via de-inflection. */
 .dict-deinflection {
   display: flex;

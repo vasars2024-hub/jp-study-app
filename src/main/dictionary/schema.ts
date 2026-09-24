@@ -32,7 +32,7 @@ import { relabelDictionarySourceLang } from './sourceLang';
 import { CORPUS_LANG_ALIAS_PAIRS } from '../../shared/dictionarySources';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 12;
+export const DICT_SCHEMA_VERSION = 13;
 
 export interface MigrationStep {
   version: number;
@@ -797,12 +797,43 @@ export const MIGRATIONS: MigrationStep[] = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_expl_created ON explanations(created_at)');
     },
   },
+  {
+    version: 13,
+    name: 'a home for IPA transcriptions, keyed like pitch',
+    up(db) {
+      // Yomitan term_meta banks carry a third mode next to `pitch` and `freq`:
+      // `ipa`, one or more IPA transcriptions per term/reading. The importer used
+      // to drop those rows because nothing here could hold them, so an installed
+      // IPA dictionary contributed nothing at all.
+      //
+      // Keyed exactly like `pitch` — `(dict_id, lang, norm, reading)` — so the
+      // same lookup that finds a word's accent finds its transcription, and
+      // removing the dictionary cascades the rows away. `transcriptions` is a
+      // JSON array of strings in the order the dictionary gave them.
+      //
+      // Purely additive: no existing row is read or rewritten, so an installed
+      // database gains an empty table and nothing is re-imported. IPA arrives
+      // when an IPA dictionary is next imported. `IF NOT EXISTS` so the step
+      // survives being applied twice, like every step in this ladder.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ipa (
+          dict_id        TEXT NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
+          lang           TEXT NOT NULL,
+          norm           TEXT NOT NULL,
+          reading        TEXT NOT NULL,
+          transcriptions TEXT NOT NULL DEFAULT '[]',
+          PRIMARY KEY (dict_id, lang, norm, reading)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ipa_lookup ON ipa(lang, norm);
+      `);
+    },
+  },
 ];
 
 /** Every table name the schema owns, for the "did it actually build" assertion. */
 export const DICT_TABLES = [
   'dictionaries', 'headwords', 'senses', 'glosses', 'xrefs', 'inflections',
-  'collocations', 'etymology', 'audio', 'pitch', 'freq_corpora', 'user_notes',
+  'collocations', 'etymology', 'audio', 'pitch', 'ipa', 'freq_corpora', 'user_notes',
   'explanations', 'chars', 'char_sources', 'examples', 'example_translations',
   'dict_pair_priority',
 ] as const;

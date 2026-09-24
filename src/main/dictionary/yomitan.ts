@@ -42,6 +42,12 @@ interface StoredPitchEntry {
   positions: number[];
 }
 
+/** One term/reading's IPA transcriptions from a Yomitan `ipa` term_meta row. */
+export interface StoredIpaEntry {
+  reading: string;
+  transcriptions: string[];
+}
+
 /**
  * One character from a Yomitan kanji dictionary. These archives used to be
  * refused ("no usable term or metadata banks") or, bundled with terms, had
@@ -65,6 +71,8 @@ interface StoredDictIndex {
   terms?: Record<string, StoredGlossaryEntry[]>;
   /** key = term\x01reading */
   pitch?: Record<string, StoredPitchEntry>;
+  /** key = term\x01reading — Yomitan `ipa` term_meta rows. */
+  ipa?: Record<string, StoredIpaEntry>;
   /** key = term\x01reading → numeric rank (lower = more common) */
   freq?: Record<string, number>;
   /** key = the character — a Yomitan kanji dictionary's `kanji_bank_*.json`. */
@@ -87,6 +95,7 @@ interface RegistryFile {
 
 const glossaryByTerm = new Map<string, StoredGlossaryEntry[]>();
 const pitchByKey = new Map<string, StoredPitchEntry>();
+const ipaByKey = new Map<string, StoredIpaEntry>();
 /**
  * Merged corpus ranks, each remembering which dictionary produced it.
  *
@@ -418,6 +427,7 @@ function writeRegistry(reg: RegistryFile): void {
 function clearMergedIndices(): void {
   glossaryByTerm.clear();
   pitchByKey.clear();
+  ipaByKey.clear();
   freqByKey.clear();
 }
 
@@ -436,6 +446,11 @@ function mergeStoredIndex(stored: StoredDictIndex, sourceTitle: string, sourceLa
   if (stored.pitch) {
     for (const [key, entry] of Object.entries(stored.pitch)) {
       if (!pitchByKey.has(key)) pitchByKey.set(key, entry);
+    }
+  }
+  if (stored.ipa) {
+    for (const [key, entry] of Object.entries(stored.ipa)) {
+      if (!ipaByKey.has(key)) ipaByKey.set(key, entry);
     }
   }
   if (stored.freq) {
@@ -565,7 +580,14 @@ function resolveSenseTags(out: StoredDictIndex): void {
   }
 }
 
-function parseTermMetaBank(entries: unknown[], out: StoredDictIndex): void {
+/**
+ * Yomitan term_meta rows: `pitch`, `freq` and `ipa` modes. Exported for the
+ * import tests; the zip reader is the only production caller.
+ */
+export function parseTermMetaBank(
+  entries: unknown[],
+  out: Pick<StoredDictIndex, 'pitch' | 'freq' | 'ipa'> & { info: Pick<YomitanDictInfo, 'hasPitch' | 'hasFreq' | 'hasIpa'> },
+): void {
   for (const row of entries) {
     if (!Array.isArray(row) || row.length < 3) continue;
     const term = String(row[0] ?? '').trim();
@@ -588,6 +610,31 @@ function parseTermMetaBank(entries: unknown[], out: StoredDictIndex): void {
       const key = metaKey(term, reading);
       out.pitch[key] = { reading, positions };
       out.info.hasPitch = true;
+    }
+
+    // `{ reading, transcriptions: [{ ipa, tags }] }`. Rows for the same
+    // term/reading across banks accumulate rather than replace, and a row with
+    // no usable transcription is skipped so it cannot mark the store as IPA.
+    if (mode === 'ipa' && data && typeof data === 'object') {
+      const d = data as { reading?: string; transcriptions?: unknown[] };
+      const reading = String(d.reading ?? term).trim();
+      const list = Array.isArray(d.transcriptions) ? d.transcriptions : [];
+      const transcriptions: string[] = [];
+      for (const item of list) {
+        const raw = item && typeof item === 'object' ? (item as { ipa?: unknown }).ipa : item;
+        const ipa = typeof raw === 'string' ? raw.trim() : '';
+        if (ipa && !transcriptions.includes(ipa)) transcriptions.push(ipa);
+      }
+      if (!transcriptions.length) continue;
+      if (!out.ipa) out.ipa = {};
+      const key = metaKey(term, reading);
+      const existing = out.ipa[key];
+      if (existing) {
+        for (const ipa of transcriptions) if (!existing.transcriptions.includes(ipa)) existing.transcriptions.push(ipa);
+      } else {
+        out.ipa[key] = { reading, transcriptions };
+      }
+      out.info.hasIpa = true;
     }
 
     if (mode === 'freq') {
@@ -665,7 +712,7 @@ function parseYomitanZip(zipPath: string): StoredDictIndex {
   }
   resolveSenseTags(stored);
 
-  if (!stored.info.hasTerms && !stored.info.hasPitch && !stored.info.hasFreq && !stored.info.hasKanji) {
+  if (!stored.info.hasTerms && !stored.info.hasPitch && !stored.info.hasFreq && !stored.info.hasKanji && !stored.info.hasIpa) {
     throw new Error('The archive contains no usable term, kanji or metadata banks.');
   }
   if (stored.info.hasTerms) {
@@ -846,6 +893,20 @@ export function getPitch(term: string, reading?: string): string {
 }
 
 /**
+ * IPA transcriptions for a term, from the installed IPA dictionaries. Tries the
+ * same keys as `getPitch`, in the same order; empty when none covers the word.
+ */
+export function getIpa(term: string, reading?: string): string[] {
+  const t = normalizeQuery(term);
+  const r = normalizeQuery(reading ?? term);
+  for (const key of [metaKey(t, r), metaKey(t, t), metaKey(r, r)]) {
+    const hit = ipaByKey.get(key);
+    if (hit?.transcriptions.length) return [...hit.transcriptions];
+  }
+  return [];
+}
+
+/**
  * The corpus rank, and the dictionary that supplied it when there is one.
  *
  * `source` is optional because a title is not guaranteed: `importYomitanZip`
@@ -879,6 +940,7 @@ export function getFrequency(term: string, reading?: string): string {
 
 function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
   const pitchHtml = getPitch(entry.word, entry.reading);
+  const ipa = getIpa(entry.word, entry.reading);
   const freq = getFrequencyDetail(entry.word, entry.reading);
   return {
     word: entry.word,
@@ -887,6 +949,7 @@ function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
     jlpt: [],
     senses: entry.senses,
     pitchHtml: pitchHtml || undefined,
+    ...(ipa.length ? { ipa } : {}),
     frequency: freq?.rank,
     ...(freq?.source ? { frequencySource: freq.source } : {}),
     glossaryHtml: entry.glossaryHtml,
@@ -979,10 +1042,12 @@ export async function lookupTermMerged(
 
   const enriched = jisho.entries.map((e) => {
     const pitchHtml = getPitch(e.word, e.reading);
+    const ipa = getIpa(e.word, e.reading);
     const freq = getFrequencyDetail(e.word, e.reading);
     return {
       ...e,
       pitchHtml: pitchHtml || undefined,
+      ...(ipa.length ? { ipa } : {}),
       frequency: freq?.rank,
       ...(freq?.source ? { frequencySource: freq.source } : {}),
     };

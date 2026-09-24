@@ -63,6 +63,7 @@ export const CORPUS_LANG_ALIAS_PAIRS: readonly (readonly [string, string])[] =
 export const DICTIONARY_KIND_LABEL_KEYS: Readonly<Record<string, string>> = {
   term: 'settings.study.dict.kind.terms',
   pitch: 'settings.study.dict.kind.pitch',
+  ipa: 'settings.study.dict.kind.ipa',
   freq: 'settings.study.dict.kind.frequency',
   name: 'settings.study.dict.kind.names',
   character: 'settings.study.dict.kind.characters',

@@ -35,6 +35,11 @@ export interface DictEntry {
   senses: DictSense[];
   /** Inline-styled Tokyo pitch pattern HTML (Phase D). */
   pitchHtml?: string;
+  /**
+   * IPA transcriptions from an installed Yomitan IPA dictionary, in the order
+   * the dictionary lists them. Absent when no IPA source covers the word.
+   */
+  ipa?: string[];
   /** Corpus frequency rank — lower is more common (Phase D). */
   frequency?: number;
   /**
@@ -67,6 +72,8 @@ export interface YomitanDictInfo {
   hasFreq: boolean;
   /** Carries a Yomitan kanji bank (character readings / meanings / stats). */
   hasKanji?: boolean;
+  /** Carries Yomitan `ipa` term_meta rows (IPA transcriptions). */
+  hasIpa?: boolean;
   importedAt: number;
   bundled?: boolean;
   /** When false, the dictionary is kept but ignored by lookups/mining. */
