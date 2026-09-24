@@ -156,6 +156,41 @@ export function saveCustomCss(css: string): { ok: boolean; error?: string; promo
   return applied;
 }
 
+function sandboxEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem('jp-os-personalization-v1');
+    return !raw || (JSON.parse(raw) as { customCssEnabled?: boolean }).customCssEnabled !== false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Add a stylesheet to the END of the sandbox, under a comment naming where it came
+ * from. This is how Theme Studio's old per-theme stylesheet (and an imported theme's)
+ * reaches the one custom-CSS editor Settings > Appearance keeps, instead of a second
+ * editor. Refused, with nothing written, when the combined sheet would be unsafe or
+ * over the size limit. Honours the sandbox's own on/off switch.
+ */
+export function appendCustomCss(css: string, label: string): { ok: boolean; error?: string } {
+  const addition = css.trim();
+  if (!addition) return { ok: true };
+  const existing = loadCustomCss().trim();
+  if (existing.includes(addition)) return { ok: true };
+  const heading = `/* ${label.replace(/\*\//g, '').replace(/\/\*/g, '').trim()} */`;
+  const combined = existing ? `${existing}\n\n${heading}\n${addition}\n` : `${heading}\n${addition}\n`;
+  const check = sanitizeUserCss(combined);
+  if (!check.ok) return { ok: false, error: check.error };
+  try {
+    localStorage.setItem(KEY, check.css);
+  } catch {
+    return { ok: false, error: 'Could not save CSS.' };
+  }
+  if (sandboxEnabled()) applyCustomCss(check.css);
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: check.css }));
+  return { ok: true };
+}
+
 export function clearCustomCss(): void {
   try {
     localStorage.removeItem(KEY);

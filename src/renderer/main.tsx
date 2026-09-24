@@ -17,6 +17,7 @@ import { applyLangAttribute, initI18n } from './i18n';
 import { bootEnvironment } from './environment';
 import { installAmbientAudio } from './environment/ambientAudio';
 import { bootCustomCss } from './customCss';
+import { bootUiCustomization } from './uiCustomizationStore';
 import { runStorageMigrations } from './storage/migrationRunner';
 import { initProfileState } from './profileState';
 import { initDesktopState } from './desktopState';
@@ -279,6 +280,9 @@ runWhenIdle(() => {
 
 if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
   bootCustomCss();
+  // Theme Studio's active theme was painted only while Settings > Appearance was
+  // open, so a restart dropped it until then. Paint it at boot like the sandbox.
+  bootUiCustomization();
   // Reward confetti layer (Phase 4.5). Main window only — the companion host
   // is a click-through overlay and must never paint a full-screen canvas.
   installRewardBursts();
