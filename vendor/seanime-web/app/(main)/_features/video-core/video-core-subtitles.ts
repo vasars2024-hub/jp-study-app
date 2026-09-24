@@ -537,6 +537,9 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
 
                     await renderer.renderer.addFonts(this.fonts)
 
+                    // Gum: a delay set before the renderer existed (a file's remembered
+                    // correction, applied as it opens) lives only in `settings` until now.
+                    renderer.timeOffset = -(this.settings.subtitleDelay ?? 0)
                     this.libassRenderer = renderer
                 }
                 catch (e) {
@@ -683,9 +686,15 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
 
     async setSubtitleDelay(subtitleDelay: number) {
         this.settings = { ...this.settings, subtitleDelay }
-        if (this.libassRenderer) {
-            await this.libassRenderer.ready
-            this.libassRenderer.timeOffset = -subtitleDelay
+        // Gum: the renderer read before the await is not the one after it. A manager torn
+        // down (file closed, track reloaded) while JASSUB was still starting set the field to
+        // null, and the write threw "Cannot set properties of null (setting 'timeOffset')".
+        // The delay is kept in `settings` above, and `_init()` hands it to the next renderer,
+        // so skipping a renderer that is gone drops nothing.
+        const renderer = this.libassRenderer
+        if (renderer) {
+            await renderer.ready
+            if (this.libassRenderer === renderer) renderer.timeOffset = -subtitleDelay
         }
         if (this.pgsRenderer) this.pgsRenderer.setTimeOffset(-subtitleDelay)
         this._updateActiveCues()

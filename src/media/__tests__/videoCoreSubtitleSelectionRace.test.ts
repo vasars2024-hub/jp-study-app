@@ -220,3 +220,35 @@ describe('VideoCore subtitle manager — primary track switching', () => {
       .toEqual([1000, 1001, 1000]);
   });
 });
+
+describe('VideoCore subtitle manager — subtitle delay against the renderer\'s life cycle', () => {
+  it('a delay set before the renderer exists reaches it once it starts', async () => {
+    const manager = makeManager(fakeVideo());
+    // The file's remembered delay is applied as it opens: JASSUB is still booting.
+    expect(manager.libassRenderer).toBeNull();
+    await manager.setSubtitleDelay(0.4);
+    await settle();
+    expect(manager.libassRenderer).not.toBeNull();
+    expect(manager.libassRenderer!.timeOffset).toBe(-0.4);
+  });
+
+  it('a renderer torn down while the delay waited for it is skipped, not written through null', async () => {
+    const manager = makeManager(fakeVideo());
+    await settle();
+    const renderer = manager.libassRenderer!;
+    // Still starting (the real worker takes seconds), and the file closes meanwhile.
+    (renderer as unknown as { ready: Promise<void> }).ready =
+      new Promise<void>((resolve) => setTimeout(resolve, 20));
+    const pending = manager.setSubtitleDelay(0.3);
+    manager.destroy();
+    await expect(pending).resolves.toBeUndefined();
+    expect(Math.abs(renderer.timeOffset)).toBe(0);
+  });
+
+  it('a live renderer takes the new delay', async () => {
+    const manager = makeManager(fakeVideo());
+    await settle();
+    await manager.setSubtitleDelay(-0.2);
+    expect(manager.libassRenderer!.timeOffset).toBe(0.2);
+  });
+});
