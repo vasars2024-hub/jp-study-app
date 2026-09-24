@@ -3042,6 +3042,7 @@ export const zh: Catalog = {
   'agent.notice.retention': '标记为仅限本次会话的上下文和附件不会写入磁盘。',
   'yt.menu.playlist': '播放列表',
   'yt.add.placeholder': '粘贴 YouTube 播放列表链接',
+  'yt.add.placeholderChannel': '粘贴 YouTube 播放列表或频道链接',
   'yt.add.submit': '添加',
   'yt.add.extensionHint': '通过链接添加（扩展稍后推出）。',
   'yt.folder.placeholder': '新文件夹名称',

@@ -267,6 +267,70 @@ export function parseYoutubePlaylistId(url: string): string | null {
   return m?.[1] ?? null;
 }
 
+/** A channel URL, and the URL whose flat listing is that channel's uploads. */
+export interface YoutubeChannelRef {
+  kind: 'channel' | 'handle' | 'custom' | 'user';
+  /** `UC…` for `/channel/`, the handle without `@`, or the `/c/` / `/user/` name. */
+  value: string;
+  /**
+   * What to hand yt-dlp. A `/channel/UC…` URL maps straight to its uploads
+   * playlist (`UU…`, same suffix); a handle or legacy name to its `/videos` tab,
+   * which yt-dlp resolves.
+   */
+  fetchUrl: string;
+  /** Known up front only for `/channel/UC…`. */
+  uploadsPlaylistId?: string;
+}
+
+/** `UC…` → `UU…`, YouTube's uploads playlist for that channel. */
+export function youtubeUploadsPlaylistId(channelId: string): string | null {
+  return /^UC[\w-]{22}$/.test(channelId) ? `UU${channelId.slice(2)}` : null;
+}
+
+/**
+ * Channel URLs in the shapes people paste: `youtube.com/@handle`,
+ * `/channel/UC…`, `/c/name`, `/user/name`, with or without a tab
+ * (`/videos`, `/featured`, …) or scheme, and `m.` / `www.`. Null for anything
+ * else — including a URL that carries `list=`, which is a playlist.
+ */
+export function parseYoutubeChannelUrl(url: string): YoutubeChannelRef | null {
+  const raw = (url ?? '').trim();
+  if (!raw || /[?&]list=/.test(raw)) return null;
+  const withScheme = /^[a-z]+:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, '')}`;
+  let u: URL;
+  try {
+    u = new URL(withScheme);
+  } catch {
+    return null;
+  }
+  if (!/^(www\.|m\.|music\.)?youtube\.com$/i.test(u.hostname)) return null;
+  const parts = u.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
+  const [first, second] = parts;
+  if (!first) return null;
+  if (first.startsWith('@') && first.length > 1) {
+    const handle = first.slice(1);
+    if (!/^[\p{L}\p{N}._·-]{1,100}$/u.test(handle)) return null;
+    return { kind: 'handle', value: handle, fetchUrl: `https://www.youtube.com/@${encodeURIComponent(handle)}/videos` };
+  }
+  if (first === 'channel' && second && /^UC[\w-]{22}$/.test(second)) {
+    const uploads = youtubeUploadsPlaylistId(second) as string;
+    return {
+      kind: 'channel',
+      value: second,
+      fetchUrl: `https://www.youtube.com/playlist?list=${uploads}`,
+      uploadsPlaylistId: uploads,
+    };
+  }
+  if ((first === 'c' || first === 'user') && second && /^[\p{L}\p{N}._-]{1,100}$/u.test(second)) {
+    return {
+      kind: first === 'c' ? 'custom' : 'user',
+      value: second,
+      fetchUrl: `https://www.youtube.com/${first}/${encodeURIComponent(second)}/videos`,
+    };
+  }
+  return null;
+}
+
 export function youtubeWatchUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }

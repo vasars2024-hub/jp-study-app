@@ -3272,6 +3272,7 @@ export const ru: Catalog = {
   'agent.notice.retention': 'Контекст и вложения, помеченные как «только этот сеанс», никогда не записываются на диск.',
   'yt.menu.playlist': 'Плейлист',
   'yt.add.placeholder': 'Вставьте URL плейлиста YouTube',
+  'yt.add.placeholderChannel': 'Вставьте ссылку на плейлист или канал YouTube',
   'yt.add.submit': 'Добавить',
   'yt.add.extensionHint': 'Добавление по ссылке (расширение позже).',
   'yt.folder.placeholder': 'Имя новой папки',

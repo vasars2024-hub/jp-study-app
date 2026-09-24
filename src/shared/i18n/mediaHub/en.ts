@@ -57,5 +57,13 @@ export const MEDIA_HUB_EN: Catalog = {
   'watchAiring.error.offline': 'offline, will retry',
   'watchAiring.error.unreachable': 'AniList did not answer, will retry',
   'watchAiring.checkNow': 'Check now',
+  // YouTube playlist manager errors
+  'ytManager.error.notPlaylistOrChannel': 'That is not a YouTube playlist or channel link. Paste a playlist (with list=) or a channel (@handle, /channel/UC…, /c/…, /user/…).',
+  'ytManager.error.removedWhileSyncing': 'That playlist was removed while it was syncing.',
+  'ytManager.error.videoNotFound': 'That video is no longer in the list.',
+  'ytManager.error.playlistNotFound': 'That playlist is no longer in the list.',
+  'ytManager.error.channelNotFound': 'That channel is no longer in the list.',
+  'ytManager.error.noYtDlp': 'yt-dlp was not found. Install it (for example pip install -U yt-dlp) and reopen the app.',
+  'ytManager.error.notVideo': 'That is not a YouTube video link.',
   'discover.library.planEmpty': 'Nothing planned yet. Titles you add from Browse land in your library as Plan to watch.',
 };

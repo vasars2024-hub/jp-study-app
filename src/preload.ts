@@ -2116,12 +2116,14 @@ const api = {
       }
     | { error: string }
   > => ipcRenderer.invoke('yt:refreshChannel', channelId),
+  /** `options.autoCaptions` (default true) also requests YouTube's auto-generated ja/en captions. */
   ytDownloadVideos: (
     videoIds: string[],
+    options?: import('./main/ytPlaylists').YtDownloadRequestOptions,
   ): Promise<{
     store: YtPlaylistsStore;
     results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
-  }> => ipcRenderer.invoke('yt:downloadVideos', videoIds),
+  }> => ipcRenderer.invoke('yt:downloadVideos', videoIds, options),
   ytFetchSubsOnly: (
     videoIds: string[],
   ): Promise<{

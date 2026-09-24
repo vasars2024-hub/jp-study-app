@@ -2945,6 +2945,7 @@ export const en: Catalog = {
   'agent.attachment.error.read-failed': 'The selected file could not be read.',
   'yt.menu.playlist': 'Playlist',
   'yt.add.placeholder': 'Paste YouTube playlist URL',
+  'yt.add.placeholderChannel': 'Paste a YouTube playlist or channel URL',
   'yt.add.submit': 'Add',
   'yt.add.extensionHint': 'Add playlist by link (extension coming later).',
   'yt.folder.placeholder': 'New folder name',

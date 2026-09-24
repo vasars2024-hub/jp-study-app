@@ -319,7 +319,16 @@ export async function downloadYoutubeUrl(
     : opts.allSubs
       ? ['--write-subs', '--write-auto-subs', '--sub-langs', 'all', '--sub-format', 'vtt/srt/ass/best']
       : subtitleLangs.length > 0
-        ? ['--write-subs', '--sub-langs', subtitleLangs.join(','), '--sub-format', 'vtt/srt/ass/best']
+        ? [
+          '--write-subs',
+          // Auto captions only where asked for (the playlist manager asks): a
+          // video with no creator track still yields Japanese text.
+          ...(opts.autoCaptions ? ['--write-auto-subs'] : []),
+          '--sub-langs',
+          subtitleLangs.join(','),
+          '--sub-format',
+          'vtt/srt/ass/best',
+        ]
         : [];
   const args = await withYtDlpJsRuntime([
     trimmed,

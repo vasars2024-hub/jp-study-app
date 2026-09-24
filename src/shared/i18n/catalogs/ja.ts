@@ -3057,6 +3057,7 @@ export const ja: Catalog = {
   'agent.notice.retention': 'セッション限定と指定されたコンテキストと添付ファイルはディスクに書き込まれません。',
   'yt.menu.playlist': 'プレイリスト',
   'yt.add.placeholder': 'YouTubeのプレイリストURLを貼り付け',
+  'yt.add.placeholderChannel': 'YouTube の再生リストまたはチャンネルの URL を貼り付け',
   'yt.add.submit': '追加',
   'yt.add.extensionHint': 'リンクで追加（拡張機能は後日対応）。',
   'yt.folder.placeholder': '新しいフォルダ名',

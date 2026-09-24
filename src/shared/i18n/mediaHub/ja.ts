@@ -57,5 +57,13 @@ export const MEDIA_HUB_JA: Catalog = {
   'watchAiring.error.offline': 'オフラインのため後で再試行します',
   'watchAiring.error.unreachable': 'AniList が応答しないため後で再試行します',
   'watchAiring.checkNow': '今すぐ確認',
+  // YouTube playlist manager errors
+  'ytManager.error.notPlaylistOrChannel': 'YouTube の再生リストまたはチャンネルのリンクではありません。再生リスト（list= 付き）かチャンネル（@ハンドル、/channel/UC…、/c/…、/user/…）を貼り付けてください。',
+  'ytManager.error.removedWhileSyncing': '同期中にその再生リストが削除されました。',
+  'ytManager.error.videoNotFound': 'その動画はリストにありません。',
+  'ytManager.error.playlistNotFound': 'その再生リストはリストにありません。',
+  'ytManager.error.channelNotFound': 'そのチャンネルはリストにありません。',
+  'ytManager.error.noYtDlp': 'yt-dlp が見つかりません。インストールして（例：pip install -U yt-dlp）アプリを開き直してください。',
+  'ytManager.error.notVideo': 'YouTube の動画リンクではありません。',
   'discover.library.planEmpty': '視聴予定はまだありません。「ブラウズ」から追加した作品は視聴予定としてライブラリに入ります。',
 };

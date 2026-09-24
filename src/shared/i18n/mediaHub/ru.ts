@@ -57,5 +57,13 @@ export const MEDIA_HUB_RU: Catalog = {
   'watchAiring.error.offline': 'нет сети, повторим позже',
   'watchAiring.error.unreachable': 'AniList не ответил, повторим позже',
   'watchAiring.checkNow': 'Проверить сейчас',
+  // YouTube playlist manager errors
+  'ytManager.error.notPlaylistOrChannel': 'Это не ссылка на плейлист или канал YouTube. Вставьте плейлист (с list=) или канал (@имя, /channel/UC…, /c/…, /user/…).',
+  'ytManager.error.removedWhileSyncing': 'Этот плейлист удалили во время синхронизации.',
+  'ytManager.error.videoNotFound': 'Этого видео больше нет в списке.',
+  'ytManager.error.playlistNotFound': 'Этого плейлиста больше нет в списке.',
+  'ytManager.error.channelNotFound': 'Этого канала больше нет в списке.',
+  'ytManager.error.noYtDlp': 'yt-dlp не найден. Установите его (например, pip install -U yt-dlp) и перезапустите приложение.',
+  'ytManager.error.notVideo': 'Это не ссылка на видео YouTube.',
   'discover.library.planEmpty': 'Пока ничего не запланировано. Добавленное из «Обзора» попадает в библиотеку как «Буду смотреть».',
 };
