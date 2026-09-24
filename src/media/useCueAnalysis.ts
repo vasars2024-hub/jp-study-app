@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SentenceAnalysisResult } from '../shared/sentenceAnalysisCore';
+import { localSentenceAnalysis } from '../renderer/localGrammarAnalysis';
 
 /**
  * Whole-sentence AI annotation for the subtitle line the player is on.
@@ -20,12 +21,27 @@ import type { SentenceAnalysisResult } from '../shared/sentenceAnalysisCore';
  *
  * That bounds spend to lines someone actually stopped at, and it matches how
  * the feature is used — you pause on the sentence you did not get.
+ *
+ * Underneath the AI sits the offline highlight (`localSentenceAnalysis`): the
+ * Grammar app's library matched on the line. It costs nothing, so it answers for
+ * every line at once, playing or paused, and it is what a fresh profile with no
+ * key or model sees instead of "needs a cloud API key". The AI result replaces it
+ * when there is one; `offline` says what the AI half is doing meanwhile.
  */
+
+/** What the AI is doing while the offline highlight stands in for it. */
+export type OfflineAiStatus =
+  | { ai: 'idle' }
+  | { ai: 'loading' }
+  | { ai: 'needsKey' }
+  | { ai: 'needsLocalModel' }
+  | { ai: 'off' }
+  | { ai: 'error'; message: string };
 
 export type CueAnalysisState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'ready'; result: SentenceAnalysisResult }
+  | { kind: 'ready'; result: SentenceAnalysisResult; offline?: OfflineAiStatus }
   | { kind: 'error'; message: string; needsKey: boolean; needsLocalModel: boolean };
 
 /** Keeps a long session's worth of lines without growing without bound. */
@@ -64,6 +80,8 @@ interface Options {
   uiLang: string;
   /** Send an uncached line without being asked. Pass the paused state here. */
   auto: boolean;
+  /** Offer the free offline highlight. Pass whether highlighting is on at all. */
+  offline?: boolean;
   /** Localized fallback for a provider error with no message of its own. */
   errorLabel: string;
 }
@@ -76,7 +94,14 @@ export interface CueAnalysis {
   retry: () => void;
 }
 
-export function useCueAnalysis({ text, lang, uiLang, auto, errorLabel }: Options): CueAnalysis {
+export function useCueAnalysis({
+  text,
+  lang,
+  uiLang,
+  auto,
+  offline: offlineWanted = true,
+  errorLabel,
+}: Options): CueAnalysis {
   const [state, setState] = useState<CueAnalysisState>({ kind: 'idle' });
   // Demand is bound to the text it was made for, so asking for one line does
   // not silently authorize a call on whatever line comes next.
@@ -103,11 +128,15 @@ export function useCueAnalysis({ text, lang, uiLang, auto, errorLabel }: Options
       setState({ kind: 'ready', result: cached });
       return;
     }
+    const local = offlineWanted ? localSentenceAnalysis(trimmed, lang) : null;
+    const offline = (status: OfflineAiStatus): CueAnalysisState => (
+      local ? { kind: 'ready', result: local, offline: status } : { kind: 'idle' }
+    );
     if (!auto && !demanded) {
-      setState({ kind: 'idle' });
+      setState(offline({ ai: 'idle' }));
       return;
     }
-    setState({ kind: 'loading' });
+    setState(local ? offline({ ai: 'loading' }) : { kind: 'loading' });
     let alive = true;
     void (async () => {
       try {
@@ -116,6 +145,14 @@ export function useCueAnalysis({ text, lang, uiLang, auto, errorLabel }: Options
         if (res.ok && res.result) {
           writeCache(key, res.result);
           setState({ kind: 'ready', result: res.result });
+        } else if (local) {
+          // No AI to add detail: the offline highlight stays, saying why it is alone.
+          setState(offline(
+            res.needsKey ? { ai: 'needsKey' }
+              : res.needsLocalModel ? { ai: 'needsLocalModel' }
+                : res.aiOff ? { ai: 'off' }
+                  : { ai: 'error', message: res.error || errorLabel },
+          ));
         } else {
           setState({
             kind: 'error',
@@ -126,9 +163,14 @@ export function useCueAnalysis({ text, lang, uiLang, auto, errorLabel }: Options
         }
       } catch (err) {
         if (!alive || id !== reqRef.current) return;
+        const message = err instanceof Error ? err.message : errorLabel;
+        if (local) {
+          setState(offline({ ai: 'error', message }));
+          return;
+        }
         setState({
           kind: 'error',
-          message: err instanceof Error ? err.message : errorLabel,
+          message,
           needsKey: false,
           needsLocalModel: false,
         });
@@ -140,7 +182,7 @@ export function useCueAnalysis({ text, lang, uiLang, auto, errorLabel }: Options
     // `errorLabel` is deliberately absent: it is only read inside the failure
     // path, and depending on it would re-run the whole analysis on a UI-language
     // switch purely to restate an error string.
-  }, [trimmed, lang, uiLang, auto, demanded, demandNonce]);
+  }, [trimmed, lang, uiLang, auto, offlineWanted, demanded, demandNonce]);
 
   const analyzeNow = useCallback(() => {
     setDemand((current) => ({

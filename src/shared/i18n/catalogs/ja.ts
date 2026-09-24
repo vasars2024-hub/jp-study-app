@@ -9203,6 +9203,9 @@ export const ja: Catalog = {
   'mediaWorkspace.study.grammarNeedsKey': '文法ハイライトにはクラウドの API キーが必要です。設定 → AI 機能 で追加してください。',
   'mediaWorkspace.study.grammarNeedsLocalModel':
     '文法ハイライトはオフラインで動く設定ですが、モデルがインストールされていません。設定 → AI 機能 でインストールするか、そこでクラウドに切り替えてください。',
+  'mediaWorkspace.study.grammarOffline': '文法ライブラリからオフラインで見つけた文型です。',
+  'mediaWorkspace.study.grammarOfflineNeedsKey': 'この行を詳しく解説するには、設定 → AI 機能 でクラウドの API キーを追加してください。',
+  'mediaWorkspace.study.grammarOfflineNeedsLocalModel': 'この行を詳しく解説するには、設定 → AI 機能 でオフラインモデルをインストールしてください。',
   'mediaWorkspace.study.grammarIdle': '一時停止すると解析します。今すぐ解析することもできます。',
   'mediaWorkspace.study.grammarAnalyzeNow': 'この行を解析',
   'mediaWorkspace.study.transcript': '字幕一覧',

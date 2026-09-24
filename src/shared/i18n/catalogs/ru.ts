@@ -10047,6 +10047,9 @@ export const ru: Catalog = {
     'Для подсветки грамматики нужен облачный ключ API. Добавьте его в «Настройки → ИИ».',
   'mediaWorkspace.study.grammarNeedsLocalModel':
     'Подсветка грамматики настроена на офлайн-работу, но модель не установлена. Установите её в «Настройки → ИИ» или переключитесь там на облако.',
+  'mediaWorkspace.study.grammarOffline': 'Конструкции из грамматической библиотеки, найдены офлайн.',
+  'mediaWorkspace.study.grammarOfflineNeedsKey': 'Чтобы получить полный разбор этой строки, добавьте облачный ключ API в «Настройки → ИИ».',
+  'mediaWorkspace.study.grammarOfflineNeedsLocalModel': 'Чтобы получить полный разбор этой строки, установите офлайн-модель в «Настройки → ИИ».',
   'mediaWorkspace.study.grammarIdle': 'Поставьте на паузу, чтобы разобрать строку, или разберите её сейчас.',
   'mediaWorkspace.study.grammarAnalyzeNow': 'Разобрать строку',
   'mediaWorkspace.study.transcript': 'Расшифровка',

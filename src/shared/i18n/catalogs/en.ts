@@ -9756,6 +9756,9 @@ export const en: Catalog = {
     'Grammar highlight needs a cloud API key. Add one in Settings → AI.',
   'mediaWorkspace.study.grammarNeedsLocalModel':
     'Grammar highlight is set to run offline, but the model is not installed. Install it in Settings → AI, or switch to Cloud there.',
+  'mediaWorkspace.study.grammarOffline': 'Patterns from the grammar library, found offline.',
+  'mediaWorkspace.study.grammarOfflineNeedsKey': 'For a full explanation of this line, add a cloud API key in Settings → AI.',
+  'mediaWorkspace.study.grammarOfflineNeedsLocalModel': 'For a full explanation of this line, install the offline model in Settings → AI.',
   'mediaWorkspace.study.grammarIdle': 'Pause on a line to break it down, or explain it now.',
   'mediaWorkspace.study.grammarAnalyzeNow': 'Explain this line',
   'mediaWorkspace.study.transcript': 'Transcript',

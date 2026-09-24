@@ -627,6 +627,7 @@ export default function VideoCoreStudyOverlay({
     lang: studyLang,
     uiLang,
     auto: preferences.grammarHighlight && playerPaused,
+    offline: preferences.grammarHighlight,
     errorLabel: t('mediaWorkspace.study.grammarError'),
   });
   const annotated = preferences.grammarHighlight && cueAnalysis.state.kind === 'ready'

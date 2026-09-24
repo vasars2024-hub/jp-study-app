@@ -1,7 +1,7 @@
 import SentenceAnalysisView from '../renderer/components/analysis/SentenceAnalysisView';
 import { useAnalysisActions } from '../renderer/analysisActions';
 import { useT } from '../renderer/i18n';
-import type { CueAnalysisState } from './useCueAnalysis';
+import type { CueAnalysisState, OfflineAiStatus } from './useCueAnalysis';
 import { openAiSettings } from '../renderer/aiSetupClient';
 
 /**
@@ -89,6 +89,10 @@ export default function VideoCoreGrammarPanel({
         </div>
       )}
 
+      {state.kind === 'ready' && state.offline && (
+        <OfflineNote status={state.offline} onAnalyzeNow={onAnalyzeNow} />
+      )}
+
       {state.kind === 'ready' && (
         <SentenceAnalysisView
           result={state.result}
@@ -112,5 +116,53 @@ export default function VideoCoreGrammarPanel({
         />
       )}
     </aside>
+  );
+}
+
+/**
+ * Above an offline highlight: where it came from, and what the AI half is doing. The
+ * library's matches are real but thin, so the way to the full explanation stays one click
+ * away — the explain button when the AI is set up, the AI settings when it is not.
+ */
+function OfflineNote({
+  status,
+  onAnalyzeNow,
+}: {
+  status: OfflineAiStatus;
+  onAnalyzeNow: () => void;
+}) {
+  const { t } = useT();
+  return (
+    <div className="study-grammar-status" data-grammar-offline={status.ai}>
+      <p>{t('mediaWorkspace.study.grammarOffline')}</p>
+      {status.ai === 'idle' && (
+        <button type="button" onClick={onAnalyzeNow}>
+          {t('mediaWorkspace.study.grammarAnalyzeNow')}
+        </button>
+      )}
+      {status.ai === 'loading' && (
+        <p role="status" aria-live="polite">{t('mediaWorkspace.study.grammarLoading')}</p>
+      )}
+      {(status.ai === 'needsKey' || status.ai === 'needsLocalModel') && (
+        <>
+          <p>
+            {status.ai === 'needsKey'
+              ? t('mediaWorkspace.study.grammarOfflineNeedsKey')
+              : t('mediaWorkspace.study.grammarOfflineNeedsLocalModel')}
+          </p>
+          <button type="button" onClick={() => openAiSettings()}>
+            {t('settings.ai.setup.action')}
+          </button>
+        </>
+      )}
+      {status.ai === 'error' && (
+        <>
+          <p role="alert">{status.message}</p>
+          <button type="button" onClick={onAnalyzeNow}>
+            {t('mediaWorkspace.study.grammarRetry')}
+          </button>
+        </>
+      )}
+    </div>
   );
 }
