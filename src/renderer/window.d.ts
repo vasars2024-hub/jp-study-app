@@ -335,6 +335,10 @@ declare global {
         error?: string;
         /** OCR succeeded but one or more pages produced no translation. */
         warning?: string;
+        /** The same warning as a catalog key, and why the pages failed. */
+        warningKey?: string;
+        warningVars?: Record<string, string | number>;
+        failure?: import('../shared/translateBatchFailure').TranslateBatchFailure;
         ocrMeta?: import('../shared/types').LibraryItem['ocrMeta'];
       }>;
       mangaOcrCancelVolume(itemId: string): Promise<{ ok: boolean }>;
@@ -920,9 +924,10 @@ declare global {
         items: Array<{ id: string; text: string; source: string; target: string }>;
       }): Promise<{
         ok: boolean;
-        results?: Array<{ id: string; text: string }>;
+        results?: Array<import('../shared/translateBatchFailure').TranslateBatchItemResult>;
         error?: string;
         cancelled?: boolean;
+        failure?: import('../shared/translateBatchFailure').TranslateBatchFailure;
       }>;
       translateCancelBatch(): Promise<{ ok: boolean }>;
       translateStatus(): Promise<{ ready: boolean; modelFound: boolean; modelPath: string | null }>;

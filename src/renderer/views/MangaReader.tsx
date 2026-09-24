@@ -6,7 +6,6 @@ import {
   readingLocatorFromProgress,
 } from '../../shared/readingLibraryAdapter';
 import type { MokuroBlock, MokuroBlockKind, MokuroBox, MokuroPage } from '../../shared/mokuroTypes';
-import { formatBytes } from '../../shared/assetRegistry';
 import { confirmDialog } from '../components/ui';
 import DictionaryPopup from '../components/DictionaryPopup';
 import ReadingListMembership from '../components/reading/ReadingListMembership';
@@ -44,7 +43,12 @@ import {
 import { stripFuriganaFragments } from '../../shared/mangaOcrText';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
 import { registerCommandHandler } from '../keyboardShortcuts';
-import { useAssetInstalled } from '../assetStore';
+import AssetInstallPrompt from '../components/AssetInstallPrompt';
+import { openSectionSurface } from '../sectionSurface';
+import {
+  summarizeTranslateFailure,
+  type TranslateBatchFailure,
+} from '../../shared/translateBatchFailure';
 import { useT } from '../i18n';
 import { KNOWN_LANGS } from '../../shared/langs';
 import { getActiveProfile } from '../profileState';
@@ -60,6 +64,41 @@ import {
 import { mangaPageFitStyles } from '../mangaPageFit';
 
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
+
+/** Manga OCR's full set, and what starts it: the encoder pulls its decoder and vocab. */
+const MANGA_OCR_ASSETS = ['manga-ocr', 'manga-ocr-decoder', 'manga-ocr-vocab', 'comic-text-detector'];
+const MANGA_OCR_START = ['manga-ocr', 'comic-text-detector'];
+
+/**
+ * The fix that goes with a translation failure. A missing model is fixed on the
+ * model's settings page; an engine that would not start, a timeout, or output
+ * that was not a translation are all worth one more try.
+ */
+function TranslateFixAction({
+  failure,
+  onOpenSettings,
+  onRetry,
+  t,
+}: {
+  failure: TranslateBatchFailure;
+  onOpenSettings: () => void;
+  onRetry?: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  if (failure.reason === 'model-missing') {
+    return (
+      <button type="button" className="btn small" onClick={onOpenSettings}>
+        {t('manga.translate.fix.openSettings')}
+      </button>
+    );
+  }
+  if (!onRetry) return null;
+  return (
+    <button type="button" className="btn small" onClick={onRetry}>
+      {t('manga.translate.fix.retry')}
+    </button>
+  );
+}
 
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 4;
@@ -192,6 +231,15 @@ export default function MangaReader({ item, onClose }: Props) {
   const [fillByRegion, setFillByRegion] = useState<Record<string, string>>({});
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState('');
+  /** Why the last translation came back empty, so the fix can be offered with it. */
+  const [translateFailure, setTranslateFailure] = useState<TranslateBatchFailure | null>(null);
+  /**
+   * The outcome of a whole-volume run, in its own slot. It used to go through
+   * `ocrError`, which only renders in the OCR error state — and the run had just
+   * marked the page done, so "N pages could not be translated" was stored and
+   * never shown.
+   */
+  const [volumeNotice, setVolumeNotice] = useState<{ kind: 'warning' | 'error'; text: string } | null>(null);
   const [pageRangeFrom, setPageRangeFrom] = useState(1);
   const [pageRangeTo, setPageRangeTo] = useState(1);
   const [chapterRangeFrom, setChapterRangeFrom] = useState(1);
@@ -223,10 +271,11 @@ export default function MangaReader({ item, onClose }: Props) {
   /** One background volume analyze per reader open. */
   const autoVolumeStartedRef = useRef(false);
 
-  const mangaOcrAsset = useAssetInstalled('manga-ocr');
-  const detectorAsset = useAssetInstalled('comic-text-detector');
-  const decoderAsset = useAssetInstalled('manga-ocr-decoder');
-  const vocabAsset = useAssetInstalled('manga-ocr-vocab');
+  /** A failure reason, worded for the reader. */
+  const failureText = useCallback(
+    (failure: TranslateBatchFailure) => t(`manga.translate.failure.${failure.reason}`),
+    [t],
+  );
 
   useEffect(() => {
     window.api.getMangaPages(item.id).then((p) => {
@@ -704,6 +753,8 @@ export default function MangaReader({ item, onClose }: Props) {
     setVolumeBusy(true);
     setOcrOpen(true);
     setOcrError('');
+    setVolumeNotice(null);
+    setTranslateFailure(null);
     setVolumeProgress({ phase: 'ocr', pageIndex: 0, pageTotal: end - start + 1 });
     const target = targetLang;
     try {
@@ -717,12 +768,25 @@ export default function MangaReader({ item, onClose }: Props) {
         endPage: end,
       });
       if (!res.ok) {
-        if (!res.cancelled) setOcrError(res.error || t('manga.ocr.volumeFailed'));
+        if (!res.cancelled) {
+          setTranslateFailure(res.failure ?? null);
+          setVolumeNotice({
+            kind: 'error',
+            text: res.failure ? failureText(res.failure) : res.error || t('manga.ocr.volumeFailed'),
+          });
+        }
         return;
       }
       // A run can succeed at OCR and still translate nothing. Say so — the
       // alternative is a page that looks translated and is not.
-      if (res.warning) setOcrError(res.warning);
+      if (res.warningKey || res.warning) {
+        setTranslateFailure(res.failure ?? null);
+        const head = res.warningKey ? t(res.warningKey, res.warningVars) : res.warning ?? '';
+        setVolumeNotice({
+          kind: 'warning',
+          text: res.failure ? `${head} ${failureText(res.failure)}` : head,
+        });
+      }
       const url = pages[idx];
       if (url) {
         const page = await window.api.mangaOcrLoadCache(item.id, url);
@@ -739,7 +803,7 @@ export default function MangaReader({ item, onClose }: Props) {
         }
       }
     } catch (err) {
-      setOcrError(err instanceof Error ? err.message : t('manga.ocr.volumeFailed'));
+      setVolumeNotice({ kind: 'error', text: err instanceof Error ? err.message : t('manga.ocr.volumeFailed') });
     } finally {
       setVolumeBusy(false);
     }
@@ -749,6 +813,7 @@ export default function MangaReader({ item, onClose }: Props) {
     idx,
     item.id,
     t,
+    failureText,
     ensureTextOverlayMode,
     mangaSettings.detectionSensitivity,
     targetLang,
@@ -842,6 +907,7 @@ export default function MangaReader({ item, onClose }: Props) {
       if (translating) return false;
       setTranslating(true);
       setTranslateError('');
+      setTranslateFailure(null);
       try {
         const target = targetLang;
         const items: Array<{ id: string; text: string; source: string; target: string }> = [];
@@ -861,18 +927,27 @@ export default function MangaReader({ item, onClose }: Props) {
         const status = await window.api.translateStatus();
         if (!status.modelFound) {
           setTranslateError(t('manga.translate.modelMissing'));
+          setTranslateFailure({ reason: 'model-missing' });
           return false;
         }
         const res = await window.api.translateRunBatch({ items });
         if (!res.ok || !res.results) {
-          setTranslateError(res.error || t('manga.translate.failed'));
+          if (res.cancelled) return false;
+          setTranslateFailure(res.failure ?? null);
+          setTranslateError(
+            res.failure ? failureText(res.failure) : res.error || t('manga.translate.failed'),
+          );
           return false;
         }
         const byId = new Map(
           res.results.filter((r) => r.text.trim()).map((r) => [r.id, r.text.trim()]),
         );
         if (!byId.size) {
-          setTranslateError(t('manga.translate.failed'));
+          // Every item came back empty; main says why, and the why has a fix.
+          const failure: TranslateBatchFailure =
+            res.failure ?? summarizeTranslateFailure(res.results) ?? { reason: 'rejected' };
+          setTranslateFailure(failure);
+          setTranslateError(failureText(failure));
           return false;
         }
         const next: MokuroPage = {
@@ -916,9 +991,17 @@ export default function MangaReader({ item, onClose }: Props) {
         setTranslating(false);
       }
     },
-    [translating, showSfx, pages, idx, item.id, t, ensureTextOverlayMode, targetLang, sourceLang],
+    [translating, showSfx, pages, idx, item.id, t, ensureTextOverlayMode, targetLang, sourceLang, failureText],
   );
   translateRef.current = runTranslatePage;
+
+  /** The fix for a missing model: the page where models and the translator live. */
+  const openTranslateModelSettings = useCallback(() => {
+    openSectionSurface('settings');
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('settings:navigate', { detail: { page: 'storage' } }));
+    }, 80);
+  }, []);
 
   /** Click-drag rubber-band → OCR crop → auto-translate → English overlay on the page. */
   const addDrawnRegion = useCallback(
@@ -993,6 +1076,7 @@ export default function MangaReader({ item, onClose }: Props) {
     setTranslatedPage(null);
     setFillByRegion({});
     setTranslateError('');
+    setTranslateFailure(null);
     setHandwritingOpen(false);
     setRegionBusy(false);
     setDrawRegionMode(false);
@@ -1726,28 +1810,49 @@ export default function MangaReader({ item, onClose }: Props) {
             )}
           </div>
 
-          {translateError && <div className="ocr-msg">{translateError}</div>}
+          {translateError && (
+            <div className="ocr-msg ocr-error" role="alert">
+              <span>{translateError}</span>
+              {translateFailure && (
+                <TranslateFixAction
+                  failure={translateFailure}
+                  onOpenSettings={openTranslateModelSettings}
+                  onRetry={mokuroPage ? () => void runTranslatePage(mokuroPage) : undefined}
+                  t={t}
+                />
+              )}
+            </div>
+          )}
+          {/* A whole-volume run's outcome, in its own slot, so a run that
+              finished OCR but translated nothing is never shown as a done page. */}
+          {volumeNotice && !volumeBusy && (
+            <div
+              className={`ocr-msg ${volumeNotice.kind === 'error' ? 'ocr-error' : 'ocr-warning'}`}
+              role={volumeNotice.kind === 'error' ? 'alert' : 'status'}
+            >
+              <span>{volumeNotice.text}</span>
+              {translateFailure && !translateError && (
+                <TranslateFixAction
+                  failure={translateFailure}
+                  onOpenSettings={openTranslateModelSettings}
+                  onRetry={() => void analyzeEntireManga()}
+                  t={t}
+                />
+              )}
+              <button type="button" className="btn small" onClick={() => setVolumeNotice(null)}>
+                {t('common.close')}
+              </button>
+            </div>
+          )}
           {modelsMissing && (
             <div className="ocr-msg">
-              <p className="muted">{t('manga.ocr.modelsMissing')}</p>
-              <button
-                className="btn"
-                onClick={() => {
-                  if (!mangaOcrAsset.installed) void window.api.assetsStart('manga-ocr');
-                  if (!detectorAsset.installed) void window.api.assetsStart('comic-text-detector');
-                  if (!decoderAsset.installed) void window.api.assetsStart('manga-ocr-decoder');
-                  if (!vocabAsset.installed) void window.api.assetsStart('manga-ocr-vocab');
-                }}
-              >
-                {t('manga.ocr.downloadModels', {
-                  size: formatBytes(
-                    (mangaOcrAsset.status?.totalBytes ?? 343_454_249) +
-                      (detectorAsset.status?.totalBytes ?? 94_669_756) +
-                      (decoderAsset.status?.totalBytes ?? 117_480_262) +
-                      (vocabAsset.status?.totalBytes ?? 30_216),
-                  ),
-                })}
-              </button>
+              {/* Follows the download it starts: progress and Cancel while it
+                  runs, the reason if it fails, and it disappears once installed. */}
+              <AssetInstallPrompt
+                ids={MANGA_OCR_ASSETS}
+                startIds={MANGA_OCR_START}
+                message={t('manga.ocr.modelsMissing')}
+              />
               <p className="muted ocr-hint">{t('manga.ocr.fallbackHint')}</p>
             </div>
           )}

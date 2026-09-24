@@ -9613,6 +9613,21 @@ mark.lookup-mark,
   padding: 16px 14px;
   font-size: 13px;
 }
+/* A message with its fix beside it: failure reason + "Open model settings" / "Try again". */
+.ocr-msg.ocr-error,
+.ocr-msg.ocr-warning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.ocr-msg.ocr-error > span,
+.ocr-msg.ocr-warning > span {
+  flex: 1 1 100%;
+}
+.ocr-msg.ocr-warning > span {
+  color: var(--warning, #d9a441);
+}
 .ocr-hint {
   margin: 0;
   padding: 10px 14px 0;

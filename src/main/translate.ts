@@ -17,6 +17,12 @@ import {
   type TranslateBatchItem,
   type TranslateSenseHint,
 } from '../shared/translateCore';
+import {
+  classifyTranslateError,
+  summarizeTranslateFailure,
+  type TranslateBatchFailure,
+  type TranslateBatchItemResult,
+} from '../shared/translateBatchFailure';
 
 /** Any language code from shared/langs.ts (kept as an alias for callers). */
 export type TransLang = string;
@@ -264,9 +270,9 @@ async function translateStrictItem(item: TranslateBatchItem): Promise<string> {
   return cleanLlmOutput(raw).replace(/^["'«]|["'»]$/g, '').trim();
 }
 
-async function translateBatchChunk(items: TranslateBatchItem[]): Promise<{ id: string; text: string }[]> {
+async function translateBatchChunk(items: TranslateBatchItem[]): Promise<TranslateBatchItemResult[]> {
   if (!items.length) return [];
-  const out: { id: string; text: string }[] = [];
+  const out: TranslateBatchItemResult[] = [];
   const needsLlm: TranslateBatchItem[] = [];
 
   for (const item of items) {
@@ -307,12 +313,18 @@ async function translateBatchChunk(items: TranslateBatchItem[]): Promise<{ id: s
             : '';
           if (text) {
             setCachedTranslation(item.text, item.source, item.target, text);
+            out.push({ id: item.id, text });
+          } else {
+            // The model answered, but not with a translation of this line.
+            out.push({ id: item.id, text: '', reason: 'rejected' });
           }
-          out.push({ id: item.id, text });
         }
-      } catch {
+      } catch (err) {
+        // Still an empty string per item — a long run must not sink on one
+        // chunk — but the reason travels with it, so a reader can say WHY.
+        const failure = classifyTranslateError(err);
         for (const item of group) {
-          out.push({ id: item.id, text: '' });
+          out.push({ id: item.id, text: '', ...failure });
         }
       }
     }
@@ -324,9 +336,9 @@ async function translateBatchChunk(items: TranslateBatchItem[]): Promise<{ id: s
           ? raw
           : '';
         if (text) setCachedTranslation(item.text, item.source, item.target, text);
-        out.push({ id: item.id, text });
-      } catch {
-        out.push({ id: item.id, text: '' });
+        out.push(text ? { id: item.id, text } : { id: item.id, text: '', reason: 'rejected' });
+      } catch (err) {
+        out.push({ id: item.id, text: '', ...classifyTranslateError(err) });
       }
     }
   }
@@ -337,7 +349,7 @@ async function translateBatchChunk(items: TranslateBatchItem[]): Promise<{ id: s
 export async function runTranslationBatch(
   items: TranslateBatchItem[],
   options?: RunTranslationBatchOptions,
-): Promise<{ id: string; text: string }[]> {
+): Promise<TranslateBatchItemResult[]> {
   const deduped = new Map<string, TranslateBatchItem>();
   for (const item of items) {
     if (!item.id || !item.text.trim()) continue;
@@ -353,7 +365,7 @@ export async function runTranslationBatch(
 
   batchCancelled = false;
   lastBatchWasCancelled = false;
-  const results: { id: string; text: string }[] = [];
+  const results: TranslateBatchItemResult[] = [];
   let ptr = 0;
   let done = 0;
   const isCancelled = (): boolean => batchCancelled || !!options?.shouldCancel?.();
@@ -801,9 +813,11 @@ export function registerTranslateIpc(): void {
       req: { items: TranslateBatchItem[] },
     ): Promise<{
       ok: boolean;
-      results?: { id: string; text: string }[];
+      results?: TranslateBatchItemResult[];
       error?: string;
       cancelled?: boolean;
+      /** Set when nothing translated: why, so the caller can offer the right fix. */
+      failure?: TranslateBatchFailure;
     }> => {
       try {
         const results = await runTranslationBatch(req.items ?? [], {
@@ -814,10 +828,11 @@ export function registerTranslateIpc(): void {
         if (didLastTranslationBatchCancel()) {
           return { ok: false, cancelled: true, results };
         }
-        return { ok: true, results };
+        const failure = summarizeTranslateFailure(results);
+        return { ok: true, results, ...(failure ? { failure } : null) };
       } catch (err) {
         console.error('[translate:runBatch]', err);
-        return { ok: false, error: friendlyError(err) };
+        return { ok: false, error: friendlyError(err), failure: classifyTranslateError(err) };
       }
     },
   );

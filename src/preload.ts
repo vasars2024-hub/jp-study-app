@@ -458,6 +458,10 @@ const api = {
     ok: boolean;
     cancelled?: boolean;
     error?: string;
+    warning?: string;
+    warningKey?: string;
+    warningVars?: Record<string, string | number>;
+    failure?: import('./shared/translateBatchFailure').TranslateBatchFailure;
     ocrMeta?: import('./shared/types').LibraryItem['ocrMeta'];
   }> => ipcRenderer.invoke('mangaOcr:analyzeVolume', req),
   mangaOcrCancelVolume: (itemId: string): Promise<{ ok: boolean }> =>
@@ -1516,9 +1520,11 @@ const api = {
     items: Array<{ id: string; text: string; source: string; target: string }>;
   }): Promise<{
     ok: boolean;
-    results?: Array<{ id: string; text: string }>;
+    results?: Array<import('./shared/translateBatchFailure').TranslateBatchItemResult>;
     error?: string;
     cancelled?: boolean;
+    /** Why nothing translated, when nothing did. */
+    failure?: import('./shared/translateBatchFailure').TranslateBatchFailure;
   }> => ipcRenderer.invoke('translate:runBatch', req),
   translateCancelBatch: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('translate:cancelBatch'),
   translateStatus: (): Promise<{ ready: boolean; modelFound: boolean; modelPath: string | null }> =>
