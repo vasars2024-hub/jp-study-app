@@ -76,6 +76,8 @@ afterAll(async () => {
 beforeEach(() => {
   encryptionAvailable = true;
   fs.rmSync(vaultFile(), { force: true });
+  // A .bak without its primary now counts as damage and is reinstated.
+  fs.rmSync(`${vaultFile()}.bak`, { force: true });
 });
 
 afterEach(() => {

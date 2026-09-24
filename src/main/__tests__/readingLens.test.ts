@@ -173,6 +173,8 @@ function writeState(raw: string): void {
 }
 function clearState(): void {
   fs.rmSync(path.join(tmpRoot, STATE), { force: true });
+  // A .bak without its primary counts as damage and would be reinstated.
+  fs.rmSync(path.join(tmpRoot, `${STATE}.bak`), { force: true });
 }
 function readState(): unknown {
   return JSON.parse(fs.readFileSync(path.join(tmpRoot, STATE), 'utf8'));

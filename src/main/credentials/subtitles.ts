@@ -1,6 +1,5 @@
 /** Subtitle-provider key adapters for the shared credential vault. */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import {
@@ -10,7 +9,7 @@ import {
   writeSecret,
   type VaultWriteResult,
 } from './vault';
-import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
+import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from '../atomicJson';
 
 export type SubtitleCredentialId = 'jimaku' | 'opensubtitles';
 type LegacySubtitleKeyFile = Partial<Record<SubtitleCredentialId, string>>;
@@ -39,7 +38,7 @@ function removeLegacyValue(id: SubtitleCredentialId): void {
   delete file[id];
   if (!file.jimaku && !file.opensubtitles) {
     try {
-      fs.rmSync(legacyPath(), { force: true });
+      removeJsonStore(legacyPath());
     } catch {
       /* absent or not removable */
     }

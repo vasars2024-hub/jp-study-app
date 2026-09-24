@@ -26,7 +26,6 @@
 
 import { app, ipcMain, net, shell } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {
   MAL_API_BASE,
@@ -57,7 +56,7 @@ import {
   vaultCanStore,
   writeSecretSet,
 } from './credentials/vault';
-import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from './atomicJson';
 import { malPushPreview, pushWatchChangesToMal } from './malPush';
 
 // ---------------------------------------------------------------------------
@@ -284,7 +283,7 @@ export function fileMalTokenStore(
     clear(): void {
       clearSecret('mal');
       try {
-        fs.rmSync(filePath(), { force: true });
+        removeJsonStore(filePath());
       } catch {
         /* nothing to remove */
       }

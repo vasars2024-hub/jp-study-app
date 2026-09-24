@@ -18,13 +18,20 @@
  *   this process did not write itself is parsed first and only promoted when it
  *   is intact, so a damaged file never overwrites a good `.bak`.
  * - **Read with fallback** — a file that fails to parse (or fails the caller's
- *   `validate`) is moved aside to `<file>.corrupt-<timestamp>` — never
- *   overwritten — and the `.bak` is served and copied back into place. Only when
- *   both are unusable does the caller's fallback come back, and the damaged copy
- *   is still on disk for manual recovery.
- * - A MISSING primary is not "damaged": it is a first run or a deliberate
- *   delete, so `.bak` is not resurrected for it (use `removeJsonStore` to delete
- *   a store together with its `.bak`).
+ *   `validate`) is copied aside to `<file>.corrupt-<timestamp>` — never
+ *   overwritten — and the `.bak` is served and copied back over it (temp +
+ *   rename, so a failed copy-back leaves the damaged primary, not a hole). Only
+ *   when both are unusable does the caller's fallback come back, and the
+ *   damaged copy is still on disk for manual recovery.
+ * - **I/O errors are not damage** — a read refused by a lock (antivirus,
+ *   OneDrive, indexer: EBUSY/EPERM/EACCES/EMFILE…) is retried with backoff and,
+ *   if it persists, answered from `.bak` (or the fallback) WITHOUT moving the
+ *   healthy primary anywhere.
+ * - A missing primary with no `.bak` is a first run. A missing primary WITH a
+ *   `.bak` is damage (a copy-back that failed half-way, a crash): the `.bak` is
+ *   served and reinstated, and a write that finds that state first copies the
+ *   `.bak` aside so the write after it cannot overwrite the only good copy.
+ *   Deliberate deletes go through `removeJsonStore`, which removes both.
  * - **Freeze** — a restore swaps files underneath live modules; while frozen,
  *   writes are held instead of landing on disk, then either dropped (restore
  *   committed, app relaunches) or replayed (restore rolled back).
@@ -201,10 +208,33 @@ function pruneCorruptCopies(file: string): void {
   }
 }
 
+function corruptTarget(file: string): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  let target = `${file}${CORRUPT_INFIX}${stamp}`;
+  for (let n = 2; fs.existsSync(target); n++) target = `${file}${CORRUPT_INFIX}${stamp}-${n}`;
+  return target;
+}
+
+/**
+ * Copy a file aside as `<file>.corrupt-<timestamp>`, leaving it in place — the
+ * caller replaces it atomically afterwards, so there is never a moment with no
+ * primary at all. Returns the copy's path, or null.
+ */
+export function quarantineCopy(file: string): string | null {
+  const target = corruptTarget(file);
+  try {
+    fs.copyFileSync(file, target);
+    pruneCorruptCopies(file);
+    return target;
+  } catch (err) {
+    if (errCode(err) !== 'ENOENT') logger('error', 'quarantine-failed', `${file}: ${errText(err)}`);
+    return null;
+  }
+}
+
 /** Move a damaged file aside so nothing overwrites it. Returns the new path, or null. */
 export function quarantineFile(file: string): string | null {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const target = `${file}${CORRUPT_INFIX}${stamp}`;
+  const target = corruptTarget(file);
   try {
     renameWithRetrySync(file, target);
     pruneCorruptCopies(file);
@@ -233,9 +263,19 @@ function keepLastGood(file: string, json: boolean): void {
   try {
     exists = fs.statSync(file).isFile();
   } catch {
+    exists = false;
+  }
+  if (!exists) {
+    // A `.bak` with no primary is the only good copy left (a copy-back that
+    // failed, a crash). This write creates a new primary, and the NEXT write
+    // would copy that over the `.bak` — so keep the `.bak` aside first.
+    const bak = `${file}${LAST_GOOD_SUFFIX}`;
+    if (!writtenThisSession.has(norm(file)) && fs.existsSync(bak)) {
+      const kept = quarantineCopy(bak);
+      logger('warn', 'last-good-kept-before-write', `${file}: primary missing, .bak copied to ${kept ?? '(could not copy)'}`);
+    }
     return;
   }
-  if (!exists) return;
   if (json && !writtenThisSession.has(norm(file))) {
     let text: string;
     try {
@@ -312,6 +352,12 @@ async function writeImplAsync(file: string, data: string | Uint8Array, options: 
     } finally {
       await handle.close();
     }
+    // A restore may have frozen writes while this one was awaiting the disk.
+    // Landing now would overwrite a restored file with a stale in-memory copy.
+    if (frozen) {
+      held.set(norm(file), { file, data, options });
+      return;
+    }
     if (options.backup !== false) keepLastGood(file, json);
     await renameWithRetry(tmp, file);
     writtenThisSession.add(norm(file));
@@ -332,6 +378,30 @@ function enqueue(file: string, run: () => Promise<void>): Promise<void> {
   return next;
 }
 
+/**
+ * Resolve once every queued async write has settled (landed, failed, or been
+ * held by a freeze). A restore freezes first, then waits here, so no write that
+ * was already past its freeze check can land after the swap.
+ */
+export async function drainAtomicWrites(timeoutMs = 15_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (chains.size) {
+    const left = deadline - Date.now();
+    if (left <= 0) return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.allSettled(Array.from(chains.values())),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, left);
+      }),
+    ]);
+    if (timer) clearTimeout(timer);
+    // The finally that removes a settled chain runs a tick later.
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  return true;
+}
+
 export function writeFileAtomic(file: string, data: string | Uint8Array, options: AtomicWriteOptions = {}): Promise<void> {
   return enqueue(file, () => writeImplAsync(file, data, options, false));
 }
@@ -349,7 +419,12 @@ export function writeJsonAtomic(file: string, value: unknown, options: JsonWrite
 type Attempt =
   | { kind: 'ok'; value: unknown }
   | { kind: 'missing' }
-  | { kind: 'bad'; error: string };
+  | { kind: 'bad'; error: string }
+  /** The file exists but could not be read (lock, handle limit) — not damage. */
+  | { kind: 'io'; error: string };
+
+/** Read errors a scanner, sync client or handle limit causes; retried, never treated as damage. */
+const TRANSIENT_READ = new Set(['EBUSY', 'EPERM', 'EACCES', 'EAGAIN', 'EMFILE', 'ENFILE']);
 
 function parseAttempt(text: string, validate?: (value: unknown) => boolean): Attempt {
   try {
@@ -362,54 +437,97 @@ function parseAttempt(text: string, validate?: (value: unknown) => boolean): Att
 }
 
 function readAttemptSync(file: string, validate?: (value: unknown) => boolean): Attempt {
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    if (errCode(err) === 'ENOENT' || errCode(err) === 'ENOTDIR') return { kind: 'missing' };
-    return { kind: 'bad', error: errText(err) };
+  for (let attempt = 0; ; attempt++) {
+    let text: string;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (err) {
+      const code = errCode(err);
+      if (code === 'ENOENT' || code === 'ENOTDIR') return { kind: 'missing' };
+      if (TRANSIENT_READ.has(code) && attempt < RENAME_BACKOFF_MS.length) {
+        sleepSync(RENAME_BACKOFF_MS[attempt]);
+        continue;
+      }
+      return { kind: 'io', error: errText(err) };
+    }
+    return parseAttempt(text, validate);
   }
-  return parseAttempt(text, validate);
 }
 
 async function readAttempt(file: string, validate?: (value: unknown) => boolean): Promise<Attempt> {
-  let text: string;
-  try {
-    text = await fs.promises.readFile(file, 'utf8');
-  } catch (err) {
-    if (errCode(err) === 'ENOENT' || errCode(err) === 'ENOTDIR') return { kind: 'missing' };
-    return { kind: 'bad', error: errText(err) };
+  for (let attempt = 0; ; attempt++) {
+    let text: string;
+    try {
+      text = await fs.promises.readFile(file, 'utf8');
+    } catch (err) {
+      const code = errCode(err);
+      if (code === 'ENOENT' || code === 'ENOTDIR') return { kind: 'missing' };
+      if (TRANSIENT_READ.has(code) && attempt < RENAME_BACKOFF_MS.length) {
+        await new Promise((r) => setTimeout(r, RENAME_BACKOFF_MS[attempt]));
+        continue;
+      }
+      return { kind: 'io', error: errText(err) };
+    }
+    return parseAttempt(text, validate);
   }
-  return parseAttempt(text, validate);
 }
 
 function resolveFallback<T>(fallback: T | (() => T)): T {
   return typeof fallback === 'function' ? (fallback as () => T)() : fallback;
 }
 
-/** Decide what to serve after the primary failed; shared by the sync and async readers. */
+/** Put the last-good copy back over `file` (temp + rename). False when it could not. */
+function reinstateLastGood(file: string): boolean {
+  const tmp = tempPathFor(file);
+  try {
+    fs.copyFileSync(`${file}${LAST_GOOD_SUFFIX}`, tmp);
+    renameWithRetrySync(tmp, file);
+    return true;
+  } catch (err) {
+    logger('warn', 'last-good-reinstate-failed', `${file}: ${errText(err)}`);
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      /* ignore */
+    }
+    return false;
+  }
+}
+
+/**
+ * Decide what to serve after the primary failed; shared by the sync and async
+ * readers. `backup` is the `.bak` read.
+ */
 function recover<T>(
   file: string,
   primary: Exclude<Attempt, { kind: 'ok' }>,
-  backup: Attempt | null,
+  backup: Attempt,
   fallback: T | (() => T),
-  quarantinedTo: string | undefined,
 ): JsonReadResult<T> {
-  if (primary.kind === 'missing') {
-    return { value: resolveFallback(fallback), source: 'missing' };
+  if (primary.kind === 'io') {
+    // The primary is there but locked. Never move it: it is most likely fine.
+    logger('warn', 'json-read-io-error', `${file}: ${primary.error}`);
+    if (backup.kind === 'ok') return { value: backup.value as T, source: 'backup', error: primary.error };
+    return { value: resolveFallback(fallback), source: 'fallback', error: primary.error };
   }
-  if (backup?.kind === 'ok') {
-    logger('warn', 'json-restored-from-last-good', `${file} (damaged copy: ${quarantinedTo ?? 'not moved'})`);
-    try {
-      // Put the last-good copy back so every other reader sees it too.
-      const tmp = tempPathFor(file);
-      fs.copyFileSync(`${file}${LAST_GOOD_SUFFIX}`, tmp);
-      renameWithRetrySync(tmp, file);
-    } catch (err) {
-      logger('warn', 'last-good-reinstate-failed', `${file}: ${errText(err)}`);
-    }
+  if (primary.kind === 'missing') {
+    if (backup.kind !== 'ok') return { value: resolveFallback(fallback), source: 'missing' };
+    // No primary but a good `.bak`: a copy-back or a swap that failed half-way.
+    logger('warn', 'json-restored-missing-primary', file);
+    reinstateLastGood(file);
+    return { value: backup.value as T, source: 'backup', error: 'primary missing' };
+  }
+  if (backup.kind === 'ok') {
+    // Copy the damaged bytes aside, then replace them in one rename: a failed
+    // copy-back leaves the damaged primary (read again next time), never a hole.
+    const quarantinedTo = quarantineCopy(file) ?? undefined;
+    logger('warn', 'json-restored-from-last-good', `${file} (damaged copy: ${quarantinedTo ?? 'not kept'})`);
+    reinstateLastGood(file);
     return { value: backup.value as T, source: 'backup', quarantinedTo, error: primary.error };
   }
+  // Nothing to reinstate: move the damaged file aside so it is kept for manual
+  // recovery and the next write cannot be mistaken for it.
+  const quarantinedTo = quarantineFile(file) ?? undefined;
   logger('error', 'json-unrecoverable', `${file}: ${primary.error} (damaged copy: ${quarantinedTo ?? 'not moved'})`);
   return { value: resolveFallback(fallback), source: 'fallback', quarantinedTo, error: primary.error };
 }
@@ -422,9 +540,8 @@ export function readJsonDetailedSync<T>(
 ): JsonReadResult<T> {
   const primary = readAttemptSync(file, options.validate);
   if (primary.kind === 'ok') return { value: primary.value as T, source: 'primary' };
-  const quarantinedTo = primary.kind === 'bad' ? quarantineFile(file) ?? undefined : undefined;
-  const backup = primary.kind === 'bad' ? readAttemptSync(`${file}${LAST_GOOD_SUFFIX}`, options.validate) : null;
-  return recover(file, primary, backup, fallback, quarantinedTo);
+  const backup = readAttemptSync(`${file}${LAST_GOOD_SUFFIX}`, options.validate);
+  return recover(file, primary, backup, fallback);
 }
 
 export function readJsonSync<T>(file: string, fallback: T | (() => T), options: JsonReadOptions = {}): T {
@@ -438,9 +555,8 @@ export async function readJsonDetailed<T>(
 ): Promise<JsonReadResult<T>> {
   const primary = await readAttempt(file, options.validate);
   if (primary.kind === 'ok') return { value: primary.value as T, source: 'primary' };
-  const quarantinedTo = primary.kind === 'bad' ? quarantineFile(file) ?? undefined : undefined;
-  const backup = primary.kind === 'bad' ? await readAttempt(`${file}${LAST_GOOD_SUFFIX}`, options.validate) : null;
-  return recover(file, primary, backup, fallback, quarantinedTo);
+  const backup = await readAttempt(`${file}${LAST_GOOD_SUFFIX}`, options.validate);
+  return recover(file, primary, backup, fallback);
 }
 
 export async function readJson<T>(file: string, fallback: T | (() => T), options: JsonReadOptions = {}): Promise<T> {

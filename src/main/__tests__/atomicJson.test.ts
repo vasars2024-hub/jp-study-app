@@ -10,6 +10,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetAtomicJsonForTests,
+  drainAtomicWrites,
   freezeAtomicWrites,
   readJsonDetailedSync,
   readJsonDetailed,
@@ -117,10 +118,77 @@ describe('reads', () => {
     expect(fs.readFileSync(path.join(dir, aside[0]), 'utf8')).toBe('not json');
   });
 
-  it('a missing primary is a first run, not damage: .bak is not resurrected', () => {
-    fs.writeFileSync(`${file}.bak`, '["deleted on purpose"]');
+  it('a missing primary with no .bak is a first run', () => {
     const result = readJsonDetailedSync(file, []);
     expect(result).toEqual({ value: [], source: 'missing' });
+  });
+
+  it('a missing primary next to a good .bak is damage: the .bak is served and reinstated', () => {
+    fs.writeFileSync(`${file}.bak`, '["last good"]');
+    const result = readJsonDetailedSync(file, []);
+    expect(result.source).toBe('backup');
+    expect(result.value).toEqual(['last good']);
+    expect(readJsonDetailedSync(file, []).source).toBe('primary');
+  });
+
+  it('a failed copy-back leaves the damaged primary in place, and a later write never overwrites the good .bak', () => {
+    writeJsonAtomicSync(file, ['good']);
+    writeJsonAtomicSync(file, ['good', 'newer']);
+    fs.writeFileSync(file, '{"trunc');
+    const real = fs.renameSync;
+    const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(to) === file) throw Object.assign(new Error('EXDEV: cross-device link'), { code: 'EXDEV' });
+      return real(from, to);
+    });
+    const first = readJsonDetailedSync<string[]>(file, []);
+    expect(first.source).toBe('backup');
+    expect(first.value).toEqual(['good']);
+    // Before: the primary had been renamed away, so this read returned the
+    // fallback and the next two writes overwrote the only good copy.
+    expect(fs.existsSync(file)).toBe(true);
+    spy.mockRestore();
+    const second = readJsonDetailedSync<string[]>(file, []);
+    expect(second.source).toBe('backup');
+    expect(second.value).toEqual(['good']);
+    expect(fs.readFileSync(`${file}.bak`, 'utf8')).toContain('good');
+  });
+
+  it('a write that finds only a .bak keeps a copy of it before the next write can replace it', () => {
+    fs.writeFileSync(`${file}.bak`, '["only good copy"]');
+    writeJsonAtomicSync(file, ['fresh 1']);
+    writeJsonAtomicSync(file, ['fresh 2']);
+    const kept = listDir().filter((n) => n.startsWith('library.json.bak.corrupt-'));
+    expect(kept).toHaveLength(1);
+    expect(fs.readFileSync(path.join(dir, kept[0]), 'utf8')).toBe('["only good copy"]');
+  });
+
+  it('retries a read a scanner briefly locks, and never quarantines the healthy file', () => {
+    writeJsonAtomicSync(file, { v: 1 });
+    const real = fs.readFileSync;
+    let locked = 2;
+    vi.spyOn(fs, 'readFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, o?: unknown) => {
+      if (String(p) === file && locked-- > 0) throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+      return real(p, o as BufferEncoding);
+    }) as typeof fs.readFileSync);
+    expect(readJsonDetailedSync(file, null)).toEqual({ value: { v: 1 }, source: 'primary' });
+    expect(listDir().filter((n) => n.includes('.corrupt-'))).toEqual([]);
+  });
+
+  it('a lock that persists is answered from .bak and the primary stays where it is', async () => {
+    writeJsonAtomicSync(file, { v: 1 });
+    writeJsonAtomicSync(file, { v: 2 });
+    const realAsync = fs.promises.readFile;
+    vi.spyOn(fs.promises, 'readFile').mockImplementation((async (p: fs.PathLike, o?: unknown) => {
+      if (String(p) === file) throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+      return realAsync(p, o as BufferEncoding);
+    }) as typeof fs.promises.readFile);
+    const result = await readJsonDetailed(file, null);
+    expect(result.source).toBe('backup');
+    expect(result.value).toEqual({ v: 1 });
+    expect(result.quarantinedTo).toBeUndefined();
+    vi.restoreAllMocks();
+    expect(readJsonSync(file, null)).toEqual({ v: 2 });
+    expect(listDir().filter((n) => n.includes('.corrupt-'))).toEqual([]);
   });
 
   it('treats a value that fails validate like a parse failure', async () => {
@@ -156,6 +224,23 @@ describe('freeze (restore)', () => {
     expect(readJsonSync(file, null)).toEqual({ v: 1 });
     thawAtomicWrites({ replay: true });
     expect(readJsonSync(file, null)).toEqual({ v: 3 });
+  });
+
+  it('holds an async write a freeze overtook while it was on its way to disk', async () => {
+    writeJsonAtomicSync(file, { v: 1 });
+    const realMkdir = fs.promises.mkdir;
+    vi.spyOn(fs.promises, 'mkdir').mockImplementation((async (...args: Parameters<typeof fs.promises.mkdir>) => {
+      const out = await realMkdir(...args);
+      freezeAtomicWrites(); // the restore starts while this write is in flight
+      return out;
+    }) as typeof fs.promises.mkdir);
+    const write = writeJsonAtomic(file, { v: 'stale in-memory copy' });
+    expect(await drainAtomicWrites()).toBe(true);
+    await write;
+    expect(readJsonSync(file, null)).toEqual({ v: 1 });
+    thawAtomicWrites({ replay: false });
+    expect(readJsonSync(file, null)).toEqual({ v: 1 });
+    expect(listDir().filter((n) => n.endsWith('.tmp'))).toEqual([]);
   });
 
   it('drops held writes when the restore committed', async () => {

@@ -18,7 +18,7 @@ import {
   writeSecret,
   type VaultWriteResult,
 } from './vault';
-import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
+import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from '../atomicJson';
 
 export type AiCredentialId = 'gemini' | 'deepseek';
 
@@ -82,7 +82,7 @@ function removeLegacyValue(id: AiCredentialId): void {
   delete file[id];
   if (!file.gemini && !file.deepseek) {
     try {
-      fs.rmSync(legacyStorePath(), { force: true });
+      removeJsonStore(legacyStorePath());
     } catch {
       /* absent or not removable */
     }
