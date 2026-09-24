@@ -83,7 +83,7 @@ function load(): AnkiDraftSession[] {
     validate: (v) => !!v && typeof v === 'object' && Array.isArray((v as SessionFile).sessions),
   });
   const now = Date.now();
-  const raw = Array.isArray(parsed?.sessions) ? parsed.sessions : [];
+  const raw = parsed && Array.isArray(parsed.sessions) ? parsed.sessions : [];
   cache = raw
     .filter(isUsable)
     // The whole point of the file. See the module header.

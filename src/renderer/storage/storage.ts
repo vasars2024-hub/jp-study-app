@@ -9,11 +9,13 @@
  *   Host (main process):               mining config, AI config, desktop layout,
  *                                      study profiles.
  *
- * Memory & storage inventories domains via settingsCatalog and export/import
- * includes all three tiers (format 2).
+ * Memory & storage inventories domains via settingsCatalog. Backups are the
+ * archive in `backupClient.ts` / `main/backup` (everything, including the
+ * library); `exportAllData`/`importAllData` remain for the OLD single-JSON
+ * format, which covers the renderer tiers and four host settings only.
  */
 
-import { kvClear, kvDelete, kvEntries, kvGet, kvSet } from './db';
+import { kvDelete, kvEntries, kvGet, kvSet } from './db';
 import {
   collectLocalStorageSnapshot,
   domainById,
@@ -250,7 +252,7 @@ export interface StorageBackup {
   domains?: Array<{ id: string; label: string; bytes: number; detail: string }>;
 }
 
-/** Full backup of localStorage, IndexedDB, and host settings. */
+/** The old single-JSON export: localStorage, IndexedDB and four host settings — NOT the library or main-process stores. */
 export async function exportAllData(): Promise<StorageBackup> {
   // Ensure reading highlights / bookmarks are mirrored into IDB before snapshot.
   try {
@@ -278,142 +280,119 @@ export async function exportAllData(): Promise<StorageBackup> {
   };
 }
 
-async function restoreHost(host: Partial<Record<HostBlobKey, unknown>> | undefined): Promise<void> {
-  if (!host) return;
+/**
+ * Re-apply the four host settings the old single-JSON export carried, each
+ * through its own validated IPC. Returns what could not be applied — the old
+ * version swallowed every failure and the UI reported success.
+ */
+export async function restoreLegacyHost(
+  host: Partial<Record<HostBlobKey, unknown>> | Record<string, unknown> | undefined,
+): Promise<Array<{ what: string; error: string }>> {
+  const failures: Array<{ what: string; error: string }> = [];
+  if (!host) return failures;
   const api = window.api;
-  if (!api) return;
-
-  if (host.mining && typeof host.mining === 'object') {
+  if (!api) return [{ what: 'host', error: 'unavailable' }];
+  const attempt = async (what: string, fn: () => Promise<unknown>): Promise<void> => {
     try {
-      await api.miningSetConfig(host.mining as Parameters<typeof api.miningSetConfig>[0]);
-    } catch {
-      /* ignore */
+      await fn();
+    } catch (err) {
+      failures.push({ what, error: err instanceof Error ? err.message : String(err) });
     }
+  };
+  const h = host as Partial<Record<HostBlobKey, unknown>>;
+
+  if (h.mining && typeof h.mining === 'object') {
+    await attempt('mining', () => api.miningSetConfig(h.mining as Parameters<typeof api.miningSetConfig>[0]));
   }
 
-  if (host.ai && typeof host.ai === 'object') {
-    const ai = host.ai as {
+  if (h.ai && typeof h.ai === 'object') {
+    const ai = h.ai as {
       providerId?: string;
       selectedPresetId?: string;
       selectedFormatId?: string;
       outputFormat?: 'anki' | 'csv';
       cardCount?: number;
     };
-    try {
-      if (ai.providerId) await api.aiSetProvider(ai.providerId as Parameters<typeof api.aiSetProvider>[0]);
-    } catch {
-      /* ignore */
+    if (ai.providerId) {
+      await attempt('ai.provider', () => api.aiSetProvider(ai.providerId as Parameters<typeof api.aiSetProvider>[0]));
     }
-    try {
-      if (ai.selectedPresetId) await api.aiSelectPreset(ai.selectedPresetId);
-    } catch {
-      /* ignore */
-    }
-    try {
-      if (typeof ai.selectedFormatId === 'string' && ai.selectedFormatId) {
-        await api.aiSetFormat({
-          formatId: ai.selectedFormatId,
+    if (ai.selectedPresetId) await attempt('ai.preset', () => api.aiSelectPreset(ai.selectedPresetId as string));
+    if (typeof ai.selectedFormatId === 'string' && ai.selectedFormatId) {
+      await attempt('ai.format', () =>
+        api.aiSetFormat({
+          formatId: ai.selectedFormatId as string,
           outputFormat: ai.outputFormat,
           cardCount: ai.cardCount,
-        });
-      }
-    } catch {
-      /* ignore */
+        }),
+      );
     }
   }
 
-  if (host.desktopLayout && typeof host.desktopLayout === 'object') {
-    const snap = host.desktopLayout as {
+  if (h.desktopLayout && typeof h.desktopLayout === 'object') {
+    const snap = h.desktopLayout as {
       viewports?: Array<{ desktopIndex: number; [k: string]: unknown }>;
       activeDesktopIndex?: number;
     };
     if (Array.isArray(snap.viewports)) {
       for (const vp of snap.viewports) {
-        try {
-          await api.desktopCommitLayout(
+        await attempt(`desktopLayout.${vp.desktopIndex}`, () =>
+          api.desktopCommitLayout(
             vp.desktopIndex as Parameters<typeof api.desktopCommitLayout>[0],
-            vp as Parameters<typeof api.desktopCommitLayout>[1],
-          );
-        } catch {
-          /* ignore */
-        }
+            vp as unknown as Parameters<typeof api.desktopCommitLayout>[1],
+          ),
+        );
       }
     }
     if (typeof snap.activeDesktopIndex === 'number') {
-      try {
-        await api.desktopSwitch(
-          snap.activeDesktopIndex as Parameters<typeof api.desktopSwitch>[0],
-        );
-      } catch {
-        /* ignore */
-      }
+      await attempt('desktopLayout.active', () =>
+        api.desktopSwitch(snap.activeDesktopIndex as Parameters<typeof api.desktopSwitch>[0]),
+      );
     }
   }
 
-  if (Array.isArray(host.profiles)) {
-    for (const p of host.profiles) {
+  if (Array.isArray(h.profiles)) {
+    for (const p of h.profiles) {
       if (!p || typeof p !== 'object') continue;
       const prof = p as { id?: string; name?: string; [k: string]: unknown };
       if (typeof prof.id !== 'string') continue;
       try {
         await api.profileUpdate(prof.id as Parameters<typeof api.profileUpdate>[0], prof);
       } catch {
-        // Profile may not exist — try create then update
-        try {
-          if (typeof prof.name === 'string') {
-            await api.profileCreate(prof.name);
-            await api.profileUpdate(prof.id as Parameters<typeof api.profileUpdate>[0], prof);
-          }
-        } catch {
-          /* ignore */
-        }
+        // Profile may not exist — create then update.
+        await attempt(`profile.${prof.name ?? prof.id}`, async () => {
+          if (typeof prof.name !== 'string') throw new Error('profile has no name');
+          await api.profileCreate(prof.name);
+          await api.profileUpdate(prof.id as Parameters<typeof api.profileUpdate>[0], prof);
+        });
       }
     }
   }
+  return failures;
 }
 
-/** Restore a backup (format 1 or 2). Returns an error string on bad input. */
+/**
+ * Restore an OLD single-JSON backup (format 1 or 2). Returns an error string
+ * on bad input or when anything failed — never "success" after a failed write.
+ * localStorage and IndexedDB are replaced all-or-nothing (backupSnapshot.ts);
+ * the new archive format goes through `backupClient.ts` instead.
+ */
 export async function importAllData(raw: string): Promise<string | null> {
-  let parsed: StorageBackup;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as StorageBackup;
+    parsed = JSON.parse(raw);
   } catch {
     return 'Not a valid JSON file.';
   }
-  if (parsed?.app !== 'jp-study-app' || !parsed.localStorage || !parsed.indexedDb) {
+  const { applyRendererSnapshot, isLegacyBackup, legacyToSnapshot } = await import('./backupSnapshot');
+  if (!isLegacyBackup(parsed)) {
     return 'This file is not a jp-study-app backup.';
   }
-
-  // Clear then restore so deleted keys don't linger
   try {
-    localStorage.clear();
-  } catch {
-    /* ignore */
+    await applyRendererSnapshot(legacyToSnapshot(parsed));
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
   }
-  try {
-    await kvClear();
-  } catch {
-    /* ignore */
-  }
-
-  for (const [key, value] of Object.entries(parsed.localStorage)) {
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      /* quota */
-    }
-  }
-  for (const [key, value] of Object.entries(parsed.indexedDb)) {
-    try {
-      await kvSet(key, value);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  if (parsed.format >= 2 && parsed.host) {
-    await restoreHost(parsed.host);
-  }
+  const failures = await restoreLegacyHost(parsed.format && parsed.format >= 2 ? parsed.host : undefined);
 
   // Rehydrate per-book highlights/bookmarks from durable IDB maps if LS missed any.
   try {
@@ -425,7 +404,7 @@ export async function importAllData(raw: string): Promise<string | null> {
     /* ignore */
   }
 
-  return null;
+  return failures.length ? failures.map((f) => `${f.what}: ${f.error}`).join('; ') : null;
 }
 
 function dispatchMany(events: string[]): void {

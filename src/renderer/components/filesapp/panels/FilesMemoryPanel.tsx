@@ -39,15 +39,12 @@
  * the barrel re-exports `AppChrome`, and the Files app must not pull the Study
  * OS chrome into its bundle. Same reason `StatsContent` does it.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Icon from '../../Icons';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmDialog } from '../../ui/dialogService';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import {
   clearSettingsDomain,
-  exportAllData,
-  importAllData,
   listSettingsDomains,
   type DomainInventoryItem,
 } from '../../../storage/storage';
@@ -81,6 +78,7 @@ import {
 import { AGENT_OPERATION_HISTORY_RETENTION_MS } from '../../../../shared/agentOperationHistory';
 import { AGENT_TOOL_OPERATIONS } from '../../../../shared/localAgent';
 import { FilesPanelCard } from './FilesPanelCard';
+import { BackupControls } from './BackupControls';
 
 interface SystemMetrics {
   freemem: number;
@@ -176,7 +174,6 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
   const [agentMemoryKey, setAgentMemoryKey] = useState('');
   const [agentMemoryValue, setAgentMemoryValue] = useState('');
   const [agentHistory, setAgentHistory] = useState(() => getAgentOperationHistorySnapshot());
-  const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const listener = () => setAgentHistory(getAgentOperationHistorySnapshot());
@@ -252,47 +249,6 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
       setBusy(false);
     }
   };
-
-  async function handleExport(): Promise<void> {
-    setBusy(true);
-    setStatus('');
-    try {
-      const backup = await exportAllData();
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `jp-study-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      const n = backup.domains?.length ?? 0;
-      setStatus(
-        t('settings.memory.backupDownloaded', { format: String(backup.format), count: n }),
-      );
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleImportFile(file: File): Promise<void> {
-    setBusy(true);
-    setStatus('');
-    try {
-      const error = await importAllData(await file.text());
-      if (error) {
-        setStatus(error);
-        return;
-      }
-      setStatus(t('settings.memory.backupRestored'));
-      setTimeout(() => window.location.reload(), 500);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleClearDomain(d: DomainInventoryItem): Promise<void> {
     if (!d.clearable) return;
@@ -863,32 +819,7 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
         description={t('search.backup.desc')}
         focused={focusCardId === 'backup'}
       >
-        <p className="fa-panel-note">{t('settings.memory.backupHint')}</p>
-        <div className="fa-panel-actions">
-          <button type="button" className="btn" disabled={busy} onClick={() => void handleExport()}>
-            <Icon name="download" size={14} style={{ marginRight: 5, verticalAlign: '-2px' }} />
-            {t('settings.memory.exportAll')}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={busy}
-            onClick={() => importRef.current?.click()}
-          >
-            {t('settings.memory.importBackup')}
-          </button>
-          <input
-            ref={importRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handleImportFile(f);
-              e.target.value = '';
-            }}
-          />
-        </div>
+        <BackupControls />
       </FilesPanelCard>
 
       <FilesPanelCard
