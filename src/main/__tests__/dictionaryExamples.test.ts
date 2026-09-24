@@ -39,15 +39,22 @@ function importCorpus(): void {
   importTatoeba(db, sentences, links, { title: 'Tatoeba' });
 }
 
+// Flaky under load: each hook creates a fresh SQLite file in %TEMP% (WAL,
+// -shm, 12 migrations), which a busy machine plus the virus scanner can push
+// past vitest's default 10 s HOOK timeout (tests get 20 s). The hooks get their
+// own budget, close only a connection that opened, and remove the folder with
+// retries — a scanner holding the just-closed dict.db gives EBUSY/EPERM.
+const HOOK_TIMEOUT_MS = 60_000;
+
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-examples-'));
   db = openDictionaryDb({ dir: path.join(root, 'dictionary') });
-});
+}, HOOK_TIMEOUT_MS);
 
 afterEach(() => {
-  db.close();
-  fs.rmSync(root, { recursive: true, force: true });
-});
+  if (db?.open) db.close();
+  fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}, HOOK_TIMEOUT_MS);
 
 describe('example sentence reader', () => {
   it('returns sentences containing the word, shortest first, with their translations', async () => {

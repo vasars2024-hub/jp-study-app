@@ -14,8 +14,14 @@
  * NOTHING, and a test that only ever checks the happy path cannot tell the
  * difference between "silent" and "broken".
  */
-import { describe, it, expect, afterEach } from 'vitest';
-import { loadPopupSandbox, type PopupHarness, type JpMessage } from './extensionHarness';
+import { describe, it, expect, afterEach, beforeAll } from 'vitest';
+import { loadPopupSandbox, warmPopupDom, type PopupHarness, type JpMessage } from './extensionHarness';
+
+// jsdom's cold load (~21 s on Windows) used to be charged to the first test's
+// 20 s budget, so that test timed out even alone. Paid here instead.
+beforeAll(() => {
+  warmPopupDom();
+}, 120_000);
 
 const VIDEO_URL = 'https://www.youtube.com/watch?v=GSx0rW2aHs8';
 

@@ -624,6 +624,22 @@ export interface PopupHarness {
   dispose(): void;
 }
 
+/**
+ * Pay jsdom's one-time cost up front, in a hook with its own budget.
+ *
+ * The first `require('jsdom')` in a fresh worker measured 21 s on this machine
+ * (647 of jsdom's own files plus undici/css-tree/parse5, read through the
+ * worktree's node_modules junction and scanned by Defender), and the first
+ * `new JSDOM(...)` another ~1 s. Charged to whichever test ran first, that
+ * alone blew its 20 s timeout — `extensionPopup.test.ts:70` failed even when
+ * run on its own. Call this from `beforeAll(..., generousTimeout)`.
+ */
+export function warmPopupDom(): void {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { JSDOM } = require('jsdom') as typeof import('jsdom');
+  new JSDOM('<!doctype html><p></p>').window.close();
+}
+
 export function loadPopupSandbox(options: PopupOptions = {}): PopupHarness {
   // Required lazily: jsdom is heavy and every other consumer of this module
   // runs in a plain node context that must not pay for it.
