@@ -46,6 +46,8 @@ import { installedPaddleLangs, paddleOcrAvailable, type PaddleLang } from './pad
 import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { decideExtensionSettingsAccess, isWellFormedExtensionOrigin } from '../shared/extensionPairing';
 import {
   detectMineLanguage,
   resolveProfileMatch,
@@ -344,6 +346,8 @@ function requestWhisperTranscribe(pcm: ArrayBuffer): Promise<{ ok: boolean; text
 export interface ExtensionBridgeState {
   token: string;
   port: number;
+  /** The extension origin allowed to pull the token without one (shared/extensionPairing.ts). */
+  pairedOrigin?: string | null;
 }
 
 export interface ExtensionBridgeStatus {
@@ -411,6 +415,7 @@ interface ExtensionBridgeStateFile {
   token?: string;
   port?: number;
   _encrypted?: boolean;
+  pairedOrigin?: string | null;
 }
 
 function encryptToken(token: string): string {
@@ -430,13 +435,17 @@ function decryptToken(stored: string, encrypted: boolean): string {
 
 function loadOrCreateState(): ExtensionBridgeState {
   try {
-    const raw = fs.readFileSync(statePath(), 'utf8');
-    const parsed = JSON.parse(raw) as ExtensionBridgeStateFile;
+    // A damaged file is moved aside and the last-good copy used, so a torn
+    // write no longer re-pairs the extension with a fresh token.
+    const parsed = readJsonSync<ExtensionBridgeStateFile>(statePath(), {} as ExtensionBridgeStateFile, {
+      validate: (v) => Boolean(v) && typeof v === 'object',
+    });
     const token = decryptToken(typeof parsed.token === 'string' ? parsed.token : '', parsed._encrypted === true);
     if (token.length >= 16) {
       bridgeState = {
         token,
         port: typeof parsed.port === 'number' ? parsed.port : EXTENSION_PORT,
+        pairedOrigin: isWellFormedExtensionOrigin(parsed.pairedOrigin ?? undefined) ? parsed.pairedOrigin : null,
       };
       // Migrate a legacy plaintext state file to encrypted-at-rest immediately.
       if (parsed._encrypted !== true) saveState(bridgeState);
@@ -460,8 +469,9 @@ function saveState(state: ExtensionBridgeState): void {
       token: encryptToken(state.token),
       port: state.port,
       _encrypted: safeStorage.isEncryptionAvailable(),
+      pairedOrigin: state.pairedOrigin ?? null,
     };
-    fs.writeFileSync(statePath(), JSON.stringify(payload, null, 2), 'utf8');
+    writeJsonAtomicSync(statePath(), payload, { mode: 0o600 });
   } catch (err) {
     console.error('[extensionServer] failed to persist bridge state', err);
   }
@@ -483,8 +493,18 @@ export function getExtensionBridgeStatus(): ExtensionBridgeStatus {
 export function regenerateExtensionToken(): ExtensionBridgeStatus {
   const state = bridgeState ?? loadOrCreateState();
   state.token = crypto.randomBytes(24).toString('hex');
+  // A new token is a new pairing: the old extension origin loses token-less pull.
+  state.pairedOrigin = null;
   saveState(state);
   return getExtensionBridgeStatus();
+}
+
+function pinExtensionOrigin(origin: string | null): void {
+  if (!origin) return;
+  const state = bridgeState ?? loadOrCreateState();
+  if (state.pairedOrigin === origin) return;
+  state.pairedOrigin = origin;
+  saveState(state);
 }
 
 function setCors(res: http.ServerResponse, origin: string | undefined): void {
@@ -618,6 +638,9 @@ function requireAuth(req: http.IncomingMessage, res: http.ServerResponse): boole
     json(res, 401, { ok: false, error: 'Unauthorized' });
     return false;
   }
+  // Authenticated traffic from an extension pins it as the paired extension.
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+  if (isWellFormedExtensionOrigin(origin) && origin !== state.pairedOrigin) pinExtensionOrigin(origin);
   return true;
 }
 
@@ -1030,13 +1053,23 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
   if (req.method === 'GET' && pathname === '/v1/extension-settings') {
-    // Loopback-only: require chrome-extension Origin (or missing Origin for same-machine tools).
-    // Reject browser tabs / other Origins so the pairing token is not leaked cross-origin.
+    // The token used to go to any caller with no Origin (a DNS-rebinding page
+    // looks exactly like that) and to any extension. See shared/extensionPairing.ts.
     const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
-    if (origin && !isAllowedExtensionOrigin(origin)) {
-      json(res, 403, { ok: false, error: 'Forbidden origin' });
+    const state = bridgeState ?? loadOrCreateState();
+    const auth = req.headers.authorization;
+    const decision = decideExtensionSettingsAccess({
+      origin,
+      host: typeof req.headers.host === 'string' ? req.headers.host : undefined,
+      port: effectivePort(state),
+      authorized: checkBearerToken(typeof auth === 'string' ? auth : undefined, state.token),
+      pinnedOrigin: state.pairedOrigin ?? null,
+    });
+    if (!decision.allow) {
+      json(res, decision.status, { ok: false, error: decision.status === 401 ? 'Unauthorized' : 'Forbidden origin' });
       return;
     }
+    pinExtensionOrigin(decision.pin);
     const status = getExtensionBridgeStatus();
     json(res, 200, {
       ok: true,

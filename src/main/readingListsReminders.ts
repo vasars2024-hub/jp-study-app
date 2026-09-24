@@ -19,9 +19,9 @@
  * against a fake clock there rather than against a real interval here.
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { BrowserWindow, ipcMain } from 'electron';
+import { readJsonSync, writeFileAtomicSync } from './atomicJson';
 import {
   createReadingReminderState,
   defaultReadingReminderSettings,
@@ -92,18 +92,7 @@ function broadcastToWindows(reminder: ReadingReminder): void {
 }
 
 function atomicWrite(filePath: string, text: string): void {
-  const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  try {
-    fs.writeFileSync(temporary, text, { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(temporary, filePath);
-  } finally {
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      // Committed, or already gone.
-    }
-  }
+  writeFileAtomicSync(filePath, text, { mode: 0o600 });
 }
 
 export function createReadingRemindersScheduler(
@@ -127,12 +116,11 @@ export function createReadingRemindersScheduler(
    * data, not by a boot-time flag.
    */
   const load = (): PersistedFile => {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch {
-      parsed = null;
-    }
+    // A damaged file is moved aside (and `.bak` served) by the reader, so the
+    // reseed below only happens when there is nothing left to recover.
+    const parsed = readJsonSync<unknown>(filePath, null, {
+      validate: (v) => typeof v === 'object' && v !== null && !Array.isArray(v),
+    });
     const at = now();
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       const fresh: PersistedFile = {

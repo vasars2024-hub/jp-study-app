@@ -4,8 +4,8 @@
 // registerXIpc() structure; the HTTP surface in extensionServer.ts calls
 // analyzeSentence() directly so both entry points share the cache.
 import { app, BrowserWindow, ipcMain } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import type { AiProviderId } from '../shared/mining';
 import {
@@ -61,11 +61,9 @@ function prefsPath(): string {
 
 export function readAnalysisPrefs(): SentenceAnalysisPrefs {
   if (prefsCache) return prefsCache;
-  try {
-    prefsCache = normalizeAnalysisPrefs(JSON.parse(fs.readFileSync(prefsPath(), 'utf-8')));
-  } catch {
-    prefsCache = normalizeAnalysisPrefs({});
-  }
+  prefsCache = normalizeAnalysisPrefs(
+    readJsonSync<unknown>(prefsPath(), {}, { validate: (v) => !!v && typeof v === 'object' }),
+  );
   return prefsCache;
 }
 
@@ -73,10 +71,7 @@ export function writeAnalysisPrefs(raw: unknown): SentenceAnalysisPrefs {
   const next = normalizeAnalysisPrefs(raw);
   prefsCache = next;
   try {
-    fs.mkdirSync(path.dirname(prefsPath()), { recursive: true });
-    const tmp = `${prefsPath()}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
-    fs.renameSync(tmp, prefsPath());
+    writeJsonAtomicSync(prefsPath(), next);
   } catch {
     /* the in-memory copy still applies for this session */
   }
@@ -105,22 +100,16 @@ function cachePath(): string {
 
 function loadCache(): AnalysisCacheFile {
   if (cache) return cache;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(cachePath(), 'utf-8')) as AnalysisCacheFile;
-    cache = parsed?.entries ? parsed : { entries: {} };
-  } catch {
-    cache = { entries: {} };
-  }
+  cache = readJsonSync<AnalysisCacheFile>(cachePath(), () => ({ entries: {} }), {
+    validate: (v) => !!v && typeof v === 'object' && !!(v as AnalysisCacheFile).entries,
+  });
   return cache;
 }
 
 function flushCache(): void {
   if (!cache || !cacheDirty) return;
   try {
-    fs.mkdirSync(path.dirname(cachePath()), { recursive: true });
-    const tmp = `${cachePath()}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(cache), 'utf-8');
-    fs.renameSync(tmp, cachePath());
+    writeJsonAtomicSync(cachePath(), cache, { space: 0, backup: false });
     cacheDirty = false;
   } catch {
     /* best-effort cache; ignore write failures */

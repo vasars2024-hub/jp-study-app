@@ -1,5 +1,6 @@
 import { app, ipcMain, dialog, protocol, BrowserWindow } from 'electron';
 import { readWatchLibrary } from './watchLibrary';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -119,15 +120,12 @@ function dbPath(): string {
   return path.join(app.getPath('userData'), MEDIA_LIBRARY_STORE_FILE);
 }
 function readDb(): MediaDb {
-  try {
-    const db = JSON.parse(fs.readFileSync(dbPath(), 'utf-8')) as MediaDb;
-    return { items: mediaItemsFromStoredDocument(db), watchFolder: db.watchFolder, relationships: Array.isArray(db.relationships) ? db.relationships : [] };
-  } catch {
-    return { items: [], relationships: [] };
-  }
+  const db = readJsonSync<MediaDb | null>(dbPath(), null, { validate: (v) => v !== null && typeof v === 'object' });
+  if (!db) return { items: [], relationships: [] };
+  return { items: mediaItemsFromStoredDocument(db), watchFolder: db.watchFolder, relationships: Array.isArray(db.relationships) ? db.relationships : [] };
 }
 function writeDb(db: MediaDb): void {
-  fs.writeFileSync(dbPath(), JSON.stringify(db, null, 2), 'utf-8');
+  writeJsonAtomicSync(dbPath(), db);
 }
 
 // Turn "AnimePahe_Re_Zero_kara_Hajimeru_Isekai_Seikatsu__74_1080p.mp4" into a

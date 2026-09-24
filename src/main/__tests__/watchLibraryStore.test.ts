@@ -392,7 +392,7 @@ describe('the document on disk', () => {
   it('quarantines a corrupt file instead of overwriting the evidence', () => {
     fs.writeFileSync(watchFile, '{ not json', 'utf-8');
     expect(readWatchLibrary().titles).toEqual([]);
-    const moved = fs.readdirSync(dir).filter((name) => name.startsWith('watch-library.corrupt-'));
+    const moved = fs.readdirSync(dir).filter((name) => name.startsWith('watch-library.json.corrupt-'));
     expect(moved).toHaveLength(1);
     expect(fs.readFileSync(path.join(dir, moved[0]), 'utf-8')).toBe('{ not json');
   });

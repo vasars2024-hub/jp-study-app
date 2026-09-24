@@ -12,6 +12,7 @@
 import { app, ipcMain } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { spawn, execFileSync } from 'node:child_process';
 import { parseHotkeyChord } from '../shared/osHotkeyChord';
 import { LEGACY_WIN_SECTION_ALIASES } from '../shared/desktop';
@@ -424,7 +425,7 @@ try {
 function writeHelperFiles(config: OsHotkeyConfigV2): void {
   fs.mkdirSync(helperDir(), { recursive: true });
   fs.writeFileSync(scriptPath(), HELPER_PS1, 'utf8');
-  fs.writeFileSync(configPath(), JSON.stringify(config, null, 2), 'utf8');
+  writeJsonAtomicSync(configPath(), config);
 }
 
 function writeStartupCmd(): void {
@@ -530,8 +531,7 @@ function startHelperProcess(): { ok: boolean; error?: string } {
 
 function readStoredConfig(): OsHotkeyConfigV2 | null {
   try {
-    const raw = JSON.parse(fs.readFileSync(configPath(), 'utf8')) as unknown;
-    return migrateConfig(raw);
+    return migrateConfig(readJsonSync<unknown>(configPath(), null));
   } catch {
     return null;
   }

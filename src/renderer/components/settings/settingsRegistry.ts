@@ -1199,9 +1199,26 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     id: 'backup',
     titleKey: 'search.backup',
     descKey: 'search.backup.desc',
-    keywords: ['backup', 'export', 'import', 'restore', 'json'],
+    keywords: ['backup', 'back up now', 'export', 'import', 'restore', 'json', 'zip', 'library'],
     pageId: 'memory',
     movedTo: 'files',
+    group: 'System',
+  },
+  // Settings > Help: the diagnostic log and the update check (audit robust #5, #7).
+  {
+    id: 'diagnostics',
+    titleKey: 'help.diagnostics.title',
+    descKey: 'help.diagnostics.body',
+    keywords: ['diagnostics', 'errors', 'error log', 'crash', 'log folder', 'bug report'],
+    pageId: 'help',
+    group: 'System',
+  },
+  {
+    id: 'updates',
+    titleKey: 'help.update.title',
+    descKey: 'help.update.desc',
+    keywords: ['updates', 'update', 'check for updates', 'version', 'release'],
+    pageId: 'help',
     group: 'System',
   },
   {

@@ -15,6 +15,8 @@ import { extractEpubTitleFromOpf } from './epubMeta';
 import { observeReadingProgress } from './readingFinishWatcher';
 import { broadcastReadingLists } from './readingListsIpc';
 import { getReadingListsStore } from './readingListsStore';
+import { readJsonDetailedSync, readJsonSync, registerJsonFlusher, writeJsonAtomicSync } from './atomicJson';
+import { logDiagnostic } from './errorLog';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -119,24 +121,81 @@ function dbPath(): string {
 function configPath(): string {
   return path.join(app.getPath('userData'), 'config.json');
 }
+/**
+ * An item id is a single path segment the app generated (a UUID). Ids arrive
+ * from the renderer (`library:remove`) and from `media://` URLs, and
+ * `library:remove` deletes `itemDir(id)` recursively — so `..`, separators,
+ * drive letters or an empty id must never reach `path.join` (audit robust #4).
+ */
+export function isSafeLibraryItemId(id: unknown): id is string {
+  if (typeof id !== 'string') return false;
+  if (!id || id.length > 200 || id.includes('..')) return false;
+  // eslint-disable-next-line no-control-regex -- control characters are exactly what is being rejected
+  if (/[\\/:*?"<>|\u0000-\u001f]/.test(id)) return false;
+  const root = path.resolve(libraryRoot());
+  return path.dirname(path.resolve(root, id)) === root;
+}
+
 export function itemDir(id: string): string {
+  if (!isSafeLibraryItemId(id)) throw new Error(`Invalid library item id: ${JSON.stringify(String(id).slice(0, 80))}`);
   return path.join(libraryRoot(), id);
 }
 
 export function ensureLibrary(): void {
   fs.mkdirSync(libraryRoot(), { recursive: true });
-  if (!fs.existsSync(dbPath())) fs.writeFileSync(dbPath(), '[]', 'utf-8');
+  if (!fs.existsSync(dbPath()) && !fs.existsSync(`${dbPath()}.bak`)) writeJsonAtomicSync(dbPath(), []);
 }
 
 // ----- tiny JSON "database" ---------------------------------------------
 
-function readDb(): LibraryItem[] {
-  try {
-    return JSON.parse(fs.readFileSync(dbPath(), 'utf-8')) as LibraryItem[];
-  } catch {
-    return [];
+/**
+ * Page-turn progress not yet on disk. Readers used to rewrite the whole of
+ * library.json on every page turn (MangaReader, NovelReader); saves are now
+ * coalesced and land within PROGRESS_FLUSH_MS, on quit, or with the next
+ * structural write — whichever comes first. `readDb` overlays them so nothing
+ * in this process ever sees a stale position.
+ */
+const pendingProgress = new Map<string, { progress: Progress; lastReadAt: number }>();
+let progressTimer: ReturnType<typeof setTimeout> | null = null;
+const PROGRESS_FLUSH_MS = 1500;
+
+function overlayPendingProgress(items: LibraryItem[]): LibraryItem[] {
+  if (!pendingProgress.size) return items;
+  for (const it of items) {
+    const pending = pendingProgress.get(it.id);
+    if (pending) {
+      it.progress = pending.progress;
+      it.lastReadAt = pending.lastReadAt;
+    }
   }
+  return items;
 }
+
+function readDb(): LibraryItem[] {
+  // A damaged library.json is moved aside and its last-good copy served —
+  // never "parse failed → []" followed by the next import overwriting it.
+  const result = readJsonDetailedSync<LibraryItem[]>(dbPath(), [], { validate: Array.isArray });
+  if (result.source === 'backup' || result.source === 'fallback') {
+    logDiagnostic(
+      result.source === 'backup' ? 'warn' : 'error',
+      'library',
+      result.source === 'backup' ? 'library-restored-from-last-good' : 'library-unreadable',
+      `${result.error ?? ''} (damaged copy kept at ${result.quarantinedTo ?? 'original path'})`,
+    );
+  }
+  return overlayPendingProgress(result.value);
+}
+
+/** Write any coalesced progress now (timer, quit, or before a restore/backup). */
+export function flushLibraryProgress(): void {
+  if (progressTimer) {
+    clearTimeout(progressTimer);
+    progressTimer = null;
+  }
+  if (!pendingProgress.size) return;
+  writeDb(readDb());
+}
+registerJsonFlusher(flushLibraryProgress);
 /**
  * "An item entered the library", as one seam.
  *
@@ -168,7 +227,12 @@ function writeDb(items: LibraryItem[]): void {
   // userData path is only meaningful after Electron is ready.
   const known = knownItemIds ?? new Set(readDb().map((item) => item.id));
   const added = items.filter((item) => !known.has(item.id));
-  fs.writeFileSync(dbPath(), JSON.stringify(items, null, 2), 'utf-8');
+  writeJsonAtomicSync(dbPath(), overlayPendingProgress(items));
+  pendingProgress.clear();
+  if (progressTimer) {
+    clearTimeout(progressTimer);
+    progressTimer = null;
+  }
   knownItemIds = new Set(items.map((item) => item.id));
   if (!added.length) return;
   for (const listener of itemsAddedListeners) {
@@ -214,14 +278,12 @@ function noteReadingProgress(
 }
 
 function readConfig(): Config {
-  try {
-    return JSON.parse(fs.readFileSync(configPath(), 'utf-8')) as Config;
-  } catch {
-    return {};
-  }
+  return readJsonSync<Config>(configPath(), {}, {
+    validate: (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v),
+  });
 }
 function writeConfig(cfg: Config): void {
-  fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2), 'utf-8');
+  writeJsonAtomicSync(configPath(), cfg);
 }
 
 // ----- helpers -----------------------------------------------------------
@@ -1529,8 +1591,12 @@ export function registerLibraryIpc(): void {
     return items;
   });
 
-  ipcMain.handle('library:remove', (_e, id: string) => {
+  ipcMain.handle('library:remove', (_e, id: unknown) => {
+    // Validated BEFORE anything is deleted: an id from the renderer is joined
+    // onto the library root and removed recursively.
+    if (!isSafeLibraryItemId(id)) throw new Error('Invalid library item id');
     fs.rmSync(itemDir(id), { recursive: true, force: true });
+    pendingProgress.delete(id);
     const items = readDb().filter((it) => it.id !== id);
     writeDb(items);
     return items;
@@ -1547,9 +1613,9 @@ export function registerLibraryIpc(): void {
       const previous = it.progress;
       const previousAt = it.lastReadAt;
       const at = Date.now();
-      it.progress = progress;
-      it.lastReadAt = at;
-      writeDb(items);
+      // Coalesced: see `pendingProgress`. Atomic when it lands.
+      pendingProgress.set(it.id, { progress, lastReadAt: at });
+      if (!progressTimer) progressTimer = setTimeout(flushLibraryProgress, PROGRESS_FLUSH_MS);
       noteReadingProgress(it, previous, previousAt, progress, at);
     }
   });

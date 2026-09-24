@@ -10,8 +10,6 @@ import AppSection from './components/AppSection';
 import CommandPalette from './components/CommandPalette';
 import ClipboardHistoryPanel from './components/ClipboardHistoryPanel';
 import FocusShell from './components/FocusShell';
-import NovelReader from './views/NovelReader';
-import MangaReader from './views/MangaReader';
 import type { LibraryItem } from '../shared/types';
 import type { DesktopWinSection } from '../shared/desktop';
 import { popoutLabel, popoutSectionFromSearch } from './popoutLabels';
@@ -30,6 +28,12 @@ import { loadMiniMode, onMiniModeChanged, type MiniModeSettings } from './miniMo
 import { applySettingsAdvancedClass } from './settingsAdvanced';
 import MiniShell from './components/MiniShell';
 import Lockscreen from './components/Lockscreen';
+
+// The readers are big (pdf.js, epub, OCR, canvas) and not shell: lazy, so they
+// leave the entry chunk's preload list (audit robust #6).
+const NovelReader = lazy(() => import('./views/NovelReader'));
+const MangaReader = lazy(() => import('./views/MangaReader'));
+
 // Lazy since Blanc got its own entry point (BLANC_REFINEMENT_PLAN.md Pillar 1).
 // The Blanc window now loads blanc.html, so this branch is only a fallback for
 // index.html?blanc=1 — and importing it eagerly cost the Study OS window the
@@ -705,11 +709,13 @@ export default function App() {
     const close = () => setReading(null);
     return (
       <>
-        {reading.kind === 'book' ? (
-          <NovelReader item={reading} onClose={close} />
-        ) : (
-          <MangaReader item={reading} onClose={close} />
-        )}
+        <Suspense fallback={<LiquidLoading layout="reading" />}>
+          {reading.kind === 'book' ? (
+            <NovelReader item={reading} onClose={close} />
+          ) : (
+            <MangaReader item={reading} onClose={close} />
+          )}
+        </Suspense>
         <CommandPalette />
         <ClipboardHistoryPanel />
         <GlobalDictionaryOverlay />

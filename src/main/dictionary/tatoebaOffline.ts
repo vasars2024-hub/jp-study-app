@@ -6,6 +6,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import { readJson, writeJsonAtomicSync } from '../atomicJson';
 
 export interface StoredExample {
   jp: string;
@@ -60,17 +61,12 @@ async function ensureLoaded(): Promise<OfflineIndex> {
   if (index) return index;
   if (!loadPromise) {
     loadPromise = (async () => {
-      try {
-        const raw = fs.readFileSync(indexPath(), 'utf-8');
-        const parsed = JSON.parse(raw) as OfflineIndex;
-        if (parsed?.version === 1 && Array.isArray(parsed.sentences)) {
-          index = parsed;
-          return;
-        }
-      } catch {
-        /* first run */
-      }
-      index = emptyIndex();
+      index = await readJson<OfflineIndex>(indexPath(), emptyIndex, {
+        validate: (v) => {
+          const parsed = v as OfflineIndex | null;
+          return parsed?.version === 1 && Array.isArray(parsed.sentences);
+        },
+      });
     })();
   }
   await loadPromise;
@@ -80,10 +76,7 @@ async function ensureLoaded(): Promise<OfflineIndex> {
 function persist(): void {
   if (!index) return;
   index.updatedAt = Date.now();
-  fs.mkdirSync(path.dirname(indexPath()), { recursive: true });
-  const tmp = `${indexPath()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(index), 'utf-8');
-  fs.renameSync(tmp, indexPath());
+  writeJsonAtomicSync(indexPath(), index, { space: 0 });
 }
 
 function addSentence(jp: string, en: string, seen: Set<string>): boolean {

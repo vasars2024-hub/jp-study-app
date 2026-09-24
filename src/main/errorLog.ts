@@ -8,6 +8,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeFileAtomicSync } from './atomicJson';
 import { app } from 'electron';
 
 export type LogSeverity = 'info' | 'warn' | 'error';
@@ -41,7 +42,7 @@ function trimIfLarge(file: string): void {
     // Keep the newest half rather than growing forever or deleting everything.
     const content = fs.readFileSync(file, 'utf-8');
     const lines = content.split('\n');
-    fs.writeFileSync(file, lines.slice(Math.floor(lines.length / 2)).join('\n'), 'utf-8');
+    writeFileAtomicSync(file, lines.slice(Math.floor(lines.length / 2)).join('\n'), { backup: false });
   } catch {
     /* ignore — logging must never throw into the caller */
   }

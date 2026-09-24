@@ -7,32 +7,93 @@
  *
  * pdf.js needs a canvas, which Node does not have and which the `canvas` native
  * module would drag in as a build dependency. Electron already ships a renderer
- * that has one, so rasterizing happens in a hidden window: it loads pdf.js from
- * the app's own bundle, draws each page, and hands the image back over IPC. No
- * new dependency, and the same pdf.js version the reader already uses.
+ * that has one, so rasterizing happens in a hidden, sandboxed window: it loads
+ * pdf.js from the app's own bundle, draws each page, and hands the image back
+ * as the return value of executeJavaScript. No new dependency, and the same
+ * pdf.js version the reader already uses.
  */
 
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, session, type Session } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 
 const requireFrom = createRequire(import.meta.url);
 
 /**
- * Absolute file:// URLs for pdf.js and its worker.
- *
- * pdfjs-dist is ESM-only and ships no CommonJS build, so the hidden window
- * cannot `require` it — and a bare specifier like 'pdfjs-dist' does not resolve
- * inside a page at all. Resolving here and passing absolute URLs across is what
- * makes the dynamic import work.
+ * Security (audit robust #4): this window parses UNTRUSTED PDFs. It used to run
+ * with nodeIntegration on, contextIsolation off and webSecurity off, so a pdf.js
+ * bug would have meant full Node access. It is now an ordinary sandboxed page:
+ * no Node, isolation on, web security on, in a private in-memory session with
+ * exactly one protocol and no permissions. pdf.js, its worker and the one PDF
+ * being rasterized are served by that protocol; pages come back as the return
+ * value of `executeJavaScript`, so there is no IPC channel at all (the old
+ * unauthenticated `ipcMain.on('pdf-raster-...')` listener is gone).
  */
-function pdfjsUrls(): { module: string; worker: string } {
-  return {
-    module: pathToFileURL(requireFrom.resolve('pdfjs-dist/build/pdf.mjs')).href,
-    worker: pathToFileURL(requireFrom.resolve('pdfjs-dist/build/pdf.worker.min.mjs')).href,
-  };
+export const PDF_RASTER_SCHEME = 'gumpdf';
+/** Registered with the other privileged schemes in main.ts, before app ready. */
+export const PDF_RASTER_SCHEME_PRIVILEGES = {
+  scheme: PDF_RASTER_SCHEME,
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+};
+const PARTITION = 'gum-pdf-raster';
+const ORIGIN = `${PDF_RASTER_SCHEME}://raster`;
+
+/** The PDFs currently being rasterized, addressed by a one-time token. */
+const activePdfs = new Map<string, string>();
+let rasterSession: Session | null = null;
+
+function staticAsset(pathname: string): { file: string; type: string } | null {
+  if (pathname === '/pdf.mjs') return { file: requireFrom.resolve('pdfjs-dist/build/pdf.mjs'), type: 'text/javascript' };
+  if (pathname === '/pdf.worker.min.mjs') {
+    return { file: requireFrom.resolve('pdfjs-dist/build/pdf.worker.min.mjs'), type: 'text/javascript' };
+  }
+  return null;
+}
+
+/** Request URL -> what to serve. Only these paths exist. Exported for the test. */
+export function resolvePdfRasterRequest(
+  url: string,
+): { kind: 'page' } | { kind: 'file'; file: string; type: string } | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (`${u.protocol}//${u.host}` !== ORIGIN) return null;
+  if (u.pathname === '/index.html') return { kind: 'page' };
+  const asset = staticAsset(u.pathname);
+  if (asset) return { kind: 'file', ...asset };
+  const m = /^\/doc\/([a-f0-9]{32})\.pdf$/.exec(u.pathname);
+  const pdf = m ? activePdfs.get(m[1]) : undefined;
+  return pdf ? { kind: 'file', file: pdf, type: 'application/pdf' } : null;
+}
+
+/** Test hook: register a PDF under a token without opening a window. */
+export function registerPdfForRasterTest(token: string, file: string | null): void {
+  if (file) activePdfs.set(token, file);
+  else activePdfs.delete(token);
+}
+
+function rasterSessionOnce(): Session {
+  if (rasterSession) return rasterSession;
+  const ses = session.fromPartition(PARTITION);
+  ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  ses.setPermissionCheckHandler(() => false);
+  ses.protocol.handle(PDF_RASTER_SCHEME, (request) => {
+    const hit = resolvePdfRasterRequest(request.url);
+    if (!hit) return new Response('not found', { status: 404 });
+    if (hit.kind === 'page') {
+      return new Response('<!doctype html><meta charset="utf-8"><body></body>', {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+    return new Response(fs.readFileSync(hit.file), { headers: { 'content-type': hit.type } });
+  });
+  rasterSession = ses;
+  return ses;
 }
 
 /** Rendering wider than this wastes OCR time; narrower loses small kana. */
@@ -76,46 +137,44 @@ export async function rasterizePdf(
   const win = new BrowserWindow({
     show: false,
     webPreferences: {
-      contextIsolation: false,
-      nodeIntegration: true,
-      // Needed so the hidden page can read the PDF off disk.
-      webSecurity: false,
+      session: rasterSessionOnce(),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      nodeIntegrationInWorker: false,
+      webSecurity: true,
+      webviewTag: false,
+      spellcheck: false,
     },
   });
+  // Nothing in here may open windows or navigate anywhere.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
 
-  const channel = `pdf-raster-${Date.now()}`;
+  const token = crypto.randomBytes(16).toString('hex');
+  activePdfs.set(token, pdfPath);
   const names: string[] = [];
 
   try {
-    const done = new Promise<void>((resolve, reject) => {
-      ipcMain.on(channel, (_e, msg: { type: string; index?: number; total?: number; data?: string; error?: string }) => {
-        if (msg.type === 'page' && typeof msg.index === 'number' && msg.data) {
-          const name = `${String(msg.index + 1).padStart(4, '0')}.jpg`;
-          fs.writeFileSync(
-            path.join(outDir, name),
-            Buffer.from(msg.data.replace(/^data:image\/\w+;base64,/, ''), 'base64'),
-          );
-          names.push(name);
-          onProgress?.({ done: names.length, total: msg.total ?? 0 });
-        } else if (msg.type === 'done') {
-          resolve();
-        } else if (msg.type === 'error') {
-          reject(new Error(msg.error ?? 'rasterize-failed'));
-        }
-      });
-    });
-
-    await win.loadURL('data:text/html,<!doctype html><meta charset="utf-8"><body></body>');
-    await win.webContents.executeJavaScript(
-      rasterScript(pdfPath, channel, TARGET_WIDTH, pdfjsUrls()),
-    );
-    await done;
-    // Written out of order is impossible here (pages are emitted sequentially),
-    // but sort anyway so the contract is "reading order" regardless.
+    await win.loadURL(`${ORIGIN}/index.html`);
+    const total = Number(await win.webContents.executeJavaScript(openScript(`${ORIGIN}/doc/${token}.pdf`)));
+    if (!Number.isFinite(total) || total <= 0) throw new Error('rasterize-failed: no pages');
+    for (let i = 0; i < total; i++) {
+      const dataUrl = String(await win.webContents.executeJavaScript(pageScript(i + 1, TARGET_WIDTH)));
+      if (!dataUrl.startsWith('data:image/')) throw new Error('rasterize-failed: bad page image');
+      const name = `${String(i + 1).padStart(4, '0')}.jpg`;
+      fs.writeFileSync(path.join(outDir, name), Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64'));
+      names.push(name);
+      onProgress?.({ done: names.length, total });
+    }
+    // Shut pdf.js down before the window goes away: destroy() terminates the
+    // worker, and tearing the window down with the worker still live crashed the
+    // process a beat later — asynchronously, so it looked like OCR had failed.
+    await win.webContents.executeJavaScript(closeScript());
     names.sort();
     return names;
   } finally {
-    ipcMain.removeAllListeners(channel);
+    activePdfs.delete(token);
     if (!win.isDestroyed()) {
       win.destroy();
       // Let the renderer process actually go away before the caller starts
@@ -126,54 +185,49 @@ export async function rasterizePdf(
 }
 
 /**
- * The script run inside the hidden window.
- *
- * Built as a string because it executes in the renderer's context, where
- * `require` resolves against the app bundle and pdf.js's worker is available.
+ * Scripts run inside the sandboxed window (main world, no Node). Each returns a
+ * value to `executeJavaScript`; that return value is the only channel out.
  */
-function rasterScript(
-  pdfPath: string,
-  channel: string,
-  targetWidth: number,
-  urls: { module: string; worker: string },
-): string {
+function openScript(pdfUrl: string): string {
   return `(async () => {
-  const { ipcRenderer } = require('electron');
-  const fs = require('node:fs');
-  try {
-    const pdfjs = await import(${JSON.stringify(urls.module)});
-    pdfjs.GlobalWorkerOptions.workerSrc = ${JSON.stringify(urls.worker)};
-    const data = new Uint8Array(fs.readFileSync(${JSON.stringify(pdfPath)}));
-    const doc = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
-    // One canvas reused for every page: allocating a few hundred large canvases
-    // leaves that much GPU-backed memory for the compositor to reclaim.
-    const canvas = document.createElement('canvas');
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const base = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({ scale: ${targetWidth} / base.width });
-      canvas.width = Math.round(viewport.width);
-      canvas.height = Math.round(viewport.height);
-      const ctx = canvas.getContext('2d');
-      // Scans are bilevel; a white ground avoids transparent pixels reading as ink.
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      ipcRenderer.send(${JSON.stringify(channel)}, {
-        type: 'page', index: i - 1, total: doc.numPages,
-        data: canvas.toDataURL('image/jpeg', ${JPEG_QUALITY}),
-      });
-      page.cleanup();
-    }
-    // Shut pdf.js down before the window goes away: destroy() terminates the
-    // worker, and tearing the window down with the worker still live crashed the
-    // process a beat later — asynchronously, so it looked like OCR had failed.
-    canvas.width = 0;
-    canvas.height = 0;
-    await doc.destroy();
-    ipcRenderer.send(${JSON.stringify(channel)}, { type: 'done' });
-  } catch (err) {
-    ipcRenderer.send(${JSON.stringify(channel)}, { type: 'error', error: String(err && err.message || err) });
-  }
-})();`;
+  const pdfjs = await import(${JSON.stringify(`${ORIGIN}/pdf.mjs`)});
+  pdfjs.GlobalWorkerOptions.workerSrc = ${JSON.stringify(`${ORIGIN}/pdf.worker.min.mjs`)};
+  const data = new Uint8Array(await (await fetch(${JSON.stringify(pdfUrl)})).arrayBuffer());
+  const doc = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
+  // One canvas reused for every page: allocating a few hundred large canvases
+  // leaves that much GPU-backed memory for the compositor to reclaim.
+  window.__gumRaster = { doc, canvas: document.createElement('canvas') };
+  return doc.numPages;
+})()`;
+}
+
+function pageScript(pageNumber: number, targetWidth: number): string {
+  return `(async () => {
+  const { doc, canvas } = window.__gumRaster;
+  const page = await doc.getPage(${pageNumber});
+  const base = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: ${targetWidth} / base.width });
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const ctx = canvas.getContext('2d');
+  // Scans are bilevel; a white ground avoids transparent pixels reading as ink.
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const out = canvas.toDataURL('image/jpeg', ${JPEG_QUALITY});
+  page.cleanup();
+  return out;
+})()`;
+}
+
+function closeScript(): string {
+  return `(async () => {
+  const r = window.__gumRaster;
+  if (!r) return true;
+  r.canvas.width = 0;
+  r.canvas.height = 0;
+  await r.doc.destroy();
+  window.__gumRaster = null;
+  return true;
+})()`;
 }

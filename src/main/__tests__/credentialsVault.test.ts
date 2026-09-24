@@ -203,6 +203,8 @@ describe('reading a secret that cannot be decrypted', () => {
   });
 
   it('survives a corrupt file', () => {
+    // No last-good copy to recover from (atomicJson would serve `.bak` otherwise).
+    fs.rmSync(`${vaultFile()}.bak`, { force: true });
     fs.writeFileSync(vaultFile(), 'not json at all', 'utf-8');
     expect(readSecret('jiten')).toBe('');
     expect(vaultStatuses()).toEqual(

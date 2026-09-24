@@ -6,6 +6,7 @@ import { openSectionSurface } from '../sectionSurface';
 import MusicWidget from './MusicWidget';
 import { useVisualizer, VizStage } from './visualizer/VisualizerContent';
 import { WALL_PRESETS } from '../environment/wallCatalog';
+import { SectionErrorBoundary } from './SectionErrorBoundary';
 const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 
 const AgentWorkspaceShell = lazy(() => import('./agent/AgentWorkspaceShell'));
@@ -161,7 +162,13 @@ export default function AppSection({
         </div>
       );
   }
-  return <Suspense fallback={<div className="app-section-loading muted">{t('common.loading')}</div>}>{view}</Suspense>;
+  // A render error stays inside this app (SectionErrorBoundary), instead of
+  // taking the whole desktop to the top-level boundary.
+  return (
+    <SectionErrorBoundary section={section}>
+      <Suspense fallback={<div className="app-section-loading muted">{t('common.loading')}</div>}>{view}</Suspense>
+    </SectionErrorBoundary>
+  );
 }
 
 export function VisualizerWidget() {

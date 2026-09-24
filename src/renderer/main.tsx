@@ -23,6 +23,7 @@ import { initDesktopState } from './desktopState';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
 import { clearOnExitIfConfigured } from './clipboardHistory';
 import { startReleaseCheck } from './releaseCheck';
+import { showCrashRecoveryNotice } from './crashRecoveryNotice';
 // Design-token foundation (Phase 1 · M1) — additive tier layer loaded BEFORE
 // styles.css so the existing :root stays authoritative on any shared name.
 import './theme/tokens.css';
@@ -312,6 +313,15 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
 
   installKeyboardShortcuts();
   runWhenIdle(startReleaseCheck, 12000);
+  // A window main reloaded after a renderer crash says so (crashRecovery.ts).
+  runWhenIdle(() => void showCrashRecoveryNotice(), 4000);
+  // At most once a day, well after startup and only when idle: an automatic
+  // backup. The renderer collects its snapshot; main writes the zip.
+  window.setTimeout(() => {
+    runWhenIdle(() => {
+      void import('./storage/backupClient').then((m) => m.runAutoBackupIfDue());
+    }, 60_000);
+  }, 90_000);
 }
 
 const container = document.getElementById('root');

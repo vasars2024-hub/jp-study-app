@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
+import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from './atomicJson';
 import {
   type CaptionLine,
   type CaptionScript,
@@ -90,7 +91,7 @@ function prefsPath(): string {
 
 function readEnabled(): boolean {
   try {
-    const raw = JSON.parse(fs.readFileSync(prefsPath(), 'utf8')) as { enabled?: boolean };
+    const raw = readJsonSync<{ enabled?: boolean } | null>(prefsPath(), null);
     return Boolean(raw?.enabled);
   } catch {
     return false;
@@ -99,8 +100,7 @@ function readEnabled(): boolean {
 
 function writeEnabled(enabled: boolean): void {
   try {
-    fs.mkdirSync(stateDir(), { recursive: true });
-    fs.writeFileSync(prefsPath(), JSON.stringify({ enabled }), 'utf8');
+    writeJsonAtomicSync(prefsPath(), { enabled }, { space: 0 });
   } catch {
     /* a lost preference is not worth failing capture over */
   }
@@ -114,10 +114,10 @@ function load(): void {
   if (loaded) return;
   loaded = true;
   try {
-    const raw = JSON.parse(fs.readFileSync(storePath(), 'utf8')) as {
+    const raw = readJsonSync<{
       version?: number;
       lines?: CaptionLine[];
-    };
+    }>(storePath(), {});
     const lines = Array.isArray(raw?.lines) ? raw.lines : [];
     const clean = lines.filter(
       (l): l is CaptionLine =>
@@ -137,9 +137,8 @@ function flush(): void {
   if (!dirty) return;
   dirty = false;
   try {
-    fs.mkdirSync(stateDir(), { recursive: true });
     const lines = allLines().slice(-STORE_MAX_LINES);
-    fs.writeFileSync(storePath(), JSON.stringify({ version: 1, lines }), 'utf8');
+    writeJsonAtomicSync(storePath(), { version: 1, lines }, { space: 0 });
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
   }
@@ -443,6 +442,7 @@ export function listLiveCaptionScripts(gapMs = DEFAULT_SCRIPT_GAP_MS): CaptionSc
 export function clearLiveCaptions(): { ok: boolean } {
   archive = [];
   working = [];
+  removeJsonStore(storePath()); // a clear must not survive in the last-good copy
   dirty = true;
   flush();
   notifyRendererNow();

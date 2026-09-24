@@ -14,6 +14,7 @@ import { app, net } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 
 // ---------------------------------------------------------------------------
 // Rate limiting
@@ -205,7 +206,7 @@ export function readCache<T>(key: string, ttlMs: number = CACHE_TTL_MS): T | nul
     const file = cacheFile(key);
     const stat = fs.statSync(file);
     if (Date.now() - stat.mtimeMs > ttlMs) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) as T;
+    return readJsonSync<T | null>(file, null);
   } catch {
     return null;
   }
@@ -213,8 +214,7 @@ export function readCache<T>(key: string, ttlMs: number = CACHE_TTL_MS): T | nul
 
 export function writeCache(key: string, value: unknown): void {
   try {
-    fs.mkdirSync(cacheDir(), { recursive: true });
-    fs.writeFileSync(cacheFile(key), JSON.stringify(value), 'utf-8');
+    writeJsonAtomicSync(cacheFile(key), value, { space: 0, backup: false });
   } catch {
     /* an uncacheable answer is still a usable answer */
   }

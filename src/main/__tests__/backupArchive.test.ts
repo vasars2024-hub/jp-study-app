@@ -1,0 +1,221 @@
+// @vitest-environment node
+/**
+ * Backup archive round trip and restore atomicity (audit robust #1).
+ *
+ * The old "Full backup" left out the library and every main-process store; its
+ * restore wiped first, ignored failed writes and reported success. Here:
+ * - every JSON store found in userData is archived (no hand-kept list), plus
+ *   the library, with book files optional; secrets and caches are not;
+ * - restore stages + validates first, and a failure half-way through the swap
+ *   leaves userData byte-for-byte as it was and names the failing path.
+ */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  autoBackupDue,
+  autoBackupName,
+  commitStaged,
+  createBackupArchive,
+  inventoryUserData,
+  isRestorableRelPath,
+  listAutoBackups,
+  listZipEntries,
+  pruneAutoBackups,
+  stageArchive,
+  type CommitFs,
+} from '../backup/backupArchive';
+
+let root: string;
+let source: string;
+let dest: string;
+
+function put(base: string, rel: string, content: string | Buffer): void {
+  const p = path.join(base, ...rel.split('/'));
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, content);
+}
+const get = (base: string, rel: string): string => fs.readFileSync(path.join(base, ...rel.split('/')), 'utf8');
+
+function seedUserData(base: string): void {
+  put(base, 'library.json', JSON.stringify([{ id: 'book-1', title: '走れメロス' }]));
+  put(base, 'config.json', '{"folders":["Novels"]}');
+  put(base, 'reading-lists.json', '{"lists":[{"id":"l1"}]}');
+  put(base, 'reading-lists-events.jsonl', '{"type":"a"}\n{"type":"b"}\n');
+  put(base, 'watch-library.json', '{"titles":[]}');
+  put(base, 'anki-draft-sessions.json', '[{"id":"s1"}]');
+  put(base, 'immersion/sites.json', '[{"url":"https://example.jp"}]');
+  put(base, 'library/book-1/book.epub', Buffer.alloc(300_000, 7));
+  put(base, 'library/book-1/_ocr/0001.corrections.json', '{"fix":1}');
+  // Must NOT be archived:
+  put(base, 'mal-tokens.json', '{"access_token":"secret"}');
+  put(base, 'mining/api-keys.json', '{"gemini":"secret"}');
+  put(base, 'IndexedDB/app_bundle_0.indexeddb.leveldb/000003.log', 'chromium');
+  put(base, 'mining/translation-cache.json', '{}');
+  put(base, 'metadata-cache/abc.json', '{}');
+  put(base, 'models/state.json', '{}');
+  put(base, 'library.json.bak', '[]');
+  put(base, 'library.json.123.tmp', '[');
+}
+
+const renderer = {
+  app: 'jp-study-app',
+  kind: 'renderer-snapshot',
+  format: 1,
+  localStorage: { 'jp-os-theme': 'dark' },
+  indexedDb: { 'jp-study-db': { version: 1, stores: { kv: { keyPath: null, autoIncrement: false, entries: [['flashcard-deck', { cards: [1] }]] } } } },
+};
+
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'gum-backup-'));
+  source = path.join(root, 'source');
+  dest = path.join(root, 'dest');
+  seedUserData(source);
+  fs.mkdirSync(dest, { recursive: true });
+});
+
+afterEach(() => {
+  fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
+
+describe('inventory', () => {
+  it('finds every JSON store by walking userData, and skips secrets, caches and Chromium internals', () => {
+    const inv = inventoryUserData(source);
+    const stores = inv.stores.map((s) => s.rel);
+    expect(stores).toEqual([
+      'anki-draft-sessions.json',
+      'config.json',
+      'immersion/sites.json',
+      'library.json',
+      'reading-lists-events.jsonl',
+      'reading-lists.json',
+      'watch-library.json',
+    ]);
+    expect(inv.library.map((s) => s.rel)).toEqual(['library/book-1/_ocr/0001.corrections.json', 'library/book-1/book.epub']);
+    expect(inv.bookBytes).toBe(300_000);
+    expect(inv.skipped.join(' ')).toMatch(/mal-tokens\.json/);
+  });
+});
+
+describe('round trip', () => {
+  it('backs up and restores stores, library and the renderer snapshot', async () => {
+    const zip = path.join(root, 'out', 'backup.zip');
+    const created = await createBackupArchive({
+      userData: source, target: zip, includeBookFiles: true, trigger: 'manual', appVersion: '1.0.1', origin: 'app://bundle', renderer,
+    });
+    expect(created.manifest.library.bookFilesIncluded).toBe(true);
+    const names = listZipEntries(zip).map((e) => e.name);
+    expect(names).toContain('userdata/library/book-1/book.epub');
+    expect(names.some((n) => n.includes('mal-tokens') || n.includes('api-keys') || n.includes('IndexedDB'))).toBe(false);
+
+    const staged = await stageArchive(zip, path.join(root, 'staging'));
+    expect(staged.ok).toBe(true);
+    if (!staged.ok) return;
+    expect(staged.staged.renderer).toEqual(renderer);
+    const result = commitStaged(staged.staged, dest, path.join(root, 'previous'));
+    expect(result.ok).toBe(true);
+    for (const rel of ['library.json', 'config.json', 'reading-lists.json', 'reading-lists-events.jsonl', 'watch-library.json', 'anki-draft-sessions.json', 'immersion/sites.json', 'library/book-1/_ocr/0001.corrections.json']) {
+      expect(get(dest, rel)).toBe(get(source, rel));
+    }
+    expect(fs.readFileSync(path.join(dest, 'library', 'book-1', 'book.epub')).equals(fs.readFileSync(path.join(source, 'library', 'book-1', 'book.epub')))).toBe(true);
+  });
+
+  it('without book files, keeps the library JSON and says what was left out', async () => {
+    const zip = path.join(root, 'nobooks.zip');
+    const created = await createBackupArchive({ userData: source, target: zip, includeBookFiles: false, trigger: 'auto', appVersion: '1.0.1', renderer: null });
+    const names = listZipEntries(zip).map((e) => e.name);
+    expect(names).not.toContain('userdata/library/book-1/book.epub');
+    expect(names).toContain('userdata/library/book-1/_ocr/0001.corrections.json');
+    expect(created.manifest.library.bookFilesOmitted).toBe(1);
+  });
+
+  it('keeps the current files aside, and moves a stale .bak out of the way', async () => {
+    put(dest, 'library.json', '[{"id":"newer-local"}]');
+    put(dest, 'library.json.bak', '[{"id":"older"}]');
+    const zip = path.join(root, 'b.zip');
+    await createBackupArchive({ userData: source, target: zip, includeBookFiles: false, trigger: 'manual', appVersion: '1', renderer: null });
+    const staged = await stageArchive(zip, path.join(root, 'staging'));
+    if (!staged.ok) throw new Error(staged.errors.join());
+    const previous = path.join(root, 'previous');
+    expect(commitStaged(staged.staged, dest, previous).ok).toBe(true);
+    expect(get(previous, 'library.json')).toBe('[{"id":"newer-local"}]');
+    expect(fs.existsSync(path.join(dest, 'library.json.bak'))).toBe(false);
+  });
+});
+
+describe('restore is all-or-nothing', () => {
+  it('rolls back every swapped file when one write fails, and names it', async () => {
+    put(dest, 'library.json', '[{"id":"current"}]');
+    put(dest, 'config.json', '{"folders":["Current"]}');
+    put(dest, 'watch-library.json', '{"titles":["current"]}');
+    const before = { lib: get(dest, 'library.json'), cfg: get(dest, 'config.json'), watch: get(dest, 'watch-library.json') };
+
+    const zip = path.join(root, 'c.zip');
+    await createBackupArchive({ userData: source, target: zip, includeBookFiles: false, trigger: 'manual', appVersion: '1', renderer: null });
+    const staged = await stageArchive(zip, path.join(root, 'staging'));
+    if (!staged.ok) throw new Error(staged.errors.join());
+
+    // A reader holds reading-lists.json open: Windows refuses the swap.
+    const io: CommitFs = {
+      rename: (from, to) => {
+        if (to.endsWith(`${path.sep}reading-lists.json`) && from.includes('staging')) {
+          throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+        }
+        fs.renameSync(from, to);
+      },
+      exists: (p) => fs.existsSync(p),
+      mkdirp: (d) => fs.mkdirSync(d, { recursive: true }),
+      rm: (p) => fs.rmSync(p, { recursive: true, force: true }),
+    };
+    const result = commitStaged(staged.staged, dest, path.join(root, 'previous'), io);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failures).toEqual([{ path: 'reading-lists.json', error: 'EPERM: operation not permitted' }]);
+    expect(result.rollbackFailures).toEqual([]);
+    // Exactly as before — including the files that had already been swapped.
+    expect(get(dest, 'library.json')).toBe(before.lib);
+    expect(get(dest, 'config.json')).toBe(before.cfg);
+    expect(get(dest, 'watch-library.json')).toBe(before.watch);
+    expect(fs.existsSync(path.join(dest, 'anki-draft-sessions.json'))).toBe(false);
+  });
+
+  it('refuses a damaged archive before touching anything', async () => {
+    const zip = path.join(root, 'd.zip');
+    await createBackupArchive({ userData: source, target: zip, includeBookFiles: false, trigger: 'manual', appVersion: '1', renderer: null });
+    const bytes = fs.readFileSync(zip);
+    // Flip a byte inside the first stored file's data.
+    const entry = listZipEntries(zip).find((e) => e.name === 'userdata/library.json');
+    if (!entry) throw new Error('entry missing');
+    bytes[entry.localHeaderOffset + 30 + entry.name.length + 2] ^= 0xff;
+    fs.writeFileSync(zip, bytes);
+    const staged = await stageArchive(zip, path.join(root, 'staging'));
+    expect(staged.ok).toBe(false);
+    if (staged.ok) return;
+    expect(staged.errors.join('\n')).toMatch(/library\.json/);
+    expect(fs.existsSync(path.join(root, 'staging'))).toBe(false);
+  });
+
+  it('rejects entries that would escape userData or overwrite secrets/Chromium data', () => {
+    for (const bad of ['../evil.json', '/abs.json', 'C:/x.json', 'a\\b.json', 'IndexedDB/x.json', 'mal-tokens.json', 'x.exe', 'lib/../../x.json']) {
+      expect(isRestorableRelPath(bad)).toBe(false);
+    }
+    for (const good of ['library.json', 'immersion/sites.json', 'library/abc/book.epub', 'reading-lists-events.jsonl']) {
+      expect(isRestorableRelPath(good)).toBe(true);
+    }
+  });
+});
+
+describe('automatic backups', () => {
+  it('are due once per day and keep the newest seven', () => {
+    const dir = path.join(root, 'backups');
+    expect(autoBackupDue(dir)).toBe(true);
+    for (let d = 1; d <= 9; d++) put(dir, autoBackupName(new Date(Date.UTC(2026, 8, d))), 'zip');
+    expect(pruneAutoBackups(dir)).toHaveLength(2);
+    const left = listAutoBackups(dir).map((b) => b.name);
+    expect(left).toHaveLength(7);
+    expect(left[0]).toContain('2026-09-09');
+    expect(autoBackupDue(dir)).toBe(false);
+    expect(autoBackupDue(dir, Date.now() + 25 * 60 * 60 * 1000)).toBe(true);
+  });
+});

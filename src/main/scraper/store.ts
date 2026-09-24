@@ -9,10 +9,9 @@
 // the previous file intact rather than a half-written one that fails to parse
 // on next boot.
 
-import fs from 'node:fs';
-import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { app } from 'electron';
+import { readJson, readJsonSync, writeJsonAtomic } from '../atomicJson';
 
 let overrideRoot: string | null = null;
 
@@ -31,29 +30,24 @@ export function scraperStorePath(name: string): string {
 }
 
 export async function readScraperJson<T>(name: string, fallback: T): Promise<T> {
+  // Missing or corrupt both mean "no usable state" (a damaged file is set aside
+  // and its last-good copy served first), and the caller's default is a better
+  // answer than an exception on every read.
   try {
-    const raw = await fsp.readFile(scraperStorePath(name), 'utf-8');
-    const parsed = JSON.parse(raw) as T;
-    return parsed ?? fallback;
+    return (await readJson<T | null>(scraperStorePath(name), fallback)) ?? fallback;
   } catch {
-    // Missing or corrupt both mean "no usable state", and the caller's default
-    // is a better answer than an exception on every read.
     return fallback;
   }
 }
 
 export function readScraperJsonSync<T>(name: string, fallback: T): T {
   try {
-    return (JSON.parse(fs.readFileSync(scraperStorePath(name), 'utf-8')) as T) ?? fallback;
+    return readJsonSync<T | null>(scraperStorePath(name), fallback) ?? fallback;
   } catch {
     return fallback;
   }
 }
 
 export async function writeScraperJson(name: string, value: unknown): Promise<void> {
-  const target = scraperStorePath(name);
-  await fsp.mkdir(path.dirname(target), { recursive: true });
-  const temp = `${target}.${process.pid}.tmp`;
-  await fsp.writeFile(temp, JSON.stringify(value, null, 2), 'utf-8');
-  await fsp.rename(temp, target);
+  await writeJsonAtomic(scraperStorePath(name), value);
 }

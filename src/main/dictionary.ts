@@ -1,6 +1,7 @@
 import { ipcMain, app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
 import type {
   DictEntry,
@@ -430,21 +431,16 @@ function glossCachePath(): string {
 }
 
 function readGlossCache(): GlossCacheFile {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(glossCachePath(), 'utf-8')) as GlossCacheFile;
-    if (parsed?.entries && typeof parsed.registryHash === 'string') return parsed;
-  } catch {
-    /* fresh cache */
-  }
-  return { registryHash: '', entries: {} };
+  return readJsonSync<GlossCacheFile>(glossCachePath(), () => ({ registryHash: '', entries: {} }), {
+    validate: (v) => {
+      const parsed = v as GlossCacheFile | null;
+      return !!parsed?.entries && typeof parsed.registryHash === 'string';
+    },
+  });
 }
 
 function writeGlossCache(cache: GlossCacheFile): void {
-  const dir = path.dirname(glossCachePath());
-  fs.mkdirSync(dir, { recursive: true });
-  const tmp = `${glossCachePath()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(cache), 'utf-8');
-  fs.renameSync(tmp, glossCachePath());
+  writeJsonAtomicSync(glossCachePath(), cache, { space: 0, backup: false });
 }
 
 /**

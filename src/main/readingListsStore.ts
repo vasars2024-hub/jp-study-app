@@ -39,6 +39,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { writeFileAtomicSync } from './atomicJson';
 import {
   emptyReadingListsDocument,
   isReadingListsDocumentShape,
@@ -89,19 +90,8 @@ export interface ReadingListsStore {
 }
 
 function atomicWrite(filePath: string, text: string): void {
-  const directory = path.dirname(filePath);
-  const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.mkdirSync(directory, { recursive: true });
-  try {
-    fs.writeFileSync(temporary, text, { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(temporary, filePath);
-  } finally {
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      // The destination was already committed or the temporary file vanished.
-    }
-  }
+  // No `.bak`: this store keeps its own last-good file (see `lastGoodPath`).
+  writeFileAtomicSync(filePath, text, { mode: 0o600, backup: false });
 }
 
 /**

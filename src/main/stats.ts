@@ -5,9 +5,9 @@
 //                  the cache on failure so the map still renders offline.
 // No IP or identifier is ever sent; Cloudflare derives the country server-side.
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, ipcMain } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   STATS_COUNTS_URL,
   STATS_PING_URL,
@@ -20,20 +20,9 @@ function countsCachePath(): string {
   return path.join(app.getPath('userData'), 'download-stats.json');
 }
 
-function atomicWrite(file: string, data: string): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, data, 'utf-8');
-  fs.renameSync(tmp, file);
-}
-
 function readCounts(): CountryCounts | null {
-  try {
-    const file = countsCachePath();
-    if (!fs.existsSync(file)) return null;
-    return sanitizeCounts(JSON.parse(fs.readFileSync(file, 'utf-8')));
-  } catch {
-    return null;
-  }
+  const raw = readJsonSync<unknown>(countsCachePath(), null);
+  return raw === null ? null : sanitizeCounts(raw);
 }
 
 async function ping(): Promise<{ ok: boolean; sent: boolean }> {
@@ -65,7 +54,7 @@ async function fetchCounts(): Promise<CountryCounts | null> {
     });
     if (!res.ok) return readCounts();
     const counts = sanitizeCounts(await res.json());
-    atomicWrite(countsCachePath(), JSON.stringify(counts));
+    writeJsonAtomicSync(countsCachePath(), counts, { space: 0, backup: false });
     return counts;
   } catch {
     return readCounts();

@@ -30,8 +30,8 @@ import {
   Tray,
 } from 'electron';
 import { spawn } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 
 export interface SystemDictionarySettings {
   enabled: boolean;
@@ -93,8 +93,9 @@ function statePath(): string {
 
 function loadSettings(): SystemDictionarySettings {
   try {
-    const raw = fs.readFileSync(statePath(), 'utf8');
-    const parsed = JSON.parse(raw) as Partial<SystemDictionarySettings>;
+    const parsed = readJsonSync<Partial<SystemDictionarySettings>>(statePath(), {}, {
+      validate: (v) => typeof v === 'object' && v !== null,
+    });
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULTS.enabled,
       hotkey:
@@ -109,7 +110,7 @@ function loadSettings(): SystemDictionarySettings {
 
 function saveSettings(): void {
   try {
-    fs.writeFileSync(statePath(), JSON.stringify(settings, null, 2), 'utf8');
+    writeJsonAtomicSync(statePath(), settings);
   } catch (err) {
     console.error('[systemDictionary] failed to persist settings', err);
   }

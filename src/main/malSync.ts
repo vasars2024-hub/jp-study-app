@@ -57,6 +57,7 @@ import {
   vaultCanStore,
   writeSecretSet,
 } from './credentials/vault';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -210,13 +211,7 @@ interface LegacyMalTokenFile extends Partial<MalTokenMetadataFile> {
 export function fileMalTokenStore(
   filePath: () => string = () => path.join(app.getPath('userData'), 'mal-tokens.json'),
 ): MalTokenStore {
-  const readFile = (): LegacyMalTokenFile | null => {
-    try {
-      return JSON.parse(fs.readFileSync(filePath(), 'utf-8')) as LegacyMalTokenFile;
-    } catch {
-      return null;
-    }
-  };
+  const readFile = (): LegacyMalTokenFile | null => readJsonSync<LegacyMalTokenFile | null>(filePath(), null);
 
   const metadata = (file = readFile()): Pick<MalTokens, 'expiresAt' | 'username'> => ({
     expiresAt: typeof file?.expiresAt === 'number' ? file.expiresAt : 0,
@@ -230,10 +225,8 @@ export function fileMalTokenStore(
       username: tokens.username,
     };
     try {
-      fs.mkdirSync(path.dirname(filePath()), { recursive: true });
-      const temp = `${filePath()}.${process.pid}.tmp`;
-      fs.writeFileSync(temp, JSON.stringify(payload), { encoding: 'utf-8', mode: 0o600 });
-      fs.renameSync(temp, filePath());
+      // No `.bak`: the file it replaces may be the legacy shape holding tokens.
+      writeJsonAtomicSync(filePath(), payload, { space: 0, mode: 0o600, backup: false });
     } catch {
       /* missing metadata only disables proactive refresh and the username label */
     }
@@ -339,12 +332,9 @@ export function readMalSyncConfig(
   configPath: () => string = () => path.join(app.getPath('userData'), 'mal-sync.json'),
   env: NodeJS.ProcessEnv = process.env,
 ): MalSyncConfig {
-  let file: Partial<MalSyncConfig> = {};
-  try {
-    file = JSON.parse(fs.readFileSync(configPath(), 'utf-8')) as Partial<MalSyncConfig>;
-  } catch {
-    file = {};
-  }
+  const file = readJsonSync<Partial<MalSyncConfig>>(configPath(), {}, {
+    validate: (v) => v !== null && typeof v === 'object',
+  });
   const fromEnv = (env[CLIENT_ID_ENV] ?? '').trim();
   return {
     clientId: fromEnv || (typeof file.clientId === 'string' ? file.clientId.trim() : ''),
@@ -363,7 +353,7 @@ export function writeMalSyncClientId(
   const payload: Partial<MalSyncConfig> = { clientId: clientId.trim() };
   if (redirectUri && redirectUri.trim()) payload.redirectUri = redirectUri.trim();
   try {
-    fs.writeFileSync(configPath(), JSON.stringify(payload, null, 2), 'utf-8');
+    writeJsonAtomicSync(configPath(), payload);
   } catch {
     /* surfaced to the user as "still not configured" on the next status read */
   }

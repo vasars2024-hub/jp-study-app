@@ -1,5 +1,4 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
 import {
   applyStudyTranscriptionProgress,
@@ -39,6 +38,7 @@ import {
   normalizeMediaStudyDatabase,
   type MediaStudyDatabase,
 } from '../shared/mediaStudyDatabase';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { getMainJapaneseTokenizer } from './japaneseTokenizer';
 import { deleteMinedNotes, mineNote, previewAnkiExpressions } from './anki';
 import { resolveCustomFrequencyRanks } from './mining';
@@ -87,23 +87,15 @@ export function normalizeStudyOrchestratorDocument(value: unknown): StudyOrchest
 
 export function readStudyOrchestratorDocument(): StudyOrchestratorDocument {
   if (memory) return memory;
-  try {
-    memory = normalizeStudyOrchestratorDocument(
-      JSON.parse(fs.readFileSync(storePath(), 'utf-8')),
-    );
-  } catch {
-    memory = createEmptyStudyOrchestratorDocument();
-  }
+  memory = normalizeStudyOrchestratorDocument(
+    readJsonSync<unknown>(storePath(), null, { validate: (v) => !!v && typeof v === 'object' }),
+  );
   return memory;
 }
 
 function persist(document: StudyOrchestratorDocument): StudyOrchestratorDocument {
   memory = normalizeStudyOrchestratorDocument(document);
-  const file = storePath();
-  const temporary = `${file}.tmp`;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(temporary, JSON.stringify(memory, null, 2), 'utf-8');
-  fs.renameSync(temporary, file);
+  writeJsonAtomicSync(storePath(), memory);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(CHANGE_CHANNEL, memory);
   }

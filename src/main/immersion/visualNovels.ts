@@ -2,6 +2,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 import {
   appendVisualNovelCapture,
   appendVisualNovelCaptures,
@@ -136,20 +137,15 @@ async function saveCaptureAudio(sourcePath: string): Promise<string> {
 }
 
 function loadDatabase(): VisualNovelDatabase {
-  try {
-    return normalizeVisualNovelDatabase(JSON.parse(fs.readFileSync(databasePath(), 'utf8')));
-  } catch {
-    return createEmptyVisualNovelDatabase();
-  }
+  const raw = readJsonSync<unknown>(databasePath(), null, {
+    validate: (value) => !!value && typeof value === 'object',
+  });
+  return raw ? normalizeVisualNovelDatabase(raw) : createEmptyVisualNovelDatabase();
 }
 
 function saveDatabase(database: VisualNovelDatabase): VisualNovelDatabase {
   const normalized = normalizeVisualNovelDatabase(database);
-  const file = databasePath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temporary = `${file}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(normalized, null, 2), 'utf8');
-  fs.renameSync(temporary, file);
+  writeJsonAtomicSync(databasePath(), normalized);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send('visual-novel:changed', normalized);
   }

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
@@ -103,12 +104,9 @@ function translationCachePath(): string {
 
 function loadTranslationCache(): TranslationCacheFile {
   if (translationCache) return translationCache;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(translationCachePath(), 'utf-8')) as TranslationCacheFile;
-    translationCache = parsed?.entries ? parsed : { entries: {} };
-  } catch {
-    translationCache = { entries: {} };
-  }
+  translationCache = readJsonSync<TranslationCacheFile>(translationCachePath(), () => ({ entries: {} }), {
+    validate: (v) => !!v && typeof v === 'object' && !!(v as TranslationCacheFile).entries,
+  });
   return translationCache;
 }
 
@@ -116,10 +114,7 @@ function loadTranslationCache(): TranslationCacheFile {
 export function flushTranslationCache(): void {
   if (!translationCache || !translationCacheDirty) return;
   try {
-    fs.mkdirSync(path.dirname(translationCachePath()), { recursive: true });
-    const tmp = `${translationCachePath()}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(translationCache), 'utf-8');
-    fs.renameSync(tmp, translationCachePath());
+    writeJsonAtomicSync(translationCachePath(), translationCache, { space: 0, backup: false });
     translationCacheDirty = false;
   } catch {
     /* best-effort cache; ignore write failures */

@@ -15,6 +15,7 @@ import path from 'node:path';
 import type { ScrapeJobSummary, ScrapeResult, SeriesMetadata } from '../../shared/scraperResults';
 import { scraperLog } from './logBus';
 import { readScraperJson, scraperStorePath, writeScraperJson } from './store';
+import { removeJsonStore } from '../atomicJson';
 
 /**
  * The persisted locations, shape and parser moved to `shared/scraperHistoryStore`
@@ -94,7 +95,7 @@ export async function recordJob(summary: ScrapeJobSummary, result: ScrapeResult)
     await writeScraperJson(SCRAPER_HISTORY_INDEX_FILE, { jobs: kept });
 
     for (const dropped of jobs.slice(MAX_HISTORY)) {
-      await fsp.rm(scraperStorePath(resultFile(dropped.id)), { force: true }).catch(() => undefined);
+      removeJsonStore(scraperStorePath(resultFile(dropped.id)));
     }
     scraperLog('info', 'history', `Saved job ${summary.id} (${summary.found} rows).`, {
       correlationId: summary.id,
@@ -179,6 +180,7 @@ export async function seriesForInfoHashes(
 
 /** Test seam — removes the index and every stored result. */
 export async function clearScraperHistory(): Promise<void> {
-  await fsp.rm(scraperStorePath(SCRAPER_HISTORY_INDEX_FILE), { force: true }).catch(() => undefined);
+  // With its last-good copy: a cleared history must not come back from `.bak`.
+  removeJsonStore(scraperStorePath(SCRAPER_HISTORY_INDEX_FILE));
   await fsp.rm(scraperStorePath(SCRAPER_HISTORY_RESULTS_DIRECTORY), { recursive: true, force: true }).catch(() => undefined);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyRelease,
   compareVersions,
   normalizeVersion,
   parseExtensionVersionFromBody,
@@ -15,6 +16,21 @@ describe('release helpers', () => {
     expect(compareVersions('1.1.0', '1.0.0')).toBe(1);
     expect(compareVersions('1.0.0', '1.0.0')).toBe(0);
     expect(compareVersions('0.9.9', '1.0.0')).toBe(-1);
+  });
+
+  it('follows semver precedence for pre-releases and build metadata', () => {
+    expect(compareVersions('1.1.0-beta.2', '1.1.0')).toBe(-1);
+    expect(compareVersions('1.1.0', '1.1.0-rc.1')).toBe(1);
+    expect(compareVersions('1.1.0-beta.10', '1.1.0-beta.2')).toBe(1);
+    expect(compareVersions('1.1.0-alpha', '1.1.0-beta')).toBe(-1);
+    expect(compareVersions('v1.0.1+build.5', '1.0.1')).toBe(0);
+  });
+
+  it('classifies the update check honestly (audit: v1.0.1 local vs v1.0.0 published said nothing)', () => {
+    expect(classifyRelease('1.0.1', '1.0.0')).toBe('newer');
+    expect(classifyRelease('1.0.1', '1.0.1')).toBe('current');
+    expect(classifyRelease('1.0.1', '1.1.0')).toBe('update');
+    expect(classifyRelease('1.0.1', null)).toBe('no-releases');
   });
 
   it('summarizes markdown bullets', () => {

@@ -7,6 +7,7 @@ import type { PitchEntry, PitchLookup } from '../../shared/pitchAccent';
 import { app, dialog, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import type { DeinflectionInfo, DictEntry, DictResult, DictSense, YomitanDictInfo } from '../../shared/types';
@@ -241,10 +242,9 @@ function focusedWindow(): BrowserWindow | undefined {
 }
 
 function atomicWriteJson(filePath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value), 'utf-8');
-  fs.renameSync(tmp, filePath);
+  // Dictionary indexes can be tens of MB and are rebuilt by re-importing; only
+  // the small registry keeps a last-good copy.
+  writeJsonAtomicSync(filePath, value, { space: 0, backup: filePath === registryPath() });
 }
 
 function metaKey(term: string, reading: string): string {
@@ -378,15 +378,13 @@ function parsePitchPositions(raw: unknown): number[] {
 }
 
 function readRegistry(): RegistryFile {
-  try {
-    const raw = JSON.parse(fs.readFileSync(registryPath(), 'utf-8')) as RegistryFile;
-    const dicts = Array.isArray(raw.dicts) ? raw.dicts : [];
-    // Backfill enabled (default on) for dicts imported before this field existed.
-    for (const d of dicts) if (d.enabled === undefined) d.enabled = true;
-    return { dicts };
-  } catch {
-    return { dicts: [] };
-  }
+  const raw = readJsonSync<RegistryFile>(registryPath(), () => ({ dicts: [] }), {
+    validate: (v) => !!v && typeof v === 'object' && Array.isArray((v as RegistryFile).dicts),
+  });
+  const dicts = raw.dicts;
+  // Backfill enabled (default on) for dicts imported before this field existed.
+  for (const d of dicts) if (d.enabled === undefined) d.enabled = true;
+  return { dicts };
 }
 
 function writeRegistry(reg: RegistryFile): void {
@@ -438,7 +436,13 @@ function loadAllIndices(): void {
     const file = dictIndexPath(info.id);
     if (!fs.existsSync(file)) continue;
     try {
-      const stored = JSON.parse(fs.readFileSync(file, 'utf-8')) as StoredDictIndex;
+      const stored = readJsonSync<StoredDictIndex | null>(file, null, {
+        validate: (v) => !!v && typeof v === 'object',
+      });
+      if (!stored) {
+        console.error(`[yomitan] failed to load ${info.id}: index unreadable`);
+        continue;
+      }
       // Backfill language detection for dicts imported before glossLangs existed.
       if (info.hasTerms && !info.glossLangs?.length) {
         info.glossLangs = detectGlossLangs(stored);

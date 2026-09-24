@@ -52,6 +52,17 @@ import { registerMalSyncIpc } from './main/malSync';
 import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
+import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
+import { registerBackupIpc } from './main/backup/backupService';
+import { handleFatalMainError, registerCrashRecoveryIpc, watchRendererCrashes } from './main/crashRecovery';
+import { PDF_RASTER_SCHEME_PRIVILEGES } from './main/pdfRasterize';
+import {
+  installIpcSenderGuard,
+  installPermissionPolicy,
+  installWebContentsHardening,
+  makeAppOriginPolicy,
+} from './main/securityHardening';
+import { flushAllJsonWriters, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
 import { registerStatsIpc } from './main/stats';
@@ -233,8 +244,9 @@ process.stderr?.on?.('error', (err) => {
 process.on('uncaughtException', (err) => {
   if (isEpipe(err)) return;
   console.error(err);
-  logDiagnostic('error', 'main', 'uncaughtException', errorDetail(err));
-  app.quit();
+  // Used to log and quit with no dialog — the app simply vanished. Now the user
+  // sees what happened, can copy the details, and chooses restart or quit.
+  handleFatalMainError(err, flushAllJsonWriters);
 });
 // Previously unhandled promise rejections in the main process were silent
 // (Node's default is a console warning at best) — log them so they're
@@ -242,6 +254,20 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   logDiagnostic('error', 'main', 'unhandledRejection', errorDetail(reason));
 });
+// Hardening installed before any handler or window exists (securityHardening.ts):
+// every ipcMain handler registered from here on answers only the app's own
+// top-level frames, and every webContents gets navigation/window.open floors.
+const appOriginPolicy = makeAppOriginPolicy(isDevServer() ? MAIN_WINDOW_VITE_DEV_SERVER_URL : null);
+installIpcSenderGuard(ipcMain, appOriginPolicy, (channel, info) => {
+  logDiagnostic('warn', 'security', 'ipc-refused', `${channel} from ${info.senderType} ${info.frameOrigin ?? 'no-frame'}`);
+});
+installWebContentsHardening(app, appOriginPolicy, {
+  openExternal: (url) => void shell.openExternal(url),
+  onBlocked: (what, url) => logDiagnostic('warn', 'security', `blocked-${what}`, url.slice(0, 300)),
+});
+// A JSON store served from its last-good copy, or moved aside as damaged, is
+// something the Diagnostics view must be able to show.
+setAtomicJsonLogger((severity, operation, detail) => logDiagnostic(severity, 'json-store', operation, detail));
 
 if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined' && MAIN_WINDOW_VITE_DEV_SERVER_URL) {
   app.commandLine.appendSwitch('disable-http-cache');
@@ -272,6 +298,8 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  // Private to the sandboxed PDF-rasterizing window's own session (pdfRasterize.ts).
+  PDF_RASTER_SCHEME_PRIVILEGES,
 ]);
 
 /**
@@ -616,6 +644,36 @@ function forwardRendererConsole(win: BrowserWindow): void {
 
 /** Primary Study OS window (full desktop). Kept so Mini Widget can hide/show it. */
 let mainWindow: BrowserWindow | null = null;
+
+/**
+ * Boot work that is not needed for the first frame runs after it (audit
+ * robust #6). The renderer's own files are served by main (`app://`), so every
+ * synchronous millisecond spent here right after `createWindow()` — opening
+ * the 540 MB dictionary database, scanning model files, binding the extension
+ * server, registering hotkeys — was a millisecond the window waited for its
+ * HTML and chunks. Runs on the main window's first `ready-to-show`, or after a
+ * fallback delay if that never comes (hidden start, failed load).
+ */
+const afterFirstPaintQueue: Array<() => void> = [];
+let firstPaintDone = false;
+function runAfterFirstPaint(): void {
+  if (firstPaintDone) return;
+  firstPaintDone = true;
+  // One more macrotask so the show/paint itself is not competing.
+  setTimeout(() => {
+    for (const task of afterFirstPaintQueue.splice(0)) {
+      try {
+        task();
+      } catch (err) {
+        logDiagnostic('error', 'main', 'deferred-boot-task', errorDetail(err));
+      }
+    }
+  }, 50);
+}
+function afterFirstPaint(task: () => void): void {
+  if (firstPaintDone) setTimeout(task, 0);
+  else afterFirstPaintQueue.push(task);
+}
 /** Floating Mini craft widget — frameless, transparent, always-on-top. */
 let miniWidgetWindow: BrowserWindow | null = null;
 /** Compact Blanc Toolbox side window — parallel to the full Study OS. */
@@ -723,12 +781,10 @@ function attachNavGuards(win: BrowserWindow): void {
     return { action: 'deny' };
   });
   // Every window goes through attachNavGuards, so this is one place to catch
-  // renderer crashes/hangs for all six window types (previously unmonitored —
-  // PHASE_6_5_AUDIT.md Phase 8 gap: a renderer crash just left a blank/frozen
-  // window with no log trail).
-  win.webContents.on('render-process-gone', (_e, details) => {
-    logDiagnostic('error', 'renderer', 'render-process-gone', `reason=${details.reason}`);
-  });
+  // renderer crashes/hangs for every window type. Logging alone left the window
+  // dead (a sweep saw reason=oom freeze the app for >10 minutes); crashed
+  // windows are now reloaded with backoff — see crashRecovery.ts.
+  watchRendererCrashes(win);
   win.on('unresponsive', () => {
     logDiagnostic('warn', 'renderer', 'unresponsive', win.getTitle());
   });
@@ -768,6 +824,7 @@ const createWindow = (restore?: {
     if (mainWindow && !mainWindow.isDestroyed() && restore?.visible !== false) {
       mainWindow.show();
     }
+    runAfterFirstPaint();
   });
 
   // Companion host is skipTaskbar; tear it down when the real main window closes
@@ -868,22 +925,15 @@ function blancBoundsFile(): string {
 /** Last Blanc window size, saved on close. Applied only when the caller passes
  *  no explicit size (the renderer omits it when rememberWindowBounds is on). */
 function readSavedBlancSize(): { width: number; height: number } | null {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(blancBoundsFile(), 'utf8')) as {
-      width?: unknown;
-      height?: unknown;
-    };
-    if (typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
-    return { width: parsed.width, height: parsed.height };
-  } catch {
-    return null;
-  }
+  const parsed = readJsonSync<{ width?: unknown; height?: unknown } | null>(blancBoundsFile(), null);
+  if (!parsed || typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
+  return { width: parsed.width, height: parsed.height };
 }
 
 function saveBlancSize(win: BrowserWindow): void {
   try {
     const { width, height } = win.getBounds();
-    fs.writeFileSync(blancBoundsFile(), JSON.stringify({ width, height }));
+    writeJsonAtomicSync(blancBoundsFile(), { width, height }, { space: 0, backup: false });
   } catch {
     /* best effort; the default size is always safe */
   }
@@ -1488,6 +1538,10 @@ function createPopoutWindow(requested: string): boolean {
     },
   });
   if (mooncapWidget) win.setAspectRatio(4 / 5);
+  // Pop-outs host the same sections as the main window — including the
+  // Immersion browser's <webview> — so they get the same webview hardening and
+  // crash recovery. The inline guards below stay as the pop-out's own policy.
+  attachNavGuards(win);
   // Same guard as main window: never let EPUB / content links hijack the SPA.
   win.webContents.on('will-navigate', (e, url) => {
     const ok =
@@ -1719,6 +1773,11 @@ function registerPlayerSyncIpc(): void {
 
 app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
+  // Electron grants every permission by default; these are allow-lists.
+  const onDenied = (permission: string, origin: string | null) =>
+    logDiagnostic('info', 'security', 'permission-denied', `${permission} for ${origin ?? 'unknown'}`);
+  installPermissionPolicy(session.defaultSession, 'app', appOriginPolicy, onDenied);
+  installPermissionPolicy(session.fromPartition('persist:immersion'), 'immersion', appOriginPolicy, onDenied);
   if (isDevServer()) startDebugBridge();
   ensureLibrary();
   if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'undefined' || !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -1754,6 +1813,9 @@ app.whenReady().then(async () => {
   });
   registerDictionaryIpc();
   registerDiagnosticsIpc();
+  registerCrashRecoveryIpc();
+  registerStorageRecoveryIpc();
+  registerBackupIpc();
   registerShellIpc();
   registerAppLifecycleIpc();
   registerToolboxIpc();
@@ -1867,26 +1929,30 @@ app.whenReady().then(async () => {
   });
   registerReadingLensIpc();
   createWindow();
-  // Assignments are seeded from `screen`, which is only live now. Run once the
-  // main window exists, so its own display is excluded from the secondaries.
-  syncDesktopWindows();
+  // Fallback: a hidden start or a failed load never fires ready-to-show.
+  setTimeout(runAfterFirstPaint, 8000);
   // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
   const coldOpen = argvOpenSection(process.argv);
   if (coldOpen) createPopoutWindow(coldOpen);
-  startExtensionServer();
-  // System-wide popup dictionary: registers its global hotkey + tray if enabled.
-  startSystemDictionary();
-  // Reading Lens: registers its own global hotkey (screen-region OCR reader).
-  startReadingLens();
-  // Provision + load offline dictionaries in the background so the window paints
-  // immediately. Consumers that need glosses (mining, the pop-up) await
-  // initYomitan() themselves, so they observe the loaded indices without any
-  // notification from here.
-  void initYomitan();
-  // Reconcile downloaded models against disk (and refresh the asset registry)
-  // in the background — consumers ask isInstalled() before touching a model, so
-  // a slow first pass degrades to "not installed yet", never to a crash.
-  void initDownloads();
+  afterFirstPaint(() => {
+    // Assignments are seeded from `screen`, which is only live now. Run once the
+    // main window exists, so its own display is excluded from the secondaries.
+    syncDesktopWindows();
+    startExtensionServer();
+    // System-wide popup dictionary: registers its global hotkey + tray if enabled.
+    startSystemDictionary();
+    // Reading Lens: registers its own global hotkey (screen-region OCR reader).
+    startReadingLens();
+    // Provision + load offline dictionaries in the background. Its first step
+    // opens the dictionary database synchronously, which is why it waits for
+    // the first frame. Consumers that need glosses (mining, the pop-up) await
+    // initYomitan() themselves, so an early lookup simply starts it.
+    void initYomitan();
+    // Reconcile downloaded models against disk (and refresh the asset registry)
+    // in the background — consumers ask isInstalled() before touching a model, so
+    // a slow first pass degrades to "not installed yet", never to a crash.
+    void initDownloads();
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1906,6 +1972,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  // Coalesced JSON saves (library page-turn progress, …) land before anything stops.
+  flushAllJsonWriters();
   stopSeanime();
   stopLocalAgentRuntime();
   stopLocalAgentScheduler();

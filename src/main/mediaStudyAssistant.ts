@@ -1,6 +1,5 @@
 import { app, ipcMain } from 'electron';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildMediaStudyAssistantPrompt,
@@ -10,6 +9,7 @@ import {
   type MediaStudyAssistantResult,
 } from '../shared/mediaStudyAssistant';
 import { callAiProvider } from './aiProviderClient';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { getConfiguredAiProvider } from './mining';
 
 interface CacheFile {
@@ -24,22 +24,16 @@ function cachePath(): string {
 
 function loadCache(): CacheFile {
   if (cache) return cache;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(cachePath(), 'utf8')) as CacheFile;
-    cache = parsed?.entries ? parsed : { entries: {} };
-  } catch {
-    cache = { entries: {} };
-  }
+  cache = readJsonSync<CacheFile>(cachePath(), () => ({ entries: {} }), {
+    validate: (v) => !!v && typeof v === 'object' && !!(v as CacheFile).entries,
+  });
   return cache;
 }
 
 function saveCache(): void {
   if (!cache) return;
   try {
-    fs.mkdirSync(path.dirname(cachePath()), { recursive: true });
-    const temporary = `${cachePath()}.tmp`;
-    fs.writeFileSync(temporary, JSON.stringify(cache), 'utf8');
-    fs.renameSync(temporary, cachePath());
+    writeJsonAtomicSync(cachePath(), cache, { space: 0, backup: false });
   } catch {
     // Cache persistence is optional; the result still returns to the caller.
   }

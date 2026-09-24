@@ -317,6 +317,14 @@ export async function startSeanime(): Promise<SeanimeStatus> {
 
   child.stdout?.on('data', pushLog);
   child.stderr?.on('data', pushLog);
+  // Without this, a spawn failure (exe deleted, blocked by antivirus, EACCES)
+  // is an unhandled 'error' event — an uncaught exception in main.
+  child.on('error', (err) => {
+    child = null;
+    keepalive.stop();
+    pushLog(`spawn error: ${err.message}`);
+    setStatus({ kind: 'failed', pid: null, error: `could not start the sidecar: ${err.message}` });
+  });
   child.on('exit', (code) => {
     child = null;
     // Release the client before anything else: a keepalive left running would retry

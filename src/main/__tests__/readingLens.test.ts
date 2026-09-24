@@ -547,6 +547,9 @@ describe('capture history IPC', () => {
 
   beforeEach(() => {
     fs.rmSync(historyPath(), { force: true });
+    // The store keeps a last-good copy; without clearing it a later "corrupt
+    // file" case would (correctly) recover the previous test's history.
+    fs.rmSync(`${historyPath()}.bak`, { force: true });
   });
 
   it('records a capture and reads it back', async () => {

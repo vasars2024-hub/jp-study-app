@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { readJson, readJsonSync, writeJsonAtomic, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -119,18 +120,14 @@ function ensureDirs(): void {
 // ----- install state -----------------------------------------------------
 
 function readState(): Record<string, InstallRecord> {
-  try {
-    return JSON.parse(fs.readFileSync(statePath(), 'utf8')) as Record<string, InstallRecord>;
-  } catch {
-    return {};
-  }
+  return readJsonSync<Record<string, InstallRecord>>(statePath(), () => ({}), {
+    validate: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
+  });
 }
 
 function writeState(state: Record<string, InstallRecord>): void {
   ensureDirs();
-  const tmp = `${statePath()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
-  fs.renameSync(tmp, statePath());
+  writeJsonAtomicSync(statePath(), state);
 }
 
 function recordInstall(id: string, record: InstallRecord): void {
@@ -489,11 +486,9 @@ function isAbort(err: unknown): boolean {
 }
 
 async function readPartialMeta(id: string): Promise<PartialMeta | null> {
-  try {
-    return JSON.parse(await fsp.readFile(partialMetaFor(id), 'utf8')) as PartialMeta;
-  } catch {
-    return null;
-  }
+  return readJson<PartialMeta | null>(partialMetaFor(id), null, {
+    validate: (v) => !!v && typeof v === 'object',
+  });
 }
 
 /**
@@ -584,7 +579,8 @@ async function downloadToPartial(spec: AssetSpec, signal: AbortSignal): Promise<
     etag: res.headers.get('etag') ?? undefined,
     lastModified: res.headers.get('last-modified') ?? undefined,
   };
-  await fsp.writeFile(partialMetaFor(spec.id), JSON.stringify(nextMeta));
+  // Transient resume hint (deleted with the .part), so no `.bak` beside it.
+  await writeJsonAtomic(partialMetaFor(spec.id), nextMeta, { space: 0, backup: false });
 
   const received = await streamToFile(spec.id, res, partial, hash, startAt, totalBytes, serverResumed);
   return { file: partial, sha256: hash.digest('hex'), bytes: received };
@@ -1010,8 +1006,8 @@ function cachedRegistryPath(): string {
  */
 async function refreshRegistry(): Promise<void> {
   try {
-    const cached = JSON.parse(await fsp.readFile(cachedRegistryPath(), 'utf8')) as unknown;
-    catalog = mergeRegistry(ASSET_CATALOG, cached);
+    const cached = await readJson<unknown>(cachedRegistryPath(), null);
+    catalog = cached === null ? ASSET_CATALOG : mergeRegistry(ASSET_CATALOG, cached);
   } catch {
     catalog = ASSET_CATALOG;
   }
@@ -1027,7 +1023,7 @@ async function refreshRegistry(): Promise<void> {
     const merged = mergeRegistry(ASSET_CATALOG, remote);
     catalog = merged;
     ensureDirs();
-    await fsp.writeFile(cachedRegistryPath(), JSON.stringify(remote));
+    await writeJsonAtomic(cachedRegistryPath(), remote, { space: 0, backup: false });
   } catch {
     // Offline, or the registry is not published yet — the bundled catalog stands.
   }

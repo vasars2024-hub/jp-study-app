@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
 import { importEpubBufferToLibrary, itemDir } from './library';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   DEFAULT_JITEN_DOWNLOAD_OPTIONS,
   buildSourceLinks,
@@ -48,12 +49,6 @@ function storePath(): string {
   return path.join(app.getPath('userData'), 'jiten.json');
 }
 
-function atomicWrite(file: string, data: string): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, data, 'utf-8');
-  fs.renameSync(tmp, file);
-}
-
 /**
  * Moves a plaintext `apiKey` out of `jiten.json` and into the credentials vault.
  *
@@ -85,7 +80,8 @@ function migrateLegacyApiKey(raw: Partial<JitenStore>, legacy: string): string {
   const config = { ...(raw.config ?? {}) } as Partial<JitenStore['config']>;
   delete config.apiKey;
   try {
-    atomicWrite(storePath(), JSON.stringify({ ...raw, config }, null, 2));
+    // No `.bak`: the copy it would keep is the plaintext key being removed.
+    writeJsonAtomicSync(storePath(), { ...raw, config }, { backup: false });
   } catch {
     // The vault holds the key now. A failed rewrite leaves a stale plaintext
     // copy that the next successful read strips, so this is not worth throwing
@@ -97,10 +93,9 @@ function migrateLegacyApiKey(raw: Partial<JitenStore>, legacy: string): string {
 function readStore(): JitenStore {
   const empty = createEmptyJitenStore();
   try {
-    const file = storePath();
-    const raw: Partial<JitenStore> = fs.existsSync(file)
-      ? (JSON.parse(fs.readFileSync(file, 'utf-8')) as Partial<JitenStore>)
-      : {};
+    const raw = readJsonSync<Partial<JitenStore>>(storePath(), {}, {
+      validate: (v) => v !== null && typeof v === 'object',
+    });
     const legacy = typeof raw.config?.apiKey === 'string' ? raw.config.apiKey.trim() : '';
     // Vault first: after migration it is the only copy that exists.
     const apiKey = readVaultSecret(JITEN_CREDENTIAL_ID) || migrateLegacyApiKey(raw, legacy);
@@ -127,7 +122,7 @@ function writeStore(store: JitenStore): JitenStore {
     sourceProfiles: sanitizeSourceProfiles(store.sourceProfiles),
     plan: sanitizePlanEntries(store.plan),
   };
-  atomicWrite(storePath(), JSON.stringify(safe, null, 2));
+  writeJsonAtomicSync(storePath(), safe);
   // Returned in memory so the caller's next request can still authenticate;
   // `forRenderer` strips it again at the IPC boundary.
   const apiKey = readVaultSecret(JITEN_CREDENTIAL_ID);

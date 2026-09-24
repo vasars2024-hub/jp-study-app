@@ -45,7 +45,8 @@ import {
   withYtDlpJsRuntime,
 } from './media';
 import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
-import { errorDetail, logDiagnostic } from './errorLog';
+import { logDiagnostic } from './errorLog';
+import { readJsonDetailedSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomicJson';
 
 const DEFAULT_AUTO_UPDATE_HOURS = 12;
 
@@ -66,29 +67,6 @@ function transcriptPath(youtubeId: string): string {
 }
 
 /**
- * Move a store we cannot read aside instead of letting the next save overwrite
- * it. Returns the quarantine path, or null when the rename itself failed —
- * either way the caller carries on with an empty store, because refusing to
- * start is worse than starting empty once the bytes are safe.
- */
-function quarantineStore(reason: string): string | null {
-  const file = storePath();
-  const aside = `${file}.corrupt-${Date.now()}`;
-  try {
-    fs.renameSync(file, aside);
-  } catch {
-    return null;
-  }
-  logDiagnostic(
-    'error',
-    'youtube',
-    'readStore',
-    `Playlist store was unreadable (${reason}); moved to ${path.basename(aside)} and started empty.`,
-  );
-  return aside;
-}
-
-/**
  * Read the store, keeping apart three cases that used to collapse into one.
  *
  * This used to be `catch { return emptyYtStore(); }`, so a file left truncated
@@ -100,31 +78,36 @@ function quarantineStore(reason: string): string | null {
  * that a later write would make permanent.
  */
 function readStore(): YtPlaylistsStore {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(storePath(), 'utf-8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException | null)?.code === 'ENOENT') return emptyYtStore();
-    throw err;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    quarantineStore(errorDetail(err));
-    return emptyYtStore();
-  }
-
-  const store = normalizeYtStore(parsed);
   // `normalizeYtStore` is a total function: any shape it does not recognise
   // comes back as an empty store, which is indistinguishable from a genuinely
   // empty one. Only the raw text can tell them apart, so ask it before
-  // accepting the emptiness.
-  if (isEmptyYtStore(store) && rawClaimsContent(parsed)) {
-    quarantineStore('shape not recognised');
+  // accepting the emptiness — a file that fails this is treated as damaged.
+  // The reader moves a damaged file aside (`.corrupt-<ts>`) and serves `.bak`.
+  const read = readJsonDetailedSync<unknown>(storePath(), null, {
+    validate: (parsed) => !(isEmptyYtStore(normalizeYtStore(parsed)) && rawClaimsContent(parsed)),
+  });
+  if (read.source === 'missing') return emptyYtStore();
+  if (read.source === 'fallback') {
+    // Could not move the bytes aside: raise rather than answer with a blank
+    // library that the next ordinary save would make permanent.
+    if (!read.quarantinedTo) throw new Error(`Playlist store is unreadable: ${read.error ?? 'unknown error'}`);
+    logDiagnostic(
+      'error',
+      'youtube',
+      'readStore',
+      `Playlist store was unreadable (${read.error}); moved to ${path.basename(read.quarantinedTo)} and started empty.`,
+    );
+    return emptyYtStore();
   }
-  return store;
+  if (read.source === 'backup') {
+    logDiagnostic(
+      'warn',
+      'youtube',
+      'readStore',
+      `Playlist store was unreadable (${read.error}); moved to ${read.quarantinedTo ? path.basename(read.quarantinedTo) : '(not moved)'} and restored the last-good copy.`,
+    );
+  }
+  return normalizeYtStore(read.value);
 }
 
 function isEmptyYtStore(store: YtPlaylistsStore): boolean {
@@ -204,19 +187,7 @@ export function playlistTrackedStatus(youtubePlaylistIdOrUrl: string): {
  * once per downloaded video, so these writes happen unattended and often.
  */
 function writeStore(store: YtPlaylistsStore): void {
-  const file = storePath();
-  const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  try {
-    fs.writeFileSync(temporary, JSON.stringify(store, null, 2), 'utf-8');
-    fs.renameSync(temporary, file);
-  } finally {
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      // Already renamed onto the target, or the temporary file vanished.
-    }
-  }
+  writeJsonAtomicSync(storePath(), store);
 }
 
 function broadcastStore(store: YtPlaylistsStore): void {
@@ -1097,9 +1068,8 @@ export function registerYtPlaylistsIpc(): void {
       cuesJson: string,
     ): YtPlaylistsStore | { error: string } => {
       if (typeof youtubeId !== 'string' || !youtubeId) return { error: 'Missing youtubeId.' };
-      fs.mkdirSync(transcriptsDir(), { recursive: true });
       try {
-        fs.writeFileSync(transcriptPath(youtubeId), typeof cuesJson === 'string' ? cuesJson : '[]', 'utf-8');
+        writeFileAtomicSync(transcriptPath(youtubeId), typeof cuesJson === 'string' ? cuesJson : '[]', { backup: false });
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
       }

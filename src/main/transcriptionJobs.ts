@@ -20,6 +20,7 @@ import { BrowserWindow, app, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   MAX_NO_WINDOW_ATTEMPTS,
   MAX_TRANSCRIPTION_ATTEMPTS,
@@ -128,7 +129,7 @@ function queuePath(): string {
 
 function saveQueue(): void {
   try {
-    fs.writeFileSync(queuePath(), JSON.stringify(queue), 'utf-8');
+    writeJsonAtomicSync(queuePath(), queue, { space: 0 });
   } catch {
     /* a queue that cannot persist still runs for this session */
   }
@@ -136,8 +137,7 @@ function saveQueue(): void {
 
 function loadQueue(): TranscriptionJob[] {
   try {
-    const raw = JSON.parse(fs.readFileSync(queuePath(), 'utf-8')) as TranscriptionJob[];
-    if (!Array.isArray(raw)) return [];
+    const raw = readJsonSync<TranscriptionJob[]>(queuePath(), [], { validate: Array.isArray });
     return raw.filter((job): job is TranscriptionJob =>
       Boolean(job && typeof job.mediaId === 'string' && typeof job.title === 'string'));
   } catch {

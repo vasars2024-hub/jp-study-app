@@ -50,6 +50,13 @@ export interface DictionaryReadClientDeps {
   /** Called once, when the worker is given up on for the session. */
   onFallback?: (reason: string) => void;
   now?: () => number;
+  /**
+   * Retire the worker after this long with nothing in flight (0 = never). The
+   * worker maps up to 256 MB of the dictionary file and a runtime sweep saw a
+   * ~500 MB Node utility process sitting there for the whole session after one
+   * lookup; the next read simply spawns a fresh one.
+   */
+  idleMs?: number;
 }
 
 interface Pending {
@@ -62,6 +69,9 @@ interface Pending {
 
 export const DEFAULT_READ_TIMEOUT_MS = 60_000;
 
+/** See `DictionaryReadClientDeps.idleMs`. */
+export const DEFAULT_READ_IDLE_MS = 5 * 60_000;
+
 /** A worker that exits twice, each within this long of being spawned, is broken. */
 export const RESPAWN_STORM_MS = 5_000;
 
@@ -73,6 +83,7 @@ export class DictionaryReadClient {
   private disposed = false;
   private spawnedAt = 0;
   private earlyExits = 0;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly deps: DictionaryReadClientDeps) {}
 
@@ -99,6 +110,7 @@ export class DictionaryReadClient {
 
   private readUntyped(kind: DictionaryReadKind, query: unknown): Promise<unknown> {
     if (!this.usingWorker()) return this.inProcess(kind, query);
+    this.clearIdle();
     const worker = this.ensureWorker();
     if (!worker) return this.inProcess(kind, query);
 
@@ -148,6 +160,25 @@ export class DictionaryReadClient {
     clearTimeout(entry.timer);
     if (message.ok) entry.resolve(message.value);
     else entry.reject(new Error(message.error));
+    if (!this.pending.size) this.armIdle();
+  }
+
+  private clearIdle(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  private armIdle(): void {
+    this.clearIdle();
+    const idleMs = this.deps.idleMs ?? DEFAULT_READ_IDLE_MS;
+    if (idleMs <= 0 || !this.worker) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      // Only a quiet worker is retired; `dropWorker` detaches it first, so its
+      // exit is not counted as a crash.
+      if (!this.pending.size) this.dropWorker();
+    }, idleMs);
+    this.idleTimer.unref?.();
   }
 
   private exited(worker: ReadWorkerHandle): void {
@@ -187,6 +218,7 @@ export class DictionaryReadClient {
   }
 
   private dropWorker(): void {
+    this.clearIdle();
     const worker = this.worker;
     this.worker = null;
     if (!worker) return;

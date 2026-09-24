@@ -30,6 +30,7 @@ import type { FilesCleanupLogEntry } from '../../shared/filesApp/cleanup';
 import { readFilesMineSource } from './mineSource';
 import { scanRoots } from './scan';
 import { watchRoots, type FilesWatchArrival, type FilesWatchSession } from './watch';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 
 /** How long a built index is served before the next request rebuilds it. */
 const INDEX_TTL_MS = 15_000;
@@ -340,17 +341,12 @@ export function appendCleanupLog(
 ): void {
   if (!entries.length) return;
   const file = path.join(userDataPath, CLEANUP_LOG_FILE);
-  let existing: FilesCleanupLogEntry[] = [];
-  try {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as { entries?: unknown };
-    if (Array.isArray(parsed?.entries)) existing = parsed.entries as FilesCleanupLogEntry[];
-  } catch {
-    // No log yet, or an unreadable one. Starting a fresh log is better than
-    // losing this run's receipt to a parse error in an older file.
-  }
+  // No log yet, or an unreadable one (moved aside by the reader): starting a
+  // fresh log is better than losing this run's receipt to an older file.
+  const existing = readCleanupLog(userDataPath);
   const next = [...existing, ...entries].slice(-CLEANUP_LOG_MAX_ENTRIES);
   try {
-    fs.writeFileSync(file, JSON.stringify({ entries: next }, null, 2), 'utf-8');
+    writeJsonAtomicSync(file, { entries: next });
   } catch {
     // A log that cannot be written must not turn a completed removal into a
     // reported failure; the in-result log is still returned to the caller.
@@ -358,12 +354,10 @@ export function appendCleanupLog(
 }
 
 export function readCleanupLog(userDataPath: string): FilesCleanupLogEntry[] {
-  try {
-    const parsed = JSON.parse(
-      fs.readFileSync(path.join(userDataPath, CLEANUP_LOG_FILE), 'utf-8'),
-    ) as { entries?: unknown };
-    return Array.isArray(parsed?.entries) ? (parsed.entries as FilesCleanupLogEntry[]) : [];
-  } catch {
-    return [];
-  }
+  const parsed = readJsonSync<{ entries: FilesCleanupLogEntry[] } | null>(
+    path.join(userDataPath, CLEANUP_LOG_FILE),
+    null,
+    { validate: (v) => v !== null && typeof v === 'object' && Array.isArray((v as { entries?: unknown }).entries) },
+  );
+  return parsed ? parsed.entries : [];
 }
