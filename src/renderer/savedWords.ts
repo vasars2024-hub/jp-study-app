@@ -13,6 +13,7 @@
 // the current language's words only.
 
 import { getStudyLang, onStudyLangChanged, type StudyLang } from './studyEnvironment';
+import { writeLocalStorage } from './localStorageWrite';
 import {
   addDeckCardsTracked,
   loadDeck,
@@ -104,7 +105,7 @@ export function migrateSavedWordsToDeck(lang: StudyLang = getStudyLang()): numbe
     );
     const unique = fresh.filter((entry, i) => fresh.findIndex((other) => other.word === entry.word) === i);
     if (unique.length) addDeckCardsTracked(unique.map((entry) => draftFor(entry, lang)));
-    localStorage.setItem(migratedKey(lang), '1');
+    writeLocalStorage(migratedKey(lang), '1');
     return unique.length;
   } catch {
     return 0;

@@ -61,6 +61,7 @@ import VisualNovelSentenceAssist from './VisualNovelSentenceAssist';
 import VisualNovelSourcePanel from './VisualNovelSourcePanel';
 import VisualNovelArt from './VisualNovelArt';
 import { TRACKING_KEYS, VisualNovelCaptureBar, VisualNovelCaptureSetup } from './VisualNovelCaptureControls';
+import { writeLocalStorageJson } from '../../localStorageWrite';
 import './visualNovel.css';
 
 interface ProgressDraft {
@@ -199,11 +200,8 @@ function readPanelState(): { selectedId: string; tab: VisualNovelTab } {
 }
 
 function writePanelState(state: { selectedId: string; tab: VisualNovelTab }): void {
-  try {
-    localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(state));
-  } catch {
-    /* storage unavailable: the panel still works, it just forgets */
-  }
+  // Storage unavailable: the panel still works, it just forgets.
+  writeLocalStorageJson(PANEL_STATE_KEY, state);
 }
 
 const emptyProgress = (): ProgressDraft => ({
@@ -620,13 +618,13 @@ export default function VisualNovelPanel({
 
   const captureScreenText = async (): Promise<void> => {
     if (!selected) return;
-    localStorage.setItem(LENS_CAPTURE_TARGET_KEY, JSON.stringify(buildVisualNovelCaptureTarget({
+    writeLocalStorageJson(LENS_CAPTURE_TARGET_KEY, buildVisualNovelCaptureTarget({
       visualNovelId: selected.id,
       title: selected.title,
       routeId: progress.route,
       chapter: progress.chapter,
       scene: progress.scene,
-    })));
+    }));
     await window.api.lensOpen('select');
     reportStatus(t('vnPanel.msg.ocrPrompt', { title: selected.title }));
   };

@@ -36,10 +36,11 @@ const SRC = resolve(__dirname, '../..');
 
 /**
  * The ceiling, measured 2026-09-06 after migrating nineteen sites across six
- * stores onto the guarded writer. MOVE THIS DOWN when you migrate more.
- * Never up.
+ * stores onto the guarded writer, and lowered to 193 on 2026-09-24 when the
+ * mining, saved-words and visual-novel writes moved onto it too. MOVE THIS DOWN
+ * when you migrate more. Never up.
  */
-const MAX_RAW_SITES = 195;
+const MAX_RAW_SITES = 193;
 const MAX_RAW_FILES = 150;
 
 /**

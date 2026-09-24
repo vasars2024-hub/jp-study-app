@@ -112,13 +112,14 @@ describe('the lyrics pane owns them, and does not own the video ones', () => {
     /*
       The control: an expression that matched nothing would pass this for any input.
 
-      Nineteen since the Liquid Study Workspace landed — thirteen `video.*` rows (see
-      `deletedPlayerDependents`, which names that set rather than counting it) plus six
+      Twenty-three since the subtitle controls landed — seventeen `video.*` rows (see
+      `deletedPlayerDependents`, which names that set rather than counting it; the four
+      newest are dual subtitles, subtitle position up/down and delay reset) plus six
       `workspace.*` rows the overlay registers for the same reason it registers the
       others: it is the surface that can carry them out.
     */
-    expect(overlayIds.size).toBe(19);
-    expect([...overlayIds].filter((id) => id.startsWith('video.'))).toHaveLength(13);
+    expect(overlayIds.size).toBe(23);
+    expect([...overlayIds].filter((id) => id.startsWith('video.'))).toHaveLength(17);
     expect([...overlayIds].filter((id) => id.startsWith('workspace.'))).toHaveLength(6);
     for (const id of CUE_NAV_IDS) expect(overlayIds.has(id)).toBe(false);
   });

@@ -31,6 +31,7 @@ import {
 } from '../../../shared/musicMining';
 import type { MediaItem } from '../../../shared/types';
 import { mineToStudy, videoCoreStudyInput } from '../../studyMining';
+import { writeLocalStorageJson } from '../../localStorageWrite';
 
 export type MusicMineOutcome =
   | { kind: 'idle' }
@@ -114,10 +115,7 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
       const result = mined.ankiResult;
       if (result) {
         const entry = createVideoCoreMiningHistoryEntry(draft, result);
-        localStorage.setItem(
-          VIDEO_CORE_MINING_HISTORY_KEY,
-          JSON.stringify(appendVideoCoreMiningHistory(readHistory(), entry)),
-        );
+        writeLocalStorageJson(VIDEO_CORE_MINING_HISTORY_KEY, appendVideoCoreMiningHistory(readHistory(), entry));
       }
       if (mined.anki === 'added' && result?.ok) {
         setOutcome({
@@ -139,14 +137,8 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
       });
-      try {
-        localStorage.setItem(
-          VIDEO_CORE_MINING_HISTORY_KEY,
-          JSON.stringify(appendVideoCoreMiningHistory(readHistory(), entry)),
-        );
-      } catch {
-        // Storage full or unavailable — the outcome below still tells the user.
-      }
+      // Storage full or unavailable — the outcome below still tells the user.
+      writeLocalStorageJson(VIDEO_CORE_MINING_HISTORY_KEY, appendVideoCoreMiningHistory(readHistory(), entry));
       setOutcome({
         kind: 'error',
         index: line.index,
