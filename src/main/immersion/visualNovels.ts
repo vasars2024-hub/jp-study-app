@@ -352,11 +352,7 @@ function readStudyTimeQueue(): VisualNovelStudyTime[] {
 }
 
 function writeStudyTimeQueue(queue: VisualNovelStudyTime[]): void {
-  const file = studyTimePath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temporary = `${file}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(queue.slice(-200)), 'utf8');
-  fs.renameSync(temporary, file);
+  writeJsonAtomicSync(studyTimePath(), queue.slice(-200));
 }
 
 function queueStudyTime(item: VisualNovelStudyTime): void {
