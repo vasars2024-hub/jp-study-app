@@ -144,8 +144,18 @@ export interface WatchTitle {
   /** The source's own format label (MAL `series_type`: TV, Movie, OVA, ONA, Special, …). */
   format?: string;
   title: string;
+  /** The native-script title (`千と千尋の神隠し`). */
   originalTitle?: string;
-  /** Other names the sources know it by (MAL English/native/synonyms). */
+  /** The official English title (AniList `title.english`, Jikan `title_english`). */
+  englishTitle?: string;
+  /** The romanised title (AniList `title.romaji`, MAL's main title). */
+  romajiTitle?: string;
+  /**
+   * Every other name the sources know it by — MAL English/native/synonyms, and
+   * the English/romaji/native/synonyms a metadata lookup returned. The matcher
+   * reads these, which is how "Sen to Chihiro no Kamikakushi" (MAL) and
+   * "Spirited Away" (Letterboxd) find each other.
+   */
   altTitles?: string[];
   year?: number;
 
@@ -167,6 +177,11 @@ export interface WatchTitle {
   scoreScale?: WatchScoreScale;
   /** 0.5–5 when rated in stars. */
   stars?: number;
+  /**
+   * Ratings this title no longer shows. Two copies of one work merged with
+   * different ratings keep the newer; the other lands here rather than vanishing.
+   */
+  scoreHistory?: WatchScoreHistoryEntry[];
   /** Episodes watched. A film reads 1 once completed. */
   progress?: number;
   episodeCount?: number;
@@ -202,6 +217,12 @@ export interface WatchTitle {
   /** userData-relative 16:9 backdrop (TMDB / TVmaze), like `MediaItem.backdropPath`. */
   backdropPath?: string;
 
+  /**
+   * The next episode to air, from the airing-schedule job (`main/watchAiring.ts`,
+   * AniList). Absent when nothing is scheduled or the title has not been checked.
+   */
+  nextAiring?: WatchNextAiring;
+
   /** Media item ids the user linked by hand; always linked, whatever the matcher says. */
   pinnedMediaItemIds?: string[];
   /** Epoch ms of the last local playback that counted. */
@@ -215,6 +236,25 @@ export interface WatchTitle {
   fieldAt?: Partial<Record<WatchTrackedField, number>>;
   /** Tracked fields whose current value came from the user. */
   manual?: WatchTrackedField[];
+}
+
+/** A rating a merge displaced (see `WatchTitle.scoreHistory`). */
+export interface WatchScoreHistoryEntry {
+  score: number;
+  scale?: WatchScoreScale;
+  stars?: number;
+  /** Where the displaced rating came from. */
+  sources: WatchSource[];
+  /** When it was given (its `fieldAt.score`), if known. */
+  at?: number;
+  /** When it was displaced. */
+  replacedAt: number;
+}
+
+export interface WatchNextAiring {
+  episode: number;
+  /** Epoch ms. */
+  at: number;
 }
 
 /** A removed title, so a re-import of older data does not resurrect it. */
@@ -478,6 +518,8 @@ function cloneTitle(title: WatchTitle): WatchTitle {
     lists: [...title.lists],
     genres: title.genres ? [...title.genres] : undefined,
     pinnedMediaItemIds: title.pinnedMediaItemIds ? [...title.pinnedMediaItemIds] : undefined,
+    scoreHistory: title.scoreHistory ? title.scoreHistory.map((entry) => ({ ...entry, sources: [...entry.sources] })) : undefined,
+    nextAiring: title.nextAiring ? { ...title.nextAiring } : undefined,
     sources: [...title.sources],
     fieldAt: title.fieldAt ? { ...title.fieldAt } : undefined,
     manual: title.manual ? [...title.manual] : undefined,
@@ -920,6 +962,230 @@ export function removeWatchTitle(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Re-merge: two titles that turned out to be one work
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether two stored titles are the same work: they share an external id, or a
+ * normalised name (any of title / original / English / romaji / alternates)
+ * with the *same known year* and a compatible kind — and no id contradicts it.
+ * The name rule needs both years: "Your Name." with no year is not enough to
+ * swallow another title, because a wrong merge loses a row and a missed one
+ * only shows it twice.
+ */
+export function watchTitlesAreSameWork(a: WatchTitle, b: WatchTitle): boolean {
+  if (watchIdentitiesConflict(a, b)) return false;
+  const aIds = new Set(watchIdKeys(a));
+  if (watchIdKeys(b).some((key) => aIds.has(key))) return true;
+  if (a.year === undefined || b.year === undefined || a.year !== b.year) return false;
+  if (!watchKindsCompatible(a.kind, b.kind)) return false;
+  const aNames = new Set(watchTitleKeys(allNames(a)));
+  return watchTitleKeys(allNames(b)).some((key) => aNames.has(key));
+}
+
+function allNames(title: WatchTitle): Pick<WatchIdentityLike, 'title' | 'originalTitle' | 'altTitles'> {
+  return {
+    title: title.title,
+    originalTitle: title.originalTitle,
+    altTitles: [...(title.altTitles ?? []), ...(title.englishTitle ? [title.englishTitle] : []), ...(title.romajiTitle ? [title.romajiTitle] : [])],
+  };
+}
+
+/** The title whose id survives a merge: an id derived from an external key, then the oldest. */
+function mergePrimary(group: readonly WatchTitle[]): WatchTitle {
+  return [...group].sort((a, b) =>
+    Number(a.id.startsWith('t:')) - Number(b.id.startsWith('t:'))
+    || a.addedAt - b.addedAt
+    || a.id.localeCompare(b.id))[0];
+}
+
+/**
+ * The member whose value of `field` should win: a user edit beats imported
+ * data, then the most recent `fieldAt`, then the primary. Only members that
+ * hold a value compete.
+ */
+function fieldWinner(group: readonly WatchTitle[], primary: WatchTitle, field: WatchTrackedField, has: (title: WatchTitle) => boolean): WatchTitle | undefined {
+  const holders = group.filter(has);
+  if (!holders.length) return undefined;
+  return [...holders].sort((a, b) =>
+    Number(!!b.manual?.includes(field)) - Number(!!a.manual?.includes(field))
+    || (b.fieldAt?.[field] ?? 0) - (a.fieldAt?.[field] ?? 0)
+    || Number(b === primary) - Number(a === primary))[0];
+}
+
+const SCALAR_MERGE_FIELDS = [
+  'kind', 'status', 'progress', 'episodeCount', 'rewatchCount', 'startedAt', 'finishedAt',
+  'liked', 'favorite', 'notes', 'review', 'title', 'year',
+] as const satisfies readonly (WatchTrackedField & keyof WatchTitle)[];
+
+/** Folds a group of titles for one work into the primary. Pure. */
+export function mergeWatchTitleGroup(group: readonly WatchTitle[], now: number): WatchTitle {
+  const primary = mergePrimary(group);
+  const next = cloneTitle(primary);
+  const others = group.filter((title) => title !== primary);
+  const fieldAt: Partial<Record<WatchTrackedField, number>> = {};
+  const manual = new Set<WatchTrackedField>();
+  const take = (field: WatchTrackedField, winner: WatchTitle | undefined): void => {
+    if (!winner) return;
+    const at = winner.fieldAt?.[field];
+    if (at !== undefined) fieldAt[field] = at;
+    if (winner.manual?.includes(field)) manual.add(field);
+  };
+
+  // Identity: fill gaps from every member.
+  for (const other of others) {
+    if (next.malId === undefined && other.malId !== undefined) next.malId = other.malId;
+    if (next.anilistId === undefined && other.anilistId !== undefined) next.anilistId = other.anilistId;
+    if (next.tmdbId === undefined && other.tmdbId !== undefined) {
+      next.tmdbId = other.tmdbId;
+      next.tmdbType = other.tmdbType;
+    }
+    if (next.tvmazeId === undefined && other.tvmazeId !== undefined) next.tvmazeId = other.tvmazeId;
+    if (!next.imdbId && other.imdbId) next.imdbId = other.imdbId;
+    if (!next.letterboxdUri && other.letterboxdUri) next.letterboxdUri = other.letterboxdUri;
+    if (!next.originalTitle && other.originalTitle) next.originalTitle = other.originalTitle;
+    if (!next.englishTitle && other.englishTitle) next.englishTitle = other.englishTitle;
+    if (!next.romajiTitle && other.romajiTitle) next.romajiTitle = other.romajiTitle;
+    if (other.anime) next.anime = true;
+    if (!next.format && other.format) next.format = other.format;
+    for (const key of ['posterPath', 'posterUrl', 'bannerPath', 'backdropPath', 'runtimeMinutes', 'nextAiring'] as const) {
+      if (next[key] === undefined && other[key] !== undefined) (next as unknown as Record<string, unknown>)[key] = other[key];
+    }
+  }
+
+  // Scalars: the most recent user edit, else the most recent data.
+  for (const field of SCALAR_MERGE_FIELDS) {
+    const winner = fieldWinner(group, primary, field, (title) => title[field] !== undefined);
+    if (!winner) continue;
+    (next as unknown as Record<string, unknown>)[field] = winner[field];
+    take(field, winner);
+  }
+
+  // Score: never lost. The winner shows; every other distinct rating is kept.
+  const rated = group.filter((title) => title.score !== undefined);
+  const scoreWinner = fieldWinner(group, primary, 'score', (title) => title.score !== undefined);
+  const history = group.flatMap((title) => title.scoreHistory ?? []);
+  if (scoreWinner) {
+    next.score = scoreWinner.score;
+    next.scoreScale = scoreWinner.scoreScale;
+    next.stars = scoreWinner.stars;
+    take('score', scoreWinner);
+    for (const loser of rated) {
+      if (loser === scoreWinner || loser.score === scoreWinner.score) continue;
+      history.push({
+        score: loser.score as number,
+        scale: loser.scoreScale,
+        stars: loser.stars,
+        sources: [...loser.sources],
+        at: loser.fieldAt?.score,
+        replacedAt: now,
+      });
+    }
+  }
+  const seenHistory = new Set<string>();
+  next.scoreHistory = history.filter((entry) => {
+    const key = `${entry.score}|${entry.stars ?? ''}|${entry.at ?? ''}`;
+    if (seenHistory.has(key)) return false;
+    seenHistory.add(key);
+    return true;
+  }).slice(-20);
+
+  // Collections: union.
+  const own = watchTitleKey(next.title);
+  next.altTitles = uniqueStrings([
+    ...group.flatMap((title) => [title.title, ...(title.altTitles ?? [])]),
+  ]).filter((name) => watchTitleKey(name) !== own);
+  next.tags = uniqueStrings(group.flatMap((title) => title.tags));
+  next.lists = uniqueStrings(group.flatMap((title) => title.lists));
+  next.genres = uniqueStrings(group.flatMap((title) => title.genres ?? []));
+  next.watchDates = group.reduce<WatchDate[]>((acc, title) => mergeWatchDates(acc, title.watchDates), []);
+  const episodes = new Set(group.flatMap((title) => title.watchedEpisodes ?? []));
+  next.watchedEpisodes = episodes.size ? [...episodes].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : undefined;
+  next.pinnedMediaItemIds = uniqueStrings(group.flatMap((title) => title.pinnedMediaItemIds ?? []));
+  next.sources = WATCH_SOURCES.filter((source) => group.some((title) => title.sources.includes(source)));
+  for (const field of ['tags', 'lists', 'watchDates'] as const) {
+    const at = Math.max(0, ...group.map((title) => title.fieldAt?.[field] ?? 0));
+    if (at) fieldAt[field] = at;
+    if (group.some((title) => title.manual?.includes(field))) manual.add(field);
+  }
+  next.addedAt = Math.min(...group.map((title) => title.addedAt || Infinity).filter(Number.isFinite), now);
+  const lastWatched = Math.max(0, ...group.map((title) => title.lastWatchedAt ?? 0));
+  next.lastWatchedAt = lastWatched || undefined;
+  next.fieldAt = fieldAt;
+  next.manual = manual.size ? WATCH_TRACKED_FIELDS.filter((field) => manual.has(field)) : undefined;
+  next.updatedAt = now;
+  return compactTitle(next);
+}
+
+export interface WatchDuplicateMergeResult {
+  document: WatchLibraryDocument;
+  /** Surviving id → ids folded into it. */
+  merged: { into: string; from: string[] }[];
+}
+
+/**
+ * Folds every set of titles that are one work (see {@link watchTitlesAreSameWork})
+ * into one. Runs after metadata lookups, which is when a MAL row learns its
+ * English name and a Letterboxd film its AniList id. Idempotent: a document
+ * with nothing to merge comes back unchanged (same object).
+ */
+export function mergeDuplicateWatchTitles(document: WatchLibraryDocument, now: number): WatchDuplicateMergeResult {
+  const titles = document.titles;
+  const parent = titles.map((_, index) => index);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const members = new Map<number, number[]>(titles.map((_, index) => [index, [index]]));
+  const tryUnion = (i: number, j: number): void => {
+    const a = find(i);
+    const b = find(j);
+    if (a === b) return;
+    const groupA = members.get(a) ?? [];
+    const groupB = members.get(b) ?? [];
+    // Every pair across the two groups must be free of contradicting ids.
+    if (groupA.some((x) => groupB.some((y) => watchIdentitiesConflict(titles[x], titles[y])))) return;
+    parent[b] = a;
+    members.set(a, [...groupA, ...groupB]);
+    members.delete(b);
+  };
+
+  // Candidate pairs through the same buckets the index uses, not n².
+  const buckets = new Map<string, number[]>();
+  titles.forEach((title, index) => {
+    const keys = [
+      ...watchIdKeys(title),
+      ...(title.year !== undefined ? watchTitleKeys(allNames(title)).map((key) => `name:${key}|${title.year}`) : []),
+    ];
+    for (const key of keys) {
+      const list = buckets.get(key);
+      if (list) list.push(index);
+      else buckets.set(key, [index]);
+    }
+  });
+  for (const list of buckets.values()) {
+    if (list.length < 2) continue;
+    for (let i = 1; i < list.length; i += 1) {
+      for (let j = 0; j < i; j += 1) {
+        if (watchTitlesAreSameWork(titles[list[j]], titles[list[i]])) tryUnion(list[j], list[i]);
+      }
+    }
+  }
+
+  const groups = [...members.values()].filter((group) => group.length > 1);
+  if (!groups.length) return { document, merged: [] };
+  const replaced = new Map<number, WatchTitle | null>();
+  const merged: WatchDuplicateMergeResult['merged'] = [];
+  for (const group of groups) {
+    const combined = mergeWatchTitleGroup(group.map((index) => titles[index]), now);
+    const keep = group.find((index) => titles[index].id === combined.id) ?? group[0];
+    for (const index of group) replaced.set(index, index === keep ? combined : null);
+    merged.push({ into: combined.id, from: group.map((index) => titles[index].id).filter((id) => id !== combined.id) });
+  }
+  const next = titles
+    .map((title, index) => (replaced.has(index) ? replaced.get(index) : title))
+    .filter((title): title is WatchTitle => !!title);
+  return { document: { ...document, titles: next }, merged };
+}
+
 export function recordWatchImport(document: WatchLibraryDocument, record: WatchImportRecord): WatchLibraryDocument {
   return { ...document, imports: [record, ...document.imports].slice(0, WATCH_IMPORT_HISTORY_LIMIT) };
 }
@@ -1237,8 +1503,12 @@ export function watchObservationFromAdd(input: WatchAddInput & { kind: WatchKind
  */
 export interface WatchMetadataPatch {
   kind?: WatchKind;
+  /** The provider says this is anime (an AniList/MAL match for a Letterboxd film). */
+  anime?: boolean;
   year?: number;
   originalTitle?: string;
+  englishTitle?: string;
+  romajiTitle?: string;
   altTitles?: string[];
   episodeCount?: number;
   genres?: string[];
@@ -1272,7 +1542,10 @@ export function applyWatchMetadata(title: WatchTitle, meta: WatchMetadataPatch, 
   if (imdb && !next.imdbId) next.imdbId = imdb;
   if (isWatchKind(meta.kind) && !next.manual?.includes('kind')) next.kind = meta.kind;
   if (positiveInt(meta.year) !== undefined && !next.manual?.includes('year')) next.year = positiveInt(meta.year);
+  if (meta.anime === true) next.anime = true;
   if (nonEmptyString(meta.originalTitle)) next.originalTitle = nonEmptyString(meta.originalTitle);
+  if (nonEmptyString(meta.englishTitle)) next.englishTitle = nonEmptyString(meta.englishTitle);
+  if (nonEmptyString(meta.romajiTitle)) next.romajiTitle = nonEmptyString(meta.romajiTitle);
   if (meta.altTitles?.length) {
     const own = watchTitleKey(next.title);
     next.altTitles = uniqueStrings([...(next.altTitles ?? []), ...meta.altTitles]).filter((name) => watchTitleKey(name) !== own);
@@ -2070,6 +2343,31 @@ function optionalNumber(value: unknown): number | undefined {
   return isFiniteNumber(value) ? value : undefined;
 }
 
+function parseScoreHistory(value: unknown): WatchScoreHistoryEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: WatchScoreHistoryEntry[] = [];
+  for (const row of value) {
+    const r = asRecord(row);
+    if (!isFiniteNumber(r.score)) continue;
+    out.push({
+      score: clampScore(r.score),
+      scale: r.scale === 'ten' || r.scale === 'stars' ? r.scale : undefined,
+      stars: isFiniteNumber(r.stars) ? clampStars(r.stars) : undefined,
+      sources: Array.isArray(r.sources) ? WATCH_SOURCES.filter((s) => (r.sources as unknown[]).includes(s)) : [],
+      at: optionalNumber(r.at),
+      replacedAt: optionalNumber(r.replacedAt) ?? 0,
+    });
+  }
+  return out.length ? out.slice(-20) : undefined;
+}
+
+function parseNextAiring(value: unknown): WatchNextAiring | undefined {
+  const r = asRecord(value);
+  const episode = positiveInt(r.episode);
+  const at = optionalNumber(r.at);
+  return episode !== undefined && at !== undefined ? { episode, at } : undefined;
+}
+
 function parseTitle(value: unknown): WatchTitle | undefined {
   const r = asRecord(value);
   const id = nonEmptyString(r.id);
@@ -2097,6 +2395,8 @@ function parseTitle(value: unknown): WatchTitle | undefined {
     format: nonEmptyString(r.format),
     title,
     originalTitle: nonEmptyString(r.originalTitle),
+    englishTitle: nonEmptyString(r.englishTitle),
+    romajiTitle: nonEmptyString(r.romajiTitle),
     altTitles: stringList(r.altTitles),
     year: positiveInt(r.year),
     malId: positiveInt(r.malId),
@@ -2110,6 +2410,7 @@ function parseTitle(value: unknown): WatchTitle | undefined {
     score: isFiniteNumber(r.score) ? clampScore(r.score) : undefined,
     scoreScale,
     stars: isFiniteNumber(r.stars) ? clampStars(r.stars) : undefined,
+    scoreHistory: parseScoreHistory(r.scoreHistory),
     progress: nonNegativeInt(r.progress),
     episodeCount: positiveInt(r.episodeCount),
     rewatchCount: nonNegativeInt(r.rewatchCount),
@@ -2129,6 +2430,7 @@ function parseTitle(value: unknown): WatchTitle | undefined {
     posterUrl: nonEmptyString(r.posterUrl),
     bannerPath: nonEmptyString(r.bannerPath),
     backdropPath: nonEmptyString(r.backdropPath),
+    nextAiring: parseNextAiring(r.nextAiring),
     pinnedMediaItemIds: stringList(r.pinnedMediaItemIds),
     lastWatchedAt: optionalNumber(r.lastWatchedAt),
     sources: sources.length ? sources : ['manual'],

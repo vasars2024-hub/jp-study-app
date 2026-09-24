@@ -60,6 +60,10 @@ export interface ProviderWork {
   titles: string[];
   displayTitle: string;
   nativeTitle?: string;
+  /** The official English title, when the provider has one (AniList `title.english`, Jikan `title_english`). */
+  englishTitle?: string;
+  /** The romanised title (AniList `title.romaji`, MAL's own main title). */
+  romajiTitle?: string;
   synopsis?: string;
   year?: number;
   format?: string;
@@ -188,6 +192,8 @@ function jikanToWork(anime: JikanAnime): ProviderWork {
     titles: [...new Set(titles.map((t) => t.trim()))],
     displayTitle: text(anime.title_english) ?? text(anime.title) ?? titles[0] ?? '',
     nativeTitle: text(anime.title_japanese),
+    englishTitle: text(anime.title_english),
+    romajiTitle: text(anime.title),
     synopsis: text(anime.synopsis),
     year: num(anime.year) ?? (Number.isFinite(airedYear) ? airedYear : undefined),
     format: text(anime.type),
@@ -416,6 +422,8 @@ function anilistToWork(media: AnilistMedia): ProviderWork {
     titles: [...new Set(titles.map((t) => t.trim()))],
     displayTitle: text(media.title?.english) ?? text(media.title?.romaji) ?? titles[0] ?? '',
     nativeTitle: text(media.title?.native),
+    englishTitle: text(media.title?.english),
+    romajiTitle: text(media.title?.romaji),
     // AniList descriptions carry light HTML even with asHtml:false.
     synopsis: text(media.description?.replace(/<[^>]+>/g, '').replace(/\s+\n/g, '\n')),
     year: num(media.startDate?.year ?? undefined),

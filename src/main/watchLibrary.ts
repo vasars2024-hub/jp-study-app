@@ -35,6 +35,7 @@ import {
   emptyWatchLibrary,
   findWatchTitleForMedia,
   malLibraryEntriesToObservations,
+  mergeDuplicateWatchTitles,
   mergeWatchObservations,
   parseWatchLibraryDocument,
   queryWatchLibrary,
@@ -49,6 +50,7 @@ import {
   WATCH_COMPLETE_FRACTION,
   WATCH_LIBRARY_SCHEMA_VERSION,
   WATCH_LIBRARY_STORE_FILE,
+  type WatchDuplicateMergeResult,
   type WatchImportRecord,
   type WatchLibraryDocument,
   type WatchLinkableMedia,
@@ -64,6 +66,7 @@ import {
   looksLikeMalExport,
   malExportRowsToListEntries,
   malExportRowsToObservations,
+  malExportLatestDate,
   malExportTimestampFromFileName,
   parseMalExportXml,
 } from '../shared/imports/malExport';
@@ -488,6 +491,21 @@ export function setWatchTitleMetadata(id: string, meta: WatchMetadataPatch, now:
   return next;
 }
 
+/**
+ * Folds titles that turned out to be one work — a MAL row and a Letterboxd
+ * film that metadata gave the same AniList id, or the same name and year once
+ * the MAL row learnt its English title. Runs after each metadata pass.
+ */
+export function mergeWatchLibraryDuplicates(now: number = Date.now()): WatchDuplicateMergeResult['merged'] {
+  const document = loadCurrent(now);
+  const result = mergeDuplicateWatchTitles(document, now);
+  if (!result.merged.length) return [];
+  writeWatchLibrary(result.document);
+  const ids = result.merged.flatMap((entry) => [entry.into, ...entry.from]);
+  broadcast({ reason: 'metadata', ids, at: now });
+  return result.merged;
+}
+
 /** Titles with no provider id at all — what a TMDB title+year search should visit. */
 export function listWatchTitlesNeedingLookup(): WatchTitle[] {
   return loadCurrent(Date.now()).titles.filter(watchTitleNeedsLookup);
@@ -522,7 +540,7 @@ export interface WatchImportSummary {
   source: 'mal-export' | 'letterboxd';
   format: WatchImportFormat;
   fileName: string;
-  /** When the export was made (from its file name, else the file's mtime). */
+  /** When the export was made (from its file name, else the newest date inside it). */
   exportedAt?: number;
   /** MAL user name / Letterboxd username, when the export names one. */
   username?: string;
@@ -702,7 +720,10 @@ export function importWatchFile(filePath: unknown, now: number = Date.now()): Wa
         ? failure('watchLibrary.import.error.mangaOnly')
         : failure('watchLibrary.import.error.empty');
     }
-    const exportedAt = malExportTimestampFromFileName(fileName) ?? (stat.mtimeMs || undefined);
+    // The export's own name, else the newest date inside it — never the file's
+    // mtime, which a copy resets to "now" and would let an old export overrule
+    // newer edits (the same rule the Letterboxd branch below follows).
+    const exportedAt = malExportTimestampFromFileName(fileName) ?? malExportLatestDate(parsed.anime);
     const observations = malExportRowsToObservations(parsed.anime, exportedAt);
     const merged = mergeWatchObservations(document, observations, now);
 

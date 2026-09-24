@@ -28,7 +28,9 @@ const script = {
   tmdbMovie: null as MetadataMatch<ProviderWork> | null,
   tvmaze: null as MetadataMatch<ProviderWork> | null,
   anilistByMal: null as ProviderWork | null,
+  anilistSearch: [] as ProviderWork[],
 };
+const merges: number[] = [];
 const asked: string[] = [];
 
 vi.mock('../watchLibrary', () => ({
@@ -39,6 +41,10 @@ vi.mock('../watchLibrary', () => ({
     return store.titles.find((title) => title.id === id) ?? null;
   },
   onWatchLibraryChanged: () => () => undefined,
+  mergeWatchLibraryDuplicates: (now: number) => {
+    merges.push(now);
+    return [];
+  },
 }));
 vi.mock('../mediaProviderClients', () => ({
   anilistByMalId: async (id: number) => {
@@ -46,7 +52,10 @@ vi.mock('../mediaProviderClients', () => ({
     return script.anilistByMal;
   },
   anilistById: async () => null,
-  anilistSearch: async () => [],
+  anilistSearch: async (query: string) => {
+    asked.push(`anilist:search:${query}`);
+    return script.anilistSearch;
+  },
   jikanById: async () => null,
   jikanSearch: async () => [],
   downloadArtwork: async (url: string, name: string) => `artwork/${name}${url.length}.jpg`,
@@ -97,7 +106,8 @@ beforeEach(() => {
   store.titles = [];
   written.length = 0;
   asked.length = 0;
-  Object.assign(script, { tmdbKey: true, tmdbMovie: null, tvmaze: null, anilistByMal: null });
+  Object.assign(script, { tmdbKey: true, tmdbMovie: null, tvmaze: null, anilistByMal: null, anilistSearch: [] });
+  merges.length = 0;
   rmSync(join(userData, 'watch-metadata-attempts.json'), { force: true });
 });
 
@@ -111,8 +121,10 @@ describe('watchLookupPlan', () => {
     expect(watchLookupPlan(title('a', { kind: 'anime' }), { tmdb: false })?.step).toBe('anime-search');
   });
 
-  it('leaves a Letterboxd film alone without a TMDB key, unless it is anime', () => {
+  it('asks AniList about a Letterboxd film without a TMDB key, only when it has a year', () => {
     expect(watchLookupPlan(title('f', { kind: 'film' }), { tmdb: false })).toBeNull();
+    expect(watchLookupPlan(title('f', { kind: 'film', year: 2001 }), { tmdb: false }))
+      .toEqual({ step: 'anime-film-search', providers: ['anilist'] });
     expect(watchLookupPlan(title('f', { kind: 'film', anime: true }), { tmdb: false })?.step).toBe('anime-search');
   });
 
@@ -194,14 +206,35 @@ describe('runWatchLibraryMetadata', () => {
     expect(asked).toHaveLength(1);
   });
 
-  it('skips a film entirely without a TMDB key — no request, no attempt', async () => {
+  it('without a TMDB key, identifies an anime film through AniList and stores every name', async () => {
     script.tmdbKey = false;
     store.titles = [title('lb:boxd.it/abc', { title: 'Spirited Away', year: 2001 })];
-    expect(await runWatchLibraryMetadata()).toEqual({ looked: 0, filled: 0 });
-    expect(asked).toEqual([]);
-    // …and a key added later reaches it at once.
+    const film: ProviderWork = {
+      provider: 'anilist', id: 199, anilistId: 199, malId: 199, year: 2001, format: 'MOVIE',
+      titles: ['Sen to Chihiro no Kamikakushi', 'Spirited Away', '千と千尋の神隠し'],
+      displayTitle: 'Spirited Away', englishTitle: 'Spirited Away', romajiTitle: 'Sen to Chihiro no Kamikakushi', nativeTitle: '千と千尋の神隠し',
+    };
+    // Same name, wrong year and wrong format: never accepted.
+    script.anilistSearch = [{ ...film, id: 5, anilistId: 5, malId: 5, year: 2019, format: 'TV' }, film];
+    expect(await runWatchLibraryMetadata()).toEqual({ looked: 1, filled: 1 });
+    expect(asked).toEqual(['anilist:search:Spirited Away']);
+    expect(written[0].meta).toMatchObject({
+      anilistId: 199, malId: 199, anime: true,
+      englishTitle: 'Spirited Away', romajiTitle: 'Sen to Chihiro no Kamikakushi', originalTitle: '千と千尋の神隠し',
+    });
+    expect(written[0].meta.altTitles).toContain('Sen to Chihiro no Kamikakushi');
+    expect(merges, 'the pass re-merges duplicates once it is done').toHaveLength(1);
+  });
+
+  it('leaves a live-action film alone when AniList has no film of that year', async () => {
+    script.tmdbKey = false;
+    store.titles = [title('lb:boxd.it/1Ekq', { title: 'Crouching Tiger, Hidden Dragon', year: 2000 })];
+    expect(await runWatchLibraryMetadata()).toEqual({ looked: 1, filled: 0 });
+    expect(written).toEqual([]);
+    // …and a key added later reaches it at once: TMDB is a new provider for the plan.
     script.tmdbKey = true;
+    asked.length = 0;
     await runWatchLibraryMetadata();
-    expect(asked).toEqual(['tmdb:movie:Spirited Away:2001']);
+    expect(asked).toEqual(['tmdb:movie:Crouching Tiger, Hidden Dragon:2000']);
   });
 });

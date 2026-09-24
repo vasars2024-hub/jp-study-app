@@ -14,6 +14,7 @@ import {
   findWatchTitleForMedia,
   linkMediaToTitles,
   malLibraryEntriesToObservations,
+  mergeDuplicateWatchTitles,
   mergeWatchObservations,
   normalizeLetterboxdUri,
   normalizeWatchDate,
@@ -792,5 +793,32 @@ describe('manual add and metadata', () => {
       runtimeMinutes: 330, posterPath: 'artwork/poster-x.jpg', episodeCount: 5, updatedAt: T2,
     });
     expect(watchTitleNeedsLookup(makeTitle({ id: 'z', title: 'Z', letterboxdUri: 'https://boxd.it/zz' }))).toBe(true);
+  });
+});
+
+describe('mergeDuplicateWatchTitles', () => {
+  const base = (id: string, extra: Partial<import('../watchLibrary').WatchTitle>): import('../watchLibrary').WatchTitle => ({
+    id, kind: 'film', title: id, status: 'completed', watchDates: [], tags: [], lists: [], sources: ['manual'], addedAt: 1, updatedAt: 1, ...extra,
+  });
+  it('never merges titles whose ids contradict, even with the same name and year', () => {
+    const doc = { ...emptyWatchLibrary(), titles: [
+      base('mal:1', { title: 'Twin', year: 2000, malId: 1 }),
+      base('mal:2', { title: 'Twin', year: 2000, malId: 2 }),
+    ] };
+    const result = mergeDuplicateWatchTitles(doc, 5);
+    expect(result.merged).toEqual([]);
+    expect(result.document).toBe(doc);
+  });
+  it('merges on a shared external id and keeps both sources', () => {
+    const doc = { ...emptyWatchLibrary(), titles: [
+      base('a', { title: 'A', anilistId: 7, sources: ['letterboxd'], tags: ['x'] }),
+      base('b', { title: 'B', anilistId: 7, sources: ['mal-export'], tags: ['y'], addedAt: 0 }),
+    ] };
+    const { document, merged } = mergeDuplicateWatchTitles(doc, 5);
+    expect(merged).toEqual([{ into: 'b', from: ['a'] }]);
+    expect(document.titles).toHaveLength(1);
+    expect(document.titles[0].sources).toEqual(['mal-export', 'letterboxd']);
+    expect(document.titles[0].tags).toEqual(['x', 'y']);
+    expect(document.titles[0].altTitles).toContain('A');
   });
 });
