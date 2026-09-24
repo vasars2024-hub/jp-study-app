@@ -1649,8 +1649,8 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
   {
     id: 'media-tracking-manager',
-    titleKey: 'trackingMgmt.title',
-    descKey: 'trackingMgmt.description',
+    titleKey: 'media.tracking.settingsTitle',
+    descKey: 'media.tracking.settingsDesc',
     keywords: ['tracking', 'progress', 'watched', 'anilist', 'myanimelist', 'sync'],
     pageId: 'scraper',
     group: 'Media',

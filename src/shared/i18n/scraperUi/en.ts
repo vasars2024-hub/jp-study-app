@@ -668,48 +668,6 @@ export const SCRAPER_UI_EN: Catalog = {
   },
   'videoServer.importFailed': 'Import failed.',
 
-  // Tracking management (settings › scraper). `status.*` and `style.*` label
-  // stored enum values; the <option value> stays the enum in every language.
-  'trackingMgmt.title': 'Tracking management',
-  'trackingMgmt.description':
-    'Correct local progress, totals, ratings, notes, favorites, and playback-language preferences.',
-  'trackingMgmt.find': 'Find tracked identity',
-  'trackingMgmt.findPlaceholder': 'Identity ID',
-  'trackingMgmt.noMatches': 'No matching tracked titles.',
-  'trackingMgmt.saved': 'Tracking changes saved locally.',
-  'trackingMgmt.rejected': 'Change rejected: {reason}.',
-  // `{reason}` above: one per rejection code in shared/mediaTrackingManagement.ts,
-  // written as a clause because the sentence around it supplies the full stop.
-  'trackingMgmt.removed': 'Tracking entry removed locally.',
-  'trackingMgmt.offlineNote': 'Offline only. This surface does not contact or execute media providers.',
-  'trackingMgmt.partition': '{type} partition',
-  'trackingMgmt.statusLabel': 'Status',
-  'trackingMgmt.status.planned': 'Planned',
-  'trackingMgmt.status.watching': 'Watching',
-  'trackingMgmt.status.completed': 'Completed',
-  'trackingMgmt.status.on-hold': 'On hold',
-  'trackingMgmt.status.dropped': 'Dropped',
-  'trackingMgmt.rating': 'Rating (0–100)',
-  'trackingMgmt.favorite': 'Favorite',
-  'trackingMgmt.audioLanguage': 'Audio language',
-  'trackingMgmt.subtitleLanguage': 'Subtitle language',
-  'trackingMgmt.secondarySubtitles': 'Secondary subtitles',
-  'trackingMgmt.subtitleStyle': 'Subtitle style',
-  'trackingMgmt.style.full': 'full',
-  'trackingMgmt.style.signs-songs': 'signs and songs',
-  'trackingMgmt.style.forced': 'forced',
-  'trackingMgmt.notes': 'Notes',
-  'trackingMgmt.watched': 'Watched',
-  'trackingMgmt.totalEpisodes': 'Total episodes',
-  'trackingMgmt.totalSeasons': 'Total seasons',
-  'trackingMgmt.season': 'Season',
-  'trackingMgmt.episode': 'Episode',
-  'trackingMgmt.seasonAria': 'Season for episode {episode}',
-  'trackingMgmt.episodeAria': 'Episode {episode}',
-  'trackingMgmt.removeMark': 'Remove mark',
-  'trackingMgmt.addMark': 'Add episode mark',
-  'trackingMgmt.removeEntry': 'Remove tracking entry',
-
   // ---- Scraper app chrome (scrApp.*) — batch 1 of the strings.ts migration ----
   // Moved out of renderer/components/scraper/strings.ts on 2026-08-30, which had
   // deferred i18n for the whole app on the grounds that its surfaces were shells.

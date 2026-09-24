@@ -669,48 +669,6 @@ export const SCRAPER_UI_RU: Catalog = {
   },
   'videoServer.importFailed': 'Не удалось импортировать.',
 
-  // Управление отслеживанием (настройки › скрапер). `{episode}` и `{type}` —
-  // не `{count}`, поэтому строки построены так, чтобы ничему не пришлось
-  // согласовываться с числом.
-  'trackingMgmt.title': 'Управление отслеживанием',
-  'trackingMgmt.description':
-    'Исправляйте локальный прогресс, общее количество, оценки, заметки, избранное и языковые настройки воспроизведения.',
-  'trackingMgmt.find': 'Найти отслеживаемый идентификатор',
-  'trackingMgmt.findPlaceholder': 'ID идентификатора',
-  'trackingMgmt.noMatches': 'Подходящих отслеживаемых наименований нет.',
-  'trackingMgmt.saved': 'Изменения отслеживания сохранены локально.',
-  'trackingMgmt.rejected': 'Изменение отклонено: {reason}.',
-  'trackingMgmt.removed': 'Запись отслеживания удалена локально.',
-  'trackingMgmt.offlineNote':
-    'Только офлайн. Этот экран не обращается к поставщикам медиа и не запускает их.',
-  'trackingMgmt.partition': 'раздел — {type}',
-  'trackingMgmt.statusLabel': 'Состояние',
-  'trackingMgmt.status.planned': 'Запланировано',
-  'trackingMgmt.status.watching': 'Смотрю',
-  'trackingMgmt.status.completed': 'Завершено',
-  'trackingMgmt.status.on-hold': 'Отложено',
-  'trackingMgmt.status.dropped': 'Брошено',
-  'trackingMgmt.rating': 'Оценка (0–100)',
-  'trackingMgmt.favorite': 'В избранном',
-  'trackingMgmt.audioLanguage': 'Язык звука',
-  'trackingMgmt.subtitleLanguage': 'Язык субтитров',
-  'trackingMgmt.secondarySubtitles': 'Вторые субтитры',
-  'trackingMgmt.subtitleStyle': 'Тип субтитров',
-  'trackingMgmt.style.full': 'полные',
-  'trackingMgmt.style.signs-songs': 'надписи и песни',
-  'trackingMgmt.style.forced': 'форсированные',
-  'trackingMgmt.notes': 'Заметки',
-  'trackingMgmt.watched': 'Просмотрено',
-  'trackingMgmt.totalEpisodes': 'Всего серий',
-  'trackingMgmt.totalSeasons': 'Всего сезонов',
-  'trackingMgmt.season': 'Сезон',
-  'trackingMgmt.episode': 'Серия',
-  'trackingMgmt.seasonAria': 'Сезон для серии — {episode}',
-  'trackingMgmt.episodeAria': 'Серия — {episode}',
-  'trackingMgmt.removeMark': 'Удалить отметку',
-  'trackingMgmt.addMark': 'Добавить отметку серии',
-  'trackingMgmt.removeEntry': 'Удалить запись отслеживания',
-
   // ---- Scraper app chrome (scrApp.*) — batch 1 ----
   // See ./en.ts for why these moved out of renderer/components/scraper/strings.ts.
   // Counts use CLDR one/few/many, which is the only way Russian reads correctly.
