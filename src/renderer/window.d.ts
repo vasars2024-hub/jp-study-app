@@ -1160,9 +1160,11 @@ declare global {
       /**
        * The discovered subtitle track for a local video, by path and side-effect free.
        * The adopted workspace has only a path, and the sidecar only sees inside the
-       * container — see `media:subtitleForPath` for the measurement.
+       * container — see `media:subtitleForPath` for the measurement. `lang` returns that
+       * language's track instead (library record, else a `.en.srt`/`.eng.srt`/`.en.ass`
+       * sidecar), for a second line under a file the library has never seen.
        */
-      subtitleForPath(filePath: string, options?: { intent?: 'play' }): Promise<SubtitlePick | null>;
+      subtitleForPath(filePath: string, options?: { intent?: 'play'; lang?: string }): Promise<SubtitlePick | null>;
       /**
        * The helper line (English unless the user chose another) for a local video,
        * never the same track as `subtitleForPath`'s. `machineTranslated` marks the

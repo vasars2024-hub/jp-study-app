@@ -62,6 +62,7 @@ import {
 } from './subtitleDiscoveryAuto';
 import type { SecondarySubtitlePick } from '../shared/subtitleDiscoveryStatus';
 import { estimateSubtitleOffset } from './subtitleSync';
+import { pickSidecarSubtitleForLanguage, sidecarTagMatches } from './subtitleSidecar';
 import type { SubtitleSyncEstimate } from '../shared/subtitleSync';
 import { mt } from './i18n';
 import type { ExternalPlayerProfile, PlaybackHandoff } from '../shared/externalPlayer';
@@ -1466,9 +1467,26 @@ export function registerMediaIpc(): void {
   };
   ipcMain.handle(
     'media:subtitleForPath',
-    (_e, filePath: string, options?: { intent?: 'play' }): SubtitlePick | null => {
+    (_e, filePath: string, options?: { intent?: 'play'; lang?: string }): SubtitlePick | null => {
       if (typeof filePath !== 'string' || !filePath.trim()) return null;
       const item = itemForPath(filePath);
+
+      // `lang` asks for one language's track rather than the study pick — the
+      // player's second line (English under a Japanese video). A file the
+      // library has never seen can only answer from a sidecar beside it
+      // (`.en.srt`, `.eng.srt`, `.en.ass`), which the renderer cannot read.
+      const lang = options && typeof options === 'object' && typeof options.lang === 'string' ? options.lang.trim() : '';
+      if (lang) {
+        if (item) {
+          const record = pickPlaybackSubtitle(
+            (item.subtitles ?? []).filter((entry) => sidecarTagMatches(entry.lang ?? '', lang)),
+            lang,
+          );
+          const text = record ? readSubtitleRecord(record) : null;
+          if (record && text) return { name: record.label ?? `${record.lang} (${record.source})`, text };
+        }
+        return pickSidecarSubtitleForLanguage(filePath, lang);
+      }
 
       // The player says `intent: 'play'` when it mounts; nothing else does (the
       // lexicon search walks the whole library through this same handler, and a

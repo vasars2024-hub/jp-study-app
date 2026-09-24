@@ -1907,9 +1907,10 @@ const api = {
    *
    * The adopted workspace opens files through the sidecar, which only sees what is inside
    * the container — so a downloaded (Jimaku/OpenSubtitles) track was invisible to it. See
-   * the handler for the measurement.
+   * the handler for the measurement. `lang` asks for that language's track instead of the
+   * study pick — a library record, else a `<stem>.<lang>.srt|ass|vtt` sidecar beside the file.
    */
-  subtitleForPath: (filePath: string, options?: { intent?: 'play' }): Promise<SubtitlePick | null> =>
+  subtitleForPath: (filePath: string, options?: { intent?: 'play'; lang?: string }): Promise<SubtitlePick | null> =>
     ipcRenderer.invoke('media:subtitleForPath', filePath, options),
   /** The helper line (English by default) for a local video; see `media:secondarySubtitleForPath`. */
   secondarySubtitleForPath: (
