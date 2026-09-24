@@ -100,6 +100,28 @@ describe('library:remove validates the id before deleting anything', () => {
     expect(() => lib.itemDir('../x')).toThrow();
   });
 
+  it('refuses a trailing dot or space, which Windows strips into another item’s folder', () => {
+    const { item } = lib.importGeneratedArticle({ title: 'Keep', html: '<p>k</p>' });
+    const id = item?.id ?? '';
+    for (const bad of [`${id}.`, `${id} `, `${id}. `, ` ${id}`]) {
+      expect(lib.isSafeLibraryItemId(bad), JSON.stringify(bad)).toBe(false);
+      expect(() => call('library:remove', bad)).toThrow(/Invalid library item id/);
+    }
+    expect(fs.existsSync(lib.itemDir(id))).toBe(true);
+    expect(readFile().some((i) => i.id === id)).toBe(true);
+  });
+
+  it('deletes nothing for an id the library does not know', () => {
+    const { item } = lib.importGeneratedArticle({ title: 'Keep', html: '<p>k</p>' });
+    const stray = path.join(lib.libraryRoot(), 'not-an-item');
+    fs.mkdirSync(stray, { recursive: true });
+    const before = readFile().length;
+    call('library:remove', 'not-an-item');
+    expect(fs.existsSync(stray)).toBe(true);
+    expect(readFile()).toHaveLength(before);
+    expect(fs.existsSync(lib.itemDir(item?.id ?? ''))).toBe(true);
+  });
+
   it('removes a real item', () => {
     const { item } = lib.importGeneratedArticle({ title: 'Gone', html: '<p>g</p>' });
     const id = item?.id ?? '';

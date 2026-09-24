@@ -126,10 +126,15 @@ function configPath(): string {
  * from the renderer (`library:remove`) and from `media://` URLs, and
  * `library:remove` deletes `itemDir(id)` recursively — so `..`, separators,
  * drive letters or an empty id must never reach `path.join` (audit robust #4).
+ *
+ * Nor may a trailing dot or space: Windows strips them from a path segment, so
+ * `"<otherId>."` names `<otherId>`'s folder and removing it deleted another
+ * item's files.
  */
 export function isSafeLibraryItemId(id: unknown): id is string {
   if (typeof id !== 'string') return false;
   if (!id || id.length > 200 || id.includes('..')) return false;
+  if (/[. ]$/.test(id) || /^ /.test(id)) return false;
   // eslint-disable-next-line no-control-regex -- control characters are exactly what is being rejected
   if (/[\\/:*?"<>|\u0000-\u001f]/.test(id)) return false;
   const root = path.resolve(libraryRoot());
@@ -1595,9 +1600,13 @@ export function registerLibraryIpc(): void {
     // Validated BEFORE anything is deleted: an id from the renderer is joined
     // onto the library root and removed recursively.
     if (!isSafeLibraryItemId(id)) throw new Error('Invalid library item id');
+    // Only an item the library knows is deleted: a folder is removed because
+    // its entry is, never because a name that happens to resolve to one came in.
+    const current = readDb();
+    if (!current.some((it) => it.id === id)) return current;
     fs.rmSync(itemDir(id), { recursive: true, force: true });
     pendingProgress.delete(id);
-    const items = readDb().filter((it) => it.id !== id);
+    const items = current.filter((it) => it.id !== id);
     writeDb(items);
     return items;
   });
