@@ -90,6 +90,25 @@ export interface AiredEpisode {
  * watched, not yet announced. `notified` maps title id → the last episode
  * announced; the caller records what it announces there.
  */
+/**
+ * The keys an announcement is remembered under: the MAL and AniList ids, which
+ * survive a dedupe merge, and the title id as a fallback (and for state written
+ * before the ids were used). Keyed by title id alone, a merge that removed the
+ * announced copy made the survivor announce the same episode again.
+ */
+export function airingNotifyKeys(title: Pick<WatchTitle, 'id' | 'malId' | 'anilistId'>): string[] {
+  const keys: string[] = [];
+  if (title.malId !== undefined) keys.push(`mal:${title.malId}`);
+  if (title.anilistId !== undefined) keys.push(`anilist:${title.anilistId}`);
+  keys.push(title.id);
+  return keys;
+}
+
+/** The last episode announced for `title` under any of its keys. */
+export function lastAnnouncedEpisode(title: Pick<WatchTitle, 'id' | 'malId' | 'anilistId'>, notified: Readonly<Record<string, number>>): number {
+  return Math.max(0, ...airingNotifyKeys(title).map((key) => notified[key] ?? 0));
+}
+
 export function airedEpisodesToAnnounce(
   titles: readonly WatchTitle[],
   notified: Readonly<Record<string, number>>,
@@ -99,7 +118,7 @@ export function airedEpisodesToAnnounce(
   for (const title of titles) {
     const next = title.nextAiring;
     if (!next || next.at > now || !AIRING_NOTIFY_STATUSES.includes(title.status)) continue;
-    if ((notified[title.id] ?? 0) >= next.episode) continue;
+    if (lastAnnouncedEpisode(title, notified) >= next.episode) continue;
     // Already watched that far (a fast viewer, or a delayed check): nothing new.
     if ((title.progress ?? 0) >= next.episode) continue;
     out.push({ titleId: title.id, title: title.title, episode: next.episode, at: next.at });

@@ -17,6 +17,7 @@ import { app, BrowserWindow, ipcMain, net } from 'electron';
 import path from 'node:path';
 import {
   airedEpisodesToAnnounce,
+  airingNotifyKeys,
   airingBatches,
   airingCandidates,
   planAiringUpdates,
@@ -47,7 +48,7 @@ interface AiringState {
   lastCheckedAt: number | null;
   lastError: WatchAiringStatus['lastError'];
   checked: number;
-  /** Title id → last episode announced. */
+  /** `mal:<id>` / `anilist:<id>` / title id → last episode announced (see `airingNotifyKeys`). */
   notified: Record<string, number>;
 }
 
@@ -122,10 +123,33 @@ export function watchAiringStatus(now: number = Date.now()): WatchAiringStatus {
 
 /** Announces episodes that have aired (no network needed), once each. */
 function announceAired(state: AiringState, now: number): void {
-  const due = airedEpisodesToAnnounce(readWatchLibrary().titles, state.notified, now);
+  const titles = readWatchLibrary().titles;
+  const due = airedEpisodesToAnnounce(titles, state.notified, now);
   if (!due.length) return;
   if (!deps.announce(due)) return;
-  for (const episode of due) state.notified[episode.titleId] = episode.episode;
+  const byId = new Map(titles.map((title) => [title.id, title]));
+  for (const episode of due) {
+    const title = byId.get(episode.titleId);
+    for (const key of title ? airingNotifyKeys(title) : [episode.titleId]) state.notified[key] = episode.episode;
+  }
+}
+
+/**
+ * A dedupe merge removed titles: what was announced for them now belongs to the
+ * title they were folded into, so the survivor does not announce it again.
+ */
+export function carryAiringStateOverMerge(merged: readonly { into: string; from: readonly string[] }[]): void {
+  if (!merged.length) return;
+  const state = readState();
+  let changed = false;
+  for (const { into, from } of merged) {
+    const best = Math.max(state.notified[into] ?? 0, ...from.map((id) => state.notified[id] ?? 0));
+    if (best > (state.notified[into] ?? 0)) {
+      state.notified[into] = best;
+      changed = true;
+    }
+  }
+  if (changed) writeState(state);
 }
 
 /** One check. Never throws. */
@@ -191,6 +215,7 @@ export function registerWatchAiring(): void {
   ipcMain.handle('watchAiring:status', () => watchAiringStatus());
   ipcMain.handle('watchAiring:refresh', () => runWatchAiringCheck());
   onWatchLibraryChanged((event) => {
+    if (event.merged?.length) carryAiringStateOverMerge(event.merged);
     if (event.reason !== 'import' && event.reason !== 'add' && event.reason !== 'mal-sync' && event.reason !== 'update') return;
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(() => {

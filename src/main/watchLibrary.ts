@@ -245,6 +245,8 @@ export interface WatchChangedEvent {
   /** Titles touched, when known and few; absent means "re-query everything". */
   ids?: string[];
   at: number;
+  /** A dedupe merge: which titles were folded into which, so per-title state can follow. */
+  merged?: { into: string; from: string[] }[];
 }
 
 /** Main-process subscribers — the metadata pass (`watchLibraryMetadata.ts`) listens for imports. */
@@ -520,7 +522,7 @@ export function mergeWatchLibraryDuplicates(now: number = Date.now()): WatchDupl
   if (!result.merged.length) return [];
   writeWatchLibrary(result.document);
   const ids = result.merged.flatMap((entry) => [entry.into, ...entry.from]);
-  broadcast({ reason: 'metadata', ids, at: now });
+  broadcast({ reason: 'metadata', ids, at: now, merged: result.merged });
   return result.merged;
 }
 

@@ -18,7 +18,7 @@ vi.mock('electron', () => ({
 
 import { __setWatchLibraryPathsForTests, addWatchTitle, readWatchLibrary, updateWatchTitle } from '../watchLibrary';
 import { __setMalLibraryPathForTests } from '../malLibrary';
-import { __setWatchAiringDepsForTests, runWatchAiringCheck } from '../watchAiring';
+import { __setWatchAiringDepsForTests, carryAiringStateOverMerge, runWatchAiringCheck } from '../watchAiring';
 import type { AiredEpisode, AiringRow } from '../../shared/watchAiring';
 
 const NOW = Date.UTC(2026, 8, 24, 12);
@@ -116,5 +116,20 @@ describe('airing-schedule job', () => {
     const id = byTitle('Airing Show')?.id as string;
     updateWatchTitle(id, { progress: 5 }, NOW + HOUR);
     expect(byTitle('Airing Show')?.nextAiring?.episode).toBe(6);
+  });
+
+  it('stores the announcement under the MAL id and carries title-id state over a merge', async () => {
+    answer = [{ anilistId: 1, malId: 100, status: 'RELEASING', nextEpisode: 6, nextAiringAt: NOW - HOUR }];
+    await runWatchAiringCheck(() => clock);
+    expect(announced.flat().map((entry) => entry.episode)).toEqual([6]);
+    const state = JSON.parse(fs.readFileSync(path.join(dir, 'watch-airing.json'), 'utf8')) as { notified: Record<string, number> };
+    expect(state.notified['mal:100']).toBe(6);
+
+    // State written by an older version, keyed by a title id a merge removed.
+    const survivor = byTitle('Planned Show')!;
+    fs.writeFileSync(path.join(dir, 'watch-airing.json'), JSON.stringify({ ...state, notified: { 'removed-copy': 3 } }));
+    carryAiringStateOverMerge([{ into: survivor.id, from: ['removed-copy'] }]);
+    const after = JSON.parse(fs.readFileSync(path.join(dir, 'watch-airing.json'), 'utf8')) as { notified: Record<string, number> };
+    expect(after.notified[survivor.id]).toBe(3);
   });
 });
