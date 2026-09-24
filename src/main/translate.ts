@@ -100,9 +100,15 @@ function translationCachePath(): string {
 
 function loadTranslationCache(): TranslationCacheFile {
   if (translationCache) return translationCache;
-  translationCache = readJsonSync<TranslationCacheFile>(translationCachePath(), () => ({ entries: {} }), {
-    validate: (v) => !!v && typeof v === 'object' && !!(v as TranslationCacheFile).entries,
-  });
+  try {
+    translationCache = readJsonSync<TranslationCacheFile>(translationCachePath(), () => ({ entries: {} }), {
+      validate: (v) => !!v && typeof v === 'object' && !!(v as TranslationCacheFile).entries,
+    });
+  } catch {
+    // A best-effort cache: no userData path (or an unreadable one) means an
+    // in-memory cache for this session, never a failed translation.
+    translationCache = { entries: {} };
+  }
   return translationCache;
 }
 

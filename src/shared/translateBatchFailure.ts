@@ -32,7 +32,10 @@ export interface TranslateBatchItemResult {
 /** Classify an error thrown by the local translation engine. */
 export function classifyTranslateError(err: unknown): TranslateBatchFailure {
   const detail = err instanceof Error ? err.message : String(err ?? '');
-  if (/model not found|ENOENT|no such file|not installed/i.test(detail)) {
+  // `LocalModelMissingError` (main/localModelFiles.ts) carries a code; its
+  // message ("No offline AI model is installedâ€¦") matches no pattern below.
+  const code = err && typeof err === 'object' ? (err as { code?: unknown }).code : undefined;
+  if (code === 'local-model-missing' || /model not found|ENOENT|no such file|not installed/i.test(detail)) {
     return { reason: 'model-missing', detail };
   }
   if (/timed? ?out|timeout|aborted/i.test(detail)) return { reason: 'timeout', detail };

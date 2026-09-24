@@ -20,6 +20,7 @@ import {
   classifyTranslateError,
   summarizeTranslateFailure,
 } from '../../shared/translateBatchFailure';
+import { LocalModelMissingError } from '../localModelFiles';
 import { runTranslationBatch } from '../translate';
 
 const h = vi.hoisted(() => ({ acquired: 0, empty: '' }));
@@ -56,6 +57,8 @@ describe('runTranslationBatch without a model', () => {
 describe('classifyTranslateError', () => {
   it('tells a missing model, a timeout and an engine failure apart', () => {
     expect(classifyTranslateError(new Error('Qwen3 model not found')).reason).toBe('model-missing');
+    // What ensureSession throws since Settings > AI owns the model install.
+    expect(classifyTranslateError(new LocalModelMissingError()).reason).toBe('model-missing');
     expect(classifyTranslateError(new Error('Translation prompt timed out after 90s')).reason).toBe('timeout');
     expect(classifyTranslateError(new Error('vulkan backend failed')).reason).toBe('engine');
   });
