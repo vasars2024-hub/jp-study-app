@@ -19,7 +19,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnkiDraft, AnkiDraftSourceKind } from '../../../shared/ankiDraft';
 import type { AnkiDraftSession } from '../../../shared/ankiDraftSession';
-import { ANKI_DRAFT_PAGE_SIZE, APKG_READ_CANCELLED } from '../../../shared/ankiDraft';
+import {
+  ANKI_DRAFT_MAX_PAGE_SIZE,
+  ANKI_DRAFT_PAGE_SIZE,
+  APKG_READ_CANCELLED,
+} from '../../../shared/ankiDraft';
+import {
+  autosaveHasEdits,
+  isWorkbenchAutosave,
+  mergeDraftPage,
+  replayJournal,
+  WORKBENCH_AUTOSAVE_VERSION,
+  type WorkbenchAutosave,
+} from '../../../shared/ankiWorkbenchPersistence';
+import { kvDelete, kvGet, kvSet } from '../../storage/db';
 import {
   WORKBENCH_STEP_IDS,
   createWorkbenchFlow,
@@ -67,6 +80,26 @@ import type { ApkgExportResult } from '../../../shared/ankiApkgExport';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck' | 'text';
+
+/**
+ * IndexedDB key of the one autosaved edit session. Not in IDB_KEYS: the storage
+ * migration runner owns those, and this is a draft, not user data it migrates.
+ */
+export const WORKBENCH_AUTOSAVE_KEY = 'deck-workbench-autosave-v1';
+const AUTOSAVE_DELAY_MS = 600;
+
+/** Component state that rides along with the draft in an autosave. */
+interface AutosaveExtra {
+  flow: WorkbenchFlowState;
+  trayActions: TrayAction[];
+  masteryHistory: MasteryHistory;
+}
+
+/** What the autosave line under the header currently says. */
+type AutosaveNotice =
+  | { kind: 'restored'; steps: number; label: string }
+  | { kind: 'replayed'; steps: number; skipped: number; label: string }
+  | { kind: 'discarded' };
 
 /**
  * Which of the numbered steps owns which tray action kinds. The three sets
@@ -211,6 +244,19 @@ export default function DeckWorkbench() {
   const [stepClaims, setStepClaims] = useState<
     Partial<Record<TrayStepId, { groupId: string; count: number }>>
   >({});
+  /**
+   * The autosaved session, as read at mount. Kept after it is restored, because
+   * reopening the same file later (after a restart, when the file's path is no
+   * longer remembered) replays its journal onto the fresh read.
+   */
+  const autosaveRef = useRef<WorkbenchAutosave<AutosaveExtra> | null>(null);
+  /** Nothing is written back until the saved session has been read. */
+  const [autosaveReady, setAutosaveReady] = useState(false);
+  const [autosaveNotice, setAutosaveNotice] = useState<AutosaveNotice | null>(null);
+  /** Set once a source is opened, so a late autosave read never replaces it. */
+  const sourceChosenRef = useRef(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -228,13 +274,35 @@ export default function DeckWorkbench() {
 
   const adoptDraft = useCallback((next: AnkiDraft, total?: number) => {
     const whole = total ?? next.counts.notes;
-    setDraft(next);
-    setTotalNotes(whole);
+    sourceChosenRef.current = true;
     setError(null);
+    setPageError(null);
     // The journal's ops name notes in the draft they were computed against.
     // Carrying them onto a different source would let undo write a previous
-    // deck's text into a note that merely shares an id.
-    setJournal(createEditJournal());
+    // deck's text into a note that merely shares an id — so a fresh source
+    // starts a fresh journal, UNLESS it is the very source an autosaved session
+    // was editing (same fingerprint: the same bytes). That is the restart case:
+    // the file is opened again and its unsaved edits come back with it.
+    const saved = autosaveRef.current;
+    if (
+      saved
+      && saved.draft.source.fingerprint === next.source.fingerprint
+      && autosaveHasEdits(saved.journal)
+    ) {
+      const replay = replayJournal(next, saved.journal, draftFieldNormalizer(next.source));
+      setDraft(replay.draft);
+      setJournal(replay.journal);
+      setAutosaveNotice({
+        kind: 'replayed',
+        steps: replay.replayed,
+        skipped: replay.skipped,
+        label: next.source.label,
+      });
+    } else {
+      setDraft(next);
+      setJournal(createEditJournal());
+    }
+    setTotalNotes(whole);
     // Same reason: ids from the previous source name nothing here, and a tray
     // built against them would report a scope it does not have.
     setSelectedIds([]);
@@ -317,6 +385,161 @@ export default function DeckWorkbench() {
     },
     [adoptDraft, refreshSessions, t],
   );
+
+  /**
+   * Autosave, part 1: read the saved session once, at mount, and put it back.
+   *
+   * The workbench lives inside a collapsible section of the Anki window, and
+   * collapsing it unmounts this component — which used to discard every edit.
+   * Restoring on mount makes collapse, close and restart all the same event.
+   */
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      let saved: unknown;
+      try {
+        saved = await kvGet<unknown>(WORKBENCH_AUTOSAVE_KEY);
+      } catch {
+        saved = undefined;
+      }
+      if (!alive) return;
+      if (isWorkbenchAutosave(saved)) {
+        const session = saved as WorkbenchAutosave<AutosaveExtra>;
+        autosaveRef.current = session;
+        // A source the user already opened in this mount wins over the save.
+        if (!sourceChosenRef.current) {
+          setDraft(session.draft);
+          setJournal(session.journal);
+          setTotalNotes(session.totalNotes);
+          if (session.extra?.flow) setFlow(session.extra.flow);
+          if (session.extra?.trayActions) setTrayActions(session.extra.trayActions);
+          if (session.extra?.masteryHistory) setMasteryHistory(session.extra.masteryHistory);
+          setAutosaveNotice({
+            kind: 'restored',
+            steps: countJournalSteps(session.journal.done),
+            label: session.draft.source.label,
+          });
+        }
+      }
+      setAutosaveReady(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /**
+   * Autosave, part 2: write the session whenever it changes, debounced. Only a
+   * session with edits is written — opening a source to look at it must not
+   * replace a saved session of real work with an empty one.
+   */
+  useEffect(() => {
+    if (!autosaveReady || !draft || !autosaveHasEdits(journal)) return;
+    const timer = window.setTimeout(() => {
+      const session: WorkbenchAutosave<AutosaveExtra> = {
+        version: WORKBENCH_AUTOSAVE_VERSION,
+        savedAt: Date.now(),
+        draft,
+        totalNotes,
+        journal,
+        extra: { flow, trayActions, masteryHistory },
+      };
+      autosaveRef.current = session;
+      void kvSet(WORKBENCH_AUTOSAVE_KEY, session).catch((err: unknown) => {
+        console.error('[deck-workbench] autosave failed:', err);
+      });
+    }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [autosaveReady, draft, journal, totalNotes, flow, trayActions, masteryHistory]);
+
+  /**
+   * Throw the saved edits away: every draft edit is undone (so the draft on
+   * screen is the source as read), every live knowledge write the trays made is
+   * put back, and the saved session is deleted. The source itself was never
+   * touched by an unapplied edit, so there is nothing else to undo.
+   */
+  const discardEdits = useCallback(async () => {
+    const confirmed = await confirmDialog({
+      title: t('ankiWorkbench.autosave.discard'),
+      message: t('ankiWorkbench.autosave.discardConfirm'),
+      confirmLabel: t('ankiWorkbench.autosave.discard'),
+      cancelLabel: t('common.cancel'),
+      danger: true,
+    });
+    if (!confirmed) return;
+    if (draft) {
+      const normalize = draftFieldNormalizer(draft.source);
+      let current = draft;
+      let currentJournal = journal;
+      while (currentJournal.done.length) {
+        const result = undoLastEdit(current, currentJournal, normalize);
+        if (!result.changed) break;
+        current = result.draft;
+        currentJournal = result.journal;
+      }
+      setDraft(current);
+    }
+    for (const entry of [...masteryHistory.undo].reverse()) {
+      for (const write of entry.backward) writeMasteryLevel(write);
+    }
+    setJournal(createEditJournal());
+    setMasteryHistory(EMPTY_MASTERY_HISTORY);
+    setTrayActions([]);
+    setStepClaims({});
+    autosaveRef.current = null;
+    void kvDelete(WORKBENCH_AUTOSAVE_KEY).catch(() => undefined);
+    setAutosaveNotice({ kind: 'discarded' });
+  }, [draft, journal, masteryHistory, t]);
+
+  /**
+   * Read further into a paged source.
+   *
+   * A CSV file is paged by offset and the pages are merged: its identity is the
+   * file's bytes, which every page reports, so a page from a different file is
+   * refused rather than spliced in. A live Anki collection is re-read as ONE
+   * wider window from the top — its commit re-reads exactly the window its
+   * fingerprint came from, so a draft stitched from separate windows could not
+   * be committed — and the journal is replayed onto that read. The window is
+   * capped at the reader's own page ceiling, and the surface says so.
+   */
+  const loadMore = useCallback(async () => {
+    if (!draft) return;
+    const loaded = draft.notes.length;
+    setLoadingMore(true);
+    setPageError(null);
+    try {
+      if (draft.source.kind === 'csv') {
+        const res = await window.api.readAnkiCsvDraft({
+          fingerprint: draft.source.fingerprint,
+          noteOffset: loaded,
+          noteLimit: ANKI_DRAFT_PAGE_SIZE,
+        });
+        if (!res.ok || !res.draft || res.draft.source.fingerprint !== draft.source.fingerprint) {
+          setPageError(t('ankiWorkbench.source.pageChanged'));
+          return;
+        }
+        const page = res.draft;
+        setDraft((prev) => (prev ? mergeDraftPage(prev, page) : prev));
+      } else if (draft.source.kind === 'ankiconnect') {
+        const res = await window.api.readAnkiConnectDraft({
+          noteOffset: 0,
+          noteLimit: Math.min(loaded + ANKI_DRAFT_PAGE_SIZE, ANKI_DRAFT_MAX_PAGE_SIZE),
+        });
+        if (!res.ok || !res.draft) {
+          setPageError(res.error ?? t('ankiWorkbench.source.pageChanged'));
+          return;
+        }
+        const replay = replayJournal(res.draft, journal, draftFieldNormalizer(res.draft.source));
+        setDraft(replay.draft);
+        setJournal(replay.journal);
+        if (res.totalNotes !== undefined) setTotalNotes(res.totalNotes);
+      }
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [draft, journal, t]);
 
   /**
    * Abandon the package read in flight. Only the package source has one to
@@ -709,6 +932,65 @@ export default function DeckWorkbench() {
     </div>
   );
 
+  const loadedNotes = draft?.notes.length ?? 0;
+  const wholeSource = totalNotes ?? loadedNotes;
+  const pageable = draft?.source.kind === 'csv' || draft?.source.kind === 'ankiconnect';
+  const windowCapped = draft?.source.kind === 'ankiconnect' && loadedNotes >= ANKI_DRAFT_MAX_PAGE_SIZE;
+  const canLoadMore = pageable && loadedNotes < wholeSource && !windowCapped;
+  /**
+   * The way past the first page, rendered where the partial state is said: on
+   * the source summary and above the browser.
+   */
+  const pager = pageable && loadedNotes < wholeSource ? (
+    <div className="deck-workbench-pager">
+      {canLoadMore && (
+        <button type="button" className="btn" disabled={loadingMore} onClick={() => void loadMore()}>
+          {loadingMore
+            ? t('ankiWorkbench.source.loadingMore')
+            : t('ankiWorkbench.source.loadMore', {
+                count: Math.min(ANKI_DRAFT_PAGE_SIZE, wholeSource - loadedNotes),
+              })}
+        </button>
+      )}
+      {windowCapped && (
+        <p className="muted">{t('ankiWorkbench.source.windowCap', { max: ANKI_DRAFT_MAX_PAGE_SIZE })}</p>
+      )}
+      {pageError && (
+        <p className="deck-workbench-error" role="alert">{pageError}</p>
+      )}
+    </div>
+  ) : null;
+
+  const autosaveLine = autosaveNotice || (draft && autosaveHasEdits(journal)) ? (
+    <div className="deck-workbench-autosave" role="status">
+      <span>
+        {autosaveNotice?.kind === 'restored'
+          ? t('ankiWorkbench.autosave.restored', {
+              count: autosaveNotice.steps,
+              label: autosaveNotice.label,
+            })
+          : autosaveNotice?.kind === 'replayed'
+            ? t('ankiWorkbench.autosave.replayed', {
+                count: autosaveNotice.steps,
+                label: autosaveNotice.label,
+              })
+            : autosaveNotice?.kind === 'discarded'
+              ? t('ankiWorkbench.autosave.discarded')
+              : t('ankiWorkbench.autosave.kept')}
+      </span>
+      {autosaveNotice?.kind === 'replayed' && autosaveNotice.skipped > 0 && (
+        <span className="muted">
+          {t('ankiWorkbench.autosave.skipped', { count: autosaveNotice.skipped })}
+        </span>
+      )}
+      {autosaveHasEdits(journal) && (
+        <button type="button" className="btn small" onClick={() => void discardEdits()}>
+          {t('ankiWorkbench.autosave.discard')}
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="deck-workbench">
       <div className="deck-workbench-head">
@@ -717,6 +999,7 @@ export default function DeckWorkbench() {
         <p className="deck-workbench-progress">
           {t('ankiWorkbench.progress', { completed: progress.completed, total: progress.total })}
         </p>
+        {autosaveLine}
       </div>
 
       <ol className="deck-workbench-stepper" aria-label={t('ankiWorkbench.stepper.label')}>
@@ -826,6 +1109,7 @@ export default function DeckWorkbench() {
                     <li>{t('ankiWorkbench.facts.noteTypes', { count: draft.counts.noteTypes })}</li>
                     <li>{t('ankiWorkbench.facts.media', { count: draft.counts.mediaReferences })}</li>
                   </ul>
+                  {pager}
                   {blocking.length > 0 && (
                     <p className="deck-workbench-error" role="alert">
                       {t('ankiWorkbench.diagnostics.blocking', {
@@ -925,6 +1209,7 @@ export default function DeckWorkbench() {
           <div className="deck-workbench-detail deck-workbench-detail-wide">
             {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
             {history}
+            {pager}
             <DeckWorkbenchJournal draft={draft} journal={journal} />
             <DeckWorkbenchBrowser
               draft={draft}

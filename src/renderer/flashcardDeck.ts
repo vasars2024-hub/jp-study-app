@@ -528,6 +528,33 @@ export function updateDeckCard(
   return store.cards;
 }
 
+/**
+ * Write the Deck Workbench's field edits back into the deck, in one persisted
+ * write. Only the six text fields a workbench edit can carry are accepted
+ * (`shared/ankiWorkbenchPersistence.ts` decides which); ids that are no longer
+ * in the deck are reported rather than recreated.
+ */
+export function applyDeckFieldPatches(
+  patches: ReadonlyArray<{
+    id: string;
+    patch: Partial<Pick<DeckFlashcard, 'word' | 'reading' | 'meaning' | 'sentence' | 'front' | 'back'>>;
+  }>,
+): { updated: string[]; missing: string[]; cards: DeckFlashcard[] } {
+  const store = readStore();
+  const byId = new Map(patches.map((entry) => [entry.id, entry.patch]));
+  const updated: string[] = [];
+  store.cards = store.cards.map((card) => {
+    const patch = byId.get(card.id);
+    if (!patch) return card;
+    updated.push(card.id);
+    return { ...card, ...patch };
+  });
+  const found = new Set(updated);
+  const missing = patches.map((entry) => entry.id).filter((id) => !found.has(id));
+  if (updated.length) writeStore(store);
+  return { updated, missing, cards: store.cards };
+}
+
 /** Attach generated/captured audio to many cards with one persisted deck write. */
 export function updateDeckCardAudioBatch(
   updates: ReadonlyArray<{ id: string; audioPath?: string; audioDataUrl?: string }>,

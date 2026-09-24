@@ -27,6 +27,7 @@ import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
 import { getSql, readCollectionBytes } from './apkgCollection';
 import { APKG_READ_CANCELLED, parseApkgDraftPageOffMainLoop } from './apkgReadHost';
 import { readCsvDraft } from './csvDraftRead';
+import { recallCsvSource } from './csvSourceMemory';
 import { exportAnkiCsv } from './csvExport';
 import type { AnkiCsvExportRequest } from '../../shared/ankiCsvExport';
 import { readConnectDraft } from './connectDraftRead';
@@ -428,6 +429,17 @@ export function registerApkgIpc(): void {
   ipcMain.handle('apkg:cancelDraftRead', (_e, readId?: string) => cancelApkgDraftRead(readId));
   ipcMain.handle('apkg:export', (_e, request: ApkgExportRequest) => exportApkg(request));
   ipcMain.handle('anki:readCsvDraft', async (_e, request?: CsvDraftRequest) => {
+    // A further page of a file already open: the fingerprint names it, and the
+    // result must still be that file — the workbench merges pages by it.
+    if (!request?.filePath && typeof request?.fingerprint === 'string' && request.fingerprint) {
+      const remembered = recallCsvSource(request.fingerprint);
+      if (!remembered) return { ok: false, error: 'source-forgotten' };
+      const page = await readCsvDraft({ ...request, filePath: remembered });
+      if (page.ok && page.draft?.source.fingerprint !== request.fingerprint) {
+        return { ok: false, error: 'source-changed' };
+      }
+      return page;
+    }
     const file = await pickAnkiTextFile(request?.filePath);
     // Same shape the package reader uses: a dismissed dialog is a named state,
     // not a read that failed, so the shell can stay quiet about it.

@@ -485,6 +485,12 @@ export interface CsvDraftRequest {
    * would need user-visible strings before there is anything to show them in.
    */
   filePath?: string;
+  /**
+   * Read the file a previous page came from, named by that page's fingerprint
+   * (the main process remembers the path; the renderer never holds one). A
+   * file whose bytes no longer match is refused as `source-changed`.
+   */
+  fingerprint?: string;
   noteOffset?: number;
   noteLimit?: number;
 }

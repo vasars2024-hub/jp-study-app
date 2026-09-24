@@ -15,7 +15,12 @@ vi.mock('../i18n', () => ({
 }));
 
 const loadDeckAsAnkiDraft = vi.fn();
-vi.mock('../flashcardDeck', () => ({ loadDeckAsAnkiDraft: () => loadDeckAsAnkiDraft() }));
+vi.mock('../flashcardDeck', () => ({
+  loadDeckAsAnkiDraft: () => loadDeckAsAnkiDraft(),
+  // The local deck's own destination reads the deck to plan its patches.
+  loadDeck: () => [],
+  applyDeckFieldPatches: () => ({ updated: [], missing: [], cards: [] }),
+}));
 vi.mock('../components/anki/deckWorkbench.css', () => ({}));
 const confirmDialog = vi.fn();
 vi.mock('../components/ui/dialogService', () => ({ confirmDialog: (...args: unknown[]) => confirmDialog(...args) }));
@@ -1135,7 +1140,7 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     await blur(field);
   }
 
-  it('offers no export for a source that is not a package file', async () => {
+  it('offers no package export for a source that is not a package file', async () => {
     loadDeckAsAnkiDraft.mockReturnValue({
       draft: browsable({ source: { kind: 'local-deck', label: 'Local deck', fingerprint: 'fp-local' } }),
     });
@@ -1144,7 +1149,9 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     await click(buttonBy('ankiWorkbench.next'));
     await toApply();
 
-    expect(host.textContent).toContain('ankiWorkbench.apply.noFile');
+    // A local deck writes back into the app's own flashcards — its own
+    // destination, never a package export.
+    expect(host.querySelector('.wb-apply-local')).not.toBeNull();
     expect(host.querySelector('.wb-apply-export')).toBeNull();
     expect(exportApkgDraft).not.toHaveBeenCalled();
   });
@@ -1505,7 +1512,7 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     expect(host.textContent).not.toContain('ankiWorkbench.apply.live.ok.verified');
   });
 
-  it('still offers nothing at all for a local deck', async () => {
+  it('never offers a live Anki commit for a local deck', async () => {
     loadDeckAsAnkiDraft.mockReturnValue({
       draft: browsable({ source: { kind: 'local-deck', label: 'Local deck', fingerprint: 'fp-local' } }),
     });
@@ -1514,7 +1521,7 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     await click(buttonBy('ankiWorkbench.next'));
     await toApply();
 
-    expect(host.textContent).toContain('ankiWorkbench.apply.noFile');
+    expect(host.textContent).not.toContain('ankiWorkbench.apply.noFile');
     expect(host.querySelector('.wb-apply-commit')).toBeNull();
     expect(commitAnkiConnectDraft).not.toHaveBeenCalled();
   });
