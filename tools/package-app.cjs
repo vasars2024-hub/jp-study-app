@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 /**
- * Reliable Windows packaging: patch Forge/Vite bug, clean caches, package, zip.
- * Usage: node tools/package-app.cjs
+ * Reliable Windows packaging: patch Forge/Vite bug, clean caches, package,
+ * prune, and (opt-in) zip.
+ * Usage: node tools/package-app.cjs [--zip] [--no-prune]
+ *
+ *   --zip       also run `electron-forge make` and write out/make/…/*.zip.
+ *               GUM_PACKAGE_ZIP=1 does the same. Off by default: the zip is a
+ *               distribution artifact only (the desktop shortcut runs the
+ *               folder), and on a nearly full C: it costs ~1 GB per build.
+ *   --no-prune  skip the node_modules prune (GUM_NO_PRUNE=1 does the same).
+ *               See tools/prune-packaged-app.cjs for the rules; it takes the
+ *               packaged node_modules from ~2 GB to ~0.4 GB.
  *
  * The desktop shortcut points at out\jp-study-app-win32-x64\jp-study-app.exe.
  * This script used to delete out\ before every build, so a failed build left
@@ -24,6 +33,8 @@
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+
+const { prunePackagedApp } = require('./prune-packaged-app.cjs');
 
 const root = path.join(__dirname, '..');
 const OUT = path.join(root, 'out');
@@ -113,7 +124,9 @@ function fail(label, staging) {
   process.exit(1);
 }
 
-function main() {
+function main(argv = process.argv.slice(2), env = process.env) {
+  const wantZip = argv.includes('--zip') || !!env.GUM_PACKAGE_ZIP;
+  const wantPrune = !argv.includes('--no-prune') && !env.GUM_NO_PRUNE;
   // FIRST, before the multi-minute Vite build: this path calls Forge directly
   // rather than through `npm run package`, so it does not inherit that script's
   // preflight and would otherwise be the one way to package a build with no
@@ -150,12 +163,31 @@ function main() {
   if (!forgeApi('electron-forge package (staging)', 'package', { dir, outDir: staging, interactive: false })) {
     fail('electron-forge package', staging);
   }
-  if (!forgeApi('electron-forge make (zip, staging)', 'make', { dir, outDir: staging, skipPackage: true, interactive: false })) {
-    fail('electron-forge make', staging);
-  }
   const stagedApp = path.join(staging, APP_DIR_NAME);
   if (!fs.existsSync(path.join(stagedApp, 'jp-study-app.exe')) && process.platform === 'win32') {
     fail('packaged app missing from staging', staging);
+  }
+
+  // Prune the STAGED copy, before make (so a zip is of the pruned app) and
+  // before the swap (so a prune failure leaves the current build untouched).
+  if (wantPrune) {
+    console.log('\n[package-app] Pruning staged node_modules\n');
+    try {
+      prunePackagedApp(path.join(stagedApp, 'resources', 'app'));
+    } catch (err) {
+      console.error(err);
+      fail('prune', staging);
+    }
+  } else {
+    console.log('[package-app] Prune skipped (--no-prune / GUM_NO_PRUNE).');
+  }
+
+  if (wantZip) {
+    if (!forgeApi('electron-forge make (zip, staging)', 'make', { dir, outDir: staging, skipPackage: true, interactive: false })) {
+      fail('electron-forge make', staging);
+    }
+  } else {
+    console.log('[package-app] No zip (pass --zip or set GUM_PACKAGE_ZIP=1 to write out/make).');
   }
 
   const swapped = swapBuild(stagedApp);
@@ -163,10 +195,17 @@ function main() {
     console.error(`[package-app] Could not swap the new build in (${swapped.error}). Is Gum running? Close it and try again.`);
     fail('swap', staging);
   }
-  try {
-    swapMake(path.join(staging, 'make'));
-  } catch (err) {
-    console.warn(`[package-app] New build is in place, but the zip could not be moved: ${err.message}`);
+  if (wantZip) {
+    try {
+      swapMake(path.join(staging, 'make'));
+    } catch (err) {
+      console.warn(`[package-app] New build is in place, but the zip could not be moved: ${err.message}`);
+    }
+  } else if (fs.existsSync(path.join(OUT, 'make'))) {
+    // A zip from an earlier build no longer matches out/<app>; the old flow
+    // always replaced it, so drop it rather than leave a stale 1 GB artifact.
+    console.log('[package-app] Removing stale out/make/ (it is of an older build).');
+    rm(path.join(OUT, 'make'));
   }
   rm(staging);
 
