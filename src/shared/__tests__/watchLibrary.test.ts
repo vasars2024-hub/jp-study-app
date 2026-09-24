@@ -16,6 +16,7 @@ import {
   malLibraryEntriesToObservations,
   mergeDuplicateWatchTitles,
   mergeWatchObservations,
+  mergeWatchTitleGroup,
   normalizeLetterboxdUri,
   normalizeWatchDate,
   parseWatchLibraryDocument,
@@ -820,5 +821,33 @@ describe('mergeDuplicateWatchTitles', () => {
     expect(document.titles[0].sources).toEqual(['mal-export', 'letterboxd']);
     expect(document.titles[0].tags).toEqual(['x', 'y']);
     expect(document.titles[0].altTitles).toContain('A');
+  });
+});
+
+describe('mergeWatchTitleGroup — which copy wins', () => {
+  const Y2024 = Date.UTC(2024, 0, 5);
+  const Y2026 = Date.UTC(2026, 5, 1);
+
+  it('newer data beats an older manual edit, as fieldGate does; manual only breaks a tie', () => {
+    const manualOld = makeTitle({ id: 'lb', title: 'Frieren', status: 'watching', progress: 3, manual: ['progress', 'status'], fieldAt: { progress: Y2024, status: Y2024 } });
+    const malNew = makeTitle({ id: 'mal:52991', title: 'Frieren', malId: 52991, status: 'completed', progress: 24, episodeCount: 24, sources: ['mal-sync'], fieldAt: { progress: Y2026, status: Y2026 } });
+    const merged = mergeWatchTitleGroup([manualOld, malNew], Y2026 + 1);
+    expect(merged.progress).toBe(24);
+    expect(merged.status).toBe('completed');
+    expect(merged.manual ?? []).not.toContain('progress');
+
+    const tie = makeTitle({ ...manualOld, id: 'lb2', fieldAt: { progress: Y2026, status: Y2026 } });
+    expect(mergeWatchTitleGroup([tie, malNew], Y2026 + 1).progress).toBe(3);
+  });
+
+  it('joins differing notes and reviews instead of dropping the other copy text', () => {
+    const a = makeTitle({ id: 'a', title: 'Mushishi', notes: 'rewatch the swamp episode', review: 'Quiet and strange.', fieldAt: { notes: Y2026, review: Y2024 } });
+    const b = makeTitle({ id: 'mal:457', title: 'Mushishi', malId: 457, notes: 'from MAL: favourite', review: 'Best iyashikei.', fieldAt: { notes: Y2024, review: Y2026 } });
+    const merged = mergeWatchTitleGroup([a, b], Y2026 + 1);
+    expect(merged.notes).toBe('rewatch the swamp episode\n\nfrom MAL: favourite');
+    expect(merged.review).toBe('Best iyashikei.\n\nQuiet and strange.');
+    // Same text on both copies is not doubled, and re-merging is stable.
+    const again = mergeWatchTitleGroup([merged, makeTitle({ ...b, id: 'mal:457b' })], Y2026 + 2);
+    expect(again.notes).toBe(merged.notes);
   });
 });

@@ -1001,23 +1001,47 @@ function mergePrimary(group: readonly WatchTitle[]): WatchTitle {
 }
 
 /**
- * The member whose value of `field` should win: a user edit beats imported
- * data, then the most recent `fieldAt`, then the primary. Only members that
- * hold a value compete.
+ * The member whose value of `field` should win: the most recent `fieldAt`,
+ * then a user edit, then the primary. Only members that hold a value compete.
+ *
+ * Same rule as `fieldGate`, which lets newer data replace a manual edit: a 2024
+ * manual "episode 3" must not beat MAL's 2026 "24/24" just because it was typed
+ * by hand. The manual flag only breaks a tie.
  */
 function fieldWinner(group: readonly WatchTitle[], primary: WatchTitle, field: WatchTrackedField, has: (title: WatchTitle) => boolean): WatchTitle | undefined {
   const holders = group.filter(has);
   if (!holders.length) return undefined;
   return [...holders].sort((a, b) =>
-    Number(!!b.manual?.includes(field)) - Number(!!a.manual?.includes(field))
-    || (b.fieldAt?.[field] ?? 0) - (a.fieldAt?.[field] ?? 0)
+    (b.fieldAt?.[field] ?? 0) - (a.fieldAt?.[field] ?? 0)
+    || Number(!!b.manual?.includes(field)) - Number(!!a.manual?.includes(field))
     || Number(b === primary) - Number(a === primary))[0];
 }
 
 const SCALAR_MERGE_FIELDS = [
   'kind', 'status', 'progress', 'episodeCount', 'rewatchCount', 'startedAt', 'finishedAt',
-  'liked', 'favorite', 'notes', 'review', 'title', 'year',
+  'liked', 'favorite', 'title', 'year',
 ] as const satisfies readonly (WatchTrackedField & keyof WatchTitle)[];
+
+/** Free text a merge joins instead of picking one: a user's writing is never dropped. */
+const TEXT_MERGE_FIELDS = ['notes', 'review'] as const satisfies readonly (WatchTrackedField & keyof WatchTitle)[];
+
+/**
+ * The winner's text first, then every other member's distinct text, newest
+ * first, separated by a blank line. Text already contained in what is kept is
+ * not repeated, so re-merging is stable.
+ */
+function joinMergedText(group: readonly WatchTitle[], winner: WatchTitle, field: (typeof TEXT_MERGE_FIELDS)[number]): string | undefined {
+  const ordered = [winner, ...group
+    .filter((title) => title !== winner)
+    .sort((a, b) => (b.fieldAt?.[field] ?? 0) - (a.fieldAt?.[field] ?? 0))];
+  const parts: string[] = [];
+  for (const title of ordered) {
+    const text = title[field]?.trim();
+    if (!text || parts.some((kept) => kept.includes(text))) continue;
+    parts.push(text);
+  }
+  return parts.length ? parts.join('\n\n') : undefined;
+}
 
 /** Folds a group of titles for one work into the primary. Pure. */
 export function mergeWatchTitleGroup(group: readonly WatchTitle[], now: number): WatchTitle {
@@ -1059,6 +1083,15 @@ export function mergeWatchTitleGroup(group: readonly WatchTitle[], now: number):
     const winner = fieldWinner(group, primary, field, (title) => title[field] !== undefined);
     if (!winner) continue;
     (next as unknown as Record<string, unknown>)[field] = winner[field];
+    take(field, winner);
+  }
+
+  // Notes and reviews: the winner's text leads, and a differing text from the
+  // other copy is joined in rather than dropped with the removed title.
+  for (const field of TEXT_MERGE_FIELDS) {
+    const winner = fieldWinner(group, primary, field, (title) => !!title[field]?.trim());
+    if (!winner) continue;
+    next[field] = joinMergedText(group, winner, field);
     take(field, winner);
   }
 
