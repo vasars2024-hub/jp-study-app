@@ -74,6 +74,7 @@ function dictKindLabel(d: YomitanDictInfo, t: (key: string) => string): string {
   const parts: string[] = [];
   if (d.hasTerms) parts.push(t('settings.study.dict.kind.terms'));
   if (d.hasPitch) parts.push(t('settings.study.dict.kind.pitch'));
+  if (d.hasIpa) parts.push(t('settings.study.dict.kind.ipa'));
   if (d.hasFreq) parts.push(t('settings.study.dict.kind.frequency'));
   return parts.length
     ? parts.join(t('settings.study.dict.kindJoin'))

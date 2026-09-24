@@ -15,6 +15,7 @@ import {
   StatsBooks,
   StatsCards,
   StatsChart,
+  StatsGrammar,
   StatsReviews,
   StatsShows,
   WordKnowledge,
@@ -166,6 +167,7 @@ export default function StatisticsView() {
             <aside className="aero-stats-knowledge">
               <WordKnowledge />
               <StatsReviews />
+              <StatsGrammar />
             </aside>
           </div>
         </div>
@@ -221,6 +223,8 @@ export default function StatisticsView() {
       <WordKnowledge />
 
       <StatsReviews />
+
+      <StatsGrammar />
 
       {!hasData ? (
         <div className="stats-empty">

@@ -16,6 +16,7 @@ import {
   getAvailableGlossLangs,
   getDictRegistryHash,
   getFrequencyDetail,
+  getIpa,
   getPitch,
   importYomitanZip,
   initYomitan,
@@ -265,6 +266,7 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
         return enrichLexiconResultMetadata(converted, {
           pitchHtml: getPitch,
           frequency: getFrequencyDetail,
+          ipa: getIpa,
         });
       } catch {
         return converted;

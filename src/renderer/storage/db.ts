@@ -389,6 +389,38 @@ export async function kvSet(key: string, value: unknown): Promise<void> {
   await withStore('readwrite', (s) => s.put(value, key));
 }
 
+/**
+ * Compare-and-set in ONE readwrite transaction: write `next` (or delete the key
+ * when `next` is undefined) only if the stored value still equals `expected`
+ * by `same`. Resolves true when it wrote, false when the value had moved on.
+ * The write is issued from the read's success callback so no other
+ * transaction can land between the check and the write.
+ */
+export async function kvCompareAndSet(
+  key: string,
+  expected: unknown,
+  next: unknown,
+  same: (current: unknown, expected: unknown) => boolean,
+): Promise<boolean> {
+  return withTransaction('readwrite', (store) => new Promise<boolean>((resolve, reject) => {
+    const read = store.get(key);
+    read.onerror = () => reject(read.error ?? new Error('IndexedDB request failed'));
+    read.onsuccess = () => {
+      if (!same(read.result, expected)) {
+        resolve(false);
+        return;
+      }
+      try {
+        const write = next === undefined ? store.delete(key) : store.put(next, key);
+        write.onsuccess = () => resolve(true);
+        write.onerror = () => reject(write.error ?? new Error('IndexedDB request failed'));
+      } catch (err) {
+        reject(err);
+      }
+    };
+  }));
+}
+
 export async function kvDelete(key: string): Promise<void> {
   await withStore('readwrite', (s) => s.delete(key));
 }

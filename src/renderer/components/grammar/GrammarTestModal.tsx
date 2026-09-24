@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
+import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import {
@@ -176,6 +177,9 @@ export default function GrammarTestModal({
       const nextFamiliarity = applyGrade(familiarity, question.id, grade);
       setFamiliarity(nextFamiliarity);
       saveFamiliarity(nextFamiliarity);
+      // One review-log row per answer, so grammar study counts toward the day
+      // and Statistics can count grammar answers next to flashcard reviews.
+      appendReviewLog({ mode: 'grammar', grammarId: question.id, word: point?.title, correct: wasCorrect });
 
       const nextCorrect = correctCount + (wasCorrect ? 1 : 0);
       const nextMissed =

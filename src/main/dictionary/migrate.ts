@@ -60,6 +60,12 @@ export interface LegacyPitchEntry {
   positions: number[];
 }
 
+/** A Yomitan `ipa` term_meta row, as `yomitan.ts` stores it. */
+export interface LegacyIpaEntry {
+  reading: string;
+  transcriptions: string[];
+}
+
 export interface LegacyKanjiEntry {
   onyomi?: string[];
   kunyomi?: string[];
@@ -75,6 +81,8 @@ export interface LegacyDictIndex {
   info: YomitanDictInfo;
   terms?: Record<string, LegacyGlossaryEntry[]>;
   pitch?: Record<string, LegacyPitchEntry>;
+  /** IPA transcriptions, keyed like `pitch` (stores written since IPA import). */
+  ipa?: Record<string, LegacyIpaEntry>;
   freq?: Record<string, number>;
   /** Yomitan kanji banks, keyed by character (stores written since kanji import). */
   kanji?: Record<string, LegacyKanjiEntry>;
@@ -91,6 +99,8 @@ export interface ImportedCounts {
   xrefs: number;
   /** Characters written to `char_sources` from a Yomitan kanji bank. */
   kanji?: number;
+  /** Term/reading rows written to `ipa` from Yomitan `ipa` term_meta. */
+  ipa?: number;
 }
 
 /**
@@ -205,10 +215,12 @@ const BUNDLED_LEGACY_PROVENANCE: Readonly<Record<string, LegacySourceProvenance>
  * if it also ships accents.
  */
 export function legacyKindOf(
-  info: Pick<YomitanDictInfo, 'hasTerms' | 'hasPitch'> & Partial<Pick<YomitanDictInfo, 'hasFreq' | 'hasKanji'>>,
-): 'term' | 'pitch' | 'freq' | 'character' {
+  info: Pick<YomitanDictInfo, 'hasTerms' | 'hasPitch'> & Partial<Pick<YomitanDictInfo, 'hasFreq' | 'hasKanji' | 'hasIpa'>>,
+): 'term' | 'pitch' | 'freq' | 'character' | 'ipa' {
   if (info.hasTerms) return 'term';
   if (info.hasPitch) return 'pitch';
+  // An IPA-only store is a pronunciation source, never "frequency · 0".
+  if (info.hasIpa && !info.hasFreq && !info.hasKanji) return 'ipa';
   // A kanji-only store is a character dictionary — the kind KANJIDIC2 imports
   // as — never a frequency list that happens to hold no ranks.
   if (info.hasKanji && !info.hasFreq) return 'character';
@@ -228,10 +240,11 @@ export function legacyKindOf(
  * to be.
  */
 export function legacyEntryCount(
-  kind: 'term' | 'pitch' | 'freq' | 'character',
-  counts: Pick<ImportedCounts, 'headwords' | 'pitch' | 'freq'> & { kanji?: number },
+  kind: 'term' | 'pitch' | 'freq' | 'character' | 'ipa',
+  counts: Pick<ImportedCounts, 'headwords' | 'pitch' | 'freq'> & { kanji?: number; ipa?: number },
 ): number {
   if (kind === 'character') return counts.kanji ?? 0;
+  if (kind === 'ipa') return counts.ipa ?? 0;
   if (kind === 'pitch') return counts.pitch;
   if (kind === 'freq') return counts.freq;
   return counts.headwords;
@@ -322,6 +335,12 @@ function deleteLegacySourceRows(db: SqliteDb, dictId: string, shouldCancel?: () 
   deleteBatch(
     `delete from pitch where rowid in (
        select rowid from pitch where dict_id = ? limit ${LEGACY_DELETE_BATCH}
+     )`,
+    dictId,
+  );
+  deleteBatch(
+    `delete from ipa where rowid in (
+       select rowid from ipa where dict_id = ? limit ${LEGACY_DELETE_BATCH}
      )`,
     dictId,
   );
@@ -452,6 +471,23 @@ export function importLegacyIndex(
       const [term] = key.split(LEGACY_KEY_SEP);
       insertPitch.run(dictId, sourceLang, term, value.reading ?? '', (value.positions ?? []).join(','));
       counts.pitch += 1;
+    }
+
+    // Keyed exactly like pitch, so one (lang, norm) probe finds both.
+    const ipaRows = Object.entries(index.ipa ?? {});
+    if (ipaRows.length) {
+      const insertIpa = db.prepare(`
+        insert or replace into ipa (dict_id, lang, norm, reading, transcriptions)
+        values (?, ?, ?, ?, ?)
+      `);
+      for (const [key, value] of ipaRows) {
+        if (shouldCancel?.()) throw new LegacyMigrationCancelled();
+        const transcriptions = (value.transcriptions ?? []).filter((ipa) => typeof ipa === 'string' && ipa.trim());
+        if (!transcriptions.length) continue;
+        const [term] = key.split(LEGACY_KEY_SEP);
+        insertIpa.run(dictId, sourceLang, term, value.reading ?? '', JSON.stringify(transcriptions));
+        counts.ipa = (counts.ipa ?? 0) + 1;
+      }
     }
 
     const insertFreq = db.prepare(`

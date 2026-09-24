@@ -1,4 +1,4 @@
-// Review log: one row per graded flashcard review or practice answer.
+// Review log: one row per graded flashcard review, practice or grammar answer.
 //
 // The deck stores only each card's CURRENT schedule, so "how many reviews did I
 // do this week, and how many did I remember" had no answer anywhere — the
@@ -9,7 +9,12 @@
 
 import type { LocalSrsRating } from './localSrs';
 
-export type ReviewLogMode = 'review' | 'learn' | 'test' | 'write';
+/**
+ * `grammar` rows are answers in the grammar practice test: they count toward the
+ * day's study like any practice answer, and are summarised on their own so the
+ * flashcard practice line keeps meaning flashcards.
+ */
+export type ReviewLogMode = 'review' | 'learn' | 'test' | 'write' | 'grammar';
 
 export interface ReviewLogEntry {
   id: string;
@@ -17,6 +22,8 @@ export interface ReviewLogEntry {
   at: number;
   mode: ReviewLogMode;
   cardId?: string;
+  /** Grammar point id, for `grammar` rows. */
+  grammarId?: string;
   word?: string;
   /** Scheduler rating, for `review` rows. */
   rating?: LocalSrsRating;
@@ -32,7 +39,7 @@ export interface ReviewLogEntry {
 /** Bound on stored rows: roughly a year of heavy daily review. */
 export const REVIEW_LOG_LIMIT = 50_000;
 
-const MODES: readonly ReviewLogMode[] = ['review', 'learn', 'test', 'write'];
+const MODES: readonly ReviewLogMode[] = ['review', 'learn', 'test', 'write', 'grammar'];
 const RATINGS: readonly LocalSrsRating[] = ['again', 'hard', 'good', 'easy'];
 
 function finite(value: unknown): number | undefined {
@@ -52,6 +59,7 @@ export function normalizeReviewLogEntry(value: unknown): ReviewLogEntry | null {
     correct: raw.correct === true,
   };
   if (typeof raw.cardId === 'string' && raw.cardId) entry.cardId = raw.cardId;
+  if (typeof raw.grammarId === 'string' && raw.grammarId) entry.grammarId = raw.grammarId.slice(0, 200);
   if (typeof raw.word === 'string' && raw.word) entry.word = raw.word.slice(0, 120);
   if (RATINGS.includes(raw.rating as LocalSrsRating)) entry.rating = raw.rating;
   const prev = finite(raw.prevIntervalDays);
@@ -106,6 +114,9 @@ export interface ReviewLogSummary {
   retentionSample: number;
   practiceAnswers: number;
   practiceCorrect: number;
+  /** Grammar practice answers inside the window (not in `practiceAnswers`). */
+  grammarAnswers: number;
+  grammarCorrect: number;
 }
 
 function localDayKey(ms: number): string {
@@ -137,6 +148,8 @@ export function summarizeReviewLog(
   let maturePassed = 0;
   let practiceAnswers = 0;
   let practiceCorrect = 0;
+  let grammarAnswers = 0;
+  let grammarCorrect = 0;
   for (const entry of entries) {
     const bucket = index.get(localDayKey(entry.at));
     if (!bucket) continue;
@@ -148,6 +161,9 @@ export function summarizeReviewLog(
         matureReviews += 1;
         if (entry.correct) maturePassed += 1;
       }
+    } else if (entry.mode === 'grammar') {
+      grammarAnswers += 1;
+      if (entry.correct) grammarCorrect += 1;
     } else {
       practiceAnswers += 1;
       if (entry.correct) practiceCorrect += 1;
@@ -161,5 +177,7 @@ export function summarizeReviewLog(
     retentionSample: matureReviews,
     practiceAnswers,
     practiceCorrect,
+    grammarAnswers,
+    grammarCorrect,
   };
 }

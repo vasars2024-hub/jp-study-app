@@ -1080,6 +1080,12 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                   />
                 </div>
               )}
+              {entry.ipa && entry.ipa.length > 0 && (
+                <div className="dict-pitch dict-ipa">
+                  <span className="dict-pitch-label">{t('dict.results.ipa')}</span>
+                  <span className="dict-ipa-text">{entry.ipa.join(' / ')}</span>
+                </div>
+              )}
               {entry.glossaryHtml ? (
                 <>
                   {/* A structured glossary arrives as one HTML block with no

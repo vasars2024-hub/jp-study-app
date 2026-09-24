@@ -25,6 +25,12 @@ vi.mock('../storage/db', () => ({
   kvSet: async (key: string, value: unknown) => {
     idb.set(key, value);
   },
+  kvCompareAndSet: async (key: string, expected: unknown, next: unknown, same: (a: unknown, b: unknown) => boolean) => {
+    if (!same(idb.get(key), expected)) return false;
+    if (next === undefined) idb.delete(key);
+    else idb.set(key, next);
+    return true;
+  },
 }));
 vi.mock('../annotations', () => ({ restoreAnnotationsFromIdb: async () => undefined }));
 vi.mock('../bookmarks', () => ({ restoreBookmarksFromIdb: async () => undefined }));
