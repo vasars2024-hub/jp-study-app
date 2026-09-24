@@ -131,6 +131,9 @@ function precedesTheDocument(h: ReadingSurfaceHarness, id: string): boolean {
 }
 
 beforeEach(() => {
+  // The panel persists "library shown" (vn-panel-state); a test that dismisses
+  // the library sheet must not start the next one with it hidden.
+  localStorage.removeItem('vn-panel-state');
   installResizeObserver();
   installReadingSurfaceApi({
     visualNovelList: async () => DATABASE,
