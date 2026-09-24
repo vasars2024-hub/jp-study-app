@@ -4,7 +4,7 @@
  * same-origin fetch — and any chrome-extension origin.
  */
 import { describe, expect, it } from 'vitest';
-import { decideExtensionSettingsAccess, isWellFormedExtensionOrigin } from '../extensionPairing';
+import { decideExtensionSettingsAccess, isWellFormedExtensionOrigin, mayEchoCors } from '../extensionPairing';
 
 const GUM = `chrome-extension://${'a'.repeat(32)}`;
 const OTHER = `chrome-extension://${'b'.repeat(32)}`;
@@ -20,12 +20,25 @@ describe('extension settings access', () => {
   it('refuses a rebinding Host even with an extension-looking Origin', () => {
     expect(decideExtensionSettingsAccess({ ...base, origin: GUM, host: 'evil.example:48971' }).allow).toBe(false);
     expect(decideExtensionSettingsAccess({ ...base, origin: GUM, host: '127.0.0.1:1' }).allow).toBe(false);
-    expect(decideExtensionSettingsAccess({ ...base, origin: GUM, host: 'localhost:48971' }).allow).toBe(true);
+    expect(decideExtensionSettingsAccess({ ...base, origin: GUM, host: 'localhost:48971', pairingOpen: true }).allow).toBe(true);
   });
 
-  it('the real extension still pulls: first pull pins it, later pulls from it work without a token', () => {
-    expect(decideExtensionSettingsAccess({ ...base, origin: GUM })).toEqual({ allow: true, pin: GUM });
+  it('the real extension still pulls: a pull during "Pair now" pins it, later pulls work without a token', () => {
+    expect(decideExtensionSettingsAccess({ ...base, origin: GUM, pairingOpen: true })).toEqual({ allow: true, pin: GUM });
     expect(decideExtensionSettingsAccess({ ...base, origin: GUM, pinnedOrigin: GUM })).toEqual({ allow: true, pin: null });
+  });
+
+  it('nothing pinned is not an open door: without the pairing window or the token, nobody gets it', () => {
+    // Every upgrade from a state file without a pin, and every "New token".
+    expect(decideExtensionSettingsAccess({ ...base, origin: OTHER })).toMatchObject({ allow: false, status: 401 });
+  });
+
+  it('echoes CORS only for the paired extension, or any extension while pairing is open', () => {
+    expect(mayEchoCors(GUM, GUM, false)).toBe(true);
+    expect(mayEchoCors(OTHER, GUM, false)).toBe(false);
+    expect(mayEchoCors(OTHER, null, false)).toBe(false);
+    expect(mayEchoCors(OTHER, null, true)).toBe(true);
+    expect(mayEchoCors('https://evil.example', null, true)).toBe(false);
   });
 
   it('another extension cannot pull once Gum is paired, unless it has the token', () => {

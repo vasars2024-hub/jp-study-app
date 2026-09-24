@@ -1726,6 +1726,8 @@ export const ja: Catalog = {
   'settings.extension.copied': 'コピーしました',
   'settings.extension.regenerate': '再生成',
   'settings.extension.refresh': '更新',
+  'settings.extension.pairNow': '今すぐペアリング',
+  'settings.extension.pairOpen': '2 分間ペアリングを受け付けます。拡張機能のオプションで「Pull from app」を押してください。ペアリングされるのは最初に取得した拡張機能だけです。',
   'settings.extension.installLead': 'Chrome に拡張機能を読み込みます（開発者モード — Web ストアではありません）：',
   'settings.extension.installStep1': 'Chrome で chrome://extensions を開きます。',
   'settings.extension.installStep2': '右上の開発者モードをオンにします。',

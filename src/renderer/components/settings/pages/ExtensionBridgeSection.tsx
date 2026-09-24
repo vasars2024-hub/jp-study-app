@@ -17,6 +17,8 @@ export default function ExtensionBridgeSection() {
     stoppedDetail?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  /** When the "Pair now" window closes; 0 while none is open. */
+  const [pairingUntil, setPairingUntil] = useState(0);
 
   const refresh = useCallback(() => {
     void window.api.extensionStatus().then(setStatus);
@@ -29,6 +31,19 @@ export default function ExtensionBridgeSection() {
   const regenerate = async () => {
     setStatus(await window.api.extensionRegenerateToken());
   };
+
+  // The extension's "Pull from app" pairs without the token only inside this
+  // window; any other installed extension used to be able to take the token.
+  const pairNow = async () => {
+    const { until } = await window.api.extensionPairNow();
+    setPairingUntil(until);
+  };
+
+  useEffect(() => {
+    if (!pairingUntil) return undefined;
+    const timer = window.setTimeout(() => setPairingUntil(0), Math.max(0, pairingUntil - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [pairingUntil]);
 
   const copyToken = async () => {
     if (!status?.token) return;
@@ -119,6 +134,9 @@ export default function ExtensionBridgeSection() {
         <button type="button" className="btn small primary" onClick={() => void copyToken()}>
           {copied ? t('settings.extension.copied') : t('settings.extension.copy')}
         </button>
+        <button type="button" className="btn small" disabled={pairingUntil > 0} onClick={() => void pairNow()}>
+          {t('settings.extension.pairNow')}
+        </button>
         <button type="button" className="btn small" onClick={() => void regenerate()}>
           {t('settings.extension.regenerate')}
         </button>
@@ -126,6 +144,11 @@ export default function ExtensionBridgeSection() {
           {t('settings.extension.refresh')}
         </button>
       </div>
+      {pairingUntil > 0 && (
+        <p className="muted os-set-hint" role="status" style={{ marginTop: 8 }}>
+          {t('settings.extension.pairOpen')}
+        </p>
+      )}
       <p className="muted os-set-hint" style={{ marginTop: 12 }}>
         {t('settings.extension.capabilitiesLead')}
       </p>

@@ -1870,6 +1870,8 @@ export const en: Catalog = {
   'settings.extension.copied': 'Copied',
   'settings.extension.regenerate': 'Regenerate',
   'settings.extension.refresh': 'Refresh',
+  'settings.extension.pairNow': 'Pair now',
+  'settings.extension.pairOpen': 'Pairing is open for two minutes: in the extension options, press "Pull from app". Only the first extension that pulls is paired.',
   'settings.extension.installLead': 'Load the extension in Chrome (developer mode — not the Web Store):',
   'settings.extension.installStep1': 'Open chrome://extensions in Chrome.',
   'settings.extension.installStep2': 'Enable Developer mode (toggle in the top-right corner).',

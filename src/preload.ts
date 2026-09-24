@@ -3147,6 +3147,8 @@ const api = {
     ipcRenderer.invoke('extension:status'),
   extensionRegenerateToken: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
     ipcRenderer.invoke('extension:regenerateToken'),
+  /** Open the two-minute window in which the extension's Pull pairs it without the token. */
+  extensionPairNow: (): Promise<{ until: number }> => ipcRenderer.invoke('extension:pairNow'),
   extensionRevealFolder: (): Promise<string | null> => ipcRenderer.invoke('extension:revealFolder'),
   onExtensionMined: (
     cb: (payload: {

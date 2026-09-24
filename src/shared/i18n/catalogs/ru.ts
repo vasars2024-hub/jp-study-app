@@ -1893,6 +1893,8 @@ export const ru: Catalog = {
   'settings.extension.copied': 'Скопировано',
   'settings.extension.regenerate': 'Сгенерировать снова',
   'settings.extension.refresh': 'Обновить',
+  'settings.extension.pairNow': 'Связать сейчас',
+  'settings.extension.pairOpen': 'Связывание открыто на две минуты: в настройках расширения нажмите «Pull from app». Связано будет только первое расширение, которое это сделает.',
   'settings.extension.installLead': 'Загрузите расширение в Chrome (режим разработчика — не из Web Store):',
   'settings.extension.installStep1': 'Откройте chrome://extensions в Chrome.',
   'settings.extension.installStep2': 'Включите режим разработчика (переключатель в правом верхнем углу).',

@@ -13,7 +13,6 @@ import {
   INBOX_FOLDER,
   buildInboxMetaBase,
   checkBearerToken,
-  isAllowedExtensionOrigin,
 } from '../shared/inboxMeta';
 import {
   classifyMineSelection,
@@ -47,7 +46,12 @@ import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
-import { decideExtensionSettingsAccess, isWellFormedExtensionOrigin } from '../shared/extensionPairing';
+import {
+  decideExtensionSettingsAccess,
+  EXTENSION_PAIRING_WINDOW_MS,
+  isWellFormedExtensionOrigin,
+  mayEchoCors,
+} from '../shared/extensionPairing';
 import {
   detectMineLanguage,
   resolveProfileMatch,
@@ -507,8 +511,26 @@ function pinExtensionOrigin(origin: string | null): void {
   saveState(state);
 }
 
+/**
+ * Until when an extension may pin itself without the token: set by "Pair now"
+ * in Settings, closed by the first pin. In memory only — a restart closes it.
+ */
+let pairingOpenUntil = 0;
+
+function pairingWindowOpen(now = Date.now()): boolean {
+  return now < pairingOpenUntil;
+}
+
+/** "Pair now": for two minutes the first extension that pulls is paired. */
+export function openExtensionPairingWindow(now = Date.now()): { until: number } {
+  pairingOpenUntil = now + EXTENSION_PAIRING_WINDOW_MS;
+  return { until: pairingOpenUntil };
+}
+
 function setCors(res: http.ServerResponse, origin: string | undefined): void {
-  if (origin && isAllowedExtensionOrigin(origin)) {
+  // Only the paired extension (or any during the user's pairing window) gets
+  // an echo; it used to go to every chrome-extension:// origin.
+  if (origin && mayEchoCors(origin, (bridgeState ?? loadOrCreateState()).pairedOrigin ?? null, pairingWindowOpen())) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else if (!origin) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1085,12 +1107,17 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       port: effectivePort(state),
       authorized: checkBearerToken(typeof auth === 'string' ? auth : undefined, state.token),
       pinnedOrigin: state.pairedOrigin ?? null,
+      pairingOpen: pairingWindowOpen(),
     });
     if (!decision.allow) {
       json(res, decision.status, { ok: false, error: decision.status === 401 ? 'Unauthorized' : 'Forbidden origin' });
       return;
     }
-    pinExtensionOrigin(decision.pin);
+    if (decision.pin) {
+      pinExtensionOrigin(decision.pin);
+      // One pairing per "Pair now": a second extension waiting in line is refused.
+      pairingOpenUntil = 0;
+    }
     const status = getExtensionBridgeStatus();
     json(res, 200, {
       ok: true,
@@ -2296,6 +2323,7 @@ export function stopExtensionServer(): void {
 export function registerExtensionBridgeIpc(): void {
   ipcMain.handle('extension:status', () => getExtensionBridgeStatus());
   ipcMain.handle('extension:regenerateToken', () => regenerateExtensionToken());
+  ipcMain.handle('extension:pairNow', () => openExtensionPairingWindow());
   ipcMain.handle('extension:revealFolder', async () => {
     const folder = getChromeExtensionFolder();
     const err = await shell.openPath(folder);

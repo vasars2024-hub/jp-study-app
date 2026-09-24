@@ -2000,6 +2000,8 @@ declare global {
         extensionVersion: string;
       }>;
       extensionRegenerateToken(): Promise<{ running: boolean; port: number; token: string; folderPath: string }>;
+      /** Opens the two-minute pairing window; resolves with when it closes. */
+      extensionPairNow(): Promise<{ until: number }>;
       extensionRevealFolder(): Promise<string | null>;
       onExtensionMined(
         cb: (payload: {

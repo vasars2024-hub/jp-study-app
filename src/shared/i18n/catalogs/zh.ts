@@ -1714,6 +1714,8 @@ export const zh: Catalog = {
   'settings.extension.copied': '已复制',
   'settings.extension.regenerate': '重新生成',
   'settings.extension.refresh': '刷新',
+  'settings.extension.pairNow': '立即配对',
+  'settings.extension.pairOpen': '配对将开放两分钟：请在扩展选项中点击“Pull from app”。只有第一个拉取的扩展会被配对。',
   'settings.extension.installLead': '在 Chrome 中加载扩展（开发者模式 — 非 Web 商店）：',
   'settings.extension.installStep1': '在 Chrome 中打开 chrome://extensions。',
   'settings.extension.installStep2': '开启右上角的开发者模式。',
