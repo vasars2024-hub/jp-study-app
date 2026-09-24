@@ -10889,6 +10889,8 @@ export const ru: Catalog = {
   'settings.nav.ai.desc': 'Включение ИИ, выбор офлайн или облака, установка модели и лимиты.',
   'settings.ai.setup.action': 'Настроить ИИ',
   'settings.ai.setup.open': 'Открыть «Настройки → ИИ»',
+  'settings.ai.setup.installModel': 'Установить офлайн-модель',
+  'settings.ai.setup.addKey': 'Добавить облачный ключ',
   'settings.ai.setup.notReady': 'ИИ ещё не настроен: установите офлайн-модель или добавьте облачный ключ.',
   'settings.ai.setup.fixHere': 'Это исправляется в «Настройки → ИИ».',
   'settings.ai.enabled.title': 'Использовать функции ИИ',

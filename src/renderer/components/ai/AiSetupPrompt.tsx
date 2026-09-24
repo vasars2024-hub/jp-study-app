@@ -20,20 +20,37 @@ export function AiSetupPrompt({
   compact = false,
   settingId,
   actionKey = 'settings.ai.setup.action',
+  offerBoth = false,
 }: {
   reasonKey?: string;
   compact?: boolean;
   settingId?: string;
   /** The button's label; "Set up AI" unless the surface is only pointing the way. */
   actionKey?: string;
+  /**
+   * Nothing is set up yet: offer both ways in, each opening its own row of
+   * Settings > AI, instead of one button that leaves the choice unexplained.
+   */
+  offerBoth?: boolean;
 }) {
   const { t } = useT();
   return (
     <div className={`ai-setup-prompt${compact ? ' is-compact' : ''}`} role="note">
       <span className="ai-setup-prompt-text">{t(reasonKey ?? 'settings.ai.setup.notReady')}</span>
-      <button type="button" className="btn small ai-setup-prompt-action" onClick={() => openAiSettings(settingId)}>
-        {t(actionKey)}
-      </button>
+      {offerBoth ? (
+        <>
+          <button type="button" className="btn small ai-setup-prompt-action" onClick={() => openAiSettings('ai-model')}>
+            {t('settings.ai.setup.installModel')}
+          </button>
+          <button type="button" className="btn small ai-setup-prompt-action" onClick={() => openAiSettings('ai-provider')}>
+            {t('settings.ai.setup.addKey')}
+          </button>
+        </>
+      ) : (
+        <button type="button" className="btn small ai-setup-prompt-action" onClick={() => openAiSettings(settingId)}>
+          {t(actionKey)}
+        </button>
+      )}
     </div>
   );
 }

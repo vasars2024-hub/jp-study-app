@@ -8723,6 +8723,8 @@ export const en: Catalog = {
   'settings.nav.ai.desc': 'Turn AI on or off, choose offline or cloud, install the model, and set limits.',
   'settings.ai.setup.action': 'Set up AI',
   'settings.ai.setup.open': 'Open Settings → AI',
+  'settings.ai.setup.installModel': 'Install the offline model',
+  'settings.ai.setup.addKey': 'Add a cloud key',
   'settings.ai.setup.notReady': 'AI is not set up yet: install the offline model or add a cloud key.',
   'settings.ai.setup.fixHere': 'This is fixed in Settings → AI.',
   'settings.ai.enabled.title': 'Use AI features',

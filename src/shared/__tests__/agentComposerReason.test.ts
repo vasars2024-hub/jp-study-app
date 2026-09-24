@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_COMPOSER_REASON_KEYS,
+  AGENT_COMPOSER_SETUP_REASON_KEYS,
+  AGENT_SETUP_NEEDED_REASON,
   agentPlanDisabledReason,
   agentSendDisabledReason,
   type AgentComposerState,
@@ -131,7 +133,31 @@ describe('agent composer AI readiness', () => {
     targetReady: true,
     agentEnabled: true,
     plannerReady: true,
+    anythingReady: true,
   };
+
+  /*
+   * A fresh profile: no model, no key, and the engine defaulting to the cloud.
+   * The composer used to say "No API key is saved for this cloud provider",
+   * which never mentions that an offline model exists.
+   */
+  it('gives a fresh profile the neutral setup reason, not a missing cloud key', () => {
+    const fresh = state({
+      setup: { ...SET_UP, targetIsLocal: false, targetReady: false, plannerReady: false, anythingReady: false },
+    });
+    expect(agentSendDisabledReason(fresh)).toBe(AGENT_SETUP_NEEDED_REASON);
+    expect(agentPlanDisabledReason(fresh)).toBe(AGENT_SETUP_NEEDED_REASON);
+    expect(AGENT_COMPOSER_SETUP_REASON_KEYS.has(AGENT_SETUP_NEEDED_REASON)).toBe(true);
+    // The same on a local target: nothing is set up, so neither side is named.
+    expect(agentSendDisabledReason({ ...fresh, setup: { ...fresh.setup!, targetIsLocal: true } }))
+      .toBe(AGENT_SETUP_NEEDED_REASON);
+  });
+
+  it('keeps naming the missing side once the other side is set up', () => {
+    // A user with a model who picked a cloud target made an explicit choice.
+    const chose = state({ setup: { ...SET_UP, targetIsLocal: false, targetReady: false } });
+    expect(agentSendDisabledReason(chose)).toBe('agent.execute.reason.cloudKeyMissing');
+  });
 
   it('blocks Send on a local target with no model, ahead of an empty draft', () => {
     const blocked = state({ draft: '', setup: { ...SET_UP, targetReady: false } });

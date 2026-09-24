@@ -43,6 +43,15 @@ export interface AgentComposerSetupState {
   agentEnabled: boolean;
   /** A plan can be made: a local model, or a key for the planner's cloud provider. */
   plannerReady: boolean;
+  /**
+   * Anything at all can run: an Agent model on disk, or a key for any cloud
+   * provider. False is a fresh install, and it gets the neutral setup reason
+   * with both ways in, rather than whichever side the default target happens
+   * to be on — the engine defaults to the cloud, so a new user used to be told
+   * "No API key is saved for this cloud provider" and never that an offline
+   * model exists.
+   */
+  anythingReady: boolean;
 }
 
 /**
@@ -51,6 +60,12 @@ export interface AgentComposerSetupState {
  * the user which kind of request is in flight does not change what they do.
  */
 const inFlight = (s: AgentComposerState) => s.busy || s.planning;
+
+/**
+ * Nothing is set up at all. The same sentence Settings > AI uses ("install the
+ * offline model or add a cloud key"), and the composer offers both as buttons.
+ */
+export const AGENT_SETUP_NEEDED_REASON = 'settings.ai.setup.notReady';
 
 /**
  * `undefined` means the button is ENABLED. The shell derives `disabled` from
@@ -63,7 +78,9 @@ export function agentPlanDisabledReason(s: AgentComposerState): string | undefin
   // model, and saying "write an objective" first sends them the wrong way.
   if (s.setup && !s.setup.aiEnabled) return 'agent.execute.reason.aiOff';
   if (s.setup && !s.setup.agentEnabled) return 'agent.plan.reason.agentDisabled';
-  if (s.setup && !s.setup.plannerReady) return 'agent.plan.reason.noPlanner';
+  if (s.setup && !s.setup.plannerReady) {
+    return s.setup.anythingReady ? 'agent.plan.reason.noPlanner' : AGENT_SETUP_NEEDED_REASON;
+  }
   if (s.attachmentReading) return 'agent.execute.reason.attachmentReading';
   // Ahead of the empty-draft rule on purpose: attached files block plan creation
   // whatever the objective says, so clearing them is the first move either way.
@@ -77,6 +94,7 @@ export function agentSendDisabledReason(s: AgentComposerState): string | undefin
   if (inFlight(s)) return 'agent.execute.reason.busy';
   if (s.setup && !s.setup.aiEnabled) return 'agent.execute.reason.aiOff';
   if (s.setup && !s.setup.targetReady) {
+    if (!s.setup.anythingReady) return AGENT_SETUP_NEEDED_REASON;
     return s.setup.targetIsLocal
       ? 'agent.execute.reason.localModelMissing'
       : 'agent.execute.reason.cloudKeyMissing';
@@ -97,6 +115,7 @@ export function agentSendDisabledReason(s: AgentComposerState): string | undefin
  */
 export const AGENT_COMPOSER_SETUP_REASON_KEYS: ReadonlySet<string> = new Set([
   'agent.execute.reason.aiOff',
+  AGENT_SETUP_NEEDED_REASON,
   'agent.execute.reason.localModelMissing',
   'agent.execute.reason.cloudKeyMissing',
   'agent.plan.reason.agentDisabled',

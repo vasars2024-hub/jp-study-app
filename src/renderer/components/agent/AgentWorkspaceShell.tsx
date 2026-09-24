@@ -79,6 +79,7 @@ import {
 } from '../../../shared/agentProviderPricing';
 import {
   AGENT_COMPOSER_SETUP_REASON_KEYS,
+  AGENT_SETUP_NEEDED_REASON,
   agentPlanDisabledReason,
   agentSendDisabledReason,
   type AgentComposerState,
@@ -1666,6 +1667,8 @@ export default function AgentWorkspaceShell() {
         plannerReady: target === 'local'
           ? aiReadiness.agentModelReady || aiReadiness.cloudReady
           : aiKeySetFor(target, aiSetupStatus.apiKeysSet),
+        anythingReady: aiReadiness.agentModelReady
+          || Object.values(aiSetupStatus.apiKeysSet).some(Boolean),
       },
     } : {}),
   };
@@ -2822,6 +2825,8 @@ export default function AgentWorkspaceShell() {
                       ? sendReasonKey
                       : planReasonKey}
                     settingId={composerState.setup && !composerState.setup.agentEnabled ? 'ai-agent' : undefined}
+                    offerBoth={sendReasonKey === AGENT_SETUP_NEEDED_REASON
+                      || planReasonKey === AGENT_SETUP_NEEDED_REASON}
                   />
                 ) : null}
 

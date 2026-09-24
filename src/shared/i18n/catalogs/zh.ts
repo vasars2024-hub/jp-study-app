@@ -9881,6 +9881,8 @@ export const zh: Catalog = {
   'settings.nav.ai.desc': '开关 AI、选择离线或云端、安装模型并设置上限。',
   'settings.ai.setup.action': '设置 AI',
   'settings.ai.setup.open': '打开 设置 → AI 功能',
+  'settings.ai.setup.installModel': '安装离线模型',
+  'settings.ai.setup.addKey': '添加云端密钥',
   'settings.ai.setup.notReady': 'AI 尚未设置：请安装离线模型或添加云端密钥。',
   'settings.ai.setup.fixHere': '可在 设置 → AI 功能 中解决。',
   'settings.ai.enabled.title': '使用 AI 功能',

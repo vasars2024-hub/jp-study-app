@@ -9932,6 +9932,8 @@ export const ja: Catalog = {
   'settings.nav.ai.desc': 'AI のオン・オフ、オフラインかクラウドかの選択、モデルのインストール、上限の設定。',
   'settings.ai.setup.action': 'AI を設定',
   'settings.ai.setup.open': '設定 → AI 機能を開く',
+  'settings.ai.setup.installModel': 'オフラインモデルをインストール',
+  'settings.ai.setup.addKey': 'クラウドのキーを追加',
   'settings.ai.setup.notReady': 'AI はまだ設定されていません。オフラインモデルをインストールするか、クラウドのキーを追加してください。',
   'settings.ai.setup.fixHere': 'これは 設定 → AI 機能 で解決できます。',
   'settings.ai.enabled.title': 'AI 機能を使う',
