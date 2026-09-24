@@ -692,7 +692,30 @@ describe('qbitTest', () => {
     const report = await qbitTest({ config: { ...config, port: 1 } });
     expect(report.status).toBe('unreachable');
   });
+
+  // The runtime check: qBittorrent closed, no password saved, and Test said
+  // "Authentication failed". Reachability is checked before the credential.
+  it('reports "unreachable", not "unauthorized", when nothing is listening and no password is stored', async () => {
+    await clearScraperSecret('test/qbit');
+    const report = await qbitTest({ config: { ...config, port: 1 } });
+    expect(report.status).toBe('unreachable');
+    expect(report.message).toBe(
+      "qBittorrent isn't reachable at 127.0.0.1:1. Is it running with Web UI enabled?",
+    );
+    const noUser = await qbitTest({ config: { ...config, port: 1, username: '' } });
+    expect(noUser.status).toBe('unreachable');
+  });
 });
+
+/**
+ * A refusal decided before the network still asks whether the address is live,
+ * but with no credential on the request: no key, no cookie, no login.
+ */
+function expectOnlyAnonymousProbe(): void {
+  expect(seenHeaders).toHaveLength(1);
+  expect(seenHeaders[0].authorization).toBeUndefined();
+  expect(seenHeaders[0].cookie).toBeUndefined();
+}
 
 describe('qbitTest in API-key mode', () => {
   /** No username and no stored password: the key must carry the call alone. */
@@ -744,7 +767,7 @@ describe('qbitTest in API-key mode', () => {
     const report = await qbitTest({ config: keyConfig() });
     expect(report.status).toBe('unauthorized');
     expect(report.message).toMatch(/no api key/i);
-    expect(seenHeaders).toHaveLength(0);
+    expectOnlyAnonymousProbe();
   });
 
   it('refuses an unusable key before making any request', async () => {
@@ -752,7 +775,7 @@ describe('qbitTest in API-key mode', () => {
     const report = await qbitTest({ config: keyConfig() });
     expect(report.status).toBe('unauthorized');
     expect(report.message).toMatch(/space or control character/i);
-    expect(seenHeaders).toHaveLength(0);
+    expectOnlyAnonymousProbe();
   });
 
   it('accepts a key passed in on the call, ahead of the keychain (no renderer sends one)', async () => {
@@ -827,7 +850,12 @@ describe('qbitTest names the auth mode it used', () => {
     expect(noPassword.authMode).toBe('password');
     expect(noUser.authMode).toBe('password');
     expect(noKey.authMode).toBe('apiKey');
-    expect(seenHeaders).toHaveLength(0);
+    // Three refusals, three credential-free reachability probes, nothing else.
+    expect(seenHeaders).toHaveLength(3);
+    for (const headers of seenHeaders) {
+      expect(headers.authorization).toBeUndefined();
+      expect(headers.cookie).toBeUndefined();
+    }
   });
 
   it('names the mode on an unreachable base path, not only on success', async () => {

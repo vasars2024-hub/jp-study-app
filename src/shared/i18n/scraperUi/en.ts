@@ -1084,6 +1084,7 @@ export const SCRAPER_UI_EN: Catalog = {
   'scrApp.set.qbitTesting': 'Testing the configured qBittorrent connection…',
   'scrApp.set.qbitTestResult': '{value}',
   'scrApp.set.qbitTestFailed': 'The connection test failed before qBittorrent returned a response.',
+  'scrApp.set.qbitUnreachable': "qBittorrent isn't reachable at {where}. Is it running with Web UI enabled?",
   'scrApp.set.listSaved': '{value} saved.',
   'scrApp.set.saveItem': 'Save {value}',
   'scrApp.set.credentialSaved': 'Credential reference saved.',

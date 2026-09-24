@@ -1025,6 +1025,7 @@ export const SCRAPER_UI_ZH: Catalog = {
   'scrApp.set.qbitTesting': '正在测试已配置的 qBittorrent 连接…',
   'scrApp.set.qbitTestResult': '{value}',
   'scrApp.set.qbitTestFailed': 'qBittorrent 返回响应前，连接测试已失败。',
+  'scrApp.set.qbitUnreachable': '无法连接到 {where} 上的 qBittorrent。它是否已运行并启用了 Web UI？',
   'scrApp.set.listSaved': '已保存{value}。',
   'scrApp.set.saveItem': '保存{value}',
   'scrApp.set.credentialSaved': '已保存凭据引用。',

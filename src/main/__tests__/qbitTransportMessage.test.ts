@@ -28,10 +28,10 @@ describe('qbitTransportMessage', () => {
   it('names the address and BOTH live possibilities on a refused connection', () => {
     const text = qbitTransportMessage(AT, sysError('ECONNREFUSED', 'connect ECONNREFUSED 127.0.0.1:8080'));
     expect(text).toContain('127.0.0.1:8080');
-    // The two causes the product cannot separate. Naming only one would be the false
-    // claim this whole decision exists to avoid.
-    expect(text).toMatch(/not be running/i);
-    expect(text).toMatch(/turned off|different port/i);
+    // The two causes the product cannot separate, asked about together. Naming only
+    // one would be the false claim this whole decision exists to avoid.
+    expect(text).toMatch(/isn't reachable/i);
+    expect(text).toMatch(/running with Web UI enabled\?/i);
     // And it is prose, not a syscall trace.
     expect(text).not.toContain('ECONNREFUSED');
     expect(text).not.toContain('connect ');
@@ -41,7 +41,7 @@ describe('qbitTransportMessage', () => {
     // undici wraps the syscall error, and `code` does not always survive on the outer
     // error. The old raw-message path could not care; this one has to.
     const text = qbitTransportMessage(AT, new Error('connect ECONNREFUSED 127.0.0.1:8080'));
-    expect(text).toMatch(/not be running/i);
+    expect(text).toMatch(/isn't reachable/i);
     expect(text).not.toContain('ECONNREFUSED');
   });
 
@@ -54,14 +54,14 @@ describe('qbitTransportMessage', () => {
     expect(text).toMatch(/could not be resolved/i);
     // A DNS failure is genuinely a different cause, so it must not borrow the
     // refused-connection wording.
-    expect(text).not.toMatch(/not be running/i);
+    expect(text).not.toMatch(/isn't reachable/i);
   });
 
   it('calls a hang a hang', () => {
     const text = qbitTransportMessage(AT, sysError('ETIMEDOUT', 'connect ETIMEDOUT 127.0.0.1:8080'));
     expect(text).toContain('127.0.0.1:8080');
     expect(text).toMatch(/did not answer in time/i);
-    expect(text).not.toMatch(/not be running/i);
+    expect(text).not.toMatch(/isn't reachable/i);
   });
 
   it('keeps an unrecognised failure verbatim rather than flattening it', () => {
@@ -78,7 +78,8 @@ describe('qbitTransportMessage', () => {
     // false honest state, because the socket result is identical for both.
     expect(refused).not.toMatch(/qBittorrent is not running\b/i);
     expect(refused).not.toMatch(/the Web ?UI is (?:turned )?off\b/i);
-    expect(refused).toMatch(/\bmay\b/i);
+    // It asks rather than tells.
+    expect(refused.trim().endsWith('?')).toBe(true);
   });
 
   it('is the same message for a dead port as for a live daemon with the WebUI off', () => {

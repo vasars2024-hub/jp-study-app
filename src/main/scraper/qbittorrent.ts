@@ -47,6 +47,7 @@ import { getScraperSecret } from './credentials';
 import { emitAcquisitionHandoff } from './handoffs';
 import { MAX_BODY_BYTES_CEILING, scraperRequest } from './http';
 import { scraperLog } from './logBus';
+import { mt } from '../i18n';
 
 const TIMEOUT_MS = 12_000;
 
@@ -152,7 +153,9 @@ export function qbitTransportMessage(
   const signal = `${typeof code === 'string' ? code : ''} ${raw}`;
 
   if (/ECONNREFUSED/.test(signal)) {
-    return `Nothing is listening on ${where}. qBittorrent may not be running, or its Web UI may be turned off or on a different port.`;
+    // A question, not a verdict: "not running" and "Web UI off" are the same
+    // socket event, so the sentence asks about both rather than picking one.
+    return mt('scrApp.set.qbitUnreachable', { where });
   }
   if (/ENOTFOUND|EAI_AGAIN/.test(signal)) {
     return `The host ${config.host} could not be resolved.`;
@@ -527,6 +530,32 @@ async function authed(
   }
 }
 
+/**
+ * Whether anything answers HTTP at the WebUI address, asked with no credential.
+ *
+ * `qbitTest` checks the stored credential before it touches the network, so
+ * with qBittorrent closed and no password saved the Test button said
+ * "Authentication failed" — sending the user to fix a password when the client
+ * was simply not running. When the credential check is about to refuse, this
+ * asks the address first. It carries no cookie, key or password: any HTTP
+ * status at all (qBittorrent answers 403 to an anonymous request) proves the
+ * address is live, and only a transport error means it is not.
+ */
+async function qbitUnreachableReason(config: ScraperQbittorrentSettings): Promise<string | null> {
+  const base = qbitBaseUrl(config);
+  try {
+    await scraperRequest(`${base}/api/v2/app/version`, {
+      method: 'GET',
+      headers: { referer: base },
+      timeoutMs: 4_000,
+      correlationId: 'qbit',
+    });
+    return null;
+  } catch (error) {
+    return qbitTransportMessage(config, error);
+  }
+}
+
 export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusReport> {
   const input = normalizeQbitInput(rawInput);
   const { config } = input;
@@ -543,31 +572,21 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   // A key authenticates on its own, so a missing username is only a problem in
   // password mode. Asking for one in key mode was the fastest way to make a
   // working key look broken.
+  let credentialProblem = '';
   if (mode === 'apiKey') {
-    const problem = apiKeyProblem(await resolveApiKey(input));
-    if (problem) {
-      return { status: 'unauthorized', version: '', message: problem, latencyMs: 0, authMode: mode };
-    }
-  } else {
-    if (!config.username) {
-      return {
-        status: 'unauthorized',
-        version: '',
-        message: 'No username is set.',
-        latencyMs: 0,
-        authMode: mode,
-      };
-    }
-    const password = await resolvePassword(input);
-    if (!password) {
-      return {
-        status: 'unauthorized',
-        version: '',
-        message: 'No password is stored for this account.',
-        latencyMs: 0,
-        authMode: mode,
-      };
-    }
+    credentialProblem = apiKeyProblem(await resolveApiKey(input));
+  } else if (!config.username) {
+    credentialProblem = 'No username is set.';
+  } else if (!(await resolvePassword(input))) {
+    credentialProblem = 'No password is stored for this account.';
+  }
+  if (credentialProblem) {
+    // Reachability first: a missing password is not the problem to report
+    // while nothing is listening at the address at all.
+    const unreachable = await qbitUnreachableReason(config);
+    return unreachable
+      ? { status: 'unreachable', version: '', message: unreachable, latencyMs: 0, authMode: mode }
+      : { status: 'unauthorized', version: '', message: credentialProblem, latencyMs: 0, authMode: mode };
   }
 
   const started = Date.now();

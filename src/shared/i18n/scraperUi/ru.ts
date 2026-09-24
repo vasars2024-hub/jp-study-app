@@ -1099,6 +1099,7 @@ export const SCRAPER_UI_RU: Catalog = {
   'scrApp.set.qbitTesting': 'Проверяем настроенное подключение к qBittorrent…',
   'scrApp.set.qbitTestResult': '{value}',
   'scrApp.set.qbitTestFailed': 'Проверка подключения завершилась ошибкой до ответа qBittorrent.',
+  'scrApp.set.qbitUnreachable': 'qBittorrent недоступен по адресу {where}. Он запущен, и включён ли в нём Web UI?',
   'scrApp.set.listSaved': '{value}: сохранено.',
   'scrApp.set.saveItem': 'Сохранить: {value}',
   'scrApp.set.credentialSaved': 'Ссылка на учётные данные сохранена.',
