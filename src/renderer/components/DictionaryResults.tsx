@@ -17,7 +17,7 @@ import {
 import AnkiSetup from './AnkiSetup';
 import Icon from './Icons';
 import { loadSaved, onSavedChanged, removeSaved, SAVED_WORDS_BOOK_ID, SAVED_WORDS_BOOK_TITLE, SAVED_WORDS_FOLDER } from '../savedWords';
-import { mineToStudy, type MineToStudyInput } from '../studyMining';
+import { mineToStudy, notifyMined, type MineToStudyInput } from '../studyMining';
 import { cycleLevel, getLevel, onKnowledgeChanged, type WkLevel } from '../knownWords';
 import { getStudyLang, onStudyLangChanged } from '../studyEnvironment';
 import { getActiveProfile, onProfileChanged } from '../profileState';
@@ -470,7 +470,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     // so a closed Anki, a missing example or a failed translation below can
     // no longer lose it. The Anki half joins the same card at the end.
     const sentence = context?.trim() || undefined;
-    await mineToStudy({ ...studyCardFor(entry, sentence), notify: false });
+    const saved = await mineToStudy({ ...studyCardFor(entry, sentence), notify: false });
     void window.api.ankiStatus().then(setAnki).catch(() => undefined);
     const counts = exampleCountsFor(active);
     const autoMax = Math.max(...Object.values(counts), 1);
@@ -697,6 +697,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     // variable lands; we just supply the raw content for this entry.
     const mined = await mineToStudy({
       ...studyCardFor(entry, sentence),
+      notify: false,
       anki: {
         route: { source: 'dictionary', cardKind: 'word' },
         term: entry.word,
@@ -713,6 +714,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         fetchAudio: profileWantsAudio(active) || undefined,
       },
     });
+    // One toast for the whole Add. The save above created the card; this call
+    // only joined Anki to it, so its own `created` is always false.
+    notifyMined({ ...mined, created: saved.created || mined.created });
     switch (mined.anki) {
       case 'added':
         setAddState((p) => ({ ...p, [i]: 'added' }));

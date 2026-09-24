@@ -515,17 +515,25 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
   const cardId = card.id;
   const finalCard = loadDeck().find((row) => row.id === cardId) ?? card;
   const result: MineToStudyResult = { card: finalCard, created, anki: outcome, ankiResult, error };
-  if (input.notify !== false) {
-    // Feedback is cosmetic: a toast that cannot render must never turn a saved
-    // card into a failed mine for the surface waiting on this promise.
-    try {
-      const toast = mineToastMessage(result);
-      showToast({ message: toast.message, kind: toast.kind });
-    } catch {
-      /* no toast host / i18n in this context */
-    }
-  }
+  if (input.notify !== false) notifyMined(result);
   return result;
+}
+
+/**
+ * The one toast a mine earns. Exported for a surface that mines in two steps —
+ * a local save first, the Anki half later — and must toast once, with the
+ * first step's `created`: the second call finds the card the first one made
+ * and would otherwise call a brand-new card "Already in your deck".
+ */
+export function notifyMined(result: Pick<MineToStudyResult, 'created' | 'anki' | 'error'>): void {
+  // Feedback is cosmetic: a toast that cannot render must never turn a saved
+  // card into a failed mine for the surface waiting on this promise.
+  try {
+    const toast = mineToastMessage(result);
+    showToast({ message: toast.message, kind: toast.kind });
+  } catch {
+    /* no toast host / i18n in this context */
+  }
 }
 
 /**
