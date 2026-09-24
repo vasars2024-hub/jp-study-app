@@ -61,6 +61,10 @@ export function executionErrorKey(code: AgentExecutionFailureCode): string {
   if (code === 'missing-credential') return 'agent.execute.error.credential';
   if (code === 'authentication') return 'agent.execute.error.authentication';
   if (code === 'bridge-unavailable') return 'agent.execute.error.bridge';
+  // Typed end to end since 2026-09: a missing model used to arrive here as a
+  // plain failure and read "the provider returned an unusable response".
+  if (code === 'local-model-missing') return 'agent.execute.error.localModelMissing';
+  if (code === 'ai-off') return 'agent.execute.error.aiOff';
   // Deliberately not folded into `privacy`: this is a capability of the chosen
   // model, and the fix is to switch target rather than to grant consent.
   if (code === 'vision-unsupported') return 'agent.attachment.visionUnsupported';
@@ -88,6 +92,11 @@ export function executionErrorKey(code: AgentExecutionFailureCode): string {
     return 'agent.execute.error.provider';
   }
   return 'agent.execute.error.request';
+}
+
+/** Failures whose remedy is in Settings > AI; a surface shows "Set up AI" beside them. */
+export function executionErrorNeedsSetup(code: AgentExecutionFailureCode): boolean {
+  return code === 'local-model-missing' || code === 'ai-off' || code === 'missing-credential';
 }
 
 /** Ids only, for a caller that needs to validate a persisted or dispatched target. */

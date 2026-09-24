@@ -7,6 +7,8 @@ import {
 import { appendNotebookEvent } from '../../notebookTimeline';
 import { useT } from '../../i18n';
 import type { TVars } from '../../../shared/i18n/core';
+import { AiSetupPrompt } from '../ai/AiSetupPrompt';
+import { useAiReadiness } from '../../aiSetupClient';
 
 type Translate = (key: string, vars?: TVars) => string;
 
@@ -56,6 +58,11 @@ export default function MediaStudyAssistantPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  // Cloud-only: this assistant needs a provider's JSON mode, so an offline
+  // model does not unlock it. Said up front instead of after a click.
+  const ai = useAiReadiness();
+  const [needsKey, setNeedsKey] = useState(false);
+  const blockedOnKey = needsKey || (ai.loaded && ai.enabled && !ai.cloudReady);
 
   useEffect(() => {
     setResult(null);
@@ -77,6 +84,10 @@ export default function MediaStudyAssistantPanel({
         jlptLevel,
       });
       if (!response.ok || !response.result) {
+        if (response.needsKey) {
+          setNeedsKey(true);
+          return;
+        }
         setError(response.error ?? t('mediaAssistant.failed'));
         return;
       }
@@ -104,12 +115,13 @@ export default function MediaStudyAssistantPanel({
 
   if (!sentence.trim()) return null;
   return (
-    <section className="media-study-assistant" aria-label={t('mediaAssistant.aria')}>
+    <section className="media-study-assistant" data-ai-entry aria-label={t('mediaAssistant.aria')}>
       <div>
         <span className="media-study-mode-kicker">{t('mediaAssistant.kicker')}</span>
         <p>{sentence}</p>
       </div>
-      <div className="media-study-assistant-actions">
+      {blockedOnKey && <AiSetupPrompt compact reasonKey="mediaAssistant.needsKey" settingId="ai-provider" />}
+      <div className="media-study-assistant-actions" hidden={blockedOnKey}>
         {MEDIA_STUDY_ASSISTANT_MODES.map((assistantMode) => (
           <button
             key={assistantMode}

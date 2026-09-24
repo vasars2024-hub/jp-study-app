@@ -1,6 +1,4 @@
-import { app, ipcMain } from 'electron';
-import fs from 'node:fs';
-import os from 'node:os';
+import { ipcMain } from 'electron';
 import path from 'node:path';
 import {
   buildLocalAgentSystemPrompt,
@@ -14,8 +12,9 @@ import {
   type LocalAgentSettings,
 } from '../shared/localAgentSettings';
 import { effectiveAgentPermission } from '../shared/localAgentProfiles';
-import { recommendedLocalAgentModels } from '../shared/localAgentModels';
+import { AI_PROVIDERS, type AiProviderId } from '../shared/aiProviders';
 import type {
+  LocalAgentPlanFailureCode,
   LocalAgentPlanRequest,
   LocalAgentPlanResponse,
   LocalAgentModelInfo,
@@ -30,12 +29,21 @@ import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 import { registerAgentOperationalIpc } from './agentOperationalIpc';
 import { getAgentSpendStore } from './agentSpendStore';
 import { broadcastAgentSpend, registerAgentSpendIpc } from './agentSpendIpc';
-import { setAgentSpendGuard } from './providerRuntime';
+import {
+  AiProviderRuntimeError,
+  getAiProviderHealth,
+  runCloudAiRequest,
+  setAgentPricingResolver,
+  setAgentSpendGuard,
+} from './providerRuntime';
+import { getAgentPricingStore } from './agentPricingStore';
+import { listLocalModelFiles, resolveLocalModelForRole } from './localModelFiles';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
+import { registerAiSetupIpc } from './aiSetupIpc';
 import { errorDetail, logDiagnostic } from './errorLog';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 export { runAgentProviderPrompt } from './agentProviderRouter';
 
-const KNOWN_MODEL_FILENAMES = ['Qwen3-1.7B.gguf', 'Qwen_Qwen3-1.7B-Q4_K_M.gguf', 'Qwen3-1.7B-Q4_K_M.gguf', 'Qwen3-8B.gguf', 'Qwen3-14B.gguf', 'Qwen3-32B.gguf'];
 const PLAN_TIMEOUT_MS = 90_000;
 const IDLE_UNLOAD_MS = 5 * 60_000;
 /** What a plan is allowed to spend, when the context has room for it. */
@@ -75,32 +83,12 @@ function cleanObjective(value: unknown): string {
   return objective;
 }
 
+/**
+ * The planner's model: the user's pick, or the per-role choice from what is installed. Shared with
+ * `translate.ts` through `localModelFiles.ts`, so both agree on what "installed" means.
+ */
 function resolveModelPath(settings: LocalAgentSettings, preferredModelFileName?: string): string | null {
-  const explicit = preferredModelFileName || settings.modelFileName;
-  const names = explicit
-    ? [explicit]
-    : [...new Set([
-      ...recommendedLocalAgentModels(settings.modelMode)
-        .filter((model) => model.fileName.toLocaleLowerCase().endsWith('.gguf'))
-        .map((model) => model.fileName),
-      ...(settings.modelMode === 'standard' ? KNOWN_MODEL_FILENAMES : []),
-    ])];
-  const roots = [
-    path.join(app.getPath('userData'), 'models'),
-    path.join(os.homedir(), 'Downloads'),
-  ];
-  for (const root of roots) {
-    for (const name of names) {
-      if (!/^[^\\/]+\.gguf$/i.test(name)) continue;
-      const candidate = path.join(root, name);
-      try {
-        if (fs.statSync(candidate).isFile()) return candidate;
-      } catch {
-        // A missing model is reported as a user-facing availability error.
-      }
-    }
-  }
-  return null;
+  return resolveLocalModelForRole('agent', settings.modelMode, preferredModelFileName || settings.modelFileName);
 }
 
 /**
@@ -138,31 +126,9 @@ function scheduleIdleUnload(): void {
 }
 
 function listAvailableModels(): LocalAgentModelInfo[] {
-  const roots: Array<{ root: string; location: LocalAgentModelInfo['location'] }> = [
-    { root: path.join(app.getPath('userData'), 'models'), location: 'app-models' },
-    { root: path.join(os.homedir(), 'Downloads'), location: 'downloads' },
-  ];
-  const found: LocalAgentModelInfo[] = [];
-  for (const { root, location } of roots) {
-    let entries: fs.Dirent[];
-    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
-    for (const entry of entries) {
-      const directory = entry.isDirectory() ? path.join(root, entry.name) : root;
-      const names = entry.isDirectory()
-        ? (() => { try { return fs.readdirSync(directory, { withFileTypes: true }); } catch { return []; } })()
-        : [entry];
-      for (const nested of names) {
-        if (!nested.isFile() || !/^[^\\/]+\.gguf$/i.test(nested.name)) continue;
-        try {
-          found.push({ fileName: nested.name, sizeBytes: fs.statSync(path.join(directory, nested.name)).size, location });
-        } catch { /* A model can disappear while the folder is being scanned. */ }
-      }
-    }
-  }
-  return found
-    .sort((a, b) => a.fileName.localeCompare(b.fileName))
-    .filter((model, index, all) => all.findIndex((candidate) => candidate.fileName.toLocaleLowerCase() === model.fileName.toLocaleLowerCase()) === index)
-    .slice(0, 100);
+  // The path stays in main: the picker needs names, and a path would put the user's profile
+  // directory in the renderer for nothing.
+  return listLocalModelFiles().map(({ fileName, sizeBytes, location }) => ({ fileName, sizeBytes, location }));
 }
 
 async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Promise<LoadedAgentRuntime> {
@@ -276,20 +242,118 @@ function queueInference<T>(run: () => Promise<T>): Promise<T> {
   return next;
 }
 
+const CLOUD_PROVIDER_IDS: ReadonlySet<string> = new Set(AI_PROVIDERS.map((provider) => provider.id));
+
+function cloudProvider(value: unknown): AiProviderId | null {
+  return typeof value === 'string' && CLOUD_PROVIDER_IDS.has(value) ? value as AiProviderId : null;
+}
+
+function refusal(
+  code: LocalAgentPlanFailureCode,
+  error: string,
+  startedAt: number,
+): LocalAgentPlanResponse {
+  return { ok: false, code, error, elapsedMs: Date.now() - startedAt };
+}
+
+/**
+ * The cloud planner: the same system prompt, the same JSON plan schema and the same validation as the
+ * local one, sent through `runCloudAiRequest` so the monthly spending limit and the rates apply.
+ *
+ * Nothing about governance is relaxed on this path. The approved-operation set, the permission
+ * ceiling and the profile allow-list go into the prompt exactly as they do locally, and
+ * `parseLocalAgentModelPlan` refuses any step outside them; every step still waits in the queue for
+ * the user's approval. What changes is what leaves the machine: while "keep sensitive context out of
+ * cloud requests" is on (the default), memories and the attached application state stay home.
+ */
+async function planWithCloud(
+  providerId: AiProviderId,
+  objective: string,
+  settings: LocalAgentSettings,
+  request: LocalAgentPlanRequest,
+  startedAt: number,
+): Promise<LocalAgentPlanResponse> {
+  if (!getAiProviderHealth(providerId).configured) {
+    return refusal('cloud-key-missing', 'No API key is saved for the cloud planner.', startedAt);
+  }
+  const permission = effectiveAgentPermission(settings.permission, request.profile);
+  const sendPrivate = !settings.excludeSensitiveContext;
+  const promptContext = {
+    permission,
+    profile: request.profile,
+    availableOperations: normalizeAvailableOperations(request.availableOperations),
+    memories: sendPrivate ? memoriesInAgentScope(settings, request.memories) : [],
+    applicationState: settings.privacyMode || !sendPrivate ? {} : request.applicationState,
+  };
+  const approvedOperations = selectLocalAgentApprovedOperations(promptContext);
+  const system = buildLocalAgentSystemPrompt(promptContext);
+  activeInferenceCount += 1;
+  try {
+    const result = await runCloudAiRequest({
+      providerId,
+      systemPrompt: system,
+      prompt: `User request:\n${objective}`,
+      responseMimeType: 'application/json',
+      // Room for a thinking model's thoughts on top of the plan itself.
+      maxOutputTokens: PLAN_MAX_OUTPUT_TOKENS * 3,
+      timeoutMs: PLAN_TIMEOUT_MS,
+      retryAttempts: 1,
+    });
+    const parsed = parseLocalAgentModelPlan(
+      result.text,
+      `agent-${startedAt}`,
+      objective,
+      permission,
+      startedAt,
+      approvedOperations,
+    );
+    lastError = '';
+    return {
+      ok: true,
+      summary: parsed.summary,
+      task: parsed.task,
+      planner: 'cloud',
+      elapsedMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : 'The cloud planner failed.';
+    if (error instanceof AiProviderRuntimeError) {
+      if (error.code === 'missing-credential') return refusal('cloud-key-missing', lastError, startedAt);
+      if (error.code === 'spend-budget') return refusal('spend-budget', lastError, startedAt);
+    }
+    return refusal('planner-failed', lastError, startedAt);
+  } finally {
+    activeInferenceCount = Math.max(0, activeInferenceCount - 1);
+  }
+}
+
 async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse> {
   const startedAt = Date.now();
   const objective = cleanObjective(request.objective);
   const settings = normalizeLocalAgentSettings(request.settings);
+  // Before anything else: the switch covers scheduled automations, which plan with no window open.
+  if (!aiFeaturesEnabled()) return refusal('ai-off', AI_FEATURES_OFF_MESSAGE, startedAt);
   if (!settings.enabled || settings.backend === 'disabled') {
-    return { ok: false, error: 'The local agent is disabled in Settings.', elapsedMs: Date.now() - startedAt };
+    return refusal('agent-disabled', 'The Agent is turned off in Settings > AI.', startedAt);
   }
+  const target = request.target === undefined || request.target === 'local'
+    ? 'local'
+    : cloudProvider(request.target);
+  if (target === null) return refusal('invalid-request', 'Unknown planner target.', startedAt);
+  if (target !== 'local') return planWithCloud(target, objective, settings, request, startedAt);
   const modelPath = resolveModelPath(settings, request.profile?.preferredModelFileName);
   if (!modelPath) {
-    return {
-      ok: false,
-      error: 'No local GGUF model was found. Place a supported Qwen3 model in the app models folder or Downloads.',
-      elapsedMs: Date.now() - startedAt,
-    };
+    // A cloud-only user used to get chat and none of the tools. With a key for the configured
+    // provider, the plan is made there instead — still governed, still approved step by step.
+    const fallback = cloudProvider(request.cloudProviderId);
+    if (fallback && getAiProviderHealth(fallback).configured) {
+      return planWithCloud(fallback, objective, settings, request, startedAt);
+    }
+    return refusal(
+      'model-missing',
+      'No offline AI model is installed. Install one in Settings > AI, or add a cloud API key there.',
+      startedAt,
+    );
   }
   activeInferenceCount += 1;
   try {
@@ -324,6 +388,7 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
       summary: loaded.summary,
       task: loaded.task,
       modelFileName: path.basename(modelPath),
+      planner: 'local',
       elapsedMs: Date.now() - startedAt,
     };
   } catch (error) {
@@ -357,6 +422,7 @@ export function registerLocalAgentIpc(): void {
     } catch (error) {
       return {
         ok: false,
+        code: 'planner-failed',
         error: error instanceof Error ? error.message : 'The local agent could not create a plan.',
       };
     }
@@ -391,7 +457,16 @@ export function registerLocalAgentIpc(): void {
       }
     },
   });
-  registerAgentSpendIpc(() => spendStore);
+  // Rates live beside the ledger and are consulted by the same runtime: a request
+  // whose caller supplied no pricing is priced from here (the user's figure, or
+  // the built-in estimate), so every cloud caller in the app counts against the
+  // limit — not only the Agent composer, which was the one caller that priced.
+  const pricingStore = getAgentPricingStore();
+  setAgentPricingResolver((providerId) => pricingStore.priceFor(providerId));
+  registerAgentSpendIpc(() => spendStore, () => pricingStore);
+  // The "Use AI features" switch and the one-reply setup status every AI
+  // surface reads.
+  registerAiSetupIpc();
   // Permission-gated navigation reads the same store the two above own, so it
   // registers beside them rather than from `src/main.ts`. Its window opener is
   // handed over separately, from the pop-out wiring that owns those windows.

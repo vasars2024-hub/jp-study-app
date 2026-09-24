@@ -385,7 +385,7 @@ export default function MediaStudyMode({
                   <time>{formatCueTime(sentence.start)}</time>
                   <span>{sentence.text}</span>
                 </button>
-                <button
+                <button data-ai-entry
                   type="button"
                   className="media-study-ask-agent"
                   title={t('media.study.askAgentLine')}

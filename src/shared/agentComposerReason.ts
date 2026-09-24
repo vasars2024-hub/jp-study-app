@@ -26,6 +26,23 @@ export interface AgentComposerState {
   visionUnsupported: boolean;
   sensitiveConsentRequired: boolean;
   cloudSensitiveConsent: boolean;
+  /**
+   * AI readiness for the selected target (`shared/aiSetup.ts`). Absent until
+   * main has answered, and absent blocks nothing: a composer must not flash
+   * "set up AI" at a user who is set up while the status is in flight.
+   */
+  setup?: AgentComposerSetupState;
+}
+
+export interface AgentComposerSetupState {
+  /** "Use AI features". */
+  aiEnabled: boolean;
+  targetIsLocal: boolean;
+  /** Local: an Agent model is on disk. Cloud: a key is saved for the chosen provider. */
+  targetReady: boolean;
+  agentEnabled: boolean;
+  /** A plan can be made: a local model, or a key for the planner's cloud provider. */
+  plannerReady: boolean;
 }
 
 /**
@@ -42,6 +59,11 @@ const inFlight = (s: AgentComposerState) => s.busy || s.planning;
  */
 export function agentPlanDisabledReason(s: AgentComposerState): string | undefined {
   if (inFlight(s)) return 'agent.execute.reason.busy';
+  // Setup outranks everything the user could type: no draft fixes a missing
+  // model, and saying "write an objective" first sends them the wrong way.
+  if (s.setup && !s.setup.aiEnabled) return 'agent.execute.reason.aiOff';
+  if (s.setup && !s.setup.agentEnabled) return 'agent.plan.reason.agentDisabled';
+  if (s.setup && !s.setup.plannerReady) return 'agent.plan.reason.noPlanner';
   if (s.attachmentReading) return 'agent.execute.reason.attachmentReading';
   // Ahead of the empty-draft rule on purpose: attached files block plan creation
   // whatever the objective says, so clearing them is the first move either way.
@@ -53,6 +75,12 @@ export function agentPlanDisabledReason(s: AgentComposerState): string | undefin
 
 export function agentSendDisabledReason(s: AgentComposerState): string | undefined {
   if (inFlight(s)) return 'agent.execute.reason.busy';
+  if (s.setup && !s.setup.aiEnabled) return 'agent.execute.reason.aiOff';
+  if (s.setup && !s.setup.targetReady) {
+    return s.setup.targetIsLocal
+      ? 'agent.execute.reason.localModelMissing'
+      : 'agent.execute.reason.cloudKeyMissing';
+  }
   if (s.attachmentReading) return 'agent.execute.reason.attachmentReading';
   if (s.draft.trim().length === 0) return 'agent.execute.reason.emptyDraft';
   if (s.knownInputOverBudget) return 'agent.execute.inputOverBudget';
@@ -63,8 +91,21 @@ export function agentSendDisabledReason(s: AgentComposerState): string | undefin
   return undefined;
 }
 
+/**
+ * The reasons whose remedy is in Settings > AI. The composer shows the one
+ * "Set up AI" link beside exactly these.
+ */
+export const AGENT_COMPOSER_SETUP_REASON_KEYS: ReadonlySet<string> = new Set([
+  'agent.execute.reason.aiOff',
+  'agent.execute.reason.localModelMissing',
+  'agent.execute.reason.cloudKeyMissing',
+  'agent.plan.reason.agentDisabled',
+  'agent.plan.reason.noPlanner',
+]);
+
 /** The keys either rule can return, so a catalog test can assert all of them. */
 export const AGENT_COMPOSER_REASON_KEYS = [
+  ...AGENT_COMPOSER_SETUP_REASON_KEYS,
   'agent.execute.reason.busy',
   'agent.execute.reason.attachmentReading',
   'agent.execute.reason.emptyDraft',

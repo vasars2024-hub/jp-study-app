@@ -24,11 +24,22 @@ import { BrowserWindow, ipcMain, type WebContents } from 'electron';
 import {
   agentSpendFailure,
   agentSpendSuccess,
+  isAgentPricingSetRequest,
   isAgentSpendBudgetRequest,
+  type AgentPricingResult,
   type AgentSpendResult,
   type AgentSpendSnapshotPayload,
 } from '../shared/agentSpendBridge';
 import { getAgentSpendStore, type AgentSpendStore } from './agentSpendStore';
+import { getAgentPricingStore, type AgentPricingStore } from './agentPricingStore';
+
+function broadcastPricing(result: AgentPricingResult, origin: WebContents | null): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    if (origin && window.webContents.id === origin.id) continue;
+    window.webContents.send('agentPricing:changed', result);
+  }
+}
 
 function broadcast(snapshot: AgentSpendSnapshotPayload, origin: WebContents | null): void {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -45,7 +56,41 @@ function broadcast(snapshot: AgentSpendSnapshotPayload, origin: WebContents | nu
  */
 export function registerAgentSpendIpc(
   resolveStore: () => AgentSpendStore = getAgentSpendStore,
+  resolvePricing: () => AgentPricingStore = getAgentPricingStore,
 ): void {
+  // Rates: only what the user entered crosses. Failures are codes, never a path.
+  ipcMain.handle('agentPricing:load', (): AgentPricingResult => {
+    try {
+      return { ok: true, rates: resolvePricing().read().rates };
+    } catch {
+      return { ok: false, code: 'read-failed' };
+    }
+  });
+
+  ipcMain.handle('agentPricing:set', (event, raw: unknown): AgentPricingResult => {
+    if (!isAgentPricingSetRequest(raw)) return { ok: false, code: 'invalid-request' };
+    try {
+      const result: AgentPricingResult = { ok: true, rates: resolvePricing().setPrice(raw.providerId, raw.price).rates };
+      broadcastPricing(result, event.sender);
+      return result;
+    } catch {
+      return { ok: false, code: 'write-failed' };
+    }
+  });
+
+  // One-time adoption of the rates the renderer used to keep in localStorage.
+  ipcMain.handle('agentPricing:migrate', (event, raw: unknown): AgentPricingResult => {
+    try {
+      const store = resolvePricing();
+      const wasMigrated = store.read().migrated;
+      const result: AgentPricingResult = { ok: true, rates: store.migrateLegacy(raw).rates };
+      if (!wasMigrated) broadcastPricing(result, event.sender);
+      return result;
+    } catch {
+      return { ok: false, code: 'write-failed' };
+    }
+  });
+
   ipcMain.handle('agentSpend:load', (): AgentSpendResult => {
     try {
       return agentSpendSuccess(resolveStore().read());

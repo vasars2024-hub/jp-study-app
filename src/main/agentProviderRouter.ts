@@ -20,6 +20,8 @@ import {
   type AiProviderRuntimeEvent,
   type AiProviderUsage,
 } from './providerRuntime';
+import { isLocalModelMissingError } from './localModelFiles';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 import { runLocalQwenPrompt } from './translate';
 
 export interface AgentProviderExecutionOptions {
@@ -316,12 +318,28 @@ async function runLocal(
 ): Promise<AgentProviderExecutionResult> {
   const startedAt = Date.now();
   const stream = policy.streaming ? options.onTextChunk : undefined;
-  const text = await runLocalQwenPrompt(prompt, {
-    maxTokens: policy.maxOutputTokens,
-    timeoutMs: policy.timeoutMs,
-    signal: options.signal,
-    onTextChunk: stream,
-  });
+  const model = policy.target.kind === 'local' ? policy.target.model : undefined;
+  let text: string;
+  try {
+    text = await runLocalQwenPrompt(prompt, {
+      maxTokens: policy.maxOutputTokens,
+      timeoutMs: policy.timeoutMs,
+      signal: options.signal,
+      onTextChunk: stream,
+      // A chat reply is prose. Without this the shared JSON extractor cut any
+      // answer containing a code block, an object or a list down to that
+      // fragment, and the fragment was what the conversation saved.
+      raw: true,
+      // The Agent's own model setting. It used to be ignored here: local chat
+      // always ran on the translation model whatever the user had picked.
+      ...(model ? { modelFileName: model } : {}),
+    });
+  } catch (error) {
+    if (isLocalModelMissingError(error)) {
+      throw new AiProviderRuntimeError(error.message, 'local-model-missing');
+    }
+    throw error;
+  }
   return {
     text,
     provider: disclosure(
@@ -357,6 +375,9 @@ export async function runAgentProviderPrompt(
   prompt: string,
   options: AgentProviderExecutionOptions = {},
 ): Promise<AgentProviderExecutionResult> {
+  // The master switch outranks every other refusal: a user who turned AI off
+  // should not be told about keys or budgets, and nothing may be sent.
+  if (!aiFeaturesEnabled()) throw new AiProviderRuntimeError(AI_FEATURES_OFF_MESSAGE, 'ai-off');
   const context = options.context ?? [];
   // The shared execution normalizer restricts this first slice to text and
   // document attachments. Keep the runtime guard too, so a future caller

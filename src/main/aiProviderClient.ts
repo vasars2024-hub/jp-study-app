@@ -4,7 +4,8 @@
 // supply an explicit JSON schema — the mining-specific fallbacks stayed behind
 // in mining.ts.
 import type { AiProviderId } from '../shared/mining';
-import { AI_PROVIDER_TIMEOUT_MS, runCloudAiRequest } from './providerRuntime';
+import { AI_PROVIDER_TIMEOUT_MS, AiProviderRuntimeError, runCloudAiRequest } from './providerRuntime';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 
 export { AI_PROVIDER_TIMEOUT_MS } from './providerRuntime';
 
@@ -89,6 +90,11 @@ export async function callAiProvider(
   schema: unknown,
   options?: { itemCount?: number; timeoutMs?: number },
 ): Promise<string> {
+  // Every caller of this helper is an AI feature (analysis, AI cards, the media
+  // assistant, Anki additions, the subtitle-fusion arbiter), so the "Use AI
+  // features" switch is enforced here once rather than in each of them.
+  // Machine translation reaches the runtime directly and is not affected.
+  if (!aiFeaturesEnabled()) throw new AiProviderRuntimeError(AI_FEATURES_OFF_MESSAGE, 'ai-off');
   if (providerId === 'gemini-2.5-flash') return callGeminiApi(apiKey, prompt, schema, options);
   return callDeepSeekApi(providerId, apiKey, prompt, schema, options);
 }

@@ -16,6 +16,13 @@
  * main alone, on the completion of requests main itself made.
  */
 
+import { AI_PROVIDERS, type AiProviderId } from './aiProviders';
+import {
+  normalizeAgentProviderPrice,
+  normalizeAgentProviderPricingTable,
+  type AgentProviderPrice,
+  type AgentProviderPricingTable,
+} from './agentProviderPricing';
 import {
   normalizeAgentSpendLedger,
   agentSpendTotals,
@@ -34,6 +41,10 @@ export const AGENT_SPEND_CHANNELS = {
   setBudget: 'agentSpend:setBudget',
   clear: 'agentSpend:clear',
   changed: 'agentSpend:changed',
+  pricingLoad: 'agentPricing:load',
+  pricingSet: 'agentPricing:set',
+  pricingMigrate: 'agentPricing:migrate',
+  pricingChanged: 'agentPricing:changed',
 } as const;
 
 export type AgentSpendChannel =
@@ -77,6 +88,40 @@ const FAILURE_CODES = new Set<AgentSpendFailureCode>([
 ]);
 
 const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/**
+ * The user's own per-provider rates, main-owned since 2026-09 (see
+ * `main/agentPricingStore.ts`). Only what the user entered crosses; the
+ * built-in estimates are shared code, so both sides compute the same
+ * effective table from it.
+ */
+export type AgentPricingResult =
+  | { ok: true; rates: AgentProviderPricingTable }
+  | { ok: false; code: AgentSpendFailureCode };
+
+export function normalizeAgentPricingResult(value: unknown): AgentPricingResult {
+  if (!value || typeof value !== 'object') return { ok: false, code: 'read-failed' };
+  const raw = value as { ok?: unknown; code?: unknown; rates?: unknown };
+  if (raw.ok === true) return { ok: true, rates: normalizeAgentProviderPricingTable(raw.rates) };
+  return {
+    ok: false,
+    code: typeof raw.code === 'string' && FAILURE_CODES.has(raw.code as AgentSpendFailureCode)
+      ? raw.code as AgentSpendFailureCode
+      : 'read-failed',
+  };
+}
+
+/** A set request: a known provider and a whole price, or `null` to return to the estimate. */
+export function isAgentPricingSetRequest(
+  value: unknown,
+): value is { providerId: AiProviderId; price: AgentProviderPrice | null } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const raw = value as { providerId?: unknown; price?: unknown };
+  if (typeof raw.providerId !== 'string' || !AI_PROVIDERS.some((provider) => provider.id === raw.providerId)) {
+    return false;
+  }
+  return raw.price === null || normalizeAgentProviderPrice(raw.price) !== undefined;
+}
 
 export function agentSpendSuccess(snapshot: AgentSpendSnapshotPayload): AgentSpendSuccess {
   return { ok: true, snapshot };

@@ -46,6 +46,15 @@ const status = (over: Partial<AssetStatus> = {}): AssetStatus => ({
 });
 
 describe('catalog', () => {
+  it('offers the offline AI model where the shared model locator looks for it', async () => {
+    const { DEFAULT_LOCAL_MODEL_ASSET_ID, QWEN3_1_7B_FILE_NAMES } = await import('../localAgentModels');
+    const qwen = findAsset(ASSET_CATALOG, DEFAULT_LOCAL_MODEL_ASSET_ID);
+    expect(qwen).toMatchObject({ kind: 'llm', installDir: DEFAULT_LOCAL_MODEL_ASSET_ID });
+    expect(qwen?.url).toMatch(/^https:\/\/huggingface\.co\/Qwen\/Qwen3-1\.7B-GGUF\/resolve\/[0-9a-f]{40}\//);
+    expect(qwen?.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(QWEN3_1_7B_FILE_NAMES).toContain(qwen?.file);
+  });
+
   it('describes Supertonic 3 as one pinned Japanese bundle', () => {
     const bundle = assetDependencyClosure(ASSET_CATALOG, 'supertonic-3');
     expect(bundle).toHaveLength(16);
@@ -316,10 +325,14 @@ describe('sha256 pin coverage (audit T6)', () => {
    * `assetsReverify` / `assetsIntegrity` in main/downloads.ts are what cover
    * those, by comparing against what was actually installed.
    *
+   * **Raised to 18 of 38 on 2026-09-24.** The offline AI model `qwen3-1.7b`
+   * names Qwen's immutable repository revision, so it carries the LFS sha256
+   * the repository reports for that file.
+   *
    * This is a ratchet, not a target: it guarantees the number only ever moves
    * the right way.
    */
-  const PINNED_BASELINE = 17;
+  const PINNED_BASELINE = 18;
 
   it('never loses a pin it already had', () => {
     const { pinned, total, unpinned } = assetPinCoverage();
@@ -334,6 +347,6 @@ describe('sha256 pin coverage (audit T6)', () => {
     // If this fails because someone pinned an asset: good — raise
     // PINNED_BASELINE to the new number and update the comment above.
     const { pinned, total } = assetPinCoverage();
-    expect({ pinned, total }).toEqual({ pinned: 17, total: 37 });
+    expect({ pinned, total }).toEqual({ pinned: 18, total: 38 });
   });
 });

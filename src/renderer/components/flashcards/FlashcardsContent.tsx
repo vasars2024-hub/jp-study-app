@@ -1292,7 +1292,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
             <button className="btn primary" onClick={state.restartReview}>
               {t('flash.reviewAgain')}
             </button>
-            <button className="btn" onClick={askAgentAboutSession}>
+            <button data-ai-entry className="btn" onClick={askAgentAboutSession}>
               {t('flash.askAgent')}
             </button>
             <button className="btn" onClick={state.endReview}>
@@ -1563,7 +1563,7 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
             {t('flash.backToDecks')}
           </button>
           {!hideAiStudio && (
-            <button className="btn" onClick={() => state.setMode('ai-studio')}>
+            <button className="btn" data-ai-entry onClick={() => state.setMode('ai-studio')}>
               {t('flash.aiCardStudio')}
             </button>
           )}
@@ -1891,11 +1891,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 {t('flash.csvTool')}
               </button>
               {!hideAiStudio && (
-                <button className="btn" onClick={() => state.setMode('ai-studio')}>
+                <button className="btn" data-ai-entry onClick={() => state.setMode('ai-studio')}>
                   {t('flash.aiCardStudio')}
                 </button>
               )}
-              <button
+              <button data-ai-entry
                 className="btn"
                 onClick={askAgent}
                 disabled={saved.length === 0}

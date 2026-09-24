@@ -10,7 +10,7 @@ import type { Catalog } from '../core';
 
 export const GAME_ARENA_CHROME_ZH: Catalog = {
   'palette.section.games': '游戏竞技场',
-  'storage.group.llm': '写作评估引擎',
+  'storage.group.llm': '语言模型',
   'search.gameArena': '游戏竞技场',
   'search.gameArena.desc': '小游戏时长、语言、等级、音效，以及镜像写作评估器',
   'games.arcade.mines.board': '雷区，{size}×{size}',

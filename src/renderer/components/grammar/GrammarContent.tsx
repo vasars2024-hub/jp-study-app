@@ -115,7 +115,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
       <header className="gram-card-head lq-hit-scope">
         <h2 lang="ja">{point.title}</h2>
         <span className={`gram-badge lv-${point.level}`}>{point.level}</span>
-        <button type="button" className="gram-ask-agent" onClick={askAgent}>
+        <button data-ai-entry type="button" className="gram-ask-agent" onClick={askAgent}>
           {t('grammar.askAgent')}
         </button>
       </header>

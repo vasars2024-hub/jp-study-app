@@ -112,6 +112,7 @@ import { applyBlancModeClass, isBlancWindow } from './blancMode';
 import { initAgentOperationalState } from './agentOperationalClient';
 import { installLocalAgentAutomationHost } from './localAgentAutomationHost';
 import { bootAeroSafeMode } from './aeroSafeMode';
+import { startAiSetupSync } from './aiSetupClient';
 
 // Lazy: the reader pulls the tokenizer and the mining path, which no other
 // window should pay for at boot.
@@ -363,6 +364,9 @@ if (container) {
   // boot in a non-English UI. English is the default and is already loaded, so
   // for most sessions this costs a microtask, not a fetch.
   void initI18n().then(async () => {
+    // Every window — the Reading Lens and the dictionary overlay too — hides its
+    // AI entry points from the first paint when "Use AI features" is off.
+    startAiSetupSync();
     if (isSysDictOverlay) {
       // Profile state powers the popup's Anki mining target; nothing else boots.
       initProfileState().catch((err) => console.error('[profileState] init failed:', err));

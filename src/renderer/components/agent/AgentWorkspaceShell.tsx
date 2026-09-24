@@ -78,6 +78,7 @@ import {
   type AgentProviderPricingTable,
 } from '../../../shared/agentProviderPricing';
 import {
+  AGENT_COMPOSER_SETUP_REASON_KEYS,
   agentPlanDisabledReason,
   agentSendDisabledReason,
   type AgentComposerState,
@@ -92,6 +93,8 @@ import {
   AGENT_CLOUD_TARGETS,
   agentTargetLabel,
   executionErrorKey,
+  executionErrorNeedsSetup,
+  isAgentCloudTarget,
   newAgentConversationId,
   newAgentExecutionId,
   type AgentTargetChoice,
@@ -104,6 +107,9 @@ import {
 import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
 import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
 import { AgentGovernancePanel } from './AgentGovernancePanel';
+import { AiSetupPrompt } from '../ai/AiSetupPrompt';
+import { notifyAiSetupChanged, useAiReadiness, useAiSetupStatus } from '../../aiSetupClient';
+import { aiKeySetFor, preferredAgentTarget } from '../../../shared/aiSetup';
 import { LOCAL_AGENT_CHAT_HISTORY_TURNS } from '../../../shared/localAgentSettings';
 import {
   loadLocalAgentSettings,
@@ -232,6 +238,8 @@ const EXECUTION_ERROR_CODES = new Set<AgentExecutionFailureCode>([
   'network',
   'invalid-response',
   'provider-failed',
+  'local-model-missing',
+  'ai-off',
   'bridge-unavailable',
 ]);
 
@@ -1331,6 +1339,21 @@ export default function AgentWorkspaceShell() {
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState('');
   const [target, setTarget] = useState<AgentTargetChoice>('local');
+  /**
+   * The target used to be a hard-coded `'local'`, so a user whose only AI was a
+   * cloud key met a failure on their very first message. It now starts on
+   * whatever can actually run (`preferredAgentTarget`) and follows readiness
+   * until the user picks one themselves.
+   */
+  const targetChosenRef = useRef(false);
+  const aiReadiness = useAiReadiness();
+  const aiSetupStatus = useAiSetupStatus();
+  const aiPreferredTarget = aiReadiness.loaded ? preferredAgentTarget(aiReadiness) : null;
+  useEffect(() => {
+    if (targetChosenRef.current || !aiPreferredTarget) return;
+    if (aiPreferredTarget !== 'local' && !isAgentCloudTarget(aiPreferredTarget)) return;
+    setTarget(aiPreferredTarget);
+  }, [aiPreferredTarget]);
   const [allowLocalFallback, setAllowLocalFallback] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [planNotice, setPlanNotice] = useState<{
@@ -1630,6 +1653,21 @@ export default function AgentWorkspaceShell() {
     visionUnsupported,
     sensitiveConsentRequired,
     cloudSensitiveConsent,
+    ...(aiReadiness.loaded && aiSetupStatus ? {
+      setup: {
+        aiEnabled: aiReadiness.enabled,
+        targetIsLocal: target === 'local',
+        targetReady: target === 'local'
+          ? aiReadiness.agentModelReady
+          : aiKeySetFor(target, aiSetupStatus.apiKeysSet),
+        agentEnabled: aiReadiness.agentEnabled,
+        // The planner falls back to the cloud when no model is installed, so a
+        // key for the provider it would use is as good as a model.
+        plannerReady: target === 'local'
+          ? aiReadiness.agentModelReady || aiReadiness.cloudReady
+          : aiKeySetFor(target, aiSetupStatus.apiKeysSet),
+      },
+    } : {}),
   };
   const planReasonKey = agentPlanDisabledReason(composerState);
   const sendReasonKey = agentSendDisabledReason(composerState);
@@ -1855,6 +1893,11 @@ export default function AgentWorkspaceShell() {
       prompt,
       policy: {
         ...basePolicy,
+        // Local chat runs on the model the Agent is configured with; main used
+        // to ignore this and always load the translation model.
+        ...(basePolicy.target.kind === 'local' && executionSettings.modelFileName
+          ? { target: { ...basePolicy.target, model: executionSettings.modelFileName } }
+          : {}),
         excludeSensitiveContext: executionSettings.excludeSensitiveContext,
         allowSensitiveContext: sensitiveConsentRequired && cloudSensitiveConsent,
         historyTurns: LOCAL_AGENT_CHAT_HISTORY_TURNS[executionSettings.chatHistory],
@@ -1920,7 +1963,10 @@ export default function AgentWorkspaceShell() {
     if (!objective || objective.length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT) return;
     setPlanning(true);
     setPlanNotice({ kind: 'status', text: t('agent.plan.planning') });
-    const result = await createAgentConversationPlan(selected, objective, t);
+    const result = await createAgentConversationPlan(selected, objective, t, {
+      target,
+      ...(aiSetupStatus ? { cloudProviderId: aiSetupStatus.providerId } : {}),
+    });
     if (result.ok) {
       setPlanNotice({
         kind: 'status',
@@ -1938,7 +1984,7 @@ export default function AgentWorkspaceShell() {
       });
     }
     setPlanning(false);
-  }, [attachments.length, draft, planning, selected, t]);
+  }, [aiSetupStatus, attachments.length, draft, planning, selected, t, target]);
 
   const createConversation = useCallback(() => {
     const base = state ?? emptyAgentWorkspaceState();
@@ -2450,8 +2496,18 @@ export default function AgentWorkspaceShell() {
                       <select
                         value={target}
                         onChange={(event) => {
-                          setTarget(event.target.value as AgentTargetChoice);
+                          const next = event.target.value as AgentTargetChoice;
+                          targetChosenRef.current = true;
+                          setTarget(next);
                           setCloudSensitiveConsent(false);
+                          // One engine and provider for the whole app: this picker
+                          // used to be a private copy, so the Agent, AI Card Studio
+                          // and analysis could each be on a different provider.
+                          void (async () => {
+                            await window.api.aiSetEngine?.(next === 'local' ? 'local-qwen' : 'cloud');
+                            if (next !== 'local') await window.api.aiSetProvider?.(next);
+                            notifyAiSetupChanged();
+                          })().catch(() => undefined);
                         }}
                         disabled={blocked}
                       >
@@ -2723,6 +2779,9 @@ export default function AgentWorkspaceShell() {
                     {t(executionErrorKey(executionFailure))}
                   </p>
                 ) : null}
+                {executionFailure && executionErrorNeedsSetup(executionFailure) ? (
+                  <AiSetupPrompt compact reasonKey="settings.ai.setup.fixHere" />
+                ) : null}
 
                 {knownInputOverBudget ? (
                   <p className="agent-message-error" role="alert">
@@ -2751,6 +2810,19 @@ export default function AgentWorkspaceShell() {
                   >
                     {planNotice.text}
                   </p>
+                ) : null}
+
+                {!executing && (
+                  (sendReasonKey && AGENT_COMPOSER_SETUP_REASON_KEYS.has(sendReasonKey))
+                  || (planReasonKey && AGENT_COMPOSER_SETUP_REASON_KEYS.has(planReasonKey))
+                ) ? (
+                  <AiSetupPrompt
+                    compact
+                    reasonKey={sendReasonKey && AGENT_COMPOSER_SETUP_REASON_KEYS.has(sendReasonKey)
+                      ? sendReasonKey
+                      : planReasonKey}
+                    settingId={composerState.setup && !composerState.setup.agentEnabled ? 'ai-agent' : undefined}
+                  />
                 ) : null}
 
                 <div className="agent-composer-actions">

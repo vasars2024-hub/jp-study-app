@@ -15,7 +15,6 @@ import { AI_PROMPT_PRESETS, formatsForPreset } from '../../shared/aiMiningCatalo
 import {
   AI_LANGUAGE_DIRECTION_PRESETS,
   AI_MINING_LANGUAGES,
-  AI_PROVIDERS,
   DEFAULT_AI_PROVIDER_ID,
   applyLanguageOptionsToFormat,
   effectiveLanguagePair,
@@ -26,6 +25,8 @@ import {
 } from '../../shared/mining';
 import type { ProfileId, StudyProfile } from '../../shared/profiles';
 import CollapsibleSection from './CollapsibleSection';
+import { AiSetupPrompt } from './ai/AiSetupPrompt';
+import { useAiReadiness } from '../aiSetupClient';
 import FieldMappingEditor from './FieldMappingEditor';
 import AiStudioPreviewPanel from './AiStudioPreviewPanel';
 import AiGenerationProgressPanel from './AiGenerationProgressPanel';
@@ -92,11 +93,6 @@ const LOG_FIELD_KEYS: Array<[string, string]> = [
 export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {}) {
   const { t, lang } = useT();
   const [aiConfig, setAiConfig] = useState<AiEngineConfig>(() => normalizeAiEngineConfig());
-  const [apiKeyDraft, setApiKeyDraft] = useState('');
-  const [savingKey, setSavingKey] = useState(false);
-  const [keyStatus, setKeyStatus] = useState('');
-  const [keyStatusKind, setKeyStatusKind] = useState<'idle' | 'ok' | 'error'>('idle');
-  const apiKeyInputRef = useRef<HTMLInputElement>(null);
   const [presets, setPresets] = useState<AiPromptPreset[]>([]);
   const [formats, setFormats] = useState<AiMiningCardFormat[]>([]);
   const [profileRevision, setProfileRevision] = useState(0);
@@ -220,6 +216,15 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       },
     );
   }, []);
+
+  // The engine, provider and key are set in Settings > AI, often in another
+  // window; re-read the config whenever readiness moves so the gate below is live.
+  const aiReadiness = useAiReadiness();
+  const readinessKey = `${aiReadiness.engine}|${aiReadiness.providerId}|${aiReadiness.cloudReady}|${aiReadiness.localReady}`;
+  useEffect(() => {
+    if (!aiReadiness.loaded) return;
+    void window.api.aiGetConfig().then((cfg) => applyAiConfigPatch(normalizeAiEngineConfig(cfg))).catch(() => undefined);
+  }, [readinessKey, aiReadiness.loaded]);
 
   const selectedProvider = useMemo(() => providerById(aiConfig.providerId), [aiConfig.providerId]);
   const currentProviderKeySaved = Boolean(aiConfig.apiKeysSet?.[selectedProvider.keyBucket]);
@@ -570,34 +575,6 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     setAiConfig((prev) => normalizeAiEngineConfig({ ...prev, ...patch }));
   }
 
-  async function saveApiKey(): Promise<void> {
-    const draft = (apiKeyDraft || apiKeyInputRef.current?.value || '').trim();
-    if (!draft) {
-      setKeyStatusKind('error');
-      setKeyStatus(t('aiStudio.status.pasteKey', { provider: selectedProvider.label }));
-      return;
-    }
-    setSavingKey(true);
-    setKeyStatus(t('aiStudio.status.saving'));
-    try {
-      const result = await window.api.aiSetApiKey({ provider: selectedProvider.keyBucket, apiKey: draft });
-      if (!result.ok) {
-        setKeyStatusKind('error');
-        setKeyStatus(result.error ?? t('aiStudio.status.couldNotSaveKey'));
-        return;
-      }
-      setAiConfig((prev) => normalizeAiEngineConfig({ ...prev, apiKeysSet: result.apiKeysSet }));
-      setApiKeyDraft('');
-      setKeyStatusKind('ok');
-      setKeyStatus(t('aiStudio.status.keySaved', { provider: selectedProvider.label }));
-    } catch (error) {
-      setKeyStatusKind('error');
-      setKeyStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSavingKey(false);
-    }
-  }
-
   async function saveLanguageOptions(patch: Partial<AiLanguageOptions>): Promise<void> {
     const result = await window.api.aiSetLanguageOptions(patch);
     setAiConfig((prev) => ({
@@ -618,9 +595,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
 
   return (
     <div className="mining-studio ai-card-studio">
-      {(status || (keyStatus && keyStatusKind !== 'idle')) && (
-        <div className="banner mining-status-top">{status || keyStatus}</div>
-      )}
+      {status && <div className="banner mining-status-top">{status}</div>}
 
       <CollapsibleSection
         title={t('aiStudio.section.provider')}
@@ -636,78 +611,26 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         defaultOpen={!engineReady}
         className="mining-collapse anki-card"
       >
-        <div className="mining-form-grid mining-form-grid-wide">
-          <label>
-            {t('aiStudio.label.engine')}
-            <select
-              value={aiConfig.engine}
-              onChange={(e) => {
-                const engine = e.target.value === 'local-qwen' ? 'local-qwen' : 'cloud';
-                void window.api.aiSetEngine(engine).then((result) =>
-                  applyAiConfigPatch(normalizeAiEngineConfig(result)),
-                );
-              }}
-            >
-              <option value="cloud">{t('aiStudio.engine.cloud')}</option>
-              <option value="local-qwen">{t('aiStudio.engine.local')}</option>
-            </select>
-          </label>
-          {aiConfig.engine === 'cloud' ? (
-            <>
-              <label>
-                {t('aiStudio.label.provider')}
-                <select
-                  value={aiConfig.providerId}
-                  onChange={(e) => {
-                    const providerId = e.target.value as AiEngineConfig['providerId'];
-                    void window.api.aiSetProvider(providerId).then((result) =>
-                      applyAiConfigPatch({
-                        providerId: result.providerId,
-                        apiKeysSet: result.apiKeysSet,
-                      }),
-                    );
-                  }}
-                >
-                  {AI_PROVIDERS.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="mining-api-key-field">
-                {t('aiStudio.label.apiKey')}
-                <input
-                  ref={apiKeyInputRef}
-                  type="password"
-                  value={apiKeyDraft}
-                  onChange={(e) => setApiKeyDraft(e.target.value)}
-                  placeholder={
-                    currentProviderKeySaved
-                      ? t('aiStudio.placeholder.replaceKey')
-                      : t('aiStudio.placeholder.pasteKey', { provider: selectedProvider.label })
-                  }
-                />
-              </label>
-            </>
-          ) : (
-            <p className={`muted mining-engine-status${aiConfig.localModelAvailable ? ' ok' : ' warn'}`}>
-              {aiConfig.localModelAvailable
-                ? t('aiStudio.local.ready')
-                : t('aiStudio.local.missing')}
-            </p>
-          )}
-        </div>
-        {aiConfig.engine === 'cloud' && (
-          <div className="mining-api-key-actions">
-            <button className="btn primary" type="button" disabled={savingKey} onClick={() => void saveApiKey()}>
-              {savingKey ? t('aiStudio.status.saving') : t('aiStudio.btn.saveKey')}
-            </button>
-          </div>
-        )}
-        {keyStatus && keyStatusKind !== 'idle' && (
-          <div className={`banner mining-key-status mining-key-status-${keyStatusKind}`}>{keyStatus}</div>
-        )}
+        {/*
+          The engine, provider and key are chosen in Settings > AI now — one
+          place for the whole app. This section used to be the only control for
+          the provider sentence analysis used, and a third place to paste a key.
+          It says what is in force and links there.
+        */}
+        <p className={`muted mining-engine-status${engineReady ? ' ok' : ' warn'}`} role="status">
+          {aiConfig.engine === 'local-qwen'
+            ? aiConfig.localModelAvailable
+              ? t('aiStudio.local.ready')
+              : t('aiStudio.local.missing')
+            : currentProviderKeySaved
+              ? t('aiStudio.summary.keySaved', { provider: selectedProvider.label })
+              : t('aiStudio.summary.connect')}
+        </p>
+        <AiSetupPrompt
+          compact
+          reasonKey={engineReady ? 'aiStudio.engine.inSettings' : 'settings.ai.setup.notReady'}
+          actionKey={engineReady ? 'settings.ai.setup.open' : 'settings.ai.setup.action'}
+        />
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -1114,6 +1037,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       {!engineReady && aiConfig.engine === 'local-qwen' && (
         <p className="muted ai-studio-hint">{t('aiStudio.hint.localMissing')}</p>
       )}
+      {!engineReady && <AiSetupPrompt compact />}
       {engineReady && generationSource === 'dictionary' && savedWords.length === 0 && (
         <p className="muted ai-studio-hint">{t('aiStudio.hint.starOrPreset')}</p>
       )}

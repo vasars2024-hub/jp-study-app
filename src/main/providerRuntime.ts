@@ -39,6 +39,15 @@ export type AiProviderErrorCode =
   | 'upstream'
   | 'network'
   | 'vision-unsupported'
+  /**
+   * A local request found no model on disk. Raised by the Agent router's local
+   * branch rather than by this runtime, and typed rather than left as a plain
+   * `Error` because the remedy — install a model — is nothing like "the provider
+   * returned an unusable response", which is what an untyped failure became.
+   */
+  | 'local-model-missing'
+  /** "Use AI features" is off in Settings > AI. Raised before any runtime runs. */
+  | 'ai-off'
   | 'invalid-response'
   /**
    * The model hit `maxOutputTokens` before finishing. Distinct from
@@ -159,6 +168,40 @@ let spendGuard: AgentSpendGuard | null = null;
 
 export function setAgentSpendGuard(guard: AgentSpendGuard | null): void {
   spendGuard = guard;
+}
+
+/**
+ * Rates for a request whose caller supplied none.
+ *
+ * Registered for the same reason as the spend guard, and the two only work
+ * together: a ceiling compares a request's estimated cost, and a request with no
+ * rates has no cost, so it was always allowed. Only the Agent composer ever
+ * passed rates; the other eight cloud callers in the app did not, which left the
+ * monthly limit unable to stop most of the spending it was set against. With
+ * this registered, every request is priced — by the user's own figure where
+ * they entered one, by the labelled built-in estimate otherwise — and so every
+ * request is both checked against the limit and valued in the ledger.
+ *
+ * `null` until main registers the store, so unit tests keep their behaviour.
+ */
+let pricingResolver: ((providerId: AiProviderId) => AiProviderPricing | undefined) | null = null;
+
+export function setAgentPricingResolver(
+  resolver: ((providerId: AiProviderId) => AiProviderPricing | undefined) | null,
+): void {
+  pricingResolver = resolver;
+}
+
+function withResolvedPricing(request: AiProviderRequest): AiProviderRequest {
+  if (request.pricing || !pricingResolver) return request;
+  let pricing: AiProviderPricing | undefined;
+  try {
+    pricing = pricingResolver(request.providerId);
+  } catch {
+    // An unreadable rate table is an unpriced request, exactly as before this existed.
+    return request;
+  }
+  return pricing ? { ...request, pricing } : request;
 }
 
 function providerModel(providerId: AiProviderId): string {
@@ -665,8 +708,9 @@ function wait(delayMs: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-export async function runCloudAiRequest(request: AiProviderRequest): Promise<AiProviderResult> {
+export async function runCloudAiRequest(input: AiProviderRequest): Promise<AiProviderResult> {
   const startedAt = Date.now();
+  const request = withResolvedPricing(input);
   const model = providerModel(request.providerId);
   const credentialBucket = providerKeyBucket(request.providerId);
   const inputChars = request.prompt.length + (request.systemPrompt?.length ?? 0);

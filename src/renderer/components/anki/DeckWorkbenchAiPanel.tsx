@@ -336,7 +336,7 @@ export default function DeckWorkbenchAiPanel({
   const skippedEmpty = prepared.skipped.filter((s) => s.reason === 'empty-source').length;
 
   return (
-    <section className="wb-ai" aria-label={t('ankiWorkbench.ai.title')}>
+    <section className="wb-ai" data-ai-entry aria-label={t('ankiWorkbench.ai.title')}>
       <div className="wb-ai-head">
         <h3>{t('ankiWorkbench.ai.title')}</h3>
         <p className="muted">{t('ankiWorkbench.ai.lead')}</p>

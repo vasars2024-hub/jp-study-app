@@ -24,7 +24,7 @@ import type { Catalog } from '../core';
 
 export const GAME_ARENA_CHROME_EN: Catalog = {
   'palette.section.games': 'Game Arena',
-  'storage.group.llm': 'Writing evaluators',
+  'storage.group.llm': 'Language models',
   'search.gameArena': 'Game Arena',
   'search.gameArena.desc': 'Minigame length, language, level, sounds, and Mirror Writing evaluator',
   // Was 'Plan 3 / 3.5' — an internal build-plan reference rendered into the

@@ -125,6 +125,7 @@ export const AGENT_SETTINGS_GUIDED_TARGETS = {
   ],
   'file-drops': ['filedrop-auto', 'filedrop-overrides', 'filedrop-undo', 'filedrop-reset'],
   'api-keys': [],
+  ai: ['ai-enabled', 'ai-engine', 'ai-provider', 'ai-model', 'ai-agent', 'ai-schedules', 'ai-spend'],
   // v1.0 audit 5.2 — the four `monitors-*` controls lead this list because the
   // Monitors page merged into Display and its cards render first there. There
   // is deliberately no `monitors` key any more: this map's keys are pages that

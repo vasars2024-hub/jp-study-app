@@ -161,6 +161,7 @@ const PAGE_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'special', titleKey: 'settings.nav.special', terms: ['special', 'wired', 'aero', 'secret modules'] },
     { section: 'settings', page: 'file-drops', titleKey: 'settings.nav.fileDrops', terms: ['file drops', 'dropped files'] },
   { section: 'settings', page: 'api-keys', titleKey: 'settings.nav.apiKeys', terms: ['api keys', 'keys'] },
+  { section: 'settings', page: 'ai', titleKey: 'settings.nav.ai', terms: ['ai settings', 'offline or cloud ai', 'ai limits'] },
   // v1.0 audit 5.2 — `monitors` merged into `display`, so this one row answers
   // for both. The monitor terms are kept rather than dropped: they are how a
   // user asks for this page, and `settings.nav.display(.desc)` names screens and
@@ -301,6 +302,13 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'motion', controlId: 'motion-particles', titleKey: 'search.motionParticles', terms: ['reward particles', 'particles', 'confetti', 'reward', 'celebration', 'badge', 'density'] },
   { section: 'settings', page: 'motion', controlId: 'motion-companion-weight', titleKey: 'search.motionCompanionWeight', terms: ['companion physics weight', 'companion', 'shimeji', 'physics', 'gravity', 'weight', 'drag'] },
   { section: 'settings', page: 'storage', controlId: 'storage-models', titleKey: 'search.storageModels', terms: ['models dictionaries', 'download', 'model', 'models', 'whisper', 'ocr', 'manga ocr', 'tesseract', 'dictionary', 'jmdict', 'cedict', 'pitch accent', 'tatoeba', 'install', 'remove', 'storage', 'disk space'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-enabled', titleKey: 'settings.ai.enabled.title', terms: ['use ai features', 'turn off ai', 'disable ai'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-engine', titleKey: 'settings.ai.engine.title', terms: ['ai engine', 'offline ai engine', 'cloud ai engine'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-provider', titleKey: 'settings.ai.provider.title', terms: ['ai provider', 'cloud provider', 'cloud ai provider'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-model', titleKey: 'settings.ai.model.title', terms: ['install ai model', 'offline ai model', 'qwen'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-agent', titleKey: 'settings.ai.agent.title', terms: ['enable agent', 'agent model'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-schedules', titleKey: 'settings.ai.schedules.title', terms: ['agent schedule', 'scheduled agent tasks', 'automation'] },
+  { section: 'settings', page: 'ai', controlId: 'ai-spend', titleKey: 'settings.ai.spend.title', terms: ['spending limit', 'cloud spending', 'monthly limit'] },
   { section: 'settings', page: 'memory', controlId: 'memory', titleKey: 'search.memory', terms: ['memory storage', 'memory', 'storage', 'backup', 'export', 'import', 'clear', 'data', 'quota', 'disk', 'ram', 'particles', 'companions', 'wallpaper', 'settings inventory'] },
   { section: 'settings', page: 'memory', controlId: 'system-memory', titleKey: 'search.systemMemory', terms: ['system memory', 'ram', 'memory', 'cpu', 'uptime', 'system'] },
   { section: 'settings', page: 'memory', controlId: 'storage-usage', titleKey: 'search.storageUsage', terms: ['app storage', 'usage', 'quota', 'disk', 'space', 'used'] },

@@ -28,6 +28,7 @@ import {
   translateSpanAgentContext,
 } from '../agentContextHandoff';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
+import { AiModelInstallControl } from '../components/ai/AiModelInstall';
 
 /**
  * Translate's end of L5 bullet 1's selection contract.
@@ -42,6 +43,23 @@ import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffCli
  * session memory and never writes it to disk: it is the user's own material, not
  * reference data. That decision lives in `SELECTION_AGENT_KIND`, not here.
  */
+/**
+ * The install control the old "install Qwen3 via Translate" messages promised
+ * and this view never had. Shown under a failed translation only when the
+ * offline model is actually missing — asked of main, not guessed from the text.
+ */
+function TranslateModelInstall() {
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void window.api.translateStatus()
+      .then((status) => { if (alive) setMissing(!status.modelFound); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+  return missing ? <AiModelInstallControl /> : null;
+}
+
 function TranslateAskAgent({
   selection,
   input,
@@ -57,7 +75,7 @@ function TranslateAskAgent({
   const span = (selection.trim() || input.trim());
   const fromSelection = selection.trim().length > 0;
   return (
-    <button
+    <button data-ai-entry
       type="button"
       className={className}
       disabled={!span}
@@ -324,6 +342,7 @@ export default function TranslateView() {
                     </>
                   )}
                   {error && <span className="aero-translate-error">{error}</span>}
+                  {error && <TranslateModelInstall />}
                 </div>
               )}
             </>
@@ -503,6 +522,7 @@ export default function TranslateView() {
                 </div>
               )}
               {error && <div className="media-error tr-error">{error}</div>}
+              {error && <TranslateModelInstall />}
             </div>
 
             {input.trim() && (

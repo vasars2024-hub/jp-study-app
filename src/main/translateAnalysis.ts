@@ -17,6 +17,7 @@ import {
 } from '../shared/translateAnalysisCore';
 import { callAiProvider } from './aiProviderClient';
 import { getConfiguredAiProvider } from './mining';
+import { AI_FEATURES_OFF_MESSAGE, aiFeaturesEnabled } from './aiFeatureGate';
 
 interface AnalysisCacheFile {
   entries: Record<string, TranslateAnalysisResult>;
@@ -89,9 +90,18 @@ export function registerTranslateAnalysisIpc(): void {
     async (
       _e,
       req: TranslateAnalyzeRequest,
-    ): Promise<{ ok: boolean; result?: TranslateAnalysisResult; error?: string }> => {
+    ): Promise<{
+      ok: boolean;
+      result?: TranslateAnalysisResult;
+      error?: string;
+      aiOff?: boolean;
+      needsKey?: boolean;
+    }> => {
+      if (!aiFeaturesEnabled()) return { ok: false, aiOff: true, error: AI_FEATURES_OFF_MESSAGE };
       const { providerId, apiKey } = getConfiguredAiProvider();
-      if (!apiKey) return { ok: false, error: 'No API key configured.' };
+      // Cloud-only by design: this breakdown needs a provider's JSON mode. Said as a flag the panel
+      // can translate, rather than as English prose.
+      if (!apiKey) return { ok: false, needsKey: true, error: 'No API key configured. Add one in Settings > AI.' };
       const flags = computeAnalysisFlags(req.source, req.target);
       const cached = getCachedAnalysis(req.translatedText, req.source, req.target, providerId);
       if (cached) return { ok: true, result: cached };

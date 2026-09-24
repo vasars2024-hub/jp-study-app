@@ -118,45 +118,130 @@ describe('anime.search', () => {
   });
 });
 
+/**
+ * A stand-in for main's watch library (`window.api.watchAdd` / `watchUpdate` /
+ * `watchList`), the app's one tracking store. `anime.track` used to write the
+ * old `jp-media-tracking-v1` localStorage document instead, so an anime the
+ * Agent tracked never appeared in the library the rest of the app reads.
+ */
+interface FakeWatchTitle {
+  id: string;
+  kind: string;
+  title: string;
+  originalTitle?: string;
+  status: string;
+  score?: number;
+  favorite?: boolean;
+  notes?: string;
+  progress?: number;
+  episodeCount?: number;
+  malId?: number;
+  altTitles?: string[];
+  updatedAt: number;
+}
+
+let watchTitles: FakeWatchTitle[] = [];
+const watchCalls: Array<[string, unknown]> = [];
+
+function installWatchLibrary(): void {
+  (window as unknown as { api: Record<string, unknown> }).api = {
+    watchList: async (query: { search?: string }) => {
+      watchCalls.push(['watchList', query]);
+      return { total: watchTitles.length, offset: 0, items: watchTitles.map((title) => ({ ...title })), facets: {} };
+    },
+    watchAdd: async (input: Record<string, unknown>) => {
+      watchCalls.push(['watchAdd', input]);
+      const title: FakeWatchTitle = {
+        id: `w-${watchTitles.length + 1}`,
+        kind: String(input.kind),
+        title: String(input.title),
+        status: String(input.status ?? 'plan'),
+        ...(typeof input.episodeCount === 'number' ? { episodeCount: input.episodeCount } : {}),
+        ...(typeof input.malId === 'number' ? { malId: input.malId } : {}),
+        ...(typeof input.originalTitle === 'string' ? { originalTitle: input.originalTitle } : {}),
+        updatedAt: 1,
+      };
+      watchTitles.push(title);
+      return { ok: true, created: true, title: { ...title } };
+    },
+    watchUpdate: async (id: string, patch: Record<string, unknown>) => {
+      watchCalls.push(['watchUpdate', { id, patch }]);
+      const title = watchTitles.find((entry) => entry.id === id);
+      if (!title) return { ok: false, error: 'not found', errorKey: 'watchLibrary.error.notFound' };
+      Object.assign(title, patch, { updatedAt: title.updatedAt + 1 });
+      return { ok: true, title: { ...title } };
+    },
+  };
+}
+
 describe('anime.track', () => {
-  it('creates a planned record from a title and reports that it created one', async () => {
+  beforeEach(() => {
+    watchTitles = [];
+    watchCalls.length = 0;
+    installWatchLibrary();
+  });
+
+  it('adds a planned title to the watch library, not the old tracking document', async () => {
     const created = await handlers()['anime.track']?.({ identityId: 'Snow Bound' }) as {
       created: boolean;
       identityId: string;
+      watchTitleId: string;
       status: string;
     };
 
-    expect(created).toMatchObject({ created: true, identityId: 'a-1', status: 'planned' });
-    expect(loadMediaTrackingDocument().records).toHaveLength(1);
+    expect(created).toMatchObject({ created: true, identityId: 'a-1', watchTitleId: 'w-1', status: 'plan' });
+    expect(watchCalls.find(([name]) => name === 'watchAdd')?.[1]).toMatchObject({
+      kind: 'anime',
+      title: 'Snow Bound',
+      originalTitle: '雪の絆',
+      year: 2021,
+      episodeCount: 12,
+      status: 'plan',
+    });
+    // The legacy localStorage store is no longer written at all.
+    expect(loadMediaTrackingDocument().records).toEqual([]);
   });
 
-  it('does not re-report an existing record as created, and keeps its status', async () => {
-    upsertMediaTrackingEntry('a-1', 'anime', { status: 'watching' });
+  it('does not re-report an existing title as created, and keeps its status', async () => {
+    watchTitles.push({ id: 'w-9', kind: 'anime', title: 'Snow Bound', status: 'watching', updatedAt: 1 });
 
     const again = await handlers()['anime.track']?.({ identityId: 'a-1' }) as {
       created: boolean;
       status: string;
+      watchTitleId: string;
     };
 
-    expect(again).toMatchObject({ created: false, status: 'watching' });
+    expect(again).toMatchObject({ created: false, status: 'watching', watchTitleId: 'w-9' });
+    expect(watchCalls.some(([name]) => name === 'watchAdd')).toBe(false);
   });
 
-  it('records watched episodes', async () => {
+  it('maps a status change and records watched episodes as progress', async () => {
+    watchTitles.push({ id: 'w-9', kind: 'anime', title: 'Snow Bound', status: 'plan', progress: 1, updatedAt: 1 });
+
     const tracked = await handlers()['anime.track']?.({
       identityId: 'a-1',
-      status: 'watching',
+      status: 'on-hold',
       watchedEpisodes: [1, 2, { season: 1, episode: 3 }],
-    }) as { progress: { watched?: number } };
+    }) as { status: string; progress: { watched: number } };
 
-    expect(tracked.progress).toBeDefined();
-    const record = loadMediaTrackingDocument().records[0];
-    expect(record.progress.kind === 'episodic' && record.progress.watchedEpisodes).toHaveLength(3);
+    expect(tracked).toMatchObject({ status: 'on_hold', progress: { watched: 3 } });
+    expect(watchCalls.find(([name]) => name === 'watchUpdate')?.[1]).toEqual({
+      id: 'w-9',
+      patch: { status: 'on_hold', progress: 3 },
+    });
+  });
+
+  it('never writes an airing date: main fetches those', async () => {
+    await handlers()['anime.track']?.({ identityId: 'a-1', status: 'watching' });
+    const written = JSON.stringify(watchCalls.filter(([name]) => name !== 'watchList'));
+    expect(written).not.toContain('nextAirDate');
+    expect(written).not.toContain('schedule');
   });
 
   it('refuses an identity the local catalogue does not know', async () => {
     await expect(handlers()['anime.track']?.({ identityId: 'Not In Catalogue' }))
       .rejects.toThrow('blanc.agent.error.animeNotFound');
-    expect(loadMediaTrackingDocument().records).toEqual([]);
+    expect(watchCalls.some(([name]) => name === 'watchAdd')).toBe(false);
   });
 });
 
@@ -184,8 +269,14 @@ describe('anime.check-releases', () => {
 });
 
 describe('anime.update-metadata', () => {
-  it('patches only what it was given and reads the answer back from the store', async () => {
-    upsertMediaTrackingEntry('a-1', 'anime', { status: 'watching', rating: 40 });
+  beforeEach(() => {
+    watchTitles = [];
+    watchCalls.length = 0;
+    installWatchLibrary();
+  });
+
+  it('patches only what it was given, in the library, and reads the answer back', async () => {
+    watchTitles.push({ id: 'w-1', kind: 'anime', title: 'Snow Bound', status: 'watching', score: 4, updatedAt: 1 });
 
     const updated = await handlers()['anime.update-metadata']?.({
       identityId: 'a-1',
@@ -196,21 +287,33 @@ describe('anime.update-metadata', () => {
     expect(updated.updated.sort()).toEqual(['notes', 'rating']);
     expect(updated.rating).toBe(88);
     expect(updated.status).toBe('watching');
+    expect(watchTitles[0]).toMatchObject({ score: 8.8, notes: 'strong second cour' });
   });
 
   it('clamps a rating instead of storing it out of range', async () => {
-    upsertMediaTrackingEntry('a-1', 'anime', {});
+    watchTitles.push({ id: 'w-1', kind: 'anime', title: 'Snow Bound', status: 'plan', updatedAt: 1 });
     const updated = await handlers()['anime.update-metadata']?.({ identityId: 'a-1', rating: 900 }) as {
       rating: number;
     };
     expect(updated.rating).toBe(100);
   });
 
+  it('refuses a schedule by name: airing dates come from main', async () => {
+    watchTitles.push({ id: 'w-1', kind: 'anime', title: 'Snow Bound', status: 'watching', updatedAt: 1 });
+    const updated = await handlers()['anime.update-metadata']?.({
+      identityId: 'a-1',
+      favorite: true,
+      schedule: { nextAirDate: '2026-10-01' },
+    }) as { updated: string[]; ignored: string[] };
+    expect(updated).toMatchObject({ updated: ['favorite'], ignored: ['schedule'] });
+    expect(JSON.stringify(watchCalls)).not.toContain('2026-10-01');
+  });
+
   it('refuses an untracked anime and an empty patch', async () => {
     await expect(handlers()['anime.update-metadata']?.({ identityId: 'a-1', rating: 5 }))
       .rejects.toThrow('blanc.agent.error.animeNotTracked');
 
-    upsertMediaTrackingEntry('a-1', 'anime', {});
+    watchTitles.push({ id: 'w-1', kind: 'anime', title: 'Snow Bound', status: 'plan', updatedAt: 1 });
     await expect(handlers()['anime.update-metadata']?.({ identityId: 'a-1' }))
       .rejects.toThrow('blanc.agent.error.nothingToUpdate');
   });

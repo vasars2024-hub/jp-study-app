@@ -24,6 +24,7 @@ import {
 } from '../../localAgentSettingsStore';
 import { useT } from '../../i18n';
 import { AgentContextSuggestionSettings } from './AgentContextSuggestionSettings';
+import { AiSetupPrompt } from '../ai/AiSetupPrompt';
 import './agentGovernance.css';
 
 const PERMISSION_LEVELS: readonly AgentPermissionLevel[] = [
@@ -300,6 +301,12 @@ export function AgentGovernancePanel({
       </div>
 
       <AgentContextSuggestionSettings />
+
+      {/*
+        The model picker and the schedule editor used to live only in Blanc.
+        They are in Settings > AI now, one click from here.
+      */}
+      <AiSetupPrompt compact reasonKey="agent.governance.moreInSettings" actionKey="settings.ai.setup.open" settingId="ai-agent" />
     </section>
   );
 }

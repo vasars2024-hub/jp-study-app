@@ -2,6 +2,7 @@ import SentenceAnalysisView from '../renderer/components/analysis/SentenceAnalys
 import { useAnalysisActions } from '../renderer/analysisActions';
 import { useT } from '../renderer/i18n';
 import type { CueAnalysisState } from './useCueAnalysis';
+import { openAiSettings } from '../renderer/aiSetupClient';
 
 /**
  * The explanation half of grammar highlight.
@@ -78,6 +79,11 @@ export default function VideoCoreGrammarPanel({
           {!state.needsKey && !state.needsLocalModel && (
             <button type="button" onClick={onAnalyzeNow}>
               {t('mediaWorkspace.study.grammarRetry')}
+            </button>
+          )}
+          {(state.needsKey || state.needsLocalModel) && (
+            <button type="button" onClick={() => openAiSettings()}>
+              {t('settings.ai.setup.action')}
             </button>
           )}
         </div>

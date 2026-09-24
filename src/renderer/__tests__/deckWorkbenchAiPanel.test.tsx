@@ -123,11 +123,14 @@ describe('DeckWorkbenchAiPanel disclosure', () => {
     expect(text()).toContain('ankiWorkbench.ai.sends.gloss');
   });
 
-  // An unpriced provider must not print a reassuring $0.00.
-  it('reports the cost as unknown when no price is stored', async () => {
+  // Since 2026-09 every known provider has a built-in, labelled estimate (see
+  // `AGENT_PROVIDER_DEFAULT_PRICING`), so the monthly limit can price every
+  // cloud call. The disclosure therefore shows an amount even before the user
+  // has entered their own rates, rather than "unknown".
+  it('reports an estimated cost from the built-in rates when no price is stored', async () => {
     await mount();
-    expect(text()).toContain('ankiWorkbench.ai.costUnknown');
-    expect(text()).not.toContain('ankiWorkbench.ai.cost:');
+    expect(text()).toContain('ankiWorkbench.ai.cost:');
+    expect(text()).not.toContain('ankiWorkbench.ai.costUnknown');
   });
 
   it('reports a real amount once the user has entered a price', async () => {

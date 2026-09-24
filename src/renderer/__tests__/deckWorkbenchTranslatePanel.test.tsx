@@ -159,9 +159,13 @@ describe('what the panel says before it spends anything', () => {
     expect(text()).toContain('ankiWorkbench.translate.skipped.cloze-source:1');
   });
 
-  it('reports no cost rather than a reassuring zero', async () => {
+  // Every known provider now carries a labelled built-in estimate, so the
+  // disclosure prices the run instead of calling its cost unknown — and still
+  // never prints a reassuring zero.
+  it('prices the run from the built-in estimate rather than a reassuring zero', async () => {
     await intoTranslateMode();
-    expect(text()).toContain('ankiWorkbench.ai.costUnknown:');
+    expect(text()).toContain('ankiWorkbench.ai.cost:');
+    expect(text()).not.toContain('ankiWorkbench.ai.costUnknown:');
     expect(text()).not.toContain('$0.00');
   });
 });

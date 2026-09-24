@@ -68,6 +68,13 @@ import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
 import FileDropsPage from './pages/FileDropsPage';
 import ApiKeysPage from './pages/ApiKeysPage';
+import AiPage from './pages/AiPage';
+import {
+  PENDING_SETTINGS_NAV_KEY,
+  clearPendingSettingsNavigation,
+  readPendingSettingsNavigation,
+  readPendingSettingsNavigationRaw,
+} from '../../aiSetupClient';
 import MotionPage from './pages/MotionPage';
 import HelpPage from './pages/HelpPage';
 import MiniModePage from './pages/MiniModePage';
@@ -230,6 +237,25 @@ export default function SettingsApp(props: SettingsWallProps) {
     };
     window.addEventListener('settings:navigate', onNav);
     return () => window.removeEventListener('settings:navigate', onNav);
+  }, [navigate]);
+
+  // "Set up AI" from a window that has no Settings of its own opens Settings as a
+  // new pop-out, which has no listener yet when the in-window event fires. The
+  // link also leaves the destination in localStorage: a fresh mount consumes it,
+  // and a Settings window that is already open hears it as a `storage` event.
+  useEffect(() => {
+    const consume = (raw: string | null): void => {
+      const pending = readPendingSettingsNavigation(raw);
+      if (!pending) return;
+      clearPendingSettingsNavigation();
+      navigate(pending.page as SettingsPageId, pending.settingId, { guided: true });
+    };
+    consume(readPendingSettingsNavigationRaw());
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key === PENDING_SETTINGS_NAV_KEY) consume(event.newValue);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [navigate]);
 
   // Main delivers only a destination it has freshly re-resolved from the
@@ -556,7 +582,7 @@ export default function SettingsApp(props: SettingsWallProps) {
               from the ordinary Settings window — including every pop-out, which
               is the one the Agent itself opens.
             */}
-            <Button
+            <Button data-ai-entry
               className="os-set-ask-agent"
               leftIcon={<Icon name="sparkle" size={14} />}
               onClick={askAgent}
@@ -657,6 +683,7 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'special' && <SpecialPage />}
               {page === 'file-drops' && <FileDropsPage />}
               {page === 'api-keys' && <ApiKeysPage />}
+              {page === 'ai' && <AiPage />}
               {page === 'display' && <DisplayPage />}
               {page === 'motion' && <MotionPage />}
               {page === 'storage' && <StoragePage />}

@@ -141,7 +141,7 @@ export default function DictionaryPopup({
         )}
         {/* Hands this entry to the one Agent conversation as context, rather than
             opening a second chat that would keep its own hidden history. */}
-        <button
+        <button data-ai-entry
           type="button"
           className="dict-agent"
           title={t('dictionary.askAgent')}

@@ -73,6 +73,8 @@ const PROVIDER_CODES = new Set<AiProviderErrorCode>([
   'upstream',
   'network',
   'vision-unsupported',
+  'local-model-missing',
+  'ai-off',
   'invalid-response',
   'output-truncated',
 ]);

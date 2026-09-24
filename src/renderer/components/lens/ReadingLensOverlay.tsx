@@ -1486,7 +1486,7 @@ export function LensChrome({
       <button type="button" className="lens-open-read" onClick={onOpenRead} title={t('lens.read.openHint')}>
         {t('lens.read.open')}
       </button>
-      <button type="button" onClick={onAskAgent} title={t('lens.action.askAgent')}>
+      <button data-ai-entry type="button" onClick={onAskAgent} title={t('lens.action.askAgent')}>
         {t('lens.action.askAgent')}
       </button>
       {onLookUp && (
@@ -1527,6 +1527,8 @@ export function LensChrome({
             role="radio"
             aria-checked={mode === m}
             className={`lens-mode-btn ${mode === m ? 'active' : ''}`}
+            // The AI mode is an AI entry point: hidden while "Use AI features" is off.
+            data-ai-entry={m === 'ai' ? '' : undefined}
             title={t(`lens.mode.${m}.hint`)}
             onClick={() => onModeChange(m)}
           >

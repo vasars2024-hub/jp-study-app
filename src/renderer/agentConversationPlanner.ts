@@ -1,4 +1,6 @@
 import type { AgentConversation } from '../shared/agentWorkspace';
+import type { AiProviderId } from '../shared/aiProviders';
+import type { LocalAgentPlanFailureCode } from '../shared/localAgentRuntime';
 import {
   cancelAgentQueueItem,
   enqueueAgentTask,
@@ -34,6 +36,11 @@ export type AgentConversationPlanFailureCode =
   | 'invalid-objective'
   | 'planner-disabled'
   | 'planner-unavailable'
+  /** No local model, and no cloud key to plan with instead. */
+  | 'model-missing'
+  | 'ai-off'
+  | 'cloud-key-missing'
+  | 'spend-budget'
   | 'no-approved-actions'
   | 'task-conflict'
   | 'store-failed';
@@ -184,10 +191,33 @@ export function agentConversationPlanContext(conversation: AgentConversation): A
   }));
 }
 
+/**
+ * Where the plan is made. Absent is the local model. A local request with no
+ * model on disk is planned on `cloudProviderId` when it has a key, so a
+ * cloud-only user reaches the Agent's tools too.
+ */
+export interface AgentConversationPlanOptions {
+  target?: 'local' | AiProviderId;
+  cloudProviderId?: AiProviderId;
+}
+
+/** Main's typed refusals, mapped onto the codes this surface translates. */
+function planFailureFromResponse(code: LocalAgentPlanFailureCode | undefined): AgentConversationPlanFailureCode {
+  switch (code) {
+    case 'agent-disabled': return 'planner-disabled';
+    case 'model-missing': return 'model-missing';
+    case 'ai-off': return 'ai-off';
+    case 'cloud-key-missing': return 'cloud-key-missing';
+    case 'spend-budget': return 'spend-budget';
+    default: return 'planner-unavailable';
+  }
+}
+
 export async function createAgentConversationPlan(
   conversation: AgentConversation,
   rawObjective: string,
   t: AgentToolRegistryTranslate,
+  options: AgentConversationPlanOptions = {},
 ): Promise<AgentConversationPlanResult> {
   const objective = rawObjective.trim();
   if (!objective || objective.length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT) {
@@ -233,6 +263,8 @@ export async function createAgentConversationPlan(
           categories: settings.memoryScope,
         })
         : [],
+      ...(options.target ? { target: options.target } : {}),
+      ...(options.cloudProviderId ? { cloudProviderId: options.cloudProviderId } : {}),
       applicationState: disclosedContext.length > 0
         ? {
             agentConversation: {
@@ -248,7 +280,9 @@ export async function createAgentConversationPlan(
     return { ok: false, code: 'planner-unavailable' };
   }
 
-  if (!response.ok) return { ok: false, code: 'planner-unavailable' };
+  // The code, never `response.error`: that string is English and can name a
+  // local model path.
+  if (!response.ok) return { ok: false, code: planFailureFromResponse(response.code) };
   if (!response.task) {
     return {
       ok: false,
