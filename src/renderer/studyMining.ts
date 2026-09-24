@@ -68,6 +68,10 @@ export interface MineToStudyInput {
   textProvenance?: DeckFlashcard['textProvenance'];
   sourceRef?: DeckFlashcard['sourceRef'];
   studyLang?: string;
+  /** Who said the line (a visual novel speaker); context, never the meaning. */
+  characterName?: string;
+  /** Where in the work the line was (chapter, scene); context, never the meaning. */
+  sceneReference?: string;
   audioPath?: string;
   imagePath?: string;
   audioDataUrl?: string;
@@ -479,6 +483,8 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
       if (input.textProvenance) draft.textProvenance = input.textProvenance;
       if (input.sourceRef) draft.sourceRef = input.sourceRef;
       if (input.studyLang && input.studyLang !== 'ja') draft.studyLang = input.studyLang;
+      if (input.characterName?.trim()) draft.characterName = input.characterName.trim().slice(0, 200);
+      if (input.sceneReference?.trim()) draft.sceneReference = input.sceneReference.trim().slice(0, 400);
       const audio = input.audioPath || audioPath;
       const image = input.imagePath || imagePath;
       if (audio) draft.audioPath = audio;

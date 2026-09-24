@@ -50,7 +50,24 @@ describe('mineVisualNovelLine', () => {
       imagePath: 'C:\\shots\\1.png',
       audioPath: 'C:\\voice\\1.ogg',
     });
-    expect(cards[0].meaning).toContain('紅莉栖');
+    // The speaker is context, not the meaning: with no translation the meaning
+    // stays empty rather than reading "紅莉栖" on the back of the card.
+    expect(cards[0].meaning).toBe('');
+    expect(cards[0].characterName).toBe('紅莉栖');
+  });
+
+  it('uses the translation as the meaning, and keeps the scene as context', async () => {
+    const line = {
+      ...capture('俺は狂気のマッドサイエンティスト'),
+      translation: 'I am a mad scientist',
+      chapter: 'Chapter 1',
+      scene: 'Lab',
+    } as VisualNovelTextCapture;
+    await mineVisualNovelLine(entry, line);
+    const [card] = loadDeck();
+    expect(card.meaning).toBe('I am a mad scientist');
+    expect(card.characterName).toBe('紅莉栖');
+    expect(card.sceneReference).toBe('Chapter 1 · Lab');
   });
 
   it('does not duplicate a line mined twice', async () => {

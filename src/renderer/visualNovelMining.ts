@@ -49,10 +49,6 @@ export function visualNovelMediaItem(entry: Pick<VisualNovelEntry, 'id' | 'title
   };
 }
 
-function captureContext(capture: VisualNovelTextCapture): string {
-  const where = [capture.speaker, capture.chapter, capture.scene].filter(Boolean).join(' · ');
-  return [capture.translation, where].filter(Boolean).join(' — ');
-}
 
 /**
  * Mine one captured line as a sentence card, with its screenshot and voice clip
@@ -72,10 +68,16 @@ export async function mineVisualNovelLine(
   // Lines mined before the unified path carry no mine key; match them on the
   // same two facts the old path deduplicated on.
   if (loadDeck().some((card) => card.bookId === item.id && card.sentence === japanese)) return false;
-  const context = captureContext(capture);
+  // The meaning is the line's translation, or nothing. The speaker and scene
+  // used to be folded into it, so a line with no translation was studied with
+  // the speaker's name as its "meaning". They are context and go on the card's
+  // own fields for it.
+  const where = [capture.chapter, capture.scene].map((part) => part?.trim()).filter(Boolean).join(' · ');
   const mined = await mineToStudy({
     word: japanese.slice(0, 80),
-    meaning: context,
+    meaning: capture.translation?.trim() ?? '',
+    characterName: capture.speaker?.trim() || undefined,
+    sceneReference: where || undefined,
     sentence: japanese,
     source: 'media',
     sourceId: item.id,
