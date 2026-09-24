@@ -134,7 +134,7 @@ describe('a new store is imported on its own', () => {
 
 describe('Yomitan kanji dictionaries', () => {
   it('parses kanji_bank rows', () => {
-    const out: { kanji?: Record<string, unknown>; info: { hasKanji?: boolean } } = { info: {} };
+    const out: Parameters<typeof parseKanjiBank>[1] = { info: {} };
     parseKanjiBank([
       ['猫', 'ビョウ', 'ねこ', 'jouyou', ['cat'], { strokes: '11', grade: '8', jlpt: '2', freq: '1702' }],
       ['bad'],
