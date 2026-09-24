@@ -11,12 +11,13 @@ import {
   presentStoredMediaResults,
 } from '../shared/mediaResultPresentation';
 import { summarizeMediaTrackingProgress } from '../shared/mediaTracking';
-import {
-  loadMediaTrackingDocument,
-  markMediaTrackingEpisodesWatched,
-  upsertMediaTrackingEntry,
-  type MediaTrackingPatch,
-} from './mediaTrackingStore';
+import type {
+  WatchAddInput,
+  WatchStatus,
+  WatchTitlePatch,
+  WatchTitleView,
+} from '../shared/watchLibrary';
+import { loadMediaTrackingDocument } from './mediaTrackingStore';
 import { loadMediaProvidersDocument } from './mediaProviderStore';
 import { analyzeSubtitles, resolveMedia, type MediaAgentTranslate } from './mediaAgentHandlers';
 
@@ -142,28 +143,110 @@ function episodeMarks(value: unknown): MediaEpisodeMark[] {
   }).slice(0, 200);
 }
 
-function trackingPatch(
-  arguments_: Readonly<Record<string, unknown>>,
-): MediaTrackingPatch {
-  const patch: MediaTrackingPatch = {};
+/**
+ * The watch library is the one tracking store (`shared/watchLibrary.ts`, main-owned). The agent's
+ * tool vocabulary keeps the statuses it has always documented to the model, mapped here.
+ */
+const WATCH_STATUS: Record<MediaTrackingStatus, WatchStatus> = {
+  planned: 'plan',
+  watching: 'watching',
+  completed: 'completed',
+  'on-hold': 'on_hold',
+  dropped: 'dropped',
+};
+
+/** What the tool's arguments ask to change, in the watch library's own terms. */
+function watchPatch(arguments_: Readonly<Record<string, unknown>>): {
+  patch: WatchTitlePatch;
+  fields: string[];
+} {
+  const patch: WatchTitlePatch = {};
+  const fields: string[] = [];
   const status = optionalText(arguments_, 'status', 20) as MediaTrackingStatus | undefined;
-  if (status && STATUSES.includes(status)) patch.status = status;
-  if (typeof arguments_.favorite === 'boolean') patch.favorite = arguments_.favorite;
-  if (arguments_.rating === null) patch.rating = null;
-  else if (typeof arguments_.rating === 'number' && Number.isFinite(arguments_.rating)) {
-    patch.rating = Math.max(0, Math.min(100, Math.round(arguments_.rating)));
+  if (status && STATUSES.includes(status)) {
+    patch.status = WATCH_STATUS[status];
+    fields.push('status');
+  }
+  if (typeof arguments_.favorite === 'boolean') {
+    patch.favorite = arguments_.favorite;
+    fields.push('favorite');
+  }
+  // The tool's rating is 0-100 (what the model has always been told); the library scores 0-10.
+  if (arguments_.rating === null) {
+    patch.score = null;
+    fields.push('rating');
+  } else if (typeof arguments_.rating === 'number' && Number.isFinite(arguments_.rating)) {
+    patch.score = Math.max(0, Math.min(100, Math.round(arguments_.rating))) / 10;
+    fields.push('rating');
   }
   const notes = optionalText(arguments_, 'notes', 1000);
-  if (notes !== undefined) patch.notes = notes;
-  return patch;
+  if (notes !== undefined) {
+    patch.notes = notes;
+    fields.push('notes');
+  }
+  return { patch, fields };
+}
+
+function identifier(result: MergedMediaResult | undefined, namespace: string): number | undefined {
+  const raw = result?.identifiers?.find((entry) => entry.namespace === namespace)?.value;
+  const value = raw === undefined ? NaN : Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function folded(value: string | null | undefined): string {
+  return (value ?? '').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 /**
- * The anime adapters. "Tracked anime" is the local `jp-media-tracking-v1`
- * document — records carrying status, progress and a release schedule, keyed by
- * the identity the local providers catalogue resolved. Only
- * `fetch-external-metadata` leaves the machine, and it is the one operation that
- * declares an `external-connection` confirmation.
+ * The library title this anime already has, if any: by MAL / AniList id first, then by an exact
+ * (folded) name. The library's own matcher does the same on `watchAdd`, so an add for a title that
+ * exists merges instead of duplicating — this lookup only decides whether to report `created`.
+ */
+async function findWatchTitle(identity: AnimeIdentity): Promise<WatchTitleView | null> {
+  const listed = await window.api.watchList({ search: identity.title, limit: 50 });
+  const malId = identifier(identity.result, 'mal');
+  const anilistId = identifier(identity.result, 'anilist');
+  const names = new Set([
+    identity.title,
+    identity.result?.originalTitle,
+    identity.result?.japaneseTitle,
+    identity.result?.romajiTitle,
+    ...(identity.result?.alternativeTitles ?? []),
+  ].map(folded).filter(Boolean));
+  const items = listed?.items ?? [];
+  return items.find((item) => (malId && item.malId === malId) || (anilistId && item.anilistId === anilistId))
+    ?? items.find((item) => [item.title, item.originalTitle, ...(item.altTitles ?? [])]
+      .some((name) => names.has(folded(name))))
+    ?? null;
+}
+
+function watchFailure(t: AnimeAgentTranslate, result: { ok: false; errorKey?: string; error?: string }): Error {
+  return new Error(result.errorKey ? t(result.errorKey) : (result.error ?? t('blanc.agent.error.animeNotFound')));
+}
+
+/** What `track` and `update-metadata` answer with: the library's record, read back after the write. */
+function watchRow(view: WatchTitleView, identity: AnimeIdentity) {
+  return {
+    identityId: identity.identityId,
+    watchTitleId: view.id,
+    title: view.title || identity.title,
+    status: view.status,
+    favorite: view.favorite ?? false,
+    rating: typeof view.score === 'number' ? Math.round(view.score * 10) : null,
+    progress: { watched: view.progress ?? 0, total: view.episodeCount ?? null },
+    updatedAt: view.updatedAt,
+  };
+}
+
+/**
+ * The anime adapters. Writes go to the watch library — the app's one tracking
+ * store, owned by main (`window.api.watchAdd` / `watchUpdate`). The old
+ * `jp-media-tracking-v1` document is still READ by `search` and
+ * `check-releases` for records main has not migrated yet, and is never written
+ * here any more. Airing dates are fetched by main (`watchAiring.ts`), so no
+ * tool writes a schedule. Only `fetch-external-metadata` leaves the machine,
+ * and it is the one operation that declares an `external-connection`
+ * confirmation.
  */
 export function createAnimeAgentHandlers(t: AnimeAgentTranslate): AgentToolHandlers {
   return {
@@ -230,23 +313,42 @@ export function createAnimeAgentHandlers(t: AnimeAgentTranslate): AgentToolHandl
 
     'anime.track': async (arguments_) => {
       const identity = resolveAnime(t, textArgument(t, arguments_, 'identityId'));
-      const patch = trackingPatch(arguments_);
-      const created = !identity.record;
-      // A first `track` with no status means "put this on my list", not "leave it
-      // in whatever state the empty record defaults to".
-      if (created && !patch.status) patch.status = 'planned';
+      const { patch } = watchPatch(arguments_);
 
-      let document = upsertMediaTrackingEntry(identity.identityId, 'anime', patch);
+      // Episodes the agent was told were watched become the library's progress
+      // (episodes watched). The library's per-episode keys belong to local
+      // playback, which is the only thing that can vouch for them.
       const marks = episodeMarks(arguments_.watchedEpisodes);
-      if (marks.length) {
-        document = markMediaTrackingEpisodesWatched(identity.identityId, 'anime', marks);
-      }
+      const highest = marks.reduce((max, mark) => Math.max(max, mark.episode), 0);
 
-      const record = document.records.find((candidate) => (
-        candidate.identityId === identity.identityId
-      ));
-      if (!record) throw new Error(t('blanc.agent.error.animeNotFound'));
-      return { created, ...trackedRow(record, identity.title) };
+      let view = await findWatchTitle(identity);
+      const created = !view;
+      if (!view) {
+        const input: WatchAddInput = {
+          kind: 'anime',
+          title: identity.title,
+          // A first `track` with no status means "put this on my list".
+          status: patch.status ?? 'plan',
+          ...(identity.result?.japaneseTitle || identity.result?.originalTitle
+            ? { originalTitle: (identity.result.japaneseTitle ?? identity.result.originalTitle) as string }
+            : {}),
+          ...(identity.result?.year ? { year: identity.result.year } : {}),
+          ...(identity.result?.episodeCount ? { episodeCount: identity.result.episodeCount } : {}),
+          ...(identifier(identity.result, 'mal') ? { malId: identifier(identity.result, 'mal') } : {}),
+          ...(identifier(identity.result, 'anilist') ? { anilistId: identifier(identity.result, 'anilist') } : {}),
+        };
+        const added = await window.api.watchAdd(input);
+        if (!added.ok) throw watchFailure(t, added);
+        view = added.title;
+        delete patch.status;
+      }
+      if (highest > (view.progress ?? 0)) patch.progress = highest;
+      if (Object.keys(patch).length) {
+        const updated = await window.api.watchUpdate(view.id, patch);
+        if (!updated.ok) throw watchFailure(t, updated);
+        view = updated.title;
+      }
+      return { created, ...watchRow(view, identity) };
     },
 
     'anime.check-releases': async (arguments_) => {
@@ -281,31 +383,25 @@ export function createAnimeAgentHandlers(t: AnimeAgentTranslate): AgentToolHandl
 
     'anime.update-metadata': async (arguments_) => {
       const identity = resolveAnime(t, textArgument(t, arguments_, 'identityId'));
-      if (!identity.record) throw new Error(t('blanc.agent.error.animeNotTracked'));
+      const view = await findWatchTitle(identity);
+      if (!view) throw new Error(t('blanc.agent.error.animeNotTracked'));
 
-      const patch = trackingPatch(arguments_);
-      const schedule = arguments_.schedule;
-      if (schedule && typeof schedule === 'object' && !Array.isArray(schedule)) {
-        const raw = schedule as Record<string, unknown>;
-        patch.schedule = {
-          ...(typeof raw.status === 'string' ? { status: raw.status as never } : {}),
-          ...(typeof raw.nextEpisodeNumber === 'number'
-            ? { nextEpisodeNumber: Math.max(0, Math.floor(raw.nextEpisodeNumber)) }
-            : {}),
-          ...(typeof raw.nextAirDate === 'string' ? { nextAirDate: raw.nextAirDate.slice(0, 40) } : {}),
-          ...(typeof raw.broadcastDay === 'string' ? { broadcastDay: raw.broadcastDay as never } : {}),
-        };
-      }
-      if (!Object.keys(patch).length) throw new Error(t('blanc.agent.error.nothingToUpdate'));
+      const { patch, fields } = watchPatch(arguments_);
+      // Airing dates are fetched by main (`watchAiring.ts`) from the title's ids;
+      // a schedule the agent supplied would be a guess competing with that, so
+      // it is refused by name rather than silently dropped.
+      const ignored = arguments_.schedule !== undefined ? ['schedule'] : [];
+      if (!fields.length) throw new Error(t('blanc.agent.error.nothingToUpdate'));
 
-      const document = upsertMediaTrackingEntry(identity.identityId, 'anime', patch);
-      const record = document.records.find((candidate) => (
-        candidate.identityId === identity.identityId
-      ));
-      if (!record) throw new Error(t('blanc.agent.error.animeNotFound'));
-      // The store normalizes what it stores, so the answer is read back out of the
-      // saved document rather than echoed from the patch.
-      return { updated: Object.keys(patch), ...trackedRow(record, identity.title) };
+      const updated = await window.api.watchUpdate(view.id, patch);
+      if (!updated.ok) throw watchFailure(t, updated);
+      // The store normalizes what it stores, so the answer is read back out of
+      // the saved record rather than echoed from the patch.
+      return {
+        updated: fields,
+        ...(ignored.length ? { ignored } : {}),
+        ...watchRow(updated.title, identity),
+      };
     },
 
     'anime.analyze-difficulty': async (arguments_) => {
