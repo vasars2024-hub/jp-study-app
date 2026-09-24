@@ -7689,6 +7689,7 @@ export const ru: Catalog = {
   'flash.ankiQueue.unreachable': 'Anki ещё не открыт. Карточки будут добавлены, когда он откроется.',
   'flash.ankiQueue.sent': { one: '{count} карточка добавлена в Anki.', few: '{count} карточки добавлены в Anki.', many: '{count} карточек добавлено в Anki.', other: '{count} карточки добавлены в Anki.' },
   'flash.ankiQueue.failed': { one: '{count} карточку Anki не принял — она остаётся в приложении.', few: '{count} карточки Anki не принял — они остаются в приложении.', many: '{count} карточек Anki не принял — они остаются в приложении.', other: '{count} карточки Anki не принял — они остаются в приложении.' },
+  'flash.ankiQueue.gaveUp': { one: '{count} карточка {tries} раз не успела добавиться в Anki и остаётся в приложении; «Добавить в Anki сейчас» попробует снова.', few: '{count} карточки {tries} раз не успели добавиться в Anki и остаются в приложении; «Добавить в Anki сейчас» попробует снова.', many: '{count} карточек {tries} раз не успели добавиться в Anki и остаются в приложении; «Добавить в Anki сейчас» попробует снова.', other: '{count} карточки {tries} раз не успели добавиться в Anki и остаются в приложении; «Добавить в Anki сейчас» попробует снова.' },
   'studyMine.toast.saved': 'Сохранено в вашу колоду',
   'studyMine.toast.savedAnki': 'Сохранено в колоду и в Anki',
   'studyMine.toast.queued': 'Сохранено — добавится в Anki, когда он откроется',

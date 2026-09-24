@@ -23,10 +23,13 @@ import { ANKI_UNREACHABLE_MSG, type MineNoteRequest, type MineNoteResult } from 
 import { loadDeck } from '../flashcardDeck';
 import {
   ANKI_MINE_QUEUE_KEY,
+  ANKI_QUEUE_MAX_ATTEMPTS,
   flushAnkiMineQueue,
+  gaveUpAnkiCards,
   markAnkiSeen,
   mineToStudy,
   pendingAnkiCards,
+  retryGaveUpAnkiCards,
 } from '../studyMining';
 
 let linkState: 'connected' | 'disconnected' = 'disconnected';
@@ -235,11 +238,93 @@ describe('mineToStudy', () => {
     let calls = 0;
     nextResult = () => {
       calls += 1;
-      return calls === 1 ? { ok: true, noteId: 1 } : { ok: false, error: ANKI_UNREACHABLE_MSG };
+      if (calls === 1) return { ok: true, noteId: 1 };
+      linkState = 'disconnected'; // Anki itself closed, not one slow note
+      return { ok: false, error: ANKI_UNREACHABLE_MSG };
     };
     const report = await flushAnkiMineQueue();
     expect(report.sent).toBe(1);
     expect(report.unreachable).toBe(true);
     expect(pendingAnkiCards()).toHaveLength(1);
+  });
+});
+
+describe('the pending-Anki queue', () => {
+  it('a note that keeps timing out no longer blocks the rest, and is given up after the limit', async () => {
+    markAnkiSeen();
+    await mineCat({ anki: { ...request, term: '犬' }, word: '犬' });
+    await mineCat();
+    linkState = 'connected';
+    // Anki is up, but the 犬 note times out every time.
+    nextResult = () => ({ ok: true, noteId: 7 });
+    const api = (window as unknown as { api: { ankiMineNote: (req: MineNoteRequest) => Promise<MineNoteResult> } }).api;
+    api.ankiMineNote = async (req) => {
+      mined.push(req);
+      return req.term === '犬' ? { ok: false, error: ANKI_UNREACHABLE_MSG } : nextResult();
+    };
+
+    const first = await flushAnkiMineQueue();
+    // Before: the drain stopped at 犬 and 猫 never went, however often it ran.
+    expect(first.sent).toBe(1);
+    expect(loadDeck().find((c) => c.word === '猫')?.ankiNoteId).toBe(7);
+    const queue = () => idb.get(ANKI_MINE_QUEUE_KEY) as Record<string, { attempts: number }>;
+    const dog = loadDeck().find((c) => c.word === '犬')!;
+    expect(queue()[dog.id].attempts).toBe(1);
+
+    for (let i = 1; i < ANKI_QUEUE_MAX_ATTEMPTS; i++) await flushAnkiMineQueue();
+    expect(queue()[dog.id].attempts).toBe(ANKI_QUEUE_MAX_ATTEMPTS);
+    expect(pendingAnkiCards()).toHaveLength(0);
+    expect(gaveUpAnkiCards().map((c) => c.word)).toEqual(['犬']);
+
+    // "Add to Anki now" puts it back with a fresh count.
+    expect(await retryGaveUpAnkiCards()).toBe(1);
+    expect(pendingAnkiCards().map((c) => c.word)).toEqual(['犬']);
+    expect(queue()[dog.id].attempts).toBe(0);
+  });
+
+  it('two windows never drain at once, however long a drain takes', async () => {
+    markAnkiSeen();
+    await mineCat();
+    linkState = 'connected';
+    const held = new Set<string>();
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: async (name: string, _opts: unknown, cb: (lock: unknown) => Promise<unknown>) => {
+          if (held.has(name)) return cb(null);
+          held.add(name);
+          try {
+            return await cb({ name });
+          } finally {
+            held.delete(name);
+          }
+        },
+      },
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const api = (window as unknown as { api: { ankiMineNote: (req: MineNoteRequest) => Promise<MineNoteResult> } }).api;
+    api.ankiMineNote = async (req) => {
+      mined.push(req);
+      await gate;
+      return { ok: true, noteId: 9 };
+    };
+    try {
+      const a = flushAnkiMineQueue();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      // A second window, two minutes later: the old lease would have expired.
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120_000);
+      vi.resetModules();
+      const other = await import('../studyMining');
+      const b = await other.flushAnkiMineQueue();
+      expect(b.sent).toBe(0);
+      release();
+      expect((await a).sent).toBe(1);
+      expect(mined).toHaveLength(1);
+    } finally {
+      delete (navigator as unknown as { locks?: unknown }).locks;
+    }
   });
 });

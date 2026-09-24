@@ -187,9 +187,16 @@ export const ANKI_MINE_QUEUE_EVENT = 'anki-mine-queue-changed';
 
 interface QueueEntry {
   request: MineNoteRequest;
+  /** Drain order; a note that timed out is moved to the back by restamping it. */
   queuedAt: number;
+  /** Sends that came back "unreachable" while Anki itself was up. */
   attempts: number;
+  /** Set once `attempts` reached ANKI_QUEUE_MAX_ATTEMPTS; the request is kept for a manual retry. */
+  gaveUpAt?: number;
 }
+
+/** A note that times out this many times while Anki answers otherwise is given up on. */
+export const ANKI_QUEUE_MAX_ATTEMPTS = 5;
 
 type QueueStore = Record<string, QueueEntry>;
 
@@ -246,6 +253,27 @@ async function dequeue(cardId: string): Promise<void> {
 /** Cards mined while Anki was down and not yet added. */
 export function pendingAnkiCards(cards: readonly DeckFlashcard[] = loadDeck()): DeckFlashcard[] {
   return cards.filter((card) => card.ankiPending === true);
+}
+
+/** Queued cards whose note kept timing out; they stay in the app until retried. */
+export function gaveUpAnkiCards(cards: readonly DeckFlashcard[] = loadDeck()): DeckFlashcard[] {
+  return cards.filter((card) => card.ankiQueueGaveUp === true);
+}
+
+/** Put given-up cards back in the queue with a fresh attempt count ("Add to Anki now"). */
+export async function retryGaveUpAnkiCards(): Promise<number> {
+  const cards = gaveUpAnkiCards();
+  if (!cards.length) return 0;
+  const now = Date.now();
+  await withQueue((queue) => {
+    for (const card of cards) {
+      const entry = queue[card.id];
+      if (entry) queue[card.id] = { request: entry.request, queuedAt: now, attempts: 0 };
+    }
+  });
+  for (const card of cards) updateDeckCard(card.id, { ankiPending: true, ankiQueueGaveUp: undefined });
+  emitQueueChanged();
+  return cards.length;
 }
 
 const ROUTE_SOURCE: Partial<Record<FlashcardSource, MineSource>> = {
@@ -560,6 +588,8 @@ export interface AnkiQueueReport {
   sent: number;
   duplicate: number;
   failed: number;
+  /** Notes that timed out ANKI_QUEUE_MAX_ATTEMPTS times; kept in the app. */
+  gaveUp: number;
   remaining: number;
   /** Anki was not reachable, so nothing was attempted. */
   unreachable: boolean;
@@ -567,9 +597,13 @@ export interface AnkiQueueReport {
 
 const LEASE_KEY = 'jp-anki-mine-queue-lease';
 const LEASE_MS = 60_000;
+const DRAIN_LOCK = 'gum-anki-mine-queue-drain';
 const windowId = Math.random().toString(36).slice(2);
 
-/** One window drains at a time: two would each create the same notes. */
+/**
+ * Fallback for a context without the Web Locks API (tests; Electron has it).
+ * Renewed before every note, so a long drain does not outlive its lease.
+ */
 function acquireLease(now = Date.now()): boolean {
   try {
     const raw = localStorage.getItem(LEASE_KEY);
@@ -593,6 +627,37 @@ function releaseLease(): void {
   }
 }
 
+type LockRequest = (
+  name: string,
+  options: { ifAvailable: boolean },
+  callback: (lock: unknown) => Promise<unknown>,
+) => Promise<unknown>;
+
+/**
+ * One window drains at a time: two would each create the same notes. The Web
+ * Locks API holds the lock for exactly as long as the drain runs, in every
+ * window of the origin, and releases it if the window dies. The old
+ * localStorage lease was never renewed, so a drain longer than a minute let a
+ * second window start sending the same notes.
+ */
+async function withDrainLock<T>(run: (renew: () => void) => Promise<T>, busy: () => T): Promise<T> {
+  const locks = (typeof navigator !== 'undefined'
+    ? (navigator as Navigator & { locks?: { request?: LockRequest } }).locks
+    : undefined);
+  if (typeof locks?.request === 'function') {
+    const request = locks.request.bind(locks) as LockRequest;
+    return (await request(DRAIN_LOCK, { ifAvailable: true }, async (lock) => (lock ? run(() => undefined) : busy()))) as T;
+  }
+  if (!acquireLease()) return busy();
+  try {
+    return await run(() => {
+      acquireLease();
+    });
+  } finally {
+    releaseLease();
+  }
+}
+
 let draining: Promise<AnkiQueueReport> | null = null;
 
 export function flushAnkiMineQueue(): Promise<AnkiQueueReport> {
@@ -603,27 +668,45 @@ export function flushAnkiMineQueue(): Promise<AnkiQueueReport> {
   return draining;
 }
 
+/**
+ * A note came back "unreachable" while the drain was running. Count it and
+ * move it to the back of the queue; after ANKI_QUEUE_MAX_ATTEMPTS it is given
+ * up on (the request stays for a manual retry) so one note that always times
+ * out can no longer block every note queued after it.
+ */
+async function recordTimeout(card: DeckFlashcard, request: MineNoteRequest): Promise<boolean> {
+  const now = Date.now();
+  let gaveUp = false;
+  await withQueue((queue) => {
+    const entry = queue[card.id] ?? { request, queuedAt: now, attempts: 0 };
+    const attempts = entry.attempts + 1;
+    gaveUp = attempts >= ANKI_QUEUE_MAX_ATTEMPTS;
+    queue[card.id] = { request: entry.request, queuedAt: now, attempts, ...(gaveUp ? { gaveUpAt: now } : {}) };
+  });
+  if (gaveUp) updateDeckCard(card.id, { ankiPending: undefined, ankiQueueGaveUp: true });
+  return gaveUp;
+}
+
 async function drain(): Promise<AnkiQueueReport> {
-  const report: AnkiQueueReport = { sent: 0, duplicate: 0, failed: 0, remaining: 0, unreachable: false };
-  const pending = pendingAnkiCards();
+  const report: AnkiQueueReport = { sent: 0, duplicate: 0, failed: 0, gaveUp: 0, remaining: 0, unreachable: false };
   // Queue entries whose card was deleted are dropped rather than sent.
   const live = new Set(loadDeck().map((card) => card.id));
   await withQueue((queue) => {
     for (const id of Object.keys(queue)) if (!live.has(id)) delete queue[id];
   });
-  if (!pending.length) return report;
+  if (!pendingAnkiCards().length) return report;
   if (!(await ankiConnected())) {
     report.unreachable = true;
-    report.remaining = pending.length;
+    report.remaining = pendingAnkiCards().length;
     return report;
   }
-  if (!acquireLease()) {
-    report.remaining = pending.length;
-    return report;
-  }
-  try {
+  return withDrainLock(async (renew) => {
+    // Oldest first; a note that timed out was restamped to the back.
     const queue = await withQueue((q) => ({ ...q }));
+    const pending = pendingAnkiCards().sort((a, b) =>
+      (queue[a.id]?.queuedAt ?? Number.MAX_SAFE_INTEGER) - (queue[b.id]?.queuedAt ?? Number.MAX_SAFE_INTEGER));
     for (let i = 0; i < pending.length; i += 1) {
+      renew();
       const card = pending[i];
       const request = queue[card.id]?.request ?? requestFromCard(card);
       let result: MineNoteResult;
@@ -633,27 +716,34 @@ async function drain(): Promise<AnkiQueueReport> {
         result = { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
       if (isUnreachable(result.error)) {
-        // Anki went away mid-drain: everything from here on stays queued.
-        report.unreachable = true;
-        report.remaining = pending.length - i;
-        break;
+        if (await recordTimeout(card, request)) report.gaveUp += 1;
+        if (!(await ankiConnected())) {
+          // Anki itself went away mid-drain: everything from here on stays queued.
+          report.unreachable = true;
+          report.remaining = pendingAnkiCards().length;
+          break;
+        }
+        // Anki is up and this one note timed out: carry on with the rest.
+        continue;
       }
       const applied = await applyAnkiResult(card, result, request);
       if (applied.outcome === 'added') report.sent += 1;
       else if (applied.outcome === 'duplicate') report.duplicate += 1;
       else report.failed += 1;
     }
-  } finally {
-    releaseLease();
-  }
-  emitQueueChanged();
-  return report;
+    if (!report.unreachable) report.remaining = pendingAnkiCards().length;
+    emitQueueChanged();
+    return report;
+  }, () => {
+    report.remaining = pendingAnkiCards().length;
+    return report;
+  });
 }
 
 /** Keep pending cards in the app only: clear the Anki half without sending. */
 export async function keepPendingCardsLocal(): Promise<number> {
-  const pending = pendingAnkiCards();
-  for (const card of pending) updateDeckCard(card.id, { ankiPending: undefined });
+  const pending = [...pendingAnkiCards(), ...gaveUpAnkiCards()];
+  for (const card of pending) updateDeckCard(card.id, { ankiPending: undefined, ankiQueueGaveUp: undefined });
   await withQueue((queue) => {
     for (const card of pending) delete queue[card.id];
   });

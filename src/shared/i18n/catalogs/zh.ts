@@ -6937,6 +6937,7 @@ export const zh: Catalog = {
   'flash.ankiQueue.unreachable': 'Anki 尚未打开。打开后会自动添加这些卡片。',
   'flash.ankiQueue.sent': { other: '已将 {count} 张卡片加入 Anki。' },
   'flash.ankiQueue.failed': { other: '{count} 张卡片被 Anki 拒绝，保留在应用内。' },
+  'flash.ankiQueue.gaveUp': { other: '{count} 张卡片在 Anki 中超时 {tries} 次，保留在应用内；点击“立即加入 Anki”可重试。' },
   'studyMine.toast.saved': '已保存到你的卡组',
   'studyMine.toast.savedAnki': '已保存到你的卡组和 Anki',
   'studyMine.toast.queued': '已保存 — Anki 打开后会自动添加',

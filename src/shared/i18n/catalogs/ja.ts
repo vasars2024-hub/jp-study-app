@@ -6979,6 +6979,7 @@ export const ja: Catalog = {
   'flash.ankiQueue.unreachable': 'Anki がまだ開いていません。開いたときに追加されます。',
   'flash.ankiQueue.sent': { other: '{count} 枚を Anki に追加しました。' },
   'flash.ankiQueue.failed': { other: '{count} 枚は Anki に拒否されたため、アプリ内に残ります。' },
+  'flash.ankiQueue.gaveUp': { other: '{count} 枚は Anki で {tries} 回タイムアウトしたため、アプリ内に残ります。「今すぐ Anki に追加」でもう一度試せます。' },
   'studyMine.toast.saved': 'デッキに保存しました',
   'studyMine.toast.savedAnki': 'デッキと Anki に保存しました',
   'studyMine.toast.queued': '保存しました — Anki を開いたときに追加します',

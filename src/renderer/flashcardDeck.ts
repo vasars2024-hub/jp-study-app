@@ -110,6 +110,11 @@ export interface DeckFlashcard {
   ankiPending?: boolean;
   /** Anki already held a matching note when this card was pushed. */
   ankiDuplicate?: boolean;
+  /**
+   * The queued note kept timing out while Anki answered otherwise, so the
+   * queue stopped retrying it; "Add to Anki now" puts it back.
+   */
+  ankiQueueGaveUp?: boolean;
   /** Page / file the card was mined from, when the surface knows one. */
   sourceUrl?: string;
   /** Normalised word + sentence + source identity; dedupes repeated mines. */

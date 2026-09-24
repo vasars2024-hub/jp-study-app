@@ -7068,6 +7068,7 @@ export const en: Catalog = {
   'flash.ankiQueue.unreachable': 'Anki is not open yet. The cards will be added when it is.',
   'flash.ankiQueue.sent': { one: '{count} card added to Anki.', other: '{count} cards added to Anki.' },
   'flash.ankiQueue.failed': { one: '{count} card was refused by Anki and stays in the app.', other: '{count} cards were refused by Anki and stay in the app.' },
+  'flash.ankiQueue.gaveUp': { one: '{count} card timed out in Anki {tries} times and stays in the app; Add to Anki now tries again.', other: '{count} cards timed out in Anki {tries} times and stay in the app; Add to Anki now tries again.' },
   'studyMine.toast.saved': 'Saved to your deck',
   'studyMine.toast.savedAnki': 'Saved to your deck and Anki',
   'studyMine.toast.queued': 'Saved — will add to Anki when it\'s open',
