@@ -14,6 +14,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoCoreMiningPanel from '../../media/VideoCoreMiningPanel';
+import { loadDeck } from '../flashcardDeck';
 import type { VideoCoreMiningSource } from '../../shared/videoCoreMining';
 import type { VideoCoreStudyCue } from '../../shared/videoCoreStudy';
 
@@ -46,6 +47,9 @@ beforeEach(() => {
   mineNote = vi.fn().mockResolvedValue({ ok: true, noteId: 7, destination: 'Mining::Japanese' });
   (window as unknown as { api: Record<string, unknown> }).api = {
     ankiStatus: vi.fn().mockResolvedValue({ connected: true, decks: ['Mining::Japanese'] }),
+    // Mining goes through the study database first (renderer/studyMining.ts),
+    // which asks the link whether Anki is up before sending the note.
+    ankiLinkState: vi.fn().mockResolvedValue({ state: 'connected', consecutiveFailures: 0 }),
     ankiMineNote: mineNote,
   };
 });
@@ -130,13 +134,17 @@ describe('video.mineCurrentLine shortcut', () => {
     expect(mineNote).toHaveBeenCalledTimes(1);
   });
 
-  it('mines the same line twice when the shortcut is pressed twice', async () => {
-    // A boolean flag would latch after the first press; the counter is why this
-    // works.
-    await mount(CUE_A, 0);
+  it('answers the shortcut a second time for the same line — without a duplicate card', async () => {
+    // A boolean flag would latch after the first press; the counter is why the
+    // second press is heard at all. Since mining writes the study database, the
+    // same line mined twice is found, not re-created: one card, one note, and
+    // the panel says the line is already mined.
+    const host = await mount(CUE_A, 0);
     await rerender(CUE_A, 1);
     await rerender(CUE_A, 2);
 
-    expect(mineNote).toHaveBeenCalledTimes(2);
+    expect(mineNote).toHaveBeenCalledTimes(1);
+    expect(loadDeck()).toHaveLength(1);
+    expect(host.textContent).toContain('Anki already contains this note');
   });
 });

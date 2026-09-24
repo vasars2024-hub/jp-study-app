@@ -605,6 +605,9 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
       return outcome.withAudio ? t('music.minedWithAudio') : t('music.mined');
     }
     if (outcome.kind === 'duplicate') return t('music.mineDuplicate');
+    if (outcome.kind === 'saved') {
+      return outcome.anki === 'queued' ? t('music.minedAnkiLater') : t('music.minedToDeck');
+    }
     return t('music.mineFailed');
   };
 

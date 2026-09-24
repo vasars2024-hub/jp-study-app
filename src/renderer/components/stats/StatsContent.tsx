@@ -34,6 +34,11 @@ import {
 } from '../../../shared/seanimeContinueWatching';
 import { MEDIA_WORKSPACE_OPEN_EVENT } from '../../../shared/mediaWorkspace';
 import { knowledgeCounts, onKnowledgeChanged } from '../../knownWords';
+import { dueDeckCards, loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { loadReviewLog, onReviewLogChanged } from '../../reviewLog';
+import { summarizeReviewLog, type ReviewLogSummary } from '../../../shared/reviewLog';
+import { localDueForecast, type LocalDueForecast } from '../../../shared/reviewForecast';
+import { getActiveProfile, onProfileChanged } from '../../profileState';
 import { syncKnowledgeFromAnki } from '../../ankiSync';
 import { LevelMeter } from '../LevelMeter';
 import { getLevelEstimate, onLevelChange } from '../../levelService';
@@ -113,7 +118,10 @@ export function useStats(): StatsState {
     // combined — peaking on reading alone would let a heavy watching day overflow it.
     peak: Math.max(1, ...summary.recent.map((d) => d.seconds + d.watchSeconds)),
     hasData:
-      summary.totalSeconds > 0 || summary.totalChars > 0 || summary.totalWatchSeconds > 0,
+      summary.totalSeconds > 0
+      || summary.totalChars > 0
+      || summary.totalWatchSeconds > 0
+      || summary.totalReviews > 0,
     refresh,
     resetAllStats,
   };
@@ -122,6 +130,10 @@ export function useStats(): StatsState {
 export function EstimatedLevelBadge() {
   const { t } = useT();
   const [estimate, setEstimate] = useState<LevelEstimate>(() => getLevelEstimate());
+  // The study profile's JLPT goal (deckParams.jlptTarget) — validated by the
+  // profile editor and, until now, shown nowhere.
+  const [target, setTarget] = useState(() => getActiveProfile().deckParams.jlptTarget);
+  useEffect(() => onProfileChanged(() => setTarget(getActiveProfile().deckParams.jlptTarget)), []);
 
   useEffect(() => {
     const refresh = (): void => setEstimate(getLevelEstimate());
@@ -144,8 +156,112 @@ export function EstimatedLevelBadge() {
       <div className="stats-level-copy">
         <span className="stats-level-title">{t('stats.level.title')}</span>
         <span className="stats-level-hint muted">{t('stats.level.hint')}</span>
+        {target && estimate.lang === 'ja' && (
+          <span className="stats-level-hint muted">{t('stats.level.goal', { level: target })}</span>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Flashcard reviews: how many, how well remembered, and what is coming.
+ *
+ * Reviews are the study this app is built around, and Statistics used to know
+ * nothing about them — reading and watching time only. Counts come from the
+ * review log (renderer/reviewLog.ts); the forecast reads each local card's own
+ * due date, with today's new-card allowance applied to what is due now.
+ */
+export function StatsReviews() {
+  const { t, lang } = useT();
+  const [log, setLog] = useState<ReviewLogSummary | null>(null);
+  const [forecast, setForecast] = useState<{ dueNow: number; days: LocalDueForecast } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const refreshLog = (): void => {
+      void loadReviewLog().then((entries) => {
+        if (alive) setLog(summarizeReviewLog(entries, 30));
+      });
+    };
+    const refreshDeck = (): void => {
+      const deck = loadDeck();
+      setForecast({ dueNow: dueDeckCards(deck).length, days: localDueForecast(deck, 7) });
+    };
+    refreshLog();
+    refreshDeck();
+    const offLog = onReviewLogChanged(refreshLog);
+    const offDeck = onDeckChanged(() => {
+      refreshDeck();
+    });
+    return () => {
+      alive = false;
+      offLog();
+      offDeck();
+    };
+  }, []);
+
+  const today = log?.perDay[log.perDay.length - 1]?.reviews ?? 0;
+  const retention = log?.retention;
+  const peak = Math.max(1, ...(forecast?.days.days.map((d) => d.due) ?? [0]));
+
+  return (
+    <section className="stats-section stats-reviews" aria-label={t('stats.reviews.title')}>
+      <h2>{t('stats.reviews.title')}</h2>
+      <div className="stats-cards">
+        <div className="stats-card">
+          <span className="stats-card-val">{formatNumber(today)}</span>
+          <span className="stats-card-lbl">{t('stats.reviews.today')}</span>
+        </div>
+        <div className="stats-card">
+          <span className="stats-card-val">
+            {log ? log.dailyAverage.toLocaleString(LANG_TAGS[lang]) : '—'}
+          </span>
+          <span className="stats-card-lbl">{t('stats.reviews.perDay')}</span>
+        </div>
+        <div className="stats-card" title={t('stats.reviews.retentionHint')}>
+          <span className="stats-card-val">
+            {retention == null
+              ? '—'
+              : new Intl.NumberFormat(LANG_TAGS[lang], { style: 'percent', maximumFractionDigits: 0 }).format(retention)}
+          </span>
+          <span className="stats-card-lbl">
+            {log && log.retentionSample > 0
+              ? t('stats.reviews.retentionOf', { count: log.retentionSample })
+              : t('stats.reviews.retention')}
+          </span>
+        </div>
+        <div className="stats-card">
+          <span className="stats-card-val">{formatNumber(forecast?.dueNow ?? 0)}</span>
+          <span className="stats-card-lbl">{t('stats.reviews.dueNow')}</span>
+        </div>
+      </div>
+      {forecast && (
+        <div className="stats-forecast" role="list" aria-label={t('stats.reviews.forecast')}>
+          {forecast.days.days.map((day) => {
+            const date = new Date();
+            date.setDate(date.getDate() + day.offsetDays);
+            const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            const label = t('stats.reviews.forecastDay', { date: chartDayLabel(iso, lang), count: day.due });
+            return (
+              <div key={day.offsetDays} className="stats-forecast-col" role="listitem" aria-label={label} title={label}>
+                <div className="stats-forecast-track">
+                  {day.due > 0 && (
+                    <div className="stats-forecast-fill" style={{ height: `${(day.due / peak) * 100}%` }} />
+                  )}
+                </div>
+                <span className="stats-bar-lbl">{weekdayInitial(iso, lang)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="muted stats-reviews-note">
+        {log && log.practiceAnswers > 0
+          ? t('stats.reviews.practice', { count: log.practiceAnswers, correct: log.practiceCorrect })
+          : t('stats.reviews.note')}
+      </p>
+    </section>
   );
 }
 

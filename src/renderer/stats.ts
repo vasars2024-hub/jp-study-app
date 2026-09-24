@@ -45,6 +45,13 @@ interface DayEntry {
   chars: number;
   /** Watched seconds. Optional: every day written before slice 8 lacks it. */
   watchSeconds?: number;
+  /** Flashcard reviews graded that day (any scheduler rating). */
+  reviews?: number;
+  /** Of `reviews`, how many were not Again — the retention numerator. */
+  reviewsPassed?: number;
+  /** Learn / Test / Write answers that day. */
+  practice?: number;
+  practiceCorrect?: number;
 }
 interface BookEntry {
   title: string;
@@ -126,11 +133,19 @@ export const READING_RECORDED_EVENT = 'jp-reading-recorded';
  */
 export const WATCH_RECORDED_EVENT = 'jp-watch-recorded';
 export const STATS_RESET_EVENT = 'jp-study-stats-reset';
+/** Fired on window after a flashcard review or practice answer is recorded. */
+export const REVIEW_RECORDED_EVENT = 'jp-review-recorded';
 export const GAME_PROGRESS_EVENT = 'jp-game-progress-changed';
 
 /** Keep every statistics host current, including separate reader/player windows. */
 export function onStatsChanged(refresh: () => void): () => void {
-  const events = [READING_RECORDED_EVENT, WATCH_RECORDED_EVENT, STATS_RESET_EVENT, STUDY_LANG_EVENT];
+  const events = [
+    READING_RECORDED_EVENT,
+    WATCH_RECORDED_EVENT,
+    REVIEW_RECORDED_EVENT,
+    STATS_RESET_EVENT,
+    STUDY_LANG_EVENT,
+  ];
   const onStorage = (event: StorageEvent): void => {
     if (event.storageArea && event.storageArea !== localStorage) return;
     if (event.key === null || event.key === statsKey() || event.key === STUDY_LANG_KEY) refresh();
@@ -172,6 +187,9 @@ export interface DayStat {
   seconds: number;
   chars: number;
   watchSeconds: number;
+  /** Flashcard reviews graded that day. */
+  reviews: number;
+  reviewsPassed: number;
 }
 export interface BookStat {
   id: string;
@@ -197,6 +215,10 @@ export interface StatsSummary {
   todaySeconds: number;
   todayChars: number;
   todayWatchSeconds: number;
+  /** Flashcard reviews graded today, and across every recorded day. */
+  todayReviews: number;
+  totalReviews: number;
+  totalReviewsPassed: number;
   recent: DayStat[]; // last 14 days, oldest → newest (includes empty days)
   books: BookStat[]; // most-recently-read first
   shows: ShowStat[]; // most-recently-watched first
@@ -439,12 +461,50 @@ export function recordWatching(showId: string, title: string, seconds: number): 
   }
 }
 
-/** A day counts as active if either channel recorded time on it. */
-function dayIsActive(entry: DayEntry | undefined): boolean {
-  return !!entry && (entry.seconds > 0 || (entry.watchSeconds ?? 0) > 0);
+/**
+ * Count flashcard reviews (or practice answers) toward today's totals.
+ *
+ * Reviews are study: a day spent clearing the deck used to leave the streak
+ * broken because only reading and watching time counted. `undo` takes one back
+ * out again when the review it recorded is undone.
+ */
+export function recordReviewActivity(
+  kind: 'review' | 'practice',
+  passed: boolean,
+  at = Date.now(),
+  undo = false,
+): void {
+  const data = load();
+  const key = dayKey(new Date(at));
+  const day = data.days[key] ?? { seconds: 0, chars: 0 };
+  const step = undo ? -1 : 1;
+  if (kind === 'review') {
+    day.reviews = Math.max(0, (day.reviews ?? 0) + step);
+    if (passed) day.reviewsPassed = Math.max(0, (day.reviewsPassed ?? 0) + step);
+  } else {
+    day.practice = Math.max(0, (day.practice ?? 0) + step);
+    if (passed) day.practiceCorrect = Math.max(0, (day.practiceCorrect ?? 0) + step);
+  }
+  data.days[key] = day;
+  save(data);
+  try {
+    window.dispatchEvent(new CustomEvent(REVIEW_RECORDED_EVENT));
+  } catch {
+    /* non-browser context (tests) — ignore */
+  }
 }
 
-/** Consecutive days (ending today or yesterday) with reading **or** watching time. */
+/** A day counts as active if any channel — reading, watching, reviewing — recorded on it. */
+function dayIsActive(entry: DayEntry | undefined): boolean {
+  return !!entry && (
+    entry.seconds > 0
+    || (entry.watchSeconds ?? 0) > 0
+    || (entry.reviews ?? 0) > 0
+    || (entry.practice ?? 0) > 0
+  );
+}
+
+/** Consecutive days (ending today or yesterday) with reading, watching or reviewing. */
 function computeStreak(days: Record<string, DayEntry>): number {
   let streak = 0;
   const cursor = new Date();
@@ -468,10 +528,14 @@ export function getSummary(): StatsSummary {
   let totalSeconds = 0;
   let totalChars = 0;
   let totalWatchSeconds = 0;
+  let totalReviews = 0;
+  let totalReviewsPassed = 0;
   for (const k of dayKeys) {
     totalSeconds += data.days[k].seconds;
     totalChars += data.days[k].chars;
     totalWatchSeconds += data.days[k].watchSeconds ?? 0;
+    totalReviews += data.days[k].reviews ?? 0;
+    totalReviewsPassed += data.days[k].reviewsPassed ?? 0;
   }
 
   const todayK = dayKey(new Date());
@@ -483,7 +547,14 @@ export function getSummary(): StatsSummary {
     d.setDate(d.getDate() - i);
     const k = dayKey(d);
     const e = data.days[k] ?? { seconds: 0, chars: 0 };
-    recent.push({ date: k, seconds: e.seconds, chars: e.chars, watchSeconds: e.watchSeconds ?? 0 });
+    recent.push({
+      date: k,
+      seconds: e.seconds,
+      chars: e.chars,
+      watchSeconds: e.watchSeconds ?? 0,
+      reviews: e.reviews ?? 0,
+      reviewsPassed: e.reviewsPassed ?? 0,
+    });
   }
 
   const books: BookStat[] = Object.entries(data.books)
@@ -503,6 +574,9 @@ export function getSummary(): StatsSummary {
     todaySeconds: today.seconds,
     todayChars: today.chars,
     todayWatchSeconds: today.watchSeconds ?? 0,
+    todayReviews: today.reviews ?? 0,
+    totalReviews,
+    totalReviewsPassed,
     recent,
     books,
     shows,

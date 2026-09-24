@@ -37,7 +37,16 @@ afterEach(async () => {
   root = null;
   document.body.replaceChildren();
   vi.restoreAllMocks();
+  // Mining writes the local study deck; a card left behind would make the
+  // next test's mine a repeat of this one.
+  localStorage.clear();
 });
+
+/** Mining is a local write, a link check, then the note: let all of it settle. */
+const CONNECTED = async () => ({ state: 'connected', consecutiveFailures: 0 });
+async function flushMine(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 describe('LexiconWorkbenchResults', () => {
   it('keeps lexical input on the full dictionary surface', async () => {
@@ -307,7 +316,7 @@ describe('LexiconWorkbenchResults', () => {
     const ankiMineNote = vi.fn().mockResolvedValue({ ok: true, noteId: 11 });
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote, ankiLinkState: CONNECTED },
     });
     const host = document.createElement('div');
     document.body.append(host);
@@ -331,7 +340,7 @@ describe('LexiconWorkbenchResults', () => {
     expect(mine?.classList.contains('lq-hit'), 'the mine button opts into the pointer floor').toBe(true);
     await act(async () => {
       mine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
+      await flushMine();
     });
 
     expect(ankiMineNote).toHaveBeenCalledTimes(1);
@@ -365,7 +374,7 @@ describe('LexiconWorkbenchResults', () => {
     const ankiMineNote = vi.fn().mockResolvedValue({ ok: false, error: 'Anki is not running' });
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote, ankiLinkState: CONNECTED },
     });
     const host = document.createElement('div');
     document.body.append(host);
@@ -377,7 +386,7 @@ describe('LexiconWorkbenchResults', () => {
 
     await act(async () => {
       host.querySelector('.lexicon-harvest-mine')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
+      await flushMine();
     });
 
     const alert = host.querySelector('.lexicon-harvest-mine-error');
@@ -406,7 +415,7 @@ describe('LexiconWorkbenchResults', () => {
     const ankiMineNote = vi.fn().mockResolvedValue({ ok: false, error: 'duplicate' });
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote, ankiLinkState: CONNECTED },
     });
     const host = document.createElement('div');
     document.body.append(host);
@@ -417,7 +426,7 @@ describe('LexiconWorkbenchResults', () => {
     });
     await act(async () => {
       host.querySelector('.lexicon-harvest-mine')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
+      await flushMine();
     });
 
     const mine = host.querySelector<HTMLButtonElement>('.lexicon-harvest-mine');
@@ -451,7 +460,7 @@ describe('LexiconWorkbenchResults', () => {
     const ankiMineNote = vi.fn().mockResolvedValue({ ok: true, noteId: 12 });
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote, ankiLinkState: CONNECTED },
     });
     const host = document.createElement('div');
     document.body.append(host);
@@ -492,7 +501,7 @@ describe('LexiconWorkbenchResults', () => {
 
     await act(async () => {
       host.querySelector('.lexicon-harvest-mine')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
+      await flushMine();
     });
     expect(ankiMineNote.mock.calls[0][0]).toMatchObject({
       term: '見る',

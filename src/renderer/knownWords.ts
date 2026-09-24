@@ -8,6 +8,7 @@
 // switching environments never mixes JA and ZH lemmas.
 
 import { getStudyLang, onStudyLangChanged, type StudyLang } from './studyEnvironment';
+import { kvGet, kvSet } from './storage/db';
 
 export const WK_LEVELS = ['New', 'Learning', 'Familiar', 'Known'] as const;
 export type WkLevel = 0 | 1 | 2 | 3;
@@ -58,12 +59,117 @@ function db(): Record<string, Entry> {
   return cache;
 }
 
-function persist(): void {
+/** IndexedDB key of one language's durable copy (not in IDB_KEYS: the migration runner owns those). */
+export function knowledgeIdbKey(lang: StudyLang = getStudyLang()): string {
+  return `word-knowledge-${lang}`;
+}
+
+/** localStorage stamp of the last cache write, compared with the durable copy at boot. */
+function stampKey(lang: StudyLang): string {
+  return `${knowledgeKey(lang)}-saved-at`;
+}
+
+interface DurableKnowledge {
+  savedAt: number;
+  entries: Record<string, Entry>;
+}
+
+const pendingMirrors = new Map<StudyLang, DurableKnowledge>();
+let mirrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Mirror a language's knowledge into IndexedDB, debounced: an Anki sync writes
+ * tens of thousands of entries in one call, and a cleared or quota-failed
+ * localStorage used to lose every graded word with no second copy anywhere.
+ */
+function scheduleMirror(lang: StudyLang, entries: Record<string, Entry>, savedAt: number): void {
+  pendingMirrors.set(lang, { savedAt, entries: { ...entries } });
+  if (mirrorTimer) return;
+  mirrorTimer = setTimeout(() => {
+    mirrorTimer = null;
+    const batch = [...pendingMirrors.entries()];
+    pendingMirrors.clear();
+    for (const [key, value] of batch) {
+      void kvSet(knowledgeIdbKey(key), value).catch((error) => {
+        console.error('[knownWords] IndexedDB mirror failed:', error);
+      });
+    }
+  }, 400);
+}
+
+/**
+ * Write one language's cache and its stamp. False when localStorage refused;
+ * the IndexedDB mirror still holds the value, so this is a cache miss, not a
+ * loss — which is why it reports rather than raising a toast.
+ */
+function writeCache(lang: StudyLang, entries: Record<string, Entry>, savedAt: number): boolean {
   try {
-    localStorage.setItem(knowledgeKey(), JSON.stringify(db()));
+    for (const [key, value] of [
+      [knowledgeKey(lang), JSON.stringify(entries)],
+      [stampKey(lang), String(savedAt)],
+    ] as const) {
+      localStorage.setItem(key, value);
+    }
+    return true;
   } catch {
-    /* storage unavailable */
+    return false;
   }
+}
+
+function persist(): void {
+  const entries = db();
+  const lang = cacheLang ?? getStudyLang();
+  const savedAt = Date.now();
+  writeCache(lang, entries, savedAt);
+  scheduleMirror(lang, entries, savedAt);
+}
+
+/**
+ * Boot reconciliation for one study language: the newer copy wins, and a
+ * missing or unreadable cache is refilled from the durable copy. A cache
+ * written before the stamp existed reads as 0, so a durable copy (which always
+ * carries a stamp) replaces it only when it holds more words.
+ */
+export async function restoreKnowledgeFromIdb(lang: StudyLang = getStudyLang()): Promise<'durable' | 'local' | 'none'> {
+  migrateLegacyOnce();
+  let durable: DurableKnowledge | null = null;
+  try {
+    const raw = await kvGet<unknown>(knowledgeIdbKey(lang));
+    if (raw && typeof raw === 'object' && (raw as DurableKnowledge).entries && typeof (raw as DurableKnowledge).entries === 'object') {
+      durable = raw as DurableKnowledge;
+    }
+  } catch {
+    durable = null;
+  }
+  let local: Record<string, Entry> | null = null;
+  let localStamp = 0;
+  try {
+    const text = localStorage.getItem(knowledgeKey(lang));
+    local = text ? (JSON.parse(text) as Record<string, Entry>) : null;
+    localStamp = Number(localStorage.getItem(stampKey(lang))) || 0;
+  } catch {
+    local = null;
+  }
+  const localCount = local ? Object.keys(local).length : 0;
+  if (!durable) {
+    if (local && localCount) scheduleMirror(lang, local, localStamp || Date.now());
+    return local ? 'local' : 'none';
+  }
+  const durableCount = Object.keys(durable.entries).length;
+  const durableWins = !local
+    || (localStamp > 0 ? durable.savedAt > localStamp : durableCount > localCount);
+  if (!durableWins) {
+    if (localStamp > durable.savedAt || !localStamp) scheduleMirror(lang, local ?? {}, localStamp || Date.now());
+    return 'local';
+  }
+  // A full cache is fine: the in-memory copy below still serves this session.
+  writeCache(lang, durable.entries, durable.savedAt);
+  if (lang === getStudyLang()) {
+    cache = { ...durable.entries };
+    cacheLang = lang;
+  }
+  emit([]);
+  return 'durable';
 }
 
 function emit(words: string[]): void {
@@ -106,6 +212,26 @@ export function setLevel(word: string, level: WkLevel, manual = true): void {
   else d[word] = { l: level, ...(manual ? { m: 1 as const } : {}) };
   persist();
   emit([word]);
+}
+
+/**
+ * Set a level inferred from evidence (a local flashcard review), never from the
+ * user's own hand. A word graded manually is left alone, exactly as the Anki
+ * sync leaves it. Returns the previous level when something changed, so the
+ * change can be undone, or null when nothing was written.
+ */
+export function setInferredLevel(word: string, level: WkLevel): WkLevel | null {
+  if (!word) return null;
+  const d = db();
+  const current = d[word];
+  if (current?.m) return null;
+  const previous: WkLevel = current?.l ?? 0;
+  if (previous === level) return null;
+  if (level === 0) delete d[word];
+  else d[word] = { l: level };
+  persist();
+  emit([word]);
+  return previous;
 }
 
 export function cycleLevel(word: string): WkLevel {

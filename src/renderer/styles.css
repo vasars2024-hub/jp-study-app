@@ -5595,6 +5595,19 @@ mark.lookup-mark,
   font-size: 11px;
   color: var(--accent);
 }
+.dict-add-note {
+  margin-top: 6px;
+  font-size: 11px;
+}
+.dict-add-note button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .dict-anki-cfg {
   position: sticky;
   bottom: 0;
@@ -12272,6 +12285,47 @@ mark.lookup-mark,
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
+}
+/* Seven-day due forecast under the Reviews cards: the chart's bars, shorter,
+   under their own names so the 14-day activity chart's columns stay its own. */
+.stats-forecast {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 90px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.stats-forecast-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+.stats-forecast-track {
+  flex: 1;
+  width: 62%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.stats-forecast-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--stat-read);
+}
+.stats-forecast-col:hover .stats-forecast-fill {
+  background: var(--accent);
+}
+.stats-reviews-note {
+  margin-top: 8px;
+  font-size: 12px;
 }
 .stats-bar-col {
   flex: 1;

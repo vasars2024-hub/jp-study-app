@@ -16,6 +16,7 @@ import {
   type WriteRound,
 } from '../../../shared/flashcardWrite';
 import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
+import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
@@ -73,10 +74,15 @@ export default function WriteMode({ onExit, deck = 'all' }: {
     setGrade(result);
     if (result.verdict === 'correct') setCorrect((n) => n + 1);
     else if (result.verdict === 'wrong') setWrong((n) => n + 1);
+    if (result.verdict === 'correct' || result.verdict === 'wrong') {
+      appendReviewLog({ mode: 'write', cardId: question.cardId, correct: result.verdict === 'correct' });
+    }
     // `close` is scored by neither branch: it is answered again, or overridden.
   }
 
   function override(): void {
+    // The user says a `close` answer was right: it counts as correct practice.
+    if (question) appendReviewLog({ mode: 'write', cardId: question.cardId, correct: true });
     setOverridden((n) => n + 1);
     advance();
   }

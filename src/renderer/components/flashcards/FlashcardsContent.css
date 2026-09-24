@@ -356,3 +356,26 @@
 .flash-view .flash-actions .flash-easy {
   min-width: 112px;
 }
+
+/* Undo last rating — quiet, under the rating row. */
+.flash-view .flash-undo-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* Cards mined while Anki was closed. One line, only while any are waiting. */
+.flash-anki-queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.flash-anki-queue-count {
+  font-weight: 600;
+}

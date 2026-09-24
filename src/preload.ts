@@ -2961,13 +2961,15 @@ const api = {
       mode: 'word' | 'sentence';
       term: string;
       sentence?: string;
+      reading?: string;
+      meaning?: string;
       text: string;
       url?: string;
       title?: string;
       folder?: string;
       audioDataUrl?: string;
       profileId?: string;
-      anki: { ok: boolean; noteId?: number; error?: string };
+      anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
     }) => void,
   ): (() => void) => {
     const handler = (
@@ -2976,13 +2978,15 @@ const api = {
         mode: 'word' | 'sentence';
         term: string;
         sentence?: string;
+        reading?: string;
+        meaning?: string;
         text: string;
         url?: string;
         title?: string;
         folder?: string;
         audioDataUrl?: string;
         profileId?: string;
-        anki: { ok: boolean; noteId?: number; error?: string };
+        anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
       },
     ): void => cb(payload);
     ipcRenderer.on('extension:mined', handler);
@@ -3078,6 +3082,9 @@ const api = {
   flashcardReadAudio: (filePath: string):
     Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
     ipcRenderer.invoke('flashcards:readAudio', filePath),
+  flashcardStoreMinedMedia: (base64: string, filename: string):
+    Promise<import('./main/flashcardAudio').StoredMinedMedia> =>
+    ipcRenderer.invoke('flashcards:storeMinedMedia', base64, filename),
   /** Reclaim managed clips a removed card batch was the only reference to. */
   flashcardReleaseAudio: (paths: readonly string[]):
     Promise<{ removed: number; skipped: number }> =>

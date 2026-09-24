@@ -78,6 +78,49 @@ export function filterLocalReviewsDue<T extends { srs?: unknown }>(
 }
 
 /**
+ * Cap how many never-reviewed cards a sitting may introduce today.
+ *
+ * Every unscheduled card is due by definition (see `isLocalReviewDue`), so a
+ * freshly imported 3,000-card deck used to put all 3,000 in front of the user
+ * at once. Scheduled cards always pass; unscheduled ones pass in deck order
+ * until `newPerDay` minus the cards already introduced today is used up.
+ * `newPerDay` undefined means no cap (the profile does not set one).
+ */
+export function limitNewCards<T extends { srs?: unknown }>(
+  cards: readonly T[],
+  newPerDay: number | undefined,
+  introducedToday: number,
+): T[] {
+  if (newPerDay === undefined || !Number.isFinite(newPerDay)) return [...cards];
+  let remaining = Math.max(0, Math.floor(newPerDay) - Math.max(0, introducedToday));
+  const out: T[] = [];
+  for (const card of cards) {
+    if (isLocalSrsState(card.srs)) {
+      out.push(card);
+    } else if (remaining > 0) {
+      out.push(card);
+      remaining -= 1;
+    }
+  }
+  return out;
+}
+
+/** Cards whose first review happened on the local day containing `now`. */
+export function countIntroducedToday(
+  cards: readonly { introducedAt?: number }[],
+  now = Date.now(),
+): number {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const from = start.getTime();
+  let n = 0;
+  for (const card of cards) {
+    if (typeof card.introducedAt === 'number' && card.introducedAt >= from && card.introducedAt <= now) n += 1;
+  }
+  return n;
+}
+
+/**
  * An SM-2-style four-button schedule. Again starts a ten-minute relearning
  * step; Hard grows slowly and lowers ease; Good graduates through 1 and 3 days;
  * Easy starts at four days and raises ease.

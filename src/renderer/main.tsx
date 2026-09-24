@@ -346,6 +346,14 @@ if (container) {
       await import('./levelLists')
         .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
         .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
+      // The deck and word knowledge have a durable IndexedDB copy; reconcile it
+      // with the localStorage cache before anything reads or writes either.
+      await Promise.all([
+        import('./flashcardDeck').then(({ restoreDeckFromIdb }) => restoreDeckFromIdb()),
+        import('./knownWords').then(({ restoreKnowledgeFromIdb }) => restoreKnowledgeFromIdb()),
+        // Both swallow their own read errors; a failure here only means the
+        // localStorage cache keeps serving, exactly as before.
+      ]).catch(() => undefined);
       createRoot(container).render(
         withStrictMode(
           <AppErrorBoundary>

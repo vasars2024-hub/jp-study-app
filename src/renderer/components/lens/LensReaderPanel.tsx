@@ -7,6 +7,7 @@ import { lemmaOf, type JpToken } from '../../tokenizer';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../../tts';
 import { getStudyLang } from '../../studyEnvironment';
 import type { DictEntry, DictResult } from '../../../shared/types';
+import { mineToStudy, requestStudyInput } from '../../studyMining';
 
 /**
  * The Reading Lens' progressive word panel.
@@ -34,7 +35,7 @@ const TIERS: Tier[] = ['glance', 'expand', 'deep'];
 const TIER_KEY = 'jp-study-lens-tier';
 const PANEL_W = 340;
 
-type MineState = 'idle' | 'adding' | 'added' | 'dup' | 'error';
+type MineState = 'idle' | 'adding' | 'added' | 'dup' | 'saved' | 'queued' | 'error';
 
 interface Props {
   /** The clicked word's surface. */
@@ -261,22 +262,23 @@ function GlanceBody({
   async function mineNow() {
     if (!entry) return;
     setMine('adding');
-    const status = await window.api.ankiStatus();
-    if (!status.connected) {
-      setMine('idle');
-      onNeedAnki();
-      return;
-    }
-    const res = await window.api.ankiMineNote({
+    // Local study card first, whatever Anki's state; the Anki half joins it now
+    // or when Anki next opens. `onNeedAnki` is kept for a setup that has never
+    // had Anki, where the card is saved to the deck only.
+    const mined = await mineToStudy(requestStudyInput({
       route: { source: 'dictionary', cardKind: 'word' },
       term: entry.word,
       reading: entry.reading && entry.reading !== entry.word ? entry.reading : undefined,
       meaning: glanceGloss(entry) || undefined,
       sentence: context.trim() || undefined,
-    });
-    if (res.ok) setMine('added');
-    else if (res.error === 'duplicate') setMine('dup');
-    else setMine('error');
+    }, 'reader', { studyLang: lang }));
+    if (mined.anki === 'added') setMine('added');
+    else if (mined.anki === 'duplicate') setMine('dup');
+    else if (mined.anki === 'queued') setMine('queued');
+    else if (mined.anki === 'local') {
+      setMine('saved');
+      onNeedAnki();
+    } else setMine('error');
   }
 
   const mineLabel = () => {
@@ -287,6 +289,10 @@ function GlanceBody({
         return t('lens.reader.mined');
       case 'dup':
         return t('lens.reader.mineDup');
+      case 'saved':
+        return t('lens.reader.mineSaved');
+      case 'queued':
+        return t('lens.reader.mineQueued');
       case 'error':
         return t('lens.reader.mineRetry');
       default:

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { appendNotebookEvent } from './notebookTimeline';
+import { mineToStudy, requestStudyInput } from './studyMining';
 import {
   buildAnalysisMineRequest,
   buildSentenceMineRequest,
@@ -128,23 +129,22 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
       setMineState('busy');
       void (async () => {
         try {
-          const status = await window.api.ankiStatus();
-          if (!status.connected) {
-            setMineState('error');
-            return;
-          }
-          const res = await window.api.ankiMineNote(
+          // The card lands in the local deck first; Anki joins it now or when
+          // it next opens. A closed Anki used to be an error and a lost card.
+          const mined = await mineToStudy(requestStudyInput(
             buildAnalysisMineRequest(annotation, analysis, prefs, { lang, uiLang }),
-          );
+            'analysis',
+            { sourceTitle: sourceLabel || undefined, studyLang: lang },
+          ));
           // A duplicate is a success from the reader's point of view: the card
-          // they wanted is in Anki, which is the only thing they asked for.
-          setMineState(res.ok || res.error === 'duplicate' ? 'done' : 'error');
+          // they wanted exists, which is the only thing they asked for.
+          setMineState(mined.anki === 'failed' ? 'error' : 'done');
         } catch {
           setMineState('error');
         }
       })();
     },
-    [prefs, lang, uiLang],
+    [prefs, lang, uiLang, sourceLabel],
   );
 
   const saveSentence = useCallback(
@@ -152,21 +152,18 @@ export function useAnalysisActions(opts: AnalysisActionsOpts): AnalysisActionsAp
       setSaveState('busy');
       void (async () => {
         try {
-          const status = await window.api.ankiStatus();
-          if (!status.connected) {
-            setSaveState('error');
-            return;
-          }
-          const res = await window.api.ankiMineNote(
+          const mined = await mineToStudy(requestStudyInput(
             buildSentenceMineRequest(analysis, prefs, { lang, uiLang }),
-          );
-          setSaveState(res.ok || res.error === 'duplicate' ? 'done' : 'error');
+            'analysis',
+            { sourceTitle: sourceLabel || undefined, studyLang: lang },
+          ));
+          setSaveState(mined.anki === 'failed' ? 'error' : 'done');
         } catch {
           setSaveState('error');
         }
       })();
     },
-    [prefs, lang, uiLang],
+    [prefs, lang, uiLang, sourceLabel],
   );
 
   const snapshot = useCallback(

@@ -22,6 +22,7 @@ import {
 } from '../../../shared/flashcardLearn';
 import { gradeWrittenAnswer, type WriteGrade } from '../../../shared/flashcardWrite';
 import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
+import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
@@ -64,6 +65,9 @@ export default function LearnMode({ onExit, deck = 'all' }: {
   /** Record the answer, then ask the next question off the NEW session state. */
   function record(correct: boolean): void {
     if (!session || !step) return;
+    // Practice answers count toward the day (streak, Statistics) through the
+    // same review log as graded reviews; they never touch a card's schedule.
+    appendReviewLog({ mode: 'learn', cardId: step.cardId, correct });
     const next = applyLearnAnswer(session, step.cardId, correct);
     setSession(next);
     setStep(isLearnComplete(next) ? null : nextLearnStep(next, pool));

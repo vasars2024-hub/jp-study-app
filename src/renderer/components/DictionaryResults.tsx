@@ -16,7 +16,8 @@ import {
 } from '../../shared/anki';
 import AnkiSetup from './AnkiSetup';
 import Icon from './Icons';
-import { addSaved, loadSaved, onSavedChanged, removeSaved } from '../savedWords';
+import { loadSaved, onSavedChanged, removeSaved, SAVED_WORDS_BOOK_ID, SAVED_WORDS_BOOK_TITLE, SAVED_WORDS_FOLDER } from '../savedWords';
+import { mineToStudy, type MineToStudyInput } from '../studyMining';
 import { cycleLevel, getLevel, onKnowledgeChanged, type WkLevel } from '../knownWords';
 import { getStudyLang, onStudyLangChanged } from '../studyEnvironment';
 import { getActiveProfile, onProfileChanged } from '../profileState';
@@ -180,7 +181,11 @@ interface Props {
   onLookup?: (word: string) => void;
 }
 
-type AddState = 'idle' | 'translating' | 'adding' | 'added' | 'dup' | 'error';
+/**
+ * `saved`: in the local deck, Anki not set up here. `queued`: in the local deck,
+ * waiting for Anki to open. Both are successes — the card exists.
+ */
+type AddState = 'idle' | 'translating' | 'adding' | 'added' | 'dup' | 'saved' | 'queued' | 'error';
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 
 /** The profile's non-Japanese language — the one a sentence should translate into. */
@@ -445,10 +450,28 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     return s;
   }
 
+  /** The local-deck half of a dictionary mine; one identity for star and Add. */
+  function studyCardFor(entry: DictEntry, sentence: string | undefined): MineToStudyInput {
+    return {
+      word: entry.word,
+      reading: entry.reading && entry.reading !== entry.word ? entry.reading : '',
+      meaning: plainMeaning(entry),
+      sentence,
+      source: 'dictionary',
+      sourceId: SAVED_WORDS_BOOK_ID,
+      sourceTitle: SAVED_WORDS_BOOK_TITLE,
+      folder: SAVED_WORDS_FOLDER,
+      studyLang: lang,
+    };
+  }
+
   async function addToAnki(entry: DictEntry, i: number) {
-    const s = await ensureAnki();
-    if (!s) return;
+    // Offline-first: the card is in the local deck before anything asks Anki,
+    // so a closed Anki, a missing example or a failed translation below can
+    // no longer lose it. The Anki half joins the same card at the end.
     const sentence = context?.trim() || undefined;
+    await mineToStudy({ ...studyCardFor(entry, sentence), notify: false });
+    void window.api.ankiStatus().then(setAnki).catch(() => undefined);
     const counts = exampleCountsFor(active);
     const autoMax = Math.max(...Object.values(counts), 1);
 
@@ -672,28 +695,40 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     setAddState((p) => ({ ...p, [i]: 'adding' }));
     // The profile's field mapping (or auto role mapper) decides where each
     // variable lands; we just supply the raw content for this entry.
-    const res = await window.api.ankiMineNote({
-      route: { source: 'dictionary', cardKind: 'word' },
-      term: entry.word,
-      reading: entry.reading && entry.reading !== entry.word ? entry.reading : undefined,
-      meaning: glossFor(entry) || undefined,
-      translation,
-      sentence,
-      exampleSentence,
-      exampleSentences,
-      exampleByLang: Object.keys(exampleByLang).length ? exampleByLang : undefined,
-      sentenceTranslation,
-      translations,
-      useExampleFallback: useExampleFallback || undefined,
-      fetchAudio: profileWantsAudio(active) || undefined,
+    const mined = await mineToStudy({
+      ...studyCardFor(entry, sentence),
+      anki: {
+        route: { source: 'dictionary', cardKind: 'word' },
+        term: entry.word,
+        reading: entry.reading && entry.reading !== entry.word ? entry.reading : undefined,
+        meaning: glossFor(entry) || undefined,
+        translation,
+        sentence,
+        exampleSentence,
+        exampleSentences,
+        exampleByLang: Object.keys(exampleByLang).length ? exampleByLang : undefined,
+        sentenceTranslation,
+        translations,
+        useExampleFallback: useExampleFallback || undefined,
+        fetchAudio: profileWantsAudio(active) || undefined,
+      },
     });
-    if (res.ok) {
-      setAddState((p) => ({ ...p, [i]: 'added' }));
-    } else if (res.error === 'duplicate') {
-      setAddState((p) => ({ ...p, [i]: 'dup' }));
-    } else {
-      setAddState((p) => ({ ...p, [i]: 'error' }));
-      setAddErr((p) => ({ ...p, [i]: res.error ?? t('dict.results.err.addFailed') }));
+    switch (mined.anki) {
+      case 'added':
+        setAddState((p) => ({ ...p, [i]: 'added' }));
+        break;
+      case 'duplicate':
+        setAddState((p) => ({ ...p, [i]: 'dup' }));
+        break;
+      case 'queued':
+        setAddState((p) => ({ ...p, [i]: 'queued' }));
+        break;
+      case 'local':
+        setAddState((p) => ({ ...p, [i]: 'saved' }));
+        break;
+      default:
+        setAddState((p) => ({ ...p, [i]: 'error' }));
+        setAddErr((p) => ({ ...p, [i]: mined.error ?? t('dict.results.err.addFailed') }));
     }
   }
 
@@ -709,16 +744,16 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     }
   }
 
+  /**
+   * The star is a real deck card now: saving keeps the sentence the word was
+   * looked up in (the popup passes it as `context`) and the card is reviewed
+   * and scheduled like any other.
+   */
   function toggleSave(entry: DictEntry) {
     if (savedSet.has(entry.word)) {
       removeSaved(entry.word);
     } else {
-      addSaved({
-        word: entry.word,
-        reading: entry.reading,
-        meaning: plainMeaning(entry),
-        addedAt: Date.now(),
-      });
+      void mineToStudy(studyCardFor(entry, context?.trim() || undefined));
     }
   }
 
@@ -864,6 +899,10 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         );
       case 'dup':
         return t('dict.results.alreadyInAnki');
+      case 'saved':
+        return t('dict.results.savedToDeck');
+      case 'queued':
+        return t('dict.results.savedAnkiLater');
       case 'translating':
         return t('dict.results.translating');
       case 'adding':
@@ -1068,7 +1107,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
               )}
               {entry.source && <div className="dict-source muted">{entry.source}</div>}
               <button
-                className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' ? 'done' : ''}`}
+                className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' || addState[i] === 'queued' || addState[i] === 'saved' ? 'done' : ''}`}
                 disabled={addState[i] === 'adding' || addState[i] === 'translating'}
                 onClick={() => addToAnki(entry, i)}
               >
@@ -1076,6 +1115,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
               </button>
               {addState[i] === 'error' && addErr[i] && (
                 <div className="dict-add-err">{addErr[i]}</div>
+              )}
+              {addState[i] === 'saved' && (
+                <div className="dict-add-note muted">
+                  {t('dict.results.savedNoAnki')}{' '}
+                  <button type="button" onClick={() => setShowSetup(true)}>
+                    {t('dict.results.setUpAnki')}
+                  </button>
+                </div>
               )}
             </div>
           );

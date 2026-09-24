@@ -31,6 +31,8 @@ const REVIEW_IDS = [
   'flashcards.prev',
   'flashcards.next',
   'flashcards.end',
+  // Undo last rating (Ctrl+Z): puts the card back with its old schedule.
+  'flashcards.undo',
 ] as const;
 
 /** Comments out first: this file's subject names `video.replayLine` in a catalog note. */
@@ -112,7 +114,7 @@ describe('all four ratings and the replay have catalog rows', () => {
 });
 
 describe('the review session registers a handler for each of them', () => {
-  it('all nine review ids, and no stragglers', () => {
+  it('all ten review ids, and no stragglers', () => {
     const source = code(readFileSync(FLASHCARDS, 'utf8'));
     const registered = new Set(
       [...source.matchAll(/registerCommandHandler\('(flashcards\.[a-zA-Z]+)'/g)]

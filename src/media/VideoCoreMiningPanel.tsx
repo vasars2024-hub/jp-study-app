@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   appendVideoCoreMiningHistory,
-  buildVideoCoreMineRequest,
   createVideoCoreMiningDraft,
   createVideoCoreMiningHistoryEntry,
   markVideoCoreMiningHistoryUndone,
@@ -30,6 +29,7 @@ import {
   type CapturedAsset,
 } from './cueAudioCapture';
 import MediaLensCaptureButton from './MediaLensCaptureButton';
+import { mineToStudy, videoCoreStudyInput } from '../renderer/studyMining';
 import MediaCueAgentHandoffButton from './MediaCueAgentHandoffButton';
 
 interface Props {
@@ -361,17 +361,18 @@ export default function VideoCoreMiningPanel({
       setMessage(t('mediaWorkspace.mining.missingText'));
       return;
     }
-    if (typeof window.api?.ankiMineNote !== 'function') {
-      setMessage(t('mediaWorkspace.mining.desktopOnly'));
-      return;
-    }
     setBusy('mine');
     setMessage('');
     try {
-      const result = await window.api.ankiMineNote(buildVideoCoreMineRequest(draft));
-      const entry = createVideoCoreMiningHistoryEntry(draft, result);
-      setHistory((current) => appendVideoCoreMiningHistory(current, entry));
-      if (result.ok) {
+      // The local study card is written first, whatever Anki's state; the
+      // Anki half joins it or waits in the queue (renderer/studyMining.ts).
+      const mined = await mineToStudy({ ...videoCoreStudyInput(draft, 'subtitle'), notify: false });
+      const result = mined.ankiResult;
+      if (result) {
+        const entry = createVideoCoreMiningHistoryEntry(draft, result);
+        setHistory((current) => appendVideoCoreMiningHistory(current, entry));
+      }
+      if (mined.anki === 'added' && result?.ok) {
         const destination = result.deckName
           ?? draft.deckName
           ?? result.profileName
@@ -385,10 +386,17 @@ export default function VideoCoreMiningPanel({
               requested: draft.deckName || '—',
             })
           : t('mediaWorkspace.mining.minedTo', { destination }));
-      } else if (result.error === 'duplicate') {
+      } else if (mined.anki === 'duplicate' || mined.anki === 'added') {
+        // `added` without a fresh result: this exact line was mined before.
         setMessage(t('mediaWorkspace.mining.duplicate'));
+      } else if (mined.anki === 'queued') {
+        setMessage(t('studyMine.toast.queued'));
+      } else if (mined.anki === 'local') {
+        setMessage(t('studyMine.toast.saved'));
       } else {
-        setMessage(result.error || t('mediaWorkspace.mining.exportFailed'));
+        setMessage(t('studyMine.toast.ankiFailed', {
+          error: mined.error || t('mediaWorkspace.mining.exportFailed'),
+        }));
       }
     } catch (error) {
       setMessage(

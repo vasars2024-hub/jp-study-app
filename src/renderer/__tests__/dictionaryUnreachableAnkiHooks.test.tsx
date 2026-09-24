@@ -45,10 +45,34 @@ vi.mock('../components/AnkiSetup', () => ({
 }));
 vi.mock('../components/Icons', () => ({ default: () => null }));
 vi.mock('../components/lexicon/CharacterMetadataPanel', () => ({ default: () => null }));
-vi.mock('../i18n', () => ({ useT: () => ({ t: (key: string) => key, lang: 'en' }) }));
+vi.mock('../i18n', () => ({ useT: () => ({ t: (key: string) => key, lang: 'en' }), t: (key: string) => key }));
 vi.mock('../translator', () => ({ translateTo: async () => '' }));
 
 import DictionaryResults from '../components/DictionaryResults';
+import { loadDeck } from '../flashcardDeck';
+
+/**
+ * Since the study database unification an unreachable Anki no longer replaces
+ * the results with the setup panel on "+ Add": the card is saved to the local
+ * deck first, and the entry offers "Set up Anki" beside the saved state. The
+ * panel — and the hook-count hazard these tests pin — is one click further.
+ */
+async function addThenOpenSetup(): Promise<void> {
+  const add = [...host.querySelectorAll('button')].find((b) =>
+    /dict\.results\.add|add to anki/i.test(b.textContent || ''),
+  );
+  expect(add, 'the "+ Add to Anki" button must be on screen to drive this').not.toBeUndefined();
+  await act(async () => {
+    add?.click();
+  });
+  // Offline-first: the card exists whatever Anki's state.
+  expect(loadDeck().some((card) => card.word === '食べる')).toBe(true);
+  const setup = [...host.querySelectorAll('button')].find((b) => b.textContent === 'dict.results.setUpAnki');
+  expect(setup, 'a saved-without-Anki entry offers the setup').not.toBeUndefined();
+  await act(async () => {
+    setup?.click();
+  });
+}
 
 const ENTRY = {
   word: '食べる',
@@ -90,6 +114,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  localStorage.clear();
   host = document.createElement('div');
   document.body.append(host);
 });
@@ -123,14 +148,7 @@ describe('Dictionary against an unreachable AnkiConnect', () => {
     // Rendered normally first: the results are up and the setup panel is not.
     expect(host.querySelector('.anki-setup-stub')).toBeNull();
 
-    const add = [...host.querySelectorAll('button')].find((b) =>
-      /dict\.results\.add|add to anki/i.test(b.textContent || ''),
-    );
-    expect(add, 'the "+ Add to Anki" button must be on screen to drive this').not.toBeUndefined();
-
-    await act(async () => {
-      add?.click();
-    });
+    await addThenOpenSetup();
 
     // The surface swapped to setup — the honest response to a refused endpoint.
     expect(host.querySelector('.anki-setup-stub')).not.toBeNull();
@@ -166,12 +184,7 @@ describe('Dictionary against an unreachable AnkiConnect', () => {
     const entriesBefore = host.querySelectorAll('.dict-entry').length;
     expect(entriesBefore).toBeGreaterThan(0);
 
-    const add = [...host.querySelectorAll('button')].find((b) =>
-      /dict\.results\.add|add to anki/i.test(b.textContent || ''),
-    );
-    await act(async () => {
-      add?.click();
-    });
+    await addThenOpenSetup();
     expect(host.querySelector('.anki-setup-stub')).not.toBeNull();
 
     const back = host.querySelector<HTMLButtonElement>('.anki-setup-back-stub');

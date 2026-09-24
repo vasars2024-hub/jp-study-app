@@ -15,7 +15,6 @@
 import { useCallback, useState } from 'react';
 import {
   appendVideoCoreMiningHistory,
-  buildVideoCoreMineRequest,
   createVideoCoreMiningDraft,
   createVideoCoreMiningHistoryEntry,
   normalizeVideoCoreMiningHistory,
@@ -31,6 +30,7 @@ import {
   type MusicMiningLine,
 } from '../../../shared/musicMining';
 import type { MediaItem } from '../../../shared/types';
+import { mineToStudy, videoCoreStudyInput } from '../../studyMining';
 
 export type MusicMineOutcome =
   | { kind: 'idle' }
@@ -39,6 +39,8 @@ export type MusicMineOutcome =
   | { kind: 'busy'; index: number }
   | { kind: 'done'; index: number; destination: string; withAudio: boolean }
   | { kind: 'duplicate'; index: number }
+  /** In the local deck; Anki is closed (`queued`) or not set up here (`local`). */
+  | { kind: 'saved'; index: number; anki: 'queued' | 'local' }
   | { kind: 'error'; index: number; message: string };
 
 export interface MusicMining {
@@ -75,11 +77,6 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
     // minable" rather than as an error keeps a click on a spacer line silent.
     if (!cue) return;
 
-    if (typeof window.api?.ankiMineNote !== 'function') {
-      setOutcome({ kind: 'error', index: line.index, message: 'desktop-only' });
-      return;
-    }
-
     let draft = createVideoCoreMiningDraft(cue, cue.text, musicMiningSource(current, kind));
 
     // Attach the line's audio when there is a real range to record.
@@ -112,23 +109,29 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
     setOutcome({ kind: 'busy', index: line.index });
     const withAudio = !!draft.audioBase64;
     try {
-      const result = await window.api.ankiMineNote(buildVideoCoreMineRequest(draft));
-      const entry = createVideoCoreMiningHistoryEntry(draft, result);
-      localStorage.setItem(
-        VIDEO_CORE_MINING_HISTORY_KEY,
-        JSON.stringify(appendVideoCoreMiningHistory(readHistory(), entry)),
-      );
-      if (result.ok) {
+      // Local study card first; the Anki half joins it or waits for Anki.
+      const mined = await mineToStudy({ ...videoCoreStudyInput(draft, 'lyrics'), notify: false });
+      const result = mined.ankiResult;
+      if (result) {
+        const entry = createVideoCoreMiningHistoryEntry(draft, result);
+        localStorage.setItem(
+          VIDEO_CORE_MINING_HISTORY_KEY,
+          JSON.stringify(appendVideoCoreMiningHistory(readHistory(), entry)),
+        );
+      }
+      if (mined.anki === 'added' && result?.ok) {
         setOutcome({
           kind: 'done',
           index: line.index,
           destination: result.deckName ?? result.profileName ?? '',
           withAudio,
         });
-      } else if (result.error === 'duplicate') {
+      } else if (mined.anki === 'duplicate' || mined.anki === 'added') {
         setOutcome({ kind: 'duplicate', index: line.index });
+      } else if (mined.anki === 'queued' || mined.anki === 'local') {
+        setOutcome({ kind: 'saved', index: line.index, anki: mined.anki });
       } else {
-        setOutcome({ kind: 'error', index: line.index, message: result.error ?? '' });
+        setOutcome({ kind: 'error', index: line.index, message: mined.error ?? result?.error ?? '' });
       }
     } catch (err) {
       // A failed mine is still recorded, so Review shows the attempt rather than losing it.
