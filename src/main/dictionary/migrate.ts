@@ -32,6 +32,7 @@ import type { DictSense, YomitanDictInfo } from '../../shared/types';
 import type { SqliteDb } from './db';
 import { DEFAULT_SOURCE_LANG, resolveGlossLangs, resolveSourceLang } from './glossLang';
 import { rebuildCharacterProjection } from './importers/kanjidic';
+import { LegacyIndexReadError, readLegacyIndexInfo, scanLegacyIndexFile } from './legacyIndexStream';
 
 /**
  * Separator between term and reading in the legacy pitch/freq key format.
@@ -354,12 +355,62 @@ function deleteLegacySourceRows(db: SqliteDb, dictId: string, shouldCancel?: () 
   checkCancelled();
 }
 
+/** The sections of a legacy store that hold rows, in the order they are written. */
+const LEGACY_ROW_SECTIONS = ['terms', 'pitch', 'ipa', 'freq', 'kanji'] as const;
+type LegacyRowSection = (typeof LEGACY_ROW_SECTIONS)[number];
+
+/**
+ * Hands every row of a store to `visit`, one member of one section at a time.
+ * What it reads from is the caller's business: a parsed index, or the file
+ * streamed a member at a time (`importLegacyIndexFile`).
+ */
+type LegacyRowSource = (visit: (section: LegacyRowSection, key: string, value: unknown) => void) => void;
+
 export function importLegacyIndex(
   db: SqliteDb,
   index: LegacyDictIndex,
   shouldCancel?: () => boolean,
 ): ImportedCounts {
-  const info = index.info;
+  return importLegacyRows(db, index.info, (visit) => {
+    for (const section of LEGACY_ROW_SECTIONS) {
+      for (const [key, value] of Object.entries(index[section] ?? {})) visit(section, key, value);
+    }
+  }, shouldCancel);
+}
+
+/**
+ * `importLegacyIndex` for a store on disk, without ever holding the whole of it.
+ *
+ * The file is streamed (`legacyIndexStream.ts`): only its `info` is read up
+ * front, then each headword's entries are parsed, written and dropped in turn.
+ * Parsing the bundled JMdict whole is what put the first-boot migration's
+ * utility process at ~530 MB. The transaction and its cancellation are the
+ * same as the in-memory import's: one store commits whole or not at all.
+ *
+ * Throws `LegacyIndexReadError` for a file that is not a readable store; the
+ * transaction has then rolled back and the database is as it was.
+ */
+export function importLegacyIndexFile(
+  db: SqliteDb,
+  file: string,
+  info: YomitanDictInfo,
+  shouldCancel?: () => boolean,
+): ImportedCounts {
+  const sections = new Set<string>(LEGACY_ROW_SECTIONS);
+  return importLegacyRows(db, info, (visit) => {
+    scanLegacyIndexFile(file, {
+      sections,
+      onMember: (section, key, value) => visit(section as LegacyRowSection, key, value),
+    });
+  }, shouldCancel);
+}
+
+function importLegacyRows(
+  db: SqliteDb,
+  info: YomitanDictInfo,
+  rows: LegacyRowSource,
+  shouldCancel?: () => boolean,
+): ImportedCounts {
   const dictId = info.id;
   const glossLangs = glossLangsOf(info);
   const glossLang = glossLangs[0] ?? 'en';
@@ -407,126 +458,121 @@ export function importLegacyIndex(
     const insertSense = db.prepare('insert into senses (headword_id, ord, pos, tags) values (?, ?, ?, ?)');
     const insertGloss = db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, ?, ?)');
     const insertXref = db.prepare('insert into xrefs (from_sense, to_text, kind) values (?, ?, ?)');
-
-    for (const [norm, entries] of Object.entries(index.terms ?? {})) {
-      for (const entry of entries) {
-        if (shouldCancel?.()) throw new LegacyMigrationCancelled();
-        const headwordId = Number(
-          insertHeadword.run(
-            dictId,
-            sourceLang,
-            entry.word,
-            norm,
-            entry.reading ?? '',
-            entry.reading ?? '',
-            entry.score ?? 0,
-          ).lastInsertRowid,
-        );
-        counts.headwords += 1;
-
-        entry.senses.forEach((sense, senseOrd) => {
-          const senseId = Number(
-            insertSense.run(
-              headwordId,
-              senseOrd,
-              (sense.partsOfSpeech ?? []).join(','),
-              (sense.tags ?? []).join(','),
-            ).lastInsertRowid,
-          );
-          counts.senses += 1;
-          // The structured HTML belongs to the entry, not to one definition, so it
-          // rides on the first gloss of the first sense — the only place a reader
-          // can find it again without a second table.
-          const html = senseOrd === 0 ? entry.glossaryHtml ?? null : null;
-          // A `see: …` definition is JMdict's own cross reference, not a meaning, so
-          // it becomes an `xrefs` row and leaves the gloss list. `glossOrd` is
-          // recounted over the definitions that stay, because `ord` is what the
-          // reader sorts by and a hole in it would print the senses out of order.
-          //
-          // No sense in the bundled store is made entirely of these (measured: 0 of
-          // 524,106), so lifting them can never leave a sense with no glosses at all
-          // — which `dictService` would then filter out of the entry completely.
-          let glossOrd = 0;
-          for (const definition of sense.definitions ?? []) {
-            const xref = parseLegacyXref(definition, entry.word);
-            if (xref) {
-              insertXref.run(senseId, xref.text, xref.kind);
-              counts.xrefs += 1;
-              continue;
-            }
-            insertGloss.run(senseId, glossLang, definition, glossOrd === 0 ? html : null, glossOrd);
-            counts.glosses += 1;
-            glossOrd += 1;
-          }
-        });
-      }
-    }
-
     const insertPitch = db.prepare(`
       insert or replace into pitch (dict_id, lang, norm, reading, positions)
       values (?, ?, ?, ?, ?)
     `);
-    for (const [key, value] of Object.entries(index.pitch ?? {})) {
-      if (shouldCancel?.()) throw new LegacyMigrationCancelled();
-      const [term] = key.split(LEGACY_KEY_SEP);
-      insertPitch.run(dictId, sourceLang, term, value.reading ?? '', (value.positions ?? []).join(','));
-      counts.pitch += 1;
-    }
-
-    // Keyed exactly like pitch, so one (lang, norm) probe finds both.
-    const ipaRows = Object.entries(index.ipa ?? {});
-    if (ipaRows.length) {
-      const insertIpa = db.prepare(`
-        insert or replace into ipa (dict_id, lang, norm, reading, transcriptions)
-        values (?, ?, ?, ?, ?)
-      `);
-      for (const [key, value] of ipaRows) {
-        if (shouldCancel?.()) throw new LegacyMigrationCancelled();
-        const transcriptions = (value.transcriptions ?? []).filter((ipa) => typeof ipa === 'string' && ipa.trim());
-        if (!transcriptions.length) continue;
-        const [term] = key.split(LEGACY_KEY_SEP);
-        insertIpa.run(dictId, sourceLang, term, value.reading ?? '', JSON.stringify(transcriptions));
-        counts.ipa = (counts.ipa ?? 0) + 1;
-      }
-    }
-
+    // Keyed exactly like pitch, so one (lang, norm) probe finds both. Prepared
+    // on the first IPA row: a database older than the `ipa` table can still
+    // take a store that has none.
+    let insertIpa: ReturnType<SqliteDb['prepare']> | null = null;
     const insertFreq = db.prepare(`
       insert into freq_corpora (lang, norm, corpus, rank, per_million)
       values (?, ?, ?, ?, null)
     `);
-    for (const [key, rank] of Object.entries(index.freq ?? {})) {
-      if (shouldCancel?.()) throw new LegacyMigrationCancelled();
-      const [term] = key.split(LEGACY_KEY_SEP);
-      insertFreq.run(sourceLang, term, dictId, rank);
-      counts.freq += 1;
-    }
-
     // Kanji banks go to the character table, exactly where KANJIDIC2 puts its
     // rows, so the character panel reads both through one projection.
-    const kanjiRows = Object.entries(index.kanji ?? {});
-    if (kanjiRows.length) {
-      const insertChar = db.prepare(`
-        insert or replace into char_sources
-          (dict_id, lang, char, strokes, radical, components, readings, meanings, jlpt, grade, freq)
-        values (?, ?, ?, ?, null, '[]', ?, ?, ?, ?, ?)
-      `);
-      for (const [char, value] of kanjiRows) {
-        if (shouldCancel?.()) throw new LegacyMigrationCancelled();
+    const insertChar = db.prepare(`
+      insert or replace into char_sources
+        (dict_id, lang, char, strokes, radical, components, readings, meanings, jlpt, grade, freq)
+      values (?, ?, ?, ?, null, '[]', ?, ?, ?, ?, ?)
+    `);
+
+    const writeTerm = (norm: string, entry: LegacyGlossaryEntry): void => {
+      const headwordId = Number(
+        insertHeadword.run(
+          dictId,
+          sourceLang,
+          entry.word,
+          norm,
+          entry.reading ?? '',
+          entry.reading ?? '',
+          entry.score ?? 0,
+        ).lastInsertRowid,
+      );
+      counts.headwords += 1;
+
+      entry.senses.forEach((sense, senseOrd) => {
+        const senseId = Number(
+          insertSense.run(
+            headwordId,
+            senseOrd,
+            (sense.partsOfSpeech ?? []).join(','),
+            (sense.tags ?? []).join(','),
+          ).lastInsertRowid,
+        );
+        counts.senses += 1;
+        // The structured HTML belongs to the entry, not to one definition, so it
+        // rides on the first gloss of the first sense — the only place a reader
+        // can find it again without a second table.
+        const html = senseOrd === 0 ? entry.glossaryHtml ?? null : null;
+        // A `see: …` definition is JMdict's own cross reference, not a meaning, so
+        // it becomes an `xrefs` row and leaves the gloss list. `glossOrd` is
+        // recounted over the definitions that stay, because `ord` is what the
+        // reader sorts by and a hole in it would print the senses out of order.
+        //
+        // No sense in the bundled store is made entirely of these (measured: 0 of
+        // 524,106), so lifting them can never leave a sense with no glosses at all
+        // — which `dictService` would then filter out of the entry completely.
+        let glossOrd = 0;
+        for (const definition of sense.definitions ?? []) {
+          const xref = parseLegacyXref(definition, entry.word);
+          if (xref) {
+            insertXref.run(senseId, xref.text, xref.kind);
+            counts.xrefs += 1;
+            continue;
+          }
+          insertGloss.run(senseId, glossLang, definition, glossOrd === 0 ? html : null, glossOrd);
+          counts.glosses += 1;
+          glossOrd += 1;
+        }
+      });
+    };
+
+    rows((section, key, value) => {
+      if (section === 'terms') {
+        for (const entry of value as LegacyGlossaryEntry[]) {
+          if (shouldCancel?.()) throw new LegacyMigrationCancelled();
+          writeTerm(key, entry);
+        }
+        return;
+      }
+      if (shouldCancel?.()) throw new LegacyMigrationCancelled();
+      const [term] = key.split(LEGACY_KEY_SEP);
+      if (section === 'pitch') {
+        const pitch = value as LegacyPitchEntry;
+        insertPitch.run(dictId, sourceLang, term, pitch.reading ?? '', (pitch.positions ?? []).join(','));
+        counts.pitch += 1;
+      } else if (section === 'ipa') {
+        const ipa = value as LegacyIpaEntry;
+        const transcriptions = (ipa.transcriptions ?? []).filter((text) => typeof text === 'string' && text.trim());
+        if (!transcriptions.length) return;
+        insertIpa ??= db.prepare(`
+          insert or replace into ipa (dict_id, lang, norm, reading, transcriptions)
+          values (?, ?, ?, ?, ?)
+        `);
+        insertIpa.run(dictId, sourceLang, term, ipa.reading ?? '', JSON.stringify(transcriptions));
+        counts.ipa = (counts.ipa ?? 0) + 1;
+      } else if (section === 'freq') {
+        insertFreq.run(sourceLang, term, dictId, value as number);
+        counts.freq += 1;
+      } else {
+        const kanji = value as LegacyKanjiEntry;
         insertChar.run(
           dictId,
           sourceLang,
-          char,
-          value.strokes ?? null,
-          JSON.stringify([...new Set([...(value.onyomi ?? []), ...(value.kunyomi ?? [])])]),
-          JSON.stringify([...new Set(value.meanings ?? [])]),
-          value.jlpt ?? null,
-          value.grade ?? null,
-          value.freq ?? null,
+          key,
+          kanji.strokes ?? null,
+          JSON.stringify([...new Set([...(kanji.onyomi ?? []), ...(kanji.kunyomi ?? [])])]),
+          JSON.stringify([...new Set(kanji.meanings ?? [])]),
+          kanji.jlpt ?? null,
+          kanji.grade ?? null,
+          kanji.freq ?? null,
         );
-        touchedChars.add(char);
+        touchedChars.add(key);
         counts.kanji = (counts.kanji ?? 0) + 1;
       }
-    }
+    });
     if (touchedChars.size) rebuildCharacterProjection(db, touchedChars);
 
     db.prepare('update dictionaries set entry_count = ? where id = ?')
@@ -624,29 +670,35 @@ export function migrateLegacyYomitanStores(
       result.skipped.push({ dictId: dirName, reason: 'no index.json' });
       return;
     }
-    let parsed: LegacyDictIndex;
+    // Only `info` is read here; the rows are streamed inside the import's own
+    // transaction, so no store is ever held in memory whole.
+    let info: YomitanDictInfo | undefined;
     try {
-      parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as LegacyDictIndex;
+      info = (readLegacyIndexInfo(file) as YomitanDictInfo | undefined) ?? undefined;
     } catch (err) {
       result.skipped.push({ dictId: dirName, reason: `unreadable index.json: ${(err as Error).message}` });
       return;
     }
-    if (!parsed?.info?.id) {
+    if (!info?.id) {
       result.skipped.push({ dictId: dirName, reason: 'index.json has no info.id' });
       return;
     }
-    onProgress?.({ current: position + 1, total: dirs.length, dictId: parsed.info.id, title: parsed.info.title });
+    onProgress?.({ current: position + 1, total: dirs.length, dictId: info.id, title: info.title });
     try {
-      const counts = importLegacyIndex(db, parsed, shouldCancel);
+      const counts = importLegacyIndexFile(db, file, info, shouldCancel);
       const bytes = fs.statSync(file).size;
-      db.prepare('update dictionaries set bytes = ? where id = ?').run(bytes, parsed.info.id);
+      db.prepare('update dictionaries set bytes = ? where id = ?').run(bytes, info.id);
       result.imported.push(counts);
     } catch (err) {
       if (err instanceof LegacyMigrationCancelled) {
         result.cancelled = true;
         return;
       }
-      result.skipped.push({ dictId: parsed.info.id, reason: `import failed: ${(err as Error).message}` });
+      // A store that turns out to be malformed past its `info` is the same
+      // "unreadable" it was when the whole file was parsed first; its
+      // transaction has rolled back, so nothing of it was written.
+      const reason = err instanceof LegacyIndexReadError ? 'unreadable index.json' : 'import failed';
+      result.skipped.push({ dictId: info.id, reason: `${reason}: ${(err as Error).message}` });
     }
   });
 
