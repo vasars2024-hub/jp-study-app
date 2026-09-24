@@ -704,6 +704,12 @@ export const SCRAPER_UI_EN: Catalog = {
   'trackingMgmt.noMatches': 'No matching tracked titles.',
   'trackingMgmt.saved': 'Tracking changes saved locally.',
   'trackingMgmt.rejected': 'Change rejected: {reason}.',
+  // `{reason}` above: one per rejection code in shared/mediaTrackingManagement.ts,
+  // written as a clause because the sentence around it supplies the full stop.
+  'trackingMgmt.reason.partition-mismatch': 'the identity partition does not match the content type',
+  'trackingMgmt.reason.not-found': 'this entry is no longer tracked',
+  'trackingMgmt.reason.content-type-mismatch': 'the content type does not match the tracked entry',
+  'trackingMgmt.reason.invalid-progress': 'the change does not fit the progress type of this entry',
   'trackingMgmt.removed': 'Tracking entry removed locally.',
   'trackingMgmt.offlineNote': 'Offline only. This surface does not contact or execute media providers.',
   'trackingMgmt.partition': '{type} partition',
