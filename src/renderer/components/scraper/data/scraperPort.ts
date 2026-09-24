@@ -31,7 +31,12 @@ import type {
 import type { ScraperQbittorrentSettings } from '../../../../shared/scraperSourceSettings';
 import type { ScraperIngestHandoff } from '../../../../shared/mediaIngest';
 import type { ScraperSchedulerSettings } from '../../../../shared/scraperOutputSettings';
-import type { ScraperSchedulerState } from '../../../../shared/scraperIpc';
+import type {
+  ScraperFreeSpaceReport,
+  ScraperQbitActionReport,
+  ScraperQbitTorrentAction,
+  ScraperSchedulerState,
+} from '../../../../shared/scraperIpc';
 import type {
   AcquisitionAction,
   AcquisitionActionResult,
@@ -119,6 +124,17 @@ export interface ScraperPort {
     config: ScraperQbittorrentSettings,
     ingest?: ScraperIngestHandoff,
   ): Promise<QbitSendReport>;
+  /**
+   * Acts on transfers in the user's client, by info hash. `deleteFiles` only
+   * matters for `delete` and is never assumed — the screen asks.
+   */
+  qbitAction(
+    action: ScraperQbitTorrentAction,
+    hashes: string[],
+    options?: { deleteFiles?: boolean },
+  ): Promise<ScraperQbitActionReport>;
+  /** Free space where downloads land; `bytes: null` when it cannot be measured. */
+  freeSpace(): Promise<ScraperFreeSpaceReport>;
 
   listDownloads(): Promise<DownloadRow[]>;
   listExports(): Promise<ExportRecord[]>;

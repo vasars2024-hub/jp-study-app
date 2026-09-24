@@ -23,7 +23,8 @@ import { SCRAPER_FIELDS } from '../components/scraper/settings/fields';
 
 /** Confirmed 2026-09-06 to have zero consumers outside their own settings model. */
 const UNWIRED = [
-  'sources.maxFallbackDepth',
+  // sources.maxFallbackDepth left this list when torrent search and the
+  // metadata walk began following fallbackIds (shared/scraperSourceOrder.ts).
   'sources.skipUnhealthy',
   'torrents.protocols',
   'torrents.verifyInfoHash',
@@ -53,7 +54,7 @@ describe('scraper settings — an unwired control admits it', () => {
 
   it('every inert field explains what happens instead', () => {
     const inert = SCRAPER_FIELDS.filter((f) => f.inert);
-    // 11 pre-existing + the 10 this repair marked.
+    // 11 pre-existing + the ones this repair marked that are still unwired.
     expect(inert.length).toBeGreaterThanOrEqual(UNWIRED.length + 11);
     for (const f of inert) {
       expect(f.hint, `${f.path} is flagged inert with no hint`).toBeTruthy();

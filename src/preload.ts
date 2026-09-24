@@ -3404,6 +3404,14 @@ const api = {
     input: import('./shared/scraperIpc').ScraperQbitSendInput,
   ): Promise<import('./shared/scraperResults').QbitSendReport> =>
     ipcRenderer.invoke(SCRAPER_CHANNELS.qbitSend, input),
+  scraperQbitAction: (
+    input: import('./shared/scraperIpc').ScraperQbitActionInput,
+  ): Promise<import('./shared/scraperIpc').ScraperQbitActionReport> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.qbitAction, input),
+  scraperFreeSpace: (
+    input: import('./shared/scraperIpc').ScraperQbitInput,
+  ): Promise<import('./shared/scraperIpc').ScraperFreeSpaceReport> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.freeSpace, input),
   // Write-and-check only: there is deliberately no channel that reads a stored
   // secret back into the renderer.
   scraperSetCredential: (

@@ -60,6 +60,8 @@ export const SCRAPER_METHODS = [
   'qbitTest',
   'qbitTransfers',
   'qbitSend',
+  'qbitAction',
+  'freeSpace',
   'listDownloads',
   'listExports',
   'writeExport',
@@ -93,6 +95,8 @@ export const SCRAPER_CHANNELS = {
   qbitTest: 'scraper:qbitTest',
   qbitTransfers: 'scraper:qbitTransfers',
   qbitSend: 'scraper:qbitSend',
+  qbitAction: 'scraper:qbitAction',
+  freeSpace: 'scraper:freeSpace',
   startScrape: 'scraper:startScrape',
   cancelScrape: 'scraper:cancelScrape',
   listJobs: 'scraper:listJobs',
@@ -161,15 +165,50 @@ export interface ScraperTorrentQuery {
 
 export interface ScraperTorrentSearchInput {
   query: ScraperTorrentQuery;
-  /** Indexers to hit, in order. Hosts come from the source registry. */
+  /** Indexers to hit, in priority order. Hosts come from the source registry. */
   indexers: ScraperSourceEntry[];
   torrents: ScraperTorrentSettings;
   timeoutMs: number;
+  /**
+   * Every source in the profile, so a failed index's `fallbackIds` can be
+   * resolved to entries. Absent means "no fallbacks".
+   */
+  pool?: ScraperSourceEntry[];
+  /** How many fallback hops a failed index may take. Absent means none. */
+  maxFallbackDepth?: number;
+  /**
+   * The profile's network, pacing and session settings for a search the user
+   * started directly. Absent keeps the request layer's own defaults.
+   */
+  settings?: ScraperSettings;
+  context?: ScraperRunContext;
+}
+
+/**
+ * What a run needs beyond the scraper profile: the pieces of the Connection
+ * Profiles and Video Server Profiles documents that change what it does. Both
+ * documents live in the renderer, so they ride along like `settings` does.
+ */
+export interface ScraperRunContext {
+  /** Per assigned host (lowercase, no `www.`): the request groups its connection profile resolves to. */
+  hosts?: Record<string, import('./connectionProfiles').ScraperHostConnection>;
+  /**
+   * Streaming providers in the user's preferred order, as video-server profile
+   * ids, names and provider labels (lowercase). Providers not named keep the
+   * sidecar's order after the named ones.
+   */
+  streamProviderOrder?: string[];
 }
 
 export interface ScraperProbeInput {
   entry: ScraperSourceEntry;
   timeoutMs: number;
+  /**
+   * Path to request on the entry's host, for a site the catalogue has no
+   * probe path for (a Verified Sites entry tests its own base URL). Must start
+   * with `/`; anything else is ignored.
+   */
+  path?: string;
 }
 
 export interface ScraperSelectorMatch {
@@ -219,6 +258,43 @@ export interface ScraperQbitSendInput extends ScraperQbitInput {
   ingest?: import('./mediaIngest').ScraperIngestHandoff;
 }
 
+/** What the Downloads page and Torrent Manager can do to a transfer. */
+export const QBIT_TORRENT_ACTIONS = ['pause', 'resume', 'recheck', 'retry', 'delete'] as const;
+export type ScraperQbitTorrentAction = (typeof QBIT_TORRENT_ACTIONS)[number];
+
+export interface ScraperQbitActionInput extends ScraperQbitInput {
+  action: ScraperQbitTorrentAction;
+  /** Info hashes, as the transfer list reports them. */
+  hashes: string[];
+  /**
+   * `delete` only. Never defaulted to true anywhere: removing a transfer and
+   * deleting what it downloaded are different requests, and the screen asks.
+   */
+  deleteFiles?: boolean;
+}
+
+export interface ScraperQbitActionReport {
+  /** True only when every hash was acted on. */
+  ok: boolean;
+  done: number;
+  /** One entry per hash qBittorrent refused, with its reason. */
+  failures: { hash: string; reason: string }[];
+}
+
+/**
+ * Free space where downloads land.
+ *
+ * `bytes` is null when nothing could be measured — the page says "unknown"
+ * rather than inventing a number.
+ */
+export interface ScraperFreeSpaceReport {
+  bytes: number | null;
+  /** Who measured it: the torrent client itself, or this machine's disk. */
+  source: 'qbittorrent' | 'disk' | 'none';
+  /** The folder measured, when known. */
+  path: string;
+}
+
 /**
  * A scrape carries the profile it should run under.
  *
@@ -229,6 +305,7 @@ export interface ScraperQbitSendInput extends ScraperQbitInput {
 export interface ScraperStartInput {
   request: ScrapeRequest;
   settings: ScraperSettings;
+  context?: ScraperRunContext;
 }
 
 export interface ScraperJobEventEnvelope {
@@ -244,6 +321,7 @@ export interface ScraperJobEventEnvelope {
 export interface ScraperSchedulerSyncInput {
   scheduler: ScraperSchedulerSettings;
   settings: ScraperSettings;
+  context?: ScraperRunContext;
 }
 
 export interface ScraperScheduleRunRecord {
@@ -290,6 +368,8 @@ export interface ScraperIpcApi {
   qbitTest(input: ScraperQbitInput): Promise<QbitStatusReport>;
   qbitTransfers(input: ScraperQbitInput): Promise<QbitTransferRow[]>;
   qbitSend(input: ScraperQbitSendInput): Promise<QbitSendReport>;
+  qbitAction(input: ScraperQbitActionInput): Promise<ScraperQbitActionReport>;
+  freeSpace(input: ScraperQbitInput): Promise<ScraperFreeSpaceReport>;
   startScrape(request: ScrapeRequest): Promise<string>;
   cancelScrape(jobId: string): Promise<void>;
   listJobs(): Promise<ScrapeJobSummary[]>;

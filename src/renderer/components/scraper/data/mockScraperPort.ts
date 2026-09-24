@@ -344,6 +344,21 @@ export function createMockScraperPort(): ScraperPort {
       };
     },
 
+    // Sample data has no client behind it, so an action says so rather than
+    // pretending a transfer paused. A screen that shows "done" here would be
+    // the exact dishonesty the live port was fixed for.
+    async qbitAction(_action, hashes) {
+      return {
+        ok: false,
+        done: 0,
+        failures: hashes.map((hash) => ({ hash, reason: 'Sample data: no qBittorrent client is connected.' })),
+      };
+    },
+
+    async freeSpace() {
+      return { bytes: null, source: 'none' as const, path: '' };
+    },
+
     async listDownloads(): Promise<DownloadRow[]> {
       const fx = await loadFixtures();
       return fx.downloads();

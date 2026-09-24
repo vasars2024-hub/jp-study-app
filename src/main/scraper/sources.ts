@@ -173,6 +173,8 @@ function toStatus(
     supportsSubtitles: entry.supportsSubtitles,
     requiresAuth: entry.requiresAuth,
     history: record.history,
+    note: record.note,
+    lastCheckedAt: record.lastCheckedAt,
   };
 }
 
@@ -212,9 +214,14 @@ export async function listSources(entries: ScraperSourceEntry[]): Promise<Source
 export async function probeSource(
   entry: ScraperSourceEntry,
   timeoutMs = 15_000,
+  requestedPath?: string,
 ): Promise<SourceStatus> {
   const catalogue = SOURCE_CATALOGUE.find((item) => item.id === entry.id);
-  const path = catalogue?.probePath ?? '/';
+  // A caller-supplied path is only a path — never a scheme or another host.
+  const ownPath = typeof requestedPath === 'string' && /^\/(?!\/)/.test(requestedPath)
+    ? requestedPath
+    : '';
+  const path = ownPath || catalogue?.probePath || '/';
   const started = Date.now();
   scraperLog('info', 'sources', `Probing ${entry.label} (${entry.host})`, {
     correlationId: `probe:${entry.id}`,

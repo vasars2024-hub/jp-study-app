@@ -14,6 +14,7 @@ import {
   type ScraperSettingsPatch,
 } from '../shared/scraperSettings';
 import { syncQbitConfigToMain } from './mediaIngestBridge';
+import { syncSchedulerConfigToMain } from './scraperSchedulerBridge';
 
 export const SCRAPER_SETTINGS_STORAGE_KEY = 'jp-scraper-settings-v1';
 const CHANGED_EVENT = 'jp-scraper-settings-changed';
@@ -57,6 +58,7 @@ export function saveScraperSettingsDocument(input: unknown): ScraperSettingsDocu
   }
   dispatchChanged(document);
   syncQbitConfigToMain(document);
+  syncSchedulerConfigToMain(document);
   return document;
 }
 
@@ -66,6 +68,14 @@ export function saveScraperSettingsDocument(input: unknown): ScraperSettingsDocu
  */
 export function syncScraperQbitToMain(): void {
   syncQbitConfigToMain(loadScraperSettingsDocument());
+}
+
+/**
+ * Hands main the active profile's schedules at start-up, so a scheduled scrape
+ * fires after a restart without the Scheduled Tasks page ever being opened.
+ */
+export function syncScraperSchedulerToMain(): void {
+  syncSchedulerConfigToMain(loadScraperSettingsDocument());
 }
 
 export function updateActiveScraperSettings(

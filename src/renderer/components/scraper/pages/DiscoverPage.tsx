@@ -5,9 +5,9 @@
 // components/discover/DiscoverContent.tsx rather than reimplemented: that file
 // is also rendered by Blanc, so forking it would split a working feature in two.
 //
-// Its future role is a funnel — pick something worth studying here, then hand
-// the title to New Scrape to actually find and fetch episodes. The action rail
-// below is that seam; today it prefills the target URL and navigates.
+// It is a funnel — pick something worth studying here, then either look up
+// which releases the torrent indexes carry for it (Find sources, on the Torrent
+// Manager) or hand the title to New Scrape to run a scrape (Queue scrape).
 
 import { useState } from 'react';
 import {
@@ -21,6 +21,8 @@ import { Button } from '../../ui';
 import Icon from '../../Icons';
 import StatusDot from '../StatusDot';
 import { useScraper } from '../ScraperContext';
+import { useScraperPort } from '../data/scraperPort';
+import { loadScraperSettingsDocument } from '../../../scraperSettingsStore';
 import { sx, sxn, sxs } from '../strings';
 import { scraperArtwork } from '../artwork';
 import { discoveryCandidateId } from '../../../../shared/mediaDiscovery';
@@ -31,6 +33,7 @@ const SHELF_LIMIT = 3;
 
 export default function DiscoverPage() {
   const ctl = useScraper();
+  const port = useScraperPort();
   const state = useDiscovery();
   const selected = state.selected;
   const [notice, setNotice] = useState('');
@@ -38,7 +41,7 @@ export default function DiscoverPage() {
     ? state.shortlistIds.has(discoveryCandidateId(selected.candidate))
     : false;
 
-  const queue = (mode: 'plan' | 'sources' | 'scrape') => {
+  const queue = async (mode: 'plan' | 'sources' | 'scrape') => {
     if (!selected) return;
     if (mode === 'plan') {
       state.toggleShortlist(selected.candidate);
@@ -49,12 +52,30 @@ export default function DiscoverPage() {
       ));
       return;
     }
-    // No provider resolution exists yet, so the seam is honest about it: the
-    // title goes into the New Scrape field as a search term rather than
-    // pretending we know which site hosts it.
-    ctl.setTargetUrl(selected.candidate.title);
     setNotice('');
-    ctl.navigate('new-scrape');
+    // Two different next steps, which used to be the same one. "Find sources"
+    // asks the Source Manager's torrent indexes which releases exist for the
+    // title, on the Torrent Manager, and starts nothing. "Queue scrape" starts
+    // a real scrape job for it under the active profile; it shows in History.
+    if (mode === 'sources') {
+      if (ctl.findTorrents) ctl.findTorrents(selected.candidate.title);
+      else {
+        ctl.setTargetUrl(selected.candidate.title);
+        ctl.navigate('new-scrape');
+      }
+      return;
+    }
+    try {
+      await port.startScrape({
+        targetUrl: selected.candidate.title,
+        profileId: loadScraperSettingsDocument().activeProfileId,
+        sourceId: '',
+        contentType: selected.candidate.mediaType === 'manga' ? 'manga' : 'anime',
+      });
+      setNotice(sxs('discover.scrapeQueued', selected.candidate.title));
+    } catch (error) {
+      setNotice(sxs('discover.scrapeFailed', error instanceof Error ? error.message : String(error)));
+    }
   };
 
   return (
@@ -76,7 +97,7 @@ export default function DiscoverPage() {
             size="sm"
             disabled={!selected}
             leftIcon={<Icon name="bookmark" size={14} />}
-            onClick={() => queue('plan')}
+            onClick={() => void queue('plan')}
           >
             {sx(selectedIsPlanned ? 'discover.removeFromPlan' : 'discover.planToWatch')}
           </Button>
@@ -84,7 +105,7 @@ export default function DiscoverPage() {
             size="sm"
             disabled={!selected}
             leftIcon={<Icon name="globe" size={14} />}
-            onClick={() => queue('sources')}
+            onClick={() => void queue('sources')}
           >
             {sx('discover.findSources')}
           </Button>
@@ -93,7 +114,7 @@ export default function DiscoverPage() {
             variant="primary"
             disabled={!selected}
             leftIcon={<Icon name="sparkle" size={14} />}
-            onClick={() => queue('scrape')}
+            onClick={() => void queue('scrape')}
           >
             {sx('discover.queueScrape')}
           </Button>

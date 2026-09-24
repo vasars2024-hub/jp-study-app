@@ -49,7 +49,7 @@ import {
   type ScraperNetworkPolicy,
 } from './networkPolicy';
 import { isCrawlAllowed } from './robots';
-import { currentScraperRuntime, type ScraperRuntime } from './runtime';
+import { currentScraperRuntime, runtimeForUrl, type ScraperRuntime } from './runtime';
 import { requestHost } from './safetyPolicy';
 import { cookieHeaderFor, mergeCookieHeaders, rememberSetCookie, userAgentForRequest } from './session';
 
@@ -624,8 +624,11 @@ export async function scraperRequest(
   url: string,
   options: ScraperRequestOptions = {},
 ): Promise<ScraperResponse> {
-  const runtime = currentScraperRuntime();
-  if (!runtime) return performRequest(url, resolveRequestOptions(options, null));
+  const scope = currentScraperRuntime();
+  if (!scope) return performRequest(url, resolveRequestOptions(options, null));
+  // A host with its own Connection Profile gets that profile's timeouts,
+  // headers, proxy, pacing and cache; every other host keeps the run's.
+  const runtime = runtimeForUrl(scope, url);
 
   const policy = runtime.network;
   const method = (options.method ?? 'GET').toUpperCase();

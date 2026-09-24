@@ -10,6 +10,7 @@ import type { QbitTransferRow } from '../../shared/scraperResults';
 let tempRoot = '';
 let saveResult: { canceled: boolean; filePath?: string } = { canceled: true };
 let revealed: string[] = [];
+let dialogPaths: string[] = [];
 
 vi.mock('electron', () => ({
   app: {
@@ -17,7 +18,12 @@ vi.mock('electron', () => ({
     getAppMetrics: () => [],
   },
   ipcMain: { handle: () => undefined },
-  dialog: { showSaveDialog: async () => saveResult },
+  dialog: {
+    showSaveDialog: async (options: { defaultPath?: string }) => {
+      dialogPaths.push(options.defaultPath ?? '');
+      return saveResult;
+    },
+  },
   shell: { showItemInFolder: (p: string) => revealed.push(p) },
   safeStorage: {
     isEncryptionAvailable: () => true,
@@ -28,16 +34,25 @@ vi.mock('electron', () => ({
 
 // The downloads list is a projection of qBittorrent's transfers; the client
 // itself has its own suite, so it is stubbed to one known shape here.
-const qbit = vi.hoisted(() => ({ transfers: [] as QbitTransferRow[], calls: 0 }));
+const qbit = vi.hoisted(() => ({
+  transfers: [] as QbitTransferRow[],
+  calls: 0,
+  free: null as number | null,
+  savePath: '',
+}));
 vi.mock('../scraper/qbittorrent', () => ({
   qbitTransfers: async () => {
     qbit.calls += 1;
     return qbit.transfers;
   },
+  qbitFreeSpace: async () => (qbit.free === null
+    ? { ok: false, reason: 'down', status: 'unreachable' }
+    : { ok: true, value: qbit.free }),
+  qbitDefaultSavePath: async () => ({ ok: true, value: qbit.savePath }),
 }));
 
 const { listExports, safeFileName, writeExport } = await import('../scraper/exports');
-const { listDownloads, toDownloadRow, toDownloadState } = await import('../scraper/downloads');
+const { downloadsFreeSpace, listDownloads, toDownloadRow, toDownloadState } = await import('../scraper/downloads');
 const { listPlugins, pluginsRoot, readManifest } = await import('../scraper/plugins');
 const { setScraperStoreRoot } = await import('../scraper/store');
 
@@ -53,11 +68,14 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
+  await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   saveResult = { canceled: true };
   revealed = [];
   qbit.transfers = [];
   qbit.calls = 0;
+  qbit.free = null;
+  qbit.savePath = '';
+  dialogPaths = [];
 });
 
 // ---- exports ------------------------------------------------------------
@@ -127,6 +145,23 @@ describe('writeExport', () => {
     expect(revealed).toHaveLength(1);
   });
 
+  it('opens the dialog in the configured destination folder', async () => {
+    const folder = path.join(tempRoot, 'exports-here');
+    await fsp.mkdir(folder, { recursive: true });
+    saveResult = { canceled: true };
+    await writeExport(exportRequest({ destination: folder }));
+    expect(dialogPaths[0]).toBe(path.join(folder, 'frieren-2026-07-27.csv'));
+  });
+
+  it('falls back to Downloads when the destination is not a folder', async () => {
+    saveResult = { canceled: true };
+    await writeExport(exportRequest({ destination: path.join(tempRoot, 'no-such-folder') }));
+    await writeExport(exportRequest({ destination: 'relative/path' }));
+    await writeExport(exportRequest({ destination: '' }));
+    const downloads = path.join(tempRoot, 'downloads', 'frieren-2026-07-27.csv');
+    expect(dialogPaths).toEqual([downloads, downloads, downloads]);
+  });
+
   it('keeps the newest records first and bounds the history', async () => {
     for (let i = 0; i < 55; i += 1) {
       saveResult = { canceled: false, filePath: path.join(tempRoot, `n${i}.csv`) };
@@ -168,6 +203,38 @@ function transfer(overrides: Partial<QbitTransferRow> = {}): QbitTransferRow {
     ...overrides,
   };
 }
+
+describe('free space', () => {
+  const config = { enabled: true } as never;
+
+  it('is qBittorrent\u2019s own figure when the client answers', async () => {
+    qbit.free = 123_456_789;
+    qbit.savePath = 'Z:\\remote';
+    await expect(downloadsFreeSpace({ config })).resolves.toEqual({
+      bytes: 123_456_789,
+      source: 'qbittorrent',
+      path: 'Z:\\remote',
+    });
+  });
+
+  it('measures the save path locally when the client cannot say', async () => {
+    qbit.savePath = tempRoot;
+    const report = await downloadsFreeSpace({ config });
+    expect(report.source).toBe('disk');
+    expect(report.bytes).toBeGreaterThan(0);
+  });
+
+  it('is null — never a made-up number — when nothing can be measured', async () => {
+    qbit.savePath = path.join(tempRoot, 'missing', 'folder');
+    await expect(downloadsFreeSpace({ config })).resolves.toMatchObject({ bytes: null, source: 'none' });
+  });
+
+  it('measures Downloads when qBittorrent is off', async () => {
+    const report = await downloadsFreeSpace({ config: { enabled: false } as never });
+    expect(report.source).toBe('disk');
+    expect(report.path).toBe(path.join(tempRoot, 'downloads'));
+  });
+});
 
 describe('the downloads list', () => {
   it('maps transfer states onto download states', () => {

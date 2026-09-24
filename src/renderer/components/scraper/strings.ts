@@ -175,6 +175,8 @@ const TEXT = {
   'discover.removeFromPlan': 'Remove from plan',
   'discover.findSources': 'Find sources',
   'discover.queueScrape': 'Queue scrape',
+  'discover.scrapeQueued': (value: string) => `Scrape started for ${value}. It appears in History when it finishes.`,
+  'discover.scrapeFailed': (value: string) => `The scrape could not start: ${value}`,
   'discover.added': (title: string) => `${title} added to the study shortlist.`,
   'discover.removed': (title: string) => `${title} removed from the study shortlist.`,
 
@@ -248,6 +250,10 @@ const TEXT = {
   'result.searchPlaceholder': 'Search episodes…',
   'result.selectAll': 'Select All',
   'result.clearSelection': 'Clear Selection',
+  'result.magnetsExported': (n: number) => `Exported ${n} magnet link${n === 1 ? '' : 's'}.`,
+  'result.sendSummary': (a: number, b: number, c: number) => `${a} sent · ${b} skipped · ${c} failed`,
+  'result.sending': 'Sending…',
+  'result.sendSelected': 'Send selected to qBittorrent',
   'result.preview': 'Preview',
   'result.export': 'Export',
   'result.exportJson': 'Export JSON',
@@ -360,7 +366,7 @@ const TEXT = {
   'sources.providerDub': 'dub',
   'sources.providerServers': (n: number) => `${n} server${n === 1 ? '' : 's'}`,
   'sources.chain': 'Priority chain',
-  'sources.chainDesc': 'Tried top to bottom. Position is the priority — there is no separate rank to keep in sync.',
+  'sources.chainDesc': 'Tried top to bottom: catalogues one after another, torrent indexes all at once with their results ranked by position. Position is the priority — there is no separate rank to keep in sync.',
   'sources.activeCount': (n: number) => `${n} enabled`,
   'sources.test': 'Test',
   'sources.testing': 'Testing…',
@@ -368,6 +374,11 @@ const TEXT = {
   'sources.subsNo': 'no subs',
   'sources.auth': 'sign-in',
   'sources.fallbackHint': 'If this source fails, try these next — in the order you pick them.',
+  'sources.verifiedSite': 'Verified site',
+  'sources.verifiedSiteNone': 'Not linked',
+  'sources.verifiedSiteLinked': (value: string) => `Verified site: ${value}`,
+  'sources.verifiedSiteReliability': (value: string) => `Reliability ${value}/100`,
+  'sources.testFailed': (value: string) => `The test could not run: ${value}`,
   'sources.fallbackOrder': 'Fallback order',
   'sources.noFallbackCandidates': 'No other source of this kind to fall back to.',
   'sources.empty': 'No sources of this kind yet.',
@@ -437,6 +448,41 @@ const TEXT = {
   'torrent.mirrorDesc': 'Every transfer, with the peer, availability and piece detail the client’s own list leaves out.',
   'torrent.activeTransfers': (n: number) => `${n} active`,
   'torrent.noTransfers': 'qBittorrent has no transfers.',
+  'torrent.actionsFor': (value: string) => `Actions for ${value}`,
+  'torrent.inspectorFor': (value: string) => `Transfer actions for ${value}`,
+  'torrent.selectedTransfer': 'Selected transfer',
+  'torrent.closeActions': 'Close transfer actions',
+  'torrent.col.name': 'Name',
+  'torrent.col.state': 'State',
+  'torrent.col.progress': 'Progress',
+  'torrent.col.down': '↓ Speed',
+  'torrent.col.up': '↑ Speed',
+  'torrent.col.eta': 'ETA',
+  'torrent.col.ratio': 'Ratio',
+  'torrent.col.seeds': 'Seeds',
+  'torrent.col.peers': 'Peers',
+  'torrent.col.availability': 'Avail.',
+  'torrent.col.size': 'Size',
+  'torrent.col.category': 'Category',
+  'torrent.col.tags': 'Tags',
+  'torrent.col.completed': 'Completed',
+  'torrent.resumeTransfer': 'Resume transfer',
+  'torrent.pauseTransfer': 'Pause transfer',
+  'torrent.forceRecheck': 'Force recheck',
+  'torrent.saveLocation': (value: string) => `Save location: ${value}`,
+  'torrent.showSaveLocation': 'Show save location',
+  'torrent.removeFromClient': 'Remove from qBittorrent',
+  'transfer.removeQuestion': (value: string) => `Remove “${value}” from qBittorrent?`,
+  'transfer.deleteFiles': 'Also delete the downloaded files',
+  'transfer.removeKeep': 'Remove, keep files',
+  'transfer.removeAndDelete': 'Remove and delete files',
+  'transfer.paused': (value: string) => `${value} paused in qBittorrent.`,
+  'transfer.resumed': (value: string) => `${value} resumed in qBittorrent.`,
+  'transfer.rechecking': (value: string) => `qBittorrent is rechecking ${value}.`,
+  'transfer.retrying': (value: string) => `qBittorrent is rechecking and restarting ${value}.`,
+  'transfer.removedKept': (value: string) => `Removed ${value} from qBittorrent. Its downloaded files were kept.`,
+  'transfer.removedDeleted': (value: string) => `Removed ${value} from qBittorrent and deleted its downloaded files.`,
+  'transfer.failed': (value: string) => `qBittorrent did not do it: ${value}`,
   'torrent.pieces': 'Piece progress',
 
   // ---- Scheduler hold reasons ----
@@ -528,6 +574,25 @@ const TEXT = {
   'downloads.player': 'Player handoff',
   'downloads.playerDesc': 'Open completed media in the configured external player.',
   'downloads.playerHint': 'Completed episodes remain linked to their scraped metadata and subtitle tracks.',
+  'downloads.state.downloading': 'Downloading',
+  'downloads.state.queued': 'Queued',
+  'downloads.state.paused': 'Paused',
+  'downloads.state.done': 'Complete',
+  'downloads.state.failed': 'Failed',
+  'downloads.loadFailed': (value: string) => `Could not read the download queue: ${value}`,
+  'downloads.freeUnknown': 'unknown',
+  'downloads.pauseItem': (value: string) => `Pause ${value}`,
+  'downloads.resumeItem': (value: string) => `Resume ${value}`,
+  'downloads.retryItem': (value: string) => `Retry ${value}`,
+  'downloads.removeItem': (value: string) => `Remove ${value}`,
+  'downloads.readyToPlay': 'Ready to play',
+  'downloads.noCompleted': 'No completed downloads yet.',
+  'downloads.playerLabel': 'Player',
+  'downloads.noPlayerOption': 'No player configured',
+  'downloads.noPlayer': 'Add an external player in Settings › Scraper first.',
+  'downloads.play': 'Open in player',
+  'downloads.playing': (a: string, b: string) => `Opened ${a} in ${b}.`,
+  'downloads.playFailed': (value: string) => `The player could not be started: ${value}`,
 
   'page.exports.title': 'Exports',
   'page.exports.subtitle': 'Create portable results for files, databases, playlists, and study tools.',
@@ -543,6 +608,27 @@ const TEXT = {
   'exports.recordCount': (n: number) => `${n.toLocaleString()} record${n === 1 ? '' : 's'}`,
   'exports.run': 'Create export',
   'exports.history': 'Export history',
+  'exports.formatsLabel': 'Export formats',
+  'exports.formatHint.json': 'Structured archive',
+  'exports.formatHint.csv': 'Spreadsheet ready',
+  'exports.formatHint.ndjson': 'Streaming records',
+  'exports.formatHint.m3u': 'Player playlist',
+  'exports.formatHint.torrent-list': 'Resolved links',
+  'exports.tile.available': 'Available rows',
+  'exports.tile.scope': 'Current scope',
+  'exports.tile.past': 'Past exports',
+  'exports.tile.format': 'Selected format',
+  'exports.optSplitOn': 'Grouped by season',
+  'exports.optSplitOff': 'One flat list, not split by season',
+  'exports.optPrettyOn': 'JSON indented for reading',
+  'exports.optPrettyOff': 'JSON written compact',
+  'exports.optDestinationDefault': 'Save dialog opens in your Downloads folder',
+  'exports.optRevealOn': 'Reveals the file when it is written',
+  'exports.optRevealOff': 'Does not open the folder afterwards',
+  'exports.editOptions': 'Edit export options',
+  'exports.optColumns': (value: string) => `Columns: ${value}`,
+  'exports.optDestination': (value: string) => `Save dialog opens in ${value}`,
+  'exports.nothingScraped': 'Nothing has been scraped yet, so there is nothing to export.',
 
   'page.history.title': 'History',
   'page.history.subtitle': 'Past scrape jobs, their outcomes, and stage-level timing details.',
@@ -552,6 +638,7 @@ const TEXT = {
   'history.jobs': 'Scrape jobs',
   'history.empty': 'No scrape jobs match this filter.',
   'history.noNote': 'No additional notes were recorded.',
+  'history.noStageTimings': 'This run recorded no per-stage timings.',
   'history.repeat': 'Repeat scrape',
   'history.col.series': 'Series',
   'history.col.provider': 'Provider',
@@ -719,6 +806,9 @@ const TEXT = {
   'health.offline': 'Offline',
   'health.unknown': 'Unknown',
   'job.queued': 'Queued',
+  'job.searching': 'Search',
+  'job.streams': 'Streams',
+  'job.subtitles': 'Subtitles',
   'job.fetching': 'Fetching',
   'job.parsing': 'Extracting',
   'job.validating': 'Validating',
@@ -731,6 +821,7 @@ const TEXT = {
   'common.close': 'Close',
   'common.cancel': 'Cancel',
   'common.clear': 'Clear',
+  'error.backendCall': 'A scraper backend call failed',
   'export.cancelled': 'Export cancelled — nothing was written.',
   'export.written': (detail: string) => `Wrote ${detail} records.`,
   'export.failed': (detail: string) => `The export could not be written: ${detail}`,
@@ -796,7 +887,7 @@ export function sx(key: ScraperTextKey): string {
   const migrated = shared(key);
   if (migrated !== null) return migrated;
   const value = TEXT[key];
-  return typeof value === 'function' ? value(0 as never) : value;
+  return typeof value === 'function' ? (value as (arg: never) => string)(0 as never) : value;
 }
 
 /** Resolve a count- or value-bearing string. */
@@ -821,6 +912,16 @@ export function sx2(key: ScraperTextKey, a: number, b: number): string {
   if (migrated !== null) return migrated;
   const entry = TEXT[key];
   return typeof entry === 'function' ? (entry as (x: number, y: number) => string)(a, b) : entry;
+}
+
+/** Resolve a three-number entry ({a} {b} {c}). */
+export function sx3(key: ScraperTextKey, a: number, b: number, c: number): string {
+  const migrated = shared(key, { a, b, c });
+  if (migrated !== null) return migrated;
+  const entry = TEXT[key];
+  return typeof entry === 'function'
+    ? (entry as (x: number, y: number, z: number) => string)(a, b, c)
+    : entry;
 }
 
 /**

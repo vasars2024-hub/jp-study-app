@@ -34,7 +34,7 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitFiles, qbitSend, qbitSetFilePriorities, qbitStart, qbitAwaitMetadata, qbitTest, qbitTorrentInfo, qbitTransfers, resetQbitSessions, swarmCount, swarmSampleOf, unreachedSwarmReason } =
+const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitFiles, qbitFreeSpace, qbitSend, qbitSetFilePriorities, qbitStart, qbitAwaitMetadata, qbitTest, qbitTorrentAction, qbitTorrentInfo, qbitTransfers, resetQbitSessions, swarmCount, swarmSampleOf, unreachedSwarmReason } =
   await import('../scraper/qbittorrent');
 type StallInput = Parameters<typeof awaitFilesStallReason>[0];
 
@@ -145,6 +145,7 @@ const COMMAND_ROUTES = [
   '/api/v2/torrents/pause',
   '/api/v2/torrents/stop',
   '/api/v2/torrents/delete',
+  '/api/v2/torrents/recheck',
 ];
 /** Their forms, so a priority or a hash list is measured rather than assumed. */
 let commandBodies: { route: string; body: string }[] = [];
@@ -298,6 +299,11 @@ beforeAll(async () => {
         : all;
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(rows));
+      return;
+    }
+    if (routed === '/api/v2/sync/maindata') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ rid: 1, full_update: true, server_state: { free_space_on_disk: 987_654_321 } }));
       return;
     }
     if (routed === '/api/v2/torrents/files') {
@@ -866,6 +872,80 @@ describe('qbitTransfers', () => {
 
   it('returns nothing when sending is switched off', async () => {
     await expect(qbitTransfers({ config: { ...config, enabled: false } })).resolves.toEqual([]);
+  });
+});
+
+describe('qbitTorrentAction — the Downloads and Torrent Manager buttons', () => {
+  const form = (index = 0) => new URLSearchParams(commandBodies[index]?.body ?? '');
+
+  it('pauses through the client, not just on screen', async () => {
+    const report = await qbitTorrentAction({ config, action: 'pause', hashes: ['AA11'] });
+    expect(report).toEqual({ ok: true, done: 1, failures: [] });
+    expect(commandBodies.map((c) => c.route)).toEqual(['/api/v2/torrents/pause']);
+    expect(form().get('hashes')).toBe('aa11');
+  });
+
+  it('resumes and rechecks through their own endpoints', async () => {
+    await qbitTorrentAction({ config, action: 'resume', hashes: ['aa11'] });
+    await qbitTorrentAction({ config, action: 'recheck', hashes: ['aa11'] });
+    expect(commandBodies.map((c) => c.route)).toEqual([
+      '/api/v2/torrents/resume',
+      '/api/v2/torrents/recheck',
+    ]);
+  });
+
+  it('retries as a recheck followed by a start', async () => {
+    await qbitTorrentAction({ config, action: 'retry', hashes: ['bb22'] });
+    expect(commandBodies.map((c) => c.route)).toEqual([
+      '/api/v2/torrents/recheck',
+      '/api/v2/torrents/resume',
+    ]);
+  });
+
+  it('keeps downloaded files on remove unless told otherwise', async () => {
+    await qbitTorrentAction({ config, action: 'delete', hashes: ['aa11'] });
+    expect(form(0).get('deleteFiles')).toBe('false');
+    await qbitTorrentAction({ config, action: 'delete', hashes: ['aa11'], deleteFiles: true });
+    expect(form(1).get('deleteFiles')).toBe('true');
+    // Anything but a literal `true` keeps the files.
+    await qbitTorrentAction({ config, action: 'delete', hashes: ['aa11'], deleteFiles: 'yes' as never });
+    expect(form(2).get('deleteFiles')).toBe('false');
+  });
+
+  it('refuses a malformed hash without sending it, and still acts on the rest', async () => {
+    const report = await qbitTorrentAction({ config, action: 'pause', hashes: ['aa11', 'x|y'] });
+    expect(report.ok).toBe(false);
+    expect(report.done).toBe(1);
+    expect(report.failures).toEqual([{ hash: 'x|y', reason: 'Not a torrent hash.' }]);
+    expect(commandBodies).toHaveLength(1);
+  });
+
+  it('reports a refusal instead of a success when the client is unreachable', async () => {
+    const report = await qbitTorrentAction({
+      config: { ...config, port: 1 },
+      action: 'pause',
+      hashes: ['aa11'],
+    });
+    expect(report.ok).toBe(false);
+    expect(report.failures[0].reason).toBeTruthy();
+  });
+
+  it('does nothing when sending is switched off', async () => {
+    const report = await qbitTorrentAction({ config: { ...config, enabled: false }, action: 'pause', hashes: ['aa11'] });
+    expect(report.ok).toBe(false);
+    expect(commandBodies).toEqual([]);
+  });
+
+  it('refuses an unknown action', async () => {
+    const report = await qbitTorrentAction({ config, action: 'format-disk' as never, hashes: ['aa11'] });
+    expect(report.ok).toBe(false);
+    expect(commandBodies).toEqual([]);
+  });
+});
+
+describe('qbitFreeSpace', () => {
+  it('reads qBittorrent’s own free-space figure', async () => {
+    await expect(qbitFreeSpace({ config })).resolves.toEqual({ ok: true, value: 987_654_321 });
   });
 });
 

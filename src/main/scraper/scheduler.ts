@@ -24,6 +24,16 @@ import { notifyScraper } from './notifications';
 import { readScraperJson, writeScraperJson } from './store';
 
 const STATE_FILE = 'scheduler-state.json';
+/**
+ * The last configuration the renderer synced, beside the run record.
+ *
+ * Without it the runner had nothing to run after a restart until the Scheduled
+ * Tasks page happened to be opened — the timer ticked, found no config and
+ * returned, so "scrape every night" silently meant "every night I open that
+ * page". The app also pushes on start and on every settings save; this file is
+ * what covers the gap before that push lands, and a start with no window.
+ */
+const CONFIG_FILE = 'scheduler-config.json';
 
 /** How often the runner re-evaluates. One minute is cron's own resolution. */
 const TICK_MS = 60_000;
@@ -117,12 +127,57 @@ function persist(): Promise<void> {
 
 /** Resolves once every queued save has landed. Used at shutdown and in tests. */
 export function whenSchedulerPersisted(): Promise<void> {
-  return persistChain;
+  return Promise.all([persistChain, configChain]).then(() => undefined);
+}
+
+/**
+ * A stored config is only trusted in the shape a sync produces: a scheduler
+ * with an entry list and a settings object. Anything else is ignored rather
+ * than run — a half-read file must not fire scrapes.
+ */
+function storedConfig(value: unknown): ScraperSchedulerSyncInput | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<ScraperSchedulerSyncInput>;
+  const scheduler = candidate.scheduler as Partial<ScraperSchedulerSyncInput['scheduler']> | undefined;
+  if (!scheduler || typeof scheduler !== 'object' || !Array.isArray(scheduler.entries)) return null;
+  if (!candidate.settings || typeof candidate.settings !== 'object') return null;
+  const entries = scheduler.entries.filter((entry) =>
+    entry && typeof entry === 'object'
+    && typeof entry.id === 'string' && entry.id
+    && typeof entry.cron === 'string'
+    && typeof entry.targetUrl === 'string');
+  return {
+    ...(candidate as ScraperSchedulerSyncInput),
+    scheduler: { ...(scheduler as ScraperSchedulerSyncInput['scheduler']), entries },
+  };
+}
+
+let configChain: Promise<void> = Promise.resolve();
+
+function persistConfig(config: ScraperSchedulerSyncInput): Promise<void> {
+  configChain = configChain
+    .then(() => writeScraperJson(CONFIG_FILE, config))
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      scraperLog('warn', 'scheduler', `Could not save the schedule configuration: ${message}`);
+    });
+  return configChain;
 }
 
 async function load(): Promise<void> {
   if (runtime.loaded) return;
   runtime.loaded = true;
+  // A sync that already arrived is newer than anything on disk.
+  if (!runtime.config) {
+    runtime.config = storedConfig(await readScraperJson<unknown>(CONFIG_FILE, null));
+    if (runtime.config) {
+      scraperLog(
+        'info',
+        'scheduler',
+        `Loaded ${runtime.config.scheduler.entries.length} schedule(s) saved by the last session.`,
+      );
+    }
+  }
   const stored = await readScraperJson<StateFile>(STATE_FILE, {});
   // Anything that is not the shape we wrote is discarded rather than trusted;
   // a bad nextRunAt would otherwise make an entry fire on every tick.
@@ -161,6 +216,7 @@ export function runScheduleNow(entryId: string): string | null {
         sourceId: '',
       },
       settings: config.settings,
+      context: config.context,
     },
     emit,
   );
@@ -283,6 +339,7 @@ export async function syncScheduler(
 ): Promise<ScraperSchedulerState> {
   await load();
   runtime.config = input;
+  void persistConfig(input);
 
   // Forget records for entries that no longer exist, so a deleted-and-recreated
   // schedule does not inherit the old one's run history.

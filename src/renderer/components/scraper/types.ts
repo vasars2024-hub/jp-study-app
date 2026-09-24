@@ -125,5 +125,14 @@ export interface ScraperController {
   openSource: (sourceId: string) => void;
   clearSource: () => void;
 
+  /**
+   * One-use handoff from Discover's "Find sources" into the Torrent Manager's
+   * search box. Optional so a page mounted without the shell (tests, harness)
+   * still type-checks; the shell always provides it.
+   */
+  torrentQuery?: string | null;
+  findTorrents?: (query: string) => void;
+  clearTorrentQuery?: () => void;
+
   recentPages: ScraperPageId[];
 }

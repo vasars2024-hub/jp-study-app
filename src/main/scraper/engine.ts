@@ -27,6 +27,7 @@ import type {
   ScrapeJobSummary,
   ScrapeResult,
   ScrapeStage,
+  ScrapeStageTiming,
   SubtitleAvailability,
   TorrentRow,
 } from '../../shared/scraperResults';
@@ -63,6 +64,7 @@ import { scraperLog, scraperLogsFor } from './logBus';
 import { runWithScraperRuntime, scraperRuntimeFor } from './runtime';
 import { searchTorrents } from './torrents';
 import { resolveSeanimeStreams } from './seanimeSources';
+import { enabledSourcesOfKind, metadataProviderOrder } from '../../shared/scraperSourceOrder';
 
 export type JobEmitter = (jobId: string, event: ScrapeJobEvent) => void;
 
@@ -71,6 +73,10 @@ interface Job {
   input: ScraperStartInput;
   startedAt: number;
   stage: ScrapeStage;
+  /** When the current stage began; -1 once the timeline has been closed. */
+  stageStartedAt: number;
+  /** Measured stage durations, in the order the run passed through them. */
+  timings: ScrapeStageTiming[];
   cancelled: boolean;
   rows: EpisodeRow[];
   result: ScrapeResult | null;
@@ -531,6 +537,28 @@ function emitRows(
  * The site-rule path: fetch the target itself and extract with the rule, rather
  * than asking a catalogue about a title it has never heard of.
  */
+/**
+ * Records how long the stage being left actually took. History renders these;
+ * it used to split the total by a fixed weight table, which reported the same
+ * percentages for every run.
+ */
+function markStage(job: Job, next: ScrapeStage): void {
+  const now = Date.now();
+  if (job.stageStartedAt > 0 && next !== job.stage) {
+    job.timings.push({ stage: job.stage, ms: Math.max(0, now - job.stageStartedAt) });
+    job.stageStartedAt = now;
+  }
+}
+
+/** Closes the timeline at the moment the summary is written. */
+function closeStageTimings(job: Job): ScrapeStageTiming[] {
+  if (job.stageStartedAt > 0) {
+    job.timings.push({ stage: job.stage, ms: Math.max(0, Date.now() - job.stageStartedAt) });
+    job.stageStartedAt = -1;
+  }
+  return [...job.timings];
+}
+
 async function runWithSiteRule(
   job: Job,
   rule: ScraperSiteRule,
@@ -596,6 +624,7 @@ async function runWithSiteRule(
     stage: 'done',
     ageMinutes: 0,
     durationSec: Math.round((Date.now() - job.startedAt) / 1_000),
+    stageTimings: closeStageTimings(job),
     found: job.rows.length,
     failed: validated.failures,
     bytes: 0,
@@ -651,6 +680,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
   const correlationId = job.id;
   const stage = (next: ScrapeStage) => {
     if (job.cancelled) throw new Cancelled();
+    markStage(job, next);
     job.stage = next;
     emit(job.id, { kind: 'stage', stage: next });
   };
@@ -675,11 +705,13 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
 
   const query = await resolveQuery(request.targetUrl, correlationId);
   if (!query) throw new Error('There is nothing to search for.');
+  // The Source Manager's metadata order when it lists a catalogue, the
+  // metadata group's own order otherwise — see `metadataProviderOrder`.
   const candidates = await searchCatalogue(
     query,
     correlationId,
     5,
-    settings.metadata.providerOrder,
+    metadataProviderOrder(settings),
   );
   if (!candidates.length) throw new Error(`Nothing in the catalogue matches "${query}".`);
   const chosen = candidates[0];
@@ -706,15 +738,17 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
 
   stage('streams');
   let releases: TorrentRow[] = [];
-  const indexers = settings.sources.entries.filter(
-    (entry) => entry.enabled && entry.kind === 'torrent',
-  );
+  // Priority order, so a release two indexes both list is credited to the
+  // higher one, and a failed index can hand over to its fallbacks.
+  const indexers = enabledSourcesOfKind(settings.sources, 'torrent');
   if (settings.sources.mode !== 'streaming' && indexers.length) {
     releases = await searchTorrents({
       query: { text: detail.titleRomaji || detail.titleEn },
       indexers,
       torrents: settings.torrents,
       timeoutMs: settings.sources.perSourceTimeoutMs,
+      pool: settings.sources.entries,
+      maxFallbackDepth: settings.sources.maxFallbackDepth,
     });
   } else {
     scraperLog(
@@ -734,6 +768,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     episodes: parsed,
     settings,
     correlationId,
+    providerOrder: job.input.context?.streamProviderOrder,
   });
   if (job.cancelled) throw new Cancelled();
 
@@ -776,6 +811,7 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     stage: 'done',
     ageMinutes: 0,
     durationSec,
+    stageTimings: closeStageTimings(job),
     found: job.rows.length,
     failed: validated.failures,
     bytes: job.rows.reduce((total, row) => total + row.sizeBytes, 0),
@@ -844,6 +880,8 @@ export function startScrape(input: ScraperStartInput, emit: JobEmitter): string 
     input,
     startedAt: Date.now(),
     stage: 'queued',
+    stageStartedAt: Date.now(),
+    timings: [],
     cancelled: false,
     rows: [],
     result: null,
@@ -858,7 +896,10 @@ export function startScrape(input: ScraperStartInput, emit: JobEmitter): string 
     // Every request the run makes, however deep, resolves its timeout, user
     // agent, headers, cookie, proxy, retries, pacing, concurrency limit and
     // cache behaviour from this scope.
-    runWithScraperRuntime(scraperRuntimeFor(input.settings, id), () => run(job, emit))
+    runWithScraperRuntime(
+      scraperRuntimeFor(input.settings, id, input.context?.hosts),
+      () => run(job, emit),
+    )
       .catch((error: unknown) => {
         if (error instanceof Cancelled || job.cancelled) {
           job.stage = 'cancelled';

@@ -25,6 +25,7 @@ import type { ScraperSettings } from '../../shared/scraperSettings';
 import { seanimeApi, SeanimeUnavailableError } from '../seanime/client';
 import { resolveAniListId, type CatalogueWork } from './catalogue';
 import { scraperLog } from './logBus';
+import { orderStreamProviders } from '../../shared/scraperSourceOrder';
 
 const PROVIDERS_ROUTE = '/api/v1/extensions/list/onlinestream-provider';
 const TORRENT_PROVIDERS_ROUTE = '/api/v1/extensions/list/anime-torrent-provider';
@@ -38,6 +39,11 @@ export interface ResolveSeanimeStreamsInput {
   episodes: EpisodeRow[];
   settings: ScraperSettings;
   correlationId: string;
+  /**
+   * The Video Server Profiles preference order (lowercase ids, names and
+   * provider labels). Absent or empty keeps the sidecar's own order.
+   */
+  providerOrder?: readonly string[];
 }
 
 export async function listSeanimeAcquisitionProviders(): Promise<AcquisitionProviderInventory> {
@@ -264,7 +270,16 @@ export async function resolveSeanimeStreams(
   const unresolved = new Map(episodes.map((episode) => [episode.number, episode]));
   const rows: StreamRow[] = [];
 
-  for (const provider of providers) {
+  // Preferred servers first: with `stopAfterFirstSuccess` on, whichever
+  // provider answers first owns the episode, so order is the preference.
+  const ordered = orderStreamProviders(providers, input.providerOrder);
+  if (input.providerOrder?.length) {
+    scraperLog('debug', 'seanime-sources', `Provider order: ${
+      ordered.map((provider) => provider.name || provider.id).join(' → ')
+    }.`, { correlationId });
+  }
+
+  for (const provider of ordered) {
     if (!unresolved.size) break;
     if (dubbed && !provider.supportsDub) continue;
 

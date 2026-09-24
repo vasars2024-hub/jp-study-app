@@ -24,7 +24,10 @@ import {
   resolveCredentialPresence,
   type VaultAnswer,
 } from '../data/credentialPresence';
-import { sx, sx2, sxn, sxs } from '../strings';
+import { sx, sx2, sx3, sxn, sxs, type ScraperTextKey } from '../strings';
+import TransferRemoveConfirm from '../TransferRemoveConfirm';
+import { errorText, qbitActionNotice, type ActionNotice } from '../data/qbitActions';
+import type { ScraperQbitTorrentAction } from '../../../../shared/scraperIpc';
 import { engineReason, firstReason, type ReasonCheck } from '../disabledReason';
 import {
   loadScraperSettingsDocument,
@@ -108,7 +111,10 @@ export default function TorrentManagerPage() {
   const [testing, setTesting] = useState(false);
   const [sendReport, setSendReport] = useState<QbitSendReport | null>(null);
   const [activeTransferHash, setActiveTransferHash] = useState<string | null>(null);
-  const [transferNotice, setTransferNotice] = useState('');
+  const [transferNotice, setTransferNotice] = useState<ActionNotice | null>(null);
+  /** Which transfer an action is in flight for, so it cannot be fired twice. */
+  const [actingHash, setActingHash] = useState<string | null>(null);
+  const [confirmRemoveHash, setConfirmRemoveHash] = useState<string | null>(null);
   /** Which transfer is mid-import, so the button cannot be fired twice. */
   const [addingHash, setAddingHash] = useState<string | null>(null);
   const [backend, setBackend] = useState<AcquisitionBackendSnapshot | null>(null);
@@ -118,6 +124,13 @@ export default function TorrentManagerPage() {
   const [vaultHas, setVaultHas] = useState<VaultAnswer>(null);
 
   useEffect(() => onScraperSettingsChanged(setDoc), []);
+
+  // Discover's "Find sources" lands here with the title already searched.
+  useEffect(() => {
+    if (!ctl.torrentQuery) return;
+    setQuery(ctl.torrentQuery);
+    ctl.clearTorrentQuery?.();
+  }, [ctl.torrentQuery, ctl.clearTorrentQuery]);
 
   const settings = useMemo(() => resolveScraperSettings(doc), [doc]);
   const qbit = settings.qbittorrent;
@@ -191,9 +204,19 @@ export default function TorrentManagerPage() {
     void search();
   }, [search]);
 
-  useEffect(() => {
-    void port.qbitTransfers().then(setTransfers);
+  // Re-read after every action: the mirror shows what qBittorrent reports,
+  // never a row patched to look like the click worked.
+  const refreshTransfers = useCallback(async () => {
+    try {
+      setTransfers(await port.qbitTransfers());
+    } catch (error) {
+      setTransferNotice({ text: sxs('transfer.failed', errorText(error)), bad: true });
+    }
   }, [port]);
+
+  useEffect(() => {
+    void refreshTransfers();
+  }, [refreshTransfers]);
 
   const refreshBackend = useCallback(async () => {
     setBackend(await port.getAcquisitionSnapshot());
@@ -235,7 +258,11 @@ export default function TorrentManagerPage() {
     // A free-text search knows no catalogue ids, but the handoff still tags the
     // torrents `gum` and records them, so main can find the Scraper's own
     // identification (job history) and import them when they finish.
-    setSendReport(await port.qbitSend(rows, qbit, { via: 'torrent-manager' }));
+    try {
+      setSendReport(await port.qbitSend(rows, qbit, { via: 'torrent-manager' }));
+    } catch (error) {
+      setTransferNotice({ text: sxs('transfer.failed', errorText(error)), bad: true });
+    }
   };
 
   const toggle = (id: string) => {
@@ -272,25 +299,25 @@ export default function TorrentManagerPage() {
         : 'bad';
   const activeTransfer = transfers.find((transfer) => transfer.hash === activeTransferHash) ?? null;
 
-  const patchTransfer = (hash: string, patch: Partial<QbitTransferRow>) => {
-    setTransfers((current) =>
-      current.map((transfer) => (transfer.hash === hash ? { ...transfer, ...patch } : transfer)),
-    );
-  };
-
-  const toggleTransfer = (transfer: QbitTransferRow) => {
-    const paused = transfer.state === 'paused';
-    patchTransfer(transfer.hash, {
-      state: paused ? (transfer.progress >= 1 ? 'seeding' : 'downloading') : 'paused',
-      downloadSpeedBps: paused && transfer.progress < 1 ? 5_400_000 : 0,
-      uploadSpeedBps: paused && transfer.progress >= 1 ? 860_000 : 0,
-    });
-    setTransferNotice(`${transfer.name} ${paused ? 'resumed' : 'paused'}.`);
-  };
-
-  const recheckTransfer = (transfer: QbitTransferRow) => {
-    patchTransfer(transfer.hash, { state: 'checking', downloadSpeedBps: 0, uploadSpeedBps: 0 });
-    setTransferNotice(`${transfer.name} queued for an integrity recheck.`);
+  const actOnTransfer = async (
+    transfer: QbitTransferRow,
+    action: ScraperQbitTorrentAction,
+    deleteFiles = false,
+  ) => {
+    setActingHash(transfer.hash);
+    try {
+      const report = await port.qbitAction(action, [transfer.hash], { deleteFiles });
+      setTransferNotice(qbitActionNotice(action, report, transfer.name, deleteFiles));
+      if (report.ok && action === 'delete') {
+        setConfirmRemoveHash(null);
+        setActiveTransferHash(null);
+      }
+    } catch (error) {
+      setTransferNotice({ text: sxs('transfer.failed', errorText(error)), bad: true });
+    } finally {
+      setActingHash(null);
+      await refreshTransfers();
+    }
   };
 
   /**
@@ -302,7 +329,7 @@ export default function TorrentManagerPage() {
    */
   const addTransferToLibrary = async (transfer: QbitTransferRow) => {
     if (transfer.progress < 1) {
-      setTransferNotice(sx('torrent.addToLibraryIncomplete'));
+      setTransferNotice({ text: sx('torrent.addToLibraryIncomplete'), bad: true });
       return;
     }
     setAddingHash(transfer.hash);
@@ -315,21 +342,15 @@ export default function TorrentManagerPage() {
         || `${transfer.savePath.replace(/[\\/]+$/, '')}/${transfer.name}`;
       // The hash lets main use the identity recorded when the torrent was sent.
       const report = await window.api.addAcquiredMedia(target, { infoHash: transfer.hash });
-      if (report.outcome === 'missing') setTransferNotice(sx('torrent.addMissing'));
-      else if (report.outcome !== 'ok') setTransferNotice(sx('torrent.addNoMedia'));
-      else if (report.added === 0) setTransferNotice(sxn('torrent.alreadyInLibrary', report.found));
-      else setTransferNotice(sx2('torrent.addedToLibrary', report.added, report.found));
+      if (report.outcome === 'missing') setTransferNotice({ text: sx('torrent.addMissing'), bad: true });
+      else if (report.outcome !== 'ok') setTransferNotice({ text: sx('torrent.addNoMedia'), bad: true });
+      else if (report.added === 0) setTransferNotice({ text: sxn('torrent.alreadyInLibrary', report.found), bad: false });
+      else setTransferNotice({ text: sx2('torrent.addedToLibrary', report.added, report.found), bad: false });
     } catch (error) {
-      setTransferNotice(sxs('torrent.addFailed', error instanceof Error ? error.message : String(error)));
+      setTransferNotice({ text: sxs('torrent.addFailed', errorText(error)), bad: true });
     } finally {
       setAddingHash(null);
     }
-  };
-
-  const removeTransfer = (transfer: QbitTransferRow) => {
-    setTransfers((current) => current.filter((candidate) => candidate.hash !== transfer.hash));
-    setActiveTransferHash(null);
-    setTransferNotice(`${transfer.name} removed from the local mirror. Downloaded files were kept.`);
   };
 
   // Each of these IS the disabled condition, not a caption written beside one:
@@ -358,6 +379,11 @@ export default function TorrentManagerPage() {
     sx('why.noRules'),
   ]);
   const whyClearSelection = firstReason(unselected);
+  // One action at a time per transfer: a second click while qBittorrent is
+  // still answering the first would race it.
+  const whyActing = activeTransfer
+    ? firstReason([actingHash === activeTransfer.hash, sx('why.busy')])
+    : undefined;
 
   return (
     <div className="scr-page scr-page--torrents">
@@ -665,7 +691,7 @@ export default function TorrentManagerPage() {
         {sendReport && (
           <div className="scr-send-report">
             <b>
-              {sendReport.sent} sent · {sendReport.skipped} skipped · {sendReport.failed} failed
+              {sx3('result.sendSummary', sendReport.sent, sendReport.skipped, sendReport.failed)}
             </b>
             <ul>
               {sendReport.details.slice(0, 6).map((detail) => (
@@ -710,7 +736,7 @@ export default function TorrentManagerPage() {
           >
             {MIRROR_COLUMNS.map(([col, label]) => (
               <div key={col} role="columnheader" className="scr-th" data-col={col}>
-                {label}
+                {label ? sx(label) : ''}
               </div>
             ))}
           </div>
@@ -775,11 +801,12 @@ export default function TorrentManagerPage() {
                   </div>
                   <div role="gridcell" className="scr-td scr-td--center" data-col="actions">
                     <IconButton
-                      label={`Actions for ${t.name}`}
+                      label={sxs('torrent.actionsFor', t.name)}
                       size="sm"
                       onClick={() => {
                         setActiveTransferHash(t.hash);
-                        setTransferNotice('');
+                        setConfirmRemoveHash(null);
+                        setTransferNotice(null);
                       }}
                     >
                       <Icon name="settings" size={13} />
@@ -791,30 +818,46 @@ export default function TorrentManagerPage() {
           </div>
         </div>
         {activeTransfer && (
-          <section className="scr-transfer-inspector" aria-label={`Transfer actions for ${activeTransfer.name}`}>
+          <section className="scr-transfer-inspector" aria-label={sxs('torrent.inspectorFor', activeTransfer.name)}>
             <div className="scr-transfer-inspector-head">
               <div>
-                <span className="scr-micro-label">Selected transfer</span>
+                <span className="scr-micro-label">{sx('torrent.selectedTransfer')}</span>
                 <strong>{activeTransfer.name}</strong>
                 <small>{activeTransfer.savePath}</small>
               </div>
-              <IconButton label="Close transfer actions" size="sm" onClick={() => setActiveTransferHash(null)}>
+              <IconButton label={sx('torrent.closeActions')} size="sm" onClick={() => setActiveTransferHash(null)}>
                 <Icon name="close" size={13} />
               </IconButton>
             </div>
             <div className="scr-transfer-inspector-stats">
-              <span><small>State</small><Pill tone={STATE_TONE[activeTransfer.state]}>{activeTransfer.state}</Pill></span>
-              <span><small>Progress</small><b>{Math.round(activeTransfer.progress * 100)}%</b></span>
-              <span><small>Availability</small><b>{activeTransfer.availability.toFixed(2)}</b></span>
-              <span><small>Ratio</small><b>{activeTransfer.ratio.toFixed(2)}</b></span>
-              <span><small>Peers</small><b>{activeTransfer.peersConnected}/{activeTransfer.peersTotal}</b></span>
+              <span><small>{sx('torrent.col.state')}</small><Pill tone={STATE_TONE[activeTransfer.state]}>{activeTransfer.state}</Pill></span>
+              <span><small>{sx('torrent.col.progress')}</small><b>{Math.round(activeTransfer.progress * 100)}%</b></span>
+              <span><small>{sx('torrent.col.availability')}</small><b>{activeTransfer.availability.toFixed(2)}</b></span>
+              <span><small>{sx('torrent.col.ratio')}</small><b>{activeTransfer.ratio.toFixed(2)}</b></span>
+              <span><small>{sx('torrent.col.peers')}</small><b>{activeTransfer.peersConnected}/{activeTransfer.peersTotal}</b></span>
             </div>
             <PieceStrip pieces={activeTransfer.pieceStates} />
             <div className="scr-page-actions">
-              <Button size="sm" variant="primary" onClick={() => toggleTransfer(activeTransfer)}>
-                {activeTransfer.state === 'paused' ? 'Resume transfer' : 'Pause transfer'}
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={!!whyActing}
+                title={whyActing}
+                onClick={() => void actOnTransfer(
+                  activeTransfer,
+                  activeTransfer.state === 'paused' ? 'resume' : 'pause',
+                )}
+              >
+                {sx(activeTransfer.state === 'paused' ? 'torrent.resumeTransfer' : 'torrent.pauseTransfer')}
               </Button>
-              <Button size="sm" onClick={() => recheckTransfer(activeTransfer)}>Force recheck</Button>
+              <Button
+                size="sm"
+                disabled={!!whyActing}
+                title={whyActing}
+                onClick={() => void actOnTransfer(activeTransfer, 'recheck')}
+              >
+                {sx('torrent.forceRecheck')}
+              </Button>
               <Button
                 size="sm"
                 disabled={activeTransfer.progress < 1 || addingHash === activeTransfer.hash}
@@ -830,17 +873,38 @@ export default function TorrentManagerPage() {
               </Button>
               <Button
                 size="sm"
-                onClick={() => setTransferNotice(`Save location: ${activeTransfer.savePath}`)}
+                onClick={() => setTransferNotice({
+                  text: sxs('torrent.saveLocation', activeTransfer.savePath),
+                  bad: false,
+                })}
               >
-                Show save location
+                {sx('torrent.showSaveLocation')}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => removeTransfer(activeTransfer)}>
-                Remove from mirror
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!!whyActing}
+                title={whyActing}
+                onClick={() => setConfirmRemoveHash(activeTransfer.hash)}
+              >
+                {sx('torrent.removeFromClient')}
               </Button>
             </div>
+            {confirmRemoveHash === activeTransfer.hash && (
+              <TransferRemoveConfirm
+                name={activeTransfer.name}
+                busy={actingHash === activeTransfer.hash}
+                onConfirm={(deleteFiles) => void actOnTransfer(activeTransfer, 'delete', deleteFiles)}
+                onCancel={() => setConfirmRemoveHash(null)}
+              />
+            )}
           </section>
         )}
-        {transferNotice && <p className="scr-action-notice" role="status">{transferNotice}</p>}
+        {transferNotice && (
+          <p className={`scr-action-notice${transferNotice.bad ? ' is-bad' : ''}`} role="status">
+            {transferNotice.text}
+          </p>
+        )}
       </ScrCard>
     </div>
   );
@@ -850,22 +914,21 @@ export default function TorrentManagerPage() {
 // `scraper.css` can drop a column and its header together. The track list itself is NOT
 // here any more: it lives on `.scr-table--mirror`, because an inline `grid-template-columns`
 // outranks a container query and made this table's 1582px min-content unreflowable.
-// (The labels stay the raw strings they already were; that pre-existing i18n gap is
-// unchanged by this slice and is recorded in the L8 ledger.)
-const MIRROR_COLUMNS: ReadonlyArray<readonly [string, string]> = [
-  ['name', 'Name'],
-  ['state', 'State'],
-  ['progress', 'Progress'],
-  ['down', '↓ Speed'],
-  ['up', '↑ Speed'],
-  ['eta', 'ETA'],
-  ['ratio', 'Ratio'],
-  ['seeds', 'Seeds'],
-  ['peers', 'Peers'],
-  ['avail', 'Avail.'],
-  ['size', 'Size'],
-  ['category', 'Category'],
-  ['tags', 'Tags'],
-  ['completed', 'Completed'],
+// Labels are string keys, resolved at render so a language switch reaches them.
+const MIRROR_COLUMNS: ReadonlyArray<readonly [string, ScraperTextKey | '']> = [
+  ['name', 'torrent.col.name'],
+  ['state', 'torrent.col.state'],
+  ['progress', 'torrent.col.progress'],
+  ['down', 'torrent.col.down'],
+  ['up', 'torrent.col.up'],
+  ['eta', 'torrent.col.eta'],
+  ['ratio', 'torrent.col.ratio'],
+  ['seeds', 'torrent.col.seeds'],
+  ['peers', 'torrent.col.peers'],
+  ['avail', 'torrent.col.availability'],
+  ['size', 'torrent.col.size'],
+  ['category', 'torrent.col.category'],
+  ['tags', 'torrent.col.tags'],
+  ['completed', 'torrent.col.completed'],
   ['actions', ''],
 ];

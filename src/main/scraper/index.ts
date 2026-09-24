@@ -16,8 +16,11 @@ import {
   type ScraperHttpProbeResult,
   type ScraperJobEventEnvelope,
   type ScraperMethod,
+  type ScraperFreeSpaceReport,
   type ScraperPluginInfo,
   type ScraperProbeInput,
+  type ScraperQbitActionInput,
+  type ScraperQbitActionReport,
   type ScraperQbitInput,
   type ScraperQbitSendInput,
   type ScraperSchedulerState,
@@ -38,6 +41,8 @@ import type {
   TorrentRow,
 } from '../../shared/scraperResults';
 import type { ScraperSourceEntry } from '../../shared/scraperSourceSettings';
+import type { ScraperSettings } from '../../shared/scraperSettings';
+import { runWithScraperRuntime, scraperRuntimeFor } from './runtime';
 import type {
   AcquisitionAction,
   AcquisitionActionResult,
@@ -60,10 +65,10 @@ import {
 import { noticesForFinishedJob } from '../../shared/scraperNotices';
 import { notifyScraper, setScraperNoticeSink } from './notifications';
 import { previousEpisodeIds, recordJob, storedResult, storedSummaries } from './history';
-import { listDownloads } from './downloads';
+import { downloadsFreeSpace, listDownloads } from './downloads';
 import { listExports, writeExport, type WriteExportRequest } from './exports';
 import { listPlugins } from './plugins';
-import { qbitSend, qbitTest, qbitTransfers } from './qbittorrent';
+import { qbitSend, qbitTest, qbitTorrentAction, qbitTransfers } from './qbittorrent';
 import { noteJobEvent, runScheduleNow, startScheduler, syncScheduler } from './scheduler';
 import { probeHttp } from './http';
 import { onScraperLog, recentScraperLogs, scraperLog } from './logBus';
@@ -101,6 +106,8 @@ const CAPABILITIES: ScraperMethod[] = [
   'qbitTest',
   'qbitTransfers',
   'qbitSend',
+  'qbitAction',
+  'freeSpace',
   'startScrape',
   'cancelScrape',
   'subscribeJob',
@@ -135,6 +142,33 @@ function subscribeLogs(sender: WebContents): void {
   });
   logSubscribers.set(sender.id, off);
   sender.once('destroyed', () => unsubscribeLogs(sender.id));
+}
+
+/**
+ * A search the user typed on the Torrent Manager, under the profile's request
+ * policy and its per-host Connection Profiles — but never from cache: a
+ * results table that answers from an hour-old copy of a live index reads as
+ * the index being wrong.
+ */
+export function directTorrentSearch(input: ScraperTorrentSearchInput): Promise<TorrentRow[]> {
+  if (!input?.settings) return searchTorrents(input);
+  const fresh = <T extends { cache: ScraperSettings['cache'] }>(groups: T): T => ({
+    ...groups,
+    cache: {
+      ...groups.cache,
+      mode: 'standard',
+      htmlEnabled: false,
+      metadataEnabled: false,
+      thumbnailsEnabled: false,
+    },
+  });
+  const hosts = Object.fromEntries(
+    Object.entries(input.context?.hosts ?? {}).map(([host, groups]) => [host, fresh(groups)]),
+  );
+  return runWithScraperRuntime(
+    scraperRuntimeFor(fresh(input.settings), 'torrents', hosts),
+    () => searchTorrents(input),
+  );
 }
 
 export function registerScraperIpc(): void {
@@ -188,7 +222,7 @@ export function registerScraperIpc(): void {
   ipcMain.handle(
     SCRAPER_CHANNELS.probeSource,
     async (_event, input: ScraperProbeInput): Promise<SourceStatus> =>
-      probeSource(input.entry, input.timeoutMs),
+      probeSource(input.entry, input.timeoutMs, input.path),
   );
 
   // The download dialog's first call: what units does this catalogue entry have?
@@ -203,7 +237,7 @@ export function registerScraperIpc(): void {
   ipcMain.handle(
     SCRAPER_CHANNELS.searchTorrents,
     async (_event, input: ScraperTorrentSearchInput): Promise<TorrentRow[]> =>
-      searchTorrents(input),
+      directTorrentSearch(input),
   );
 
   // Audit C1-3. Deliberately not a port method: `ScraperPort` is implemented by
@@ -229,6 +263,20 @@ export function registerScraperIpc(): void {
   ipcMain.handle(
     SCRAPER_CHANNELS.qbitSend,
     async (_event, input: ScraperQbitSendInput): Promise<QbitSendReport> => qbitSend(input),
+  );
+
+  // Pause, resume, recheck, retry and remove act on the user's real client —
+  // the Downloads page and Torrent Manager used to change only their own rows.
+  ipcMain.handle(
+    SCRAPER_CHANNELS.qbitAction,
+    async (_event, input: ScraperQbitActionInput): Promise<ScraperQbitActionReport> =>
+      qbitTorrentAction(input),
+  );
+
+  ipcMain.handle(
+    SCRAPER_CHANNELS.freeSpace,
+    async (_event, input: ScraperQbitInput): Promise<ScraperFreeSpaceReport> =>
+      downloadsFreeSpace(input),
   );
 
   // Secrets cross this boundary in one direction only: the renderer can store

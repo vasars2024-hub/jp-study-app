@@ -37,7 +37,13 @@ import type {
   StreamRow,
   TorrentRow,
 } from '../../../../shared/scraperResults';
-import { getActiveScraperSettings } from '../../../scraperSettingsStore';
+import {
+  getActiveScraperSettings,
+  loadScraperSettingsDocument,
+  onScraperSettingsChanged,
+  saveScraperSettingsDocument,
+} from '../../../scraperSettingsStore';
+import { formatBytes } from '../../../../shared/assetRegistry';
 import { scraperArtwork } from '../artwork';
 
 const STAGE_LABEL: Record<ScrapeStage, string> = {
@@ -86,6 +92,25 @@ export default function NewScrapePage() {
   const unsubscribe = useRef<(() => void) | null>(null);
 
   const settings = useMemo(() => getActiveScraperSettings(), []);
+  // The profile picker and the preflight line read the real document: they
+  // used to say "Balanced" whichever profile a run would actually use.
+  const [doc, setDoc] = useState(() => loadScraperSettingsDocument());
+  useEffect(() => onScraperSettingsChanged(setDoc), []);
+  const activeProfile = doc.profiles.find((profile) => profile.id === doc.activeProfileId) ?? null;
+  // Measured where downloads land; `null` renders as "unknown", never a guess.
+  const [freeBytes, setFreeBytes] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void port.freeSpace().then(
+      (report) => {
+        if (alive) setFreeBytes(report.bytes);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [port]);
   const languagePriority = settings.episodeProcessing.languagePriority;
 
   useEffect(
@@ -150,7 +175,7 @@ export default function NewScrapePage() {
             active: false,
             lastScrape: `${event.summary.provider} · ${event.summary.found}/${event.summary.found}`,
           });
-          void port.getResult(jobId).then(setResult);
+          void port.getResult(jobId).then(setResult, () => undefined);
           break;
         case 'error':
           setRun((prev) => ({ ...prev, stage: 'failed' }));
@@ -359,13 +384,12 @@ export default function NewScrapePage() {
             <label className="scr-micro-label" htmlFor="scr-profile">{sx('scrape.profile')}</label>
             <Select
               id="scr-profile"
-              value="balanced"
-              onChange={() => ctl.navigate('profiles')}
-              options={[
-                { value: 'fast', label: 'Fast' },
-                { value: 'balanced', label: 'Balanced' },
-                { value: 'thorough', label: 'Thorough' },
-              ]}
+              value={doc.activeProfileId}
+              onChange={(event) => setDoc(saveScraperSettingsDocument({
+                ...doc,
+                activeProfileId: event.target.value,
+              }))}
+              options={doc.profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
             />
           </div>
           <div>
@@ -400,8 +424,11 @@ export default function NewScrapePage() {
         <div className="scr-preflight">
           <span><b>{sx('scrape.preflightUrl')}</b> {preflight}</span>
           <span><b>{sx('scrape.preflightProvider')}</b> {looksLikeUrl ? sx('scrape.detected') : '—'}</span>
-          <span><b>{sx('scrape.preflightProfile')}</b> Balanced</span>
-          <span><b>{sx('scrape.preflightSpace')}</b> 412 GB</span>
+          <span><b>{sx('scrape.preflightProfile')}</b> {activeProfile?.name ?? '—'}</span>
+          <span>
+            <b>{sx('scrape.preflightSpace')}</b>{' '}
+            {freeBytes === null ? sx('downloads.freeUnknown') : formatBytes(freeBytes)}
+          </span>
         </div>
 
         {run.jobId && (

@@ -13,12 +13,11 @@ import { loadUnifiedSearchDocument } from './unifiedSearchStore';
  * Renderer-side wiring between the local Unified Search document and the search
  * coordinator ({@link createUnifiedSearchSession}).
  *
- * The document supplies the *inert* provider configuration; the coordinator
- * needs an executable registry. Concrete source connectors — the code that would
- * perform network requests, parse responses, authenticate, or resolve identities
- * — belong to a later phase. Until then every enabled provider is bound to an
- * inert executor so the coordinator and its UI can run deterministically with no
- * I/O and no third-party site access.
+ * The document supplies the provider configuration; the coordinator needs an
+ * executable registry. Each provider is bound by kind to a real connector when
+ * the caller supplies one (`unifiedSearchBackends.ts` has the catalogue and
+ * torrent-index connectors the app binds) and to the inert executor otherwise,
+ * which keeps the coordinator deterministic in tests and harnesses.
  */
 
 /** Performs no work: resolves to zero results without touching the network. */
@@ -32,13 +31,30 @@ export interface UnifiedSearchRegistryExecutors {
    * wired in this context). Site/metadata connectors are deferred to later phases.
    */
   localLibrary?: UnifiedSearchProviderExecutor;
+  /** Connector for `kind: 'metadata'` providers — the public catalogues. */
+  metadata?: UnifiedSearchProviderExecutor;
+  /** Connector for `kind: 'site'` and `kind: 'connector'` providers — the torrent indexes. */
+  sites?: UnifiedSearchProviderExecutor;
+}
+
+function executorForKind(
+  kind: UnifiedSearchDocument['providers'][number]['kind'],
+  executors: UnifiedSearchRegistryExecutors,
+): UnifiedSearchProviderExecutor {
+  switch (kind) {
+    case 'local-library':
+      return executors.localLibrary ?? inertExecutor;
+    case 'metadata':
+      return executors.metadata ?? inertExecutor;
+    default:
+      return executors.sites ?? inertExecutor;
+  }
 }
 
 /**
  * Assembles a provider registry from the enabled providers of a document, binding
  * each to a real executor by kind where one is supplied and to the inert executor
- * otherwise. So far only the offline `local-library` connector is real; every
- * other kind resolves cleanly with no results until its connector lands.
+ * otherwise.
  */
 export function createUnifiedSearchRegistry(
   document: UnifiedSearchDocument,
@@ -46,9 +62,7 @@ export function createUnifiedSearchRegistry(
 ): UnifiedSearchProviderRegistry {
   const registry: Record<string, UnifiedSearchProviderExecutor> = {};
   for (const provider of selectEnabledUnifiedSearchProviders(document)) {
-    registry[provider.id] = provider.kind === 'local-library' && executors.localLibrary
-      ? executors.localLibrary
-      : inertExecutor;
+    registry[provider.id] = executorForKind(provider.kind, executors);
   }
   return Object.freeze(registry);
 }
@@ -71,6 +85,10 @@ export interface RendererUnifiedSearchSessionOptions {
   buildRegistry?: (document: UnifiedSearchDocument) => UnifiedSearchProviderRegistry;
   /** Offline executor bound to `local-library` providers by the default registry. */
   localLibrary?: UnifiedSearchProviderExecutor;
+  /** Catalogue executor bound to `metadata` providers by the default registry. */
+  metadata?: UnifiedSearchProviderExecutor;
+  /** Index executor bound to `site` and `connector` providers by the default registry. */
+  sites?: UnifiedSearchProviderExecutor;
   concurrency?: number;
 }
 
@@ -85,7 +103,11 @@ export function createRendererUnifiedSearchSession(
   const loadDocument = options.loadDocument ?? loadUnifiedSearchDocument;
   const buildRegistry = options.buildRegistry
     ?? ((document: UnifiedSearchDocument) =>
-      createUnifiedSearchRegistry(document, { localLibrary: options.localLibrary }));
+      createUnifiedSearchRegistry(document, {
+        localLibrary: options.localLibrary,
+        metadata: options.metadata,
+        sites: options.sites,
+      }));
   // The coordinator calls `getDocument` then `getRegistry` within one search;
   // caching the plan's document keeps the registry aligned to the very providers
   // that were planned, and reads the store only once per search.

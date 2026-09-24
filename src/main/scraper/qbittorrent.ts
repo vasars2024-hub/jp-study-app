@@ -27,7 +27,13 @@ import {
   DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
   validateScraperQbittorrentSettings,
 } from '../../shared/scraperSourceSettings';
-import type { ScraperQbitInput, ScraperQbitSendInput } from '../../shared/scraperIpc';
+import {
+  QBIT_TORRENT_ACTIONS,
+  type ScraperQbitActionInput,
+  type ScraperQbitActionReport,
+  type ScraperQbitInput,
+  type ScraperQbitSendInput,
+} from '../../shared/scraperIpc';
 import {
   hasRenamePlaceholders,
   infoHashFromMagnet,
@@ -1558,6 +1564,143 @@ export async function qbitStart(
     return { ok: false, reason: failureReason(response, endpoint) };
   }
   return { ok: true, value: true };
+}
+
+/** Asks qBittorrent to re-verify a torrent's pieces against the files on disk. */
+export async function qbitRecheck(
+  input: ScraperQbitInput,
+  hash: string,
+): Promise<QbitOutcome<true>> {
+  const response = await authed(input, '/api/v2/torrents/recheck', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ hashes: hash.trim().toLowerCase() }).toString(),
+  });
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response, 'torrents/recheck') };
+  }
+  return { ok: true, value: true };
+}
+
+/**
+ * Removes a torrent from the user's client.
+ *
+ * Unlike `qbitDiscardSubtitleTorrent`, this is the user's own explicit action
+ * on their own transfer, so there is no category gate — but `deleteFiles` is
+ * never assumed. The caller has to say, and the screen asks, because "remove
+ * the transfer" and "delete what it downloaded" are different requests.
+ */
+export async function qbitDelete(
+  input: ScraperQbitInput,
+  hash: string,
+  deleteFiles: boolean,
+): Promise<QbitOutcome<true>> {
+  const response = await authed(input, '/api/v2/torrents/delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      hashes: hash.trim().toLowerCase(),
+      deleteFiles: deleteFiles ? 'true' : 'false',
+    }).toString(),
+  });
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response, 'torrents/delete') };
+  }
+  return { ok: true, value: true };
+}
+
+/** An info hash as qBittorrent prints it: v1 is 40 hex, v2 is 64. */
+const HASH_PATTERN = /^[0-9a-f]{1,64}$/;
+
+/**
+ * One user action on transfers the Downloads page or Torrent Manager shows.
+ *
+ * Every hash is attempted and reported on its own, so a batch where one
+ * transfer vanished between the list and the click still acts on the rest and
+ * says which one it could not touch. `retry` is a recheck followed by a start:
+ * what qBittorrent needs to leave an errored state, and a plain start for a
+ * paused one.
+ */
+export async function qbitTorrentAction(
+  rawInput: ScraperQbitActionInput,
+): Promise<ScraperQbitActionReport> {
+  const input = normalizeQbitInput(rawInput);
+  const action = rawInput?.action;
+  if (!QBIT_TORRENT_ACTIONS.includes(action)) {
+    return { ok: false, done: 0, failures: [{ hash: '', reason: 'Unknown action.' }] };
+  }
+  if (!input.config.enabled) {
+    return {
+      ok: false,
+      done: 0,
+      failures: [{ hash: '', reason: 'Sending to qBittorrent is turned off.' }],
+    };
+  }
+  const hashes = [...new Set((Array.isArray(rawInput.hashes) ? rawInput.hashes : [])
+    .map((hash) => String(hash ?? '').trim().toLowerCase()))];
+  const failures: { hash: string; reason: string }[] = [];
+  let done = 0;
+  for (const hash of hashes) {
+    if (!HASH_PATTERN.test(hash)) {
+      failures.push({ hash, reason: 'Not a torrent hash.' });
+      continue;
+    }
+    let outcome: QbitOutcome<true>;
+    switch (action) {
+      case 'pause':
+        outcome = await qbitStop(input, hash);
+        break;
+      case 'resume':
+        outcome = await qbitStart(input, hash);
+        break;
+      case 'recheck':
+        outcome = await qbitRecheck(input, hash);
+        break;
+      case 'retry': {
+        const checked = await qbitRecheck(input, hash);
+        outcome = checked.ok ? await qbitStart(input, hash) : checked;
+        break;
+      }
+      case 'delete':
+        outcome = await qbitDelete(input, hash, rawInput.deleteFiles === true);
+        break;
+    }
+    if (outcome.ok) done += 1;
+    else failures.push({ hash, reason: outcome.reason });
+  }
+  scraperLog(
+    failures.length ? 'warn' : 'info',
+    'qbit',
+    `${action}: ${done} of ${hashes.length} transfer(s)${
+      action === 'delete' ? (rawInput.deleteFiles === true ? ', files deleted' : ', files kept') : ''
+    }.`,
+  );
+  return { ok: failures.length === 0 && hashes.length > 0, done, failures };
+}
+
+/**
+ * Free space where qBittorrent saves, in qBittorrent's own words.
+ *
+ * `sync/maindata` reports `free_space_on_disk` for the default save path, which
+ * is the one number that stays right when the client runs on another machine —
+ * a local `statfs` of a path that only exists over there would be a guess.
+ */
+export async function qbitFreeSpace(
+  rawInput: ScraperQbitInput,
+): Promise<QbitPollOutcome<number>> {
+  const input = normalizeQbitInput(rawInput);
+  if (!input.config.enabled) return { ok: false, reason: 'qBittorrent is not enabled.', status: 'unknown' };
+  const response = await authed(input, '/api/v2/sync/maindata?rid=0', { maxBytes: MAX_BODY_BYTES_CEILING });
+  if ('error' in response || response.status !== 200) return pollFailure(response, 'sync/maindata');
+  try {
+    const parsed = JSON.parse(response.body) as { server_state?: { free_space_on_disk?: unknown } };
+    const free = parsed?.server_state?.free_space_on_disk;
+    return typeof free === 'number' && Number.isFinite(free) && free >= 0
+      ? { ok: true, value: free }
+      : { ok: false, reason: 'qBittorrent did not report free space.', status: 'unknown' };
+  } catch {
+    return { ok: false, reason: 'The sync data was not valid JSON.', status: 'unknown' };
+  }
 }
 
 export interface QbitAwaitOptions {

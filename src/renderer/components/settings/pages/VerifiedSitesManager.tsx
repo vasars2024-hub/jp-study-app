@@ -3,6 +3,7 @@ import {
   removeVerifiedSite,
   findVerifiedSiteDuplicateGroups,
   promoteVerifiedSite,
+  recordVerifiedSiteTest,
   reconcileVerifiedSiteDuplicates,
   reviewPromotionEligibility,
   upsertVerifiedSite,
@@ -28,6 +29,7 @@ import {
   type FmhyDirectoryReconciliation,
 } from '../../../../shared/fmhyDirectoryImport';
 import SettingsCard from '../SettingsCard';
+import { probeVerifiedSite } from '../../../verifiedSiteProbe';
 import { confirmDialog } from '../../ui';
 import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
@@ -131,6 +133,8 @@ export default function VerifiedSitesManager() {
   const [fmhyHtml, setFmhyHtml] = useState('');
   const [fmhyReview, setFmhyReview] = useState<{ parsed: FmhyDirectoryImportResult; reconciliation: FmhyDirectoryReconciliation; html: string } | null>(null);
   const [fmhySnapshot, setFmhySnapshot] = useState(loadFmhyDirectorySnapshot);
+  /** The site a compatibility test is running for; one at a time. */
+  const [testingId, setTestingId] = useState<string | null>(null);
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return document.sites.filter((site) => (status === 'all' || site.status === status)
@@ -148,6 +152,49 @@ export default function VerifiedSitesManager() {
     setDraft(site ? { ...site, compatibility: { ...site.compatibility }, supportedContent: [...site.supportedContent] } : blankDraft());
     setMessage(null);
   };
+  /**
+   * Runs a real compatibility test and records what it measured. With
+   * `promote`, the site is marked Verified only when the test passes —
+   * MASTER_PLAN §4's "run compatibility tests before marking a site as
+   * Verified", which the Promote button used to skip.
+   */
+  const testSite = async (site: VerifiedSiteRecord, promote = false) => {
+    setTestingId(site.id);
+    setMessage(null);
+    try {
+      const probe = await probeVerifiedSite(site);
+      // Re-read: the document may have changed while the request was out.
+      const recorded = recordVerifiedSiteTest(loadVerifiedSitesDocument(), site.id, probe);
+      let next = recorded.document;
+      if (promote && recorded.passed) {
+        const promoted = promoteVerifiedSite(next, site.id);
+        if (promoted.issues.length) {
+          persist(next);
+          setMessage(promoted.issues[0].message);
+          return;
+        }
+        next = promoted.value;
+      }
+      persist(next);
+      const rate = next.sites.find((item) => item.id === site.id)?.successRate ?? 0;
+      if (!recorded.passed) {
+        const reason = [t(`scrApp.health.${probe.health}`), probe.note].filter(Boolean).join(' — ');
+        setMessage(t(promote ? 'verifiedSites.msg.promoteBlocked' : 'verifiedSites.msg.testFailed', { name: site.name, reason }));
+      } else {
+        setMessage(promote
+          ? t('verifiedSites.msg.promoted', { name: site.name })
+          : t('verifiedSites.msg.testPassed', { name: site.name, rate }));
+      }
+    } catch (error) {
+      setMessage(t('verifiedSites.msg.testError', {
+        name: site.name,
+        reason: error instanceof Error ? error.message : String(error),
+      }));
+    } finally {
+      setTestingId(null);
+    }
+  };
+
   const saveDraft = () => {
     if (!draft) return;
     const baseId = draft.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'site';
@@ -191,14 +238,18 @@ export default function VerifiedSitesManager() {
               <a href={site.baseUrl} onClick={(event) => event.preventDefault()}>{site.baseUrl}</a>
               <span className="muted">{site.source === 'fmhy' ? `FMHY · ${site.sourceCategory ?? t('verifiedSites.uncategorized')}` : t(CATEGORY_KEY[site.category] ?? 'verifiedSites.category.mixed')} · {site.languages.join(', ') || t('verifiedSites.noLanguages')} · {t('verifiedSites.reliability', { score: site.reliabilityScore })}</span>
               <span className="muted">{t('verifiedSites.rowMeta', { source: sourceLabel(site.source, t), promotion: t(PROMOTION_KEY[site.promotionEligibility] ?? 'verifiedSites.promotion.notReviewed') })}</span>
+              <span className="muted">
+                {site.lastVerifiedAt
+                  ? t('verifiedSites.lastVerifiedAt', { at: new Date(site.lastVerifiedAt).toLocaleString(LANG_TAGS[lang]), rate: site.successRate ?? 0 })
+                  : t('verifiedSites.neverTested')}
+              </span>
             </div>
             <span className={`verified-site-status status-${site.status}`}>{t(STATUS_KEY[site.status] ?? 'verifiedSites.status.unverified')}</span>
+            <button type="button" className="btn small" disabled={testingId !== null} onClick={() => void testSite(site)}>
+              {testingId === site.id ? t('verifiedSites.testing') : t('verifiedSites.test')}
+            </button>
             <button type="button" className="btn small" onClick={() => startEdit(site)}>{t('verifiedSites.edit')}</button>
-            {site.status !== 'verified' && <button type="button" className="btn small" disabled={site.source !== 'built-in' && site.promotionEligibility !== 'eligible'} onClick={() => {
-              const promoted = promoteVerifiedSite(document, site.id);
-              if (promoted.issues.length) setMessage(promoted.issues[0].message);
-              else { persist(promoted.value); setMessage(t('verifiedSites.msg.promoted', { name: site.name })); }
-            }}>{t('verifiedSites.promote')}</button>}
+            {site.status !== 'verified' && <button type="button" className="btn small" title={t('verifiedSites.promoteHint')} disabled={testingId !== null || (site.source !== 'built-in' && site.promotionEligibility !== 'eligible')} onClick={() => void testSite(site, true)}>{t('verifiedSites.promote')}</button>}
             <button type="button" className="btn small danger" onClick={() => void (async () => {
               const ok = await confirmDialog({
                 title: t('verifiedSites.delete'),
@@ -226,11 +277,12 @@ export default function VerifiedSitesManager() {
             <label>{t('verifiedSites.field.languages')}<input value={draft.languages.join(', ')} placeholder="ja, en" onChange={(event) => patch('languages', splitList(event.currentTarget.value))} /></label>
             <label>{t('verifiedSites.field.countryCode')}<input maxLength={2} value={draft.countryCode ?? ''} placeholder="JP" onChange={(event) => patch('countryCode', event.currentTarget.value || null)} /></label>
             <label>{t('verifiedSites.field.scraperVersion')}<input value={draft.scraperVersion} onChange={(event) => patch('scraperVersion', event.currentTarget.value)} /></label>
-            <label>{t('verifiedSites.field.reliability')}<input type="number" min={0} max={100} value={draft.reliabilityScore} onChange={(event) => patch('reliabilityScore', Number(event.currentTarget.value))} /></label>
-            <label>{t('verifiedSites.field.successRate')}<input type="number" min={0} max={100} value={draft.successRate ?? ''} onChange={(event) => patch('successRate', event.currentTarget.value === '' ? null : Number(event.currentTarget.value))} /></label>
-            <label>{t('verifiedSites.field.avgScrapeTime')}<input type="number" min={0} value={draft.averageScrapeTimeMs ?? ''} onChange={(event) => patch('averageScrapeTimeMs', event.currentTarget.value === '' ? null : Number(event.currentTarget.value))} /></label>
-            <label>{t('verifiedSites.field.lastVerified')}<input type="date" value={localDate(draft.lastVerifiedAt)} onChange={(event) => patch('lastVerifiedAt', event.currentTarget.value || null)} /></label>
-            <label>{t('verifiedSites.field.lastScrape')}<input type="date" value={localDate(draft.lastSuccessfulScrapeAt)} onChange={(event) => patch('lastSuccessfulScrapeAt', event.currentTarget.value || null)} /></label>
+            {/* Measured, not typed: Test site writes these from a real request. */}
+            <label>{t('verifiedSites.field.reliability')}<output>{draft.lastVerifiedAt || draft.successRate !== null ? draft.reliabilityScore : t('verifiedSites.notMeasured')}</output></label>
+            <label>{t('verifiedSites.field.successRate')}<output>{draft.successRate ?? t('verifiedSites.notMeasured')}</output></label>
+            <label>{t('verifiedSites.field.lastVerified')}<output>{localDate(draft.lastVerifiedAt) || t('verifiedSites.notMeasured')}</output></label>
+            <label>{t('verifiedSites.field.avgScrapeTime')}<output>{draft.averageScrapeTimeMs ?? t('verifiedSites.notMeasured')}</output></label>
+            <label>{t('verifiedSites.field.lastScrape')}<output>{localDate(draft.lastSuccessfulScrapeAt) || t('verifiedSites.notMeasured')}</output></label>
             <label>{t('verifiedSites.field.iconUrl')}<input type="url" value={draft.iconUrl ?? ''} onChange={(event) => patch('iconUrl', event.currentTarget.value || null)} /></label>
             <label>{t('verifiedSites.field.tags')}<input value={draft.tags.join(', ')} onChange={(event) => patch('tags', splitList(event.currentTarget.value))} /></label>
           </div>

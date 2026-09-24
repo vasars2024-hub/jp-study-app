@@ -5,9 +5,10 @@
 // everything after that: a real file on a real path, and a record of it that
 // survives a restart so the Exports page lists history rather than fixtures.
 //
-// The path comes from a save dialog rather than from settings, because
-// `destinationRef` is explicitly documented as a handle main resolves — a
-// renderer-supplied absolute path is exactly what should not be trusted here.
+// The path comes from a save dialog rather than from settings: the user always
+// confirms where a file lands. `destinationRef` (the Export group's Destination)
+// is where that dialog OPENS, and only when main can see it is an existing
+// directory — anything else falls back to Downloads, as the field's hint says.
 
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -29,6 +30,23 @@ interface ExportsFile {
 }
 
 const EMPTY: ExportsFile = { exports: [] };
+
+/**
+ * The folder the save dialog opens in: the configured destination when it is
+ * an absolute path to an existing directory, the user's Downloads otherwise.
+ */
+export async function exportStartFolder(destinationRef: string): Promise<string> {
+  const candidate = typeof destinationRef === 'string' ? destinationRef.trim() : '';
+  if (candidate && path.isAbsolute(candidate)) {
+    try {
+      if ((await fsp.stat(candidate)).isDirectory()) return candidate;
+    } catch {
+      /* unreadable or missing — fall through */
+    }
+    scraperLog('warn', 'export', `Export destination ${candidate} is not a folder; opening Downloads.`);
+  }
+  return app.getPath('downloads');
+}
 
 /** Keeps a user-supplied name from becoming a path. */
 export function safeFileName(name: string, fallback = 'anime-export'): string {
@@ -73,7 +91,7 @@ export interface WriteExportRequest extends ScraperExportInput {
  */
 export async function writeExport(request: WriteExportRequest): Promise<ExportRecord | null> {
   const name = safeFileName(request.defaultName);
-  const suggested = path.join(app.getPath('downloads'), name);
+  const suggested = path.join(await exportStartFolder(request.destination), name);
   const choice = await dialog.showSaveDialog({
     title: 'Save export',
     defaultPath: suggested,

@@ -400,6 +400,28 @@ describe('a scrape run', () => {
     expect(events.at(-1)?.kind).toBe('done');
   });
 
+  it('records how long each stage actually took, in the order it ran', async () => {
+    // A slow episode list makes the fetching stage measurably the longest one —
+    // the old History chart gave every run the same fixed split.
+    catalogue.delayMs = 60;
+    const { events } = await runJob(settingsWith());
+    const done = events.find((e) => e.kind === 'done') as { summary: { stageTimings?: { stage: string; ms: number }[] } };
+    const timings = done.summary.stageTimings ?? [];
+    expect(timings.map((t) => t.stage)).toEqual([
+      'queued',
+      'searching',
+      'fetching',
+      'streams',
+      'parsing',
+      'subtitles',
+      'validating',
+    ]);
+    expect(timings.every((t) => t.ms >= 0)).toBe(true);
+    const fetching = timings.find((t) => t.stage === 'fetching')?.ms ?? 0;
+    expect(fetching).toBeGreaterThanOrEqual(50);
+    expect(fetching).toBe(Math.max(...timings.map((t) => t.ms)));
+  });
+
   it('streams one row event per episode before it finishes', async () => {
     const { events } = await runJob(settingsWith());
     const rows = events.filter((e) => e.kind === 'row');
