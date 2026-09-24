@@ -32,8 +32,8 @@
  */
 
 import { app } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   METADATA_ACCEPT_CONFIDENCE,
   pickMetadataMatch,
@@ -143,20 +143,13 @@ function attemptsPath(): string {
 }
 
 function readAttempts(): Record<string, WatchAttempt> {
-  try {
-    const raw = JSON.parse(fs.readFileSync(attemptsPath(), 'utf-8')) as { titles?: Record<string, WatchAttempt> };
-    return raw && typeof raw.titles === 'object' && raw.titles ? raw.titles : {};
-  } catch {
-    return {};
-  }
+  const raw = readJsonSync<{ titles?: Record<string, WatchAttempt> } | null>(attemptsPath(), null);
+  return raw && typeof raw.titles === 'object' && raw.titles ? raw.titles : {};
 }
 
 function writeAttempts(titles: Record<string, WatchAttempt>): void {
   try {
-    const target = attemptsPath();
-    const temp = `${target}.${process.pid}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify({ version: 1, titles }), 'utf-8');
-    fs.renameSync(temp, target);
+    writeJsonAtomicSync(attemptsPath(), { version: 1, titles }, { space: 0, backup: false });
   } catch {
     /* an unwritten attempt only means the title is asked again next time */
   }

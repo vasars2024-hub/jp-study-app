@@ -12,8 +12,8 @@
  */
 
 import { app } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from './atomicJson';
 import {
   READING_LENS_HISTORY_LIMIT,
   READING_LENS_HISTORY_VERSION,
@@ -68,7 +68,7 @@ function load(): ReadingLensHistoryEntry[] {
   if (entries) return entries;
   let loaded: ReadingLensHistoryEntry[];
   try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(historyPath(), 'utf8'));
+    const parsed = readJsonSync<unknown>(historyPath(), null);
     loaded = normalizeReadingLensHistory(parsed);
     retentionDays = normalizeReadingLensRetentionDays(
       parsed && typeof parsed === 'object' && !Array.isArray(parsed)
@@ -92,15 +92,11 @@ function load(): ReadingLensHistoryEntry[] {
 
 function persist(): void {
   try {
-    fs.writeFileSync(
-      historyPath(),
-      JSON.stringify(
-        { schemaVersion: READING_LENS_HISTORY_VERSION, retentionDays, entries: entries ?? [] },
-        null,
-        2,
-      ),
-      'utf8',
-    );
+    writeJsonAtomicSync(historyPath(), {
+      schemaVersion: READING_LENS_HISTORY_VERSION,
+      retentionDays,
+      entries: entries ?? [],
+    });
   } catch (err) {
     console.error('[readingLensHistory] failed to persist', err);
   }
@@ -190,6 +186,7 @@ export function setCapturePinned(captureId: unknown, pinned: unknown): ReadingLe
  * next read does not have to distinguish "cleared" from "never used". */
 export function clearCaptures(): void {
   entries = [];
+  removeJsonStore(historyPath()); // a clear must not survive in the last-good copy
   persist();
 }
 

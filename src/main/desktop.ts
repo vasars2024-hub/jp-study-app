@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import type {
@@ -15,6 +14,7 @@ import type {
   WindowSnapshot,
 } from '../shared/desktop';
 import { parsePresentation } from '../shared/liquidWindowState';
+import { readJsonDetailedSync, writeJsonAtomicSync } from './atomicJson';
 import {
   DEFAULT_ASSIGNMENT,
   DESKTOP_CITY,
@@ -54,9 +54,7 @@ function desktopStorePath(): string {
 }
 
 function atomicWriteJson(filePath: string, value: unknown): void {
-  const next = `${filePath}.tmp`;
-  fs.writeFileSync(next, JSON.stringify(value, null, 2), 'utf8');
-  fs.renameSync(next, filePath);
+  writeJsonAtomicSync(filePath, value);
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -292,16 +290,19 @@ class DesktopStore {
 
   private load(): DesktopLayoutStoreSchema {
     const filePath = desktopStorePath();
+    // A damaged file is moved aside (and `.bak` served) by the reader, so the
+    // reseed below only ever lands where there is nothing left to keep.
+    const read = readJsonDetailedSync<(Partial<DesktopLayoutStoreSchema> & {
+      /** v1/v2 shape — a record keyed 0/1, replaced by `desktops` in v3. */
+      viewports?: Record<number, unknown>;
+    }) | null>(filePath, null, { validate: isObject });
     try {
-      if (!fs.existsSync(filePath)) {
+      if (!read.value || read.source === 'missing' || read.source === 'fallback') {
         const seed = seedStore();
         atomicWriteJson(filePath, seed);
         return seed;
       }
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Partial<DesktopLayoutStoreSchema> & {
-        /** v1/v2 shape — a record keyed 0/1, replaced by `desktops` in v3. */
-        viewports?: Record<number, unknown>;
-      };
+      const parsed = read.value;
       const seed = seedStore();
       const fromVersion = typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : 1;
 
@@ -370,9 +371,9 @@ class DesktopStore {
 
       return next;
     } catch {
-      const seed = seedStore();
-      atomicWriteJson(filePath, seed);
-      return seed;
+      // Serve defaults but don't write them over a file that parsed: the next
+      // persist() keeps it as the `.bak` last-good copy.
+      return seedStore();
     }
   }
 

@@ -80,6 +80,7 @@ import { mergeMalExportEntries } from '../shared/malLibrary';
 import { MEDIA_LIBRARY_STORE_FILE, mediaItemsFromStoredDocument } from '../shared/mediaLibraryEntries';
 import { malLibraryFilePath, readMalLibrary, writeMalLibrary } from './malLibrary';
 import { mt } from './i18n';
+import { readJsonDetailedSync, readJsonSync, writeJsonAtomicSync } from './atomicJson';
 
 // ---------------------------------------------------------------------------
 // Paths (overridable for tests)
@@ -124,7 +125,7 @@ function sameStamp(a: FileStamp | null, b: FileStamp | null): boolean {
 let documentCache: { stamp: FileStamp; document: WatchLibraryDocument } | null = null;
 
 /**
- * Moves an unreadable or newer-schema file aside before it could be overwritten.
+ * Moves a newer-schema file aside before it could be overwritten.
  * The library then starts empty, but the old bytes are evidence, not garbage.
  */
 function quarantine(file: string, label: string): void {
@@ -140,14 +141,10 @@ export function readWatchLibrary(): WatchLibraryDocument {
   const stamp = stampOf(file);
   if (!stamp) return emptyWatchLibrary();
   if (documentCache && sameStamp(documentCache.stamp, stamp)) return documentCache.document;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf-8'));
-  } catch {
-    quarantine(file, 'corrupt');
-    return emptyWatchLibrary();
-  }
-  const document = parseWatchLibraryDocument(raw);
+  // A damaged file is moved aside (`.corrupt-<ts>`) and `.bak` served by the reader.
+  const read = readJsonDetailedSync<unknown>(file, null);
+  if (read.source === 'missing' || read.source === 'fallback') return emptyWatchLibrary();
+  const document = parseWatchLibraryDocument(read.value);
   if (document.version > WATCH_LIBRARY_SCHEMA_VERSION) {
     // Reading a newer document with older rules would drop what this version
     // does not know and write the loss back on the next change.
@@ -161,10 +158,7 @@ export function readWatchLibrary(): WatchLibraryDocument {
 /** Atomic: rename-over in the same directory, so a crash leaves the previous file. */
 export function writeWatchLibrary(document: WatchLibraryDocument): void {
   const target = watchPath();
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  const temp = `${target}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(document, null, 2), 'utf-8');
-  fs.renameSync(temp, target);
+  writeJsonAtomicSync(target, document);
   const stamp = stampOf(target);
   documentCache = stamp ? { stamp, document } : null;
 }
@@ -180,13 +174,8 @@ function readMediaItems(): WatchLinkableMedia[] {
   const stamp = stampOf(file);
   if (!stamp) return [];
   if (mediaCache && sameStamp(mediaCache.stamp, stamp)) return mediaCache.items;
-  let items: WatchLinkableMedia[] = [];
-  try {
-    items = mediaItemsFromStoredDocument(JSON.parse(fs.readFileSync(file, 'utf-8')))
-      .filter((item) => item && typeof item.id === 'string') as WatchLinkableMedia[];
-  } catch {
-    items = [];
-  }
+  const items = mediaItemsFromStoredDocument(readJsonSync<unknown>(file, null))
+    .filter((item) => item && typeof item.id === 'string') as WatchLinkableMedia[];
   mediaCache = { stamp, items };
   return items;
 }

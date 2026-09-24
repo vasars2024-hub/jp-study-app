@@ -1,6 +1,6 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, ipcMain, type BrowserWindowConstructorOptions } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 
 /** Native OS frame + in-app chrome behavior. */
 export type WindowChromeMode = 'standard' | 'borderless' | 'frameless';
@@ -26,8 +26,9 @@ function parseMode(v: unknown): WindowChromeMode {
 
 export function loadWindowChromePrefs(): WindowChromePrefs {
   try {
-    const raw = fs.readFileSync(prefsPath(), 'utf8');
-    const parsed = JSON.parse(raw) as { mode?: unknown; borderless?: boolean };
+    const parsed = readJsonSync<{ mode?: unknown; borderless?: boolean }>(prefsPath(), {}, {
+      validate: (v) => typeof v === 'object' && v !== null,
+    });
     if (parsed.mode !== undefined) return { mode: parseMode(parsed.mode) };
     return { mode: parseMode(parsed.borderless) };
   } catch {
@@ -37,8 +38,7 @@ export function loadWindowChromePrefs(): WindowChromePrefs {
 
 export function saveWindowChromePrefs(prefs: WindowChromePrefs): void {
   try {
-    fs.mkdirSync(path.dirname(prefsPath()), { recursive: true });
-    fs.writeFileSync(prefsPath(), JSON.stringify({ mode: prefs.mode }));
+    writeJsonAtomicSync(prefsPath(), { mode: prefs.mode }, { space: 0 });
   } catch {
     /* ignore */
   }

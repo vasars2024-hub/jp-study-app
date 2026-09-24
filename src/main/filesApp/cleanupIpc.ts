@@ -41,6 +41,9 @@ import {
 } from '../../shared/filesApp/cleanup';
 import { isIncompleteName } from '../../shared/filesApp/scan';
 import { isAbsoluteFilePath, type FilesIpcHandleRegistrar } from './deletionIpc';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
+
+const isJsonObject = (value: unknown): boolean => value !== null && typeof value === 'object';
 
 export {
   FILES_CLEANUP_PLAN_CHANNEL,
@@ -298,18 +301,14 @@ export function relocateMediaRow(userDataPath: string, itemId: string, newPath: 
   const rowId = itemId.startsWith('media:') ? itemId.slice('media:'.length) : null;
   if (!rowId) return false;
   const file = path.join(userDataPath, MEDIA_LIBRARY_STORE_FILE);
-  let doc: { items?: { id?: unknown; path?: unknown }[] };
-  try {
-    doc = JSON.parse(fs.readFileSync(file, 'utf-8')) as typeof doc;
-  } catch {
-    return false;
-  }
+  const doc = readJsonSync<{ items?: { id?: unknown; path?: unknown }[] } | null>(file, null, { validate: isJsonObject });
+  if (!doc) return false;
   if (!Array.isArray(doc.items)) return false;
   const row = doc.items.find((candidate) => candidate?.id === rowId);
   if (!row) return false;
   row.path = newPath;
   try {
-    fs.writeFileSync(file, JSON.stringify(doc, null, 2), 'utf-8');
+    writeJsonAtomicSync(file, doc);
   } catch {
     return false;
   }
@@ -383,18 +382,14 @@ export function softDeleteMediaRow(
   const rowId = itemId.startsWith('media:') ? itemId.slice('media:'.length) : null;
   if (!rowId) return null;
   const file = path.join(userDataPath, MEDIA_LIBRARY_STORE_FILE);
-  let doc: { items?: { id?: unknown }[] };
-  try {
-    doc = JSON.parse(fs.readFileSync(file, 'utf-8')) as typeof doc;
-  } catch {
-    return null;
-  }
+  const doc = readJsonSync<{ items?: { id?: unknown }[] } | null>(file, null, { validate: isJsonObject });
+  if (!doc) return null;
   if (!Array.isArray(doc.items)) return null;
   const index = doc.items.findIndex((candidate) => candidate?.id === rowId);
   if (index < 0) return null;
   const [row] = doc.items.splice(index, 1);
   try {
-    fs.writeFileSync(file, JSON.stringify(doc, null, 2), 'utf-8');
+    writeJsonAtomicSync(file, doc);
   } catch {
     return null;
   }
@@ -408,16 +403,12 @@ export function undoSoftDeletedMediaRow(userDataPath: string, undoToken: unknown
   const row = mediaUndoRows.get(undoToken);
   if (row === undefined) return false;
   const file = path.join(userDataPath, MEDIA_LIBRARY_STORE_FILE);
-  let doc: { items?: unknown[] };
-  try {
-    doc = JSON.parse(fs.readFileSync(file, 'utf-8')) as typeof doc;
-  } catch {
-    return false;
-  }
+  const doc = readJsonSync<{ items?: unknown[] } | null>(file, null, { validate: isJsonObject });
+  if (!doc) return false;
   if (!Array.isArray(doc.items)) doc.items = [];
   doc.items.push(row);
   try {
-    fs.writeFileSync(file, JSON.stringify(doc, null, 2), 'utf-8');
+    writeJsonAtomicSync(file, doc);
   } catch {
     return false;
   }

@@ -13,8 +13,8 @@
 // decides that.
 
 import { app } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 
 import {
   ANKI_DRAFT_SESSION_STORE_FILE,
@@ -77,13 +77,11 @@ function isUsable(value: unknown): value is AnkiDraftSession {
 
 function load(): AnkiDraftSession[] {
   if (cache) return cache;
-  let parsed: SessionFile | null = null;
-  try {
-    parsed = JSON.parse(fs.readFileSync(storePath(), 'utf8')) as SessionFile;
-  } catch {
-    // Absent or unreadable is the normal first-run state, not an error.
-    parsed = null;
-  }
+  // Absent is the normal first-run state; a damaged file is quarantined and
+  // its last-good copy served.
+  const parsed = readJsonSync<SessionFile | null>(storePath(), null, {
+    validate: (v) => !!v && typeof v === 'object' && Array.isArray((v as SessionFile).sessions),
+  });
   const now = Date.now();
   const raw = Array.isArray(parsed?.sessions) ? parsed.sessions : [];
   cache = raw
@@ -95,14 +93,10 @@ function load(): AnkiDraftSession[] {
 
 function persist(sessions: AnkiDraftSession[]): void {
   const file: SessionFile = { version: ANKI_DRAFT_SESSION_VERSION, sessions };
-  const target = storePath();
-  const tmp = `${target}.tmp`;
   try {
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    // Write-then-rename: a crash during the write must not turn a readable file
+    // Atomic write: a crash during the write must not turn a readable file
     // of resumable sessions into a truncated one that load() then discards.
-    fs.writeFileSync(tmp, JSON.stringify(file, null, 2), 'utf8');
-    fs.renameSync(tmp, target);
+    writeJsonAtomicSync(storePath(), file);
   } catch (err) {
     console.error('[anki] could not persist draft sessions:', err);
   }

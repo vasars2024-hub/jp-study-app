@@ -3,9 +3,9 @@
 // -> SWITCHING pathways and the monotonically increasing profileEpoch that
 // epoch-guards all long-running Anki work (invariant P-4).
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { readJsonDetailedSync, writeJsonAtomicSync } from './atomicJson';
 import type {
   CardBlueprint,
   DeckParams,
@@ -87,27 +87,27 @@ export class ProfileStore {
 
   private load(): ProfileStoreSchema {
     const file = this.storePath();
+    // A damaged or unknown-schemaVersion file is moved aside (and `.bak`
+    // served) by the reader, so seeding below never overwrites it.
+    const read = readJsonDetailedSync<Record<string, unknown> | null>(file, null, {
+      validate: (v) => isPlainObject(v) && v.schemaVersion === 1,
+    });
     try {
-      if (!fs.existsSync(file)) {
-        // Missing file is the normal first boot (T2).
+      if (!read.value || read.source === 'missing' || read.source === 'fallback') {
+        // Missing file is the normal first boot (T2). FAULT: rebuild from
+        // seeds; the app never refuses to start over profile data (T2, AC-11).
+        if (read.source === 'fallback') console.error('[profiles] store unreadable, rebuilding from seeds:', read.error);
         const fresh = seedSchema();
         this.persistSchema(fresh);
         return fresh;
       }
-      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as Record<string, unknown>;
-      if (!isPlainObject(parsed) || parsed.schemaVersion !== 1) {
-        throw new Error(`unknown schemaVersion: ${String((parsed as { schemaVersion?: unknown })?.schemaVersion)}`);
-      }
-      const backfilled = this.backfill(parsed);
+      const backfilled = this.backfill(read.value);
       this.persistSchema(backfilled); // write back any seeded gaps
       return backfilled;
     } catch (err) {
-      // FAULT: rebuild from seeds; the app never refuses to start over
-      // profile data (T2, AC-11).
+      // Serve seeds, but don't write them over a file that parsed.
       console.error('[profiles] store unreadable, rebuilding from seeds:', err);
-      const fresh = seedSchema();
-      this.persistSchema(fresh);
-      return fresh;
+      return seedSchema();
     }
   }
 
@@ -281,10 +281,7 @@ export class ProfileStore {
 
   private persistSchema(schema: ProfileStoreSchema): void {
     try {
-      const file = this.storePath();
-      const tmp = `${file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(schema, null, 2), 'utf-8');
-      fs.renameSync(tmp, file);
+      writeJsonAtomicSync(this.storePath(), schema);
     } catch (err) {
       console.error('[profiles] persist failed:', err);
     }

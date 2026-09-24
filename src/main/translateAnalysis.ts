@@ -3,8 +3,8 @@
 // call per analyzed sentence, cached on disk next to the translation cache.
 // Mirrors translate.ts's cache shape and registerXIpc() structure.
 import { app, ipcMain } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import type { AiProviderId } from '../shared/mining';
 import {
@@ -31,22 +31,16 @@ function analysisCachePath(): string {
 
 function loadAnalysisCache(): AnalysisCacheFile {
   if (analysisCache) return analysisCache;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(analysisCachePath(), 'utf-8')) as AnalysisCacheFile;
-    analysisCache = parsed?.entries ? parsed : { entries: {} };
-  } catch {
-    analysisCache = { entries: {} };
-  }
+  analysisCache = readJsonSync<AnalysisCacheFile>(analysisCachePath(), () => ({ entries: {} }), {
+    validate: (v) => !!v && typeof v === 'object' && !!(v as AnalysisCacheFile).entries,
+  });
   return analysisCache;
 }
 
 function flushAnalysisCache(): void {
   if (!analysisCache || !analysisCacheDirty) return;
   try {
-    fs.mkdirSync(path.dirname(analysisCachePath()), { recursive: true });
-    const tmp = `${analysisCachePath()}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(analysisCache), 'utf-8');
-    fs.renameSync(tmp, analysisCachePath());
+    writeJsonAtomicSync(analysisCachePath(), analysisCache, { space: 0, backup: false });
     analysisCacheDirty = false;
   } catch {
     /* best-effort cache; ignore write failures */

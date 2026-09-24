@@ -53,7 +53,7 @@ import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerWatchLibraryIpc } from './main/watchLibrary';
 import { registerReleaseIpc } from './main/release';
 import { registerStorageRecoveryIpc } from './main/backup/storageRecovery';
-import { flushAllJsonWriters, setAtomicJsonLogger } from './main/atomicJson';
+import { flushAllJsonWriters, readJsonSync, setAtomicJsonLogger, writeJsonAtomicSync } from './main/atomicJson';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
 import { registerStatsIpc } from './main/stats';
@@ -873,22 +873,15 @@ function blancBoundsFile(): string {
 /** Last Blanc window size, saved on close. Applied only when the caller passes
  *  no explicit size (the renderer omits it when rememberWindowBounds is on). */
 function readSavedBlancSize(): { width: number; height: number } | null {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(blancBoundsFile(), 'utf8')) as {
-      width?: unknown;
-      height?: unknown;
-    };
-    if (typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
-    return { width: parsed.width, height: parsed.height };
-  } catch {
-    return null;
-  }
+  const parsed = readJsonSync<{ width?: unknown; height?: unknown } | null>(blancBoundsFile(), null);
+  if (!parsed || typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
+  return { width: parsed.width, height: parsed.height };
 }
 
 function saveBlancSize(win: BrowserWindow): void {
   try {
     const { width, height } = win.getBounds();
-    fs.writeFileSync(blancBoundsFile(), JSON.stringify({ width, height }));
+    writeJsonAtomicSync(blancBoundsFile(), { width, height }, { space: 0, backup: false });
   } catch {
     /* best effort; the default size is always safe */
   }

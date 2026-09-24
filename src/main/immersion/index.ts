@@ -23,6 +23,7 @@ import {
   type ImmersionVisitInput,
 } from '../../shared/immersion';
 import { registerVisualNovelIpc } from './visualNovels';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 
 function immersionDir(): string {
   const dir = path.join(app.getPath('userData'), 'immersion');
@@ -30,19 +31,10 @@ function immersionDir(): string {
   return dir;
 }
 
-function atomicWrite(file: string, data: string): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, data, 'utf-8');
-  fs.renameSync(tmp, file);
-}
+const isObject = (v: unknown): boolean => !!v && typeof v === 'object';
 
 function readJson<T>(file: string, fallback: T): T {
-  try {
-    if (!fs.existsSync(file)) return fallback;
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) as T;
-  } catch {
-    return fallback;
-  }
+  return readJsonSync<T>(file, fallback, { validate: isObject });
 }
 
 function sitesPath(): string {
@@ -79,7 +71,7 @@ function loadSites(): ImmersionSitesStore {
 }
 
 function saveSites(store: ImmersionSitesStore): void {
-  atomicWrite(sitesPath(), JSON.stringify(store, null, 2));
+  writeJsonAtomicSync(sitesPath(), store);
 }
 
 function loadSession(): ImmersionSession {
@@ -101,7 +93,7 @@ function loadSession(): ImmersionSession {
 }
 
 function saveSession(session: ImmersionSession): void {
-  atomicWrite(sessionPath(), JSON.stringify({ ...session, updatedAt: Date.now() }, null, 2));
+  writeJsonAtomicSync(sessionPath(), { ...session, updatedAt: Date.now() });
 }
 
 function loadMetrics(): ImmersionMetricsMap {
@@ -110,7 +102,7 @@ function loadMetrics(): ImmersionMetricsMap {
 }
 
 function saveMetrics(map: ImmersionMetricsMap): void {
-  atomicWrite(metricsPath(), JSON.stringify(map, null, 2));
+  writeJsonAtomicSync(metricsPath(), map);
 }
 
 function broadcast(channel: string, payload: unknown): void {

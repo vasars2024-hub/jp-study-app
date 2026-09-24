@@ -14,9 +14,9 @@
  * on the next read, and the next read fails closed to empty.
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   adoptLegacyAgentOperationalState,
   emptyAgentOperationalState,
@@ -44,30 +44,19 @@ export interface AgentOperationalStore {
 }
 
 function readFile(filePath: string): AgentOperationalState {
+  const raw = readJsonSync<unknown>(filePath, null, {
+    validate: (value) => !!value && typeof value === 'object',
+  });
+  if (raw === null) return emptyAgentOperationalState();
   try {
-    return normalizeAgentOperationalState(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    return normalizeAgentOperationalState(raw);
   } catch {
     return emptyAgentOperationalState();
   }
 }
 
 function atomicWrite(filePath: string, state: AgentOperationalState): void {
-  const directory = path.dirname(filePath);
-  const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.mkdirSync(directory, { recursive: true });
-  try {
-    fs.writeFileSync(temporary, JSON.stringify(state, null, 2), {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
-    fs.renameSync(temporary, filePath);
-  } finally {
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      // The destination was already committed or the temporary file vanished.
-    }
-  }
+  writeJsonAtomicSync(filePath, state, { mode: 0o600 });
 }
 
 export function createAgentOperationalStore(

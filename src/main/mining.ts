@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
+import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
 import { extractEpubTitleFromOpf } from './epubMeta';
 import type {
@@ -288,16 +289,15 @@ function resolveItemEpubPath(itemId: string): string | null {
   return null;
 }
 
-function atomicWrite(filePath: string, content: string): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp`;
-  fs.writeFileSync(tmp, content, 'utf-8');
-  fs.renameSync(tmp, filePath);
-}
+/** The shape every frequency-dictionary reader relies on; anything else is treated as damaged. */
+const isFrequencyDictionaryFile = (value: unknown): boolean =>
+  Boolean(value && typeof value === 'object' && (value as Partial<FrequencyDictionaryFile>).summary?.id);
 
 function readMiningConfig(): MiningConfigFile {
   try {
-    const raw = JSON.parse(fs.readFileSync(configPath(), 'utf-8')) as Partial<MiningConfigFile>;
+    const raw = readJsonSync<Partial<MiningConfigFile>>(configPath(), {}, {
+      validate: (v) => typeof v === 'object' && v !== null,
+    });
     const selectedPresetId =
       typeof raw.selectedPresetId === 'string' && raw.selectedPresetId.trim()
         ? raw.selectedPresetId
@@ -352,7 +352,7 @@ function readMiningConfig(): MiningConfigFile {
 }
 
 function writeMiningConfig(config: MiningConfigFile): void {
-  atomicWrite(configPath(), JSON.stringify(config, null, 2));
+  writeJsonAtomicSync(configPath(), config);
 }
 
 function stripHtml(raw: string): string {
@@ -752,7 +752,7 @@ function readFrequencySummary(filePath: string): FrequencyDictionarySummary | nu
 
   // A file this module did not write, or one whose summary is not in the head window.
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as FrequencyDictionaryFile;
+    const parsed = readJsonSync<FrequencyDictionaryFile | null>(filePath, null, { validate: isFrequencyDictionaryFile });
     return parsed?.summary?.id ? parsed.summary : null;
   } catch {
     return null;
@@ -776,8 +776,10 @@ function syncBundledFrequencySummary(
   const nextSummary = { ...current, ...patch };
   if (JSON.stringify(nextSummary) === JSON.stringify(current)) return false;
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as FrequencyDictionaryFile;
-    atomicWrite(filePath, JSON.stringify({ ...parsed, summary: { ...parsed.summary, ...patch } }, null, 2));
+    const parsed = readJsonSync<FrequencyDictionaryFile | null>(filePath, null, { validate: isFrequencyDictionaryFile });
+    if (!parsed) return false;
+    // Bundled lists are regenerated from the app's own data, so no last-good copy.
+    writeJsonAtomicSync(filePath, { ...parsed, summary: { ...parsed.summary, ...patch } }, { backup: false });
     return true;
   } catch {
     return false;
@@ -814,7 +816,7 @@ function ensureBundledFrequencyDictionaries(): boolean {
       importedAt: Date.now(),
       language: def.language,
     };
-    atomicWrite(file, JSON.stringify({ summary, ranks }, null, 2));
+    writeJsonAtomicSync(file, { summary, ranks }, { backup: false });
     changed = true;
   }
   return changed;
@@ -889,7 +891,7 @@ async function ensureRemoteBundledFrequencyDictionaries(): Promise<void> {
         importedAt: Date.now(),
         language: def.language,
       };
-      atomicWrite(file, JSON.stringify({ summary, ranks }, null, 2));
+      writeJsonAtomicSync(file, { summary, ranks }, { backup: false });
       changed = true;
     } catch (error) {
       console.warn(`[mining] failed to provision bundled frequency list ${def.id}:`, error);
@@ -964,7 +966,9 @@ function listFrequencyDictionaryFiles(): FrequencyDictionaryFile[] {
   const out: FrequencyDictionaryFile[] = [];
   for (const name of files) {
     try {
-      const parsed = JSON.parse(fs.readFileSync(path.join(freqRoot(), name), 'utf-8')) as FrequencyDictionaryFile;
+      const parsed = readJsonSync<FrequencyDictionaryFile | null>(path.join(freqRoot(), name), null, {
+        validate: isFrequencyDictionaryFile,
+      });
       if (parsed?.summary?.id && parsed?.ranks) out.push(parsed);
     } catch {
       /* ignore broken files */
@@ -1857,7 +1861,7 @@ async function importFrequencyDictionary(filePath?: string): Promise<{ ok: boole
       enabled: true,
       importedAt: Date.now(),
     };
-    atomicWrite(path.join(freqRoot(), `${id}.json`), JSON.stringify({ summary, ranks }, null, 2));
+    writeJsonAtomicSync(path.join(freqRoot(), `${id}.json`), { summary, ranks });
     invalidateFreqDictCache();
     return { ok: true };
   } catch (error) {
@@ -1871,6 +1875,7 @@ function removeFrequencyDictionary(id: string): { ok: boolean; error?: string } 
   }
   try {
     fs.unlinkSync(path.join(freqRoot(), `${id}.json`));
+    removeJsonStore(path.join(freqRoot(), `${id}.json`)); // and its last-good copy
     invalidateFreqDictCache();
     return { ok: true };
   } catch (error) {
@@ -1881,9 +1886,10 @@ function removeFrequencyDictionary(id: string): { ok: boolean; error?: string } 
 function setFrequencyDictionaryEnabled(id: string, enabled: boolean): { ok: boolean; error?: string } {
   try {
     const file = path.join(freqRoot(), `${id}.json`);
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as FrequencyDictionaryFile;
+    const parsed = readJsonSync<FrequencyDictionaryFile | null>(file, null, { validate: isFrequencyDictionaryFile });
+    if (!parsed) throw new Error(`Frequency dictionary ${id} is missing or unreadable.`);
     parsed.summary.enabled = enabled;
-    atomicWrite(file, JSON.stringify(parsed, null, 2));
+    writeJsonAtomicSync(file, parsed, { backup: !isBundledFrequencyDictId(id) });
     invalidateFreqDictCache();
     return { ok: true };
   } catch (error) {

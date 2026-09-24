@@ -18,6 +18,7 @@ import {
   writeSecret,
   type VaultWriteResult,
 } from './vault';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 
 export type AiCredentialId = 'gemini' | 'deepseek';
 
@@ -40,11 +41,9 @@ function legacyGeminiPath(): string {
 }
 
 function readLegacyFile(): LegacyAiKeyFile {
-  try {
-    return JSON.parse(fs.readFileSync(legacyStorePath(), 'utf-8')) as LegacyAiKeyFile;
-  } catch {
-    return {};
-  }
+  return readJsonSync<LegacyAiKeyFile>(legacyStorePath(), {}, {
+    validate: (v) => v !== null && typeof v === 'object',
+  });
 }
 
 function decodeLegacy(value: unknown, encrypted: boolean): string {
@@ -64,11 +63,8 @@ function legacyValue(id: AiCredentialId): string {
 }
 
 function atomicWriteLegacy(file: LegacyAiKeyFile): void {
-  const target = legacyStorePath();
-  const temp = `${target}.${process.pid}.tmp`;
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(temp, JSON.stringify(file, null, 2), { encoding: 'utf-8', mode: 0o600 });
-  fs.renameSync(temp, target);
+  // No `.bak`: it would keep the provider key this rewrite just removed.
+  writeJsonAtomicSync(legacyStorePath(), file, { mode: 0o600, backup: false });
 }
 
 /** Removes only the migrated provider, preserving another provider not yet moved. */

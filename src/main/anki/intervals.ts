@@ -4,9 +4,9 @@
 // userData/anki-intervals.json, and diff snapshots by FNV-1a fingerprint so
 // the renderer is only pushed real changes.
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { readJson, writeJsonAtomic } from '../atomicJson';
 import {
   ANKI_INTERVALS_SNAPSHOT_FILE,
   ankiCardIsSuspended,
@@ -125,9 +125,10 @@ export function recordDeletedNotes(noteIds: readonly number[]): void {
  */
 export async function loadPersistedSnapshot(): Promise<void> {
   try {
-    const raw = await fs.promises.readFile(snapshotPath(), 'utf-8');
-    const parsed = JSON.parse(raw) as IntervalSnapshot;
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.entries)) return;
+    const parsed = await readJson<IntervalSnapshot | null>(snapshotPath(), null, {
+      validate: (v) => !!v && typeof v === 'object' && Array.isArray((v as IntervalSnapshot).entries),
+    });
+    if (!parsed) return;
     currentSnapshot = {
       generatedAt: typeof parsed.generatedAt === 'number' ? parsed.generatedAt : 0,
       sourceQueries: Array.isArray(parsed.sourceQueries) ? parsed.sourceQueries : [],
@@ -137,8 +138,7 @@ export async function loadPersistedSnapshot(): Promise<void> {
     };
     currentHash = hashEntries(currentSnapshot.entries);
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException)?.code;
-    if (code !== 'ENOENT') console.error('[anki] interval snapshot unreadable:', err);
+    console.error('[anki] interval snapshot unreadable:', err);
   }
 }
 
@@ -756,15 +756,11 @@ export function flushSnapshotWrites(): Promise<void> {
   return writeChain;
 }
 
-/** Atomic write (tmp + rename), serialized so writes never interleave (P-1 style). */
+/** Atomic write (tmp + fsync + rename, `.bak` kept), serialized so writes never interleave (P-1 style). */
 function persistSnapshot(snapshot: IntervalSnapshot): void {
   const file = snapshotPath();
-  const tmp = `${file}.tmp`;
   writeChain = writeChain
-    .then(async () => {
-      await fs.promises.writeFile(tmp, JSON.stringify(snapshot), 'utf-8');
-      await fs.promises.rename(tmp, file);
-    })
+    .then(() => writeJsonAtomic(file, snapshot, { space: 0 }))
     .catch((err) => {
       console.error('[anki] interval snapshot persist failed:', err);
     });

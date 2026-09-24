@@ -22,7 +22,7 @@
  * favour of centring on the target display.
  */
 import { app, BrowserWindow, ipcMain } from 'electron';
-import fs from 'node:fs';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import path from 'node:path';
 import {
   centreOnWorkArea,
@@ -96,8 +96,12 @@ function loadBounds(): Record<string, DetachedWindowBounds> {
   if (boundsCache) return boundsCache;
   const next: Record<string, DetachedWindowBounds> = {};
   try {
-    const raw = JSON.parse(fs.readFileSync(storePath(), 'utf8')) as unknown;
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    // No file yet, or a damaged one with no intact `.bak`: "no saved geometry" —
+    // never a failure to open the window.
+    const raw = readJsonSync<unknown>(storePath(), null, {
+      validate: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
+    });
+    if (raw) {
       const screens = workAreas();
       for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
         const bounds = sanitizeDetachedBounds(value, screens);
@@ -105,8 +109,7 @@ function loadBounds(): Record<string, DetachedWindowBounds> {
       }
     }
   } catch {
-    // No file yet, or a corrupt one. Either way the answer is "no saved geometry" —
-    // never a failure to open the window.
+    // Sanitising failed — same answer: no saved geometry.
   }
   boundsCache = next;
   return next;
@@ -121,10 +124,7 @@ function saveBoundsSoon(): void {
   saveTimer = setTimeout(() => {
     saveTimer = null;
     try {
-      const file = storePath();
-      const tmp = `${file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(boundsCache ?? {}, null, 2), 'utf8');
-      fs.renameSync(tmp, file);
+      writeJsonAtomicSync(storePath(), boundsCache ?? {});
     } catch {
       // Geometry is a convenience. Losing it must never surface as an error.
     }

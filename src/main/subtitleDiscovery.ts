@@ -19,6 +19,7 @@ import { BrowserWindow, app, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { createEmptySubtitleQualityRatings } from '../shared/subtitleQuality';
 import { matchSubtitleTracks, mismatchedAutoSubtitleIds } from '../shared/subtitleMatching';
 import {
@@ -211,7 +212,7 @@ function settingsPath(): string {
 
 export function loadDiscoverySettings(): SubtitleDiscoverySettings {
   try {
-    return normalizeSubtitleDiscoverySettings(JSON.parse(fs.readFileSync(settingsPath(), 'utf-8')));
+    return normalizeSubtitleDiscoverySettings(readJsonSync<unknown>(settingsPath(), null));
   } catch {
     return { ...DEFAULT_SUBTITLE_DISCOVERY_SETTINGS };
   }
@@ -223,7 +224,7 @@ export function saveDiscoverySettings(input: unknown): SubtitleDiscoverySettings
   // this object, and a copy read before a dismissal must not bring the notice back.
   settings.dismissedNotices = [...new Set([...loadDiscoverySettings().dismissedNotices, ...settings.dismissedNotices])];
   try {
-    fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2), 'utf-8');
+    writeJsonAtomicSync(settingsPath(), settings);
   } catch {
     /* settings that will not persist still apply to this session */
   }

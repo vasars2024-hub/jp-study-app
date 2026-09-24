@@ -46,6 +46,7 @@ import { installedPaddleLangs, paddleOcrAvailable, type PaddleLang } from './pad
 import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   detectMineLanguage,
   resolveProfileMatch,
@@ -430,8 +431,11 @@ function decryptToken(stored: string, encrypted: boolean): string {
 
 function loadOrCreateState(): ExtensionBridgeState {
   try {
-    const raw = fs.readFileSync(statePath(), 'utf8');
-    const parsed = JSON.parse(raw) as ExtensionBridgeStateFile;
+    // A damaged file is moved aside and the last-good copy used, so a torn
+    // write no longer re-pairs the extension with a fresh token.
+    const parsed = readJsonSync<ExtensionBridgeStateFile>(statePath(), {} as ExtensionBridgeStateFile, {
+      validate: (v) => Boolean(v) && typeof v === 'object',
+    });
     const token = decryptToken(typeof parsed.token === 'string' ? parsed.token : '', parsed._encrypted === true);
     if (token.length >= 16) {
       bridgeState = {
@@ -461,7 +465,7 @@ function saveState(state: ExtensionBridgeState): void {
       port: state.port,
       _encrypted: safeStorage.isEncryptionAvailable(),
     };
-    fs.writeFileSync(statePath(), JSON.stringify(payload, null, 2), 'utf8');
+    writeJsonAtomicSync(statePath(), payload, { mode: 0o600 });
   } catch (err) {
     console.error('[extensionServer] failed to persist bridge state', err);
   }

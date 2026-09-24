@@ -10,6 +10,7 @@ import {
   writeSecret,
   type VaultWriteResult,
 } from './vault';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 
 export type SubtitleCredentialId = 'jimaku' | 'opensubtitles';
 type LegacySubtitleKeyFile = Partial<Record<SubtitleCredentialId, string>>;
@@ -19,11 +20,9 @@ function legacyPath(): string {
 }
 
 function readLegacyFile(): LegacySubtitleKeyFile {
-  try {
-    return JSON.parse(fs.readFileSync(legacyPath(), 'utf-8')) as LegacySubtitleKeyFile;
-  } catch {
-    return {};
-  }
+  return readJsonSync<LegacySubtitleKeyFile>(legacyPath(), {}, {
+    validate: (v) => v !== null && typeof v === 'object',
+  });
 }
 
 function legacyValue(id: SubtitleCredentialId): string {
@@ -48,10 +47,8 @@ function removeLegacyValue(id: SubtitleCredentialId): void {
   }
 
   try {
-    const target = legacyPath();
-    const temp = `${target}.${process.pid}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify(file), { encoding: 'utf-8', mode: 0o600 });
-    fs.renameSync(temp, target);
+    // No `.bak`: it would keep the provider key this rewrite just removed.
+    writeJsonAtomicSync(legacyPath(), file, { space: 0, mode: 0o600, backup: false });
   } catch {
     /* leaving an obsolete copy is safer than damaging the remaining provider */
   }

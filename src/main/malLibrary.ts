@@ -28,8 +28,8 @@
  */
 
 import { app, ipcMain } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   emptyMalLibrary,
   mergeMalDerivatives,
@@ -61,15 +61,11 @@ export function malLibraryFilePath(): string {
 }
 
 export function readMalLibrary(): MalLibraryDocument {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(fs.readFileSync(libraryPath(), 'utf-8'));
-  } catch {
-    // Absent or unreadable are the same answer to the caller: an empty library.
-    // A corrupt file is deliberately not deleted here — the next successful sync
-    // overwrites it, and until then it is evidence rather than garbage.
-    return emptyMalLibrary();
-  }
+  // Absent or unreadable are the same answer to the caller: an empty library.
+  // A corrupt file is moved aside (`.corrupt-<ts>`, `.bak` served if intact) by
+  // the reader, so it stays evidence rather than being overwritten.
+  const raw = readJsonSync<unknown>(libraryPath(), null);
+  if (raw === null) return emptyMalLibrary();
   const document = parseMalLibraryDocument(raw);
   if (document.version > MAL_LIBRARY_SCHEMA_VERSION) {
     // Reading a newer document with older rules would drop the fields this
@@ -86,10 +82,7 @@ export function readMalLibrary(): MalLibraryDocument {
  * property that matters: the previous library survives an interrupted write.
  */
 export function writeMalLibrary(document: MalLibraryDocument): void {
-  const target = libraryPath();
-  const temp = `${target}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(document, null, 2), 'utf-8');
-  fs.renameSync(temp, target);
+  writeJsonAtomicSync(libraryPath(), document);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

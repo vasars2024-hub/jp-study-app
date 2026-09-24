@@ -65,6 +65,7 @@ import {
 import type { ScraperSettingsIssue } from '../shared/scraperSettingsPrimitives';
 import { qbitCredentialGap, qbitCredentialRef } from '../shared/subtitleNyaa';
 import type { MediaAcquiredImport, MediaItem } from '../shared/types';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
 import { mediaMetadataRunning, runMediaMetadata } from './mediaMetadata';
 import { artworkName, downloadArtwork } from './mediaProviderClients';
@@ -109,26 +110,15 @@ function userFile(name: string): string {
 }
 
 function readJson(name: string): unknown {
-  try {
-    return JSON.parse(fs.readFileSync(userFile(name), 'utf-8'));
-  } catch {
-    return undefined;
-  }
+  return readJsonSync<unknown>(userFile(name), undefined);
 }
 
-/** Written beside and renamed over, so a crash mid-write never leaves half a file. */
+/** Atomic (temp + fsync + rename, `.bak` kept), so a crash mid-write never leaves half a file. */
 function writeJson(name: string, value: unknown): void {
-  const target = userFile(name);
-  const temp = `${target}.tmp`;
   try {
-    fs.writeFileSync(temp, JSON.stringify(value), 'utf-8');
-    fs.renameSync(temp, target);
+    writeJsonAtomicSync(userFile(name), value, { space: 0 });
   } catch {
-    try {
-      fs.rmSync(temp, { force: true });
-    } catch {
-      /* nothing to clean */
-    }
+    /* best effort — the next save retries */
   }
 }
 

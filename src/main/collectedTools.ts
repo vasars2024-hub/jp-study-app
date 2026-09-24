@@ -9,9 +9,9 @@
 // single source of truth for "shortcuts the user saved" rather than growing a
 // second, parallel store (BLANC_REFINEMENT_PLAN.md, Pillar 3).
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, ipcMain } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   emptyCollectedToolsStore,
   normalizeToolTarget,
@@ -25,12 +25,6 @@ import {
 
 function storePath(): string {
   return path.join(app.getPath('userData'), 'collected-tools.json');
-}
-
-function atomicWrite(file: string, data: string): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, data, 'utf-8');
-  fs.renameSync(tmp, file);
 }
 
 function sanitizeKind(value: unknown): CollectedToolKind {
@@ -86,9 +80,7 @@ function sanitizeFolders(raw: unknown): CollectedFolder[] {
 
 function load(): CollectedToolsStore {
   try {
-    const file = storePath();
-    if (!fs.existsSync(file)) return emptyCollectedToolsStore();
-    const raw = JSON.parse(fs.readFileSync(file, 'utf-8')) as unknown;
+    const raw = readJsonSync<unknown>(storePath(), null, { validate: (v) => !!v && typeof v === 'object' });
     if (!raw || typeof raw !== 'object') return emptyCollectedToolsStore();
     const folders = sanitizeFolders((raw as { folders?: unknown }).folders);
     const folderIds = new Set(folders.map((f) => f.id));
@@ -104,7 +96,7 @@ function load(): CollectedToolsStore {
 }
 
 function save(store: CollectedToolsStore): void {
-  atomicWrite(storePath(), JSON.stringify(store, null, 2));
+  writeJsonAtomicSync(storePath(), store);
 }
 
 function addTool(input: CollectToolInput): { tool: CollectedTool; duplicate: boolean } {

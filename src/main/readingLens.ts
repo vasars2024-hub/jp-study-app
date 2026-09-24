@@ -25,8 +25,8 @@ import {
   ipcMain,
   screen,
 } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
 import {
   clearCaptures,
@@ -194,7 +194,9 @@ export function normalizeLensRegionMemory(value: unknown): LensRegionMemory | nu
 
 function loadSettings(): ReadingLensSettings {
   try {
-    const parsed = JSON.parse(fs.readFileSync(statePath(), 'utf8')) as Partial<ReadingLensSettings>;
+    const parsed = readJsonSync<Partial<ReadingLensSettings>>(statePath(), {}, {
+      validate: (v) => typeof v === 'object' && v !== null,
+    });
     return {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULTS.enabled,
       hotkey:
@@ -211,7 +213,7 @@ function loadSettings(): ReadingLensSettings {
 
 function saveSettings(): void {
   try {
-    fs.writeFileSync(statePath(), JSON.stringify(settings, null, 2), 'utf8');
+    writeJsonAtomicSync(statePath(), settings);
   } catch (err) {
     console.error('[readingLens] failed to persist settings', err);
   }

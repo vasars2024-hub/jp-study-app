@@ -153,23 +153,57 @@ vi.mock('electron', () => {
   };
 });
 
-vi.mock('node:fs', () => ({
-  default: {
+// In-memory disk. Covers the calls `../atomicJson` makes (temp file via an fd,
+// fsync, rename, `.bak` copy) so the real helper runs against it.
+vi.mock('node:fs', () => {
+  const enoent = (file: unknown): Error =>
+    Object.assign(new Error(`ENOENT: ${String(file)}`), { code: 'ENOENT' });
+  const fds = new Map<number, string>();
+  let nextFd = 100;
+  const fs = {
     readFileSync: (file: string) => {
       const found = h.files.get(String(file));
-      if (found === undefined) throw new Error('ENOENT');
+      if (found === undefined) throw enoent(file);
       return found;
     },
-    writeFileSync: (file: string, data: string) => {
-      h.files.set(String(file), data);
+    writeFileSync: (target: string | number, data: string) => {
+      const file = typeof target === 'number' ? fds.get(target) : String(target);
+      if (file === undefined) throw new Error('EBADF');
+      h.files.set(file, String(data));
     },
     renameSync: (from: string, to: string) => {
       const value = h.files.get(String(from));
+      if (value === undefined) throw enoent(from);
       h.files.delete(String(from));
-      if (value !== undefined) h.files.set(String(to), value);
+      h.files.set(String(to), value);
     },
-  },
-}));
+    openSync: (file: string) => {
+      const fd = nextFd++;
+      fds.set(fd, String(file));
+      h.files.set(String(file), '');
+      return fd;
+    },
+    fsyncSync: () => undefined,
+    closeSync: (fd: number) => {
+      fds.delete(fd);
+    },
+    mkdirSync: () => undefined,
+    statSync: (file: string) => {
+      if (!h.files.has(String(file))) throw enoent(file);
+      return { isFile: () => true };
+    },
+    copyFileSync: (from: string, to: string) => {
+      const value = h.files.get(String(from));
+      if (value === undefined) throw enoent(from);
+      h.files.set(String(to), value);
+    },
+    rmSync: (file: string) => {
+      h.files.delete(String(file));
+    },
+    readdirSync: () => [],
+  };
+  return { default: fs, ...fs };
+});
 
 vi.mock('../displays', () => ({
   listDisplays: () => h.displays,

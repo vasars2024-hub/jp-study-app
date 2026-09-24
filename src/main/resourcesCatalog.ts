@@ -1,13 +1,13 @@
 // Remote Resources catalogue: fetch from GitHub, cache in userData, serve offline.
 //
 // Fetch style mirrors src/main/release.ts (AbortController, 15s timeout, null on
-// failure). The userData JSON cache uses the atomic temp-file-then-rename pattern
-// from src/main/immersion/index.ts. The cache is only ever overwritten on a
-// successful fetch — a failed refresh never deletes what we already have.
+// failure). The userData JSON cache is written through ./atomicJson (temp file,
+// fsync, rename). The cache is only ever overwritten on a successful fetch — a
+// failed refresh never deletes what we already have.
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, ipcMain } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   CATALOG_URL,
   NOVELS_URL,
@@ -26,22 +26,9 @@ function novelsCachePath(): string {
   return path.join(app.getPath('userData'), 'novels-catalog.json');
 }
 
-function atomicWrite(file: string, data: string): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, data, 'utf-8');
-  fs.renameSync(tmp, file);
-}
-
 /** Return the cached catalogue, or null if there is no valid cache yet. */
 function readCache(): ResourcesCatalog | null {
-  try {
-    const file = cachePath();
-    if (!fs.existsSync(file)) return null;
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as unknown;
-    return isResourcesCatalog(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return readJsonSync<ResourcesCatalog | null>(cachePath(), null, { validate: isResourcesCatalog });
 }
 
 /** Fetch the remote catalogue; validate; write cache; return it (null on failure). */
@@ -56,7 +43,7 @@ async function fetchCatalog(): Promise<ResourcesCatalog | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as unknown;
     if (!isResourcesCatalog(data)) return null;
-    atomicWrite(cachePath(), JSON.stringify(data));
+    writeJsonAtomicSync(cachePath(), data, { space: 0, backup: false });
     return data;
   } catch {
     return null;
@@ -67,14 +54,7 @@ async function fetchCatalog(): Promise<ResourcesCatalog | null> {
 
 /** Return the cached novels catalogue, or null if none yet. */
 function readNovelsCache(): NovelsCatalog | null {
-  try {
-    const file = novelsCachePath();
-    if (!fs.existsSync(file)) return null;
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as unknown;
-    return isNovelsCatalog(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return readJsonSync<NovelsCatalog | null>(novelsCachePath(), null, { validate: isNovelsCatalog });
 }
 
 async function fetchNovels(): Promise<NovelsCatalog | null> {
@@ -88,7 +68,7 @@ async function fetchNovels(): Promise<NovelsCatalog | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as unknown;
     if (!isNovelsCatalog(data)) return null;
-    atomicWrite(novelsCachePath(), JSON.stringify(data));
+    writeJsonAtomicSync(novelsCachePath(), data, { space: 0, backup: false });
     return data;
   } catch {
     return null;

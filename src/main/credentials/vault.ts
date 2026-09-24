@@ -31,9 +31,9 @@
  * an invitation to open it in an editor and "fix" it.
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { app, safeStorage } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
 import {
   CREDENTIAL_REGISTRY,
   credentialEnvVar,
@@ -124,28 +124,24 @@ export function openSecret(sealed: string): string {
 // ---------------------------------------------------------------------------
 
 function readVault(): VaultFile {
-  try {
-    const raw = JSON.parse(fs.readFileSync(vaultPath(), 'utf-8')) as Partial<VaultFile>;
-    return {
-      version: typeof raw.version === 'number' ? raw.version : 1,
-      secrets: raw.secrets && typeof raw.secrets === 'object' ? { ...raw.secrets } : {},
-      meta: raw.meta && typeof raw.meta === 'object' ? { ...raw.meta } : {},
-    };
-  } catch {
-    // Missing or corrupt both mean "nothing stored", which is a state the UI
-    // already renders. Throwing here would take the settings page down with it.
-    return { ...EMPTY, secrets: {}, meta: {} };
-  }
+  // Missing or corrupt (with no intact `.bak`) both mean "nothing stored", which
+  // is a state the UI already renders. Throwing here would take the settings
+  // page down with it. A corrupt file is moved aside by the reader, not lost.
+  const raw = readJsonSync<Partial<VaultFile> | null>(vaultPath(), null, {
+    validate: (v) => v !== null && typeof v === 'object',
+  });
+  if (!raw) return { ...EMPTY, secrets: {}, meta: {} };
+  return {
+    version: typeof raw.version === 'number' ? raw.version : 1,
+    secrets: raw.secrets && typeof raw.secrets === 'object' ? { ...raw.secrets } : {},
+    meta: raw.meta && typeof raw.meta === 'object' ? { ...raw.meta } : {},
+  };
 }
 
 function writeVault(file: VaultFile): void {
-  const target = vaultPath();
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  const temp = `${target}.${process.pid}.tmp`;
   // 0o600: the ciphertext is useless to another user, but there is no reason to
   // hand it to them either.
-  fs.writeFileSync(temp, JSON.stringify(file), { encoding: 'utf-8', mode: 0o600 });
-  fs.renameSync(temp, target);
+  writeJsonAtomicSync(vaultPath(), file, { space: 0, mode: 0o600 });
 }
 
 function secretKey(id: string, field: string): string {

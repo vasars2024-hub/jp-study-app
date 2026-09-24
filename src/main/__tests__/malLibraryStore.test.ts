@@ -59,8 +59,8 @@ describe('readMalLibrary', () => {
   it('answers an empty library rather than throwing on unparseable content', () => {
     fs.writeFileSync(file, '{ this is not json', 'utf-8');
     expect(readMalLibrary().entries).toEqual([]);
-    // The bad file is evidence; nothing here deletes it.
-    expect(fs.existsSync(file)).toBe(true);
+    // The bad file is evidence; it is moved aside (atomicJson), never deleted.
+    expect(fs.readdirSync(dir).some((name) => name.startsWith('mal-library.json.corrupt-'))).toBe(true);
   });
 
   it('refuses to read a document from a newer schema with older rules', () => {

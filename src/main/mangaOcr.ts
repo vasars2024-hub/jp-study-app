@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
+import { readJson, writeJsonAtomic } from './atomicJson';
 import { BrowserWindow, ipcMain, nativeImage, type NativeImage } from 'electron';
 import type * as OrtNamespace from 'onnxruntime-node';
 import {
@@ -816,8 +817,7 @@ function isStringArray(v: unknown): v is string[] {
 export async function readCorrections(itemId: string, stem: string): Promise<CorrectionMap> {
   const p = correctionsPath(itemId, stem);
   try {
-    const raw = JSON.parse(await fsp.readFile(p, 'utf8')) as unknown;
-    if (!raw || typeof raw !== 'object') return {};
+    const raw = await readJson<unknown>(p, {}, { validate: (v) => typeof v === 'object' && v !== null });
     const out: CorrectionMap = {};
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
       // Legacy shape: a bare string[] of corrected lines (pre-schema-extension).
@@ -841,8 +841,8 @@ export async function readCorrections(itemId: string, stem: string): Promise<Cor
 }
 
 export async function writeCorrections(itemId: string, stem: string, map: CorrectionMap): Promise<void> {
-  await fsp.mkdir(ocrDir(itemId), { recursive: true });
-  await fsp.writeFile(correctionsPath(itemId, stem), JSON.stringify(map, null, 2), 'utf8');
+  // The user's hand corrections: keep a last-good copy (unlike the OCR caches below).
+  await writeJsonAtomic(correctionsPath(itemId, stem), map);
 }
 
 export function applyCorrections(page: MokuroPage, map: CorrectionMap): MokuroPage {
@@ -865,8 +865,7 @@ export function applyCorrections(page: MokuroPage, map: CorrectionMap): MokuroPa
 }
 
 async function writeCache(itemId: string, stem: string, page: MokuroPage): Promise<void> {
-  await fsp.mkdir(ocrDir(itemId), { recursive: true });
-  await fsp.writeFile(cachePath(itemId, stem), JSON.stringify(page, null, 2), 'utf8');
+  await writeJsonAtomic(cachePath(itemId, stem), page, { backup: false });
 }
 
 export async function loadMangaOcrCache(itemId: string, mediaUrl: string): Promise<MokuroPage | null> {
@@ -874,7 +873,7 @@ export async function loadMangaOcrCache(itemId: string, mediaUrl: string): Promi
   if (!resolved || resolved.itemId !== itemId) return null;
   const p = cachePath(itemId, resolved.stem);
   try {
-    const raw = JSON.parse(await fsp.readFile(p, 'utf8')) as unknown;
+    const raw = await readJson<unknown>(p, null);
     const page = parseMokuroPage(raw);
     const corrections = await readCorrections(itemId, resolved.stem);
     return applyCorrections(page, corrections);
@@ -891,9 +890,10 @@ export async function loadMangaOcrTranslateCache(
   const resolved = resolveMediaPath(mediaUrl);
   if (!resolved || resolved.itemId !== itemId) return null;
   try {
-    const raw = JSON.parse(
-      await fsp.readFile(translateCachePath(itemId, resolved.stem, targetLang), 'utf8'),
-    ) as { page?: unknown };
+    const raw = await readJson<{ page?: unknown } | null>(
+      translateCachePath(itemId, resolved.stem, targetLang),
+      null,
+    );
     if (!raw?.page) return null;
     return parseMokuroPage(raw.page);
   } catch {
@@ -907,11 +907,10 @@ async function writeTranslateCache(
   targetLang: string,
   page: MokuroPage,
 ): Promise<void> {
-  await fsp.mkdir(ocrDir(itemId), { recursive: true });
-  await fsp.writeFile(
+  await writeJsonAtomic(
     translateCachePath(itemId, stem, targetLang),
-    JSON.stringify({ version: 1, targetLang, page }, null, 2),
-    'utf8',
+    { version: 1, targetLang, page },
+    { backup: false },
   );
 }
 
@@ -962,8 +961,7 @@ export async function refreshMangaOcrMeta(
 /** Read the on-disk cache file as literally persisted (no corrections applied). */
 async function readRawCachePage(itemId: string, stem: string): Promise<MokuroPage | null> {
   try {
-    const raw = JSON.parse(await fsp.readFile(cachePath(itemId, stem), 'utf8')) as unknown;
-    return parseMokuroPage(raw);
+    return parseMokuroPage(await readJson<unknown>(cachePath(itemId, stem), null));
   } catch {
     return null;
   }
