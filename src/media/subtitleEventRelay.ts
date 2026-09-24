@@ -21,6 +21,10 @@
  * So the relay keeps every event of the current stream and replays them into each new
  * manager. `onSubtitleEvents` keys events by track, start, duration and text (or the event's
  * own id), so a replay adds nothing the manager already has.
+ *
+ * The relay keeps each event once, by that same key: the sidecar sends a cue again whenever
+ * it re-reads the part of the file that holds it (every seek restarts its extraction, and
+ * `subtitleBackfill` asks for whole-file passes), and those repeats must not pile up here.
  */
 
 import type { MKVParser_SubtitleEvent } from '../../vendor/seanime/generated/types';
@@ -32,12 +36,22 @@ export interface SubtitleEventSink {
 export interface SubtitleEventRelay<M extends SubtitleEventSink> {
   /** A new stream is opening: the previous stream's events must not reach its manager. */
   reset(): void;
-  /** Events from the sidecar. Delivered now if a manager is attached, and kept either way. */
-  receive(events: MKVParser_SubtitleEvent[]): void;
+  /**
+   * Events from the sidecar. The ones not seen before in this stream are kept, and delivered
+   * now if a manager is attached. Returns how many were new.
+   */
+  receive(events: MKVParser_SubtitleEvent[]): number;
   /** The current manager (or none). A manager seen for the first time gets every kept event. */
   attach(manager: M | null): void;
-  /** Events kept for the current stream. */
+  /** Distinct events kept for the current stream. */
   readonly received: number;
+}
+
+/** The identity `VideoCoreSubtitleManager` dedups events by (its `__eventMapKey`). */
+export function subtitleEventKey(event: MKVParser_SubtitleEvent): string {
+  const id = event.extraData?.['_id'];
+  if (id) return `id:${id}`;
+  return `${event.trackNumber}:${event.startTime}:${event.duration}:${event.text}`;
 }
 
 export function createSubtitleEventRelay<M extends SubtitleEventSink>(
@@ -46,15 +60,24 @@ export function createSubtitleEventRelay<M extends SubtitleEventSink>(
   },
 ): SubtitleEventRelay<M> {
   let kept: MKVParser_SubtitleEvent[] = [];
+  let seen = new Set<string>();
   let current: M | null = null;
   return {
     reset() {
       kept = [];
+      seen = new Set();
     },
     receive(events) {
-      if (!events.length) return;
-      kept.push(...events);
-      if (current) deliver(current, events);
+      const fresh = events.filter((event) => {
+        const key = subtitleEventKey(event);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (!fresh.length) return 0;
+      kept.push(...fresh);
+      if (current) deliver(current, fresh);
+      return fresh.length;
     },
     attach(manager) {
       if (manager === current) return;

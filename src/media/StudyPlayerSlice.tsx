@@ -27,6 +27,7 @@ import {
   vc_subtitleManager,
 } from '@/app/(main)/_features/video-core/video-core';
 import { vc_videoElement } from '@/app/(main)/_features/video-core/video-core-atoms';
+import { useVideoCoreEvents } from '@/app/(main)/_features/video-core/video-core-events';
 import {
   vc_settingsRaw,
   type VideoCoreLifecycleState,
@@ -99,6 +100,7 @@ import { getStudyLang } from '../renderer/studyEnvironment';
 import { rememberStudyTrackChoice, studySubtitleSource } from './studySubtitleMemory';
 import { resumeWriteAction } from './videoCoreResumeWrite';
 import { createSubtitleEventRelay } from './subtitleEventRelay';
+import { createSubtitleBackfill } from './subtitleBackfill';
 import {
   createWatchTimeState,
   watchTimeFlush,
@@ -134,6 +136,8 @@ type CueProofState = {
   parserBytes?: number;
   managerClass?: string;
   subtitleEvents?: number;
+  /** Whole-file subtitle passes asked of the sidecar for this stream (see subtitleBackfill). */
+  subtitleBackfills?: number;
   cueChanges?: Array<{
     rawText: string;
     text: string;
@@ -808,6 +812,14 @@ function StudyPlayerSession({
   const identityConfirmed = useAtomValue(clientIdentityConfirmedAtom);
   /** Every muxed subtitle event of the current stream, replayed into each new manager. */
   const subtitleRelay = React.useMemo(() => createSubtitleEventRelay<NonNullable<typeof manager>>(), []);
+  const { sendEvent: sendVideoCoreEvent } = useVideoCoreEvents();
+  /** Set below, once the video element is known; the backfill is created before it is. */
+  const requestFullSubtitlePass = React.useRef<() => void>(() => undefined);
+  /** Gets the sidecar to read a muxed MKV's subtitles end to end at least once per stream. */
+  const subtitleBackfill = React.useMemo(
+    () => createSubtitleBackfill({ requestFullPass: () => requestFullSubtitlePass.current() }),
+    [],
+  );
   const pulledPlaybackIds = React.useRef(new Set<string>());
   const pendingParserInfo = React.useRef<NativePlayer_PlaybackInfo | null>(null);
   const proofConfig = proofWindow().__SEANIME_CUE_PROOF_CONFIG__;
@@ -1469,13 +1481,49 @@ function StudyPlayerSession({
   }, [clientId, playbackRequest, proofConfig, video]);
 
   // A manager VideoCore builds (or rebuilds) gets every event of the stream so far: the
-  // sidecar sends each cue once, and a fresh manager starts with an empty cache.
+  // sidecar does not resend a cue for it, and a fresh manager starts with an empty cache.
   React.useEffect(() => {
     subtitleRelay.attach(manager);
     if (manager && subtitleRelay.received) {
       publishProof({ managerClass: manager.constructor.name, subtitleEvents: subtitleRelay.received });
     }
   }, [manager, subtitleRelay]);
+
+  // Each seek makes the sidecar drop its subtitle read and restart it past the seek point, so
+  // cues before that point (and in its own cluster) may never be sent. Once the seeks settle,
+  // a seek message at exactly 0 has it read the whole file again; see subtitleBackfill.ts.
+  // Local files only: for a torrent or debrid stream that read would pull the whole file.
+  const backfillPlaybackId = state.playbackInfo?.id ?? null;
+  const backfillEnabled = Boolean(
+    !proofConfig
+      && state.playbackInfo?.localFile
+      && state.playbackInfo.mkvMetadata?.subtitleTracks?.length,
+  );
+  React.useEffect(() => {
+    requestFullSubtitlePass.current = () => {
+      sendVideoCoreEvent('video-seeked', {
+        currentTime: 0,
+        duration: video?.duration ?? 0,
+        paused: video?.paused ?? true,
+      });
+      publishProof({ subtitleBackfills: subtitleBackfill.requested });
+    };
+  });
+  React.useEffect(() => {
+    subtitleBackfill.reset(backfillEnabled);
+    if (!video || !backfillEnabled) return undefined;
+    const onStreamStarted = () => subtitleBackfill.onStreamStarted();
+    const onSeeked = () => subtitleBackfill.onSeeked();
+    video.addEventListener('loadedmetadata', onStreamStarted);
+    video.addEventListener('seeked', onSeeked);
+    // The media may have loaded before this listener was attached.
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) onStreamStarted();
+    return () => {
+      video.removeEventListener('loadedmetadata', onStreamStarted);
+      video.removeEventListener('seeked', onSeeked);
+      subtitleBackfill.reset(false);
+    };
+  }, [backfillEnabled, backfillPlaybackId, subtitleBackfill, video]);
 
   /**
    * The request the slice is showing NOW, for async work that must not land on a later one.
@@ -1495,6 +1543,7 @@ function StudyPlayerSession({
         case 'open-and-await':
           // A new stream: the previous one's cues must not reach its manager.
           subtitleRelay.reset();
+          subtitleBackfill.reset(false);
           setState({
             // Do not mount VideoCore until the following "watch" payload supplies real
             // playback info. Mounting it with null info terminates the just-opened
@@ -1564,6 +1613,7 @@ function StudyPlayerSession({
           // Delivered to the manager attached NOW, not the one this handler closed over — that
           // one may already be destroyed — and kept for any manager built after it.
           subtitleRelay.receive(events);
+          subtitleBackfill.onEvents();
           if (manager) {
             publishProof({ managerClass: manager.constructor.name, subtitleEvents: subtitleRelay.received });
           }
