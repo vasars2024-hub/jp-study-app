@@ -46,7 +46,9 @@ import {
   SUBTITLE_POSITION_MAX,
   subtitleAppearanceIsDefault,
   toSubtitleFontChoice,
+  VIDEO_FIT_MODES,
   type VideoCoreStudyPreferences,
+  type VideoFitMode,
 } from '../shared/videoCoreStudy';
 import { useT } from '../renderer/i18n';
 import { useStudyWorkspace } from './StudyWorkspaceProvider';
@@ -346,6 +348,19 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
       {open === 'playback' && (
         <StudyToolSheet id="study-sheet-playback" titleKey="studyWorkspace.bar.playback" onClose={close}>
           <StudyToolGroup labelKey="studyWorkspace.group.transport">
+            <label title={shortcutTitle('video.cycleVideoFit')}>
+              {t('mediaWorkspace.study.videoFit')}
+              <select
+                value={preferences.videoFit}
+                data-study-pref="videoFit"
+                aria-label={t('mediaWorkspace.study.videoFit')}
+                onChange={(event) => updatePreference('videoFit', event.currentTarget.value as VideoFitMode)}
+              >
+                {VIDEO_FIT_MODES.map((mode) => (
+                  <option key={mode} value={mode}>{t(`mediaWorkspace.study.videoFit.${mode}`)}</option>
+                ))}
+              </select>
+            </label>
             <label>
               {t('mediaWorkspace.study.playbackSpeed')}
               <select

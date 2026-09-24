@@ -189,3 +189,11 @@ describe('V hides every subtitle line at once', () => {
     expect(OVERLAY).toMatch(/registerCommandHandler\('video\.toggleSubtitles'/);
   });
 });
+
+describe('picture fit removes the black bars', () => {
+  it('overrides VideoCore\'s inline contain for the video and both overlay canvases together', () => {
+    expect(CSS).toMatch(/#media-workspace\[data-video-fit='cover'\] video, #media-workspace\[data-video-fit='cover'\] canvas\.vc-pgs-canvas, #media-workspace\[data-video-fit='cover'\] canvas\.vc-anime4k-canvas \{ object-fit: cover !important; \}/);
+    expect(CSS).toMatch(/#media-workspace\[data-video-fit='fill'\] video,[^{]*\{ object-fit: fill !important; \}/);
+    expect(OVERLAY).toMatch(/host\.dataset\.videoFit = preferences\.videoFit/);
+  });
+});

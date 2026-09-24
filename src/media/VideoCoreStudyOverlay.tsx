@@ -101,6 +101,7 @@ import {
   type VideoCoreDictationEvaluation,
   type VideoCoreStudyPreferences,
   type VideoCoreTimingSignal,
+  nextVideoFit,
 } from '../shared/videoCoreStudy';
 import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
 import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
@@ -1075,6 +1076,21 @@ export default function VideoCoreStudyOverlay({
    * subtitles show English without a click. Re-asked whenever the automation reports a
    * status change, because a translation can finish while the episode is already playing.
    */
+  /*
+   * Picture fit (Fit / Fill / Stretch). VideoCore paints the <video> and its PGS and Anime4K
+   * canvases with an inline `object-fit: contain`, so the mode is published as an attribute on
+   * the workspace root and mediaWorkspace.css overrides all three together — the bitmap
+   * subtitles stay registered to the picture whichever way it is scaled.
+   */
+  React.useEffect(() => {
+    const host = video?.closest('#media-workspace');
+    if (!(host instanceof HTMLElement)) return undefined;
+    host.dataset.videoFit = preferences.videoFit;
+    return () => {
+      delete host.dataset.videoFit;
+    };
+  }, [video, preferences.videoFit]);
+
   const [helperRevision, setHelperRevision] = React.useState(0);
   React.useEffect(() => {
     if (typeof window.api?.onSubtitleAutoStatus !== 'function') return undefined;
@@ -1845,6 +1861,9 @@ export default function VideoCoreStudyOverlay({
       }),
       registerCommandHandler('video.toggleSubtitles', () => {
         updatePreference('subtitlesHidden', !preferencesRef.current.subtitlesHidden);
+      }),
+      registerCommandHandler('video.cycleVideoFit', () => {
+        updatePreference('videoFit', nextVideoFit(preferencesRef.current.videoFit));
       }),
       // One ladder for both keys (see `nudgeSubtitlePosition`): up past the highest lift
       // reaches the top of the picture, and down from the top comes back.

@@ -659,6 +659,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: 'Shift+F' },
   { id: 'video.toggleDualSubs', label: 'Toggle dual subtitles', category: 'Video', defaultKeys: 'Shift+D' },
   { id: 'video.toggleSubtitles', label: 'Hide / show subtitles', category: 'Video', defaultKeys: 'V' },
+  { id: 'video.cycleVideoFit', label: 'Picture: fit / fill / stretch', category: 'Video', defaultKeys: 'Shift+Z' },
   { id: 'video.subPositionUp', label: 'Move subtitles up', category: 'Video', defaultKeys: 'Shift+ArrowUp' },
   { id: 'video.subPositionDown', label: 'Move subtitles down', category: 'Video', defaultKeys: 'Shift+ArrowDown' },
   { id: 'video.subDelayReset', label: 'Reset subtitle delay', category: 'Video', defaultKeys: '' },

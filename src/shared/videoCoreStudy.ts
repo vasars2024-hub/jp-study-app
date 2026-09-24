@@ -125,6 +125,15 @@ export function toSubtitleFontChoice(value: string): SubtitleFontChoice {
   return (value in SUBTITLE_FONT_STACKS ? value : 'default') as SubtitleFontChoice;
 }
 
+export type VideoFitMode = 'contain' | 'cover' | 'fill';
+export const VIDEO_FIT_MODES: readonly VideoFitMode[] = ['contain', 'cover', 'fill'];
+
+/** The next mode for the cycle key: Fit → Fill → Stretch → Fit. */
+export function nextVideoFit(current: VideoFitMode): VideoFitMode {
+  const at = VIDEO_FIT_MODES.indexOf(current);
+  return VIDEO_FIT_MODES[(at + 1) % VIDEO_FIT_MODES.length] ?? 'contain';
+}
+
 export interface VideoCoreStudyPreferences {
   playbackRate: number;
   autoPause: boolean;
@@ -135,6 +144,9 @@ export interface VideoCoreStudyPreferences {
   /** Every subtitle line hidden at once (the V key). Separate from `primarySubs`, so
    *  showing them again restores exactly the lines that were on before. */
   subtitlesHidden: boolean;
+  /** How the picture fills the player: the whole frame with bars (`contain`), the whole
+   *  player with the edges trimmed (`cover`), or stretched to the player (`fill`). */
+  videoFit: VideoFitMode;
   dictationMode: boolean;
   shadowingMode: boolean;
   subtitleFontSize: number;
@@ -323,6 +335,7 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     primarySubs: raw.primarySubs !== false,
     dualSubs: raw.dualSubs !== false,
     subtitlesHidden: raw.subtitlesHidden === true,
+    videoFit: VIDEO_FIT_MODES.includes(raw.videoFit as VideoFitMode) ? raw.videoFit as VideoFitMode : 'contain',
     dictationMode: raw.dictationMode === true,
     shadowingMode: raw.shadowingMode === true,
     subtitleFontSize: fontSize,

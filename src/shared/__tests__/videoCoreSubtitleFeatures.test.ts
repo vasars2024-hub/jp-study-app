@@ -335,3 +335,15 @@ describe('hide / show all subtitles (V)', () => {
     expect(normalizeVideoCoreStudyPreferences({ subtitlesHidden: true }).subtitlesHidden).toBe(true);
   });
 });
+
+describe('picture fit (Shift+Z)', () => {
+  it('defaults to the whole picture and cycles Fit → Fill → Stretch → Fit', async () => {
+    const { normalizeVideoCoreStudyPreferences, nextVideoFit } = await import('../videoCoreStudy');
+    expect(normalizeVideoCoreStudyPreferences({}).videoFit).toBe('contain');
+    expect(normalizeVideoCoreStudyPreferences({ videoFit: 'zoom' }).videoFit).toBe('contain');
+    expect(normalizeVideoCoreStudyPreferences({ videoFit: 'cover' }).videoFit).toBe('cover');
+    expect(nextVideoFit('contain')).toBe('cover');
+    expect(nextVideoFit('cover')).toBe('fill');
+    expect(nextVideoFit('fill')).toBe('contain');
+  });
+});

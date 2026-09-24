@@ -1682,3 +1682,18 @@
     max-height: min(16rem, calc(100% - 1rem));
   }
 }
+
+/* Picture fit (Playback ▸ Picture, Shift+Z). VideoCore sets `object-fit: contain` inline on
+   the video and on its PGS / Anime4K canvases, hence !important; the three move together so
+   bitmap subtitles stay registered to the picture. "Fill" removes the black bars by trimming
+   whatever edge overflows; "Stretch" fills without trimming and distorts the picture. */
+#media-workspace[data-video-fit='cover'] video,
+#media-workspace[data-video-fit='cover'] canvas.vc-pgs-canvas,
+#media-workspace[data-video-fit='cover'] canvas.vc-anime4k-canvas {
+  object-fit: cover !important;
+}
+#media-workspace[data-video-fit='fill'] video,
+#media-workspace[data-video-fit='fill'] canvas.vc-pgs-canvas,
+#media-workspace[data-video-fit='fill'] canvas.vc-anime4k-canvas {
+  object-fit: fill !important;
+}

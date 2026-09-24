@@ -112,15 +112,15 @@ describe('the lyrics pane owns them, and does not own the video ones', () => {
     /*
       The control: an expression that matched nothing would pass this for any input.
 
-      Twenty-four since the subtitle controls landed — eighteen `video.*` rows (see
-      `deletedPlayerDependents`, which names that set rather than counting it; the five
-      newest are dual subtitles, subtitle position up/down, delay reset and hide/show
-      subtitles) plus six
+      Twenty-five since the subtitle and picture controls landed — nineteen `video.*` rows (see
+      `deletedPlayerDependents`, which names that set rather than counting it; the six
+      newest are dual subtitles, subtitle position up/down, delay reset, hide/show
+      subtitles and picture fit) plus six
       `workspace.*` rows the overlay registers for the same reason it registers the
       others: it is the surface that can carry them out.
     */
-    expect(overlayIds.size).toBe(24);
-    expect([...overlayIds].filter((id) => id.startsWith('video.'))).toHaveLength(18);
+    expect(overlayIds.size).toBe(25);
+    expect([...overlayIds].filter((id) => id.startsWith('video.'))).toHaveLength(19);
     expect([...overlayIds].filter((id) => id.startsWith('workspace.'))).toHaveLength(6);
     for (const id of CUE_NAV_IDS) expect(overlayIds.has(id)).toBe(false);
   });
