@@ -38,6 +38,7 @@
  * model path or provider response.
  */
 
+import { currentAiSetupStatus, refreshAiSetup } from './aiSetupClient';
 import type { AgentAutomation } from '../shared/localAgentAutomation';
 import type { AgentAutomationRunFailureCode } from '../shared/localAgentAutomationRuns';
 import type { AgentTask } from '../shared/localAgent';
@@ -95,6 +96,11 @@ export async function runScheduledAutomation(
 
   const plan = window.api?.localAgentPlan;
   if (typeof plan !== 'function') return { ok: false, code: 'planner-unavailable' };
+  // The configured cloud provider, so an automation can plan without a local
+  // model the same way the conversation planner does. Read fresh: this runs
+  // unattended, often long after the window last looked.
+  await refreshAiSetup();
+  const cloudProviderId = currentAiSetupStatus()?.providerId;
 
   let response: Awaited<ReturnType<typeof plan>>;
   try {
@@ -114,6 +120,7 @@ export async function runScheduledAutomation(
           categories: settings.memoryScope,
         })
         : [],
+      ...(cloudProviderId ? { cloudProviderId } : {}),
     });
   } catch {
     // Backend/model exception text can carry a local model path. The code is the

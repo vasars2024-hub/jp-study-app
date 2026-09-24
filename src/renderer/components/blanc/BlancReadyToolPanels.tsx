@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { DictEntry, DictResult } from '../../../shared/types';
 import type { ImmersionSite } from '../../../shared/immersion';
@@ -32,7 +32,7 @@ import { fuzzyScore } from '../../fuzzySearch';
 import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
-import { LANG_TAGS, type TVars } from '../../../shared/i18n/core';
+import type { TVars } from '../../../shared/i18n/core';
 import type {
   AgentExecutionEvent,
   AgentTask,
@@ -47,20 +47,6 @@ import {
   addDeckCards,
   loadDeck,
 } from '../../flashcardDeck';
-import {
-  loadLocalAgentAutomations,
-  onLocalAgentAutomationsChanged,
-  removeLocalAgentAutomation,
-  saveLocalAgentAutomation,
-} from '../../localAgentAutomationStore';
-import {
-  loadLocalAgentAutomationRuns,
-  onLocalAgentAutomationRunsChanged,
-} from '../../localAgentAutomationRunsStore';
-import {
-  latestAgentAutomationRun,
-  type AgentAutomationRunLog,
-} from '../../../shared/localAgentAutomationRuns';
 import type { AgentAutomation } from '../../../shared/localAgentAutomation';
 import type { LocalAgentModelInfo, LocalAgentRuntimeStatus } from '../../../shared/localAgentRuntime';
 import {
@@ -103,6 +89,7 @@ import {
   createCentralAgentToolRegistry,
 } from '../../agentToolRegistry';
 import { AgentProfileOperationsEditor, agentPermissionLabelKey } from './AgentProfileOperations';
+import { AgentAutomationEditor } from '../agent/AgentAutomationEditor';
 
 // This panel renders Study OS class names, whose rules live in styles.css.
 // Imported here rather than in the boot entry so the 468 KB sheet rides this
@@ -314,16 +301,6 @@ const APPROVAL_REFUSAL_KEYS: Record<AgentQueuedStepApprovalFailureCode, string> 
   'operation-denied': 'blanc.agent.approvalRefusal.operationDenied',
 };
 
-const AGENT_WEEKDAY_KEYS = [
-  'common.weekday.sun',
-  'common.weekday.mon',
-  'common.weekday.tue',
-  'common.weekday.wed',
-  'common.weekday.thu',
-  'common.weekday.fri',
-  'common.weekday.sat',
-] as const;
-
 export function LocalAgentPanel() {
   const { t, lang } = useT();
   const [settings, setSettings] = useState(() => loadLocalAgentSettings());
@@ -335,15 +312,6 @@ export function LocalAgentPanel() {
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [events, setEvents] = useState<AgentExecutionEvent[]>([]);
-  const [automations, setAutomations] = useState<AgentAutomation[]>(() => loadLocalAgentAutomations());
-  const [automationRuns, setAutomationRuns] = useState<AgentAutomationRunLog>(
-    () => loadLocalAgentAutomationRuns(),
-  );
-  const [automationName, setAutomationName] = useState('');
-  const [automationObjective, setAutomationObjective] = useState('');
-  const [automationTime, setAutomationTime] = useState('09:00');
-  const [automationFrequency, setAutomationFrequency] = useState<AgentAutomation['frequency']>('daily');
-  const [automationWeekday, setAutomationWeekday] = useState(1);
   const [runtimeStatus, setRuntimeStatus] = useState<LocalAgentRuntimeStatus>({ loaded: false, busy: false });
   const [availableModels, setAvailableModels] = useState<LocalAgentModelInfo[]>([]);
   const [profileStore, setProfileStore] = useState<AgentProfileStore>(() => loadLocalAgentProfiles());
@@ -425,23 +393,10 @@ export function LocalAgentPanel() {
   // between the `useState` initializer and the passive effect, which would
   // otherwise leave the panel showing an empty queue until the next edit.
   useEffect(() => {
-    setAutomations(loadLocalAgentAutomations());
-    return onLocalAgentAutomationsChanged(setAutomations);
-  }, []);
-
-  useEffect(() => {
     setTaskQueue(loadLocalAgentTaskQueue());
     return onLocalAgentTaskQueueChanged(setTaskQueue);
   }, []);
 
-  // Main-written and read-only here. Without this the schedule table could only
-  // say when an automation is *due*, never whether it actually ran — and a fire
-  // that reached nobody would be indistinguishable from one that has not come
-  // due yet.
-  useEffect(() => {
-    setAutomationRuns(loadLocalAgentAutomationRuns());
-    return onLocalAgentAutomationRunsChanged(setAutomationRuns);
-  }, []);
 
 
   // This panel is a real automation handler, so it registers as one: main
@@ -504,68 +459,6 @@ export function LocalAgentPanel() {
       window.clearInterval(timer);
     };
   }, []);
-
-  const addAutomation = (): void => {
-    const name = automationName.trim();
-    const scheduledObjective = automationObjective.trim();
-    if (!name || !scheduledObjective) {
-      setStatus(t('blanc.agent.status.scheduleNeedsNameAndTask'));
-      return;
-    }
-    const entry: AgentAutomation = {
-      id: `agent-auto-${Date.now().toString(36)}`,
-      name,
-      objective: scheduledObjective,
-      frequency: automationFrequency,
-      time: automationTime,
-      ...(automationFrequency === 'weekly' ? { weekday: automationWeekday } : {}),
-      enabled: true,
-      permission: effectiveAgentPermission(settings.permission, activeProfile),
-      createdAt: Date.now(),
-    };
-    setAutomations(saveLocalAgentAutomation(entry));
-    setAutomationName('');
-    setAutomationObjective('');
-    setStatus(t('blanc.agent.status.scheduled', { name }));
-  };
-
-  const removeAutomation = (id: string): void => {
-    setAutomations(removeLocalAgentAutomation(id));
-    setStatus(t('blanc.agent.status.scheduleRemoved'));
-  };
-
-  /**
-   * The schedule table's honest state. Four answers, and the failure states are why
-   * the column exists: a `missed` fire came due and reached nobody, which is not
-   * the same as an automation that has not come due yet.
-   *
-   * "Not yet" deliberately does not say "never ran": the run log keeps fourteen
-   * days, so an absent row is only an absent row.
-   */
-  const lastRunCell = (automationId: string): ReactNode => {
-    const run = latestAgentAutomationRun(automationRuns, automationId);
-    if (!run) return <span className="blanc-note">{t('blanc.agent.run.never')}</span>;
-    const time = new Date(run.at).toLocaleString(LANG_TAGS[lang], {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    if (run.outcome === 'failed') {
-      const reason = t(`blanc.agent.run.failure.${run.failureCode ?? 'unknown'}`);
-      return (
-        <span className="blanc-note" title={reason}>
-          {t('blanc.agent.run.failed', { time, reason })}
-        </span>
-      );
-    }
-    if (run.outcome === 'delivered') return t('blanc.agent.run.delivered', { time });
-    return (
-      <span className="blanc-note" title={t('blanc.agent.run.missedHint')}>
-        {t('blanc.agent.run.missed', { time })}
-      </span>
-    );
-  };
 
   const changeProfile = (id: string): void => {
     setProfileStore(saveLocalAgentProfiles({ ...profileStore, activeProfileId: id }));
@@ -908,16 +801,11 @@ export function LocalAgentPanel() {
       </fieldset>
       <fieldset>
         <legend>{t('blanc.agent.section.scheduled')}</legend>
-        <p className="blanc-note">{t('blanc.agent.scheduleNote')}</p>
-        <div className="blanc-form-grid">
-          <label>{t('blanc.agent.field.name')}<input value={automationName} maxLength={120} onChange={(event) => setAutomationName(event.currentTarget.value)} /></label>
-          <label>{t('blanc.agent.field.time')}<input type="time" value={automationTime} onChange={(event) => setAutomationTime(event.currentTarget.value)} /></label>
-          <label>{t('blanc.agent.field.frequency')}<select value={automationFrequency} onChange={(event) => setAutomationFrequency(event.currentTarget.value as AgentAutomation['frequency'])}><option value="daily">{t('blanc.agent.frequency.daily')}</option><option value="weekly">{t('blanc.agent.frequency.weekly')}</option></select></label>
-          {automationFrequency === 'weekly' && <label>{t('blanc.agent.field.day')}<select value={automationWeekday} onChange={(event) => setAutomationWeekday(Number(event.currentTarget.value))}>{[1, 2, 3, 4, 5, 6, 0].map((day) => <option key={day} value={day}>{t(AGENT_WEEKDAY_KEYS[day])}</option>)}</select></label>}
-        </div>
-        <label>{t('blanc.agent.field.scheduledRequest')}<textarea rows={2} maxLength={500} value={automationObjective} placeholder={t('blanc.agent.placeholder.scheduledRequest')} onChange={(event) => setAutomationObjective(event.currentTarget.value)} /></label>
-        <div className="blanc-row-actions"><button type="button" onClick={addAutomation} disabled={!settings.enabled}>{t('blanc.agent.action.addSchedule')}</button><span className="blanc-note">{t('blanc.agent.scheduledCount', { count: automations.length })}</span></div>
-        {automations.length > 0 && <div className="blanc-table-wrap"><table className="blanc-table"><thead><tr><th>{t('blanc.agent.table.name')}</th><th>{t('blanc.agent.table.when')}</th><th>{t('blanc.agent.field.permission')}</th><th>{t('blanc.agent.table.lastRun')}</th><th /></tr></thead><tbody>{automations.map((entry) => <tr key={entry.id}><td>{entry.name}</td><td>{t('blanc.agent.scheduleWhen', { frequency: t(`blanc.agent.frequency.${entry.frequency}`), time: entry.time })}{entry.frequency === 'weekly' && entry.weekday != null ? ` · ${t(AGENT_WEEKDAY_KEYS[entry.weekday])}` : ''}</td><td>{t(agentPermissionLabelKey(entry.permission))}</td><td>{lastRunCell(entry.id)}</td><td><button type="button" onClick={() => removeAutomation(entry.id)}>{t('common.remove')}</button></td></tr>)}</tbody></table></div>}
+        {/*
+          The schedule editor is shared with Settings > AI, which is where the
+          main Agent's automations are managed; Blanc renders the same one.
+        */}
+        <AgentAutomationEditor variant="blanc" />
       </fieldset>
     </div>
   );
