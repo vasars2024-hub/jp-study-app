@@ -174,6 +174,77 @@ function regionToPixels(
   return { x, y, width, height };
 }
 
+interface ScreenSourceLike {
+  display_id: string;
+  thumbnail: { getSize: () => { width: number; height: number } };
+}
+
+interface DisplayLike {
+  id: number;
+  bounds: { width: number; height: number };
+}
+
+/** Whether a source's thumbnail has the display's shape (it is letterboxed to it). */
+function sameShape(source: ScreenSourceLike, display: DisplayLike): boolean {
+  const { width, height } = source.thumbnail.getSize();
+  if (!(width > 0 && height > 0 && display.bounds.width > 0 && display.bounds.height > 0)) return false;
+  const a = width / height;
+  const b = display.bounds.width / display.bounds.height;
+  return Math.abs(a - b) / b < 0.02;
+}
+
+/**
+ * Which `desktopCapturer` screen source shows `target`, or `null` when that
+ * cannot be told.
+ *
+ * Which screen we grab has to be certain, not probable: a wrong pick OCRs a
+ * different monitor and returns `ok: true`, so the user reads text that was
+ * never inside the box they drew. But "certain" is not the same as "labelled".
+ * Electron fills `display_id` on Windows only when DXGI output duplication
+ * works; where it is refused (hybrid-GPU laptops report access denied) every
+ * source comes back with an empty id, and the old rule — refuse unless there is
+ * exactly one screen — left the Lens unable to capture on any two-monitor setup.
+ *
+ * So, in order, each step only where it cannot be wrong:
+ *   1. the source whose `display_id` names the target;
+ *   2. the one unlabelled source left when exactly one display is unclaimed;
+ *   3. the only unlabelled source shaped like the target, when the target is
+ *      the only unclaimed display of that shape (the thumbnail is letterboxed
+ *      into the requested size, so it keeps the screen's aspect ratio);
+ *   4. pairing by order — the capturer and `screen.getAllDisplays()` both walk
+ *      the system's monitor list, which Electron itself relies on to label
+ *      DXGI sources — but only when the counts agree and every pair has the
+ *      same shape, so a mismatched order is caught rather than trusted.
+ * Anything else is genuinely ambiguous and refuses.
+ */
+function pickScreenSource<S extends ScreenSourceLike>(
+  sources: S[],
+  displays: DisplayLike[],
+  target: DisplayLike,
+): S | null {
+  const byId = sources.find((s) => s.display_id === String(target.id));
+  if (byId) return byId;
+
+  const known = new Set(displays.map((d) => String(d.id)));
+  const claimed = new Set(sources.map((s) => s.display_id).filter((id) => known.has(id)));
+  // A source labelled with another display is that display's, never ours.
+  const unlabelled = sources.filter((s) => !known.has(s.display_id));
+  const open = displays.filter((d) => !claimed.has(String(d.id)));
+  if (!unlabelled.length || !open.some((d) => d.id === target.id)) return null;
+
+  if (unlabelled.length === 1 && open.length === 1) return unlabelled[0];
+
+  const shaped = unlabelled.filter((s) => sameShape(s, target));
+  if (shaped.length === 1 && open.filter((d) => sameShape(shaped[0], d)).length === 1) {
+    return shaped[0];
+  }
+
+  if (unlabelled.length === open.length && open.every((d, i) => sameShape(unlabelled[i], d))) {
+    return unlabelled[open.findIndex((d) => d.id === target.id)] ?? null;
+  }
+  return null;
+}
+
 /**
  * Grab `region` (display-local DIP) from `displayId` as a PNG data URL at full
  * physical resolution. Returns the crop and the display's scale factor so the
@@ -192,28 +263,11 @@ async function captureRegion(
   };
 
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize });
-  /*
-   * Which screen we actually grabbed has to be certain, not probable.
-   *
-   * The old chain was `display_id match → primary → sources[0]`, which on a
-   * machine where Electron reports an empty `display_id` — it does on some
-   * Windows and Linux configurations — silently OCRs a *different monitor* and
-   * returns `ok: true`. The user then reads text that was never inside the box
-   * they drew, with nothing to indicate it. That is the false-success shape this
-   * track forbids, and an honest refusal is the correct behaviour.
-   *
-   * The unlabelled fallback survives only where it cannot be wrong: exactly one
-   * screen source and exactly one display, where "the screen" is unambiguous.
-   * Anything else refuses.
-   */
   // No sources at all is a different condition — the capturer gave us nothing,
   // which `capture-failed` already covers. Ambiguity is specifically "screens
   // exist and we cannot tell which one is the requested display".
   if (sources.length === 0) return null;
-  const matched = sources.find((s) => s.display_id === String(display.id));
-  const onlyScreen =
-    !matched && sources.length === 1 && screen.getAllDisplays().length === 1 ? sources[0] : null;
-  const source = matched ?? onlyScreen;
+  const source = pickScreenSource(sources, screen.getAllDisplays(), display);
   if (!source) throw new Error('capture-display-ambiguous');
   if (source.thumbnail.isEmpty()) return null;
 
@@ -357,23 +411,16 @@ export async function ocrRegion(
   displayId: number,
   opts: { engine?: OcrEngineChoice; includeScreenshot?: boolean } = {},
 ): Promise<LensOcrResult> {
-  let cap: { image: Electron.NativeImage; scaleFactor: number } | null;
-  try {
-    cap = await captureRegion(region, displayId);
-  } catch (err) {
-    return EMPTY({ error: err instanceof Error ? err.message : 'capture-failed' });
-  }
-  if (!cap) return EMPTY({ error: 'capture-failed' });
-
-  const { image, scaleFactor: sf } = cap;
-  const hash = crypto.createHash('sha1').update(image.toBitmap()).digest('hex');
   const engine = opts.engine ?? 'auto';
 
+  // Models first, capture second. The capture can fail for reasons of its own
+  // (an ambiguous monitor, a compositor hiccup), and when it ran first those
+  // failures hid the one thing a fresh install needs to see — the offer to
+  // fetch the model — behind an error the user could do nothing about.
   if (engine === 'manga' && !mangaOcrAvailable()) {
     return EMPTY({
       engine: 'manga',
       available: false,
-      hash,
       error: 'manga-models-missing',
       missingAssets: { ids: MANGA_ASSETS, startIds: MANGA_START },
     });
@@ -386,10 +433,20 @@ export async function ocrRegion(
       available: false,
       downloading: fetch.downloading,
       missingAssets: fetch.missingAssets,
-      hash,
       error: 'web-models-missing',
     });
   }
+
+  let cap: { image: Electron.NativeImage; scaleFactor: number } | null;
+  try {
+    cap = await captureRegion(region, displayId);
+  } catch (err) {
+    return EMPTY({ error: err instanceof Error ? err.message : 'capture-failed' });
+  }
+  if (!cap) return EMPTY({ error: 'capture-failed' });
+
+  const { image, scaleFactor: sf } = cap;
+  const hash = crypto.createHash('sha1').update(image.toBitmap()).digest('hex');
 
   let result: AutoOcrResult;
   let zoom = 1;
@@ -476,6 +533,7 @@ function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
 
 export const __screenOcrTestables = {
   regionToPixels,
+  pickScreenSource,
   decideZoom,
   scaleLines,
   betterPass,

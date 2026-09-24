@@ -131,8 +131,16 @@ vi.mock('../ocrAuto', () => ({
 const { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr, downloads } = h;
 /** The two-monitor default, restored per test — the display list is mutable. */
 const DEFAULT_DISPLAYS = displays.map((d) => ({ ...d }));
-const { regionToPixels, decideZoom, scaleLines, betterPass, medianGlyphPx, meanConfidence, totalChars } =
-  __screenOcrTestables;
+const {
+  regionToPixels,
+  pickScreenSource,
+  decideZoom,
+  scaleLines,
+  betterPass,
+  medianGlyphPx,
+  meanConfidence,
+  totalChars,
+} = __screenOcrTestables;
 
 // ---- helpers ------------------------------------------------------------
 
@@ -234,6 +242,66 @@ describe('regionToPixels', () => {
   });
 });
 
+// ---- pickScreenSource: which screen is which -------------------------
+
+describe('pickScreenSource', () => {
+  const src = (display_id: string, width: number, height: number, name: string) => ({
+    display_id,
+    name,
+    thumbnail: { getSize: () => ({ width, height }) },
+  });
+  const wide = { id: 1, bounds: { width: 1280, height: 720 } }; // 16:9 at 150 %
+  const tall = { id: 2, bounds: { width: 1920, height: 1200 } }; // 16:10
+  const alsoWide = { id: 3, bounds: { width: 1920, height: 1080 } };
+
+  it('takes the labelled source when Electron filled display_id', () => {
+    const sources = [src('2', 1920, 1200, 'b'), src('1', 1920, 1080, 'a')];
+    expect(pickScreenSource(sources, [wide, tall], wide)?.name).toBe('a');
+  });
+
+  it('takes the one unlabelled source left when the other display is claimed', () => {
+    const sources = [src('1', 1920, 1080, 'a'), src('', 1920, 1080, 'b')];
+    expect(pickScreenSource(sources, [wide, alsoWide], alsoWide)?.name).toBe('b');
+  });
+
+  it('never takes a source labelled for another display', () => {
+    const sources = [src('3', 1920, 1080, 'other')];
+    expect(pickScreenSource(sources, [wide, alsoWide], wide)).toBeNull();
+  });
+
+  it('tells unlabelled monitors apart by shape, whatever order they come in', () => {
+    const sources = [src('', 1920, 1200, 'tall'), src('', 1920, 1080, 'wide')];
+    expect(pickScreenSource(sources, [wide, tall], wide)?.name).toBe('wide');
+    expect(pickScreenSource(sources, [wide, tall], tall)?.name).toBe('tall');
+  });
+
+  it('pairs same-shaped unlabelled monitors by order', () => {
+    const sources = [src('', 1920, 1080, 'first'), src('', 1920, 1080, 'second')];
+    expect(pickScreenSource(sources, [wide, alsoWide], wide)?.name).toBe('first');
+    expect(pickScreenSource(sources, [wide, alsoWide], alsoWide)?.name).toBe('second');
+  });
+
+  it('refuses an order that the shapes contradict', () => {
+    // Two 16:9 displays and a 16:10 one, but the 16:10 source is listed first:
+    // the order is provably not the display order, and shape alone cannot say
+    // which 16:9 source is which.
+    const sources = [src('', 1920, 1200, 'tall'), src('', 1920, 1080, 'x'), src('', 1920, 1080, 'y')];
+    expect(pickScreenSource(sources, [wide, alsoWide, tall], wide)).toBeNull();
+    // The odd one out is still certain.
+    expect(pickScreenSource(sources, [wide, alsoWide, tall], tall)?.name).toBe('tall');
+  });
+
+  it('refuses when there are more screens than displays and none is labelled', () => {
+    const sources = [src('', 1920, 1080, 'a'), src('', 1920, 1080, 'b'), src('', 1920, 1080, 'c')];
+    expect(pickScreenSource(sources, [wide, alsoWide], wide)).toBeNull();
+  });
+
+  it('refuses an empty thumbnail as a shape witness', () => {
+    const sources = [src('', 0, 0, 'a'), src('', 1920, 1080, 'b')];
+    expect(pickScreenSource(sources, [wide, alsoWide], wide)).toBeNull();
+  });
+});
+
 // ---- ocrRegion: the main-process crash surface -------------------------
 
 describe('ocrRegion — malformed input must not throw', () => {
@@ -287,8 +355,11 @@ describe('ocrRegion — malformed input must not throw', () => {
    * `ok: true` — the user reads text that was never inside the box they drew.
    * With two displays present, an unmatchable source must refuse instead.
    */
-  it('refuses rather than capturing a different monitor when no source matches', async () => {
+  it('refuses rather than capturing a different monitor when the sources cannot be paired', async () => {
+    // Three unlabelled screens for two displays: no count, shape or order
+    // argument can say which one is display 2.
     state.sources = [
+      { display_id: '', thumbnail: state.thumbnail },
       { display_id: '', thumbnail: state.thumbnail },
       { display_id: '', thumbnail: state.thumbnail },
     ];
@@ -296,6 +367,39 @@ describe('ocrRegion — malformed input must not throw', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toBe('capture-display-ambiguous');
     expect(cropCalls).toEqual([]); // nothing was captured at all
+  });
+
+  /*
+   * The two-monitor laptop the runtime check ran on: a 1280x720 primary at
+   * 150 % and a 1920x1080 at 100 %, both 16:9, and Electron handing back two
+   * sources with an empty `display_id` because DXGI duplication was refused.
+   * Every scan used to end in `capture-display-ambiguous` there.
+   */
+  it('captures each monitor of an unlabelled two-display setup', async () => {
+    displays.splice(
+      0,
+      displays.length,
+      { id: 193337900, bounds: { x: 0, y: 0, width: 1280, height: 720 }, scaleFactor: 1.5 },
+      { id: 3773702556, bounds: { x: 1280, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
+    );
+    const first = fakeImage(1920, 1080, 0x11);
+    const second = fakeImage(1920, 1080, 0x22);
+    state.sources = [
+      { id: 'screen:0:0', display_id: '', thumbnail: first },
+      { id: 'screen:2:0', display_id: '', thumbnail: second },
+    ];
+    ocr.impl = () => result([line([0, 0, 10, 10])]);
+    const onPrimary = await ocrRegion({ x: 100, y: 100, width: 200, height: 100 }, 193337900);
+    const onSecondary = await ocrRegion({ x: 100, y: 100, width: 200, height: 100 }, 3773702556);
+    expect(onPrimary.ok).toBe(true);
+    expect(onSecondary.ok).toBe(true);
+    // Different bitmaps prove different sources; the crop proves the primary's
+    // 150 % scale was applied to the primary's source.
+    expect(onPrimary.hash).not.toBe(onSecondary.hash);
+    expect(cropCalls).toEqual([
+      { x: 150, y: 150, width: 300, height: 150 },
+      { x: 100, y: 100, width: 200, height: 100 },
+    ]);
   });
 
   it('still captures an unlabelled source when there is exactly one screen and one display', async () => {
@@ -344,6 +448,18 @@ describe('ocrRegion — engine availability', () => {
     // One request, for the parent — the manager queues the detector and charset.
     expect(downloads.started).toEqual(['paddle-ocr-ja']);
     expect(ocr.calls).toHaveLength(0);
+  });
+
+  it('offers the model before trying to capture, so a capture problem cannot hide it', async () => {
+    engines.paddle = false;
+    state.sources = [
+      { display_id: '', thumbnail: state.thumbnail },
+      { display_id: '', thumbnail: state.thumbnail },
+      { display_id: '', thumbnail: state.thumbnail },
+    ];
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 2);
+    expect(res).toMatchObject({ available: false, error: 'web-models-missing', downloading: true });
+    expect(cropCalls).toEqual([]);
   });
 
   it('does not start a second download while one is already running', async () => {
