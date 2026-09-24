@@ -217,9 +217,10 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
   { id: 'library', labelKey: 'palette.section.library', glyph: 'library' },
   { id: 'novels', labelKey: 'palette.section.novels', glyph: 'novels' },
-  // 'scan', not 'search': Reading is the OCR reading lens, and sharing the
-  // generic search glyph left it as the one app in Start without an app icon
-  // (inline affordances like search stay monochrome — see theme/aeroIconPack.ts).
+  // 'reading' is the Reading workspace opened on its Discover tab (the Finder),
+  // not the OCR lens — the lens has no app window. The 'scan' glyph is kept so
+  // saved layouts and the taskbar do not change icon. Not offered in Start:
+  // see START_HIDDEN_SECTIONS.
   { id: 'reading', labelKey: 'palette.section.reading', glyph: 'scan' },
   { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
   { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
@@ -256,8 +257,15 @@ const START_PRIMARY_SECTIONS: WinSection[] = [
  * Start showed two ways into one app — "Media" and "Video" — with nothing to
  * choose between them. `player` is the one kept, relabelled "Watch"; the Video
  * tab is one click away in the Media Center's own sidebar.
+ *
+ * `novels` and `reading` are the same case three times over: Library, Novels
+ * and Reading Finder all opened the one Reading workspace (Novels on its Plan
+ * tab, Reading on Discover), so Start offered three doors into one room.
+ * `library` is the one kept, and it now opens that workspace on its Library
+ * tab; Plan, Discover, Lists and the rest are its tabs. Both ids stay real
+ * sections for deep links, the lens hand-off, pop-outs and saved layouts.
  */
-const START_HIDDEN_SECTIONS: ReadonlySet<WinSection> = new Set<WinSection>(['video']);
+const START_HIDDEN_SECTIONS: ReadonlySet<WinSection> = new Set<WinSection>(['video', 'novels', 'reading']);
 /**
  * D189 — these are the subtitle under every app name in the Aero start menu,
  * and they were English literals in every language. A module-level map cannot
@@ -475,9 +483,9 @@ const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] =
   {
     id: 'study',
     labelKey: 'desktop.startCategory.study',
-    sections: ['agent', 'dictionary', 'grammar', 'reading', 'translate', 'files', 'anki', 'flashcards'],
+    sections: ['agent', 'dictionary', 'grammar', 'translate', 'files', 'anki', 'flashcards'],
   },
-  { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
+  { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'immersion'] },
   { id: 'progress', labelKey: 'desktop.startCategory.progress', sections: ['stats', 'calendar'] },
   { id: 'system', labelKey: 'desktop.startCategory.system', sections: ['games', 'resources', 'city', 'settings'] },
 ];

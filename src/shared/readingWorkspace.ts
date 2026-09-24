@@ -35,6 +35,30 @@ export const READING_WORKSPACE_SECTIONS = [
 export type ReadingWorkspaceSection = (typeof READING_WORKSPACE_SECTIONS)[number];
 
 /**
+ * The tabs the workspace shows — fewer than the sections it can be routed to.
+ *
+ * Home, Discover and Continue were three tabs over one surface (the Finder),
+ * differing only in which of its parts showed: nine tabs for five screens. They
+ * are one tab now, whose Finder carries the Continue row above the catalogue.
+ * `home` and `continue` stay valid route sections — deep links, widgets and
+ * saved routes name them — and select the Discover tab when they arrive.
+ */
+export const READING_WORKSPACE_TABS = [
+  'discover',
+  'library',
+  'lists',
+  'captures',
+  'plan',
+  'imports',
+  'sources',
+] as const satisfies readonly ReadingWorkspaceSection[];
+export type ReadingWorkspaceTab = (typeof READING_WORKSPACE_TABS)[number];
+
+export function readingWorkspaceTabForSection(section: ReadingWorkspaceSection): ReadingWorkspaceTab {
+  return section === 'home' || section === 'continue' ? 'discover' : section;
+}
+
+/**
  * The retained surface that currently owns each workspace destination.
  *
  * Keeping this mapping beside the route vocabulary prevents the two legacy
