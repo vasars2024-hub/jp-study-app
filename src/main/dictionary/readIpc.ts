@@ -5,6 +5,7 @@
 import { utilityProcess } from 'electron';
 import { dictionaryDb, dictionaryDir } from './db';
 import { dictionaryImportWorkerPath } from './importJobs';
+import type { LookupQuery, LookupResult } from './dictService';
 import { DictionaryReadClient, type ReadWorkerHandle } from './readClient';
 import {
   runDictionaryRead,
@@ -61,6 +62,22 @@ export function readDictionary<K extends DictionaryReadKind>(
   query: DictionaryReadQueries[K],
 ): Promise<DictionaryReadResults[K]> {
   return dictionaryReads().read(kind, query);
+}
+
+/**
+ * Queries per worker message. Well under `LOOKUP_BATCH_MAX`, so one message is
+ * a few seconds of cold page faults at worst and never nears the read timeout.
+ */
+const LOOKUP_BATCH_CHUNK = 64;
+
+/** Many lookups, one result per query in order, in as few round trips as fit. */
+export async function readDictionaryBatch(queries: readonly LookupQuery[]): Promise<LookupResult[]> {
+  const out: LookupResult[] = [];
+  for (let start = 0; start < queries.length; start += LOOKUP_BATCH_CHUNK) {
+    const chunk = queries.slice(start, start + LOOKUP_BATCH_CHUNK);
+    out.push(...await readDictionary('lookupBatch', { queries: chunk }));
+  }
+  return out;
 }
 
 /** For app shutdown. Safe when no read ever happened. */

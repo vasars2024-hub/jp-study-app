@@ -37,6 +37,7 @@ import {
   findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
+  lookupBatch,
   type CompoundQuery,
   type EtymologyQuery,
   type ExampleQuery,
@@ -55,6 +56,8 @@ import type { LexiconXrefResult } from '../../shared/lexiconXrefs';
 
 export interface DictionaryReadQueries {
   lookup: LookupQuery;
+  /** At most `LOOKUP_BATCH_MAX` queries; `readDictionaryBatch` chunks longer lists. */
+  lookupBatch: { queries: LookupQuery[] };
   neighbors: NeighborQuery;
   compounds: CompoundQuery;
   examples: ExampleQuery;
@@ -65,6 +68,7 @@ export interface DictionaryReadQueries {
 
 export interface DictionaryReadResults {
   lookup: LookupResult;
+  lookupBatch: LookupResult[];
   neighbors: LexiconNeighborResult;
   compounds: LexiconCompoundResult;
   examples: LexiconExampleResult;
@@ -102,6 +106,8 @@ export async function runDictionaryRead(
   switch (kind) {
     case 'lookup':
       return lookup(db, query as LookupQuery);
+    case 'lookupBatch':
+      return lookupBatch(db, (query as DictionaryReadQueries['lookupBatch']).queries);
     case 'neighbors':
       return findSemanticNeighbors(db, query as NeighborQuery);
     case 'compounds':

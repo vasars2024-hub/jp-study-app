@@ -1195,20 +1195,52 @@ export function removeYomitanDict(id: string): { ok: boolean; error?: string } {
 }
 
 /**
- * Everything, glossaries included, for a caller that reads the term index
- * directly (`lookupOfflineDeinflected`, `lookupGlossary`, `lookupTermMerged`).
- * The first such call pays the glossary parse once; see `termsLoaded`.
+ * The metadata, and the term glossaries only while they can answer something
+ * the database cannot: resolves `true` when a caller may read the term index
+ * (`lookupOfflineDeinflected`, `lookupGlossary`, `lookupTermMerged`), `false`
+ * when SQLite owns every term store and the caller should not.
+ *
+ * This is the single gate on the ~260 MB parse. Every caller that reads the
+ * glossaries asks it first, so on a migrated installation no feature — the
+ * extension, the gloss batch, mining, the pop-up's miss path — can load them.
+ * They load only as the documented migration fallback, for a store still
+ * waiting for its database import, and `releaseYomitanTermsIfMigrated` drops
+ * them again once that import lands.
  */
-export async function initYomitan(): Promise<void> {
+export async function initYomitan(): Promise<boolean> {
   await initYomitanMeta();
+  if (!legacyTermsPending()) return false;
   ensureYomitanTerms();
+  return true;
 }
 
-/** Load the term glossaries now, once; what `initYomitan()` adds to the metadata. */
+/**
+ * Load the term glossaries now, once, regardless of the database. Production
+ * code goes through `initYomitan()`; this is for tests of the legacy reader.
+ */
 export function ensureYomitanTerms(): void {
   if (termsLoaded) return;
   termsLoaded = true;
   loadAllIndices();
+}
+
+/** Whether the term glossaries are in memory. For tests and diagnostics. */
+export function yomitanTermsLoaded(): boolean {
+  return termsLoaded;
+}
+
+/**
+ * Drop the term glossaries once no term store is waiting for its database
+ * import. Called when an import job settles: a lookup during the first-boot
+ * migration loads them as the fallback, and without this they would stay
+ * resident for the rest of that session although SQLite now answers for them.
+ * Returns whether anything was released.
+ */
+export function releaseYomitanTermsIfMigrated(): boolean {
+  if (!termsLoaded || legacyTermsPending()) return false;
+  termsLoaded = false;
+  loadAllIndices();
+  return true;
 }
 
 /**

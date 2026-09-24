@@ -108,9 +108,11 @@ export async function enrichTermsBatch(
     /**
      * Consult the legacy Yomitan store for words the database did not know.
      *
-     * On by default because that store still holds this installation's JMdict.
-     * It is separable because reaching it means `initYomitan()`, which on a
-     * profile that has never opened a dictionary **provisions the bundled
+     * On by default for the migration window: `initYomitan()` loads that store
+     * only while a term dictionary is still waiting for its database import,
+     * and answers `false` (so nothing is read) once SQLite owns them all. It is
+     * separable because reaching it means `initYomitan()`, which on a profile
+     * that has never opened a dictionary **provisions the bundled
      * dictionaries** — hundreds of thousands of terms and about fifteen seconds.
      * A test that only wants to prove the database path must be able to say so
      * rather than pay for that, and it is genuinely a different claim.
@@ -151,9 +153,10 @@ export async function enrichTermsBatch(
   if (!legacyFallback || !missed.length) return out;
 
   // Only now, and only once: the whole point of deferring this is that a
-  // selection the database can answer never provisions the legacy store.
+  // selection the database can answer never provisions the legacy store, and a
+  // migrated installation never loads its ~260 MB of glossaries.
   try {
-    await initYomitan();
+    if (!(await initYomitan())) return out;
   } catch {
     return out;
   }

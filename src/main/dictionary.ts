@@ -21,13 +21,12 @@ import {
   importYomitanZip,
   initYomitan,
   initYomitanMeta,
-  legacyTermsPending,
   listYomitanDicts,
-  lookupGlossary,
   getPitchData,
   lookupOfflineDeinflected,
   lookupTermMerged,
   moveYomitanDict,
+  releaseYomitanTermsIfMigrated,
   removeYomitanDict,
   setYomitanEnabled,
   setYomitanLang,
@@ -42,8 +41,12 @@ import {
   offlineStatus,
   searchOffline,
 } from './dictionary/tatoebaOffline';
-import { enrichLexiconResultMetadata, lookupResultToDictResult } from './dictionary/lexiconAdapter';
-import { clampLookupLimit } from '../shared/dictionaryLookup';
+import {
+  enrichLexiconResultMetadata,
+  lookupResultToDictResult,
+  lookupResultToPerLanguageDictResult,
+} from './dictionary/lexiconAdapter';
+import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup';
 import { legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import {
   lookupChineseInDictionary,
@@ -81,7 +84,8 @@ import {
 } from '../shared/lexiconExplainPrompt';
 import { normalizePolicy } from '../shared/agentExecutionBridge';
 import { dictionaryDir } from './dictionary/db';
-import { disposeDictionaryReads, readDictionary } from './dictionary/readIpc';
+import { disposeDictionaryReads, readDictionary, readDictionaryBatch } from './dictionary/readIpc';
+import type { LookupResult } from './dictionary/dictService';
 import { warmDictionaryPages, type DictWarmResult } from './dictionary/warmup';
 import {
   scheduleDictionaryCacheWarmup,
@@ -144,6 +148,7 @@ import {
   type LexiconAudioResult,
 } from '../shared/lexiconAudio';
 import {
+  onDictionaryImportSettled,
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
   queueYomitanStoreImport,
@@ -282,9 +287,10 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   // The legacy glossaries can only add something here while a store is still
   // waiting for its database import: once SQLite owns every store, its exact,
   // de-inflected and prefix lookups above already covered the same data. Loading
-  // them for every miss is what kept ~260 MB of them resident after one popup.
-  if (legacyTermsPending()) await initYomitan();
-  else await initYomitanMeta();
+  // them for every miss is what kept ~260 MB of them resident after one popup,
+  // so `initYomitan()` loads them only then; otherwise the legacy leg below
+  // reads empty maps and goes straight to Jisho.
+  await initYomitan();
   const merged = await lookupTermMerged(q, lookupWord);
   if (merged.entries.length || merged.error) return merged;
 
@@ -303,13 +309,93 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   return merged;
 }
 
-/** Offline-only Yomitan glossary lookup (de-inflection aware) — no Jisho HTTP. */
+/** Legacy pitch, frequency and IPA on a database result, as the legacy index attached them. */
+function withLegacyMetadata(result: DictResult): DictResult {
+  return enrichLexiconResultMetadata(result, {
+    pitchHtml: getPitch,
+    frequency: getFrequencyDetail,
+    ipa: getIpa,
+  });
+}
+
+/**
+ * Offline lookups for the callers that used to read the legacy in-memory index
+ * directly — the browser extension, `lookupTermOffline`, the VN/mining gloss
+ * batch and mining's lemma readings. One result per text, in order.
+ *
+ * The database answers, in one batched read off the main process. Headwords
+ * only: the legacy index was keyed by headword and never searched glosses, and
+ * a reverse hit ("eat" → 食べる) is not what any of these callers asked for.
+ * Merged entries are split back into one per gloss language, which is the shape
+ * the legacy index returned (see `lookupResultToPerLanguageDictResult`), and the
+ * pitch/frequency/IPA the legacy entries carried are attached from the metadata
+ * indices, which stay loaded.
+ *
+ * The legacy index answers a text only when the database had nothing for it and
+ * a term store is still waiting for its database import — the documented
+ * migration fallback. On a migrated installation it is never loaded from here.
+ */
+async function lookupOfflineMany(texts: readonly string[], limit = DICT_LOOKUP_LIMIT): Promise<DictResult[]> {
+  const queries = texts.map((text) => (text ?? '').trim());
+  const asked = queries.filter(Boolean);
+  let unified: LookupResult[] = [];
+  try {
+    unified = await readDictionaryBatch(asked.map((text) => ({ text, limit, headwordsOnly: true })));
+  } catch {
+    // A database read must never take the offline fallback down.
+  }
+  try {
+    await initYomitanMeta();
+  } catch {
+    // Without the metadata the entries simply carry no pitch or frequency.
+  }
+  let legacyReady: boolean | undefined;
+  const out: DictResult[] = [];
+  let next = 0;
+  for (const q of queries) {
+    if (!q) {
+      out.push({ query: q, entries: [] });
+      continue;
+    }
+    const hit = unified[next];
+    next += 1;
+    if (hit?.entries.length) {
+      out.push(withLegacyMetadata(lookupResultToPerLanguageDictResult(hit)));
+      continue;
+    }
+    if (legacyReady === undefined) legacyReady = await initYomitan().catch(() => false);
+    if (!legacyReady) {
+      out.push({ query: q, entries: [] });
+      continue;
+    }
+    const local = lookupOfflineDeinflected(q);
+    out.push({ query: q, entries: local.entries, ...(local.deinflection ? { deinflection: local.deinflection } : {}) });
+  }
+  return out;
+}
+
+/** Offline-only dictionary lookup (de-inflection aware) — no Jisho HTTP. */
 export async function lookupTermOffline(query: string): Promise<DictResult> {
-  await initYomitan();
-  const q = (query ?? '').trim();
-  if (!q) return { query: q, entries: [] };
-  const local = lookupOfflineDeinflected(q);
-  return { query: q, entries: local.entries, deinflection: local.deinflection };
+  const [result] = await lookupOfflineMany([query ?? '']);
+  return result;
+}
+
+/**
+ * The dictionary readings of each word's own headword, for mining's lemma
+ * readings: entries written exactly as the word, best first. Replaces a
+ * per-token read of the legacy index with one batched database read.
+ */
+export async function lookupHeadwordReadings(words: readonly string[]): Promise<Map<string, string[]>> {
+  const unique = [...new Set(words.map((word) => word.trim()).filter(Boolean))];
+  const results = await lookupOfflineMany(unique);
+  const out = new Map<string, string[]>();
+  unique.forEach((word, index) => {
+    const readings = results[index].entries
+      .filter((entry) => entry.word === word)
+      .map((entry) => entry.reading ?? '');
+    if (readings.length) out.set(word, readings);
+  });
+  return out;
 }
 
 /**
@@ -336,11 +422,9 @@ export async function lookupOfflineInterlinearMerged(
     // The legacy fallback only answers for stores SQLite does not own yet (see
     // `lookupTerm`); without one it would load every glossary to add nothing.
     // The boot cache warm-up runs this path, so that load used to be permanent.
-    if (!legacyTermsPending()) {
-      await initYomitanMeta();
+    if (!(await initYomitan())) {
       result = lookupOfflineInterlinearFromStore(text, options);
     } else {
-      await initYomitan();
       const dicts = listYomitanDicts();
       result = lookupOfflineInterlinearFromStore(text, options, (query) =>
         legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
@@ -443,8 +527,6 @@ interface GlossCacheFile {
   entries: Record<string, CandidateGlosses>;
 }
 
-const GLOSS_BATCH_CONCURRENCY = 32;
-
 function glossCachePath(): string {
   return path.join(app.getPath('userData'), 'mining', 'gloss-cache.json');
 }
@@ -507,7 +589,7 @@ export async function lookupTermsBatch(
   queries: GlossLookupQuery[],
   langs: CandidateGlossLang[],
 ): Promise<Record<string, CandidateGlosses>> {
-  await initYomitan();
+  await initYomitanMeta();
   const registryHash = getDictRegistryHash();
   const cache = readGlossCache();
   if (cache.registryHash !== registryHash) {
@@ -536,22 +618,16 @@ export async function lookupTermsBatch(
     toFetch.push({ key, query });
   }
 
-  let ptr = 0;
-  async function worker(): Promise<void> {
-    while (ptr < toFetch.length) {
-      const i = ptr++;
-      const { key, query } = toFetch[i];
-      const lookupQ = query.expression.trim() || (query.reading ?? '').trim();
-      const entries = lookupGlossary(lookupQ);
-      const glosses = resolveGlossesForEntries(entries, langs);
-      const merged = { ...(result[key] ?? {}), ...glosses };
-      result[key] = merged;
-      cache.entries[key] = { ...(cache.entries[key] ?? {}), ...merged };
-    }
-  }
-
-  const workers = Math.min(GLOSS_BATCH_CONCURRENCY, Math.max(1, toFetch.length));
-  await Promise.all(Array.from({ length: workers }, () => worker()));
+  // One batched database read for every word the cache could not answer.
+  const found = await lookupOfflineMany(
+    toFetch.map(({ query }) => query.expression.trim() || (query.reading ?? '').trim()),
+  );
+  toFetch.forEach(({ key }, index) => {
+    const glosses = resolveGlossesForEntries(found[index].entries, langs);
+    const merged = { ...(result[key] ?? {}), ...glosses };
+    result[key] = merged;
+    cache.entries[key] = { ...(cache.entries[key] ?? {}), ...merged };
+  });
   writeGlossCache(cache);
   return result;
 }
@@ -1371,6 +1447,11 @@ export function registerDictionaryIpc(): void {
   // (progress, cancellation, post-reload recovery), so they live next door
   // rather than as four more one-line handlers here.
   registerDictionaryImportIpc();
+  // A lookup during the first-boot migration may load the legacy glossaries as
+  // its fallback; once the import that made them necessary lands, drop them.
+  onDictionaryImportSettled(() => {
+    if (releaseYomitanTermsIfMigrated()) console.log('[dictionary] legacy term glossaries released');
+  });
   // Provisioning is already asynchronous. Once it has named every bundled
   // legacy store, migrate only the stores SQLite does not yet own. The job stays
   // observable/cancellable through the same Settings card as a manual rebuild.

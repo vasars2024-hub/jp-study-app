@@ -75,9 +75,30 @@ function startNextStoreImport(manager: DictionaryImportJobs): void {
   }
 }
 
+/** Main-process listeners told whenever an import job settles, however it ended. */
+const settledListeners = new Set<() => void>();
+
+/**
+ * Run `listener` each time an import job settles. The legacy term index uses it
+ * to release its glossaries once the migration that needed them has landed.
+ */
+export function onDictionaryImportSettled(listener: () => void): () => void {
+  settledListeners.add(listener);
+  return () => settledListeners.delete(listener);
+}
+
 function broadcast(snapshot: DictionaryImportJobSnapshot): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(DICTIONARY_IMPORT_CHANNELS.changed, snapshot);
+  }
+  if (snapshot.status !== 'running') {
+    for (const listener of settledListeners) {
+      try {
+        listener();
+      } catch (error) {
+        console.warn('[dictionary] import-settled listener failed:', error);
+      }
+    }
   }
   if (snapshot.status !== 'running' && jobs && pendingStoreImports.length) {
     // Settled: the slot is free on the next tick (settle runs inside the job).

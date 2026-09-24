@@ -59,7 +59,7 @@ import {
   REMOTE_BUNDLED_FREQUENCY_DICTIONARIES,
   isBundledFrequencyDictId,
 } from '../shared/bundledFrequencyDicts';
-import { getFrequencyRank, initYomitan, lookupGlossary } from './dictionary/yomitan';
+import { getFrequencyRank } from './dictionary/yomitan';
 // Direct rather than via the shared/mining barrel: that barrel no longer
 // re-exports the AI catalog, because re-exporting it pulled 41 KB into Blanc's
 // boot chunk through storage.ts. See the note in shared/mining.ts.
@@ -549,8 +549,9 @@ function isJapaneseText(text: string): boolean {
  * Reading of the dictionary (lemma) form — NOT of a conjugated surface. The
  * old code stored the reading of the first surface hit on the lemma (会う →
  * アッ from 会った, 訊く → キイ from 訊いて). Preference order:
- * 1. Yomitan dictionary reading for the exact lemma (disambiguated by the
- *    kuromoji lemma reading when the word has several readings).
+ * 1. Dictionary reading for the exact lemma (disambiguated by the kuromoji
+ *    lemma reading when the word has several readings). `dictReadings` is
+ *    read for every lemma at once by `lookupHeadwordReadings`.
  * 2. Kuromoji re-tokenization of the bare lemma.
  * 3. Whatever the surface pass produced (last resort).
  * Readings are stored as hiragana; the export option converts to katakana.
@@ -560,6 +561,7 @@ function resolveLemmaReading(
   lemma: string,
   surfaceReading: string,
   fromLemma: boolean,
+  dictReadings: readonly string[],
 ): string {
   let kuroReading = fromLemma ? surfaceReading : '';
   if (!kuroReading) {
@@ -576,10 +578,7 @@ function resolveLemmaReading(
       /* keep fallbacks */
     }
   }
-  const dictReadings = lookupGlossary(lemma)
-    .filter((e) => e.word === lemma)
-    .map((e) => e.reading ?? '');
-  return pickLemmaReading(dictReadings, kuroReading, surfaceReading);
+  return pickLemmaReading([...dictReadings], kuroReading, surfaceReading);
 }
 
 async function tokenizeJapanese(text: string): Promise<Map<string, TokenCandidate>> {
@@ -620,14 +619,18 @@ async function tokenizeJapanese(text: string): Promise<Map<string, TokenCandidat
     }
   }
 
-  // Fix readings against the dictionary / bare-lemma tokenization.
-  await initYomitan();
+  // Fix readings against the dictionary / bare-lemma tokenization. One batched
+  // database read for every lemma; a failed read leaves the tokenizer's readings.
+  const { lookupHeadwordReadings } = await import('./dictionary');
+  const dictReadings = await lookupHeadwordReadings([...byExpression.keys()])
+    .catch(() => new Map<string, string[]>());
   for (const entry of byExpression.values()) {
     entry.reading = resolveLemmaReading(
       tokenizer,
       entry.expression,
       entry.reading,
       entry.readingFromLemma ?? false,
+      dictReadings.get(entry.expression) ?? [],
     );
   }
   return byExpression;

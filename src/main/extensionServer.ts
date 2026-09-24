@@ -1884,10 +1884,10 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         json(res, 400, { ok: false, error: 'query required' });
         return;
       }
-      const { initYomitan, lookupOfflineDeinflected } = await import('./dictionary/yomitan');
-      // The glossaries load on first use now, not at boot; this path reads them.
-      await initYomitan();
-      const local = lookupOfflineDeinflected(query);
+      // The dictionary database, one entry per gloss language — the shape the
+      // legacy in-memory index answered with, without loading that index.
+      const { lookupTermOffline } = await import('./dictionary');
+      const local = await lookupTermOffline(query);
       const entries = (local.entries || []).slice(0, 8).map((e) => ({
         word: e.word,
         reading: e.reading,

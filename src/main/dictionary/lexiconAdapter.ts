@@ -92,6 +92,50 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
 }
 
 /**
+ * One legacy entry per gloss language, where the database merged several.
+ *
+ * The database merges dictionaries that agree on headword and reading, so the
+ * bundled JMdict (English) and JMdict (Russian) arrive as one entry whose senses
+ * are the English ones followed by the Russian ones. The legacy in-memory index
+ * kept one entry per dictionary, and the callers moved off it depend on that:
+ * the gloss batch picks "the entry declared for this language", and a merged
+ * entry declares both, so its `glossaryHtml` (one dictionary's) could be served
+ * as the other language's gloss. Every sense comes from one dictionary, so its
+ * glosses share a language and grouping by it undoes the merge.
+ *
+ * The groups appear in the order the sources were merged, primary first, so
+ * each group is credited to the source in the same position when the counts
+ * agree. When they do not (a source whose senses were all duplicates), the
+ * entry's own primary title is the honest answer.
+ */
+function toLegacyEntriesByGlossLang(entry: LookupEntry): DictEntry[] {
+  const groups = new Map<string, LookupSense[]>();
+  for (const sense of entry.senses) {
+    const lang = sense.glosses[0]?.lang ?? '';
+    const list = groups.get(lang);
+    if (list) list.push(sense);
+    else groups.set(lang, [sense]);
+  }
+  if (groups.size <= 1) return [toLegacyEntry(entry)];
+  const titles = entry.sources.map((source) => source.dictTitle);
+  const attributable = titles.length === groups.size;
+  return [...groups.values()].map((senses, index) =>
+    toLegacyEntry({ ...entry, senses, dictTitle: (attributable && titles[index]) || entry.dictTitle }));
+}
+
+/**
+ * `lookupResultToDictResult`, with merged entries split back into one entry per
+ * gloss language — the shape the legacy index answered with. For the callers
+ * that replaced a legacy read (the extension, the gloss batch, offline lookups).
+ */
+export function lookupResultToPerLanguageDictResult(result: LookupResult): DictResult {
+  return {
+    ...lookupResultToDictResult(result),
+    entries: result.entries.flatMap(toLegacyEntriesByGlossLang),
+  };
+}
+
+/**
  * Restore legacy pitch/frequency fields until the unified lookup exposes them.
  *
  * The frequency resolver may answer with a bare rank or with a rank that knows

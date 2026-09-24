@@ -785,6 +785,34 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   return result;
 }
 
+/** The most one `lookupBatch` call answers; a longer list is the caller's to chunk. */
+export const LOOKUP_BATCH_MAX = 256;
+
+/** How long `lookupBatch` runs before it hands the event loop back. */
+const LOOKUP_BATCH_YIELD_MS = 50;
+
+/**
+ * Several `lookup`s in one call, answered in order, one result per query.
+ *
+ * The callers that used to read the legacy in-memory index a word at a time —
+ * the VN gloss batch, mining's lemma readings — ask for tens to hundreds of
+ * words at once. One message per batch keeps that a single round trip to the
+ * read worker instead of one per word, and the time-budgeted yield keeps the
+ * in-process fallback from holding the main loop for the whole list.
+ */
+export async function lookupBatch(db: SqliteDb, queries: readonly LookupQuery[]): Promise<LookupResult[]> {
+  const out: LookupResult[] = [];
+  let sliceStart = Date.now();
+  for (const query of queries.slice(0, LOOKUP_BATCH_MAX)) {
+    out.push(lookup(db, query));
+    if (Date.now() - sliceStart >= LOOKUP_BATCH_YIELD_MS) {
+      await new Promise<void>((resolve) => { setImmediate(resolve); });
+      sliceStart = Date.now();
+    }
+  }
+  return out;
+}
+
 /**
  * IPA transcriptions for one entry, from every enabled IPA source, highest
  * priority first and deduplicated.
