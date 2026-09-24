@@ -132,6 +132,9 @@ export interface VideoCoreStudyPreferences {
   furigana: boolean;
   primarySubs: boolean;
   dualSubs: boolean;
+  /** Every subtitle line hidden at once (the V key). Separate from `primarySubs`, so
+   *  showing them again restores exactly the lines that were on before. */
+  subtitlesHidden: boolean;
   dictationMode: boolean;
   shadowingMode: boolean;
   subtitleFontSize: number;
@@ -319,6 +322,7 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     furigana: raw.furigana === true,
     primarySubs: raw.primarySubs !== false,
     dualSubs: raw.dualSubs !== false,
+    subtitlesHidden: raw.subtitlesHidden === true,
     dictationMode: raw.dictationMode === true,
     shadowingMode: raw.shadowingMode === true,
     subtitleFontSize: fontSize,

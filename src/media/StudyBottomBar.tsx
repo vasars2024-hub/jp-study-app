@@ -448,6 +448,14 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.japaneseSubs')}
             </label>
+            <label title={shortcutTitle('video.toggleSubtitles')}>
+              <input
+                type="checkbox"
+                data-study-pref="subtitlesHidden"
+                checked={preferences.subtitlesHidden}
+                onChange={(event) => updatePreference('subtitlesHidden', event.currentTarget.checked)}
+              /> {t('mediaWorkspace.study.hideAllSubs')}
+            </label>
             <label title={shortcutTitle('video.toggleDualSubs')}>
               <input
                 type="checkbox"

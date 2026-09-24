@@ -326,3 +326,12 @@ describe('What the second line shows when a track can supply it', () => {
       .toEqual({ text: 'Good morning.', translate: true, fallback: true });
   });
 });
+
+describe('hide / show all subtitles (V)', () => {
+  it('defaults to shown and only an explicit true hides', async () => {
+    const { normalizeVideoCoreStudyPreferences } = await import('../videoCoreStudy');
+    expect(normalizeVideoCoreStudyPreferences({}).subtitlesHidden).toBe(false);
+    expect(normalizeVideoCoreStudyPreferences({ subtitlesHidden: 'yes' }).subtitlesHidden).toBe(false);
+    expect(normalizeVideoCoreStudyPreferences({ subtitlesHidden: true }).subtitlesHidden).toBe(true);
+  });
+});

@@ -169,3 +169,23 @@ describe('the second line for a file that is not in the library', () => {
     expect(effect).toMatch(/if \(!helper\?\.text && typeof window\.api\.subtitleForPath === 'function'\)/);
   });
 });
+
+describe('dual subtitles stack', () => {
+  it('the second line is a block of its own, so two short lines never share a row', () => {
+    const secondary = rule('#media-workspace .study-cue-secondary');
+    expect(secondary).toMatch(/display: block;/);
+    expect(secondary).toMatch(/width: fit-content;/);
+    expect(secondary).toMatch(/margin: 0\.4rem auto 0;/);
+    expect(secondary).not.toMatch(/display: inline-block;/);
+  });
+});
+
+describe('V hides every subtitle line at once', () => {
+  it('gates the study line, the second line, its fallback hint and the timing readout', () => {
+    expect(OVERLAY).toMatch(/activeCue && preferences\.primarySubs && !preferences\.subtitlesHidden/);
+    expect(OVERLAY).toMatch(/preferences\.dualSubs && !preferences\.subtitlesHidden && secondaryText/);
+    expect(OVERLAY).toMatch(/preferences\.dualSubs && !preferences\.subtitlesHidden && secondaryIsFallback/);
+    expect(OVERLAY).toMatch(/preferences\.cueTimingReadout && !preferences\.subtitlesHidden/);
+    expect(OVERLAY).toMatch(/registerCommandHandler\('video\.toggleSubtitles'/);
+  });
+});

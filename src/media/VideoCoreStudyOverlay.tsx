@@ -1843,6 +1843,9 @@ export default function VideoCoreStudyOverlay({
       registerCommandHandler('video.toggleDualSubs', () => {
         updatePreference('dualSubs', !preferencesRef.current.dualSubs);
       }),
+      registerCommandHandler('video.toggleSubtitles', () => {
+        updatePreference('subtitlesHidden', !preferencesRef.current.subtitlesHidden);
+      }),
       // One ladder for both keys (see `nudgeSubtitlePosition`): up past the highest lift
       // reaches the top of the picture, and down from the top comes back.
       registerCommandHandler('video.subPositionUp', () => {
@@ -2878,7 +2881,7 @@ export default function VideoCoreStudyOverlay({
         data-study-cue-position={preferences.subtitleAtTop ? 'top' : 'bottom'}
         style={subtitlePlacementStyle(preferences) as React.CSSProperties}
       >
-        {activeCue && preferences.primarySubs && (!preferences.dictationMode || dictationRevealed) ? (
+        {activeCue && preferences.primarySubs && !preferences.subtitlesHidden && (!preferences.dictationMode || dictationRevealed) ? (
           <SubtitleCueLine
             /*
               `sa-palette` carries the category hues from sentenceAnalysis.css so
@@ -2901,6 +2904,12 @@ export default function VideoCoreStudyOverlay({
             }}
             onMouseUp={handleLookupMouseUp}
           />
+        ) : preferences.subtitlesHidden && activeCue ? (
+          /* Said once, then faded (the same CSS as the no-subtitles notice), so a stray V
+             press never reads as "the subtitles broke". */
+          <span className="study-cue-status" data-study-cue-status="none" data-study-subs-hidden>
+            {t('mediaWorkspace.study.subtitlesHidden', { key: shortcutKeysFor('video.toggleSubtitles') || 'V' })}
+          </span>
         ) : preferences.dictationMode && activeCue ? (
           <span className="study-cue-status">{t('mediaWorkspace.study.listenType')}</span>
         ) : noCuesNow && noSubtitlesSettled ? (
@@ -2913,7 +2922,7 @@ export default function VideoCoreStudyOverlay({
           </span>
         ) : null}
 
-        {activeCue && preferences.cueTimingReadout && (
+        {activeCue && preferences.cueTimingReadout && !preferences.subtitlesHidden && (
           <span className="study-cue-timing">
             {t('mediaWorkspace.mining.cueMeta', {
               cue: activeCue.index + 1,
@@ -2923,7 +2932,7 @@ export default function VideoCoreStudyOverlay({
           </span>
         )}
 
-        {preferences.dualSubs && secondaryText && (
+        {preferences.dualSubs && !preferences.subtitlesHidden && secondaryText && (
           <p
             className="study-cue-secondary"
             lang={preferences.secondarySubLang}
@@ -2945,7 +2954,7 @@ export default function VideoCoreStudyOverlay({
           </span>
         )}
 
-        {preferences.dualSubs && secondaryIsFallback && (
+        {preferences.dualSubs && !preferences.subtitlesHidden && secondaryIsFallback && (
           /* The second line is in another language than the one chosen: said once, faded
              like the notice above, so the choice does not look silently ignored. */
           <span

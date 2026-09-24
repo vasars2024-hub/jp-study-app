@@ -539,10 +539,15 @@
   text-shadow: 0 2px 4px rgb(0 0 0 / 1);
 }
 
+/* Always on its own line under the study line. It was inline-block like the study line, so
+   two short lines that fit the 46rem overlay together sat side by side ("そうですね。…
+   It is. Shall we…") instead of stacked. A fit-content block keeps the background hugging
+   the words while forcing the line break; auto margins centre it. */
 #media-workspace .study-cue-secondary {
-  margin: 0.4rem 0 0;
+  margin: 0.4rem auto 0;
   font-family: var(--subtitle-font-stack);
-  display: inline-block;
+  display: block;
+  width: fit-content;
   max-width: 100%;
   color: rgb(225 231 255 / 0.94);
   font-size: clamp(0.88rem, 1.4vw, 1.18rem);
