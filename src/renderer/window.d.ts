@@ -1025,6 +1025,21 @@ declare global {
         entries: import('../shared/malLibrary').MalLibraryEntry[];
         summary: import('../shared/malLibrary').MalLibrarySummary;
       }>;
+      /** Writes one entry on the user's MAL list. Explicit user action only. */
+      malUpdateEntry(
+        animeId: number,
+        update: import('../shared/malSync').MalListStatusUpdate,
+      ): Promise<
+        import('../main/malSync').MalIpcResult<import('../shared/malSync').MalListStatusUpdate>
+      >;
+      /** What differs between the watch library and the MAL list as last fetched. Local only. */
+      malPushPreview(): Promise<
+        import('../main/malSync').MalIpcResult<import('../shared/malPush').MalPushPreview>
+      >;
+      /** Sends that diff (or just `animeIds`) to MAL — only from the "Push changes" button. */
+      malPushChanges(
+        animeIds?: number[],
+      ): Promise<import('../main/malSync').MalIpcResult<import('../main/malPush').MalPushResult>>;
       /**
        * Watch-tracking library (anime / TV / films, owned or not). Local disk
        * only; imports read export files, nothing signs in anywhere.

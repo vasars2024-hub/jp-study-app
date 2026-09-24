@@ -1737,6 +1737,15 @@ const api = {
   ): Promise<
     import('./main/malSync').MalIpcResult<import('./shared/malSync').MalListStatusUpdate>
   > => ipcRenderer.invoke('mal:updateEntry', animeId, update),
+  /** What differs between the watch library and the MAL list as last fetched. Local only. */
+  malPushPreview: (): Promise<
+    import('./main/malSync').MalIpcResult<import('./shared/malPush').MalPushPreview>
+  > => ipcRenderer.invoke('mal:pushPreview'),
+  /** Sends that diff (or just `animeIds`) to MAL — only ever from an explicit click. */
+  malPushChanges: (
+    animeIds?: number[],
+  ): Promise<import('./main/malSync').MalIpcResult<import('./main/malPush').MalPushResult>> =>
+    ipcRenderer.invoke('mal:pushChanges', animeIds),
   onMediaMetadataProgress: (
     cb: (p: import('./shared/mediaMetadataIpc').MediaMetadataProgress) => void,
   ): (() => void) => {

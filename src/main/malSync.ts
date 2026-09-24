@@ -57,6 +57,7 @@ import {
   vaultCanStore,
   writeSecretSet,
 } from './credentials/vault';
+import { malPushPreview, pushWatchChangesToMal } from './malPush';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -1145,6 +1146,16 @@ export function registerMalSyncIpc(): void {
       }
       return client().fetchDerivatives(ids, clean);
     }));
+
+  // Write-back of the watch library's edits. Preview is local disk only; the
+  // push sends one PATCH per differing title and runs only when the user clicks
+  // "Push changes to MAL" — never on a timer or after an import (gate 13).
+  ipcMain.handle('mal:pushPreview', async () => guard(() => malPushPreview()));
+  ipcMain.handle('mal:pushChanges', async (_event, animeIds: unknown) =>
+    guard(() => pushWatchChangesToMal(
+      client(),
+      Array.isArray(animeIds) ? animeIds.filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0) : undefined,
+    )));
 
   ipcMain.handle('mal:updateEntry', async (_event, animeId: unknown, update: unknown) =>
     guard(() => {
