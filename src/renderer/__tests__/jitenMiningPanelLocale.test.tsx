@@ -93,7 +93,10 @@ beforeAll(async () => {
   installApiStub();
   for (const lang of LANGS) await ensureCatalog(lang);
   JitenMiningPanel = (await import('../components/JitenMiningPanel')).default;
-});
+  // Four full catalogs plus the panel's module graph, transformed cold: seconds
+  // under a full parallel run, which vitest's default 10 s hook budget did not
+  // always cover. The tests after it are milliseconds each.
+}, 120_000);
 
 let root: Root | null = null;
 let host: HTMLElement | null = null;
