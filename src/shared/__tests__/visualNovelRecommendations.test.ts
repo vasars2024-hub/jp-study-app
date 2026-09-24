@@ -3,8 +3,10 @@ import type { MediaLanguageProfile } from '../mediaStudyDatabase';
 import { createVisualNovelEntry, type VisualNovelSourceResult } from '../visualNovel';
 import {
   buildVisualNovelLearnerContext,
+  estimateVisualNovelDifficultyPrior,
   rankVisualNovelEntries,
   rankVisualNovelSourceResults,
+  visualNovelCandidateRequest,
 } from '../visualNovelRecommendations';
 
 const profile = (
@@ -120,5 +122,61 @@ describe('visual novel recommendations', () => {
     ], context);
 
     expect(ranked.map((item) => item.item.providerId)).toEqual(['v1', 'v2']);
+  });
+
+  it('ranks VNDB candidates by estimated difficulty against the learner, not only by interest', () => {
+    const base: Omit<VisualNovelSourceResult, 'providerId' | 'title' | 'tags'> = {
+      provider: 'vndb' as const,
+      japaneseTitle: '',
+      alternativeTitles: [],
+      developer: '',
+      releaseDate: '',
+      platforms: [],
+      characters: [],
+      synopsis: '',
+      estimatedPlaytimeHours: 20,
+      coverImageUrl: '',
+      screenshotUrls: [],
+      communityRating: 8,
+      communityVoteCount: 500,
+      sourceUrl: '',
+    };
+    const beginner = {
+      targetDifficultyScore: 40,
+      targetJlpt: 'N4' as const,
+      knownCoverage: 0.6,
+      preferredTags: [],
+      analyzedTitles: 1,
+    };
+    const results = [
+      { ...base, providerId: 'v-hard', title: 'Hard', tags: ['Science Fiction', 'Philosophy', 'Mystery'] },
+      { ...base, providerId: 'v-easy', title: 'Easy', tags: ['Slice of Life', 'Comedy', 'School Life'] },
+    ];
+    const forBeginner = rankVisualNovelSourceResults(results, beginner);
+    expect(forBeginner.map((item) => item.item.providerId)).toEqual(['v-easy', 'v-hard']);
+    expect(forBeginner[0]).toMatchObject({ difficultySource: 'vndb' });
+    const forAdvanced = rankVisualNovelSourceResults(results, { ...beginner, targetDifficultyScore: 85, targetJlpt: 'N1' });
+    expect(forAdvanced.map((item) => item.item.providerId)).toEqual(['v-hard', 'v-easy']);
+    // A title with no Japanese release sinks.
+    const noJapanese = rankVisualNovelSourceResults([
+      { ...results[1], providerId: 'v-en', languages: ['en'] },
+      { ...results[1], providerId: 'v-ja', languages: ['ja', 'en'] },
+    ], beginner);
+    expect(noJapanese[0].item.providerId).toBe('v-ja');
+  });
+
+  it('estimates a difficulty prior from VNDB tags and length alone', () => {
+    const easy = estimateVisualNovelDifficultyPrior({ tags: ['Slice of Life', 'Comedy'], estimatedPlaytimeHours: 6 });
+    const hard = estimateVisualNovelDifficultyPrior({ tags: ['Science Fiction', 'Time Travel', 'Conspiracy'], estimatedPlaytimeHours: 60 });
+    expect(easy.score).toBeLessThan(hard.score);
+    expect(hard.jlpt).toBe('N1');
+  });
+
+  it('asks VNDB for tags the learner likes and excludes what is already in the library', () => {
+    const request = visualNovelCandidateRequest(
+      [{ sourceIds: { vndb: 'v2002' } }, { sourceIds: {} }] as unknown as Parameters<typeof visualNovelCandidateRequest>[0],
+      { targetDifficultyScore: 55, targetJlpt: 'N3', knownCoverage: null, preferredTags: ['Mystery', 'Time Travel', 'Romance', 'Drama'], analyzedTitles: 0 },
+    );
+    expect(request).toEqual({ tags: ['Mystery', 'Time Travel', 'Romance'], excludeProviderIds: ['v2002'] });
   });
 });

@@ -44,6 +44,7 @@ import { setAgentNavigationOpener } from './main/agentNavigationIpc';
 import { registerLocalAgentSchedulerIpc, stopLocalAgentScheduler } from './main/localAgentScheduler';
 import { registerMiningIpc } from './main/mining';
 import { registerImmersionIpc } from './main/immersion';
+import { configureVisualNovelReader } from './main/immersion/visualNovelReaderWindow';
 import { registerSystemMetricsIpc } from './main/systemMetrics';
 import { registerScraperIpc } from './main/scraper';
 import { registerReadingIpc } from './main/reading';
@@ -1866,6 +1867,13 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerReadingLensIpc();
+  // The VN reader window beside a running game (Visual Novels ▸ Launch).
+  configureVisualNovelReader({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+  });
   createWindow();
   // Assignments are seeded from `screen`, which is only live now. Run once the
   // main window exists, so its own display is excluded from the secondaries.

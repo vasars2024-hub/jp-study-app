@@ -15,7 +15,10 @@ import {
   updateVisualNovelProgress,
   updateVisualNovelRoutes,
   upsertVisualNovelEntry,
+  updateVisualNovelSettings,
   visualNovelEngineCompatibility,
+  visualNovelSettings,
+  DEFAULT_VISUAL_NOVEL_SETTINGS,
 } from '../visualNovel';
 
 describe('visual novel engine detection', () => {
@@ -27,10 +30,31 @@ describe('visual novel engine detection', () => {
     expect(detectVisualNovelEngine(['assets/custom.dat'])).toBe('unknown');
   });
 
-  it('maps extraction compatibility', () => {
-    expect(visualNovelEngineCompatibility('renpy')).toBe('supported');
-    expect(visualNovelEngineCompatibility('unity')).toBe('partial');
+  it('detects BGI, Siglus and the other archive engines by their shipped files', () => {
+    // The audit's own probe inputs: both returned `unknown` before.
+    expect(detectVisualNovelEngine(['BGI.exe', 'data01000.arc'])).toBe('bgi');
+    expect(detectVisualNovelEngine(['game.exe', 'data01000.arc', 'sysgrp.arc'])).toBe('bgi');
+    expect(detectVisualNovelEngine(['SiglusEngine.exe', 'Scene.pck'])).toBe('siglus');
+    expect(detectVisualNovelEngine(['game.exe', 'Gameexe.dat'])).toBe('siglus');
+    expect(detectVisualNovelEngine(['game.exe', 'root.pfs'])).toBe('artemis');
+    expect(detectVisualNovelEngine(['cs2.exe', 'scene.int'])).toBe('catsystem2');
+    expect(detectVisualNovelEngine(['game.exe', 'ysbin/yst_list.ybn', 'bn.ypf'])).toBe('yuris');
+    expect(detectVisualNovelEngine(['arc.nsa', 'nscr.exe'])).toBe('nscripter');
+    expect(detectVisualNovelEngine(['resources/app/tyrano/libs.js'])).toBe('tyrano');
+    // KiriKiri is still KiriKiri.
+    expect(detectVisualNovelEngine(['game.exe', 'data.xp3'])).toBe('kirikiri');
+  });
+
+  it('only claims what script import can actually read', () => {
+    // Script import reads PLAIN .rpy/.ks/.txt files, which a shipped game often
+    // does not have, so no engine is labelled fully supported any more.
+    expect(visualNovelEngineCompatibility('renpy')).toBe('partial');
+    expect(visualNovelEngineCompatibility('kirikiri')).toBe('partial');
+    expect(visualNovelEngineCompatibility('bgi')).toBe('manual');
+    expect(visualNovelEngineCompatibility('siglus')).toBe('manual');
+    expect(visualNovelEngineCompatibility('unity')).toBe('manual');
     expect(visualNovelEngineCompatibility('custom')).toBe('manual');
+    expect(visualNovelEngineCompatibility('unknown')).toBe('unknown');
   });
 });
 
@@ -206,7 +230,7 @@ describe('visual novel database', () => {
       chapters: ['Prologue', 'Chapter 1'],
       estimatedPlaytimeHours: 0,
       engine: 'renpy',
-      engineCompatibility: 'supported',
+      engineCompatibility: 'partial',
       sourceIds: { vndb: 'v17' },
       backgroundImageUrls: ['https://example.test/background.jpg'],
       screenshotUrls: ['https://example.test/one.jpg'],
@@ -320,5 +344,40 @@ describe('visual novel database', () => {
       scene: 'Scene 3',
     });
     expect(removeVisualNovelCapture(updated, 'capture-assist').captures).toEqual([]);
+  });
+});
+
+describe('visual novel capture settings', () => {
+  it('defaults clipboard capture ON for every novel, including ones saved before the field existed', () => {
+    const database = normalizeVisualNovelDatabase({
+      version: 1,
+      entries: [{ id: 'old', title: 'Saved in an older build' }],
+    });
+    expect(database.entries[0].clipboardCapture).toBe(true);
+    expect(visualNovelSettings(database)).toEqual(DEFAULT_VISUAL_NOVEL_SETTINGS);
+  });
+
+  it('only stores a local websocket and a real LEProc.exe', () => {
+    const database = updateVisualNovelSettings(createEmptyVisualNovelDatabase(), {
+      websocketEnabled: true,
+      websocketUrl: 'ws://example.com:6677',
+      localeEmulatorPath: 'C:/Windows/System32/cmd.exe',
+      reader: { opacity: 7, fontSize: 2, bounds: { x: 10, y: 20, width: 500, height: 300 } },
+    });
+    const settings = visualNovelSettings(database);
+    expect(settings.websocketEnabled).toBe(true);
+    expect(settings.websocketUrl).toBe('ws://localhost:6677');
+    expect(settings.localeEmulatorPath).toBe('');
+    expect(settings.reader).toMatchObject({ opacity: 1, fontSize: 12, bounds: { x: 10, y: 20, width: 500, height: 300 } });
+    const next = updateVisualNovelSettings(database, { localeEmulatorPath: 'D:/LE/LEProc.exe', websocketUrl: '127.0.0.1:9001' });
+    expect(visualNovelSettings(next)).toMatchObject({ localeEmulatorPath: 'D:/LE/LEProc.exe', websocketUrl: 'ws://127.0.0.1:9001' });
+    // A partial reader patch keeps the rest of the reader settings.
+    expect(visualNovelSettings(next).reader.bounds).toEqual({ x: 10, y: 20, width: 500, height: 300 });
+  });
+
+  it('keeps the local settings when a library export is merged in', () => {
+    const local = updateVisualNovelSettings(createEmptyVisualNovelDatabase(), { websocketEnabled: true });
+    const merged = mergeVisualNovelDatabases(local, createEmptyVisualNovelDatabase(), () => 'x');
+    expect(visualNovelSettings(merged).websocketEnabled).toBe(true);
   });
 });
