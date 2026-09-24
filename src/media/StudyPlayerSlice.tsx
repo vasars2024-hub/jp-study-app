@@ -98,6 +98,7 @@ import {
 import { getStudyLang } from '../renderer/studyEnvironment';
 import { rememberStudyTrackChoice, studySubtitleSource } from './studySubtitleMemory';
 import { resumeWriteAction } from './videoCoreResumeWrite';
+import { createSubtitleEventRelay } from './subtitleEventRelay';
 import {
   createWatchTimeState,
   watchTimeFlush,
@@ -805,7 +806,8 @@ function StudyPlayerSession({
   const clientId = useAtomValue(clientIdAtom);
   const connected = useAtomValue(websocketConnectedAtom);
   const identityConfirmed = useAtomValue(clientIdentityConfirmedAtom);
-  const pendingEvents = React.useRef<MKVParser_SubtitleEvent[]>([]);
+  /** Every muxed subtitle event of the current stream, replayed into each new manager. */
+  const subtitleRelay = React.useMemo(() => createSubtitleEventRelay<NonNullable<typeof manager>>(), []);
   const pulledPlaybackIds = React.useRef(new Set<string>());
   const pendingParserInfo = React.useRef<NativePlayer_PlaybackInfo | null>(null);
   const proofConfig = proofWindow().__SEANIME_CUE_PROOF_CONFIG__;
@@ -1466,16 +1468,14 @@ function StudyPlayerSession({
     return () => window.clearInterval(timer);
   }, [clientId, playbackRequest, proofConfig, video]);
 
+  // A manager VideoCore builds (or rebuilds) gets every event of the stream so far: the
+  // sidecar sends each cue once, and a fresh manager starts with an empty cache.
   React.useEffect(() => {
-    if (!manager || !pendingEvents.current.length) return;
-    const batch = pendingEvents.current.splice(0);
-    publishProof({
-      managerClass: manager.constructor.name,
-      subtitleEvents:
-        (proofWindow().__SEANIME_CUE_PROOF__?.subtitleEvents ?? 0) + batch.length,
-    });
-    void manager.onSubtitleEvents(batch);
-  }, [manager]);
+    subtitleRelay.attach(manager);
+    if (manager && subtitleRelay.received) {
+      publishProof({ managerClass: manager.constructor.name, subtitleEvents: subtitleRelay.received });
+    }
+  }, [manager, subtitleRelay]);
 
   /**
    * The request the slice is showing NOW, for async work that must not land on a later one.
@@ -1493,6 +1493,8 @@ function StudyPlayerSession({
 
       switch (message.type) {
         case 'open-and-await':
+          // A new stream: the previous one's cues must not reach its manager.
+          subtitleRelay.reset();
           setState({
             // Do not mount VideoCore until the following "watch" payload supplies real
             // playback info. Mounting it with null info terminates the just-opened
@@ -1559,15 +1561,11 @@ function StudyPlayerSession({
               `[cue-proof] subtitle-event ${events.length} cue(s), tracks ${tracks.join(', ')}`,
             );
           }
+          // Delivered to the manager attached NOW, not the one this handler closed over — that
+          // one may already be destroyed — and kept for any manager built after it.
+          subtitleRelay.receive(events);
           if (manager) {
-            publishProof({
-              managerClass: manager.constructor.name,
-              subtitleEvents:
-                (proofWindow().__SEANIME_CUE_PROOF__?.subtitleEvents ?? 0) + events.length,
-            });
-            void manager.onSubtitleEvents(events);
-          } else {
-            pendingEvents.current.push(...events);
+            publishProof({ managerClass: manager.constructor.name, subtitleEvents: subtitleRelay.received });
           }
           break;
         }
