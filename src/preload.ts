@@ -156,9 +156,12 @@ import type {
 } from './shared/agentOperationalState';
 import type { AgentOperationalResult } from './shared/agentOperationalBridge';
 import type {
+  AgentPricingResult,
   AgentSpendResult,
   AgentSpendSnapshotPayload,
 } from './shared/agentSpendBridge';
+import type { AiSetupStatus } from './shared/aiSetup';
+import type { AgentProviderPrice } from './shared/agentProviderPricing';
 import type {
   ReadingListEvent,
   ReadingListsDocument,
@@ -1527,6 +1530,8 @@ const api = {
     ok: boolean;
     result?: import('./shared/translateAnalysisCore').TranslateAnalysisResult;
     error?: string;
+    aiOff?: boolean;
+    needsKey?: boolean;
   }> => ipcRenderer.invoke('translate:analyze', req),
   // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
   extractVideoClip: (
@@ -2227,6 +2232,16 @@ const api = {
   ): Promise<{ ok: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke('mining:saveEpubDeckFile', content, title, ext),
   aiGetConfig: (): Promise<AiEngineConfig> => ipcRenderer.invoke('ai:getConfig'),
+  // Settings > AI: the "Use AI features" switch and the one status every AI
+  // surface derives its readiness from (`shared/aiSetup.ts`).
+  aiSetupStatus: (): Promise<AiSetupStatus> => ipcRenderer.invoke('aiSetup:status'),
+  aiSetupSetEnabled: (enabled: boolean): Promise<AiSetupStatus> =>
+    ipcRenderer.invoke('aiSetup:setEnabled', enabled),
+  onAiSetupChanged: (cb: (status: AiSetupStatus) => void): (() => void) => {
+    const handler = (_event: unknown, status: AiSetupStatus): void => cb(status);
+    ipcRenderer.on('aiSetup:changed', handler);
+    return () => ipcRenderer.removeListener('aiSetup:changed', handler);
+  },
   localAgentPlan: (request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse> =>
     ipcRenderer.invoke('localAgent:plan', request),
   localAgentStatus: (): Promise<LocalAgentRuntimeStatus> => ipcRenderer.invoke('localAgent:status'),
@@ -2328,6 +2343,18 @@ const api = {
     const handler = (_event: unknown, snapshot: AgentSpendSnapshotPayload): void => cb(snapshot);
     ipcRenderer.on('agentSpend:changed', handler);
     return () => ipcRenderer.removeListener('agentSpend:changed', handler);
+  },
+  // The per-provider rates the limit prices every cloud request with. Only the
+  // user's own figures cross; the built-in estimates are shared code.
+  agentPricingLoad: (): Promise<AgentPricingResult> => ipcRenderer.invoke('agentPricing:load'),
+  agentPricingSet: (providerId: AiProviderId, price: AgentProviderPrice | null): Promise<AgentPricingResult> =>
+    ipcRenderer.invoke('agentPricing:set', { providerId, price }),
+  agentPricingMigrate: (legacy: unknown): Promise<AgentPricingResult> =>
+    ipcRenderer.invoke('agentPricing:migrate', legacy),
+  onAgentPricingChanged: (cb: (result: AgentPricingResult) => void): (() => void) => {
+    const handler = (_event: unknown, result: AgentPricingResult): void => cb(result);
+    ipcRenderer.on('agentPricing:changed', handler);
+    return () => ipcRenderer.removeListener('agentPricing:changed', handler);
   },
   // Reading Lists. The write is compare-and-swap rather than a save, because the
   // library window, the reader window and a desktop widget are different
@@ -2476,6 +2503,8 @@ const api = {
     result?: import('./shared/mediaStudyAssistant').MediaStudyAssistantResult;
     error?: string;
     cached?: boolean;
+    aiOff?: boolean;
+    needsKey?: boolean;
   }> => ipcRenderer.invoke('media-study:assist', req),
   studyGet: (): Promise<StudyOrchestratorDocument> => ipcRenderer.invoke('study:get'),
   studyMigrateLegacy: (value: unknown): Promise<StudyOrchestratorDocument> =>

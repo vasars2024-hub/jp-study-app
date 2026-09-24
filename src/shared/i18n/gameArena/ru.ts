@@ -14,7 +14,7 @@ import type { Catalog } from '../core';
 
 export const GAME_ARENA_CHROME_RU: Catalog = {
   'palette.section.games': 'Игровая арена',
-  'storage.group.llm': 'Модели оценки письма',
+  'storage.group.llm': 'Языковые модели',
   'search.gameArena': 'Игровая арена',
   'search.gameArena.desc': 'Длина мини-игр, язык, уровень, звуки и оценщик «Зеркального письма»',
   'games.arcade.mines.board': 'Минное поле, {size} на {size}',

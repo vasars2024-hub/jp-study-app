@@ -30,6 +30,7 @@ import { loadToolboxSettings } from './toolboxSettings';
 import { bootTheme, onThemeChanged } from './theme';
 import { initProfileState } from './profileState';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
+import { startAiSetupSync } from './aiSetupClient';
 import { installBlancConsoleCapture } from './blancConsole';
 import { installNotificationCapture } from './notificationStore';
 import { clearOnExitIfConfigured } from './clipboardHistory';
@@ -157,6 +158,7 @@ if (container) {
   // the active one must resolve before the first paint or a non-English UI
   // flashes English. English is already loaded — a microtask for most sessions.
   void initI18n().then(() => {
+    startAiSetupSync();
     createRoot(container).render(
       withStrictMode(
         <AppErrorBoundary>

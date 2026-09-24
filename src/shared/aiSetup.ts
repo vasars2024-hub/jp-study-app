@@ -20,7 +20,7 @@
  */
 
 import type { AiApiKeysSet, AiProviderId } from './aiProviders';
-import { providerKeyBucket } from './aiProviders';
+import { AI_PROVIDERS, providerKeyBucket } from './aiProviders';
 import type { LocalAgentModelInfo } from './localAgentRuntime';
 
 /** The Settings page id every "Set up AI" link opens. */
@@ -130,6 +130,32 @@ export function preferredAgentTarget(readiness: AiReadiness): 'local' | AiProvid
   if (configured === 'local' && readiness.cloudReady) return readiness.providerId;
   if (configured !== 'local' && readiness.agentModelReady) return 'local';
   return configured;
+}
+
+/**
+ * Re-derives a status that crossed the bridge. Anything that is not an object
+ * with a boolean switch is `null` — "no answer yet" — never a thrown render.
+ */
+export function normalizeAiSetupStatus(value: unknown): AiSetupStatus | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Partial<AiSetupStatus>;
+  if (typeof raw.enabled !== 'boolean') return null;
+  const keys = (raw.apiKeysSet && typeof raw.apiKeysSet === 'object' ? raw.apiKeysSet : {}) as Partial<AiApiKeysSet>;
+  const fallback = pendingAiSetupStatus();
+  return {
+    enabled: raw.enabled,
+    engine: raw.engine === 'local-qwen' ? 'local-qwen' : 'cloud',
+    providerId: typeof raw.providerId === 'string' && AI_PROVIDERS.some((provider) => provider.id === raw.providerId)
+      ? raw.providerId
+      : fallback.providerId,
+    apiKeysSet: { gemini: keys.gemini === true, deepseek: keys.deepseek === true },
+    localModelInstalled: raw.localModelInstalled === true,
+    models: Array.isArray(raw.models)
+      ? raw.models.filter((model): model is LocalAgentModelInfo => (
+        Boolean(model) && typeof model.fileName === 'string' && typeof model.sizeBytes === 'number'
+      ))
+      : [],
+  };
 }
 
 /** The status a window shows before main has answered: nothing assumed ready. */

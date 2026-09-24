@@ -38,6 +38,7 @@ import {
 } from '../shared/subtitleFusionCore';
 import { callAiProvider } from './aiProviderClient';
 import { getConfiguredAiProvider } from './mining';
+import { aiFeaturesEnabled } from './aiFeatureGate';
 
 /** Why a job produced no verdicts, when it produced none. */
 export type FusionArbitrationSkip = 'no-key' | 'no-candidates' | 'cancelled' | null;
@@ -152,6 +153,10 @@ export async function arbitrateFusionDecisions(
   // still reports honestly which of the two reasons applied.
   let send = options.call;
   if (!send) {
+    // "Use AI features" off reads as the same honest outcome as no key: the
+    // cloud check did not run. Refused here rather than per batch, where it
+    // would surface as a failed arbitration.
+    if (!aiFeaturesEnabled()) return unchanged('no-key');
     const provider = readProvider();
     if (!provider?.apiKey) return unchanged('no-key');
     send = (prompt: string, itemCount: number) => callAiProvider(

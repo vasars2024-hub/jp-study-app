@@ -98,6 +98,8 @@ export const en: Catalog = {
   'mediaAssistant.mode.create-study-notes': 'Create study notes',
   'mediaAssistant.busy': 'Requesting an on-demand explanation…',
   'mediaAssistant.failed': 'The assistant could not analyze this sentence.',
+  'mediaAssistant.needsKey':
+    'The study assistant runs on a cloud AI provider. Add a key in Settings → AI to use it.',
   'mediaAssistant.cached': 'Loaded a saved explanation.',
   'mediaAssistant.saved': 'Saved to Notebook.',
   'mediaAssistant.translation': 'Translation',
@@ -2639,6 +2641,8 @@ export const en: Catalog = {
   'storage.group.examples': 'Example sentences',
   'storage.group.sentences': 'Graded sentences',
   'storage.asset.supertonic3.desc': 'High-quality offline Japanese speech with ten local voice styles.',
+  'storage.asset.qwen3.desc':
+    'The offline AI model: translation, AI cards, sentence analysis and the Agent without a cloud key.',
   // The plural case Russian actually needs: 1 / 2–4 / 5+.
   'storage.modelCount': {
     one: '{count} model installed',
@@ -2825,7 +2829,8 @@ export const en: Catalog = {
   'agent.execute.provider.deepseekFlash': 'DeepSeek V4 Flash',
   'agent.execute.provider.deepseekPro': 'DeepSeek V4 Pro',
   'agent.execute.provider.noKey': '{provider} — no API key',
-  'agent.execute.provider.noKeyHint': 'No API key is saved for this provider, so a run will be refused before it is sent. Add the key in AI Studio, or pick another provider.',
+  'agent.execute.provider.noKeyHint':
+    'No API key is saved for this provider, so a run will be refused before it is sent. Add the key in Settings → AI, or pick another provider.',
   'agent.execute.localFallback': 'Use local Qwen if the cloud key is missing',
   'agent.execute.cloudNotice': 'This prompt and selected context will be sent to {provider}.',
   'agent.execute.localNotice': 'This prompt stays on this device.',
@@ -2844,6 +2849,10 @@ export const en: Catalog = {
   'agent.execute.error.privacy': 'The request was blocked by its privacy or budget policy.',
   'agent.execute.error.transient': 'The provider is temporarily unavailable. Try again.',
   'agent.execute.error.provider': 'The provider returned an unusable response.',
+  'agent.execute.error.localModelMissing':
+    'No offline model is installed, so nothing was run. Install it in Settings → AI, or switch the Agent to a cloud provider.',
+  'agent.execute.error.aiOff':
+    'AI features are turned off, so nothing was sent. Turn them on in Settings → AI.',
   'agent.timeline.title': 'Activity',
   'agent.timeline.effect.navigate': 'Open a place',
   'agent.timeline.status.review': 'Awaiting your approval',
@@ -3535,10 +3544,11 @@ export const en: Catalog = {
   'lens.ai.analyzing': 'Analyzing the sentence…',
   'lens.ai.reanalyze': 'Re-analyze',
   'lens.ai.retry': 'Try again',
+  'lens.ai.off': 'AI features are turned off in Settings → AI.',
   'lens.ai.error': 'The analysis failed.',
-  'lens.ai.needsKey': 'AI analysis needs an API key. Add one in Flashcards → AI Card Studio.',
+  'lens.ai.needsKey': 'AI analysis needs a cloud API key. Add one in Settings → AI.',
   'lens.ai.needsLocalModel':
-    'AI analysis needs the local Qwen model. Install Qwen3-1.7B via Translate, or switch to Cloud in Flashcards → AI Card Studio.',
+    'AI analysis is set to run offline, but the model is not installed. Install it in Settings → AI, or switch to Cloud there.',
   'lens.ai.snapshotSource': 'Captured from the Reading Lens',
 
   // Reading Lens — the Read depth (progressive experience 3 of 3)
@@ -3646,7 +3656,7 @@ export const en: Catalog = {
   'settings.analysis.desc':
     'What an AI OCR read explains, and where the result goes — flashcards and notebook snapshots.',
   'settings.analysis.engineNote':
-    'Cloud vs Local Qwen is set in Flashcards → AI Card Studio. Sentence analysis uses the same engine.',
+    'Offline or cloud is chosen in Settings → AI. Sentence analysis uses the same engine.',
   'settings.analysis.depth': 'Explanation depth',
   'settings.analysis.depth.brief': 'Brief',
   'settings.analysis.depth.standard': 'Standard',
@@ -3924,7 +3934,8 @@ export const en: Catalog = {
   'noteCss.reset': 'Reset to default',
   'noteCss.savedMsg': 'Card styling saved.',
   'noteCss.saveFailed': 'Could not save card styling.',
-  'sentenceAnalysis.needKey': 'Formality, declension, and measure-word analysis need a cloud AI key. Add one in Flashcards → AI Card Studio to unlock these panels.',
+  'sentenceAnalysis.needKey':
+    'Formality, declension and measure-word notes come from a cloud AI provider, even when the translation ran offline. Add a key in Settings → AI to see them.',
   'sentenceAnalysis.analyzing': 'Analyzing grammar…',
   'sentenceAnalysis.unavailable': 'Analysis unavailable: {error}',
   'sentenceAnalysis.failed': 'Analysis failed.',
@@ -5316,7 +5327,8 @@ export const en: Catalog = {
   'manga.translate.working': 'Translating…',
   'manga.translate.noText': 'No text to translate on this page.',
   'manga.translate.failed': 'Translation failed.',
-  'manga.translate.modelMissing': 'Translation model not found. Install Qwen3-1.7B (Q4_K_M) via Downloads, or place it in the app models folder.',
+  'manga.translate.modelMissing':
+    'The offline translation model is not installed. Install it in Settings → AI.',
   'manga.translate.target': 'Translate to',
   'manga.translate.toggleVisibility': 'Show / hide translation (Ctrl+Shift+T)',
   'manga.translate.show': 'Show translation',
@@ -6584,14 +6596,15 @@ export const en: Catalog = {
   'aiStudio.section.provider': 'Provider & API key',
   'aiStudio.summary.keySaved': '{provider} key saved',
   'aiStudio.summary.connect': 'Connect Gemini or DeepSeek',
+  'aiStudio.engine.inSettings':
+    'The engine, provider and key are chosen in Settings → AI, for the whole app.',
   'aiStudio.summary.localReady': 'Local Qwen ready',
   'aiStudio.summary.localMissing': 'Local Qwen model missing',
   'aiStudio.label.engine': 'Engine',
   'aiStudio.engine.cloud': 'Cloud (Gemini / DeepSeek)',
   'aiStudio.engine.local': 'Local Qwen (offline)',
   'aiStudio.local.ready': 'Qwen3 model found — enrichment and sentence analysis run offline.',
-  'aiStudio.local.missing':
-    'Qwen3-1.7B not found. Place it in Downloads or install via the Translate view.',
+  'aiStudio.local.missing': 'The offline model is not installed. Install it in Settings → AI.',
   'aiStudio.label.provider': 'AI provider',
   'aiStudio.label.apiKey': 'API key',
   'aiStudio.placeholder.replaceKey': 'Replace saved key…',
@@ -6724,9 +6737,9 @@ export const en: Catalog = {
   },
   'aiStudio.agentBatch.note':
     'Generated by the Agent for “{deck}”. Nothing is saved yet — review it here, then use Save to flashcards.',
-  'aiStudio.hint.saveKey': 'Save an API key above to enable generation.',
+  'aiStudio.hint.saveKey': 'Add an API key in Settings → AI to enable generation.',
   'aiStudio.hint.localMissing':
-    'Install Qwen3-1.7B via Translate (or place the GGUF in Downloads) to generate offline.',
+    'Install the offline model in Settings → AI to generate cards without a cloud key.',
   'aiStudio.hint.starOrPreset': 'Open Dictionary, look up words, and tap the star icon — or switch source to preset generation.',
   'aiStudio.status.generatedPreset': 'Generated {cards} cards from {count} invented items · review them below, then Save to flashcards.',
   'aiStudio.status.generatedDict': 'Generated {cards} cards from {count} words · review them below, then Save to flashcards.',
@@ -7081,7 +7094,8 @@ export const en: Catalog = {
   'epub.translate.status.loadingModel': 'Loading translation model…',
   'epub.translate.status.loadingModelPct': 'Loading translation model… {pct}%',
   'epub.translate.status.sectionTimeout': 'Section {current}/{total} timed out — continuing…',
-  'epub.translate.modelMissing': 'Translation model not found. Install Qwen3-1.7B (Q4_K_M) via Downloads, or place it in the app models folder.',
+  'epub.translate.modelMissing':
+    'The offline translation model is not installed. Install it in Settings → AI.',
   'epub.translate.stopped': 'Translation stopped',
   'epub.translate.rangeReady': 'Range translation ready',
   'epub.translate.failed': 'Translation failed',
@@ -7205,7 +7219,8 @@ export const en: Catalog = {
   'epub.mining.engine.api': 'Cloud API',
   'epub.mining.qwen.checking': 'Checking local Qwen model…',
   'epub.mining.qwen.ready': 'Qwen3 model found — runs locally, no API key needed.',
-  'epub.mining.qwen.missing': 'Qwen3 model not found. Place Qwen3-1.7B.gguf in Downloads or install via Translate view.',
+  'epub.mining.qwen.missing':
+    'The offline translation model is not installed. Install it below or in Settings → AI.',
   'epub.mining.provider': 'Provider',
   'epub.mining.apiKey': 'API key',
   'epub.mining.apiKey.replace': 'Replace saved key…',
@@ -7213,7 +7228,7 @@ export const en: Catalog = {
   'epub.mining.saveKey': 'Save key',
   'epub.mining.savingKey': 'Saving…',
   'epub.mining.apiKey.saved': '{provider} key saved — faster than local Qwen for large decks.',
-  'epub.mining.apiKey.need': 'Save a {provider} key to use cloud translation.',
+  'epub.mining.apiKey.need': 'Add a {provider} key in Settings → AI to use cloud translation.',
   'epub.mining.translateSentences': 'Translate context sentences',
   'epub.mining.translateSentences.hint': 'Slow — enables {sentence-translation:*} variables.',
   'epub.mining.step4.title': 'Analyze EPUB',
@@ -8429,10 +8444,9 @@ export const en: Catalog = {
   'blanc.agent.error.organizeFailed': 'The file could not be organized.',
   'blanc.agent.error.animeNotFound': 'No stored anime matches that identity or title.',
   'blanc.agent.error.animeNotTracked': 'That anime is not being tracked yet.',
-  'blanc.agent.error.aiKeyMissing':
-    'AI card generation needs an API key. Add one in Flashcards → AI Card Studio.',
+  'blanc.agent.error.aiKeyMissing': 'AI card generation needs an API key. Add one in Settings → AI.',
   'blanc.agent.error.aiLocalModelMissing':
-    'AI card generation is set to local Qwen, but the model is missing. Install Qwen3-1.7B via Translate, or switch to Cloud in Flashcards → AI Card Studio.',
+    'AI card generation is set to run offline, but the model is not installed. Install it in Settings → AI, or switch to Cloud there.',
   'blanc.agent.error.aiNoTerms':
     'No words to build cards from. Star words in Dictionary first, or pass terms directly.',
   'blanc.agent.error.aiNoBook':
@@ -8470,8 +8484,15 @@ export const en: Catalog = {
   'agent.plan.planning': 'Creating plan…',
   'agent.plan.queued': 'Queued {count} steps: {summary}',
   'agent.plan.error.invalid-objective': 'Action plans need a request of 500 characters or fewer.',
-  'agent.plan.error.planner-disabled': 'Enable the local Agent and choose a GGUF model in Settings before creating a plan.',
-  'agent.plan.error.planner-unavailable': 'The local planner is unavailable.',
+  'agent.plan.error.planner-disabled':
+    'The Agent is not allowed to plan actions. Turn it on in Settings → AI.',
+  'agent.plan.error.planner-unavailable':
+    'The planner could not make a plan. Try again, or check Settings → AI.',
+  'agent.plan.error.model-missing':
+    'No offline model is installed and no cloud key is saved, so no plan could be made. Set one up in Settings → AI.',
+  'agent.plan.error.ai-off': 'AI features are turned off in Settings → AI.',
+  'agent.plan.error.cloud-key-missing': 'The cloud planner has no API key. Add one in Settings → AI.',
+  'agent.plan.error.spend-budget': 'Making this plan in the cloud would exceed the monthly spending limit.',
   'agent.plan.error.no-approved-actions': 'The planner found no action available to the active profile.',
   'agent.plan.error.store-failed': 'The plan could not be added to the operational queue.',
   'agent.plan.error.task-conflict': 'The planner returned a task that is already in the operational queue. Create the plan again.',
@@ -8520,6 +8541,82 @@ export const en: Catalog = {
   // ---- Credentials vault (Settings → API keys) ----
   'settings.nav.apiKeys': 'API keys',
   'settings.nav.apiKeys.desc': 'Every key the app can hold, in one place.',
+  'settings.nav.ai': 'AI',
+  'settings.nav.ai.desc': 'Turn AI on or off, choose offline or cloud, install the model, and set limits.',
+  'settings.ai.setup.action': 'Set up AI',
+  'settings.ai.setup.open': 'Open Settings → AI',
+  'settings.ai.setup.notReady': 'AI is not set up yet: install the offline model or add a cloud key.',
+  'settings.ai.setup.fixHere': 'This is fixed in Settings → AI.',
+  'settings.ai.enabled.title': 'Use AI features',
+  'settings.ai.enabled.desc': 'AI is optional. Everything else in the app works with it off.',
+  'settings.ai.enabled.label': 'Use AI features',
+  'settings.ai.enabled.onNote':
+    'AI buttons appear across the app. Nothing loads or connects until you use one.',
+  'settings.ai.enabled.offNote':
+    'AI buttons are hidden everywhere, and the Agent and its schedules do not run.',
+  'settings.ai.engine.title': 'Engine',
+  'settings.ai.engine.desc':
+    'Offline runs on this computer with the installed model. Cloud sends requests to the provider below.',
+  'settings.ai.engine.local': 'Offline',
+  'settings.ai.engine.cloud': 'Cloud',
+  'settings.ai.ready': 'Ready.',
+  'settings.ai.notReady.key': 'Add an API key for the provider below to use the cloud.',
+  'settings.ai.notReady.model': 'Install the offline model below to run AI on this computer.',
+  'settings.ai.provider.title': 'Cloud provider',
+  'settings.ai.provider.desc':
+    'Used by every cloud AI feature in the app. Keys are stored encrypted on this computer.',
+  'settings.ai.provider.label': 'Provider',
+  'settings.ai.key.label': 'API key',
+  'settings.ai.key.placeholder': 'Paste your {provider} key',
+  'settings.ai.key.replacePlaceholder': 'A key is saved. Paste a new one to replace it',
+  'settings.ai.key.save': 'Save key',
+  'settings.ai.key.get': 'Get a key',
+  'settings.ai.key.isSaved': 'A key is saved for this provider.',
+  'settings.ai.key.none': 'No key saved for this provider yet.',
+  'settings.ai.key.saved': '{provider} key saved.',
+  'settings.ai.key.failed': 'The key could not be saved.',
+  'settings.ai.key.empty': 'Paste a key first.',
+  'settings.ai.key.vaultNote':
+    'The same encrypted vault as Settings → API keys; a key saved in either place is the same key.',
+  'settings.ai.model.title': 'Offline model',
+  'settings.ai.model.desc':
+    'Qwen3 1.7B, from Qwen\'s official release (Apache-2.0). It powers offline translation, AI cards, sentence analysis and the Agent, and loads only while in use.',
+  'settings.ai.model.manualNote':
+    'A GGUF you downloaded yourself also works: put it in the app\'s models folder or in Downloads.',
+  'settings.ai.model.installed': 'Installed · {size}',
+  'settings.ai.model.downloading': 'Downloading… {percent}%',
+  'settings.ai.model.paused': 'Paused at {percent}%',
+  'settings.ai.model.notInstalled': 'Not installed · {size} download',
+  'settings.ai.model.install': 'Install ({size})',
+  'settings.ai.agent.title': 'Agent',
+  'settings.ai.agent.desc':
+    'The Agent can plan actions with the app\'s tools. Every step waits for your approval.',
+  'settings.ai.agent.enable': 'Let the Agent plan actions',
+  'settings.ai.agent.onReady':
+    'On. Plans use the offline model when it is installed, and the cloud provider otherwise.',
+  'settings.ai.agent.onNotReady':
+    'On, but nothing can make a plan yet: install the offline model or add a cloud key above.',
+  'settings.ai.agent.offNote': 'Off. You can still chat with the Agent; it will not plan or run actions.',
+  'settings.ai.agent.model': 'Agent model',
+  'settings.ai.agent.modelAuto': 'Automatic (best installed)',
+  'settings.ai.agent.modelMissing': '{name} (not found)',
+  'settings.ai.agent.modelMissingNote':
+    'The chosen model file is not on this computer. Pick another, or choose Automatic.',
+  'settings.ai.schedules.title': 'Scheduled Agent tasks',
+  'settings.ai.schedules.desc':
+    'Requests the Agent plans on a schedule. Each plan still waits for your approval.',
+  'settings.ai.spend.title': 'Cloud spending',
+  'settings.ai.spend.desc':
+    'Every cloud AI request in the app is priced and counted here, whichever feature sent it.',
+  'settings.ai.rates.note':
+    'Rates in US dollars per million tokens. Built-in figures are estimates from each provider\'s price page and may be out of date; enter your own to replace them.',
+  'settings.ai.rates.input': 'Input',
+  'settings.ai.rates.output': 'Output',
+  'settings.ai.rates.yours': 'Your rate',
+  'settings.ai.rates.estimate': 'Estimate, editable ({input} / {output})',
+  'settings.ai.rates.inputFor': 'Input rate for {provider}',
+  'settings.ai.rates.outputFor': 'Output rate for {provider}',
+  'settings.ai.rates.reset': 'Use estimate',
   'apiKeys.overview.title': 'Credentials',
   'apiKeys.overview.desc': '{configured} of {total} configured.',
   'apiKeys.optional': 'Every key here is optional. The app works fully offline with none of them set — a key buys extra features, never core function.',
@@ -8608,6 +8705,7 @@ export const en: Catalog = {
   'agent.governance.enabled.label': 'Enable the local Agent',
   'agent.governance.enabled.onNote': 'Agent actions can run, within the permission ceiling and profile below.',
   'agent.governance.enabled.offNote': 'Every Agent action is unavailable. Chat still works, but nothing on the capability list above can run.',
+  'agent.governance.moreInSettings': 'The Agent\'s model and scheduled tasks are in Settings → AI.',
   'agent.governance.enabled.backendNote': 'No local model backend is selected, so the Agent cannot be turned on here. Choose one in Settings first.',
   'agent.governance.permission.label': 'Permission ceiling',
   'agent.governance.permission.effective': 'Operations run at: {effective}.',
@@ -9568,9 +9666,10 @@ export const en: Catalog = {
   'mediaWorkspace.study.grammarLoading': 'Analyzing this line…',
   'mediaWorkspace.study.grammarError': 'The analysis failed.',
   'mediaWorkspace.study.grammarRetry': 'Retry',
-  'mediaWorkspace.study.grammarNeedsKey': 'Grammar highlight needs an API key. Add one in Flashcards → AI Card Studio.',
+  'mediaWorkspace.study.grammarNeedsKey':
+    'Grammar highlight needs a cloud API key. Add one in Settings → AI.',
   'mediaWorkspace.study.grammarNeedsLocalModel':
-    'Grammar highlight needs the local Qwen model. Install Qwen3-1.7B via Translate, or switch to Cloud in Flashcards → AI Card Studio.',
+    'Grammar highlight is set to run offline, but the model is not installed. Install it in Settings → AI, or switch to Cloud there.',
   'mediaWorkspace.study.grammarIdle': 'Pause on a line to break it down, or explain it now.',
   'mediaWorkspace.study.grammarAnalyzeNow': 'Explain this line',
   'mediaWorkspace.study.transcript': 'Transcript',
@@ -10338,7 +10437,8 @@ export const en: Catalog = {
   'agent.execute.inputUsage': '{count} of {limit} prompt and file characters',
   'agent.execute.inputBudgetNote': 'Conversation history, workflow instructions, and selected context are counted by the final check when you send.',
   'agent.execute.inputOverBudget': 'The prompt and attached files exceed the {limit}-character input limit.',
-  'agent.execute.costRatesNote': 'Enter what this provider charges, in US dollars per million tokens. Check its pricing page — nothing is assumed for you.',
+  'agent.execute.costRatesNote':
+    'US dollars per million tokens. The built-in figures are estimates you can edit here or in Settings → AI.',
   'agent.execute.costInputRate': 'Input rate per million tokens',
   'agent.execute.costOutputRate': 'Output rate per million tokens',
   'agent.execute.costRateUnset': 'Not set',
@@ -10350,19 +10450,27 @@ export const en: Catalog = {
   'agent.execute.sensitiveConsent': 'Send selected sensitive context and attached file contents to {provider} for this request.',
   'agent.execute.sensitiveExcluded': 'Sensitive context and attachments will stay local because persistent exclusion is on.',
   'agent.execute.reason.busy': 'A request is already running. Wait for it to finish.',
+  'agent.execute.reason.aiOff': 'AI features are turned off in Settings → AI.',
+  'agent.execute.reason.localModelMissing': 'No offline model is installed for the Agent.',
+  'agent.execute.reason.cloudKeyMissing': 'No API key is saved for this cloud provider.',
   'agent.execute.reason.attachmentReading': 'Still reading the attached file.',
   'agent.execute.reason.emptyDraft': 'Write a prompt before sending.',
   'agent.execute.reason.needsConsent': 'Tick the consent box above before sending sensitive context.',
   'agent.plan.reason.emptyObjective': 'Describe the objective before creating a plan.',
+  'agent.plan.reason.agentDisabled':
+    'The Agent is not allowed to plan actions. Turn it on in Settings → AI.',
+  'agent.plan.reason.noPlanner': 'Plans need the offline model or a cloud API key.',
   'agent.execute.error.costBudget': 'The estimated cost of this request is above the cost limit you set. Raise the limit or shorten the request.',
   'agent.execute.error.spendBudget': 'This request would take you past the monthly spending limit you set. Raise it under Request limits, or wait until next month.',
   'agent.spend.title': 'Monthly spending across every cloud provider',
   'agent.spend.loading': 'Reading the spending record…',
   'agent.spend.total': 'US${amount} in {period}, across {count} priced request(s)',
-  'agent.spend.unpriced': '{count} further request(s) ran with no rates entered, so what they cost is not in that total and cannot be.',
+  'agent.spend.unpriced':
+    '{count} earlier request(s) ran before rates existed, so what they cost is not in that total.',
   'agent.spend.limitEnable': 'Refuse requests that would take the month past a limit',
   'agent.spend.limit': 'Monthly limit in US dollars',
-  'agent.spend.limitNote': 'One limit covers every cloud provider together. A request is refused before it is sent when its estimated cost would take the month past this number. Requests made with no rates entered are never refused by it, because there is no figure to compare.',
+  'agent.spend.limitNote':
+    'One limit covers every cloud provider and every AI feature in the app together. A request is refused before it is sent when its estimated cost would take the month past this number. Costs are estimated from the rates in Settings → AI.',
   'agent.spend.remaining': 'US${amount} left before the limit',
   'agent.spend.exhausted': 'The limit is reached. Priced cloud requests are refused until it is raised or the month turns over.',
   'agent.spend.clear': 'Erase the record',

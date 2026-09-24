@@ -123,3 +123,42 @@ describe('agent composer reason strings', () => {
     }
   });
 });
+
+describe('agent composer AI readiness', () => {
+  const SET_UP = {
+    aiEnabled: true,
+    targetIsLocal: true,
+    targetReady: true,
+    agentEnabled: true,
+    plannerReady: true,
+  };
+
+  it('blocks Send on a local target with no model, ahead of an empty draft', () => {
+    const blocked = state({ draft: '', setup: { ...SET_UP, targetReady: false } });
+    expect(agentSendDisabledReason(blocked)).toBe('agent.execute.reason.localModelMissing');
+  });
+
+  it('names a missing key, not a missing model, on a cloud target', () => {
+    const blocked = state({ setup: { ...SET_UP, targetIsLocal: false, targetReady: false } });
+    expect(agentSendDisabledReason(blocked)).toBe('agent.execute.reason.cloudKeyMissing');
+  });
+
+  it('says AI is off before anything else the user could fix', () => {
+    const off = state({ setup: { ...SET_UP, aiEnabled: false, targetReady: false } });
+    expect(agentSendDisabledReason(off)).toBe('agent.execute.reason.aiOff');
+    expect(agentPlanDisabledReason(off)).toBe('agent.execute.reason.aiOff');
+  });
+
+  it('gates plans on the Agent switch and on having a planner', () => {
+    expect(agentPlanDisabledReason(state({ setup: { ...SET_UP, agentEnabled: false } })))
+      .toBe('agent.plan.reason.agentDisabled');
+    expect(agentPlanDisabledReason(state({ setup: { ...SET_UP, plannerReady: false } })))
+      .toBe('agent.plan.reason.noPlanner');
+    // Chat does not need the Agent switch: it is a conversation, not an action.
+    expect(agentSendDisabledReason(state({ setup: { ...SET_UP, agentEnabled: false } }))).toBeUndefined();
+  });
+
+  it('blocks nothing while readiness is still unknown', () => {
+    expect(agentSendDisabledReason(state({ setup: undefined }))).toBeUndefined();
+  });
+});

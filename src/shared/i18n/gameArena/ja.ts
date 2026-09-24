@@ -11,7 +11,7 @@ import type { Catalog } from '../core';
 
 export const GAME_ARENA_CHROME_JA: Catalog = {
   'palette.section.games': 'ゲームアリーナ',
-  'storage.group.llm': '作文評価エンジン',
+  'storage.group.llm': '言語モデル',
   'search.gameArena': 'ゲームアリーナ',
   'search.gameArena.desc': 'ミニゲームの長さ・言語・レベル・効果音、ミラーライティング評価',
   'games.arcade.mines.board': '地雷原、{size}×{size}',

@@ -1,0 +1,104 @@
+/* Settings > AI and the "Set up AI" affordance. Fluent-quiet: one line of text,
+   one button, the accent only on the action. */
+.ai-setup-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ai-setup-prompt.is-compact {
+  padding: 4px 8px;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.ai-setup-prompt-text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.ai-setup-prompt-action {
+  flex: 0 0 auto;
+}
+
+.ai-model-install {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-model-install-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-model-install-status {
+  font-size: 12px;
+}
+
+.ai-model-install-status.is-error {
+  color: var(--danger);
+}
+
+.ai-page-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.ai-page-grid > label,
+.ai-page-grid > span {
+  font-size: 13px;
+}
+
+.ai-page-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ai-page-key-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.ai-page-status {
+  font-size: 12px;
+}
+
+.ai-page-status.is-ok {
+  color: var(--success);
+}
+
+.ai-page-rates {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ai-page-rates th,
+.ai-page-rates td {
+  text-align: left;
+  padding: 4px 8px 4px 0;
+  vertical-align: middle;
+}
+
+.ai-page-rates input {
+  width: 96px;
+}
+
+.ai-page-rate-tag {
+  font-size: 11px;
+  opacity: 0.75;
+}

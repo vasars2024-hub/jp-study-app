@@ -44,6 +44,9 @@ export type SettingsPageId =
   | 'file-drops'
   // Phase 0 credentials vault — every API key in the app, one page.
   | 'api-keys'
+  // Settings > AI — the master switch, engine, provider/key, offline model,
+  // Agent, schedules and spend. Every "Set up AI" link lands here.
+  | 'ai'
   | 'display'
   | 'motion'
   | 'storage'

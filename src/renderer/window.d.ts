@@ -81,9 +81,12 @@ import type {
 } from '../shared/agentOperationalState';
 import type { AgentOperationalResult } from '../shared/agentOperationalBridge';
 import type {
+  AgentPricingResult,
   AgentSpendResult,
   AgentSpendSnapshotPayload,
 } from '../shared/agentSpendBridge';
+import type { AiSetupStatus } from '../shared/aiSetup';
+import type { AgentProviderPrice } from '../shared/agentProviderPricing';
 import type {
   ReadingListEvent,
   ReadingListsDocument,
@@ -934,6 +937,8 @@ declare global {
         ok: boolean;
         result?: import('../shared/translateAnalysisCore').TranslateAnalysisResult;
         error?: string;
+        aiOff?: boolean;
+        needsKey?: boolean;
       }>;
       // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
       extractVideoClip(
@@ -1405,6 +1410,9 @@ declare global {
         ext?: string,
       ): Promise<{ ok: boolean; path?: string; error?: string }>;
       aiGetConfig(): Promise<AiEngineConfig>;
+      aiSetupStatus(): Promise<AiSetupStatus>;
+      aiSetupSetEnabled(enabled: boolean): Promise<AiSetupStatus>;
+      onAiSetupChanged(cb: (status: AiSetupStatus) => void): () => void;
       localAgentPlan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse>;
       localAgentStatus(): Promise<LocalAgentRuntimeStatus>;
       localAgentModels(): Promise<LocalAgentModelInfo[]>;
@@ -1436,6 +1444,13 @@ declare global {
       agentSpendSetBudget(budgetUsd: number | null): Promise<AgentSpendResult>;
       agentSpendClear(): Promise<AgentSpendResult>;
       onAgentSpendChanged(cb: (snapshot: AgentSpendSnapshotPayload) => void): () => void;
+      agentPricingLoad(): Promise<AgentPricingResult>;
+      agentPricingSet(
+        providerId: import('../shared/aiProviders').AiProviderId,
+        price: AgentProviderPrice | null,
+      ): Promise<AgentPricingResult>;
+      agentPricingMigrate(legacy: unknown): Promise<AgentPricingResult>;
+      onAgentPricingChanged(cb: (result: AgentPricingResult) => void): () => void;
       readingListsLoad(): Promise<ReadingListsResult>;
       readingListsWrite(
         baseRevision: number,
@@ -1524,6 +1539,8 @@ declare global {
         result?: import('../shared/mediaStudyAssistant').MediaStudyAssistantResult;
         error?: string;
         cached?: boolean;
+        aiOff?: boolean;
+        needsKey?: boolean;
       }>;
       studyGet(): Promise<StudyOrchestratorDocument>;
       studyMigrateLegacy(value: unknown): Promise<StudyOrchestratorDocument>;

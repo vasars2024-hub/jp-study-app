@@ -90,6 +90,8 @@ export const ru: Catalog = {
   'mediaAssistant.mode.create-study-notes': 'Составить учебные заметки',
   'mediaAssistant.busy': 'Запрашиваем разбор…',
   'mediaAssistant.failed': 'Помощник не смог разобрать это предложение.',
+  'mediaAssistant.needsKey':
+    'Учебный помощник работает через облачного провайдера ИИ. Добавьте ключ в «Настройки → ИИ», чтобы им пользоваться.',
   'mediaAssistant.cached': 'Загружен сохранённый разбор.',
   'mediaAssistant.saved': 'Сохранено в блокнот.',
   'mediaAssistant.translation': 'Перевод',
@@ -2654,6 +2656,8 @@ export const ru: Catalog = {
   'storage.group.examples': 'Примеры предложений',
   'storage.group.sentences': 'Предложения по уровням',
   'storage.asset.supertonic3.desc': 'Высококачественная офлайн-озвучка японского текста с десятью локальными голосами.',
+  'storage.asset.qwen3.desc':
+    'Офлайн-модель ИИ: перевод, ИИ-карточки, разбор предложений и агент без облачного ключа.',
   'storage.modelCount': {
     one: 'Установлена {count} модель',
     few: 'Установлено {count} модели',
@@ -2826,6 +2830,7 @@ export const ru: Catalog = {
   'agent.governance.enabled.label': 'Включить локального агента',
   'agent.governance.enabled.onNote': 'Действия агента доступны в пределах уровня разрешений и профиля ниже.',
   'agent.governance.enabled.offNote': 'Все действия агента недоступны. Чат продолжает работать, но ничего из списка возможностей выше запустить нельзя.',
+  'agent.governance.moreInSettings': 'Модель агента и задачи по расписанию находятся в «Настройки → ИИ».',
   'agent.governance.enabled.backendNote': 'Локальный бэкенд модели не выбран, поэтому включить агента здесь нельзя. Сначала выберите его в настройках.',
   'agent.governance.permission.label': 'Предел разрешений',
   'agent.governance.permission.effective': 'Операции выполняются с уровнем: {effective}.',
@@ -3040,7 +3045,8 @@ export const ru: Catalog = {
   'agent.execute.provider.deepseekFlash': 'DeepSeek V4 Flash (облако)',
   'agent.execute.provider.deepseekPro': 'DeepSeek V4 Pro (облако)',
   'agent.execute.provider.noKey': '{provider} — нет API-ключа',
-  'agent.execute.provider.noKeyHint': 'Для этого провайдера не сохранён API-ключ, поэтому запуск будет отклонён ещё до отправки. Добавьте ключ в AI Studio или выберите другого провайдера.',
+  'agent.execute.provider.noKeyHint':
+    'Для этого провайдера не сохранён ключ API, поэтому запрос будет отклонён до отправки. Добавьте ключ в «Настройки → ИИ» или выберите другого провайдера.',
   'agent.execute.localFallback': 'Использовать локальный Qwen, если нет облачного ключа',
   'agent.execute.cloudNotice': 'Запрос и выбранный контекст будут отправлены в {provider}.',
   'agent.execute.localNotice': 'Этот запрос останется на устройстве.',
@@ -3050,7 +3056,8 @@ export const ru: Catalog = {
   'agent.execute.inputUsage': 'Запрос и файлы: {count} из {limit} символов',
   'agent.execute.inputBudgetNote': 'История разговора, инструкции режима и выбранный контекст учитываются при окончательной проверке перед отправкой.',
   'agent.execute.inputOverBudget': 'Запрос и вложенные файлы превышают лимит в {limit} входных символов.',
-  'agent.execute.costRatesNote': 'Укажите тарифы этого провайдера в долларах США за миллион токенов. Сверьтесь с его страницей цен — здесь ничего не додумывается за вас.',
+  'agent.execute.costRatesNote':
+    'Доллары США за миллион токенов. Встроенные цифры — оценка, их можно изменить здесь или в «Настройки → ИИ».',
   'agent.execute.costInputRate': 'Цена входа за миллион токенов',
   'agent.execute.costOutputRate': 'Цена выхода за миллион токенов',
   'agent.execute.costRateUnset': 'Не указано',
@@ -3058,21 +3065,35 @@ export const ru: Catalog = {
   'agent.execute.costEstimateNote': 'Оценка учитывает запрос, вложенные файлы и весь лимит вывода. История разговора, инструкции режима и выбранный контекст добавляются финальной проверкой при отправке, поэтому фактическая сумма будет выше.',
   'agent.execute.costCapEnable': 'Отклонять запросы дороже лимита',
   'agent.execute.costCap': 'Лимит стоимости в долларах США',
-  'agent.execute.costUnpriced': 'Чтобы оценить или ограничить стоимость, нужны оба тарифа.',
+  'agent.execute.costUnpriced': 'Для оценки и ограничения стоимости нужны обе цены.',
   'agent.execute.sensitiveConsent': 'Отправить выбранный конфиденциальный контекст и содержимое вложений в {provider} для этого запроса.',
   'agent.execute.sensitiveExcluded': 'Конфиденциальный контекст и вложения останутся локальными, потому что постоянное исключение включено.',
   'agent.execute.reason.busy': 'Запрос уже выполняется. Дождитесь завершения.',
+  'agent.execute.reason.aiOff': 'Функции ИИ выключены в «Настройки → ИИ».',
+  'agent.execute.reason.localModelMissing': 'Для агента не установлена офлайн-модель.',
+  'agent.execute.reason.cloudKeyMissing': 'Для этого облачного провайдера не сохранён ключ API.',
   'agent.execute.reason.attachmentReading': 'Файл вложения ещё читается.',
   'agent.execute.reason.emptyDraft': 'Перед отправкой напишите запрос.',
   'agent.execute.reason.needsConsent': 'Отметьте согласие выше, чтобы отправить конфиденциальный контекст.',
   'agent.plan.reason.emptyObjective': 'Опишите цель, прежде чем создавать план.',
+  'agent.plan.reason.agentDisabled':
+    'Агенту не разрешено планировать действия. Включите это в «Настройки → ИИ».',
+  'agent.plan.reason.noPlanner': 'Для планов нужна офлайн-модель или облачный ключ API.',
   'agent.plan.create': 'Создать план действий',
   'agent.plan.attachmentsUnsupported': 'Удалите выбранные файлы перед созданием плана. Для плана используется только контекст беседы.',
   'agent.plan.planning': 'Создание плана…',
   'agent.plan.queued': 'В очередь добавлено шагов: {count}. {summary}',
   'agent.plan.error.invalid-objective': 'Запрос для плана действий должен содержать не более 500 символов.',
-  'agent.plan.error.planner-disabled': 'Перед созданием плана включите локальный Agent и выберите модель GGUF в настройках.',
-  'agent.plan.error.planner-unavailable': 'Локальный планировщик недоступен.',
+  'agent.plan.error.planner-disabled':
+    'Агенту не разрешено планировать действия. Включите это в «Настройки → ИИ».',
+  'agent.plan.error.planner-unavailable':
+    'Планировщик не смог составить план. Повторите попытку или проверьте «Настройки → ИИ».',
+  'agent.plan.error.model-missing':
+    'Нет ни офлайн-модели, ни облачного ключа, поэтому план не составлен. Настройте что-то одно в «Настройки → ИИ».',
+  'agent.plan.error.ai-off': 'Функции ИИ выключены в «Настройки → ИИ».',
+  'agent.plan.error.cloud-key-missing':
+    'У облачного планировщика нет ключа API. Добавьте его в «Настройки → ИИ».',
+  'agent.plan.error.spend-budget': 'Составление этого плана в облаке превысит месячный лимит расходов.',
   'agent.plan.error.no-approved-actions': 'Планировщик не нашёл действий, доступных активному профилю.',
   'agent.plan.error.store-failed': 'Не удалось добавить план в операционную очередь.',
   'agent.plan.error.task-conflict': 'Планировщик вернул задачу, которая уже есть в операционной очереди. Создайте план заново.',
@@ -3135,6 +3156,10 @@ export const ru: Catalog = {
   'agent.execute.error.spendBudget': 'Этот запрос выведет вас за месячный лимит расходов, который вы задали. Повысьте его в разделе «Лимиты запроса» или дождитесь следующего месяца.',
   'agent.execute.error.transient': 'Провайдер временно недоступен. Повторите попытку.',
   'agent.execute.error.provider': 'Провайдер вернул непригодный ответ.',
+  'agent.execute.error.localModelMissing':
+    'Офлайн-модель не установлена, поэтому ничего не запущено. Установите её в «Настройки → ИИ» или переключите агента на облачного провайдера.',
+  'agent.execute.error.aiOff':
+    'Функции ИИ выключены, поэтому ничего не отправлено. Включите их в «Настройки → ИИ».',
   'agent.timeline.title': 'Активность',
   'agent.timeline.effect.navigate': 'Открыть место',
   'agent.timeline.status.review': 'Готово к проверке',
@@ -3157,10 +3182,12 @@ export const ru: Catalog = {
   'agent.spend.title': 'Месячные расходы по всем облачным провайдерам',
   'agent.spend.loading': 'Чтение записи о расходах…',
   'agent.spend.total': 'US${amount} за {period}, по {count} запрос(ам) с известной ценой',
-  'agent.spend.unpriced': 'Ещё {count} запрос(ов) выполнены без введённых тарифов, поэтому их стоимость не входит в этот итог и войти не может.',
+  'agent.spend.unpriced':
+    '{count} более ранних запросов выполнены до появления цен, поэтому их стоимость не вошла в итог.',
   'agent.spend.limitEnable': 'Отклонять запросы, выводящие месяц за предел',
   'agent.spend.limit': 'Месячный предел в долларах США',
-  'agent.spend.limitNote': 'Один предел действует на всех облачных провайдеров вместе. Запрос отклоняется до отправки, если его расчётная стоимость выведет месяц за эту сумму. Запросы без введённых тарифов им не отклоняются: сравнивать не с чем.',
+  'agent.spend.limitNote':
+    'Один лимит охватывает всех облачных провайдеров и все функции ИИ в приложении вместе. Запрос отклоняется до отправки, если его оценочная стоимость выведет месяц за этот предел. Стоимость оценивается по ценам из «Настройки → ИИ».',
   'agent.spend.remaining': 'До предела осталось US${amount}',
   'agent.spend.exhausted': 'Предел достигнут. Оплачиваемые облачные запросы отклоняются, пока предел не повышен или не начался новый месяц.',
   'agent.spend.clear': 'Стереть запись',
@@ -3868,10 +3895,11 @@ export const ru: Catalog = {
   'lens.ai.analyzing': 'Разбираем предложение…',
   'lens.ai.reanalyze': 'Разобрать заново',
   'lens.ai.retry': 'Ещё раз',
+  'lens.ai.off': 'Функции ИИ выключены в «Настройки → ИИ».',
   'lens.ai.error': 'Не удалось выполнить разбор.',
-  'lens.ai.needsKey': 'Для разбора нужен ключ API. Добавьте его в «Карточки → AI Card Studio».',
+  'lens.ai.needsKey': 'Для разбора ИИ нужен облачный ключ API. Добавьте его в «Настройки → ИИ».',
   'lens.ai.needsLocalModel':
-    'Для разбора нужна локальная модель Qwen. Установите Qwen3-1.7B через «Перевод» или переключитесь на облако в «Карточки → AI Card Studio».',
+    'Разбор ИИ настроен на офлайн-работу, но модель не установлена. Установите её в «Настройки → ИИ» или переключитесь там на облако.',
   'lens.ai.snapshotSource': 'Снято через «Линзу чтения»',
 
   // Reading Lens — the Read depth (progressive experience 3 of 3)
@@ -3994,7 +4022,7 @@ export const ru: Catalog = {
   'settings.analysis.desc':
     'Что объясняет режим AI OCR и куда попадает результат — карточки и снимки в блокноте.',
   'settings.analysis.engineNote':
-    'Облако или локальный Qwen задаётся в «Карточки → AI Card Studio». Разбор предложений использует тот же движок.',
+    'Офлайн или облако выбирается в «Настройки → ИИ». Разбор предложений использует тот же движок.',
   'settings.analysis.depth': 'Глубина объяснений',
   'settings.analysis.depth.brief': 'Кратко',
   'settings.analysis.depth.standard': 'Стандартно',
@@ -4301,9 +4329,10 @@ export const ru: Catalog = {
   'noteCss.reset': 'Сбросить к стандартному',
   'noteCss.savedMsg': 'Оформление карточек сохранено.',
   'noteCss.saveFailed': 'Не удалось сохранить оформление карточек.',
-  'sentenceAnalysis.needKey': 'Для анализа вежливости, склонения и счётных слов нужен облачный ключ AI. Добавьте его в разделе Карточки → AI Card Studio, чтобы открыть эти панели.',
-  'sentenceAnalysis.analyzing': 'Анализ грамматики…',
-  'sentenceAnalysis.unavailable': 'Анализ недоступен: {error}',
+  'sentenceAnalysis.needKey':
+    'Заметки о вежливости, склонении и счётных словах приходят от облачного провайдера ИИ, даже если перевод выполнен офлайн. Добавьте ключ в «Настройки → ИИ», чтобы их увидеть.',
+  'sentenceAnalysis.analyzing': 'Разбираем грамматику…',
+  'sentenceAnalysis.unavailable': 'Разбор недоступен: {error}',
   'sentenceAnalysis.failed': 'Не удалось выполнить анализ.',
   'ui.menubar.aria': 'Меню приложения',
   'ui.splitPane.aria': 'Изменить размер панелей',
@@ -5832,7 +5861,7 @@ export const ru: Catalog = {
   'manga.translate.working': 'Перевод…',
   'manga.translate.noText': 'На странице нет текста для перевода.',
   'manga.translate.failed': 'Ошибка перевода.',
-  'manga.translate.modelMissing': 'Модель перевода не найдена. Установите Qwen3-1.7B (Q4_K_M) через Downloads или положите в папку models приложения.',
+  'manga.translate.modelMissing': 'Офлайн-модель перевода не установлена. Установите её в «Настройки → ИИ».',
   'manga.translate.target': 'Переводить на',
   'manga.translate.toggleVisibility': 'Показать / скрыть перевод (Ctrl+Shift+T)',
   'manga.translate.show': 'Показать перевод',
@@ -7155,14 +7184,15 @@ export const ru: Catalog = {
   'aiStudio.section.provider': 'Провайдер и API-ключ',
   'aiStudio.summary.keySaved': 'Ключ {provider} сохранён',
   'aiStudio.summary.connect': 'Подключите Gemini или DeepSeek',
+  'aiStudio.engine.inSettings':
+    'Движок, провайдер и ключ выбираются в «Настройки → ИИ» для всего приложения.',
   'aiStudio.summary.localReady': 'Локальный Qwen готов',
   'aiStudio.summary.localMissing': 'Нет локальной модели Qwen',
   'aiStudio.label.engine': 'Движок',
   'aiStudio.engine.cloud': 'Облако (Gemini / DeepSeek)',
   'aiStudio.engine.local': 'Локальный Qwen (офлайн)',
   'aiStudio.local.ready': 'Модель Qwen3 найдена — генерация карточек и разбор предложений работают офлайн.',
-  'aiStudio.local.missing':
-    'Qwen3-1.7B не найден. Положите файл в Downloads или установите через «Перевод».',
+  'aiStudio.local.missing': 'Офлайн-модель не установлена. Установите её в «Настройки → ИИ».',
   'aiStudio.label.provider': 'AI-провайдер',
   'aiStudio.label.apiKey': 'API-ключ',
   'aiStudio.placeholder.replaceKey': 'Заменить сохранённый ключ…',
@@ -7311,9 +7341,9 @@ export const ru: Catalog = {
   },
   'aiStudio.agentBatch.note':
     'Сгенерировано Агентом для «{deck}». Пока ничего не сохранено — проверьте здесь, затем нажмите «Сохранить в карточки».',
-  'aiStudio.hint.saveKey': 'Сохраните API-ключ выше, чтобы включить генерацию.',
+  'aiStudio.hint.saveKey': 'Добавьте ключ API в «Настройки → ИИ», чтобы включить генерацию.',
   'aiStudio.hint.localMissing':
-    'Для офлайн-генерации установите Qwen3-1.7B через «Перевод» или положите GGUF в Downloads.',
+    'Установите офлайн-модель в «Настройки → ИИ», чтобы создавать карточки без облачного ключа.',
   'aiStudio.hint.starOrPreset': 'Откройте Словарь, найдите слова и нажмите звезду — или переключите источник на пресет.',
   'aiStudio.status.generatedPreset': 'Создано {cards} карт из {count} придуманных элементов · проверьте их ниже и нажмите «Сохранить во флэш-карточки».',
   'aiStudio.status.generatedDict': 'Создано {cards} карт из {count} слов · проверьте их ниже и нажмите «Сохранить во флэш-карточки».',
@@ -7707,7 +7737,7 @@ export const ru: Catalog = {
   'epub.translate.status.loadingModel': 'Загрузка модели перевода…',
   'epub.translate.status.loadingModelPct': 'Загрузка модели перевода… {pct}%',
   'epub.translate.status.sectionTimeout': 'Секция {current}/{total} зависла — переходим дальше…',
-  'epub.translate.modelMissing': 'Модель перевода не найдена. Установите Qwen3-1.7B (Q4_K_M) через Downloads или положите в папку models приложения.',
+  'epub.translate.modelMissing': 'Офлайн-модель перевода не установлена. Установите её в «Настройки → ИИ».',
   'epub.translate.stopped': 'Перевод остановлен',
   'epub.translate.rangeReady': 'Перевод диапазона готов',
   'epub.translate.failed': 'Ошибка перевода',
@@ -7831,7 +7861,8 @@ export const ru: Catalog = {
   'epub.mining.engine.api': 'Облачный API',
   'epub.mining.qwen.checking': 'Проверка локальной модели Qwen…',
   'epub.mining.qwen.ready': 'Модель Qwen3 найдена — локально, без API-ключа.',
-  'epub.mining.qwen.missing': 'Модель Qwen3 не найдена. Положите Qwen3-1.7B.gguf в Загрузки или установите в разделе «Перевод».',
+  'epub.mining.qwen.missing':
+    'Офлайн-модель перевода не установлена. Установите её ниже или в «Настройки → ИИ».',
   'epub.mining.provider': 'Провайдер',
   'epub.mining.apiKey': 'API-ключ',
   'epub.mining.apiKey.replace': 'Заменить сохранённый ключ…',
@@ -7839,7 +7870,8 @@ export const ru: Catalog = {
   'epub.mining.saveKey': 'Сохранить ключ',
   'epub.mining.savingKey': 'Сохранение…',
   'epub.mining.apiKey.saved': 'Ключ {provider} сохранён — быстрее локального Qwen на больших колодах.',
-  'epub.mining.apiKey.need': 'Сохраните ключ {provider} для облачного перевода.',
+  'epub.mining.apiKey.need':
+    'Добавьте ключ {provider} в «Настройки → ИИ», чтобы пользоваться облачным переводом.',
   'epub.mining.translateSentences': 'Переводить контекстные предложения',
   'epub.mining.translateSentences.hint': 'Медленно — включает переменные {sentence-translation:*}.',
   'epub.mining.step4.title': 'Анализ EPUB',
@@ -9085,9 +9117,9 @@ export const ru: Catalog = {
   'blanc.agent.error.animeNotFound': 'Ни одно сохранённое аниме не совпадает с этим идентификатором или названием.',
   'blanc.agent.error.animeNotTracked': 'Это аниме ещё не отслеживается.',
   'blanc.agent.error.aiKeyMissing':
-    'Для генерации карточек нужен ключ API. Добавьте его в «Карточки → AI Card Studio».',
+    'Для генерации карточек нужен ключ API. Добавьте его в «Настройки → ИИ».',
   'blanc.agent.error.aiLocalModelMissing':
-    'Генерация карточек настроена на локальную модель Qwen, но она не найдена. Установите Qwen3-1.7B через «Перевод» или переключитесь на облако в «Карточки → AI Card Studio».',
+    'Генерация карточек настроена на офлайн-работу, но модель не установлена. Установите её в «Настройки → ИИ» или переключитесь там на облако.',
   'blanc.agent.error.aiNoTerms':
     'Нет слов для создания карточек. Сначала сохраните слова в словаре или передайте их напрямую.',
   'blanc.agent.error.aiNoBook':
@@ -9930,9 +9962,10 @@ export const ru: Catalog = {
   'mediaWorkspace.study.grammarLoading': 'Разбор строки…',
   'mediaWorkspace.study.grammarError': 'Не удалось выполнить разбор.',
   'mediaWorkspace.study.grammarRetry': 'Повторить',
-  'mediaWorkspace.study.grammarNeedsKey': 'Для подсветки грамматики нужен ключ API. Добавьте его в «Карточки → AI Card Studio».',
+  'mediaWorkspace.study.grammarNeedsKey':
+    'Для подсветки грамматики нужен облачный ключ API. Добавьте его в «Настройки → ИИ».',
   'mediaWorkspace.study.grammarNeedsLocalModel':
-    'Для подсветки грамматики нужна локальная модель Qwen. Установите Qwen3-1.7B через «Перевод» или переключитесь на облако в «Карточки → AI Card Studio».',
+    'Подсветка грамматики настроена на офлайн-работу, но модель не установлена. Установите её в «Настройки → ИИ» или переключитесь там на облако.',
   'mediaWorkspace.study.grammarIdle': 'Поставьте на паузу, чтобы разобрать строку, или разберите её сейчас.',
   'mediaWorkspace.study.grammarAnalyzeNow': 'Разобрать строку',
   'mediaWorkspace.study.transcript': 'Расшифровка',
@@ -10768,6 +10801,82 @@ export const ru: Catalog = {
   // ---- Хранилище учётных данных (Настройки → Ключи API) ----
   'settings.nav.apiKeys': 'Ключи API',
   'settings.nav.apiKeys.desc': 'Все ключи, которые может хранить приложение, в одном месте.',
+  'settings.nav.ai': 'ИИ',
+  'settings.nav.ai.desc': 'Включение ИИ, выбор офлайн или облака, установка модели и лимиты.',
+  'settings.ai.setup.action': 'Настроить ИИ',
+  'settings.ai.setup.open': 'Открыть «Настройки → ИИ»',
+  'settings.ai.setup.notReady': 'ИИ ещё не настроен: установите офлайн-модель или добавьте облачный ключ.',
+  'settings.ai.setup.fixHere': 'Это исправляется в «Настройки → ИИ».',
+  'settings.ai.enabled.title': 'Использовать функции ИИ',
+  'settings.ai.enabled.desc': 'ИИ необязателен. Всё остальное в приложении работает и без него.',
+  'settings.ai.enabled.label': 'Использовать функции ИИ',
+  'settings.ai.enabled.onNote':
+    'Кнопки ИИ появятся по всему приложению. Ничего не загружается и не подключается, пока вы ими не воспользуетесь.',
+  'settings.ai.enabled.offNote': 'Кнопки ИИ скрыты везде, агент и его расписания не запускаются.',
+  'settings.ai.engine.title': 'Движок',
+  'settings.ai.engine.desc':
+    'Офлайн работает на этом компьютере с установленной моделью. Облако отправляет запросы выбранному ниже провайдеру.',
+  'settings.ai.engine.local': 'Офлайн',
+  'settings.ai.engine.cloud': 'Облако',
+  'settings.ai.ready': 'Готово.',
+  'settings.ai.notReady.key': 'Чтобы пользоваться облаком, добавьте ключ API для провайдера ниже.',
+  'settings.ai.notReady.model': 'Чтобы запускать ИИ на этом компьютере, установите офлайн-модель ниже.',
+  'settings.ai.provider.title': 'Облачный провайдер',
+  'settings.ai.provider.desc':
+    'Используется всеми облачными функциями ИИ в приложении. Ключи хранятся на этом компьютере в зашифрованном виде.',
+  'settings.ai.provider.label': 'Провайдер',
+  'settings.ai.key.label': 'Ключ API',
+  'settings.ai.key.placeholder': 'Вставьте ключ {provider}',
+  'settings.ai.key.replacePlaceholder': 'Ключ сохранён. Вставьте новый, чтобы заменить его',
+  'settings.ai.key.save': 'Сохранить ключ',
+  'settings.ai.key.get': 'Получить ключ',
+  'settings.ai.key.isSaved': 'Для этого провайдера ключ сохранён.',
+  'settings.ai.key.none': 'Для этого провайдера ключ ещё не сохранён.',
+  'settings.ai.key.saved': 'Ключ {provider} сохранён.',
+  'settings.ai.key.failed': 'Не удалось сохранить ключ.',
+  'settings.ai.key.empty': 'Сначала вставьте ключ.',
+  'settings.ai.key.vaultNote':
+    'Это то же зашифрованное хранилище, что и «Настройки → Ключи API»: ключ, сохранённый в любом из мест, один и тот же.',
+  'settings.ai.model.title': 'Офлайн-модель',
+  'settings.ai.model.desc':
+    'Qwen3 1.7B из официального выпуска Qwen (Apache-2.0). Работает для офлайн-перевода, ИИ-карточек, разбора предложений и агента и загружается только во время использования.',
+  'settings.ai.model.manualNote':
+    'Подойдёт и GGUF, скачанный вами: положите его в папку models приложения или в «Загрузки».',
+  'settings.ai.model.installed': 'Установлено · {size}',
+  'settings.ai.model.downloading': 'Загрузка… {percent}%',
+  'settings.ai.model.paused': 'Приостановлено на {percent}%',
+  'settings.ai.model.notInstalled': 'Не установлено · загрузка {size}',
+  'settings.ai.model.install': 'Установить ({size})',
+  'settings.ai.agent.title': 'Агент',
+  'settings.ai.agent.desc':
+    'Агент может планировать действия с помощью инструментов приложения. Каждый шаг ждёт вашего одобрения.',
+  'settings.ai.agent.enable': 'Разрешить агенту планировать действия',
+  'settings.ai.agent.onReady':
+    'Включено. Планы строятся офлайн-моделью, если она установлена, иначе облачным провайдером.',
+  'settings.ai.agent.onNotReady':
+    'Включено, но планировать пока нечем: установите офлайн-модель или добавьте облачный ключ выше.',
+  'settings.ai.agent.offNote':
+    'Выключено. С агентом можно общаться, но он не планирует и не выполняет действия.',
+  'settings.ai.agent.model': 'Модель агента',
+  'settings.ai.agent.modelAuto': 'Автоматически (лучшая из установленных)',
+  'settings.ai.agent.modelMissing': '{name} (не найдена)',
+  'settings.ai.agent.modelMissingNote':
+    'Выбранного файла модели нет на этом компьютере. Выберите другой или «Автоматически».',
+  'settings.ai.schedules.title': 'Задачи агента по расписанию',
+  'settings.ai.schedules.desc':
+    'Запросы, которые агент планирует по расписанию. Каждый план по-прежнему ждёт вашего одобрения.',
+  'settings.ai.spend.title': 'Расходы на облако',
+  'settings.ai.spend.desc':
+    'Каждый облачный запрос ИИ в приложении оценивается и учитывается здесь, какая бы функция его ни отправила.',
+  'settings.ai.rates.note':
+    'Цены в долларах США за миллион токенов. Встроенные цифры — оценка по странице цен каждого провайдера и могут устареть; введите свои, чтобы заменить их.',
+  'settings.ai.rates.input': 'Ввод',
+  'settings.ai.rates.output': 'Вывод',
+  'settings.ai.rates.yours': 'Ваша цена',
+  'settings.ai.rates.estimate': 'Оценка, можно изменить ({input} / {output})',
+  'settings.ai.rates.inputFor': 'Цена ввода для {provider}',
+  'settings.ai.rates.outputFor': 'Цена вывода для {provider}',
+  'settings.ai.rates.reset': 'Вернуть оценку',
   'apiKeys.overview.title': 'Учётные данные',
   'apiKeys.overview.desc': 'Настроено {configured} из {total}.',
   'apiKeys.optional': 'Все ключи здесь необязательны. Приложение полностью работает офлайн без единого ключа — ключ добавляет возможности, но никогда не требуется для основных функций.',

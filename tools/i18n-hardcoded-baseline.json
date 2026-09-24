@@ -8,7 +8,6 @@
   "src/renderer/components/NoteCssEditor.tsx": 9,
   "src/renderer/components/PerfOverlay.tsx": 8,
   "src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx": 19,
-  "src/renderer/components/SentenceAnalysisPanel.tsx": 6,
   "src/renderer/components/SentenceTranslatePopup.tsx": 7,
   "src/renderer/components/settings/pages/ExternalPlayerPanel.tsx": 23,
   "src/renderer/components/settings/pages/MediaTrackingManager.tsx": 27,
