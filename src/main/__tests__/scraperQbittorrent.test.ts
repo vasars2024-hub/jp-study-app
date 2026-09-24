@@ -422,6 +422,9 @@ beforeEach(async () => {
     retryDelay: 50,
   });
   await fsp.rm(path.join(tempRoot, 'credentials.dat'), { force: true });
+  // A .bak without its primary counts as damage and would be reinstated,
+  // carrying the previous test's secrets back in.
+  await fsp.rm(path.join(tempRoot, 'credentials.dat.bak'), { force: true });
   await setScraperSecret('test/qbit', GOOD_PASS);
 });
 

@@ -80,8 +80,12 @@ beforeEach(async () => {
   notifications.resetScraperNotifications();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
-  await fsp.rm(scraperStorePath('scheduler-state.json'), { force: true });
-  await fsp.rm(scraperStorePath('scheduler-config.json'), { force: true });
+  // With their .bak: a .bak without its primary counts as damage and would be
+  // reinstated, carrying the previous test's fired slots back in.
+  for (const name of ['scheduler-state.json', 'scheduler-config.json']) {
+    await fsp.rm(scraperStorePath(name), { force: true });
+    await fsp.rm(scraperStorePath(`${name}.bak`), { force: true });
+  }
 });
 
 afterEach(async () => {

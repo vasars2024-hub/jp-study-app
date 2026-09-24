@@ -192,6 +192,8 @@ vi.mock('node:fs', () => {
       if (!h.files.has(String(file))) throw enoent(file);
       return { isFile: () => true };
     },
+    // The first write of a store checks for an orphaned `.bak` to keep aside.
+    existsSync: (file: string) => h.files.has(String(file)),
     copyFileSync: (from: string, to: string) => {
       const value = h.files.get(String(from));
       if (value === undefined) throw enoent(from);
