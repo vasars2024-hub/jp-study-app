@@ -70,6 +70,7 @@ export const MAL_SYNC_JA: Catalog = {
   'malSync.pushPushing': '送信中…',
   'malSync.pushResult': '送信 {sent} 件、失敗 {failed} 件。',
   'malSync.pushRemaining': { other: '残り {count} 件は次回の送信で送られます。' },
+  'malSync.pushChangedOnMal': { other: '前回の取得後に MyAnimeList 側で変更された {count} 件は、上書きせずそのままにしました。もう一度リストを取得して比べてください：' },
   'malSync.pushAdded': 'MyAnimeList に新規追加',
   'malSync.pushField.status': 'ステータス',
   'malSync.pushField.score': 'スコア',

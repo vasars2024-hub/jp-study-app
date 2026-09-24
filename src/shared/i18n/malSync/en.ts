@@ -95,6 +95,7 @@ export const MAL_SYNC_EN: Catalog = {
   'malSync.pushPushing': 'Pushing…',
   'malSync.pushResult': 'Sent {sent}, failed {failed}.',
   'malSync.pushRemaining': { one: '{count} more waits for the next push.', other: '{count} more wait for the next push.' },
+  'malSync.pushChangedOnMal': { one: '{count} title changed on MyAnimeList since the last fetch and was left as it is there. Fetch the list again to compare:', other: '{count} titles changed on MyAnimeList since the last fetch and were left as they are there. Fetch the list again to compare:' },
   'malSync.pushAdded': 'new on MyAnimeList',
   'malSync.pushField.status': 'status',
   'malSync.pushField.score': 'score',

@@ -68,6 +68,7 @@ export const MAL_SYNC_ZH: Catalog = {
   'malSync.pushPushing': '正在推送…',
   'malSync.pushResult': '已发送 {sent} 项，失败 {failed} 项。',
   'malSync.pushRemaining': { other: '还有 {count} 项将在下次推送时发送。' },
+  'malSync.pushChangedOnMal': { other: '有 {count} 项在上次获取后已在 MyAnimeList 上更改，已保持原样未覆盖。请重新获取列表后再比较：' },
   'malSync.pushAdded': '在 MyAnimeList 上新增',
   'malSync.pushField.status': '状态',
   'malSync.pushField.score': '评分',

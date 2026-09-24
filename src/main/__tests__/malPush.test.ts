@@ -34,6 +34,11 @@ const NOW = Date.UTC(2026, 8, 24, 12);
 let dir: string;
 let sent: MalHttpRequest[];
 let failWith: number | null;
+/** The list as MAL has it right now (what a GET of my_list_status returns). */
+let server: Map<number, { status: string; score: number; num_episodes_watched: number; is_rewatching: boolean; updated_at: string }>;
+/** MAL's own episode counts. */
+let malEpisodeCount: Map<number, number>;
+const patches = (): MalHttpRequest[] => sent.filter((request) => request.method === 'PATCH');
 
 function client(): MalSyncClient {
   let tokens: MalTokens | null = { accessToken: 'FAKE', refreshToken: 'FAKE-R', expiresAt: 4_000_000_000_000 };
@@ -41,17 +46,22 @@ function client(): MalSyncClient {
     transport: async (request) => {
       sent.push(request);
       if (failWith) return { status: failWith, body: '' };
+      const animeId = Number(/\/anime\/(\d+)/.exec(request.url)?.[1]);
+      if (request.method === 'GET') {
+        const row = server.get(animeId);
+        return { status: 200, body: JSON.stringify({ id: animeId, num_episodes: malEpisodeCount.get(animeId) ?? 0, ...(row ? { my_list_status: row } : {}) }) };
+      }
       const body = new URLSearchParams(request.body ?? '');
-      return {
-        status: 200,
-        body: JSON.stringify({
-          status: body.get('status') ?? 'watching',
-          score: Number(body.get('score') ?? 0),
-          num_episodes_watched: Number(body.get('num_watched_episodes') ?? 0),
-          is_rewatching: body.get('is_rewatching') === 'true',
-          updated_at: new Date(NOW).toISOString(),
-        }),
+      const prior = server.get(animeId);
+      const next = {
+        status: body.get('status') ?? prior?.status ?? 'watching',
+        score: Number(body.get('score') ?? prior?.score ?? 0),
+        num_episodes_watched: Number(body.get('num_watched_episodes') ?? prior?.num_episodes_watched ?? 0),
+        is_rewatching: body.has('is_rewatching') ? body.get('is_rewatching') === 'true' : prior?.is_rewatching ?? false,
+        updated_at: new Date(NOW).toISOString(),
       };
+      server.set(animeId, next);
+      return { status: 200, body: JSON.stringify(next) };
     },
     store: {
       read: () => tokens,
@@ -70,6 +80,11 @@ beforeEach(() => {
   __setMalLibraryPathForTests(() => path.join(dir, 'mal-library.json'));
   sent = [];
   failWith = null;
+  server = new Map([
+    [1, { status: 'watching', score: 0, num_episodes_watched: 3, is_rewatching: false, updated_at: '2026-09-01T00:00:00Z' }],
+    [2, { status: 'plan_to_watch', score: 0, num_episodes_watched: 0, is_rewatching: false, updated_at: '2026-09-01T00:00:00Z' }],
+  ]);
+  malEpisodeCount = new Map([[1, 12], [2, 24]]);
   // The MAL list as last fetched and saved: two shows.
   applyMalLibrarySync({
     media: 'anime',
@@ -110,12 +125,12 @@ describe('push changes to MAL', () => {
 
     const result = await pushWatchChangesToMal(client(), undefined, () => NOW);
     expect(result).toMatchObject({ sent: 2, failed: [], remaining: 0 });
-    expect(sent.map((request) => [request.method, request.url.replace(/^.*\/anime\//, '')])).toEqual([
+    expect(patches().map((request) => [request.method, request.url.replace(/^.*\/anime\//, '')])).toEqual([
       ['PATCH', '1/my_list_status'],
       ['PATCH', '2/my_list_status'],
     ]);
-    expect(new URLSearchParams(sent[0].body).get('num_watched_episodes')).toBe('7');
-    expect(new URLSearchParams(sent[0].body).get('score')).toBe('8');
+    expect(new URLSearchParams(patches()[0].body).get('num_watched_episodes')).toBe('7');
+    expect(new URLSearchParams(patches()[0].body).get('score')).toBe('8');
     // The stored rows now agree, so the diff is empty — and the push did not
     // fold itself back in as fresh MAL data.
     expect(malPushPreview().changes).toEqual([]);
@@ -145,7 +160,7 @@ describe('push changes to MAL', () => {
     updateWatchTitle(idOf(2), { progress: 1 }, NOW);
     const result = await pushWatchChangesToMal(client(), [2], () => NOW);
     expect(result.sent).toBe(1);
-    expect(sent).toHaveLength(1);
+    expect(patches()).toHaveLength(1);
     expect(malPushPreview().changes.map((change) => change.animeId)).toEqual([1]);
   });
 
@@ -156,5 +171,25 @@ describe('push changes to MAL', () => {
     recordWatchLocalProgress({ mediaItemId: 'f4', positionSec: 1400, durationSec: 1440 }, NOW);
     expect(sent).toEqual([]);
     expect(malPushPreview().changes).toEqual([expect.objectContaining({ animeId: 1, update: { episodesWatched: 4 } })]);
+  });
+
+  it('re-reads each title before the PATCH and never overwrites an edit made on MAL since the fetch', async () => {
+    updateWatchTitle(idOf(1), { progress: 7 }, NOW);
+    updateWatchTitle(idOf(2), { status: 'watching' }, NOW);
+    // Edited on the MAL site after the last fetch: the snapshot says 3, MAL says 10.
+    server.set(1, { status: 'watching', score: 9, num_episodes_watched: 10, is_rewatching: false, updated_at: '2026-09-20T00:00:00Z' });
+    const result = await pushWatchChangesToMal(client(), undefined, () => NOW);
+    expect(result.sent).toBe(1);
+    expect(result.changedOnMal).toEqual([{ animeId: 1, title: 'Show One' }]);
+    expect(patches().map((request) => request.url.replace(/^.*\/anime\//, ''))).toEqual(['2/my_list_status']);
+    expect(server.get(1)?.num_episodes_watched).toBe(10);
+  });
+
+  it('caps episodes at the MAL count, not a lower one from another provider', async () => {
+    // TMDB split the show: the library thinks it has 12 episodes, MAL has 24.
+    updateWatchTitle(idOf(2), { status: 'watching', progress: 20, episodeCount: 12 }, NOW);
+    expect(malPushPreview().changes.find((change) => change.animeId === 2)?.update.episodesWatched).toBe(20);
+    await pushWatchChangesToMal(client(), [2], () => NOW);
+    expect(new URLSearchParams(patches()[0].body).get('num_watched_episodes')).toBe('20');
   });
 });

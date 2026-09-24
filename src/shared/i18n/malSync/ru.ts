@@ -78,6 +78,7 @@ export const MAL_SYNC_RU: Catalog = {
   'malSync.pushPushing': 'Отправка…',
   'malSync.pushResult': 'Отправлено: {sent}, с ошибкой: {failed}.',
   'malSync.pushRemaining': { one: 'Ещё {count} ждёт следующей отправки.', few: 'Ещё {count} ждут следующей отправки.', many: 'Ещё {count} ждут следующей отправки.', other: 'Ещё {count} ждут следующей отправки.' },
+  'malSync.pushChangedOnMal': { one: '{count} тайтл изменён на MyAnimeList после последней загрузки и оставлен как есть. Загрузите список снова, чтобы сравнить:', few: '{count} тайтла изменены на MyAnimeList после последней загрузки и оставлены как есть. Загрузите список снова, чтобы сравнить:', many: '{count} тайтлов изменены на MyAnimeList после последней загрузки и оставлены как есть. Загрузите список снова, чтобы сравнить:', other: '{count} тайтла изменены на MyAnimeList после последней загрузки и оставлены как есть. Загрузите список снова, чтобы сравнить:' },
   'malSync.pushAdded': 'новое в MyAnimeList',
   'malSync.pushField.status': 'статус',
   'malSync.pushField.score': 'оценка',

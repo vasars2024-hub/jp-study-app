@@ -35,6 +35,7 @@ import {
   isMalListStatus,
   parseMalAnimeListPage,
   parseMalListStatusResponse,
+  parseMalLiveListStatus,
   serialiseMalListStatusUpdate,
   DEFAULT_MAL_RELATION_MAX_DEPTH,
   DEFAULT_MAL_RELATION_MAX_REQUESTS,
@@ -42,6 +43,7 @@ import {
   nextRelationFrontier,
   parseMalAnimeRelations,
   type MalAnimeRelations,
+  type MalLiveListStatus,
   type MalDerivative,
   type MalListEntry,
   type MalListStatus,
@@ -998,6 +1000,24 @@ export class MalSyncClient {
     }
 
     return { derivatives, requests, truncated };
+  }
+
+  /**
+   * The user's list row for one title as MAL has it right now, plus MAL's own
+   * episode count. `listStatus` is null when the title is not on the list.
+   * The push reads this immediately before each PATCH, so an edit made on the
+   * MAL site after the last fetch is not overwritten from a stale snapshot.
+   */
+  async readListStatus(animeId: number): Promise<MalLiveListStatus> {
+    if (!Number.isFinite(animeId) || animeId <= 0) {
+      throw new MalSyncError('request-failed', 'That is not a MyAnimeList entry id.');
+    }
+    const query = new URLSearchParams({ fields: 'my_list_status,num_episodes' });
+    const response = await this.authedRequest({
+      url: `${MAL_API_BASE}/anime/${Math.trunc(animeId)}?${query.toString()}`,
+      method: 'GET',
+    });
+    return parseMalLiveListStatus(this.parseJson(response));
   }
 
   // -- list write -----------------------------------------------------------

@@ -40,9 +40,15 @@ function malScore(title: WatchTitle): number {
   return title.score === undefined ? 0 : Math.max(0, Math.min(10, Math.round(title.score)));
 }
 
-function malEpisodes(title: WatchTitle): number {
+/**
+ * Episodes to send. Capped at MAL's OWN count for the series — the library's
+ * `episodeCount` can come from another provider (TMDB, TVmaze) that splits or
+ * counts a show differently and is lower than MAL's, and capping at it sent
+ * MAL fewer episodes than were watched. Unknown to MAL (0 / absent): no cap.
+ */
+function malEpisodes(title: WatchTitle, malTotal: number | undefined): number {
   const progress = Math.max(0, Math.trunc(title.progress ?? 0));
-  return title.episodeCount ? Math.min(progress, title.episodeCount) : progress;
+  return malTotal && malTotal > 0 ? Math.min(progress, malTotal) : progress;
 }
 
 /**
@@ -69,8 +75,8 @@ export function diffWatchLibraryAgainstMal(
     const status: MalListStatus = malStatusFromWatch(title.status);
     const rewatching = title.status === 'rewatching';
     const score = malScore(title);
-    const episodes = malEpisodes(title);
     const row = rows.get(title.malId);
+    const episodes = malEpisodes(title, row?.totalEpisodes);
     if (!row) {
       if (!title.sources.some((source) => LOCAL_INTENT.includes(source))) continue;
       const update: MalListStatusUpdate = { status, episodesWatched: episodes };

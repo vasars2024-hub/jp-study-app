@@ -491,6 +491,16 @@ export default function MalSyncPanel() {
             ))}
           </ul>
         )}
+        {pushResult?.changedOnMal && pushResult.changedOnMal.length > 0 && (
+          <>
+            <p className="muted">{t('malSync.pushChangedOnMal', { count: pushResult.changedOnMal.length })}</p>
+            <ul className="muted">
+              {pushResult.changedOnMal.slice(0, PREVIEW_ROWS).map((row) => (
+                <li key={row.animeId}>{row.title}</li>
+              ))}
+            </ul>
+          </>
+        )}
 
         <small className="muted">{t('malSync.relatedDesc', { limit: RELATED_REQUEST_LIMIT })}</small>
         <div className="field-row">

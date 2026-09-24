@@ -246,6 +246,35 @@ export function parseMalAnimeListPage(payload: unknown): MalListPage {
   return { entries, nextPageUrl: typeof next === 'string' && next ? next : null };
 }
 
+/** One title's list row as MAL has it now (`GET /anime/{id}?fields=my_list_status,num_episodes`). */
+export interface MalLiveListStatus {
+  /** Null when the title is not on the user's list. */
+  listStatus: (Required<Pick<MalListStatusUpdate, 'episodesWatched' | 'score' | 'rewatching'>> & {
+    status?: MalListStatus;
+    /** MAL's `updated_at`, verbatim. */
+    updatedAt?: string;
+  }) | null;
+  /** MAL's episode count; 0 while unknown or still airing. */
+  numEpisodes: number;
+}
+
+export function parseMalLiveListStatus(payload: unknown): MalLiveListStatus {
+  const root = asRecord(payload);
+  const numEpisodes = asFiniteNumber(root.num_episodes, 0);
+  if (!root.my_list_status || typeof root.my_list_status !== 'object') return { listStatus: null, numEpisodes };
+  const list = asRecord(root.my_list_status);
+  return {
+    listStatus: {
+      status: isMalListStatus(list.status) ? list.status : undefined,
+      episodesWatched: asFiniteNumber(list.num_episodes_watched, 0),
+      score: asFiniteNumber(list.score, 0),
+      rewatching: list.is_rewatching === true,
+      updatedAt: typeof list.updated_at === 'string' ? list.updated_at : undefined,
+    },
+    numEpisodes,
+  };
+}
+
 /** Parses the PATCH response, which returns the saved status alone (no node). */
 export function parseMalListStatusResponse(payload: unknown): MalListStatusUpdate {
   const listStatus = asRecord(payload);
