@@ -109,6 +109,7 @@ export default function ScraperApp() {
   const [dashboardJobActive, setDashboardJobActive] = useState(false);
   const [transientJobActive, setTransientJobActive] = useState(false);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [torrentQuery, setTorrentQuery] = useState<string | null>(null);
   const [lastScrape, setLastScrape] = useState<string | null>(null);
   const [settingsDocument, setSettingsDocument] = useState(loadScraperSettingsDocument);
 
@@ -121,7 +122,21 @@ export default function ScraperApp() {
   );
   const port = useMemo(() => {
     const mock = createMockScraperPort();
-    return mockMode ? mock : createIpcScraperPort(mock);
+    if (mockMode) return mock;
+    // A live call that fails is said out loud, once per method and message
+    // every half minute — the rail's 3-second stats poll must not turn one
+    // outage into a stack of identical toasts.
+    const recent = new Map<string, number>();
+    return createIpcScraperPort(mock, {
+      onError: (method, error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const key = `${method}\u0000${message}`;
+        const now = Date.now();
+        if ((recent.get(key) ?? 0) > now - 30_000) return;
+        recent.set(key, now);
+        showToast({ title: sx('error.backendCall'), message, kind: 'error' });
+      },
+    });
   }, [mockMode]);
 
   // The rail's STATUS block, polled from the port. With a backend these are the
@@ -246,6 +261,11 @@ export default function ScraperApp() {
     navigate('sources');
   }, [navigate]);
   const clearSource = useCallback(() => setSourceId(null), []);
+  const findTorrents = useCallback((query: string) => {
+    setTorrentQuery(query);
+    navigate('torrents');
+  }, [navigate]);
+  const clearTorrentQuery = useCallback(() => setTorrentQuery(null), []);
   const activeJobCount = countActiveScraperJobs(dashboardJobActive, transientJobActive);
   // One composed reading, handed to the rail AND to every page through the
   // controller. Pages used to take their own one-shot `systemStats()` at mount
@@ -316,6 +336,10 @@ export default function ScraperApp() {
       openSource,
       clearSource,
 
+      torrentQuery,
+      findTorrents,
+      clearTorrentQuery,
+
       recentPages: shell.recentPages,
     }),
     [
@@ -335,6 +359,9 @@ export default function ScraperApp() {
       sourceId,
       openSource,
       clearSource,
+      torrentQuery,
+      findTorrents,
+      clearTorrentQuery,
     ],
   );
 

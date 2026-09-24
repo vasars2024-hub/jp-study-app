@@ -14,6 +14,12 @@
  * every key and destroys the signal. A naive grep does NOT discriminate — a dead key
  * still shows 2-3 hits from its own type and default.
  *
+ * Tightened 2026-09-24: i18n catalogs are model files too (their keys spell every
+ * setting path), a key inside a string literal or a comment is not a read, and a
+ * validator, normalizer or sanitizer function body is not a consumer. Before that, the
+ * Export group scanned LIVE in full on catalog keys and validators alone while no
+ * field reached the exported bytes.
+ *
  * A 0-consumer result is a LEAD, not a verdict. Keys can be read dynamically
  * (`config[name]`, a spread into an options object, a string-keyed lookup), so the
  * scanner separates them out and refuses to call them dead:
@@ -59,6 +65,10 @@ function indexSources(dir, out = new Map()) {
 function isModelFile(rel) {
   return (
     rel.includes('/__tests__/') ||
+    // Translation catalogs name every setting in their keys
+    // ('scraperDrawer.field.export.destinationRef.hint'). That labels the
+    // control; it does not read the value.
+    rel.includes('/i18n/') ||
     rel.endsWith('.d.ts') ||
     /(^|\/)fields\.ts$/.test(rel) ||
     /Ipc\.ts$/.test(rel) ||
@@ -140,9 +150,142 @@ function consumersOf(key, sources, ownFile) {
   const hits = [];
   for (const [rel, text] of sources) {
     if (rel === ownFile || isModelFile(rel)) continue;
-    if (read.test(text) || destructure.test(text)) hits.push(rel);
+    const code = readableCode(rel, text);
+    if (read.test(code) || destructure.test(code)) hits.push(rel);
   }
   return hits;
+}
+
+/**
+ * Source text with comments removed and every string literal blanked, except
+ * a string that is a bare identifier (so `settings['format']` still counts).
+ * A key named inside a longer string — an i18n key, a settings path in a field
+ * table, a log line — or in a comment is not a read of the value.
+ */
+function regexCanStart(before) {
+  const trimmed = before.replace(/\s+$/, '');
+  if (!trimmed) return true;
+  if (/(?:^|[^\w$])(?:return|typeof|case|in|of|void|yield|await)$/.test(trimmed)) return true;
+  return /[(,=:[!&|?{};+\-*%<>~^]$/.test(trimmed);
+}
+
+function codeOnly(text) {
+  let out = '';
+  let i = 0;
+  const n = text.length;
+  const bare = /^[A-Za-z_$][\w$]*$/;
+  while (i < n) {
+    const c = text[i];
+    const d = text[i + 1];
+    if (c === '/' && d === '/') {
+      while (i < n && text[i] !== '\n') i += 1;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      i += 2;
+      while (i < n && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+      i += 2;
+      continue;
+    }
+    // A regex literal (`/[",]/`) can hold quotes and backticks; read as a
+    // string, one of those swallows the rest of the file. A `/` after an
+    // operator, an opening bracket or `return` starts a regex, not a division.
+    if (c === '/' && regexCanStart(out)) {
+      let j = i + 1;
+      let inClass = false;
+      while (j < n && text[j] !== '\n') {
+        if (text[j] === '\\') {
+          j += 2;
+          continue;
+        }
+        if (text[j] === '[') inClass = true;
+        else if (text[j] === ']') inClass = false;
+        else if (text[j] === '/' && !inClass) break;
+        j += 1;
+      }
+      out += '/re/';
+      i = j + 1;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      let body = '';
+      while (j < n && text[j] !== c && (c === '`' || text[j] !== '\n')) {
+        if (text[j] === '\\') {
+          body += text.slice(j, j + 2);
+          j += 2;
+          continue;
+        }
+        body += text[j];
+        j += 1;
+      }
+      // A template keeps its `${…}` expressions: those are code.
+      const kept = c === '`'
+        ? (body.match(/\$\{[^}]*\}/g) ?? []).join(' ')
+        : bare.test(body) ? body : '';
+      out += `${c}${kept}${c}`;
+      i = j + 1;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
+}
+
+/**
+ * The text with every validator/normalizer function body removed.
+ *
+ * A `validateXSettings(input)` that reads `s.format` to copy it into the
+ * normalized object touches every key by construction, so counting it makes
+ * every key of a settings group look consumed. The model's own file is already
+ * excluded; this covers validators that live elsewhere (profile layers, import
+ * paths, override sanitizers), and it is how the Export group scanned LIVE in
+ * full while nothing outside its model read a single field.
+ */
+const VALIDATOR = /function\s+(?:validate|normalize|sanitize)[A-Za-z0-9_$]*\s*(?:<[^>]*>)?\s*\(/g;
+function withoutValidators(text) {
+  let out = '';
+  let last = 0;
+  VALIDATOR.lastIndex = 0;
+  let m;
+  while ((m = VALIDATOR.exec(text))) {
+    // Past the parameter list (it can hold braces of its own), then the body.
+    let parens = 0;
+    let bodyStart = -1;
+    for (let i = m.index + m[0].length - 1; i < text.length; i += 1) {
+      if (text[i] === '(') parens += 1;
+      else if (text[i] === ')' && (parens -= 1) === 0) {
+        bodyStart = text.indexOf('{', i);
+        break;
+      }
+    }
+    if (bodyStart < 0) break;
+    let depth = 0;
+    let end = text.length;
+    for (let i = bodyStart; i < text.length; i += 1) {
+      if (text[i] === '{') depth += 1;
+      else if (text[i] === '}' && (depth -= 1) === 0) {
+        end = i + 1;
+        break;
+      }
+    }
+    out += text.slice(last, m.index);
+    last = end;
+    VALIDATOR.lastIndex = end;
+  }
+  return out + text.slice(last);
+}
+
+const codeCache = new Map();
+/** What the consumer scan reads: code only, validators removed. Cached per file. */
+function readableCode(rel, text) {
+  let code = codeCache.get(rel);
+  if (code === undefined) {
+    code = withoutValidators(codeOnly(text));
+    codeCache.set(rel, code);
+  }
+  return code;
 }
 
 /**

@@ -2,32 +2,38 @@
 //
 // The backend lands one method at a time, so this is not an all-or-nothing
 // swap: main answers `scraperCapabilities()` with the methods it genuinely
-// implements, and everything else is delegated to the sample-data port. A
-// half-built backend therefore shows real data where real data exists and the
-// old fixtures everywhere else, instead of an error where a table used to be.
+// implements, and anything main does not implement is delegated to the
+// sample-data port. A method main DOES implement never falls back: when the
+// real call throws, the error reaches the screen (through `onError` and the
+// rejected promise). The old behaviour — swap in sample data on any throw — is
+// how a qBittorrent send that never left the machine was reported as "sent".
 //
 // Capabilities are fetched once and cached as a promise. Every call awaits it,
 // which costs one microtask after the first round-trip and means no screen has
-// to know whether the answer has arrived yet.
+// to know whether the answer has arrived yet. A failed fetch is not cached, so
+// the next call asks again.
 
 import type { ScraperMethod, ScraperSchedulerState } from '../../../../shared/scraperIpc';
 import type { LogLine } from '../../../../shared/scraperResults';
 import type { ScraperSourceEntry } from '../../../../shared/scraperSourceSettings';
+import { enabledSourcesOfKind } from '../../../../shared/scraperSourceOrder';
 import { getActiveScraperSettings } from '../../../scraperSettingsStore';
+import { scraperRunScope } from '../../../scraperRunContext';
 import type { ScraperPort } from './scraperPort';
 
 /** Nothing is real when the preload bridge is missing (tests, harnesses). */
 const NO_CAPABILITIES: ScraperMethod[] = [];
 
+/** True when the preload bridge exists — the packaged or dev app, not a harness. */
+function bridgePresent(): boolean {
+  return typeof window !== 'undefined' && typeof window.api?.scraperCapabilities === 'function';
+}
+
 async function fetchCapabilities(): Promise<Set<ScraperMethod>> {
-  try {
-    const list = await window.api?.scraperCapabilities?.();
-    return new Set(Array.isArray(list) ? list : NO_CAPABILITIES);
-  } catch {
-    // A backend that cannot answer is treated as a backend that has nothing,
-    // which is the same as running with no backend at all.
-    return new Set(NO_CAPABILITIES);
-  }
+  // No bridge is "no backend at all": every method is sample data, by design.
+  if (!bridgePresent()) return new Set(NO_CAPABILITIES);
+  const list = await window.api.scraperCapabilities();
+  return new Set(Array.isArray(list) ? list : NO_CAPABILITIES);
 }
 
 /** The active profile's sources, read fresh so a reorder takes effect at once. */
@@ -39,40 +45,85 @@ function sourceEntries(): ScraperSourceEntry[] {
   }
 }
 
-export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
+/**
+ * Thrown for "main has no stored result for this job". A normal answer for an
+ * id that was never run, so it is not reported through `onError`.
+ */
+export class ScraperResultMissingError extends Error {}
+
+export interface IpcScraperPortOptions {
+  /**
+   * Hears every failed live call, so the app can show it. The promise still
+   * rejects — this is for the user, the rejection is for the caller.
+   */
+  onError?: (method: ScraperMethod, error: unknown) => void;
+}
+
+export function createIpcScraperPort(
+  fallback: ScraperPort,
+  options: IpcScraperPortOptions = {},
+): ScraperPort {
   let capabilities: Promise<Set<ScraperMethod>> | null = null;
   const caps = (): Promise<Set<ScraperMethod>> => {
-    if (!capabilities) capabilities = fetchCapabilities();
+    if (!capabilities) {
+      capabilities = fetchCapabilities().catch((error: unknown) => {
+        capabilities = null;
+        throw error;
+      });
+    }
     return capabilities;
+  };
+
+  const report = (method: ScraperMethod, error: unknown) => {
+    if (error instanceof ScraperResultMissingError) return;
+    try {
+      options.onError?.(method, error);
+    } catch {
+      /* a broken reporter must not replace the real error */
+    }
   };
 
   /**
    * Runs `real` when main implements `method`, otherwise the sample-data path.
-   * A real implementation that throws also falls back: a transient backend
-   * failure should degrade the screen, not blank it.
+   *
+   * A real implementation that throws is NOT swapped for sample data: the
+   * error is reported and rethrown. Sample data in a live window is a lie
+   * about the user's own client, library and disk.
    */
   const route = async <T>(
     method: ScraperMethod,
     real: () => Promise<T>,
     sample: () => Promise<T>,
   ): Promise<T> => {
-    const set = await caps();
+    let set: Set<ScraperMethod>;
+    try {
+      set = await caps();
+    } catch (error) {
+      report(method, error);
+      throw error;
+    }
     if (!set.has(method)) return sample();
     try {
       return await real();
     } catch (error) {
-      console.warn(`[scraper] ${method} failed, falling back to sample data`, error);
-      return sample();
+      report(method, error);
+      throw error;
     }
   };
 
   return {
     ...fallback,
 
-    // The capability list itself, which is the one answer that cannot fall back
-    // to sample data: a screen asking "is this live?" needs main's own reply,
-    // and "the backend could not tell me" is the same answer as "nothing".
-    backendCapabilities: async (): Promise<readonly string[]> => [...(await caps())],
+    // The capability list itself. "The backend could not tell me" is answered
+    // as "nothing is live", which is what a screen asking "is this live?" can
+    // act on; the failure itself is reported by whichever call hit it.
+    backendCapabilities: async (): Promise<readonly string[]> => {
+      try {
+        return [...(await caps())];
+      } catch {
+        return [];
+      }
+    },
 
     // Settings live in the renderer, so the port — not main — is what turns
     // "the source called nyaa" into the entry main needs. Main stays stateless
@@ -143,24 +194,33 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
         () => fallback.listPlugins(),
       ),
 
+    // The export group decides where the save dialog opens and whether the
+    // file is revealed. The columns were already applied by the builder; they
+    // ride along for the record.
     writeExport: (request) =>
       route(
         'writeExport',
-        () => window.api.scraperWriteExport({
-          ...request,
-          destination: '',
-          columns: [],
-        }),
+        () => {
+          const exportSettings = getActiveScraperSettings().export;
+          return window.api.scraperWriteExport({
+            ...request,
+            destination: exportSettings.destinationRef,
+            columns: exportSettings.includeColumns,
+            openAfter: request.openAfter ?? exportSettings.openAfterExport,
+          });
+        },
         () => fallback.writeExport(request),
       ),
 
+    // A run carries the Connection Profiles scope and the video-server order
+    // with its settings: main keeps neither document.
     startScrape: (request) =>
       route(
         'startScrape',
-        () => window.api.scraperStartScrape({
-          request,
-          settings: getActiveScraperSettings(),
-        }),
+        () => {
+          const { settings, context } = scraperRunScope(getActiveScraperSettings());
+          return window.api.scraperStartScrape({ request, settings, context });
+        },
         () => fallback.startScrape(request),
       ),
 
@@ -195,9 +255,9 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
         'getResult',
         async () => {
           const result = await window.api.scraperGetResult(jobId);
-          // Main answers null for a job it has never run — the sample result is
-          // a better answer than an empty screen for a fixture-era job id.
-          if (!result) throw new Error(`No stored result for ${jobId}`);
+          // Main answers null for a job it has never run. The caller decides
+          // what an absent result means; sample rows are never it.
+          if (!result) throw new ScraperResultMissingError(`No stored result for ${jobId}`);
           return result;
         },
         () => fallback.getResult(jobId),
@@ -226,22 +286,47 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
         () => fallback.qbitSend(rows, config),
       ),
 
+    qbitAction: (action, hashes, actionOptions) =>
+      route(
+        'qbitAction',
+        () => window.api.scraperQbitAction({
+          config: getActiveScraperSettings().qbittorrent,
+          action,
+          hashes,
+          // Only ever true when the caller said so: the default keeps files.
+          deleteFiles: actionOptions?.deleteFiles === true,
+        }),
+        () => fallback.qbitAction(action, hashes, actionOptions),
+      ),
+
+    freeSpace: () =>
+      route(
+        'freeSpace',
+        () => window.api.scraperFreeSpace({ config: getActiveScraperSettings().qbittorrent }),
+        () => fallback.freeSpace(),
+      ),
+
     searchTorrents: (query) =>
       route(
         'searchTorrents',
         () => {
-          const settings = getActiveScraperSettings();
+          const { settings, context } = scraperRunScope(getActiveScraperSettings());
           const wanted = new Set(settings.torrents.indexerIds);
-          // An empty indexer list means "any torrent source in the profile",
-          // which is what a freshly seeded profile looks like.
-          const indexers = settings.sources.entries.filter(
-            (entry) => entry.kind === 'torrent' && (!wanted.size || wanted.has(entry.id)),
+          // Priority order — the Source Manager's list, top to bottom. An empty
+          // indexer list means "any torrent source in the profile", which is
+          // what a freshly seeded profile looks like.
+          const indexers = enabledSourcesOfKind(settings.sources, 'torrent').filter(
+            (entry) => !wanted.size || wanted.has(entry.id),
           );
           return window.api.scraperSearchTorrents({
             query,
             indexers,
             torrents: settings.torrents,
             timeoutMs: settings.sources.perSourceTimeoutMs,
+            pool: settings.sources.entries,
+            maxFallbackDepth: settings.sources.maxFallbackDepth,
+            settings,
+            context,
           });
         },
         () => fallback.searchTorrents(query),
@@ -266,10 +351,10 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
     syncScheduler: (scheduler) =>
       route(
         'syncScheduler',
-        () => window.api.scraperSyncScheduler({
-          scheduler,
-          settings: getActiveScraperSettings(),
-        }),
+        () => {
+          const { settings, context } = scraperRunScope(getActiveScraperSettings());
+          return window.api.scraperSyncScheduler({ scheduler, settings, context });
+        },
         () => fallback.syncScheduler(scheduler),
       ),
 
@@ -288,7 +373,7 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
         detach = set.has('subscribeScheduler')
           ? window.api.scraperOnSchedulerState(listener)
           : fallback.subscribeScheduler(listener);
-      });
+      }, (error: unknown) => report('subscribeScheduler', error));
       return () => {
         released = true;
         detach?.();
@@ -307,7 +392,7 @@ export function createIpcScraperPort(fallback: ScraperPort): ScraperPort {
         detach = set.has('tailLogs')
           ? window.api.scraperTailLogs(listener)
           : fallback.tailLogs(listener);
-      });
+      }, (error: unknown) => report('tailLogs', error));
       return () => {
         released = true;
         detach?.();

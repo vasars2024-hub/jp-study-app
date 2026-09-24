@@ -3,7 +3,7 @@
 // One module because they share a shape — a summary strip over a list built
 // from the port — and splitting them would mean four near-identical files.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Progress, Select } from '../../ui';
 import VirtualList from '../../VirtualList';
@@ -17,10 +17,30 @@ import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
 import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import { distinctEpisodes } from '../data/dashboardData';
-import { sx, sxn, sxNumber, sxs } from '../strings';
+import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
+import { firstReason } from '../disabledReason';
+import TransferRemoveConfirm from '../TransferRemoveConfirm';
+import { errorText, qbitActionNotice } from '../data/qbitActions';
+import { loadExternalPlayerPreferences } from '../../../externalPlayerStore';
+import { selectExternalPlayerProfile, type PlaybackHandoff } from '../../../../shared/externalPlayer';
+import type {
+  ScraperFreeSpaceReport,
+  ScraperQbitTorrentAction,
+} from '../../../../shared/scraperIpc';
 import { SERIES, episodes, type FixtureSeries } from '../data/fixtures';
 import { scraperArtwork } from '../artwork';
-import { buildEpisodeExport, exportExtension } from '../data/exportBuilder';
+import {
+  buildEpisodeExport,
+  exportColumns,
+  exportExtension,
+  exportFileStem,
+} from '../data/exportBuilder';
+import {
+  loadScraperSettingsDocument,
+  onScraperSettingsChanged,
+  updateActiveScraperSettings,
+} from '../../../scraperSettingsStore';
+import { resolveScraperSettings } from '../../../../shared/scraperSettings';
 import {
   buildResultLibrary,
   buildSeriesResultReport,
@@ -35,6 +55,7 @@ import type {
   ExportRecord,
   ScrapeJobSummary,
   ScrapeResult,
+  ScrapeStageTiming,
 } from '../../../../shared/scraperResults';
 import {
   SCRAPER_EXPORT_FORMATS,
@@ -93,8 +114,8 @@ export function ResultsPage() {
   );
 
   // Every stored job becomes one row in the library. Sample data stands in only
-  // while nothing has been scraped yet, so an empty profile still has something
-  // to look at.
+  // in a window with no backend at all (a harness); a live profile that has
+  // scraped nothing shows an empty library, not somebody else's shows.
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -118,9 +139,10 @@ export function ResultsPage() {
           return;
         }
       } catch {
-        /* fall through to sample data */
+        /* nothing stored */
       }
-      if (alive) setLibrary({ series: SERIES, rows: episodes() });
+      const live = (await port.backendCapabilities().catch(() => [])).length > 0;
+      if (alive) setLibrary(live ? { series: [], rows: [] } : { series: SERIES, rows: episodes() });
     })();
     return () => {
       alive = false;
@@ -395,16 +417,50 @@ const DOWNLOAD_TONE: Record<DownloadRow['state'], 'good' | 'warn' | 'bad' | 'acc
   failed: 'bad',
 };
 
+const DOWNLOAD_STATE_KEY: Record<DownloadRow['state'], ScraperTextKey> = {
+  downloading: 'downloads.state.downloading',
+  queued: 'downloads.state.queued',
+  paused: 'downloads.state.paused',
+  done: 'downloads.state.done',
+  failed: 'downloads.state.failed',
+};
+
 export function DownloadsPage() {
   const port = useScraperPort();
   const [rows, setRows] = useState<DownloadRow[]>([]);
-  const [notice, setNotice] = useState('');
-  const [player, setPlayer] = useState('system');
-  const [playerNotice, setPlayerNotice] = useState('');
+  const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [free, setFree] = useState<ScraperFreeSpaceReport | null>(null);
+  const [players] = useState(() => loadExternalPlayerPreferences());
+  const [playerId, setPlayerId] = useState(
+    () => selectExternalPlayerProfile(players, 'video')?.id ?? '',
+  );
+  const [playId, setPlayId] = useState('');
+  const [playerNotice, setPlayerNotice] = useState<{ text: string; bad: boolean } | null>(null);
+
+  // Every action re-reads the client rather than patching rows locally: the
+  // page shows what qBittorrent says happened, not what the click hoped for.
+  const refresh = useCallback(async () => {
+    try {
+      setRows(await port.listDownloads());
+    } catch (error) {
+      setNotice({ text: sxs('downloads.loadFailed', errorText(error)), bad: true });
+    }
+  }, [port]);
 
   useEffect(() => {
-    void port.listDownloads().then(setRows);
-  }, [port]);
+    void refresh();
+    let alive = true;
+    void port.freeSpace().then((report) => {
+      if (alive) setFree(report);
+    }, () => {
+      if (alive) setFree({ bytes: null, source: 'none', path: '' });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [port, refresh]);
 
   const totals = useMemo(
     () => ({
@@ -419,56 +475,59 @@ export function DownloadsPage() {
   );
 
   // A storage warning is only useful before the disk fills, so it is derived
-  // from what is still to come rather than from what has already landed.
-  const freeBytes = 412 * 1024 ** 3;
-  const tight = totals.remaining > freeBytes * 0.8;
+  // from what is still to come rather than from what has already landed — and
+  // only when the free space was actually measured.
+  const freeBytes = free?.bytes ?? null;
+  const tight = freeBytes !== null && totals.remaining > freeBytes * 0.8;
 
-  const togglePause = (id: string) => {
-    setRows((current) =>
-      current.map((row) =>
-        row.id === id && (row.state === 'downloading' || row.state === 'paused')
-          ? {
-              ...row,
-              state: row.state === 'paused' ? 'downloading' : 'paused',
-              speedBps: row.state === 'paused' ? 6_800_000 : 0,
-              etaSec: row.state === 'paused' ? 94 : null,
-            }
-          : row,
-      ),
-    );
-    setNotice('Download queue state updated.');
-  };
-
-  const retry = (id: string) => {
-    setRows((current) =>
-      current.map((row) =>
-        row.id === id
-          ? { ...row, state: 'queued', receivedBytes: 0, speedBps: 0, etaSec: null, error: '' }
-          : row,
-      ),
-    );
-    setNotice('Episode returned to the queue.');
-  };
-
-  const cancel = (id: string) => {
-    const row = rows.find((item) => item.id === id);
-    setRows((current) => current.filter((item) => item.id !== id));
-    setNotice(row ? `Removed ${row.title} from the queue.` : 'Queue updated.');
+  const act = async (
+    row: DownloadRow,
+    action: ScraperQbitTorrentAction,
+    deleteFiles = false,
+  ) => {
+    setBusyId(row.id);
+    try {
+      const report = await port.qbitAction(action, [row.id], { deleteFiles });
+      setNotice(qbitActionNotice(action, report, row.title, deleteFiles));
+      if (report.ok && action === 'delete') setRemovingId(null);
+    } catch (error) {
+      setNotice({ text: sxs('transfer.failed', errorText(error)), bad: true });
+    } finally {
+      setBusyId(null);
+      await refresh();
+    }
   };
 
   const completed = rows.filter((row) => row.state === 'done');
-  const createPlayerHandoff = () => {
-    const row = completed[0];
-    if (!row) return;
-    const fileUrl = `file:///${row.destination.replace(/\\/g, '/')}`;
-    const playlist = `#EXTM3U\n#EXTINF:-1,${row.title}\n${fileUrl}\n`;
-    const href = URL.createObjectURL(new Blob([playlist], { type: 'audio/x-mpegurl' }));
-    const anchor = document.createElement('a');
-    anchor.href = href;
-    anchor.download = `${row.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${player}.m3u`;
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(href), 0);
-    setPlayerNotice(`Created a ${player === 'system' ? 'system player' : player.toUpperCase()} handoff for ${row.title}.`);
+  const playRow = completed.find((row) => row.id === playId) ?? completed[0] ?? null;
+  const player = players.profiles.find((profile) => profile.id === playerId) ?? null;
+  const whyPlay = firstReason(
+    [!playRow, sx('downloads.noCompleted')],
+    [!player, sx('downloads.noPlayer')],
+  );
+
+  // A real handoff: the chosen external player profile is launched on the
+  // file qBittorrent wrote. It used to download an .m3u whose only link to the
+  // player dropdown was its file name.
+  const playInPlayer = async () => {
+    if (!playRow || !player) return;
+    const handoff: PlaybackHandoff = {
+      mediaPath: playRow.contentPath || playRow.destination,
+      title: playRow.title,
+      episodeNumber: null,
+      subtitlePath: null,
+      audioPreference: null,
+      metadata: { source: 'scraper-downloads', infoHash: playRow.id },
+      resumePositionSec: null,
+    };
+    try {
+      const refused = await window.api.handoffMedia(handoff, player);
+      setPlayerNotice(refused
+        ? { text: sxs('downloads.playFailed', refused), bad: true }
+        : { text: sxss('downloads.playing', playRow.title, player.name), bad: false });
+    } catch (error) {
+      setPlayerNotice({ text: sxs('downloads.playFailed', errorText(error)), bad: true });
+    }
   };
 
   return (
@@ -480,26 +539,33 @@ export function DownloadsPage() {
       />
 
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.active')}</span><span className="scr-tile-value">{totals.active}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.queued')}</span><span className="scr-tile-value">{totals.queued}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.done')}</span><span className="scr-tile-value">{totals.done}</span></div>
-        <div className={`scr-tile${totals.failed ? ' is-bad' : ''}`}><span className="scr-tile-label">{sx('downloads.failed')}</span><span className="scr-tile-value">{totals.failed}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.active')}</span><span className="scr-tile-value">{sxNumber(totals.active)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.queued')}</span><span className="scr-tile-value">{sxNumber(totals.queued)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.done')}</span><span className="scr-tile-value">{sxNumber(totals.done)}</span></div>
+        <div className={`scr-tile${totals.failed ? ' is-bad' : ''}`}><span className="scr-tile-label">{sx('downloads.failed')}</span><span className="scr-tile-value">{sxNumber(totals.failed)}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">{sx('downloads.speed')}</span><span className="scr-tile-value">{formatBytes(totals.speed)}/s</span></div>
       </div>
 
-      <div className={`scr-storage-bar${tight ? ' is-tight' : ''}`}>
+      <div
+        className={`scr-storage-bar${tight ? ' is-tight' : ''}`}
+        title={free?.path || undefined}
+      >
         <Icon name={tight ? 'warning' : 'drive'} size={14} />
         <span>
           {sx('downloads.remaining')} {formatBytes(totals.remaining)} · {sx('downloads.free')}{' '}
-          {formatBytes(freeBytes)}
+          {freeBytes === null ? sx('downloads.freeUnknown') : formatBytes(freeBytes)}
         </span>
       </div>
 
       <ScrCard id="download-queue" title={sx('downloads.queue')} statusId="page.downloads">
-        {notice && <p className="scr-action-notice" role="status">{notice}</p>}
+        {notice && (
+          <p className={`scr-action-notice${notice.bad ? ' is-bad' : ''}`} role="status">{notice.text}</p>
+        )}
         <ul className="scr-dl-list">
           {rows.map((row, index) => {
             const ratio = row.totalBytes ? row.receivedBytes / row.totalBytes : 0;
+            const busy = busyId === row.id;
+            const paused = row.state === 'paused';
             return (
               <li key={row.id} className="scr-dl">
                 <span className="scr-t-thumb scr-dl-thumb" aria-hidden>
@@ -511,9 +577,17 @@ export function DownloadsPage() {
                   <Progress value={row.state === 'queued' ? 0 : ratio} />
                   <span className="scr-dl-path">{row.destination}</span>
                   {row.error && <span className="scr-dl-error">{row.error}</span>}
+                  {removingId === row.id && (
+                    <TransferRemoveConfirm
+                      name={row.title}
+                      busy={busy}
+                      onConfirm={(deleteFiles) => void act(row, 'delete', deleteFiles)}
+                      onCancel={() => setRemovingId(null)}
+                    />
+                  )}
                 </div>
                 <div className="scr-dl-meta">
-                  <Pill tone={DOWNLOAD_TONE[row.state]}>{row.state}</Pill>
+                  <Pill tone={DOWNLOAD_TONE[row.state]}>{sx(DOWNLOAD_STATE_KEY[row.state])}</Pill>
                   <span className="scr-t-num">
                     {formatBytes(row.receivedBytes)} / {formatBytes(row.totalBytes)}
                   </span>
@@ -526,22 +600,27 @@ export function DownloadsPage() {
                 </div>
                 <div className="scr-dl-actions">
                   <IconButton
-                    label={`${row.state === 'paused' ? 'Resume' : 'Pause'} ${row.title}`}
+                    label={sxs(paused ? 'downloads.resumeItem' : 'downloads.pauseItem', row.title)}
                     size="sm"
-                    disabled={row.state !== 'downloading' && row.state !== 'paused'}
-                    onClick={() => togglePause(row.id)}
+                    disabled={busy || (row.state !== 'downloading' && row.state !== 'queued' && !paused)}
+                    onClick={() => void act(row, paused ? 'resume' : 'pause')}
                   >
-                    <Icon name={row.state === 'paused' ? 'player' : 'pause'} size={13} />
+                    <Icon name={paused ? 'player' : 'pause'} size={13} />
                   </IconButton>
                   <IconButton
-                    label={`Retry ${row.title}`}
+                    label={sxs('downloads.retryItem', row.title)}
                     size="sm"
-                    disabled={row.state !== 'failed' && row.state !== 'paused'}
-                    onClick={() => retry(row.id)}
+                    disabled={busy || (row.state !== 'failed' && !paused)}
+                    onClick={() => void act(row, 'retry')}
                   >
                     <Icon name="refresh" size={13} />
                   </IconButton>
-                  <IconButton label={`Cancel ${row.title}`} size="sm" onClick={() => cancel(row.id)}>
+                  <IconButton
+                    label={sxs('downloads.removeItem', row.title)}
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setRemovingId(row.id)}
+                  >
                     <Icon name="close" size={13} />
                   </IconButton>
                 </div>
@@ -560,34 +639,56 @@ export function DownloadsPage() {
       >
         <div className="scr-player-handoff">
           <span className="scr-t-thumb scr-dl-thumb" aria-hidden>
-            {completed[0]
-              ? <img src={scraperArtwork(Math.max(0, rows.indexOf(completed[0])))} alt="" />
+            {playRow
+              ? <img src={scraperArtwork(Math.max(0, rows.indexOf(playRow)))} alt="" />
               : <Icon name="player" size={18} />}
           </span>
           <div>
-            <span className="scr-micro-label">Ready to play</span>
-            <strong>{completed[0]?.title ?? 'No completed episodes'}</strong>
-            <small>{completed[0]?.destination ?? sx('downloads.playerHint')}</small>
+            <span className="scr-micro-label">{sx('downloads.readyToPlay')}</span>
+            {completed.length > 1 ? (
+              <select
+                className="scr-input"
+                aria-label={sx('downloads.readyToPlay')}
+                value={playRow?.id ?? ''}
+                onChange={(event) => setPlayId(event.target.value)}
+              >
+                {completed.map((row) => (
+                  <option key={row.id} value={row.id}>{row.title}</option>
+                ))}
+              </select>
+            ) : (
+              <strong>{playRow?.title ?? sx('downloads.noCompleted')}</strong>
+            )}
+            <small>{playRow ? (playRow.contentPath || playRow.destination) : sx('downloads.playerHint')}</small>
           </div>
           <label className="scr-result-inline-filter">
-            <span>Player</span>
-            <select className="scr-input" value={player} onChange={(event) => setPlayer(event.target.value)}>
-              <option value="system">System default</option>
-              <option value="vlc">VLC</option>
-              <option value="mpv">mpv</option>
+            <span>{sx('downloads.playerLabel')}</span>
+            <select
+              className="scr-input"
+              value={playerId}
+              disabled={!players.profiles.length}
+              onChange={(event) => setPlayerId(event.target.value)}
+            >
+              {!players.profiles.length && <option value="">{sx('downloads.noPlayerOption')}</option>}
+              {players.profiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              ))}
             </select>
           </label>
           <Button
             size="sm"
             variant="primary"
             leftIcon={<Icon name="player" size={13} />}
-            disabled={!completed.length}
-            onClick={createPlayerHandoff}
+            disabled={!!whyPlay}
+            title={whyPlay}
+            onClick={() => void playInPlayer()}
           >
-            Create player handoff
+            {sx('downloads.play')}
           </Button>
         </div>
-        {playerNotice && <p className="scr-action-notice" role="status">{playerNotice}</p>}
+        {playerNotice && (
+          <p className={`scr-action-notice${playerNotice.bad ? ' is-bad' : ''}`} role="status">{playerNotice.text}</p>
+        )}
       </ScrCard>
     </div>
   );
@@ -596,23 +697,35 @@ export function DownloadsPage() {
 // ---------------------------------------------------------------- exports ---
 
 export function ExportsPage() {
+  const ctl = useScraper();
   const port = useScraperPort();
   const [records, setRecords] = useState<ExportRecord[]>([]);
-  const [format, setFormat] = useState<ScraperExportFormat>('json');
+  // Format and template ARE the profile's Export group — one source of truth.
+  // The page used to keep its own two copies, so the drawer's settings changed
+  // nothing a user could export.
+  const [doc, setDoc] = useState(() => loadScraperSettingsDocument());
+  useEffect(() => onScraperSettingsChanged(setDoc), []);
+  const exportSettings = useMemo(() => resolveScraperSettings(doc).export, [doc]);
+  const format = exportSettings.format;
+  const template = exportSettings.filenameTemplate;
+  const setFormat = (next: ScraperExportFormat) =>
+    setDoc(updateActiveScraperSettings({ export: { format: next } }));
+  const setTemplate = (next: string) =>
+    setDoc(updateActiveScraperSettings({ export: { filenameTemplate: next } }));
   const [scope, setScope] = useState('all');
-  const [template, setTemplate] = useState('{series}-{date}');
   const [notice, setNotice] = useState('');
 
   const [rows, setRows] = useState<EpisodeRow[]>([]);
   const [source, setSource] = useState<{ jobId: string; title: string } | null>(null);
 
   useEffect(() => {
-    void port.listExports().then(setRecords);
+    void port.listExports().then(setRecords, () => undefined);
   }, [port]);
 
   // Export what was actually scraped. The newest finished job is the one the
-  // user just ran, so that is what the builder is pointed at; sample rows are
-  // the fallback for a profile that has never run anything.
+  // user just ran, so that is what the builder is pointed at. Sample rows are
+  // only for a window with no backend at all: a live profile that has never
+  // run anything has nothing to export, and says so.
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -628,9 +741,10 @@ export function ExportsPage() {
           }
         }
       } catch {
-        /* fall through to sample rows */
+        /* nothing exportable */
       }
-      if (alive) setRows(episodes());
+      const live = (await port.backendCapabilities().catch(() => [])).length > 0;
+      if (alive) setRows(live ? [] : episodes());
     })();
     return () => {
       alive = false;
@@ -647,43 +761,45 @@ export function ExportsPage() {
     }
   }, [rows, scope]);
 
-  // The series slug the template expands to, taken from the rows being
-  // exported rather than from a hard-coded example.
-  const seriesSlug = (source?.title || rows[0]?.seriesId || 'anime-export')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'anime-export';
-
-  const fileStem = template
-    .replace('{series}', seriesSlug)
-    .replace('{date}', new Date().toISOString().slice(0, 10))
-    .replace(/[^a-z0-9._-]+/gi, '-')
-    .replace(/^-+|-+$/g, '') || 'anime-export';
+  // The series the template expands to, taken from the rows being exported
+  // rather than from a hard-coded example.
+  const fileStem = exportFileStem(template, source?.title || rows[0]?.seriesId || '');
 
   // A live preview of the name is the cheapest way to catch a template mistake
   // before it writes a thousand files with the wrong one.
   const previewPath = `${fileStem}.${exportExtension(format)}`;
 
-  const sample = scoped[0];
+  const samplePreview = useMemo(
+    () => (scoped[0] ? buildEpisodeExport([scoped[0]], exportSettings).content.slice(0, 1_200) : ''),
+    [scoped, exportSettings],
+  );
 
   const createExport = async () => {
     if (!scoped.length) return;
-    const output = buildEpisodeExport(scoped, format);
-    const created = await port.writeExport({
-      jobId: source?.jobId ?? '',
-      format,
-      content: output.content,
-      defaultName: `${fileStem}.${output.extension}`,
-      recordCount: scoped.length,
-    });
+    const output = buildEpisodeExport(scoped, exportSettings);
+    let created: ExportRecord | null;
+    try {
+      created = await port.writeExport({
+        jobId: source?.jobId ?? '',
+        format,
+        content: output.content,
+        defaultName: `${fileStem}.${output.extension}`,
+        recordCount: scoped.length,
+        openAfter: exportSettings.openAfterExport,
+      });
+    } catch (error) {
+      setNotice(sxs('export.failed', errorText(error)));
+      return;
+    }
     if (!created) {
       setNotice(sx('export.cancelled'));
       return;
     }
-    setRecords((current) => [created, ...current]);
+    const record = created;
+    setRecords((current) => [record, ...current]);
     setNotice(
       created.outcome === 'ok'
-        ? sxs('export.written', `${created.destination} · ${scoped.length.toLocaleString()}`)
+        ? sxs('export.written', `${created.destination} · ${sxNumber(scoped.length)}`)
         : sxs('export.failed', created.note),
     );
   };
@@ -692,7 +808,7 @@ export function ExportsPage() {
     <div className="scr-page">
       <PageHead titleKey="page.exports.title" subKey="page.exports.subtitle" statusId="page.exports" />
 
-      <div className="scr-export-format-strip" aria-label="Export formats">
+      <div className="scr-export-format-strip" aria-label={sx('exports.formatsLabel')}>
         {SCRAPER_EXPORT_FORMATS.map((candidate) => (
           <button
             type="button"
@@ -704,27 +820,17 @@ export function ExportsPage() {
             <Icon name={candidate === 'm3u' ? 'player' : candidate === 'torrent-list' ? 'download' : 'file'} size={16} />
             <span>
               <b>{candidate.toUpperCase()}</b>
-              <small>
-                {candidate === 'json'
-                  ? 'Structured archive'
-                  : candidate === 'csv'
-                    ? 'Spreadsheet ready'
-                    : candidate === 'ndjson'
-                      ? 'Streaming records'
-                      : candidate === 'm3u'
-                        ? 'Player playlist'
-                        : 'Resolved links'}
-              </small>
+              <small>{sx(`exports.formatHint.${candidate}` as ScraperTextKey)}</small>
             </span>
           </button>
         ))}
       </div>
 
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Available rows</span><span className="scr-tile-value">{rows.length.toLocaleString()}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Current scope</span><span className="scr-tile-value">{scoped.length.toLocaleString()}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Past exports</span><span className="scr-tile-value">{records.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Selected format</span><span className="scr-tile-value scr-tile-value--format">{format.toUpperCase()}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('exports.tile.available')}</span><span className="scr-tile-value">{sxNumber(rows.length)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('exports.tile.scope')}</span><span className="scr-tile-value">{sxNumber(scoped.length)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('exports.tile.past')}</span><span className="scr-tile-value">{sxNumber(records.length)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('exports.tile.format')}</span><span className="scr-tile-value scr-tile-value--format">{format.toUpperCase()}</span></div>
       </div>
 
       <div className="scr-grid">
@@ -770,28 +876,37 @@ export function ExportsPage() {
             </div>
           </div>
 
+          {/* The rest of the Export group, stated where it takes effect. Edited
+              in one place — the drawer — so there is no second copy to drift. */}
+          <ul className="scr-export-options" aria-label={sx('exports.editOptions')}>
+            <li>{sxs('exports.optColumns', exportColumns(exportSettings).join(', '))}</li>
+            <li>{sx(exportSettings.splitBySeason ? 'exports.optSplitOn' : 'exports.optSplitOff')}</li>
+            {format === 'json' && (
+              <li>{sx(exportSettings.prettyPrint ? 'exports.optPrettyOn' : 'exports.optPrettyOff')}</li>
+            )}
+            <li>
+              {exportSettings.destinationRef.trim()
+                ? sxs('exports.optDestination', exportSettings.destinationRef.trim())
+                : sx('exports.optDestinationDefault')}
+            </li>
+            <li>{sx(exportSettings.openAfterExport ? 'exports.optRevealOn' : 'exports.optRevealOff')}</li>
+            <li>
+              <Button size="sm" variant="ghost" onClick={() => ctl.openDrawer('export')}>
+                {sx('exports.editOptions')}
+              </Button>
+            </li>
+          </ul>
+
           <div className="scr-export-preview">
             <span className="scr-muted">{sx('exports.willWrite')}</span>
             <code>{previewPath}</code>
             <span className="scr-muted">{sxn('exports.recordCount', scoped.length)}</span>
           </div>
 
-          {sample && (
-            <pre className="scr-export-sample">
-{JSON.stringify(
-  {
-    number: sample.number,
-    titleEn: sample.titleEn,
-    titleJa: sample.titleJa,
-    resolution: sample.resolution,
-    source: sample.sourceLabel,
-    subtitles: sample.subtitles.map((s) => s.language),
-  },
-  null,
-  2,
-)}
-            </pre>
-          )}
+          {/* The first row exactly as the builder will write it, so the
+              drawer's columns, split and indentation are visible here. */}
+          {samplePreview && <pre className="scr-export-sample">{samplePreview}</pre>}
+          {!rows.length && <p className="scr-muted">{sx('exports.nothingScraped')}</p>}
 
           <div className="scr-export-action">
             <Button variant="primary" size="sm" disabled={!scoped.length} onClick={() => void createExport()}>
@@ -848,7 +963,7 @@ export function HistoryPage() {
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    void port.listJobs().then(setJobs);
+    void port.listJobs().then(setJobs, () => undefined);
   }, [port]);
 
   const visible = useMemo(() => {
@@ -993,18 +1108,24 @@ export function HistoryPage() {
           }
         >
           {/* Per-stage timings are what turn "it was slow" into "the mirror
-              checks were slow", which is the only version you can act on. */}
-          <div className="scr-stages">
-            {stageBreakdown(open.durationSec).map((stage) => (
-              <div key={stage.label} className="scr-stage">
-                <span className="scr-stage-label">{stage.label}</span>
-                <div className="scr-stage-bar">
-                  <span style={{ width: `${stage.percent}%` }} />
+              checks were slow", which is the only version you can act on.
+              They are the engine's measured transitions; a run recorded
+              before those existed says so instead of showing a made-up split. */}
+          {open.stageTimings?.length ? (
+            <div className="scr-stages">
+              {stageBreakdown(open.stageTimings).map((stage, index) => (
+                <div key={`${stage.stage}-${index}`} className="scr-stage">
+                  <span className="scr-stage-label">{sx(`job.${stage.stage}` as ScraperTextKey)}</span>
+                  <div className="scr-stage-bar">
+                    <span style={{ width: `${stage.percent}%` }} />
+                  </div>
+                  <span className="scr-t-num">{formatStageMs(stage.ms)}</span>
                 </div>
-                <span className="scr-t-num">{formatDuration(stage.seconds)}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="scr-muted">{sx('history.noStageTimings')}</p>
+          )}
         </ScrCard>
       )}
     </div>
@@ -1014,18 +1135,17 @@ export function HistoryPage() {
 const HISTORY_TEMPLATE =
   '28px minmax(180px, 2fr) 104px 104px 84px 72px 96px 92px 92px 44px';
 
-/** A plausible split of a job's runtime across its stages. */
-function stageBreakdown(totalSec: number) {
-  const weights: [string, number][] = [
-    ['Search', 0.08],
-    ['Fetch', 0.34],
-    ['Extract', 0.31],
-    ['Mirrors', 0.16],
-    ['Validate', 0.11],
-  ];
-  return weights.map(([label, weight]) => ({
-    label,
-    seconds: Math.round(totalSec * weight),
-    percent: Math.round(weight * 100),
+/** Each measured stage as a share of the measured total. */
+export function stageBreakdown(timings: readonly ScrapeStageTiming[]) {
+  const total = timings.reduce((sum, stage) => sum + Math.max(0, stage.ms), 0);
+  return timings.map((stage) => ({
+    stage: stage.stage,
+    ms: Math.max(0, stage.ms),
+    percent: total ? Math.round((Math.max(0, stage.ms) / total) * 100) : 0,
   }));
+}
+
+/** Sub-second stages are the common case, so they keep their milliseconds. */
+function formatStageMs(ms: number): string {
+  return ms < 1_000 ? `${sxNumber(ms)} ms` : formatDuration(Math.round(ms / 1_000));
 }

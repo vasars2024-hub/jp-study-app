@@ -24,7 +24,9 @@ import type {
   StreamRow,
   TorrentRow,
 } from '../../../../shared/scraperResults';
-import { sx, sxn } from '../strings';
+import { sx, sx3, sxn, sxs } from '../strings';
+import { useScraperPort } from '../data/scraperPort';
+import { getActiveScraperSettings } from '../../../scraperSettingsStore';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
 import { openMediaWorkspace, reachMediaWorkspace } from '../../../mediaWorkspaceBridge';
 
@@ -410,9 +412,11 @@ export function TorrentTable({
 }
 
 export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
+  const port = useScraperPort();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [resolution, setResolution] = useState('all');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
+  const [sending, setSending] = useState(false);
   const resolutions = useMemo(
     () => [...new Set(torrents.map((torrent) => torrent.resolution))].sort().reverse(),
     [torrents],
@@ -436,12 +440,33 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
       'anime-torrents.txt',
       selectedRows.map((torrent) => `${torrent.name}\n${torrent.magnet}`).join('\n\n'),
     );
-    setNotice(`Exported ${selectedRows.length} selected magnet links.`);
+    setNotice({ text: sxn('result.magnetsExported', selectedRows.length), bad: false });
   };
-  const queueSelected = () => {
+  // A real send, through the same path as the Torrent Manager's: the notice is
+  // qBittorrent's own answer. It used to say "Queued" and send nothing.
+  const queueSelected = async () => {
     if (!selectedRows.length) return;
-    setNotice(`Queued ${selectedRows.length} release${selectedRows.length === 1 ? '' : 's'} for qBittorrent handoff.`);
-    setSelected(new Set());
+    setSending(true);
+    try {
+      const report = await port.qbitSend(
+        selectedRows,
+        getActiveScraperSettings().qbittorrent,
+        { via: 'scrape-results' },
+      );
+      const reasons = report.details
+        .filter((detail) => detail.outcome !== 'sent' && detail.reason)
+        .map((detail) => detail.reason);
+      const summary = sx3('result.sendSummary', report.sent, report.skipped, report.failed);
+      setNotice({
+        text: reasons.length ? `${summary} ${[...new Set(reasons)].join(' ')}` : summary,
+        bad: report.sent === 0,
+      });
+      if (report.sent > 0) setSelected(new Set());
+    } catch (error) {
+      setNotice({ text: sxs('transfer.failed', error instanceof Error ? error.message : String(error)), bad: true });
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -474,11 +499,18 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
         <span className="scr-result-control-spacer" />
         <span className="scr-muted">{selected.size} selected</span>
         <Button size="sm" onClick={exportMagnets} disabled={!selected.size}>Export magnets</Button>
-        <Button size="sm" variant="primary" onClick={queueSelected} disabled={!selected.size}>
-          Queue selected
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => void queueSelected()}
+          disabled={!selected.size || sending}
+        >
+          {sx(sending ? 'result.sending' : 'result.sendSelected')}
         </Button>
       </div>
-      {notice && <p className="scr-action-notice" role="status">{notice}</p>}
+      {notice && (
+        <p className={`scr-action-notice${notice.bad ? ' is-bad' : ''}`} role="status">{notice.text}</p>
+      )}
       <TorrentTable torrents={visible} selected={selected} onToggle={toggle} />
     </div>
   );

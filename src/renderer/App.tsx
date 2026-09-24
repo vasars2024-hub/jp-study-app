@@ -209,6 +209,23 @@ export default function App() {
   useEffect(() => {
     void import('./scraperSettingsStore').then((store) => store.syncScraperQbitToMain()).catch(() => undefined);
   }, []);
+  // Scheduled scrapes run in main on their own timer; it needs the schedules
+  // (and the connection profiles a run honours) without the Scraper being open.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let alive = true;
+    void Promise.all([import('./scraperSettingsStore'), import('./connectionProfilesStore')])
+      .then(([store, connections]) => {
+        if (!alive) return;
+        store.syncScraperSchedulerToMain();
+        off = connections.onConnectionProfilesChanged(() => store.syncScraperSchedulerToMain());
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, []);
   useEffect(() => {
     if (!blanc.enabled || popout || isBlancWindow()) return;
     void window.api.blancOpen({ width: 560, height: 460 });

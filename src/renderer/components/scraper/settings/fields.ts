@@ -266,7 +266,7 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   // ------------------------------------------------------------- sources ---
   { path: 'sources.mode', group: 'sources', kind: 'select', label: 'Source Mode', options: opts(SCRAPER_SOURCE_MODES, { streaming: 'Streaming only', torrent: 'Torrents only', both: 'Streaming and torrents' }), keywords: ['mode', 'switch'] },
   { path: 'sources.stopAfterFirstSuccess', group: 'sources', kind: 'toggle', label: 'Stop After First Success', hint: 'Off means every enabled source is tried, even after one works.' },
-  { path: 'sources.maxFallbackDepth', group: 'sources', kind: 'number', label: 'Max Fallback Depth', min: 0, max: 10, hint: 'Stored for a future fallback limit. Sources are tried in order and the chain is bounded by Stop After First Success and the per-source timeout, not by a depth.', inert: true },
+  { path: 'sources.maxFallbackDepth', group: 'sources', kind: 'number', label: 'Max Fallback Depth', min: 0, max: 10, hint: 'How many hops a failed source may take through its fallbacks, and through theirs. 0 turns fallbacks off.' },
   { path: 'sources.perSourceTimeoutMs', group: 'sources', kind: 'number', label: 'Per-Source Timeout', min: 1_000, max: 300_000, step: 1_000, unit: 'ms' },
   { path: 'sources.skipUnhealthy', group: 'sources', kind: 'toggle', label: 'Skip Unhealthy Sources', hint: 'Stored for a future pre-filter. Health is probed and shown in Source Manager, but a run still tries every enabled source and lets it fail.', inert: true },
   { path: 'sources.requireSubtitleAvailability', group: 'sources', kind: 'toggle', label: 'Require Subtitles', hint: 'Only accept a source that actually offers your subtitle languages.' },
@@ -324,7 +324,7 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'images.namingTemplate', group: 'images', kind: 'text', label: 'Naming Template', hint: 'Stored for a future downloader. The current scraper returns image URLs and does not write artwork files.', advanced: true, inert: true },
 
   // ------------------------------------------------------------ metadata ---
-  { path: 'metadata.providerOrder', group: 'metadata', kind: 'tags', label: 'Provider Order', hint: 'Ordered. The first provider with a value wins.' },
+  { path: 'metadata.providerOrder', group: 'metadata', kind: 'tags', label: 'Provider Order', hint: 'Ordered. The first provider with a value wins. Used only when the Source Manager lists no catalogue source; when it does, its order is the one tried.' },
   { path: 'metadata.titleLanguage', group: 'metadata', kind: 'select', label: 'Title Language', options: opts(SCRAPER_TITLE_LANGUAGES, { romaji: 'Romaji', english: 'English', native: 'Japanese' }) },
   { path: 'metadata.alsoStoreNativeTitle', group: 'metadata', kind: 'toggle', label: 'Also Store Japanese Title', hint: 'Shown as the second line under each result.' },
   { path: 'metadata.mergeStrategy', group: 'metadata', kind: 'select', label: 'Merge Strategy', options: opts(SCRAPER_MERGE_STRATEGIES, { 'first-wins': 'First provider wins', 'prefer-complete': 'Prefer the most complete', manual: 'Ask me' }), hint: 'Stored for a future multi-provider merge. The search returns as soon as one provider answers, so only ever one record exists and there is nothing to merge.', inert: true },
@@ -394,12 +394,14 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'validation.onFailure', group: 'validation', kind: 'select', label: 'On Failure', options: opts(SCRAPER_VALIDATION_FAILURE_MODES, { warn: 'Warn and keep', skip: 'Skip the item', abort: 'Abort the job' }) },
 
   // -------------------------------------------------------------- export ---
-  // 2026-08-05: NOTHING here is inert any more. `buildEpisodeExport` takes the
-  // group (renderer/components/scraper/data/exportBuilder.ts), the Exports page
-  // reads format and template from the document instead of from two useState
-  // locals, and `destinationRef`/`openAfterExport` reach main's writeExport.
-  // The comment this replaces said the Results page chose its format and columns
-  // "independently of this panel" — that was the defect, not the design.
+  // NOTHING here is inert. `buildEpisodeExport(rows, settings.export)`
+  // (data/exportBuilder.ts) reads format, includeColumns, includeSubtitleColumn,
+  // splitBySeason and prettyPrint; the Exports page reads format and
+  // filenameTemplate from the document (it keeps no copy of its own); and the
+  // IPC port hands destinationRef and openAfterExport to main's writeExport,
+  // which opens the save dialog in that folder and reveals the file. An earlier
+  // version of this comment claimed all of that while the builder still took a
+  // bare format — scraperExportBuilder.test.ts now pins each field.
   { path: 'export.format', group: 'export', kind: 'select', label: 'Format', options: opts(SCRAPER_EXPORT_FORMATS, { json: 'JSON', csv: 'CSV', ndjson: 'NDJSON', m3u: 'M3U playlist', 'torrent-list': 'Torrent list' }) },
   { path: 'export.destinationRef', group: 'export', kind: 'text', label: 'Destination', placeholder: 'Choose a folder', hint: 'An absolute folder path the save dialog opens in. The file still lands wherever you confirm the dialog; an unreadable path falls back to Downloads.' },
   { path: 'export.filenameTemplate', group: 'export', kind: 'text', label: 'Filename Template', hint: 'Supports {series} and {date}.' },

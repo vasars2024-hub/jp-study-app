@@ -220,8 +220,10 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // can be driven further without writing into or deleting from the userData
   // tree, which is not a trade this check is allowed to make.
   'set.logging': 'ready',
-  // 2026-08-05: was INERT IN FULL. `buildEpisodeExport` takes the group
-  // (data/exportBuilder.ts) and every field reaches the bytes or the dialog:
+  // Was INERT IN FULL, and an earlier version of this note claimed the wiring
+  // before it existed. Now `buildEpisodeExport(rows, settings.export)`
+  // (data/exportBuilder.ts) takes the group and every field reaches the bytes
+  // or the dialog:
   // includeColumns and includeSubtitleColumn choose the columns, splitBySeason
   // groups them, prettyPrint sets JSON indentation, format picks the branch,
   // filenameTemplate names the file, destinationRef is the folder the save
@@ -229,8 +231,9 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // openAfterExport reveals the result. The Exports page no longer keeps its own
   // copy of format and template — that duplication was the whole defect.
   //
-  // Held at 'untested': 11 builder assertions with two positive controls seen
-  // red, but no file has been written through a save dialog in a running app.
+  // Held at 'untested': the builder assertions in scraperExportBuilder.test.ts
+  // and the dialog-folder tests in scraperOutputs.test.ts pass, but no file has
+  // been written through a save dialog in a running app.
   'set.export': 'untested',
   'set.developer': 'ready',
   'set.profiles': 'ready',

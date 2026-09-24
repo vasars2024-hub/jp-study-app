@@ -16,7 +16,9 @@ import StatusDot from '../StatusDot';
 import { Pill } from '../result/Pill';
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
-import { sx, sxn } from '../strings';
+import { sx, sxn, sxs } from '../strings';
+import { loadVerifiedSitesDocument } from '../../../verifiedSitesStore';
+import { verifiedSiteForSource, type VerifiedSitesDocument } from '../../../../shared/verifiedSites';
 import {
   loadScraperSettingsDocument,
   onScraperSettingsChanged,
@@ -61,7 +63,7 @@ const INVENTORY_TONE = {
  * this page is opened. Without the seed the page would open empty on a fresh
  * install, which reads as broken rather than as "nothing configured yet".
  */
-function seedEntries(discovered: SourceStatus[]): ScraperSourceEntry[] {
+function seedEntries(discovered: SourceStatus[], sites: VerifiedSitesDocument): ScraperSourceEntry[] {
   return discovered.map((source, index) => ({
     id: source.id,
     label: source.label,
@@ -70,7 +72,8 @@ function seedEntries(discovered: SourceStatus[]): ScraperSourceEntry[] {
     enabled: source.enabled,
     priority: index + 1,
     fallbackIds: [],
-    verifiedSiteId: '',
+    // Linked to the Verified Sites record on the same host, when there is one.
+    verifiedSiteId: verifiedSiteForSource(sites, { host: source.host, verifiedSiteId: '' })?.id ?? '',
     requiresAuth: source.requiresAuth,
     supportsSubtitles: source.supportsSubtitles,
     health: source.health,
@@ -90,13 +93,16 @@ export default function SourceManagerPage() {
   const [probing, setProbing] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [handoffSourceId, setHandoffSourceId] = useState<string | null>(null);
+  const [probeNotice, setProbeNotice] = useState('');
+  // Read once per visit: Verified Sites is edited in Settings, not here.
+  const [verifiedSites] = useState(() => loadVerifiedSitesDocument());
   const sourceRefs = useRef(new Map<string, HTMLLIElement>());
 
   useEffect(() => onScraperSettingsChanged(setDoc), []);
 
   useEffect(() => {
-    void port.listSources().then(setDiscovered);
-    void port.listAcquisitionProviders().then(setInventory);
+    void port.listSources().then(setDiscovered, () => undefined);
+    void port.listAcquisitionProviders().then(setInventory, () => undefined);
   }, [port]);
 
   const settings = useMemo(() => resolveScraperSettings(doc), [doc]);
@@ -105,13 +111,13 @@ export default function SourceManagerPage() {
   // Seed once, when the profile has no sources but the port knows some.
   useEffect(() => {
     if (stored.length || !discovered.length) return;
-    const entries = seedEntries(discovered);
+    const entries = seedEntries(discovered, verifiedSites);
     setDoc(
       updateActiveScraperSettings({
         sources: { entries, order: entries.map((e) => e.id) },
       }),
     );
-  }, [stored.length, discovered]);
+  }, [stored.length, discovered, verifiedSites]);
 
   const healthById = useMemo(
     () => new Map(discovered.map((s) => [s.id, s])),
@@ -190,15 +196,22 @@ export default function SourceManagerPage() {
 
   const probe = async (id: string) => {
     setProbing(id);
+    setProbeNotice('');
     try {
       const status = await port.probeSource(id);
       setDiscovered((prev) => prev.map((s) => (s.id === id ? status : s)));
       patchSources(
         stored.map((e) => (e.id === id ? { ...e, health: status.health } : e)),
       );
+    } catch (error) {
+      setProbeNotice(sxs('sources.testFailed', error instanceof Error ? error.message : String(error)));
     } finally {
       setProbing(null);
     }
+  };
+
+  const linkVerifiedSite = (id: string, siteId: string) => {
+    patchSources(stored.map((entry) => (entry.id === id ? { ...entry, verifiedSiteId: siteId } : entry)));
   };
 
   const setMode = (mode: ScraperSourceMode) => {
@@ -345,6 +358,7 @@ export default function SourceManagerPage() {
             const health = live?.health ?? entry.health;
             const isOpen = expanded === entry.id;
             const rank = stored.findIndex((e) => e.id === entry.id);
+            const linkedSite = verifiedSiteForSource(verifiedSites, entry);
             return (
               <li
                 key={entry.id}
@@ -402,6 +416,14 @@ export default function SourceManagerPage() {
                     {entry.supportsSubtitles ? sx('sources.subsYes') : sx('sources.subsNo')}
                   </Pill>
                   {entry.requiresAuth && <Pill tone="warn">{sx('sources.auth')}</Pill>}
+                  {linkedSite && (
+                    <Pill
+                      tone={linkedSite.status === 'verified' ? 'good' : linkedSite.status === 'broken' ? 'bad' : 'outline'}
+                      title={sxs('sources.verifiedSiteReliability', String(linkedSite.reliabilityScore))}
+                    >
+                      {sxs('sources.verifiedSiteLinked', linkedSite.name)}
+                    </Pill>
+                  )}
 
                   <Button
                     size="sm"
@@ -446,6 +468,22 @@ export default function SourceManagerPage() {
                         {sx('sources.fallbackOrder')}: {entry.fallbackIds.join(' → ')}
                       </p>
                     )}
+                    {/* Which Verified Sites record this source is. Matched by
+                        host until the user picks one; the choice is kept on
+                        the source, so a later host change does not lose it. */}
+                    <label className="scr-result-inline-filter">
+                      <span>{sx('sources.verifiedSite')}</span>
+                      <select
+                        className="scr-input"
+                        value={linkedSite?.id ?? ''}
+                        onChange={(event) => linkVerifiedSite(entry.id, event.target.value)}
+                      >
+                        <option value="">{sx('sources.verifiedSiteNone')}</option>
+                        {verifiedSites.sites.map((site) => (
+                          <option key={site.id} value={site.id}>{site.name}</option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                 )}
               </li>
@@ -455,6 +493,7 @@ export default function SourceManagerPage() {
         </ol>
 
         {kind !== 'all' && <p className="scr-muted">{sx('sources.reorderAllOnly')}</p>}
+        {probeNotice && <p className="scr-action-notice is-bad" role="status">{probeNotice}</p>}
       </ScrCard>
     </div>
   );

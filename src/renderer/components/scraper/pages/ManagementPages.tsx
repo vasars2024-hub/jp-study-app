@@ -1266,7 +1266,7 @@ export function PluginsPage() {
   const installInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void port.listPlugins().then(setPlugins);
+    void port.listPlugins().then(setPlugins, () => undefined);
   }, [port]);
 
   const visible = useMemo(
