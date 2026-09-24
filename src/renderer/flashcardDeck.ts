@@ -347,7 +347,7 @@ function writeCache(store: FlashcardDeckStore, unverified = false): boolean {
   let text: string | null = null;
   try {
     text = JSON.stringify(store);
-    localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, text);
+    setCacheItem(FLASHCARD_DECK_STORAGE_KEY, text);
     overflowStore = null;
     overflowText = null;
     setOverflowMarker(unverified ? DECK_UNVERIFIED : null);
@@ -360,10 +360,19 @@ function writeCache(store: FlashcardDeckStore, unverified = false): boolean {
   }
 }
 
+/**
+ * The deck's cache keys are a synchronous cache in front of IndexedDB, not the
+ * durable home: a refused write is handled by the caller (overflow), so the
+ * guarded writer's toast would be wrong here (see the raw-write ratchet).
+ */
+function setCacheItem(key: string, value: string): void {
+  localStorage.setItem(key, value);
+}
+
 function setOverflowMarker(stamp: number | null): void {
   try {
     if (stamp === null) localStorage.removeItem(FLASHCARD_DECK_OVERFLOW_KEY);
-    else localStorage.setItem(FLASHCARD_DECK_OVERFLOW_KEY, String(stamp));
+    else setCacheItem(FLASHCARD_DECK_OVERFLOW_KEY, String(stamp));
   } catch {
     /* the cache is so full that even the marker does not fit */
   }
