@@ -138,8 +138,19 @@ async function withBusy<T>(fn: () => Promise<T>, whenBusy: T): Promise<T> {
   }
 }
 
-async function createManual(event: IpcMainInvokeEvent, args: { includeBookFiles?: boolean; renderer?: unknown }): Promise<CreateBackupReply> {
-  const renderer = isRendererSnapshot(args?.renderer) ? args.renderer : null;
+/**
+ * "Back up now": the save dialog first, the lock only once a path is chosen.
+ *
+ * The lock used to be taken before the dialog, so a dialog left open — the
+ * user reading the folder, or away from the desk — held it for as long as it
+ * stayed up. The once-per-launch automatic backup, which runs a few seconds
+ * after boot, then found the lock taken, reported `busy`, and was never tried
+ * again that session. A dialog writes nothing; only the archive needs the lock.
+ */
+async function createManualFromDialog(
+  event: IpcMainInvokeEvent,
+  args: { includeBookFiles?: boolean; renderer?: unknown },
+): Promise<CreateBackupReply> {
   const stamp = new Date().toISOString().slice(0, 10);
   const lastDir = readState().lastManual?.path ? path.dirname(readState().lastManual?.path ?? '') : app.getPath('documents');
   const pick = await dialog.showSaveDialog(parentWindow(event) as BrowserWindow, {
@@ -148,11 +159,24 @@ async function createManual(event: IpcMainInvokeEvent, args: { includeBookFiles?
     filters: [{ name: mt('backup.dialog.filter'), extensions: ['zip'] }],
   });
   if (pick.canceled || !pick.filePath) return { ok: false, cancelled: true };
+  const target = pick.filePath;
+  return withBusy<CreateBackupReply>(
+    () => createManual(event, args, target),
+    { ok: false, error: mt('backup.error.busy') },
+  );
+}
+
+async function createManual(
+  event: IpcMainInvokeEvent,
+  args: { includeBookFiles?: boolean; renderer?: unknown },
+  target: string,
+): Promise<CreateBackupReply> {
+  const renderer = isRendererSnapshot(args?.renderer) ? args.renderer : null;
   flushAllJsonWriters();
   try {
     const result = await createBackupArchive({
       userData: app.getPath('userData'),
-      target: pick.filePath,
+      target,
       includeBookFiles: args?.includeBookFiles !== false,
       trigger: 'manual',
       appVersion: app.getVersion(),
@@ -337,7 +361,7 @@ async function relaunch(): Promise<void> {
 export function registerBackupIpc(): void {
   ipcMain.handle('backup:status', () => getBackupStatus());
   ipcMain.handle('backup:create', (event, args: { includeBookFiles?: boolean; renderer?: unknown }) =>
-    withBusy<CreateBackupReply>(() => createManual(event, args ?? {}), { ok: false, error: mt('backup.error.busy') }),
+    createManualFromDialog(event, args ?? {}),
   );
   ipcMain.handle('backup:autoDue', () => autoBackupDue(backupsDir()));
   ipcMain.handle('backup:createAuto', (event, args: { renderer?: unknown }) =>

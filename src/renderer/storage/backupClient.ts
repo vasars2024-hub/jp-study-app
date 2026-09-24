@@ -32,16 +32,38 @@ export async function backUpNow(includeBookFiles: boolean): Promise<CreateBackup
   return a.backupCreate({ includeBookFiles, renderer });
 }
 
-/** Once a day, after the app is idle; the zip is written in main. */
-export async function runAutoBackupIfDue(): Promise<void> {
+/** How long to wait before retrying an automatic backup main refused as busy. */
+export const AUTO_BACKUP_BUSY_RETRY_MS = 2 * 60_000;
+const AUTO_BACKUP_BUSY_ATTEMPTS = 6;
+
+function isBusyReply(reply: unknown): boolean {
+  return Boolean(reply && typeof reply === 'object' && (reply as { skipped?: unknown }).skipped === 'busy');
+}
+
+/**
+ * Once a day, after the app is idle; the zip is written in main.
+ *
+ * `busy` means a manual backup or a restore holds main's lock right now, not
+ * that today's backup is done — so it is retried a few times, a couple of
+ * minutes apart, with a fresh snapshot each time. It used to be dropped, and
+ * the day went without an automatic backup.
+ */
+export async function runAutoBackupIfDue(
+  { retryMs = AUTO_BACKUP_BUSY_RETRY_MS, attempts = AUTO_BACKUP_BUSY_ATTEMPTS } = {},
+): Promise<void> {
   const a = api();
   if (!a?.backupAutoDue || !a.backupCreateAuto) return;
-  try {
-    if (!(await a.backupAutoDue())) return;
-    const renderer = await collectRendererSnapshot();
-    await a.backupCreateAuto({ renderer });
-  } catch (err) {
-    console.warn('[backup] automatic backup failed:', err);
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      if (!(await a.backupAutoDue())) return;
+      const renderer = await collectRendererSnapshot();
+      const reply = await a.backupCreateAuto({ renderer });
+      if (!isBusyReply(reply)) return;
+    } catch (err) {
+      console.warn('[backup] automatic backup failed:', err);
+      return;
+    }
+    if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, retryMs));
   }
 }
 
