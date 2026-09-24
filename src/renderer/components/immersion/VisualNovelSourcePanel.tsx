@@ -11,6 +11,7 @@ import {
   rankVisualNovelSourceResults,
   type VisualNovelLearnerContext,
 } from '../../../shared/visualNovelRecommendations';
+import VisualNovelArt from './VisualNovelArt';
 
 function preferredReleaseFacts(
   releases: VisualNovelRelease[],
@@ -124,7 +125,7 @@ export default function VisualNovelSourcePanel({
       <div className="visual-novel-source-results">
         {rankedResults.map(({ item: result, reasons, score }) => (
           <article key={result.providerId}>
-            {result.coverImageUrl && <img src={result.coverImageUrl} alt="" loading="lazy" />}
+            {result.coverImageUrl && <VisualNovelArt src={result.coverImageUrl} />}
             <div>
               <strong>{result.title}</strong>
               <span>{result.japaneseTitle}</span>

@@ -1,0 +1,169 @@
+/* The VN reader window (`?vnReader=1`). A frameless, always-on-top window, so the
+   header is the drag handle and every control inside it opts out of dragging. */
+html.vn-reader-window,
+html.vn-reader-window body,
+html.vn-reader-window #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg, #121117);
+}
+
+.vn-reader {
+  --vn-reader-font: 20px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  color: var(--text, #eee);
+  background: var(--bg, #121117);
+  font-size: 13px;
+}
+
+.vn-reader-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: var(--surface-1, rgba(255, 255, 255, 0.03));
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.vn-reader-head button,
+.vn-reader-head input,
+.vn-reader-head label {
+  -webkit-app-region: no-drag;
+}
+
+.vn-reader-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--text-muted, #888);
+  opacity: 0.6;
+}
+
+.vn-reader-dot.is-on {
+  background: var(--accent, #d84b57);
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #d84b57) 25%, transparent);
+}
+
+.vn-reader-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-muted, #aaa);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vn-reader-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.vn-reader-tools button {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vn-reader-tools button:hover { background: var(--surface-2, rgba(255, 255, 255, 0.07)); }
+.vn-reader-tools button small { font-size: 10px; }
+.vn-reader-close:hover { background: color-mix(in srgb, var(--accent, #d84b57) 70%, transparent) !important; }
+.vn-reader-opacity input { width: 70px; accent-color: var(--accent, #d84b57); }
+
+.vn-reader-empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--text-muted, #aaa);
+  line-height: 1.5;
+}
+
+.vn-reader-lines {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px 12px 12px;
+  overflow: auto;
+}
+
+.vn-reader-line {
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  opacity: 0.62;
+}
+
+.vn-reader-line.is-newest,
+.vn-reader-line:hover {
+  opacity: 1;
+  background: var(--surface-1, rgba(255, 255, 255, 0.04));
+}
+
+.vn-reader-speaker {
+  color: var(--accent-text, var(--accent, #d84b57));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vn-reader-line p {
+  margin: 0;
+  font-size: var(--vn-reader-font);
+  line-height: 1.5;
+}
+
+.vn-reader-line p.vn-reader-translation {
+  color: var(--text-muted, #aaa);
+  font-size: calc(var(--vn-reader-font) * 0.7);
+}
+
+.vn-reader-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  visibility: hidden;
+}
+
+.vn-reader-line.is-newest .vn-reader-actions,
+.vn-reader-line:hover .vn-reader-actions,
+.vn-reader-line:focus-within .vn-reader-actions {
+  visibility: visible;
+}
+
+.vn-reader-actions small { margin-right: auto; color: var(--text-muted, #aaa); }
+
+.vn-reader-actions button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.05));
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vn-reader-actions button.primary {
+  border-color: var(--accent, #d84b57);
+  background: color-mix(in srgb, var(--accent, #d84b57) 28%, transparent);
+}

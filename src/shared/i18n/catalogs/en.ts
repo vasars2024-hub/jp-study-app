@@ -14,6 +14,7 @@ import { GAME_ARENA_CHROME_EN } from '../gameArena/en';
 import { MOONCAP_PHASE_LORE_EN } from '../mooncapLore/en';
 import { MINING_UI_EN } from '../miningUi/en';
 import { MAL_SYNC_EN } from '../malSync/en';
+import { VISUAL_NOVEL_EN } from '../visualNovel/en';
 import { WATCH_LIBRARY_EN } from '../watchLibrary/en';
 import { GUM_LIBRARY_EN } from '../gumLibrary/en';
 import { SCRAPER_UI_EN } from '../scraperUi/en';
@@ -580,7 +581,6 @@ export const en: Catalog = {
   'vnPanel.captureScreenText': 'Capture screen text',
   'vnPanel.stopHook': 'Stop text hook',
   'vnPanel.startHook': 'Start text hook',
-  'vnPanel.clipboardCapture': 'Live clipboard capture',
   'vnPanel.hookListening': 'Hook listening · {count} new lines',
   'vnPanel.aria.miningScope': 'Mining scope',
   'vnPanel.scope.all': 'Entire visual novel',
@@ -619,7 +619,6 @@ export const en: Catalog = {
     other: '{count} speakers',
   },
   'vnPanel.commonSignals': 'Common signals: {signals}',
-  'vnPanel.msg.clipboardCaptured': 'Captured new Japanese text from the clipboard.',
   'vnPanel.msg.added': 'Visual novel added to the local library.',
   'vnPanel.msg.removed': 'Removed {title} from the local library.',
   'vnPanel.msg.removeFailed': '{title} is still in the local library.',
@@ -770,6 +769,7 @@ export const en: Catalog = {
   ...MOONCAP_PHASE_LORE_EN,
   ...MINING_UI_EN,
   ...MAL_SYNC_EN,
+  ...VISUAL_NOVEL_EN,
   ...WATCH_LIBRARY_EN,
   ...GUM_LIBRARY_EN,
   ...SCRAPER_UI_EN,

@@ -14,6 +14,7 @@ import { GAME_ARENA_CHROME_JA } from '../gameArena/ja';
 import { MOONCAP_PHASE_LORE_JA } from '../mooncapLore/ja';
 import { MINING_UI_JA } from '../miningUi/ja';
 import { MAL_SYNC_JA } from '../malSync/ja';
+import { VISUAL_NOVEL_JA } from '../visualNovel/ja';
 import { WATCH_LIBRARY_JA } from '../watchLibrary/ja';
 import { GUM_LIBRARY_JA } from '../gumLibrary/ja';
 import { SCRAPER_UI_JA } from '../scraperUi/ja';
@@ -531,7 +532,6 @@ export const ja: Catalog = {
   'vnPanel.captureScreenText': '画面のテキストを取り込む',
   'vnPanel.stopHook': 'テキストフックを停止',
   'vnPanel.startHook': 'テキストフックを開始',
-  'vnPanel.clipboardCapture': 'クリップボードを自動取り込み',
   'vnPanel.hookListening': 'フック待機中 · 新着 {count} 行',
   'vnPanel.aria.miningScope': 'マイニング範囲',
   'vnPanel.scope.all': '作品全体',
@@ -558,7 +558,6 @@ export const ja: Catalog = {
   'vnPanel.charactersHead': 'キャラクターの話し方',
   'vnPanel.speakers': '話者 {count} 人',
   'vnPanel.commonSignals': 'よく出る語尾: {signals}',
-  'vnPanel.msg.clipboardCaptured': 'クリップボードから新しい日本語を取り込みました。',
   'vnPanel.msg.added': 'ビジュアルノベルをローカルライブラリに追加しました。',
   'vnPanel.msg.removed': '{title} をローカルライブラリから削除しました。',
   'vnPanel.msg.removeFailed': '{title} はローカルライブラリに残っています。',
@@ -670,6 +669,7 @@ export const ja: Catalog = {
   ...MOONCAP_PHASE_LORE_JA,
   ...MINING_UI_JA,
   ...MAL_SYNC_JA,
+  ...VISUAL_NOVEL_JA,
   ...WATCH_LIBRARY_JA,
   ...GUM_LIBRARY_JA,
   ...SCRAPER_UI_JA,

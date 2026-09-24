@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import SystemDictOverlay from './components/SystemDictOverlay';
 import ReadingLensOverlay from './components/lens/ReadingLensOverlay';
+import { installVisualNovelStudyTimeSync } from './visualNovelStudyTime';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { withStrictMode } from './strictRoot';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
@@ -105,6 +106,10 @@ import { initAgentOperationalState } from './agentOperationalClient';
 import { installLocalAgentAutomationHost } from './localAgentAutomationHost';
 import { bootAeroSafeMode } from './aeroSafeMode';
 
+// Lazy: the reader pulls the tokenizer and the mining path, which no other
+// window should pay for at boot.
+const VisualNovelReaderOverlay = React.lazy(() => import('./components/immersion/VisualNovelReaderOverlay'));
+
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
 // itself is main's now, so nothing is pushed the other way at boot.
@@ -155,6 +160,15 @@ const isReadingLens =
   new URLSearchParams(window.location.search).get('readingLens') === '1';
 if (isReadingLens) {
   document.documentElement.classList.add('reading-lens-window');
+}
+
+// The Visual Novel reader beside a running game (main/immersion/visualNovelReaderWindow.ts).
+// Same rule as the two overlays above: no shell or environment boot.
+const isVnReader =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('vnReader') === '1';
+if (isVnReader) {
+  document.documentElement.classList.add('vn-reader-window');
 }
 
 function runWhenIdle(fn: () => void, timeout = 5000): void {
@@ -275,7 +289,7 @@ runWhenIdle(() => {
   installShellSounds();
 }, 3000);
 
-if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
+if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader) {
   bootCustomCss();
   // Reward confetti layer (Phase 4.5). Main window only — the companion host
   // is a click-through overlay and must never paint a full-screen canvas.
@@ -286,6 +300,8 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
   // deferred to idle either — the scheduler ticks every 30s and a fire that
   // arrives before the claim is recorded `missed` for the rest of the day.
   installLocalAgentAutomationHost();
+  // Finished VN sessions are timed in main; bank them in the shared study stats.
+  installVisualNovelStudyTimeSync();
   runWhenIdle(() => {
     bootEnvironment();
     // Per-environment ambient soundscapes are dormant until a sound pack exists.
@@ -329,6 +345,18 @@ if (container) {
         withStrictMode(
           <AppErrorBoundary>
             <SystemDictOverlay />
+          </AppErrorBoundary>,
+        ),
+      );
+    } else if (isVnReader) {
+      // Mining writes to the active profile's deck; nothing else boots.
+      initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+      createRoot(container).render(
+        withStrictMode(
+          <AppErrorBoundary>
+            <React.Suspense fallback={null}>
+              <VisualNovelReaderOverlay />
+            </React.Suspense>
           </AppErrorBoundary>,
         ),
       );

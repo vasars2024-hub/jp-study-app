@@ -1,0 +1,170 @@
+/* Visual Novels — tabs, live capture and discovery. The long-standing panel rules
+   stay in styles.css (their tests read them there); these are the parts added with
+   the tabbed workspace. Every rule reflows on the pane's own containers, never on
+   the viewport, for the reason `visualNovelPaneReflow.test.ts` records. */
+
+/* The tabbed workspace is one column: the primary column carries the summary and
+   the tab bar, and the setup column only appears for the tabs that live in it. */
+.visual-novel-workspace.is-tabbed { grid-template-columns: minmax(0, 1fr); }
+.visual-novel-column[hidden],
+.visual-novel-tabpanel[hidden] { display: none; }
+.visual-novel-tabpanel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 12px; min-width: 0; }
+
+.visual-novel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.visual-novel-tabs [role='tab'] {
+  position: relative;
+  min-height: var(--lq-hit-target, 32px);
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.visual-novel-tabs [role='tab']:hover { color: var(--text); }
+
+.visual-novel-tabs [role='tab'].is-active { color: var(--text); font-weight: 600; }
+
+.visual-novel-tabs [role='tab'].is-active::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent, #d84b57);
+}
+
+.visual-novel-difficulty { color: var(--text-muted); }
+
+/* Live capture strip */
+.vn-capture-bar {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.vn-capture-bar[data-state='on'] { border-color: color-mix(in srgb, var(--accent, #d84b57) 55%, var(--border)); }
+.vn-capture-bar-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vn-capture-bar-status small { color: var(--text-muted); font-size: 0.74rem; }
+
+.vn-capture-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.6;
+}
+
+.vn-capture-bar[data-state='on'] .vn-capture-dot,
+.vn-capture-bar[data-state='test'] .vn-capture-dot {
+  background: var(--accent, #d84b57);
+  opacity: 1;
+}
+
+.vn-capture-bar p { margin: 0; font-size: 0.8rem; }
+.vn-capture-test-ok { color: var(--text); }
+.vn-capture-last { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.95rem !important; }
+.vn-capture-last b { color: var(--accent-text, var(--accent, #d84b57)); font-weight: 600; }
+.vn-capture-bar-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.vn-capture-bar-actions button,
+.vn-capture-le button {
+  min-height: var(--lq-hit-target, 30px);
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-1);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vn-capture-bar-actions button.primary {
+  border-color: var(--accent, #d84b57);
+  background: color-mix(in srgb, var(--accent, #d84b57) 26%, var(--surface-1));
+}
+
+.vn-capture-bar-actions button:disabled { opacity: 0.5; cursor: default; }
+
+/* Capture setup tab */
+.vn-capture-setup {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.vn-capture-setup p { margin: 0; line-height: 1.5; }
+.vn-capture-steps { display: grid; gap: 6px; margin: 0; padding-left: 18px; line-height: 1.5; }
+.vn-capture-options { display: grid; gap: 8px; }
+.vn-capture-options label { display: flex; align-items: center; gap: 8px; }
+.vn-capture-options .vn-capture-url { display: grid; gap: 4px; color: var(--text-muted); font-size: 0.76rem; }
+
+.vn-capture-url input {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+}
+
+.vn-capture-le { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+.vn-capture-le > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.vn-capture-le code {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* VNDB discovery in the library rail */
+.visual-novel-discover { display: grid; gap: 6px; }
+
+.visual-novel-discover > button,
+.visual-novel-candidate button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.visual-novel-candidate {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+
+.visual-novel-candidate img { width: 38px; height: 54px; border-radius: 4px; object-fit: cover; }
+.visual-novel-candidate > div { display: grid; gap: 3px; min-width: 0; }
+.visual-novel-candidate small { overflow: hidden; color: var(--text-muted); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
+.visual-novel-candidate span { display: flex; gap: 5px; }
