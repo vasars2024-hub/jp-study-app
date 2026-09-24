@@ -262,10 +262,14 @@ async function replaceDatabase(name: string, snap: SnapshotDatabase): Promise<vo
 
 /**
  * Replace this origin's localStorage and IndexedDB with `snapshot`. Resolves
- * with a `rollback` that puts back what was there; throws `SnapshotApplyError`
- * (after rolling back itself) when any write fails.
+ * with a `rollback` that puts back what was there and `before`, the data it
+ * replaced; throws `SnapshotApplyError` (after rolling back itself) when any
+ * write fails. Callers flush pending IndexedDB mirrors first
+ * (`flushPendingMirrors`) so `before` holds the latest edits.
  */
-export async function applyRendererSnapshot(snapshot: RendererSnapshot): Promise<{ rollback: () => Promise<void> }> {
+export async function applyRendererSnapshot(
+  snapshot: RendererSnapshot,
+): Promise<{ rollback: () => Promise<void>; before: RendererSnapshot }> {
   if (!isRendererSnapshot(snapshot)) {
     throw new SnapshotApplyError([{ area: 'localStorage', target: 'snapshot', error: 'unexpected shape' }], []);
   }
@@ -306,6 +310,8 @@ export async function applyRendererSnapshot(snapshot: RendererSnapshot): Promise
       const problems = await restoreBefore();
       if (problems.length) throw new SnapshotApplyError(problems, problems);
     },
+    // What was replaced — main keeps it in the pre-restore folder.
+    before,
   };
 }
 

@@ -6,11 +6,16 @@
  *
  * Restore order is what makes it all-or-nothing across both processes:
  *   1. main stages + validates the archive (nothing touched yet);
- *   2. this module applies the renderer snapshot, keeping a rollback;
- *   3. main swaps the files in — and if any swap fails it undoes its own
- *      steps, and this module rolls the renderer data back too.
+ *   2. every other window stops writing renderer data, this one lands its
+ *      pending mirrors and then stops too;
+ *   3. this module applies the renderer snapshot, keeping a rollback and the
+ *      data it replaced;
+ *   4. main keeps that data and the replaced files in backups/pre-restore-<ts>
+ *      and swaps the files in — and if any swap fails it undoes its own steps,
+ *      and this module rolls the renderer data back and lets writes resume.
  */
 import { applyRendererSnapshot, collectRendererSnapshot, isLegacyBackup, isRendererSnapshot, legacyToSnapshot, SnapshotApplyError } from './backupSnapshot';
+import { flushPendingMirrors, setRendererWriteBlock } from './storage';
 import type { CreateBackupReply } from '../../main/backup/backupService';
 import type { BackupManifest } from '../../main/backup/backupArchive';
 
@@ -112,17 +117,33 @@ export async function relaunchAfterRestore(): Promise<void> {
   await api()?.backupRelaunch?.();
 }
 
+/** Stop every window writing renderer data; this one after landing its pending mirrors. */
+async function beginRendererRestore(a: Partial<Api>): Promise<void> {
+  await a.backupRestoreBegin?.();
+  await flushPendingMirrors();
+  setRendererWriteBlock('idb');
+}
+
+async function endRendererRestore(a: Partial<Api>): Promise<void> {
+  setRendererWriteBlock(null);
+  await a.backupRestoreEnd?.();
+}
+
 export async function applyRestore(plan: RestorePlan): Promise<ApplyRestoreResult> {
   const a = api();
   if (!a) return { ok: false, failures: [{ what: 'app', error: 'unavailable' }] };
 
   if (plan.kind === 'legacy') {
     if (!isLegacyBackup(plan.legacy)) return { ok: false, failures: [{ what: 'file', error: 'not a backup' }] };
+    await beginRendererRestore(a);
     try {
       await applyRendererSnapshot(legacyToSnapshot(plan.legacy));
     } catch (err) {
+      await endRendererRestore(a);
       return { ok: false, failures: applyFailures(err) };
     }
+    // Applied: nothing in this window may write over it before the relaunch.
+    setRendererWriteBlock('all');
     // The four host settings the old format carried go through their own
     // validated IPC. A failure there is reported, but the renderer data is in.
     const { restoreLegacyHost } = await import('./storage');
@@ -131,22 +152,34 @@ export async function applyRestore(plan: RestorePlan): Promise<ApplyRestoreResul
   }
 
   let rollback: (() => Promise<void>) | null = null;
-  if (plan.renderer != null) {
-    if (!isRendererSnapshot(plan.renderer)) {
-      await discardRestore();
-      return { ok: false, failures: [{ what: 'renderer.json', error: 'unexpected shape' }] };
-    }
-    try {
-      rollback = (await applyRendererSnapshot(plan.renderer)).rollback;
-    } catch (err) {
-      await discardRestore();
-      return { ok: false, failures: applyFailures(err) };
-    }
+  let previousRenderer: unknown = null;
+  if (plan.renderer != null && !isRendererSnapshot(plan.renderer)) {
+    await discardRestore();
+    return { ok: false, failures: [{ what: 'renderer.json', error: 'unexpected shape' }] };
   }
-  const commit = await a.backupRestoreCommit?.(plan.token);
+  await beginRendererRestore(a);
+  try {
+    if (plan.renderer != null) {
+      const applied = await applyRendererSnapshot(plan.renderer as Parameters<typeof applyRendererSnapshot>[0]);
+      rollback = applied.rollback;
+      previousRenderer = applied.before;
+    } else {
+      // Nothing to apply, but the current data is still replaced in spirit:
+      // keep it with the files the restore moves aside.
+      previousRenderer = await collectRendererSnapshot({ mirrorReading: false });
+    }
+  } catch (err) {
+    await endRendererRestore(a);
+    await discardRestore();
+    return { ok: false, failures: applyFailures(err) };
+  }
+  // Applied: nothing in this window may write over it before the relaunch.
+  setRendererWriteBlock('all');
+  const commit = await a.backupRestoreCommit?.(plan.token, { previousRenderer });
   if (commit?.ok) return { ok: true, warnings: [], needsRelaunch: false };
   const failures: RestoreFailure[] = (commit && !commit.ok ? [...commit.failures, ...commit.rollbackFailures] : [{ path: 'app', error: 'unavailable' }])
     .map((f) => ({ what: f.path, error: f.error }));
+  setRendererWriteBlock('idb');
   if (rollback) {
     try {
       await rollback();
@@ -154,5 +187,6 @@ export async function applyRestore(plan: RestorePlan): Promise<ApplyRestoreResul
       failures.push(...applyFailures(err));
     }
   }
+  await endRendererRestore(a);
   return { ok: false, failures };
 }

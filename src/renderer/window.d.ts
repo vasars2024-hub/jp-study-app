@@ -1874,7 +1874,14 @@ declare global {
       backupAutoDue(): Promise<boolean>;
       backupCreateAuto(args: { renderer: unknown }): Promise<unknown>;
       backupRestoreChoose(): Promise<import('../main/backup/backupService').RestoreChooseReply>;
-      backupRestoreCommit(token: string): Promise<import('../main/backup/backupService').RestoreCommitReply>;
+      backupRestoreCommit(
+        token: string,
+        args?: import('../main/backup/backupService').RestoreCommitArgs,
+      ): Promise<import('../main/backup/backupService').RestoreCommitReply>;
+      /** Other windows stop writing renderer data while a restore applies. */
+      backupRestoreBegin(): Promise<void>;
+      backupRestoreEnd(): Promise<void>;
+      onBackupRestoring(cb: (state: { active: boolean }) => void): () => void;
       backupRestoreDiscard(): Promise<void>;
       backupRelaunch(): Promise<void>;
       backupOpenFolder(): Promise<string>;

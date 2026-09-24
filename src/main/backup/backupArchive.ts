@@ -181,7 +181,8 @@ export interface BackupManifest {
   format: typeof BACKUP_FORMAT;
   createdAt: string;
   appVersion: string;
-  trigger: 'manual' | 'auto';
+  /** `pre-restore`: the state a restore replaced, kept in backups/pre-restore-<ts>. */
+  trigger: 'manual' | 'auto' | 'pre-restore';
   /** Renderer origin the snapshot came from — information only; restore ignores it. */
   origin: string | null;
   includesBookFiles: boolean;
@@ -684,30 +685,53 @@ export type CommitResult =
 /**
  * Swap every staged file into userData, or none. Current files (and their
  * `.bak`, which would otherwise resurrect pre-restore data) are moved into
- * `previousDir`; on any failure every move is undone in reverse.
+ * `previousDir/userdata/`, the same layout as an archive, so the folder can be
+ * restored itself. `extras` are current files the archive does not contain
+ * (see `currentFilesMissingFromArchive`): they are moved aside too, so the
+ * result is the backup's state rather than a mix. On any failure every move is
+ * undone in reverse.
  */
-export function commitStaged(staged: StagedRestore, userData: string, previousDir: string, io: CommitFs = realFs): CommitResult {
+export function commitStaged(
+  staged: StagedRestore,
+  userData: string,
+  previousDir: string,
+  io: CommitFs = realFs,
+  extras: string[] = [],
+): CommitResult {
   const moved: Array<{ from: string; to: string }> = [];
   const placed: Array<{ from: string; to: string }> = [];
   const failures: Array<{ path: string; error: string }> = [];
+  const moveAside = (target: string): void => {
+    for (const current of [target, `${target}.bak`]) {
+      if (!io.exists(current)) continue;
+      const aside = path.join(previousDir, 'userdata', path.relative(userData, current));
+      io.mkdirp(path.dirname(aside));
+      io.rename(current, aside);
+      moved.push({ from: current, to: aside });
+    }
+  };
   for (const rel of staged.files) {
     const segments = rel.split('/');
     const target = path.join(userData, ...segments);
     const source = path.join(staged.stagingDir, 'userdata', ...segments);
     try {
       io.mkdirp(path.dirname(target));
-      for (const current of [target, `${target}.bak`]) {
-        if (!io.exists(current)) continue;
-        const aside = path.join(previousDir, path.relative(userData, current));
-        io.mkdirp(path.dirname(aside));
-        io.rename(current, aside);
-        moved.push({ from: current, to: aside });
-      }
+      moveAside(target);
       io.rename(source, target);
       placed.push({ from: source, to: target });
     } catch (err) {
       failures.push({ path: rel, error: err instanceof Error ? err.message : String(err) });
       break;
+    }
+  }
+  if (!failures.length) {
+    for (const rel of extras) {
+      try {
+        moveAside(path.join(userData, ...rel.split('/')));
+      } catch (err) {
+        failures.push({ path: rel, error: err instanceof Error ? err.message : String(err) });
+        break;
+      }
     }
   }
   if (!failures.length) return { ok: true, previousDir, restored: placed.length };
@@ -728,6 +752,158 @@ export function commitStaged(staged: StagedRestore, userData: string, previousDi
     }
   }
   return { ok: false, failures, rollbackFailures };
+}
+
+/**
+ * Current files a restore of `staged` would otherwise leave behind: every
+ * store and library file in userData's inventory that the archive does not
+ * contain. Secrets, caches and Chromium data are not in the inventory; files
+ * the archive's manifest lists as excluded, and book files when the archive
+ * was made without them, stay where they are.
+ */
+export function currentFilesMissingFromArchive(staged: StagedRestore, userData: string): string[] {
+  const inv = inventoryUserData(userData);
+  const inArchive = new Set(staged.files.map((rel) => rel.toLowerCase()));
+  const excluded = new Set(
+    (Array.isArray(staged.manifest.excluded) ? staged.manifest.excluded : [])
+      .map((entry) => String(entry).replace(/ \(.*\)$/, '').toLowerCase()),
+  );
+  const withBooks = staged.manifest.includesBookFiles === true;
+  const out: string[] = [];
+  for (const source of [...inv.stores, ...inv.library]) {
+    if (source.bookFile && !withBooks) continue;
+    const lower = source.rel.toLowerCase();
+    if (inArchive.has(lower) || excluded.has(lower) || !isRestorableRelPath(source.rel)) continue;
+    out.push(source.rel);
+  }
+  return out;
+}
+
+function walkFiles(root: string, rel = '', out: string[] = []): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(rel ? path.join(root, ...rel.split('/')) : root, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    const child = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) walkFiles(root, child, out);
+    else if (e.isFile()) out.push(child);
+  }
+  return out;
+}
+
+const baseName = (rel: string): string => rel.slice(rel.lastIndexOf('/') + 1);
+
+/**
+ * Make a pre-restore folder restorable: write a manifest describing the files
+ * that were moved into `previousDir/userdata/` (the `.bak` copies riding along
+ * are not counted; a restore skips them).
+ */
+export function writePreRestoreManifest(
+  previousDir: string,
+  info: { appVersion: string; includesBookFiles: boolean; renderer: unknown | null },
+): BackupManifest {
+  const files = walkFiles(path.join(previousDir, 'userdata')).filter((rel) => !isTransientName(baseName(rel)));
+  const stores: BackupManifest['stores'] = [];
+  let libraryFiles = 0;
+  let libraryBytes = 0;
+  for (const rel of files) {
+    let bytes = 0;
+    try {
+      bytes = fs.statSync(path.join(previousDir, 'userdata', ...rel.split('/'))).size;
+    } catch {
+      /* counted anyway */
+    }
+    if (rel.split('/')[0].toLowerCase() === 'library') {
+      libraryFiles += 1;
+      libraryBytes += bytes;
+    } else {
+      stores.push({ path: rel, bytes });
+    }
+  }
+  const manifest: BackupManifest = {
+    app: BACKUP_APP,
+    kind: BACKUP_KIND,
+    format: BACKUP_FORMAT,
+    createdAt: new Date().toISOString(),
+    appVersion: info.appVersion,
+    trigger: 'pre-restore',
+    origin: null,
+    includesBookFiles: info.includesBookFiles,
+    stores,
+    library: { files: libraryFiles, bytes: libraryBytes, bookFilesIncluded: info.includesBookFiles, bookFilesOmitted: 0 },
+    renderer: rendererSummary(info.renderer),
+    excluded: [],
+    entries: files.length,
+  };
+  fs.writeFileSync(path.join(previousDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  return manifest;
+}
+
+/**
+ * `stageArchive` for an unpacked backup folder — what a restore leaves in
+ * `backups/pre-restore-<ts>` (manifest.json, renderer.json, userdata/...).
+ * Files are copied, so the folder stays intact until the swap succeeds.
+ */
+export async function stageDirectory(dir: string, stagingDir: string): Promise<StageResult> {
+  let manifest: BackupManifest;
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+    if (!isBackupManifest(parsed)) return { ok: false, errors: ['manifest.json is not a Gum backup manifest'] };
+    if (parsed.format > BACKUP_FORMAT) {
+      return { ok: false, errors: [`Backup format ${parsed.format} is newer than this app understands (${BACKUP_FORMAT})`] };
+    }
+    manifest = parsed;
+  } catch (err) {
+    return { ok: false, errors: [`manifest.json: ${err instanceof Error ? err.message : String(err)}`] };
+  }
+  const errors: string[] = [];
+  let renderer: unknown | null = null;
+  if (fs.existsSync(path.join(dir, 'renderer.json'))) {
+    try {
+      renderer = JSON.parse(fs.readFileSync(path.join(dir, 'renderer.json'), 'utf8'));
+      const r = renderer as { localStorage?: unknown; indexedDb?: unknown } | null;
+      if (!r || typeof r !== 'object' || typeof r.localStorage !== 'object' || typeof r.indexedDb !== 'object') {
+        errors.push('renderer.json: unexpected shape');
+      }
+    } catch (err) {
+      errors.push(`renderer.json: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  const sourceRoot = path.join(dir, 'userdata');
+  const rels = walkFiles(sourceRoot).filter((rel) => !isTransientName(baseName(rel)));
+  const expected = expectedDataEntries(manifest);
+  if (expected !== null && rels.length !== expected) {
+    return {
+      ok: false,
+      errors: [`The folder holds ${rels.length} files but its manifest lists ${expected}; it is incomplete or damaged, so nothing was restored`],
+    };
+  }
+  fs.rmSync(stagingDir, { recursive: true, force: true });
+  fs.mkdirSync(stagingDir, { recursive: true });
+  const files: string[] = [];
+  for (const rel of rels) {
+    if (!isRestorableRelPath(rel)) {
+      errors.push(`${rel}: not a location a restore may write`);
+      continue;
+    }
+    const target = path.join(stagingDir, 'userdata', ...rel.split('/'));
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(path.join(sourceRoot, ...rel.split('/')), target);
+      if (path.extname(rel).toLowerCase() === '.json') JSON.parse(fs.readFileSync(target, 'utf8'));
+      files.push(rel);
+    } catch (err) {
+      errors.push(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  if (errors.length) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    return { ok: false, errors };
+  }
+  return { ok: true, staged: { stagingDir, files, manifest, renderer } };
 }
 
 // ── housekeeping ─────────────────────────────────────────────────────────────

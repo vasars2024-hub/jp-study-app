@@ -2944,8 +2944,19 @@ const api = {
   backupCreateAuto: (args: { renderer: unknown }): Promise<unknown> => ipcRenderer.invoke('backup:createAuto', args),
   backupRestoreChoose: (): Promise<import('./main/backup/backupService').RestoreChooseReply> =>
     ipcRenderer.invoke('backup:restoreChoose'),
-  backupRestoreCommit: (token: string): Promise<import('./main/backup/backupService').RestoreCommitReply> =>
-    ipcRenderer.invoke('backup:restoreCommit', token),
+  backupRestoreCommit: (
+    token: string,
+    args?: import('./main/backup/backupService').RestoreCommitArgs,
+  ): Promise<import('./main/backup/backupService').RestoreCommitReply> =>
+    ipcRenderer.invoke('backup:restoreCommit', token, args),
+  /** Tell every other window to stop writing renderer data (a restore is applying). */
+  backupRestoreBegin: (): Promise<void> => ipcRenderer.invoke('backup:restoreBegin'),
+  backupRestoreEnd: (): Promise<void> => ipcRenderer.invoke('backup:restoreEnd'),
+  onBackupRestoring: (cb: (state: { active: boolean }) => void): (() => void) => {
+    const handler = (_e: unknown, state: { active: boolean }): void => cb(state);
+    ipcRenderer.on('backup:restoring', handler);
+    return () => ipcRenderer.removeListener('backup:restoring', handler);
+  },
   backupRestoreDiscard: (): Promise<void> => ipcRenderer.invoke('backup:restoreDiscard'),
   backupRelaunch: (): Promise<void> => ipcRenderer.invoke('backup:relaunch'),
   backupOpenFolder: (): Promise<string> => ipcRenderer.invoke('backup:openFolder'),

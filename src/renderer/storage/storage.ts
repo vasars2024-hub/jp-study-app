@@ -15,7 +15,7 @@
  * format, which covers the renderer tiers and four host settings only.
  */
 
-import { kvDelete, kvEntries, kvGet, kvSet } from './db';
+import { kvDelete, kvEntries, kvGet, kvSet, setIdbWritesBlocked } from './db';
 import {
   collectLocalStorageSnapshot,
   domainById,
@@ -98,9 +98,96 @@ function flushMirrors(): void {
 
 /** Fire-and-forget mirror of a heavy value into IndexedDB, off the click path. */
 export function mirrorToIdb(key: string, value: unknown): void {
+  if (writeBlock) return;
   pendingMirrors.set(key, value);
   if (mirrorTimer != null) return;
   mirrorTimer = window.setTimeout(() => scheduleIdle(flushMirrors), 120);
+}
+
+/**
+ * Land every pending mirror now. A restore calls this before it snapshots the
+ * current data, so the copy it keeps aside is not missing the last edits.
+ */
+export async function flushPendingMirrors(): Promise<void> {
+  if (mirrorTimer != null) {
+    window.clearTimeout(mirrorTimer);
+    mirrorTimer = null;
+  }
+  const batch = Array.from(pendingMirrors.entries());
+  pendingMirrors.clear();
+  await Promise.all(batch.map(([key, value]) => kvSet(key, value).catch((err) => {
+    console.error(`[storage] IndexedDB mirror failed for ${key}:`, err);
+  })));
+}
+
+// ── restore write block ──────────────────────────────────────────────────────
+
+/**
+ * While a backup restore replaces this origin's renderer data, and until the
+ * app relaunches, nothing in any window may write it: a pending mirror or an
+ * in-memory store saving itself would land on top of the restored values.
+ *
+ * - `'idb'`: IndexedDB kv writes and mirrors are dropped (pending ones too).
+ *   The restoring window uses this while it applies the snapshot itself.
+ * - `'all'`: localStorage writes are dropped as well.
+ *
+ * The window that applies the restore sets this itself; every other window
+ * gets it from main (`backup:restoring`).
+ */
+let writeBlock: 'idb' | 'all' | null = null;
+let storageWrites: Pick<Storage, 'setItem' | 'removeItem' | 'clear'> | null = null;
+
+export function rendererWritesBlocked(): 'idb' | 'all' | null {
+  return writeBlock;
+}
+
+export function setRendererWriteBlock(scope: 'idb' | 'all' | null): void {
+  writeBlock = scope;
+  setIdbWritesBlocked(scope !== null);
+  if (scope !== null) {
+    pendingMirrors.clear();
+    if (mirrorTimer != null) {
+      window.clearTimeout(mirrorTimer);
+      mirrorTimer = null;
+    }
+  }
+  if (typeof Storage === 'undefined' || typeof localStorage === 'undefined') return;
+  const proto = Storage.prototype;
+  if (scope === 'all' && !storageWrites) {
+    const original = { setItem: proto.setItem, removeItem: proto.removeItem, clear: proto.clear };
+    storageWrites = original;
+    const blocked = (target: Storage): boolean => {
+      try {
+        return target === window.localStorage;
+      } catch {
+        return false;
+      }
+    };
+    proto.setItem = function setItem(this: Storage, key: string, value: string): void {
+      if (!blocked(this)) original.setItem.call(this, key, value);
+    };
+    proto.removeItem = function removeItem(this: Storage, key: string): void {
+      if (!blocked(this)) original.removeItem.call(this, key);
+    };
+    proto.clear = function clear(this: Storage): void {
+      if (!blocked(this)) original.clear.call(this);
+    };
+  } else if (scope !== 'all' && storageWrites) {
+    proto.setItem = storageWrites.setItem;
+    proto.removeItem = storageWrites.removeItem;
+    proto.clear = storageWrites.clear;
+    storageWrites = null;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  try {
+    (window as { api?: Partial<Window['api']> }).api?.onBackupRestoring?.((state) => {
+      setRendererWriteBlock(state?.active ? 'all' : null);
+    });
+  } catch {
+    /* no bridge (tests, plain browser) */
+  }
 }
 
 export interface StoredItemInfo {

@@ -9,8 +9,13 @@
  *   backup:create        renderer snapshot in → save dialog → archive
  *   backup:createAuto    once a day, no dialog, into userData/backups (last 7 kept)
  *   backup:restoreChoose open dialog → stage + validate → staged token (+ the
- *                        renderer snapshot for the renderer to apply)
- *   backup:restoreCommit swap the staged files in, or roll everything back
+ *                        renderer snapshot for the renderer to apply). A
+ *                        `manifest.json` inside a pre-restore folder restores
+ *                        that folder.
+ *   backup:restoreBegin  tell every other window to stop writing renderer data
+ *   backup:restoreCommit keep the renderer's current data and every replaced
+ *                        file in backups/pre-restore-<ts> (itself restorable),
+ *                        swap the staged files in, or roll everything back
  *   backup:relaunch      flush DOM storage and restart on the restored data
  *
  * Automatic backups leave book files out: seven copies of a multi-GB library
@@ -26,14 +31,17 @@ import {
   BackupTooLargeError,
   commitStaged,
   createBackupArchive,
+  currentFilesMissingFromArchive,
   inventoryUserData,
   listAutoBackups,
   pruneAutoBackups,
   stageArchive,
+  stageDirectory,
+  writePreRestoreManifest,
   type BackupManifest,
   type StagedRestore,
 } from './backupArchive';
-import { flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites, writeJsonAtomicSync } from '../atomicJson';
+import { drainAtomicWrites, flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites, writeJsonAtomicSync } from '../atomicJson';
 import { logDiagnostic } from '../errorLog';
 import { mt } from '../i18n';
 
@@ -268,6 +276,27 @@ async function restoreChoose(event: IpcMainInvokeEvent): Promise<RestoreChooseRe
   if (pick.canceled || !file) return { ok: false, cancelled: true };
   discardPending();
 
+  const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const stagingDir = path.join(backupsDir(), `.staging-${token}`);
+
+  if (path.basename(file).toLowerCase() === 'manifest.json') {
+    // An unpacked backup — the pre-restore folder a restore leaves behind.
+    const staged = await stageDirectory(path.dirname(file), stagingDir);
+    if (!staged.ok) {
+      logDiagnostic('warn', 'backup', 'restore-rejected', staged.errors.slice(0, 20).join(' | '));
+      return { ok: false, errors: staged.errors };
+    }
+    pending = { token, staged: staged.staged };
+    return {
+      ok: true,
+      kind: 'archive',
+      token,
+      manifest: staged.staged.manifest,
+      files: staged.staged.files.length,
+      renderer: staged.staged.renderer,
+    };
+  }
+
   if (file.toLowerCase().endsWith('.json')) {
     // The old export ("format 1/2"): localStorage + IndexedDB + four host
     // settings, one JSON file. The renderer converts and applies it.
@@ -284,8 +313,6 @@ async function restoreChoose(event: IpcMainInvokeEvent): Promise<RestoreChooseRe
     }
   }
 
-  const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  const stagingDir = path.join(backupsDir(), `.staging-${token}`);
   const staged = await stageArchive(file, stagingDir);
   if (!staged.ok) {
     logDiagnostic('warn', 'backup', 'restore-rejected', staged.errors.slice(0, 20).join(' | '));
@@ -308,8 +335,9 @@ export type RestoreCommitReply =
 
 function pruneOldPreRestore(keep: string): void {
   try {
-    for (const name of fs.readdirSync(backupsDir())) {
-      const p = path.join(backupsDir(), name);
+    const dir = path.dirname(keep);
+    for (const name of fs.readdirSync(dir)) {
+      const p = path.join(dir, name);
       if (name.startsWith('pre-restore-') && p !== keep) fs.rmSync(p, { recursive: true, force: true });
     }
   } catch {
@@ -317,7 +345,33 @@ function pruneOldPreRestore(keep: string): void {
   }
 }
 
-function restoreCommit(token: unknown): RestoreCommitReply {
+export interface RestoreCommitArgs {
+  /** The renderer's localStorage/IndexedDB as they were before the restore replaced them. */
+  previousRenderer?: unknown;
+}
+
+export interface RestoreCommitDeps {
+  userData: string;
+  backupsDir: string;
+  appVersion: string;
+}
+
+/**
+ * The swap itself, electron-free for tests. Order matters:
+ * 1. coalesced saves land, then writes freeze and in-flight async writes drain
+ *    — none may land after the swap;
+ * 2. the renderer's current data goes to previousDir/renderer.json — the
+ *    dialog promises the current data is kept, and until now it lived only in
+ *    the renderer's memory;
+ * 3. the files are swapped (current ones, and current stores the archive does
+ *    not contain, move to previousDir/userdata);
+ * 4. previousDir gets a manifest, so choosing it in Restore… puts it all back.
+ */
+export async function commitPendingRestore(
+  token: unknown,
+  args: RestoreCommitArgs,
+  deps: RestoreCommitDeps,
+): Promise<RestoreCommitReply> {
   if (!pending || pending.token !== token) {
     return { ok: false, failures: [{ path: '', error: mt('backup.error.noStagedRestore') }], rollbackFailures: [] };
   }
@@ -326,24 +380,83 @@ function restoreCommit(token: unknown): RestoreCommitReply {
   // otherwise a module's in-memory copy would overwrite a restored file.
   flushAllJsonWriters();
   freezeAtomicWrites();
-  const previousDir = path.join(backupsDir(), `pre-restore-${new Date().toISOString().replace(/[:.]/g, '-')}`);
-  const result = commitStaged(staged, app.getPath('userData'), previousDir);
+  if (!(await drainAtomicWrites())) {
+    thawAtomicWrites({ replay: true });
+    discardPending();
+    return { ok: false, failures: [{ path: '', error: mt('backup.error.writesBusy') }], rollbackFailures: [] };
+  }
+  const previousDir = path.join(deps.backupsDir, `pre-restore-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+  const previousRenderer = isRendererSnapshot(args.previousRenderer) ? args.previousRenderer : null;
+  try {
+    fs.mkdirSync(previousDir, { recursive: true });
+    if (previousRenderer) fs.writeFileSync(path.join(previousDir, 'renderer.json'), JSON.stringify(previousRenderer));
+  } catch (err) {
+    thawAtomicWrites({ replay: true });
+    discardPending();
+    fs.rmSync(previousDir, { recursive: true, force: true });
+    const error = mt('backup.error.previousNotSaved', { error: err instanceof Error ? err.message : String(err) });
+    return { ok: false, failures: [{ path: previousDir, error }], rollbackFailures: [] };
+  }
+  const extras = currentFilesMissingFromArchive(staged, deps.userData);
+  const result = commitStaged(staged, deps.userData, previousDir, undefined, extras);
   discardPending();
   if (!result.ok) {
     thawAtomicWrites({ replay: true });
+    // Everything was moved back: the folder holds only the renderer copy.
+    if (!result.rollbackFailures.length) fs.rmSync(previousDir, { recursive: true, force: true });
     logDiagnostic('error', 'backup', 'restore-rolled-back', JSON.stringify(result).slice(0, 2000));
     return result;
+  }
+  try {
+    writePreRestoreManifest(previousDir, {
+      appVersion: deps.appVersion,
+      includesBookFiles: staged.manifest.includesBookFiles === true,
+      renderer: previousRenderer,
+    });
+  } catch (err) {
+    logDiagnostic('warn', 'backup', 'pre-restore-manifest-failed', err instanceof Error ? err.message : String(err));
   }
   // Held writes are stale in-memory copies: drop them, and stay frozen until
   // the relaunch so a timer firing before exit can't overwrite a restored file.
   thawAtomicWrites({ replay: false });
   freezeAtomicWrites();
   pruneOldPreRestore(previousDir);
-  logDiagnostic('info', 'backup', 'restore-committed', `${result.restored} file(s); previous state in ${previousDir}`);
+  logDiagnostic('info', 'backup', 'restore-committed', `${result.restored} file(s), ${extras.length} left-over file(s) moved aside; previous state in ${previousDir}`);
+  return result;
+}
+
+/** Test seam: stage a restore without the dialog. */
+export function setPendingRestoreForTests(token: string, staged: StagedRestore | null): void {
+  pending = staged ? { token, staged } : null;
+}
+
+async function restoreCommit(token: unknown, args: RestoreCommitArgs): Promise<RestoreCommitReply> {
+  const result = await commitPendingRestore(token, args ?? {}, {
+    userData: app.getPath('userData'),
+    backupsDir: backupsDir(),
+    appVersion: app.getVersion(),
+  });
+  if (!result.ok) return result;
   // Every module re-reads from disk on the next start. Guaranteed here rather
   // than left to the renderer, since writes stay frozen until it happens.
   setTimeout(() => void relaunch(), 1200);
   return result;
+}
+
+/**
+ * A restore is replacing the renderer data: every OTHER window must stop
+ * mirroring and writing localStorage/IndexedDB, or its in-memory copies land
+ * on top of the restored values (the applying window blocks itself).
+ */
+function broadcastRestoring(event: IpcMainInvokeEvent, active: boolean): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed() || win.webContents === event.sender) continue;
+    try {
+      win.webContents.send('backup:restoring', { active });
+    } catch {
+      /* a closing window writes nothing */
+    }
+  }
 }
 
 async function relaunch(): Promise<void> {
@@ -368,7 +481,9 @@ export function registerBackupIpc(): void {
     withBusy(() => createAuto(event, args ?? {}), { ok: false as const, skipped: 'busy' }),
   );
   ipcMain.handle('backup:restoreChoose', (event) => restoreChoose(event));
-  ipcMain.handle('backup:restoreCommit', (_e, token: unknown) => restoreCommit(token));
+  ipcMain.handle('backup:restoreBegin', (event) => broadcastRestoring(event, true));
+  ipcMain.handle('backup:restoreEnd', (event) => broadcastRestoring(event, false));
+  ipcMain.handle('backup:restoreCommit', (_e, token: unknown, args?: RestoreCommitArgs) => restoreCommit(token, args ?? {}));
   ipcMain.handle('backup:restoreDiscard', () => {
     discardPending();
   });

@@ -145,7 +145,7 @@ describe('round trip', () => {
     if (!staged.ok) throw new Error(staged.errors.join());
     const previous = path.join(root, 'previous');
     expect(commitStaged(staged.staged, dest, previous).ok).toBe(true);
-    expect(get(previous, 'library.json')).toBe('[{"id":"newer-local"}]');
+    expect(get(previous, 'userdata/library.json')).toBe('[{"id":"newer-local"}]');
     expect(fs.existsSync(path.join(dest, 'library.json.bak'))).toBe(false);
   });
 });

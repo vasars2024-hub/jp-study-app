@@ -384,11 +384,27 @@ async function rebuildAfterCorruption(cause: unknown): Promise<IDBDatabase> {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+/**
+ * Set while a backup restore is replacing this origin's data (and until the
+ * app relaunches): every kv write is dropped, so an in-memory copy in some
+ * window cannot land on top of the restored values. Reads still work.
+ */
+let writesBlocked = false;
+
+export function setIdbWritesBlocked(blocked: boolean): void {
+  writesBlocked = blocked;
+}
+
+export function idbWritesBlocked(): boolean {
+  return writesBlocked;
+}
+
 export async function kvGet<T>(key: string): Promise<T | undefined> {
   return (await withStore('readonly', (s) => s.get(key))) as T | undefined;
 }
 
 export async function kvSet(key: string, value: unknown): Promise<void> {
+  if (writesBlocked) return;
   await withStore('readwrite', (s) => s.put(value, key));
 }
 
@@ -405,6 +421,7 @@ export async function kvCompareAndSet(
   next: unknown,
   same: (current: unknown, expected: unknown) => boolean,
 ): Promise<boolean> {
+  if (writesBlocked) return false;
   return withTransaction('readwrite', (store) => new Promise<boolean>((resolve, reject) => {
     const read = store.get(key);
     read.onerror = () => reject(read.error ?? new Error('IndexedDB request failed'));
@@ -425,10 +442,12 @@ export async function kvCompareAndSet(
 }
 
 export async function kvDelete(key: string): Promise<void> {
+  if (writesBlocked) return;
   await withStore('readwrite', (s) => s.delete(key));
 }
 
 export async function kvClear(): Promise<void> {
+  if (writesBlocked) return;
   await withStore('readwrite', (s) => s.clear());
 }
 
@@ -454,6 +473,7 @@ export async function kvEntries(): Promise<Array<[string, unknown]>> {
  * wrote key by key, ignoring failures.
  */
 export async function kvReplaceAll(entries: Array<[string, unknown]>): Promise<void> {
+  if (writesBlocked) return;
   await withTransaction('readwrite', async (store) => {
     store.clear();
     const writes = entries.map(([key, value]) => requestToPromise(store.put(value, key)));
