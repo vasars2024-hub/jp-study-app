@@ -173,6 +173,9 @@ function dropConnection(db: IDBDatabase | null): void {
 const OPEN_BACKOFF_MS = [0, 150, 600];
 
 async function openWithRetry(): Promise<IDBDatabase> {
+  // No IndexedDB at all (a non-browser context) is not transient: retrying it
+  // only delays every caller's localStorage fallback by the full back-off.
+  if (typeof indexedDB === 'undefined') throw new Error('IndexedDB is not available');
   let lastErr: unknown;
   let corruptStreak = 0;
   for (let attempt = 0; attempt < OPEN_BACKOFF_MS.length; attempt++) {

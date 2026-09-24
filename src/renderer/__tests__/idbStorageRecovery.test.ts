@@ -97,6 +97,19 @@ describe('stale connections are retried, never wiped', () => {
     expect(fake.deleteCalls).toEqual([]);
     fake.clearFaults();
   });
+
+  it('with no IndexedDB at all, fails at once instead of waiting out the back-off', async () => {
+    const g = globalThis as { indexedDB?: unknown };
+    const saved = g.indexedDB;
+    delete g.indexedDB;
+    try {
+      const started = Date.now();
+      await expect(kvGet('csv-editor')).rejects.toThrow(/not available/);
+      expect(Date.now() - started).toBeLessThan(100);
+    } finally {
+      g.indexedDB = saved;
+    }
+  });
 });
 
 describe('real corruption', () => {
