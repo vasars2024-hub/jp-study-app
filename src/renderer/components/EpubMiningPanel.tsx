@@ -25,6 +25,9 @@ import {
   migrateEpubCardTemplates,
 } from '../../shared/epubDeck';
 import { AI_PROVIDERS, providerKeyBucket } from '../../shared/aiProviders';
+import { AiSetupPrompt } from './ai/AiSetupPrompt';
+import { AiModelInstallControl } from './ai/AiModelInstall';
+import { notifyAiSetupChanged, useAiReadiness } from '../aiSetupClient';
 import { useT } from '../i18n';
 import CollapsibleSection from './CollapsibleSection';
 import EpubCardLayoutEditor from './EpubCardLayoutEditor';
@@ -96,8 +99,6 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
   const [enrichProgress, setEnrichProgress] = useState<MiningEnrichProgress | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [aiConfig, setAiConfig] = useState<AiEngineConfig | null>(null);
-  const [apiKeyDraft, setApiKeyDraft] = useState('');
-  const [savingApiKey, setSavingApiKey] = useState(false);
   const [qwenReady, setQwenReady] = useState<boolean | null>(null);
   // Bumped on Cancel so a late analyze result can never overwrite panel state.
   const analyzeGenRef = useRef(0);
@@ -192,16 +193,21 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
   }, [filteredCandidates, analysis, config]);
 
   const translationEngine = exp.translationEngine ?? 'qwen';
+  // The app-wide provider (Settings > AI) wins: this panel used to keep its own
+  // copy, so EPUB translation could run on a different provider — with a
+  // different key — from everything else.
   const translationApiProvider =
-    exp.translationApiProvider ?? aiConfig?.providerId ?? 'gemini-2.5-flash';
+    aiConfig?.providerId ?? exp.translationApiProvider ?? 'gemini-2.5-flash';
   const selectedApiProvider =
     AI_PROVIDERS.find((p) => p.id === translationApiProvider) ?? AI_PROVIDERS[0];
   const apiKeySaved = Boolean(aiConfig?.apiKeysSet?.[providerKeyBucket(translationApiProvider)]);
 
+  const aiReadiness = useAiReadiness();
+  const readinessKey = `${aiReadiness.providerId}|${aiReadiness.cloudReady}|${aiReadiness.localReady}`;
   useEffect(() => {
     void window.api.aiGetConfig().then(setAiConfig).catch(() => setAiConfig(null));
     void window.api.translateStatus().then((s) => setQwenReady(s.modelFound)).catch(() => setQwenReady(false));
-  }, []);
+  }, [readinessKey]);
 
   useEffect(() => {
     const unsub = window.api.onMiningEnrichProgress((payload) => {
@@ -1114,25 +1120,27 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
                 </button>
               </div>
               {translationEngine === 'qwen' ? (
-                <p className={`muted mining-engine-status${qwenReady ? ' ok' : ' warn'}`}>
-                  {qwenReady === null
-                    ? t('epub.mining.qwen.checking')
-                    : qwenReady
-                      ? t('epub.mining.qwen.ready')
-                      : t('epub.mining.qwen.missing')}
-                </p>
+                <>
+                  <p className={`muted mining-engine-status${qwenReady ? ' ok' : ' warn'}`}>
+                    {qwenReady === null
+                      ? t('epub.mining.qwen.checking')
+                      : qwenReady
+                        ? t('epub.mining.qwen.ready')
+                        : t('epub.mining.qwen.missing')}
+                  </p>
+                  {qwenReady === false && <AiModelInstallControl />}
+                </>
               ) : (
                 <div className="mining-api-engine-fields">
                   <label>
                     {t('epub.mining.provider')}
                     <select
                       value={translationApiProvider}
-                      onChange={(e) =>
-                        patchExport({
-                          translationEngine: 'api',
-                          translationApiProvider: e.target.value as typeof translationApiProvider,
-                        })
-                      }
+                      onChange={(e) => {
+                        const next = e.target.value as typeof translationApiProvider;
+                        patchExport({ translationEngine: 'api', translationApiProvider: next });
+                        void window.api.aiSetProvider(next).then(() => notifyAiSetupChanged()).catch(() => undefined);
+                      }}
                     >
                       {AI_PROVIDERS.map((provider) => (
                         <option key={provider.id} value={provider.id}>
@@ -1141,50 +1149,12 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
                       ))}
                     </select>
                   </label>
-                  <label className="mining-api-key-field">
-                    {t('epub.mining.apiKey')}
-                    <input
-                      type="password"
-                      value={apiKeyDraft}
-                      onChange={(e) => setApiKeyDraft(e.target.value)}
-                      placeholder={
-                        apiKeySaved
-                          ? t('epub.mining.apiKey.replace')
-                          : t('epub.mining.apiKey.paste', { provider: selectedApiProvider.label })
-                      }
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn subtle"
-                    disabled={savingApiKey || !apiKeyDraft.trim()}
-                    onClick={() => {
-                      setSavingApiKey(true);
-                      void window.api
-                        .aiSetApiKey({
-                          provider: providerKeyBucket(translationApiProvider),
-                          apiKey: apiKeyDraft.trim(),
-                        })
-                        .then((result) => {
-                          if (result.ok) {
-                            setApiKeyDraft('');
-                            setAiConfig((prev) =>
-                              prev
-                                ? { ...prev, apiKeysSet: result.apiKeysSet, apiKeySet: result.apiKeySet }
-                                : prev,
-                            );
-                          }
-                        })
-                        .finally(() => setSavingApiKey(false));
-                    }}
-                  >
-                    {savingApiKey ? t('epub.mining.savingKey') : t('epub.mining.saveKey')}
-                  </button>
                   <p className={`muted mining-engine-status${apiKeySaved ? ' ok' : ' warn'}`}>
                     {apiKeySaved
                       ? t('epub.mining.apiKey.saved', { provider: selectedApiProvider.label })
                       : t('epub.mining.apiKey.need', { provider: selectedApiProvider.label })}
                   </p>
+                  {!apiKeySaved && <AiSetupPrompt compact />}
                 </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../../tts';
 import { useAnalysisActions } from '../../analysisActions';
 import { analysisCommandForKey, isTextEntryTarget } from '../../../shared/analysisShortcuts';
 import type { SentenceAnalysisResult } from '../../../shared/sentenceAnalysisCore';
+import { openAiSettings } from '../../aiSetupClient';
 
 /**
  * The Reading Lens' AI panel — what a scan opens when the mode toggle is on
@@ -41,7 +42,7 @@ const MARGIN = 12;
 type State =
   | { kind: 'loading' }
   | { kind: 'ready'; result: SentenceAnalysisResult }
-  | { kind: 'error'; message: string; needsKey: boolean; needsLocalModel: boolean };
+  | { kind: 'error'; message: string; needsKey: boolean; needsLocalModel: boolean; aiOff?: boolean };
 
 export default function LensAnalysisPanel({ text, region, onLookup, onClose }: Props) {
   const { t, lang: uiLang } = useT();
@@ -77,6 +78,7 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
             message: res.error || t('lens.ai.error'),
             needsKey: !!res.needsKey,
             needsLocalModel: !!res.needsLocalModel,
+            aiOff: !!res.aiOff,
           });
         }
       } catch (err) {
@@ -198,16 +200,23 @@ export default function LensAnalysisPanel({ text, region, onLookup, onClose }: P
               {text}
             </div>
             <p>
-              {state.needsKey
-                ? t('lens.ai.needsKey')
-                : state.needsLocalModel
-                  ? t('lens.ai.needsLocalModel')
-                  : state.message}
+              {state.aiOff
+                ? t('lens.ai.off')
+                : state.needsKey
+                  ? t('lens.ai.needsKey')
+                  : state.needsLocalModel
+                    ? t('lens.ai.needsLocalModel')
+                    : state.message}
             </p>
             <div className="lens-analysis-error-actions">
-              {!state.needsKey && !state.needsLocalModel && (
+              {!state.needsKey && !state.needsLocalModel && !state.aiOff && (
                 <button type="button" onClick={reanalyze}>
                   {t('lens.ai.retry')}
+                </button>
+              )}
+              {(state.needsKey || state.needsLocalModel || state.aiOff) && (
+                <button type="button" onClick={() => openAiSettings()}>
+                  {t(state.aiOff ? 'settings.ai.setup.open' : 'settings.ai.setup.action')}
                 </button>
               )}
               <button type="button" onClick={onClose}>

@@ -5,12 +5,17 @@ import ParticleBreakdown from './translate-analysis/ParticleBreakdown';
 import FormalityToggle from './translate-analysis/FormalityToggle';
 import DeclensionDrawer from './translate-analysis/DeclensionDrawer';
 import MeasureWordGuide from './translate-analysis/MeasureWordGuide';
+import { AiSetupPrompt } from './ai/AiSetupPrompt';
+import { useAiReadiness } from '../aiSetupClient';
+import { useT } from '../i18n';
 
 // Orchestrates the linguistic-analysis panels under the Translate view.
 // The Japanese particle breakdown is fully offline (kuromoji); formality,
-// declension, and measure words need the cloud key configured in
-// Flashcards → AI Card Studio. Only this component talks to window.api;
-// the sub-widgets are pure presentational.
+// declension, and measure words come from the cloud provider configured in
+// Settings > AI — even when the translation itself ran offline, which is why
+// the panel says so in words rather than leaving the sections missing. Hidden
+// entirely while "Use AI features" is off. Only this component talks to
+// window.api; the sub-widgets are pure presentational.
 export default function SentenceAnalysisPanel({
   sourceText,
   translatedText,
@@ -22,12 +27,14 @@ export default function SentenceAnalysisPanel({
   source: string;
   target: string;
 }) {
+  const { t } = useT();
   const jaInvolved = source === 'ja' || target === 'ja';
   const jaText = source === 'ja' ? sourceText : target === 'ja' ? translatedText : '';
 
   const [tokens, setTokens] = useState<JpToken[] | null>(null);
   const [result, setResult] = useState<TranslateAnalysisResult | null>(null);
-  const [keySet, setKeySet] = useState<boolean | null>(null);
+  const ai = useAiReadiness();
+  const cloudAnalysis = ai.loaded && ai.enabled && ai.cloudReady;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const reqRef = useRef(0);
@@ -58,13 +65,10 @@ export default function SentenceAnalysisPanel({
     setLoading(false);
     if (!translatedText.trim() || !sourceText.trim()) return;
     if (jaInvolved && tokens === null) return;
+    if (!cloudAnalysis) return;
     let alive = true;
     void (async () => {
       try {
-        const config = await window.api.aiGetConfig();
-        if (!alive || id !== reqRef.current) return;
-        setKeySet(config.apiKeySet);
-        if (!config.apiKeySet) return;
         setLoading(true);
         const jaParticleTokens = jaInvolved
           ? (tokens ?? []).filter((t) => t.pos === '助詞').map((t) => t.surface)
@@ -79,7 +83,7 @@ export default function SentenceAnalysisPanel({
         if (!alive || id !== reqRef.current) return;
         setLoading(false);
         if (res.ok && res.result) setResult(res.result);
-        else setError(res.error ?? 'Analysis failed.');
+        else setError(res.error ?? t('lens.ai.error'));
       } catch (err) {
         if (!alive || id !== reqRef.current) return;
         setLoading(false);
@@ -89,7 +93,7 @@ export default function SentenceAnalysisPanel({
     return () => {
       alive = false;
     };
-  }, [sourceText, translatedText, source, target, tokens, jaInvolved]);
+  }, [sourceText, translatedText, source, target, tokens, jaInvolved, cloudAnalysis, t]);
 
   // Both must be present: post-swap the view clears the snapshot while the
   // output pane still shows repurposed text — no analysis should render then.
@@ -100,19 +104,16 @@ export default function SentenceAnalysisPanel({
       {jaInvolved && tokens && tokens.length > 0 && (
         <ParticleBreakdown tokens={tokens} notes={result?.particleNotes} />
       )}
-      {keySet === false && (
-        <p className="tr-analysis-nudge muted">
-          Formality, declension, and measure-word analysis need a cloud AI key. Add one in
-          Flashcards → AI Card Studio to unlock these panels.
-        </p>
+      {ai.loaded && ai.enabled && !ai.cloudReady && (
+        <AiSetupPrompt compact reasonKey="sentenceAnalysis.needKey" settingId="ai-provider" />
       )}
       {loading && (
         <div className="tr-analysis-loading">
           <span className="media-gen-dot" />
-          <span className="muted">Analyzing grammar…</span>
+          <span className="muted">{t('sentenceAnalysis.analyzing')}</span>
         </div>
       )}
-      {error && <p className="tr-analysis-error muted">Analysis unavailable: {error}</p>}
+      {error && <p className="tr-analysis-error muted">{t('sentenceAnalysis.unavailable', { error })}</p>}
       {result?.formality && <FormalityToggle variants={result.formality} lang={target} />}
       {result?.declension && <DeclensionDrawer items={result.declension} />}
       {(result?.measureWords || result?.aspectNotes) && (

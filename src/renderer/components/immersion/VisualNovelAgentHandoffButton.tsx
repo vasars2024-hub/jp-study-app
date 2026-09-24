@@ -99,7 +99,7 @@ export default function VisualNovelAgentHandoffButton({
   };
 
   return (
-    <button type="button" disabled={busy || !line} onClick={() => void ask()}>
+    <button data-ai-entry type="button" disabled={busy || !line} onClick={() => void ask()}>
       {busy ? t('vnAssist.working') : t('vnAssist.askAgent')}
     </button>
   );

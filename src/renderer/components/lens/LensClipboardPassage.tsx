@@ -101,7 +101,7 @@ export default function LensClipboardPassage({
         <button type="button" className="lens-open-read" onClick={onOpenRead} title={t('lens.read.openHint')}>
           {t('lens.read.open')}
         </button>
-        <button type="button" onClick={onAskAgent}>
+        <button data-ai-entry type="button" onClick={onAskAgent}>
           {t('lens.action.askAgent')}
         </button>
         {onLookUp && (

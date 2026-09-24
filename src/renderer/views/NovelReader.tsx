@@ -101,6 +101,7 @@ import { recordEpubPageRead } from '../readingGardenProgress';
 // §11.1 row 8. A read-only cross-reference — §10.2 keeps list LOGIC out of this
 // file, so the reader hands it an item id and renders whatever comes back.
 import ReadingListMembership from '../components/reading/ReadingListMembership';
+import { useAiReadiness } from '../aiSetupClient';
 
 interface Props {
   item: LibraryItem;
@@ -207,6 +208,7 @@ function parseLoc(loc: string | undefined): { part: number; frac: number } | nul
  */
 export default function NovelReader({ item, onClose }: Props) {
   const aero = useAeroMaterials();
+  const aiReadiness = useAiReadiness();
   // L3.2 — the reader is the app's third Liquid host. See `readerPresentation.ts`.
   const presentation = useReaderPresentation('book');
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -2563,6 +2565,7 @@ export default function NovelReader({ item, onClose }: Props) {
     }
   }
 
+  const aiFeaturesOn = aiReadiness.enabled;
   const readerMenus: MenuBarMenu[] = [
     {
       id: 'file',
@@ -2645,18 +2648,21 @@ export default function NovelReader({ item, onClose }: Props) {
           icon: <Icon name="flashcards" size={14} />,
           onSelect: () => addSelectionToCollection('selection'),
         },
-        {
-          id: 'ask-agent-selection',
-          label: t('epub.askAgent'),
-          icon: <Icon name="sparkle" size={14} />,
-          onSelect: askAgentAboutSelection,
-        },
-        {
-          id: 'ask-agent-passage',
-          label: t('epub.askAgentPassage'),
-          icon: <Icon name="sparkle" size={14} />,
-          onSelect: askAgentAboutPassage,
-        },
+        // Agent hand-offs are AI entry points: gone while "Use AI features" is off.
+        ...(aiFeaturesOn ? [
+          {
+            id: 'ask-agent-selection',
+            label: t('epub.askAgent'),
+            icon: <Icon name="sparkle" size={14} />,
+            onSelect: askAgentAboutSelection,
+          },
+          {
+            id: 'ask-agent-passage',
+            label: t('epub.askAgentPassage'),
+            icon: <Icon name="sparkle" size={14} />,
+            onSelect: askAgentAboutPassage,
+          },
+        ] : []),
         {
           id: 'lens-capture',
           label: t('epub.readWithLens'),
@@ -3140,7 +3146,7 @@ export default function NovelReader({ item, onClose }: Props) {
             "Collect" is duplicated here for exactly the same reason, so the
             hand-off follows it rather than being reachable only in one embedding.
           */}
-          <button
+          <button data-ai-entry
             type="button"
             className="btn small"
             title={t('epub.askAgent')}
@@ -3155,7 +3161,7 @@ export default function NovelReader({ item, onClose }: Props) {
             sends the paragraph around it — different questions, so they read as
             different controls.
           */}
-          <button
+          <button data-ai-entry
             type="button"
             className="btn small"
             title={t('epub.askAgentPassage')}

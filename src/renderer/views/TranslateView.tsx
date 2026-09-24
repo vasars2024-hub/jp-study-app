@@ -57,7 +57,7 @@ function TranslateAskAgent({
   const span = (selection.trim() || input.trim());
   const fromSelection = selection.trim().length > 0;
   return (
-    <button
+    <button data-ai-entry
       type="button"
       className={className}
       disabled={!span}

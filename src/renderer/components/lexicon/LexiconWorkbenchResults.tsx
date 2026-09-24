@@ -716,7 +716,7 @@ function LexiconWorkbenchResults({
           {pinned && (
             <>
               <div className="lexicon-explain-bar">
-                <button className="lexicon-explain-run" onClick={explainInAgent} type="button">
+                <button data-ai-entry className="lexicon-explain-run" onClick={explainInAgent} type="button">
                   {t('lexicon.explain.action')}
                 </button>
                 <span className="muted">{t('lexicon.explain.generated')}</span>

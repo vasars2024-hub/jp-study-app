@@ -171,7 +171,7 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
   if (!engine) return null;
 
   return (
-    <details className="lexicon-explain-entry" open={Boolean(explanation)}>
+    <details className="lexicon-explain-entry" data-ai-entry open={Boolean(explanation)}>
       <summary>{t('lexicon.wordExplain.title')}</summary>
       {!engine.ok ? (
         <p className="muted lexicon-explain-blocked">{t(BLOCK_LABEL_KEYS[engine.blocked])}</p>
