@@ -181,25 +181,39 @@ const AUTO_ANALYZE_WINDOW = 400;
 const autoAnalyzedLines = new Map<string, number>();
 
 /**
- * What survives closing the window: the selected novel and the open tab. The
- * section used to be a `useState(false)` inside the Immersion view, so every
- * close threw both away.
+ * What survives closing the window: the selected novel, the open tab, and
+ * whether the library rail is shown. The section used to be a `useState(false)`
+ * inside the Immersion view, so every close threw them away; the library toggle
+ * was left out when the other two were persisted, so "Hide library" came back
+ * shown on every reopen.
  */
 const PANEL_STATE_KEY = 'vn-panel-state';
 
-function readPanelState(): { selectedId: string; tab: VisualNovelTab } {
+interface PanelState {
+  selectedId: string;
+  tab: VisualNovelTab;
+  libraryOpen: boolean;
+}
+
+function readPanelState(): PanelState {
   try {
-    const raw = JSON.parse(localStorage.getItem(PANEL_STATE_KEY) ?? '{}') as { selectedId?: unknown; tab?: unknown };
+    const raw = JSON.parse(localStorage.getItem(PANEL_STATE_KEY) ?? '{}') as {
+      selectedId?: unknown;
+      tab?: unknown;
+      libraryOpen?: unknown;
+    };
     return {
       selectedId: typeof raw.selectedId === 'string' ? raw.selectedId : '',
       tab: TABS.includes(raw.tab as VisualNovelTab) ? raw.tab as VisualNovelTab : 'read',
+      // Only an explicit `false` hides it: the library is how a first visit starts.
+      libraryOpen: raw.libraryOpen !== false,
     };
   } catch {
-    return { selectedId: '', tab: 'read' };
+    return { selectedId: '', tab: 'read', libraryOpen: true };
   }
 }
 
-function writePanelState(state: { selectedId: string; tab: VisualNovelTab }): void {
+function writePanelState(state: PanelState): void {
   // Storage unavailable: the panel still works, it just forgets.
   writeLocalStorageJson(PANEL_STATE_KEY, state);
 }
@@ -251,7 +265,7 @@ export default function VisualNovelPanel({
   standalone?: boolean;
 }) {
   const { t } = useT();
-  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(() => readPanelState().libraryOpen);
   const [database, setDatabase] = useState<VisualNovelDatabase>(createEmptyVisualNovelDatabase);
   const [studyProfiles, setStudyProfiles] = useState(() => loadMediaStudyDatabase().profiles);
   const [selectedId, setSelectedId] = useState(() => readPanelState().selectedId);
@@ -283,7 +297,7 @@ export default function VisualNovelPanel({
   const [error, setError] = useState('');
   const [popup, setPopup] = useState<{ query: string; x: number; y: number; context?: string } | null>(null);
 
-  useEffect(() => writePanelState({ selectedId, tab }), [selectedId, tab]);
+  useEffect(() => writePanelState({ selectedId, tab, libraryOpen }), [selectedId, tab, libraryOpen]);
 
   const reportStatus = (message: string, isError = false): void => {
     if (isError) {
