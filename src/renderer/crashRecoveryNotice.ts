@@ -30,13 +30,22 @@ export async function showCrashRecoveryNotice(): Promise<void> {
       /* the notice still goes out */
     }
   }
+  const message = notice.safeMode
+    ? `${t('crash.recovered.body', { reason: notice.reason })} ${t('crash.recovered.safeMode')}`
+    : t('crash.recovered.body', { reason: notice.reason });
   notify({
     id: 'crash-recovered',
     title: t('crash.recovered.title'),
-    message: notice.safeMode
-      ? `${t('crash.recovered.body', { reason: notice.reason })} ${t('crash.recovered.safeMode')}`
-      : t('crash.recovered.body', { reason: notice.reason }),
+    message,
     kind: 'warning',
     source: 'system',
   });
+  // The notification center only records; nothing in it surfaces on its own,
+  // so a crash the user did not watch happen stayed invisible until they
+  // opened the center. The toast is what they actually see come back.
+  window.dispatchEvent(
+    new CustomEvent('os:toast', {
+      detail: { message, kind: 'warn' },
+    }),
+  );
 }
