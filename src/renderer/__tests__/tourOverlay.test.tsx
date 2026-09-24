@@ -301,3 +301,55 @@ describe('tour script', () => {
     expect(stale, 'every anchored step points at a class DesktopShell still renders').toEqual([]);
   });
 });
+
+describe('the tour names real Settings pages and can take you there', () => {
+  it('every page it names is a Settings page, rendered by its sidebar label', async () => {
+    const { SETTINGS_NAV } = await import('../components/settings/settingsRegistry');
+    const { settingsPageNameKey } = await import('../../shared/onboarding/tourScript');
+    const pageIds = new Set(SETTINGS_NAV.map((page) => page.id));
+    for (const step of TOUR_STEPS) {
+      for (const page of Object.values(step.settingsPages ?? {})) {
+        expect(pageIds.has(page), page).toBe(true);
+        // The label the tour prints IS the one the Settings sidebar shows.
+        expect(settingsPageNameKey(page)).toBe(SETTINGS_NAV.find((entry) => entry.id === page)?.labelKey);
+      }
+      if (step.destination) expect(pageIds.has(step.destination.page), step.destination.page).toBe(true);
+    }
+    // No catalog still hard-codes the old, non-existent page names.
+    for (const lang of UI_LANGS) {
+      const body = String(CATALOGS[lang]['tour.language.body']);
+      expect(body, lang).toContain('{appearance}');
+      expect(body, lang).toContain('{study}');
+      expect(String(CATALOGS[lang]['tour.assets.body']), lang).toContain('{storage}');
+    }
+  });
+
+  it('fills the page names and "Take me there" opens Settings at the card', async () => {
+    const assets = TOUR_STEPS.findIndex((step) => step.id === 'assets');
+    const { rememberStep } = await import('../onboardingStore');
+    rememberStep(TOUR_STEPS[assets].id);
+    await mount();
+    expect(host.querySelector('[data-tour-step]')?.getAttribute('data-tour-step')).toBe('assets');
+    const text = host.querySelector('.tour-bubble__body')?.textContent ?? '';
+    expect(text).toContain(String(CATALOGS.en['settings.nav.storage']));
+    expect(text).not.toContain('{storage}');
+
+    const seen: unknown[] = [];
+    const onOpen = (event: Event) => {
+      seen.push((event as CustomEvent).detail);
+      event.preventDefault();
+    };
+    const onNav = (event: Event) => seen.push((event as CustomEvent).detail);
+    window.addEventListener('os:open', onOpen);
+    window.addEventListener('settings:navigate', onNav);
+    await act(async () => {
+      button(String(CATALOGS.en['tour.takeMeThere']))?.click();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+    window.removeEventListener('os:open', onOpen);
+    window.removeEventListener('settings:navigate', onNav);
+    expect(seen).toContainEqual({ page: 'storage', settingId: undefined });
+    expect(bubble()).toBeNull();
+    expect(shouldRunTour()).toBe(false);
+  });
+});

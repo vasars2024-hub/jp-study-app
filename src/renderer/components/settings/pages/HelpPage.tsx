@@ -13,6 +13,7 @@ import { loadOnboarding, onTourStarted, replayTour } from '../../../onboardingSt
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useT } from '../../../i18n';
 import SettingsAssistantCard from './SettingsAssistantCard';
+import HelpShortcutsCard from './HelpShortcutsCard';
 
 /**
  * `idle` before the button is used; `started` only when an overlay actually
@@ -73,6 +74,7 @@ export default function HelpPage() {
         </p>
       )}
     </SettingsCard>
+      <HelpShortcutsCard />
     </>
   );
 }

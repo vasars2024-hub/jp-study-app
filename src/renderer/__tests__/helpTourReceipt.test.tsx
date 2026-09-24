@@ -19,11 +19,15 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import HelpPage from '../components/settings/pages/HelpPage';
 import { SettingsProvider } from '../components/settings/SettingsContext';
 import type { SettingsController } from '../components/settings/types';
 import { announceTourStarted, loadOnboarding, markTourComplete, onTourArmChanged } from '../onboardingStore';
+
+// The shortcuts card on the same page has its own suite; it pulls in the command
+// registry, which needs the preload bridge this suite does not stand up.
+vi.mock('../components/settings/pages/HelpShortcutsCard', () => ({ default: () => null }));
 
 // `SettingsCard` reads two fields and nothing else on this page.
 const settings = { advancedMode: false, focusSettingId: null } as unknown as SettingsController;
