@@ -3,6 +3,7 @@ import LensReaderPanel from './LensReaderPanel';
 import LensAnalysisPanel from './LensAnalysisPanel';
 import LensClipboardPassage from './LensClipboardPassage';
 import LensReadPanel from './LensReadPanel';
+import AssetInstallPrompt from '../AssetInstallPrompt';
 import { useT } from '../../i18n';
 import { handOffToAgent, readingPassageAgentContext } from '../../agentContextHandoff';
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
@@ -116,7 +117,17 @@ type LensState =
       tokens: JpToken[];
     }
   | { kind: 'empty'; region: Rect }
-  | { kind: 'error'; region: Rect | null; message: string; canRetry: boolean };
+  | {
+    kind: 'error';
+    region: Rect | null;
+    message: string;
+    canRetry: boolean;
+    /**
+     * The models this scan needed and did not have. Their live download (or an
+     * install button) is shown in place, and the scan re-runs when they land.
+     */
+    install?: { ids: string[]; startIds: string[]; engine: 'auto' | 'manga' | 'web' };
+  };
 
 const MIN_REGION = 12;
 
@@ -447,13 +458,18 @@ export default function ReadingLensOverlay() {
         .then((res) => {
           if (!alive) return;
           if (!res.available) {
+            // `downloading` is now only ever true when main actually queued the
+            // models; the prompt below shows that download's own progress.
             const message =
               res.engine === 'manga'
                 ? t('lens.error.manga')
                 : res.downloading
                   ? t('lens.error.downloading')
                   : t('lens.error.web');
-            setState({ kind: 'error', region, message, canRetry: true });
+            const install = res.missingAssets
+              ? { ids: res.missingAssets.ids, startIds: res.missingAssets.startIds, engine }
+              : undefined;
+            setState({ kind: 'error', region, message, canRetry: true, install });
             return;
           }
           if (!res.ok) {
@@ -983,6 +999,11 @@ export default function ReadingLensOverlay() {
     }
   };
 
+  /** A model the scan was missing just finished installing: read the region now. */
+  const rescanAfterInstall = () => {
+    if (state.kind === 'error' && state.install) rescan(state.install.engine);
+  };
+
   /**
    * Show the other engine's already-finished read of the same region.
    *
@@ -1279,6 +1300,14 @@ export default function ReadingLensOverlay() {
             {state.kind === 'empty' ? t('lens.empty.title') : state.message}
           </div>
           {state.kind === 'empty' && <div className="lens-message-sub">{t('lens.empty.hint')}</div>}
+          {state.kind === 'error' && state.install && (
+            <AssetInstallPrompt
+              className="lens-install"
+              ids={state.install.ids}
+              startIds={state.install.startIds}
+              onInstalled={rescanAfterInstall}
+            />
+          )}
           <div className="lens-message-actions">
             {state.kind === 'empty' && (
               <button type="button" onClick={() => rescan('manga')}>

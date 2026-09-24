@@ -47,6 +47,10 @@ import {
 import { sequenceConfidence, tokenProbability } from '../shared/ocrConfidence';
 import { sortReadingOrder } from '../shared/readingOrder';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
+import {
+  summarizeTranslateFailure,
+  type TranslateBatchFailure,
+} from '../shared/translateBatchFailure';
 import type { LibraryItem } from '../shared/types';
 
 export type {
@@ -1591,7 +1595,13 @@ async function translateMokuroPage(
   page: MokuroPage,
   targetLang: string,
   shouldCancel: () => boolean,
-): Promise<{ page: MokuroPage; requested: number; translated: number }> {
+): Promise<{
+  page: MokuroPage;
+  requested: number;
+  translated: number;
+  /** Why nothing translated, when nothing did. */
+  failure?: TranslateBatchFailure;
+}> {
   const items: Array<{ id: string; text: string; source: string; target: string }> = [];
   for (const block of page.blocks) {
     if (block.kind === 'ignore') continue;
@@ -1613,6 +1623,9 @@ async function translateMokuroPage(
       // continuing to validate. An echo is not a translation.
       .filter(([id, text]) => text && text !== sourceById.get(id)?.trim()),
   );
+  const failure = byId.size === 0
+    ? summarizeTranslateFailure(results.length ? results : items.map((i) => ({ id: i.id, text: '' })))
+    : null;
   return {
     page: {
       ...page,
@@ -1625,6 +1638,7 @@ async function translateMokuroPage(
     },
     requested: items.length,
     translated: byId.size,
+    ...(failure ? { failure } : null),
   };
 }
 
@@ -1640,6 +1654,10 @@ export async function analyzeMangaVolume(
   error?: string;
   /** Set when OCR succeeded but one or more pages produced no translation. */
   warning?: string;
+  /** The warning as a catalog key for the renderer, and why pages failed. */
+  warningKey?: string;
+  warningVars?: Record<string, string | number>;
+  failure?: TranslateBatchFailure;
   ocrMeta?: NonNullable<LibraryItem['ocrMeta']>;
 }> {
   const itemId = req.itemId;
@@ -1654,6 +1672,7 @@ export async function analyzeMangaVolume(
   if (doTranslate && !isTranslateAvailable()) {
     return {
       ok: false,
+      failure: { reason: 'model-missing' },
       error:
         'Qwen3 translation model not found. Place Qwen3-1.7B (Q4_K_M) in Downloads or the app models folder.',
     };
@@ -1666,6 +1685,8 @@ export async function analyzeMangaVolume(
   const pageTotal = pages.length;
   /** Pages that had text but came back with nothing translated. */
   let translateFailures = 0;
+  /** The first such page's reason — one fix usually covers them all. */
+  let firstFailure: TranslateBatchFailure | undefined;
   try {
     for (let offset = 0; offset < pages.length; offset++) {
       const i = startPage + offset;
@@ -1733,6 +1754,7 @@ export async function analyzeMangaVolume(
           }
           if (result.requested > 0 && result.translated === 0) {
             translateFailures += 1;
+            firstFailure ??= result.failure;
             console.error(
               `[mangaOcr] no region on page ${i + 1} could be translated to "${targetLang}"; not caching it`,
             );
@@ -1769,6 +1791,16 @@ export async function analyzeMangaVolume(
           : `OCR finished, but ${translateFailures} of ${pageTotal} page(s) could not be translated. Those pages are cached as OCR only.`
         : undefined;
 
+    const localized = translateFailures > 0
+      ? {
+        warningKey: translateFailures === pageTotal
+          ? 'manga.translate.warning.none'
+          : 'manga.translate.warning.some',
+        warningVars: { failed: translateFailures, total: pageTotal },
+        ...(firstFailure ? { failure: firstFailure } : null),
+      }
+      : null;
+
     broadcastVolumeProgress({
       itemId,
       phase: 'done',
@@ -1777,7 +1809,7 @@ export async function analyzeMangaVolume(
       ocrMeta,
       ...(warning ? { warning } : null),
     });
-    return { ok: true, ocrMeta, ...(warning ? { warning } : null) };
+    return { ok: true, ocrMeta, ...(warning ? { warning } : null), ...localized };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     broadcastVolumeProgress({

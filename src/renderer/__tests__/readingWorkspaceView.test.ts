@@ -104,14 +104,16 @@ describe('ReadingWorkspaceView', () => {
     }
   });
 
-  it('lands the Reading compatibility entry on Discover inside one nine-destination shell', async () => {
+  it('lands the Reading compatibility entry on Discover inside one seven-tab shell', async () => {
     await render();
 
-    // Eight since the lens passage lane landed — Captures is the destination
-    // `resolveReadingLensWorkflow`'s `reading` target had been routing to for
-    // its whole life with nothing there to receive it — and nine since Reading
-    // Lists P4b mounted §6's surface as a sibling of Library.
-    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(9);
+    // Nine tabs until Home, Discover and Continue — three tabs over the one
+    // Finder surface — were folded into Discover (audit: nine tabs, five
+    // screens). Captures (the lens passage lane) and Lists (Reading Lists P4b)
+    // are still their own destinations.
+    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(7);
+    expect(host.querySelector('[aria-controls="reading-workspace-panel-home"]')).toBeNull();
+    expect(host.querySelector('[aria-controls="reading-workspace-panel-continue"]')).toBeNull();
     expect(host.querySelector('[role="tablist"]')?.classList.contains('lq-contextual')).toBe(true);
     expect(host.querySelector('[role="tablist"]')?.getAttribute('data-lq-role')).toBe('contextual');
     expect(tab('captures')).not.toBeNull();
@@ -166,16 +168,44 @@ describe('ReadingWorkspaceView', () => {
     expect(host.querySelector('[data-surface="novels"]')?.getAttribute('data-mode')).toBe('sources');
   });
 
-  it('gives Home, Discover, and Continue distinct Finder intents', async () => {
+  it('lands a home or continue deep link on the one Discover tab', async () => {
+    // The sections stay valid route values — widgets and saved routes name them —
+    // but there is no tab of their own to select any more.
     await render();
+    for (const section of ['home', 'continue'] as const) {
+      await act(async () => tab('library').click());
+      await act(async () => {
+        publishReadingWorkspaceRoute({
+          version: READING_WORKSPACE_SCHEMA_VERSION,
+          section,
+          intent: section === 'continue' ? 'continue' : 'browse',
+        });
+        await Promise.resolve();
+      });
+      expect(tab('discover').getAttribute('aria-selected')).toBe('true');
+      expect(host.querySelector('[data-surface="finder"]')?.getAttribute('data-mode')).toBe('discover');
+    }
+  });
 
-    expect(host.querySelector('[data-surface="finder"]')?.getAttribute('data-mode')).toBe('discover');
-
-    await act(async () => tab('home').click());
-    expect(host.querySelector('[data-surface="finder"]')?.getAttribute('data-mode')).toBe('home');
-
-    await act(async () => tab('continue').click());
-    expect(host.querySelector('[data-surface="finder"]')?.getAttribute('data-mode')).toBe('continue');
+  it('does not take deep links when it is only an entry (the Library window)', async () => {
+    await act(async () => {
+      root.render(createElement(ReadingWorkspaceView, {
+        initialSection: 'library',
+        onOpenBook: () => undefined,
+        routeHost: false,
+      }));
+      await Promise.resolve();
+    });
+    expect(tab('library').getAttribute('aria-selected')).toBe('true');
+    publishReadingWorkspaceRoute({
+      version: READING_WORKSPACE_SCHEMA_VERSION,
+      section: 'lists',
+      intent: 'browse',
+    });
+    await act(async () => Promise.resolve());
+    // Still on Library, and the route is kept for the real host to consume.
+    expect(tab('library').getAttribute('aria-selected')).toBe('true');
+    expect(consumePendingReadingWorkspaceRoute('reading')?.section).toBe('lists');
   });
 
   it('consumes a route retained while its lazy desktop host was opening', async () => {
@@ -233,6 +263,6 @@ describe('ReadingWorkspaceView', () => {
     await act(async () => tab('sources').dispatchEvent(new KeyboardEvent('keydown', {
       key: 'Home', bubbles: true,
     })));
-    expect(tab('home').getAttribute('aria-selected')).toBe('true');
+    expect(tab('discover').getAttribute('aria-selected')).toBe('true');
   });
 });

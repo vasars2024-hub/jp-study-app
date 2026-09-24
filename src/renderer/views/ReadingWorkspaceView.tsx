@@ -9,10 +9,12 @@ import {
 } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import {
-  READING_WORKSPACE_SECTIONS,
+  READING_WORKSPACE_TABS,
   readingWorkspaceSurfaceForSection,
+  readingWorkspaceTabForSection,
   type ReadingWorkspaceRoute,
   type ReadingWorkspaceSection,
+  type ReadingWorkspaceTab,
 } from '../../shared/readingWorkspace';
 import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
@@ -37,25 +39,21 @@ const NovelsView = lazy(() => import('./NovelsView'));
 const ReadingCapturesView = lazy(() => import('./ReadingCapturesView'));
 const ReadingListsView = lazy(() => import('./ReadingListsView'));
 
-const SECTION_LABEL_KEYS: Record<ReadingWorkspaceSection, string> = {
-  home: 'settings.nav.home',
+const SECTION_LABEL_KEYS: Record<ReadingWorkspaceTab, string> = {
   discover: 'palette.section.reading',
   library: 'palette.section.library',
   lists: 'readingLists.view.title',
   captures: 'reading.captures.title',
-  continue: 'reading.continue.title',
   plan: 'novelsView.plan',
   imports: 'library.aero.toolbar.import',
   sources: 'novelsView.sources',
 };
 
-const SECTION_ICONS: Record<ReadingWorkspaceSection, Parameters<typeof Icon>[0]['name']> = {
-  home: 'app',
+const SECTION_ICONS: Record<ReadingWorkspaceTab, Parameters<typeof Icon>[0]['name']> = {
   discover: 'search',
   library: 'library',
   lists: 'clipboard',
   captures: 'scan',
-  continue: 'bookmark',
   plan: 'calendar',
   imports: 'download',
   sources: 'globe',
@@ -64,11 +62,22 @@ const SECTION_ICONS: Record<ReadingWorkspaceSection, Parameters<typeof Icon>[0][
 export interface ReadingWorkspaceViewProps {
   initialSection: ReadingWorkspaceSection;
   onOpenBook: (item: LibraryItem) => void;
+  /**
+   * Whether this window receives Reading deep links and lens passages.
+   *
+   * The `reading` and `novels` windows are the hosts those are delivered to
+   * (DesktopShell opens them by host id, the lens pops out `reading`). The
+   * Library window shows the same workspace but is an entry, not a host: if it
+   * listened too, one deep link would move it AND open the host window, and a
+   * single-use lens passage could land in whichever window claimed it first.
+   */
+  routeHost?: boolean;
 }
 
 export default function ReadingWorkspaceView({
   initialSection,
   onOpenBook,
+  routeHost = true,
 }: ReadingWorkspaceViewProps) {
   const { t } = useT();
   const [section, setSection] = useState(initialSection);
@@ -121,6 +130,7 @@ export default function ReadingWorkspaceView({
   }, [onOpenBook]);
 
   useEffect(() => {
+    if (!routeHost) return undefined;
     const host = readingWorkspaceHostForSection(initialSection);
     const unsubscribe = subscribeReadingWorkspaceRoutes(host, applyRoute);
     /*
@@ -140,7 +150,7 @@ export default function ReadingWorkspaceView({
       unsubscribe();
       unsubscribeStaged();
     };
-  }, [applyRoute, initialSection]);
+  }, [applyRoute, initialSection, routeHost]);
 
   /**
    * Claim a lens passage waiting in main, on mount and on every announcement.
@@ -172,6 +182,7 @@ export default function ReadingWorkspaceView({
   }, []);
 
   useEffect(() => {
+    if (!routeHost) return undefined;
     const cancelMount = claimPassage();
     const unsubscribe = onReadingPassageHandoffStaged(() => {
       claimPassage();
@@ -180,26 +191,28 @@ export default function ReadingWorkspaceView({
       cancelMount();
       unsubscribe();
     };
-  }, [claimPassage]);
+  }, [claimPassage, routeHost]);
 
   const selectByKeyboard = (
     event: KeyboardEvent<HTMLButtonElement>,
     currentIndex: number,
   ) => {
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % READING_WORKSPACE_SECTIONS.length;
-    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + READING_WORKSPACE_SECTIONS.length) % READING_WORKSPACE_SECTIONS.length;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % READING_WORKSPACE_TABS.length;
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + READING_WORKSPACE_TABS.length) % READING_WORKSPACE_TABS.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = READING_WORKSPACE_SECTIONS.length - 1;
+    if (event.key === 'End') nextIndex = READING_WORKSPACE_TABS.length - 1;
     if (nextIndex === null) return;
     event.preventDefault();
-    const nextSection = READING_WORKSPACE_SECTIONS[nextIndex];
+    const nextSection = READING_WORKSPACE_TABS[nextIndex];
     setSection(nextSection);
     tabsRef.current[nextIndex]?.focus();
   };
 
   const surface = readingWorkspaceSurfaceForSection(section);
-  const panelId = `reading-workspace-panel-${section}`;
+  /** A `home` or `continue` route lands on the Discover tab that holds both. */
+  const activeTab = readingWorkspaceTabForSection(section);
+  const panelId = `reading-workspace-panel-${activeTab}`;
 
   return (
     <div className="reading-workspace" data-reading-section={section}>
@@ -209,7 +222,7 @@ export default function ReadingWorkspaceView({
         role="tablist"
         aria-label={t('reading.menu.view')}
       >
-        {READING_WORKSPACE_SECTIONS.map((item, index) => (
+        {READING_WORKSPACE_TABS.map((item, index) => (
           <button
             key={item}
             id={`reading-workspace-tab-${item}`}
@@ -218,8 +231,8 @@ export default function ReadingWorkspaceView({
             role="tab"
             className="reading-workspace-tab"
             aria-controls={`reading-workspace-panel-${item}`}
-            aria-selected={section === item}
-            tabIndex={section === item ? 0 : -1}
+            aria-selected={activeTab === item}
+            tabIndex={activeTab === item ? 0 : -1}
             onClick={() => setSection(item)}
             onKeyDown={(event) => selectByKeyboard(event, index)}
           >
@@ -233,7 +246,7 @@ export default function ReadingWorkspaceView({
         id={panelId}
         className="reading-workspace-panel"
         role="tabpanel"
-        aria-labelledby={`reading-workspace-tab-${section}`}
+        aria-labelledby={`reading-workspace-tab-${activeTab}`}
       >
         {/*
           The fallback used to be an EMPTY div with `min-height: 100%` — it
@@ -256,8 +269,8 @@ export default function ReadingWorkspaceView({
           {surface === 'finder' ? (
             <ReadingFinderView
               onOpenBook={onOpenBook}
-              mode={section === 'continue' ? 'continue' : section === 'home' ? 'home' : 'discover'}
-              initialQuery={section === 'discover' ? finderQuery : undefined}
+              mode="discover"
+              initialQuery={finderQuery || undefined}
             />
           ) : null}
           {surface === 'lists' ? (

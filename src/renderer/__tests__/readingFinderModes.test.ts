@@ -56,13 +56,31 @@ async function render(mode: 'home' | 'discover' | 'continue') {
 }
 
 describe('ReadingFinderView workspace modes', () => {
-  it('keeps catalogue controls and results in Discover only', async () => {
+  it('keeps catalogue controls and results in Discover, with the Continue row above them', async () => {
     await render('discover');
 
     expect(host.querySelector('[data-reading-finder-mode="discover"]')).not.toBeNull();
     expect(host.querySelector('.rf-controls')).not.toBeNull();
     expect(host.querySelector('.res-grid')).not.toBeNull();
-    expect(host.querySelector('.rf-continue')).toBeNull();
+    // The Reading workspace folded its Home and Continue tabs into Discover, so
+    // the book in progress has to be reachable from here — it used to be
+    // asserted absent, when Continue was a tab of its own.
+    expect(host.querySelector('.rf-continue-card')?.textContent).toContain('続きの本');
+    const continueRow = host.querySelector('.rf-continue')!;
+    expect(continueRow.compareDocumentPosition(host.querySelector('.rf-controls')!))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('shows no empty Continue row in Discover when nothing is in progress', async () => {
+    const api = (window as unknown as { api: { listLibrary: () => Promise<LibraryItem[]> } }).api;
+    const original = api.listLibrary;
+    api.listLibrary = async () => [];
+    try {
+      await render('discover');
+      expect(host.querySelector('.rf-continue')).toBeNull();
+    } finally {
+      api.listLibrary = original;
+    }
   });
 
   it('makes Home a focused overview with resumable reading', async () => {

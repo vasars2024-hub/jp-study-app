@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Icon from '../components/Icons';
 import { useT } from '../i18n';
 import {
@@ -16,6 +16,10 @@ import {
   NovelsTable,
   useNovels,
 } from '../components/novels/NovelsContent';
+
+// Lazy: the chapter dialog opens the manga reader, and that graph (dictionary,
+// shortcuts, player bus) has no business loading with the novel planner.
+const ReadingMangaSources = lazy(() => import('../components/reading/ReadingMangaSources'));
 
 export type NovelsViewMode = 'plan' | 'imports' | 'sources';
 
@@ -128,7 +132,16 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
               <NovelsInspector state={state} />
             </aside>
           </>
-        ) : null}
+        ) : (
+          // Sources used to leave this column empty. Manga chapters are the other
+          // kind of source a reader has, and their dialog was otherwise only
+          // reachable from the Scraper.
+          <main className="jiten-table-wrap">
+            <Suspense fallback={<div className="muted" aria-live="polite">{t('common.loading')}</div>}>
+              <ReadingMangaSources />
+            </Suspense>
+          </main>
+        )}
       </div>
     </div>
   );

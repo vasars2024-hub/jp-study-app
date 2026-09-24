@@ -22,7 +22,9 @@ const ITEM = 'item-under-test';
 const PAGES = ['0001', '0002'];
 
 /** Filled per test to decide what the batch translator "returns". */
-let batchImpl: (items: Array<{ id: string; text: string }>) => Array<{ id: string; text: string }> = () => [];
+let batchImpl: (
+  items: Array<{ id: string; text: string }>,
+) => Array<{ id: string; text: string; reason?: string; detail?: string }> = () => [];
 const batchCalls: Array<Array<{ id: string; text: string }>> = [];
 
 vi.mock('electron', () => ({
@@ -158,5 +160,44 @@ describe('analyzeMangaVolume translation caching', () => {
     expect(res.ok).toBe(true);
     expect(translateCaches()).toEqual(['0001.tr.en.json']);
     expect(res.warning).toMatch(/1 of 2/);
+  });
+
+  /*
+   * The reader could only say "Translation failed." — the reason was dropped
+   * with the empty string. It now travels from the batch to the run's result,
+   * localizable, so the reader can offer the fix that goes with it.
+   */
+  it('says why nothing translated, as a catalog key the reader can word', async () => {
+    batchImpl = (items) => items.map((i) => ({
+      id: i.id,
+      text: '',
+      reason: 'model-missing',
+      detail: 'model not found',
+    }));
+
+    const res = await analyzeMangaVolume({ itemId: ITEM, translate: true, targetLang: 'en' });
+
+    expect(res).toMatchObject({
+      ok: true,
+      warningKey: 'manga.translate.warning.none',
+      warningVars: { failed: 2, total: 2 },
+      failure: { reason: 'model-missing', detail: 'model not found' },
+    });
+  });
+
+  it('keeps a partial run key distinct from a total failure', async () => {
+    let call = 0;
+    batchImpl = (items) => {
+      call += 1;
+      return items.map((i) => (call === 1
+        ? { id: i.id, text: 'It is very quiet.' }
+        : { id: i.id, text: '', reason: 'timeout' }));
+    };
+    const res = await analyzeMangaVolume({ itemId: ITEM, translate: true, targetLang: 'en' });
+    expect(res).toMatchObject({
+      warningKey: 'manga.translate.warning.some',
+      warningVars: { failed: 1, total: 2 },
+      failure: { reason: 'timeout' },
+    });
   });
 });

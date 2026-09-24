@@ -12,9 +12,20 @@ import { Button } from '../ui/Button';
 import { Checkbox } from '../ui/Checkbox';
 import { Progress } from '../ui/Progress';
 import Icon from '../Icons';
+import AssetInstallPrompt from '../AssetInstallPrompt';
 import { useT } from '../../i18n';
+import { useAssetStatuses } from '../../assetStore';
 import type { LibraryItem } from '../../../shared/types';
-import type { BookOcrPhase, BookOcrProgress } from '../../../shared/bookOcrIpc';
+import {
+  BOOK_OCR_INSTALL_ASSET,
+  BOOK_OCR_MANGA_ASSETS,
+  BOOK_OCR_WEB_ASSETS,
+  bookOcrEngine,
+  bookOcrViewOf,
+  type BookOcrPhase,
+  type BookOcrProgress,
+  type BookOcrView,
+} from '../../../shared/bookOcrIpc';
 
 interface Props {
   item: LibraryItem;
@@ -29,6 +40,9 @@ const ACTIVE: readonly BookOcrPhase[] = [
   'packaging',
 ];
 
+/** Every asset either engine needs, so the panel follows installs of both. */
+const ENGINE_ASSETS: readonly string[] = [...BOOK_OCR_WEB_ASSETS, ...BOOK_OCR_MANGA_ASSETS];
+
 function formatEta(ms: number, t: (k: string, v?: Record<string, unknown>) => string): string {
   const total = Math.round(ms / 1000);
   if (total < 60) return t('bookOcr.eta.seconds', { count: total });
@@ -41,6 +55,13 @@ export function BookOcrPanel({ item }: Props) {
   const [heavy, setHeavy] = useState(true);
   const [bilingual, setBilingual] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const engineStatuses = useAssetStatuses(ENGINE_ASSETS);
+  const engineKnown = engineStatuses.some((s) => s !== null);
+  const engine = bookOcrEngine(
+    (id) => engineStatuses[ENGINE_ASSETS.indexOf(id)]?.state === 'installed',
+  );
+  const view = bookOcrViewOf(item);
 
   // Only progress for the item on screen; the stream carries every job.
   useEffect(() => {
@@ -69,6 +90,15 @@ export function BookOcrPanel({ item }: Props) {
 
   const cancel = useCallback(() => {
     void window.api.bookOcrCancel?.(item.id);
+  }, [item.id]);
+
+  const switchView = useCallback(async (next: BookOcrView) => {
+    setSwitching(true);
+    try {
+      await window.api.librarySetOcrView?.(item.id, next);
+    } finally {
+      setSwitching(false);
+    }
   }, [item.id]);
 
   const phase = progress?.phase;
@@ -105,7 +135,49 @@ export function BookOcrPanel({ item }: Props) {
         </p>
       )}
       {phase === 'cancelled' && <p className="muted">{t('bookOcr.cancelled')}</p>}
-      {phase === 'error' && <p className="book-ocr-error">{progress?.error ?? t('bookOcr.failed')}</p>}
+      {phase === 'error' && (
+        <p className="book-ocr-error" role="alert">
+          {progress?.errorKey
+            ? t(progress.errorKey, progress.errorVars)
+            : progress?.error ?? t('bookOcr.failed')}
+        </p>
+      )}
+
+      {/* Conversion never replaces the original: both stay on disk, and this
+          decides which one opens. */}
+      {view && (
+        <div className="book-ocr-view" role="group" aria-label={t('bookOcr.view.label')}>
+          <span className="muted">{t('bookOcr.view.label')}</span>
+          <button
+            type="button"
+            className="btn small"
+            aria-pressed={view === 'original'}
+            disabled={switching || view === 'original'}
+            onClick={() => void switchView('original')}
+          >
+            {t('bookOcr.view.original')}
+          </button>
+          <button
+            type="button"
+            className="btn small"
+            aria-pressed={view === 'text'}
+            disabled={switching || view === 'text'}
+            onClick={() => void switchView('text')}
+          >
+            {t('bookOcr.view.text')}
+          </button>
+        </div>
+      )}
+
+      {/* No engine, no button: starting without one used to read every page as
+          blank and file the result as the book. */}
+      {engineKnown && !engine && (
+        <AssetInstallPrompt
+          ids={BOOK_OCR_WEB_ASSETS}
+          startIds={[BOOK_OCR_INSTALL_ASSET]}
+          message={t('bookOcr.needsModel')}
+        />
+      )}
 
       <Checkbox
         checked={heavy}
@@ -120,8 +192,12 @@ export function BookOcrPanel({ item }: Props) {
       <p className="muted book-ocr-hint">
         {bilingual ? t('bookOcr.hint.bilingual') : t('bookOcr.hint.default')}
       </p>
-      <Button onClick={() => void start()} leftIcon={<Icon name="novels" size={14} />}>
-        {item.epubFile ? t('bookOcr.reconvert') : t('bookOcr.convert')}
+      <Button
+        onClick={() => void start()}
+        disabled={!engine}
+        leftIcon={<Icon name="novels" size={14} />}
+      >
+        {view ? t('bookOcr.reconvert') : t('bookOcr.convert')}
       </Button>
     </div>
   );

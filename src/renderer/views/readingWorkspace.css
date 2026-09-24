@@ -139,8 +139,14 @@
 .reading-workspace .jiten-novels[data-novels-mode='sources'] .jiten-filters {
   box-sizing: border-box;
   width: min(720px, 100%);
-  min-height: 100%;
   margin-inline: auto;
+}
+
+/* Manga chapter sources sit under the novel sources, in the same column. */
+.reading-workspace .jiten-novels[data-novels-mode='sources'] .jiten-table-wrap {
+  box-sizing: border-box;
+  width: min(720px, 100%);
+  margin: 10px auto 0;
 }
 
 .reading-workspace .jiten-novels[data-novels-mode='sources'] .jiten-filters > label {

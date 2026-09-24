@@ -18,9 +18,12 @@ import { rasterizePdf } from './pdfRasterize';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { translateForBook } from './translate';
+import { isInstalled } from './downloads';
 import { pageConfidence, type BookLine, type BookPage } from '../shared/bookOcr';
 import {
+  bookOcrEngine,
   estimateEtaMs,
+  judgeBookOcrRun,
   type BookOcrPhase,
   type BookOcrProgress,
   type BookOcrRequest,
@@ -66,6 +69,16 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
   const item = getLibraryItem(itemId);
   if (!item) return { ok: false, error: 'item-not-found' };
 
+  // Refuse before a single page is read. Without an engine every page throws,
+  // and the old per-page catch turned a book's worth of throws into a book's
+  // worth of blank pages that then replaced the readable original.
+  const engine = bookOcrEngine(isInstalled);
+  if (!engine) {
+    const refusal = { error: 'models-missing', errorKey: 'bookOcr.error.modelsMissing' };
+    broadcast({ itemId, phase: 'error', done: 0, total: 0, confidence: 0, ...refusal });
+    return { ok: false, ...refusal };
+  }
+
   running.add(itemId);
   cancelled.delete(itemId);
 
@@ -94,6 +107,9 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
 
     const pages: BookPage[] = [];
     const startedAt = Date.now();
+    /** Pages the engine threw on, and the first reason, for the verdict below. */
+    let failedPages = 0;
+    let firstError: string | undefined;
 
     for (let i = 0; i < files.length; i++) {
       if (cancelled.has(itemId)) {
@@ -106,22 +122,45 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
       if (dataUrl) {
         try {
           const result = await ocrAuto(dataUrl, {
-            engine: 'auto',
+            engine,
             langHint: 'ja',
             forceLang: 'ja',
             quality: req.quality ?? 'heavy',
           });
           lines = result.lines.map((l) => ({ text: l.text, confidence: l.confidence }));
-        } catch {
+        } catch (err) {
           // A page the engines cannot read becomes an empty page rather than
-          // failing the whole book — 200 good pages beat none.
+          // failing the whole book — 200 good pages beat none. But it is
+          // counted: a run where most pages failed is judged below, not shipped.
+          failedPages += 1;
+          firstError ??= err instanceof Error ? err.message : String(err);
         }
+      } else {
+        failedPages += 1;
       }
       pages.push({ number: i + 1, lines });
 
       emit('recognizing', i + 1, files.length, bookConfidence(pages), {
         etaMs: estimateEtaMs(i + 1, files.length, Date.now() - startedAt),
       });
+    }
+
+    // A run that read almost nothing is a failure, not a book. Judged before
+    // translation and packaging so a failed run costs no more time and, above
+    // all, never reaches `attachGeneratedEpub` — the item keeps its kind.
+    const verdict = judgeBookOcrRun(
+      pages.map((p) => p.lines.map((l) => l.text).join('')),
+      failedPages,
+      firstError,
+    );
+    if (!verdict.ok) {
+      const failure = {
+        error: verdict.error,
+        errorKey: verdict.errorKey,
+        errorVars: verdict.errorVars,
+      };
+      emit('error', pages.length, files.length, bookConfidence(pages), failure);
+      return { ok: false, ...failure };
     }
 
     if (req.bilingual) {

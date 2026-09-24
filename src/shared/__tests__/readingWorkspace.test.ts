@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   READING_WORKSPACE_SCHEMA_VERSION,
   READING_WORKSPACE_SECTIONS,
+  READING_WORKSPACE_TABS,
   defaultReadingWorkspaceRoute,
   normalizeReadingWorkspaceSection,
   normalizeReadingWorkspaceEntry,
@@ -11,6 +12,7 @@ import {
   normalizeReadingWorkspaceRoute,
   readingWorkspaceEntryFromLibraryItem,
   readingWorkspaceSurfaceForSection,
+  readingWorkspaceTabForSection,
   routeForReadingWorkspaceEntry,
   serializeReadingWorkspaceRoute,
   type ReadingWorkspaceEntry,
@@ -232,5 +234,18 @@ describe('Reading workspace library normalization', () => {
     expect(routeForReadingWorkspaceEntry(entry, 'continue').section).toBe('continue');
     expect(routeForReadingWorkspaceEntry(entry, 'plan').section).toBe('plan');
     expect(routeForReadingWorkspaceEntry(entry, 'import').section).toBe('imports');
+  });
+});
+
+describe('workspace tabs', () => {
+  it('shows one tab per screen, and every routable section lands on one of them', () => {
+    expect(READING_WORKSPACE_TABS).toEqual(['discover', 'library', 'lists', 'captures', 'plan', 'imports', 'sources']);
+    for (const section of READING_WORKSPACE_SECTIONS) {
+      expect(READING_WORKSPACE_TABS).toContain(readingWorkspaceTabForSection(section));
+    }
+    expect(readingWorkspaceTabForSection('home')).toBe('discover');
+    expect(readingWorkspaceTabForSection('continue')).toBe('discover');
+    // Home and Continue are still real route sections — only their tabs went.
+    expect(normalizeReadingWorkspaceSection('continue-reading')).toBe('continue');
   });
 });

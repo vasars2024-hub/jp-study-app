@@ -9,7 +9,6 @@ import { WALL_PRESETS } from '../environment/wallCatalog';
 const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 
 const AgentWorkspaceShell = lazy(() => import('./agent/AgentWorkspaceShell'));
-const LibraryView = lazy(() => import('../views/LibraryView'));
 const ReadingWorkspaceView = lazy(() => import('../views/ReadingWorkspaceView'));
 const MediaCenterView = lazy(() => import('../views/MediaCenterView'));
 // Retained as an exported compatibility surface for older deep links and
@@ -76,7 +75,11 @@ export default function AppSection({
       view = <ReadingGarden />;
       break;
     case 'library':
-      view = <LibraryView onOpen={onOpenBook} />;
+      // Start's one way into Reading: the workspace, on its Library tab, so
+      // Discover, Lists, Captures and the novel plan are tabs away rather than
+      // separate Start entries (see DesktopShell START_HIDDEN_SECTIONS). Not a
+      // route host — deep links and lens passages still go to `reading`.
+      view = <ReadingWorkspaceView initialSection="library" onOpenBook={onOpenBook} routeHost={false} />;
       break;
     case 'novels':
       view = <ReadingWorkspaceView initialSection="plan" onOpenBook={onOpenBook} />;

@@ -23,7 +23,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import {
   createReadingSurfaceHarness,
@@ -89,8 +89,35 @@ function installRailGeometry(): void {
   });
 }
 
+/*
+ * Loaded ONCE, in `beforeAll`, with its own budget — not inside the first test.
+ *
+ * Run alone, this file failed 7 of 8 (audit, reproducible on a loaded machine):
+ * the first test's `await import('../views/ImmersionView')` is a COLD transform
+ * of the whole Immersion graph (dictionary popup, player bus, shortcuts, the VN
+ * panel) — measured 8.6 s of that test's 8.7 s on an idle machine, and past the
+ * 20 s test timeout with other suites running. In a full run another file had
+ * already warmed the transform cache, which is why it only failed alone. The
+ * timed-out test then left its mount in flight while `afterEach` restored the
+ * geometry stubs and emptied the body, and every later test read that
+ * half-torn-down tree: `aria-posinset` "1" after a scroll, a null list, an
+ * input from a detached realm. Module cost is setup, so it is paid in setup.
+ */
+let ImmersionView: typeof import('../views/ImmersionView').default;
+let IMMERSION_SITE_ROW_HEIGHT: number;
+
+beforeAll(async () => {
+  // The graph touches `window.api` at module-eval time (player bus), so the
+  // stub has to exist before the import; `beforeEach` reinstalls it per test.
+  installReadingSurfaceApi({
+    immersionListSites: async () => SITES,
+    onImmersionSitesChanged: () => () => undefined,
+  });
+  ({ default: ImmersionView } = await import('../views/ImmersionView'));
+  ({ IMMERSION_SITE_ROW_HEIGHT } = await import('../components/immersion/ImmersionContent'));
+}, 120_000);
+
 async function mountImmersion(width = 1200): Promise<ReadingSurfaceHarness> {
-  const { default: ImmersionView } = await import('../views/ImmersionView');
   harness = createReadingSurfaceHarness({
     render: () => createElement(ImmersionView),
     ready: (container) => container.querySelector('.immersion-site-row') !== null,
@@ -143,7 +170,6 @@ describe('the Immersion sites rail under real load', () => {
     expect(rows(h).length).toBeLessThan(SITE_COUNT);
     // Every slot is the declared height, so the constant is the one in force
     // rather than one the component only documents.
-    const { IMMERSION_SITE_ROW_HEIGHT } = await import('../components/immersion/ImmersionContent');
     expect(IMMERSION_SITE_ROW_HEIGHT).toBe(ROW_HEIGHT);
     expect(new Set(slots(h).map((s) => s.style.height))).toEqual(new Set([`${ROW_HEIGHT}px`]));
   });

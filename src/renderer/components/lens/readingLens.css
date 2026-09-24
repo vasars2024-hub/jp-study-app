@@ -461,6 +461,49 @@
   color: #fff;
 }
 
+/* A missing model's download, in place (AssetInstallPrompt). */
+.lens-install {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.lens-install button {
+  justify-self: start;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--lens-ink);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.lens-install button:hover {
+  background: var(--lens-accent);
+  color: #fff;
+}
+.lens-install .asset-install-busy {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 8px;
+}
+.lens-install .ui-progress {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.lens-install .ui-progress__bar {
+  height: 100%;
+  background: var(--lens-accent);
+}
+.lens-install .asset-install-error {
+  margin: 0;
+  color: #ff8a8a;
+}
+
 /* ---- Reader panel (Glance / Expand / Deep) ---- */
 
 .lens-reader {

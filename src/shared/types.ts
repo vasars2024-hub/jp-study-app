@@ -472,6 +472,25 @@ export interface LibraryItem {
 
   /** Manga only: number of pages. */
   pageCount?: number;
+
+  /**
+   * Set once a page-image item (manga, image archive, scanned PDF) has been
+   * converted to text by book OCR. Conversion is reversible: this is how the
+   * item was shelved before, so it can be switched back to its original pages
+   * at any time. The page images and the original file are never deleted.
+   */
+  ocrOriginal?: {
+    kind: LibraryKind;
+    /** The original's `epubFile` (a scanned PDF's `original.pdf`); absent for page images. */
+    epubFile?: string;
+  };
+  /** The EPUB book OCR built, relative to the item folder. */
+  ocrEpubFile?: string;
+  /**
+   * Reading position kept per view, so switching between the original pages and
+   * the converted text does not hand one format the other's locator.
+   */
+  ocrViewProgress?: { original?: Progress; text?: Progress };
   /**
    * Provider provenance for a manga chapter downloaded into the local
    * library. The page bytes are local, so the retained reader/OCR path treats

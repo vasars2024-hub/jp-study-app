@@ -120,6 +120,16 @@ export default function ReadingFinderView({
           </section>
         )}
 
+        {/* The workspace folded its Home and Continue tabs into this one, so the
+            books in progress sit above the catalogue — only when there are any,
+            so a first run is not greeted by an empty shelf. */}
+        {mode === 'discover' && continueReading.length > 0 && (
+          <section className="rf-continue" aria-label={t('reading.continue.title')}>
+            <h2>{t('reading.continue.title')}</h2>
+            <ContinueReadingRow state={state} onOpenBook={onOpenBook} />
+          </section>
+        )}
+
         {mode === 'discover' && <ReadingFinderControls state={state} />}
 
         {mode === 'discover' && (

@@ -7,8 +7,10 @@ import type { LibraryItem } from '../../../shared/types';
 import MangaReader from '../../views/MangaReader';
 import { useT } from '../../i18n';
 import Icon from '../Icons';
+import { openMangaProviderInventory } from './mangaProviderLinks';
 import {
   isEmptyProviderResult,
+  isLocalOnlyMangaProvider,
   mangaChapterSecondaryTitle,
   mangaChapterSourceKey,
   type MangaChapterOrder,
@@ -28,6 +30,24 @@ interface ProviderChapters {
 interface Props {
   candidate: DiscoveryCandidate;
   onClose: () => void;
+}
+
+/**
+ * What to say when there is no chapter provider at all. Exported so every
+ * Reading surface that depends on providers explains the same way.
+ */
+export function MangaNoProviders() {
+  const { t } = useT();
+  return (
+    <div className="reading-source-message reading-source-empty" role="status">
+      <strong>{t('reading.sources.noProviders.title')}</strong>
+      <p>{t('reading.sources.noProviders.body')}</p>
+      <button type="button" className="disc-btn" onClick={openMangaProviderInventory}>
+        <Icon name="globe" size={12} />
+        {t('reading.sources.noProviders.action')}
+      </button>
+    </div>
+  );
 }
 
 function providerState(
@@ -53,6 +73,12 @@ function providerState(
 export default function MangaProviderBrowser({ candidate, onClose }: Props) {
   const { t } = useT();
   const [sources, setSources] = useState<ProviderChapters[]>([]);
+  /**
+   * Whether the provider list has answered. An empty list used to be read as
+   * "still loading", so a machine with no provider installed showed
+   * "Loading sources…" forever.
+   */
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [downloading, setDownloading] = useState('');
   const [downloadMessage, setDownloadMessage] = useState('');
@@ -79,13 +105,18 @@ export default function MangaProviderBrowser({ candidate, onClose }: Props) {
   useEffect(() => {
     let dead = false;
     setLoadError('');
+    setProvidersLoaded(false);
     void window.api.readingMangaProviders().then(async (reply) => {
       if (dead) return;
       if (reply.state !== 'ready' || !reply.data) {
         setLoadError(reply.message || reply.state);
         return;
       }
-      const providers = reply.data;
+      // The local provider only reads what is already downloaded; asking it for
+      // a catalogue title's chapters crashes the sidecar (see
+      // isLocalOnlyMangaProvider), so it is not a source here.
+      const providers = reply.data.filter((provider) => !isLocalOnlyMangaProvider(provider.id));
+      setProvidersLoaded(true);
       setSources(providers.map((provider) => providerState(provider)));
       const settled = await Promise.all(providers.map(async (provider): Promise<ProviderChapters> => {
         const chapters = await window.api.readingMangaChapters({
@@ -227,11 +258,13 @@ export default function MangaProviderBrowser({ candidate, onClose }: Props) {
           </div>
         ) : null}
 
-        {!loadError && sources.length === 0 ? (
+        {!loadError && !providersLoaded ? (
           <div className="reading-source-message" role="status" aria-busy="true">
             {t('reading.sources.loading')}
           </div>
         ) : null}
+
+        {!loadError && providersLoaded && sources.length === 0 ? <MangaNoProviders /> : null}
 
         {sources.length > 0 ? (
           <div className="reading-source-summary">
