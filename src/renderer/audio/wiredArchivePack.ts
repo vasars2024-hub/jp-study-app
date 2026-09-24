@@ -1,5 +1,5 @@
 import { soundEngine } from './soundEngine';
-import type { SoundPackManifest } from './soundPack';
+import { lazySounds, type SoundPackManifest } from './soundPack';
 
 export const WIRED_ARCHIVE_SOUND_PACK_ID = 'wired-archive-generated';
 
@@ -174,59 +174,58 @@ const CUES: Record<CueName, Cue> = {
   'switch-clack': { duration: 0.1, tones: [{ start: 0.005, duration: 0.025, freq: 2200, gain: 0.05 }, { start: 0.02, duration: 0.06, freq: 90, gain: 0.045 }] },
 };
 
-const urls = Object.fromEntries(Object.entries(CUES).map(([name, cue]) => [name, cueUrl(cue)])) as Record<CueName, string>;
-
+// Cue names per sound; each WAV is synthesized on its first play (`lazySounds`).
 export const WIRED_ARCHIVE_SOUND_PACK: SoundPackManifest = {
   id: WIRED_ARCHIVE_SOUND_PACK_ID,
   label: 'WIRED ARCHIVE generated terminal cues',
   themeId: 'wired-archive',
-  sounds: {
+  sounds: lazySounds<CueName>({
     system: {
-      startup: urls.startup,
-      shutdown: urls.shutdown,
-      restart: urls.restart,
-      sleep: urls.sleep,
-      wake: urls.wake,
+      startup: 'startup',
+      shutdown: 'shutdown',
+      restart: 'restart',
+      sleep: 'sleep',
+      wake: 'wake',
     },
     ui: {
-      'window-open': urls['window-open'],
-      'window-close': urls['window-close'],
-      minimize: urls.minimize,
-      menu: urls.menu,
-      dialog: urls.dialog,
-      confirm: urls.confirm,
-      cancel: urls.cancel,
-      route: urls.route,
-      dock: urls.dock,
-      decrypt: urls.decrypt,
-      'sync-fail': urls['sync-fail'],
-      'db-blip': urls['db-blip'],
-      'tape-seek': urls['tape-seek'],
-      'switch-clack': urls['switch-clack'],
+      'window-open': 'window-open',
+      'window-close': 'window-close',
+      minimize: 'minimize',
+      menu: 'menu',
+      dialog: 'dialog',
+      confirm: 'confirm',
+      cancel: 'cancel',
+      route: 'route',
+      dock: 'dock',
+      decrypt: 'decrypt',
+      'sync-fail': 'sync-fail',
+      'db-blip': 'db-blip',
+      'tape-seek': 'tape-seek',
+      'switch-clack': 'switch-clack',
     },
     notification: {
-      notify: urls.notify,
-      info: urls.info,
-      warning: urls.warning,
-      error: urls.error,
+      notify: 'notify',
+      info: 'info',
+      warning: 'warning',
+      error: 'error',
     },
     environment: {
-      ambient: urls.ambient,
-      forest: urls.ambient,
-      ocean: urls.ambient,
-      sky: urls.ambient,
-      city: urls.ambient,
-      space: urls.ambient,
-      snow: urls.ambient,
+      ambient: 'ambient',
+      forest: 'ambient',
+      ocean: 'ambient',
+      sky: 'ambient',
+      city: 'ambient',
+      space: 'ambient',
+      snow: 'ambient',
     },
     achievement: {
-      milestone: urls.confirm,
-      'sync-ok': urls['sync-ok'],
+      milestone: 'confirm',
+      'sync-ok': 'sync-ok',
     },
     companion: {
-      chirp: urls.info,
+      chirp: 'info',
     },
-  },
+  }, (cue) => cueUrl(CUES[cue])),
 };
 
 let registered = false;

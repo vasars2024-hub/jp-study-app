@@ -35,6 +35,39 @@ export interface SoundPackManifest {
   sounds: Partial<Record<SoundCategory, Record<string, string>>>;
 }
 
+/**
+ * A pack's sounds map whose URLs are built on first read, not at registration.
+ *
+ * The two generated packs (Aero, WIRED ARCHIVE) synthesize every cue as a WAV
+ * data URL. Built eagerly (both are registered at boot) that was ~22 MB of
+ * base64 strings on the renderer heap for two themes most users never pick.
+ * `layout` names a cue per sound; `build` makes its URL once, when the sound
+ * engine first asks for it, and the result is kept for the next play.
+ */
+export function lazySounds<K extends string>(
+  layout: Partial<Record<SoundCategory, Record<string, K>>>,
+  build: (cue: K) => string,
+): SoundPackManifest['sounds'] {
+  const cache = new Map<K, string>();
+  const urlFor = (cue: K): string => {
+    let url = cache.get(cue);
+    if (url === undefined) {
+      url = build(cue);
+      cache.set(cue, url);
+    }
+    return url;
+  };
+  const sounds: SoundPackManifest['sounds'] = {};
+  for (const [category, names] of Object.entries(layout) as [SoundCategory, Record<string, K>][]) {
+    const group: Record<string, string> = {};
+    for (const [name, cue] of Object.entries(names)) {
+      Object.defineProperty(group, name, { enumerable: true, get: () => urlFor(cue) });
+    }
+    sounds[category] = group;
+  }
+  return sounds;
+}
+
 /** Build a conventional asset URL for a pack sound (origin-relative → app://). */
 export function soundAssetUrl(packId: string, category: SoundCategory, file: string): string {
   return `${location.origin}/sounds/${packId}/${category}/${file}`;

@@ -6,7 +6,7 @@
  * intentionally representative chimes, not final mastered production assets.
  */
 import { soundEngine } from './soundEngine';
-import type { SoundPackManifest } from './soundPack';
+import { lazySounds, type SoundPackManifest } from './soundPack';
 
 export const AERO_PROOF_SOUND_PACK_ID = 'secret-aero-proof';
 
@@ -318,56 +318,53 @@ export function registerAeroProofSoundPack(): void {
   if (registered) return;
   registered = true;
 
-  const urls = Object.fromEntries(
-    (Object.keys(CUES) as CueId[]).map((id) => [id, wavDataUrl(CUES[id])]),
-  ) as Record<CueId, string>;
-
+  // Cue ids per sound; each WAV is synthesized on its first play (`lazySounds`).
   const manifest: SoundPackManifest = {
     id: AERO_PROOF_SOUND_PACK_ID,
     label: 'Secret Aero System',
     themeId: 'frutiger-aero',
-    sounds: {
+    sounds: lazySounds<CueId>({
       system: {
-        startup: urls.startup,
-        shutdown: urls.shutdown,
-        restart: urls.restart,
-        sleep: urls.sleep,
-        wake: urls.wake,
+        startup: 'startup',
+        shutdown: 'shutdown',
+        restart: 'restart',
+        sleep: 'sleep',
+        wake: 'wake',
       },
       notification: {
-        notify: urls.notify,
-        info: urls.info,
-        warning: urls.warning,
-        error: urls.error,
+        notify: 'notify',
+        info: 'info',
+        warning: 'warning',
+        error: 'error',
       },
       ui: {
-        info: urls.info,
-        warning: urls.warning,
-        error: urls.error,
-        confirm: urls.confirm,
-        cancel: urls.cancel,
-        dialog: urls.dialog,
-        menu: urls.menu,
-        'window-open': urls.windowOpen,
-        'window-close': urls.windowClose,
-        minimize: urls.minimize,
+        info: 'info',
+        warning: 'warning',
+        error: 'error',
+        confirm: 'confirm',
+        cancel: 'cancel',
+        dialog: 'dialog',
+        menu: 'menu',
+        'window-open': 'windowOpen',
+        'window-close': 'windowClose',
+        minimize: 'minimize',
       },
       achievement: {
-        milestone: urls.achievement,
+        milestone: 'achievement',
       },
       companion: {
-        chirp: urls.companion,
+        chirp: 'companion',
       },
       environment: {
-        ambient: urls.ambient,
-        forest: urls.ambient,
-        ocean: urls.ambient,
-        sky: urls.ambient,
-        city: urls.ambient,
-        space: urls.ambient,
-        snow: urls.ambient,
+        ambient: 'ambient',
+        forest: 'ambient',
+        ocean: 'ambient',
+        sky: 'ambient',
+        city: 'ambient',
+        space: 'ambient',
+        snow: 'ambient',
       },
-    },
+    }, (id) => wavDataUrl(CUES[id])),
   };
 
   soundEngine.registerPack(manifest);
