@@ -7,24 +7,8 @@
   </head>
   <body>
     <div id="root"></div>
-    <!--
-      Latency measurement escape hatch, off unless `?noReactTrack=1` is in the URL.
-
-      React's DEV build logs every re-rendered component to the DevTools "Components" track,
-      and for any fiber whose props identity changed it SERIALIZES the whole props diff first
-      (`addObjectDiffToProperties` -> `addValueToProperties`, react-dom_client dev only; the
-      production build contains neither). On a surface that passes a list as a prop that is
-      exactly the immersion saved-sites rail - the cost is proportional to the list, lands
-      OUTSIDE React's own render measurement, and reads as product latency. It is what made
-      ten separate product-side candidates for `immersion` cat2 all measure DEAD.
-
-      `supportsUserTiming` is computed once when react-dom evaluates, from `console.timeStamp`.
-      Removing it here - before the module script - is the only point at which the track can be
-      turned off, and it is why this lives in the HTML rather than in a module.
-    -->
-    <script>
-      if (location.search.includes('noReactTrack')) delete console.timeStamp;
-    </script>
+    <!-- The dev-only `?noReactTrack` switch lives in src/renderer/reactTrackHatch.ts: an
+         inline script here is refused by the packaged app's CSP on every launch. -->
     <script type="module" src="/src/renderer/main.tsx"></script>
   </body>
 </html>

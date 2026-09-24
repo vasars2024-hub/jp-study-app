@@ -82,3 +82,25 @@ describe('Reading Garden — the empty state is named, and only when it is true'
     expect(emptyLine()).toBeNull();
   });
 });
+
+describe('City — the optional ambient track', () => {
+  it('without the gitignored track, nothing is requested and no music control is offered', async () => {
+    // The .opus is regenerated locally and never committed, so the test tree —
+    // like a packaged build — has none. It used to be requested anyway (a 404 on
+    // every open); now the player is never pointed at it.
+    const created: HTMLAudioElement[] = [];
+    const RealAudio = window.Audio;
+    (window as { Audio: unknown }).Audio = function FakeAudio(this: unknown) {
+      const el = new RealAudio();
+      created.push(el);
+      return el;
+    } as unknown as typeof Audio;
+    try {
+      await mountWith(3);
+      expect(created.filter((el) => el.src.includes('mooncap-endless-dream'))).toEqual([]);
+      expect(host.querySelector('.reading-garden-info-music')).toBeNull();
+    } finally {
+      (window as { Audio: unknown }).Audio = RealAudio;
+    }
+  });
+});

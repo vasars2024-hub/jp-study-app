@@ -41,10 +41,21 @@ import {
 } from "./mooncapMusic";
 import "./readingGarden.css";
 
-const mooncapMusicUrl = new URL(
-  "../../assets/reading-garden/audio/mooncap-endless-dream.opus",
-  import.meta.url,
-).href;
+/**
+ * The Mooncap ambient track is optional: it is regenerated locally and
+ * gitignored (~118 MB), so most builds do not contain it. A `new URL(...)` to it
+ * resolved anyway and the City requested it on every open — a 404 in the
+ * console of every packaged build. A glob resolves to nothing when the file is
+ * absent, so the music simply is not offered and nothing is fetched.
+ */
+const mooncapMusicUrl: string | null =
+  (Object.values(
+    import.meta.glob("../../assets/reading-garden/audio/mooncap-endless-dream.opus", {
+      eager: true,
+      query: "?url",
+      import: "default",
+    }),
+  )[0] as string | undefined) ?? null;
 
 const stage01To10Url = new URL(
   "../../assets/reading-garden/mushroom-stages-01-10.png",
@@ -872,6 +883,7 @@ export default function ReadingGarden({
   );
 
   useEffect(() => {
+    if (!mooncapMusicUrl) return undefined;
     mooncapMusicPlayer.configure(mooncapMusicUrl);
     return () => {
       mooncapMusicPlayer.dispose();
@@ -1122,6 +1134,7 @@ export default function ReadingGarden({
                 <small>{t("mooncap.info.evolvedToday")}</small>
               )}
             </div>
+            {mooncapMusicUrl ? (
             <div className="reading-garden-info-music">
               <div className="reading-garden-info-music-heading">
                 <span>{t("mooncap.info.musicLabel")}</span>
@@ -1174,6 +1187,7 @@ export default function ReadingGarden({
                 <strong>{Math.round(music.volume * 100)}</strong>
               </label>
             </div>
+            ) : null}
             <div className="reading-garden-info-track" aria-hidden="true">
               <i
                 style={{

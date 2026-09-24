@@ -1,4 +1,6 @@
 // (widget system loaded via App → DesktopShell)
+// FIRST, before react-dom evaluates: the dev-only `?noReactTrack` switch.
+import './reactTrackHatch';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
