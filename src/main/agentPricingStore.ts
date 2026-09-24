@@ -17,9 +17,9 @@
  * `migrated` records that the renderer's legacy values were adopted, so a stale
  * window cannot re-import rates the user has since cleared.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import type { AiProviderId } from '../shared/aiProviders';
 import {
   effectiveAgentProviderPrice,
@@ -67,27 +67,13 @@ export function createAgentPricingStore(rootDirectory: string): AgentPricingStor
 
   const current = (): AgentPricingDocument => {
     if (cached) return cached;
-    try {
-      cached = normalizeAgentPricingDocument(JSON.parse(fs.readFileSync(filePath, 'utf8')));
-    } catch {
-      cached = normalizeAgentPricingDocument(null);
-    }
+    // A damaged file is moved aside and its last-good copy served (atomicJson).
+    cached = normalizeAgentPricingDocument(readJsonSync<unknown>(filePath, null));
     return cached;
   };
 
   const commit = (next: AgentPricingDocument): AgentPricingDocument => {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-    try {
-      fs.writeFileSync(temporary, JSON.stringify(next, null, 2), { encoding: 'utf8', mode: 0o600 });
-      fs.renameSync(temporary, filePath);
-    } finally {
-      try {
-        fs.rmSync(temporary, { force: true });
-      } catch {
-        // Already renamed into place, or already gone.
-      }
-    }
+    writeJsonAtomicSync(filePath, next, { mode: 0o600 });
     cached = next;
     return next;
   };
