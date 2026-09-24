@@ -6,7 +6,7 @@
  * keeps the remaining localStorage/IndexedDB data in deterministic order.
  */
 
-import { kvGet, kvSet } from './db';
+import { kvCompareAndSet, kvGet, kvSet } from './db';
 import { IDB_KEYS, LS_KEYS } from './storage';
 import { restoreAnnotationsFromIdb } from '../annotations';
 import { restoreBookmarksFromIdb } from '../bookmarks';
@@ -52,7 +52,37 @@ function collectSnapshot(): StorageMigrationSnapshot {
   return { localStorage: localStorageSnapshot, indexedDb: indexedDbSnapshot };
 }
 
+/**
+ * Value equality for the compare-and-set below. localStorage values are the
+ * raw strings `getItem` returned; IndexedDB values are structured clones, so
+ * they compare by their JSON form (the plan itself clones through JSON).
+ */
+function sameValue(current: unknown, expected: unknown): boolean {
+  if (current === expected) return true;
+  if (current === undefined || expected === undefined) return false;
+  try {
+    return JSON.stringify(current) === JSON.stringify(expected);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The adapter never writes a key whose value changed since `readSnapshot`.
+ *
+ * The runner starts ~8 s after boot and awaits IndexedDB between the read and
+ * the write. It used to write every retained key back from its snapshot, so a
+ * card mined in that window was overwritten by the deck read before it (the
+ * deck's `savedAt` stamps only recovered it on the next boot). Now:
+ * - a key whose planned value equals what was read is not written at all —
+ *   writing it back could only lose a newer value;
+ * - a key the plan does change (a corrupt entry being dropped) is re-read
+ *   immediately before the write and skipped if it no longer matches.
+ *   localStorage is re-read synchronously right before `setItem`; IndexedDB
+ *   goes through `kvCompareAndSet`, one transaction for check and write.
+ */
 function createAdapter(): StorageMigrationAdapter {
+  const read: StorageMigrationSnapshot = { localStorage: {}, indexedDb: {} };
   return {
     async readSnapshot() {
       const snapshot = collectSnapshot();
@@ -60,19 +90,30 @@ function createAdapter(): StorageMigrationAdapter {
       for (const [key, value] of entries) {
         if (value !== undefined) snapshot.indexedDb[key] = value;
       }
+      read.localStorage = { ...snapshot.localStorage };
+      read.indexedDb = { ...snapshot.indexedDb };
       return snapshot;
     },
     async replaceAtomic(next) {
       const idbKeys = new Set(Object.values(IDB_KEYS));
       for (const key of idbKeys) {
+        const planned = next.indexedDb[key];
+        const original = read.indexedDb[key];
+        if (sameValue(planned, original)) continue;
         try {
-          await kvSet(key, next.indexedDb[key]);
+          await kvCompareAndSet(key, original, planned, sameValue);
         } catch {
           /* ignore */
         }
       }
       for (const key of Object.values(LS_KEYS)) {
-        if (next.localStorage[key] === undefined) {
+        const planned = next.localStorage[key];
+        const original = read.localStorage[key];
+        if (sameValue(planned, original)) continue;
+        // Synchronous re-read: nothing can run between this and the write.
+        const current = readLocal(key) ?? undefined;
+        if (!sameValue(current, original)) continue;
+        if (planned === undefined) {
           try {
             localStorage.removeItem(key);
           } catch {
@@ -80,7 +121,7 @@ function createAdapter(): StorageMigrationAdapter {
           }
           continue;
         }
-        writeLocal(key, next.localStorage[key]);
+        writeLocal(key, planned);
       }
     },
   };
