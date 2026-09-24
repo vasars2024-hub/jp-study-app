@@ -93,8 +93,6 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.arcade.mines.flagged': '旗を立てました。',
   'games.arcade.mines.unflagged': '旗を外しました。',
   'games.arcade.mines.next': 'クリア！ステージ {stage} を開始します。',
-  'games.kicker': '練習',
-  'games.title': 'ゲームアリーナ',
   'games.desc': 'レベルに合わせた短時間のローカル演習と、ミラーライティング評価。',
   'games.progress': 'ゲームの進捗',
   'games.xp': '{xp} XP',

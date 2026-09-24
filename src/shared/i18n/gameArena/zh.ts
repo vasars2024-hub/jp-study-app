@@ -92,8 +92,6 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.arcade.mines.flagged': '已标记格子。',
   'games.arcade.mines.unflagged': '已移除标记。',
   'games.arcade.mines.next': '棋盘已清空，开始第 {stage} 关。',
-  'games.kicker': '练习',
-  'games.title': '游戏竞技场',
   'games.desc': '贴合你等级的本地快速练习，外加镜像写作评估。',
   'games.progress': '游戏进度',
   'games.xp': '{xp} XP',

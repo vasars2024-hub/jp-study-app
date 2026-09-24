@@ -109,8 +109,6 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.arcade.mines.flagged': 'Cell flagged.',
   'games.arcade.mines.unflagged': 'Flag removed.',
   'games.arcade.mines.next': 'Board cleared. Stage {stage} is ready.',
-  'games.kicker': 'Practice',
-  'games.title': 'Game Arena',
   'games.desc': 'Fast local drills plus Mirror Writing evaluation, all keyed to your level.',
   'games.progress': 'Game progress',
   'games.xp': '{xp} XP',

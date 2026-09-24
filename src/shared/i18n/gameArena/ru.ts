@@ -96,8 +96,6 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.arcade.mines.flagged': 'Флажок установлен.',
   'games.arcade.mines.unflagged': 'Флажок убран.',
   'games.arcade.mines.next': 'Поле очищено. Начинается этап {stage}.',
-  'games.kicker': 'Практика',
-  'games.title': 'Игровая арена',
   'games.desc': 'Быстрые локальные упражнения и оценка «Зеркального письма» — всё по вашему уровню.',
   'games.progress': 'Игровой прогресс',
   'games.xp': '{xp} XP',
