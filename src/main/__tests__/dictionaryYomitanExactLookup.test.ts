@@ -23,7 +23,7 @@ vi.mock('../i18n', () => ({ mt: (key: string) => key }));
 // The real one opens a SQLite database in userData; nothing here reads it.
 vi.mock('../dictionary/service', () => ({ initDictionaryService: () => undefined }));
 
-import { lookupGlossary, lookupOfflineDeinflected, setYomitanLang } from '../dictionary/yomitan';
+import { ensureYomitanTerms, lookupGlossary, lookupOfflineDeinflected, setYomitanLang } from '../dictionary/yomitan';
 
 const DICT_ID = 'fixture-jmdict-en';
 
@@ -83,6 +83,8 @@ function seedStore(): void {
 beforeEach(() => {
   tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-yomitan-exact-'));
   seedStore();
+  // The glossaries load on first use, not with the metadata; this file reads them.
+  ensureYomitanTerms();
   // The only exported call that reloads the merged indices without touching the
   // network; clearing an override that was never set leaves the registry's
   // meaning unchanged.

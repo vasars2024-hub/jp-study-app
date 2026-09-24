@@ -28,7 +28,7 @@ vi.mock('electron', () => ({
 vi.mock('../i18n', () => ({ mt: (key: string) => key }));
 vi.mock('../dictionary/service', () => ({ initDictionaryService: () => undefined }));
 
-import { importYomitanZip, lookupGlossary } from '../dictionary/yomitan';
+import { ensureYomitanTerms, importYomitanZip, lookupGlossary } from '../dictionary/yomitan';
 import {
   parseTagBankRows,
   splitSenseTags,
@@ -83,6 +83,8 @@ function writeZip(file: string, opts: { tagBank?: unknown[]; tagBankFirst?: bool
 async function importFixture(opts: { tagBank?: unknown[]; tagBankFirst?: boolean }): Promise<void> {
   const zipPath = path.join(tempRoot, `fixture-${opts.tagBankFirst ? 'first' : 'last'}.zip`);
   writeZip(zipPath, opts);
+  // The glossaries load on first use rather than at boot; this file reads them.
+  ensureYomitanTerms();
   const res = await importYomitanZip(zipPath);
   expect(res.ok).toBe(true);
 }

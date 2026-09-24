@@ -9,7 +9,7 @@ import { loadAfterCacheClear, loadWindowWithRetry, loadWithRetry } from './main/
 import { registerReadingListsIpc } from './main/readingListsIpc';
 import { registerReadingListsLateBinding } from './main/readingListsBinding';
 import { registerReadingRemindersIpc } from './main/readingListsReminders';
-import { registerDictionaryIpc, initYomitan } from './main/dictionary';
+import { registerDictionaryIpc, initYomitanMeta } from './main/dictionary';
 import { registerMediaIpc } from './main/media';
 import { registerYtPlaylistsIpc, startYtAutoUpdateTimer, stopYtAutoUpdateTimer } from './main/ytPlaylists';
 import { registerProfileIpc } from './main/profiles';
@@ -1951,11 +1951,12 @@ app.whenReady().then(async () => {
     startSystemDictionary();
     // Reading Lens: registers its own global hotkey (screen-region OCR reader).
     startReadingLens();
-    // Provision + load offline dictionaries in the background. Its first step
-    // opens the dictionary database synchronously, which is why it waits for
-    // the first frame. Consumers that need glosses (mining, the pop-up) await
-    // initYomitan() themselves, so an early lookup simply starts it.
-    void initYomitan();
+    // Provision the offline dictionaries and load their metadata (pitch, IPA,
+    // frequency) in the background. Its first step opens the dictionary database
+    // synchronously, which is why it waits for the first frame. The term
+    // glossaries are not loaded here: consumers that read them await
+    // initYomitan() themselves, which loads them on first use.
+    void initYomitanMeta();
     // Reconcile downloaded models against disk (and refresh the asset registry)
     // in the background — consumers ask isInstalled() before touching a model, so
     // a slow first pass degrades to "not installed yet", never to a crash.

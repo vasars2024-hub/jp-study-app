@@ -1884,7 +1884,9 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         json(res, 400, { ok: false, error: 'query required' });
         return;
       }
-      const { lookupOfflineDeinflected } = await import('./dictionary/yomitan');
+      const { initYomitan, lookupOfflineDeinflected } = await import('./dictionary/yomitan');
+      // The glossaries load on first use now, not at boot; this path reads them.
+      await initYomitan();
       const local = lookupOfflineDeinflected(query);
       const entries = (local.entries || []).slice(0, 8).map((e) => ({
         word: e.word,

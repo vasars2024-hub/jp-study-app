@@ -15,6 +15,7 @@ import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
 import {
   initDictionaryService,
+  pendingLegacyStores,
   removeDictionarySource,
   setDictionarySourceEnabled,
   syncDictionarySourceOrder,
@@ -108,6 +109,19 @@ const ipaByKey = new Map<string, StoredIpaEntry>();
 const freqByKey = new Map<string, { rank: number; source: string }>();
 let dictList: YomitanDictInfo[] = [];
 let initPromise: Promise<void> | null = null;
+/**
+ * Whether the term glossaries are in memory, as opposed to only the metadata
+ * (pitch, IPA, frequency) and the registry.
+ *
+ * The glossaries are most of this module's memory — the bundled JMdict (en, ru)
+ * and Moedict alone were ~260 MB of main-process heap, parsed at boot and held
+ * for the life of the process — and on an installation whose stores have been
+ * migrated into SQLite nothing on the lookup path reads them: the database
+ * answers exact, reading, de-inflected and prefix lookups for the same data. So
+ * boot loads only the metadata (`initYomitanMeta`), and the glossaries load the
+ * first time a caller that still reads them directly awaits `initYomitan()`.
+ */
+let termsLoaded = false;
 
 const KANJIUM_PITCH_ID = 'bundled-kanjium-pitch';
 const KANJIUM_PITCH_URL =
@@ -431,8 +445,13 @@ function clearMergedIndices(): void {
   freqByKey.clear();
 }
 
-function mergeStoredIndex(stored: StoredDictIndex, sourceTitle: string, sourceLangs?: string[]): void {
-  if (stored.terms) {
+function mergeStoredIndex(
+  stored: StoredDictIndex,
+  sourceTitle: string,
+  sourceLangs?: string[],
+  withTerms = true,
+): void {
+  if (withTerms && stored.terms) {
     for (const [term, entries] of Object.entries(stored.terms)) {
       const tagged = entries.map((e) => ({
         ...e,
@@ -461,6 +480,16 @@ function mergeStoredIndex(stored: StoredDictIndex, sourceTitle: string, sourceLa
   }
 }
 
+/**
+ * Whether a store carries anything the metadata load needs. Read from the
+ * registry flags so a term-only store (JMdict is ~100 MB of JSON) is not even
+ * parsed at boot. `hasIpa` predates some registries; an unflagged store with no
+ * terms is read to be safe, one with terms gets its IPA with the glossaries.
+ */
+function carriesMetadata(info: YomitanDictInfo): boolean {
+  return info.hasPitch || info.hasFreq || info.hasIpa === true || (info.hasIpa === undefined && !info.hasTerms);
+}
+
 function loadAllIndices(): void {
   clearMergedIndices();
   const reg = readRegistry();
@@ -471,6 +500,8 @@ function loadAllIndices(): void {
   let registryChanged = false;
   for (const info of dictList) {
     if (info.enabled === false) continue;
+    const wantTerms = termsLoaded && info.hasTerms;
+    if (!wantTerms && !carriesMetadata(info)) continue;
     const file = dictIndexPath(info.id);
     if (!fs.existsSync(file)) continue;
     try {
@@ -486,7 +517,7 @@ function loadAllIndices(): void {
         info.glossLangs = detectGlossLangs(stored);
         registryChanged = true;
       }
-      mergeStoredIndex(stored, info.title, effectiveGlossLangs(info));
+      mergeStoredIndex(stored, info.title, effectiveGlossLangs(info), wantTerms);
     } catch (err) {
       console.error(`[yomitan] failed to load ${info.id}:`, err);
     }
@@ -1163,8 +1194,43 @@ export function removeYomitanDict(id: string): { ok: boolean; error?: string } {
   return { ok: true };
 }
 
-/** Boot-time init: seed bundled pitch, load all indices. Safe to call repeatedly. */
-export function initYomitan(): Promise<void> {
+/**
+ * Everything, glossaries included, for a caller that reads the term index
+ * directly (`lookupOfflineDeinflected`, `lookupGlossary`, `lookupTermMerged`).
+ * The first such call pays the glossary parse once; see `termsLoaded`.
+ */
+export async function initYomitan(): Promise<void> {
+  await initYomitanMeta();
+  ensureYomitanTerms();
+}
+
+/** Load the term glossaries now, once; what `initYomitan()` adds to the metadata. */
+export function ensureYomitanTerms(): void {
+  if (termsLoaded) return;
+  termsLoaded = true;
+  loadAllIndices();
+}
+
+/**
+ * Whether a legacy term store exists that SQLite does not own yet — a bundled
+ * store still migrating, or a Yomitan zip whose import is queued. Only then can
+ * the in-memory glossaries answer something the database cannot.
+ */
+export function legacyTermsPending(): boolean {
+  try {
+    const pending = new Set(pendingLegacyStores());
+    return dictList.some((info) => info.hasTerms && info.enabled !== false && pending.has(info.id));
+  } catch {
+    // No database to ask: the in-memory index is the only answer there is.
+    return true;
+  }
+}
+
+/**
+ * Boot-time init: seed and provision the bundled stores, load the registry and
+ * the metadata indices (pitch, IPA, frequency). Safe to call repeatedly.
+ */
+export function initYomitanMeta(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       fs.mkdirSync(yomitanRoot(), { recursive: true });

@@ -20,6 +20,8 @@ import {
   getPitch,
   importYomitanZip,
   initYomitan,
+  initYomitanMeta,
+  legacyTermsPending,
   listYomitanDicts,
   lookupGlossary,
   getPitchData,
@@ -260,9 +262,10 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
     if (unified.entries.length) {
       const converted = lookupResultToDictResult(unified);
       // Preserve the legacy popup's pitch/frequency contract while the unified
-      // schema grows first-class metadata fields of its own.
+      // schema grows first-class metadata fields of its own. Only the metadata:
+      // the glossaries are not read on this path.
       try {
-        await initYomitan();
+        await initYomitanMeta();
         return enrichLexiconResultMetadata(converted, {
           pitchHtml: getPitch,
           frequency: getFrequencyDetail,
@@ -276,7 +279,12 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
     // A database read must never take the established dictionary fallback down.
   }
 
-  await initYomitan();
+  // The legacy glossaries can only add something here while a store is still
+  // waiting for its database import: once SQLite owns every store, its exact,
+  // de-inflected and prefix lookups above already covered the same data. Loading
+  // them for every miss is what kept ~260 MB of them resident after one popup.
+  if (legacyTermsPending()) await initYomitan();
+  else await initYomitanMeta();
   const merged = await lookupTermMerged(q, lookupWord);
   if (merged.entries.length || merged.error) return merged;
 
@@ -325,10 +333,18 @@ export async function lookupOfflineInterlinearMerged(
 ): Promise<LexiconInterlinearResult> {
   let result: LexiconInterlinearResult;
   try {
-    await initYomitan();
-    const dicts = listYomitanDicts();
-    result = lookupOfflineInterlinearFromStore(text, options, (query) =>
-      legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
+    // The legacy fallback only answers for stores SQLite does not own yet (see
+    // `lookupTerm`); without one it would load every glossary to add nothing.
+    // The boot cache warm-up runs this path, so that load used to be permanent.
+    if (!legacyTermsPending()) {
+      await initYomitanMeta();
+      result = lookupOfflineInterlinearFromStore(text, options);
+    } else {
+      await initYomitan();
+      const dicts = listYomitanDicts();
+      result = lookupOfflineInterlinearFromStore(text, options, (query) =>
+        legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
+    }
   } catch {
     // A legacy store that will not load must not take the database path down.
     result = lookupOfflineInterlinearFromStore(text, options);
@@ -1348,7 +1364,7 @@ export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:moveYomitan', (_e, id: string, dir: number) => moveYomitanDict(id, dir));
   ipcMain.handle('dict:setYomitanLang', (_e, id: string, lang: string) => setYomitanLang(id, lang));
   ipcMain.handle('dict:availableLangs', async (): Promise<string[]> => {
-    await initYomitan();
+    await initYomitanMeta();
     return getAvailableGlossLangs();
   });
   // The long imports run in a utility process and have their own lifecycle
@@ -1358,9 +1374,9 @@ export function registerDictionaryIpc(): void {
   // Provisioning is already asynchronous. Once it has named every bundled
   // legacy store, migrate only the stores SQLite does not yet own. The job stays
   // observable/cancellable through the same Settings card as a manual rebuild.
-  void initYomitan().then(startPendingLegacyDictionaryMigration).catch((error: unknown) => {
+  void initYomitanMeta().then(startPendingLegacyDictionaryMigration).catch((error: unknown) => {
     console.warn('[dictionary] automatic bundled-source migration did not start:', error);
   });
 }
 
-export { fetchJapaneseAudio, initYomitan };
+export { fetchJapaneseAudio, initYomitan, initYomitanMeta };
