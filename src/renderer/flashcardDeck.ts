@@ -213,10 +213,40 @@ function newId(): string {
  * mirror that stale value over the durable copy.
  */
 let overflowStore: FlashcardDeckStore | null = null;
+/** `overflowStore` as JSON: the base of a later three-way merge. */
+let overflowText: string | null = null;
 /** True while boot reconciliation is deciding between the two copies. */
 let restoring = false;
 /** Cards created while reconciliation was reading the durable copy. */
 let createdWhileRestoring = new Set<string>();
+
+/**
+ * localStorage marker holding the `savedAt` of the newest deck write that did
+ * not fit in the cache. `overflowStore` lives in ONE window's memory; every
+ * other window would read the stale cache and mirror it over the durable copy.
+ * A window that sees a marker newer than what it holds reads IndexedDB before
+ * its next write reaches the durable copy (see `writeStore`).
+ *
+ * `DECK_UNVERIFIED` is the same marker for a write whose base was unreadable:
+ * the cache has it, IndexedDB does not yet, and nobody may treat that cache as
+ * a base (not another window, not boot reconciliation after a crash) until it
+ * has been merged with the durable copy.
+ */
+export const FLASHCARD_DECK_OVERFLOW_KEY = 'jp-flashcard-deck-overflow';
+const DECK_UNVERIFIED = Number.MAX_SAFE_INTEGER;
+
+/**
+ * Set by `readStore` when what it returned is not a safe base for a durable
+ * write: the cache is missing or unreadable (while IndexedDB may still hold the
+ * deck), or another window's newer deck lives only in IndexedDB. `baseText` is
+ * the JSON the caller's copy was parsed from, for the three-way merge.
+ */
+let lastReadSuspect: { baseText: string | null } | null = null;
+/** Base of the first suspect write while its durable check runs. */
+let pendingBase: { baseText: string | null } | null = null;
+let pendingVerify: Promise<void> | null = null;
+/** The durable copy could not be read: keep guarding writes from this base. */
+let unverifiedBase: { baseText: string | null } | null = null;
 
 /** Emitted when a deck write could not reach localStorage (quota / blocked). */
 export const FLASHCARD_DECK_STORAGE_EVENT = 'flashcard-deck-storage';
@@ -226,18 +256,63 @@ export interface FlashcardDeckStorageIssue {
   cards: number;
 }
 
+function readOverflowMarker(): number | null {
+  try {
+    const raw = localStorage.getItem(FLASHCARD_DECK_OVERFLOW_KEY);
+    if (!raw) return null;
+    const stamp = Number(raw);
+    return Number.isFinite(stamp) ? stamp : null;
+  } catch {
+    return null;
+  }
+}
+
+function copyStore(store: FlashcardDeckStore): FlashcardDeckStore {
+  return { ...store, cards: store.cards, folders: store.folders };
+}
+
+function safeGetCache(): string | null {
+  try {
+    return localStorage.getItem(FLASHCARD_DECK_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 function readStore(): FlashcardDeckStore {
+  lastReadSuspect = null;
+  const marker = readOverflowMarker();
   if (overflowStore) {
-    return { ...overflowStore, cards: overflowStore.cards, folders: overflowStore.folders };
+    const own = overflowStore.savedAt ?? 0;
+    if (marker !== null && marker > own) {
+      // Another window's newer deck overflowed too and lives only in IndexedDB.
+      lastReadSuspect = { baseText: overflowText };
+      return copyStore(overflowStore);
+    }
+    if (marker !== null) return copyStore(overflowStore);
+    // No marker: another window wrote a deck that fits the cache again. Its
+    // copy is the newer one when its stamp is.
+    const cached = parseFlashcardDeckStore(safeGetCache()).store;
+    if ((cached.savedAt ?? 0) <= own) return copyStore(overflowStore);
+    overflowStore = null;
+    overflowText = null;
   }
   try {
     const raw = localStorage.getItem(FLASHCARD_DECK_STORAGE_KEY);
-    if (!raw) return { folders: [], cards: [] };
+    if (!raw) {
+      lastReadSuspect = { baseText: null };
+      return { folders: [], cards: [] };
+    }
     // v1.0 audit 5.1 — this key accumulated one JSON layer per boot from an old
     // migration-runner bug. A single parse then yields a *string*, both checks
     // below fail, and a real deck reads as empty (measured: 3,221 cards gone,
     // 37.25 MB of text, 5.2 s of blocked main thread per read).
     const { store, layers } = parseFlashcardDeckStore(raw);
+    if (layers === 0) {
+      lastReadSuspect = { baseText: null };
+    } else if (marker !== null && marker > (store.savedAt ?? 0)) {
+      lastReadSuspect = { baseText: raw };
+    }
     // Self-heal once, so the cost is paid a single time rather than per read.
     // Only when peeling actually recovered a deck — never write back an empty
     // store over a value we simply failed to understand.
@@ -253,21 +328,44 @@ function readStore(): FlashcardDeckStore {
         // Damaged and unrecoverable. The first deck write would overwrite it,
         // so keep a copy — this is the loss that happened to the CSV draft.
         quarantineIfUnrepaired(localStorage, FLASHCARD_DECK_STORAGE_KEY, layers);
+        lastReadSuspect = { baseText: null };
       }
     }
     return store;
   } catch {
+    lastReadSuspect = { baseText: null };
     return { folders: [], cards: [] };
   }
 }
 
-/** Write the synchronous cache; false when it could not hold the deck. */
-function writeCache(store: FlashcardDeckStore): boolean {
+/**
+ * Write the synchronous cache; false when it could not hold the deck. On
+ * overflow the deck stays in this window's memory and the marker tells every
+ * other window that its cache is stale.
+ */
+function writeCache(store: FlashcardDeckStore, unverified = false): boolean {
+  let text: string | null = null;
   try {
-    localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, JSON.stringify(store));
+    text = JSON.stringify(store);
+    localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, text);
+    overflowStore = null;
+    overflowText = null;
+    setOverflowMarker(unverified ? DECK_UNVERIFIED : null);
     return true;
   } catch {
+    overflowStore = store;
+    overflowText = text;
+    setOverflowMarker(unverified ? DECK_UNVERIFIED : store.savedAt ?? 0);
     return false;
+  }
+}
+
+function setOverflowMarker(stamp: number | null): void {
+  try {
+    if (stamp === null) localStorage.removeItem(FLASHCARD_DECK_OVERFLOW_KEY);
+    else localStorage.setItem(FLASHCARD_DECK_OVERFLOW_KEY, String(stamp));
+  } catch {
+    /* the cache is so full that even the marker does not fit */
   }
 }
 
@@ -281,23 +379,130 @@ function reportCacheFull(store: FlashcardDeckStore): void {
   }
 }
 
-function writeStore(store: FlashcardDeckStore): void {
-  const previous = overflowStore?.savedAt ?? 0;
-  // Strictly increasing, so two writes in one millisecond still order.
-  store.savedAt = Math.max(Date.now(), previous + 1, (store.savedAt ?? 0) + 1);
-  if (writeCache(store)) {
-    overflowStore = null;
-  } else {
+function sameCard(left: DeckFlashcard | undefined, right: DeckFlashcard | undefined): boolean {
+  if (!left || !right) return false;
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Three-way merge of a write whose base could not be trusted.
+ *
+ * `base` is what the writer read (empty when the cache was missing), `written`
+ * what it wants to store, `durable` the IndexedDB copy. A card the writer did
+ * not touch keeps its durable version; a card it added or edited keeps the
+ * written one; a card it deleted from its base stays deleted; and every durable
+ * card its base never had — the deck the empty read could not see — is kept.
+ */
+export function mergeDeckOverDurable(
+  base: FlashcardDeckStore,
+  written: FlashcardDeckStore,
+  durable: FlashcardDeckStore,
+): FlashcardDeckStore {
+  const baseById = new Map(base.cards.map((card) => [card.id, card]));
+  const durableById = new Map(durable.cards.map((card) => [card.id, card]));
+  const writtenIds = new Set(written.cards.map((card) => card.id));
+  const cards = written.cards.map((card) => {
+    const durableCard = durableById.get(card.id);
+    return durableCard && sameCard(baseById.get(card.id), card) ? durableCard : card;
+  });
+  for (const card of durable.cards) {
+    if (!writtenIds.has(card.id) && !baseById.has(card.id)) cards.push(card);
+  }
+  const folders = [
+    ...written.folders,
+    ...durable.folders.filter((folder) => !written.folders.includes(folder) && !base.folders.includes(folder)),
+  ];
+  return {
+    folders,
+    cards,
+    savedAt: Math.max(written.savedAt ?? 0, (durable.savedAt ?? 0) + 1),
+  };
+}
+
+/** Cache + durable home for a store whose base is trusted. */
+function commitStore(store: FlashcardDeckStore): void {
+  if (!writeCache(store)) {
     // localStorage full. Keep the deck in memory so the next read is not the
     // stale cached value, and tell the user: silently degrading is how a deck
     // used to lose cards.
-    overflowStore = store;
     reportCacheFull(store);
   }
   // Write-through to IndexedDB: durable home for deck data. localStorage is
   // just the synchronous cache (see storage/storage.ts). Held while boot
   // reconciliation runs, which writes the winner to both homes itself.
   if (!restoring) mirrorToIdb(IDB_KEYS.flashcardDeck, store);
+}
+
+/**
+ * Settle the held writes against the durable copy: read IndexedDB, merge the
+ * current deck over it, and commit to both homes. When IndexedDB cannot be read
+ * nothing is mirrored and later writes stay guarded — a copy that could not be
+ * seen is never overwritten.
+ */
+async function verifyPendingWrite(read: (key: string) => Promise<unknown>): Promise<void> {
+  let durable: FlashcardDeckStore | null = null;
+  let readable = true;
+  try {
+    durable = normalizeDurableDeck(await read(IDB_KEYS.flashcardDeck));
+  } catch {
+    readable = false;
+  }
+  const base = pendingBase;
+  pendingBase = null;
+  // Everything this window wrote meanwhile is in the cache (or overflow copy).
+  const written = readStore();
+  lastReadSuspect = null;
+  if (!readable) {
+    unverifiedBase = base;
+    return;
+  }
+  unverifiedBase = null;
+  const next = durable && (durable.cards.length || durable.folders.length)
+    ? mergeDeckOverDurable(parseFlashcardDeckStore(base?.baseText ?? null).store, written, durable)
+    : written;
+  if (next.cards.length !== written.cards.length) {
+    logBlanc('warn', 'deck', 'A deck write was based on an unreadable or stale copy; merged it with the durable deck', {
+      written: written.cards.length,
+      durable: durable?.cards.length ?? 0,
+      merged: next.cards.length,
+    });
+  }
+  commitStore(next);
+  window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
+}
+
+/** Test seam: wait until every held deck write has been checked and committed. */
+export async function settleDeckWritesForTests(): Promise<void> {
+  while (pendingVerify) await pendingVerify;
+}
+
+function writeStore(store: FlashcardDeckStore): void {
+  const suspect = lastReadSuspect ?? unverifiedBase;
+  lastReadSuspect = null;
+  const previous = overflowStore?.savedAt ?? 0;
+  // Strictly increasing, so two writes in one millisecond still order.
+  store.savedAt = Math.max(Date.now(), previous + 1, (store.savedAt ?? 0) + 1);
+  if (!restoring && (suspect || pendingVerify)) {
+    // The base this write was built on may be missing cards the durable copy
+    // has (an emptied or unreadable cache, or another window's overflowed
+    // deck). The cache takes it now, marked unverified; IndexedDB only gets
+    // it merged with its own copy: a one-card deck with a newer stamp must
+    // never be mirrored over the deck.
+    if (!pendingVerify) pendingBase = suspect;
+    if (!writeCache(store, true)) reportCacheFull(store);
+    if (!pendingVerify) {
+      pendingVerify = verifyPendingWrite(kvGet).finally(() => {
+        pendingVerify = null;
+      });
+    }
+    window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
+    return;
+  }
+  commitStore(store);
   window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
 }
 
@@ -345,6 +550,16 @@ export async function restoreDeckFromIdb(
     const current = readStore();
     if (!durable || !durableWins) {
       if (!current.cards.length && !current.folders.length) return 'empty';
+      if (durable && readOverflowMarker() === DECK_UNVERIFIED && (durable.cards.length || durable.folders.length)) {
+        // A write built on an unreadable cache never reached the durable copy
+        // (the window closed first). Its newer stamp must not win outright:
+        // merge it over the durable deck instead.
+        const merged = mergeDeckOverDurable({ folders: [], cards: [] }, current, durable);
+        if (!writeCache(merged)) reportCacheFull(merged);
+        mirrorToIdb(IDB_KEYS.flashcardDeck, merged);
+        window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
+        return 'durable';
+      }
       // The cache is the newer copy (or the only one): make sure the durable
       // home has it, since a quota failure or an old build may never have
       // mirrored it.
@@ -363,12 +578,7 @@ export async function restoreDeckFromIdb(
       cards: [...createdMeanwhile, ...durable.cards],
       savedAt: Math.max(durableStamp, current.savedAt ?? 0),
     };
-    if (writeCache(winner)) {
-      overflowStore = null;
-    } else {
-      overflowStore = winner;
-      reportCacheFull(winner);
-    }
+    if (!writeCache(winner)) reportCacheFull(winner);
     if (createdMeanwhile.length) mirrorToIdb(IDB_KEYS.flashcardDeck, winner);
     logBlanc('info', 'deck', 'Restored the local deck from its durable copy', {
       cards: winner.cards.length,
@@ -385,7 +595,12 @@ export async function restoreDeckFromIdb(
 /** Test seam: forget the in-memory overflow copy. */
 export function resetDeckMemoryForTests(): void {
   overflowStore = null;
+  overflowText = null;
   restoring = false;
+  lastReadSuspect = null;
+  pendingBase = null;
+  pendingVerify = null;
+  unverifiedBase = null;
 }
 
 export function loadDeck(): DeckFlashcard[] {
