@@ -12,6 +12,7 @@
  */
 
 import { UI_CUSTOM_CSS_LIMIT, reviewCustomCss } from '../shared/uiCustomization';
+import { writeLocalStorage } from './localStorageWrite';
 
 const KEY = 'jp-os-custom-css-v1';
 const STYLE_ID = 'jp-user-css';
@@ -147,7 +148,7 @@ export function saveCustomCss(css: string): { ok: boolean; error?: string; promo
   if (!check.ok) return { ok: false, error: check.error };
   try {
     if (!check.css.trim()) localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, check.css);
+    else if (!writeLocalStorage(KEY, check.css)) return { ok: false, error: 'Could not save CSS.' };
   } catch {
     return { ok: false, error: 'Could not save CSS.' };
   }
@@ -181,11 +182,7 @@ export function appendCustomCss(css: string, label: string): { ok: boolean; erro
   const combined = existing ? `${existing}\n\n${heading}\n${addition}\n` : `${heading}\n${addition}\n`;
   const check = sanitizeUserCss(combined);
   if (!check.ok) return { ok: false, error: check.error };
-  try {
-    localStorage.setItem(KEY, check.css);
-  } catch {
-    return { ok: false, error: 'Could not save CSS.' };
-  }
+  if (!writeLocalStorage(KEY, check.css)) return { ok: false, error: 'Could not save CSS.' };
   if (sandboxEnabled()) applyCustomCss(check.css);
   window.dispatchEvent(new CustomEvent(EVENT, { detail: check.css }));
   return { ok: true };

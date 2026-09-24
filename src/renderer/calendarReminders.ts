@@ -36,6 +36,7 @@ import {
   type EventOccurrence,
   type ReminderOffset,
 } from './calendar';
+import { writeLocalStorage } from './localStorageWrite';
 
 export const CALENDAR_REMINDER_STATE_KEY = 'jp-calendar-reminders-v1';
 /** Window event carrying the reminders a tick delivered, for the on-screen card. */
@@ -212,12 +213,10 @@ const localStorageBacked: CalendarReminderStorage = {
       return null;
     }
   },
+  // Refused (storage full): reported, and the reminder may repeat; the guarded
+  // writer never throws, so it will never crash the tick.
   write: (text) => {
-    try {
-      localStorage.setItem(CALENDAR_REMINDER_STATE_KEY, text);
-    } catch {
-      /* Storage full: the reminder may repeat, it will never crash the tick. */
-    }
+    writeLocalStorage(CALENDAR_REMINDER_STATE_KEY, text);
   },
 };
 

@@ -37,11 +37,14 @@ const SRC = resolve(__dirname, '../..');
 /**
  * The ceiling, measured 2026-09-06 after migrating nineteen sites across six
  * stores onto the guarded writer, and lowered to 193 on 2026-09-24 when the
- * mining, saved-words and visual-novel writes moved onto it too. MOVE THIS DOWN
- * when you migrate more. Never up.
+ * mining, saved-words and visual-novel writes moved onto it too. The nine-branch
+ * merge brought 196; custom CSS, the UI customization document, the player's
+ * subtitle size, the watch-library migration mark and the calendar reminder
+ * state moved onto the guarded writer, and the dead tracking-sources store was
+ * deleted: 190 on 2026-09-24. MOVE THIS DOWN when you migrate more. Never up.
  */
-const MAX_RAW_SITES = 193;
-const MAX_RAW_FILES = 150;
+const MAX_RAW_SITES = 190;
+const MAX_RAW_FILES = 148;
 
 /**
  * **Not every site should be migrated, and this is the distinction to make

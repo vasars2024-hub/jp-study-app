@@ -24,6 +24,7 @@ import {
   type OsPersonalization,
 } from './osPersonalization';
 import { appendCustomCss } from './customCss';
+import { writeLocalStorageJson } from './localStorageWrite';
 
 import { nextLocalId, nowIso } from './storeIds';
 
@@ -55,11 +56,8 @@ export function loadUiCustomizationDocument(): UiCustomizationDocument {
 export function saveUiCustomizationDocument(input: unknown): UiCustomizationDocument {
   const document_ = normalizeUiCustomizationDocument(input);
   memoryFallback = document_;
-  try {
-    localStorage.setItem(UI_CUSTOMIZATION_STORAGE_KEY, JSON.stringify(document_));
-  } catch {
-    // Keep the validated value in memory when storage is unavailable or full.
-  }
+  // A refused write is reported; the validated value stays in memory.
+  writeLocalStorageJson(UI_CUSTOMIZATION_STORAGE_KEY, document_);
   applyUiCustomization(document_);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent<UiCustomizationDocument>(CHANGED_EVENT, { detail: document_ }));

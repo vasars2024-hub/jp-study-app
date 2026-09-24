@@ -7,6 +7,7 @@
  * player's own normalizer, so the stored value is always one the player accepts.
  * An open player takes the change live through `SUBTITLE_FONT_SIZE_EVENT`.
  */
+import { writeLocalStorageJson } from './localStorageWrite';
 import {
   PLAYER_PREFERENCES_STORAGE_KEY,
   normalizeVideoCoreStudyPreferences,
@@ -31,11 +32,8 @@ export function readPlayerSubtitleFontSize(): number {
 /** Writes the size (clamped by the player's normalizer) and returns what was stored. */
 export function writePlayerSubtitleFontSize(size: number): number {
   const next = normalizeVideoCoreStudyPreferences({ ...readPreferences(), subtitleFontSize: size });
-  try {
-    localStorage.setItem(PLAYER_PREFERENCES_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    /* Storage full: the open player still takes it from the event below. */
-  }
+  // A refused write is reported; the open player still takes the size from the event below.
+  writeLocalStorageJson(PLAYER_PREFERENCES_STORAGE_KEY, next);
   window.dispatchEvent(
     new CustomEvent<{ subtitleFontSize: number }>(SUBTITLE_FONT_SIZE_EVENT, {
       detail: { subtitleFontSize: next.subtitleFontSize },

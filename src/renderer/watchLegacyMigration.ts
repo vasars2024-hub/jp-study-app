@@ -10,6 +10,7 @@
  * run, and a run with nothing new costs no IPC at all.
  */
 
+import { writeLocalStorageJson } from './localStorageWrite';
 import { loadMediaTrackingDocument } from './mediaTrackingStore';
 import { loadMediaShortlist } from './discoveryShortlistStore';
 import { loadMediaProvidersDocument } from './mediaProviderStore';
@@ -46,11 +47,8 @@ export function readWatchLegacyMark(): WatchLegacyMark {
 }
 
 function writeMark(mark: WatchLegacyMark): void {
-  try {
-    localStorage.setItem(WATCH_LEGACY_MIGRATION_KEY, JSON.stringify(mark));
-  } catch {
-    /* the next run simply sends the same rows again, which is a fixed point */
-  }
+  // Refused: the next run simply sends the same rows again, which is a fixed point.
+  writeLocalStorageJson(WATCH_LEGACY_MIGRATION_KEY, mark);
 }
 
 function identityInfo(): Map<string, LegacyIdentityInfo> {
