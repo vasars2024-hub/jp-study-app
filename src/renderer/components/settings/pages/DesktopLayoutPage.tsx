@@ -182,6 +182,26 @@ export default function DesktopLayoutPage() {
             {t('settings.desktop.clock.date')}
           </button>
         </div>
+        <div className="os-viz-row">
+          <span className="os-viz-label muted">{t('settings.desktop.label.weekStart')}</span>
+          {(
+            [
+              ['auto', 'settings.desktop.weekStart.auto'],
+              [0, 'settings.desktop.weekStart.sunday'],
+              [1, 'settings.desktop.weekStart.monday'],
+            ] as [0 | 1 | 'auto', string][]
+          ).map(([id, labelKey]) => (
+            <button
+              key={String(id)}
+              type="button"
+              {...seg(deskPrefs.weekStart === id)}
+              onClick={() => patchDesk({ weekStart: id })}
+              title={id === 'auto' ? t('settings.desktop.weekStart.autoHint') : undefined}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
       </SettingsCard>
 
       <SettingsCard

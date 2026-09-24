@@ -32,6 +32,12 @@ export interface DesktopPrefs {
   clock24h: boolean | 'auto';
   clockSeconds: boolean;
   clockShowDate: boolean;
+  /**
+   * First day of the week in the Calendar. `'auto'` follows the UI language's
+   * locale (Monday for Russian and Chinese; Sunday for Japanese and English);
+   * 0 (Sunday) and 1 (Monday) are the user's explicit choice.
+   */
+  weekStart: 0 | 1 | 'auto';
   startColumns: StartColumnsId;
   /**
    * When true (default), open app windows restore from the last session.
@@ -56,6 +62,7 @@ const DEFAULTS: DesktopPrefs = {
   clock24h: 'auto',
   clockSeconds: false,
   clockShowDate: true,
+  weekStart: 'auto',
   startColumns: 4,
   restoreSessionWindows: true,
   companionHostDisplays: 'primary',
@@ -84,6 +91,10 @@ function normalizeClock24h(v: unknown): boolean | 'auto' {
   return v === true || v === false ? v : 'auto';
 }
 
+function normalizeWeekStart(v: unknown): 0 | 1 | 'auto' {
+  return v === 0 || v === 1 ? v : 'auto';
+}
+
 /**
  * The `hour12` option to pass to `toLocaleTimeString`. `undefined` is not the
  * same as `false` here: an absent option lets `Intl` use the locale's own hour
@@ -104,6 +115,7 @@ export function loadDesktopPrefs(): DesktopPrefs {
         ...parsed,
         snapGrid: normalizeSnapGrid(parsed.snapGrid ?? DEFAULTS.snapGrid),
         clock24h: normalizeClock24h(parsed.clock24h),
+        weekStart: normalizeWeekStart(parsed.weekStart),
       };
     }
   } catch {
@@ -141,6 +153,7 @@ export function saveDesktopPrefs(partial: Partial<DesktopPrefs>): DesktopPrefs {
     clock24h: normalizeClock24h(
       partial.clock24h !== undefined ? partial.clock24h : prev.clock24h,
     ),
+    weekStart: normalizeWeekStart(partial.weekStart !== undefined ? partial.weekStart : prev.weekStart),
   };
   try {
     localStorage.setItem(KEY, JSON.stringify(next));

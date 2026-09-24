@@ -88,6 +88,8 @@ import './theme/flatten.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { registerWiredArchive } from './theme/wired-archive';
 import { installNotificationCapture } from './notificationStore';
+import { installCalendarReminders } from './calendarReminders';
+import { deliverCalendarReminders } from './calendarReminderDelivery';
 import { bootWallpaperFit } from './wallpaperFit';
 import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
@@ -286,6 +288,10 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
   // deferred to idle either — the scheduler ticks every 30s and a fire that
   // arrives before the claim is recorded `missed` for the rest of the day.
   installLocalAgentAutomationHost();
+  // Calendar reminders fire from the primary desktop window only (the function
+  // checks), so windows sharing localStorage never deliver one reminder twice.
+  // Not deferred: its first tick is the launch catch-up for anything missed.
+  installCalendarReminders(deliverCalendarReminders);
   runWhenIdle(() => {
     bootEnvironment();
     // Per-environment ambient soundscapes are dormant until a sound pack exists.

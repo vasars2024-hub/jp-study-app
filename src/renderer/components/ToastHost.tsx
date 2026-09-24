@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ToastViewport } from './ui/Toast';
 import ReadingReminderHost from './reading/ReadingReminderHost';
+import CalendarReminderHost from './calendar/CalendarReminderHost';
 import { useT } from '../i18n';
 
 /**
@@ -190,6 +191,8 @@ export default function ToastHost() {
         that never shows a reminder. It renders nothing until main pushes one.
       */}
       <ReadingReminderHost />
+      {/* Calendar reminders, same reasoning: renders nothing until one is due. */}
+      <CalendarReminderHost />
     </>
   );
 }

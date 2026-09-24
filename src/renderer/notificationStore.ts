@@ -23,7 +23,7 @@ export interface ShellNotification {
   /** Optional deep-link / release page opened from the notification center. */
   actionUrl?: string;
   /** In-app action when the notice is not an external URL. */
-  clientAction?: 'extension-settings';
+  clientAction?: 'extension-settings' | 'open-calendar';
   /** Stable client key used to replace an earlier notice for the same event. */
   clientId?: string;
 }
@@ -87,7 +87,7 @@ export interface NotifyInput {
   source?: string;
   priority?: NotificationPriority;
   actionUrl?: string;
-  clientAction?: 'extension-settings';
+  clientAction?: 'extension-settings' | 'open-calendar';
   /**
    * When set, replaces any existing unread/read notice with the same clientId
    * so repeated release checks do not spam the center.
