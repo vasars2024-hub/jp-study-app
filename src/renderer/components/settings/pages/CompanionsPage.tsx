@@ -21,7 +21,7 @@ import {
   type BuddyTrigger,
 } from '../../../environment/buddyRoutines';
 import { speakBeepLine, voiceForType } from '../../../environment/beepSpeech';
-import { defFor } from '../../../environment/companionCatalog';
+import { defFor, localizedCompanionDef } from '../../../environment/companionCatalog';
 import { COMMAND_CATALOG, SHORTCUT_OPEN_APPS } from '../../../keyboardShortcuts';
 import { useT } from '../../../i18n';
 import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
@@ -66,7 +66,7 @@ function blankStep(type: BuddyStep['type']): BuddyStep {
 }
 
 export default function CompanionsPage() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { env, patchEnv, deskPrefs, patchDesk, seg, focusSettingId } = useSettings();
   const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
   const [wiredDiscovered, setWiredDiscovered] = useState(hasDiscoveredWired);
@@ -83,7 +83,13 @@ export default function CompanionsPage() {
     window.addEventListener(READING_RECORDED_EVENT, onRead);
     return () => window.removeEventListener(READING_RECORDED_EVENT, onRead);
   }, []);
-  const companionDefs = useMemo(() => COMPANION_DEFS(), [aeroDiscovered, wiredDiscovered]);
+  // Names and blurbs resolve through i18n at render (CLAUDE.md i18n rule 7): the
+  // catalog is module-level data and used to reach every language in English.
+  // `localizedCompanionDef` keeps a proper name (Remilia, Fateburn) as it is.
+  const companionDefs = useMemo(
+    () => COMPANION_DEFS().map((def) => localizedCompanionDef(def, t)),
+    [aeroDiscovered, wiredDiscovered, lang],
+  );
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const [editId, setEditId] = useState<string>(routines[0]?.id ?? '');
   const [testMsg, setTestMsg] = useState('');

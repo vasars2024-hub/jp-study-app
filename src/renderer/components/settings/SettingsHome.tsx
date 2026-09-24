@@ -68,8 +68,9 @@ export default function SettingsHome() {
 
   return (
     <div className="os-set-home">
+      {/* No "Settings" heading: the window title already says it (CLAUDE.md
+          window minimalism). The one-line intro stays. */}
       <ContextualSurface as="header" className="os-set-page-head">
-        <h2 className="os-set-page-title">{t('settings.appTitle')}</h2>
         <p className="os-set-page-intro muted">{t('settings.home.intro')}</p>
       </ContextualSurface>
 

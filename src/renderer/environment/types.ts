@@ -132,10 +132,41 @@ export interface EnvironmentSettings {
 
 export const DAY_CYCLE_PLAYLIST_ID = 'day-cycle';
 
+/**
+ * The built-in day-cycle playlist's seed labels, and the i18n key for each.
+ *
+ * They are stored in the playlist (so a user can rename them), which is why they
+ * reached every language in English. A label still equal to its seed is shown
+ * through i18n; a renamed one is the user's content and is shown as typed.
+ */
+const DAY_CYCLE_SEED_LABELS: Record<string, { label: string; key: string }> = {
+  'dc-dawn': { label: 'Dawn', key: 'settings.wallpaper.dayCycle.dawn' },
+  'dc-midday': { label: 'Midday', key: 'settings.wallpaper.dayCycle.midday' },
+  'dc-dusk': { label: 'Dusk', key: 'settings.wallpaper.dayCycle.dusk' },
+  'dc-night': { label: 'Night', key: 'settings.wallpaper.dayCycle.night' },
+  'dc-aurora': { label: 'Late night', key: 'settings.wallpaper.dayCycle.lateNight' },
+  'dc-ember': { label: 'Focus ember', key: 'settings.wallpaper.dayCycle.focusEmber' },
+  'dc-crimson': { label: 'Exam veil', key: 'settings.wallpaper.dayCycle.examVeil' },
+};
+const DAY_CYCLE_SEED_NAME = 'Day cycle';
+
+/** The i18n key for a built-in item's label, or `null` when it is the user's own. */
+export function seedWallpaperLabelKey(item: { id: string; label?: string }): string | null {
+  const seed = DAY_CYCLE_SEED_LABELS[item.id];
+  return seed && (item.label === undefined || item.label === seed.label) ? seed.key : null;
+}
+
+/** The i18n key for the built-in playlist's name, or `null` once renamed. */
+export function seedPlaylistNameKey(playlist: { id: string; name: string }): string | null {
+  return playlist.id === DAY_CYCLE_PLAYLIST_ID && playlist.name === DAY_CYCLE_SEED_NAME
+    ? 'settings.wallpaper.dayCycle.name'
+    : null;
+}
+
 export function buildDefaultDayCyclePlaylist(): WallpaperPlaylist {
   return {
     id: DAY_CYCLE_PLAYLIST_ID,
-    name: 'Day cycle',
+    name: DAY_CYCLE_SEED_NAME,
     transition: 'crossfade',
     transitionMs: 1200,
     items: [

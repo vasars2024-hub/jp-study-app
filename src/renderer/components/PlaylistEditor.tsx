@@ -16,6 +16,7 @@ import {
   type WallpaperPlaylist,
 } from '../environment';
 import type { CalendarCategory } from '../environment/types';
+import { seedPlaylistNameKey, seedWallpaperLabelKey } from '../environment/types';
 import { useT } from '../i18n';
 
 const CAL_CATS: CalendarCategory[] = ['exam', 'study', 'assignment', 'reminder', 'personal'];
@@ -39,7 +40,10 @@ function itemSwatchStyle(it: WallpaperItem): { background?: string; backgroundIm
   return { background: '#2a2830' };
 }
 
-function itemLabel(it: WallpaperItem): string {
+function itemLabel(it: WallpaperItem, t: (key: string) => string): string {
+  // A built-in day-cycle slot still carrying its seed label is chrome, not content.
+  const seedKey = seedWallpaperLabelKey(it);
+  if (seedKey) return t(seedKey);
   return it.label || (it.kind === 'preset' ? WALL_PRESETS.find((p) => p.id === it.ref)?.label : null) || it.ref;
 }
 
@@ -265,7 +269,10 @@ export default function PlaylistEditor({
           >
             {playlists.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {(() => {
+                  const key = seedPlaylistNameKey(p);
+                  return key ? t(key) : p.name;
+                })()}
               </option>
             ))}
           </select>
@@ -352,7 +359,7 @@ export default function PlaylistEditor({
               title={t(`playlistEditor.wallKind.${it.kind}`)}
             />
             <div className="pl-item-meta">
-              <span className="pl-item-name">{itemLabel(it)}</span>
+              <span className="pl-item-name">{itemLabel(it, t)}</span>
               <span className="muted pl-item-sub">
                 {t(`playlistEditor.wallKind.${it.kind}`)}
                 {it.tags?.length ? ` · ${it.tags.join(', ')}` : ''}
@@ -533,7 +540,7 @@ export default function PlaylistEditor({
                   >
                     {active.items.map((it) => (
                       <option key={it.id} value={it.id}>
-                        {itemLabel(it)}
+                        {itemLabel(it, t)}
                       </option>
                     ))}
                     {!itemOk && (

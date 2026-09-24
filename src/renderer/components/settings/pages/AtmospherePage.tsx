@@ -14,6 +14,18 @@ import type { WeatherMode } from '../../../environment/types';
 
 export default function AtmospherePage() {
   const { t } = useT();
+  // Scene and particle names live in module-level data (environmentPresets,
+  // particleEngine), so they are resolved by id here, at render (i18n rule 7).
+  const sceneText = (id: string, part: 'name' | 'desc', fallback: string): string => {
+    const key = `settings.atmosphere.scene.${id}.${part}`;
+    const out = t(key);
+    return out === key ? fallback : out;
+  };
+  const particleText = (id: string, fallback: string): string => {
+    const key = `settings.atmosphere.particle.${id}`;
+    const out = t(key);
+    return out === key ? fallback : out;
+  };
   const s = useSettings();
   const { env, patchEnv, seg, focusSettingId } = s;
   const resolved = env.enabled && env.rotationEnabled ? resolveWall(env) : null;
@@ -70,7 +82,7 @@ export default function AtmospherePage() {
               key={p.id}
               type="button"
               {...seg(env.environmentPresetId === p.id)}
-              title={p.description}
+              title={sceneText(p.id, 'desc', p.description)}
               onClick={() => {
                 // Clicking the active preset clears it — otherwise these chips
                 // are one-way and there is no way back to an unthemed desk.
@@ -79,15 +91,21 @@ export default function AtmospherePage() {
                   return;
                 }
                 patchEnv({ ...presetPatch(p.id), enabled: true });
-                emitCompanionEvent('environment', p.label);
+                emitCompanionEvent('environment', sceneText(p.id, 'name', p.label));
               }}
             >
-              {p.label}
+              {sceneText(p.id, 'name', p.label)}
             </button>
           ))}
         </div>
         {env.environmentPresetId && (
-          <p className="muted os-set-hint">{getEnvironmentPreset(env.environmentPresetId)?.description}</p>
+          <p className="muted os-set-hint">
+            {sceneText(
+              env.environmentPresetId,
+              'desc',
+              getEnvironmentPreset(env.environmentPresetId)?.description ?? '',
+            )}
+          </p>
         )}
       </SettingsCard>
 
@@ -171,7 +189,7 @@ export default function AtmospherePage() {
                 type="button"
                 {...seg(on)}
                 disabled={!env.enabled || !env.particlesEnabled || env.matchParticleSuggestions}
-                title={p.label}
+                title={particleText(p.id, p.label)}
                 onClick={() => {
                   const next: ParticlePresetId[] = on
                     ? env.particlePresets.filter((id) => id !== p.id)
@@ -181,7 +199,7 @@ export default function AtmospherePage() {
                   patchEnv({ particlePresets: next });
                 }}
               >
-                {p.label}
+                {particleText(p.id, p.label)}
               </button>
             );
           })}

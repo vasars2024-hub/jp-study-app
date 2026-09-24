@@ -11,6 +11,7 @@ import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import PlaylistEditor from '../../PlaylistEditor';
 import { resolveWall } from '../../../environment';
+import { seedWallpaperLabelKey } from '../../../environment/types';
 import { useT } from '../../../i18n';
 
 export default function WallpaperRotationCard() {
@@ -53,7 +54,12 @@ export default function WallpaperRotationCard() {
       )}
       {resolved && (
         <p className="muted os-set-hint">
-          {t('settings.atmosphere.now')} <strong>{resolved.item.label ?? resolved.item.ref}</strong>
+          {t('settings.atmosphere.now')} <strong>
+            {(() => {
+              const key = seedWallpaperLabelKey(resolved.item);
+              return key ? t(key) : (resolved.item.label ?? resolved.item.ref);
+            })()}
+          </strong>
           {' — '}
           {resolved.reason}
         </p>
