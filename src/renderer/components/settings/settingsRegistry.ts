@@ -1642,7 +1642,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   {
     id: 'external-players',
     titleKey: 'externalPlayer.title',
-    descKey: 'externalPlayer.description',
+    descKey: 'externalPlayer.desc',
     keywords: ['external player', 'mpv', 'vlc', 'open in', 'playback app'],
     pageId: 'scraper',
     group: 'Media',

@@ -669,31 +669,6 @@ export const SCRAPER_UI_RU: Catalog = {
   },
   'videoServer.importFailed': 'Не удалось импортировать.',
 
-  // Внешние проигрыватели (настройки › скрапер).
-  'externalPlayer.title': 'Внешние проигрыватели',
-  'externalPlayer.description':
-    'Передавайте воспроизведение в VLC, mpv, IINA или другое локальное приложение. Медиафайлы остаются за пределами этого приложения.',
-  'externalPlayer.defaultPlayer': 'Проигрыватель по умолчанию',
-  'externalPlayer.choosePlayer': 'Выберите проигрыватель',
-  'externalPlayer.edit': 'Изменить',
-  'externalPlayer.editPlayer': 'Изменить проигрыватель',
-  'externalPlayer.addPlayer': 'Добавить проигрыватель',
-  'externalPlayer.name': 'Название',
-  'externalPlayer.appPath': 'Путь к приложению',
-  'externalPlayer.pathPlaceholder': 'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
-  'externalPlayer.contentType': 'Тип содержимого',
-  'externalPlayer.type.video': 'Видео',
-  'externalPlayer.type.audio': 'Аудио',
-  'externalPlayer.type.any': 'Любой',
-  'externalPlayer.arguments': 'Аргументы (по одному в строке)',
-  'externalPlayer.subtitleSupport': 'Поддержка субтитров',
-  'externalPlayer.subtitleHint': 'Передавать {token}, когда выбран файл субтитров.',
-  'externalPlayer.resumeSupport': 'Поддержка возобновления',
-  'externalPlayer.resumeHint': 'Если сохранённая позиция есть, она передаётся вместе с файлом.',
-  'externalPlayer.savePlayer': 'Сохранить проигрыватель',
-  'externalPlayer.empty':
-    'Профилей проигрывателей пока нет. Добавьте один, чтобы включить передачу воспроизведения.',
-
   // Управление отслеживанием (настройки › скрапер). `{episode}` и `{type}` —
   // не `{count}`, поэтому строки построены так, чтобы ничему не пришлось
   // согласовываться с числом.
@@ -999,6 +974,8 @@ export const SCRAPER_UI_RU: Catalog = {
   'scrApp.result.enabled': 'Включено',
   'scrApp.result.disabled': 'Отключено',
   'scrApp.result.selected': 'Выбрано: {n}',
+  'scrApp.result.pagePrev': 'Предыдущая страница',
+  'scrApp.result.pageNext': 'Следующая страница',
   'scrApp.result.showing': 'Показано',
   'scrApp.result.perPage': 'на странице',
   'scrApp.result.play.refresh': 'Запустите сбор заново, чтобы обновить ссылку провайдера перед воспроизведением.',

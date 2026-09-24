@@ -549,7 +549,7 @@ export default function NewScrapePage() {
 
               <div className="scr-pager">
                 <IconButton
-                  label="Previous page"
+                  label={sx('result.pagePrev')}
                   size="sm"
                   disabled={safePage === 0}
                   onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
@@ -572,7 +572,7 @@ export default function NewScrapePage() {
                   ),
                 )}
                 <IconButton
-                  label="Next page"
+                  label={sx('result.pageNext')}
                   size="sm"
                   disabled={safePage >= pageCount - 1}
                   onClick={() => setPageIndex((p) => Math.min(pageCount - 1, p + 1))}

@@ -668,32 +668,6 @@ export const SCRAPER_UI_EN: Catalog = {
   },
   'videoServer.importFailed': 'Import failed.',
 
-  // External players (settings › scraper). `Add player` / `Save player` are
-  // asserted verbatim by externalPlayerPanel.test.tsx — keep the English byte-
-  // identical if you edit them, or widen the vitest glob (U9) first and see it.
-  'externalPlayer.title': 'External players',
-  'externalPlayer.description':
-    'Delegate playback to VLC, mpv, IINA, or another local application. Media stays outside this app.',
-  'externalPlayer.defaultPlayer': 'Default player',
-  'externalPlayer.choosePlayer': 'Choose a player',
-  'externalPlayer.edit': 'Edit',
-  'externalPlayer.editPlayer': 'Edit player',
-  'externalPlayer.addPlayer': 'Add player',
-  'externalPlayer.name': 'Name',
-  'externalPlayer.appPath': 'Application path',
-  'externalPlayer.pathPlaceholder': 'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
-  'externalPlayer.contentType': 'Content type',
-  'externalPlayer.type.video': 'Video',
-  'externalPlayer.type.audio': 'Audio',
-  'externalPlayer.type.any': 'Any',
-  'externalPlayer.arguments': 'Arguments (one per line)',
-  'externalPlayer.subtitleSupport': 'Subtitle support',
-  'externalPlayer.subtitleHint': 'Pass {token} when a subtitle file is selected.',
-  'externalPlayer.resumeSupport': 'Resume support',
-  'externalPlayer.resumeHint': 'The handoff includes the saved position when available.',
-  'externalPlayer.savePlayer': 'Save player',
-  'externalPlayer.empty': 'No player profiles yet. Add one to enable playback handoff.',
-
   // Tracking management (settings › scraper). `status.*` and `style.*` label
   // stored enum values; the <option value> stays the enum in every language.
   'trackingMgmt.title': 'Tracking management',
@@ -985,6 +959,8 @@ export const SCRAPER_UI_EN: Catalog = {
   'scrApp.result.enabled': 'Enabled',
   'scrApp.result.disabled': 'Disabled',
   'scrApp.result.selected': '{n} selected',
+  'scrApp.result.pagePrev': 'Previous page',
+  'scrApp.result.pageNext': 'Next page',
   'scrApp.result.showing': 'Showing',
   'scrApp.result.perPage': 'per page',
   'scrApp.result.play.refresh': 'Run this scrape again to refresh the provider URL before playback.',

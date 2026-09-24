@@ -382,7 +382,7 @@ export function ResultsPage() {
             {notice && <p className="scr-action-notice" role="status">{notice}</p>}
             <div className="scr-results-inspector-stats">
               <span><small>Coverage</small><b>{Math.round((selected.episodes.length / Math.max(1, selected.expected)) * 100)}%</b></span>
-              <span><small>Japanese subs</small><b>{selected.withJapanese.toLocaleString()}</b></span>
+              <span><small>{sx('result.detail.japaneseSubs')}</small><b>{sxNumber(selected.withJapanese)}</b></span>
               <span><small>Indexed size</small><b>{formatBytes(selected.bytes)}</b></span>
               <span><small>Runtime</small><b>{formatDuration(selected.durationSec)}</b></span>
               <span><small>Issues</small><b>{selected.failed + selected.warned + selected.missing}</b></span>
@@ -1004,7 +1004,7 @@ export function HistoryPage() {
 
       <div className="scr-history-overview">
         <div className="scr-tile-row">
-          <div className="scr-tile"><span className="scr-tile-label">Episodes found</span><span className="scr-tile-value">{totals.episodes.toLocaleString()}</span></div>
+          <div className="scr-tile"><span className="scr-tile-label">{sx('result.detail.found')}</span><span className="scr-tile-value">{sxNumber(totals.episodes)}</span></div>
           <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">Failed checks</span><span className="scr-tile-value">{sxNumber(totals.failures)}</span></div>
           <div className="scr-tile"><span className="scr-tile-label">Data indexed</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(totals.bytes)}</span></div>
           <div className="scr-tile"><span className="scr-tile-label">Average runtime</span><span className="scr-tile-value scr-tile-value--text">{formatDuration(totals.average)}</span></div>

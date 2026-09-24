@@ -629,30 +629,6 @@ export const SCRAPER_UI_JA: Catalog = {
   'videoServer.importedWithIssues': '読み込みました。{count} 件の値を修正しました。',
   'videoServer.importFailed': '読み込みに失敗しました。',
 
-  // 外部プレイヤー（設定 › スクレイパー）。
-  'externalPlayer.title': '外部プレイヤー',
-  'externalPlayer.description':
-    'VLC、mpv、IINA などのローカルアプリに再生を委ねます。メディアはこのアプリの外に置かれたままです。',
-  'externalPlayer.defaultPlayer': '既定のプレイヤー',
-  'externalPlayer.choosePlayer': 'プレイヤーを選択',
-  'externalPlayer.edit': '編集',
-  'externalPlayer.editPlayer': 'プレイヤーを編集',
-  'externalPlayer.addPlayer': 'プレイヤーを追加',
-  'externalPlayer.name': '名前',
-  'externalPlayer.appPath': 'アプリのパス',
-  'externalPlayer.pathPlaceholder': 'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
-  'externalPlayer.contentType': '種類',
-  'externalPlayer.type.video': '動画',
-  'externalPlayer.type.audio': '音声',
-  'externalPlayer.type.any': 'すべて',
-  'externalPlayer.arguments': '引数（1 行に 1 つ）',
-  'externalPlayer.subtitleSupport': '字幕対応',
-  'externalPlayer.subtitleHint': '字幕ファイルが選ばれているとき {token} を渡します。',
-  'externalPlayer.resumeSupport': 'レジューム対応',
-  'externalPlayer.resumeHint': '保存された再生位置がある場合は、それも引き渡します。',
-  'externalPlayer.savePlayer': 'プレイヤーを保存',
-  'externalPlayer.empty': 'プレイヤー設定はまだありません。追加すると再生の受け渡しが有効になります。',
-
   // 視聴記録の管理（設定 › スクレイパー）。
   'trackingMgmt.title': '視聴記録の管理',
   'trackingMgmt.description':
@@ -923,6 +899,8 @@ export const SCRAPER_UI_JA: Catalog = {
   'scrApp.result.enabled': '有効',
   'scrApp.result.disabled': '無効',
   'scrApp.result.selected': '{n} 件選択中',
+  'scrApp.result.pagePrev': '前のページ',
+  'scrApp.result.pageNext': '次のページ',
   'scrApp.result.showing': '表示中',
   'scrApp.result.perPage': '件／ページ',
   'scrApp.result.play.refresh': '再生前にこのスクレイプをもう一度実行し、プロバイダー URL を更新してください。',

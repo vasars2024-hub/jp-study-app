@@ -33,7 +33,7 @@ import {
   type JobOutcome,
 } from '../data/dashboardData';
 import type { ScrapeJobSummary, SourceStatus } from '../../../../shared/scraperResults';
-import { sx, sx2, sxn, sxs } from '../strings';
+import { sx, sx2, sxn, sxNumber, sxs } from '../strings';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
 
 const HEALTH_LABEL: Record<SourceStatus['health'], 'health.ok' | 'health.degraded' | 'health.blocked' | 'health.offline' | 'health.unknown'> = {
@@ -212,31 +212,28 @@ export default function DashboardPage() {
 
       <section className="scr-dashboard-hero">
         <div className="scr-dashboard-hero-copy">
-          <span className="scr-dashboard-eyebrow">Scraper command center</span>
-          <h2>Build a clean anime library from one place.</h2>
-          <p>
-            Start a scrape, watch provider health, and move finished episodes into
-            downloads or Japanese study workflows without leaving the dashboard.
-          </p>
+          <span className="scr-dashboard-eyebrow">{sx('dash.hero.eyebrow')}</span>
+          <h2>{sx('dash.hero.title')}</h2>
+          <p>{sx('dash.hero.body')}</p>
           <div className="scr-dashboard-hero-actions">
             <Button
               variant="primary"
               leftIcon={<Icon name="sparkle" size={14} />}
               onClick={() => ctl.navigate('new-scrape')}
             >
-              New scrape
+              {sx('nav.newScrape')}
             </Button>
             <Button
               leftIcon={<Icon name="search" size={14} />}
               onClick={() => ctl.navigate('discover')}
             >
-              Discover anime
+              {sx('dash.hero.discover')}
             </Button>
           </div>
           <div className="scr-dashboard-hero-status">
-            <span><b>{healthy}</b> healthy sources</span>
-            <span><b>{snap.episodes.indexed.toLocaleString()}</b> indexed episodes</span>
-            <span><b>{snap.episodes.japanese}</b> Japanese subtitle tracks</span>
+            <span><b>{sxNumber(healthy)}</b> {sx('dash.hero.healthySources')}</span>
+            <span><b>{sxNumber(snap.episodes.indexed)}</b> {sx('dash.hero.indexedEpisodes')}</span>
+            <span><b>{sxNumber(snap.episodes.japanese)}</b> {sx('dash.hero.japaneseTracks')}</span>
           </div>
         </div>
         <div className="scr-dashboard-hero-art" aria-label="Recent anime artwork">
@@ -249,21 +246,21 @@ export default function DashboardPage() {
       <section className="scr-dashboard-block" aria-labelledby="scr-dashboard-quick-title">
         <div className="scr-dashboard-block-head">
           <div>
-            <h2 id="scr-dashboard-quick-title">Quick access</h2>
-            <p>Jump directly into the next part of the scraping workflow.</p>
+            <h2 id="scr-dashboard-quick-title">{sx('dash.quick.title')}</h2>
+            <p>{sx('dash.quick.subtitle')}</p>
           </div>
         </div>
         <div className="scr-dashboard-quick">
           {[
-            { page: 'new-scrape' as const, icon: 'sparkle' as const, label: 'New scrape', note: 'URL or title' },
-            { page: 'discover' as const, icon: 'search' as const, label: 'Discover', note: 'Find a series' },
-            { page: 'results' as const, icon: 'clipboard' as const, label: 'Results', note: 'Review episodes' },
-            { page: 'downloads' as const, icon: 'download' as const, label: 'Downloads', note: `${queued} queued` },
-            { page: 'sources' as const, icon: 'globe' as const, label: 'Sources', note: `${snap.sources.length} configured` },
+            { page: 'new-scrape' as const, icon: 'sparkle' as const, label: sx('nav.newScrape'), note: sx('dash.quick.newScrape') },
+            { page: 'discover' as const, icon: 'search' as const, label: sx('nav.discover'), note: sx('dash.quick.discover') },
+            { page: 'results' as const, icon: 'clipboard' as const, label: sx('nav.results'), note: sx('dash.quick.results') },
+            { page: 'downloads' as const, icon: 'download' as const, label: sx('nav.downloads'), note: sxn('dash.quick.queued', queued) },
+            { page: 'sources' as const, icon: 'globe' as const, label: sx('nav.sources'), note: sxn('dash.quick.configured', snap.sources.length) },
             // The active profile is whatever the most recent job ran under —
             // 'Balanced active' was hard-coded and stayed that way after a
             // profile change.
-            { page: 'profiles' as const, icon: 'settings' as const, label: 'Profiles', note: recent[0]?.profile ? `${recent[0].profile} active` : 'None run yet' },
+            { page: 'profiles' as const, icon: 'settings' as const, label: sx('nav.profiles'), note: recent[0]?.profile ? sxs('dash.quick.profileActive', recent[0].profile) : sx('dash.quick.profileNone') },
           ].map((action) => (
             <button
               type="button"
@@ -282,11 +279,11 @@ export default function DashboardPage() {
       <section className="scr-dashboard-block" aria-labelledby="scr-dashboard-series-title">
         <div className="scr-dashboard-block-head">
           <div>
-            <h2 id="scr-dashboard-series-title">Recent anime</h2>
-            <p>Continue from the latest indexed series.</p>
+            <h2 id="scr-dashboard-series-title">{sx('dash.series.title')}</h2>
+            <p>{sx('dash.series.subtitle')}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => ctl.navigate('results')}>
-            View all results
+            {sx('dash.series.viewAll')}
           </Button>
         </div>
         {series.length === 0 ? (
@@ -320,7 +317,7 @@ export default function DashboardPage() {
 
       <div className="scr-tile-row">
         <StatTile label={sx('dash.stat.series')} value={String(new Set(snap.jobs.map((j) => j.seriesId)).size)} />
-        <StatTile label={sx('dash.stat.episodes')} value={snap.episodes.indexed.toLocaleString()} />
+        <StatTile label={sx('dash.stat.episodes')} value={sxNumber(snap.episodes.indexed)} />
         <StatTile label={sx('dash.stat.queued')} value={String(queued)} />
         <StatTile label={sx('dash.stat.failed')} value={String(failed)} tone={failed > 0 ? 'bad' : undefined} />
         <StatTile label={sx('dash.stat.downloaded')} value={formatBytes(bytes)} />
@@ -511,7 +508,7 @@ export default function DashboardPage() {
               <span className="scr-mini-label">{sx('dash.learning.subs')}</span>
             </div>
             <div>
-              <span className="scr-mini-value">{snap.episodes.indexed.toLocaleString()}</span>
+              <span className="scr-mini-value">{sxNumber(snap.episodes.indexed)}</span>
               <span className="scr-mini-label">{sx('dash.learning.episodes')}</span>
             </div>
           </div>

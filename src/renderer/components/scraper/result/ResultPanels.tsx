@@ -475,7 +475,7 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
         <div className="scr-tile"><span className="scr-tile-label">Releases</span><span className="scr-tile-value">{torrents.length}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">Total seeders</span><span className="scr-tile-value">{torrents.reduce((sum, torrent) => sum + torrent.seeders, 0).toLocaleString()}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">Batches</span><span className="scr-tile-value">{torrents.filter((torrent) => torrent.isBatch).length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Japanese subtitles</span><span className="scr-tile-value">{torrents.filter((torrent) => torrent.subtitleLanguages.includes('ja')).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('result.detail.japaneseSubs')}</span><span className="scr-tile-value">{torrents.filter((torrent) => torrent.subtitleLanguages.includes('ja')).length}</span></div>
       </div>
       <div className="scr-result-controls">
         <label className="scr-result-inline-filter">
@@ -558,7 +558,7 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
     <div className="scr-panel scr-panel--images scr-result-workspace">
       <div className="scr-tile-row">
         <div className="scr-tile"><span className="scr-tile-label">Images</span><span className="scr-tile-value">{summary.count}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Total size</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(summary.totalBytes)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('result.detail.totalSize')}</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(summary.totalBytes)}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">Providers</span><span className="scr-tile-value">{summary.sources}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">Episode linked</span><span className="scr-tile-value">{summary.episodeLinked}</span></div>
       </div>
@@ -698,14 +698,14 @@ export function MetadataPanel({ metadata }: { metadata: SeriesMetadata }) {
       <div className="scr-tile-row">
         <div className="scr-tile"><span className="scr-tile-label">Fields present</span><span className="scr-tile-value">{complete}/{rows.length}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">Providers</span><span className="scr-tile-value">{providerCount}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Community rating</span><span className="scr-tile-value">{metadata.communityRating}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{sx('result.meta.rating')}</span><span className="scr-tile-value">{metadata.communityRating}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">External IDs</span><span className="scr-tile-value">{Number(Boolean(metadata.malId)) + Number(Boolean(metadata.aniListId))}</span></div>
       </div>
       <div className="scr-result-controls">
         <p className="scr-muted scr-panel-note">{sx('result.meta.provenanceNote')}</p>
         <span className="scr-result-control-spacer" />
         <Button size="sm" variant="ghost" onClick={() => void copyMetadata()}>Copy JSON</Button>
-        <Button size="sm" leftIcon={<Icon name="external" size={13} />} onClick={exportMetadata}>Export JSON</Button>
+        <Button size="sm" leftIcon={<Icon name="external" size={13} />} onClick={exportMetadata}>{sx('result.exportJson')}</Button>
       </div>
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
       <div className="scr-table" role="table">

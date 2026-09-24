@@ -203,6 +203,7 @@ function initialBreakout(): BreakoutState {
 }
 
 function AeroBreakout(props: ArcadeGamePanelProps) {
+  const { t } = useT();
   const record = useArcadeResult(props);
   const keys = usePressedKeys();
   const [state, setState] = useState<BreakoutState>(() => initialBreakout());
@@ -280,7 +281,7 @@ function AeroBreakout(props: ArcadeGamePanelProps) {
   }, [keys, record]);
 
   return (
-    <ArcadeShell {...props} title="Aero Breakout" subtitle="jakesgordon-style Breakout logic under glossy desktop glass" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
+    <ArcadeShell {...props} title={t('games.arcade.breakout.title')} subtitle="jakesgordon-style Breakout logic under glossy desktop glass" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
       <div className="arcade-aero-field arcade-aero-breakout">
         {state.bricks.map((brick) => (
           <span key={brick.id} className={`arcade-aero-brick capsule-${brick.color}`} style={{ left: pct(brick.x), top: pct(brick.y), width: pct(brick.w), height: pct(brick.h) }} />
@@ -375,6 +376,7 @@ function initialTetris(): TetrisState {
 }
 
 function AeroTetris(props: ArcadeGamePanelProps) {
+  const { t } = useT();
   const record = useArcadeResult(props);
   const keys = usePressedKeys();
   const [state, setState] = useState<TetrisState>(() => initialTetris());
@@ -468,7 +470,7 @@ function AeroTetris(props: ArcadeGamePanelProps) {
   }, [state.grid, state.piece]);
 
   return (
-    <ArcadeShell {...props} title="Aero Blocks" subtitle="jakesgordon-style Tetris mechanics in a frosted glass well" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
+    <ArcadeShell {...props} title={t('games.arcade.blocks.title')} subtitle="jakesgordon-style Tetris mechanics in a frosted glass well" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
       <div className="arcade-aero-tetris">
         {cells.map((cell, index) => <span key={index} className={cell ? `arcade-tetris-cell tetris-${cell}` : 'arcade-tetris-cell'} />)}
       </div>
@@ -503,6 +505,7 @@ function initialPong(): PongState {
 }
 
 function AeroPong(props: ArcadeGamePanelProps) {
+  const { t } = useT();
   const record = useArcadeResult(props);
   const keys = usePressedKeys();
   const [state, setState] = useState<PongState>(() => initialPong());
@@ -567,7 +570,7 @@ function AeroPong(props: ArcadeGamePanelProps) {
   }, [keys, record]);
 
   return (
-    <ArcadeShell {...props} title="Aero Pong" subtitle="jakesgordon-style Pong with glass paddles and a soft center court" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
+    <ArcadeShell {...props} title={t('games.arcade.pong.title')} subtitle="jakesgordon-style Pong with glass paddles and a soft center court" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
       <div className="arcade-aero-field arcade-aero-pong">
         <span className="arcade-pong-net" />
         <span className="arcade-pong-paddle player" style={{ top: pct(state.player) }} />
@@ -640,6 +643,7 @@ function oppositeDir(a: SnakeDir, b: SnakeDir): boolean {
 }
 
 function AeroSnake(props: ArcadeGamePanelProps) {
+  const { t } = useT();
   const record = useArcadeResult(props);
   const keys = usePressedKeys();
   const [state, setState] = useState<SnakeState>(() => initialSnake());
@@ -696,7 +700,7 @@ function AeroSnake(props: ArcadeGamePanelProps) {
   }, [keys, record]);
 
   return (
-    <ArcadeShell {...props} title="Aero Snake" subtitle="patorjk-style Snake rules with Vista ribbon tiles" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
+    <ArcadeShell {...props} title={t('games.arcade.snake.title')} subtitle="patorjk-style Snake rules with Vista ribbon tiles" score={state.score} lives={state.lives} stage={state.stage} status={state.status} complete={state.complete} onReset={reset}>
       <div className="arcade-aero-snake">
         {Array.from({ length: SNAKE_W * SNAKE_H }, (_, index) => {
           const x = index % SNAKE_W;
