@@ -20,6 +20,7 @@ import {
   type AiProviderRuntimeEvent,
   type AiProviderUsage,
 } from './providerRuntime';
+import { isLocalModelMissingError } from './localModelFiles';
 import { runLocalQwenPrompt } from './translate';
 
 export interface AgentProviderExecutionOptions {
@@ -316,12 +317,28 @@ async function runLocal(
 ): Promise<AgentProviderExecutionResult> {
   const startedAt = Date.now();
   const stream = policy.streaming ? options.onTextChunk : undefined;
-  const text = await runLocalQwenPrompt(prompt, {
-    maxTokens: policy.maxOutputTokens,
-    timeoutMs: policy.timeoutMs,
-    signal: options.signal,
-    onTextChunk: stream,
-  });
+  const model = policy.target.kind === 'local' ? policy.target.model : undefined;
+  let text: string;
+  try {
+    text = await runLocalQwenPrompt(prompt, {
+      maxTokens: policy.maxOutputTokens,
+      timeoutMs: policy.timeoutMs,
+      signal: options.signal,
+      onTextChunk: stream,
+      // A chat reply is prose. Without this the shared JSON extractor cut any
+      // answer containing a code block, an object or a list down to that
+      // fragment, and the fragment was what the conversation saved.
+      raw: true,
+      // The Agent's own model setting. It used to be ignored here: local chat
+      // always ran on the translation model whatever the user had picked.
+      ...(model ? { modelFileName: model } : {}),
+    });
+  } catch (error) {
+    if (isLocalModelMissingError(error)) {
+      throw new AiProviderRuntimeError(error.message, 'local-model-missing');
+    }
+    throw error;
+  }
   return {
     text,
     provider: disclosure(

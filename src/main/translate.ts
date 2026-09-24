@@ -1,11 +1,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
 import { acquireLlamaSession, type LlamaSessionHandle } from './llamaHost';
+import {
+  LocalModelMissingError,
+  findLocalModelFile,
+  resolveQwenSmallModelPath,
+} from './localModelFiles';
 import {
   buildBatchPrompt,
   buildSentencePrompt,
@@ -22,14 +26,6 @@ import {
 export type TransLang = string;
 
 export type { TranslateBatchItem };
-
-const MODEL_FILENAMES = [
-  'Qwen_Qwen3-1.7B-Q4_K_M.gguf',
-  'Qwen3-1.7B-Q4_K_M.gguf',
-  'qwen3-1.7b-q4_k_m.gguf',
-];
-
-const USER_MODEL = 'Qwen3-1.7B.gguf';
 
 /**
  * The chat session, and — since 2026-08-24 — a handle rather than an object.
@@ -158,11 +154,11 @@ export interface RunTranslationBatchOptions {
  * OVER-counts Latin text (really ~4 chars/token) while sitting close to the truth on Japanese
  * (~1.2): over-counting shortens a completion, under-counting causes the defect below.
  */
-async function countPromptTokens(prompt: string): Promise<number> {
+async function countPromptTokens(prompt: string, on: LlamaSessionHandle | null = session): Promise<number> {
   try {
     // Asynchronous only because the tokenizer now answers from the model host; it is still the
     // exact tokenizer the generation will use, not a second copy loaded to count with.
-    const tokens = await session?.countTokens(prompt);
+    const tokens = await on?.countTokens(prompt);
     if (typeof tokens === 'number') return tokens;
   } catch {
     /* Fall through to the estimate; a tokenizer failure must not fail the request. */
@@ -184,8 +180,12 @@ async function countPromptTokens(prompt: string): Promise<number> {
  * So the budget is computed rather than trusted, and a prompt with no room left is an explicit
  * failure the user can act on.
  */
-async function fitOutputBudget(prompt: string, requested: number): Promise<number> {
-  const promptTokens = await countPromptTokens(prompt);
+async function fitOutputBudget(
+  prompt: string,
+  requested: number,
+  on: LlamaSessionHandle | null = session,
+): Promise<number> {
+  const promptTokens = await countPromptTokens(prompt, on);
   const room = TRANSLATE_CONTEXT_SIZE - promptTokens - CHAT_TEMPLATE_RESERVE_TOKENS;
   if (room < MIN_USABLE_OUTPUT_TOKENS) {
     throw new Error(
@@ -402,16 +402,12 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+/**
+ * The file names and folders are `localModelFiles.ts`'s, shared with the Agent: this module used to
+ * keep its own shorter list, so a model the Agent could load was "not found" here and the reverse.
+ */
 function resolveModelPath(): string | null {
-  const stored = path.join(app.getPath('userData'), 'models', USER_MODEL);
-  if (fs.existsSync(stored)) return stored;
-
-  const downloads = path.join(os.homedir(), 'Downloads');
-  for (const name of MODEL_FILENAMES) {
-    const candidate = path.join(downloads, name);
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  return null;
+  return resolveQwenSmallModelPath();
 }
 
 /** Whether the Qwen model file is present — checked before queuing LLM work. */
@@ -430,8 +426,8 @@ export function isTranslateReady(): boolean {
 
 function friendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
-  if (/model not found|ENOENT|no such file/i.test(msg)) {
-    return 'Qwen3 translation model not found. Place Qwen3-1.7B (Q4_K_M) in your Downloads folder, or copy it to the app data models folder.';
+  if (err instanceof LocalModelMissingError || /model not found|ENOENT|no such file/i.test(msg)) {
+    return 'The offline AI model is not installed. Install Qwen3-1.7B in Settings > AI.';
   }
   if (/llama|gguf|cuda|vulkan|backend|native/i.test(msg)) {
     return 'The Qwen3 translation engine could not start. Try restarting the app.';
@@ -506,7 +502,7 @@ async function ensureSession(): Promise<LlamaSessionHandle> {
     loadPromise = (async () => {
       const modelPath = resolveModelPath();
       if (!modelPath) {
-        throw new Error('Qwen3 model not found');
+        throw new LocalModelMissingError();
       }
 
       broadcast('translate:progress', { status: 'init', progress: 0, file: path.basename(modelPath) });
@@ -565,7 +561,7 @@ async function ensureSession(): Promise<LlamaSessionHandle> {
 export async function ensureTranslateReady(): Promise<{ ok: boolean; error?: string }> {
   try {
     if (!isTranslateAvailable()) {
-      return { ok: false, error: friendlyError(new Error('Qwen3 model not found')) };
+      return { ok: false, error: friendlyError(new LocalModelMissingError()) };
     }
     await ensureSession();
     return { ok: true };
@@ -620,66 +616,115 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+export interface LocalQwenPromptOptions {
+  maxTokens?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  onTextChunk?: (text: string) => void;
+  /**
+   * Return the model's whole reply instead of the JSON fragment inside it.
+   *
+   * Every original caller asked for JSON and wanted the object even when the model wrapped it in
+   * prose, so the fragment was the default. A chat reply is the opposite: "Here is an example:" and
+   * a code block is the answer, and cutting it down to the block silently discarded the rest.
+   */
+  raw?: boolean;
+  /**
+   * A GGUF file other than the translation model — the Agent's own configured model. Missing on
+   * disk is a `LocalModelMissingError`, never a quiet fallback to a different model.
+   */
+  modelFileName?: string;
+}
+
 /**
- * Generic local-Qwen completion for Card Studio / sentence analysis.
- * Shares the Translate session so we never load two GGUFs at once.
+ * A session for `modelFileName` when it names a different file from the translation model.
+ *
+ * Borrowed for one prompt and released straight after: the host keeps the weights and the KV cache
+ * resident through its grace window, so a conversation does not reload between turns, and this
+ * module never ends up holding two multi-GB models past the request that needed the second one.
+ */
+async function borrowSessionFor(modelFileName: string | undefined): Promise<{
+  session: LlamaSessionHandle;
+  borrowed: boolean;
+}> {
+  const wanted = modelFileName?.trim();
+  if (wanted) {
+    const modelPath = findLocalModelFile(wanted);
+    if (!modelPath) throw new LocalModelMissingError();
+    if (path.resolve(modelPath).toLocaleLowerCase() !== (resolveModelPath() ?? '').toLocaleLowerCase()) {
+      return { session: await acquireLlamaSession(modelPath, TRANSLATE_CONTEXT_SIZE), borrowed: true };
+    }
+  } else if (!isTranslateAvailable()) {
+    throw new LocalModelMissingError();
+  }
+  return { session: await ensureSession(), borrowed: false };
+}
+
+/**
+ * Generic local-Qwen completion for Card Studio / sentence analysis / the Agent's local chat.
+ * Shares the Translate session so we never load two GGUFs at once — unless the caller names a
+ * different model, which is then borrowed for the one prompt.
  */
 export async function runLocalQwenPrompt(
   prompt: string,
-  options?: {
-    maxTokens?: number;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-    onTextChunk?: (text: string) => void;
-  },
+  options?: LocalQwenPromptOptions,
 ): Promise<string> {
-  if (!isTranslateAvailable()) {
-    throw new Error(friendlyError(new Error('Qwen3 model not found')));
+  if (!options?.modelFileName?.trim() && !isTranslateAvailable()) {
+    throw new LocalModelMissingError();
   }
   const requestedTokens = Math.max(64, Math.min(8192, options?.maxTokens ?? 2048));
   const timeoutMs = Math.max(5_000, options?.timeoutMs ?? 90_000);
   return enqueue(async () => {
-    const s = await ensureSession();
-    // After `ensureSession`, so the weights — and therefore the real tokenizer — are loaded. The
-    // callers of this function are the ones that could ask for a whole context of output.
-    const maxTokens = await fitOutputBudget(prompt, requestedTokens);
+    const { session: s, borrowed } = await borrowSessionFor(options?.modelFileName);
     // Independent of EPUB batch cancel — analysis/enrichment must not abort mid-flight
     // just because a translation batch was cancelled elsewhere.
     const controller = new AbortController();
     let timedOut = false;
     const abort = () => controller.abort(options?.signal?.reason);
-    if (options?.signal?.aborted) {
-      resetSessionHistory(s);
-      throw new Error('Local Qwen request was cancelled.');
-    }
-    options?.signal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, timeoutMs);
+    let timer: ReturnType<typeof setTimeout> | null = null;
     try {
+      // After the session exists, so the weights — and therefore the real tokenizer — are loaded.
+      // The callers of this function are the ones that could ask for a whole context of output.
+      const maxTokens = await fitOutputBudget(prompt, requestedTokens, s);
+      if (options?.signal?.aborted) {
+        throw new Error('Local Qwen request was cancelled.');
+      }
+      options?.signal?.addEventListener('abort', abort, { once: true });
+      timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeoutMs);
       const raw = await s.prompt(prompt, {
         maxTokens,
         signal: controller.signal,
         onTextChunk: options?.onTextChunk,
       });
-      return extractJsonish(cleanLlmOutput(raw));
+      const cleaned = cleanLlmOutput(raw);
+      return options?.raw ? cleaned : extractJsonish(cleaned);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         if (!timedOut) throw new Error('Local Qwen request was cancelled.');
         throw new Error(`Local Qwen timed out after ${Math.round(timeoutMs / 1000)}s.`);
       }
+      // The typed failure survives: the Agent and the analysis panels branch on it.
+      if (err instanceof LocalModelMissingError) throw err;
       throw err instanceof Error ? new Error(friendlyError(err)) : err;
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       options?.signal?.removeEventListener('abort', abort);
       resetSessionHistory(s);
+      if (borrowed) void s.release().catch(() => undefined);
     }
   });
 }
 
-/** Prefer a JSON object/array if the model wrapped it in prose or fences. */
-function extractJsonish(cleaned: string): string {
+/**
+ * Prefer a JSON object/array if the model wrapped it in prose or fences.
+ *
+ * Only for callers that asked for JSON. Exported so the chat path's test can show what it is
+ * protected from.
+ */
+export function extractJsonish(cleaned: string): string {
   const fence = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence?.[1]) return fence[1].trim();
   const objStart = cleaned.indexOf('{');

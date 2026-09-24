@@ -39,6 +39,13 @@ export type AiProviderErrorCode =
   | 'upstream'
   | 'network'
   | 'vision-unsupported'
+  /**
+   * A local request found no model on disk. Raised by the Agent router's local
+   * branch rather than by this runtime, and typed rather than left as a plain
+   * `Error` because the remedy — install a model — is nothing like "the provider
+   * returned an unusable response", which is what an untyped failure became.
+   */
+  | 'local-model-missing'
   | 'invalid-response'
   /**
    * The model hit `maxOutputTokens` before finishing. Distinct from
