@@ -862,16 +862,12 @@ html {
    and uses --accent / panel colors so themes and accent presets recolor it.
    ========================================================================== */
 
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-*:hover,
-*:focus,
-*:focus-within {
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-}
+/* No `scrollbar-width` / `scrollbar-color` on `*` (round-2 audit V6). Chromium honours
+   those standard properties since 121 and, where either is set, IGNORES every
+   `::-webkit-scrollbar` rule below: the themed thin thumb became the native bar with
+   arrow buttons, and `transparent` hid it outright until hover. The app runs only in
+   Chromium, so the webkit rules are the whole implementation. Containers that hide
+   their bar on purpose still set `scrollbar-width: none` themselves. */
 
 /* Chromium / Electron / Safari */
 *::-webkit-scrollbar {
@@ -6025,6 +6021,12 @@ mark.lookup-mark,
   padding: var(--space-xl);
   margin-bottom: 18px;
   box-shadow: var(--shadow-card);
+}
+/* Anki's first connection check: one placeholder card roughly the height of the
+   "not connected" card it is replaced by (AnkiView mounts nothing below it). */
+.anki-first-check {
+  min-height: 320px;
+  color: var(--muted);
 }
 /* ============================================================================
    IR-2 — `.anki-card` containment cues (closes the request Phase 3A filed).
@@ -13622,7 +13624,9 @@ mark.lookup-mark,
   max-width: 220px;
 }
 .os-viz-label {
-  width: 62px;
+  /* A floor, not a width (round-2 audit V8): "Чувствительность" does not fit 62px. */
+  min-width: 62px;
+  flex: none;
   font-size: 12.5px;
 }
 .os-viz-select {
@@ -16721,6 +16725,8 @@ html[data-taskbar-size='large'] .os-tray-btn {
 
 .os-accent-row {
   display: flex;
+  /* The swatches wrap in a narrow Settings window instead of running off its edge (V8). */
+  flex-wrap: wrap;
   gap: 10px;
 }
 .os-accent {
@@ -27850,6 +27856,8 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
 .credential-field { display: grid; gap: 4px; margin: 10px 0 0; }
 .credential-field label { font-size: 12px; color: var(--muted); }
 .credential-field input { width: 100%; }
+/* The Save .btn sits in the field's grid; without this it stretches to the full row width. */
+.credential-field .btn { justify-self: start; }
 .credential-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
 /* A store that cannot encrypt is a security statement, not a hint: it reads as a
    warning rather than as muted body text. */

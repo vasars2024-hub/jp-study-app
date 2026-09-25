@@ -77,3 +77,17 @@
     width: 100%;
   }
 }
+
+/* LAYOUT JUMPS on open (V12). The refresh hint is always mounted and holds one line
+   even while its text is empty, so the idle -> "Refreshing…" swap cannot push the
+   landing down. The learner map reserves its own box (the choropleth's viewBox ratio,
+   `WORLD_MAP_VIEWBOX` 1010x666) until the counts and the map chunk are both in, so the
+   map paints into space that already exists instead of shoving the bundles down. */
+.res-refresh-hint {
+  min-height: 1lh;
+}
+.heatmap-svg-wrap--pending {
+  aspect-ratio: 1010 / 666;
+  border-radius: 8px;
+  background: var(--panel-2);
+}

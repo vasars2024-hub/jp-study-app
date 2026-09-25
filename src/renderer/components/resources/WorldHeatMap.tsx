@@ -5,6 +5,7 @@ import {
   statsConfigured,
   type CountryCounts,
 } from '../../../shared/stats';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import { useT } from '../../i18n';
 import { repairStaleTelemetryPingFlag, sendTelemetryPingIfNeeded } from '../../telemetryPing';
 
@@ -45,9 +46,10 @@ export default function WorldHeatMap({
   /** Bump to re-fetch remote counts (e.g. after opt-in from the widget). */
   refreshToken?: number;
 } = {}) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [counts, setCounts] = useState<CountryCounts | null>(null);
   const [mapData, setMapData] = useState<WorldMapData | null>(null);
+  const [mapFailed, setMapFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [hover, setHover] = useState<{ iso: string; count: number } | null>(null);
   const [consented, setConsented] = useState(hasConsentYes);
@@ -65,6 +67,7 @@ export default function WorldHeatMap({
       })
       .catch(() => {
         // The ranked bar fallback still works if the optional map chunk fails.
+        if (alive) setMapFailed(true);
       });
     return () => {
       alive = false;
@@ -125,6 +128,24 @@ export default function WorldHeatMap({
       </section>
     );
   }
+  // LAYOUT JUMP (V12). In the Resources app this card sits ABOVE the bundles, and it
+  // used to grow in two late steps: a one-line 'Loading…' card, then the counts (as bars),
+  // then the map chunk (a ~240px choropleth) — each step shoving the bundles and the list
+  // down, the last one ~190px about 0.8s after the window opened. The full-size card now
+  // reserves the map's own box (aspect-ratio of its viewBox) until both the counts and the
+  // map chunk are in, so the map paints into space that was already there. When nothing
+  // can arrive (no Worker configured and no consent) there is no placeholder at all,
+  // rather than one that would collapse again.
+  const mapPending = !mapData && !mapFailed;
+  if (!compact && (!loaded || mapPending)) {
+    if (!loaded && !statsConfigured() && !consented) return null;
+    return (
+      <section className={sectionClass} aria-busy="true">
+        <div className="heatmap-caption muted">{t('resources.heatmap.loading')}</div>
+        <div className="heatmap-svg-wrap heatmap-svg-wrap--pending" />
+      </section>
+    );
+  }
   if (!loaded) {
     return (
       <section className={sectionClass}>
@@ -174,7 +195,7 @@ export default function WorldHeatMap({
               <span className="heatmap-bar-track">
                 <span className="heatmap-bar-fill" style={{ width: `${max > 0 ? (count / max) * 100 : 0}%` }} />
               </span>
-              <span className="heatmap-bar-count">{count.toLocaleString()}</span>
+              <span className="heatmap-bar-count">{count.toLocaleString(LANG_TAGS[lang])}</span>
             </div>
           ))}
         </div>
