@@ -859,6 +859,9 @@ declare global {
       playerSendCommand(cmd: import('../shared/playerSync').PlayerCommand): void;
       onPlayerSync(cb: (snap: import('../shared/playerSync').PlayerSnapshot) => void): () => void;
       onPlayerCommand(cb: (cmd: import('../shared/playerSync').PlayerCommand) => void): () => void;
+      playerSendVizFrame?(frame: import('./vizFrames').VizFrame): void;
+      onPlayerVizFrame?(cb: (frame: unknown) => void): () => void;
+      musicLocalLyrics?(id: string): Promise<import('../shared/musicLocalLyrics').LocalLyrics | null>;
       openExternal(url: string): Promise<boolean>;
       getWindowBorderless(): Promise<boolean>;
       setWindowBorderless(borderless: boolean): Promise<boolean>;

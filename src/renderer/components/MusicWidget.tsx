@@ -6,7 +6,7 @@ import { coverFor, paletteFor, accentPalette, type Palette } from '../albumArt';
 import { isLiked, onLikedChanged, toggleLiked } from '../likedSongs';
 import { guessSongMeta } from '../lyrics';
 import { useLiveLyrics, type LyricsState } from '../liveLyrics';
-import { loadVizSettings, onVizSettingsChanged } from '../visualizerSettings';
+import { loadVizSettings, onVizSettingsChanged, vizShowsIn } from '../visualizerSettings';
 import { loadMusicWidgetSettings, onMusicWidgetSettingsChanged, toggleShowLyrics } from '../musicWidgetSettings';
 import { openSectionSurface } from '../sectionSurface';
 import { useT } from '../i18n';
@@ -319,7 +319,8 @@ export default function MusicWidget() {
       className={`mwidget ${big ? 'big' : 'bar'}${narrow ? ' narrow' : ''}`}
       style={{ background: bg }}
     >
-      {viz.enabled && (
+      {/* The "Where" setting decides, not `enabled` alone: "Wallpaper" keeps it off here. */}
+      {vizShowsIn(viz, 'widget') && (
         <VisualizerCanvas className="mwidget-viz" settings={viz} idleBaseline={false} />
       )}
       {!ps.current ? (

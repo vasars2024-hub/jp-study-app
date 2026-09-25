@@ -853,11 +853,20 @@ function VideoPanel({
 function MusicPanel({ state }: { state: MusicState }) {
   const { t } = useT();
   const { ps } = state;
-  const queue = (ps.queue.length > 0 ? ps.queue : state.baseSongs).slice(0, 8);
+  // Up next is what will actually play: the current track, then the leader's play order
+  // after it (`ps.upNext`, shuffle included). It used to be the first eight rows of the
+  // queue, whatever was playing — track 40 playing still listed tracks 1-8.
+  const pool = ps.queue.length > 0 ? ps.queue : state.baseSongs;
+  const byId = new Map(pool.map((item) => [item.id, item]));
+  const currentIndex = ps.current ? pool.findIndex((item) => item.id === ps.current?.id) : -1;
+  const upcoming = ps.upNext.length
+    ? ps.upNext.map((id) => byId.get(id)).filter((item): item is MediaItem => !!item)
+    : pool.slice(currentIndex + 1);
+  const queue = (ps.current && currentIndex >= 0 ? [pool[currentIndex], ...upcoming] : pool).slice(0, 8);
   return (
     <div className="mc-page mc-music-page">
       <div className="mc-music-head">
-        <div><span className="mc-eyebrow">{t('mediaCenter.music.eyebrow')}</span><h1>{state.currentMeta?.title ?? t('mediaCenter.nav.music')}</h1><p>{state.currentMeta?.artist ?? t('mediaCenter.music.libraryCount', { count: state.baseSongs.length })}</p></div>
+        <div><span className="mc-eyebrow">{t('mediaCenter.music.eyebrow')}</span><h1>{state.currentMeta?.title ?? t('mediaCenter.music.chooseTrack')}</h1><p>{state.currentMeta?.artist ?? t('mediaCenter.music.libraryCount', { count: state.baseSongs.length })}</p></div>
         <div className="mc-music-window-actions lq-hit-scope">
           <button type="button" className="mc-button" onClick={() => void window.api.popOut('music')}>
             <Icon name="window" size={13} /> {t('mediaCenter.music.detachPlayer')}

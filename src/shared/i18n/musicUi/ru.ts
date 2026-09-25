@@ -3,4 +3,10 @@
 import type { Catalog } from '../core';
 
 export const MUSIC_UI_RU: Catalog = {
+  // Music player errors and the visualizer "Where" state.
+  'musicUi.error.fileMissing': 'Не удалось открыть файл. Возможно, он был перемещён?',
+  'musicUi.viz.wallpaperOnly': 'Визуализатор настроен показываться только на обоях',
+  'musicUi.viz.off': 'Визуализатор выключен',
+  'musicUi.viz.showHereToo': 'Показывать и здесь',
+  'musicUi.viz.turnOn': 'Включить',
 };

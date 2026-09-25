@@ -45,6 +45,8 @@ interface DayEntry {
   chars: number;
   /** Watched seconds. Optional: every day written before slice 8 lacks it. */
   watchSeconds?: number;
+  /** Seconds of music listened to (the Music app / mini player). */
+  listenSeconds?: number;
   /** Flashcard reviews graded that day (any scheduler rating). */
   reviews?: number;
   /** Of `reviews`, how many were not Again — the retention numerator. */
@@ -133,6 +135,8 @@ export const READING_RECORDED_EVENT = 'jp-reading-recorded';
  */
 export const WATCH_RECORDED_EVENT = 'jp-watch-recorded';
 export const STATS_RESET_EVENT = 'jp-study-stats-reset';
+/** Fired on window after each recordListening() flush; detail = ListenDelta. */
+export const LISTEN_RECORDED_EVENT = 'jp-listen-recorded';
 /** Fired on window after a flashcard review or practice answer is recorded. */
 export const REVIEW_RECORDED_EVENT = 'jp-review-recorded';
 export const GAME_PROGRESS_EVENT = 'jp-game-progress-changed';
@@ -215,6 +219,9 @@ export interface StatsSummary {
   todaySeconds: number;
   todayChars: number;
   todayWatchSeconds: number;
+  /** Music listened to today / across every recorded day. Its own channel, like watching. */
+  todayListenSeconds?: number;
+  totalListenSeconds?: number;
   /** Flashcard reviews graded today, and across every recorded day. */
   todayReviews: number;
   totalReviews: number;
@@ -461,6 +468,37 @@ export function recordWatching(showId: string, title: string, seconds: number): 
   }
 }
 
+export interface ListenDelta {
+  trackId: string;
+  title: string;
+  seconds: number;
+}
+
+/**
+ * Add a chunk of music listening to today's totals.
+ *
+ * Called by the music player's accumulator (`renderer/musicListening.ts`, the same
+ * rules as `recordWatching`'s). A separate `listenSeconds` field for the reason watch
+ * time has its own: surfaces label `seconds` "read" and `watchSeconds` "watched".
+ * It does not count toward the streak — background music is not a study day on its own.
+ */
+export function recordListening(trackId: string, title: string, seconds: number): void {
+  if (!trackId || !(seconds > 0)) return;
+  const data = load();
+  const key = dayKey(new Date());
+  const day = data.days[key] ?? { seconds: 0, chars: 0 };
+  day.listenSeconds = Math.round(((day.listenSeconds ?? 0) + seconds) * 100) / 100;
+  data.days[key] = day;
+  save(data);
+  try {
+    window.dispatchEvent(
+      new CustomEvent<ListenDelta>(LISTEN_RECORDED_EVENT, { detail: { trackId, title, seconds } }),
+    );
+  } catch {
+    /* non-browser context (tests) — ignore */
+  }
+}
+
 /**
  * Count flashcard reviews (or practice answers) toward today's totals.
  *
@@ -528,12 +566,14 @@ export function getSummary(): StatsSummary {
   let totalSeconds = 0;
   let totalChars = 0;
   let totalWatchSeconds = 0;
+  let totalListenSeconds = 0;
   let totalReviews = 0;
   let totalReviewsPassed = 0;
   for (const k of dayKeys) {
     totalSeconds += data.days[k].seconds;
     totalChars += data.days[k].chars;
     totalWatchSeconds += data.days[k].watchSeconds ?? 0;
+    totalListenSeconds += data.days[k].listenSeconds ?? 0;
     totalReviews += data.days[k].reviews ?? 0;
     totalReviewsPassed += data.days[k].reviewsPassed ?? 0;
   }
@@ -574,6 +614,8 @@ export function getSummary(): StatsSummary {
     todaySeconds: today.seconds,
     todayChars: today.chars,
     todayWatchSeconds: today.watchSeconds ?? 0,
+    todayListenSeconds: today.listenSeconds ?? 0,
+    totalListenSeconds,
     todayReviews: today.reviews ?? 0,
     totalReviews,
     totalReviewsPassed,

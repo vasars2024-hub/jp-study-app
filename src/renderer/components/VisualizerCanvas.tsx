@@ -12,6 +12,7 @@ import {
 import { accentPalette, paletteFor, type Palette } from '../albumArt';
 import type { VizSettings } from '../visualizerSettings';
 import { getState, subscribe as subscribePlayer } from '../playerBus';
+import { requestRemoteFrames } from '../vizFrames';
 
 // Canvas that draws the live audio visualization from the shared analyser:
 //  - spectrum: classic analyzer bars, bass on the left → treble on the right
@@ -19,6 +20,8 @@ import { getState, subscribe as subscribePlayer } from '../playerBus';
 //  - particles: beat-driven bursts that explode and accelerate with the music
 // Used full-screen behind the desktop (wallpaper mode) and inside widgets.
 // Idles to a dim baseline when nothing plays; loop stops entirely once faded.
+// In a window that does not own the audio (a detached mini player or Visualizer),
+// the data is the leader window's analyser relayed over IPC -- see vizFrames.ts.
 
 interface Props {
   settings: VizSettings;
@@ -61,6 +64,10 @@ export default function VisualizerCanvas({ settings, className, idleBaseline }: 
       unsub();
     };
   }, [settings.colorTheme]);
+
+  // While mounted, ask the window that owns the audio for analyser frames (a no-op
+  // in that window itself, which reads its own analyser).
+  useEffect(() => requestRemoteFrames(), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;

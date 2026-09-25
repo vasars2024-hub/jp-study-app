@@ -19,8 +19,12 @@ import {
 } from './lyrics';
 import { loadLyricsSettings, onLyricsSettingsChanged } from './lyricsSettings';
 
-/** Where a set of lyrics came from, carried so the UI can attribute them. */
-export type LyricsSource = 'lrclib' | 'file';
+/**
+ * Where a set of lyrics came from, carried so the UI can attribute them. `file` is a
+ * .lrc the user picked; `sidecar` and `embedded` travel with the audio file itself
+ * (see `shared/musicLocalLyrics.ts`).
+ */
+export type LyricsSource = 'lrclib' | 'file' | 'sidecar' | 'embedded';
 
 export type LyricsState =
   | { kind: 'none' }
@@ -39,14 +43,34 @@ export interface LiveLyrics {
   loadFromFile: (text: string) => void;
 }
 
-function toLyricsState(res: LyricsResult): LyricsState {
+export function toLyricsState(res: { lrc?: string; plain?: string; source?: LyricsSource }): LyricsState {
+  const source = res.source;
   if (res.lrc) {
     const cues = parseSubtitles(res.lrc);
-    if (cues.length) return { kind: 'synced', cues };
+    if (cues.length) return { kind: 'synced', cues, source };
   }
   const plain = res.plain ?? res.lrc ?? '';
-  const lines = plain.split('\n').map((l) => l.trim()).filter(Boolean);
-  return lines.length ? { kind: 'plain', lines } : { kind: 'missing' };
+  // Stray LRC header tags ([ar:…], [ti:…]) are metadata, not lyrics lines.
+  const lines = plain
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !/^\[[a-z]+:[^\]]*\]$/i.test(l));
+  return lines.length ? { kind: 'plain', lines, source } : { kind: 'missing' };
+}
+
+/**
+ * Lyrics stored with the audio file (a sidecar .lrc, or embedded tags), or null. Never
+ * throws: a host without the IPC (an older preload, a test) simply has none.
+ */
+export async function readLocalLyrics(id: string): Promise<LyricsState | null> {
+  try {
+    const local = await window.api.musicLocalLyrics?.(id);
+    if (!local || !local.text) return null;
+    const state = toLyricsState({ lrc: local.text, source: local.source });
+    return state.kind === 'missing' ? null : state;
+  } catch {
+    return null;
+  }
 }
 
 export function useLiveLyrics(current: MediaItem | null, duration: number, time: number): LiveLyrics {
@@ -61,6 +85,16 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
   const load = useCallback(async (item: MediaItem, durationSec: number, force: boolean) => {
     if (force) clearLyrics(item.id);
     const cached = cachedLyrics(item.id);
+    // A .lrc the user picked by hand is their correction and outranks everything.
+    // Otherwise lyrics that ship with the file beat a guess from the network.
+    if (cached?.source !== 'file') {
+      const local = await readLocalLyrics(item.id);
+      if (lyricsForRef.current !== null && lyricsForRef.current !== item.id) return;
+      if (local) {
+        setLyrics(local);
+        return;
+      }
+    }
     if (cached) {
       setLyrics(toLyricsState(cached));
       return;

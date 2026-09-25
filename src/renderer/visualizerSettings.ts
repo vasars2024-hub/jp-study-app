@@ -33,6 +33,19 @@ const DEFAULTS: VizSettings = {
   customColors: ['#ff2e4d', '#7a5cff'],
 };
 
+/** The two places the visualizer can be drawn; `mode` 'both' means both. */
+export type VizSurface = 'wallpaper' | 'widget';
+
+/**
+ * Whether the visualizer should draw on `surface` — the ONE reading of the "Where"
+ * setting. It used to be half honoured: the desktop wallpaper checked `mode`, while the
+ * mini player drew whenever `enabled` was on and the Visualizer window ignored both.
+ * "Widget" covers every widget-like host: the Visualizer window and the mini player.
+ */
+export function vizShowsIn(s: Pick<VizSettings, 'enabled' | 'mode'>, surface: VizSurface): boolean {
+  return s.enabled && (s.mode === 'both' || s.mode === surface);
+}
+
 const listeners = new Set<(s: VizSettings) => void>();
 
 export function loadVizSettings(): VizSettings {
