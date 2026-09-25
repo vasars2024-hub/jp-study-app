@@ -17,6 +17,7 @@
 
 import { hasKanji } from './furigana';
 import { hasHan, hasKana } from './langs';
+import { normalizeStudyLang, type StudyLang } from './studyLang';
 import { autoAudioSourceFor, type AutoAudioSource } from './flashcardAutoAudio';
 
 /**
@@ -90,9 +91,15 @@ export function autoReadingTextFor(card: { word?: string; sentence?: string }): 
   return (card.word || card.sentence || '').trim();
 }
 
-/** Worth annotating: Japanese, and carrying at least one kanji to annotate. */
-export function needsReading(text: string): boolean {
+/**
+ * Worth annotating. Japanese: carrying at least one kanji (kana reads itself).
+ * Chinese: any hanzi (pinyin). Russian: a word of two or more syllables (a
+ * stress mark has somewhere to go).
+ */
+export function needsReading(text: string, lang: StudyLang = 'ja'): boolean {
   if (!text) return false;
+  if (lang === 'zh') return hasHan(text);
+  if (lang === 'ru') return /[аеёиоуыэюя][^аеёиоуыэюя]*[аеёиоуыэюя]/iu.test(text);
   if (!hasKana(text) && !hasHan(text)) return false;
   return hasKanji(text);
 }
@@ -107,13 +114,13 @@ export interface AutoReadingSelection<T> {
 }
 
 export function selectAutoReadingCards<
-  T extends { source?: string; word?: string; sentence?: string; reading?: string },
+  T extends { source?: string; word?: string; sentence?: string; reading?: string; studyLang?: string },
 >(cards: readonly T[], preferences: AutoReadingPreferences): AutoReadingSelection<T> {
   const eligible = cards.filter((card) => {
     if ((card.reading ?? '').trim()) return false;
     const family = autoReadingSourceFor(card.source);
     if (!family || !preferences[family]) return false;
-    return needsReading(autoReadingTextFor(card));
+    return needsReading(autoReadingTextFor(card), normalizeStudyLang(card.studyLang));
   });
   const chosen = eligible.slice(0, preferences.maxPerBatch);
   return {

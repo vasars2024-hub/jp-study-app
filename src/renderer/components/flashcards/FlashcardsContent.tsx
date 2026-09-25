@@ -105,6 +105,7 @@ import TestMode from './TestMode';
 import WriteMode from './WriteMode';
 import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPractice';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
+import { normalizeStudyLang } from '../../../shared/studyLang';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, loadSavedCards, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -813,10 +814,12 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setAudioBusy(true);
     setAudioError('');
     try {
+      // The card's own language speaks it (absent is Japanese, as stored).
+      const lang = normalizeStudyLang(card.studyLang);
       const result = await window.api.flashcardSynthesizeAudio(
         card.sentence || card.word,
-        'ja',
-        preferredVoiceFor('ja'),
+        lang,
+        preferredVoiceFor(lang),
       );
       if (!result.ok || !result.path) {
         // NOT `result.error`: that is the synthesizer's own English sentence, and it
@@ -852,13 +855,16 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     try {
       // The OS synthesizer owns one voice device. Sequential generation avoids
       // competing speech engines while still keeping the renderer responsive.
-      const voice = preferredVoiceFor('ja');
+      // One voice per language, read once for the batch; each card speaks in its own language.
+      const voices = new Map<string, string | undefined>();
       for (const card of candidates) {
         if (batch.cancelled) break;
+        const lang = normalizeStudyLang(card.studyLang);
+        if (!voices.has(lang)) voices.set(lang, preferredVoiceFor(lang));
         const result = await window.api.flashcardSynthesizeAudio(
           card.sentence || card.word,
-          'ja',
-          voice,
+          lang,
+          voices.get(lang),
           batch.id,
         );
         if (batch.cancelled || result.reason === 'cancelled') break;

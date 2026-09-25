@@ -5,6 +5,7 @@
 // DictionaryResults.tsx, AnkiSetup.tsx and StatisticsView.tsx run unmodified.
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
 import {
@@ -32,6 +33,8 @@ import type { CardContent, FieldRole, ProfileId, StudyProfile } from '../../shar
 import { buildRouteContext, profileForLanguage, resolveProfileMatch } from '../../shared/profileRules';
 import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/types';
 import { fetchJapaneseAudio } from '../dictionary';
+import { getMainStudyLang } from '../studyLanguage';
+import { studyLangOfText, type StudyLang } from '../../shared/studyLang';
 import { getFrequency, getPitch } from '../dictionary/yomitan';
 import { resolveCustomFrequencyRanks } from '../mining';
 import { getDueForecast } from './forecast';
@@ -128,6 +131,29 @@ async function storeSuppliedImage(req: MineNoteRequest): Promise<string> {
   return req.imageHtml?.trim() ?? '';
 }
 
+/** The card's language for its word audio: the route's, else the text's script. */
+export function mineAudioLanguage(req: Pick<MineNoteRequest, 'route'>, term: string): StudyLang {
+  const routed = req.route?.language;
+  if (routed === 'ja' || routed === 'zh' || routed === 'ru') return routed;
+  return studyLangOfText(term, getMainStudyLang());
+}
+
+/** Word audio from the offline voice of `lang`, stored in Anki's media folder. '' when none speaks it. */
+async function synthesizedAudioField(term: string, lang: StudyLang): Promise<string> {
+  try {
+    // Loaded on demand: the synthesizer pulls the asset registry and ffmpeg.
+    const { synthesizeFlashcardAudio } = await import('../flashcardAudio');
+    const result = await synthesizeFlashcardAudio(term, lang);
+    if (!result.ok || !result.path) return '';
+    const data = (await fs.promises.readFile(result.path)).toString('base64');
+    const filename = `jsa-tts-${lang}-${crypto.createHash('md5').update(data).digest('hex').slice(0, 12)}${path.extname(result.path)}`;
+    await invoke('storeMediaFile', { filename, data });
+    return `[sound:${filename}]`;
+  } catch {
+    return '';
+  }
+}
+
 async function gatherMiningValues(
   req: MineNoteRequest,
   content: Partial<Record<CardContent, string>>,
@@ -207,9 +233,15 @@ async function gatherMiningValues(
   }
 
   if (req.fetchAudio && term) {
-    values.audio = await fetchJapaneseAudio(term, reading || term, async (filename, data) => {
-      await invoke('storeMediaFile', { filename, data });
-    });
+    // JapanesePod101's word audio is Japanese only. A Chinese or Russian card
+    // gets the offline voice of its own language instead of a Japanese lookup
+    // that either finds nothing or finds a homograph's reading.
+    const lang = mineAudioLanguage(req, term);
+    values.audio = lang === 'ja'
+      ? await fetchJapaneseAudio(term, reading || term, async (filename, data) => {
+        await invoke('storeMediaFile', { filename, data });
+      })
+      : await synthesizedAudioField(term, lang);
   } else if (typeof req.audioBase64 === 'string' && req.audioBase64.trim()) {
     const filename =
       (typeof req.audioFilename === 'string' && req.audioFilename.trim()) ||

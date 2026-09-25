@@ -93,3 +93,13 @@ describe('which new cards a run picks up', () => {
     expect(result.skipped).toBe(1);
   });
 });
+
+describe('every study language is speakable in its own voice', () => {
+  it('Chinese needs hanzi, Russian Cyrillic, Japanese kana or kanji', async () => {
+    const { isSpeakableIn } = await import('../flashcardAutoAudio');
+    expect(isSpeakableIn('你好', 'zh')).toBe(true);
+    expect(isSpeakableIn('Привет', 'ru')).toBe(true);
+    expect(isSpeakableIn('Привет', 'ja')).toBe(false);
+    expect(isSpeakableIn('ねこ', 'ja')).toBe(true);
+  });
+});

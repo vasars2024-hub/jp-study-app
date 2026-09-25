@@ -30,6 +30,11 @@ import {
 } from '../shared/flashcardAutoReading';
 import { updateDeckCardReadingBatch, type DeckFlashcard } from './flashcardDeck';
 import { getTokenizer, tokenizeSync } from './tokenizer';
+import { fetchReadingAid } from './readingAid';
+import { normalizeStudyLang, studyLangTag } from '../shared/studyLang';
+import { segmentStudyText } from '../shared/studySegmentation';
+import { stressedRussian } from '../shared/readingAid';
+import { getChineseScript } from './studyEnvironment';
 
 const PREF_KEY = 'jp-flashcard-auto-reading-v1';
 export const AUTO_READING_EVENT = 'flashcard-auto-reading';
@@ -92,6 +97,23 @@ export function readingForText(text: string, form: AutoReadingForm): string {
 }
 
 /**
+ * A Chinese or Russian card's reading: pinyin word by word (`jīntiān tiānqì`),
+ * or the text with its stress marks (`кни́га`). Empty when the dictionary has
+ * nothing for it — never the text handed back as its own "reading".
+ */
+export async function studyReadingForText(text: string, lang: 'zh' | 'ru'): Promise<string> {
+  const parts = segmentStudyText(text, lang === 'zh' ? studyLangTag('zh', getChineseScript()) : 'ru');
+  const words = parts.filter((part) => part.wordLike).map((part) => part.text);
+  const readings = await fetchReadingAid(lang, words);
+  if (lang === 'zh') {
+    const syllables = words.map((word) => readings[word]?.filter(Boolean).join('') ?? '');
+    return syllables.every(Boolean) ? syllables.join(' ') : '';
+  }
+  if (!words.some((word) => readings[word])) return '';
+  return parts.map((part) => (part.wordLike ? stressedRussian(part.text, readings[part.text]) : part.text)).join('').trim();
+}
+
+/**
  * Annotate whichever of `created` the preference covers.
  *
  * Callers fire and forget: mining must not wait on the dictionary build. Returns
@@ -106,20 +128,33 @@ export async function annotateNewCards(
   if (!selection.chosen.length) return null;
 
   const report: AutoReadingReport = { added: 0, failed: 0, deferred: selection.deferred };
-  try {
-    await getTokenizer();
-  } catch {
-    report.failed = selection.chosen.length;
-    report.tokenizerUnavailable = true;
-    window.dispatchEvent(new CustomEvent<AutoReadingReport>(AUTO_READING_EVENT, { detail: report }));
-    return report;
-  }
-
   const updates: Array<{ id: string; reading: string }> = [];
+
+  // Chinese and Russian cards: pinyin and stress from the dictionaries in main.
+  // Japanese cards: kuromoji, as before.
+  const japanese = selection.chosen.filter((card) => normalizeStudyLang(card.studyLang) === 'ja');
   for (const card of selection.chosen) {
-    const reading = readingForText(autoReadingTextFor(card), preferences.form);
+    const lang = normalizeStudyLang(card.studyLang);
+    if (lang === 'ja') continue;
+    const reading = await studyReadingForText(autoReadingTextFor(card), lang).catch(() => '');
     if (reading) updates.push({ id: card.id, reading });
     else report.failed += 1;
+  }
+
+  if (japanese.length) {
+    let ready = true;
+    try {
+      await getTokenizer();
+    } catch {
+      ready = false;
+      report.failed += japanese.length;
+      report.tokenizerUnavailable = true;
+    }
+    for (const card of ready ? japanese : []) {
+      const reading = readingForText(autoReadingTextFor(card), preferences.form);
+      if (reading) updates.push({ id: card.id, reading });
+      else report.failed += 1;
+    }
   }
   if (updates.length) {
     updateDeckCardReadingBatch(updates);

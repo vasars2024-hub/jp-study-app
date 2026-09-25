@@ -12,7 +12,8 @@
  *     language, and a Latin-script gloss read by a Japanese voice is noise.
  */
 
-import { hasHan, hasKana } from './langs';
+import { hasCyrillic, hasHan, hasKana } from './langs';
+import { normalizeStudyLang, type StudyLang } from './studyLang';
 
 /** The four mining families the preference distinguishes. */
 export type AutoAudioSource = 'epub' | 'extension' | 'media' | 'import';
@@ -92,6 +93,13 @@ export function isSpeakableJapanese(text: string): boolean {
   return hasKana(text) || hasHan(text);
 }
 
+/** Text a voice of the card's language can speak: Han for Chinese, Cyrillic for Russian. */
+export function isSpeakableIn(text: string, lang: StudyLang): boolean {
+  if (lang === 'zh') return hasHan(text);
+  if (lang === 'ru') return hasCyrillic(text);
+  return isSpeakableJapanese(text);
+}
+
 export interface AutoAudioSelection<T> {
   /** Cards to synthesize, in order, already capped. */
   chosen: T[];
@@ -108,13 +116,15 @@ export function selectAutoAudioCards<
     word?: string;
     audioPath?: string;
     audioDataUrl?: string;
+    /** Absent is Japanese, as on every stored card. */
+    studyLang?: string;
   },
 >(cards: readonly T[], preferences: AutoAudioPreferences): AutoAudioSelection<T> {
   const eligible = cards.filter((card) => {
     if (card.audioPath || card.audioDataUrl) return false;
     const family = autoAudioSourceFor(card.source);
     if (!family || !preferences[family]) return false;
-    return isSpeakableJapanese(autoAudioTextFor(card));
+    return isSpeakableIn(autoAudioTextFor(card), normalizeStudyLang(card.studyLang));
   });
   const chosen = eligible.slice(0, preferences.maxPerBatch);
   return {
