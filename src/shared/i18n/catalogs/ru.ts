@@ -4812,6 +4812,7 @@ export const ru: Catalog = {
   'grammar.practice.lang': 'Язык',
   'grammar.practice.lang.ja': 'Японский',
   'grammar.practice.lang.zh': 'Китайский',
+  'grammar.practice.lang.ru': 'Русский',
   'grammar.practice.levels': 'Уровни',
   'grammar.practice.register': 'Регистр',
   'grammar.practice.register.business': 'Деловой',

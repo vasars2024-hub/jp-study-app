@@ -180,3 +180,20 @@ describe('the transcript rail reading line', () => {
       .toBe('Две кни' + String.fromCharCode(0x301) + 'ги.');
   });
 });
+
+describe('Grammar opens on the study language', () => {
+  it('a learner with no saved filters sees their language first; Russian points exist and filter', async () => {
+    const { loadPracticeFilters, filterGrammarPoints, EXPLORER_FILTERS_KEY } = await import('../data/grammar/practiceFilters');
+    const { GRAMMAR } = await import('../data/grammar');
+    localStorage.clear();
+    setStudyLang('ru');
+    const filters = loadPracticeFilters();
+    expect(filters.lang).toBe('ru');
+    expect(loadPracticeFilters(EXPLORER_FILTERS_KEY).lang).toBe('ru');
+    const shown = filterGrammarPoints(GRAMMAR, { ...filters, levels: ['A1'] });
+    expect(shown.length).toBeGreaterThan(10);
+    expect(shown.every((p) => p.lang === 'ru')).toBe(true);
+    setStudyLang('zh');
+    expect(loadPracticeFilters().lang).toBe('zh');
+  });
+});

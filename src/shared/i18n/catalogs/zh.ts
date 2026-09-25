@@ -4433,6 +4433,7 @@ export const zh: Catalog = {
   'grammar.practice.lang': '语言',
   'grammar.practice.lang.ja': '日语',
   'grammar.practice.lang.zh': '中文',
+  'grammar.practice.lang.ru': '俄语',
   'grammar.practice.levels': '等级',
   'grammar.practice.register': '语体',
   'grammar.practice.register.business': '商务',

@@ -78,7 +78,7 @@ function cat(
     group,
     labelKey: `grammar.cat.${id}`,
     descKey: `grammar.cat.${id}.desc`,
-    langs: opts.langs ?? ['ja', 'zh'],
+    langs: opts.langs ?? ['ja', 'zh', 'ru'],
     confusableWith: opts.confusableWith,
   };
 }

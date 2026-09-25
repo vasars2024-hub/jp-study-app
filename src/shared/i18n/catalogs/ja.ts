@@ -4457,6 +4457,7 @@ export const ja: Catalog = {
   'grammar.practice.lang': '言語',
   'grammar.practice.lang.ja': '日本語',
   'grammar.practice.lang.zh': '中国語',
+  'grammar.practice.lang.ru': 'ロシア語',
   'grammar.practice.levels': 'レベル',
   'grammar.practice.register': 'レジスター',
   'grammar.practice.register.business': 'ビジネス',

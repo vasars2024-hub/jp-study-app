@@ -1,4 +1,4 @@
-import type { GrammarLevel, GrammarPoint, HskLevel, JlptLevel } from './types';
+import type { CefrLevel, GrammarLevel, GrammarPoint, HskLevel, JlptLevel } from './types';
 import {
   normalizeGrammarList,
   type ModuleProvenance,
@@ -18,6 +18,7 @@ import { N1_SUPPLEMENT } from './n1-supplement';
 import { HSK } from './hsk';
 import { HSK_EXTRA } from './hsk-extra';
 import { HSK_IMPORT } from './hsk-import';
+import { RU_CEFR } from './ru-cefr';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
@@ -126,7 +127,17 @@ const HSK_IMPORTED: ModuleProvenance = {
   verification: 'imported-unreviewed',
 };
 
-/** All grammar points (JA JLPT + ZH HSK), normalized with provenance. */
+/*
+ * Russian A1–B1, written for this app against the taxonomy (categories, not
+ * gloss-regex functions), with examples authored alongside each point.
+ */
+const RU_AUTHORED: ModuleProvenance = {
+  source: 'authored:ru-cefr',
+  tagSource: 'authored',
+  verification: 'verified',
+};
+
+/** All grammar points (JA JLPT + ZH HSK + RU CEFR), normalized with provenance. */
 export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(N5, CORE),
   ...normalizeGrammarList(N4, CORE),
@@ -142,6 +153,7 @@ export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(HSK, HSK_SEED),
   ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
   ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),
+  ...normalizeGrammarList(RU_CEFR, RU_AUTHORED),
 ];
 
 /** Raw per-module lists, for the corpus audit's provenance accounting. */
@@ -160,6 +172,7 @@ export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
   hsk: HSK,
   'hsk-extra': HSK_EXTRA,
   'hsk-import': HSK_IMPORT,
+  'ru-cefr': RU_CEFR,
 };
 
 function countLevel(level: GrammarLevel): number {
@@ -187,6 +200,15 @@ export const HSK_COUNTS: Record<HskLevel, number> = {
   HSK6: countLevel('HSK6'),
   'HSK7-9': countLevel('HSK7-9'),
   HSK10: countLevel('HSK10'),
+};
+
+export const CEFR_COUNTS: Record<CefrLevel, number> = {
+  A1: countLevel('A1'),
+  A2: countLevel('A2'),
+  B1: countLevel('B1'),
+  B2: countLevel('B2'),
+  C1: countLevel('C1'),
+  C2: countLevel('C2'),
 };
 
 export function grammarByLevel(level: GrammarLevel): NormalizedGrammarPoint[] {

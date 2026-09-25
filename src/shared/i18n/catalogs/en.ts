@@ -4398,6 +4398,7 @@ export const en: Catalog = {
   'grammar.practice.lang': 'Language',
   'grammar.practice.lang.ja': 'Japanese',
   'grammar.practice.lang.zh': 'Chinese',
+  'grammar.practice.lang.ru': 'Russian',
   'grammar.practice.levels': 'Levels',
   'grammar.practice.register': 'Register',
   'grammar.practice.register.business': 'Business',

@@ -338,7 +338,7 @@ export function parsePracticeDeepLink(detail: unknown): Partial<PracticeFilters>
   if (!detail || typeof detail !== 'object') return undefined;
   const d = detail as Record<string, unknown>;
   const out: Partial<PracticeFilters> = {};
-  if (d.lang === 'ja' || d.lang === 'zh' || d.lang === 'all') out.lang = d.lang;
+  if (d.lang === 'ja' || d.lang === 'zh' || d.lang === 'ru' || d.lang === 'all') out.lang = d.lang;
   if (typeof d.level === 'string') out.levels = [d.level as GrammarLevel];
   if (Array.isArray(d.levels)) out.levels = d.levels as GrammarLevel[];
   if (typeof d.functions === 'string') out.functions = [d.functions as GrammarFunctionId];

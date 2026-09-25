@@ -2,7 +2,7 @@
 
 import type { GrammarFunctionId } from './functions';
 
-export type GrammarLang = 'ja' | 'zh';
+export type GrammarLang = 'ja' | 'zh' | 'ru';
 
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
 
@@ -33,7 +33,10 @@ export const LEGACY_HSK_LEVELS: Record<string, HskLevel> = {
   HSK9: 'HSK7-9',
 };
 
-export type GrammarLevel = JlptLevel | HskLevel;
+/** CEFR bands, the scale Russian (TORFL) grammar is published on. */
+export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+export type GrammarLevel = JlptLevel | HskLevel | CefrLevel;
 
 export type GrammarRegister = 'neutral' | 'casual' | 'business' | 'literary';
 
@@ -101,7 +104,7 @@ export type GrammarVerification =
  * `HSK7-9` is now modelled as the single band the standard publishes, so this
  * function no longer has to launder two invented levels as `hsk3.0`.
  */
-export type GrammarFramework = 'jlpt' | 'hsk3.0' | 'grammarx';
+export type GrammarFramework = 'jlpt' | 'hsk3.0' | 'cefr' | 'grammarx';
 
 export interface GrammarProvenance {
   /** Human-readable origin, e.g. 'supplement-n3' or 'authored:core-n5'. */
@@ -141,7 +144,20 @@ export const HSK_LEVELS: HskLevel[] = [
   'HSK10',
 ];
 
-export const ALL_GRAMMAR_LEVELS: GrammarLevel[] = [...JLPT_LEVELS, ...HSK_LEVELS];
+export const CEFR_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+export const ALL_GRAMMAR_LEVELS: GrammarLevel[] = [...JLPT_LEVELS, ...HSK_LEVELS, ...CEFR_LEVELS];
+
+export function isCefrLevel(level: string): level is CefrLevel {
+  return (CEFR_LEVELS as string[]).includes(level);
+}
+
+/** The level scale a grammar language is measured on. */
+export function levelsForGrammarLang(lang: GrammarLang): GrammarLevel[] {
+  if (lang === 'zh') return [...HSK_LEVELS];
+  if (lang === 'ru') return [...CEFR_LEVELS];
+  return [...JLPT_LEVELS];
+}
 
 export function isJlptLevel(level: string): level is JlptLevel {
   return (JLPT_LEVELS as string[]).includes(level);
@@ -152,7 +168,7 @@ export function isHskLevel(level: string): level is HskLevel {
 }
 
 export interface GrammarExample {
-  /** Japanese or Chinese sentence. */
+  /** The example in the study language (Japanese, Chinese or Russian); the field name is historical. */
   jp: string;
   /** Full reading (hiragana / pinyin) when available. */
   reading?: string;
@@ -212,6 +228,7 @@ export function isUnofficialLevel(level: GrammarLevel): boolean {
 
 export function frameworkForLevel(level: GrammarLevel): GrammarFramework {
   if (isJlptLevel(level)) return 'jlpt';
+  if (isCefrLevel(level)) return 'cefr';
   if (level === 'HSK10') return 'grammarx';
   return 'hsk3.0';
 }

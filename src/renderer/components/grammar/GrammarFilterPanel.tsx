@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import {
   CATEGORY_BY_ID,
   GRAMMAR_REGISTERS,
+  CEFR_LEVELS,
   HSK_LEVELS,
   JLPT_LEVELS,
   categoriesByGroup,
   isUnofficialLevel,
+  levelsForGrammarLang,
   type GrammarLevel,
   type NormalizedGrammarPoint,
 } from '../../data/grammar';
@@ -58,9 +60,8 @@ export default function GrammarFilterPanel({
   }
 
   const levelOptions: GrammarLevel[] = useMemo(() => {
-    if (filters.lang === 'zh') return [...HSK_LEVELS];
-    if (filters.lang === 'ja') return [...JLPT_LEVELS];
-    return [...JLPT_LEVELS, ...HSK_LEVELS];
+    if (filters.lang !== 'all') return levelsForGrammarLang(filters.lang);
+    return [...JLPT_LEVELS, ...HSK_LEVELS, ...CEFR_LEVELS];
   }, [filters.lang]);
 
   /* Same options, split by framework so the two scales stay visually distinct. */
@@ -69,9 +70,12 @@ export default function GrammarFilterPanel({
       return [{ labelKey: 'grammar.filter.levels.hsk', levels: [...HSK_LEVELS] }];
     if (filters.lang === 'ja')
       return [{ labelKey: 'grammar.filter.levels.jlpt', levels: [...JLPT_LEVELS] }];
+    if (filters.lang === 'ru')
+      return [{ labelKey: 'grammar.filter.levels.cefr', levels: [...CEFR_LEVELS] }];
     return [
       { labelKey: 'grammar.filter.levels.jlpt', levels: [...JLPT_LEVELS] },
       { labelKey: 'grammar.filter.levels.hsk', levels: [...HSK_LEVELS] },
+      { labelKey: 'grammar.filter.levels.cefr', levels: [...CEFR_LEVELS] },
     ];
   }, [filters.lang]);
 
@@ -230,6 +234,7 @@ export default function GrammarFilterPanel({
           <option value="all">{t('grammar.filter.all')}</option>
           <option value="ja">{t('grammar.practice.lang.ja')}</option>
           <option value="zh">{t('grammar.practice.lang.zh')}</option>
+          <option value="ru">{t('grammar.practice.lang.ru')}</option>
         </select>
       </label>
 
@@ -246,7 +251,9 @@ export default function GrammarFilterPanel({
             ? t('grammar.filter.levels.hsk')
             : filters.lang === 'ja'
               ? t('grammar.filter.levels.jlpt')
-              : t('grammar.practice.levels')}
+              : filters.lang === 'ru'
+                ? t('grammar.filter.levels.cefr')
+                : t('grammar.practice.levels')}
         </legend>
         {levelBands.map((band) => (
           <div key={band.labelKey} className="gx-filters-levelband">
