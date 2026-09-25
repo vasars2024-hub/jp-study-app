@@ -91,7 +91,7 @@ export default function CardVoicePicker() {
         </p>
       )}
 
-      <button type="button" onClick={() => void read(true)} disabled={busy}>
+      <button className="btn" type="button" onClick={() => void read(true)} disabled={busy}>
         {busy ? t('flash.voice.reading') : t('flash.voice.rescan')}
       </button>
     </fieldset>

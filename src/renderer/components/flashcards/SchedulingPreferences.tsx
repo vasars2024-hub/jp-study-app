@@ -140,6 +140,7 @@ export default function SchedulingPreferencesPanel() {
       */}
       <div className="flash-match-actions">
         <button
+          className="btn"
           type="button"
           onClick={convert}
           disabled={scheduled === 0}
@@ -148,6 +149,7 @@ export default function SchedulingPreferencesPanel() {
           {t('flash.schedule.convert', { count: scheduled })}
         </button>
         <button
+          className="btn"
           type="button"
           onClick={reset}
           disabled={scheduled === 0}

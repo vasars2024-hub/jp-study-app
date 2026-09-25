@@ -41,7 +41,7 @@ export default function DeckAudioExport() {
     <fieldset className="auto-reading-options">
       <legend>{t('flash.deckExport.title')}</legend>
       <p className="muted">{t('flash.deckExport.lead')}</p>
-      <button type="button" onClick={() => void run()} disabled={busy}>
+      <button className="btn" type="button" onClick={() => void run()} disabled={busy}>
         {busy ? t('flash.deckExport.working') : t('flash.deckExport.run')}
       </button>
 
@@ -67,6 +67,7 @@ export default function DeckAudioExport() {
 
       {outcome?.ok && outcome.directory && (
         <button
+          className="btn"
           type="button"
           onClick={() => void window.api.flashcardRevealExport(outcome.directory as string)}
         >

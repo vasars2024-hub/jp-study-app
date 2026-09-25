@@ -116,7 +116,7 @@ import {
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
-import { useWiredMaterials } from '../ui';
+import { SearchBox, Select, Tabs, useWiredMaterials } from '../ui';
 import type { LibraryItem } from '../../../shared/types';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { JitenStore } from '../../../shared/jiten';
@@ -235,6 +235,12 @@ export interface FlashcardsState {
   reviewIndex: number;
   masteredIds: Set<string>;
   exploredIds: Set<string>;
+  /**
+   * Cards whose answer has been shown this sitting. The review strip names a card only
+   * once it is in here: listing every word up front gave away the answer to the card on
+   * screen (a sentence prompt sat under a chip reading its own target word).
+   */
+  revealedIds: Set<string>;
   flipped: boolean;
   cardFx: 'decrypt' | 'resync' | null;
   reviewed: number;
@@ -345,6 +351,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [masteredIds, setMasteredIds] = useState<Set<string>>(() => new Set());
   const [exploredIds, setExploredIds] = useState<Set<string>>(() => new Set());
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
   const reviewRootRef = useRef<HTMLDivElement>(null);
   const [flipped, setFlipped] = useState(false);
   // WIRED decrypt/resync card effects (§5.5) — transient class, wired-gated.
@@ -560,6 +567,15 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     })), { mode: reviewMode });
   }
 
+  function markRevealed(id: string): void {
+    setRevealedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
   function markExplored(id: string): void {
     setExploredIds((prev) => {
       if (prev.has(id)) return prev;
@@ -591,6 +607,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewIndex(0);
     setMasteredIds(new Set(initialMastered));
     setExploredIds(new Set(ordered[0] ? [ordered[0].id] : []));
+    setRevealedIds(new Set());
     setTotal(ordered.length);
     setReviewed(initialMastered.size);
     setFlipped(false);
@@ -635,6 +652,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewIndex(0);
     setMasteredIds(new Set());
     setExploredIds(new Set());
+    setRevealedIds(new Set());
     setFlipped(false);
   }
 
@@ -657,7 +675,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }
 
   function flip(): void {
-    if (!flipped) fireCardFx('decrypt', 320);
+    if (!flipped) {
+      fireCardFx('decrypt', 320);
+      const card = sessionCards[reviewIndex];
+      if (card) markRevealed(card.id);
+    }
     setFlipped((f) => !f);
   }
 
@@ -705,6 +727,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setMasteredIds(snapshot.masteredIds);
     setReviewed(snapshot.reviewed);
     markExplored(snapshot.cardId);
+    markRevealed(snapshot.cardId);
     setFlipped(true);
   }
 
@@ -1137,6 +1160,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     reviewIndex,
     masteredIds,
     exploredIds,
+    revealedIds,
     flipped,
     cardFx,
     reviewed,
@@ -1227,6 +1251,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
     sessionCards,
     reviewIndex,
     exploredIds,
+    revealedIds,
     unknownReviewCards,
     knownReviewCards,
     flipped,
@@ -1267,6 +1292,29 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   function reviewStripCard(card: ReviewCard, mastered: boolean): JSX.Element {
     const i = sessionCards.findIndex((c) => c.id === card.id);
     const active = i === reviewIndex;
+    // A chip names its card only once that card's answer has been shown: the word and
+    // reading ARE the answer to a sentence, meaning or listening prompt.
+    const named = revealedIds.has(card.id);
+    if (!named) {
+      return (
+        <button
+          key={card.id}
+          type="button"
+          role="listitem"
+          data-review-active={active ? 'true' : undefined}
+          data-review-hidden="true"
+          className={`flash-strip-card flash-review-strip-card${active ? ' active' : ''}${mastered ? ' mastered' : ''}`}
+          onClick={() => state.goToReviewIndex(i)}
+          title={t('flash.review.hiddenCardTitle', { position: i + 1 })}
+        >
+          <span className="flash-strip-word">
+            {card.promptKind === 'listening'
+              ? t('flash.audioCardShort')
+              : t('flash.review.hiddenCard', { position: i + 1 })}
+          </span>
+        </button>
+      );
+    }
     return (
       <button
         key={card.id}
@@ -1275,12 +1323,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
         data-review-active={active ? 'true' : undefined}
         className={`flash-strip-card flash-review-strip-card${active ? ' active' : ''}${mastered ? ' mastered' : ''}`}
         onClick={() => state.goToReviewIndex(i)}
-        title={card.promptKind === 'listening' ? t('flash.prompt.listening') : card.word}
+        title={card.word}
       >
         <span className="flash-strip-word" lang="ja">
-          {card.promptKind === 'listening' ? t('flash.audioCardShort') : card.word}
+          {card.word}
         </span>
-        {card.promptKind !== 'listening' && card.reading && card.reading !== card.word && (
+        {card.reading && card.reading !== card.word && (
           <span className="flash-strip-reading" lang="ja">
             {card.reading}
           </span>
@@ -1953,89 +2001,111 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       {practice === 'write' && <WriteMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {practice === 'learn' && <LearnMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {practice === 'test' && <TestMode deck={practiceDeck} onExit={() => setPractice('none')} />}
+      {/*
+        The practice launcher: four mode tiles on the window surface, not a bordered
+        fieldset inside the window's own panel. Every tile has the same shape (icon, name,
+        one line of what it drills), so no caption sits under one button and beside the
+        next. The tile's accessible name is its action ("Start learning"); the line below
+        the name is its description.
+      */}
       {practice === 'none' && (
-        <fieldset className="auto-reading-options">
-          <legend>{t('flash.practice.title')}</legend>
-          <p className="muted">{t('flash.practice.lead')}</p>
-          <label className="auto-reading-options__form">
-            {t('flash.practice.deck')}
-            {/* The count is on the option, not a footnote: a mode that refuses
-                a four-card deck is only honest if the four was visible first. */}
-            <select
-              value={practiceDeck}
-              onChange={(event) => setPracticeDeck(event.currentTarget.value)}
-            >
-              {practiceDeckChoices.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {t('flash.practice.deckOption', { name: choice.label, count: choice.count })}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ul className="flash-practice-list">
+        <section className="flash-practice" aria-labelledby="flash-practice-title">
+          <div className="flash-practice__head">
+            <div className="flash-practice__intro">
+              <h2 id="flash-practice-title" className="flash-section-title">
+                {t('flash.practice.title')}
+              </h2>
+              <p className="muted">{t('flash.practice.lead')}</p>
+            </div>
+            <label className="flash-practice__deck">
+              <span className="muted">{t('flash.practice.deck')}</span>
+              {/* The count is on the option, not a footnote: a mode that refuses
+                  a four-card deck is only honest if the four was visible first. */}
+              <Select
+                value={practiceDeck}
+                onChange={(event) => setPracticeDeck(event.currentTarget.value)}
+              >
+                {practiceDeckChoices.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {t('flash.practice.deckOption', { name: choice.label, count: choice.count })}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </div>
+          <ul className="flash-practice__modes">
             {PRACTICE_MODES.map((entry) => (
               <li key={entry.id}>
                 <button
                   type="button"
+                  className="flash-practice__tile"
                   disabled={practiceDeckSize === 0}
+                  aria-label={t(entry.startKey)}
+                  aria-describedby={`flash-practice-about-${entry.id}`}
                   onClick={() => setPractice(entry.id)}
                 >
-                  {t(entry.startKey)}
+                  <span className="flash-practice__icon" aria-hidden="true">
+                    <Icon name={entry.icon} size={18} />
+                  </span>
+                  <span className="flash-practice__text">
+                    <span className="flash-practice__name">{t(entry.titleKey)}</span>
+                    <span id={`flash-practice-about-${entry.id}`} className="flash-practice__about">
+                      {t(entry.aboutKey)}
+                    </span>
+                  </span>
                 </button>
-                <span className="muted">{t(entry.aboutKey)}</span>
               </li>
             ))}
           </ul>
           {practiceDeckSize === 0 && (
-            <p className="auto-reading-options__report">{t('flash.practice.emptyDeck')}</p>
+            <p className="flash-practice__empty muted" role="status">{t('flash.practice.emptyDeck')}</p>
           )}
-        </fieldset>
+        </section>
       )}
 
-      <ContextualSurface className="flash-tabs">
-        <button
-          type="button"
-          className={`flash-tab ${overviewTab === 'epub' ? 'active' : ''}`}
-          aria-pressed={overviewTab === 'epub'}
-          onClick={() => state.setOverviewTab('epub')}
-        >
-          {t('flash.tab.epubDecks', { count: epubCards.length })}
-        </button>
-        <button
-          type="button"
-          className={`flash-tab ${overviewTab === 'dictionary' ? 'active' : ''}`}
-          aria-pressed={overviewTab === 'dictionary'}
-          onClick={() => state.setOverviewTab('dictionary')}
-        >
-          {t('flash.tab.dictionary', { count: saved.length })}
-        </button>
-      </ContextualSurface>
-
-      <div className="flash-search">
-        <Icon name="search" size={14} className="flash-search-icon" />
-        <input
-          type="search"
-          className="flash-search-input"
-          value={search}
-          onChange={(e) => state.setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') state.setSearch('');
-          }}
-          placeholder={t('flash.search.placeholder')}
-          aria-label={t('flash.search.aria')}
+      {/* The card collections: the design system's tab strip and search field, so this
+          window's controls read like every other window's. */}
+      <div className="flash-collections">
+        <Tabs
+          className="flash-collection-tabs"
+          aria-label={t('flash.tabs.label')}
+          value={overviewTab}
+          onChange={(id) => state.setOverviewTab(id === 'dictionary' ? 'dictionary' : 'epub')}
+          tabs={[
+            { id: 'epub', label: t('flash.tab.epubDecks', { count: epubCards.length }) },
+            { id: 'dictionary', label: t('flash.tab.dictionary', { count: saved.length }) },
+          ]}
         />
-        {search && (
-          <>
-            <span className="flash-search-count muted">
-              {overviewTab === 'epub'
-                ? t('flash.search.matchCount', { count: filteredDeck.length })
-                : t('flash.search.matchCount', { count: filteredSaved.length })}
-            </span>
-            <button type="button" className="flash-search-clear" title={t('flash.search.clear')} aria-label={t('flash.search.clear')} onClick={() => state.setSearch('')}>
-              ×
-            </button>
-          </>
-        )}
+        <div className="flash-searchbar">
+          <SearchBox
+            className="flash-search"
+            value={search}
+            onChange={(e) => state.setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') state.setSearch('');
+            }}
+            placeholder={t('flash.search.placeholder')}
+            aria-label={t('flash.search.aria')}
+          />
+          {search && (
+            <>
+              <span className="flash-search-count muted" role="status">
+                {overviewTab === 'epub'
+                  ? t('flash.search.matchCount', { count: filteredDeck.length })
+                  : t('flash.search.matchCount', { count: filteredSaved.length })}
+              </span>
+              <button
+                type="button"
+                className="btn small flash-search-clear"
+                title={t('flash.search.clear')}
+                aria-label={t('flash.search.clear')}
+                onClick={() => state.setSearch('')}
+              >
+                <Icon name="close" size={14} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <DeckImportPanel onImported={() => state.setDeck(loadDeck())} />
@@ -2061,7 +2131,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             <div className="flash-review-setup-grid">
               <label>
                 {t('flash.epubSource')}
-                <select value={reviewBookKey} onChange={(e) => state.setReviewBookKey(e.target.value)}>
+                <Select value={reviewBookKey} onChange={(e) => state.setReviewBookKey(e.target.value)}>
                   {/*
                     D310: every number here is the size of the session that option
                     would start, via the same `reviewSessionCards` the Start review
@@ -2081,7 +2151,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                       </option>
                     );
                   })}
-                </select>
+                </Select>
               </label>
               <label className="flash-review-setup-check">
                 <input
@@ -2093,14 +2163,14 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               </label>
               <label>
                 {t('flash.reviewMode')}
-                <select
+                <Select
                   value={reviewMode}
                   onChange={(event) => state.setReviewMode(event.target.value as FlashcardReviewMode)}
                 >
                   <option value="mixed">{t('flash.reviewMode.mixed')}</option>
                   <option value="text">{t('flash.reviewMode.text')}</option>
                   <option value="audio">{t('flash.reviewMode.audio')}</option>
-                </select>
+                </Select>
               </label>
               {reviewMode === 'audio' && <AudioPoolNote state={state} />}
               <button

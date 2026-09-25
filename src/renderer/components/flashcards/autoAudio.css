@@ -185,26 +185,7 @@
   flex-wrap: wrap;
 }
 
-/* The practice launcher: one row per mode, its own line of what it drills. */
-.flash-practice-list {
-  list-style: none;
-  margin: var(--space-xs) 0 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.flash-practice-list li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm, 0.75rem);
-  flex-wrap: wrap;
-}
-
-.flash-practice-list button {
-  min-height: 44px;
-  min-width: 10rem;
-}
+/* The practice launcher itself (mode tiles) is styled with the overview, in FlashcardsContent.css. */
 
 /*
  * Write mode. A typing surface stays on the opaque anchor with the panels

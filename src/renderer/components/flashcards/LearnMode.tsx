@@ -90,7 +90,7 @@ export default function LearnMode({ onExit, deck = 'all' }: {
       <fieldset className="auto-reading-options">
         <legend>{t('flash.learn.title')}</legend>
         <p className="auto-reading-options__report">{t('flash.learn.noUsableCards')}</p>
-        {onExit && <button type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
+        {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
       </fieldset>
     );
   }
@@ -115,8 +115,8 @@ export default function LearnMode({ onExit, deck = 'all' }: {
           {t('flash.learn.done', { total: progress.total })}
         </p>
         <div className="flash-match-actions">
-          <button type="button" onClick={begin}>{t('flash.learn.again')}</button>
-          {onExit && <button type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
+          <button className="btn primary" type="button" onClick={begin}>{t('flash.learn.again')}</button>
+          {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
         </div>
       </fieldset>
     );
@@ -153,11 +153,11 @@ export default function LearnMode({ onExit, deck = 'all' }: {
         </p>
         <div className="flash-match-actions">
           {chosen && (
-            <button type="button" onClick={() => record(chosen.correct)} autoFocus>
+            <button className="btn" type="button" onClick={() => record(chosen.correct)} autoFocus>
               {t('flash.learn.next')}
             </button>
           )}
-          {onExit && <button type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
+          {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
         </div>
       </fieldset>
     );
@@ -193,7 +193,7 @@ export default function LearnMode({ onExit, deck = 'all' }: {
           onChange={(event) => setTyped(event.target.value)}
         />
         {(!grade || grade.verdict === 'empty' || grade.verdict === 'close') && (
-          <button type="submit">{t('flash.write.check')}</button>
+          <button className="btn primary" type="submit">{t('flash.write.check')}</button>
         )}
       </form>
 
@@ -208,17 +208,17 @@ export default function LearnMode({ onExit, deck = 'all' }: {
 
       <div className="flash-match-actions">
         {grade?.verdict === 'close' && (
-          <button type="button" onClick={() => record(true)}>{t('flash.write.override')}</button>
+          <button className="btn" type="button" onClick={() => record(true)}>{t('flash.write.override')}</button>
         )}
         {(grade?.verdict === 'correct' || grade?.verdict === 'wrong') && (
-          <button type="button" onClick={() => record(grade.verdict === 'correct')} autoFocus>
+          <button className="btn" type="button" onClick={() => record(grade.verdict === 'correct')} autoFocus>
             {t('flash.learn.next')}
           </button>
         )}
         {(!grade || grade.verdict === 'empty' || grade.verdict === 'close') && (
-          <button type="button" onClick={() => record(false)}>{t('flash.learn.skip')}</button>
+          <button className="btn" type="button" onClick={() => record(false)}>{t('flash.learn.skip')}</button>
         )}
-        {onExit && <button type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
+        {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.learn.exit')}</button>}
       </div>
     </fieldset>
   );
