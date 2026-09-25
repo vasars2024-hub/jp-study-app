@@ -61,6 +61,13 @@ import type { StudyLang } from '../../../shared/levelScale';
 import { badgeKeyForTier, type LevelEstimate } from '../../../shared/levelEstimate';
 import { useT } from '../../i18n';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
+import { useWatchTitles } from '../../useWatchTitles';
+import {
+  groupShowsByLibraryTitle,
+  libraryTitlesByResumeKey,
+  type MediaPathRef,
+  type ShowStatRow,
+} from '../../../shared/statsShowTitles';
 
 /**
  * YYYY-MM-DD → single weekday initial (M T W … / 月 火 水 … / П В С …) for the
@@ -98,6 +105,12 @@ export function chartDayLabel(isoDate: string, lang: UiLang = 'en'): string {
 
 export interface StatsState {
   summary: StatsSummary;
+  /**
+   * `summary.shows` folded to one row per Watch-library title and named with the
+   * library's title (see shared/statsShowTitles.ts). Use this, not
+   * `summary.shows`, wherever shows are listed or counted.
+   */
+  shows: ShowStatRow[];
   peak: number;
   hasData: boolean;
   refresh: () => void;
@@ -112,6 +125,33 @@ export function useStats(): StatsState {
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
   useEffect(() => onStatsChanged(refresh), [refresh]);
+
+  // The library's view of which files belong to which title — only fetched
+  // once there is watch time to name.
+  const watched = summary.shows.length > 0;
+  const { titles } = useWatchTitles(watched);
+  const [media, setMedia] = useState<MediaPathRef[]>([]);
+  useEffect(() => {
+    if (!watched) return undefined;
+    let alive = true;
+    const api = typeof window !== 'undefined' ? window.api : undefined;
+    void Promise.resolve(api?.listMedia?.())
+      .then((items) => {
+        if (alive && Array.isArray(items)) setMedia(items);
+      })
+      .catch(() => undefined);
+    const off = api?.onMediaChanged?.((items) => {
+      if (Array.isArray(items)) setMedia(items);
+    });
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, [watched]);
+  const shows = useMemo(
+    () => groupShowsByLibraryTitle(summary.shows, libraryTitlesByResumeKey(titles, media)),
+    [summary.shows, titles, media],
+  );
 
   const resetAllStats = useCallback(async () => {
     const ok = await confirmDialog({
@@ -130,6 +170,7 @@ export function useStats(): StatsState {
 
   return {
     summary,
+    shows,
     // The bar is stacked since slice 8, so the scale is the taller of the two channels
     // combined — peaking on reading alone would let a heavy watching day overflow it.
     peak: Math.max(1, ...summary.recent.map((d) => d.seconds + d.watchSeconds)),
@@ -587,7 +628,7 @@ export function StatsCards({ state }: { state: StatsState }) {
             <span className="stats-card-lbl">{t('stats.card.totalWatched')}</span>
           </div>
           <div className="stats-card">
-            <span className="stats-card-val">{s.shows.length}</span>
+            <span className="stats-card-val">{state.shows.length}</span>
             <span className="stats-card-lbl">{t('stats.card.showsWatched')}</span>
           </div>
         </>
@@ -712,7 +753,7 @@ export function StatsShows({ state }: { state: StatsState }) {
       positions.set(`file:${entry.pathKey}`, continueWatchingResumeSec(entry));
     }
     setResumable(positions);
-  }, [state.summary.shows.length]);
+  }, [state.shows.length]);
 
   const resume = (id: string): void => {
     const localFilePath = continueWatchingPathFromKey(id);
@@ -725,7 +766,7 @@ export function StatsShows({ state }: { state: StatsState }) {
 
   return (
     <ul className="stats-books">
-      {state.summary.shows.map((show) => {
+      {state.shows.map((show) => {
         const meta = t('stats.showMeta', { duration: formatDuration(show.seconds) });
         const canResume = resumable != null && continueWatchingPathFromKey(show.id) !== '';
         const body = (

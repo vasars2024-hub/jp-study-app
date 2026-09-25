@@ -1,0 +1,19 @@
+/* Round-2 widget additions. The base widget styles are in styles.css. */
+
+/* Daily goal widget: the user's own goals kept from the old free-text widget. */
+.wgt-goals .wgt-goals-own {
+  flex: 0 1 auto;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding-top: 6px;
+}
+.wgt-goals-own li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wgt-goals-own label.wgt-goal-top {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 6px;
+}

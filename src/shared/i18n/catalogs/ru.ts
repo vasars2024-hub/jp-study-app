@@ -8763,9 +8763,6 @@ export const ru: Catalog = {
   'widgets.worldClock.areaPlaceholder': 'Регион/город (часовой пояс IANA)',
   'widgets.worldClock.addZone': 'Добавить пояс',
   'widgets.worldClock.badTz': 'неверный часовой пояс',
-  'widgets.dailyGoals.addPlaceholder': 'Добавить цель…',
-  'widgets.dailyGoals.emptyHint': 'Поставьте одну-две цели на сегодня.',
-  'widgets.dailyGoals.raiseTarget': 'Повысить цель',
   'widgets.habitTracker.addPlaceholder': 'Добавить привычку…',
   'widgets.habitTracker.emptyHint': 'Отслеживайте ежедневную привычку.',
   'widgets.heatmap.summary': 'Последние {days} дн. · всего {duration}',
@@ -13753,8 +13750,6 @@ export const ru: Catalog = {
   'common.increase': 'Увеличить: {label}',
   'common.zoomIn': 'Увеличить масштаб',
   'common.zoomOut': 'Уменьшить масштаб',
-  'widgets.dailyGoals.decrement': 'Убавить на один',
-  'widgets.dailyGoals.increment': 'Прибавить один',
   'verifiedSites.title': 'Проверенные сайты',
   'verifiedSites.desc': 'Локальная кураторская база. Статус и совместимость заполняет пользователь; этот менеджер не выполняет сетевую проверку.',
   'verifiedSites.count': {

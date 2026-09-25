@@ -11,4 +11,6 @@ export const STUDY_UI_ZH: Catalog = {
   'flash.tabs.label': '卡片集合',
   'flash.review.hiddenCard': '卡片 {position}',
   'flash.review.hiddenCardTitle': '卡片 {position}：显示答案后才会显示单词',
+  // Statistics window.
+  'stats.status.live': '指标实时',
 };

@@ -11,4 +11,6 @@ export const STUDY_UI_RU: Catalog = {
   'flash.tabs.label': 'Наборы карточек',
   'flash.review.hiddenCard': 'Карточка {position}',
   'flash.review.hiddenCardTitle': 'Карточка {position}: слово появится, когда вы откроете ответ',
+  // Statistics window.
+  'stats.status.live': 'Метрики обновляются',
 };

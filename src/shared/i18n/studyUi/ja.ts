@@ -11,4 +11,6 @@ export const STUDY_UI_JA: Catalog = {
   'flash.tabs.label': 'カードの一覧',
   'flash.review.hiddenCard': 'カード {position}',
   'flash.review.hiddenCardTitle': 'カード {position}：答えを表示すると単語が見えます',
+  // Statistics window.
+  'stats.status.live': 'メトリクス更新中',
 };

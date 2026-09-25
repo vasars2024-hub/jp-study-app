@@ -11,4 +11,6 @@ export const STUDY_UI_EN: Catalog = {
   'flash.tabs.label': 'Card collections',
   'flash.review.hiddenCard': 'Card {position}',
   'flash.review.hiddenCardTitle': 'Card {position}: its word shows once you reveal the answer',
+  // Statistics window.
+  'stats.status.live': 'Metrics live',
 };
