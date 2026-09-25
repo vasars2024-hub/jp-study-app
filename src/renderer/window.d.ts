@@ -668,6 +668,12 @@ declare global {
       filesDelete(
         request: import('../shared/filesApp/deletion').FilesDeleteRequest,
       ): Promise<import('../shared/filesApp/deletion').FilesDeletionResult>;
+      filesTrashOwnedFile(itemId: string): Promise<{ ok: boolean; reasonKey?: string }>;
+      onFilesWatchImport?(
+        cb: (arrivals: import('../shared/filesApp/watchImport').FilesWatchImportArrival[]) => void,
+      ): () => void;
+      filesPreview?(itemId: string): Promise<import('../shared/filesApp/preview').FilesPreview>;
+      filesDuplicates?(): Promise<import('../shared/filesApp/preview').FilesDuplicateGroup[]>;
       // Gates 32-35. `filesCleanupPlan` is the dry run and writes nothing.
       filesCleanupPlan(
         settings: import('../shared/filesApp/cleanup').FilesCleanupSettings,

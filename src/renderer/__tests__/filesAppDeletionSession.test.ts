@@ -82,16 +82,18 @@ describe('FilesDeletionSession', () => {
     const other = item({ id: 'media:other' });
 
     const result = await session.delete(referenced);
+    // Audit r2 #2: a linked media row is removed through the media library
+    // itself — deferred until the undo window passes, so Undo stays exact.
     expect(result).toMatchObject({
       ok: true,
       itemId: 'media:referenced',
-      mode: 'soft',
+      mode: 'owner',
       undoToken: 'undo:one',
     });
     expect(session.visibleItems([referenced, other]).map((row) => row.id)).toEqual(['media:other']);
     expect(trash).not.toHaveBeenCalled();
 
-    if (!result.ok || result.mode !== 'soft') throw new Error('Expected a soft-delete receipt');
+    if (!result.ok || result.mode !== 'owner') throw new Error('Expected an owner-delete receipt');
     expect(session.undo(result.undoToken, result.undoExpiresAt - 1)).toEqual({
       ok: true,
       itemId: 'media:referenced',

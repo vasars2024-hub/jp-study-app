@@ -359,7 +359,7 @@ export async function relocateBrokenLinkInMain(
 }
 
 /* ------------------------------------------------------------------ *
- * The one soft-delete adapter main owns.
+ * The soft-delete adapters main owns.
  * ------------------------------------------------------------------ */
 
 /**
@@ -372,8 +372,17 @@ export async function relocateBrokenLinkInMain(
  * The undo is in-memory and session-scoped, which is what "an undo window"
  * means here — the record is gone from the store immediately, and a restart
  * without an Undo is the user having accepted the removal.
+ *
+ * `library.json` gets the same adapter for the same reason (`main/library.ts`
+ * writes it): a library row whose book file is gone is a broken link the
+ * cleanup offers, and it used to end the run as "failed" because nothing here
+ * could remove it (audit r2 #4). Only the ROW goes; the item folder stays, so
+ * Undo puts back a record whose cover and progress are still where they were.
  */
-const mediaUndoRows = new Map<string, unknown>();
+type UndoRow = { store: 'media' | 'library'; row: unknown };
+const cleanupUndoRows = new Map<string, UndoRow>();
+
+const LIBRARY_STORE_FILE = 'library.json';
 
 export function softDeleteMediaRow(
   userDataPath: string,
@@ -394,44 +403,85 @@ export function softDeleteMediaRow(
     return null;
   }
   const undoToken = `media-undo:${rowId}:${Date.now()}`;
-  mediaUndoRows.set(undoToken, row);
+  cleanupUndoRows.set(undoToken, { store: 'media', row });
+  return { undoToken };
+}
+
+export function softDeleteLibraryRow(
+  userDataPath: string,
+  itemId: string,
+): { undoToken: string } | null {
+  const rowId = itemId.startsWith('library:') ? itemId.slice('library:'.length) : null;
+  if (!rowId) return null;
+  const file = path.join(userDataPath, LIBRARY_STORE_FILE);
+  const rows = readJsonSync<{ id?: unknown }[] | null>(file, null, { validate: Array.isArray });
+  if (!rows) return null;
+  const index = rows.findIndex((candidate) => candidate?.id === rowId);
+  if (index < 0) return null;
+  const [row] = rows.splice(index, 1);
+  try {
+    writeJsonAtomicSync(file, rows);
+  } catch {
+    return null;
+  }
+  const undoToken = `library-undo:${rowId}:${Date.now()}`;
+  cleanupUndoRows.set(undoToken, { store: 'library', row });
   return { undoToken };
 }
 
 export function undoSoftDeletedMediaRow(userDataPath: string, undoToken: unknown): boolean {
   if (typeof undoToken !== 'string') return false;
-  const row = mediaUndoRows.get(undoToken);
-  if (row === undefined) return false;
+  const entry = cleanupUndoRows.get(undoToken);
+  if (entry === undefined) return false;
+  if (entry.store === 'library') {
+    const file = path.join(userDataPath, LIBRARY_STORE_FILE);
+    const rows = readJsonSync<unknown[] | null>(file, null, { validate: Array.isArray }) ?? [];
+    rows.push(entry.row);
+    try {
+      writeJsonAtomicSync(file, rows);
+    } catch {
+      return false;
+    }
+    cleanupUndoRows.delete(undoToken);
+    return true;
+  }
   const file = path.join(userDataPath, MEDIA_LIBRARY_STORE_FILE);
   const doc = readJsonSync<{ items?: unknown[] } | null>(file, null, { validate: isJsonObject });
   if (!doc) return false;
   if (!Array.isArray(doc.items)) doc.items = [];
-  doc.items.push(row);
+  doc.items.push(entry.row);
   try {
     writeJsonAtomicSync(file, doc);
   } catch {
     return false;
   }
-  mediaUndoRows.delete(undoToken);
+  cleanupUndoRows.delete(undoToken);
   return true;
 }
 
 /**
- * The production soft-delete: media rows go through the adapter above, and
- * everything else is refused loudly rather than reported as removed. A row this
- * cannot reverse must not appear in the log with an undo token that does
- * nothing — gate 35's log is only worth having if every entry is true.
+ * The production soft-delete: media and library rows go through the adapters
+ * above, and everything else is refused loudly rather than reported as
+ * removed. A row this cannot reverse must not appear in the log with an undo
+ * token that does nothing — gate 35's log is only worth having if every entry
+ * is true. (The planner no longer offers those rows at all; see
+ * `CLEANUP_BROKEN_LINK_SOURCES`.)
  */
 export function createCleanupSoftDelete(
   userDataPath: () => string,
 ): (candidate: FilesCleanupCandidate) => Promise<{ undoToken: string }> {
   return async (candidate) => {
-    if (candidate.source !== 'media') {
-      throw new Error(`No soft-delete adapter for source ${candidate.source}`);
+    if (candidate.source === 'media') {
+      const receipt = softDeleteMediaRow(userDataPath(), candidate.itemId);
+      if (!receipt) throw new Error(`media.json row not found for ${candidate.itemId}`);
+      return receipt;
     }
-    const receipt = softDeleteMediaRow(userDataPath(), candidate.itemId);
-    if (!receipt) throw new Error(`media.json row not found for ${candidate.itemId}`);
-    return receipt;
+    if (candidate.source === 'library') {
+      const receipt = softDeleteLibraryRow(userDataPath(), candidate.itemId);
+      if (!receipt) throw new Error(`library.json row not found for ${candidate.itemId}`);
+      return receipt;
+    }
+    throw new Error(`No soft-delete adapter for source ${candidate.source}`);
   };
 }
 

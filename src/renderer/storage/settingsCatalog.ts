@@ -373,6 +373,15 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
   },
 ];
 
+/**
+ * One piece of a row's detail, as an i18n key the Memory panel translates —
+ * or, for a storage key name (which is data, not chrome), the raw text. The
+ * English `detail` string beside it stays for anything that still reads it.
+ */
+export type DomainDetailPart =
+  | { key: string; values?: Record<string, string | number> }
+  | { raw: string };
+
 export interface DomainInventoryItem {
   id: string;
   label: string;
@@ -384,8 +393,10 @@ export interface DomainInventoryItem {
   count: number;
   /** Present when any data is stored. */
   present: boolean;
-  /** Human summary (e.g. particle presets, companion count). */
+  /** Human summary (e.g. particle presets, companion count). English; see `detailParts`. */
   detail: string;
+  /** The same summary, translatable. */
+  detailParts?: DomainDetailPart[];
   clearable: boolean;
   clearConfirm?: string;
   tier: 'local' | 'durable' | 'host' | 'mixed';
@@ -427,6 +438,131 @@ function lsKeysMatching(def: SettingsDomainDef): string[] {
     /* ignore */
   }
   return out;
+}
+
+function environmentParts(raw: string | null): DomainDetailPart[] {
+  if (!raw) return [{ key: 'settings.memory.detail.notConfigured' }];
+  try {
+    const e = JSON.parse(raw) as Partial<typeof DEFAULT_ENVIRONMENT> & {
+      particlePresets?: string[];
+      companions?: unknown[];
+      buddyRoutines?: unknown[];
+      playlists?: unknown[];
+      rotationEnabled?: boolean;
+      particlesEnabled?: boolean;
+      companionsEnabled?: boolean;
+      particleDensity?: number;
+      particleIntensity?: number;
+      particleSize?: number;
+      dayCycleLighting?: boolean;
+    };
+    const parts: DomainDetailPart[] = [
+      { key: e.enabled ? 'settings.memory.detail.layerOn' : 'settings.memory.detail.layerOff' },
+    ];
+    if (e.particlesEnabled) {
+      const presets = Array.isArray(e.particlePresets) ? e.particlePresets.join(', ') : '';
+      parts.push({
+        key: 'settings.memory.detail.particles',
+        values: {
+          presets: presets || '—',
+          density: Math.round((e.particleDensity ?? 0) * 100),
+          intensity: Math.round((e.particleIntensity ?? 0) * 100),
+          size: Math.round((e.particleSize ?? 0) * 100),
+        },
+      });
+    } else {
+      parts.push({ key: 'settings.memory.detail.particlesOff' });
+    }
+    if (e.companionsEnabled) {
+      parts.push({
+        key: 'settings.memory.detail.companions',
+        values: {
+          count: Array.isArray(e.companions) ? e.companions.length : 0,
+          routines: Array.isArray(e.buddyRoutines) ? e.buddyRoutines.length : 0,
+        },
+      });
+    } else {
+      parts.push({ key: 'settings.memory.detail.companionsOff' });
+    }
+    parts.push(
+      e.rotationEnabled
+        ? {
+            key: 'settings.memory.detail.rotation',
+            values: { count: Array.isArray(e.playlists) ? e.playlists.length : 0 },
+          }
+        : { key: 'settings.memory.detail.rotationOff' },
+    );
+    if (e.dayCycleLighting) parts.push({ key: 'settings.memory.detail.lightingOn' });
+    return parts;
+  } catch {
+    return [{ key: 'settings.memory.detail.unreadable' }];
+  }
+}
+
+/** The translatable twin of `summarizeDomain` — same branches, same order. */
+function summarizeDomainParts(def: SettingsDomainDef, keys: string[]): DomainDetailPart[] {
+  if (def.id === 'environment' || def.id === 'wallpaper-rotation') {
+    try {
+      return environmentParts(localStorage.getItem('jp-os-environment-v1'));
+    } catch {
+      return keys.length
+        ? [{ key: 'settings.memory.detail.keys', values: { count: keys.length } }]
+        : [{ key: 'settings.memory.detail.empty' }];
+    }
+  }
+  if (def.id === 'appearance') {
+    try {
+      return [{ key: 'settings.memory.detail.theme', values: { theme: localStorage.getItem('jp-os-theme') ?? 'default' } }];
+    } catch {
+      /* fall through */
+    }
+  }
+  if (def.id === 'display') {
+    try {
+      const z = localStorage.getItem('jp-app-zoom');
+      if (z) return [{ key: 'settings.memory.detail.zoom', values: { pct: Math.round(Number(z) * 100) } }];
+      return [{ key: keys.length ? 'settings.memory.detail.customDisplay' : 'settings.memory.detail.defaults' }];
+    } catch {
+      /* fall through */
+    }
+  }
+  if (def.id === 'flashcards' && keys.length) {
+    try {
+      const raw = localStorage.getItem('jp-flashcard-deck');
+      if (raw) {
+        const store = JSON.parse(raw) as { cards?: unknown[] };
+        if (Array.isArray(store.cards)) {
+          return [{ key: 'settings.memory.detail.cards', values: { count: store.cards.length } }];
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  if (def.id === 'annotations' || def.id === 'bookmarks') {
+    let marks = 0;
+    for (const k of keys) {
+      try {
+        const list = JSON.parse(localStorage.getItem(k) ?? '[]') as unknown[];
+        if (Array.isArray(list)) marks += list.length;
+      } catch {
+        /* ignore */
+      }
+    }
+    if (marks || keys.length) {
+      return [
+        {
+          key: def.id === 'annotations' ? 'settings.memory.detail.marks' : 'settings.memory.detail.bookmarks',
+          values: { count: marks, books: keys.length },
+        },
+      ];
+    }
+  }
+  if (!keys.length && !def.hostKey) return [{ key: 'settings.memory.detail.empty' }];
+  if (keys.length === 1) return [{ raw: keys[0] }];
+  if (keys.length) return [{ key: 'settings.memory.detail.keys', values: { count: keys.length } }];
+  if (def.hostKey) return [{ key: 'settings.memory.detail.hostConfig' }];
+  return [{ key: 'settings.memory.detail.empty' }];
 }
 
 function summarizeEnvironment(raw: string | null): string {
@@ -571,6 +707,7 @@ export function listDomainInventoryLocal(): DomainInventoryItem[] {
       // Host/IDB presence is filled in by enrichDomainInventory.
       present: keys.length > 0,
       detail: summarizeDomain(def, keys),
+      detailParts: summarizeDomainParts(def, keys),
       clearable: def.clearable,
       clearConfirm: def.clearConfirm,
       tier,
@@ -595,6 +732,7 @@ export async function enrichDomainInventory(
     let count = row.count;
     let present = row.present;
     let detail = row.detail;
+    let detailParts = row.detailParts;
     let tier = row.tier;
 
     if (def.idbKeys) {
@@ -620,17 +758,28 @@ export async function enrichDomainInventory(
         const vp = snap?.viewports?.[0];
         if (vp) {
           detail = `Icons ${vp.icons?.length ?? 0} · Windows ${vp.windows?.length ?? 0}`;
+          detailParts = [
+            {
+              key: 'settings.memory.detail.desktopLayout',
+              values: { icons: vp.icons?.length ?? 0, windows: vp.windows?.length ?? 0 },
+            },
+          ];
         }
       } else if (def.hostKey === 'profiles') {
         const list = host.profiles;
-        if (Array.isArray(list)) detail = `${list.length} profile(s)`;
+        if (Array.isArray(list)) {
+          detail = `${list.length} profile(s)`;
+          detailParts = [{ key: 'settings.memory.detail.profiles', values: { count: list.length } }];
+        }
       } else if (def.hostKey === 'mining') {
         detail = 'Mining config present';
+        detailParts = [{ key: 'settings.memory.detail.miningPresent' }];
       } else if (def.hostKey === 'ai') {
         detail = 'AI config present';
+        detailParts = [{ key: 'settings.memory.detail.aiPresent' }];
       }
     }
-    return { ...row, bytes, count, present, detail, tier };
+    return { ...row, bytes, count, present, detail, detailParts, tier };
   });
 }
 

@@ -89,18 +89,24 @@ describe('Files app deletion policy', () => {
       referenced: true,
     });
 
+    // Audit r2 #2: the media LIBRARY row is removed through its owner; the
+    // user's file stays unless they explicitly ask for it (`trashFile`).
     expect(planFilesDeletion(referencedVideo)).toMatchObject({
-      mode: 'soft',
+      mode: 'owner',
+      owner: 'media',
       risk: 'irreplaceable-media',
-      messageKey: 'filesApp.delete.confirmSoft',
+      messageKey: 'filesApp.delete.confirmOwner.media',
       requiresExplicitConfirmation: false,
     });
     await expect(executeFilesDeletion(referencedVideo, {}, deps)).resolves.toMatchObject({
       ok: true,
       itemId: 'media:referenced-episode',
-      mode: 'soft',
+      mode: 'owner',
     });
-    expect(deps.softDelete).toHaveBeenCalledWith(referencedVideo);
+    expect(deps.softDelete).toHaveBeenCalledWith(referencedVideo, {
+      owner: 'media',
+      localId: 'referenced-episode',
+    });
     expect(deps.trashFile).not.toHaveBeenCalled();
   });
 

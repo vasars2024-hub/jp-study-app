@@ -54,3 +54,11 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Linked media only: the one opt-in that also takes the user's own file. */
+.fa-delete-trash-file {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  margin: var(--lq-space-1) 0 var(--lq-space-2);
+}

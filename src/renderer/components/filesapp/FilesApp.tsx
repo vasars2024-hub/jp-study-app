@@ -51,7 +51,7 @@ import {
   categoryContains,
   categoryNode,
   countByCategory,
-  deleteModeFor,
+  isFilesCategoryId,
   isFilesPanelCategory,
   isMachineDerived,
   foldFilesQuery,
@@ -85,8 +85,24 @@ import {
   filesOpenDecision,
   isRoutableLocation,
   openFor,
+  withLibraryTwin,
+  withOwnedRoute,
   type FilesOpenDecision,
 } from '../../../shared/filesApp/openPlan';
+import { performFilesOpenRoute } from './filesOpenRoute';
+import { runOwnerDelete } from './filesOwnerDeleters';
+import { FilesPreviewPane } from './FilesPreviewPane';
+import { filesSourceLabel } from './filesSourceLabels';
+import { ContextMenu, type MenuItem } from '../ui/ContextMenu';
+import {
+  FILES_OPTIONAL_COLUMNS,
+  filesGridTemplate,
+  filesStatusBadges,
+  toggleFilesColumn,
+  type FilesOptionalColumn,
+} from '../../../shared/filesApp/columns';
+import { loadFilesColumns, saveFilesColumns } from '../../filesColumnsStore';
+import type { FilesDuplicateGroup } from '../../../shared/filesApp/preview';
 import {
   addToCollection,
   ancestorsOf,
@@ -206,12 +222,18 @@ const ROW_HEIGHT = 32;
  * shorter row that the windowing does not know about scrolls wrong.
  */
 const COMPACT_ROW_HEIGHT = 24;
-const DETAILS_COLUMNS = ['name', 'kind', 'provenance', 'size', 'modified'] as const;
 const COMPACT_COLUMNS = ['name', 'kind'] as const;
 
-function columnsFor(mode: FilesViewMode): readonly FilesSortColumn[] {
-  return mode === 'compact' ? COMPACT_COLUMNS : DETAILS_COLUMNS;
+/**
+ * The columns on screen. Details shows the user's own pick (audit r2 #6 —
+ * the set used to be fixed); compact keeps its two, for the reason above.
+ */
+function columnsFor(mode: FilesViewMode, chosen: readonly FilesOptionalColumn[]): readonly FilesSortColumn[] {
+  return mode === 'compact' ? COMPACT_COLUMNS : ['name', ...chosen];
 }
+
+/** The special views reached from the rail that are not folders. */
+type FilesSpecialView = 'hidden' | 'duplicates';
 
 /**
  * Gate 16's drag payload.
@@ -350,7 +372,10 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * is the gate's own rule about not silently choosing.
    */
   const [openState, setOpenState] = useState<
-    { status: 'idle' } | { status: 'routing' } | { status: 'settled'; decision: FilesOpenDecision }
+    | { status: 'idle' }
+    | { status: 'routing' }
+    /** `preview`: a note with no app of its own, shown in the preview pane instead. */
+    | { status: 'settled'; decision: FilesOpenDecision; preview?: boolean }
   >({ status: 'idle' });
   /**
    * Gate 8: the panel card a settings-search hit named, so the hit lands on its
@@ -418,6 +443,24 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const [scanOpen, setScanOpen] = useState(false);
   const [cleanupOpen, setCleanupOpen] = useState(false);
 
+  /* ---------------------- explorer basics (r2 #9) ---------------------- */
+
+  /** The row's right-click menu, anchored where the pointer was. */
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; itemId: string } | null>(null);
+  /** Hidden items / Duplicates: rail entries that are views, not folders. */
+  const [specialView, setSpecialView] = useState<FilesSpecialView | null>(null);
+  const [duplicates, setDuplicates] = useState<
+    { status: 'idle' } | { status: 'loading' } | { status: 'ready'; groups: FilesDuplicateGroup[] }
+  >({ status: 'idle' });
+  /** Item rename (media titles, visual novel titles), inline in the inspector. */
+  const [renamingItem, setRenamingItem] = useState<{ id: string; draft: string } | null>(null);
+  const [itemNotice, setItemNotice] = useState<FolderNotice | null>(null);
+  /** Set by the context menu's Delete, so it lands on the inspector's one confirm. */
+  const [deleteRequest, setDeleteRequest] = useState<{ itemId: string; nonce: number } | null>(null);
+  /** The user's column pick for the details view, remembered across restarts. */
+  const [columns, setColumns] = useState<FilesOptionalColumn[]>(loadFilesColumns);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+
   /**
    * Which folder's view is on screen. The precedence — smart, then collection,
    * then category, then root — is the same order `visible` resolves the list in,
@@ -457,7 +500,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     clearPendingFilesScope();
     const onScope = (event: Event) => {
       const detail = (event as CustomEvent<FilesScopeRequest | null>).detail;
-      if (!detail) return;
+      if (!detail || !isFilesCategoryId(detail.categoryId)) return;
+      // Main's Agent delivery retries until a mounted Files app says it took it.
+      detail.handled?.();
       clearPendingFilesScope();
       setScope(detail.categoryId);
       // A derived scope and one of the user's own folders are mutually
@@ -466,6 +511,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       // intersection of two things nobody asked to intersect.
       setCollectionScope(null);
       setSmartScope(null);
+      setSpecialView(null);
       setSelectedId(detail.focusItemId ?? null);
       setFocusCardId(detail.focusCardId ?? null);
       // A scope arriving on an open window must not land inside a stale search:
@@ -504,6 +550,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * The status dock below renders it and never unmounts.
    */
   const [deleteNotice, setDeleteNotice] = useState<FilesDeletionNotice | null>(null);
+  /** Read through a ref: the commit callback is declared below the receipt it serves. */
+  const commitDueDeletesRef = useRef<() => Promise<void>>(async () => undefined);
+  useEffect(() => {
+    if (deleteNotice?.key !== 'filesApp.delete.ownerPending' || !deleteNotice.undoExpiresAt) return undefined;
+    const wait = Math.max(0, deleteNotice.undoExpiresAt - Date.now()) + 250;
+    const timer = window.setTimeout(() => void commitDueDeletesRef.current(), wait);
+    return () => window.clearTimeout(timer);
+  }, [deleteNotice]);
   /*
    * A soft delete writes localStorage from inside the control, so nothing in
    * React's tree knows the row vanished. This is the same subscribe-and-re-read
@@ -516,6 +570,46 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     window.addEventListener(FILES_SOFT_DELETE_EVENT, bump);
     return () => window.removeEventListener(FILES_SOFT_DELETE_EVENT, bump);
   }, []);
+
+  /*
+   * Audit r2 #2: an owner delete is REAL — it runs the owning store's own
+   * delete — but not until its 10-second Undo has passed, so Undo stays exact
+   * (nothing was touched yet). This runs whatever is due on mount and again
+   * when the newest receipt's window closes; the app-level host
+   * (`useFilesWatchAutoImport`) covers deletes left pending by a Files window
+   * that closed first.
+   */
+  const commitDueDeletes = useCallback(async () => {
+    const result = await deletionSession.commitDue((itemId, commit) => runOwnerDelete(itemId, commit));
+    if (result.committed || result.failed) {
+      setSoftDeleteGeneration((n) => n + 1);
+      if (result.committed) announceFilesIndexChanged();
+    }
+  }, [deletionSession]);
+  commitDueDeletesRef.current = commitDueDeletes;
+  useEffect(() => {
+    void commitDueDeletes();
+  }, [commitDueDeletes]);
+
+  /** Hidden items: hides, and owner deletes the owner refused. Re-read with the tombstones. */
+  const hiddenRows = useMemo(
+    () => deletionSession.hiddenRows(),
+    // The rows live in the session; the counter is what says they moved.
+    [deletionSession, softDeleteGeneration],
+  );
+
+  const onRestoreHidden = useCallback(
+    (itemId: string) => {
+      const ok = deletionSession.restore(itemId);
+      setItemNotice(
+        ok
+          ? { key: 'filesApp.hidden.restored', tone: 'ok' }
+          : { key: 'filesApp.hidden.restoreFailed', tone: 'error' },
+      );
+      if (ok) refresh();
+    },
+    [deletionSession, refresh],
+  );
 
   /*
    * The single funnel. Filtering HERE rather than in the list means a
@@ -667,10 +761,26 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * answer. Opening never imports — see that module's header for why re-running
    * `DropRouter`'s switch on an already-indexed row would be a defect.
    */
-  const runOpenDecision = useCallback((decision: FilesOpenDecision) => {
-    setOpenState({ status: 'settled', decision });
-    if (decision.mode === 'open') openSectionSurface(decision.section);
-  }, []);
+  const runOpenDecision = useCallback(
+    (raw: FilesOpenDecision, item: FilesItem) => {
+      // The exact record, not the owning app's front page (audit r2 #1): an
+      // owned row carries its route already; a loose media file borrows the
+      // route of the library entry that points at the same path.
+      const decision = withLibraryTwin(raw, item, state.snapshot?.items ?? []);
+      if (decision.mode !== 'open') {
+        setOpenState({ status: 'settled', decision });
+        return;
+      }
+      if (decision.route) {
+        const outcome = performFilesOpenRoute(decision.route);
+        setOpenState({ status: 'settled', decision, preview: outcome === 'preview' });
+        return;
+      }
+      setOpenState({ status: 'settled', decision });
+      openSectionSurface(decision.section);
+    },
+    [state.snapshot],
+  );
 
   /**
    * Takes the item rather than reading `selected`, because the double-click
@@ -680,7 +790,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const openItem = useCallback(
     async (item: FilesItem) => {
       if (!isRoutableLocation(item.location)) {
-        runOpenDecision(filesOpenDecision(item, null));
+        runOpenDecision(filesOpenDecision(item, null), item);
         return;
       }
       setOpenState({ status: 'routing' });
@@ -688,7 +798,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       // A missing plan is NOT downgraded to the kind table: for a file the
       // router is the authority, and guessing from the extension is what
       // sniffing exists to avoid. `filesOpenDecision(item, null)` refuses here.
-      runOpenDecision(filesOpenDecision(item, plans?.[0] ?? null));
+      runOpenDecision(filesOpenDecision(item, plans?.[0] ?? null), item);
     },
     [runOpenDecision],
   );
@@ -700,7 +810,10 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const onChooseCandidate = useCallback(
     // The kind travels with the pick too, or gate 15's refinement would apply
     // on the direct route and be dropped the moment the list was involved.
-    (candidate: DropCandidate) => runOpenDecision(openFor(candidate, false, selected?.kind)),
+    (candidate: DropCandidate) => {
+      if (!selected) return;
+      runOpenDecision(withOwnedRoute(openFor(candidate, false, selected.kind), selected), selected);
+    },
     [runOpenDecision, selected],
   );
 
@@ -792,6 +905,57 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     setMineState({ status: 'idle' });
     setRevealNote(null);
     setOpenState({ status: 'idle' });
+  }, []);
+
+  /* ------------------- explorer basics (audit r2 #9) ------------------ */
+
+  const openDuplicates = useCallback(async () => {
+    setSpecialView('duplicates');
+    setDuplicates({ status: 'loading' });
+    const api = window.api as (typeof window.api & { filesDuplicates?: () => Promise<FilesDuplicateGroup[]> }) | undefined;
+    try {
+      const groups = typeof api?.filesDuplicates === 'function' ? await api.filesDuplicates() : [];
+      setDuplicates({ status: 'ready', groups: Array.isArray(groups) ? groups : [] });
+    } catch {
+      setDuplicates({ status: 'ready', groups: [] });
+    }
+  }, []);
+
+  /** Rename is offered where the owning store has a title to rename. */
+  const renameTarget = (item: FilesItem): 'media' | 'visual-novel' | null =>
+    item.id.startsWith('media:') ? 'media' : item.id.startsWith('visual-novel:') ? 'visual-novel' : null;
+
+  const onCommitItemRename = useCallback(async () => {
+    if (!renamingItem) return;
+    const item = allItems.find((candidate) => candidate.id === renamingItem.id);
+    const title = renamingItem.draft.trim();
+    if (!item || !title) {
+      setItemNotice({ key: 'filesApp.rename.empty', tone: 'error' });
+      return;
+    }
+    const target = renameTarget(item);
+    try {
+      if (target === 'media') {
+        await window.api.updateMediaMetadata(item.id.slice('media:'.length), { title });
+      } else if (target === 'visual-novel') {
+        await window.api.visualNovelUpdateMetadata(item.id.slice('visual-novel:'.length), { title });
+      } else {
+        return;
+      }
+      setItemNotice({ key: 'filesApp.rename.done', values: { name: title }, tone: 'ok' });
+      setRenamingItem(null);
+      refresh();
+    } catch {
+      setItemNotice({ key: 'filesApp.rename.failed', tone: 'error' });
+    }
+  }, [renamingItem, allItems, refresh]);
+
+  const onToggleColumn = useCallback((column: FilesOptionalColumn) => {
+    setColumns((current) => {
+      const next = toggleFilesColumn(current, column);
+      saveFilesColumns(next);
+      return next;
+    });
   }, []);
 
   /* ---------------------- gate 16/17 actions ---------------------- */
@@ -1026,6 +1190,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   const onOpenSmart = useCallback((id: string) => {
     setSmartScope(id);
+    setSpecialView(null);
     setScope(null);
     setCollectionScope(null);
     setFocusCardId(null);
@@ -1109,6 +1274,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       setScope(null);
       setCollectionScope(null);
       setSmartScope(null);
+      setSpecialView(null);
       selectItem(target.itemId);
       return;
     }
@@ -1116,11 +1282,17 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       setScope(target.categoryId);
       setCollectionScope(null);
       setSmartScope(null);
+      setSpecialView(null);
       setFocusCardId(null);
       return;
     }
+    // All three scopes, as in the two branches above: `visible` resolves a
+    // smart folder BEFORE a collection, so leaving `smartScope` set kept the
+    // saved search on screen and the pinned folder appeared to do nothing.
     setScope(null);
     setCollectionScope(target.collectionId);
+    setSmartScope(null);
+    setSpecialView(null);
     setFocusCardId(null);
   }, [selectItem]);
 
@@ -1220,11 +1392,43 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           setScope(null);
           setCollectionScope(null);
           setSmartScope(null);
+          setSpecialView(null);
         }}
       >
         {treeIcon('drive')}
         <span className="fa-tree-label">{t('filesApp.tree.everything')}</span>
         {treeCount(allItems.length)}
+      </button>
+      {/* Audit r2 #2 and #9: two VIEWS, not folders — what Files is hiding,
+          with a way back, and the same file found twice. */}
+      <button
+        type="button"
+        className="fa-tree-node fa-tree-special"
+        data-special="hidden"
+        title={t('filesApp.hidden.title')}
+        data-selected={specialView === 'hidden' ? 'true' : undefined}
+        aria-pressed={specialView === 'hidden'}
+        onClick={() => setSpecialView('hidden')}
+      >
+        {treeIcon('eye')}
+        <span className="fa-tree-label">{t('filesApp.hidden.title')}</span>
+        {/* Counted only when there is something hidden: a 0 here would read as
+            a claim about the index, which may not have loaded yet (D314). */}
+        {hiddenRows.length > 0 ? (
+          <span className="fa-tree-count">{hiddenRows.length.toLocaleString(LANG_TAGS[lang])}</span>
+        ) : null}
+      </button>
+      <button
+        type="button"
+        className="fa-tree-node fa-tree-special"
+        data-special="duplicates"
+        title={t('filesApp.duplicates.title')}
+        data-selected={specialView === 'duplicates' ? 'true' : undefined}
+        aria-pressed={specialView === 'duplicates'}
+        onClick={() => void openDuplicates()}
+      >
+        {treeIcon('file')}
+        <span className="fa-tree-label">{t('filesApp.duplicates.title')}</span>
       </button>
       {FILES_TREE.map((node) => (
         <button
@@ -1257,6 +1461,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             setScope(node.id);
             setCollectionScope(null);
             setSmartScope(null);
+            setSpecialView(null);
             // A tree click is not a search hit; it asked for the panel, not for
             // one card inside it. Carrying the highlight over would leave the
             // previous hit's row lit on a screen nobody searched for.
@@ -1506,6 +1711,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                   setCollectionScope(collection.id);
                   setScope(null);
                   setSmartScope(null);
+                  setSpecialView(null);
                   setFocusCardId(null);
                   setFolderNotice(null);
                 }}
@@ -1725,6 +1931,33 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               </button>
             ))}
           </div>
+          {viewMode === 'details' ? (
+            <div className="fa-columns">
+              <button
+                type="button"
+                className="fa-columns-toggle"
+                aria-expanded={columnsOpen}
+                onClick={() => setColumnsOpen((open) => !open)}
+              >
+                {t('filesApp.columns.label')}
+              </button>
+              {columnsOpen ? (
+                <div className="fa-columns-menu" role="group" aria-label={t('filesApp.columns.label')}>
+                  {FILES_OPTIONAL_COLUMNS.map((column) => (
+                    <label key={column} className="fa-columns-option">
+                      <input
+                        type="checkbox"
+                        data-column={column}
+                        checked={columns.includes(column)}
+                        onChange={() => onToggleColumn(column)}
+                      />
+                      <span>{t(`filesApp.column.${column}`)}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {viewNotice ? (
             <p className="fa-view-notice" role="status">
               {t(viewNotice)}
@@ -1792,6 +2025,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             setScope(null);
             setCollectionScope(null);
             setSmartScope(null);
+            setSpecialView(null);
           }}
           title={scopeLabel}
         >
@@ -1812,7 +2046,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       <span role="columnheader" className="fa-cell fa-cell-select">
         <span className="fa-visually-hidden">{t('filesApp.bulk.selection')}</span>
       </span>
-      {columnsFor(viewMode).map((column) => (
+      {columnsFor(viewMode, columns).map((column) => (
         <button
           key={column}
           type="button"
@@ -1853,6 +2087,94 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         </Suspense>
       );
     }
+    if (specialView === 'hidden') {
+      const byId = new Map((state.snapshot?.items ?? []).map((item) => [item.id, item]));
+      return (
+        <div className="fa-special" data-special="hidden">
+          <p className="fa-details-note">{t('filesApp.hidden.explain')}</p>
+          {hiddenRows.length === 0 ? (
+            <p className="fa-state">{t('filesApp.hidden.empty')}</p>
+          ) : (
+            <ul className="fa-special-list">
+              {hiddenRows.map((row) => {
+                const item = byId.get(row.itemId);
+                return (
+                  <li key={row.itemId} className="fa-special-row" data-item={row.itemId}>
+                    <span className="fa-special-name">{item?.name ?? row.name ?? row.itemId}</span>
+                    {item ? (
+                      <span className="fa-state-detail">{filesSourceLabel(item.source, t)}</span>
+                    ) : null}
+                    {row.commitError ? (
+                      <span className="fa-state-detail fa-hidden-failed">
+                        {t('filesApp.hidden.deleteFailed', { reason: row.commitError })}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="fa-action fa-hidden-restore"
+                      onClick={() => onRestoreHidden(row.itemId)}
+                    >
+                      {t('filesApp.hidden.restore')}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {itemNotice ? (
+            <p className="fa-folder-notice" data-tone={itemNotice.tone} role="status">
+              {t(itemNotice.key, itemNotice.values)}
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+    if (specialView === 'duplicates') {
+      const byId = new Map(allItems.map((item) => [item.id, item]));
+      return (
+        <div className="fa-special" data-special="duplicates">
+          <p className="fa-details-note">{t('filesApp.duplicates.explain')}</p>
+          {duplicates.status !== 'ready' ? (
+            <p className="fa-state">{t('filesApp.duplicates.scanning')}</p>
+          ) : duplicates.groups.length === 0 ? (
+            <p className="fa-state">{t('filesApp.duplicates.none')}</p>
+          ) : (
+            <ul className="fa-special-list">
+              {duplicates.groups.map((group) => (
+                <li key={group.itemIds.join('|')} className="fa-duplicate-group" data-reason={group.reason}>
+                  <p className="fa-details-note">
+                    {t(group.reason === 'path' ? 'filesApp.duplicates.samePath' : 'filesApp.duplicates.sameContent', {
+                      count: group.itemIds.length,
+                    })}
+                  </p>
+                  {group.itemIds.map((id) => {
+                    const item = byId.get(id);
+                    if (!item) return null;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className="fa-action fa-duplicate-item"
+                        onClick={() => {
+                          setSpecialView(null);
+                          setScope(null);
+                          setCollectionScope(null);
+                          setSmartScope(null);
+                          selectItem(id);
+                        }}
+                      >
+                        {item.name}
+                        <span className="fa-state-detail"> {filesSourceLabel(item.source, t)}</span>
+                      </button>
+                    );
+                  })}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    }
     if (state.status === 'loading') {
       return <p className="fa-state">{t('filesApp.state.loading')}</p>;
     }
@@ -1878,13 +2200,20 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         data-view={viewMode}
         aria-label={t('filesApp.list.label')}
         aria-rowcount={visible.length + 1}
+        style={
+          viewMode === 'details'
+            ? ({ '--fa-row-columns': filesGridTemplate(columns) } as CSSProperties)
+            : undefined
+        }
       >
         {header}
         {failed.length > 0 ? (
           // A store that could not be read is named, so a category at 0 is
           // never mistaken for an honest zero.
           <p className="fa-state-warning" role="status">
-            {t('filesApp.state.partial', { sources: failed.map((f) => f.source).join(', ') })}
+            {t('filesApp.state.partial', {
+              sources: failed.map((f) => filesSourceLabel(f.source, t)).join(', '),
+            })}
           </p>
         ) : null}
         {/* A folder that quietly shrank is the shape the plan calls a finding.
@@ -1945,6 +2274,17 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                 e.preventDefault();
                 selectItem(item.id);
               }
+              if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+                e.preventDefault();
+                const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                selectItem(item.id);
+                setContextMenu({ x: box.left + 24, y: box.bottom, itemId: item.id });
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              selectItem(item.id);
+              setContextMenu({ x: e.clientX, y: e.clientY, itemId: item.id });
             }}
           >
             <span role="gridcell" className="fa-cell fa-cell-select">
@@ -1960,31 +2300,58 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             </span>
             <span role="gridcell" className="fa-cell fa-cell-name">
               {item.name}
-              {item.flags.brokenLink ? (
-                <span className="fa-badge fa-badge-broken">{t('filesApp.flag.brokenLink')}</span>
-              ) : null}
-            </span>
-            <span role="gridcell" className="fa-cell fa-cell-kind">
-              {t(`filesApp.kind.${item.kind}`)}
-            </span>
-            {/* Gate 22: compact really drops these three — see `columnsFor`. */}
-            {viewMode === 'details' ? (
-              <>
+              {/* Audit r2 #6: every computed flag is shown, not only the broken link. */}
+              {filesStatusBadges(item.flags).map((badge) => (
                 <span
-                  role="gridcell"
-                  className="fa-cell fa-cell-provenance"
-                  data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
+                  key={badge.key}
+                  className={`fa-badge${badge.key === 'filesApp.flag.brokenLink' ? ' fa-badge-broken' : ''}`}
+                  data-tone={badge.tone}
                 >
-                  {t(`filesApp.provenance.${item.provenance}`)}
+                  {t(badge.key)}
                 </span>
-                <span role="gridcell" className="fa-cell fa-cell-size">
-                  {formatSize(item.sizeBytes, t, lang)}
-                </span>
-                <span role="gridcell" className="fa-cell fa-cell-modified">
-                  {formatDate(item.modifiedAt, lang)}
-                </span>
-              </>
-            ) : null}
+              ))}
+            </span>
+            {/* Gate 22: compact keeps only Kind — see `columnsFor`. */}
+            {columnsFor(viewMode, columns).slice(1).map((column) => {
+              switch (column) {
+                case 'kind':
+                  return (
+                    <span key={column} role="gridcell" className="fa-cell fa-cell-kind">
+                      {t(`filesApp.kind.${item.kind}`)}
+                    </span>
+                  );
+                case 'provenance':
+                  return (
+                    <span
+                      key={column}
+                      role="gridcell"
+                      className="fa-cell fa-cell-provenance"
+                      data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
+                    >
+                      {t(`filesApp.provenance.${item.provenance}`)}
+                    </span>
+                  );
+                case 'size':
+                  return (
+                    <span key={column} role="gridcell" className="fa-cell fa-cell-size">
+                      {formatSize(item.sizeBytes, t, lang)}
+                    </span>
+                  );
+                default:
+                  return (
+                    <span key={column} role="gridcell" className={`fa-cell fa-cell-${column}`}>
+                      {formatDate(
+                        column === 'created'
+                          ? item.createdAt
+                          : column === 'lastUsed'
+                            ? item.lastUsedAt
+                            : item.modifiedAt,
+                        lang,
+                      )}
+                    </span>
+                  );
+              }
+            })}
           </div>
           )}
           gridRole="rowgroup"
@@ -2043,6 +2410,13 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             {t('filesApp.action.openCancel')}
           </button>
         </div>
+      );
+    }
+    if (openState.preview) {
+      return (
+        <p className="fa-details-note fa-open-opened" role="status">
+          {t('filesApp.open.previewed')}
+        </p>
       );
     }
     return (
@@ -2256,7 +2630,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <dt>{t('filesApp.details.location')}</dt>
         <dd className="fa-details-location">{describeLocation(selected, t)}</dd>
         <dt>{t('filesApp.details.source')}</dt>
-        <dd>{selected.source}</dd>
+        <dd>{filesSourceLabel(selected.source, t)}</dd>
         {/* The anti-gatekeeper promise, said per item instead of only in a test.
             `FILES_ROUTE_PARITY` has carried the route for every store since
             gate 6; until this line it was evidence nothing in the product read,
@@ -2294,6 +2668,38 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           </>
         ) : null}
       </dl>
+      <FilesPreviewPane item={selected} t={t} />
+      {renamingItem?.id === selected.id ? (
+        <div className="fa-collection-rename fa-item-rename">
+          <label>
+            <span className="fa-visually-hidden">{t('filesApp.rename.label')}</span>
+            <input
+              type="text"
+              value={renamingItem.draft}
+              autoFocus
+              onChange={(e) => setRenamingItem({ id: selected.id, draft: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void onCommitItemRename();
+                }
+                if (e.key === 'Escape') setRenamingItem(null);
+              }}
+            />
+          </label>
+          <button type="button" className="fa-action" onClick={() => void onCommitItemRename()}>
+            {t('filesApp.collections.renameSave')}
+          </button>
+          <button type="button" className="fa-action" onClick={() => setRenamingItem(null)}>
+            {t('filesApp.collections.renameCancel')}
+          </button>
+        </div>
+      ) : null}
+      {itemNotice && specialView === null ? (
+        <p className="fa-details-note" role="status">
+          {t(itemNotice.key, itemNotice.values)}
+        </p>
+      ) : null}
       {/* Gate 10. Always offered — every row has SOME answer, and where that
           answer is "nothing opens this", the refusal is the honest outcome and
           is more useful than a hidden button. */}
@@ -2390,7 +2796,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           purpose — a Recycle Bin delete and an index-only one are not the same
           promise. The control below is the act; this is the label. */}
       <p className="fa-details-note">
-        {t(`filesApp.delete.mode.${deleteModeFor(selected.location)}`)}
+        {/* The session's plan, not the location alone: a library book is a file
+            on disk, but Delete removes it through the Library (audit r2 #2). */}
+        {t(`filesApp.delete.mode.${deletionSession.plan(selected).mode}`)}
       </p>
       <FilesDeletionControls
         item={selected}
@@ -2401,6 +2809,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
            where the rebuild is harmless and keeps one path for both. */
         onChanged={refresh}
         onNotice={setDeleteNotice}
+        confirmRequest={deleteRequest?.itemId === selected.id ? deleteRequest.nonce : 0}
+        onConfirmRequestHandled={() => setDeleteRequest(null)}
       />
       {revealNote ? (
         <p className="fa-details-note" role="status">
@@ -2584,6 +2994,70 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * space, and the derived tree is what a user needs to get anywhere at all.
    * Widening the window restores them, which is the reversible half.
    */
+  /**
+   * The row's right-click menu (audit r2 #9). Every entry is an action the
+   * inspector already offers, reached in one gesture: the menu adds a door,
+   * not a second implementation.
+   */
+  const contextMenuItems = (itemId: string): MenuItem[] => {
+    const item = allItems.find((candidate) => candidate.id === itemId);
+    if (!item) return [];
+    const close = (): void => setContextMenu(null);
+    const pinned = isPinned(favoritesDoc, { type: 'item', itemId: item.id });
+    const deletable = deletionSession.plan(item).mode !== 'none';
+    return [
+      {
+        id: 'open',
+        label: t('filesApp.action.open'),
+        onSelect: () => {
+          close();
+          void openItem(item);
+        },
+      },
+      {
+        id: 'reveal',
+        label: t('filesApp.action.reveal'),
+        disabled: !revealTargetFor(item.location),
+        onSelect: () => {
+          close();
+          void window.api?.filesReveal?.(item.location).then((result) => {
+            if (result && !result.ok) setRevealNote(t(result.reasonKey ?? 'filesApp.reveal.notFileBacked'));
+          });
+        },
+      },
+      {
+        id: 'rename',
+        label: t('filesApp.rename.action'),
+        disabled: renameTarget(item) === null,
+        onSelect: () => {
+          close();
+          setItemNotice(null);
+          setRenamingItem({ id: item.id, draft: item.name });
+        },
+      },
+      {
+        id: 'pin',
+        label: t(pinned ? 'filesApp.favorites.unpinItem' : 'filesApp.favorites.pinItem'),
+        onSelect: () => {
+          close();
+          onToggleFavorite({ type: 'item', itemId: item.id }, item.name);
+        },
+      },
+      { id: 'sep', label: '', separator: true },
+      {
+        id: 'delete',
+        label: t('filesApp.delete.action'),
+        danger: true,
+        disabled: !deletable,
+        onSelect: () => {
+          close();
+          setSelectedId(item.id);
+          setDeleteRequest((current) => ({ itemId: item.id, nonce: (current?.nonce ?? 0) + 1 }));
+        },
+      },
+    ];
+  };
+
   const compactRoutes: RailItem[] = [
     {
       id: ROOT_ROUTE_ID,
@@ -2611,6 +3085,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     // a derived node sets one and drops the search highlight.
     setCollectionScope(null);
     setSmartScope(null);
+    setSpecialView(null);
     if (id === ROOT_ROUTE_ID) {
       setScope(null);
       return;
@@ -2656,6 +3131,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {mineReceipts}
       {canvas}
     </LiquidAppScaffold>
+    {contextMenu ? (
+      <ContextMenu
+        open
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => setContextMenu(null)}
+        items={contextMenuItems(contextMenu.itemId)}
+      />
+    ) : null}
     {scanOpen ? (
       <ScanReviewSheet
         onClose={() => setScanOpen(false)}

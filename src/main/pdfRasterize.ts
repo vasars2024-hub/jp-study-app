@@ -125,6 +125,8 @@ export async function rasterizePdf(
   pdfPath: string,
   outDir: string,
   onProgress?: (p: RasterizeProgress) => void,
+  /** Stop after this many pages — the Files preview needs only the first. */
+  maxPages = Number.POSITIVE_INFINITY,
 ): Promise<string[]> {
   if (!fs.existsSync(pdfPath)) throw new Error('pdf-not-found');
   fs.mkdirSync(outDir, { recursive: true });
@@ -159,13 +161,14 @@ export async function rasterizePdf(
     await win.loadURL(`${ORIGIN}/index.html`);
     const total = Number(await win.webContents.executeJavaScript(openScript(`${ORIGIN}/doc/${token}.pdf`)));
     if (!Number.isFinite(total) || total <= 0) throw new Error('rasterize-failed: no pages');
-    for (let i = 0; i < total; i++) {
+    const limit = Math.min(total, Math.max(1, Math.floor(maxPages)));
+    for (let i = 0; i < limit; i++) {
       const dataUrl = String(await win.webContents.executeJavaScript(pageScript(i + 1, TARGET_WIDTH)));
       if (!dataUrl.startsWith('data:image/')) throw new Error('rasterize-failed: bad page image');
       const name = `${String(i + 1).padStart(4, '0')}.jpg`;
       fs.writeFileSync(path.join(outDir, name), Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64'));
       names.push(name);
-      onProgress?.({ done: names.length, total });
+      onProgress?.({ done: names.length, total: limit });
     }
     // Shut pdf.js down before the window goes away: destroy() terminates the
     // worker, and tearing the window down with the worker still live crashed the

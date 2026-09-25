@@ -29,6 +29,14 @@ export interface FilesDeletionControlsProps {
    * the status dock, which never unmounts.
    */
   onNotice?(notice: FilesDeletionNotice | null): void;
+  /**
+   * Bumped by another entry point to the same Delete (the row's context menu),
+   * so it lands on this confirmation rather than acting on its own — one
+   * confirm, one wording, whichever way the user got here.
+   */
+  confirmRequest?: number;
+  /** Told once the request above has opened the confirmation, so it is not replayed. */
+  onConfirmRequestHandled?(): void;
 }
 
 /**
@@ -45,9 +53,13 @@ export function FilesDeletionControls({
   t,
   onChanged,
   onNotice,
+  confirmRequest = 0,
+  onConfirmRequestHandled,
 }: FilesDeletionControlsProps) {
   const plan = useMemo(() => session.plan(item), [item, session]);
   const [pending, setPending] = useState<FilesDeletionPlan | null>(null);
+  /** Linked media only: also send the user's own file to the Recycle Bin. */
+  const [trashFile, setTrashFile] = useState(false);
   const [busy, setBusy] = useState(false);
   const [inlineNotice, setInlineNotice] = useState<FilesDeletionNotice | null>(null);
   const operationGeneration = useRef(0);
@@ -66,17 +78,28 @@ export function FilesDeletionControls({
   useEffect(() => {
     operationGeneration.current += 1;
     setPending(null);
+    setTrashFile(false);
     setInlineNotice(null);
     setBusy(false);
     // Deliberately does NOT clear a hoisted notice: the receipt for the row
     // that just left the list must outlive the selection change it caused.
   }, [item.id]);
 
+  useEffect(() => {
+    if (confirmRequest <= 0) return;
+    if (plan.mode !== 'none') setPending(plan);
+    onConfirmRequestHandled?.();
+    // `plan` is read at the moment of the request; a later re-plan must not re-open it.
+  }, [confirmRequest]);
+
   const confirmDelete = async () => {
     if (!pending || busy) return;
     const generation = operationGeneration.current;
     setBusy(true);
-    const result = await session.delete(item, { confirmedItemId: pending.itemId });
+    const result = await session.delete(item, {
+      confirmedItemId: pending.itemId,
+      ...(pending.owner === 'media' && trashFile ? { trashFile: true } : {}),
+    });
     // The receipt is published either way: a delayed reply must not be attached
     // to a row selected since, but a hoisted owner still needs to hear about it.
     if (generation !== operationGeneration.current) {
@@ -121,6 +144,17 @@ export function FilesDeletionControls({
           aria-label={t('filesApp.delete.confirmAction')}
         >
           <p>{t(pending.messageKey, pending.messageValues)}</p>
+          {pending.owner === 'media' ? (
+            <label className="fa-delete-trash-file">
+              <input
+                type="checkbox"
+                checked={trashFile}
+                onChange={(e) => setTrashFile(e.target.checked)}
+                disabled={busy}
+              />
+              <span>{t('filesApp.delete.alsoTrashFile')}</span>
+            </label>
+          ) : null}
           <div className="fa-delete-confirm-actions">
             <button
               type="button"

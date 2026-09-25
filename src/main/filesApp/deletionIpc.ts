@@ -178,6 +178,43 @@ export function isAbsoluteFilePath(value: string): boolean {
   return Boolean(candidate) && (path.win32.isAbsolute(candidate) || path.posix.isAbsolute(candidate));
 }
 
+export const FILES_TRASH_OWNED_FILE_CHANNEL = 'filesapp:trash-owned-file';
+
+/**
+ * The one extra a linked-media delete may carry: the user ticked "also move
+ * the file to the Recycle Bin". Same contract as Delete — an id crosses the
+ * bridge, the path is re-read here — and narrower: only a `media:` row that is
+ * a link to the user's own file qualifies, because that is the only row whose
+ * Delete offers the choice.
+ */
+export async function trashOwnedMediaFileInMain(
+  requestValue: unknown,
+  dependencies: FilesDeletionMainDependencies,
+): Promise<{ ok: boolean; reasonKey?: string }> {
+  if (typeof requestValue !== 'string' || !requestValue.startsWith('media:') || requestValue.length > 1_024) {
+    return { ok: false, reasonKey: 'filesApp.delete.invalidRequest' };
+  }
+  const target = dependencies.lookupItem(requestValue);
+  if (!target || target.id !== requestValue) return { ok: false, reasonKey: 'filesApp.delete.notFound' };
+  if (target.referenced !== true || target.location.store !== 'file') {
+    return { ok: false, reasonKey: 'filesApp.delete.refuseNotTrashable' };
+  }
+  if (!isAbsoluteFilePath(target.location.path)) {
+    return { ok: false, reasonKey: 'filesApp.delete.failed' };
+  }
+  try {
+    await dependencies.trashItem(target.location.path);
+  } catch {
+    return { ok: false, reasonKey: 'filesApp.delete.failed' };
+  }
+  try {
+    dependencies.onTrashed?.(target);
+  } catch {
+    /* the trash itself succeeded; the cache TTL is the fallback */
+  }
+  return { ok: true };
+}
+
 export interface FilesIpcHandleRegistrar {
   handle(channel: string, listener: (_event: unknown, request: unknown) => unknown): void;
 }
@@ -189,5 +226,8 @@ export function registerFilesDeletionIpc(
 ): void {
   ipc.handle(FILES_DELETE_CHANNEL, (_event, request) =>
     deleteFilesItemInMain(request, dependencies),
+  );
+  ipc.handle(FILES_TRASH_OWNED_FILE_CHANNEL, (_event, itemId) =>
+    trashOwnedMediaFileInMain(itemId, dependencies),
   );
 }

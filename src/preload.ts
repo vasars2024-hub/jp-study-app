@@ -1110,6 +1110,26 @@ const api = {
     return () => ipcRenderer.removeListener('filesapp:watch-arrival', handler);
   },
   /**
+   * Arrivals the MAIN window should import (sent to that window only, so a
+   * popped-out Files window never imports the same file a second time).
+   */
+  onFilesWatchImport: (
+    cb: (arrivals: import('./shared/filesApp/watchImport').FilesWatchImportArrival[]) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      arrivals: import('./shared/filesApp/watchImport').FilesWatchImportArrival[],
+    ): void => cb(arrivals);
+    ipcRenderer.on('filesapp:watch-import', handler);
+    return () => ipcRenderer.removeListener('filesapp:watch-import', handler);
+  },
+  /** The preview pane: an image URL, a few thousand characters of text, or why not. */
+  filesPreview: (itemId: string): Promise<import('./shared/filesApp/preview').FilesPreview> =>
+    ipcRenderer.invoke('filesapp:preview', itemId),
+  /** Rows that are the same file twice (same path, or same sampled content). */
+  filesDuplicates: (): Promise<import('./shared/filesApp/preview').FilesDuplicateGroup[]> =>
+    ipcRenderer.invoke('filesapp:duplicates'),
+  /**
    * Delete one Files-index item through its authoritative id. Paths, kinds and
    * risk classifications never cross this bridge; main resolves them again.
    */
@@ -1117,6 +1137,9 @@ const api = {
     request: import('./shared/filesApp/deletion').FilesDeleteRequest,
   ): Promise<import('./shared/filesApp/deletion').FilesDeletionResult> =>
     ipcRenderer.invoke(FILES_DELETE_CHANNEL, request),
+  /** Linked media Delete with "also move the file to the Recycle Bin" ticked. */
+  filesTrashOwnedFile: (itemId: string): Promise<{ ok: boolean; reasonKey?: string }> =>
+    ipcRenderer.invoke('filesapp:trash-owned-file', itemId),
 
   /**
    * Gates 32-35 — cleanup. Same contract as Delete: the renderer names classes

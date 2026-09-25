@@ -105,6 +105,15 @@ export function appendNotebookEvent(
   return full;
 }
 
+/** Remove one entry — the Files app's Delete on a note. Unknown ids change nothing. */
+export function removeNotebookEntry(id: string): boolean {
+  const list = loadNotebookTimeline();
+  const next = list.filter((entry) => entry.id !== id);
+  if (next.length === list.length) return false;
+  persist(next);
+  return true;
+}
+
 export function onNotebookTimelineChanged(cb: () => void): () => void {
   const h = () => cb();
   window.addEventListener(NOTEBOOK_TIMELINE_EVENT, h);

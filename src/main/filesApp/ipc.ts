@@ -31,6 +31,15 @@ import { readFilesMineSource } from './mineSource';
 import { scanRoots } from './scan';
 import { watchRoots, type FilesWatchArrival, type FilesWatchSession } from './watch';
 import { readJsonSync, writeJsonAtomicSync } from '../atomicJson';
+import {
+  FILES_WATCH_IMPORT_CHANNEL,
+  FILES_WATCH_STORE_FILE,
+  normalizeFilesWatchPersisted,
+  type FilesWatchImportArrival,
+} from '../../shared/filesApp/watchImport';
+import { FILES_DUPLICATES_CHANNEL, FILES_PREVIEW_CHANNEL } from '../../shared/filesApp/preview';
+import { findIndexDuplicates, previewFilesItem } from './preview';
+import { ingestPathKey, isIngestCandidatePath, isPathKeyWithin } from '../../shared/mediaIngest';
 
 /** How long a built index is served before the next request rebuilds it. */
 const INDEX_TTL_MS = 15_000;
@@ -61,6 +70,80 @@ function broadcastArrivals(arrivals: FilesWatchArrival[]): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(FILES_WATCH_ARRIVAL_CHANNEL, arrivals);
   }
+  requestWatchImport(arrivals);
+}
+
+/**
+ * What this module needs from the rest of main, injected by `main.ts` (see
+ * `ipcDeps.ts`) so the handlers stay testable without loading the library,
+ * media-ingest and PDF modules.
+ */
+let deps: FilesAppIpcOptions = {};
+
+/**
+ * Whether the media-ingest watcher already imports this arrival — a media
+ * file, inside one of ITS active folders, that its own name/dir rules accept.
+ * That watcher runs from app start and files what it imports; importing here
+ * as well would put every episode in the library twice.
+ */
+export function coveredByMediaIngest(
+  entry: { path: string; target: string },
+  mediaFolders: readonly string[],
+): boolean {
+  if (entry.target !== 'media' || !isIngestCandidatePath(entry.path)) return false;
+  const key = ingestPathKey(entry.path);
+  return mediaFolders.some((folder) => isPathKeyWithin(key, ingestPathKey(folder)));
+}
+
+function requestWatchImport(arrivals: FilesWatchArrival[]): void {
+  // The window that runs watched-folder imports. Exactly one, so a Files window
+  // popped out beside the desktop cannot import the same arrival a second time;
+  // the importers are renderer-side (`renderer/fileImportExecute.ts`), so the
+  // main window's renderer is where they run.
+  const win = deps.mainWindow?.();
+  if (!win || win.isDestroyed()) return;
+  let mediaFolders: string[] = [];
+  try {
+    mediaFolders = deps.mediaIngestFolders?.() ?? [];
+  } catch {
+    mediaFolders = [];
+  }
+  const payload: FilesWatchImportArrival[] = arrivals.map((arrival) => ({
+    entry: arrival.entry,
+    root: arrival.root,
+    ...(coveredByMediaIngest(arrival.entry, mediaFolders) ? { coveredByMediaIngest: true } : {}),
+  }));
+  win.webContents.send(FILES_WATCH_IMPORT_CHANNEL, payload);
+}
+
+function watchStorePath(): string {
+  return path.join(app.getPath('userData'), FILES_WATCH_STORE_FILE);
+}
+
+/** Start (or replace) the one watch session. Shared by the IPC and app start. */
+function startWatchSession(list: string[], stabilityOption: unknown): FilesWatchStatus {
+  watchSession?.stop();
+  watchSession = null;
+  watchRootsInUse = [];
+  if (!list.length) return { roots: [], pending: 0 };
+  const stabilityMs = normalizeIngestSettings(stabilityOption).stabilityMs;
+  const session = watchRoots(list, broadcastArrivals, { stabilityMs });
+  // The baseline sweep, whose whole job is to announce nothing.
+  session.sweep();
+  watchSession = session;
+  watchRootsInUse = list;
+  return { roots: list, pending: session.pendingCount() };
+}
+
+/**
+ * Resume watching at app start, from main's own copy of the list — watching
+ * used to stop at every restart until the Files window was opened again,
+ * because only the renderer knew the roots. Runs after first paint.
+ */
+export function startFilesWatchFromDisk(): FilesWatchStatus {
+  const saved = normalizeFilesWatchPersisted(readJsonSync<unknown>(watchStorePath(), null));
+  if (!saved.roots.length || watchSession) return { roots: [...watchRootsInUse], pending: 0 };
+  return startWatchSession(saved.roots, { stabilityMs: saved.stabilityMs });
 }
 
 export function defaultFilesContext(): FilesEnumeratorContext {
@@ -95,7 +178,20 @@ export interface FilesRevealResult {
   reasonKey?: string;
 }
 
-export function registerFilesAppIpc(): void {
+export interface FilesAppIpcOptions {
+  /** The main desktop window — where watched-folder imports run. */
+  mainWindow?: () => BrowserWindow | null;
+  /** The media-ingest watcher's active folders; media there is its to import. */
+  mediaIngestFolders?: () => string[];
+  /** `localfile://` URL for an image on disk (the preview pane). */
+  localFileUrl?: (absPath: string) => string;
+  /** Page one of a PDF as an image file, for the preview pane. */
+  renderPdfFirstPage?: (pdfPath: string, outDir: string) => Promise<string | null>;
+}
+
+export function registerFilesAppIpc(options: FilesAppIpcOptions = {}): void {
+  deps = options;
+
   ipcMain.handle('filesapp:index', (_e, force: unknown): FilesIndexSnapshot =>
     getFilesIndex(force === true),
   );
@@ -254,26 +350,41 @@ export function registerFilesAppIpc(): void {
    * a re-add announces nothing that was already there.
    *
    * The renderer owns the list (it is part of the same settings document as
-   * gate 31's window) and re-sends it on load; main holds no preference of its
-   * own, which keeps one writer for it.
+   * gate 31's window) and re-sends it on load. Main keeps a COPY of what it
+   * was last told (`files-watch.json`), so the watch resumes at the next app
+   * start without the Files window having to be opened first.
    */
   ipcMain.handle('filesapp:watch-set', (_e, roots: unknown, options: unknown): FilesWatchStatus => {
     const list = Array.isArray(roots)
       ? roots.filter((r): r is string => typeof r === 'string' && r.length > 0).slice(0, 8)
       : [];
-    watchSession?.stop();
-    watchSession = null;
-    watchRootsInUse = [];
-    if (!list.length) return { roots: [], pending: 0 };
-
     const stabilityMs = normalizeIngestSettings(options).stabilityMs;
-    const session = watchRoots(list, broadcastArrivals, { stabilityMs });
-    // The baseline sweep, whose whole job is to announce nothing.
-    session.sweep();
-    watchSession = session;
-    watchRootsInUse = list;
-    return { roots: list, pending: session.pendingCount() };
+    try {
+      writeJsonAtomicSync(watchStorePath(), normalizeFilesWatchPersisted({ roots: list, stabilityMs }));
+    } catch {
+      // Watching still starts; it just will not resume by itself after a restart.
+    }
+    return startWatchSession(list, { stabilityMs });
   });
+
+  /**
+   * The preview pane: one item, resolved by id from the index (never a path
+   * from the renderer), read through a reader this app already has.
+   */
+  ipcMain.handle(FILES_PREVIEW_CHANNEL, (_e, itemId: unknown) => {
+    const item =
+      typeof itemId === 'string' ? (getFilesIndex().items.find((i) => i.id === itemId) ?? null) : null;
+    const toUrl = deps.localFileUrl;
+    if (!toUrl) return { kind: 'none', reasonKey: 'filesApp.preview.none.unsupported' };
+    return previewFilesItem(item, {
+      localFileUrl: toUrl,
+      renderPdfFirstPage: deps.renderPdfFirstPage,
+      tempDir: () => app.getPath('temp'),
+    });
+  });
+
+  /** Rows that are the same file twice: one path under two sources, or equal bytes. */
+  ipcMain.handle(FILES_DUPLICATES_CHANNEL, () => findIndexDuplicates(getFilesIndex().items));
 
   /** What is being watched, and how many files are still arriving. */
   ipcMain.handle('filesapp:watch-status', (): FilesWatchStatus => {

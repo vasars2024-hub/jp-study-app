@@ -16,7 +16,14 @@ export type FilesDeletionLocation =
   | { store: 'localStorage'; key: string; pointer?: string }
   | { store: 'derived'; describes: string };
 
-export type FilesDeletionMode = 'trash' | 'soft' | 'none';
+/**
+ * `owner` is a real delete through the store that owns the record (the
+ * Library's `library:remove`, the dictionary's own uninstall, the deck's
+ * `removeDeckCards`, …), run once the undo window has passed. `soft` is what
+ * is left for records no owner can delete from here: hidden in Files only,
+ * and restorable from the Hidden items view.
+ */
+export type FilesDeletionMode = 'trash' | 'owner' | 'soft' | 'none';
 export type FilesDeletionRisk = 'replaceable' | 'irreplaceable-media';
 export const FILES_DELETE_CHANNEL = 'filesapp:delete';
 
@@ -43,7 +50,82 @@ export interface FilesDeletionPlan {
   messageKey: string;
   messageValues: { name: string; sizeBytes: number | null };
   requiresExplicitConfirmation: boolean;
+  /** Which store's own delete runs, for an `owner` plan. */
+  owner?: FilesOwnerDeleteKind;
 }
+
+/**
+ * The stores a Files delete can actually remove a record from, each through
+ * that store's own API (audit r2 #2: every non-file delete used to be a
+ * permanent hide that the owning app never heard about).
+ */
+export const FILES_OWNER_DELETE_KINDS = [
+  'library',
+  'media',
+  'dictionary',
+  'visual-novel',
+  'deck-card',
+  'notebook',
+  'saved-word',
+  'translation',
+  'clipboard',
+  'annotation',
+] as const;
+export type FilesOwnerDeleteKind = (typeof FILES_OWNER_DELETE_KINDS)[number];
+
+export interface FilesOwnerDelete {
+  owner: FilesOwnerDeleteKind;
+  /** The id inside the owning store — the catalogue id minus its prefix. */
+  localId: string;
+}
+
+const OWNER_FOR_PREFIX: Readonly<Record<string, FilesOwnerDeleteKind>> = {
+  library: 'library',
+  media: 'media',
+  dictionary: 'dictionary',
+  'visual-novel': 'visual-novel',
+  'deck-card': 'deck-card',
+  notebook: 'notebook',
+  'saved-word': 'saved-word',
+  translation: 'translation',
+  clipboard: 'clipboard',
+  annotation: 'annotation',
+};
+
+/**
+ * Which owner deletes this row, or `null` when none can. A media row is only
+ * owner-deleted when it is a LINK to the user's file (`referenced`, which every
+ * real library row is): the record goes, and the bytes stay unless the user
+ * asks for them too.
+ */
+export function ownerDeleteFor(
+  target: Pick<FilesDeletionTarget, 'id' | 'location' | 'referenced'>,
+): FilesOwnerDelete | null {
+  if (target.location.store === 'derived') return null;
+  const at = target.id.indexOf(':');
+  if (at <= 0 || at === target.id.length - 1) return null;
+  const owner = OWNER_FOR_PREFIX[target.id.slice(0, at)];
+  if (!owner) return null;
+  if (owner === 'media' && target.referenced !== true) return null;
+  return { owner, localId: target.id.slice(at + 1) };
+}
+
+/**
+ * Confirm copy per owner — spelled out rather than built from the owner id so
+ * `tools/i18n-check.cjs` and grep can see every key.
+ */
+const OWNER_CONFIRM_KEY: Readonly<Record<FilesOwnerDeleteKind, string>> = {
+  library: 'filesApp.delete.confirmOwner.library',
+  media: 'filesApp.delete.confirmOwner.media',
+  dictionary: 'filesApp.delete.confirmOwner.dictionary',
+  'visual-novel': 'filesApp.delete.confirmOwner.visualNovel',
+  'deck-card': 'filesApp.delete.confirmOwner.deckCard',
+  notebook: 'filesApp.delete.confirmOwner.note',
+  'saved-word': 'filesApp.delete.confirmOwner.savedWord',
+  translation: 'filesApp.delete.confirmOwner.translation',
+  clipboard: 'filesApp.delete.confirmOwner.clipboard',
+  annotation: 'filesApp.delete.confirmOwner.highlight',
+};
 
 export function deletionModeForLocation(location: FilesDeletionLocation): FilesDeletionMode {
   if (location.store === 'file') return 'trash';
@@ -76,10 +158,12 @@ export function deletionRiskForKind(kind: string): FilesDeletionRisk {
  * Recycle Bin wording and imply a recovery path that does not exist.
  */
 export function planFilesDeletion(target: FilesDeletionTarget): FilesDeletionPlan {
-  const mode = deletionModeForTarget(target);
+  const owner = ownerDeleteFor(target);
+  const mode: FilesDeletionMode = owner ? 'owner' : deletionModeForTarget(target);
   const risk = deletionRiskForKind(target.kind);
-  const messageKey =
-    mode === 'trash'
+  const messageKey = owner
+    ? OWNER_CONFIRM_KEY[owner.owner]
+    : mode === 'trash'
       ? risk === 'irreplaceable-media'
         ? 'filesApp.delete.confirmMediaTrash'
         : 'filesApp.delete.confirmTrash'
@@ -96,6 +180,7 @@ export function planFilesDeletion(target: FilesDeletionTarget): FilesDeletionPla
     // The separate media guard protects bytes. Removing a reference is an
     // undoable index action and leaves those bytes untouched.
     requiresExplicitConfirmation: risk === 'irreplaceable-media' && mode === 'trash',
+    ...(owner ? { owner: owner.owner } : {}),
   };
 }
 
@@ -107,7 +192,7 @@ export interface FilesSoftDeleteReceipt {
 
 export type FilesDeletionResult =
   | { ok: true; itemId: string; mode: 'trash' }
-  | ({ ok: true; itemId: string; mode: 'soft' } & FilesSoftDeleteReceipt)
+  | ({ ok: true; itemId: string; mode: 'soft' | 'owner' } & FilesSoftDeleteReceipt)
   | {
       ok: false;
       itemId: string;
@@ -153,7 +238,7 @@ export function isFilesDeletionResultForItem(
   if (result.ok) {
     if (result.mode === 'trash') return true;
     return (
-      result.mode === 'soft' &&
+      (result.mode === 'soft' || result.mode === 'owner') &&
       typeof result.undoToken === 'string' &&
       result.undoToken.length > 0 &&
       typeof result.undoExpiresAt === 'number' &&
@@ -174,8 +259,15 @@ export function isFilesDeletionResultForItem(
 export interface FilesDeletionDependencies {
   /** Main supplies Electron `shell.trashItem`; never `unlink` or `rm`. */
   trashFile(path: string): Promise<void>;
-  /** The owning store marks one exact row and returns its bounded undo token. */
-  softDelete(target: FilesDeletionTarget): Promise<FilesSoftDeleteReceipt>;
+  /**
+   * Hide one exact row and return its bounded undo token. For an `owner`
+   * delete the same call also schedules the owner's real delete for when the
+   * undo window has passed.
+   */
+  softDelete(
+    target: FilesDeletionTarget,
+    commit?: FilesOwnerDelete & { trashFile?: boolean },
+  ): Promise<FilesSoftDeleteReceipt>;
 }
 
 export interface FilesDeletionAuthorization {
@@ -184,6 +276,12 @@ export interface FilesDeletionAuthorization {
    * selection can change while a confirmation dialog is open.
    */
   confirmedItemId?: string;
+  /**
+   * Linked media only: also send the user's own file to the Recycle Bin. Off
+   * unless the user ticks it — removing a library link never touches the
+   * bytes on its own.
+   */
+  trashFile?: boolean;
 }
 
 /** The complete renderer-to-main request. Paths and risk never cross IPC. */
@@ -239,6 +337,16 @@ export async function executeFilesDeletion(
       }
       await dependencies.trashFile(path);
       return { ok: true, itemId: target.id, mode: 'trash' };
+    }
+
+    if (plan.mode === 'owner') {
+      const owner = ownerDeleteFor(target);
+      if (!owner) return { ok: false, itemId: target.id, reasonKey: 'filesApp.delete.failed' };
+      const receipt = await dependencies.softDelete(target, {
+        ...owner,
+        ...(owner.owner === 'media' && authorization.trashFile === true ? { trashFile: true } : {}),
+      });
+      return { ok: true, itemId: target.id, mode: 'owner', ...receipt };
     }
 
     const receipt = await dependencies.softDelete(target);

@@ -1,12 +1,28 @@
-import type { FilesSoftDeleteReceipt } from './deletion';
+import type { FilesOwnerDelete, FilesSoftDeleteReceipt } from './deletion';
 
 export const FILES_SOFT_DELETE_STORAGE_KEY = 'jp-files-soft-deletes-v1';
 export const FILES_SOFT_DELETE_EVENT = 'jp-files-soft-deletes-changed';
 export const FILES_SOFT_DELETE_UNDO_MS = 10_000;
 
+/** The owner's real delete, run once the undo window has passed. */
+export interface FilesSoftDeleteCommit extends FilesOwnerDelete {
+  /** Linked media only: the user also asked for the file itself to go. */
+  trashFile?: boolean;
+}
+
 export interface FilesSoftDeleteTombstone extends FilesSoftDeleteReceipt {
   itemId: string;
   deletedAt: number;
+  /** What the row was called, so the Hidden items view can name it. */
+  name?: string;
+  /** Present for an owner delete that has not run yet. */
+  commit?: FilesSoftDeleteCommit;
+  /**
+   * The owner refused or failed. The row stays hidden and is listed under
+   * Hidden items with the reason, where it can be restored — it is never
+   * silently re-shown, and never silently claimed as deleted.
+   */
+  commitError?: string;
 }
 
 interface FilesSoftDeleteStateV1 {
@@ -88,7 +104,11 @@ export class FilesSoftDeleteStore {
     return this.list().some((row) => row.itemId === itemId);
   }
 
-  delete(itemId: string, now = Date.now()): FilesSoftDeleteReceipt {
+  delete(
+    itemId: string,
+    now = Date.now(),
+    extra: { name?: string; commit?: FilesSoftDeleteCommit } = {},
+  ): FilesSoftDeleteReceipt {
     if (!itemId) throw new Error('Files soft-delete requires an item id');
     const state = parseState(this.persistence.read(FILES_SOFT_DELETE_STORAGE_KEY));
     const existing = state.tombstones.find((row) => row.itemId === itemId);
@@ -106,6 +126,8 @@ export class FilesSoftDeleteStore {
       deletedAt: now,
       undoToken,
       undoExpiresAt: now + Math.max(0, this.undoWindowMs),
+      ...(extra.name ? { name: extra.name } : {}),
+      ...(extra.commit ? { commit: extra.commit } : {}),
     };
     this.save({ version: 1, tombstones: [...state.tombstones, tombstone] });
     return { undoToken, undoExpiresAt: tombstone.undoExpiresAt };
@@ -134,6 +156,62 @@ export class FilesSoftDeleteStore {
       return { ok: false, reason: 'storage-failed' };
     }
     return { ok: true, itemId: match.itemId };
+  }
+
+  /**
+   * Owner deletes whose undo window has passed and that have not been tried
+   * yet. A failed one is not retried on its own: the owner already said no,
+   * and a loop that asked again every few seconds would only repeat it.
+   */
+  due(now = Date.now()): FilesSoftDeleteTombstone[] {
+    return this.list().filter(
+      (row) => row.commit && !row.commitError && now > row.undoExpiresAt,
+    );
+  }
+
+  /** Rows that are hidden rather than deleted: hide-only, or an owner that refused. */
+  hidden(): FilesSoftDeleteTombstone[] {
+    return this.list().filter((row) => !row.commit || Boolean(row.commitError));
+  }
+
+  /** The owner removed the record, so there is nothing left to hide. */
+  settle(itemId: string): void {
+    const state = parseState(this.persistence.read(FILES_SOFT_DELETE_STORAGE_KEY));
+    if (!state.tombstones.some((row) => row.itemId === itemId)) return;
+    this.save({ version: 1, tombstones: state.tombstones.filter((row) => row.itemId !== itemId) });
+  }
+
+  markFailed(itemId: string, reason: string): void {
+    const state = parseState(this.persistence.read(FILES_SOFT_DELETE_STORAGE_KEY));
+    this.save({
+      version: 1,
+      tombstones: state.tombstones.map((row) =>
+        row.itemId === itemId ? { ...row, commitError: reason || 'failed' } : row,
+      ),
+    });
+  }
+
+  /**
+   * Hidden items' Restore: un-hide a row whenever the user asks. Unlike
+   * `undo` this has no window — a hide is not a delete, so there is nothing
+   * the passing of time made irreversible. A pending owner delete is not
+   * restorable here (its receipt carries Undo while it is still pending).
+   */
+  restore(itemId: string): boolean {
+    let state: FilesSoftDeleteStateV1;
+    try {
+      state = parseState(this.persistence.read(FILES_SOFT_DELETE_STORAGE_KEY));
+    } catch {
+      return false;
+    }
+    const match = state.tombstones.find((row) => row.itemId === itemId);
+    if (!match || (match.commit && !match.commitError)) return false;
+    try {
+      this.save({ version: 1, tombstones: state.tombstones.filter((row) => row.itemId !== itemId) });
+    } catch {
+      return false;
+    }
+    return true;
   }
 
   private save(state: FilesSoftDeleteStateV1): void {

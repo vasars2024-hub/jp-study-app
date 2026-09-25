@@ -48,6 +48,7 @@ import {
   listSettingsDomains,
   type DomainInventoryItem,
 } from '../../../storage/storage';
+import { domainCategory, domainConfirm, domainDetail, domainLabel } from './memoryDomainText';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import {
   DEFAULT_STORAGE_BUDGET,
@@ -138,6 +139,11 @@ function healthLabel(status: StorageHealthStatus, t: TFn): string {
   return t('settings.memory.health.ok');
 }
 
+/** A thrown message is English from wherever it came; the user gets a sentence in their language. */
+function actionFailed(t: TFn): string {
+  return t('settings.memory.actionFailed');
+}
+
 function failureReason(kind: StorageWriteFailure['kind'], t: TFn): string {
   if (kind === 'quota') return t('settings.memory.health.kind.quota');
   if (kind === 'serialize') return t('settings.memory.health.kind.serialize');
@@ -187,7 +193,8 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
       setDomains(await listSettingsDomains());
     } catch (error) {
       setDomains([]);
-      setLoadError(error instanceof Error ? error.message : t('settings.memory.inventoryFail'));
+      console.warn('[memory] inventory failed', error);
+      setLoadError(t('settings.memory.inventoryFail'));
     }
     try {
       const est = await navigator.storage.estimate();
@@ -244,7 +251,9 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
       setStatus(ok);
       await refreshStorage();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      // Logged for a bug report; shown as a translated sentence, never raw (audit r2 #8).
+      console.warn('[memory] action failed', error);
+      setStatus(actionFailed(t));
     } finally {
       setBusy(false);
     }
@@ -252,7 +261,7 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
 
   async function handleClearDomain(d: DomainInventoryItem): Promise<void> {
     if (!d.clearable) return;
-    const msg = d.clearConfirm ?? t('settings.memory.clearDomainMsg', { label: d.label });
+    const msg = domainConfirm(d, t) ?? t('settings.memory.clearDomainMsg', { label: domainLabel(d, t) });
     const ok = await confirmDialog({
       title: t('settings.memory.clearDomainTitle'),
       message: msg,
@@ -264,10 +273,16 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
     setStatus('');
     try {
       const err = await clearSettingsDomain(d.id);
-      setStatus(err ?? t('settings.memory.clearedLabel', { label: d.label }));
+      // `clearSettingsDomain` answers in English; its refusal is said in the user's language.
+      setStatus(
+        err
+          ? t('settings.memory.clearFailedLabel', { label: domainLabel(d, t) })
+          : t('settings.memory.clearedLabel', { label: domainLabel(d, t) }),
+      );
       await refreshStorage();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      console.warn('[memory] clear failed', error);
+      setStatus(actionFailed(t));
     } finally {
       setBusy(false);
     }
@@ -379,12 +394,18 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
     if (!q) return domains;
     return domains.filter(
       (d) =>
+        // The words on screen AND the catalogue's English, so a filter typed
+        // in either language finds the row.
+        domainLabel(d, t).toLowerCase().includes(q) ||
+        domainDetail(d, t).toLowerCase().includes(q) ||
+        domainCategory(d, t).toLowerCase().includes(q) ||
         d.label.toLowerCase().includes(q) ||
         d.detail.toLowerCase().includes(q) ||
         d.category.toLowerCase().includes(q) ||
         d.description.toLowerCase().includes(q),
     );
-  }, [domains, q]);
+    // `lang`: the translated fields change with it; `t` itself is stable.
+  }, [domains, q, t, lang]);
 
   const present = domains.filter((d) => d.present || d.bytes > 0);
   const totalBytes = present.reduce((n, d) => n + d.bytes, 0);
@@ -592,12 +613,12 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
               {filtered.map((d) => (
                 <tr key={d.id} data-empty={d.present || d.bytes > 0 ? undefined : 'true'}>
                   <td>
-                    <strong>{d.label}</strong>
+                    <strong>{domainLabel(d, t)}</strong>
                   </td>
-                  <td className="fa-panel-note">{d.category}</td>
+                  <td className="fa-panel-note">{domainCategory(d, t)}</td>
                   <td className="fa-panel-note">{tierLabel(d.tier, t)}</td>
                   <td>{d.bytes > 0 ? formatBytes(d.bytes) : '—'}</td>
-                  <td className="fa-panel-note">{d.detail}</td>
+                  <td className="fa-panel-note">{domainDetail(d, t)}</td>
                   <td>
                     {d.clearable ? (
                       /* D344. The visible word stays "Clear" — the column head
@@ -609,7 +630,7 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
                       <button
                         type="button"
                         className="btn small"
-                        aria-label={t('settings.memory.clearDomainAria', { label: d.label })}
+                        aria-label={t('settings.memory.clearDomainAria', { label: domainLabel(d, t) })}
                         disabled={busy || !(d.present || d.bytes > 0)}
                         onClick={() => void handleClearDomain(d)}
                       >
