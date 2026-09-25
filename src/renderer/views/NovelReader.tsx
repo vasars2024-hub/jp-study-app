@@ -56,7 +56,7 @@ import {
 } from '../../shared/lensCaptureTarget';
 import { documentCapturePage, documentCaptureSection } from '../novelLensCapture';
 import { getTokenizer, tokenizerReady } from '../tokenizer';
-import { highlightEl, recolorEl, resetHighlightRoot } from '../wordHighlight';
+import { highlightEl, highlightReady, recolorEl, resetHighlightRoot } from '../wordHighlight';
 import { onKnowledgeChanged } from '../knownWords';
 import {
   lookupWordFromMouseUp,
@@ -1020,7 +1020,7 @@ export default function NovelReader({ item, onClose }: Props) {
         ? [root]
         : Array.from(root.querySelectorAll<HTMLElement>('.novel-part'));
       for (const el of els.length ? els : [root]) {
-        if (settings.wordHighlight && tokenizerReady()) highlightEl(el);
+        if (settings.wordHighlight && highlightReady()) highlightEl(el);
         // Personal H-key highlights (annotations) — always, even if vocab colors off.
         const pi = el.dataset.pi != null ? Number(el.dataset.pi) : paged ? partRef.current : undefined;
         applyAnnotationsToRoot(el, annotations, pi);

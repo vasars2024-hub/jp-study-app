@@ -3,8 +3,11 @@
 // the pure shared/comprehensibility.ts; this file only supplies the two things
 // that can't live in shared — the tokenizer and knownWords.
 
-import { getTokenizer, tokenizeSync } from './tokenizer';
+import { getTokenizer } from './tokenizer';
 import { getLevel } from './knownWords';
+import { getStudyLang } from './studyEnvironment';
+import { studyTokens } from './studyTokens';
+import type { StudyLang } from '../shared/studyLang';
 import {
   scoreComprehensibility,
   type ComprehensibilityScore,
@@ -29,18 +32,23 @@ const MAX_SCORE_CHARS = 60_000;
 export async function scoreTextComprehensibility(
   text: string,
   opts?: ScoreOptions,
+  lang: StudyLang = getStudyLang(),
 ): Promise<ComprehensibilityScore> {
   const trimmed = (text ?? '').slice(0, MAX_SCORE_CHARS);
   if (!trimmed.trim()) {
     return scoreComprehensibility([], getLevel, opts);
   }
-  try {
-    await getTokenizer();
-  } catch {
-    // Tokenizer unavailable → no honest score to give.
-    return scoreComprehensibility([], getLevel, opts);
+  // Chinese and Russian are split by ICU and need no analyser build; a Chinese
+  // text run through kuromoji was scored as Japanese words.
+  if (lang === 'ja') {
+    try {
+      await getTokenizer();
+    } catch {
+      // Tokenizer unavailable → no honest score to give.
+      return scoreComprehensibility([], getLevel, opts);
+    }
   }
-  const tokens = tokenizeSync(trimmed).map((t) => ({
+  const tokens = studyTokens(trimmed, lang).map((t) => ({
     lemma: t.lemma,
     content: t.content,
     proper: t.proper,

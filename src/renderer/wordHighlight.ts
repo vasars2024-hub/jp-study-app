@@ -1,8 +1,11 @@
-// Wrap Japanese content words in the reader DOM with knowledge-level spans, so
-// new/learning words are tinted (LingQ style). Operates on the already-rendered
-// chapter DOM; safe to call repeatedly (skips elements already processed).
+// Wrap study-language content words in the reader DOM with knowledge-level
+// spans, so new/learning words are tinted (LingQ style): Japanese via kuromoji,
+// Chinese and Russian via ICU words. Operates on the already-rendered chapter
+// DOM; safe to call repeatedly (skips elements already processed).
 import { getLevel } from './knownWords';
-import { tokenizeSync, tokenizerReady } from './tokenizer';
+import { getStudyLang } from './studyEnvironment';
+import { hasStudyText, studyTokens, studyTokensReady } from './studyTokens';
+import type { StudyLang } from '../shared/studyLang';
 
 const DONE = 'data-wk';
 const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'SVG', 'IMG', 'MARK']);
@@ -37,7 +40,7 @@ mark.lookup-mark,
 }
 `;
 
-function collectTextNodes(root: Element): Text[] {
+function collectTextNodes(root: Element, lang: StudyLang): Text[] {
   const out: Text[] = [];
   const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
@@ -49,7 +52,7 @@ function collectTextNodes(root: Element): Text[] {
         }
       }
       const t = node.nodeValue ?? '';
-      if (!t.trim() || !/[぀-ヿ㐀-鿿々]/.test(t)) return NodeFilter.FILTER_REJECT;
+      if (!t.trim() || !hasStudyText(t, lang)) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
@@ -66,14 +69,20 @@ export function resetHighlightRoot(root: HTMLElement): void {
   root.removeAttribute(DONE);
 }
 
-/** Highlight content words inside `root`. Requires the tokenizer to be ready. */
+/** Whether `highlightEl` can run now (Japanese needs kuromoji built). */
+export function highlightReady(): boolean {
+  return studyTokensReady(getStudyLang());
+}
+
+/** Highlight content words inside `root`. Japanese requires the tokenizer to be ready. */
 export function highlightEl(root: HTMLElement, force = false): void {
-  if (!tokenizerReady()) return;
+  const lang = getStudyLang();
+  if (!studyTokensReady(lang)) return;
   if (!force && root.getAttribute(DONE) === '1') return;
   root.setAttribute(DONE, '1');
-  for (const textNode of collectTextNodes(root)) {
+  for (const textNode of collectTextNodes(root, lang)) {
     const text = textNode.nodeValue ?? '';
-    const tokens = tokenizeSync(text);
+    const tokens = studyTokens(text, lang);
     if (!tokens.length) continue;
     const frag = root.ownerDocument.createDocumentFragment();
     let any = false;
@@ -101,7 +110,7 @@ export function highlightDocument(doc: Document, force = false): void {
   doc.querySelectorAll<HTMLElement>('p, li, blockquote, h1, h2, h3, h4, section, div').forEach((el) => {
     if (el === body) return;
     if (el.querySelector('p, li')) return;
-    if (/[぀-ヿ㐀-鿿々]/.test(el.textContent ?? '')) highlightEl(el, force);
+    if (hasStudyText(el.textContent ?? '')) highlightEl(el, force);
   });
 }
 

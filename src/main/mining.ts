@@ -49,6 +49,9 @@ import {
   type ChapterRangeInput,
 } from '../shared/chapterRange';
 import { kataToHira } from '../shared/langs';
+import { studyLangOfText, type StudyLang } from '../shared/studyLang';
+import { isVocabularySegment, studyWordKey, studyWords } from '../shared/studySegmentation';
+import { getMainStudyLang } from './studyLanguage';
 import { pickLemmaReading } from '../shared/readings';
 import {
   matchesChineseNameHeuristic,
@@ -541,8 +544,20 @@ export function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-function isJapaneseText(text: string): boolean {
-  return /[぀-ヿ㐀-鿿々]/.test(text);
+/**
+ * Which study language a book's text is in, or null for none of them (an
+ * English book). Sampled from the start: the script of the first 20 000
+ * characters decides.
+ */
+export function miningTextLanguage(text: string, studyLang: StudyLang = getMainStudyLang()): StudyLang | null {
+  const sample = text.slice(0, 20_000);
+  const kana = (sample.match(/[\p{Script=Hiragana}\p{Script=Katakana}]/gu) ?? []).length;
+  const cyrillic = (sample.match(/\p{Script=Cyrillic}/gu) ?? []).length;
+  const han = (sample.match(/\p{Script=Han}/gu) ?? []).length;
+  if (!kana && !cyrillic && !han) return null;
+  if (cyrillic > kana + han) return 'ru';
+  if (kana) return 'ja';
+  return studyLangOfText(sample.replace(/\p{Script=Cyrillic}/gu, ''), studyLang);
 }
 
 /**
@@ -654,6 +669,40 @@ function tokenizeJapaneseSimple(text: string): Map<string, TokenCandidate> {
     }
   }
   return byExpression;
+}
+
+/**
+ * Chinese and Russian books: ICU word boundaries. Russian forms of one word are
+ * counted together under their stem, shown as the form met most often; the
+ * dictionary lookup that glosses a candidate takes it on to the lemma.
+ * Exported for the tests.
+ */
+export function tokenizeStudyLanguage(text: string, lang: 'zh' | 'ru'): Map<string, TokenCandidate> {
+  const byKey = new Map<string, TokenCandidate & { forms: Map<string, number> }>();
+  for (const sentence of splitSentences(text)) {
+    for (const word of studyWords(sentence, lang)) {
+      if (!isVocabularySegment(word, lang)) continue;
+      const surface = lang === 'ru' ? word.toLowerCase() : word;
+      if (lang === 'ru' && surface.length < 2) continue;
+      const key = studyWordKey(surface, lang);
+      const entry = byKey.get(key) ?? {
+        expression: surface,
+        reading: '',
+        count: 0,
+        sampleSentence: sentence,
+        forms: new Map<string, number>(),
+      };
+      entry.count += 1;
+      entry.forms.set(surface, (entry.forms.get(surface) ?? 0) + 1);
+      byKey.set(key, entry);
+    }
+  }
+  const out = new Map<string, TokenCandidate>();
+  for (const { forms, ...entry } of byKey.values()) {
+    const expression = [...forms.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? entry.expression;
+    out.set(expression, { ...entry, expression });
+  }
+  return out;
 }
 
 function tokenizeSimple(text: string): Map<string, TokenCandidate> {
@@ -1766,13 +1815,19 @@ async function analyzeBook(
         : 'No readable text found in this EPUB. If the book opens in the reader, try Re-importing it — some publishers use non-standard EPUB layouts.',
     );
   }
-  const japanese = isJapaneseText(text);
+  // The book's language, from its text: kana is Japanese, Cyrillic Russian,
+  // and Han alone follows the study language — a Chinese novel used to go
+  // through the Japanese analyser, and a Russian one found "no vocabulary".
+  const bookLang = miningTextLanguage(text);
+  const japanese = bookLang === 'ja';
   const analyzer =
     traditional.analyzer === 'kuromoji' && japanese ? 'kuromoji' : japanese ? 'kuromoji' : 'simple';
   let tokens: Map<string, TokenCandidate>;
   if (japanese) {
     tokens = await tokenizeJapanese(text);
     if (tokens.size === 0) tokens = tokenizeJapaneseSimple(text);
+  } else if (bookLang === 'zh' || bookLang === 'ru') {
+    tokens = tokenizeStudyLanguage(text, bookLang);
   } else {
     tokens = tokenizeSimple(text);
   }
@@ -1782,12 +1837,11 @@ async function analyzeBook(
   const blacklist = traditional.limits;
   let candidates: MiningCandidate[] = [...tokens.values()]
     .map((token) => {
-      // `japanese` is all this path knows: a book that is not Japanese may be
-      // Chinese, Russian or English, so it narrows only when it is sure.
+      // Narrowed to the book's language when the text says which it is.
       const frequencies = resolveCustomFrequencyRanks(
         token.expression,
         token.reading,
-        japanese ? 'ja' : undefined,
+        bookLang ?? undefined,
       );
       return {
         expression: token.expression,
