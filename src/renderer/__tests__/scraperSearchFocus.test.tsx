@@ -95,3 +95,45 @@ describe('ScraperSearch focus ownership', () => {
     expect(host.querySelector('.scr-search-pop')).toBeNull();
   });
 });
+
+describe('the palette chord and the Scraper search', () => {
+  it('searches the Scraper from the Scraper window and opens the app palette from any other', async () => {
+    const ks = await import('../keyboardShortcuts');
+    const uninstall = ks.installKeyboardShortcuts();
+    document.body.innerHTML =
+      '<div class="fwin" id="scraper"><div id="host"></div></div>' +
+      '<div class="fwin" id="other"><button id="elsewhere">Elsewhere</button></div>';
+    const palette = vi.fn();
+    window.addEventListener('palette:open', palette);
+    try {
+      const host = document.getElementById('host') as HTMLElement;
+      root = createRoot(host);
+      await act(async () => {
+        root?.render(createElement(ScraperProvider, { value: controller() }, createElement(ScraperSearch)));
+      });
+      const input = host.querySelector<HTMLInputElement>('.scr-search-input');
+      const chord = ks.effectiveKeys('nav.palette');
+      expect(chord).toBe('Ctrl+K');
+      // The hint shows the live chord, not a hard-coded "Ctrl K".
+      expect(host.querySelector('.scr-search-shortcut')?.textContent).toBe('Ctrl+K');
+      const pressCtrlK = (target: Element) =>
+        target.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', code: 'KeyK', ctrlKey: true, bubbles: true, cancelable: true }));
+
+      const elsewhere = document.getElementById('elsewhere') as HTMLButtonElement;
+      await act(async () => elsewhere.focus());
+      await act(async () => pressCtrlK(elsewhere));
+      expect(palette).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(elsewhere);
+
+      const scraperButton = document.createElement('button');
+      host.append(scraperButton);
+      await act(async () => scraperButton.focus());
+      await act(async () => pressCtrlK(scraperButton));
+      expect(palette).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(input);
+    } finally {
+      window.removeEventListener('palette:open', palette);
+      uninstall();
+    }
+  });
+});

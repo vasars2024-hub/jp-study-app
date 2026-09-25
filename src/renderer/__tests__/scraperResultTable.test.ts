@@ -3,6 +3,7 @@ import {
   GROUP_OPTIONS,
   SCRAPER_COLUMNS,
   columnById,
+  columnLabel,
   gridTemplate,
   groupLabelFor,
   resolveColumns,
@@ -74,7 +75,7 @@ describe('table columns', () => {
   });
 
   it('resolves a column by id', () => {
-    expect(columnById('size')?.label).toBe('Size');
+    expect(columnLabel(columnById('size')!)).toBe('Size');
     expect(columnById('ghost' as never)).toBeUndefined();
   });
 });
@@ -143,7 +144,7 @@ describe('grouping', () => {
   it('labels a row for each grouping key', () => {
     const r = row({ season: 3, kind: 'ova' });
     expect(groupLabelFor(r, 'season')).toBe('Season 3');
-    expect(groupLabelFor(r, 'type')).toBe('ova');
+    expect(groupLabelFor(r, 'type')).toBe('OVA');
     expect(groupLabelFor(r, 'source')).toBe('StreamSB');
     expect(groupLabelFor(r, 'resolution')).toBe('1080p');
     expect(groupLabelFor(r, '')).toBe('');

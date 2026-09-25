@@ -121,6 +121,15 @@ export interface ScraperShellState {
   railCollapsed: boolean;
   /** Screenshot-1 layout: one narrow window instead of the rail + drawer app. */
   compact: boolean;
+  /**
+   * "Advanced / developer tools": expert settings fields plus the developer pages
+   * (Selector Tester, Regex Tester, HTTP Inspector, Script Console) and the rail's
+   * memory/CPU readout. Off by default so a learner sees the scraper, not its
+   * workbench. It used to live under its own localStorage key
+   * (`jp-scraper-advanced-v1`), restored separately from everything else here;
+   * ScraperApp migrates that key into this field once.
+   */
+  advanced: boolean;
   drawerOpen: boolean;
   /** Advanced Settings drawer category id; validated against the drawer nav at render. */
   drawerCategory: string;
@@ -146,6 +155,7 @@ export const DEFAULT_SCRAPER_SHELL_STATE: ScraperShellState = {
   page: 'dashboard',
   railCollapsed: false,
   compact: false,
+  advanced: false,
   drawerOpen: false,
   drawerCategory: 'network',
   resultTab: 'episodes',
@@ -286,6 +296,7 @@ export function normalizeScraperShellState(input: unknown): {
       page: enumAt(input, 'page', SCRAPER_PAGE_IDS, 'dashboard', issues),
       railCollapsed: boolAt(input, 'railCollapsed', false),
       compact: boolAt(input, 'compact', false),
+      advanced: boolAt(input, 'advanced', false),
       drawerOpen: boolAt(input, 'drawerOpen', false),
       drawerCategory,
       resultTab: enumAt(input, 'resultTab', SCRAPER_RESULT_TABS, 'episodes', issues),

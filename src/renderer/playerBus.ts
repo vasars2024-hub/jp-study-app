@@ -237,13 +237,16 @@ audio.addEventListener('ended', () => {
 attachAudio(audio);
 
 void (async () => {
+  // No preload bridge outside Electron: component tests reach this module through
+  // keyboardShortcuts without stubbing window.api, and must not crash on import.
+  if (!window.api) return;
   myWindowId = await window.api.playerWindowId();
   const snap = await window.api.playerGetSnapshot();
   if (snap) applySnapshot(snap);
 })();
 
-window.api.onPlayerSync(applySnapshot);
-window.api.onPlayerCommand((cmd) => {
+window.api?.onPlayerSync(applySnapshot);
+window.api?.onPlayerCommand((cmd) => {
   if (isLeader()) runCommand(cmd);
 });
 

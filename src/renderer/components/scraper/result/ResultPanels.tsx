@@ -24,10 +24,21 @@ import type {
   StreamRow,
   TorrentRow,
 } from '../../../../shared/scraperResults';
-import { sx, sx3, sxn, sxs } from '../strings';
+import { sx, sx3, sxn, sxNumber, sxs } from '../strings';
 import { useScraperPort } from '../data/scraperPort';
 import { getActiveScraperSettings } from '../../../scraperSettingsStore';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
+import {
+  imageKindText,
+  localizeScraperMessage,
+  logLevelText,
+  streamHealthText,
+  tr,
+  unitDays,
+  unitKbps,
+  unitMs,
+} from '../localize';
+import { useNarrow } from './useNarrow';
 import { openMediaWorkspace, reachMediaWorkspace } from '../../../mediaWorkspaceBridge';
 
 function downloadText(filename: string, content: string, type = 'text/plain') {
@@ -150,11 +161,11 @@ export function StreamTable({
               <div role="gridcell" className="scr-td"><Pill tone="outline">{stream.resolution}</Pill></div>
               <div role="gridcell" className="scr-td"><span className="scr-t-plain">{stream.codec}</span></div>
               <div role="gridcell" className="scr-td"><span className="scr-t-plain">{stream.container}</span></div>
-              <div role="gridcell" className="scr-td"><span className="scr-t-num">{stream.bitrateKbps.toLocaleString()} kbps</span></div>
-              <div role="gridcell" className="scr-td"><span className="scr-t-num">{stream.latencyMs} ms</span></div>
+              <div role="gridcell" className="scr-td"><span className="scr-t-num">{unitKbps(sxNumber(stream.bitrateKbps))}</span></div>
+              <div role="gridcell" className="scr-td"><span className="scr-t-num">{unitMs(stream.latencyMs)}</span></div>
               <div role="gridcell" className="scr-td">
                 <Pill tone={stream.health === 'ok' ? 'good' : stream.health === 'degraded' ? 'warn' : 'bad'}>
-                  {stream.health}
+                  {streamHealthText(stream.health)}
                 </Pill>
               </div>
               <div role="gridcell" className="scr-td">
@@ -171,7 +182,7 @@ export function StreamTable({
                     disabled={!stream.playback || stream.playback.refreshRequired}
                     onClick={() => { void onPlay(stream); }}
                   >
-                    Play
+                    {tr('scrApp.r2.streams.play')}
                   </Button>
                 </div>
               )}
@@ -226,7 +237,7 @@ export function StreamResultPanel({
       );
     }
     downloadText('anime-streams.m3u', lines.join('\n'), 'audio/x-mpegurl');
-    setNotice(`Exported ${visible.length} stream links to an M3U playlist.`);
+    setNotice(tr('scrApp.r2.streams.exported', { count: visible.length }));
   };
 
   /**
@@ -276,13 +287,13 @@ export function StreamResultPanel({
   return (
     <div className="scr-panel scr-result-workspace">
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Mirrors</span><span className="scr-tile-value">{streams.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Healthy</span><span className="scr-tile-value">{healthy}</span></div>
-        <div className={`scr-tile${expiring ? ' is-warn' : ''}`}><span className="scr-tile-label">Expiring soon</span><span className="scr-tile-value">{expiring}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Average latency</span><span className="scr-tile-value scr-tile-value--text">{averageLatency} ms</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.streams.mirrors')}</span><span className="scr-tile-value">{streams.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.streams.healthy')}</span><span className="scr-tile-value">{healthy}</span></div>
+        <div className={`scr-tile${expiring ? ' is-warn' : ''}`}><span className="scr-tile-label">{tr('scrApp.r2.streams.expiring')}</span><span className="scr-tile-value">{expiring}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.streams.avgLatency')}</span><span className="scr-tile-value scr-tile-value--text">{unitMs(averageLatency)}</span></div>
       </div>
       <div className="scr-result-controls">
-        <div className="scr-chip-row" aria-label="Stream health filter">
+        <div className="scr-chip-row" aria-label={tr('scrApp.r2.streams.healthFilter')}>
           {(['all', 'ok', 'degraded', 'dead'] as const).map((value) => (
             <button
               key={value}
@@ -290,21 +301,21 @@ export function StreamResultPanel({
               className={`scr-chip${health === value ? ' is-on' : ''}`}
               onClick={() => setHealth(value)}
             >
-              {value === 'all' ? 'All health' : value}
+              {value === 'all' ? tr('scrApp.r2.streams.allHealth') : streamHealthText(value)}
             </button>
           ))}
         </div>
         <label className="scr-result-inline-filter">
-          <span>Resolution</span>
+          <span>{sx('result.col.resolution')}</span>
           <select className="scr-input" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-            <option value="all">All resolutions</option>
+            <option value="all">{tr('scrApp.r2.common.allResolutions')}</option>
             {resolutions.map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
         <span className="scr-result-control-spacer" />
-        <span className="scr-muted">{visible.length} visible</span>
+        <span className="scr-muted">{tr('scrApp.r2.common.visible', { count: visible.length })}</span>
         <Button size="sm" leftIcon={<Icon name="external" size={13} />} onClick={exportPlaylist} disabled={!visible.length}>
-          Export M3U
+          {tr('scrApp.r2.streams.exportM3u')}
         </Button>
       </div>
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
@@ -314,6 +325,18 @@ export function StreamResultPanel({
 }
 
 // --------------------------------------------------------------- torrents ---
+
+/**
+ * Below this width (CSS px of the table itself) the indexer table stops being a
+ * table and becomes a list of two-line cards. Measured in the round-2 audit: at
+ * the default Scraper window the nine-column grid (and its 980px container tier,
+ * which still pays ~450px of fixed tracks) left the release NAME 49px wide, so
+ * every title rendered as "[ASW] Ts…" with no way to read the rest.
+ */
+export const TORRENT_CARD_BREAKPOINT = 640;
+const TORRENT_ROW_HEIGHT = 44;
+/** Title (up to two lines), the batch/files line, the fold line, the metrics line. */
+const TORRENT_CARD_HEIGHT = 104;
 
 export function TorrentTable({
   torrents,
@@ -325,17 +348,19 @@ export function TorrentTable({
   onToggle?: (id: string) => void;
 }) {
   const selectable = Boolean(onToggle);
+  const [tableRef, cards] = useNarrow<HTMLDivElement>(TORRENT_CARD_BREAKPOINT);
   // The track list lives in `scraper.css` keyed off these classes, never inline: an inline
   // declaration — including an inline custom property — outranks a container query, so a
   // template written here could never reflow. See `.scr-table--torrents`.
   return (
     <div
-      className={`scr-table scr-table--torrents${selectable ? ' is-selectable' : ''}`}
+      ref={tableRef}
+      className={`scr-table scr-table--torrents${selectable ? ' is-selectable' : ''}${cards ? ' is-cards' : ''}`}
       role="table"
       aria-rowcount={torrents.length + 1}
     >
       <div className="scr-thead" role="row" aria-rowindex={1}>
-        {selectable && <div role="columnheader" className="scr-th" />}
+        {selectable && <div role="columnheader" className="scr-th" data-col="select" />}
         {([
           ['name', sx('result.col.name')], ['group', sx('result.col.group')],
           ['resolution', sx('result.col.resolution')], ['seeders', sx('result.col.seeders')],
@@ -349,62 +374,75 @@ export function TorrentTable({
       <div className="scr-tbody">
         <VirtualList
           items={torrents}
-          itemHeight={44}
+          itemHeight={cards ? TORRENT_CARD_HEIGHT : TORRENT_ROW_HEIGHT}
           getKey={(t) => t.id}
           gridRole="rowgroup"
           emptyState={<p className="scr-table-empty">{sx('result.emptyTorrents')}</p>}
-          renderItem={(row, index) => (
-            <div
-              role="row"
-              aria-rowindex={index + 2}
-              className={`scr-row${selected?.has(row.id) ? ' is-selected' : ''}`}
-            >
-              {selectable && (
-                <div role="gridcell" className="scr-td scr-td--center">
-                  <input
-                    type="checkbox"
-                    checked={selected?.has(row.id) ?? false}
-                    aria-label={`Select ${row.name}`}
-                    onChange={() => onToggle?.(row.id)}
-                  />
+          renderItem={(row, index) => {
+            const kindLine = tr('scrApp.r2.torrents.kindFiles', {
+              kind: row.isBatch ? sx('result.batch') : sx('result.single'),
+              count: row.fileCount,
+            });
+            const subs = row.subtitleLanguages.join(', ').toUpperCase();
+            return (
+              <div
+                role="row"
+                aria-rowindex={index + 2}
+                className={`scr-row${selected?.has(row.id) ? ' is-selected' : ''}`}
+              >
+                {selectable && (
+                  <div role="gridcell" className="scr-td scr-td--center" data-col="select">
+                    <input
+                      type="checkbox"
+                      checked={selected?.has(row.id) ?? false}
+                      aria-label={tr('scrApp.r2.common.selectItem', { name: row.name })}
+                      onChange={() => onToggle?.(row.id)}
+                    />
+                  </div>
+                )}
+                <div role="gridcell" className="scr-td" data-col="name">
+                  <span className="scr-t-titles">
+                    {/* Release names run to 80-120 characters and are truncated in
+                        both layouts, so the full name is always one hover away. */}
+                    <span className="scr-t-en" title={row.name}>{row.name}</span>
+                    <span className="scr-t-ja" title={kindLine}>{kindLine}</span>
+                    {/* The four columns the narrow tier drops, folded back into the row that
+                        lost them. Nothing about this table is reachable anywhere else — there
+                        is no per-row inspector here — so hiding a column without this line
+                        would delete the value outright. Painted only by the tier. */}
+                    <span className="scr-t-fold">
+                      {row.releaseGroup} · {unitDays(row.ageDays)} ·{' '}
+                      {row.subtitleLanguages.join(', ').toUpperCase()} · {row.tracker}
+                    </span>
+                  </span>
                 </div>
-              )}
-              <div role="gridcell" className="scr-td" data-col="name">
-                <span className="scr-t-titles">
-                  <span className="scr-t-en">{row.name}</span>
-                  <span className="scr-t-ja">
-                    {row.isBatch ? sx('result.batch') : sx('result.single')} · {row.fileCount} files
+                <div role="gridcell" className="scr-td" data-col="group"><Pill>{row.releaseGroup}</Pill></div>
+                <div role="gridcell" className="scr-td" data-col="resolution"><Pill tone="outline">{row.resolution}</Pill></div>
+                {/* Seeders drive whether a torrent is usable at all, so the number
+                    is toned rather than left as neutral text. The card label is
+                    painted only in the card layout, where no column header sits
+                    above the number to say what it counts. */}
+                <div role="gridcell" className="scr-td" data-col="seeders">
+                  <span className="scr-t-cardlabel">{sx('result.col.seeders')}</span>
+                  <span className={`scr-seed${row.seeders < 3 ? ' is-low' : row.seeders > 200 ? ' is-high' : ''}`}>
+                    {sxNumber(row.seeders)}
                   </span>
-                  {/* The four columns the narrow tier drops, folded back into the row that
-                      lost them. Nothing about this table is reachable anywhere else — there
-                      is no per-row inspector here — so hiding a column without this line
-                      would delete the value outright. Painted only by the tier. */}
-                  <span className="scr-t-fold">
-                    {row.releaseGroup} · {row.ageDays}d ·{' '}
-                    {row.subtitleLanguages.join(', ').toUpperCase()} · {row.tracker}
-                  </span>
-                </span>
+                </div>
+                <div role="gridcell" className="scr-td" data-col="leechers">
+                  <span className="scr-t-cardlabel">{sx('result.col.leechers')}</span>
+                  <span className="scr-t-num">{sxNumber(row.leechers)}</span>
+                </div>
+                <div role="gridcell" className="scr-td" data-col="size"><span className="scr-t-num">{formatBytes(row.sizeBytes)}</span></div>
+                <div role="gridcell" className="scr-td" data-col="age"><span className="scr-t-num">{unitDays(row.ageDays)}</span></div>
+                <div role="gridcell" className="scr-td" data-col="subs">
+                  <Pill tone={row.subtitleLanguages.includes('ja') ? 'good' : 'warn'}>
+                    {subs}
+                  </Pill>
+                </div>
+                <div role="gridcell" className="scr-td" data-col="tracker"><span className="scr-t-plain" title={row.tracker}>{row.tracker}</span></div>
               </div>
-              <div role="gridcell" className="scr-td" data-col="group"><Pill>{row.releaseGroup}</Pill></div>
-              <div role="gridcell" className="scr-td" data-col="resolution"><Pill tone="outline">{row.resolution}</Pill></div>
-              {/* Seeders drive whether a torrent is usable at all, so the number
-                  is toned rather than left as neutral text. */}
-              <div role="gridcell" className="scr-td" data-col="seeders">
-                <span className={`scr-seed${row.seeders < 3 ? ' is-low' : row.seeders > 200 ? ' is-high' : ''}`}>
-                  {row.seeders.toLocaleString()}
-                </span>
-              </div>
-              <div role="gridcell" className="scr-td" data-col="leechers"><span className="scr-t-num">{row.leechers.toLocaleString()}</span></div>
-              <div role="gridcell" className="scr-td" data-col="size"><span className="scr-t-num">{formatBytes(row.sizeBytes)}</span></div>
-              <div role="gridcell" className="scr-td" data-col="age"><span className="scr-t-num">{row.ageDays}d</span></div>
-              <div role="gridcell" className="scr-td" data-col="subs">
-                <Pill tone={row.subtitleLanguages.includes('ja') ? 'good' : 'warn'}>
-                  {row.subtitleLanguages.join(', ').toUpperCase()}
-                </Pill>
-              </div>
-              <div role="gridcell" className="scr-td" data-col="tracker"><span className="scr-t-plain">{row.tracker}</span></div>
-            </div>
-          )}
+            );
+          }}
         />
       </div>
     </div>
@@ -472,16 +510,16 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
   return (
     <div className="scr-panel scr-result-workspace">
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Releases</span><span className="scr-tile-value">{torrents.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Total seeders</span><span className="scr-tile-value">{torrents.reduce((sum, torrent) => sum + torrent.seeders, 0).toLocaleString()}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Batches</span><span className="scr-tile-value">{torrents.filter((torrent) => torrent.isBatch).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.torrents.releases')}</span><span className="scr-tile-value">{torrents.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.torrents.totalSeeders')}</span><span className="scr-tile-value">{sxNumber(torrents.reduce((sum, torrent) => sum + torrent.seeders, 0))}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.torrents.batches')}</span><span className="scr-tile-value">{torrents.filter((torrent) => torrent.isBatch).length}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">{sx('result.detail.japaneseSubs')}</span><span className="scr-tile-value">{torrents.filter((torrent) => torrent.subtitleLanguages.includes('ja')).length}</span></div>
       </div>
       <div className="scr-result-controls">
         <label className="scr-result-inline-filter">
-          <span>Resolution</span>
+          <span>{sx('result.col.resolution')}</span>
           <select className="scr-input" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-            <option value="all">All resolutions</option>
+            <option value="all">{tr('scrApp.r2.common.allResolutions')}</option>
             {resolutions.map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
@@ -491,14 +529,14 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
           onClick={() => setSelected(new Set(visible.map((torrent) => torrent.id)))}
           disabled={!visible.length}
         >
-          Select visible
+          {tr('scrApp.r2.torrents.selectVisible')}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} disabled={!selected.size}>
-          Clear
+          {sx('common.clear')}
         </Button>
         <span className="scr-result-control-spacer" />
-        <span className="scr-muted">{selected.size} selected</span>
-        <Button size="sm" onClick={exportMagnets} disabled={!selected.size}>Export magnets</Button>
+        <span className="scr-muted">{sxn('result.selected', selected.size)}</span>
+        <Button size="sm" onClick={exportMagnets} disabled={!selected.size}>{tr('scrApp.r2.torrents.exportMagnets')}</Button>
         <Button
           size="sm"
           variant="primary"
@@ -539,9 +577,9 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
     if (!selected) return;
     try {
       await navigator.clipboard.writeText(imageSource(selected));
-      setNotice(`${selected.kind} source copied to the clipboard.`);
+      setNotice(tr('scrApp.r2.images.copied', { kind: imageKindText(selected.kind) }));
     } catch {
-      setNotice('Clipboard access is unavailable. Use Download image instead.');
+      setNotice(tr('scrApp.r2.images.clipboardUnavailable'));
     }
   };
 
@@ -551,19 +589,19 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
     anchor.href = imageSource(selected);
     anchor.download = imageDownloadFilename(selected);
     anchor.click();
-    setNotice(`${imageDownloadFilename(selected)} prepared for download.`);
+    setNotice(tr('scrApp.r2.images.prepared', { name: imageDownloadFilename(selected) }));
   };
 
   return (
     <div className="scr-panel scr-panel--images scr-result-workspace">
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Images</span><span className="scr-tile-value">{summary.count}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.images.count')}</span><span className="scr-tile-value">{summary.count}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">{sx('result.detail.totalSize')}</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(summary.totalBytes)}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Providers</span><span className="scr-tile-value">{summary.sources}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Episode linked</span><span className="scr-tile-value">{summary.episodeLinked}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.common.providers')}</span><span className="scr-tile-value">{summary.sources}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.images.episodeLinked')}</span><span className="scr-tile-value">{summary.episodeLinked}</span></div>
       </div>
       <div className="scr-result-controls">
-        <div className="scr-chip-row" aria-label="Image kind filter">
+        <div className="scr-chip-row" aria-label={tr('scrApp.r2.images.kindFilter')}>
           {(['all', 'poster', 'banner', 'thumbnail', 'still'] as const).map((value) => (
             <button
               key={value}
@@ -571,7 +609,7 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
               className={`scr-chip${kind === value ? ' is-on' : ''}`}
               onClick={() => setKind(value)}
             >
-              {value === 'all' ? 'All images' : value}
+              {value === 'all' ? tr('scrApp.r2.images.all') : imageKindText(value)}
             </button>
           ))}
         </div>
@@ -581,11 +619,11 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
             className="scr-input"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search images…"
+            placeholder={tr('scrApp.r2.images.search')}
           />
         </label>
         <span className="scr-result-control-spacer" />
-        <span className="scr-muted">{visible.length} visible</span>
+        <span className="scr-muted">{tr('scrApp.r2.common.visible', { count: visible.length })}</span>
       </div>
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
       <div className="scr-image-workspace">
@@ -603,7 +641,7 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
                 <button
                   type="button"
                   className="scr-img-select"
-                  aria-label={`Preview ${img.kind} ${img.id}`}
+                  aria-label={tr('scrApp.r2.images.preview', { kind: imageKindText(img.kind), id: img.id })}
                   aria-pressed={selected?.id === img.id}
                   onClick={() => {
                     setSelectedId(img.id);
@@ -611,10 +649,10 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
                   }}
                 >
                   <span className="scr-img-frame">
-                    <img src={imageSource(img)} alt={`${img.kind} ${img.id}`} loading="lazy" />
+                    <img src={imageSource(img)} alt="" loading="lazy" />
                   </span>
                   <span className="scr-img-caption">
-                    <span className="scr-img-kind">{img.kind}</span>
+                    <span className="scr-img-kind">{imageKindText(img.kind)}</span>
                     <span className="scr-img-meta">
                       {img.width}×{img.height} · {formatBytes(img.sizeBytes)}
                     </span>
@@ -625,27 +663,27 @@ export function ImageGrid({ images }: { images: ImageRow[] }) {
           />
         </div>
         {selected && (
-          <aside className="scr-image-inspector" aria-label={`Image details for ${selected.id}`}>
+          <aside className="scr-image-inspector" aria-label={tr('scrApp.r2.images.detailsFor', { id: selected.id })}>
             <div className="scr-image-inspector-preview">
-              <img src={imageSource(selected)} alt={`${selected.kind} full preview`} />
+              <img src={imageSource(selected)} alt={tr('scrApp.r2.images.fullPreview', { kind: imageKindText(selected.kind) })} />
             </div>
             <div>
-              <span className="scr-eyebrow">Selected image</span>
-              <h3>{selected.kind} · {selected.id}</h3>
+              <span className="scr-eyebrow">{tr('scrApp.r2.images.selected')}</span>
+              <h3>{imageKindText(selected.kind)} · {selected.id}</h3>
               <p>{selected.sourceLabel}</p>
             </div>
             <dl className="scr-image-inspector-meta">
-              <div><dt>Dimensions</dt><dd>{selected.width} × {selected.height}</dd></div>
-              <div><dt>Format</dt><dd>{selected.format.toUpperCase()}</dd></div>
-              <div><dt>File size</dt><dd>{formatBytes(selected.sizeBytes)}</dd></div>
-              <div><dt>Episode</dt><dd>{selected.episodeId ?? 'Series artwork'}</dd></div>
+              <div><dt>{tr('scrApp.r2.images.dimensions')}</dt><dd>{selected.width} × {selected.height}</dd></div>
+              <div><dt>{sx('result.meta.format')}</dt><dd>{selected.format.toUpperCase()}</dd></div>
+              <div><dt>{tr('scrApp.r2.images.fileSize')}</dt><dd>{formatBytes(selected.sizeBytes)}</dd></div>
+              <div><dt>{tr('scrApp.r2.images.episode')}</dt><dd>{selected.episodeId ?? tr('scrApp.r2.images.seriesArtwork')}</dd></div>
             </dl>
             <div className="scr-image-inspector-actions">
               <Button size="sm" variant="ghost" onClick={() => void copySource()}>
-                Copy source
+                {tr('scrApp.r2.images.copySource')}
               </Button>
               <Button size="sm" variant="primary" leftIcon={<Icon name="download" size={13} />} onClick={downloadImage}>
-                Download image
+                {tr('scrApp.r2.images.download')}
               </Button>
             </div>
           </aside>
@@ -682,29 +720,29 @@ export function MetadataPanel({ metadata }: { metadata: SeriesMetadata }) {
       JSON.stringify(metadata, null, 2),
       'application/json',
     );
-    setNotice('Metadata JSON file created.');
+    setNotice(tr('scrApp.r2.meta.jsonCreated'));
   };
   const copyMetadata = async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
-      setNotice('Metadata copied to the clipboard.');
+      setNotice(tr('scrApp.r2.meta.copied'));
     } catch {
-      setNotice('Clipboard access is unavailable; use Export JSON instead.');
+      setNotice(tr('scrApp.r2.meta.clipboardUnavailable'));
     }
   };
 
   return (
     <div className="scr-panel scr-result-workspace">
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Fields present</span><span className="scr-tile-value">{complete}/{rows.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Providers</span><span className="scr-tile-value">{providerCount}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.meta.fieldsPresent')}</span><span className="scr-tile-value">{complete}/{rows.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.common.providers')}</span><span className="scr-tile-value">{providerCount}</span></div>
         <div className="scr-tile"><span className="scr-tile-label">{sx('result.meta.rating')}</span><span className="scr-tile-value">{metadata.communityRating}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">External IDs</span><span className="scr-tile-value">{Number(Boolean(metadata.malId)) + Number(Boolean(metadata.aniListId))}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.meta.externalIds')}</span><span className="scr-tile-value">{Number(Boolean(metadata.malId)) + Number(Boolean(metadata.aniListId))}</span></div>
       </div>
       <div className="scr-result-controls">
         <p className="scr-muted scr-panel-note">{sx('result.meta.provenanceNote')}</p>
         <span className="scr-result-control-spacer" />
-        <Button size="sm" variant="ghost" onClick={() => void copyMetadata()}>Copy JSON</Button>
+        <Button size="sm" variant="ghost" onClick={() => void copyMetadata()}>{tr('scrApp.r2.meta.copyJson')}</Button>
         <Button size="sm" leftIcon={<Icon name="external" size={13} />} onClick={exportMetadata}>{sx('result.exportJson')}</Button>
       </div>
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
@@ -757,32 +795,32 @@ export function LogConsole({ logs }: { logs: LogLine[] }) {
         )
         .join('\n'),
     );
-    setNotice(`Exported ${visible.length} log lines.`);
+    setNotice(tr('scrApp.r2.logs.exported', { count: visible.length }));
   };
 
   return (
     <div className="scr-panel scr-panel--logs scr-result-workspace">
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Log lines</span><span className="scr-tile-value">{logs.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Errors</span><span className="scr-tile-value">{logs.filter((line) => line.level === 'error').length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Warnings</span><span className="scr-tile-value">{logs.filter((line) => line.level === 'warn').length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Channels</span><span className="scr-tile-value">{new Set(logs.map((line) => line.channel)).size}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.logs.lines')}</span><span className="scr-tile-value">{logs.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.logs.errors')}</span><span className="scr-tile-value">{logs.filter((line) => line.level === 'error').length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.logs.warnings')}</span><span className="scr-tile-value">{logs.filter((line) => line.level === 'warn').length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.logs.channels')}</span><span className="scr-tile-value">{new Set(logs.map((line) => line.channel)).size}</span></div>
       </div>
       <div className="scr-result-controls">
-        <div className="scr-chip-row" aria-label="Log level filter">
+        <div className="scr-chip-row" aria-label={tr('scrApp.r2.logs.levelFilter')}>
           {(['all', 'error', 'warn', 'info', 'debug'] as const).map((value) => (
             <button key={value} type="button" className={`scr-chip${level === value ? ' is-on' : ''}`} onClick={() => setLevel(value)}>
-              {value}
+              {value === 'all' ? tr('scrApp.r2.logs.allLevels') : logLevelText(value)}
             </button>
           ))}
         </div>
         <label className="scr-result-log-search">
           <Icon name="search" size={13} />
-          <input className="scr-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search logs…" />
+          <input className="scr-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tr('scrApp.r2.logs.search')} />
         </label>
         <span className="scr-result-control-spacer" />
         <Button size="sm" leftIcon={<Icon name="external" size={13} />} onClick={exportLogs} disabled={!visible.length}>
-          Export log
+          {tr('scrApp.r2.logs.export')}
         </Button>
       </div>
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
@@ -796,9 +834,9 @@ export function LogConsole({ logs }: { logs: LogLine[] }) {
         renderItem={(line) => (
           <div className={`scr-log scr-log--${line.level}`}>
             <span className="scr-log-time">{formatEtaClock(line.offsetMs / 1_000)}</span>
-            <span className="scr-log-level">{line.level}</span>
+            <span className="scr-log-level">{logLevelText(line.level)}</span>
             <span className="scr-log-channel">{line.channel}</span>
-            <span className="scr-log-msg">{line.message}</span>
+            <span className="scr-log-msg">{localizeScraperMessage(line.message)}</span>
           </div>
         )}
       />

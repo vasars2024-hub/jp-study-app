@@ -94,9 +94,15 @@ export default function ScraperNav({ stats }: { stats: ScraperSystemStats }) {
         <p className="scr-rail-tasks">
           {busy ? sxn('nav.activeTasks', stats.activeJobs) : sx('nav.noActiveTasks')}
         </p>
-        <hr className="scr-rail-rule" />
-        <p className="scr-rail-metric">{sxn('nav.memory', stats.memoryMb)}</p>
-        <p className="scr-rail-metric">{sxn('nav.cpu', stats.cpuPercent)}</p>
+        {/* Process memory and CPU are a developer readout, not something a
+            learner acts on — shown only with "Advanced / developer tools". */}
+        {ctl.advancedMode && (
+          <>
+            <hr className="scr-rail-rule" />
+            <p className="scr-rail-metric">{sxn('nav.memory', stats.memoryMb)}</p>
+            <p className="scr-rail-metric">{sxn('nav.cpu', stats.cpuPercent)}</p>
+          </>
+        )}
       </div>
     </ContextualSurface>
   );

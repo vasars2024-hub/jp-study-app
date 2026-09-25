@@ -4,7 +4,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../Icons';
 import { Button } from '../../ui';
-import { SCRAPER_COLUMNS, GROUP_OPTIONS, type GroupKey } from './columns';
+import { SCRAPER_COLUMNS, GROUP_OPTIONS, columnLabel, type GroupKey } from './columns';
+import { tr } from '../localize';
 import type { ScraperColumnId, ScraperSortDir } from '../../../../shared/scraperShell';
 import { sx } from '../strings';
 
@@ -94,7 +95,8 @@ export default function ResultToolbar({
 }) {
   const filterCount =
     (filters.onlyMissingSubs ? 1 : 0) + (filters.onlyFailed ? 1 : 0) + (filters.resolution ? 1 : 0);
-  const sortLabel = SCRAPER_COLUMNS.find((c) => c.id === sortColumn)?.label || 'Episode';
+  const sortColumnDef = SCRAPER_COLUMNS.find((c) => c.id === sortColumn);
+  const sortLabel = (sortColumnDef && columnLabel(sortColumnDef)) || tr('scrApp.r2.col.episode');
 
   return (
     <div className="scr-toolbar">
@@ -154,7 +156,7 @@ export default function ResultToolbar({
                   close();
                 }}
               >
-                {column.label}
+                {columnLabel(column)}
                 {column.id === sortColumn && (
                   <span className="scr-pop-hint">{sortDir === 'asc' ? '↑' : '↓'}</span>
                 )}
@@ -165,7 +167,7 @@ export default function ResultToolbar({
       </Popover>
 
       <Popover
-        label={groupBy ? `${sx('result.group')}: ${GROUP_OPTIONS.find((g) => g.value === groupBy)?.label}` : sx('result.group')}
+        label={groupBy ? `${sx('result.group')}: ${tr(GROUP_OPTIONS.find((g) => g.value === groupBy)?.labelKey ?? 'scrApp.r2.group.none')}` : sx('result.group')}
         icon={<Icon name="app" size={13} />}
         active={Boolean(groupBy)}
       >
@@ -181,7 +183,7 @@ export default function ResultToolbar({
                   close();
                 }}
               >
-                {option.label}
+                {tr(option.labelKey)}
               </button>
             ))}
           </div>
@@ -206,7 +208,7 @@ export default function ResultToolbar({
                       )
                     }
                   />
-                  {column.label}
+                  {columnLabel(column)}
                 </label>
               );
             })}

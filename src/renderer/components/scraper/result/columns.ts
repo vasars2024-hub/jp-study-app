@@ -6,10 +6,17 @@
 
 import type { ScraperColumnId } from '../../../../shared/scraperShell';
 import type { EpisodeRow } from '../../../../shared/scraperResults';
+import { episodeKindText, episodeStatusText, tr } from '../localize';
 
 export interface ScraperColumn {
   id: ScraperColumnId;
-  label: string;
+  /**
+   * i18n key of the header, resolved with `columnLabel()` at render — never text:
+   * this table is module-level, so text stored here would be frozen in whatever
+   * language was active when the module loaded (it was English, always).
+   * '' for the header-less select column; '#' is not a word and needs no key.
+   */
+  labelKey: string;
   /** CSS grid track, e.g. '1fr' or '80px'. */
   track: string;
   align?: 'start' | 'center' | 'end';
@@ -21,21 +28,27 @@ export interface ScraperColumn {
 }
 
 export const SCRAPER_COLUMNS: ScraperColumn[] = [
-  { id: 'select', label: '', track: '34px', align: 'center', sortable: false, locked: true },
-  { id: 'index', label: '#', track: '52px', align: 'end', sortable: true, locked: true, sortValue: (r) => r.number },
-  { id: 'title', label: 'Title', track: 'minmax(220px, 2.2fr)', sortable: true, locked: true, sortValue: (r) => r.titleEn },
-  { id: 'type', label: 'Type', track: '96px', sortable: true, sortValue: (r) => r.kind },
-  { id: 'language', label: 'Language', track: '96px', sortable: true, sortValue: (r) => r.audio },
-  { id: 'subtitles', label: 'Subs', track: '104px', sortable: true, sortValue: (r) => r.subtitles.map((s) => s.language).join(',') },
-  { id: 'resolution', label: 'Resolution', track: '104px', sortable: true, sortValue: (r) => r.resolution },
-  { id: 'source', label: 'Source', track: 'minmax(90px, 0.7fr)', sortable: true, sortValue: (r) => r.sourceLabel },
-  { id: 'size', label: 'Size', track: '96px', align: 'end', sortable: true, sortValue: (r) => r.sizeBytes },
-  { id: 'duration', label: 'Duration', track: '92px', align: 'end', sortable: true, sortValue: (r) => r.durationSec },
-  { id: 'season', label: 'Season', track: '80px', align: 'end', sortable: true, sortValue: (r) => r.season },
-  { id: 'airDate', label: 'Aired', track: '104px', sortable: true, sortValue: (r) => r.airDate ?? '' },
-  { id: 'status', label: 'Status', track: '96px', sortable: true, sortValue: (r) => r.status },
-  { id: 'link', label: 'Link', track: '58px', align: 'center', sortable: false, locked: true },
+  { id: 'select', labelKey: '', track: '34px', align: 'center', sortable: false, locked: true },
+  { id: 'index', labelKey: '#', track: '52px', align: 'end', sortable: true, locked: true, sortValue: (r) => r.number },
+  { id: 'title', labelKey: 'scrApp.r2.col.title', track: 'minmax(220px, 2.2fr)', sortable: true, locked: true, sortValue: (r) => r.titleEn },
+  { id: 'type', labelKey: 'scrApp.r2.col.type', track: '96px', sortable: true, sortValue: (r) => r.kind },
+  { id: 'language', labelKey: 'scrApp.r2.col.language', track: '96px', sortable: true, sortValue: (r) => r.audio },
+  { id: 'subtitles', labelKey: 'scrApp.r2.col.subtitles', track: '104px', sortable: true, sortValue: (r) => r.subtitles.map((s) => s.language).join(',') },
+  { id: 'resolution', labelKey: 'scrApp.r2.col.resolution', track: '104px', sortable: true, sortValue: (r) => r.resolution },
+  { id: 'source', labelKey: 'scrApp.r2.col.source', track: 'minmax(90px, 0.7fr)', sortable: true, sortValue: (r) => r.sourceLabel },
+  { id: 'size', labelKey: 'scrApp.r2.col.size', track: '96px', align: 'end', sortable: true, sortValue: (r) => r.sizeBytes },
+  { id: 'duration', labelKey: 'scrApp.r2.col.duration', track: '92px', align: 'end', sortable: true, sortValue: (r) => r.durationSec },
+  { id: 'season', labelKey: 'scrApp.r2.col.season', track: '80px', align: 'end', sortable: true, sortValue: (r) => r.season },
+  { id: 'airDate', labelKey: 'scrApp.r2.col.airDate', track: '104px', sortable: true, sortValue: (r) => r.airDate ?? '' },
+  { id: 'status', labelKey: 'scrApp.r2.col.status', track: '96px', sortable: true, sortValue: (r) => r.status },
+  { id: 'link', labelKey: 'scrApp.r2.col.link', track: '58px', align: 'center', sortable: false, locked: true },
 ];
+
+/** A column's header text in the current UI language. */
+export function columnLabel(column: Pick<ScraperColumn, 'labelKey'>): string {
+  if (!column.labelKey || column.labelKey === '#') return column.labelKey;
+  return tr(column.labelKey);
+}
 
 export function columnById(id: ScraperColumnId): ScraperColumn | undefined {
   return SCRAPER_COLUMNS.find((c) => c.id === id);
@@ -93,27 +106,28 @@ export function sortRows(
 
 export type GroupKey = '' | 'season' | 'type' | 'source' | 'resolution' | 'status';
 
-export const GROUP_OPTIONS: { value: GroupKey; label: string }[] = [
-  { value: '', label: 'No grouping' },
-  { value: 'season', label: 'Season' },
-  { value: 'type', label: 'Type' },
-  { value: 'source', label: 'Source' },
-  { value: 'resolution', label: 'Resolution' },
-  { value: 'status', label: 'Status' },
+/** `labelKey` is resolved with `tr()` at render, same contract as `labelKey` above. */
+export const GROUP_OPTIONS: { value: GroupKey; labelKey: string }[] = [
+  { value: '', labelKey: 'scrApp.r2.group.none' },
+  { value: 'season', labelKey: 'scrApp.r2.col.season' },
+  { value: 'type', labelKey: 'scrApp.r2.col.type' },
+  { value: 'source', labelKey: 'scrApp.r2.col.source' },
+  { value: 'resolution', labelKey: 'scrApp.r2.col.resolution' },
+  { value: 'status', labelKey: 'scrApp.r2.col.status' },
 ];
 
 export function groupLabelFor(row: EpisodeRow, key: GroupKey): string {
   switch (key) {
     case 'season':
-      return `Season ${row.season}`;
+      return tr('scrApp.r2.group.seasonN', { n: row.season });
     case 'type':
-      return row.kind;
+      return episodeKindText(row.kind);
     case 'source':
       return row.sourceLabel;
     case 'resolution':
       return row.resolution;
     case 'status':
-      return row.status;
+      return episodeStatusText(row.status);
     default:
       return '';
   }

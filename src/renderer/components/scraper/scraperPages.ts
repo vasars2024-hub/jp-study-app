@@ -104,12 +104,17 @@ export const SCRAPER_NAV: ScraperNavPage[] = [
   },
 
   // ---- Tools ----
+  // Developer tools. `advanced: true` keeps them off the rail, out of search and
+  // out of reach until "Advanced / developer tools" is switched on (off by
+  // default) — a learner opening the Scraper should meet scraping, not a
+  // selector workbench (round-2 journey J11).
   {
     id: 'selector-tester',
     labelKey: 'nav.selectorTester',
     descKey: 'nav.selectorTester.desc',
     icon: 'scan',
     group: 'Tools',
+    advanced: true,
   },
   {
     id: 'regex-tester',
@@ -117,6 +122,7 @@ export const SCRAPER_NAV: ScraperNavPage[] = [
     descKey: 'nav.regexTester.desc',
     icon: 'command',
     group: 'Tools',
+    advanced: true,
   },
   {
     id: 'http-inspector',
@@ -124,6 +130,7 @@ export const SCRAPER_NAV: ScraperNavPage[] = [
     descKey: 'nav.httpInspector.desc',
     icon: 'network',
     group: 'Tools',
+    advanced: true,
   },
   {
     id: 'script-console',
@@ -131,6 +138,7 @@ export const SCRAPER_NAV: ScraperNavPage[] = [
     descKey: 'nav.scriptConsole.desc',
     icon: 'keyboard',
     group: 'Tools',
+    advanced: true,
   },
 ];
 

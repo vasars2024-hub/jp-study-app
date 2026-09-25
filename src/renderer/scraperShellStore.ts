@@ -56,6 +56,26 @@ export function patchScraperShellState(patch: Partial<ScraperShellState>): Scrap
   return saveScraperShellState({ ...loadScraperShellState(), ...patch });
 }
 
+/** Where "Advanced / developer tools" lived before it joined the shell document. */
+export const LEGACY_SCRAPER_ADVANCED_KEY = 'jp-scraper-advanced-v1';
+
+/**
+ * One-time move of the old standalone advanced flag into `ScraperShellState.advanced`.
+ * The legacy key is removed either way, so it cannot resurrect a choice the user
+ * later reverses; a '1' carries over as `advanced: true`.
+ */
+export function migrateLegacyScraperAdvancedMode(): void {
+  let legacy: string | null = null;
+  try {
+    legacy = localStorage.getItem(LEGACY_SCRAPER_ADVANCED_KEY);
+    if (legacy === null) return;
+    localStorage.removeItem(LEGACY_SCRAPER_ADVANCED_KEY);
+  } catch {
+    return;
+  }
+  if (legacy === '1') patchScraperShellState({ advanced: true });
+}
+
 /** Navigate and record the visit in one write, so the MRU can't drift from the page. */
 export function navigateScraperShell(page: ScraperPageId): ScraperShellState {
   const current = loadScraperShellState();

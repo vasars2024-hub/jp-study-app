@@ -5,6 +5,7 @@ import ScrCard from '../ScrCard';
 import StatusDot from '../StatusDot';
 import { useScraper } from '../ScraperContext';
 import { useT } from '../../../i18n';
+import { profileDescription, profileName, profileReasonText } from '../localize';
 import { LANG_TAGS, type UiLang } from '../../../../shared/i18n/core';
 import { useScraperPort } from '../data/scraperPort';
 import type { PluginInfo } from '../data/scraperPort';
@@ -185,8 +186,8 @@ export function ProfilesPage() {
             <ScrCard
               key={profile.id}
               id={`profile-${profile.id}`}
-              title={profile.name}
-              description={profile.description}
+              title={profileName(profile)}
+              description={profileDescription(profile)}
               statusId="page.profiles"
               className={active ? 'scr-card--active' : ''}
               trailing={active ? <span className="scr-pill scr-pill--good">{t('scraperMgmt.profiles.active')}</span> : null}
@@ -243,7 +244,7 @@ export function ProfilesPage() {
             <span role="columnheader">{t('scraperMgmt.compare.setting')}</span>
             {document.profiles.map((profile) => (
               <span key={profile.id} role="columnheader">
-                {profile.name}
+                {profileName(profile)}
                 {profile.id === document.activeProfileId && <small>{t('scraperMgmt.profiles.active')}</small>}
               </span>
             ))}
@@ -449,7 +450,7 @@ export function ProfilesPage() {
               {activeProfile.history.map((version) => (
                 <li className="scr-list-row" key={version.id}>
                   <span className="scr-list-main">
-                    <span className="scr-list-title">{version.reason}</span>
+                    <span className="scr-list-title">{profileReasonText(version.reason)}</span>
                     <span className="scr-list-sub">
                       {new Date(version.createdAt).toLocaleString(LANG_TAGS[lang])}
                       {' · '}
@@ -1113,7 +1114,11 @@ export function SiteRulesPage() {
         subtitle={t('scraperMgmt.rules.subtitle')}
         actions={
           <>
-            <Button size="sm" onClick={() => ctl.navigate('selector-tester')}>{t('scraperMgmt.rules.openTester')}</Button>
+            {/* The Selector Tester is a developer tool, reachable only with
+                "Advanced / developer tools" on — a button to it would bounce. */}
+            {ctl.advancedMode && (
+              <Button size="sm" onClick={() => ctl.navigate('selector-tester')}>{t('scraperMgmt.rules.openTester')}</Button>
+            )}
             <Button size="sm" variant="primary" leftIcon={<Icon name="plus" size={13} />} onClick={addRule}>
               {t('scraperMgmt.rules.new')}
             </Button>

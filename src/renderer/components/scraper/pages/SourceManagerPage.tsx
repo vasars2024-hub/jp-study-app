@@ -17,6 +17,7 @@ import { Pill } from '../result/Pill';
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { sx, sxn, sxs } from '../strings';
+import { sourceKindText, tr } from '../localize';
 import { loadVerifiedSitesDocument } from '../../../verifiedSitesStore';
 import { verifiedSiteForSource, type VerifiedSitesDocument } from '../../../../shared/verifiedSites';
 import {
@@ -35,13 +36,8 @@ import type { SourceStatus } from '../../../../shared/scraperResults';
 import type { AcquisitionProviderInventory } from '../../../../shared/acquisition';
 import { resolveSourceHandoff } from '../data/sourceHandoff';
 
-const KIND_TABS: { id: ScraperSourceKind | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'streaming', label: 'Streaming' },
-  { id: 'torrent', label: 'Torrent' },
-  { id: 'metadata', label: 'Metadata' },
-  { id: 'subtitles', label: 'Subtitles' },
-];
+/** Labels come from `sourceKindText` at render, so they follow the UI language. */
+const KIND_TABS: (ScraperSourceKind | 'all')[] = ['all', 'streaming', 'torrent', 'metadata', 'subtitles'];
 
 const HEALTH_TONE = {
   ok: 'good',
@@ -337,16 +333,16 @@ export default function SourceManagerPage() {
         <div className="scr-kind-tabs" role="tablist">
           {KIND_TABS.map((tab) => (
             <button
-              key={tab.id}
+              key={tab}
               type="button"
               role="tab"
-              aria-selected={kind === tab.id}
-              className={`scr-chip${kind === tab.id ? ' is-on' : ''}`}
-              onClick={() => setKind(tab.id)}
+              aria-selected={kind === tab}
+              className={`scr-chip${kind === tab ? ' is-on' : ''}`}
+              onClick={() => setKind(tab)}
             >
-              {tab.label}
+              {sourceKindText(tab)}
               <span className="scr-chip-count">
-                {tab.id === 'all' ? stored.length : stored.filter((e) => e.kind === tab.id).length}
+                {tab === 'all' ? stored.length : stored.filter((e) => e.kind === tab).length}
               </span>
             </button>
           ))}
@@ -378,7 +374,7 @@ export default function SourceManagerPage() {
                       of these, never the only way to change the order. */}
                   <div className="scr-source-move">
                     <IconButton
-                      label={`Move ${entry.label} up`}
+                      label={tr('scrApp.r2.sources.moveUp', { name: entry.label })}
                       size="sm"
                       disabled={rank === 0 || kind !== 'all'}
                       onClick={() => move(entry.id, -1)}
@@ -386,7 +382,7 @@ export default function SourceManagerPage() {
                       <Icon name="chevron" size={11} />
                     </IconButton>
                     <IconButton
-                      label={`Move ${entry.label} down`}
+                      label={tr('scrApp.r2.sources.moveDown', { name: entry.label })}
                       size="sm"
                       disabled={rank === stored.length - 1 || kind !== 'all'}
                       onClick={() => move(entry.id, 1)}
@@ -397,7 +393,7 @@ export default function SourceManagerPage() {
 
                   <Toggle
                     checked={entry.enabled}
-                    aria-label={`Enable ${entry.label}`}
+                    aria-label={tr('scrApp.r2.sources.enable', { name: entry.label })}
                     onChange={() => toggleEnabled(entry.id)}
                   />
 
@@ -406,7 +402,7 @@ export default function SourceManagerPage() {
                     <span className="scr-source-host">{entry.host}</span>
                   </div>
 
-                  <Pill tone="outline">{entry.kind}</Pill>
+                  <Pill tone="outline">{sourceKindText(entry.kind)}</Pill>
                   <Pill tone={HEALTH_TONE[health]}>{sx(`health.${health}` as never)}</Pill>
                   <span className="scr-source-latency">
                     {live?.latencyMs ? `${live.latencyMs} ms` : '—'}
@@ -433,7 +429,7 @@ export default function SourceManagerPage() {
                     {probing === entry.id ? sx('sources.testing') : sx('sources.test')}
                   </Button>
                   <IconButton
-                    label={`Fallbacks for ${entry.label}`}
+                    label={tr('scrApp.r2.sources.fallbacksFor', { name: entry.label })}
                     size="sm"
                     aria-expanded={isOpen}
                     onClick={() => setExpanded(isOpen ? null : entry.id)}

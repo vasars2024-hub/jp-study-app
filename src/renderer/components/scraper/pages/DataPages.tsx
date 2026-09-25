@@ -18,6 +18,7 @@ import { formatDuration } from '../../../stats';
 import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import { distinctEpisodes } from '../data/dashboardData';
 import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
+import { episodeStatusText, tr } from '../localize';
 import { firstReason } from '../disabledReason';
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
 import { errorText, qbitActionNotice } from '../data/qbitActions';
@@ -211,7 +212,7 @@ export function ResultsPage() {
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(href), 1_000);
-    setNotice(`${report.filename} created with ${selected.episodes.length.toLocaleString()} episodes.`);
+    setNotice(tr('scrApp.r2.results.reportCreated', { name: report.filename, count: selected.episodes.length }));
   };
 
   return (
@@ -255,11 +256,11 @@ export function ResultsPage() {
       </div>
 
       <div className="scr-result-controls scr-results-toolbar">
-        <div className="scr-chip-row" aria-label="Result library filter">
+        <div className="scr-chip-row" aria-label={tr('scrApp.r2.results.filter')}>
           {([
-            ['all', 'All series'],
-            ['problems', 'Needs attention'],
-            ['complete', 'Complete'],
+            ['all', 'scrApp.r2.results.filter.all'],
+            ['problems', 'scrApp.r2.results.filter.problems'],
+            ['complete', 'scrApp.r2.results.filter.complete'],
           ] as const).map(([value, label]) => (
             <button
               key={value}
@@ -267,7 +268,7 @@ export function ResultsPage() {
               className={`scr-chip${filter === value ? ' is-on' : ''}`}
               onClick={() => setFilter(value)}
             >
-              {label}
+              {tr(label)}
             </button>
           ))}
         </div>
@@ -277,7 +278,7 @@ export function ResultsPage() {
             className="scr-input"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search result library…"
+            placeholder={tr('scrApp.r2.results.search')}
           />
         </label>
         <span className="scr-result-control-spacer" />
@@ -322,13 +323,13 @@ export function ResultsPage() {
                 <img src={scraperArtwork(index + 2)} alt="" />
                 <span>
                   <b>{Math.round(ratio * 100)}%</b>
-                  <small>catalogue coverage</small>
+                  <small>{tr('scrApp.r2.results.coverageCaption')}</small>
                 </span>
               </div>
               <div className="scr-meter">
                 <Progress value={ratio} />
                 <span className="scr-t-num">
-                  {own.length.toLocaleString()} / {expected.toLocaleString()}
+                  {sxNumber(own.length)} / {sxNumber(expected)}
                 </span>
               </div>
               <div className="scr-chip-row">
@@ -350,7 +351,7 @@ export function ResultsPage() {
         <section
           ref={inspectorRef}
           className="scr-results-inspector"
-          aria-label={`Result details for ${selected.series.titleEn}`}
+          aria-label={tr('scrApp.r2.results.detailsFor', { name: selected.series.titleEn })}
           tabIndex={-1}
         >
           <div className="scr-results-inspector-media">
@@ -367,27 +368,27 @@ export function ResultsPage() {
           <div className="scr-results-inspector-body">
             <div className="scr-dashboard-block-head">
               <div>
-                <span className="scr-eyebrow">Series result inspector</span>
-                <h2>{selected.episodes.length.toLocaleString()} indexed episodes</h2>
-                <p>Review the latest rows, export a report, or resume this title in New Scrape.</p>
+                <span className="scr-eyebrow">{tr('scrApp.r2.results.inspector')}</span>
+                <h2>{tr('scrApp.r2.results.indexedEpisodes', { count: selected.episodes.length })}</h2>
+                <p>{tr('scrApp.r2.results.inspectorLead')}</p>
               </div>
               <div className="scr-page-actions">
-                <Button size="sm" variant="ghost" onClick={() => setSelectedId(null)}>Close</Button>
-                <Button size="sm" onClick={exportSeriesReport}>Export report</Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedId(null)}>{sx('common.close')}</Button>
+                <Button size="sm" onClick={exportSeriesReport}>{tr('scrApp.r2.results.exportReport')}</Button>
                 <Button size="sm" variant="primary" onClick={() => resumeSeries(selected.series.titleEn)}>
-                  Resume scrape
+                  {tr('scrApp.r2.results.resume')}
                 </Button>
               </div>
             </div>
             {notice && <p className="scr-action-notice" role="status">{notice}</p>}
             <div className="scr-results-inspector-stats">
-              <span><small>Coverage</small><b>{Math.round((selected.episodes.length / Math.max(1, selected.expected)) * 100)}%</b></span>
+              <span><small>{tr('scrApp.r2.results.coverage')}</small><b>{Math.round((selected.episodes.length / Math.max(1, selected.expected)) * 100)}%</b></span>
               <span><small>{sx('result.detail.japaneseSubs')}</small><b>{sxNumber(selected.withJapanese)}</b></span>
-              <span><small>Indexed size</small><b>{formatBytes(selected.bytes)}</b></span>
-              <span><small>Runtime</small><b>{formatDuration(selected.durationSec)}</b></span>
-              <span><small>Issues</small><b>{selected.failed + selected.warned + selected.missing}</b></span>
+              <span><small>{tr('scrApp.r2.results.indexedSize')}</small><b>{formatBytes(selected.bytes)}</b></span>
+              <span><small>{tr('scrApp.r2.results.runtime')}</small><b>{formatDuration(selected.durationSec)}</b></span>
+              <span><small>{tr('scrApp.r2.results.issues')}</small><b>{selected.failed + selected.warned + selected.missing}</b></span>
             </div>
-            <div className="scr-results-episode-preview" role="table" aria-label="Recent indexed episodes">
+            <div className="scr-results-episode-preview" role="table" aria-label={tr('scrApp.r2.results.recentEpisodes')}>
               {selected.episodes.slice(0, 5).map((episode) => (
                 <div role="row" key={episode.id}>
                   <span role="cell">{episode.numberLabel}</span>
@@ -395,7 +396,7 @@ export function ResultsPage() {
                   <span role="cell">{episode.resolution}</span>
                   <span role="cell">{episode.subtitles.map((subtitle) => subtitle.language.toUpperCase()).join(', ') || '—'}</span>
                   <Pill tone={episode.status === 'ok' ? 'good' : episode.status === 'warning' ? 'warn' : 'bad'}>
-                    {episode.status}
+                    {episodeStatusText(episode.status)}
                   </Pill>
                 </div>
               ))}
@@ -1005,15 +1006,18 @@ export function HistoryPage() {
       <div className="scr-history-overview">
         <div className="scr-tile-row">
           <div className="scr-tile"><span className="scr-tile-label">{sx('result.detail.found')}</span><span className="scr-tile-value">{sxNumber(totals.episodes)}</span></div>
-          <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">Failed checks</span><span className="scr-tile-value">{sxNumber(totals.failures)}</span></div>
-          <div className="scr-tile"><span className="scr-tile-label">Data indexed</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(totals.bytes)}</span></div>
-          <div className="scr-tile"><span className="scr-tile-label">Average runtime</span><span className="scr-tile-value scr-tile-value--text">{formatDuration(totals.average)}</span></div>
+          <div className={`scr-tile${totals.failures ? ' is-bad' : ''}`}><span className="scr-tile-label">{tr('scrApp.r2.history.failedChecks')}</span><span className="scr-tile-value">{sxNumber(totals.failures)}</span></div>
+          <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.history.dataIndexed')}</span><span className="scr-tile-value scr-tile-value--text">{formatBytes(totals.bytes)}</span></div>
+          <div className="scr-tile"><span className="scr-tile-label">{tr('scrApp.r2.history.avgRuntime')}</span><span className="scr-tile-value scr-tile-value--text">{formatDuration(totals.average)}</span></div>
         </div>
-        <div className="scr-history-activity" aria-label="Recent scrape activity">
-          <span className="scr-history-activity-label">Recent activity<small>Episodes found per run</small></span>
+        <div className="scr-history-activity" aria-label={tr('scrApp.r2.history.activityAria')}>
+          <span className="scr-history-activity-label">
+            {tr('scrApp.r2.history.activity')}
+            <small>{tr('scrApp.r2.history.activityHint')}</small>
+          </span>
           <div className="scr-history-bars">
             {activity.map((job) => (
-              <span key={job.id} title={`${job.titleEn}: ${job.found} episodes`}>
+              <span key={job.id} title={tr('scrApp.r2.history.barTitle', { name: job.titleEn, count: job.found })}>
                 <i style={{ height: `${job.height}%` }} />
               </span>
             ))}

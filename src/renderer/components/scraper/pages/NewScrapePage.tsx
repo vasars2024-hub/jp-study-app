@@ -22,7 +22,8 @@ import { resolveColumns, rowMatches, sortRows, type GroupKey } from '../result/c
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { formatEtaClock } from '../data/charts';
-import { sx, sxn } from '../strings';
+import { sx, sxn, sxNumber } from '../strings';
+import { profileName, tr } from '../localize';
 import {
   SCRAPER_PAGE_SIZES,
   type ScraperColumnId,
@@ -389,7 +390,7 @@ export default function NewScrapePage() {
                 ...doc,
                 activeProfileId: event.target.value,
               }))}
-              options={doc.profiles.map((profile) => ({ value: profile.id, label: profile.name }))}
+              options={doc.profiles.map((profile) => ({ value: profile.id, label: profileName(profile) }))}
             />
           </div>
           <div>
@@ -582,10 +583,11 @@ export default function NewScrapePage() {
               </div>
 
               <span className="scr-muted scr-foot-count">
-                {`${sx('result.showing')} ${filtered.length ? safePage * ctl.pageSize + 1 : 0} to ${Math.min(
-                  (safePage + 1) * ctl.pageSize,
-                  filtered.length,
-                )} of ${filtered.length.toLocaleString()}`}
+                {tr('scrApp.r2.table.range', {
+                  from: sxNumber(filtered.length ? safePage * ctl.pageSize + 1 : 0),
+                  to: sxNumber(Math.min((safePage + 1) * ctl.pageSize, filtered.length)),
+                  total: sxNumber(filtered.length),
+                })}
               </span>
 
               <Select
@@ -672,7 +674,7 @@ export default function NewScrapePage() {
         <section className="scr-compact-profile" aria-label={sx('result.currentProfile')}>
           <div>
             <span>{sx('result.currentProfile')}</span>
-            <strong>Balanced</strong>
+            <strong>{activeProfile ? profileName(activeProfile) : '—'}</strong>
           </div>
           <div><span>{sx('result.concurrent')}</span><strong>{settings.network.concurrentRequests}</strong></div>
           <div><span>{sx('result.retries')}</span><strong>{settings.network.retryAttempts}</strong></div>
