@@ -18,7 +18,7 @@ const h = vi.hoisted(() => ({
   installed: new Set<string>(),
   /** Per-page OCR behaviour, by page index. */
   pages: [] as Array<{ text?: string; throws?: string }>,
-  ocrCalls: [] as Array<{ engine?: string }>,
+  ocrCalls: [] as Array<{ engine?: string; forceLang?: string }>,
   attached: [] as string[],
   broadcasts: [] as Array<Record<string, unknown>>,
 }));
@@ -38,8 +38,8 @@ vi.mock('electron', () => ({
 vi.mock('../downloads', () => ({ isInstalled: (id: string) => h.installed.has(id) }));
 
 vi.mock('../ocrAuto', () => ({
-  ocrAuto: async (dataUrl: string, opts: { engine?: string }) => {
-    h.ocrCalls.push({ engine: opts.engine });
+  ocrAuto: async (dataUrl: string, opts: { engine?: string; forceLang?: string }) => {
+    h.ocrCalls.push({ engine: opts.engine, forceLang: opts.forceLang });
     const index = Number(/page-(\d+)/.exec(dataUrl)?.[1] ?? 0);
     const page = h.pages[index] ?? {};
     if (page.throws) throw new Error(page.throws);
@@ -98,6 +98,16 @@ describe('runBookOcr — no engine installed', () => {
     const res = await runBookOcr({ itemId: 'm2' });
     expect(res.error).toBe('models-missing');
     expect(h.attached).toEqual([]);
+  });
+
+  it('reads a Chinese book with the Chinese recognizer, and never with manga-ocr', async () => {
+    h.installed = new Set(['paddle-ocr-det', 'paddle-ocr-zh', 'paddle-ocr-zh-keys', ...MANGA]);
+    h.pages = [{ text: '今天天气很好' }, { text: '我们去公园' }];
+    const res = await runBookOcr({ itemId: 'z1', lang: 'zh' });
+    expect(res.ok).toBe(true);
+    expect(h.ocrCalls.map((c) => [c.engine, c.forceLang])).toEqual([['auto', 'zh'], ['auto', 'zh']]);
+    h.installed = new Set(MANGA);
+    expect((await runBookOcr({ itemId: 'z2', lang: 'ru' })).error).toBe('models-missing');
   });
 
   it('runs on manga-ocr alone when that is what is installed', async () => {

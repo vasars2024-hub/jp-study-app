@@ -21,6 +21,7 @@ import { summarizeAssetBundle } from '../shared/assetBundleProgress';
 import type { AssetError } from '../shared/assetRegistry';
 import { ocrAuto, type AutoOcrLine, type AutoOcrResult, type OcrEngineChoice } from './ocrAuto';
 import { orderReadingLensLines } from '../shared/readingLensLineOrder';
+import { getMainStudyLang } from './studyLanguage';
 
 export interface LensOcrLine {
   text: string;
@@ -411,7 +412,10 @@ export async function ocrRegion(
   displayId: number,
   opts: { engine?: OcrEngineChoice; includeScreenshot?: boolean } = {},
 ): Promise<LensOcrResult> {
-  const engine = opts.engine ?? 'auto';
+  // The Lens reads the study language: PaddleOCR's pack for it, and manga-ocr
+  // (Japanese only) never for a Chinese or Russian learner.
+  const lang = getMainStudyLang();
+  const engine: OcrEngineChoice = lang !== 'ja' && opts.engine === 'manga' ? 'web' : opts.engine ?? 'auto';
 
   // Models first, capture second. The capture can fail for reasons of its own
   // (an ambiguous monitor, a compositor hiccup), and when it ran first those
@@ -427,7 +431,7 @@ export async function ocrRegion(
   }
   // 'auto' still needs the general engine, since that is the pass it decides from.
   if (engine !== 'manga' && !paddleOcrAvailable()) {
-    const fetch = await ensureWebOcrModels('ja');
+    const fetch = await ensureWebOcrModels(lang);
     return EMPTY({
       engine: 'web',
       available: false,
@@ -451,7 +455,7 @@ export async function ocrRegion(
   let result: AutoOcrResult;
   let zoom = 1;
   try {
-    const adaptive = await ocrAdaptive(image, 'ja', engine);
+    const adaptive = await ocrAdaptive(image, lang, engine);
     result = adaptive.result;
     zoom = adaptive.zoom;
   } catch (err) {

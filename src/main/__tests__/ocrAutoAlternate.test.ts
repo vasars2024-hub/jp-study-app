@@ -173,3 +173,25 @@ describe('ocrAuto — the alternate read', () => {
     expect(forced.alternate).toBeUndefined();
   });
 });
+
+describe('ocrAuto — manga-ocr is Japanese only', () => {
+  it('never consults manga-ocr for a Chinese or Russian page, even on request', async () => {
+    h.paddleText = '今天天气很好';
+    h.mangaText = '猫が窓の外を見ている';
+
+    const zh = await ocrAuto(DATA_URL, { forceLang: 'zh' });
+    expect(zh.engine).toBe('web');
+    expect(h.mangaCalls).toBe(0);
+
+    const forced = await ocrAuto(DATA_URL, { engine: 'manga', forceLang: 'ru' });
+    expect(forced.engine).toBe('web');
+    expect(h.mangaCalls).toBe(0);
+  });
+
+  it('still consults it for Japanese', async () => {
+    h.paddleText = 'ネコ ガ マ ド';
+    h.mangaText = '猫が窓の外を見ている';
+    const ja = await ocrAuto(DATA_URL, { forceLang: 'ja' });
+    expect(ja.engine).toBe('manga');
+  });
+});

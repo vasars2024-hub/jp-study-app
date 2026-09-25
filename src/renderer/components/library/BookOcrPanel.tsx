@@ -16,12 +16,15 @@ import AssetInstallPrompt from '../AssetInstallPrompt';
 import { useT } from '../../i18n';
 import { useAssetStatuses } from '../../assetStore';
 import type { LibraryItem } from '../../../shared/types';
+import { studyLangFromTag } from '../../../shared/studyLang';
+import { getStudyLang } from '../../studyEnvironment';
 import {
-  BOOK_OCR_INSTALL_ASSET,
   BOOK_OCR_MANGA_ASSETS,
-  BOOK_OCR_WEB_ASSETS,
   bookOcrEngine,
+  bookOcrInstallAsset,
   bookOcrViewOf,
+  bookOcrWebAssets,
+  type BookOcrLang,
   type BookOcrPhase,
   type BookOcrProgress,
   type BookOcrView,
@@ -41,7 +44,9 @@ const ACTIVE: readonly BookOcrPhase[] = [
 ];
 
 /** Every asset either engine needs, so the panel follows installs of both. */
-const ENGINE_ASSETS: readonly string[] = [...BOOK_OCR_WEB_ASSETS, ...BOOK_OCR_MANGA_ASSETS];
+const ENGINE_ASSETS: readonly string[] = [
+  ...new Set([...bookOcrWebAssets('ja'), ...bookOcrWebAssets('zh'), ...bookOcrWebAssets('ru'), ...BOOK_OCR_MANGA_ASSETS]),
+];
 
 function formatEta(ms: number, t: (k: string, v?: Record<string, unknown>) => string): string {
   const total = Math.round(ms / 1000);
@@ -58,8 +63,11 @@ export function BookOcrPanel({ item }: Props) {
   const [switching, setSwitching] = useState(false);
   const engineStatuses = useAssetStatuses(ENGINE_ASSETS);
   const engineKnown = engineStatuses.some((s) => s !== null);
+  // The book's language picks the recognizer (the library tag, else the study language).
+  const bookLang: BookOcrLang = studyLangFromTag(item.lang) ?? getStudyLang();
   const engine = bookOcrEngine(
     (id) => engineStatuses[ENGINE_ASSETS.indexOf(id)]?.state === 'installed',
+    bookLang,
   );
   const view = bookOcrViewOf(item);
 
@@ -80,13 +88,14 @@ export function BookOcrPanel({ item }: Props) {
       await window.api.bookOcrRun?.({
         itemId: item.id,
         quality: heavy ? 'heavy' : 'fast',
+        lang: bookLang,
         bilingual,
         pageMarkers: true,
       });
     } finally {
       setStarting(false);
     }
-  }, [item.id, heavy, bilingual]);
+  }, [item.id, heavy, bilingual, bookLang]);
 
   const cancel = useCallback(() => {
     void window.api.bookOcrCancel?.(item.id);
@@ -173,8 +182,8 @@ export function BookOcrPanel({ item }: Props) {
           blank and file the result as the book. */}
       {engineKnown && !engine && (
         <AssetInstallPrompt
-          ids={BOOK_OCR_WEB_ASSETS}
-          startIds={[BOOK_OCR_INSTALL_ASSET]}
+          ids={bookOcrWebAssets(bookLang)}
+          startIds={[bookOcrInstallAsset(bookLang)]}
           message={t('bookOcr.needsModel')}
         />
       )}

@@ -52,6 +52,14 @@ describe('bookOcrEngine', () => {
     expect(bookOcrEngine(has('paddle-ocr-det', 'paddle-ocr-zh', 'paddle-ocr-zh-keys'))).toBeNull();
     expect(bookOcrEngine(has('manga-ocr'))).toBeNull();
   });
+
+  it('reads a Chinese or Russian book with its own recognizer, never manga-ocr', () => {
+    const manga = ['manga-ocr', 'manga-ocr-decoder', 'manga-ocr-vocab', 'comic-text-detector'];
+    expect(bookOcrEngine(has('paddle-ocr-det', 'paddle-ocr-zh', 'paddle-ocr-zh-keys'), 'zh')).toBe('auto');
+    expect(bookOcrEngine(has('paddle-ocr-det', 'paddle-ocr-ru', 'paddle-ocr-ru-keys'), 'ru')).toBe('auto');
+    expect(bookOcrEngine(has(...manga), 'zh')).toBeNull();
+    expect(bookOcrEngine(has('paddle-ocr-det', 'paddle-ocr-ja', 'paddle-ocr-ja-keys'), 'ru')).toBeNull();
+  });
 });
 
 describe('judgeBookOcrRun', () => {

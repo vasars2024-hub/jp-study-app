@@ -5359,6 +5359,7 @@ export const en: Catalog = {
   'manga.ocr.drawRegionTitle': 'Click and drag on the page to OCR and translate a region',
   'manga.ocr.drawRegionHint': 'Drag on the page to highlight text — it will be scanned and shown as an English overlay.',
   'manga.ocr.noText': 'No text was found on this page.',
+  'manga.ocr.fallbackJapaneseOnly': 'The offline fallback reader only reads Japanese. Install {lang} text recognition to scan this page.',
   'manga.ocr.failed': 'OCR failed.',
   'manga.ocr.readFailed': 'Could not read this page image.',
   'manga.hw.open': 'Draw',

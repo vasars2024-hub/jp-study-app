@@ -35,6 +35,8 @@ export interface BookOcrRequest {
   itemId: string;
   /** Read every page twice and consult both engines. Slower, better. */
   quality?: 'fast' | 'heavy';
+  /** The book's language; the study language when omitted. */
+  lang?: BookOcrLang;
   /** Also translate each page and lay the book out side by side. */
   bilingual?: boolean;
   /** Target language for the bilingual build. */
@@ -102,8 +104,6 @@ export function bookOcrViewOf(item: {
  * panel (which offers the install) and the job (which refuses without one).
  */
 
-/** The Japanese general-OCR set: detector, recognizer, charset. */
-export const BOOK_OCR_WEB_ASSETS = ['paddle-ocr-det', 'paddle-ocr-ja', 'paddle-ocr-ja-keys'] as const;
 /** The manga-ocr set, as `main/mangaOcr.ts` requires it. */
 export const BOOK_OCR_MANGA_ASSETS = [
   'manga-ocr',
@@ -111,15 +111,27 @@ export const BOOK_OCR_MANGA_ASSETS = [
   'manga-ocr-vocab',
   'comic-text-detector',
 ] as const;
-/**
- * What the Convert panel offers to install. Japanese web OCR, because printed
- * pages are what it reads well (manga-ocr answers dense print with fluent
- * nonsense) and because it is ~15 MB against manga-ocr's ~550 MB. Starting it
- * queues its `requires` — the shared detector and the charset — too.
- */
-export const BOOK_OCR_INSTALL_ASSET = 'paddle-ocr-ja';
 
 export type BookOcrEngine = 'auto' | 'manga';
+
+/** The languages a book can be read in: PaddleOCR has a recognizer for each. */
+export type BookOcrLang = 'ja' | 'zh' | 'ru';
+
+/** The general-OCR set for a book's language: detector, recognizer, charset. */
+export function bookOcrWebAssets(lang: BookOcrLang = 'ja'): string[] {
+  return ['paddle-ocr-det', `paddle-ocr-${lang}`, `paddle-ocr-${lang}-keys`];
+}
+
+/**
+ * What the Convert panel offers to install for a book in `lang`: the general
+ * web OCR for that language, because printed pages are what it reads well
+ * (manga-ocr answers dense print with fluent nonsense) and because it is
+ * ~15 MB against manga-ocr's ~550 MB. Starting it queues its `requires` — the
+ * shared detector and the charset — too.
+ */
+export function bookOcrInstallAsset(lang: BookOcrLang = 'ja'): string {
+  return `paddle-ocr-${lang}`;
+}
 
 /**
  * The engine the job can run with, or `null` when nothing that reads Japanese
@@ -130,9 +142,13 @@ export type BookOcrEngine = 'auto' | 'manga';
  * every page would throw. manga-ocr alone is still a usable engine for a
  * manga, so it is the fallback rather than a refusal.
  */
-export function bookOcrEngine(installed: (assetId: string) => boolean): BookOcrEngine | null {
-  if (BOOK_OCR_WEB_ASSETS.every(installed)) return 'auto';
-  if (BOOK_OCR_MANGA_ASSETS.every(installed)) return 'manga';
+export function bookOcrEngine(
+  installed: (assetId: string) => boolean,
+  lang: BookOcrLang = 'ja',
+): BookOcrEngine | null {
+  if (bookOcrWebAssets(lang).every(installed)) return 'auto';
+  // manga-ocr reads Japanese only; a Chinese or Russian book needs its own recognizer.
+  if (lang === 'ja' && BOOK_OCR_MANGA_ASSETS.every(installed)) return 'manga';
   return null;
 }
 

@@ -5358,6 +5358,7 @@ export const ja: Catalog = {
   'manga.ocr.drawRegionTitle': 'ページ上をドラッグしてOCRし、翻訳オーバーレイを表示',
   'manga.ocr.drawRegionHint': 'ページ上でテキストを囲むと、読み取り後に英語オーバーレイで表示されます。',
   'manga.ocr.noText': 'このページに文字が見つかりませんでした。',
+  'manga.ocr.fallbackJapaneseOnly': 'オフラインの予備エンジンは日本語しか読めません。このページを読み取るには{lang}の文字認識をインストールしてください。',
   'manga.ocr.failed': 'OCRに失敗しました。',
   'manga.ocr.readFailed': 'このページ画像を読めませんでした。',
   'manga.hw.open': '手書き',

@@ -47,6 +47,8 @@ import {
 } from '../shared/mangaOcrText';
 import { sequenceConfidence, tokenProbability } from '../shared/ocrConfidence';
 import { sortReadingOrder } from '../shared/readingOrder';
+import { getMainStudyLang } from './studyLanguage';
+import { recognizePaddleOcrDataUrl } from './paddleOcr';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import {
   summarizeTranslateFailure,
@@ -710,7 +712,57 @@ interface MangaCropRead {
   confidence: number;
 }
 
+/**
+ * One region cropped out of the page's RGBA pixels as a PNG data URL (the
+ * native image wants BGRA), for a recognizer that reads images, not tensors.
+ */
+export function cropRegionDataUrl(rgba: Buffer, srcW: number, srcH: number, box: MokuroBox): string {
+  const pad = 4;
+  const x0 = Math.max(0, Math.floor(box[0]) - pad);
+  const y0 = Math.max(0, Math.floor(box[1]) - pad);
+  const x1 = Math.min(srcW, Math.ceil(box[2]) + pad);
+  const y1 = Math.min(srcH, Math.ceil(box[3]) + pad);
+  const w = Math.max(1, x1 - x0);
+  const h = Math.max(1, y1 - y0);
+  const bgra = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const src = ((y0 + y) * srcW + (x0 + x)) * 4;
+      const dst = (y * w + x) * 4;
+      bgra[dst] = rgba[src + 2];
+      bgra[dst + 1] = rgba[src + 1];
+      bgra[dst + 2] = rgba[src];
+      bgra[dst + 3] = rgba[src + 3];
+    }
+  }
+  return nativeImage.createFromBitmap(bgra, { width: w, height: h }).toDataURL();
+}
+
+/**
+ * Read one detected region in the study language. manga-ocr is a Japanese
+ * model: on a Chinese manhua or a Russian comic it answers with fluent Japanese
+ * that is not on the page. Those regions go to PaddleOCR's recognizer for the
+ * language instead (the page's regions still come from the comic detector).
+ */
 async function recognizeCrop(
+  rgba: Buffer,
+  srcW: number,
+  srcH: number,
+  box: MokuroBox,
+  points: Array<{ x: number; y: number }>,
+): Promise<MangaCropRead> {
+  const lang = getMainStudyLang();
+  if (lang !== 'ja') {
+    const read = await recognizePaddleOcrDataUrl(cropRegionDataUrl(rgba, srcW, srcH, box), { forceLang: lang });
+    const confidence = read.lines.length
+      ? read.lines.reduce((sum, line) => sum + line.confidence, 0) / read.lines.length
+      : 0;
+    return { text: read.lines.map((line) => line.text).join(lang === 'ru' ? ' ' : ''), confidence };
+  }
+  return recognizeCropJapanese(rgba, srcW, srcH, box, points);
+}
+
+async function recognizeCropJapanese(
   rgba: Buffer,
   srcW: number,
   srcH: number,

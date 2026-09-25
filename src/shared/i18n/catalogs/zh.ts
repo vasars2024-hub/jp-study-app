@@ -5325,6 +5325,7 @@ export const zh: Catalog = {
   'manga.ocr.drawRegionTitle': '在页面上拖拽以 OCR 并显示翻译叠加层',
   'manga.ocr.drawRegionHint': '在页面上框选文字后会识别并显示为英文叠加层。',
   'manga.ocr.noText': '本页未找到文字。',
+  'manga.ocr.fallbackJapaneseOnly': '离线备用识别只能读取日文。要扫描此页，请安装{lang}文字识别。',
   'manga.ocr.failed': 'OCR 失败。',
   'manga.ocr.readFailed': '无法读取此页图片。',
   'manga.hw.open': '手写',
