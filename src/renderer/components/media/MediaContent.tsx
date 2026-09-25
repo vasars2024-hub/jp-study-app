@@ -245,8 +245,8 @@ export interface MediaState {
   setModelTier: (t: WhisperModelTier) => void;
   prefer: ReturnType<typeof loadWhisperDevice>;
   downloaded: ReturnType<typeof loadDownloaded>;
-  subLang: 'ja' | 'zh';
-  setSubLang: (l: 'ja' | 'zh') => void;
+  subLang: 'ja' | 'zh' | 'ru';
+  setSubLang: (l: 'ja' | 'zh' | 'ru') => void;
   genState: GenState;
   genMsg: string;
   genProgress: number;
@@ -443,7 +443,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   );
   const [prefer, setPrefer] = useState(loadWhisperDevice);
   const [downloaded, setDownloaded] = useState(loadDownloaded);
-  const [subLang, setSubLang] = useState<'ja' | 'zh'>(() => getStudyLang());
+  const [subLang, setSubLang] = useState<'ja' | 'zh' | 'ru'>(() => getStudyLang());
   const [genState, setGenState] = useState<GenState>('idle');
   const [genMsg, setGenMsg] = useState('');
   const [genProgress, setGenProgress] = useState(0);

@@ -1066,7 +1066,7 @@ export function BlancAudioMinePanel() {
   const transcription = useWhisperTranscribe();
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
-  const [lang, setLang] = useState<'ja' | 'zh'>(() => getStudyLang());
+  const [lang, setLang] = useState<'ja' | 'zh' | 'ru'>(() => getStudyLang());
   const [tier, setTier] = useState<WhisperModelTier>(() => loadWhisperModelTier(getStudyLang()));
   const [device, setDevice] = useState<WhisperDevice>(() => loadWhisperDevice());
   const [downloaded, setDownloaded] = useState(() => loadDownloaded());

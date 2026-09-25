@@ -33,6 +33,9 @@ const LEVELS: Record<StudyLang, ReadonlyArray<{ level: string; slot: LevelSlotId
     { level: 'HSK5', slot: 'hsk-5' },
     { level: 'HSK6', slot: 'hsk-6' },
   ],
+  // No Russian grammar corpus ships yet, so there are no levels to report and
+  // the estimate runs on vocabulary alone rather than on Japanese points.
+  ru: [],
 };
 
 /**

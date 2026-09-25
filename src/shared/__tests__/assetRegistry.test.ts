@@ -329,6 +329,10 @@ describe('sha256 pin coverage (audit T6)', () => {
    * names Qwen's immutable repository revision, so it carries the LFS sha256
    * the repository reports for that file.
    *
+   * **Total 39 on 2026-09-25** (still 18 pinned): the Russian starter
+   * dictionary `wiktionary-ru` joined unpinned — kaikki.org regenerates it
+   * weekly, the MDBG/Tatoeba convention.
+   *
    * This is a ratchet, not a target: it guarantees the number only ever moves
    * the right way.
    */
@@ -347,6 +351,6 @@ describe('sha256 pin coverage (audit T6)', () => {
     // If this fails because someone pinned an asset: good — raise
     // PINNED_BASELINE to the new number and update the comment above.
     const { pinned, total } = assetPinCoverage();
-    expect({ pinned, total }).toEqual({ pinned: 18, total: 38 });
+    expect({ pinned, total }).toEqual({ pinned: 18, total: 39 });
   });
 });

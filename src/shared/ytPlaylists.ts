@@ -2,7 +2,7 @@
  * YouTube immersion playlist types + pure helpers (DIP playlist manager).
  */
 
-export type YtStudyLang = 'ja' | 'zh' | 'en';
+export type YtStudyLang = 'ja' | 'zh' | 'ru' | 'en';
 export type YtSubLang = 'ja' | 'zh' | 'en' | 'ru';
 export type YtPlaylistSort = 'playlist' | 'views' | 'date' | 'title' | 'unlogged';
 export type YtSubscriptionStatus = 'subscribed' | 'watching' | 'custom' | 'unsubscribed';

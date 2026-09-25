@@ -26,7 +26,7 @@ export interface StudyGrammarPointSignal {
   title: string;
   meaning: string;
   level: string;
-  lang: 'ja' | 'zh';
+  lang: 'ja' | 'zh' | 'ru';
 }
 
 export interface StudyGrammarWeaknessContext {

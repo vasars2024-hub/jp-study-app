@@ -4,14 +4,24 @@ import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import { useAssetInstalled } from '../../../assetStore';
 import {
+  getChineseScript,
   getStudyLang,
+  onChineseScriptChanged,
   onStudyLangChanged,
   requiredAssetIds,
   requiredAssetsSizeLabel,
+  setChineseScript,
   setStudyLang,
+  type ChineseScript,
   type StudyLang,
 } from '../../../studyEnvironment';
 import { segButton as seg } from '../../ui/segButton';
+import {
+  STUDY_LANG_NAME_KEY,
+  STUDY_LANG_NATIVE_NAME,
+  STUDY_LANGS,
+  studyLangTag,
+} from '../../../../shared/studyLang';
 
 
 /** Settings > Study — environment switch + missing starter assets CTA. */
@@ -21,18 +31,12 @@ export default function StudyLanguageSection() {
   const [studyLang, setStudyLangState] = useState<StudyLang>(getStudyLang);
   const required = useMemo(() => requiredAssetIds(studyLang), [studyLang]);
   const primaryId = required[0] ?? '';
-  const { installed, status } = useAssetInstalled(primaryId || 'cc-cedict');
+  const { installed } = useAssetInstalled(primaryId || 'cc-cedict');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => onStudyLangChanged(setStudyLangState), []);
-
-  useEffect(() => {
-    if (status?.state === 'installed' && primaryId === 'cc-cedict') {
-      // The CC-CEDICT index now lives in main (Phase 4), so this drops main's
-      // cache rather than the renderer's.
-      void window.api.resetChineseDictCache();
-    }
-  }, [status?.state, primaryId]);
+  const [chineseScript, setChineseScriptState] = useState<ChineseScript>(getChineseScript);
+  useEffect(() => onChineseScriptChanged(setChineseScriptState), []);
 
   const missing = required.length > 0 && !installed;
   const sizeLabel = useMemo(() => requiredAssetsSizeLabel(studyLang), [studyLang, uiLang]);
@@ -58,23 +62,41 @@ export default function StudyLanguageSection() {
         highlight={focusSettingId === 'study-language'}
       >
         <div className="sp-seg" role="group" aria-label={t('settings.study.lang.aria')}>
-          <button
-            type="button"
-            {...seg(studyLang === 'ja')}
-            onClick={() => setStudyLang('ja')}
-            lang="ja"
-          >
-            日本語
-          </button>
-          <button
-            type="button"
-            {...seg(studyLang === 'zh')}
-            onClick={() => setStudyLang('zh')}
-            lang="zh"
-          >
-            中文
-          </button>
+          {STUDY_LANGS.map((code) => (
+            <button
+              key={code}
+              type="button"
+              {...seg(studyLang === code)}
+              onClick={() => setStudyLang(code)}
+              lang={studyLangTag(code, chineseScript)}
+              title={t(STUDY_LANG_NAME_KEY[code])}
+            >
+              {STUDY_LANG_NATIVE_NAME[code]}
+            </button>
+          ))}
         </div>
+        {studyLang === 'zh' && (
+          <div className="sp-seg" role="group" aria-label={t('settings.study.zhScript.aria')}>
+            <button
+              type="button"
+              {...seg(chineseScript === 'simplified')}
+              onClick={() => setChineseScript('simplified')}
+              lang="zh-Hans"
+              title={t('settings.study.zhScript.simplified')}
+            >
+              简体
+            </button>
+            <button
+              type="button"
+              {...seg(chineseScript === 'traditional')}
+              onClick={() => setChineseScript('traditional')}
+              lang="zh-Hant"
+              title={t('settings.study.zhScript.traditional')}
+            >
+              繁體
+            </button>
+          </div>
+        )}
         <p className="muted os-set-hint">{t('settings.study.lang.imeHint')}</p>
       </SettingsCard>
 
@@ -82,7 +104,7 @@ export default function StudyLanguageSection() {
         <SettingsCard
           id="study-language-setup"
           title={t('settings.study.setup.title', {
-            lang: studyLang === 'zh' ? t('settings.study.lang.zh') : t('settings.study.lang.ja'),
+            lang: t(STUDY_LANG_NAME_KEY[studyLang]),
           })}
           description={t('settings.study.setup.desc', {
             count: required.length,

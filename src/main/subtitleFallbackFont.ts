@@ -34,6 +34,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { localFileUrl } from './library';
 import type { SubtitleFallbackFont } from '../shared/types';
+import { normalizeStudyLang } from '../shared/studyLang';
 
 export interface SubtitleFallbackFontPick {
   /** The face this file carries, for logging and for the renderer's own reporting. */
@@ -52,7 +53,7 @@ export interface SubtitleFallbackFontPick {
  * would trade one tofu for another.
  */
 export const SUBTITLE_FALLBACK_FONT_CANDIDATES: Readonly<
-  Record<'ja' | 'zh', readonly SubtitleFallbackFontPick[]>
+  Record<'ja' | 'zh' | 'ru', readonly SubtitleFallbackFontPick[]>
 > = {
   ja: [
     { family: 'Noto Sans JP', path: 'NotoSansJP-VF.ttf' },
@@ -67,6 +68,14 @@ export const SUBTITLE_FALLBACK_FONT_CANDIDATES: Readonly<
     { family: 'Microsoft YaHei', path: 'msyh.ttc' },
     { family: 'Microsoft YaHei Light', path: 'msyhl.ttc' },
     { family: 'SimSun', path: 'simsun.ttc' },
+  ],
+  // Cyrillic is in every Windows UI face, so this list is about a clean sans at
+  // subtitle sizes, not about coverage.
+  ru: [
+    { family: 'Noto Sans', path: 'NotoSans-Regular.ttf' },
+    { family: 'Segoe UI', path: 'segoeui.ttf' },
+    { family: 'Arial', path: 'arial.ttf' },
+    { family: 'Tahoma', path: 'tahoma.ttf' },
   ],
 };
 
@@ -105,7 +114,7 @@ export function pickSubtitleFallbackFont(
   dirs: readonly string[],
   exists: (candidate: string) => boolean,
 ): SubtitleFallbackFontPick | null {
-  const candidates = SUBTITLE_FALLBACK_FONT_CANDIDATES[lang === 'zh' ? 'zh' : 'ja'];
+  const candidates = SUBTITLE_FALLBACK_FONT_CANDIDATES[normalizeStudyLang(lang)];
   for (const candidate of candidates) {
     for (const dir of dirs) {
       const full = path.join(dir, candidate.path);

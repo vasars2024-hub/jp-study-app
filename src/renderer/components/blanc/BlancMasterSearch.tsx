@@ -32,7 +32,7 @@ export interface BlancMasterSearchContent {
   detail: string;
   category: string;
   keywords?: string[];
-  language?: 'ja' | 'zh';
+  language?: 'ja' | 'zh' | 'ru';
 }
 
 export type BlancMasterSearchResult =

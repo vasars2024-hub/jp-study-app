@@ -137,8 +137,8 @@ export interface StudyBottomBarProps {
   onWhisperDeviceChange: (device: WhisperDevice) => void;
   whisperModel: WhisperModelTier;
   onWhisperModelChange: (tier: WhisperModelTier) => void;
-  whisperLanguage: 'ja' | 'zh';
-  onWhisperLanguageChange: (language: 'ja' | 'zh') => void;
+  whisperLanguage: 'ja' | 'zh' | 'ru';
+  onWhisperLanguageChange: (language: 'ja' | 'zh' | 'ru') => void;
   whisperBusy: boolean;
   whisperCanGenerate: boolean;
   whisperState: string;
@@ -942,7 +942,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                   value={props.whisperLanguage}
                   disabled={props.whisperBusy}
                   onChange={(event) => props.onWhisperLanguageChange(
-                    event.currentTarget.value as 'ja' | 'zh',
+                    event.currentTarget.value as 'ja' | 'zh' | 'ru',
                   )}
                 >
                   <option value="ja">{t('mediaCenter.settings.japanese')}</option>

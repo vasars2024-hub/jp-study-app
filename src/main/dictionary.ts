@@ -924,6 +924,14 @@ export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookupChinese', (_e, query: string, limit?: number) =>
     lookupChineseInDictionary(query, limit === undefined ? undefined : clampLookupLimit(limit)));
   ipcMain.handle('dict:resetChineseCache', () => resetChineseDictionaryCache());
+  // A CC-CEDICT install drops the cached index wherever the download started —
+  // Storage, the setup card, the agent — not only while Settings > Study is
+  // mounted (which is where the renderer-side reset lived).
+  void import('./downloads').then(({ onAssetInstalled }) => {
+    onAssetInstalled((id) => {
+      if (id === 'cc-cedict') resetChineseDictionaryCache();
+    });
+  }).catch(() => { /* downloads unavailable (tests) */ });
   ipcMain.handle('dict:listSources', (_e, pair?: unknown) =>
     listDictionarySources(undefined, readPair(pair)));
   ipcMain.handle('dict:listPairs', () => listDictionaryPairs());

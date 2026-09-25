@@ -5,11 +5,12 @@
 // Scale (Plan 0.5, "Road to v1.01"):
 //   JP: 1 Beginner (pre-N5), 2 N5, 3 N4, 4 N3, 5 N2, 6 N1, 7 Advanced (post-N1).
 //   ZH: 1 HSK1 … 6 HSK6, 7 Advanced.
+//   RU: 1 A1 … 6 C2 (CEFR; TORFL ТЭУ … ТРКИ-4 name the same bands), 7 Advanced.
 // A level "counts as reached" when coverage of its list ≥ threshold (default
 // 0.8). Level 7 is inferred from an advanced custom list and/or the total
 // known-word count, since there is no single canonical post-N1 / post-HSK6 list.
 
-export type StudyLang = 'ja' | 'zh';
+export type StudyLang = 'ja' | 'zh' | 'ru';
 export type LevelTier = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 /** Stable identifier for one upload/paste slot on the Level page. */
@@ -25,7 +26,13 @@ export type LevelSlotId =
   | 'hsk-3'
   | 'hsk-4'
   | 'hsk-5'
-  | 'hsk-6';
+  | 'hsk-6'
+  | 'cefr-a1'
+  | 'cefr-a2'
+  | 'cefr-b1'
+  | 'cefr-b2'
+  | 'cefr-c1'
+  | 'cefr-c2';
 
 export interface LevelSlot {
   id: LevelSlotId;
@@ -74,6 +81,18 @@ export const ZH_SLOTS: readonly LevelSlot[] = [
   { id: 'hsk-6', tier: 6, short: 'HSK 6', label: 'HSK 6' },
 ];
 
+// Russian is graded on the CEFR bands. TORFL (ТРКИ), the Russian state exam,
+// is aligned to the same six bands, so its level names ride along in the label
+// for learners who know the exam rather than the framework.
+export const RU_SLOTS: readonly LevelSlot[] = [
+  { id: 'cefr-a1', tier: 1, short: 'A1', label: 'CEFR A1 (TORFL ТЭУ)' },
+  { id: 'cefr-a2', tier: 2, short: 'A2', label: 'CEFR A2 (TORFL ТБУ)' },
+  { id: 'cefr-b1', tier: 3, short: 'B1', label: 'CEFR B1 (TORFL ТРКИ-1)' },
+  { id: 'cefr-b2', tier: 4, short: 'B2', label: 'CEFR B2 (TORFL ТРКИ-2)' },
+  { id: 'cefr-c1', tier: 5, short: 'C1', label: 'CEFR C1 (TORFL ТРКИ-3)' },
+  { id: 'cefr-c2', tier: 6, short: 'C2', label: 'CEFR C2 (TORFL ТРКИ-4)' },
+];
+
 export const JA_TIERS: readonly TierInfo[] = [
   { tier: 1, name: 'Beginner' },
   { tier: 2, name: 'N5' },
@@ -94,8 +113,20 @@ export const ZH_TIERS: readonly TierInfo[] = [
   { tier: 7, name: 'Advanced' },
 ];
 
+export const RU_TIERS: readonly TierInfo[] = [
+  { tier: 1, name: 'A1' },
+  { tier: 2, name: 'A2' },
+  { tier: 3, name: 'B1' },
+  { tier: 4, name: 'B2' },
+  { tier: 5, name: 'C1' },
+  { tier: 6, name: 'C2' },
+  { tier: 7, name: 'Advanced' },
+];
+
 export function slotsForLang(lang: StudyLang): readonly LevelSlot[] {
-  return lang === 'zh' ? ZH_SLOTS : JA_SLOTS;
+  if (lang === 'zh') return ZH_SLOTS;
+  if (lang === 'ru') return RU_SLOTS;
+  return JA_SLOTS;
 }
 
 /**
@@ -111,12 +142,26 @@ export function guessLevelSlot(name: string, lang: StudyLang): LevelSlot | null 
     const m = /\bhsk\s*([1-6])\b/i.exec(text);
     return m ? slots.find((s) => s.id === `hsk-${m[1]}`) ?? null : null;
   }
+  if (lang === 'ru') {
+    const cefr = /\b(?:cefr\s*)?([abc][12])\b/i.exec(text);
+    if (cefr) return slots.find((s) => s.id === `cefr-${cefr[1].toLowerCase()}`) ?? null;
+    // TORFL names the same bands: ТЭУ (A1), ТБУ (A2), ТРКИ-1..4 (B1..C2), also
+    // spelled TRKI / TORFL-n in Latin. `\b` is ASCII-only, so the Cyrillic
+    // names are matched as plain substrings.
+    if (/тэу/i.test(text)) return slots.find((s) => s.id === 'cefr-a1') ?? null;
+    if (/тбу/i.test(text)) return slots.find((s) => s.id === 'cefr-a2') ?? null;
+    const torfl = /(?:трки|\btrki|\btorfl)\s*([1-4])\b/i.exec(text);
+    if (torfl) return slots.find((s) => s.tier === Number(torfl[1]) + 2) ?? null;
+    return null;
+  }
   const m = /(?:\bjlpt\s*n?\s*|\bn)([0-5])\b/i.exec(text);
   return m ? slots.find((s) => s.id === `jlpt-n${m[1]}`) ?? null : null;
 }
 
 export function tiersForLang(lang: StudyLang): readonly TierInfo[] {
-  return lang === 'zh' ? ZH_TIERS : JA_TIERS;
+  if (lang === 'zh') return ZH_TIERS;
+  if (lang === 'ru') return RU_TIERS;
+  return JA_TIERS;
 }
 
 export function tierName(lang: StudyLang, tier: LevelTier): string {

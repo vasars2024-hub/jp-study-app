@@ -3,7 +3,7 @@ export const DICTIONARY_SAVED_SEARCHES_LIMIT = 24;
 
 export interface DictionarySavedSearch {
   query: string;
-  lang: 'ja' | 'zh';
+  lang: 'ja' | 'zh' | 'ru';
 }
 
 let memory: DictionarySavedSearch[] = [];

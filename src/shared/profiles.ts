@@ -129,7 +129,7 @@ export interface StudyProfile {
   /** Shown in Settings — explains what this profile is for. */
   description?: string;
   /** Lemma space tracked by the knowledge store. */
-  targetLang: 'ja' | 'zh';
+  targetLang: 'ja' | 'zh' | 'ru';
   card: CardBlueprint;
   anki: AnkiBinding;
   deckParams: DeckParams;

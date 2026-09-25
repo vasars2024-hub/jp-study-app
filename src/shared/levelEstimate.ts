@@ -28,7 +28,7 @@ import {
   type StudyLang,
 } from './levelScale';
 
-export type LevelScheme = 'jlpt' | 'hsk';
+export type LevelScheme = 'jlpt' | 'hsk' | 'cefr';
 
 /** Compact result both Statistics and EPUB cover render as a badge. */
 export interface LevelEstimate {
@@ -42,7 +42,9 @@ export interface LevelEstimate {
 }
 
 export function schemeForLang(lang: StudyLang): LevelScheme {
-  return lang === 'zh' ? 'hsk' : 'jlpt';
+  if (lang === 'zh') return 'hsk';
+  if (lang === 'ru') return 'cefr';
+  return 'jlpt';
 }
 
 /**
@@ -59,7 +61,7 @@ export function badgeForTier(lang: StudyLang, tier: LevelTier): string {
 
 /** Full prose label for a tier. */
 export function levelLabel(lang: StudyLang, tier: LevelTier): string {
-  if (tier === 7) return lang === 'zh' ? 'Advanced' : 'JLPT Advanced';
+  if (tier === 7) return lang === 'ja' ? 'JLPT Advanced' : 'Advanced';
   const slot = slotsForLang(lang).find((s) => s.tier === tier);
   if (slot) return slot.label;
   if (lang === 'ja' && tier === 1) return 'JLPT Beginner';
@@ -83,7 +85,7 @@ export function badgeKeyForTier(lang: StudyLang, tier: LevelTier): string | null
  * "JLPT" is the exam's own name in every language.
  */
 export function levelLabelKey(lang: StudyLang, tier: LevelTier): string | null {
-  if (tier === 7) return lang === 'zh' ? 'level.tier.advanced' : 'level.label.jlptAdvanced';
+  if (tier === 7) return lang === 'ja' ? 'level.label.jlptAdvanced' : 'level.tier.advanced';
   const slot = slotsForLang(lang).find((s) => s.tier === tier);
   if (slot) return null;
   if (lang === 'ja' && tier === 1) return 'level.label.jlptBeginner';

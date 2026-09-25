@@ -93,7 +93,7 @@ function reasonLabel(reason: string, t: TFn): string {
 /** Word-level bases: dictionary gloss first, Qwen only as the fail-switch. */
 const WORD_LEVEL_BASES = new Set(['expression', 'meaning', 'translation']);
 
-export type DictLang = 'ja' | 'zh';
+export type DictLang = 'ja' | 'zh' | 'ru';
 
 const EX_LANG_KEY = 'jp-study-ex-langs';
 const EX_DISPLAY_KEY = 'jp-study-ex-display';

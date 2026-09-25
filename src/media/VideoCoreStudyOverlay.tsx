@@ -425,7 +425,7 @@ export default function VideoCoreStudyOverlay({
     loadWhisperDevice,
   );
   const [whisperLanguage, setWhisperLanguage] =
-    React.useState<'ja' | 'zh'>(getStudyLang);
+    React.useState<'ja' | 'zh' | 'ru'>(getStudyLang);
   const [whisperState, setWhisperState] =
     React.useState<WhisperGenerationState>('idle');
   const [whisperMessage, setWhisperMessage] = React.useState('');

@@ -32,7 +32,7 @@ export interface TranscribeCue {
 export interface TranscribeRunOptions {
   tier: WhisperModelTier;
   device: WhisperDevice;
-  lang: 'ja' | 'zh';
+  lang: 'ja' | 'zh' | 'ru';
 }
 
 /** Model-download progress, non-null only while a tier's files are streaming in. */

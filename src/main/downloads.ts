@@ -163,6 +163,29 @@ function setStatus(id: string, patch: Partial<AssetStatus>): void {
   if (!current) return;
   statuses.set(id, { ...current, ...patch });
   broadcast(id);
+  if (patch.state === 'installed' && current.state !== 'installed') notifyInstalled(id);
+}
+
+const installedListeners = new Set<(id: string) => void>();
+
+/**
+ * Main-process consumers told when an asset finishes installing — the hook that
+ * lets a dictionary drop its cached index (or import itself) wherever the
+ * download was started from, instead of only while one Settings page is open.
+ */
+export function onAssetInstalled(listener: (id: string) => void): () => void {
+  installedListeners.add(listener);
+  return () => installedListeners.delete(listener);
+}
+
+function notifyInstalled(id: string): void {
+  for (const listener of installedListeners) {
+    try {
+      listener(id);
+    } catch (error) {
+      console.warn('[downloads] installed listener failed:', error);
+    }
+  }
 }
 
 let lastBroadcast = 0;

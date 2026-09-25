@@ -3153,6 +3153,11 @@ const api = {
   setUiLang: (lang: string): void => {
     void ipcRenderer.invoke('i18n:setLang', lang);
   },
+  // Same shape for the study language (ja/zh/ru + Chinese script): main mirrors
+  // it for subtitle discovery, OCR, whisper and YouTube. See main/studyLanguage.ts.
+  setStudyLanguage: (value: { lang: string; script: string }): void => {
+    void ipcRenderer.invoke('study:setLanguage', value);
+  },
 
   // Chrome extension bridge (Phase 9) — loopback HTTP server status / token.
   extensionStatus: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
@@ -3443,8 +3448,8 @@ const api = {
       badge: string;
       empty?: boolean;
       noLists?: boolean;
-      lang?: 'ja' | 'zh' | null;
-      scheme?: 'jlpt' | 'hsk' | null;
+      lang?: 'ja' | 'zh' | 'ru' | null;
+      scheme?: 'jlpt' | 'hsk' | 'cefr' | null;
       label?: string;
       confidence?: number;
       error?: string;

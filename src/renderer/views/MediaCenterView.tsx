@@ -1476,7 +1476,7 @@ function SettingsPanel({
             <select
               value={state.subLang}
               aria-label={t('mediaCenter.settings.transcriptionLanguage')}
-              onChange={(event) => state.setSubLang(event.target.value as 'ja' | 'zh')}
+              onChange={(event) => state.setSubLang(event.target.value as 'ja' | 'zh' | 'ru')}
             >
               <option value="ja">{t('mediaCenter.settings.japanese')}</option>
               <option value="zh">{t('mediaCenter.settings.chinese')}</option>

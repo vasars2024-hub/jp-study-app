@@ -130,8 +130,8 @@ export interface LevelEstimateBridgeResult {
   empty?: boolean;
   /** Settings vocab bands missing — cannot score. */
   noLists?: boolean;
-  lang?: 'ja' | 'zh' | null;
-  scheme?: 'jlpt' | 'hsk' | null;
+  lang?: 'ja' | 'zh' | 'ru' | null;
+  scheme?: 'jlpt' | 'hsk' | 'cefr' | null;
   label?: string;
   confidence?: number;
   error?: string;
