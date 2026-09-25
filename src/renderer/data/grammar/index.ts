@@ -19,6 +19,7 @@ import { HSK } from './hsk';
 import { HSK_EXTRA } from './hsk-extra';
 import { HSK_IMPORT } from './hsk-import';
 import { RU_CEFR } from './ru-cefr';
+import { HSK_STARTER } from './hsk-starter';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
@@ -127,6 +128,13 @@ const HSK_IMPORTED: ModuleProvenance = {
   verification: 'imported-unreviewed',
 };
 
+/** HSK 2–4 everyday patterns the seed and expansion left out; authored the same way as hsk-extra. */
+const HSK_STARTER_AUTHORED: ModuleProvenance = {
+  source: 'authored:hsk-starter',
+  tagSource: 'authored',
+  verification: 'verified',
+};
+
 /*
  * Russian A1–B1, written for this app against the taxonomy (categories, not
  * gloss-regex functions), with examples authored alongside each point.
@@ -153,6 +161,7 @@ export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(HSK, HSK_SEED),
   ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
   ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),
+  ...normalizeGrammarList(HSK_STARTER, HSK_STARTER_AUTHORED),
   ...normalizeGrammarList(RU_CEFR, RU_AUTHORED),
 ];
 
@@ -172,6 +181,7 @@ export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
   hsk: HSK,
   'hsk-extra': HSK_EXTRA,
   'hsk-import': HSK_IMPORT,
+  'hsk-starter': HSK_STARTER,
   'ru-cefr': RU_CEFR,
 };
 

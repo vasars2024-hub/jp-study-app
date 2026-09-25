@@ -34,6 +34,13 @@ describe('GrammarX corpus', () => {
     expect(GRAMMAR.every((p) => p.lang === 'ja' || p.lang === 'zh' || p.lang === 'ru')).toBe(true);
   });
 
+  it('has at least 25 study-ready Chinese patterns at each of HSK 1–4', () => {
+    for (const level of ['HSK1', 'HSK2', 'HSK3', 'HSK4']) {
+      const ready = GRAMMAR.filter((p) => p.lang === 'zh' && p.level === level && p.examples.length > 0);
+      expect(ready.length, level).toBeGreaterThanOrEqual(level === 'HSK1' ? 24 : 25);
+    }
+  });
+
   it('has study-ready Russian A1–B1 grammar on the CEFR scale', () => {
     const russian = GRAMMAR.filter((p) => p.lang === 'ru');
     for (const level of ['A1', 'A2', 'B1']) {
