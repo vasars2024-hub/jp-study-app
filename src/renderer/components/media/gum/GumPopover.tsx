@@ -19,6 +19,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { createPortal } from 'react-dom';
 import { ContextualSurface } from '../../liquid/LiquidSurface';
 import GumIcon from './GumIcons';
+import { toLayoutRect } from '../../../zoomCoords';
 
 export interface GumPopoverProps {
   /** Summary content: the control's visible label (and current value). */
@@ -42,7 +43,7 @@ const MIN_HEIGHT = 140;
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * Where a panel goes, as a pure function of three boxes (all in client pixels), so
+ * Where a panel goes, as a pure function of three boxes (all in layout pixels), so
  * the geometry can be tested without a layout engine.
  */
 export function placePopover(
@@ -96,7 +97,10 @@ export default function GumPopover({
     if (!details || !panel || !root) return;
     const summary = details.querySelector('summary');
     if (!summary) return;
-    const rootRect = root.getBoundingClientRect();
+    // Layout pixels throughout: the client rects are scaled by the #root zoom, while the
+    // panel's own offsetWidth and the `left/top` written below are not. Mixing the two
+    // put the menu a fifth short of its trigger at the 80% default zoom.
+    const rootRect = toLayoutRect(root.getBoundingClientRect());
     if (rootRect.width === 0 && rootRect.height === 0) return;
     // Measure the natural size first: no stale cap or offset from the previous placement
     // (an absolute box near the right edge shrink-wraps to the room left of it).
@@ -105,7 +109,7 @@ export default function GumPopover({
     panel.style.top = '0px';
     panel.style.maxWidth = `min(440px, ${Math.max(0, rootRect.width - EDGE * 2)}px)`;
     const next = placePopover(
-      summary.getBoundingClientRect(),
+      toLayoutRect(summary.getBoundingClientRect()),
       rootRect,
       { width: panel.offsetWidth, height: panel.scrollHeight },
       align,
