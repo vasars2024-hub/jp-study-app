@@ -2065,7 +2065,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
 
       {/* The card collections: the design system's tab strip and search field, so this
           window's controls read like every other window's. */}
-      <div className="flash-collections">
+      <ContextualSurface className="flash-collections">
         <Tabs
           className="flash-collection-tabs"
           aria-label={t('flash.tabs.label')}
@@ -2106,7 +2106,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             </>
           )}
         </div>
-      </div>
+      </ContextualSurface>
 
       <DeckImportPanel onImported={() => state.setDeck(loadDeck())} />
 
