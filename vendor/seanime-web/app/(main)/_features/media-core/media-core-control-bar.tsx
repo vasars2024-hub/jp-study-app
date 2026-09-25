@@ -3,10 +3,24 @@ import { cn } from "@/components/ui/core/styling"
 import { AnimatePresence, motion } from "motion/react"
 import React from "react"
 import { FaDiamond } from "react-icons/fa6"
-import { LuChevronLeft, LuChevronRight, LuVolume, LuVolume1, LuVolume2, LuVolumeOff } from "react-icons/lu"
+import {
+    LuCaptions,
+    LuChevronLeft,
+    LuChevronRight,
+    LuChevronUp,
+    LuFilm,
+    LuHeadphones,
+    LuMessagesSquare,
+    LuSettings,
+    LuVolume,
+    LuVolume1,
+    LuVolume2,
+    LuVolumeOff,
+} from "react-icons/lu"
 import { RiPauseLargeLine, RiPlayLargeLine } from "react-icons/ri"
 import { RxEnterFullScreen, RxExitFullScreen } from "react-icons/rx"
 import { TbPictureInPicture, TbPictureInPictureOff } from "react-icons/tb"
+import { useT } from "../../../../../../src/renderer/i18n" // Gum: K5, translated control names
 
 export function formatTime(seconds: number) {
     const sign = seconds < 0 ? "-" : ""
@@ -343,6 +357,8 @@ export function MediaCoreMobileControlBarView(props: MediaCoreMobileControlBarVi
 export interface MediaCoreControlButtonIconProps {
     icons: [string, React.ElementType][]
     state: string
+    /** Gum (K5): the button's accessible name, already translated. */
+    label?: string
     className?: string
     iconClass?: string
     onClick: () => void
@@ -352,16 +368,44 @@ export interface MediaCoreControlButtonIconProps {
     isMiniPlayer: boolean
 }
 
+/**
+ * Gum (round-2 K5): the menu triggers (audio, quality, settings, subtitles, chat) are built in
+ * their own files as icon-only buttons and never said what they were - a screen reader read
+ * eight unnamed buttons in a row. Their icon is the one stable thing that names them, so an
+ * unlabelled button is named from it here rather than by touching five vendor files.
+ */
+const ICON_LABEL_KEYS = new Map<React.ElementType, string>([
+    [LuHeadphones, "playerUi.control.audio"],
+    [LuFilm, "playerUi.control.quality"],
+    [LuChevronUp, "playerUi.control.settings"],
+    [LuSettings, "playerUi.control.settings"],
+    [LuCaptions, "playerUi.control.subtitles"],
+    [LuMessagesSquare, "playerUi.control.chat"],
+])
+
+export function mediaCoreControlLabelKey(icons: [string, React.ElementType][], state: string): string | undefined {
+    const icon = icons.find(([iconState]) => iconState === state)?.[1] ?? icons[0]?.[1]
+    return icon ? ICON_LABEL_KEYS.get(icon) : undefined
+}
+
 export function MediaCoreControlButtonIcon(props: MediaCoreControlButtonIconProps) {
     const { icons, state, className, iconClass, onClick, onWheel, children, isMobile, isMiniPlayer } = props
+    const { t } = useT()
+    const fallbackKey = props.label ? undefined : mediaCoreControlLabelKey(icons, state)
+    const label = props.label ?? (fallbackKey ? t(fallbackKey) : undefined)
 
     return (
         <button
-            role="button"
+            type="button"
+            aria-label={label}
+            title={label}
             data-vc-element="control-button"
             data-vc-state={state}
             className={cn(
-                "vc-control-button flex items-center justify-center transition-opacity relative h-full focus-visible:outline-none focus:outline-none focus-visible:opacity-50",
+                // Gum (K5): the focus style was `outline-none` plus a 50% fade, which on a moving
+                // picture is no visible focus at all. A real brand-colour ring, inset so the bar's
+                // overflow cannot clip it.
+                "vc-control-button flex items-center justify-center transition-opacity relative h-full rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[rgb(var(--color-brand-400))]",
                 isMobile ? "px-1 text-2xl" : "px-2 text-3xl hover:opacity-80",
                 isMiniPlayer && !isMobile && "text-2xl",
                 className,
@@ -400,6 +444,7 @@ export function MediaCorePlayButton(props: {
     isMobile: boolean
     isMiniPlayer: boolean
 }) {
+    const { t } = useT()
     return (
         <MediaCoreControlButtonIcon
             icons={[
@@ -407,6 +452,7 @@ export function MediaCorePlayButton(props: {
                 ["paused", RiPlayLargeLine],
             ]}
             state={props.paused ? "paused" : "playing"}
+            label={props.paused ? t("playerUi.control.play") : t("playerUi.control.pause")}
             onClick={props.onTogglePlay}
             isMobile={props.isMobile}
             isMiniPlayer={props.isMiniPlayer}
@@ -425,6 +471,7 @@ export interface MediaCoreVolumeButtonProps {
 
 export function MediaCoreVolumeButton(props: MediaCoreVolumeButtonProps) {
     const { volume, muted, onVolumeChange, onMuteToggle, isMobile, isMiniPlayer } = props
+    const { t } = useT()
     const [isSliding, setIsSliding] = React.useState(false)
 
     function linearToVolume(linear: number): number {
@@ -489,6 +536,7 @@ export function MediaCoreVolumeButton(props: MediaCoreVolumeButtonProps) {
                                 "low"
                 }
                 className={isMiniPlayer ? "text-[1.3rem]" : "text-2xl"}
+                label={muted ? t("playerUi.control.unmute") : t("playerUi.control.mute")}
                 onClick={onMuteToggle}
                 onWheel={handleWheel}
                 isMobile={isMobile}
@@ -528,11 +576,13 @@ export function MediaCoreVolumeButton(props: MediaCoreVolumeButtonProps) {
 }
 
 export function MediaCoreNextButton(props: { onClick: () => void; isMobile: boolean; isMiniPlayer: boolean }) {
+    const { t } = useT()
     if (props.isMiniPlayer) return null
     return (
         <MediaCoreControlButtonIcon
             icons={[["default", LuChevronRight]]}
             state="default"
+            label={t("playerUi.control.nextEpisode")}
             onClick={props.onClick}
             isMobile={props.isMobile}
             isMiniPlayer={props.isMiniPlayer}
@@ -541,11 +591,13 @@ export function MediaCoreNextButton(props: { onClick: () => void; isMobile: bool
 }
 
 export function MediaCorePreviousButton(props: { onClick: () => void; isMobile: boolean; isMiniPlayer: boolean }) {
+    const { t } = useT()
     if (props.isMiniPlayer) return null
     return (
         <MediaCoreControlButtonIcon
             icons={[["default", LuChevronLeft]]}
             state="default"
+            label={t("playerUi.control.previousEpisode")}
             onClick={props.onClick}
             isMobile={props.isMobile}
             isMiniPlayer={props.isMiniPlayer}
@@ -592,6 +644,7 @@ export function MediaCorePipButton(props: {
     isMobile: boolean
     isMiniPlayer: boolean
 }) {
+    const { t } = useT()
     if (props.isMiniPlayer) return null
     return (
         <MediaCoreControlButtonIcon
@@ -600,6 +653,7 @@ export function MediaCorePipButton(props: {
                 ["pip", TbPictureInPictureOff],
             ]}
             state={props.isPip ? "pip" : "default"}
+            label={props.isPip ? t("playerUi.control.exitPip") : t("playerUi.control.enterPip")}
             onClick={props.onTogglePip}
             isMobile={props.isMobile}
             isMiniPlayer={props.isMiniPlayer}
@@ -613,6 +667,7 @@ export function MediaCoreFullscreenButton(props: {
     isMobile: boolean
     isMiniPlayer: boolean
 }) {
+    const { t } = useT()
     return (
         <MediaCoreControlButtonIcon
             icons={[
@@ -620,6 +675,7 @@ export function MediaCoreFullscreenButton(props: {
                 ["fullscreen", RxExitFullScreen],
             ]}
             state={props.isFullscreen ? "fullscreen" : "default"}
+            label={props.isFullscreen ? t("playerUi.control.exitFullscreen") : t("playerUi.control.fullscreen")}
             onClick={props.onToggleFullscreen}
             isMobile={props.isMobile}
             isMiniPlayer={props.isMiniPlayer}
