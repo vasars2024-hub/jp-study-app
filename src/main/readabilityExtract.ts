@@ -5,6 +5,7 @@
 
 import { createRequire } from 'node:module';
 import { Readability } from '@mozilla/readability';
+import { decodeHtmlBytes } from '../shared/htmlCharset';
 
 const require = createRequire(import.meta.url);
 const { parseHTML } = require('linkedom') as typeof import('linkedom');
@@ -185,7 +186,10 @@ async function fetchArticleHtml(url: string): Promise<{ html: string; url: strin
   if (ct && !/html|xml|text/i.test(ct)) {
     throw new Error(`Not a web page (${ct.split(';')[0]}).`);
   }
-  const html = (await res.text()).slice(0, 3_000_000);
+  // In the page's own charset (header, then <meta>): a GBK, Big5 or
+  // windows-1251 page decoded as UTF-8 was mojibake in Reader Mode.
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const html = decodeHtmlBytes(bytes.subarray(0, 12_000_000), ct).text.slice(0, 3_000_000);
   if (html.length < 400) throw new Error('Page returned too little content.');
   return { html, url: res.url };
 }
