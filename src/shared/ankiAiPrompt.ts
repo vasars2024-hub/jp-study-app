@@ -28,6 +28,7 @@
 import { estimateAgentProviderCostUsd, agentEstimatedTokens, type AgentProviderPricingTable } from './agentProviderPricing';
 import { AI_PROVIDERS, providerById, providerKeyBucket, type AiProviderId } from './aiProviders';
 import type { AiAdditionKind } from './ankiAiAdditions';
+import { normalizeStudyLang, type StudyLang } from './studyLang';
 
 /** Notes per provider request. Chunked so a cancel lands between calls, not after all of them. */
 export const AI_ADDITIONS_CHUNK_SIZE = 8;
@@ -52,9 +53,18 @@ export interface AiAdditionsRequest {
   variantCount: number;
   /** Whether the note's meaning field is sent alongside the word. See the module note. */
   sendGloss: boolean;
-  /** Language for the explanatory kinds. Japanese output is Japanese regardless. */
+  /** Language for the explanatory kinds. Study-language output is in the study language regardless. */
   explainLanguage: string;
+  /** The deck's language: example sentences are written in it. Japanese when omitted. */
+  studyLang?: StudyLang;
 }
+
+/** English names the model is told, per study language. */
+const STUDY_LANG_ENGLISH: Readonly<Record<StudyLang, string>> = {
+  ja: 'Japanese',
+  zh: 'Chinese (Mandarin)',
+  ru: 'Russian',
+};
 
 export const AI_ADDITIONS_SCHEMA = {
   type: 'object',
@@ -74,18 +84,18 @@ export const AI_ADDITIONS_SCHEMA = {
   required: ['results'],
 } as const;
 
-const KIND_INSTRUCTIONS: Record<AiAdditionKind, string> = {
-  'example-sentence':
-    'Write one natural Japanese sentence that uses the word, short enough for a flashcard and unambiguous about the word\'s meaning.',
-  'sentence-translation':
-    'Write a natural translation of a short Japanese sentence that uses the word, giving the sentence and its translation on one line separated by " — ".',
-  definition:
+const KIND_INSTRUCTIONS: Record<AiAdditionKind, (language: string) => string> = {
+  'example-sentence': (language) =>
+    `Write one natural ${language} sentence that uses the word, short enough for a flashcard and unambiguous about the word's meaning.`,
+  'sentence-translation': (language) =>
+    `Write a natural translation of a short ${language} sentence that uses the word, giving the sentence and its translation on one line separated by " — ".`,
+  definition: () =>
     'Write one concise definition of the word, in the requested explanation language, without repeating the word itself as the whole definition.',
-  mnemonic:
+  mnemonic: () =>
     'Write one short memory aid for the word\'s form or meaning. Concrete and visual beats clever.',
-  'usage-note':
+  'usage-note': () =>
     'Write one short note on register, nuance, or when the word would be the wrong choice.',
-  hint: 'Write one short clue that helps recall the word without containing the word or its reading.',
+  hint: () => 'Write one short clue that helps recall the word without containing the word or its reading.',
 };
 
 function text(value: unknown): string {
@@ -130,6 +140,7 @@ export function normalizeAiAdditionsRequest(value: unknown): AiAdditionsRequest 
     explainLanguage: typeof raw.explainLanguage === 'string' && raw.explainLanguage.trim()
       ? raw.explainLanguage.trim().slice(0, 16)
       : 'en',
+    studyLang: normalizeStudyLang(raw.studyLang),
   };
 }
 
@@ -146,8 +157,8 @@ export function buildAiAdditionsPrompt(
     note.gloss ? `${index + 1}. ${note.term} (${note.gloss})` : `${index + 1}. ${note.term}`
   ));
   return [
-    'You generate study material for Japanese flashcards.',
-    `Task for every word: ${KIND_INSTRUCTIONS[request.kind]}`,
+    `You generate study material for ${STUDY_LANG_ENGLISH[request.studyLang ?? 'ja']} flashcards.`,
+    `Task for every word: ${KIND_INSTRUCTIONS[request.kind](STUDY_LANG_ENGLISH[request.studyLang ?? 'ja'])}`,
     `Give exactly ${request.variantCount} distinct alternative(s) per word; a user picks one.`,
     `Explanations and translations use language code: ${request.explainLanguage}.`,
     'Words:',

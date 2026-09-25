@@ -910,6 +910,7 @@ const api = {
     variantCount: number;
     sendGloss: boolean;
     explainLanguage: string;
+    studyLang?: 'ja' | 'zh' | 'ru';
   }): Promise<AiAdditionsRunResult> => ipcRenderer.invoke('anki:aiGenerateAdditions', request),
   /**
    * Deck Workbench field translation (gate 2). A different question with the

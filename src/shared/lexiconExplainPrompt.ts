@@ -123,11 +123,16 @@ export function readExplainGrounding(raw: unknown): LexiconExplainGrounding {
  * bumping the version leaves every previously cached answer being served for a
  * question that is no longer being asked. The failing assertion is the reminder.
  */
+/** "a Japanese / Chinese / Russian learner" — the word's language, not always Japanese. */
+const LEARNER_OF: Readonly<Record<string, string>> = { ja: 'Japanese', zh: 'Chinese', ru: 'Russian' };
+
 export function buildExplanationPrompt(
   word: string,
   reading: string,
   glossLang: string,
   grounding: LexiconExplainGrounding,
+  /** The word's language. The Japanese prompt is unchanged (and so is the cache version). */
+  wordLang = 'ja',
 ): string {
   const glosses = grounding.glosses
     .map((gloss) => gloss.trim().slice(0, EXPLAIN_GLOSS_MAX_CHARS))
@@ -138,7 +143,7 @@ export function buildExplanationPrompt(
     ? `${word.trim()} (${reading.trim()})`
     : word.trim();
   const lines = [
-    `Explain the word ${headword} to a Japanese learner.`,
+    `Explain the word ${headword} to a ${LEARNER_OF[wordLang] ?? 'Japanese'} learner.`,
     `Write every value in ${explanationProseLanguage(glossLang)}.`,
     '',
     'Dictionary material already shown to the reader:',

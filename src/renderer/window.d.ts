@@ -524,6 +524,7 @@ declare global {
         variantCount: number;
         sendGloss: boolean;
         explainLanguage: string;
+        studyLang?: 'ja' | 'zh' | 'ru';
       }): Promise<AiAdditionsRunResult>;
       /** Deck Workbench field translation — gate 2. Same batch id space as above. */
       ankiAiTranslateField(request: {
