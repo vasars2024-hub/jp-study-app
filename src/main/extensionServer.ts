@@ -46,7 +46,7 @@ import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
 import { getMainStudyLang } from './studyLanguage';
-import { studyLangOfText } from '../shared/studyLang';
+import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   decideExtensionSettingsAccess,
@@ -1931,16 +1931,20 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     if (!requireAuth(req, res)) return;
     try {
       const raw = await readBody(req);
-      const body = JSON.parse(raw || '{}') as { query?: string };
+      const body = JSON.parse(raw || '{}') as { query?: string; lang?: string };
       const query = String(body.query ?? '').trim().slice(0, 80);
       if (!query) {
         json(res, 400, { ok: false, error: 'query required' });
         return;
       }
+      // The page's language when the extension says it, else the query's script
+      // (Han alone following the study language) — a Chinese page is answered
+      // from the Chinese dictionary, not the Japanese one.
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(query, getMainStudyLang());
       // The dictionary database, one entry per gloss language — the shape the
       // legacy in-memory index answered with, without loading that index.
       const { lookupTermOffline } = await import('./dictionary');
-      const local = await lookupTermOffline(query);
+      const local = await lookupTermOffline(query, lang);
       const entries = (local.entries || []).slice(0, 8).map((e) => ({
         word: e.word,
         reading: e.reading,

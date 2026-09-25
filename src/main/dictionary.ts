@@ -339,12 +339,21 @@ function withLegacyMetadata(result: DictResult): DictResult {
  * a term store is still waiting for its database import — the documented
  * migration fallback. On a migrated installation it is never loaded from here.
  */
-async function lookupOfflineMany(texts: readonly string[], limit = DICT_LOOKUP_LIMIT): Promise<DictResult[]> {
+async function lookupOfflineMany(
+  texts: readonly string[],
+  limit = DICT_LOOKUP_LIMIT,
+  lang?: 'ja' | 'zh' | 'ru',
+): Promise<DictResult[]> {
   const queries = texts.map((text) => (text ?? '').trim());
   const asked = queries.filter(Boolean);
   let unified: LookupResult[] = [];
   try {
-    unified = await readDictionaryBatch(asked.map((text) => ({ text, limit, headwordsOnly: true })));
+    unified = await readDictionaryBatch(asked.map((text) => ({
+      text,
+      limit,
+      headwordsOnly: true,
+      ...(lang ? { sourceLangs: [lang] } : {}),
+    })));
   } catch {
     // A database read must never take the offline fallback down.
   }
@@ -367,6 +376,16 @@ async function lookupOfflineMany(texts: readonly string[], limit = DICT_LOOKUP_L
       out.push(withLegacyMetadata(lookupResultToPerLanguageDictResult(hit)));
       continue;
     }
+    // The legacy stores are Japanese: a Chinese miss falls back to CC-CEDICT,
+    // a Russian one has no fallback.
+    if (lang === 'zh') {
+      out.push(await lookupChineseInDictionary(q, limit).catch(() => ({ query: q, entries: [] })));
+      continue;
+    }
+    if (lang === 'ru') {
+      out.push({ query: q, entries: [] });
+      continue;
+    }
     if (legacyReady === undefined) legacyReady = await initYomitan().catch(() => false);
     if (!legacyReady) {
       out.push({ query: q, entries: [] });
@@ -378,9 +397,13 @@ async function lookupOfflineMany(texts: readonly string[], limit = DICT_LOOKUP_L
   return out;
 }
 
-/** Offline-only dictionary lookup (de-inflection aware) — no Jisho HTTP. */
-export async function lookupTermOffline(query: string): Promise<DictResult> {
-  const [result] = await lookupOfflineMany([query ?? '']);
+/**
+ * Offline-only dictionary lookup (de-inflection aware) — no Jisho HTTP. `lang`
+ * pins the source language (the browser extension says which page language it
+ * is reading); without it the query's script decides, as before.
+ */
+export async function lookupTermOffline(query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> {
+  const [result] = await lookupOfflineMany([query ?? ''], DICT_LOOKUP_LIMIT, lang);
   return result;
 }
 
