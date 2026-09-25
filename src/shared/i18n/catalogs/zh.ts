@@ -12042,12 +12042,12 @@ export const zh: Catalog = {
   'filesApp.mine.refuse.notAFile': '该位置是文件夹，不是文件。',
   'filesApp.mine.refuse.tooLarge': '该文件过大，无法按文本读取。',
   'filesApp.mine.refuse.unknownSubtitleFormat': '本应用无法读取这种字幕格式。',
-  'filesApp.mine.refuse.noJapanese': '读取了 {read} 条，均不含日文，因此没有添加任何内容。',
+  'filesApp.mine.refuse.noJapanese': '读取了 {read} 条，均不含{lang}文本，因此没有添加任何内容。',
   'filesApp.mine.refuse.allDuplicates': '{read} 条全部已在卡组中，因此没有添加任何内容。',
   'filesApp.mine.added': {
     other: '已从 {read} 条中添加 {count} 张卡片。',
   },
-  'filesApp.mine.skipped': '跳过 {notJapanese} 条无日文、{duplicate} 条已在卡组中的内容。',
+  'filesApp.mine.skipped': '跳过 {notJapanese} 条无{lang}文本、{duplicate} 条已在卡组中的内容。',
   'filesApp.mine.capped': '已在 {max} 张上限处停止；另有 {overCap} 条未添加。',
   'filesApp.mine.machineMark': '这些卡片已标记为机器生成的文本。',
   'filesApp.mine.undone': {

@@ -13232,8 +13232,7 @@ export const ru: Catalog = {
   'filesApp.mine.refuse.notAFile': 'По этому пути находится папка, а не файл.',
   'filesApp.mine.refuse.tooLarge': 'Этот файл слишком велик, чтобы читать его как текст.',
   'filesApp.mine.refuse.unknownSubtitleFormat': 'Приложение не читает этот формат субтитров.',
-  'filesApp.mine.refuse.noJapanese':
-    'Прочитано фрагментов: {read}, японского текста нет ни в одном — ничего не добавлено.',
+  'filesApp.mine.refuse.noJapanese': 'Прочитано фрагментов: {read}, ни в одном нет текста на изучаемом языке ({lang}) — ничего не добавлено.',
   'filesApp.mine.refuse.allDuplicates':
     'Все {read} фрагментов уже есть в колоде — ничего не добавлено.',
   'filesApp.mine.added': {
@@ -13242,7 +13241,7 @@ export const ru: Catalog = {
     many: 'Добавлено {count} карточек из {read} фрагментов.',
     other: 'Добавлено {count} карточки из {read} фрагментов.',
   },
-  'filesApp.mine.skipped': 'Пропущено без японского: {notJapanese}, уже в колоде: {duplicate}.',
+  'filesApp.mine.skipped': 'Пропущено без текста на изучаемом языке ({lang}): {notJapanese}, уже в колоде: {duplicate}.',
   'filesApp.mine.capped': 'Остановлено на пределе в {max} карточек; ещё {overCap} фрагментов не добавлено.',
   'filesApp.mine.machineMark': 'Эти карточки помечены как текст машинного происхождения.',
   'filesApp.mine.undone': {

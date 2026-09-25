@@ -37,17 +37,24 @@ export const KINOMOTO_PRESET: ReadonlyArray<{ role: FieldRole; field: string }> 
   { role: 'frequency', field: 'Frequency' },
 ];
 
+/**
+ * Field names each role is recognised by, in the note types learners of every
+ * study language actually use: Japanese (単語, 読み), Chinese (汉字 / Hanzi,
+ * 拼音 / Pinyin, Simplified / Traditional) and Russian (Слово, Ударение,
+ * Перевод). A Chinese deck's `Pinyin` field used to go unfilled because only
+ * Japanese and English names were known.
+ */
 export const ROLE_SYNONYMS: Record<FieldRole, RegExp> = {
-  term: /^(term|expression|word|front|単語|表現)$/i,
-  reading: /^(reading|furigana|kana|yomi|よみ|読み|ルビ)$/i,
-  meaning: /^(meaning|definition|glossary|gloss|back|意味|定義)$/i,
-  translation: /(translation|訳|翻訳)/i,
-  sentence: /(sentence|context|例文|用例|^文$)/i, // superset of the legacy dictionary.ts regex
-  notes: /^(notes?|備考|メモ)$/i,
-  image: /^(image|picture|screenshot|画像)$/i,
-  termAudio: /^((term|word)[ _-]?audio|audio|音声)$/i,
-  sentenceAudio: /(sentence[ _-]?audio)/i,
-  frequency: /(freq|頻度)/i,
+  term: /^(term|expression|word|front|vocab(ulary)?|hanzi|simplified|traditional|単語|表現|汉字|漢字|词语|詞語|单词|單詞|生词|生詞|слово|лексема|термин)$/i,
+  reading: /^(reading|furigana|kana|yomi|pinyin|zhuyin|bopomofo|stress(ed)?|よみ|読み|ルビ|拼音|注音|ударение|произношение)$/i,
+  meaning: /^(meaning|definition|glossary|gloss|back|意味|定義|释义|釋義|意思|定义|значение|определение)$/i,
+  translation: /(translation|訳|翻訳|翻译|翻譯|перевод)/i,
+  sentence: /(sentence|context|例文|用例|^文$|句子|例句|предложение|пример|контекст)/i, // superset of the legacy dictionary.ts regex
+  notes: /^(notes?|備考|メモ|笔记|筆記|备注|備註|заметки|примечани[ея])$/i,
+  image: /^(image|picture|screenshot|画像|图片|圖片|изображение|картинка)$/i,
+  termAudio: /^((term|word)[ _-]?audio|audio|音声|发音|發音|аудио|звук|произношение[ _-]?аудио)$/i,
+  sentenceAudio: /(sentence[ _-]?audio|句子音频|例句音频|аудио[ _-]?предложени)/i,
+  frequency: /(freq|頻度|频率|頻率|частот)/i,
 };
 
 // ----- Hashing ---------------------------------------------------------------

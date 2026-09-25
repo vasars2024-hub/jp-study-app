@@ -174,6 +174,8 @@ import {
   createWindowFilesDeletionSession,
   type FilesDeletionNotice,
 } from './filesDeletionSession';
+import { getStudyLang } from '../../studyEnvironment';
+import { STUDY_LANG_NAME_KEY } from '../../../shared/studyLang';
 import './filesApp.css';
 
 /**
@@ -2077,7 +2079,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     if (mineState.status === 'refused') {
       return (
         <p className="fa-details-note fa-mine-refusal" role="status">
-          {t(mineState.reasonKey, mineState.values)}
+          {t(mineState.reasonKey, { ...mineState.values, lang: t(STUDY_LANG_NAME_KEY[getStudyLang()]) })}
           {mineState.detail ? <span className="fa-state-detail"> {mineState.detail}</span> : null}
         </p>
       );
@@ -2104,6 +2106,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             {t('filesApp.mine.skipped', {
               notJapanese: mineState.skippedNotJapanese,
               duplicate: mineState.skippedDuplicate,
+              lang: t(STUDY_LANG_NAME_KEY[getStudyLang()]),
             })}
           </p>
         ) : null}

@@ -12164,14 +12164,13 @@ export const ja: Catalog = {
   'filesApp.mine.refuse.notAFile': 'その場所はファイルではなくフォルダーです。',
   'filesApp.mine.refuse.tooLarge': 'このファイルはテキストとして読み込むには大きすぎます。',
   'filesApp.mine.refuse.unknownSubtitleFormat': 'この字幕形式はこのアプリでは読み取れません。',
-  'filesApp.mine.refuse.noJapanese':
-    '{read} 件を読み取りましたが、日本語を含むものがなかったため何も追加されませんでした。',
+  'filesApp.mine.refuse.noJapanese': '{read} 件を読み取りましたが、{lang}を含むものがなかったため何も追加されませんでした。',
   'filesApp.mine.refuse.allDuplicates':
     '{read} 件すべてがすでにデッキにあるため、何も追加されませんでした。',
   'filesApp.mine.added': {
     other: '{read} 件から {count} 枚のカードを追加しました。',
   },
-  'filesApp.mine.skipped': '日本語なし {notJapanese} 件、デッキに既存 {duplicate} 件をスキップしました。',
+  'filesApp.mine.skipped': '{lang}なし {notJapanese} 件、デッキに既存 {duplicate} 件をスキップしました。',
   'filesApp.mine.capped': '上限の {max} 枚で停止しました。残り {overCap} 件は追加されていません。',
   'filesApp.mine.machineMark': 'これらのカードは機械由来のテキストとして印が付いています。',
   'filesApp.mine.undone': {

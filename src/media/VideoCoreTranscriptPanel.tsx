@@ -1,7 +1,7 @@
 import React from 'react';
 import type { VideoCoreActiveCue } from '@/app/(main)/_features/video-core/video-core-subtitles';
 import { isTypesettingCueText, stripAssCueText } from '../shared/videoCoreStudy';
-import { resolveProfileMatch } from '../shared/profileRules';
+import { profileForLanguage, resolveProfileMatch } from '../shared/profileRules';
 import { posCategoryClass } from '../shared/posCategory';
 import { getTokenizer, tokenizeSync, type JpToken } from '../renderer/tokenizer';
 import { translate } from '../renderer/translator';
@@ -40,7 +40,7 @@ interface MiningDestination {
   usedDefault: boolean;
 }
 
-function useMiningDestination(): MiningDestination | null {
+function useMiningDestination(lang: StudyLang): MiningDestination | null {
   const [destination, setDestination] = React.useState<MiningDestination | null>(null);
 
   React.useEffect(() => {
@@ -59,10 +59,14 @@ function useMiningDestination(): MiningDestination | null {
         const activeId = snapshot?.activeProfileId ?? '';
         const resolved = resolveProfileMatch(
           (ruleStore?.rules ?? []) as Parameters<typeof resolveProfileMatch>[0],
-          { source: 'subtitle', cardKind: 'word', language: 'ja' },
+          { source: 'subtitle', cardKind: 'word', language: lang },
           activeId,
         );
-        const profile = profiles.find((entry) => entry.id === resolved.profileId)
+        // Same fallback as the Anki gateway: no rule matched → a profile that studies this language.
+        const profileId = resolved.usedDefault
+          ? profileForLanguage(profiles, lang, resolved.profileId)
+          : resolved.profileId;
+        const profile = profiles.find((entry) => entry.id === profileId)
           ?? profiles.find((entry) => entry.id === activeId);
         if (!profile) return;
         setDestination({
@@ -77,7 +81,7 @@ function useMiningDestination(): MiningDestination | null {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [lang]);
 
   return destination;
 }
@@ -552,7 +556,7 @@ export default function VideoCoreTranscriptPanel({
   );
 
   const translateLabel = t('mediaWorkspace.study.transcriptTranslate');
-  const destination = useMiningDestination();
+  const destination = useMiningDestination(lang);
 
   return (
     <aside className="study-transcript-panel" aria-label={t('mediaWorkspace.study.transcript')}>

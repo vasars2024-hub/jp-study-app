@@ -30,6 +30,8 @@ import {
 } from './cueAudioCapture';
 import MediaLensCaptureButton from './MediaLensCaptureButton';
 import { mineToStudy, videoCoreStudyInput } from '../renderer/studyMining';
+import { getStudyLang } from '../renderer/studyEnvironment';
+import { studyLangOfText } from '../shared/studyLang';
 import MediaCueAgentHandoffButton from './MediaCueAgentHandoffButton';
 
 interface Props {
@@ -195,7 +197,11 @@ export default function VideoCoreMiningPanel({
         && current.provenance.cue.startMs === cue.startMs
         && current.provenance.source.playbackId === source.playbackId
       ) return current;
-      return createVideoCoreMiningDraft(cue, displayText, source, Date.now(), translationText);
+      // The study line is in the study language; its script settles a line in
+      // another one (a Japanese song in a Chinese learner's show).
+      return createVideoCoreMiningDraft(
+        cue, displayText, source, Date.now(), translationText, studyLangOfText(displayText, getStudyLang()),
+      );
     });
     autoTranslationRef.current = translationText;
     setMessage('');

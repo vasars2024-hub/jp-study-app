@@ -12746,15 +12746,14 @@ export const en: Catalog = {
   'filesApp.mine.refuse.notAFile': 'That location is a folder, not a file.',
   'filesApp.mine.refuse.tooLarge': 'That file is too large to read as text.',
   'filesApp.mine.refuse.unknownSubtitleFormat': 'This subtitle format is not one this app reads.',
-  'filesApp.mine.refuse.noJapanese':
-    'Read {read} passages and none of them held any Japanese, so nothing was added.',
+  'filesApp.mine.refuse.noJapanese': 'Read {read} passages and none of them held any {lang} text, so nothing was added.',
   'filesApp.mine.refuse.allDuplicates':
     'All {read} passages are already in your deck, so nothing was added.',
   'filesApp.mine.added': {
     one: 'Added {count} card from {read} passages.',
     other: 'Added {count} cards from {read} passages.',
   },
-  'filesApp.mine.skipped': 'Skipped {notJapanese} without Japanese, {duplicate} already in the deck.',
+  'filesApp.mine.skipped': 'Skipped {notJapanese} without {lang} text, {duplicate} already in the deck.',
   'filesApp.mine.capped': 'Stopped at the {max}-card limit; {overCap} more passages were not added.',
   'filesApp.mine.machineMark': 'These cards are marked as machine-derived text.',
   'filesApp.mine.undone': {

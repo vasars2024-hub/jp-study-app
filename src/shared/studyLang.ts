@@ -111,3 +111,17 @@ export const STUDY_LANG_LEVEL_SCALE: Readonly<Record<StudyLang, 'jlpt' | 'hsk' |
   zh: 'hsk',
   ru: 'cefr',
 };
+
+/**
+ * The study language a piece of mined or clicked text is in, by its script:
+ * kana is Japanese, Cyrillic Russian. Han with no kana is ambiguous (猫 is a
+ * Japanese and a Chinese word), so it follows the study language — Japanese
+ * unless Chinese is studied. Anything else is the study language.
+ */
+export function studyLangOfText(text: string, studyLang: StudyLang = DEFAULT_STUDY_LANG): StudyLang {
+  const value = String(text ?? '');
+  if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value)) return 'ja';
+  if (/\p{Script=Cyrillic}/u.test(value)) return 'ru';
+  if (/\p{Script=Han}/u.test(value)) return studyLang === 'zh' ? 'zh' : 'ja';
+  return studyLang;
+}

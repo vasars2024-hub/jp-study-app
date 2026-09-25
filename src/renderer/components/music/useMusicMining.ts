@@ -31,6 +31,8 @@ import {
 } from '../../../shared/musicMining';
 import type { MediaItem } from '../../../shared/types';
 import { mineToStudy, videoCoreStudyInput } from '../../studyMining';
+import { getStudyLang } from '../../studyEnvironment';
+import { studyLangOfText } from '../../../shared/studyLang';
 import { writeLocalStorageJson } from '../../localStorageWrite';
 
 export type MusicMineOutcome =
@@ -78,7 +80,9 @@ export function useMusicMining(current: MediaItem | null): MusicMining {
     // minable" rather than as an error keeps a click on a spacer line silent.
     if (!cue) return;
 
-    let draft = createVideoCoreMiningDraft(cue, cue.text, musicMiningSource(current, kind));
+    let draft = createVideoCoreMiningDraft(
+      cue, cue.text, musicMiningSource(current, kind), Date.now(), '', studyLangOfText(cue.text, getStudyLang()),
+    );
 
     // Attach the line's audio when there is a real range to record.
     //

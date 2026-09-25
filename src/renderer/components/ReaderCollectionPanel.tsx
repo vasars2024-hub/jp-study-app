@@ -21,6 +21,7 @@ import type { VisualNovelStudyCardKind } from '../../shared/visualNovelStudyCard
 import { getLevel } from '../knownWords';
 import Icon from './Icons';
 import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
+import { normalizeStudyLang } from '../../shared/studyLang';
 
 type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
@@ -260,6 +261,7 @@ export default function ReaderCollectionPanel({
             cardKind: c.studyKind
               ? (c.studyKind === 'sentence' ? 'sentence' : 'word')
               : (c.sentence ? 'sentence' : 'word'),
+            language: normalizeStudyLang(c.studyLang),
           },
           term: c.word,
           reading: c.reading || undefined,

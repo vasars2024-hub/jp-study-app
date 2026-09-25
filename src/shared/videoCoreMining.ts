@@ -1,5 +1,6 @@
 import type { MineNoteRequest, MineNoteResult } from './anki';
 import type { VideoCoreStudyCue } from './videoCoreStudy';
+import type { StudyLang } from './studyLang';
 
 export const VIDEO_CORE_MINING_HISTORY_KEY = 'jp-video-core-mining-history-v1';
 export const VIDEO_CORE_MINING_HISTORY_LIMIT = 100;
@@ -59,6 +60,11 @@ export interface VideoCoreMiningDraft {
   /** The scene the sentence was said in, for the {clip} variable. */
   clipBase64?: string;
   clip?: VideoCoreMiningAsset;
+  /**
+   * The language of the line (the study track's language). Optional only for
+   * drafts kept from before it existed; those were Japanese.
+   */
+  language?: StudyLang;
   provenance: VideoCoreCueProvenance;
 }
 
@@ -161,6 +167,7 @@ export function createVideoCoreMiningDraft(
   source: VideoCoreMiningSource,
   capturedAt = Date.now(),
   translation = '',
+  language?: StudyLang,
 ): VideoCoreMiningDraft {
   const sentence = displayText.trim();
   const cueProvenance: VideoCoreCueProvenance = {
@@ -185,6 +192,7 @@ export function createVideoCoreMiningDraft(
     translation: translation.trim(),
     sentence,
     deckName: '',
+    ...(language ? { language } : {}),
     provenance: cueProvenance,
   };
 }
@@ -223,7 +231,9 @@ export function buildVideoCoreMineRequest(draft: VideoCoreMiningDraft): MineNote
     route: {
       source: 'subtitle',
       cardKind: draft.cardKind,
-      language: 'ja',
+      // The line's own language routes the note; a draft from before the field
+      // existed was Japanese.
+      language: draft.language ?? 'ja',
     },
     term: draft.term.trim(),
     ...(draft.reading.trim() ? { reading: draft.reading.trim() } : {}),

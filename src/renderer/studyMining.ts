@@ -45,6 +45,8 @@ import { showToast } from './components/ui/Toast';
 import { translateAnkiReason } from '../shared/anki';
 import { t } from './i18n';
 import { writeLocalStorage } from './localStorageWrite';
+import { getStudyLang } from './studyEnvironment';
+import { normalizeStudyLang, studyLangFromTag, studyLangOfText, type StudyLang } from '../shared/studyLang';
 
 export interface MineMediaPayload {
   base64: string;
@@ -67,7 +69,13 @@ export interface MineToStudyInput {
   studyKind?: DeckFlashcard['studyKind'];
   textProvenance?: DeckFlashcard['textProvenance'];
   sourceRef?: DeckFlashcard['sourceRef'];
-  studyLang?: string;
+  /**
+   * The language of what was mined — from the source (the subtitle track, the
+   * book, the page's text), else the study language. Required: a card mined
+   * without it used to be stored as Japanese and routed to the Japanese Anki
+   * profile whatever the learner was studying.
+   */
+  studyLang: StudyLang;
   /** Who said the line (a visual novel speaker); context, never the meaning. */
   characterName?: string;
   /** Where in the work the line was (chapter, scene); context, never the meaning. */
@@ -295,6 +303,8 @@ export function requestFromCard(card: DeckFlashcard): MineNoteRequest {
     route: {
       source: ROUTE_SOURCE[card.source] ?? 'other',
       cardKind: card.studyKind === 'sentence' || (sentence && sentence === card.word.trim()) ? 'sentence' : 'word',
+      // A stored card with no language is Japanese (the format predates the others).
+      language: normalizeStudyLang(card.studyLang),
     },
     term: card.word,
     ...(card.reading?.trim() && card.reading !== card.word ? { reading: card.reading.trim() } : {}),
@@ -422,6 +432,8 @@ export function requestStudyInput(
 ): MineToStudyInput {
   const sentence = request.sentence?.trim();
   return {
+    studyLang: studyLangFromTag(request.route?.language)
+      ?? studyLangOfText(`${request.term} ${sentence ?? ''}`, getStudyLang()),
     word: request.term.trim(),
     reading: request.reading?.trim() ?? '',
     meaning: (request.meaning || request.translation || request.sentenceTranslation || '').trim(),
@@ -459,6 +471,7 @@ export function videoCoreStudyInput(
     sourceUrl: origin.localFilePath || origin.streamPath || undefined,
     folder: source === 'lyrics' ? 'Music' : 'Media',
     studyKind: draft.cardKind === 'sentence' ? 'sentence' : 'vocabulary',
+    studyLang: draft.language ?? studyLangOfText(draft.sentence || draft.term, getStudyLang()),
     ...(draft.audioBase64 && draft.audio
       ? { audio: { base64: draft.audioBase64, filename: draft.audio.filename } }
       : {}),
@@ -467,6 +480,20 @@ export function videoCoreStudyInput(
       : {}),
     anki: buildVideoCoreMineRequest(draft),
   };
+}
+
+/**
+ * The mined language rides on the Anki request, so the mining rules route a
+ * Chinese or Russian card to that language's profile and deck. Without it main
+ * guessed from the characters — and a kanji-only Japanese word (猫) reads as
+ * Chinese.
+ */
+export function withRouteLanguage(
+  request: MineNoteRequest | undefined,
+  studyLang: StudyLang | undefined,
+): MineNoteRequest | undefined {
+  if (!request || !studyLang || (request.route?.language && request.route.language !== 'unknown')) return request;
+  return { ...request, route: { ...(request.route ?? {}), language: studyLang } };
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +537,9 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
       if (input.studyKind) draft.studyKind = input.studyKind;
       if (input.textProvenance) draft.textProvenance = input.textProvenance;
       if (input.sourceRef) draft.sourceRef = input.sourceRef;
-      if (input.studyLang && input.studyLang !== 'ja') draft.studyLang = input.studyLang;
+      // Absent means Japanese on stored cards (the format predates other languages).
+      const lang = normalizeStudyLang(input.studyLang, studyLangOfText(word, getStudyLang()));
+      if (lang !== 'ja') draft.studyLang = lang;
       if (input.characterName?.trim()) draft.characterName = input.characterName.trim().slice(0, 200);
       if (input.sceneReference?.trim()) draft.sceneReference = input.sceneReference.trim().slice(0, 400);
       const audio = input.audioPath || audioPath;
@@ -534,14 +563,17 @@ async function runMine(key: string, input: MineToStudyInput): Promise<MineToStud
         : 'local';
   let ankiResult: MineNoteResult | undefined;
   let error: string | undefined;
-  const request = input.anki ?? (input.ankiResult ? requestFromCard(card) : undefined);
+  const request = withRouteLanguage(
+    input.anki ?? (input.ankiResult ? requestFromCard(card) : undefined),
+    input.studyLang,
+  );
   if (input.ankiResult && outcome !== 'added') {
     const applied = await applyAnkiResult(card, input.ankiResult, request ?? requestFromCard(card));
     outcome = applied.outcome;
     error = applied.error;
     ankiResult = input.ankiResult;
-  } else if (input.anki && outcome === 'local') {
-    const pushed = await pushToAnki(card, input.anki);
+  } else if (request && input.anki && outcome === 'local') {
+    const pushed = await pushToAnki(card, request);
     outcome = pushed.outcome;
     ankiResult = pushed.result;
     error = pushed.error;

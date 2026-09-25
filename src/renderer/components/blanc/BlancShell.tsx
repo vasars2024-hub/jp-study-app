@@ -98,7 +98,8 @@ import { clearLockscreenPin, hasLockscreenPin, loadLockscreen, saveLockscreen, s
 import { getActiveProfile } from '../../profileState';
 import { loadSaved, type SavedWord } from '../../savedWords';
 import { loadLookupHistory, type LookupHistoryEntry } from '../../lookupHistory';
-import { setStudyLang } from '../../studyEnvironment';
+import { getStudyLang, setStudyLang } from '../../studyEnvironment';
+import { normalizeStudyLang, studyLangOfText } from '../../../shared/studyLang';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
 import {
   addDeckCards,
@@ -963,9 +964,12 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
     });
   };
 
-  const sendCard = async (card: Pick<DeckFlashcard, 'id' | 'word' | 'reading' | 'meaning' | 'sentence'>): Promise<boolean> => {
+  const sendCard = async (
+    card: Pick<DeckFlashcard, 'id' | 'word' | 'reading' | 'meaning' | 'sentence' | 'studyLang'>,
+  ): Promise<boolean> => {
     const result = await window.api.ankiMineNote({
-      route: { source: 'other', cardKind: card.sentence ? 'sentence' : 'word' },
+      // The card's own language routes it (absent is Japanese, as stored).
+      route: { source: 'other', cardKind: card.sentence ? 'sentence' : 'word', language: normalizeStudyLang(card.studyLang) },
       term: card.word,
       reading: card.reading || undefined,
       meaning: card.meaning || undefined,
@@ -1011,6 +1015,8 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
       front: word,
       back: meaning.trim(),
       source: 'epub' as const,
+      // Absent means Japanese on a stored card; anything else is said.
+      ...(studyLangOfText(word, getStudyLang()) !== 'ja' ? { studyLang: studyLangOfText(word, getStudyLang()) } : {}),
     };
     const created = addDeckCards([payload])[0];
     setCards(loadDeck());

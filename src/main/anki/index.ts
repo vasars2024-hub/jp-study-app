@@ -29,7 +29,7 @@ import {
 } from '../../shared/anki';
 
 import type { CardContent, FieldRole, ProfileId, StudyProfile } from '../../shared/profiles';
-import { buildRouteContext, resolveProfileMatch } from '../../shared/profileRules';
+import { buildRouteContext, profileForLanguage, resolveProfileMatch } from '../../shared/profileRules';
 import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/types';
 import { fetchJapaneseAudio } from '../dictionary';
 import { getFrequency, getPitch } from '../dictionary/yomitan';
@@ -351,7 +351,12 @@ function resolveMineTarget(req: Pick<
     const resolved = resolveProfileMatch(loadProfileRules().rules, ctx, active?.id || '');
     matchedRuleLabel = resolved.matchedRule?.label;
     usedDefault = resolved.usedDefault;
-    profile = (resolved.profileId && store.getProfile(resolved.profileId)) || active;
+    // No rule matched: a card in another study language goes to a profile that
+    // studies it, not into the active (say, Japanese) profile's deck.
+    const profileId = resolved.usedDefault
+      ? profileForLanguage(store.getAllProfiles(), ctx.language, resolved.profileId)
+      : resolved.profileId;
+    profile = (profileId && store.getProfile(profileId)) || active;
   } else {
     profile = active;
   }

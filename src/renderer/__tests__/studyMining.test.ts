@@ -72,11 +72,38 @@ function mineCat(extra: Partial<Parameters<typeof mineToStudy>[0]> = {}) {
     sentence: '猫が好きです。',
     source: 'dictionary',
     sourceTitle: 'Dictionary',
+    studyLang: 'ja',
     anki: request,
     notify: false,
     ...extra,
   });
 }
+
+describe('the mined language travels with the card', () => {
+  it('a Russian card is stored as Russian and its note is routed as Russian', async () => {
+    linkState = 'connected';
+    markAnkiSeen();
+    const result = await mineToStudy({
+      word: 'книга',
+      meaning: 'book',
+      sentence: 'Это книга.',
+      source: 'subtitle',
+      studyLang: 'ru',
+      anki: { route: { source: 'subtitle', cardKind: 'word' }, term: 'книга', sentence: 'Это книга.' },
+      notify: false,
+    });
+    expect(result.card.studyLang).toBe('ru');
+    expect(mined.at(-1)?.route?.language).toBe('ru');
+  });
+
+  it('a Japanese card keeps the stored convention (no field) and routes as Japanese even for a kanji-only word', async () => {
+    linkState = 'connected';
+    markAnkiSeen();
+    const result = await mineCat({ word: '犬', sentence: undefined, anki: { route: { source: 'dictionary', cardKind: 'word' }, term: '犬' } });
+    expect(result.card.studyLang).toBeUndefined();
+    expect(mined.at(-1)?.route?.language).toBe('ja');
+  });
+});
 
 describe('mineToStudy', () => {
   it('keeps a local card with every field even when Anki is closed', async () => {
