@@ -2299,7 +2299,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               />
             </span>
             <span role="gridcell" className="fa-cell fa-cell-name">
-              {item.name}
+              <span className="fa-name-text">{item.name}</span>
               {/* Audit r2 #6: every computed flag is shown, not only the broken link. */}
               {filesStatusBadges(item.flags).map((badge) => (
                 <span
