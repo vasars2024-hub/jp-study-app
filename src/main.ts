@@ -85,6 +85,8 @@ import {
   mainWindowOptions,
   registerWindowChromeIpc,
 } from './main/windowChrome';
+import { guardWindowToWorkArea, MAIN_WINDOW_MIN_SIZE, minimumSizeAt } from './main/windowBounds';
+import { installAppMenu } from './main/appMenu';
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
@@ -802,8 +804,8 @@ const createWindow = (restore?: {
     height: restore?.bounds?.height ?? 860,
     x: restore?.bounds?.x,
     y: restore?.bounds?.y,
-    minWidth: 940,
-    minHeight: 600,
+    // 800x500 DIP, never more than the work area it opens on (see windowBounds.ts).
+    ...minimumSizeAt(MAIN_WINDOW_MIN_SIZE, restore?.bounds),
     backgroundColor: '#1b1b21',
     autoHideMenuBar: true,
     // Deferred show + ready-to-show, matching every other window in this file
@@ -819,6 +821,7 @@ const createWindow = (restore?: {
       webviewTag: true,
     },
   });
+  guardWindowToWorkArea(mainWindow, MAIN_WINDOW_MIN_SIZE);
 
   if (restore?.maximized) mainWindow.maximize();
   mainWindow.once('ready-to-show', () => {
@@ -1774,6 +1777,7 @@ function registerPlayerSyncIpc(): void {
 
 app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
+  installAppMenu();
   // Electron grants every permission by default; these are allow-lists.
   const onDenied = (permission: string, origin: string | null) =>
     logDiagnostic('info', 'security', 'permission-denied', `${permission} for ${origin ?? 'unknown'}`);
