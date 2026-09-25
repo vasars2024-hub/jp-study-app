@@ -4633,6 +4633,10 @@ export const ja: Catalog = {
   'grammar.curation.rejectSelected': '選択項目を却下（{count}）',
   'grammar.curation.selectAll': '表示中をすべて選択',
   'grammar.curation.undo': '元に戻す',
+  'grammar.curation.import': '文法リストを取り込む…',
+  'grammar.curation.importHint': 'CSV・TSV・JSON：文型、意味、構造、説明、レベル、言語、例文／訳の列。どの学習言語でも可。',
+  'grammar.curation.imported': '{count} 件の文法項目を確認待ちとして取り込みました（{skipped} 行をスキップ）。',
+  'grammar.curation.importNothing': '{file} から文法項目（文型と意味または例文）を読み取れませんでした。',
   'grammar.curation.empty': 'このキューは空です。',
   'grammar.search.placeholder': '文法や意味を検索…',
   'grammar.count': {

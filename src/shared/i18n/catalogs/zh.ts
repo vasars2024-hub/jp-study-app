@@ -4610,6 +4610,10 @@ export const zh: Catalog = {
   'grammar.curation.rejectSelected': '拒绝所选（{count}）',
   'grammar.curation.selectAll': '全选当前列表',
   'grammar.curation.undo': '撤销',
+  'grammar.curation.import': '导入语法列表…',
+  'grammar.curation.importHint': 'CSV、TSV 或 JSON：句型、含义、结构、说明、等级、语言，以及例句／译文列。适用于任何学习语言。',
+  'grammar.curation.imported': '已导入 {count} 个语法点待审核（跳过 {skipped} 行）。',
+  'grammar.curation.importNothing': '{file} 中没有可识别的语法点（需要句型以及含义或例句）。',
   'grammar.curation.empty': '此队列已清空。',
   'grammar.search.placeholder': '搜索语法或释义…',
   'grammar.count': {

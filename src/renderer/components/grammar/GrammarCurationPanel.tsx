@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GRAMMAR, type NormalizedGrammarPoint } from '../../data/grammar';
+import { GRAMMAR, importUserGrammar, type NormalizedGrammarPoint } from '../../data/grammar';
+import { parseGrammarImport } from '../../data/grammar/userImport';
+import { getStudyLang } from '../../studyEnvironment';
 import { dedupeGrammarByTitle } from '../../data/grammar/practiceFilters';
 import {
   ISSUE_TYPES,
@@ -49,7 +51,30 @@ export default function GrammarCurationPanel() {
     saveCuration(state);
   }, [state]);
 
-  const corpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
+  // Bumped after an import: GRAMMAR grows in place, so the memo needs a reason to re-read it.
+  const [corpusVersion, setCorpusVersion] = useState(0);
+  const [importNote, setImportNote] = useState('');
+  const corpus = useMemo(() => {
+    void corpusVersion;
+    return dedupeGrammarByTitle(GRAMMAR);
+  }, [corpusVersion]);
+
+  /**
+   * A grammar list of the learner's own — any study language — joins the
+   * corpus as imported content awaiting review, which is this queue's job.
+   */
+  const importFile = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    const { points, skipped } = parseGrammarImport(await file.text(), file.name, getStudyLang());
+    if (!points.length) {
+      setImportNote(t('grammar.curation.importNothing', { file: file.name }));
+      return;
+    }
+    importUserGrammar(points);
+    setCorpusVersion((n) => n + 1);
+    setIssue('imported-unreviewed');
+    setImportNote(t('grammar.curation.imported', { count: points.length, skipped }));
+  }, [t]);
   const counts = useMemo(() => issueCounts(corpus, state), [corpus, state]);
   const queue = useMemo(() => curationQueue(corpus, state, issue), [corpus, state, issue]);
 
@@ -188,7 +213,20 @@ export default function GrammarCurationPanel() {
         <Button size="sm" disabled={history.length === 0} onClick={undo}>
           {t('grammar.curation.undo')}
         </Button>
+        <label className="btn small gram-cur-import" title={t('grammar.curation.importHint')}>
+          {t('grammar.curation.import')}
+          <input
+            type="file"
+            accept=".csv,.tsv,.txt,.json"
+            hidden
+            onChange={(event) => {
+              void importFile(event.currentTarget.files?.[0]);
+              event.currentTarget.value = '';
+            }}
+          />
+        </label>
       </div>
+      {importNote && <p className="gram-cur-summary" role="status">{importNote}</p>}
 
       {queue.length === 0 ? (
         <p className="gram-cur-empty">{t('grammar.curation.empty')}</p>

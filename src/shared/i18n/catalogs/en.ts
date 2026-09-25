@@ -4599,6 +4599,10 @@ export const en: Catalog = {
   'grammar.curation.rejectSelected': 'Reject selected ({count})',
   'grammar.curation.selectAll': 'Select all in view',
   'grammar.curation.undo': 'Undo',
+  'grammar.curation.import': 'Import grammar list…',
+  'grammar.curation.importHint': 'CSV, TSV or JSON: pattern, meaning, structure, explanation, level, language, and example / translation columns. Any study language.',
+  'grammar.curation.imported': { one: 'Imported {count} grammar point for review ({skipped} rows skipped).', other: 'Imported {count} grammar points for review ({skipped} rows skipped).' },
+  'grammar.curation.importNothing': 'Nothing in {file} could be read as a grammar point (a pattern and a meaning or an example).',
   'grammar.curation.empty': 'Nothing left in this queue.',
   'grammar.search.placeholder': 'Search grammar or meaning…',
   'grammar.count': {

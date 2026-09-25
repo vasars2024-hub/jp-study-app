@@ -5026,6 +5026,10 @@ export const ru: Catalog = {
   'grammar.curation.rejectSelected': 'Отклонить выбранные ({count})',
   'grammar.curation.selectAll': 'Выбрать все в списке',
   'grammar.curation.undo': 'Отменить',
+  'grammar.curation.import': 'Импортировать список грамматики…',
+  'grammar.curation.importHint': 'CSV, TSV или JSON: конструкция, значение, структура, объяснение, уровень, язык и столбцы пример / перевод. Любой изучаемый язык.',
+  'grammar.curation.imported': { one: 'Импортирован {count} грамматический пункт на проверку (пропущено строк: {skipped}).', few: 'Импортировано {count} грамматических пункта на проверку (пропущено строк: {skipped}).', many: 'Импортировано {count} грамматических пунктов на проверку (пропущено строк: {skipped}).', other: 'Импортировано {count} грамматического пункта на проверку (пропущено строк: {skipped}).' },
+  'grammar.curation.importNothing': 'В файле {file} не нашлось грамматических пунктов (нужны конструкция и значение или пример).',
   'grammar.curation.empty': 'В этой очереди пусто.',
   'grammar.search.placeholder': 'Поиск по конструкции или значению…',
   'grammar.count': {

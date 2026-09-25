@@ -20,6 +20,7 @@ import { HSK_EXTRA } from './hsk-extra';
 import { HSK_IMPORT } from './hsk-import';
 import { RU_CEFR } from './ru-cefr';
 import { HSK_STARTER } from './hsk-starter';
+import { writeLocalStorageJson } from '../../localStorageWrite';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
@@ -164,6 +165,55 @@ export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(HSK_STARTER, HSK_STARTER_AUTHORED),
   ...normalizeGrammarList(RU_CEFR, RU_AUTHORED),
 ];
+
+/*
+ * Grammar lists the learner imported (CSV / TSV / JSON, any study language —
+ * `userImport.ts`). Imported content nobody here reviewed: it lands in the
+ * curation queue as `imported-unreviewed`, like the other imported modules.
+ */
+export const USER_GRAMMAR_KEY = 'jp-grammar-user-points-v1';
+
+const USER_IMPORTED: ModuleProvenance = {
+  source: 'user-import',
+  tagSource: 'imported',
+  verification: 'imported-unreviewed',
+};
+
+function readUserGrammar(): GrammarPoint[] {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(USER_GRAMMAR_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((p): p is GrammarPoint => !!p && typeof p === 'object' && typeof (p as GrammarPoint).id === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+GRAMMAR.push(...normalizeGrammarList(readUserGrammar(), USER_IMPORTED));
+
+/**
+ * Add imported points to the corpus (this session) and keep them (the next).
+ * A point already imported — same pattern and meaning — is replaced, not
+ * duplicated. Returns how many are new.
+ */
+export function importUserGrammar(points: readonly GrammarPoint[]): number {
+  const stored = readUserGrammar();
+  const byId = new Map(stored.map((p) => [p.id, p]));
+  let added = 0;
+  for (const point of points) {
+    if (!byId.has(point.id)) added += 1;
+    byId.set(point.id, point);
+  }
+  writeLocalStorageJson(USER_GRAMMAR_KEY, [...byId.values()]);
+  const incoming = new Set(points.map((p) => p.id));
+  for (let i = GRAMMAR.length - 1; i >= 0; i -= 1) {
+    if (incoming.has(GRAMMAR[i].id)) GRAMMAR.splice(i, 1);
+  }
+  GRAMMAR.push(...normalizeGrammarList([...points], USER_IMPORTED));
+  return added;
+}
 
 /** Raw per-module lists, for the corpus audit's provenance accounting. */
 export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
