@@ -55,6 +55,12 @@ export type FilesOpenDecision =
       reasonKey: string;
       /** True when content sniffing, not the extension, chose this target. */
       sniffed: boolean;
+      /**
+       * The exact record to open inside `section`, when the row's owner is
+       * known. Absent means the app opens at its front page, which is the
+       * honest answer only for a loose file no store claims.
+       */
+      route?: FilesItemOpenRoute;
     }
   | {
       /** More than one honest home. The user picks; nothing opens yet. */
@@ -80,7 +86,7 @@ const SECTION_FOR_TARGET: Record<DropTargetId, DesktopWinSection | null> = {
   media: 'player',
   // DropRouter hands the path to the open media session and opens `player`.
   subtitle: 'player',
-  'anki-level': 'anki',
+  'anki-level': 'stats',
   'anki-cards': 'flashcards',
   // No path-in importer in DropRouter, but the OWNER is not in doubt: CSV/TSV
   // rows become deck cards, and the deck is what you would open to see them.
@@ -165,6 +171,135 @@ const SECTION_FOR_KIND: Partial<Record<FilesItemKind, DesktopWinSection>> = {
 
 export function sectionForKind(kind: FilesItemKind): DesktopWinSection | null {
   return SECTION_FOR_KIND[kind] ?? null;
+}
+
+/**
+ * Where a row opens INSIDE the app that owns it.
+ *
+ * Opening used to stop at the section: "Open" on a book brought the Library's
+ * front page forward and left the user to find the book again, which is the
+ * dead end the Files app exists to remove. Every row whose id names a store
+ * record (`<enumerator>:<local id>`, see `FilesItem.id`) carries enough to
+ * address that record directly, so the route is derived from the id rather
+ * than guessed from the name.
+ */
+export type FilesItemOpenRoute =
+  | { kind: 'library'; itemId: string }
+  | { kind: 'media'; mediaId: string }
+  | { kind: 'visual-novel'; visualNovelId: string }
+  | { kind: 'deck'; folder: string | null; cardId: string | null }
+  | { kind: 'lookup'; query: string }
+  | { kind: 'note'; entryId: string };
+
+/** The sections each route lands in, so a routed open and its receipt agree. */
+function sectionsForRoute(route: FilesItemOpenRoute): readonly DesktopWinSection[] {
+  switch (route.kind) {
+    case 'library':
+      return ['library'];
+    case 'media':
+      // Audio refines to Music (gate 15); both are the same media library.
+      return ['player', 'music'];
+    case 'visual-novel':
+      return ['visualnovels'];
+    case 'deck':
+      return ['flashcards'];
+    case 'lookup':
+      return ['dictionary'];
+    case 'note':
+      return ['files'];
+  }
+}
+
+/** Split `<prefix>:<rest>` once; the rest may itself contain colons. */
+function idParts(id: string): { prefix: string; rest: string } | null {
+  const at = id.indexOf(':');
+  if (at <= 0 || at === id.length - 1) return null;
+  return { prefix: id.slice(0, at), rest: id.slice(at + 1) };
+}
+
+/**
+ * The owner route for a row, or `null` for a row no store claims (a loose
+ * download, an export, a model file) — those still open at the app the file
+ * router names, because there is no record inside it to address.
+ */
+export function ownedOpenRoute(item: Pick<FilesItem, 'id'>): FilesItemOpenRoute | null {
+  const parts = idParts(item.id);
+  if (!parts) return null;
+  switch (parts.prefix) {
+    case 'library':
+      return { kind: 'library', itemId: parts.rest };
+    case 'media':
+      return { kind: 'media', mediaId: parts.rest };
+    case 'visual-novel':
+      return { kind: 'visual-novel', visualNovelId: parts.rest };
+    case 'deck-folder':
+      return { kind: 'deck', folder: parts.rest, cardId: null };
+    case 'deck-card':
+      return { kind: 'deck', folder: null, cardId: parts.rest };
+    case 'saved-word':
+    case 'lookup':
+    case 'known-word':
+      return { kind: 'lookup', query: parts.rest };
+    case 'notebook':
+      return { kind: 'note', entryId: parts.rest };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Attach the owner route to an `open` decision when both point at the same
+ * app. A user who picked a DIFFERENT home from the ranked list asked for that
+ * app, not for this row's owner, so the route is dropped rather than forced.
+ */
+export function withOwnedRoute(
+  decision: FilesOpenDecision,
+  item: Pick<FilesItem, 'id'>,
+): FilesOpenDecision {
+  if (decision.mode !== 'open') return decision;
+  const route = ownedOpenRoute(item);
+  if (!route || !sectionsForRoute(route).includes(decision.section)) return decision;
+  return { ...decision, route };
+}
+
+function pathKeyOf(value: string): string {
+  return value.trim().replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+}
+
+/**
+ * A loose video or audio file (a download, a file in an export folder) that
+ * the media library ALSO lists opens as that library entry — its title page,
+ * its resume point — instead of at the Media Center's front page. Matched by
+ * path, the only identity the two rows share.
+ */
+export function withLibraryTwin(
+  decision: FilesOpenDecision,
+  item: Pick<FilesItem, 'location'>,
+  items: readonly Pick<FilesItem, 'id' | 'location'>[],
+): FilesOpenDecision {
+  if (decision.mode !== 'open' || decision.route || decision.target !== 'media') return decision;
+  if (item.location.store !== 'file') return decision;
+  const key = pathKeyOf(item.location.path);
+  const twin = items.find(
+    (candidate) =>
+      candidate.id.startsWith('media:') &&
+      candidate.location.store === 'file' &&
+      pathKeyOf(candidate.location.path) === key,
+  );
+  return twin ? { ...decision, route: { kind: 'media', mediaId: twin.id.slice('media:'.length) } } : decision;
+}
+
+function openOwned(route: FilesItemOpenRoute, kind: FilesItemKind): FilesOpenDecision {
+  const section: DesktopWinSection =
+    route.kind === 'media' && kind === 'audio' ? 'music' : sectionsForRoute(route)[0];
+  return {
+    mode: 'open',
+    target: 'unknown',
+    section,
+    reasonKey: 'filesApp.open.reason.byOwner',
+    sniffed: false,
+    route,
+  };
 }
 
 /** True for the rows whose `location` carries a real path to hand the router. */
@@ -260,13 +395,20 @@ export function openFor(
  * pretending otherwise would route a sniffed `.zip` by its extension.
  */
 export function filesOpenDecision(
-  item: Pick<FilesItem, 'kind' | 'location'>,
+  item: Pick<FilesItem, 'kind' | 'location'> & Partial<Pick<FilesItem, 'id'>>,
   plan: FilesOpenRoutedPlan | null,
 ): FilesOpenDecision {
+  const owned = item.id ? ownedOpenRoute({ id: item.id }) : null;
   if (isRoutableLocation(item.location)) {
     if (!plan) return { mode: 'refuse', reasonKey: 'filesApp.open.refuse.unrouted' };
-    return decisionForRoutedPlan(plan, item.kind);
+    const routed = decisionForRoutedPlan(plan, item.kind);
+    // A manga volume is a page FOLDER, which the router rightly refuses as a
+    // container — but the library owns it and its reader opens it. The owner
+    // is the authority for its own record.
+    if (routed.mode === 'refuse' && owned) return openOwned(owned, item.kind);
+    return item.id ? withOwnedRoute(routed, { id: item.id }) : routed;
   }
+  if (owned) return openOwned(owned, item.kind);
   const section = sectionForKind(item.kind);
   if (!section) return { mode: 'refuse', reasonKey: 'filesApp.open.refuse.noOwner' };
   return {

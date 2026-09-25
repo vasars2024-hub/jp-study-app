@@ -148,7 +148,18 @@ export function classifyForCleanup(
 export type FilesCleanupProtectionReason =
   | 'filesApp.cleanup.protect.irreplaceableMedia'
   | 'filesApp.cleanup.protect.nothingToRemove'
-  | 'filesApp.cleanup.protect.brokenLinkMarked';
+  | 'filesApp.cleanup.protect.brokenLinkMarked'
+  | 'filesApp.cleanup.protect.noRemover';
+
+/**
+ * The sources whose broken-link RECORD main can remove (and put back on Undo):
+ * `media.json` and `library.json` rows, through the adapters in
+ * `main/filesApp/cleanupIpc.ts`. A broken link from any other source used to
+ * be offered, confirmed, and then fail in the log (audit r2 #4) — a scraper
+ * job's output record has no remover on this side at all. Those are now shown
+ * as protected, with the reason, and never offered.
+ */
+export const CLEANUP_BROKEN_LINK_SOURCES: ReadonlySet<string> = new Set(['media', 'library']);
 
 /**
  * The one function a scheduled run and a manual run both pass through.
@@ -179,6 +190,10 @@ export function protectionFor(
   // makes a broken link removable, and then only with its own confirmation.
   if (classId === 'broken-links' && policy !== 'prompt') {
     return 'filesApp.cleanup.protect.brokenLinkMarked';
+  }
+
+  if (classId === 'broken-links' && !CLEANUP_BROKEN_LINK_SOURCES.has(item.source)) {
+    return 'filesApp.cleanup.protect.noRemover';
   }
 
   return null;
@@ -284,7 +299,9 @@ export function planFilesCleanup(
       classId,
       // `none` was refused by the guard above; narrowing here rather than
       // casting means a future mode has to be handled, not silently trashed.
-      mode: mode === 'trash' ? 'trash' : 'soft',
+      // A broken link's file is already gone, so what is removed is the
+      // RECORD — sending a missing path to the Recycle Bin can only fail.
+      mode: classId === 'broken-links' ? 'soft' : mode === 'trash' ? 'trash' : 'soft',
       sizeBytes: item.sizeBytes,
       location: item.location,
       source: item.source,

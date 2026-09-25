@@ -81,7 +81,8 @@ describe('ytPlaylists helpers', () => {
     expect(aaa.hasOfficialSubs).toBe(true);
     expect(aaa.loggedAt).toBe(100);
     expect(aaa.viewCount).toBe(99);
-    expect(merged.find((v) => v.youtubeId === 'bbb')).toBeUndefined();
+    // r2files #21: a video gone from YouTube is kept (with its local files) and marked.
+    expect(merged.find((v) => v.youtubeId === 'bbb')).toMatchObject({ removedFromYouTube: true });
     const ccc = merged.find((v) => v.youtubeId === 'ccc');
     if (!ccc) throw new Error('missing ccc');
     expect(ccc.downloaded).toBe(false);

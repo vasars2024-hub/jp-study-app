@@ -109,7 +109,8 @@ function smartCount(label: string): number {
 function bodyRowNames(): string[] {
   return all('[role="row"]')
     .filter((r) => !r.classList.contains('fa-head'))
-    .map((r) => r.querySelector('.fa-cell-name')?.textContent ?? '');
+    // The name alone: status badges (audit r2 #6) sit beside it in the same cell.
+    .map((r) => r.querySelector('.fa-cell-name .fa-name-text')?.textContent ?? '');
 }
 
 function persisted() {

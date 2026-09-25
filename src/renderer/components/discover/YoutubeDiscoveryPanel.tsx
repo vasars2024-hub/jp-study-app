@@ -80,6 +80,8 @@ export interface YoutubeDiscoveryState {
   handoff: (candidate: YoutubeDiscoveryCandidate) => void;
   measurePace: (candidate: YoutubeDiscoveryCandidate) => void;
   notice: string;
+  /** The last "Check captions" that failed, and for which video. */
+  probeError: { videoId: string; message: string } | null;
   shortlist: YoutubeShortlistEntry[];
   shortlistIds: Set<string>;
   toggleShortlist: (candidate: YoutubeDiscoveryCandidate) => void;
@@ -141,6 +143,8 @@ export function useYoutubeDiscovery(level: StudyLevel, enabled = true): YoutubeD
   const [insights, setInsights] = useState<Record<string, VideoInsight>>({});
   const [busyVideoId, setBusyVideoId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  /** A "Check captions" that failed, said beside the video it was for (audit r2 #24). */
+  const [probeError, setProbeError] = useState<{ videoId: string; message: string } | null>(null);
   const [shortlist, setShortlist] = useState<YoutubeShortlistEntry[]>([]);
   const [requireHumanCaptions, setRequireHumanCaptionsState] = useState(initial.requireHumanCaptions);
   const [hideLive, setHideLiveState] = useState(initial.hideLive);
@@ -235,6 +239,7 @@ export function useYoutubeDiscovery(level: StudyLevel, enabled = true): YoutubeD
     if (!window.api?.ytDiscoveryProbe) return;
     setBusyVideoId(videoId);
     setNotice('');
+    setProbeError(null);
     void window.api.ytDiscoveryProbe(videoId)
       .then((reply) => {
         if (reply.probe) {
@@ -244,10 +249,13 @@ export function useYoutubeDiscovery(level: StudyLevel, enabled = true): YoutubeD
           }));
         } else {
           setMessage(reply.message ?? '');
+          setProbeError({ videoId, message: reply.message ?? '' });
           if (reply.state === 'tool-missing') setLoadState('tool-missing');
         }
       })
-      .catch(() => undefined)
+      .catch((error: unknown) =>
+        setProbeError({ videoId, message: error instanceof Error ? error.message : String(error) }),
+      )
       .finally(() => setBusyVideoId(null));
   }, []);
 
@@ -329,6 +337,7 @@ export function useYoutubeDiscovery(level: StudyLevel, enabled = true): YoutubeD
     handoff,
     measurePace,
     notice,
+    probeError,
     shortlist,
     shortlistIds,
     toggleShortlist,
@@ -669,7 +678,7 @@ export function YoutubeDiscoveryInspector({ state }: { state: YoutubeDiscoverySt
   const { t } = useT();
   const {
     selected, insights, busyVideoId, probe, handoff, measurePace,
-    notice, shortlistIds, toggleShortlist, channels,
+    notice, probeError, shortlistIds, toggleShortlist, channels,
   } = state;
 
   // Sort only — every label below is resolved through `t()` down in the JSX, so
@@ -772,6 +781,13 @@ export function YoutubeDiscoveryInspector({ state }: { state: YoutubeDiscoverySt
       </section>
 
       {notice ? <p className="disc-insp-note" role="status">{t(`ytDiscovery.notice.${notice}`)}</p> : null}
+      {probeError && probeError.videoId === candidate.videoId ? (
+        <p className="disc-insp-note disc-insp-error" role="alert">
+          {probeError.message
+            ? t('ytDiscovery.notice.probeFailedDetail', { detail: probeError.message })
+            : t('ytDiscovery.notice.probeFailed')}
+        </p>
+      ) : null}
 
       <div className="disc-insp-actions">
         <button

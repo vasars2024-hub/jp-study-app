@@ -199,6 +199,7 @@ export function normalizeAgentNavigationResult(value: unknown): AgentNavigationR
           ...(destination.page ? { page: destination.page.slice(0, 500) } : {}),
           ...(destination.controlId ? { controlId: destination.controlId.slice(0, 240) } : {}),
           ...(destination.highlight === true ? { highlight: true } : {}),
+          ...(destination.filesScope ? { filesScope: destination.filesScope } : {}),
         },
         opened: raw.opened === true,
       };

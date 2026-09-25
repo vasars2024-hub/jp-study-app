@@ -17,7 +17,7 @@ import {
   youtubeUploadsPlaylistId,
   addPlanToWatchIds,
   removePlanToWatchIds,
-  diffNewVideos,
+  newsIdsAfterCheck,
   EXTENSION_YT_PLAYLIST_ID,
   isImmersionPlaylist,
   youtubeThumbUrl,
@@ -43,10 +43,12 @@ import {
 import {
   downloadYoutubeUrl,
   findYtDlp,
+  removePartialDownloads,
   ytDlpJson,
   ytDlpSubtitleLangs,
   withYtDlpJsRuntime,
 } from './media';
+import { YtDownloadQueue, type YtQueueEntry, type YtQueueRunResult } from './ytDownloadQueue';
 import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
 import { logDiagnostic } from './errorLog';
 import { readJsonDetailedSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomicJson';
@@ -368,6 +370,8 @@ function applyPlaylistSync(
   store: YtPlaylistsStore,
   fetched: PlaylistFetch,
   existingId?: string,
+  /** The user's study language, for a NEW playlist's language and subtitles. */
+  studyLang: YtStudyLang = 'ja',
 ): { store: YtPlaylistsStore; playlist: YtPlaylist } | null {
   const { mapped, listId } = fetched;
   const url = fetched.url;
@@ -395,8 +399,8 @@ function applyPlaylistSync(
         youtubePlaylistId: resolvedYoutubeId,
         channelTitle: mapped.channelTitle,
         subscriptionStatus: 'subscribed',
-        lang: 'ja',
-        preferSubs: ['ja'],
+        lang: studyLang,
+        preferSubs: [studyLang],
         autoUpdate: true,
         lastSyncedAt: Date.now(),
         lastCheckedAt: Date.now(),
@@ -429,12 +433,13 @@ function applyPlaylistSync(
 async function syncAndCommit(
   url: string,
   existingId?: string,
+  studyLang?: YtStudyLang,
 ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> {
   const fetched = await fetchPlaylist(url);
   if ('error' in fetched) return fetched;
   let synced: { store: YtPlaylistsStore; playlist: YtPlaylist } | null = null;
   const store = commitStore((fresh) => {
-    synced = applyPlaylistSync(fresh, fetched, existingId);
+    synced = applyPlaylistSync(fresh, fetched, existingId, studyLang);
     return synced ? synced.store : null;
   });
   if (!synced) return { error: mt('ytManager.error.removedWhileSyncing') };
@@ -449,11 +454,16 @@ async function syncAndCommit(
  * yt-dlp writes the creator track, and the pick after download ranks creator
  * tracks first as before.
  */
-export function preferSubsToDownloadOptions(preferSubs: YtSubLang[], autoCaptions = true): YouTubeDownloadOptions {
+export function preferSubsToDownloadOptions(
+  preferSubs: YtSubLang[],
+  autoCaptions = true,
+  /** The user's study language — the study line — rather than a fixed Japanese. */
+  studyLang: YtSubLang = 'ja',
+): YouTubeDownloadOptions {
   const preferred = preferSubs.filter((l): l is Exclude<YouTubeSubtitleLang, 'none'> =>
     l === 'ja' || l === 'zh' || l === 'en' || l === 'ru',
   );
-  const langs = [...new Set<Exclude<YouTubeSubtitleLang, 'none'>>([...preferred, 'ja', 'en'])];
+  const langs = [...new Set<Exclude<YouTubeSubtitleLang, 'none'>>([...preferred, studyLang, 'en'])];
   return {
     audioOnly: false,
     subtitleLang: langs[0] ?? 'none',
@@ -467,6 +477,8 @@ export interface YtDownloadRequestOptions {
   allSubs?: boolean;
   /** Also request auto-generated captions (default true). */
   autoCaptions?: boolean;
+  /** The user's study language (renderer `getStudyLang()`); default Japanese. */
+  studyLang?: YtSubLang;
 }
 
 /** Re-validates download options that crossed the bridge. */
@@ -476,74 +488,131 @@ export function sanitizeYtDownloadOptions(value: unknown): YtDownloadRequestOpti
   if (typeof r.audioOnly === 'boolean') out.audioOnly = r.audioOnly;
   if (typeof r.allSubs === 'boolean') out.allSubs = r.allSubs;
   if (typeof r.autoCaptions === 'boolean') out.autoCaptions = r.autoCaptions;
+  if (r.studyLang === 'ja' || r.studyLang === 'zh' || r.studyLang === 'ru' || r.studyLang === 'en') {
+    out.studyLang = r.studyLang;
+  }
   return out;
 }
 
-/** Download YT playlist videos by internal ids (used by IPC and extension bridge). */
+/** Options each queued video was asked for with (a queue entry is only an id). */
+const queuedOptions = new Map<string, YtDownloadRequestOptions>();
+type ProgressEvent = { videoId: string; index: number; total: number; stage: string; percent: number };
+const progressListeners = new Set<(ev: ProgressEvent) => void>();
+
+function broadcast(channel: string, payload: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (!win.isDestroyed()) win.webContents.send(channel, payload);
+    } catch {
+      /* window closing */
+    }
+  }
+}
+
+/**
+ * One video, downloaded and recorded. The queue calls this; `signal` is how a
+ * pause or a cancel reaches yt-dlp.
+ */
+async function downloadOneVideo(
+  videoId: string,
+  signal: AbortSignal,
+  onProgress: (ev: { stage: string; percent: number }) => void,
+): Promise<YtQueueRunResult> {
+  // Re-read per video: a download of twenty is long, and the nineteenth must
+  // be planned against the library as it is now, not as it was at the start.
+  const snapshot = readStore();
+  const video = snapshot.videos.find((v) => v.id === videoId);
+  if (!video) return { ok: false, error: mt('ytManager.error.videoNotFound') };
+  const downloadOpts = queuedOptions.get(videoId) ?? {};
+  const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
+  const studyLang = downloadOpts.studyLang ?? 'ja';
+  const opts = preferSubsToDownloadOptions(pl?.preferSubs ?? [studyLang], downloadOpts.autoCaptions !== false, studyLang);
+  if (downloadOpts.audioOnly === true) opts.audioOnly = true;
+  if (downloadOpts.allSubs === true) opts.allSubs = true;
+  const result = await downloadYoutubeUrl(video.url, opts, onProgress, {
+    signal,
+    resumable: true,
+    detectAutoCaptions: true,
+  });
+  if ('error' in result) {
+    return { ok: false, error: result.error, ...(result.errorKey === 'cancelled' ? { aborted: true } : {}) };
+  }
+  commitStore((fresh) => {
+    const target = fresh.videos.find((v) => v.id === videoId);
+    // Removed while it downloaded. The file on disk is the user's to keep;
+    // the row is not coming back.
+    if (!target) return null;
+    target.downloaded = true;
+    target.mediaItemId = result.item.id;
+    // Audit r2 #20: "Subs" means the creator's subtitles. An auto caption is
+    // its own chip; a download that could not tell keeps the old reading.
+    const hasSub = Boolean(result.subtitle);
+    const auto = result.subtitleIsAuto === true;
+    target.hasOfficialSubs = hasSub && !auto;
+    target.hasAutoSubs = hasSub && auto;
+    target.loggedAt = target.loggedAt ?? Date.now();
+    return fresh;
+  });
+  return { ok: true, mediaItemId: result.item.id };
+}
+
+let downloadQueue: YtDownloadQueue | null = null;
+let lastQueueSnapshot: YtQueueEntry[] = [];
+
+function queue(): YtDownloadQueue {
+  if (downloadQueue) return downloadQueue;
+  downloadQueue = new YtDownloadQueue({
+    run: (videoId, signal, onProgress) =>
+      downloadOneVideo(videoId, signal, (ev) => {
+        onProgress(ev);
+        const entries = lastQueueSnapshot;
+        const index = Math.max(0, entries.findIndex((e) => e.videoId === videoId));
+        const progress = { videoId, index, total: entries.length, stage: ev.stage, percent: ev.percent };
+        for (const listener of progressListeners) listener(progress);
+        // Kept for the media jobs tray, which reads the old per-video event.
+        broadcast('yt:downloadProgress', progress);
+      }),
+    cleanup: (videoId) => {
+      const video = readStore().videos.find((v) => v.id === videoId);
+      if (video) removePartialDownloads(video.youtubeId);
+    },
+    onChange: (entries) => {
+      lastQueueSnapshot = entries;
+      broadcast('yt:queueChanged', entries);
+    },
+  });
+  return downloadQueue;
+}
+
+/**
+ * Download YT playlist videos by internal ids (used by IPC and extension bridge).
+ * Goes through the queue, so each one can be paused or cancelled from the
+ * window; resolves once every requested video has settled.
+ */
 export async function downloadVideosByIds(
   videoIds: string[],
-  onProgress?: (ev: {
-    videoId: string;
-    index: number;
-    total: number;
-    stage: string;
-    percent: number;
-  }) => void,
+  onProgress?: (ev: ProgressEvent) => void,
   downloadOpts?: YtDownloadRequestOptions,
 ): Promise<{
   store: YtPlaylistsStore;
   results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
 }> {
-  const results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }> = [];
-  const ids = Array.isArray(videoIds) ? videoIds : [];
-  for (let i = 0; i < ids.length; i++) {
-    const videoId = ids[i];
-    // Re-read per video: a download of twenty is long, and the nineteenth must
-    // be planned against the library as it is now, not as it was at the start.
-    const snapshot = readStore();
-    const video = snapshot.videos.find((v) => v.id === videoId);
-    if (!video) {
-      results.push({ videoId, ok: false, error: mt('ytManager.error.videoNotFound') });
-      continue;
-    }
-    const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
-    const opts = preferSubsToDownloadOptions(pl?.preferSubs ?? ['ja'], downloadOpts?.autoCaptions !== false);
-    if (downloadOpts?.audioOnly === true) opts.audioOnly = true;
-    if (downloadOpts?.allSubs === true) opts.allSubs = true;
-    onProgress?.({
-      videoId,
-      index: i,
-      total: ids.length,
-      stage: 'downloading',
-      percent: 0,
-    });
-    const result = await downloadYoutubeUrl(video.url, opts, (ev) => {
-      onProgress?.({
-        videoId,
-        index: i,
-        total: ids.length,
-        stage: ev.stage,
-        percent: ev.percent,
-      });
-    });
-    if ('error' in result) {
-      results.push({ videoId, ok: false, error: result.error });
-      continue;
-    }
-    commitStore((fresh) => {
-      const target = fresh.videos.find((v) => v.id === videoId);
-      // Removed while it downloaded. The file on disk is the user's to keep;
-      // the row is not coming back.
-      if (!target) return null;
-      target.downloaded = true;
-      target.mediaItemId = result.item.id;
-      target.hasOfficialSubs = Boolean(result.subtitle);
-      target.loggedAt = target.loggedAt ?? Date.now();
-      return fresh;
-    });
-    results.push({ videoId, ok: true, mediaItemId: result.item.id });
+  const ids = Array.isArray(videoIds) ? videoIds.filter((id) => typeof id === 'string' && id) : [];
+  for (const id of ids) queuedOptions.set(id, downloadOpts ?? {});
+  const wanted = new Set(ids);
+  const listener = onProgress
+    ? (ev: ProgressEvent): void => {
+        if (wanted.has(ev.videoId)) onProgress(ev);
+      }
+    : null;
+  if (listener) progressListeners.add(listener);
+  try {
+    const results = await queue().enqueue(ids);
+    for (const id of ids) queuedOptions.delete(id);
+    return { store: readStore(), results };
+  } finally {
+    if (listener) progressListeners.delete(listener);
   }
-  return { store: readStore(), results };
 }
 
 async function fetchSubsOnly(
@@ -872,8 +941,10 @@ export function registerYtPlaylistsIpc(): void {
     return saveAndBroadcast(store);
   });
 
-  ipcMain.handle('yt:addPlaylist', async (_e, url: string) => {
-    const result = await syncAndCommit(typeof url === 'string' ? url : '');
+  ipcMain.handle('yt:addPlaylist', async (_e, url: string, studyLang?: unknown) => {
+    const lang: YtStudyLang | undefined =
+      studyLang === 'ja' || studyLang === 'zh' || studyLang === 'en' ? studyLang : undefined;
+    const result = await syncAndCommit(typeof url === 'string' ? url : '', undefined, lang);
     if ('error' in result) return { error: result.error };
     return { store: result.store, playlist: result.playlist };
   });
@@ -1072,12 +1143,31 @@ export function registerYtPlaylistsIpc(): void {
       store: YtPlaylistsStore;
       results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
     }> => {
-      const sender = e.sender;
-      return downloadVideosByIds(Array.isArray(videoIds) ? videoIds : [], (ev) => {
-        sender.send('yt:downloadProgress', ev);
-      }, sanitizeYtDownloadOptions(options));
+      void e;
+      // Progress reaches every window through the queue's own broadcast.
+      return downloadVideosByIds(Array.isArray(videoIds) ? videoIds : [], undefined, sanitizeYtDownloadOptions(options));
     },
   );
+
+  /* Audit r2 #17: the queue's controls. Ids are internal video ids; nothing else crosses. */
+  ipcMain.handle('yt:downloadQueue', (): YtQueueEntry[] => queue().snapshot());
+  ipcMain.handle('yt:cancelDownloads', (_e, videoIds?: unknown): YtQueueEntry[] => {
+    const ids = Array.isArray(videoIds) ? videoIds.filter((id): id is string => typeof id === 'string') : undefined;
+    queue().cancel(ids);
+    return queue().snapshot();
+  });
+  ipcMain.handle('yt:pauseDownload', (_e, videoId: unknown): YtQueueEntry[] => {
+    if (typeof videoId === 'string') queue().pause(videoId);
+    return queue().snapshot();
+  });
+  ipcMain.handle('yt:resumeDownload', (_e, videoId: unknown): YtQueueEntry[] => {
+    if (typeof videoId === 'string') queue().resume(videoId);
+    return queue().snapshot();
+  });
+  ipcMain.handle('yt:clearFinishedDownloads', (): YtQueueEntry[] => {
+    queue().clearFinished();
+    return queue().snapshot();
+  });
 
   ipcMain.handle(
     'yt:fetchSubsOnly',
@@ -1094,7 +1184,7 @@ export function registerYtPlaylistsIpc(): void {
           continue;
         }
         const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
-        const out = await fetchSubsOnly(video.youtubeId, video.url, pl?.preferSubs ?? ['ja']);
+        const out = await fetchSubsOnly(video.youtubeId, video.url, pl?.preferSubs ?? [pl?.lang === 'zh' ? 'zh' : 'ja']);
         if (!out.ok) {
           results.push({ videoId, ok: false, error: out.error });
           continue;
@@ -1172,11 +1262,15 @@ export function registerYtPlaylistsIpc(): void {
           store = result.store;
         }
       }
+      // Audit r2 #16: the FIRST check has nothing to compare against, and
+      // "everything since the epoch" listed the whole library as new. It sets
+      // the baseline instead; every later check reports what arrived after it.
+      const newVideoIds = newsIdsAfterCheck(readStore(), since);
       store = commitStore((fresh) => {
         fresh.lastNewsCheckedAt = Date.now();
+        fresh.lastNewsVideoIds = newVideoIds;
         return fresh;
       });
-      const newVideoIds = diffNewVideos(store, since).map((v) => v.id);
       try {
         sender.send('yt:refreshProgress', {
           playlistId: '',

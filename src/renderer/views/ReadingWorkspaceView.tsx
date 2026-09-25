@@ -32,6 +32,7 @@ import {
   subscribeStagedPopoutReadingWorkspaceRoutes,
 } from '../readingWorkspaceNavigation';
 import './readingWorkspace.css';
+import MangaShortlistStrip from '../components/reading/MangaShortlistStrip';
 
 const ReadingFinderView = lazy(() => import('./ReadingFinderView'));
 const LibraryView = lazy(() => import('./LibraryView'));
@@ -265,6 +266,9 @@ export default function ReadingWorkspaceView({
         >
           {surface === 'library' ? (
             <LibraryView onOpen={onOpenBook} revealItemId={reveal?.itemId ?? null} />
+          ) : null}
+          {surface === 'finder' ? (
+            <MangaShortlistStrip onFind={(title) => setFinderQuery(title)} />
           ) : null}
           {surface === 'finder' ? (
             <ReadingFinderView

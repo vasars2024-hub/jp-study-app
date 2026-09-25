@@ -19,19 +19,37 @@ import SentenceTranslatePopup from '../SentenceTranslatePopup';
 import Icon from '../Icons';
 import VirtualList from '../VirtualList';
 import {
+  IMMERSION_HISTORY_RANGES,
+  IMMERSION_MAX_TABS,
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
-  IMMERSION_SUBJECT_LANG,
+  addImmersionTab,
+  closeImmersionTab,
+  cycleImmersionTab,
+  detectImmersionTextLang,
+  emptySession,
+  immersionNavAfter,
+  immersionScrollPct,
   immersionStatsId,
   isNoVideoCaptureError,
   isRemoteMediaUrl,
   nextImmersionMode,
   normalizeImmersionUrl,
   shouldUseLiveImmersionMode,
+  updateImmersionTab,
+  type ImmersionBookmark,
+  type ImmersionDayMetrics,
+  type ImmersionFolder,
+  type ImmersionHistoryRange,
   type ImmersionMode,
+  type ImmersionNavStack,
+  type ImmersionSession,
   type ImmersionSite,
   type ImmersionSitesStore,
 } from '../../../shared/immersion';
+import { LANG_TAGS } from '../../../shared/i18n/core';
+import { getStudyLang, onStudyLangChanged } from '../../studyEnvironment';
+import { confirmDialog } from '../ui/dialogService';
 import {
   buildBrowserCaptureTarget,
   browserCaptureUrl,
@@ -131,7 +149,13 @@ export function useImmersion() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readerHtml, setReaderHtml] = useState('');
+  /** History: one row per page visited. */
   const [sites, setSites] = useState<ImmersionSite[]>([]);
+  /** Bookmarks: the pages the user starred (audit r2 #12 — no longer the same list). */
+  const [bookmarks, setBookmarks] = useState<ImmersionBookmark[]>([]);
+  const [folders, setFolders] = useState<ImmersionFolder[]>([]);
+  /** `null` until the user picks: then Bookmarks when there are any, else History. */
+  const [railViewChoice, setRailView] = useState<'bookmarks' | 'history' | null>(null);
   const [sitesStatus, setSitesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [siteQuery, setSiteQuery] = useState('');
   const normalizedSiteQuery = siteQuery.trim().normalize('NFKC').toLowerCase();
@@ -152,13 +176,42 @@ export function useImmersion() {
       : sites),
     [sites, siteHaystacks, normalizedSiteQuery],
   );
-  const [history, setHistory] = useState<string[]>([]);
-  const [histIdx, setHistIdx] = useState(-1);
+  const railView = railViewChoice ?? (bookmarks.length > 0 ? 'bookmarks' : 'history');
+  const filteredBookmarks = useMemo(() => {
+    if (!normalizedSiteQuery) return bookmarks;
+    return bookmarks.filter((b) =>
+      `${b.title} ${b.url} ${b.tags.join(' ')}`.normalize('NFKC').toLowerCase().includes(normalizedSiteQuery),
+    );
+  }, [bookmarks, normalizedSiteQuery]);
+  /**
+   * Back/Forward. One stack, fed by the app's own navigations AND by the page's
+   * (audit r2 #10: a link clicked inside the page moved the webview but never
+   * reached this stack, so Back skipped straight past it).
+   */
+  const [nav, setNav] = useState<ImmersionNavStack>({ entries: [], index: -1 });
+  const history = nav.entries;
+  const histIdx = nav.index;
+  /** The url `navigate` asked for, until the webview reports where it landed (redirects replace). */
+  const pendingNavRef = useRef<string | null>(null);
+  /** Furthest point read on this page, 0-100 — sent with the stats flush (audit r2 #13). */
+  const readPctRef = useRef(0);
+  /* ---- tabs (audit r2 #11): the session store main already kept ---- */
+  const [session, setSession] = useState<ImmersionSession>(emptySession);
+  const [sessionReady, setSessionReady] = useState(false);
+  /** Each tab's Back/Forward stack. In memory: a restart restores pages, not trails. */
+  const navByTab = useRef(new Map<string, ImmersionNavStack>());
+  const rootRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<PopupState>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   /** Slice 70: study lookup on the LIVE guest page, not just Reader Mode. */
   const [liveLookup, setLiveLookup] = useState(true);
+  /**
+   * The study language (Settings), which the reader follows: Chinese and
+   * Russian are study languages too, and nothing here may assume Japanese.
+   */
+  const [studyLang, setStudyLangState] = useState(getStudyLang);
+  useEffect(() => onStudyLangChanged(setStudyLangState), []);
 
   const readerRef = useRef<HTMLDivElement>(null);
   const webviewRef = useRef<HTMLElement | null>(null);
@@ -205,32 +258,27 @@ export function useImmersion() {
   const splitView = mode === 'reader' && showReader && showWebview;
 
   // ----- Sites library -----
+  const applySitesStore = useCallback((store: ImmersionSitesStore) => {
+    // History is newest first; bookmarks keep the order they were starred in.
+    setSites([...store.sites].sort((a, b) => b.lastVisited - a.lastVisited));
+    setBookmarks([...(store.bookmarks ?? [])].sort((a, b) => b.createdAt - a.createdAt));
+    setFolders([...(store.folders ?? [])].sort((a, b) => a.order - b.order));
+    setSitesStatus('ready');
+  }, []);
+
   const refreshSites = useCallback(async () => {
     setSitesStatus('loading');
     try {
-      const store: ImmersionSitesStore = await window.api.immersionListSites();
-      setSites(
-        [...store.sites].sort(
-          (a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.lastVisited - a.lastVisited,
-        ),
-      );
-      setSitesStatus('ready');
+      applySitesStore(await window.api.immersionListSites());
     } catch {
       setSitesStatus('error');
     }
-  }, []);
+  }, [applySitesStore]);
 
   useEffect(() => {
     void refreshSites();
-    return window.api.onImmersionSitesChanged((store) => {
-      setSites(
-        [...store.sites].sort(
-          (a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.lastVisited - a.lastVisited,
-        ),
-      );
-      setSitesStatus('ready');
-    });
-  }, [refreshSites]);
+    return window.api.onImmersionSitesChanged(applySitesStore);
+  }, [refreshSites, applySitesStore]);
 
   // ----- Stats flush (feeds study widgets via recordReading) -----
   const flushStats = useCallback(() => {
@@ -252,6 +300,8 @@ export function useImmersion() {
         title: activeTitle.current,
         seconds: secs,
         chars,
+        // How far this page was read, so the rail's progress bar has a number.
+        ...(readPctRef.current > 0 ? { completionPct: readPctRef.current } : {}),
         countVisit: false,
       });
     }
@@ -286,13 +336,19 @@ export function useImmersion() {
   const runHighlight = useCallback(() => {
     const root = readerRef.current;
     if (!root || !readerHtml) return;
+    // The known-word colouring is built on the Japanese tokenizer; over another
+    // study language it would mark Japanese readings of Chinese text.
+    if (studyLang !== 'ja') {
+      resetHighlightRoot(root);
+      return;
+    }
     const apply = () => {
       resetHighlightRoot(root);
       highlightEl(root, true);
     };
     if (tokenizerReady()) apply();
     else void getTokenizer().then(apply).catch(() => undefined);
-  }, [readerHtml]);
+  }, [readerHtml, studyLang]);
 
   useEffect(() => {
     if (!showReader || !readerHtml) return;
@@ -362,7 +418,15 @@ export function useImmersion() {
       setStatus(null);
       // The reader pass re-states the row's real title and canonical URL after a redirect.
       // It is the SAME arrival `navigate` already counted, so it must not count a second one.
-      void window.api.immersionRecordVisit({ url: art.url, title: art.title, countVisit: false });
+      // …and the language the page is written in, which the rail prefixes
+      // (audit r2 #13: the renderer never sent it, so every row read AUTO).
+      const pageLang = detectImmersionTextLang(art.html.replace(/<[^>]+>/g, ' '), getStudyLang());
+      void window.api.immersionRecordVisit({
+        url: art.url,
+        title: art.title,
+        countVisit: false,
+        ...(pageLang !== 'auto' ? { lang: pageLang } : {}),
+      });
       setLoading(false);
     } catch (e) {
       if (!isCurrent()) return;
@@ -396,7 +460,9 @@ export function useImmersion() {
       // new visit. Back and Forward reach a different page and correctly do count.
       if (immersionStatsId(url) !== activeStatsId.current) {
         void window.api.immersionRecordVisit({ url });
+        readPctRef.current = 0;
       }
+      pendingNavRef.current = url;
       // A fresh attempt, so the previous one's failure stops speaking for it — including a retry
       // of the same URL, where `did-start-loading` may not fire before the reader pass is due.
       loadFailure.current = null;
@@ -420,13 +486,7 @@ export function useImmersion() {
         setMode(opts.mode);
       }
       if (opts?.pushHistory !== false) {
-        setHistory((h) => {
-          const base = histIdx >= 0 ? h.slice(0, histIdx + 1) : h;
-          if (base[base.length - 1] === url) return base;
-          const next = [...base, url].slice(-40);
-          setHistIdx(next.length - 1);
-          return next;
-        });
+        setNav((current) => immersionNavAfter(current, url));
       }
 
       if (nextMode === 'reader' || nextMode === 'focus') {
@@ -453,19 +513,19 @@ export function useImmersion() {
         }
       }
     },
-    [flushStats, histIdx, loadReader, mode],
+    [flushStats, loadReader, mode],
   );
 
   const goBack = () => {
     if (histIdx <= 0) return;
     const i = histIdx - 1;
-    setHistIdx(i);
+    setNav((current) => ({ ...current, index: i }));
     navigate(history[i], { pushHistory: false });
   };
   const goForward = () => {
     if (histIdx < 0 || histIdx >= history.length - 1) return;
     const i = histIdx + 1;
-    setHistIdx(i);
+    setNav((current) => ({ ...current, index: i }));
     navigate(history[i], { pushHistory: false });
   };
   const reload = () => {
@@ -568,14 +628,29 @@ export function useImmersion() {
     const onNav = (e: Event) => {
       const u = (e as { url?: string }).url;
       if (u && /^https?:\/\//i.test(u)) {
+        // Where a navigation the app asked for actually landed (possibly after a
+        // redirect) replaces that entry; anything else is the PAGE moving — a
+        // link, a form, pushState — and is a new entry Back can return from.
+        const own = pendingNavRef.current !== null;
+        pendingNavRef.current = null;
         if (readerUrl.current !== u) {
           readerRequest.current += 1;
           readerUrl.current = u;
           setReaderHtml('');
         }
+        setNav((current) => immersionNavAfter(current, u, { replace: own }));
+        const statsId = immersionStatsId(u);
+        if (statsId !== activeStatsId.current) {
+          // Bank the page being left before the next one starts counting, and
+          // count the arrival exactly once — `navigate` already did for its own.
+          flushStats();
+          if (!own) void window.api.immersionRecordVisit({ url: u });
+          readPctRef.current = 0;
+          pageOpenAt.current = Date.now();
+        }
         setCurrentUrl(u);
         setUrlInput(u);
-        activeStatsId.current = immersionStatsId(u);
+        activeStatsId.current = statsId;
       }
     };
     const onNewWindow = (e: Event) => {
@@ -601,7 +676,20 @@ export function useImmersion() {
       wv.removeEventListener('did-navigate-in-page', onNav);
       wv.removeEventListener('new-window', onNewWindow);
     };
-  }, [mode, currentUrl, loadReader, navigate, readerHtml, t]);
+  }, [mode, currentUrl, loadReader, navigate, readerHtml, t, flushStats]);
+
+  // How far the reader has been scrolled — the furthest point counts (audit r2 #13).
+  useEffect(() => {
+    const el = readerRef.current;
+    if (!el || !showReader) return undefined;
+    const onScroll = (): void => {
+      const pct = immersionScrollPct(el.scrollTop, el.scrollHeight, el.clientHeight);
+      if (pct > readPctRef.current) readPctRef.current = pct;
+    };
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [showReader, readerHtml]);
 
   // ----- Reader lookup -----
   const onReaderPointerDown = (e: React.PointerEvent) => noteLookupPointerDown(e);
@@ -708,14 +796,69 @@ export function useImmersion() {
   }, [liveLookup, showWebview]);
 
   // ----- Actions -----
+  const bookmarkKey = (url: string): string => immersionStatsId(url);
+  const currentBookmark = useMemo(
+    () => (currentUrl ? bookmarks.find((b) => bookmarkKey(b.url) === bookmarkKey(currentUrl)) ?? null : null),
+    [bookmarks, currentUrl],
+  );
+
+  /** Star or unstar the current page — "Save site" had no reverse (audit r2 #12). */
   const saveCurrentSite = async () => {
     if (!currentUrl) return;
+    const starred = currentBookmark !== null;
     const res = await window.api.immersionSaveSite({
       url: currentUrl,
       title: activeTitle.current,
-      favorite: true,
+      favorite: !starred,
     });
-    setStatus(res.ok ? t('immersion.saved') : res.error ?? t('immersion.saveFailed'));
+    setStatus(
+      res.ok
+        ? t(starred ? 'immersion.bookmark.removed' : 'immersion.saved')
+        : t('immersion.saveFailed'),
+    );
+  };
+
+  const updateBookmark = async (
+    bookmark: ImmersionBookmark,
+    patch: { folderId?: string | null; tags?: string[] },
+  ) => {
+    const res = await window.api.immersionSaveSite({ url: bookmark.url, favorite: true, ...patch });
+    if (!res.ok) setStatus(t('immersion.saveFailed'));
+  };
+
+  const removeBookmark = async (bookmark: ImmersionBookmark) => {
+    const res = await window.api.immersionSaveSite({ url: bookmark.url, favorite: false });
+    setStatus(res.ok ? t('immersion.bookmark.removed') : t('immersion.saveFailed'));
+  };
+
+  const addFolder = async (name: string) => {
+    if (!name.trim()) return;
+    const res = await window.api.immersionAddFolder(name);
+    if (!res.ok) setStatus(t('immersion.saveFailed'));
+  };
+
+  const removeFolder = async (folder: ImmersionFolder) => {
+    const ok = await confirmDialog({
+      title: t('immersion.folders.removeTitle'),
+      message: t('immersion.folders.removeMessage', { name: folder.name }),
+      confirmLabel: t('immersion.remove'),
+      danger: true,
+    });
+    if (!ok) return;
+    await window.api.immersionRemoveFolder(folder.id);
+  };
+
+  /** Clear history over a time range; bookmarks are a separate list and stay. */
+  const clearHistory = async (range: ImmersionHistoryRange) => {
+    const ok = await confirmDialog({
+      title: t('immersion.history.clearTitle'),
+      message: t(`immersion.history.clearMessage.${range}`),
+      confirmLabel: t('immersion.history.clear'),
+      danger: true,
+    });
+    if (!ok) return;
+    const res = await window.api.immersionClearHistory(range);
+    setStatus(res.ok ? t('immersion.history.cleared') : t('immersion.saveFailed'));
   };
 
   // Save the current page to the Resources app's "My tools" collection.
@@ -829,6 +972,104 @@ export function useImmersion() {
     await window.api.lensOpen('select');
   };
 
+  // ----- Tabs (audit r2 #11) -----
+  // Restore the session main kept: the tabs, and the active tab's page.
+  useEffect(() => {
+    let alive = true;
+    void Promise.resolve(window.api.immersionGetSession?.())
+      .then((stored) => {
+        if (!alive) return;
+        const restored = stored && Array.isArray(stored.tabs) && stored.tabs.length ? stored : emptySession();
+        setSession(restored);
+        setSessionReady(true);
+        const active = restored.tabs.find((tab) => tab.id === restored.activeTabId);
+        if (active?.url) {
+          setNav({ entries: [active.url], index: 0 });
+          navigate(active.url, { pushHistory: false, mode: active.mode });
+        }
+      })
+      .catch(() => {
+        if (alive) setSessionReady(true);
+      });
+    return () => {
+      alive = false;
+    };
+    // Once, on mount: a later `navigate` identity must not re-restore the session.
+  }, []);
+
+  // Keep the active tab describing the page on screen.
+  useEffect(() => {
+    if (!sessionReady) return;
+    setSession((s) => {
+      const tab = s.tabs.find((candidate) => candidate.id === s.activeTabId);
+      // Until the page reports its own title, `title` is the url (or the
+      // window's name): keep the tab's stored title for the same page, and
+      // drop it for a new one so the strip shows the host instead.
+      const real = currentUrl && title && title !== currentUrl && title !== 'Immersion' ? title : '';
+      const keep = tab && tab.url === currentUrl ? tab.title : '';
+      return updateImmersionTab(s, s.activeTabId, { url: currentUrl, title: real || keep, mode });
+    });
+  }, [sessionReady, currentUrl, title, mode]);
+
+  // Persist, coalesced: a burst of title/url updates is one write.
+  useEffect(() => {
+    if (!sessionReady) return undefined;
+    const timer = window.setTimeout(() => {
+      void window.api.immersionSetSession?.(session);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [session, sessionReady]);
+
+  /** Show `tabId`: park the current tab's trail, then load the target's page (or a blank one). */
+  const activateTab = useCallback(
+    (next: ImmersionSession, tabId: string) => {
+      navByTab.current.set(session.activeTabId, nav);
+      const target = next.tabs.find((tab) => tab.id === tabId);
+      setSession({ ...next, activeTabId: tabId });
+      if (!target) return;
+      const trail = navByTab.current.get(tabId) ?? {
+        entries: target.url ? [target.url] : [],
+        index: target.url ? 0 : -1,
+      };
+      setNav(trail);
+      if (target.url) {
+        navigate(target.url, { pushHistory: false, mode: target.mode });
+      } else {
+        closePage();
+        setMode(target.mode);
+      }
+    },
+    [session.activeTabId, nav, navigate, closePage],
+  );
+
+  const switchTab = useCallback(
+    (tabId: string) => {
+      if (tabId === session.activeTabId) return;
+      activateTab(session, tabId);
+    },
+    [session, activateTab],
+  );
+
+  const newTab = useCallback(() => {
+    if (session.tabs.length >= IMMERSION_MAX_TABS) {
+      setStatus(t('immersion.tabs.max', { max: IMMERSION_MAX_TABS }));
+      return;
+    }
+    const next = addImmersionTab(session, mode === 'focus' ? 'reader' : mode);
+    activateTab(next, next.activeTabId);
+    window.setTimeout(() => urlBarRef.current?.focus(), 0);
+  }, [session, mode, activateTab, t]);
+
+  const closeTab = useCallback(
+    (tabId: string) => {
+      navByTab.current.delete(tabId);
+      const next = closeImmersionTab(session, tabId);
+      if (tabId === session.activeTabId) activateTab(next, next.activeTabId);
+      else setSession(next);
+    },
+    [session, activateTab],
+  );
+
   // Keyboard — rebindable via Settings → Shortcuts; Escape stays local.
   useEffect(() => {
     const offs = [
@@ -850,6 +1091,27 @@ export function useImmersion() {
       }),
     ];
     const onKey = (e: KeyboardEvent) => {
+      // Tab shortcuts only while THIS browser has focus — the desktop shell
+      // hosts other apps in the same window, and Ctrl+W there is theirs.
+      const focusedHere = !!rootRef.current && rootRef.current.contains(document.activeElement);
+      if (focusedHere && e.ctrlKey && !e.altKey && !e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (key === 't' && !e.shiftKey) {
+          e.preventDefault();
+          newTab();
+          return;
+        }
+        if (key === 'w' && !e.shiftKey) {
+          e.preventDefault();
+          closeTab(session.activeTabId);
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          switchTab(cycleImmersionTab(session, e.shiftKey ? -1 : 1));
+          return;
+        }
+      }
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') {
         if (e.key === 'Escape') (e.target as HTMLElement).blur();
@@ -865,7 +1127,7 @@ export function useImmersion() {
       offs.forEach((off) => off());
       window.removeEventListener('keydown', onKey);
     };
-  }, [applyMode, cycleMode, currentUrl, mode]);
+  }, [applyMode, cycleMode, currentUrl, mode, newTab, closeTab, switchTab, session]);
 
   const showRail = railOpen && showChrome;
 
@@ -875,6 +1137,9 @@ export function useImmersion() {
     currentUrl, title, mode, loading, error, status, setStatus,
     readerHtml, readerHtmlProp,
     sites, sitesStatus, history, histIdx, popup, setPopup,
+    bookmarks, filteredBookmarks, folders, railView, setRailView, currentBookmark,
+    updateBookmark, removeBookmark, addFolder, removeFolder, clearHistory,
+    session, switchTab, newTab, closeTab, rootRef, lang, studyLang,
     captureBusy, railOpen, setRailOpen,
     liveLookup, setLiveLookup,
     showChrome, showReader, showWebview, splitView, showRail,
@@ -887,6 +1152,68 @@ export function useImmersion() {
 }
 
 export type ImmersionState = ReturnType<typeof useImmersion>;
+
+/**
+ * The browser's tabs (audit r2 #11), on the session store main has always kept.
+ * Rendered by the host above its toolbar; Ctrl+T / Ctrl+W / Ctrl+Tab work
+ * while the browser has focus (see the keyboard effect in `useImmersion`).
+ */
+export function ImmersionTabStrip({ state }: { state: ImmersionState }) {
+  const { t, session } = state;
+  const atCap = session.tabs.length >= IMMERSION_MAX_TABS;
+  const labelFor = (tab: ImmersionSession['tabs'][number]): string => {
+    if (tab.title && tab.title !== 'New tab') return tab.title;
+    if (tab.url) {
+      try {
+        return new URL(tab.url).host;
+      } catch {
+        return tab.url;
+      }
+    }
+    return t('immersion.tabs.blank');
+  };
+  return (
+    <div className="immersion-tabs lq-hit-scope" role="tablist" aria-label={t('immersion.tabs.label')}>
+      {session.tabs.map((tab) => {
+        const label = labelFor(tab);
+        const active = tab.id === session.activeTabId;
+        return (
+          <div key={tab.id} className={`immersion-tab${active ? ' active' : ''}`} data-tab={tab.id}>
+            <button
+              type="button"
+              role="tab"
+              className="immersion-tab-button"
+              aria-selected={active}
+              title={tab.url || label}
+              onClick={() => state.switchTab(tab.id)}
+            >
+              {label}
+            </button>
+            <button
+              type="button"
+              className="immersion-tab-close"
+              aria-label={t('immersion.tabs.close', { title: label })}
+              title={t('immersion.tabs.close', { title: label })}
+              onClick={() => state.closeTab(tab.id)}
+            >
+              <Icon name="close" size={11} />
+            </button>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="immersion-tab-new"
+        aria-label={t('immersion.tabs.new')}
+        title={atCap ? t('immersion.tabs.max', { max: IMMERSION_MAX_TABS }) : t('immersion.tabs.new')}
+        disabled={atCap}
+        onClick={state.newTab}
+      >
+        <Icon name="plus" size={12} />
+      </button>
+    </div>
+  );
+}
 
 /** Classic (non-aero) toolbar — reused by Study OS's plain path and Blanc. */
 /**
@@ -1064,9 +1391,15 @@ export function ImmersionToolbar({ state, overflow }: { state: ImmersionState; o
             <Icon name="close" size={14} />
             <span>{t('immersion.closePage')}</span>
           </button>
-          <button type="button" className="btn small" {...pageActionProps} onClick={() => void state.saveCurrentSite()}>
+          <button
+            type="button"
+            className="btn small immersion-bookmark-toggle"
+            {...pageActionProps}
+            aria-pressed={state.currentBookmark !== null}
+            onClick={() => void state.saveCurrentSite()}
+          >
             <Icon name="bookmark" size={14} />
-            <span>{t('immersion.saveSite')}</span>
+            <span>{state.currentBookmark ? t('immersion.bookmark.unstar') : t('immersion.saveSite')}</span>
           </button>
           <button type="button" className="btn small" {...pageActionProps} onClick={() => void state.saveCurrentAsTool()}>
             <Icon name="star" size={14} />
@@ -1119,7 +1452,7 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
          away an explicit Live or Focus choice for everyone else. */
       onClick={() => state.navigate(s.url)}
     >
-      {s.label}
+      {t(s.labelKey)}
     </button>
   );
   return (
@@ -1159,13 +1492,13 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
             the disclosure's reverse transition is the same click that opened it.
           */}
           <div className="immersion-starters">
-            {IMMERSION_STARTERS.filter((s) => s.lang === IMMERSION_SUBJECT_LANG).map(starterButton)}
+            {IMMERSION_STARTERS.filter((s) => s.lang === state.studyLang).map(starterButton)}
           </div>
-          {IMMERSION_STARTERS.some((s) => s.lang !== IMMERSION_SUBJECT_LANG) && (
+          {IMMERSION_STARTERS.some((s) => s.lang !== state.studyLang) && (
             <details className="immersion-starters-more">
               <summary className="immersion-starters-summary">{t('immersion.moreDestinations')}</summary>
               <div className="immersion-starters">
-                {IMMERSION_STARTERS.filter((s) => s.lang !== IMMERSION_SUBJECT_LANG).map(starterButton)}
+                {IMMERSION_STARTERS.filter((s) => s.lang !== state.studyLang).map(starterButton)}
               </div>
             </details>
           )}
@@ -1297,14 +1630,254 @@ export function ImmersionSiteSearch({ state }: { state: ImmersionState }) {
   );
 }
 
+/**
+ * Today's immersion totals — the metrics main has always counted and nothing
+ * read (audit r2 #14): reading time, characters, pages exported, videos
+ * captured, plus the last seven days' reading time.
+ */
+export function ImmersionStatsCard({ state }: { state: ImmersionState }) {
+  const { t, lang } = state;
+  const [today, setToday] = useState<ImmersionDayMetrics | null>(null);
+  const [weekSeconds, setWeekSeconds] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const weekOf = (all: Record<string, ImmersionDayMetrics>): number => {
+      const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      return Object.entries(all).reduce((sum, [day, m]) => {
+        const at = new Date(`${day}T12:00:00`).getTime();
+        return at >= since ? sum + (m?.seconds ?? 0) : sum;
+      }, 0);
+    };
+    void Promise.resolve(window.api.immersionGetMetrics?.())
+      .then((res) => {
+        if (!alive || !res) return;
+        setToday(res.today);
+        setWeekSeconds(weekOf(res.all ?? {}));
+      })
+      .catch(() => undefined);
+    const off = window.api.onImmersionMetricsChanged?.((p) => {
+      setToday(p.metrics);
+      setWeekSeconds(weekOf(p.all ?? {}));
+    });
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, []);
+  if (!today) return null;
+  const nf = new Intl.NumberFormat(LANG_TAGS[lang]);
+  const minutes = (s: number) => nf.format(Math.round(s / 60));
+  return (
+    <div className="immersion-stats-card" aria-label={t('immersion.stats.label')}>
+      <p className="immersion-stats-line">
+        {t('immersion.stats.today', { minutes: minutes(today.seconds), chars: nf.format(today.chars) })}
+      </p>
+      <p className="immersion-stats-line muted">
+        {t('immersion.stats.pages', {
+          pages: nf.format(today.pagesExported),
+          videos: nf.format(today.videosCaptured),
+        })}
+      </p>
+      <p className="immersion-stats-line muted">{t('immersion.stats.week', { minutes: minutes(weekSeconds) })}</p>
+    </div>
+  );
+}
+
+/** Bookmarks, with folders and tags — the pages the user chose to keep (audit r2 #12). */
+function ImmersionBookmarkList({ state }: { state: ImmersionState }) {
+  const { t, filteredBookmarks, folders, bookmarks } = state;
+  const [folderFilter, setFolderFilter] = useState<string>('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [tagsDraft, setTagsDraft] = useState('');
+  const [newFolder, setNewFolder] = useState<string | null>(null);
+  const shown = folderFilter
+    ? filteredBookmarks.filter((b) => (folderFilter === '-' ? !b.folderId : b.folderId === folderFilter))
+    : filteredBookmarks;
+  return (
+    <div className="immersion-bookmarks lq-hit-scope">
+      <div className="immersion-folder-row" role="group" aria-label={t('immersion.folders.label')}>
+        <select
+          className="immersion-folder-filter"
+          aria-label={t('immersion.folders.filter')}
+          value={folderFilter}
+          onChange={(e) => setFolderFilter(e.target.value)}
+        >
+          <option value="">{t('immersion.folders.all')}</option>
+          <option value="-">{t('immersion.folders.unfiled')}</option>
+          {folders.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+        {newFolder === null ? (
+          <button type="button" className="btn small" onClick={() => setNewFolder('')}>
+            {t('immersion.folders.new')}
+          </button>
+        ) : (
+          <form
+            className="immersion-folder-new"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void state.addFolder(newFolder);
+              setNewFolder(null);
+            }}
+          >
+            <input
+              autoFocus
+              value={newFolder}
+              aria-label={t('immersion.folders.name')}
+              placeholder={t('immersion.folders.name')}
+              onChange={(e) => setNewFolder(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setNewFolder(null);
+              }}
+            />
+          </form>
+        )}
+        {folderFilter && folderFilter !== '-' ? (
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => {
+              const folder = folders.find((f) => f.id === folderFilter);
+              if (folder) void state.removeFolder(folder).then(() => setFolderFilter(''));
+            }}
+          >
+            {t('immersion.folders.remove')}
+          </button>
+        ) : null}
+      </div>
+      {bookmarks.length === 0 ? (
+        <p className="muted immersion-rail-empty" role="status">{t('immersion.bookmarks.empty')}</p>
+      ) : null}
+      <ul className="immersion-bookmark-list">
+        {shown.map((b) => (
+          <li key={b.id} className="immersion-bookmark-row" data-bookmark={b.id}>
+            <button type="button" className="immersion-site-card" onClick={() => state.navigate(b.url)} title={b.url}>
+              <span className="immersion-site-title">
+                <Icon name="star" size={11} className="immersion-site-fav" fill />
+                {b.title}
+              </span>
+              <span className="immersion-site-meta muted">
+                {b.lang !== 'auto' ? `${b.lang.toUpperCase()} · ` : ''}
+                {folders.find((f) => f.id === b.folderId)?.name ?? t('immersion.folders.unfiled')}
+                {b.tags.length ? ` · ${b.tags.map((tag) => `#${tag}`).join(' ')}` : ''}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="immersion-site-remove"
+              title={t('immersion.bookmark.edit')}
+              aria-label={`${t('immersion.bookmark.edit')} — ${b.title}`}
+              aria-expanded={editing === b.id}
+              onClick={() => {
+                setEditing(editing === b.id ? null : b.id);
+                setTagsDraft(b.tags.join(', '));
+              }}
+            >
+              <Icon name="edit" size={12} />
+            </button>
+            <button
+              type="button"
+              className="immersion-site-remove immersion-bookmark-unstar"
+              title={t('immersion.bookmark.unstar')}
+              aria-label={`${t('immersion.bookmark.unstar')} — ${b.title}`}
+              onClick={() => void state.removeBookmark(b)}
+            >
+              <Icon name="close" size={12} />
+            </button>
+            {editing === b.id ? (
+              <form
+                className="immersion-bookmark-edit"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void state.updateBookmark(b, { tags: tagsDraft.split(',').map((tag) => tag.trim()).filter(Boolean) });
+                  setEditing(null);
+                }}
+              >
+                <label>
+                  <span>{t('immersion.bookmark.folder')}</span>
+                  <select
+                    value={b.folderId ?? ''}
+                    onChange={(e) => void state.updateBookmark(b, { folderId: e.target.value || null })}
+                  >
+                    <option value="">{t('immersion.folders.unfiled')}</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t('immersion.bookmark.tags')}</span>
+                  <input value={tagsDraft} onChange={(e) => setTagsDraft(e.target.value)} />
+                </label>
+                <button type="submit" className="btn small">{t('immersion.bookmark.save')}</button>
+              </form>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** History, newest first, with a time-ranged Clear (audit r2 #12). */
+function ImmersionHistoryControls({ state }: { state: ImmersionState }) {
+  const { t, sites } = state;
+  const [range, setRange] = useState<ImmersionHistoryRange>('hour');
+  if (sites.length === 0) return null;
+  return (
+    <div className="immersion-history-clear">
+      <select
+        aria-label={t('immersion.history.range')}
+        value={range}
+        onChange={(e) => setRange(e.target.value as ImmersionHistoryRange)}
+      >
+        {IMMERSION_HISTORY_RANGES.map((r) => (
+          <option key={r} value={r}>
+            {t(`immersion.history.range.${r}`)}
+          </option>
+        ))}
+      </select>
+      <button type="button" className="btn small" onClick={() => void state.clearHistory(range)}>
+        {t('immersion.history.clear')}
+      </button>
+    </div>
+  );
+}
+
 export function ImmersionSiteList({ state }: { state: ImmersionState }) {
   // `sites` is deliberately not read here any more: the rail's empty/loading/error
   // copy belongs to `ImmersionSitesStatus`, which is the only thing allowed to
   // describe the saved library's state.
-  const { t, currentUrl, filteredSites, siteQuery } = state;
+  const { t, currentUrl, filteredSites, siteQuery, railView } = state;
   return (
     <div className="immersion-rail">
+      <ImmersionStatsCard state={state} />
+      <div className="immersion-rail-views" role="tablist" aria-label={t('immersion.sites')}>
+        {(['bookmarks', 'history'] as const).map((view) => (
+          <button
+            key={view}
+            type="button"
+            role="tab"
+            className={`immersion-rail-view${railView === view ? ' active' : ''}`}
+            aria-selected={railView === view}
+            data-view={view}
+            onClick={() => state.setRailView(view)}
+          >
+            {t(`immersion.rail.view.${view}`)}
+          </button>
+        ))}
+      </div>
       <ImmersionSiteSearch state={state} />
+      {railView === 'bookmarks' ? (
+        <ImmersionBookmarkList state={state} />
+      ) : (
+        <>
+      <ImmersionHistoryControls state={state} />
       <ImmersionSitesStatus state={state} />
       <VirtualList
         /* Was `key={normalizedQuery}`, which reset the scroll offset by REMOUNTING the
@@ -1323,7 +1896,9 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
           <div className="immersion-site-row">
             <button type="button" className="immersion-site-card" onClick={() => state.navigate(s.url)} title={s.url}>
               <span className="immersion-site-title">
-                {s.favorite && <Icon name="star" size={11} className="immersion-site-fav" fill />}
+                {state.bookmarks.some((b) => immersionStatsId(b.url) === immersionStatsId(s.url)) && (
+                  <Icon name="star" size={11} className="immersion-site-fav" fill />
+                )}
                 {s.title}
               </span>
               <span className="immersion-site-meta muted">
@@ -1353,6 +1928,8 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
           </div>
         )}
       />
+        </>
+      )}
       {/*
        * The curated destinations, in the rail, and ONLY once a page is open.
        *
@@ -1384,7 +1961,7 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
                   /* Same as the empty state's starters: keep the mode the user chose. */
                   onClick={() => state.navigate(s.url)}
                 >
-                  <span className="immersion-rail-destination-label">{s.label}</span>
+                  <span className="immersion-rail-destination-label">{t(s.labelKey)}</span>
                   {s.lang !== 'auto' && (
                     <span className="immersion-rail-destination-lang muted">{s.lang.toUpperCase()}</span>
                   )}

@@ -62,6 +62,7 @@ import VisualNovelSourcePanel from './VisualNovelSourcePanel';
 import VisualNovelArt from './VisualNovelArt';
 import { TRACKING_KEYS, VisualNovelCaptureBar, VisualNovelCaptureSetup } from './VisualNovelCaptureControls';
 import { writeLocalStorageJson } from '../../localStorageWrite';
+import { VISUAL_NOVEL_FOCUS_EVENT, onOpenIntent, takeVisualNovelFocus } from '../../openIntents';
 import './visualNovel.css';
 
 interface ProgressDraft {
@@ -327,6 +328,16 @@ export default function VisualNovelPanel({
       active = false;
       off();
     };
+  }, []);
+
+  // "Open" on a visual novel in the Files app lands on that novel, not the last one viewed.
+  useEffect(() => {
+    const apply = (): void => {
+      const id = takeVisualNovelFocus();
+      if (id) setSelectedId(id);
+    };
+    apply();
+    return onOpenIntent(VISUAL_NOVEL_FOCUS_EVENT, apply);
   }, []);
 
   useEffect(() => onMediaStudyDatabaseChanged((next) => setStudyProfiles(next.profiles)), []);

@@ -673,6 +673,12 @@ declare global {
       filesDelete(
         request: import('../shared/filesApp/deletion').FilesDeleteRequest,
       ): Promise<import('../shared/filesApp/deletion').FilesDeletionResult>;
+      filesTrashOwnedFile(itemId: string): Promise<{ ok: boolean; reasonKey?: string }>;
+      onFilesWatchImport?(
+        cb: (arrivals: import('../shared/filesApp/watchImport').FilesWatchImportArrival[]) => void,
+      ): () => void;
+      filesPreview?(itemId: string): Promise<import('../shared/filesApp/preview').FilesPreview>;
+      filesDuplicates?(): Promise<import('../shared/filesApp/preview').FilesDuplicateGroup[]>;
       // Gates 32-35. `filesCleanupPlan` is the dry run and writes nothing.
       filesCleanupPlan(
         settings: import('../shared/filesApp/cleanup').FilesCleanupSettings,
@@ -1304,6 +1310,7 @@ declare global {
       ytDeleteFolder(folderId: string): Promise<import('../shared/ytPlaylists').YtPlaylistsStore>;
       ytAddPlaylist(
         url: string,
+        studyLang?: 'ja' | 'zh' | 'en',
       ): Promise<
         | {
             store: import('../shared/ytPlaylists').YtPlaylistsStore;
@@ -1362,6 +1369,12 @@ declare global {
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
         results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
       }>;
+      ytDownloadQueue?(): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytCancelDownloads?(videoIds?: string[]): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytPauseDownload?(videoId: string): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytResumeDownload?(videoId: string): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytClearFinishedDownloads?(): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      onYtQueueChanged?(cb: (entries: import('../main/ytDownloadQueue').YtQueueEntry[]) => void): () => void;
       ytFetchSubsOnly(videoIds: string[]): Promise<{
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
         results: Array<{ videoId: string; ok: boolean; error?: string }>;
@@ -1833,7 +1846,12 @@ declare global {
       ): () => void;
       immersionSaveSite(
         input: ImmersionSaveSiteInput,
-      ): Promise<{ ok: boolean; site?: ImmersionSite; error?: string }>;
+      ): Promise<{ ok: boolean; bookmark?: import('../shared/immersion').ImmersionBookmark | null; error?: string }>;
+      immersionClearHistory(
+        range: import('../shared/immersion').ImmersionHistoryRange,
+      ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;
+      immersionAddFolder(name: string): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;
+      immersionRemoveFolder(id: string): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;
       immersionRemoveSite(
         id: string,
       ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;

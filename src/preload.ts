@@ -1122,6 +1122,26 @@ const api = {
     return () => ipcRenderer.removeListener('filesapp:watch-arrival', handler);
   },
   /**
+   * Arrivals the MAIN window should import (sent to that window only, so a
+   * popped-out Files window never imports the same file a second time).
+   */
+  onFilesWatchImport: (
+    cb: (arrivals: import('./shared/filesApp/watchImport').FilesWatchImportArrival[]) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      arrivals: import('./shared/filesApp/watchImport').FilesWatchImportArrival[],
+    ): void => cb(arrivals);
+    ipcRenderer.on('filesapp:watch-import', handler);
+    return () => ipcRenderer.removeListener('filesapp:watch-import', handler);
+  },
+  /** The preview pane: an image URL, a few thousand characters of text, or why not. */
+  filesPreview: (itemId: string): Promise<import('./shared/filesApp/preview').FilesPreview> =>
+    ipcRenderer.invoke('filesapp:preview', itemId),
+  /** Rows that are the same file twice (same path, or same sampled content). */
+  filesDuplicates: (): Promise<import('./shared/filesApp/preview').FilesDuplicateGroup[]> =>
+    ipcRenderer.invoke('filesapp:duplicates'),
+  /**
    * Delete one Files-index item through its authoritative id. Paths, kinds and
    * risk classifications never cross this bridge; main resolves them again.
    */
@@ -1129,6 +1149,9 @@ const api = {
     request: import('./shared/filesApp/deletion').FilesDeleteRequest,
   ): Promise<import('./shared/filesApp/deletion').FilesDeletionResult> =>
     ipcRenderer.invoke(FILES_DELETE_CHANNEL, request),
+  /** Linked media Delete with "also move the file to the Recycle Bin" ticked. */
+  filesTrashOwnedFile: (itemId: string): Promise<{ ok: boolean; reasonKey?: string }> =>
+    ipcRenderer.invoke('filesapp:trash-owned-file', itemId),
 
   /**
    * Gates 32-35 — cleanup. Same contract as Delete: the renderer names classes
@@ -2097,10 +2120,12 @@ const api = {
     ipcRenderer.invoke('yt:saveFolder', folder),
   ytDeleteFolder: (folderId: string): Promise<YtPlaylistsStore> =>
     ipcRenderer.invoke('yt:deleteFolder', folderId),
+  /** `studyLang`: the new playlist's language and subtitle default (the user's study language). */
   ytAddPlaylist: (
     url: string,
+    studyLang?: 'ja' | 'zh' | 'en',
   ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> =>
-    ipcRenderer.invoke('yt:addPlaylist', url),
+    ipcRenderer.invoke('yt:addPlaylist', url, studyLang),
   ytRefreshPlaylist: (
     playlistId: string,
   ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> =>
@@ -2153,6 +2178,25 @@ const api = {
     store: YtPlaylistsStore;
     results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
   }> => ipcRenderer.invoke('yt:downloadVideos', videoIds, options),
+  /** The download queue: each video's state and progress, with pause/resume/cancel. */
+  ytDownloadQueue: (): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:downloadQueue'),
+  /** Stop downloads (all of them without ids): yt-dlp is killed and partial files removed. */
+  ytCancelDownloads: (videoIds?: string[]): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:cancelDownloads', videoIds),
+  ytPauseDownload: (videoId: string): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:pauseDownload', videoId),
+  ytResumeDownload: (videoId: string): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:resumeDownload', videoId),
+  ytClearFinishedDownloads: (): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:clearFinishedDownloads'),
+  onYtQueueChanged: (
+    cb: (entries: import('./main/ytDownloadQueue').YtQueueEntry[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, entries: import('./main/ytDownloadQueue').YtQueueEntry[]): void => cb(entries);
+    ipcRenderer.on('yt:queueChanged', handler);
+    return () => ipcRenderer.removeListener('yt:queueChanged', handler);
+  },
   ytFetchSubsOnly: (
     videoIds: string[],
   ): Promise<{
@@ -2884,10 +2928,23 @@ const api = {
     ipcRenderer.on('visual-novel:changed', handler);
     return () => ipcRenderer.removeListener('visual-novel:changed', handler);
   },
+  /** Star (favorite: true, or edit tags/folder) or unstar (favorite: false) a page. */
   immersionSaveSite: (
     input: ImmersionSaveSiteInput,
-  ): Promise<{ ok: boolean; site?: ImmersionSite; error?: string }> =>
+  ): Promise<{ ok: boolean; bookmark?: import('./shared/immersion').ImmersionBookmark | null; error?: string }> =>
     ipcRenderer.invoke('immersion:saveSite', input),
+  immersionClearHistory: (
+    range: import('./shared/immersion').ImmersionHistoryRange,
+  ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>
+    ipcRenderer.invoke('immersion:clearHistory', range),
+  immersionAddFolder: (
+    name: string,
+  ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>
+    ipcRenderer.invoke('immersion:addFolder', name),
+  immersionRemoveFolder: (
+    id: string,
+  ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>
+    ipcRenderer.invoke('immersion:removeFolder', id),
   immersionRemoveSite: (
     id: string,
   ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>

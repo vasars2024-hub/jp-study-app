@@ -67,7 +67,15 @@ export interface YtVideo {
   firstSeenAt?: number;
   downloaded: boolean;
   mediaItemId?: string;
+  /** Creator-made subtitles came with the download (audit r2 #20: not auto captions). */
   hasOfficialSubs: boolean | null;
+  /** Only YouTube's auto-generated captions came with the download. */
+  hasAutoSubs?: boolean;
+  /**
+   * The video is no longer in its playlist on YouTube (deleted, made private,
+   * or taken out). Kept, with its local file, rather than dropped (audit r2 #21).
+   */
+  removedFromYouTube?: boolean;
   transcribed: boolean;
   loggedAt?: number;
 }
@@ -80,6 +88,8 @@ export interface YtPlaylistsStore {
   videos: YtVideo[];
   /** Unix ms of last News check completion. */
   lastNewsCheckedAt?: number;
+  /** What that check found, so reopening the window shows it without a re-sync. */
+  lastNewsVideoIds?: string[];
   /** Ordered internal video ids in Plan to watch. */
   planToWatchIds: string[];
 }
@@ -246,6 +256,13 @@ export function normalizeYtStore(raw: unknown): YtPlaylistsStore {
       typeof parsed.lastNewsCheckedAt === 'number' && Number.isFinite(parsed.lastNewsCheckedAt)
         ? parsed.lastNewsCheckedAt
         : undefined,
+    ...(Array.isArray(parsed.lastNewsVideoIds)
+      ? {
+          lastNewsVideoIds: parsed.lastNewsVideoIds.filter(
+            (id): id is string => typeof id === 'string' && !!id,
+          ),
+        }
+      : {}),
     planToWatchIds: Array.isArray(parsed.planToWatchIds)
       ? parsed.planToWatchIds.filter((id): id is string => typeof id === 'string' && !!id)
       : [],
@@ -395,11 +412,19 @@ export function mergePlaylistVideos(
     existing.filter((v) => v.playlistId === playlistId).map((v) => [v.youtubeId, v]),
   );
   const others = existing.filter((v) => v.playlistId !== playlistId);
+  const remoteIds = new Set(remote.map((r) => r.youtubeId));
+  // Gone from YouTube: kept and marked, never silently dropped — the user may
+  // have its file, its transcript and its cards (audit r2 #21).
+  const removed: YtVideo[] = [...byId.values()]
+    .filter((v) => !remoteIds.has(v.youtubeId))
+    .map((v) => ({ ...v, removedFromYouTube: true }));
   const merged: YtVideo[] = remote.map((r, i) => {
     const prev = byId.get(r.youtubeId);
     if (prev) {
+      const { removedFromYouTube: _back, ...rest } = prev;
+      void _back;
       return {
-        ...prev,
+        ...rest,
         title: r.title || prev.title,
         thumbUrl: r.thumbUrl ?? prev.thumbUrl,
         durationSec: r.durationSec ?? prev.durationSec,
@@ -428,7 +453,40 @@ export function mergePlaylistVideos(
       transcribed: false,
     };
   });
-  return [...others, ...merged];
+  return [...others, ...merged, ...removed];
+}
+
+/**
+ * Whether opening the manager should sync (audit r2 #22): only when a playlist
+ * the auto-update timer looks after is due by that timer's own rule, or when
+ * nothing has ever been checked. Every other open shows what is stored.
+ */
+export function ytPlaylistIsDue(
+  lastCheckedAt: number | undefined,
+  frequencyHours: number,
+  now: number,
+): boolean {
+  if (!lastCheckedAt) return true;
+  return now - lastCheckedAt >= frequencyHours * 60 * 60 * 1000;
+}
+
+export function ytNewsIsStale(store: YtPlaylistsStore, now: number): boolean {
+  const immersion = (store.playlists ?? []).filter(isImmersionPlaylist);
+  if (immersion.length === 0) return false;
+  if (!store.lastNewsCheckedAt) return true;
+  return immersion.some(
+    (p) => p.autoUpdate && ytPlaylistIsDue(p.lastCheckedAt, p.updateFrequencyHours, now),
+  );
+}
+
+/** View counts in the UI language's own compact form (1.2K, 1,2 тыс., 1.2万) — audit r2 #23. */
+export function formatYtViews(n: number | undefined, locale: string): string {
+  if (n == null || !Number.isFinite(n)) return '—';
+  try {
+    return new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  } catch {
+    return String(n);
+  }
 }
 
 export function ensureTrackedChannel(
@@ -537,6 +595,16 @@ export function diffNewVideos(store: YtPlaylistsStore, sinceMs: number): YtVideo
         v.firstSeenAt > sinceMs,
     )
     .sort((a, b) => (b.firstSeenAt ?? 0) - (a.firstSeenAt ?? 0));
+}
+
+/**
+ * What a News check reports as new (audit r2 #16). The FIRST check has no
+ * earlier one to compare against — "new since the epoch" is the whole library —
+ * so it reports nothing and becomes the baseline.
+ */
+export function newsIdsAfterCheck(store: YtPlaylistsStore, previousCheckAt: number | undefined): string[] {
+  if (!previousCheckAt || previousCheckAt <= 0) return [];
+  return diffNewVideos(store, previousCheckAt).map((v) => v.id);
 }
 
 export function addPlanToWatchIds(store: YtPlaylistsStore, videoIds: string[]): YtPlaylistsStore {

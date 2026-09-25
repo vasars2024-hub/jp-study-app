@@ -67,10 +67,30 @@ export interface ImmersionDayMetrics {
 
 export type ImmersionMetricsMap = Record<string, ImmersionDayMetrics>;
 
+/**
+ * A page the user chose to keep — separate from `ImmersionSite`, which is the
+ * per-page HISTORY row every visit creates (audit r2 #12: the two were one list,
+ * so a real profile's "saved sites" rail held 883 rows of browsing history, and
+ * "Save site" only set a flag nothing could unset).
+ */
+export interface ImmersionBookmark {
+  id: string;
+  url: string;
+  title: string;
+  lang: ImmersionLang;
+  tags: string[];
+  folderId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ImmersionSitesStore {
-  schemaVersion: 1;
+  /** 2 adds `bookmarks`; a v1 store is migrated on read (`migrateSitesStore`). */
+  schemaVersion: 2;
+  /** History: one row per page visited, with its reading stats. */
   sites: ImmersionSite[];
   folders: ImmersionFolder[];
+  bookmarks: ImmersionBookmark[];
 }
 
 export interface ImmersionSaveSiteInput {
@@ -78,8 +98,31 @@ export interface ImmersionSaveSiteInput {
   title?: string;
   lang?: ImmersionLang;
   tags?: string[];
+  /** true stars the page (creates or updates its bookmark); false unstars it. */
   favorite?: boolean;
   folderId?: string | null;
+}
+
+/** How far back "Clear history" reaches. */
+export type ImmersionHistoryRange = 'hour' | 'day' | 'week' | 'all';
+
+export const IMMERSION_HISTORY_RANGES: readonly ImmersionHistoryRange[] = ['hour', 'day', 'week', 'all'];
+
+const RANGE_MS: Record<Exclude<ImmersionHistoryRange, 'all'>, number> = {
+  hour: 60 * 60 * 1000,
+  day: 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
+};
+
+/** History rows kept after clearing `range`, measured back from `now`. */
+export function clearImmersionHistory(
+  sites: readonly ImmersionSite[],
+  range: ImmersionHistoryRange,
+  now: number,
+): ImmersionSite[] {
+  if (range === 'all') return [];
+  const since = now - RANGE_MS[range];
+  return sites.filter((site) => site.lastVisited < since);
 }
 
 export interface ImmersionVisitInput {
@@ -114,17 +157,23 @@ export interface ImmersionMetricsDelta {
   pagesExported?: number;
 }
 
-/** Curated starter immersion destinations (no emoji). */
-export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; url: string; lang: ImmersionLang }> = [
-  { label: 'NHK Easy', url: 'https://news.web.nhk/news/easy/', lang: 'ja' },
-  { label: 'Wikipedia JP', url: 'https://ja.wikipedia.org/wiki/メインページ', lang: 'ja' },
-  { label: 'Hacker News', url: 'https://news.ycombinator.com/', lang: 'auto' },
-  { label: 'Chinese Wikipedia', url: 'https://zh.wikipedia.org/wiki/Wikipedia:首页', lang: 'zh' },
-  { label: 'Russian Wikipedia', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница', lang: 'ru' },
+/**
+ * Curated starter immersion destinations (no emoji). `labelKey` is resolved with
+ * `t()` at render time (CLAUDE.md i18n rule 7); `label` is the English fallback
+ * for a caller outside React.
+ */
+export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; labelKey: string; url: string; lang: ImmersionLang }> = [
+  { label: 'NHK Easy', labelKey: 'immersion.starter.nhkEasy', url: 'https://news.web.nhk/news/easy/', lang: 'ja' },
+  { label: 'Wikipedia JP', labelKey: 'immersion.starter.wikipediaJa', url: 'https://ja.wikipedia.org/wiki/メインページ', lang: 'ja' },
+  { label: 'Hacker News', labelKey: 'immersion.starter.hackerNews', url: 'https://news.ycombinator.com/', lang: 'auto' },
+  { label: 'Chinese Wikipedia', labelKey: 'immersion.starter.wikipediaZh', url: 'https://zh.wikipedia.org/wiki/Wikipedia:首页', lang: 'zh' },
+  { label: 'Russian Wikipedia', labelKey: 'immersion.starter.wikipediaRu', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница', lang: 'ru' },
 ];
 
 /**
- * The language this app is about. `IMMERSION_STARTERS` carries five destinations in four
+ * The DEFAULT study language — the empty state's split follows the user's
+ * actual study language (`getStudyLang()` in the renderer), this is only the
+ * fallback for a caller with no access to it. `IMMERSION_STARTERS` carries five destinations in four
  * languages because Immersion reads any of them, but only two of them are what someone
  * opens a Japanese study app to read. The empty state surfaces the subject-language
  * destinations and tucks the rest behind one disclosure, so the split is derived from the
@@ -133,6 +182,146 @@ export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; url: string; lan
 export const IMMERSION_SUBJECT_LANG: ImmersionLang = 'ja';
 
 export const IMMERSION_MAX_TABS = 5;
+
+/* ------------------------------------------------------------------ *
+ * Back/Forward — audit r2 #10.
+ * ------------------------------------------------------------------ */
+
+export interface ImmersionNavStack {
+  entries: string[];
+  index: number;
+}
+
+export const IMMERSION_NAV_LIMIT = 40;
+
+/**
+ * The stack after the page moved to `url`.
+ *
+ * `replace` is for the page the app itself asked for landing somewhere else (a
+ * redirect): the entry it pushed IS this navigation, so it is rewritten rather
+ * than followed by a second one Back would bounce through. A move to the entry
+ * already current changes nothing — which is what makes Back/Forward, and the
+ * `did-navigate` they cause, safe to feed through here.
+ */
+export function immersionNavAfter(
+  stack: ImmersionNavStack,
+  url: string,
+  opts: { replace?: boolean } = {},
+): ImmersionNavStack {
+  if (!url) return stack;
+  const current = stack.index >= 0 ? stack.entries[stack.index] : undefined;
+  if (current === url) return stack;
+  if (opts.replace && stack.index >= 0) {
+    const entries = [...stack.entries];
+    entries[stack.index] = url;
+    return { entries, index: stack.index };
+  }
+  const base = stack.index >= 0 ? stack.entries.slice(0, stack.index + 1) : [];
+  const entries = [...base, url].slice(-IMMERSION_NAV_LIMIT);
+  return { entries, index: entries.length - 1 };
+}
+
+/* ------------------------------------------------------------------ *
+ * Tabs — audit r2 #11.
+ * ------------------------------------------------------------------ */
+
+function nextTabIdFor(session: ImmersionSession): string {
+  let n = session.tabs.length + 1;
+  const used = new Set(session.tabs.map((tab) => tab.id));
+  while (used.has(`tab-${n}`)) n += 1;
+  return `tab-${n}`;
+}
+
+/** A new blank tab, made active — or the session unchanged at the cap. */
+export function addImmersionTab(session: ImmersionSession, mode: ImmersionMode = 'reader'): ImmersionSession {
+  if (session.tabs.length >= IMMERSION_MAX_TABS) return session;
+  const id = nextTabIdFor(session);
+  return {
+    activeTabId: id,
+    tabs: [...session.tabs, { id, url: '', title: '', mode }],
+    updatedAt: Date.now(),
+  };
+}
+
+/** Close one tab. The neighbour to its left takes over; the last tab is replaced by a blank one. */
+export function closeImmersionTab(session: ImmersionSession, tabId: string): ImmersionSession {
+  const at = session.tabs.findIndex((tab) => tab.id === tabId);
+  if (at < 0) return session;
+  const tabs = session.tabs.filter((tab) => tab.id !== tabId);
+  if (tabs.length === 0) return emptySession();
+  const activeTabId =
+    session.activeTabId === tabId ? tabs[Math.max(0, at - 1)].id : session.activeTabId;
+  return { activeTabId, tabs, updatedAt: Date.now() };
+}
+
+/** The tab `step` places away from the active one, wrapping (Ctrl+Tab / Ctrl+Shift+Tab). */
+export function cycleImmersionTab(session: ImmersionSession, step: 1 | -1): string {
+  const at = Math.max(0, session.tabs.findIndex((tab) => tab.id === session.activeTabId));
+  const next = (at + step + session.tabs.length) % session.tabs.length;
+  return session.tabs[next]?.id ?? session.activeTabId;
+}
+
+/** Record where the active tab is, so switching away and back (or a restart) returns to it. */
+export function updateImmersionTab(
+  session: ImmersionSession,
+  tabId: string,
+  patch: Partial<Pick<ImmersionTab, 'url' | 'title' | 'mode' | 'scrollY'>>,
+): ImmersionSession {
+  let changed = false;
+  const tabs = session.tabs.map((tab) => {
+    if (tab.id !== tabId) return tab;
+    const next = { ...tab, ...patch };
+    if (next.url !== tab.url || next.title !== tab.title || next.mode !== tab.mode || next.scrollY !== tab.scrollY) {
+      changed = true;
+    }
+    return next;
+  });
+  return changed ? { ...session, tabs, updatedAt: Date.now() } : session;
+}
+
+/* ------------------------------------------------------------------ *
+ * The page's language and how far it was read — audit r2 #13.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The study language a page is written in, from its own text: kana means
+ * Japanese, Han without kana means Chinese, Cyrillic means Russian. Counted,
+ * not sniffed from one character — an English page quoting one kanji is still
+ * English. `auto` when nothing dominates.
+ */
+export function detectImmersionTextLang(text: string, studyLang?: ImmersionLang): ImmersionLang {
+  let kana = 0;
+  let han = 0;
+  let cyr = 0;
+  let latin = 0;
+  const sample = text.slice(0, 20_000);
+  for (const ch of sample) {
+    const c = ch.codePointAt(0) ?? 0;
+    if ((c >= 0x3040 && c <= 0x30ff) || (c >= 0x31f0 && c <= 0x31ff)) kana += 1;
+    else if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf)) han += 1;
+    else if (c >= 0x0400 && c <= 0x04ff) cyr += 1;
+    else if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)) latin += 1;
+  }
+  const cjk = kana + han;
+  const total = cjk + cyr + latin;
+  if (total < 20) return 'auto';
+  if (cjk >= cyr && cjk / total >= 0.3) {
+    if (kana / cjk >= 0.05) return 'ja';
+    if (kana === 0) return 'zh';
+    // A trace of kana in Han text is what both a Chinese page quoting Japanese
+    // and a kanji-heavy Japanese page look like; the study language decides.
+    return studyLang === 'ja' ? 'ja' : 'zh';
+  }
+  if (cyr / total >= 0.3) return 'ru';
+  return 'auto';
+}
+
+/** Scroll position as a reading percentage, 0-100; a page that fits reads as 100. */
+export function immersionScrollPct(scrollTop: number, scrollHeight: number, clientHeight: number): number {
+  const room = scrollHeight - clientHeight;
+  if (!(room > 0)) return scrollHeight > 0 ? 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(((scrollTop + clientHeight) / scrollHeight) * 100)));
+}
 
 export function immersionDayKey(d = new Date()): string {
   const y = d.getFullYear();
@@ -275,14 +464,78 @@ export function nextSiteStreak(
 }
 
 export function emptySitesStore(): ImmersionSitesStore {
-  return { schemaVersion: 1, sites: [], folders: [] };
+  return { schemaVersion: 2, sites: [], folders: [], bookmarks: [] };
+}
+
+export function sanitizeBookmark(raw: unknown): ImmersionBookmark | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.id !== 'string' || typeof o.url !== 'string') return null;
+  const url = normalizeImmersionUrl(o.url);
+  if (!url) return null;
+  const now = Date.now();
+  return {
+    id: o.id,
+    url,
+    title: typeof o.title === 'string' && o.title.trim() ? o.title.trim() : url,
+    lang: sanitizeLang(o.lang),
+    tags: Array.isArray(o.tags)
+      ? [...new Set(o.tags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0).map((t) => t.trim()))]
+      : [],
+    folderId: typeof o.folderId === 'string' && o.folderId ? o.folderId : undefined,
+    createdAt: typeof o.createdAt === 'number' ? o.createdAt : now,
+    updatedAt: typeof o.updatedAt === 'number' ? o.updatedAt : now,
+  };
+}
+
+/**
+ * Read a stored sites document of either schema.
+ *
+ * A v1 store has no bookmarks: every page it holds is history, and the rows the
+ * user starred (`favorite`) ALSO become bookmarks, keeping their title, tags and
+ * folder. The history rows stay as they are — their reading stats are the rail's
+ * progress bars — so migrating loses nothing and can run on every read of an
+ * unmigrated file without duplicating anything.
+ */
+export function migrateSitesStore(raw: unknown): ImmersionSitesStore {
+  if (!raw || typeof raw !== 'object') return emptySitesStore();
+  const o = raw as Record<string, unknown>;
+  const sites = Array.isArray(o.sites) ? (o.sites.map(sanitizeSite).filter(Boolean) as ImmersionSite[]) : [];
+  const folders = Array.isArray(o.folders)
+    ? o.folders
+        .filter((f): f is { id: string; name: string; order?: unknown } => {
+          if (!f || typeof f !== 'object') return false;
+          const x = f as Record<string, unknown>;
+          return typeof x.id === 'string' && typeof x.name === 'string';
+        })
+        .map((f) => ({ id: f.id, name: f.name, order: typeof f.order === 'number' ? f.order : 0 }))
+    : [];
+  let bookmarks: ImmersionBookmark[];
+  if (Array.isArray(o.bookmarks)) {
+    bookmarks = o.bookmarks.map(sanitizeBookmark).filter(Boolean) as ImmersionBookmark[];
+  } else {
+    bookmarks = sites
+      .filter((site) => site.favorite)
+      .map((site) => ({
+        id: `bm-${site.id}`,
+        url: site.url,
+        title: site.title,
+        lang: site.lang,
+        tags: [...site.tags],
+        folderId: site.folderId,
+        createdAt: site.createdAt,
+        updatedAt: site.updatedAt,
+      }));
+  }
+  return { schemaVersion: 2, sites, folders, bookmarks };
 }
 
 export function emptySession(): ImmersionSession {
   const id = 'tab-1';
   return {
     activeTabId: id,
-    tabs: [{ id, url: '', title: 'New tab', mode: 'reader' }],
+    // No title: the tab strip names a blank tab in the UI language.
+    tabs: [{ id, url: '', title: '', mode: 'reader' }],
     updatedAt: Date.now(),
   };
 }

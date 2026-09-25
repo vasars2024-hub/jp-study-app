@@ -95,16 +95,14 @@ const WIRED = [
 ];
 
 /**
- * Unwired on purpose, each for a reason recorded in D260. Not "forgotten" —
- * `openFilesAppForStatistics` in particular would open the surface the user is
- * already standing on, since Statistics IS a Files panel now.
+ * Audit r2 #7 closed D260: the four helpers nobody called
+ * (`openFilesAppForDecks`, `…ForDictionaries`, `…ForStatistics`,
+ * `…ForTranscript`) were deleted rather than kept as dead vocabulary — the
+ * assistant now reaches every category through the navigation index, and the
+ * Files rail reaches them in one click. The list stays, empty, so a new
+ * unwired helper has to be declared here to pass.
  */
-const UNWIRED = [
-  'openFilesAppForDecks',
-  'openFilesAppForDictionaries',
-  'openFilesAppForStatistics',
-  'openFilesAppForTranscript',
-];
+const UNWIRED: string[] = [];
 
 describe('Files app context entry — the callers vocabulary', () => {
   it('scans a real renderer tree, so an empty scan cannot pass vacuously', () => {

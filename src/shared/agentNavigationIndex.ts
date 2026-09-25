@@ -51,6 +51,7 @@
  */
 
 import type { DesktopWinSection } from './desktop';
+import { FILES_TREE, type FilesCategoryId } from './filesApp/catalog';
 
 export interface AgentNavigationIndexEntry {
   /** An allowlisted section; `settings` for every page and control target. */
@@ -59,6 +60,11 @@ export interface AgentNavigationIndexEntry {
   page?: string;
   /** Registered guided control id. Always resolves with a visible highlight. */
   controlId?: string;
+  /**
+   * A Files app category the window opens scoped to (FILES_APP_PLAN, "the
+   * Files app registers its categories there"). Only on `section: 'files'`.
+   */
+  filesScope?: FilesCategoryId;
   /**
    * The i18n key of this destination's own title, copied from the coordinate's
    * `SETTINGS_REGISTRY` entry and held to it by the mirror gate.
@@ -87,6 +93,7 @@ export interface AgentNavigationIndexResult {
   page?: string;
   controlId?: string;
   highlight?: true;
+  filesScope?: FilesCategoryId;
 }
 
 /**
@@ -321,10 +328,56 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'memory', controlId: 'factory-reset', titleKey: 'search.factoryReset', terms: ['factory reset', 'factory', 'reset', 'wipe', 'erase', 'fresh'] },
 ];
 
+/**
+ * The Files app's categories (audit r2 #7), so "show my books in files" opens
+ * the Files window on Books rather than at the root.
+ *
+ * Every term is the category's own label PLUS "files", as one multi-word term:
+ * a bare "books" or "dictionaries" still belongs to the app that owns them (the
+ * comment on the `files` section entry above explains why a finder must not
+ * hijack the word for the thing being found), and a phrase that names both is
+ * unambiguous. The title key is the phrase "<Category> in Files", translated,
+ * so a question in another language needs both halves as well.
+ */
+const FILES_LABEL_WORDS: Readonly<Record<string, string>> = {
+  'sources/books': 'books',
+  'sources/manga': 'manga',
+  'sources/visual-novels': 'visual novels',
+  'sources/video': 'video',
+  'sources/audio': 'audio',
+  'sources/text': 'text',
+  'outputs/decks': 'decks',
+  'outputs/mined': 'mined cards',
+  'outputs/packages': 'packages',
+  'outputs/exports': 'exports',
+  'outputs/notes': 'notes',
+  'outputs/highlights': 'highlights',
+  'outputs/drafts': 'drafts',
+  'reference/dictionaries': 'dictionaries',
+  'reference/models': 'models',
+  'reference/artwork': 'artwork',
+  'system/memory': 'memory',
+  'system/statistics': 'statistics',
+  'system/profiles': 'profiles',
+  'workspaces/studies': 'study workspaces',
+  'workspaces/queue': 'queue',
+  'workspaces/acquisitions': 'acquisitions',
+};
+
+const FILES_SCOPE_ENTRIES: readonly AgentNavigationIndexEntry[] = FILES_TREE.filter(
+  (node) => node.isLeaf && FILES_LABEL_WORDS[node.id],
+).map((node) => ({
+  section: 'files' as const,
+  filesScope: node.id,
+  titleKey: `filesApp.agentScope.${node.id.replace('/', '.')}`,
+  terms: [`${FILES_LABEL_WORDS[node.id]} files`],
+}));
+
 export const AGENT_NAVIGATION_INDEX: readonly AgentNavigationIndexEntry[] = [
   ...SECTION_ENTRIES,
   ...PAGE_ENTRIES,
   ...CONTROL_ENTRIES,
+  ...FILES_SCOPE_ENTRIES,
 ];
 
 /**
@@ -498,6 +551,7 @@ function destinationOf(entry: AgentNavigationIndexEntry): AgentNavigationIndexRe
     section: entry.section,
     ...(entry.page ? { page: entry.page } : {}),
     ...(entry.controlId ? { controlId: entry.controlId, highlight: true as const } : {}),
+    ...(entry.filesScope ? { filesScope: entry.filesScope } : {}),
   };
 }
 
@@ -507,7 +561,8 @@ function sameDestination(
 ): boolean {
   return left.section === right.section
     && left.page === right.page
-    && left.controlId === right.controlId;
+    && left.controlId === right.controlId
+    && left.filesScope === right.filesScope;
 }
 
 /**

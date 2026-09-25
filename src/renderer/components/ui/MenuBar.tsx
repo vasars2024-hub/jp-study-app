@@ -189,6 +189,7 @@ export function MenuBar({ menus, end, className = '', 'aria-label': ariaLabel }:
                       role="menuitem"
                       className={['ui-menu__item', it.danger ? 'ui-menu__item--danger' : ''].filter(Boolean).join(' ')}
                       disabled={it.disabled}
+                      title={it.title}
                       onClick={() => {
                         it.onSelect?.();
                         close(true);

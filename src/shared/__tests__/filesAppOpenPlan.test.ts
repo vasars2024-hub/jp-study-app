@@ -106,7 +106,8 @@ describe('gate 10 — the owning section is derived, not restated', () => {
     const fromRouter: Partial<Record<DropTargetId, string>> = {
       media: 'player',
       subtitle: 'player',
-      'anki-level': 'anki',
+      // A level-check deck now runs the Level flow and lands in Stats (r2data #12).
+      'anki-level': 'stats',
       'anki-cards': 'flashcards',
       'dictionary-yomitan': 'dictionary',
     };
@@ -205,7 +206,7 @@ describe('gate 10 — more than one candidate offers the ranked list', () => {
     expect(decision).toEqual({
       mode: 'open',
       target: 'anki-level',
-      section: 'anki',
+      section: 'stats',
       reasonKey: 'fileDrop.reason.apkgLevel',
       sniffed: false,
     });

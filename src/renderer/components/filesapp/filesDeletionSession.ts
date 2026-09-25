@@ -14,7 +14,9 @@ import {
   FILES_SOFT_DELETE_EVENT,
   FILES_SOFT_DELETE_STORAGE_KEY,
   FilesSoftDeleteStore,
+  type FilesSoftDeleteCommit,
   type FilesSoftDeletePersistence,
+  type FilesSoftDeleteTombstone,
   type FilesSoftDeleteUndoResult,
 } from '../../../shared/filesApp/softDelete';
 
@@ -86,7 +88,9 @@ export function deletionNoticeForResult(
     return { key: 'filesApp.delete.trashed', values: { name: itemName }, tone: 'ok' };
   }
   return {
-    key: 'filesApp.delete.softDeleted',
+    // An owner delete has not happened yet — it runs when Undo expires — so the
+    // receipt says "will be", and a hide says where to get the row back.
+    key: result.mode === 'owner' ? 'filesApp.delete.ownerPending' : 'filesApp.delete.softDeleted',
     values: { name: itemName },
     tone: 'ok',
     undoToken: result.undoToken,
@@ -126,6 +130,8 @@ export function deletionTargetFromItem(item: FilesDeletionCatalogueItem): FilesD
  */
 export class FilesDeletionSession {
   private readonly softDeletes: FilesSoftDeleteStore;
+  /** Guards a delete from running twice when two timers reach it together. */
+  private readonly inFlight = new Set<string>();
 
   constructor(
     private readonly bridge: FilesDeletionBridge,
@@ -194,12 +200,53 @@ export class FilesDeletionSession {
       trashFile: async () => {
         throw new Error('Index-only deletion cannot trash a file');
       },
-      softDelete: async ({ id }) => this.softDeletes.delete(id),
+      softDelete: async ({ id, name }, commit) =>
+        this.softDeletes.delete(id, Date.now(), { name, ...(commit ? { commit } : {}) }),
     });
   }
 
   undo(undoToken: string, now = Date.now()): FilesSoftDeleteUndoResult {
     return this.softDeletes.undo(undoToken, now);
+  }
+
+  /** What the Hidden items view lists: hides, and owner deletes that were refused. */
+  hiddenRows(): FilesSoftDeleteTombstone[] {
+    return this.softDeletes.hidden();
+  }
+
+  restore(itemId: string): boolean {
+    return this.softDeletes.restore(itemId);
+  }
+
+  /**
+   * Run every owner delete whose undo window has passed. Each settles on its
+   * own: a success removes the tombstone (the record is gone, so there is
+   * nothing left to hide), a failure is recorded on it so Hidden items can say
+   * why and offer Restore. Returns how many of each, for the caller to refresh.
+   */
+  async commitDue(
+    run: (itemId: string, commit: FilesSoftDeleteCommit) => Promise<{ ok: true } | { ok: false; reason: string }>,
+    now = Date.now(),
+  ): Promise<{ committed: number; failed: number }> {
+    let committed = 0;
+    let failed = 0;
+    for (const row of this.softDeletes.due(now)) {
+      if (!row.commit || this.inFlight.has(row.itemId)) continue;
+      this.inFlight.add(row.itemId);
+      try {
+        const outcome = await run(row.itemId, row.commit);
+        if (outcome.ok) {
+          this.softDeletes.settle(row.itemId);
+          committed += 1;
+        } else {
+          this.softDeletes.markFailed(row.itemId, outcome.reason);
+          failed += 1;
+        }
+      } finally {
+        this.inFlight.delete(row.itemId);
+      }
+    }
+    return { committed, failed };
   }
 }
 

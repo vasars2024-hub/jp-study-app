@@ -275,8 +275,12 @@ describe('ImmersionView Aero shell renders in the interface language', () => {
     await render('en');
     const rail = host.querySelector('.aero-immersion-rail');
     expect(rail, 'the Aero sites rail did not render').toBeTruthy();
-    expect(rail!.querySelectorAll('.aero-immersion-rail-empty')).toHaveLength(1);
-    expect(rail!.querySelectorAll('.immersion-rail-empty')).toHaveLength(0);
+    // Since r2files the Aero rail renders the shared list (Bookmarks + History), so the
+    // invariant is on the words, not a class: "no saved sites" is said exactly once.
+    const empty = catalogFor('en')['immersion.rail.empty'] as string;
+    const saying = [...rail!.querySelectorAll('[role="status"], p')]
+      .filter((node) => (node.textContent ?? '').includes(empty));
+    expect(saying).toHaveLength(1);
   });
 
   it.each(['ja', 'zh', 'ru'] as const)('drops every English menu label in %s', async (lang) => {

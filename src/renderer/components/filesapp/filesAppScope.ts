@@ -25,6 +25,7 @@ import {
 } from '../../../shared/filesApp/catalog';
 import { filesPanelForCard } from '../../../shared/filesApp/systemPanels';
 import { openSectionSurface } from '../../sectionSurface';
+import { writeLocalStorageJson } from '../../localStorageWrite';
 
 export interface FilesScopeRequest {
   /** The category to pre-filter to. A filter the root node clears, never a mode. */
@@ -46,6 +47,8 @@ export interface FilesScopeRequest {
    * translation table sits between the two worlds.
    */
   focusCardId?: string | null;
+  /** Set by main's Agent delivery: a mounted Files app calls it to say it took the scope. */
+  handled?: () => void;
 }
 
 /**
@@ -58,15 +61,41 @@ export interface FilesScopeRequest {
  * appear to do nothing on the second click.
  */
 export const FILES_SCOPE_EVENT = 'filesapp:scope';
+/**
+ * The same request, parked where ANOTHER window can read it: a Files pop-out
+ * mounts its own renderer, where `pending` below is a fresh `null` — so a
+ * scoped open used to reach a pop-out unscoped. Main writes this key too, when
+ * the Agent opens Files on a category (audit r2 #7).
+ */
+export const FILES_SCOPE_STORAGE_KEY = 'jp-files-pending-scope';
+/** A parked scope older than this is somebody else's, not this open's. */
+const STORED_SCOPE_TTL_MS = 60_000;
 
 let pending: FilesScopeRequest | null = null;
+
+function readStoredScope(): FilesScopeRequest | null {
+  try {
+    const raw = localStorage.getItem(FILES_SCOPE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { categoryId?: unknown; focusItemId?: unknown; at?: unknown };
+    if (!isFilesCategoryId(parsed.categoryId)) return null;
+    if (typeof parsed.at !== 'number' || Date.now() - parsed.at > STORED_SCOPE_TTL_MS) return null;
+    return {
+      categoryId: parsed.categoryId,
+      ...(typeof parsed.focusItemId === 'string' ? { focusItemId: parsed.focusItemId } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Look without consuming. For tests and for a host that wants to know whether a
  * scope is waiting; the app itself uses `takePendingFilesScope`.
  */
 export function peekPendingFilesScope(): FilesScopeRequest | null {
-  return pending;
+  // Pure: reads, never clears (see `FilesApp`'s lazy initialiser).
+  return pending ?? readStoredScope();
 }
 
 /** Read the pending scope and clear it. See the module note on why. */
@@ -79,6 +108,11 @@ export function takePendingFilesScope(): FilesScopeRequest | null {
 /** Drop any pending scope without opening anything. */
 export function clearPendingFilesScope(): void {
   pending = null;
+  try {
+    localStorage.removeItem(FILES_SCOPE_STORAGE_KEY);
+  } catch {
+    /* storage unavailable: nothing was parked there either */
+  }
 }
 
 /**
@@ -97,14 +131,18 @@ export function openFilesAppScoped(request: FilesScopeRequest): boolean {
     ...(request.focusItemId ? { focusItemId: request.focusItemId } : {}),
     ...(request.focusCardId ? { focusCardId: request.focusCardId } : {}),
   };
+  writeLocalStorageJson(FILES_SCOPE_STORAGE_KEY, {
+    categoryId: pending.categoryId,
+    ...(pending.focusItemId ? { focusItemId: pending.focusItemId } : {}),
+    at: Date.now(),
+  });
   const claimed = openSectionSurface('files');
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(FILES_SCOPE_EVENT, { detail: pending }));
   }
   // A pop-out mounts its own renderer, where this module is a fresh instance
-  // and `pending` is null. The scope is kept rather than dropped so the desktop
-  // shell — which shares this instance — still honours it; a pop-out simply
-  // opens unscoped, which is the honest degradation and not a broken filter.
+  // and `pending` is null; it reads the copy parked in localStorage above
+  // instead, so it opens scoped too.
   return claimed;
 }
 
@@ -137,24 +175,6 @@ export function openFilesAppForMedia(mediaId?: string | null): boolean {
   });
 }
 
-/** From a video's transcript, which lives under text rather than under video. */
-export function openFilesAppForTranscript(youtubeId?: string | null): boolean {
-  return openFilesAppScoped({
-    categoryId: 'sources/text',
-    focusItemId: youtubeId ? `transcript:${youtubeId}` : null,
-  });
-}
-
-/** From the dictionary manager. */
-export function openFilesAppForDictionaries(): boolean {
-  return openFilesAppScoped({ categoryId: 'reference/dictionaries' });
-}
-
-/** From the deck or flashcards surface. */
-export function openFilesAppForDecks(): boolean {
-  return openFilesAppScoped({ categoryId: 'outputs/decks' });
-}
-
 /**
  * Gate 8's redirect: a settings-search hit for a card that MOVED here.
  *
@@ -171,9 +191,4 @@ export function openFilesAppForSystemCard(cardId: string): boolean {
 /** From anywhere that used to link at the Settings "Memory" page. */
 export function openFilesAppForMemory(): boolean {
   return openFilesAppScoped({ categoryId: 'system/memory' });
-}
-
-/** From anywhere that used to open the Statistics section. */
-export function openFilesAppForStatistics(): boolean {
-  return openFilesAppScoped({ categoryId: 'system/statistics' });
 }

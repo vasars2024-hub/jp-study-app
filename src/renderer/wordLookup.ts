@@ -2,6 +2,7 @@
 // kuromoji when available), highlight it in the text, and return popup coords.
 
 import { tokenizeSync, tokenizerReady, type JpToken } from './tokenizer';
+import { getStudyLang } from './studyEnvironment';
 import { detectSentenceBounds, isSentencePunct, sentenceAt } from '../shared/sentenceBounds';
 
 export interface WordLookupHit {
@@ -239,6 +240,12 @@ export function resolveWordSpanInText(
 ): { start: number; end: number; query: string } | null {
   if (!text) return null;
 
+  // The word walk below is kuromoji's, i.e. Japanese. For another study
+  // language it would cut Chinese into Japanese morphemes and give Russian a
+  // single letter, so those take their own span rule instead.
+  const study = studyLangSafely();
+  if (study !== 'ja') return studyLangSpanAt(text, globalOffset, study);
+
   const tokens =
     cachedTokens ??
     (tokenizerReady() && /[぀-ヿ㐀-鿿]/.test(text) ? tokenizeSync(text) : undefined);
@@ -288,6 +295,47 @@ export function resolveWordSpanInText(
   }
 
   return cjkSpanAt(text, globalOffset);
+}
+
+function studyLangSafely(): string {
+  try {
+    return getStudyLang();
+  } catch {
+    return 'ja';
+  }
+}
+
+/**
+ * The lookup span for a non-Japanese study language.
+ *
+ * Chinese has no spaces and no segmenter here, so the query is the run of Han
+ * characters FROM the click, capped at eight — the dictionary popup's own
+ * longest-match resolves the word inside it. Russian (and any alphabetic
+ * language) takes the whole word under the pointer, hyphenated compounds
+ * included.
+ */
+export function studyLangSpanAt(
+  text: string,
+  offset: number,
+  lang: string,
+): { start: number; end: number; query: string } | null {
+  if (!text) return null;
+  const at = Math.min(Math.max(offset, 0), text.length - 1);
+  if (lang === 'zh') {
+    const isHan = (c: string) => /[㐀-鿿]/.test(c);
+    if (!isHan(text[at])) return cjkSpanAt(text, offset);
+    let end = at;
+    while (end < text.length && end - at < 8 && isHan(text[end])) end++;
+    return { start: at, end, query: text.slice(at, end) };
+  }
+  const isLetter = (c: string) => /[\p{L}\p{M}'’-]/u.test(c);
+  if (!isLetter(text[at])) return null;
+  let start = at;
+  while (start > 0 && isLetter(text[start - 1])) start--;
+  let end = at + 1;
+  while (end < text.length && isLetter(text[end])) end++;
+  const query = text.slice(start, end).replace(/^[-'’]+|[-'’]+$/g, '');
+  return query ? { start, end, query } : null;
 }
 
 function cjkSpanAt(text: string, offset: number): { start: number; end: number; query: string } | null {

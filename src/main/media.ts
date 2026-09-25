@@ -1,4 +1,5 @@
 import { app, ipcMain, dialog, protocol, BrowserWindow } from 'electron';
+import { partialDownloadFiles, subtitleIsAutoCaption } from '../shared/youtubeDownloadFiles';
 import { readWatchLibrary } from './watchLibrary';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import path from 'node:path';
@@ -255,6 +256,44 @@ export interface DownloadYoutubeResult {
   subtitle?: SubtitlePick;
   /** Present only when a specific dub was asked for. MINING gate 1's receipt. */
   audioTrack?: YouTubeAudioTrackReceipt;
+  /**
+   * Only with `control.detectAutoCaptions`: true when the subtitle that came
+   * with the file is YouTube's auto-generated track rather than the creator's.
+   */
+  subtitleIsAuto?: boolean;
+}
+
+/**
+ * The YouTube manager's hold on one download (audit r2 #17). All optional, so
+ * every other caller's arguments stay byte-identical.
+ */
+export interface YoutubeDownloadControl {
+  /** Stop the download: the process is killed and the call answers `cancelled`. */
+  signal?: AbortSignal;
+  /** Keep partial files as `.part` and resume them (`--continue`) instead of `--no-part`. */
+  resumable?: boolean;
+  /** Record which subtitle languages are the creator's, to tell them from auto captions. */
+  detectAutoCaptions?: boolean;
+}
+
+export function removePartialDownloads(youtubeId: string): number {
+  const outDir = path.join(app.getPath('userData'), MEDIA_DOWNLOAD_DIRECTORY);
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(outDir);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of partialDownloadFiles(names, youtubeId)) {
+    try {
+      fs.rmSync(path.join(outDir, name), { force: true });
+      removed += 1;
+    } catch {
+      /* in use or gone: nothing more to do */
+    }
+  }
+  return removed;
 }
 
 /**
@@ -281,6 +320,7 @@ export async function downloadYoutubeUrl(
   link: string,
   options: YouTubeDownloadOptions,
   onProgress?: (ev: { stage: string; percent: number }) => void,
+  control: YoutubeDownloadControl = {},
 ): Promise<DownloadYoutubeResult | MediaDownloadError> {
   const trimmed = typeof link === 'string' ? link.trim() : '';
   if (!isRemoteMediaLink(trimmed)) return { error: 'Please paste a valid video or media link.' };
@@ -306,6 +346,7 @@ export async function downloadYoutubeUrl(
   const outDir = path.join(app.getPath('userData'), MEDIA_DOWNLOAD_DIRECTORY);
   fs.mkdirSync(outDir, { recursive: true });
   const pathFile = path.join(outDir, `.out_${crypto.randomUUID()}.txt`);
+  const subsInfoFile = control.detectAutoCaptions ? path.join(outDir, `.subs_${crypto.randomUUID()}.json`) : '';
   const formatIdFile = audioPlan.action === 'select' ? path.join(outDir, `.fmt_${crypto.randomUUID()}.txt`) : '';
   const format = youtubeFormatArgs(audioPlan, Boolean(opts.audioOnly));
   const subtitleLangs = opts.audioOnly ? [] : resolveYtDlpSubtitleLangs(opts);
@@ -338,7 +379,8 @@ export async function downloadYoutubeUrl(
     trimmed,
     '--no-playlist',
     '--newline',
-    '--no-part',
+    // Resumable downloads keep yt-dlp's `.part` file so a paused one continues.
+    ...(control.resumable ? ['--continue'] : ['--no-part']),
     '-o',
     path.join(outDir, '%(title).150B [%(id)s].%(ext)s'),
     '--print-to-file',
@@ -351,9 +393,23 @@ export async function downloadYoutubeUrl(
     ...(audioPlan.action === 'select' && formatIdFile
       ? ['--print-to-file', 'after_move:format_id', formatIdFile]
       : []),
+    // The creator's own subtitle languages (not `automatic_captions`), so an
+    // auto caption is not reported as "Subs".
+    ...(subsInfoFile ? ['--print-to-file', 'after_move:%(subtitles)j', subsInfoFile] : []),
   ]);
+  if (control.signal?.aborted) return { error: 'cancelled', errorKey: 'cancelled' };
   return new Promise((resolve) => {
     const proc = spawn(bin, args);
+    let aborted = false;
+    const onAbort = (): void => {
+      aborted = true;
+      try {
+        proc.kill();
+      } catch {
+        /* already gone */
+      }
+    };
+    control.signal?.addEventListener('abort', onAbort, { once: true });
     let err = '';
     const onData = (buf: Buffer): void => {
       const s = buf.toString();
@@ -368,6 +424,32 @@ export async function downloadYoutubeUrl(
     });
     proc.on('error', (e2) => resolve({ error: `Could not run yt-dlp: ${e2.message}` }));
     proc.on('close', (code) => {
+      control.signal?.removeEventListener('abort', onAbort);
+      let manualSubLangs: string[] | null = null;
+      if (subsInfoFile) {
+        try {
+          const raw = fs.readFileSync(subsInfoFile, 'utf-8').trim().split(/\r?\n/).pop() ?? '';
+          const parsed = JSON.parse(raw) as unknown;
+          manualSubLangs = parsed && typeof parsed === 'object' ? Object.keys(parsed as object) : [];
+        } catch {
+          manualSubLangs = null;
+        }
+        try {
+          fs.rmSync(subsInfoFile, { force: true });
+        } catch {
+          /* ignore */
+        }
+      }
+      if (aborted) {
+        try {
+          fs.rmSync(pathFile, { force: true });
+          if (formatIdFile) fs.rmSync(formatIdFile, { force: true });
+        } catch {
+          /* ignore */
+        }
+        resolve({ error: 'cancelled', errorKey: 'cancelled' });
+        return;
+      }
       let file = '';
       try {
         file = (fs.readFileSync(pathFile, 'utf-8').trim().split(/\r?\n/).pop() ?? '').trim();
@@ -398,10 +480,14 @@ export async function downloadYoutubeUrl(
       broadcastMedia();
       // Announced like every other finished download (`media:ingested`).
       getMediaIngest()?.announceDownloaded([item]);
+      const subtitle = findDownloadedSubtitle(file, primarySubtitleLang(opts));
       resolve({
         item,
         url: `playfile://${tokenFor(item.path)}`,
-        subtitle: findDownloadedSubtitle(file, primarySubtitleLang(opts)),
+        subtitle,
+        ...(subtitle && manualSubLangs !== null
+          ? { subtitleIsAuto: subtitleIsAutoCaption(subtitle.name, manualSubLangs) }
+          : {}),
         audioTrack:
           audioPlan.action === 'select'
             ? {

@@ -12,7 +12,13 @@ import type { StudyReviewFocusRequest } from '../shared/mediaWorkspace';
 export type MediaCenterIntent =
   | { tab: 'review'; focus?: StudyReviewFocusRequest }
   | { tab: 'library' }
-  | { tab: 'home' };
+  | { tab: 'home' }
+  /**
+   * One library file: its title page for a video (the Gum title, where Play
+   * resumes it), or straight into the music player for audio. The Files app's
+   * Open sends this so the user lands on the item rather than the front page.
+   */
+  | { tab: 'title'; mediaId: string };
 
 const INTENT_EVENT = 'media-center:intent';
 let pending: MediaCenterIntent | null = null;

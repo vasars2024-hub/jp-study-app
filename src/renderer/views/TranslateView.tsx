@@ -356,19 +356,19 @@ export default function TranslateView() {
 
   const classicStatus = (
     <>
-      <StatusBarField>TRN / CHANNEL READY</StatusBarField>
+      <StatusBarField>{t('translate.wired.status.ready')}</StatusBarField>
       <StatusBarField>
         {LANG_LABELS[source]} → {LANG_LABELS[target]}
       </StatusBarField>
       <StatusBarSpacer />
       <StatusBarField live>
         {busy
-          ? msg || 'DECODING'
+          ? msg || t('translate.wired.status.decoding')
           : state.state === 'done'
-            ? 'DECODE COMPLETE'
+            ? t('translate.wired.status.done')
             : state.state === 'error'
-              ? 'CHANNEL FAULT'
-              : 'STANDBY'}
+              ? t('translate.wired.status.fault')
+              : t('translate.wired.status.standby')}
       </StatusBarField>
     </>
   );

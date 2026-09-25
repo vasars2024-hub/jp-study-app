@@ -22,8 +22,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ImmersionBody,
   ImmersionPopups,
-  ImmersionSiteSearch,
-  ImmersionSitesStatus,
+  ImmersionSiteList,
+  ImmersionTabStrip,
   ImmersionToolbar,
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
@@ -32,7 +32,6 @@ import {
   useImmersion,
 } from '../components/immersion/ImmersionContent';
 import { openSectionSurface } from '../sectionSurface';
-import { removeImmersionSiteWithConfirm } from '../components/immersion/immersionSiteActions';
 
 export default function ImmersionView() {
   const aero = useAeroMaterials();
@@ -85,7 +84,12 @@ export default function ImmersionView() {
       label: t('immersion.aero.menu.file'),
       items: [
         { id: 'focus-url', label: t('immersion.aero.menu.openLocation'), onSelect: () => { state.urlBarRef.current?.focus(); state.urlBarRef.current?.select(); } },
-        { id: 'save-site', label: t('immersion.aero.menu.saveSite'), disabled: !currentUrl, onSelect: () => void state.saveCurrentSite() },
+        {
+          id: 'save-site',
+          label: state.currentBookmark ? t('immersion.bookmark.unstar') : t('immersion.aero.menu.saveSite'),
+          disabled: !currentUrl,
+          onSelect: () => void state.saveCurrentSite(),
+        },
         { id: 'export-library', label: t('immersion.aero.menu.exportReaderPage'), disabled: !currentUrl, onSelect: () => void state.exportToLibrary() },
         { id: 'capture-video', label: t('immersion.aero.menu.captureVideo'), disabled: captureBusy || !currentUrl, onSelect: () => void state.captureVideo() },
         { id: 'visual-novels', label: t('immersion.visualNovelLibrary'), onSelect: openVisualNovels },
@@ -126,7 +130,7 @@ export default function ImmersionView() {
       items: [
         ...IMMERSION_STARTERS.map((starter) => ({
           id: starter.url,
-          label: starter.label,
+          label: t(starter.labelKey),
           /* Keep the mode the user chose - see ImmersionContent's starterButton. */
           onSelect: () => state.navigate(starter.url),
         })),
@@ -151,7 +155,8 @@ export default function ImmersionView() {
   if (aero && showChrome) {
     return (
       <AppChrome menus={immersionMenus} status={immersionStatus} className="aero-immersion-chrome">
-        <div className={`aero-immersion aero-immersion-mode-${mode}`}>
+        <div ref={state.rootRef} className={`aero-immersion aero-immersion-mode-${mode}`}>
+          <ImmersionTabStrip state={state} />
           <Toolbar className="aero-immersion-toolbar">
             <Button size="sm" className="aero-immersion-icon-btn" title={t('immersion.back')} onClick={state.goBack} disabled={histIdx <= 0}>
               <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
@@ -231,7 +236,15 @@ export default function ImmersionView() {
             >
               <Icon name="dictionary" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" aria-label={t('immersion.saveSite')} title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.saveSite')} disabled={!currentUrl} onClick={() => void state.saveCurrentSite()}>
+            <Button
+              size="sm"
+              className={`aero-immersion-icon-btn ${state.currentBookmark ? 'active' : ''}`}
+              aria-label={t('immersion.saveSite')}
+              aria-pressed={state.currentBookmark !== null}
+              title={!currentUrl ? t('immersion.reason.noPage') : state.currentBookmark ? t('immersion.bookmark.unstar') : t('immersion.saveSite')}
+              disabled={!currentUrl}
+              onClick={() => void state.saveCurrentSite()}
+            >
               <Icon name="bookmark" size={14} />
             </Button>
             <Button size="sm" className="aero-immersion-icon-btn" aria-label={t('immersion.saveAsTool')} title={!currentUrl ? t('immersion.reason.noPage') : t('immersion.saveAsTool')} disabled={!currentUrl} onClick={() => void state.saveCurrentAsTool()}>
@@ -297,7 +310,7 @@ export default function ImmersionView() {
                             state.navigate(s.url, { mode: 'reader' });
                           }}
                         >
-                          {s.label}
+                          {t(s.labelKey)}
                         </Button>
                       ))}
                     </div>
@@ -330,43 +343,10 @@ export default function ImmersionView() {
                     <Icon name="refresh" size={13} />
                   </Button>
                 </div>
-                {/* Aero's own empty paragraph used to live here unconditionally on
-                    `sites.length === 0`, which is true while the read is still running
-                    and true when it failed. `ImmersionSitesStatus` owns all three
-                    states now and keeps Aero's typography through the class prop. */}
-                <ImmersionSitesStatus state={state} messageClassName="aero-immersion-rail-empty" />
-                <ImmersionSiteSearch state={state} />
-                <ul className="aero-immersion-site-list">
-                  {state.filteredSites.map((s) => (
-                    <li key={s.id}>
-                      <button type="button" className="aero-immersion-site" onClick={() => state.navigate(s.url)} title={s.url}>
-                        <span className="aero-immersion-site-title">
-                          {s.favorite ? `${t('immersion.aero.pinned')} - ` : ''}
-                          {s.title}
-                        </span>
-                        <span className="aero-immersion-site-meta">
-                          {s.lang !== 'auto' ? s.lang.toUpperCase() + ' - ' : ''}
-                          {t('immersion.visitsCount', { count: s.visitCount })}
-                          {s.streakDays > 0 ? ` - ${t('immersion.streakDays', { days: s.streakDays })}` : ''}
-                        </span>
-                        {s.completionPct > 0 && (
-                          <span className="aero-immersion-site-bar">
-                            <span style={{ width: `${s.completionPct}%` }} />
-                          </span>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        className="aero-immersion-site-remove"
-                        title={t('immersion.remove')}
-                        aria-label={`${t('immersion.remove')} — ${s.title}`}
-                        onClick={() => void removeImmersionSiteWithConfirm(s)}
-                      >
-                        <Icon name="close" size={12} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                {/* The shared rail (audit r2 #12/#13): Bookmarks and History as
+                    separate lists, the reading-progress bar and the page language,
+                    and today's reading stats. Aero keeps its own head above it. */}
+                <ImmersionSiteList state={state} />
               </aside>
             )}
           </div>
@@ -379,7 +359,8 @@ export default function ImmersionView() {
   }
 
   return (
-    <div className={`immersion-root immersion-mode-${mode}`} data-mode={mode}>
+    <div ref={state.rootRef} className={`immersion-root immersion-mode-${mode}`} data-mode={mode}>
+      {showChrome && <ImmersionTabStrip state={state} />}
       {showChrome && (
         <ImmersionToolbar
           state={state}

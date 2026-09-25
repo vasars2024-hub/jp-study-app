@@ -4,15 +4,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import {
+  IMMERSION_MAX_TABS,
   applyMetricsDelta,
+  clearImmersionHistory,
   emptyDayMetrics,
   emptySession,
   emptySitesStore,
   immersionDayKey,
+  migrateSitesStore,
   nextSiteStreak,
   normalizeImmersionUrl,
-  sanitizeSite,
+  type ImmersionBookmark,
   type ImmersionDayMetrics,
+  type ImmersionHistoryRange,
   type ImmersionLang,
   type ImmersionMetricsDelta,
   type ImmersionMetricsMap,
@@ -47,27 +51,10 @@ function metricsPath(): string {
   return path.join(immersionDir(), 'metrics.json');
 }
 
-function loadSites(): ImmersionSitesStore {
+/** Exported for the migration test: reads either schema, answers v2. */
+export function loadSites(): ImmersionSitesStore {
   const raw = readJson<unknown>(sitesPath(), emptySitesStore());
-  if (!raw || typeof raw !== 'object') return emptySitesStore();
-  const o = raw as Record<string, unknown>;
-  const sites = Array.isArray(o.sites)
-    ? (o.sites.map(sanitizeSite).filter(Boolean) as ImmersionSite[])
-    : [];
-  const folders = Array.isArray(o.folders)
-    ? o.folders
-        .filter((f): f is { id: string; name: string; order: number } => {
-          if (!f || typeof f !== 'object') return false;
-          const x = f as Record<string, unknown>;
-          return typeof x.id === 'string' && typeof x.name === 'string';
-        })
-        .map((f) => ({
-          id: f.id,
-          name: f.name,
-          order: typeof f.order === 'number' ? f.order : 0,
-        }))
-    : [];
-  return { schemaVersion: 1, sites, folders };
+  return migrateSitesStore(raw);
 }
 
 function saveSites(store: ImmersionSitesStore): void {
@@ -77,17 +64,23 @@ function saveSites(store: ImmersionSitesStore): void {
 function loadSession(): ImmersionSession {
   const raw = readJson<ImmersionSession | null>(sessionPath(), null);
   if (!raw || !Array.isArray(raw.tabs) || raw.tabs.length === 0) return emptySession();
+  const tabs = raw.tabs
+    .filter((t) => t && typeof t.id === 'string')
+    .slice(0, IMMERSION_MAX_TABS)
+    .map((t) => ({
+      id: t.id,
+      url: typeof t.url === 'string' && (t.url === '' || normalizeImmersionUrl(t.url)) ? t.url : '',
+      title: typeof t.title === 'string' ? t.title : '',
+      mode: (t.mode === 'live' ? 'live' : t.mode === 'focus' ? 'focus' : 'reader') as ImmersionSession['tabs'][number]['mode'],
+      scrollY: typeof t.scrollY === 'number' ? t.scrollY : undefined,
+    }));
+  if (tabs.length === 0) return emptySession();
   return {
-    activeTabId: typeof raw.activeTabId === 'string' ? raw.activeTabId : raw.tabs[0].id,
-    tabs: raw.tabs
-      .filter((t) => t && typeof t.id === 'string')
-      .map((t) => ({
-        id: t.id,
-        url: typeof t.url === 'string' ? t.url : '',
-        title: typeof t.title === 'string' ? t.title : 'Tab',
-        mode: t.mode === 'live' ? 'live' : t.mode === 'focus' ? 'focus' : 'reader',
-        scrollY: typeof t.scrollY === 'number' ? t.scrollY : undefined,
-      })),
+    activeTabId:
+      typeof raw.activeTabId === 'string' && tabs.some((t) => t.id === raw.activeTabId)
+        ? raw.activeTabId
+        : tabs[0].id,
+    tabs,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
   };
 }
@@ -179,44 +172,95 @@ function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
   return site;
 }
 
-function saveSite(input: ImmersionSaveSiteInput): ImmersionSite {
+function findBookmarkByUrl(store: ImmersionSitesStore, url: string): ImmersionBookmark | undefined {
+  const key = siteKey(url);
+  return store.bookmarks.find((b) => siteKey(b.url) === key);
+}
+
+/**
+ * Star, edit or unstar a page. Bookmarks are their own list now (audit r2 #12):
+ * `favorite: false` REMOVES the bookmark — the reverse "Save site" never had —
+ * and the page's history row, with its reading stats, is not touched either way.
+ * Returns the bookmark, or `null` after an unstar.
+ */
+function saveSite(input: ImmersionSaveSiteInput): ImmersionBookmark | null {
   const url = normalizeImmersionUrl(input.url);
   if (!url) throw new Error('Invalid URL');
   const store = loadSites();
   const now = Date.now();
-  let site = findSiteByUrl(store, url);
-  if (!site) {
-    site = {
+  let bookmark = findBookmarkByUrl(store, url);
+  if (input.favorite === false) {
+    if (bookmark) store.bookmarks = store.bookmarks.filter((b) => b.id !== bookmark?.id);
+    const site = findSiteByUrl(store, url);
+    if (site) site.favorite = false;
+    saveSites(store);
+    broadcast('immersion:sitesChanged', store);
+    return null;
+  }
+  const folderId =
+    typeof input.folderId === 'string' && store.folders.some((f) => f.id === input.folderId)
+      ? input.folderId
+      : undefined;
+  if (!bookmark) {
+    bookmark = {
       id: crypto.randomUUID(),
       url,
-      title: (input.title || url).trim(),
-      lang: input.lang || 'auto',
-      tags: input.tags ?? [],
-      completionPct: 0,
-      lastVisited: now,
-      visitCount: 0,
-      estimatedDifficulty: 0,
-      streakDays: 0,
-      totalSeconds: 0,
-      totalChars: 0,
-      favorite: Boolean(input.favorite),
-      folderId: input.folderId || undefined,
+      title: (input.title || findSiteByUrl(store, url)?.title || url).trim(),
+      lang: input.lang || findSiteByUrl(store, url)?.lang || 'auto',
+      tags: cleanTags(input.tags ?? []),
+      folderId,
       createdAt: now,
       updatedAt: now,
     };
-    store.sites.push(site);
+    store.bookmarks.push(bookmark);
   } else {
-    if (input.title) site.title = input.title.trim();
-    if (input.lang) site.lang = input.lang;
-    if (input.tags) site.tags = input.tags;
-    if (typeof input.favorite === 'boolean') site.favorite = input.favorite;
-    if (input.folderId === null) site.folderId = undefined;
-    else if (typeof input.folderId === 'string') site.folderId = input.folderId;
-    site.updatedAt = now;
+    if (input.title) bookmark.title = input.title.trim();
+    if (input.lang) bookmark.lang = input.lang;
+    if (input.tags) bookmark.tags = cleanTags(input.tags);
+    if (input.folderId === null) bookmark.folderId = undefined;
+    else if (folderId) bookmark.folderId = folderId;
+    bookmark.updatedAt = now;
   }
+  // Kept in step for any reader of the old flag (the extension bridge, v1 tooling).
+  const site = findSiteByUrl(store, url);
+  if (site) site.favorite = true;
   saveSites(store);
   broadcast('immersion:sitesChanged', store);
-  return site;
+  return bookmark;
+}
+
+function cleanTags(tags: readonly string[]): string[] {
+  return [...new Set(tags.map((t) => (typeof t === 'string' ? t.trim() : '')).filter(Boolean))].slice(0, 20);
+}
+
+/** "Clear history" over a time range. Bookmarks are a separate list and stay. */
+function clearHistory(range: ImmersionHistoryRange): ImmersionSitesStore {
+  const store = loadSites();
+  store.sites = clearImmersionHistory(store.sites, range, Date.now());
+  saveSites(store);
+  broadcast('immersion:sitesChanged', store);
+  return store;
+}
+
+function addFolder(name: string): ImmersionSitesStore {
+  const store = loadSites();
+  const clean = name.trim().slice(0, 80);
+  if (clean && !store.folders.some((f) => f.name.toLocaleLowerCase() === clean.toLocaleLowerCase())) {
+    store.folders.push({ id: crypto.randomUUID(), name: clean, order: store.folders.length });
+    saveSites(store);
+    broadcast('immersion:sitesChanged', store);
+  }
+  return store;
+}
+
+/** Remove a folder; its bookmarks stay, unfiled. */
+function removeFolder(id: string): ImmersionSitesStore {
+  const store = loadSites();
+  store.folders = store.folders.filter((f) => f.id !== id);
+  for (const b of store.bookmarks) if (b.folderId === id) b.folderId = undefined;
+  saveSites(store);
+  broadcast('immersion:sitesChanged', store);
+  return store;
 }
 
 function removeSite(id: string): ImmersionSitesStore {
@@ -260,10 +304,26 @@ export function registerImmersionIpc(): void {
 
   ipcMain.handle('immersion:saveSite', async (_e, input: ImmersionSaveSiteInput) => {
     try {
-      return { ok: true as const, site: saveSite(input) };
+      return { ok: true as const, bookmark: saveSite(input) };
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
     }
+  });
+
+  ipcMain.handle('immersion:clearHistory', async (_e, range: unknown) => {
+    const valid: ImmersionHistoryRange[] = ['hour', 'day', 'week', 'all'];
+    if (!valid.includes(range as ImmersionHistoryRange)) return { ok: false as const, error: 'Invalid range' };
+    return { ok: true as const, store: clearHistory(range as ImmersionHistoryRange) };
+  });
+
+  ipcMain.handle('immersion:addFolder', async (_e, name: unknown) => {
+    if (typeof name !== 'string') return { ok: false as const, error: 'Invalid name' };
+    return { ok: true as const, store: addFolder(name) };
+  });
+
+  ipcMain.handle('immersion:removeFolder', async (_e, id: unknown) => {
+    if (typeof id !== 'string') return { ok: false as const, error: 'Invalid id' };
+    return { ok: true as const, store: removeFolder(id) };
   });
 
   ipcMain.handle('immersion:removeSite', async (_e, id: string) => {
@@ -281,7 +341,7 @@ export function registerImmersionIpc(): void {
     if (!session || !Array.isArray(session.tabs)) {
       return { ok: false as const, error: 'Invalid session' };
     }
-    saveSession(session);
+    saveSession({ ...session, tabs: session.tabs.slice(0, IMMERSION_MAX_TABS) });
     return { ok: true as const };
   });
 

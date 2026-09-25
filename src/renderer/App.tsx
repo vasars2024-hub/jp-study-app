@@ -51,6 +51,7 @@ const BlancLockscreen = lazy(() =>
   import('./components/blanc/BlancShell').then((m) => ({ default: m.BlancLockscreen })),
 );
 import ToastHost from './components/ToastHost';
+import { useFilesWatchAutoImport } from './components/filesapp/filesWatchAutoImport';
 import { getAssignment, onDesktopChanged } from './desktopState';
 import SeanimeDevPanel from './components/SeanimeDevPanel';
 import MediaWorkspaceHost from '../media/MediaWorkspaceHost';
@@ -190,6 +191,8 @@ export default function App() {
   const [popoutPresentation, setPopoutPresentation] = useState(() =>
     popout ? readPopoutPresentation(popout) : undefined,
   );
+  // Watched folders import into the main window only; see the hook's header.
+  useFilesWatchAutoImport(!popout && !secondary && !detachedBlock);
   const popoutPresentable = popout != null && canPresentLiquid(popout, 'popout');
   const popoutLiquid = popoutPresentable && popoutPresentation?.mode === 'liquid';
   const togglePopoutLiquid = useCallback(() => {

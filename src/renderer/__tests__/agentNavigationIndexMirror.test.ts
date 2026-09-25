@@ -77,6 +77,15 @@ function allowedWords(entry: AgentNavigationIndexEntry): Set<string> {
     for (const word of words(value)) out.add(word);
   };
 
+  if (entry.filesScope) {
+    // A Files category (audit r2 #7): the Files app's own name plus the
+    // category's own title phrase, "<Category> in Files" — nothing invented.
+    add(entry.section);
+    add(englishText(AGENT_NAVIGATION_SECTION_LABEL_KEYS[entry.section]));
+    add(englishText(entry.titleKey));
+    return out;
+  }
+
   if (!entry.page) {
     add(entry.section);
     add(englishText(AGENT_NAVIGATION_SECTION_LABEL_KEYS[entry.section]));
@@ -150,6 +159,13 @@ describe('agent navigation index mirrors the live Settings surface', () => {
         : entry.section;
       expect(entry.titleKey, `${coord} carries no titleKey`).toBeTruthy();
 
+      if (entry.filesScope) {
+        expect(entry.section, `${coord} scopes a window that is not Files`).toBe('files');
+        expect(entry.titleKey, `${coord} titleKey is not its category's`).toBe(
+          `filesApp.agentScope.${entry.filesScope.replace('/', '.')}`,
+        );
+        continue;
+      }
       if (entry.controlId) {
         const registered = SETTINGS_REGISTRY.find((c) => c.id === entry.controlId);
         expect(entry.titleKey, `${coord} titleKey drifted from SETTINGS_REGISTRY`)

@@ -73,7 +73,7 @@ function seedReferencedMedia(): { videoPath: string; otherPath: string } {
 }
 
 describe('gate 30 — referenced items behave', () => {
-  it('marks a media row referenced, and Delete plans a SOFT removal for it', () => {
+  it('marks a media row referenced, and Delete plans an OWNER removal for it', () => {
     seedReferencedMedia();
     const row = itemsById().get('media:v1');
 
@@ -86,7 +86,9 @@ describe('gate 30 — referenced items behave', () => {
     // `store === 'file'` branch here would trash the user's own bytes.
     const target = lookupFilesDeletionTarget([row as never], 'media:v1');
     expect(target?.referenced).toBe(true);
-    expect(planFilesDeletion(target as never).mode).toBe('soft');
+    // r2files: Delete is real now — the media library's own remove, never a file trash.
+    // The next case pins that the user's bytes still never reach trashItem.
+    expect(planFilesDeletion(target as never).mode).toBe('owner');
   });
 
   it('REMOVING it leaves the user original on disk, and never reaches trashItem', async () => {

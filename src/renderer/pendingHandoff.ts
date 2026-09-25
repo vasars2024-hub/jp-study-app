@@ -29,6 +29,16 @@ const HANDOFFS = {
   studyMediaRequest: { key: 'jp-pending-study-media-request', backing: 'session' },
   libraryFocusFolder: { key: 'jp-library-focus-folder', backing: 'session' },
   /*
+   * "Open this exact record" from the Files app. `local`, not `session`: a
+   * Files window popped out on its own opens the owner through `popOut`, which
+   * is a DIFFERENT renderer with its own sessionStorage — a session handoff
+   * would reach nobody there. `take` on mount clears it, so it cannot linger
+   * past the open it was written for.
+   */
+  visualNovelFocus: { key: 'jp-pending-visual-novel-focus', backing: 'local' },
+  flashcardsFocus: { key: 'jp-pending-flashcards-focus', backing: 'local' },
+  dictionaryQuery: { key: 'jp-pending-dictionary-query', backing: 'local' },
+  /*
    * "Practice this" deep links into Grammar.
    *
    * `session`, not `local`: a deep link expresses what the user wants *now*,

@@ -1,7 +1,7 @@
 /**
  * YouTube immersion playlist manager — metadata sync, selective download, open in Video.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes } from 'react';
 import Icon from '../components/Icons';
 import VirtualList from '../components/VirtualList';
 import { AppChrome, StatusBarField, StatusBarSpacer, confirmDialog, type MenuBarMenu } from '../components/ui';
@@ -9,13 +9,15 @@ import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSur
 import { useT } from '../i18n';
 import { localizeYtPlaylistError } from '../ytPlaylistErrors';
 import { LANG_TAGS } from '../../shared/i18n/core';
-import { setStudyLang } from '../studyEnvironment';
+import { getStudyLang, setStudyLang } from '../studyEnvironment';
+import type { YtQueueEntry } from '../../main/ytDownloadQueue';
 import { openExtensionSettings, openLibraryInbox } from '../extensionBridgeUi';
 import { firstReason } from '../../shared/disabledReason';
 import {
-  diffNewVideos,
   emptyYtStore,
   filterUnlogged,
+  formatYtViews,
+  ytNewsIsStale,
   isImmersionPlaylist,
   isVideoUnlogged,
   normalizeYtStore,
@@ -54,11 +56,51 @@ function formatDuration(sec?: number): string {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
-function formatViews(n?: number): string {
-  if (n == null || !Number.isFinite(n)) return '—';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
+/**
+ * A text field that edits locally and saves on blur or Enter (audit r2 #18):
+ * saving every keystroke through main, which trims, made a trailing space
+ * impossible to type — "My Channel" could not get past "My".
+ */
+function CommitInput({
+  value,
+  onCommit,
+  ...rest
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const [draft, setDraft] = useState(value);
+  const editing = useRef(false);
+  useEffect(() => {
+    if (!editing.current) setDraft(value);
+  }, [value]);
+  const commit = (): void => {
+    editing.current = false;
+    if (draft !== value) onCommit(draft);
+  };
+  return (
+    <input
+      {...rest}
+      value={draft}
+      onFocus={() => {
+        editing.current = true;
+      }}
+      onChange={(e) => {
+        editing.current = true;
+        setDraft(e.target.value);
+      }}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+        } else if (e.key === 'Escape') {
+          editing.current = false;
+          setDraft(value);
+        }
+      }}
+    />
+  );
 }
 
 function openInVideoPlayer(mediaItemId: string, whisperLang?: YtStudyLang): void {
@@ -87,20 +129,14 @@ export default function YouTubePlaylistsView() {
   const [error, setError] = useState('');
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [newsIds, setNewsIds] = useState<string[]>([]);
-  const [dlProgress, setDlProgress] = useState<{
-    videoId: string;
-    index: number;
-    total: number;
-    percent: number;
-    stage: string;
-  } | null>(null);
+  /** The download queue (audit r2 #17): every video's state, with its own controls. */
+  const [queue, setQueue] = useState<YtQueueEntry[]>([]);
   const [refreshProgress, setRefreshProgress] = useState<{
     index: number;
     total: number;
     title: string;
     stage: string;
   } | null>(null);
-  const newsBootstrapped = useRef(false);
 
   const applyStore = useCallback((s: YtPlaylistsStore) => {
     setStore(normalizeYtStore(s));
@@ -118,12 +154,12 @@ export default function YouTubePlaylistsView() {
     setError('');
     setRefreshProgress({ index: 0, total: 1, title: '', stage: 'syncing' });
     try {
-      const before = store.lastNewsCheckedAt ?? 0;
       const r = await window.api.ytRefreshAll();
-      const nextStore = normalizeYtStore(r.store);
-      applyStore(nextStore);
-      const newIds = Array.isArray(r.newVideoIds) ? r.newVideoIds : [];
-      setNewsIds(newIds.length ? newIds : diffNewVideos(nextStore, before).map((v) => v.id));
+      applyStore(normalizeYtStore(r.store));
+      // Main's answer is the answer (audit r2 #16). The old fallback recomputed
+      // "new since" from a `before` captured at mount — before the store had even
+      // loaded, i.e. 0 — and so listed the whole library as new.
+      setNewsIds(Array.isArray(r.newVideoIds) ? r.newVideoIds : []);
       const errors = Array.isArray(r.errors) ? r.errors : [];
       if (errors.length) {
         setError(
@@ -139,7 +175,10 @@ export default function YouTubePlaylistsView() {
       setBusy('');
       setRefreshProgress(null);
     }
-  }, [applyStore, store.lastNewsCheckedAt, t]);
+  }, [applyStore, t]);
+  /** Read through a ref by the mount effect, which must not re-run when `t` changes. */
+  const runNewsRefreshRef = useRef(runNewsRefresh);
+  runNewsRefreshRef.current = runNewsRefresh;
 
   useEffect(() => {
     void window.api.ytList().then((s) => {
@@ -147,17 +186,19 @@ export default function YouTubePlaylistsView() {
       setStore(next);
       const first = next.playlists.find(isImmersionPlaylist);
       setSide((prev) => prev ?? (first ? { kind: 'playlist', id: first.id } : null));
+      // Audit r2 #22: opening the window used to re-sync every playlist. It now
+      // syncs only when the auto-update rule says a playlist is due; otherwise it
+      // shows what the last check found, and Refresh all is one click away.
+      if (ytNewsIsStale(next, Date.now())) void runNewsRefreshRef.current();
+      else setNewsIds(next.lastNewsVideoIds ?? []);
     });
     const off = window.api.onYtChanged((s) => setStore(normalizeYtStore(s)));
-    const offDl = window.api.onYtDownloadProgress((p) =>
-      setDlProgress({
-        videoId: p.videoId,
-        index: p.index,
-        total: p.total,
-        percent: p.percent,
-        stage: p.stage,
-      }),
-    );
+    void Promise.resolve(window.api.ytDownloadQueue?.())
+      .then((entries) => {
+        if (Array.isArray(entries)) setQueue(entries);
+      })
+      .catch(() => undefined);
+    const offDl = window.api.onYtQueueChanged?.((entries) => setQueue(entries)) ?? (() => undefined);
     const offRf = window.api.onYtRefreshProgress((p) => {
       if (p.stage === 'done') {
         setRefreshProgress(null);
@@ -177,12 +218,6 @@ export default function YouTubePlaylistsView() {
     };
   }, []);
 
-  useEffect(() => {
-    if (newsBootstrapped.current) return;
-    newsBootstrapped.current = true;
-    setMainTab('news');
-    void runNewsRefresh();
-  }, []);
 
   const playlist = useMemo(() => {
     if (side?.kind !== 'playlist') return null;
@@ -243,7 +278,8 @@ export default function YouTubePlaylistsView() {
     if (!url) return;
     setBusy(t('yt.status.syncing'));
     setError('');
-    const r = await window.api.ytAddPlaylist(url);
+    // A new playlist starts in the user's study language, not a fixed Japanese.
+    const r = await window.api.ytAddPlaylist(url, getStudyLang());
     setBusy('');
     if ('error' in r) {
       setError(localizeYtPlaylistError(r.error, t));
@@ -270,17 +306,15 @@ export default function YouTubePlaylistsView() {
 
   const downloadIds = async (ids: string[]): Promise<void> => {
     if (!ids.length) return;
-    setBusy(t('yt.status.downloading'));
     setError('');
-    // Creator subtitles first, YouTube's auto-generated ja/en captions when a
-    // video has none — so every download arrives with a study line.
-    const r = await window.api.ytDownloadVideos(ids, { autoCaptions: true });
-    setBusy('');
-    setDlProgress(null);
-    applyStore(r.store);
-    const fail = r.results.find((x) => !x.ok);
-    if (fail?.error) setError(localizeYtPlaylistError(fail.error, t));
     setSelectedVideoIds(new Set());
+    // Queued, not awaited with the window locked (audit r2 #17): the queue
+    // panel shows progress and holds Pause, Resume and Cancel. Creator
+    // subtitles first, auto captions in the STUDY language when there are none.
+    const r = await window.api.ytDownloadVideos(ids, { autoCaptions: true, studyLang: getStudyLang() });
+    applyStore(r.store);
+    const fail = r.results.find((x) => !x.ok && x.error !== 'cancelled');
+    if (fail?.error) setError(localizeYtPlaylistError(fail.error, t));
   };
 
   const logSelected = async (): Promise<void> => {
@@ -443,23 +477,61 @@ export default function YouTubePlaylistsView() {
     return { root, byFolder };
   }, [playlists, folders]);
 
+  const menuItem = (
+    id: string,
+    label: string,
+    guards: Array<[boolean, string]>,
+    onSelect: () => void,
+  ): MenuBarMenu['items'][number] => {
+    const why = firstReason(...guards);
+    return { id, label, onSelect, disabled: !!why, ...(why ? { title: why } : {}) };
+  };
+
   const menus: MenuBarMenu[] = useMemo(
     () => [
       {
         id: 'yt',
         label: t('yt.menu.playlist'),
+        // Audit r2 #19: these did nothing while busy or without a playlist or
+        // a selection. Each is disabled with the reason as its tooltip, the
+        // same `firstReason` rule the toolbar buttons use.
         items: [
-          { id: 'news', label: t('yt.news.refreshAll'), onSelect: () => void runNewsRefresh() },
-          { id: 'surprise', label: t('yt.action.surprise'), onSelect: () => surpriseMe() },
-          { id: 'refresh', label: t('yt.action.refresh'), onSelect: () => void refresh() },
-          { id: 'plan-add', label: t('yt.plan.add'), onSelect: () => void addToPlan([...selectedVideoIds]) },
-          { id: 'dl-sel', label: t('yt.action.downloadSelected'), onSelect: () => void logSelected() },
-          { id: 'dl-all', label: t('yt.action.downloadAll'), onSelect: () => void downloadAll() },
-          { id: 'remove', label: t('yt.action.remove'), onSelect: () => void removePlaylist() },
+          menuItem('news', t('yt.news.refreshAll'), [[!!busy, busy]], () => void runNewsRefresh()),
+          menuItem('surprise', t('yt.action.surprise'), [[!!busy, busy]], () => surpriseMe()),
+          menuItem(
+            'refresh',
+            t('yt.action.refresh'),
+            [[!!busy, busy], [!playlist, t('yt.why.needPlaylist')]],
+            () => void refresh(),
+          ),
+          menuItem(
+            'plan-add',
+            t('yt.plan.add'),
+            [[!!busy, busy], [selectedVideoIds.size === 0, t('yt.why.needSelection')]],
+            () => void addToPlan([...selectedVideoIds]),
+          ),
+          menuItem(
+            'dl-sel',
+            t('yt.action.downloadSelected'),
+            [[!!busy, busy], [selectedVideoIds.size === 0, t('yt.why.needSelection')]],
+            () => void logSelected(),
+          ),
+          menuItem(
+            'dl-all',
+            t('yt.action.downloadAll'),
+            [[!!busy, busy], [!playlist, t('yt.why.needPlaylist')]],
+            () => void downloadAll(),
+          ),
+          menuItem(
+            'remove',
+            t('yt.action.remove'),
+            [[!!busy, busy], [!playlist, t('yt.why.needPlaylist')]],
+            () => void removePlaylist(),
+          ),
         ],
       },
     ],
-    [t, lang, playlist, selectedVideoIds, store],
+    [t, lang, playlist, selectedVideoIds, store, busy],
   );
 
   const renderPlaylistBtn = (p: YtPlaylist) => (
@@ -554,7 +626,7 @@ export default function YouTubePlaylistsView() {
           <div className="yt-row-title">{v.title}</div>
           <div className="yt-row-meta">
             {opts?.showPlaylist ? <span>{playlistTitleById.get(v.playlistId) ?? '—'}</span> : null}
-            <span>{formatViews(v.viewCount)}</span>
+            <span>{formatYtViews(v.viewCount, LANG_TAGS[lang])}</span>
             <span>{formatDuration(v.durationSec)}</span>
           </div>
         </div>
@@ -562,6 +634,14 @@ export default function YouTubePlaylistsView() {
           {isVideoUnlogged(v) ? <span className="yt-chip status new">{t('yt.chip.new')}</span> : null}
           {v.downloaded ? <span className="yt-chip status dl">{t('yt.chip.downloaded')}</span> : null}
           {v.hasOfficialSubs ? <span className="yt-chip status subs">{t('yt.chip.subs')}</span> : null}
+          {!v.hasOfficialSubs && v.hasAutoSubs ? (
+            <span className="yt-chip status autosubs">{t('yt.chip.autoSubs')}</span>
+          ) : null}
+          {v.removedFromYouTube ? (
+            <span className="yt-chip status removed" title={t('yt.chip.removedHint')}>
+              {t('yt.chip.removed')}
+            </span>
+          ) : null}
           {v.transcribed ? <span className="yt-chip status tr">{t('yt.chip.transcribed')}</span> : null}
         </div>
         <div className="yt-row-actions" onClick={(e) => e.stopPropagation()}>
@@ -597,9 +677,9 @@ export default function YouTubePlaylistsView() {
     );
   };
 
-  const dlVideoTitle = dlProgress
-    ? videos.find((v) => v.id === dlProgress.videoId)?.title ?? ''
-    : '';
+  const videoTitleById = useMemo(() => new Map(videos.map((v) => [v.id, v.title])), [videos]);
+  const openQueue = queue.filter((e) => e.state === 'queued' || e.state === 'downloading' || e.state === 'paused');
+  const finishedQueue = queue.length - openQueue.length;
 
   const showPlaylistPane = mainTab === 'playlist' && (side?.kind === 'plan' || !!playlist);
   const showEmptyPlaylist = mainTab === 'playlist' && side?.kind !== 'plan' && !playlist;
@@ -796,28 +876,83 @@ export default function YouTubePlaylistsView() {
               </button>
             </div>
 
-            {(dlProgress || refreshProgress) && (
-              <div className="yt-download-bar" role="status">
-                {dlProgress ? (
-                  <>
-                    <div className="yt-download-bar-meta">
-                      <span>
-                        {t('yt.download.bar', {
-                          current: dlProgress.index + 1,
-                          total: dlProgress.total,
-                          percent: Math.round(dlProgress.percent),
-                        })}
+            {queue.length > 0 ? (
+              <div className="yt-queue" role="region" aria-label={t('yt.queue.label')}>
+                <div className="yt-queue-head">
+                  <span>{t('yt.queue.summary', { open: openQueue.length, done: finishedQueue })}</span>
+                  <button
+                    type="button"
+                    className="btn small"
+                    disabled={openQueue.length === 0}
+                    title={openQueue.length === 0 ? t('yt.queue.nothingToCancel') : undefined}
+                    onClick={() => void window.api.ytCancelDownloads?.()}
+                  >
+                    {t('yt.queue.cancelAll')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn small"
+                    disabled={finishedQueue === 0}
+                    onClick={() => void window.api.ytClearFinishedDownloads?.()}
+                  >
+                    {t('yt.queue.clearFinished')}
+                  </button>
+                </div>
+                <ul className="yt-queue-list">
+                  {queue.map((entry) => (
+                    <li key={entry.videoId} className="yt-queue-row" data-state={entry.state} data-video={entry.videoId}>
+                      <span className="yt-queue-title">{videoTitleById.get(entry.videoId) ?? entry.videoId}</span>
+                      <span className="yt-queue-state">
+                        {entry.state === 'downloading'
+                          ? t('yt.queue.state.downloadingPct', { percent: Math.round(entry.percent) })
+                          : t(`yt.queue.state.${entry.state}`)}
                       </span>
-                      <span className="yt-download-bar-title">{dlVideoTitle}</span>
-                    </div>
-                    <div className="yt-download-track">
-                      <div
-                        className="yt-download-fill"
-                        style={{ width: `${Math.min(100, Math.max(0, dlProgress.percent))}%` }}
-                      />
-                    </div>
-                  </>
-                ) : (
+                      {entry.state === 'downloading' || entry.state === 'paused' ? (
+                        <span className="yt-download-track">
+                          <span
+                            className="yt-download-fill"
+                            style={{ width: `${Math.min(100, Math.max(0, entry.percent))}%` }}
+                          />
+                        </span>
+                      ) : null}
+                      {entry.state === 'downloading' || entry.state === 'queued' ? (
+                        <button
+                          type="button"
+                          className="btn ghost small yt-queue-pause"
+                          onClick={() => void window.api.ytPauseDownload?.(entry.videoId)}
+                        >
+                          {t('yt.queue.pause')}
+                        </button>
+                      ) : null}
+                      {entry.state === 'paused' ? (
+                        <button
+                          type="button"
+                          className="btn ghost small yt-queue-resume"
+                          onClick={() => void window.api.ytResumeDownload?.(entry.videoId)}
+                        >
+                          {t('yt.queue.resume')}
+                        </button>
+                      ) : null}
+                      {entry.state === 'downloading' || entry.state === 'queued' || entry.state === 'paused' ? (
+                        <button
+                          type="button"
+                          className="btn ghost small yt-queue-cancel"
+                          onClick={() => void window.api.ytCancelDownloads?.([entry.videoId])}
+                        >
+                          {t('yt.queue.cancel')}
+                        </button>
+                      ) : null}
+                      {entry.state === 'failed' && entry.error ? (
+                        <span className="yt-queue-error">{localizeYtPlaylistError(entry.error, t)}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {refreshProgress && (
+              <div className="yt-download-bar" role="status">
+                {(
                   <>
                     <div className="yt-download-bar-meta">
                       <span>
@@ -1041,25 +1176,25 @@ export default function YouTubePlaylistsView() {
                     </label>
                     <label className="yt-pref">
                       <span>{t('yt.pref.channelId')}</span>
-                      <input
+                      <CommitInput
                         value={playlist.channelId ?? ''}
-                        onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
-                        placeholder="UC..."
+                        onCommit={(next) => void setPlaylistField({ channelId: next })}
+                        placeholder={t('yt.pref.channelIdPlaceholder')}
                       />
                     </label>
                     <label className="yt-pref">
                       <span>{t('yt.pref.channelTitle')}</span>
-                      <input
+                      <CommitInput
                         value={playlist.channelTitle ?? ''}
-                        onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
+                        onCommit={(next) => void setPlaylistField({ channelTitle: next })}
                         placeholder={t('yt.pref.channelNamePlaceholder')}
                       />
                     </label>
                     <label className="yt-pref">
                       <span>{t('yt.pref.channelIcon')}</span>
-                      <input
+                      <CommitInput
                         value={playlist.channelIconUrl ?? ''}
-                        onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
+                        onCommit={(next) => void setPlaylistField({ channelIconUrl: next })}
                         placeholder="https://..."
                       />
                     </label>
@@ -1082,14 +1217,12 @@ export default function YouTubePlaylistsView() {
                     </label>
                     <label className="yt-pref">
                       <span>{t('yt.pref.updateFreq')}</span>
-                      <input
+                      <CommitInput
                         type="number"
                         min="1"
                         step="1"
-                        value={playlist.updateFrequencyHours}
-                        onChange={(e) =>
-                          void setPlaylistField({ updateFrequencyHours: Number(e.currentTarget.value) })
-                        }
+                        value={String(playlist.updateFrequencyHours)}
+                        onCommit={(next) => void setPlaylistField({ updateFrequencyHours: Number(next) })}
                       />
                     </label>
                     <label className="yt-pref">

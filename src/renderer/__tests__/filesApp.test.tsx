@@ -509,7 +509,8 @@ describe('Files app — opening routes through the file router (gate 10)', () =>
 
     await click(ranked[1]);
     await settle();
-    expect(opened).toEqual(['anki']);
+    // A level-check deck runs the Level flow and lands in Stats (r2data #12).
+    expect(opened).toEqual(['stats']);
   });
 
   it('CONTROL: a router that answers nothing refuses instead of guessing the kind', async () => {
@@ -613,7 +614,11 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
     expect(hasText('Deleting this sends the file to the Recycle Bin.')).toBe(true);
 
     await click(bodyRows().find((r) => r.textContent?.includes('JMdict')));
-    expect(hasText('Deleting this removes the record, with an undo window.')).toBe(true);
+    // Audit r2 #2: a dictionary is deleted by the dictionary's own uninstall,
+    // after the undo window — the old "removes the record" line was a hide.
+    expect(
+      hasText('Deleting this removes it from the app that owns it, after a 10-second undo window.'),
+    ).toBe(true);
     expect(hasText('Deleting this sends the file to the Recycle Bin.')).toBe(false);
   });
 
@@ -902,7 +907,8 @@ describe('Files app — honest states', () => {
     );
     await mount(<FilesApp />);
     await settle();
-    expect(hasText('Some stores could not be read, so their counts show 0: dictionaries')).toBe(
+    // The store is named in words (audit r2 #8), not by its enumerator id.
+    expect(hasText('Some stores could not be read, so their counts show 0: Dictionaries')).toBe(
       true,
     );
   });

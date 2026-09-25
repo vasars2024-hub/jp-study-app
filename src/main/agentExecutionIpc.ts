@@ -155,6 +155,7 @@ function indexNavigationCards(
         ...(answer.page ? { page: answer.page } : {}),
         ...(answer.controlId ? { controlId: answer.controlId } : {}),
         ...(answer.highlight ? { highlight: true } : {}),
+        ...(answer.filesScope ? { filesScope: answer.filesScope } : {}),
         query: title,
       },
     }],

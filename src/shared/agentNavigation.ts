@@ -36,6 +36,7 @@
  */
 
 import type { DesktopWinSection } from './desktop';
+import { isFilesCategoryId } from './filesApp/catalog';
 import {
   resolveAgentNavigationQuery,
   type AgentNavigationTranslatedTitles,
@@ -225,6 +226,8 @@ export interface AgentNavigationDestination {
   controlId?: string;
   /** Present only for a control the Settings surface can visibly highlight. */
   highlight?: true;
+  /** A Files app category the Files window opens scoped to (`section: 'files'` only). */
+  filesScope?: string;
 }
 
 /**
@@ -246,6 +249,11 @@ export function isAgentNavigationDestination(
   if (raw.page !== undefined && page === undefined) return false;
   if (raw.controlId !== undefined && controlId === undefined) return false;
   if (raw.highlight !== undefined && highlight === undefined) return false;
+  if (raw.filesScope !== undefined) {
+    // A scope is a filter on the Files window and nothing else: a real category
+    // id, on that one section, with no Settings coordinates beside it.
+    return raw.section === 'files' && isFilesCategoryId(raw.filesScope) && !page && !controlId && !highlight;
+  }
   if (!controlId && !highlight && raw.section !== 'settings') return true;
   if (raw.section !== 'settings' || !page || !isAgentSettingsPage(page)) return false;
   if (!controlId) return highlight === undefined;
@@ -316,11 +324,13 @@ export function resolveAgentNavigation(
     if (answer.controlId !== effect.controlId) return { ok: false, code: 'stale-provenance' };
     const effectHighlight = effect.highlight === true ? true : undefined;
     if (answer.highlight !== effectHighlight) return { ok: false, code: 'stale-provenance' };
+    if (answer.filesScope !== effect.filesScope) return { ok: false, code: 'stale-provenance' };
     const destination: AgentNavigationDestination = {
       section: answer.section,
       ...(answer.page ? { page: answer.page } : {}),
       ...(answer.controlId ? { controlId: answer.controlId } : {}),
       ...(answer.highlight ? { highlight: true } : {}),
+      ...(answer.filesScope ? { filesScope: answer.filesScope } : {}),
     };
     // The allowlist still has the last word. The index is hand-written, but so
     // was every other list that has ever drifted from the surface it names.

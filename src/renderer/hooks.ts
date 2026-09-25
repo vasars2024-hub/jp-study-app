@@ -46,12 +46,14 @@ export function useElementSize<T extends HTMLElement>(
       // Returning `prev` is what actually skips the render: React bails out on Object.is.
       return next.width === prev.width && next.height === prev.height ? prev : next;
     });
+    apply(el.clientWidth, el.clientHeight);
+    // No observer (jsdom, a stripped-down host): the first measurement stands.
+    if (typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
       if (box) apply(box.width, box.height);
     });
     ro.observe(el);
-    apply(el.clientWidth, el.clientHeight);
     return () => ro.disconnect();
   }, [axis]);
   return [ref, size];

@@ -35,6 +35,7 @@ describe('agent navigation index — every entry is a place the allowlist permit
         section: entry.section,
         ...(entry.page ? { page: entry.page } : {}),
         ...(entry.controlId ? { controlId: entry.controlId, highlight: true } : {}),
+        ...(entry.filesScope ? { filesScope: entry.filesScope } : {}),
       };
       expect(
         isAgentNavigationDestination(destination),
@@ -59,7 +60,8 @@ describe('agent navigation index — every entry is a place the allowlist permit
   it('never lists the same destination twice', () => {
     const seen = new Set<string>();
     for (const entry of AGENT_NAVIGATION_INDEX) {
-      const key = `${entry.section}|${entry.page ?? ''}|${entry.controlId ?? ''}`;
+      // A Files category is its own coordinate (audit r2 #7), like a page is.
+      const key = `${entry.section}|${entry.page ?? ''}|${entry.controlId ?? ''}|${entry.filesScope ?? ''}`;
       expect(seen.has(key), key).toBe(false);
       seen.add(key);
     }

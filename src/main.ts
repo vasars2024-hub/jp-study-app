@@ -32,7 +32,8 @@ import {
 } from './main/studyBlockWindows';
 import { registerDeskDragIpc } from './main/deskDrag';
 import { registerFileRouterIpc } from './main/fileRouter';
-import { registerFilesAppIpc } from './main/filesApp/ipc';
+import { registerFilesAppIpc, startFilesWatchFromDisk } from './main/filesApp/ipc';
+import { filesAppIpcDeps } from './main/filesApp/ipcDeps';
 import { registerTranslateIpc } from './main/translate';
 import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerSentenceAnalysisIpc } from './main/sentenceAnalysis';
@@ -1656,10 +1657,48 @@ async function deliverAgentSettingsDestination(
   }
 }
 
+/**
+ * Scope a Files window the Agent opened (audit r2 #7). The category is an id
+ * `isAgentNavigationDestination` already validated against the Files tree, and
+ * it crosses as JSON, never as interpolated text. Offered until a mounted
+ * Files app says it took it (`handled`), because a freshly opened window loads
+ * the Files chunk lazily after `did-finish-load` — the same reason Settings
+ * delivery above retries.
+ */
+const FILES_SCOPE_DELIVERY_BUDGET_MS = 8_000;
+
+async function deliverFilesScope(win: BrowserWindow, categoryId: string): Promise<boolean> {
+  if (!await waitForPopoutLoad(win)) return false;
+  const detail = JSON.stringify({ categoryId });
+  const script = `(() => {
+    let handled = false;
+    const detail = { ...${detail}, handled: () => { handled = true; } };
+    window.dispatchEvent(new CustomEvent('filesapp:scope', { detail }));
+    return handled;
+  })()`;
+  const started = Date.now();
+  while (Date.now() - started < FILES_SCOPE_DELIVERY_BUDGET_MS) {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return false;
+    try {
+      if (await win.webContents.executeJavaScript(script)) return true;
+    } catch {
+      return false;
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+  }
+  // The window opened; only the filter did not arrive. Opening is still the answer.
+  return true;
+}
+
 async function openAgentNavigationDestination(
   destination: AgentNavigationDestination,
 ): Promise<boolean> {
   if (!createPopoutWindow(destination.section)) return false;
+  if (destination.section === 'files' && destination.filesScope) {
+    const filesWin = popoutWindows.get('files');
+    if (!filesWin || filesWin.isDestroyed()) return false;
+    return deliverFilesScope(filesWin, destination.filesScope);
+  }
   if (destination.section !== 'settings' || !destination.page) return true;
   const win = popoutWindows.get('settings');
   if (!win || win.isDestroyed()) return false;
@@ -1858,7 +1897,7 @@ app.whenReady().then(async () => {
   registerStudyBlockWindowIpc();
   registerDeskDragIpc();
   registerFileRouterIpc();
-  registerFilesAppIpc();
+  registerFilesAppIpc(filesAppIpcDeps(() => mainWindow));
   registerTranslateIpc();
   registerTranslateAnalysisIpc();
   registerSentenceAnalysisIpc();
@@ -1961,6 +2000,9 @@ app.whenReady().then(async () => {
     // in the background — consumers ask isInstalled() before touching a model, so
     // a slow first pass degrades to "not installed yet", never to a crash.
     void initDownloads();
+    // The Files app's watched folders, resumed from main's own copy of the list
+    // so they keep importing without the Files window being opened first.
+    startFilesWatchFromDisk();
   });
 
   app.on('activate', () => {
