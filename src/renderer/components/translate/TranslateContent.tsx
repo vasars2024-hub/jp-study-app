@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { translateTo, onModelProgress, type TransLang } from '../../translator';
-import { getStudyLang, setStudyLang } from '../../studyEnvironment';
+import { getStudyLang } from '../../studyEnvironment';
 import {
   appendTranslationHistory,
   clearTranslationHistory,
@@ -123,7 +123,9 @@ export function useTranslate(): TranslateController {
     const next = l === target ? source : l;
     setSource(next);
     setTranslateSource(next);
-    if (next === 'ja' || next === 'zh') setStudyLang(next);
+    // Translating from a language is not studying it: picking Chinese as a
+    // source used to switch a Japanese learner's whole study language
+    // (dictionaries, known words, subtitles) as a side effect.
   }
 
   function pickTarget(l: TransLang) {
@@ -137,7 +139,6 @@ export function useTranslate(): TranslateController {
     setTarget(source);
     setTranslateSource(target);
     setTranslateTarget(source);
-    if (target === 'ja' || target === 'zh') setStudyLang(target);
     setInput(output);
     setOutput(input);
     setTranslatedInput('');
