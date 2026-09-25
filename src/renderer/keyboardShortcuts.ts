@@ -71,7 +71,16 @@ export interface CustomCommandDef {
 // ---------------------------------------------------------------------------
 export const COMMAND_CATALOG: AppCommand[] = [
   // Navigation
-  { id: 'nav.palette', label: 'Open command palette', category: 'Navigation', defaultKeys: 'Ctrl+Space' },
+  // Not Ctrl+Space: that is the Chinese (and Korean) IME's own on/off toggle, so a
+  // Pinyin user reaching for the IME opened the palette instead. Ctrl+K has no
+  // meaning in a text field and no Windows or IME owner.
+  {
+    id: 'nav.palette',
+    label: 'Open command palette',
+    category: 'Navigation',
+    defaultKeys: 'Ctrl+K',
+    note: 'Ctrl+P opens the same palette in search mode.',
+  },
   { id: 'nav.search', label: 'Global search', category: 'Navigation', defaultKeys: 'Ctrl+P' },
   { id: 'nav.settings', label: 'Open settings', category: 'Navigation', defaultKeys: 'Ctrl+,' },
   { id: 'nav.home', label: 'Return home (close reader)', category: 'Navigation', defaultKeys: 'Ctrl+H' },
@@ -79,7 +88,9 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'nav.undo',
     label: 'Undo last action',
     category: 'Navigation',
-    defaultKeys: 'Ctrl+Shift+Z',
+    // Was Ctrl+Shift+Z, which is Redo in every text field — pressing it while typing
+    // reopened a closed window instead of redoing an edit.
+    defaultKeys: 'Ctrl+Alt+Z',
     note:
       'Reverses the last recorded action (e.g. reopening a closed desktop window, removing a just-added Anki note). Not a full text-editor undo.',
   },
@@ -145,14 +156,16 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'window.moveToNextMonitor',
     label: 'Move window to next monitor',
     category: 'Window',
-    defaultKeys: 'Ctrl+Shift+ArrowRight',
+    // Snap (Ctrl+Alt+Arrow) plus Shift, the way Windows adds Shift to Win+Arrow for the
+    // same move. Was Ctrl+Shift+ArrowRight, which selects a word in every text field.
+    defaultKeys: 'Ctrl+Alt+Shift+ArrowRight',
     note: 'Sends the focused window to the desktop on the next configured display.',
   },
   {
     id: 'window.moveToPrevMonitor',
     label: 'Move window to previous monitor',
     category: 'Window',
-    defaultKeys: 'Ctrl+Shift+ArrowLeft',
+    defaultKeys: 'Ctrl+Alt+Shift+ArrowLeft',
     note: 'Sends the focused window to the desktop on the previous configured display.',
   },
   {
@@ -271,16 +284,17 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'nav.nextDesktop',
     label: 'Switch to next desktop',
     category: 'Window',
-    // Normal form is Ctrl before Meta. Spelled the Windows way ('Meta+Ctrl+…') this never
-    // matched a keypress — see effectiveKeys.
-    defaultKeys: 'Ctrl+Meta+ArrowRight',
+    // Not Win+Ctrl+Arrow: that is Windows' own virtual-desktop switch, and the OS takes
+    // it before Electron sees the keydown, so the old default could never fire. Page
+    // keys are the "next page of windows" and have no Windows owner with Ctrl+Alt+Shift.
+    defaultKeys: 'Ctrl+Alt+Shift+PageDown',
     note: 'Cycles Desktop 1 → Desktop 2. Saves the current layout before switching.',
   },
   {
     id: 'nav.prevDesktop',
     label: 'Switch to previous desktop',
     category: 'Window',
-    defaultKeys: 'Ctrl+Meta+ArrowLeft',
+    defaultKeys: 'Ctrl+Alt+Shift+PageUp',
     note: 'Cycles Desktop 2 → Desktop 1. Saves the current layout before switching.',
   },
   {
@@ -440,7 +454,9 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Rate Again',
     category: 'Flashcards',
     defaultKeys: '1',
-    note: 'After the card is flipped. Bare A is reserved for video subtitle prev.',
+    // The video player's own keymap (`vc_defaultKeybindings`) seeks with bare A / D,
+    // which is why the ratings sit on the digit row and not on letters.
+    note: 'After the card is flipped. Bare A and D seek the video player back and forward.',
   },
   {
     id: 'flashcards.hard',
@@ -539,7 +555,8 @@ export const COMMAND_CATALOG: AppCommand[] = [
   },
 
   // Utility
-  { id: 'clipboard.open', label: 'Open clipboard history', category: 'Utility', defaultKeys: 'Ctrl+Shift+V' },
+  // Not Ctrl+Shift+V: that is paste-as-plain-text in every text field.
+  { id: 'clipboard.open', label: 'Open clipboard history', category: 'Utility', defaultKeys: 'Ctrl+Alt+Shift+V' },
   { id: 'calendar.open', label: 'Open calendar', category: 'Utility', defaultKeys: '' },
   {
     id: 'app.toggle',
@@ -582,8 +599,9 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: '',
     note: 'Unbound by default — Space is used by the reader / flashcards.',
   },
-  { id: 'music.next', label: 'Next track', category: 'Music', defaultKeys: 'Ctrl+ArrowRight' },
-  { id: 'music.prev', label: 'Previous track', category: 'Music', defaultKeys: 'Ctrl+ArrowLeft' },
+  // Not Ctrl+ArrowLeft/Right: those move the caret by a word in every text field.
+  { id: 'music.next', label: 'Next track', category: 'Music', defaultKeys: 'Ctrl+Alt+PageDown' },
+  { id: 'music.prev', label: 'Previous track', category: 'Music', defaultKeys: 'Ctrl+Alt+PageUp' },
   { id: 'music.volumeUp', label: 'Volume up', category: 'Music', defaultKeys: 'Ctrl+ArrowUp' },
   { id: 'music.volumeDown', label: 'Volume down', category: 'Music', defaultKeys: 'Ctrl+ArrowDown' },
   // The lyric-line transport (slice 20's buttons, pressed live in slice 21). These are
@@ -595,8 +613,8 @@ export const COMMAND_CATALOG: AppCommand[] = [
   //
   // Unbound by default, for the same reason `music.playPause` above is: every free single
   // letter belongs to the adopted player's own keymap, and the Music block already spends
-  // all four `Ctrl+Arrow*` chords on track/volume while `Ctrl+Alt+Arrow*` is virtual-desktop
-  // navigation. A row the user binds beats a default chosen to fill a column — and
+  // Ctrl+Alt+PageUp/PageDown and Ctrl+ArrowUp/Down on track/volume while `Ctrl+Alt+Arrow*`
+  // is window snapping. A row the user binds beats a default chosen to fill a column — and
   // bind-then-press is proven (phase I of `retirement-step3-harness.mjs`).
   //
   // Unlike their neighbours these three are NOT built-ins: stepping needs the cue sheet of
@@ -796,6 +814,8 @@ interface ShortcutStore {
   active: string;
   profiles: Record<string, Overrides>;
   customCommands: CustomCommandDef[];
+  /** Which set of built-in defaults the profiles were last migrated to (see MOVED_DEFAULTS). */
+  defaultsVersion?: number;
 }
 
 const KEY = 'jp-shortcuts-v1';
@@ -805,7 +825,80 @@ const DEFAULT_PROFILE = 'Default';
 const MOUSE_NAMES = ['MouseLeft', 'MouseMiddle', 'MouseRight', 'Mouse4', 'Mouse5'] as const;
 
 function emptyStore(): ShortcutStore {
-  return { active: DEFAULT_PROFILE, profiles: { [DEFAULT_PROFILE]: {} }, customCommands: [] };
+  return {
+    active: DEFAULT_PROFILE,
+    profiles: { [DEFAULT_PROFILE]: {} },
+    customCommands: [],
+    defaultsVersion: DEFAULTS_VERSION,
+  };
+}
+
+/**
+ * Built-in defaults that moved, keyed by the version that moved them, as `id → old chord`
+ * (the new chord is whatever the catalog says now).
+ *
+ * Version 2 (round-2 keyboard pass) took every default off a chord that already means
+ * something to a text field or to Windows: Ctrl+Space is the Chinese IME toggle,
+ * Ctrl+Shift+Z is Redo, Ctrl+Shift+V is paste-as-plain-text, Ctrl(+Shift)+Arrow moves or
+ * selects by word, and Win+Ctrl+Arrow is Windows' own desktop switch.
+ */
+const DEFAULTS_VERSION = 2;
+const MOVED_DEFAULTS: Record<number, Record<string, string>> = {
+  2: {
+    'nav.palette': 'Ctrl+Space',
+    'nav.undo': 'Ctrl+Shift+Z',
+    'clipboard.open': 'Ctrl+Shift+V',
+    'music.next': 'Ctrl+ArrowRight',
+    'music.prev': 'Ctrl+ArrowLeft',
+    'window.moveToNextMonitor': 'Ctrl+Shift+ArrowRight',
+    'window.moveToPrevMonitor': 'Ctrl+Shift+ArrowLeft',
+    'nav.nextDesktop': 'Ctrl+Meta+ArrowRight',
+    'nav.prevDesktop': 'Ctrl+Meta+ArrowLeft',
+  },
+};
+
+/**
+ * Carry profiles from an older set of defaults to the current one.
+ *
+ * - No override, or an override that merely spells the OLD default: the row follows the
+ *   default, so it moves to the new chord (the override is dropped).
+ * - An override that is anything else is the user's own choice and is kept as is.
+ * - Exception: if the user already bound the NEW chord to another command in that
+ *   profile, moving would hand one keypress to two commands. The row keeps its old chord
+ *   as an explicit override instead, so nothing the user had working stops working.
+ */
+export function migrateMovedDefaults(profiles: Record<string, Overrides>, fromVersion: number): boolean {
+  let changed = false;
+  for (let v = fromVersion + 1; v <= DEFAULTS_VERSION; v += 1) {
+    const moved = MOVED_DEFAULTS[v];
+    if (!moved) continue;
+    for (const prof of Object.values(profiles)) {
+      if (!prof || typeof prof !== 'object') continue;
+      for (const [id, oldKeys] of Object.entries(moved)) {
+        const ov = prof[id];
+        const old = normalizeChord(oldKeys);
+        if (ov === null) continue;
+        if (typeof ov === 'string' && normalizeChord(ov) !== old) continue;
+        const next = splitChords(normalizeChord(COMMAND_CATALOG.find((c) => c.id === id)?.defaultKeys ?? ''));
+        const taken = Object.entries(prof).some(
+          ([other, keys]) =>
+            other !== id &&
+            typeof keys === 'string' &&
+            splitChords(normalizeChord(keys)).some((k) => next.includes(k)),
+        );
+        if (taken) {
+          if (prof[id] !== old) {
+            prof[id] = old;
+            changed = true;
+          }
+        } else if (id in prof) {
+          delete prof[id];
+          changed = true;
+        }
+      }
+    }
+  }
+  return changed;
 }
 
 /**
@@ -858,8 +951,11 @@ function loadStore(): ShortcutStore {
                 !!(c as CustomCommandDef).action,
             )
           : [];
-        const migrated = migrateHighlightHKey(profiles);
-        const next = { active, profiles, customCommands };
+        const fromVersion = typeof p.defaultsVersion === 'number' ? p.defaultsVersion : 1;
+        const movedDefaults = fromVersion < DEFAULTS_VERSION;
+        if (movedDefaults) migrateMovedDefaults(profiles, fromVersion);
+        const migrated = migrateHighlightHKey(profiles) || movedDefaults;
+        const next: ShortcutStore = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION };
         if (migrated) {
           try {
             localStorage.setItem(KEY, JSON.stringify(next));
@@ -946,7 +1042,7 @@ function syncToolboxGlobalShortcut(): void {
       if (result && !result.ok && result.error) {
         window.dispatchEvent(
           new CustomEvent('os:toast', {
-            detail: { message: `Toolbox global shortcut: ${result.error}`, kind: 'muted' },
+            detail: { message: t('shortcut.toast.toolboxGlobal', { error: result.error }), kind: 'muted' },
           }),
         );
       }
@@ -967,7 +1063,7 @@ function syncAppToggleGlobalShortcut(): void {
       if (result && !result.ok && result.error) {
         window.dispatchEvent(
           new CustomEvent('os:toast', {
-            detail: { message: `Hide/show Gum shortcut: ${result.error}`, kind: 'muted' },
+            detail: { message: t('shortcut.toast.appToggle', { error: result.error }), kind: 'muted' },
           }),
         );
       }
@@ -988,7 +1084,7 @@ function syncAppRestartGlobalShortcut(): void {
       if (result && !result.ok && result.error) {
         window.dispatchEvent(
           new CustomEvent('os:toast', {
-            detail: { message: `Full restart shortcut: ${result.error}`, kind: 'muted' },
+            detail: { message: t('shortcut.toast.appRestart', { error: result.error }), kind: 'muted' },
           }),
         );
       }
@@ -1019,7 +1115,7 @@ export function syncOsHotkeyHelperFromShortcuts(force = false): void {
         if (result && !result.ok && result.error) {
           window.dispatchEvent(
             new CustomEvent('os:toast', {
-              detail: { message: `Startup helper: ${result.error}`, kind: 'muted' },
+              detail: { message: t('shortcut.toast.startupHelper', { error: result.error }), kind: 'muted' },
             }),
           );
         }
@@ -1174,24 +1270,38 @@ function allCommands(): AppCommand[] {
   return [...COMMAND_CATALOG, ...customs];
 }
 
+/** Module-level `t` resolves against the live language on every call (see resumeToast). */
+function translatedOr(key: string, fallback: string): string {
+  const out = t(key);
+  return out === key ? fallback : out;
+}
+
+function builtinLabel(id: string): string | undefined {
+  const cmd = COMMAND_CATALOG.find((c) => c.id === id);
+  if (!cmd) return undefined;
+  const legacy = t(`commands.${id}`);
+  return legacy !== `commands.${id}` ? legacy : translatedOr(`cmd.${id}`, cmd.label);
+}
+
 function describeCustomAction(action: CustomAction): string {
   if (action.type === 'openApp') {
     const app = SHORTCUT_OPEN_APPS.find((a) => a.id === action.appId);
-    return `Opens ${app?.label ?? action.appId}`;
+    const name = translatedOr(`palette.section.${action.appId}`, app?.label ?? action.appId);
+    return t('shortcut.custom.opens', { name });
   }
   if (action.type === 'runCommand') {
-    const cmd = COMMAND_CATALOG.find((c) => c.id === action.commandId);
-    return `Runs “${cmd?.label ?? action.commandId}”`;
+    return t('shortcut.custom.runs', { name: builtinLabel(action.commandId) ?? action.commandId });
   }
   if (action.type === 'runCommands') {
     const labels = action.commandIds.map((id) => {
-      const c = COMMAND_CATALOG.find((x) => x.id === id);
       const custom = store.customCommands.find((x) => x.id === id);
-      return c?.label ?? custom?.label ?? id;
+      return builtinLabel(id) ?? custom?.label ?? id;
     });
-    return `Stack: ${labels.join(' → ')}`;
+    return t('shortcut.custom.stack', { names: labels.join(' → ') });
   }
-  return `Dispatches ${action.event}${action.detail ? ` (${action.detail})` : ''}`;
+  return action.detail
+    ? t('shortcut.custom.dispatchesDetail', { event: action.event, detail: action.detail })
+    : t('shortcut.custom.dispatches', { event: action.event });
 }
 
 /**
@@ -1304,6 +1414,7 @@ export function resetBinding(id: string): void {
 
 export function resetAllBindings(): void {
   store.profiles[store.active] = {};
+  store.defaultsVersion = DEFAULTS_VERSION;
   persist();
 }
 
@@ -1412,7 +1523,9 @@ export function importShortcuts(json: string): { ok: boolean; error?: string } {
           (c) => c && typeof c.id === 'string' && typeof c.label === 'string' && c.action,
         )
       : store.customCommands;
-    store = { active, profiles, customCommands };
+    // An export from before a defaults move carries the old chords as they were then.
+    migrateMovedDefaults(profiles, typeof p.defaultsVersion === 'number' ? p.defaultsVersion : 1);
+    store = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION };
     persist();
     return { ok: true };
   } catch (err) {
@@ -1425,18 +1538,90 @@ export function importShortcuts(json: string): { ok: boolean; error?: string } {
 // registration wins (the topmost view owns the shortcut).
 // ---------------------------------------------------------------------------
 type Handler = (e: Event) => boolean | void;
-const handlers = new Map<string, Handler[]>();
 
-export function registerCommandHandler(id: string, fn: Handler): () => void {
+/**
+ * Where a view-local handler is allowed to hear its keys.
+ *
+ * - an element, or a getter returning one (a React ref's `.current`) — the view's own root;
+ * - a string — every element carrying `data-command-scope="<string>"`.
+ *
+ * A scoped handler only runs when the keyboard is on that surface, which means either
+ *
+ * 1. focus is inside the surface's window (the enclosing desktop `.fwin`, or the element
+ *    itself when it is not in a desktop window — a pop-out or a full-screen reader), or
+ * 2. nothing is focused (`document.activeElement` is `<body>`, which is where a click on
+ *    plain text leaves it) and the surface's desktop window is the focused one.
+ *
+ * Mouse chords use the event target instead of focus. The palette's `runCommand` ignores
+ * scopes: choosing a command there is an explicit request, not a stray key.
+ */
+export type CommandScope = Element | null | undefined | string | (() => Element | null | undefined);
+
+export interface CommandHandlerOptions {
+  scope?: CommandScope;
+}
+
+interface HandlerEntry {
+  fn: Handler;
+  scope?: CommandScope;
+}
+
+const handlers = new Map<string, HandlerEntry[]>();
+
+export function registerCommandHandler(id: string, fn: Handler, opts?: CommandHandlerOptions): () => void {
+  const entry: HandlerEntry = { fn, scope: opts?.scope };
   const list = handlers.get(id) ?? [];
-  list.push(fn);
+  list.push(entry);
   handlers.set(id, list);
   return () => {
     const cur = handlers.get(id);
     if (!cur) return;
-    const i = cur.indexOf(fn);
+    const i = cur.indexOf(entry);
     if (i >= 0) cur.splice(i, 1);
   };
+}
+
+function scopeElements(scope: CommandScope): Element[] {
+  if (typeof scope === 'string') {
+    return [...document.querySelectorAll('[data-command-scope]')].filter(
+      (el) => el.getAttribute('data-command-scope') === scope,
+    );
+  }
+  const el = typeof scope === 'function' ? scope() : scope;
+  return el ? [el] : [];
+}
+
+/** The region that counts as "this surface": its desktop window, or itself outside one. */
+function surfaceRegion(el: Element): Element {
+  return el.closest('.fwin') ?? el;
+}
+
+/** True when a handler registered with `scope` may hear this keypress / click. */
+export function scopeHasKeyboard(scope: CommandScope, mouseTarget?: EventTarget | null): boolean {
+  const els = scopeElements(scope).filter((el) => el.isConnected);
+  if (!els.length) return false;
+  if (mouseTarget instanceof Node) return els.some((el) => surfaceRegion(el).contains(mouseTarget));
+  const active = document.activeElement;
+  if (active && active !== document.body && active !== document.documentElement) {
+    return els.some((el) => surfaceRegion(el).contains(active));
+  }
+  return els.some((el) => {
+    const win = el.closest('.fwin');
+    return win ? win.classList.contains('focused') : true;
+  });
+}
+
+/** Topmost handler that may run for this event (scoped ones only on their own surface). */
+function eligibleHandler(id: string, e: Event | null, fromMouse = false): Handler | null {
+  const stack = handlers.get(id);
+  if (!stack || !stack.length) return null;
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const entry = stack[i];
+    if (!entry) continue;
+    if (entry.scope === undefined || e === null) return entry.fn;
+    if (scopeHasKeyboard(entry.scope, fromMouse ? e.target : undefined)) return entry.fn;
+  }
+  return null;
 }
 
 function openApp(appId: string): void {
@@ -1618,15 +1803,19 @@ function builtinHandler(id: string): Handler | null {
       return () => {
         if (!canUndo()) {
           window.dispatchEvent(
-            new CustomEvent('os:toast', { detail: { message: 'Nothing to undo', kind: 'muted' } }),
+            new CustomEvent('os:toast', { detail: { message: t('shortcut.undo.nothing'), kind: 'muted' } }),
           );
           return;
         }
-        const label = peekUndo()?.label ?? 'action';
+        const label = peekUndo()?.label;
         void performUndo().then((done) => {
+          const what = done || label;
           window.dispatchEvent(
             new CustomEvent('os:toast', {
-              detail: { message: done ? `Undid: ${done}` : `Undid: ${label}`, kind: 'ok' },
+              detail: {
+                message: what ? t('shortcut.undo.done', { action: what }) : t('shortcut.undo.doneGeneric'),
+                kind: 'ok',
+              },
             }),
           );
         });
@@ -1710,8 +1899,7 @@ export function runCommand(id: string): boolean {
   if (runDepth >= MAX_RUN_DEPTH) return false;
   runDepth++;
   try {
-    const stack = handlers.get(id);
-    const fn = stack && stack.length ? stack[stack.length - 1] : builtinHandler(id);
+    const fn = eligibleHandler(id, null) ?? builtinHandler(id);
     if (!fn) return false;
     return fn(new KeyboardEvent('keydown')) !== false;
   } finally {
@@ -1748,22 +1936,85 @@ function isLockscreenActive(): boolean {
   return Boolean(document.querySelector('.lockscreen[role="dialog"]'));
 }
 
+const CARET_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
+const CLIPBOARD_AND_HISTORY_LETTERS = new Set(['A', 'C', 'V', 'X', 'Z', 'Y']);
+const RICH_TEXT_LETTERS = new Set(['B', 'I', 'U']);
+
+/**
+ * True when a chord already means something to a text field, so it must not be taken
+ * away from one: caret and selection moves (Ctrl/Shift + arrows, Home, End, Shift+Page),
+ * word deletion (Ctrl+Backspace / Delete), the clipboard and history (Ctrl+A/C/V/X/Z/Y,
+ * Ctrl+Shift+Z / V, Ctrl/Shift+Insert, Shift+Delete) and, in rich text, Ctrl+B/I/U.
+ * Anything with Alt or Meta is not an editing chord in Chromium.
+ */
+export function isEditingChord(chord: string, richText = false): boolean {
+  const parts = chord.split('+');
+  const key = parts[parts.length - 1] ?? '';
+  const mods = new Set(parts.slice(0, -1));
+  if (mods.has('Alt') || mods.has('Meta')) return false;
+  const ctrl = mods.has('Ctrl');
+  const shift = mods.has('Shift');
+  if (CARET_KEYS.has(key)) return true;
+  if (key === 'PageUp' || key === 'PageDown') return !ctrl;
+  if (key === 'Backspace' || key === 'Delete') return ctrl || shift;
+  if (key === 'Insert') return ctrl !== shift;
+  // With Shift only Redo (Z) and paste-as-plain-text (V) edit; Ctrl+Shift+C and the rest are free.
+  if (ctrl && CLIPBOARD_AND_HISTORY_LETTERS.has(key)) return !shift || key === 'Z' || key === 'V';
+  if (ctrl && !shift && richText && RICH_TEXT_LETTERS.has(key)) return true;
+  return false;
+}
+
+/**
+ * Controls whose own activation key is Space or Enter. A bare Space/Enter pressed on one
+ * must press THAT control — a grade button, a link, a disclosure — not whatever command the
+ * key is bound to globally (flashcards.flip is Space|Enter).
+ */
+const NATIVE_ACTIVATION_SELECTOR = [
+  'button',
+  'a[href]',
+  'summary',
+  'select',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  '[role="menuitemcheckbox"]',
+  '[role="menuitemradio"]',
+  '[role="checkbox"]',
+  '[role="radio"]',
+  '[role="switch"]',
+  '[role="tab"]',
+  '[role="option"]',
+].join(', ');
+
+function focusedControlOwnsKey(chord: string): boolean {
+  if (chord !== 'Space' && chord !== 'Enter') return false;
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return false;
+  return el.matches(NATIVE_ACTIVATION_SELECTOR);
+}
+
 function dispatchChord(chord: string, e: Event, opts?: { fromMouse?: boolean }): boolean {
+  const fromMouse = Boolean(opts?.fromMouse);
   // While the lockscreen is up, plain keys belong to PIN entry — not global shortcuts.
-  if (!opts?.fromMouse && isLockscreenActive()) {
+  if (!fromMouse && isLockscreenActive()) {
     const ke = e as KeyboardEvent;
     if (!ke.ctrlKey && !ke.altKey && !ke.metaKey) return false;
   }
-  // While typing, only keyboard chords that carry Ctrl/Alt/Meta may fire.
-  if (!opts?.fromMouse && isTypingTarget()) {
+  // A focused button / link / disclosure keeps its own Space and Enter.
+  if (!fromMouse && focusedControlOwnsKey(chord)) return false;
+  // While typing, only keyboard chords that carry Ctrl/Alt/Meta may fire — and of those,
+  // not the ones that already edit text, unless the command says it works while typing.
+  const typing = !fromMouse && isTypingTarget();
+  if (typing) {
     const ke = e as KeyboardEvent;
     if (!ke.ctrlKey && !ke.altKey && !ke.metaKey) return false;
   }
+  const editing = typing && isEditingChord(chord, (document.activeElement as HTMLElement | null)?.isContentEditable === true);
   for (const c of allCommands()) {
     if (!chordMatches(c.id, chord)) continue;
-    const stack = handlers.get(c.id);
-    const fn = stack && stack.length ? stack[stack.length - 1] : builtinHandler(c.id);
-    if (!fn) continue; // dead binding (view not mounted) — try the next match
+    if (editing && !c.worksWhileTyping) continue;
+    const fn = eligibleHandler(c.id, e, fromMouse) ?? builtinHandler(c.id);
+    if (!fn) continue; // dead binding (view not mounted, or not the focused surface) — try the next match
     if (fn(e) !== false) {
       e.preventDefault();
       if (opts?.fromMouse) e.stopPropagation();

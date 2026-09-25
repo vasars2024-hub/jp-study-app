@@ -261,6 +261,8 @@ export interface FlashcardsState {
   initialJitenDeckId: number | null;
   deckLevels: Record<string, BookLevelEstimate>;
   stripRef: React.RefObject<HTMLDivElement | null>;
+  /** The review surface's root — the keyboard scope of every review shortcut. */
+  reviewRootRef: React.RefObject<HTMLDivElement | null>;
   // derived
   epubCards: DeckFlashcard[];
   recentStrip: DeckFlashcard[];
@@ -343,6 +345,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [masteredIds, setMasteredIds] = useState<Set<string>>(() => new Set());
   const [exploredIds, setExploredIds] = useState<Set<string>>(() => new Set());
+  const reviewRootRef = useRef<HTMLDivElement>(null);
   const [flipped, setFlipped] = useState(false);
   // WIRED decrypt/resync card effects (§5.5) — transient class, wired-gated.
   const wiredFx = useWiredMaterials();
@@ -1053,46 +1056,52 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }, [mode, reviewIndex, sessionCards.length]);
 
   // Review shortcuts — central manager (Settings → Shortcuts rebindable).
+  //
+  // Scoped to the review surface: Space, the digits, Escape and Ctrl+Z are ordinary keys
+  // everywhere else, so they only reach the sitting while the keyboard is on this window.
+  // Unscoped, Escape in any other window ended the review and Ctrl+Z in a text field
+  // elsewhere took back a rating.
   useEffect(() => {
     if (mode !== 'review') return;
+    const scoped = { scope: () => reviewRootRef.current };
     const offs = [
       registerCommandHandler('flashcards.flip', () => {
         flip();
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.end', () => {
         endReview();
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.prev', () => {
         goToReviewIndex(reviewIndex - 1);
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.next', () => {
         goToReviewIndex(reviewIndex + 1);
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.again', () => {
         if (flipped) again();
         else return false;
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.hard', () => {
         if (flipped) hard();
         else return false;
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.gotIt', () => {
         if (flipped) gotIt();
         else return false;
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.easy', () => {
         if (flipped) easy();
         else return false;
-      }),
+      }, scoped),
       registerCommandHandler('flashcards.undo', () => {
         if (undoStackRef.current.length) undoRating();
         else return false;
-      }),
+      }, scoped),
       // Not gated on `flipped`: in audio-only review the prompt IS the audio, so
       // replaying it before the answer is revealed is the whole point of the key.
       registerCommandHandler('flashcards.replayAudio', () => {
         void playCurrentAudio();
-      }),
+      }, scoped),
     ];
     return () => offs.forEach((off) => off());
   }, [mode, flipped, reviewIndex, sessionCards, masteredIds]);
@@ -1153,6 +1162,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     initialJitenDeckId,
     deckLevels,
     stripRef,
+    reviewRootRef,
     epubCards,
     recentStrip,
     filteredDeck,
@@ -1281,7 +1291,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
 
   if (sessionComplete || !current) {
     return (
-      <div className="flash-view">
+      <div className="flash-view" ref={state.reviewRootRef}>
         <div className="flash-done">
           <div className="flash-done-emoji">
             <Icon name="confetti" size={44} />
@@ -1319,7 +1329,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
       : null;
 
   return (
-    <div className="flash-view review">
+    <div className="flash-view review" ref={state.reviewRootRef}>
       <div className="flash-review-shell">
         <div className="flash-review-top">
           <button className="btn small" onClick={state.endReview}>

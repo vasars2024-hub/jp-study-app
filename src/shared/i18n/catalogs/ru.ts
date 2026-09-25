@@ -4627,7 +4627,7 @@ export const ru: Catalog = {
   'desktop.task.closeAll': 'Закрыть все приложения',
   'desktop.task.minimize': 'Свернуть',
   'desktop.task.restore': 'Восстановить',
-  'desktop.clipboardHistory': 'История буфера обмена (Ctrl+Shift+V)',
+  'desktop.clipboardHistory': 'История буфера обмена (Ctrl+Alt+Shift+V)',
   'desktop.tray.hiddenIcons': 'Показать скрытые значки',
   'desktop.desktopN': 'Стол {n}',
   'desktop.dragToDesktop': 'Перетащите на рабочий стол · нажмите, чтобы открыть',

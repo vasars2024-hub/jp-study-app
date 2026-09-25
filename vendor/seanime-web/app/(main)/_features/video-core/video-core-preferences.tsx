@@ -49,6 +49,7 @@ import { toast } from "sonner"
 import { z } from "zod"
 import { useServerStatus } from "../../_hooks/use-server-status"
 import { useVideoCoreScreenshot } from "./video-core-screenshot"
+import { keyBelongsToFocusedControl } from "./video-core-keyboard-target" // Gum: K1
 
 export const videoCorePreferencesModalAtom = atom(false)
 
@@ -1004,6 +1005,16 @@ export function VideoCoreKeybindingController(props: {
                 isKeybindingsModalOpen ||
                 isEditableKeyboardTarget(e.target) ||
                 isEditableKeyboardTarget(document.activeElement)
+            ) {
+                return
+            }
+
+            // Gum (round-2 K1): Enter/Space on a focused button, link or menu item — and the
+            // arrow keys inside a menu, list or slider — belong to that control. Taking them
+            // here turned every button in the window into a play/pause key while a video was open.
+            if (
+                keyBelongsToFocusedControl(e) ||
+                keyBelongsToFocusedControl({ code: e.code, key: e.key, target: document.activeElement })
             ) {
                 return
             }

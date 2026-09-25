@@ -4258,7 +4258,7 @@ export const zh: Catalog = {
   'desktop.task.closeAll': '关闭所有应用',
   'desktop.task.minimize': '最小化',
   'desktop.task.restore': '还原',
-  'desktop.clipboardHistory': '剪贴板历史（Ctrl+Shift+V）',
+  'desktop.clipboardHistory': '剪贴板历史（Ctrl+Alt+Shift+V）',
   'desktop.tray.hiddenIcons': '显示隐藏的图标',
   'desktop.desktopN': '桌面 {n}',
   'desktop.dragToDesktop': '拖到桌面 · 点击打开',
