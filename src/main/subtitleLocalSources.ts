@@ -184,12 +184,17 @@ export function normalizeStreamLanguage(raw: string | null | undefined): string 
   if (!value || value === 'und' || value === 'unknown') return null;
   const three: Record<string, string> = {
     jpn: 'ja', eng: 'en', chi: 'zh', zho: 'zh', kor: 'ko', rus: 'ru',
+    // Fansub file-name tags for the two Chinese scripts. They used to fall to
+    // the two-letter cut below and become `ch`, a language nothing matches.
+    chs: 'zh-hans', cht: 'zh-hant', sc: 'zh-hans', tc: 'zh-hant', gb: 'zh-hans', big5: 'zh-hant',
     spa: 'es', fra: 'fr', fre: 'fr', deu: 'de', ger: 'de', por: 'pt', ita: 'it',
   };
   if (three[value]) return three[value];
   // `ja-JP` / `ja_jp` collapse to `ja`; `zh-hans` is kept, being a real distinction.
   const [base, region] = value.split(/[-_]/);
   if (base === 'zh' && (region === 'hans' || region === 'hant')) return `zh-${region}`;
+  if (base === 'zh' && (region === 'cn' || region === 'sg')) return 'zh-hans';
+  if (base === 'zh' && (region === 'tw' || region === 'hk' || region === 'mo')) return 'zh-hant';
   return base.length === 2 ? base : base.slice(0, 2) || null;
 }
 
@@ -217,6 +222,8 @@ export function guessSidecarLanguage(fileName: string, mediaStem: string): strin
     ? base.slice(mediaStem.length)
     : base;
   const words: Record<string, string> = {
+    // The script words first: `Chinese.Simplified` is Simplified, not just Chinese.
+    simplified: 'zh-hans', traditional: 'zh-hant',
     japanese: 'ja', nihongo: 'ja', english: 'en', chinese: 'zh', korean: 'ko',
     russian: 'ru', spanish: 'es', french: 'fr', german: 'de',
   };

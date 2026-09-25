@@ -82,6 +82,7 @@ import {
 } from './chineseLookup';
 import { listUserNotes, readUserNote, writeUserNote } from './notes';
 import { chineseReadings, russianReadings } from './readingAid';
+import { getMainChineseScript } from '../studyLanguage';
 import type { ReadingAidLang, ReadingAidResult } from '../../shared/readingAid';
 import {
   clearStoredExplanations,
@@ -706,6 +707,7 @@ const chineseDeps: ChineseLookupDeps = {
     }
   },
   loadCedictText,
+  script: () => getMainChineseScript(),
 };
 
 /** Look a Chinese term up. Database first, CC-CEDICT file second. */

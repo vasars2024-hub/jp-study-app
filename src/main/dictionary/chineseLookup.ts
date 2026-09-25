@@ -62,9 +62,22 @@ export function buildCedictIndex(text: string): CedictIndex {
   return { byWord, all };
 }
 
-function toDictEntry(entry: CedictEntry): DictEntry {
+/**
+ * The headword in the script the learner reads: the form the query was typed
+ * in when it names one (a Traditional query gets 傳統), else the preference.
+ * It used to be Simplified always, so a Traditional learner looked up 傳統 and
+ * was shown 传统.
+ */
+export function cedictHeadwordFor(entry: CedictEntry, query: string, script: 'simplified' | 'traditional' = 'simplified'): string {
+  if (entry.trad === entry.simp) return entry.simp;
+  if (query && query === entry.trad) return entry.trad;
+  if (query && query === entry.simp) return entry.simp;
+  return script === 'traditional' ? entry.trad : entry.simp;
+}
+
+function toDictEntry(entry: CedictEntry, query = '', script: 'simplified' | 'traditional' = 'simplified'): DictEntry {
   return {
-    word: entry.simp,
+    word: cedictHeadwordFor(entry, query, script),
     reading: pinyinToneMarks(entry.pinyin),
     isCommon: false,
     jlpt: [],
@@ -79,7 +92,11 @@ function toDictEntry(entry: CedictEntry): DictEntry {
  * "improvement" here would be a behaviour change on the path users are actually
  * on today, with no database to compare against.
  */
-export function lookupCedictIndex(index: CedictIndex, query: string): DictResult {
+export function lookupCedictIndex(
+  index: CedictIndex,
+  query: string,
+  script: 'simplified' | 'traditional' = 'simplified',
+): DictResult {
   const q = (query ?? '').trim();
   if (!q) return { query: q, entries: [] };
   const { byWord, all } = index;
@@ -93,7 +110,7 @@ export function lookupCedictIndex(index: CedictIndex, query: string): DictResult
         hit = byWord.get(q.slice(0, len));
       }
     }
-    return { query: q, entries: (hit ?? []).slice(0, 12).map(toDictEntry) };
+    return { query: q, entries: (hit ?? []).slice(0, 12).map((entry) => toDictEntry(entry, q, script)) };
   }
 
   // English → Chinese: match whole glosses first, then substrings.
@@ -110,7 +127,7 @@ export function lookupCedictIndex(index: CedictIndex, query: string): DictResult
     if (exact.length >= 20) break;
   }
   const merged = [...exact, ...partial].slice(0, 20);
-  return { query: q, entries: merged.map(toDictEntry) };
+  return { query: q, entries: merged.map((entry) => toDictEntry(entry, '', script)) };
 }
 
 /**
@@ -143,6 +160,8 @@ export interface ChineseLookupDeps {
   db: () => SqliteDb | null;
   /** The CC-CEDICT `.u8` text — managed install first, bundled copy second. */
   loadCedictText: () => Promise<string>;
+  /** Which script the learner reads, for headwords the query does not settle. */
+  script?: () => 'simplified' | 'traditional';
 }
 
 let indexPromise: Promise<CedictIndex> | null = null;
@@ -218,7 +237,7 @@ export async function lookupChineseTerm(
     // `dictionary.ts`'s Japanese path.
   }
   try {
-    return lookupCedictIndex(await getIndex(deps), q);
+    return lookupCedictIndex(await getIndex(deps), q, deps.script?.() ?? 'simplified');
   } catch (err) {
     return { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
   }

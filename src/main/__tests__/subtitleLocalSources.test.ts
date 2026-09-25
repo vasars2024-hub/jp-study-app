@@ -127,3 +127,15 @@ describe('guessSidecarLanguage', () => {
     expect(guessSidecarLanguage(`${showStem}.ja.srt`, showStem)).toBe('ja');
   });
 });
+
+describe('Simplified and Traditional Chinese tags stay distinct', () => {
+  it('maps fansub and region tags to zh-hans / zh-hant instead of "ch"', () => {
+    expect(normalizeStreamLanguage('chs')).toBe('zh-hans');
+    expect(normalizeStreamLanguage('cht')).toBe('zh-hant');
+    expect(normalizeStreamLanguage('zh-TW')).toBe('zh-hant');
+    expect(normalizeStreamLanguage('zh_CN')).toBe('zh-hans');
+    expect(guessSidecarLanguage('Show.01.chs.ass', 'Show.01')).toBe('zh-hans');
+    expect(guessSidecarLanguage('Show.01.cht.ass', 'Show.01')).toBe('zh-hant');
+    expect(guessSidecarLanguage('Show.01.Chinese.Traditional.srt', 'Show.01')).toBe('zh-hant');
+  });
+});
