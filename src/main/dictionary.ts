@@ -47,9 +47,11 @@ import {
   lookupResultToPerLanguageDictResult,
 } from './dictionary/lexiconAdapter';
 import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup';
-import { legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
+import { interlinearFallbackLang, legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
+import { cedictInterlinearLookup, type CedictIndex } from './dictionary/chineseLookup';
 import {
   lookupChineseInDictionary,
+  loadCedictIndex,
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
   findLexiconCollocationsInDb,
@@ -418,20 +420,40 @@ export async function lookupOfflineInterlinearMerged(
   options: LexiconInterlinearOptions = {},
 ): Promise<LexiconInterlinearResult> {
   let result: LexiconInterlinearResult;
-  try {
-    // The legacy fallback only answers for stores SQLite does not own yet (see
-    // `lookupTerm`); without one it would load every glossary to add nothing.
-    // The boot cache warm-up runs this path, so that load used to be permanent.
-    if (!(await initYomitan())) {
-      result = lookupOfflineInterlinearFromStore(text, options);
-    } else {
-      const dicts = listYomitanDicts();
-      result = lookupOfflineInterlinearFromStore(text, options, (query) =>
-        legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
+  const fallbackLang = interlinearFallbackLang(text, options.sourceLangs);
+  if (fallbackLang === 'zh') {
+    // A Chinese passage falls back to CC-CEDICT, never to the Japanese stores.
+    let cedict: CedictIndex | null = null;
+    try {
+      cedict = await loadCedictIndex();
+    } catch {
+      /* no Chinese dictionary installed: the database answer stands alone */
     }
-  } catch {
-    // A legacy store that will not load must not take the database path down.
+    const index = cedict;
+    result = lookupOfflineInterlinearFromStore(
+      text,
+      { ...options, sourceLangs: options.sourceLangs?.length ? options.sourceLangs : ['zh'] },
+      index ? (query) => cedictInterlinearLookup(index, query) : undefined,
+    );
+  } else if (fallbackLang !== 'ja') {
+    // Russian (and anything else) has no legacy store: the database is the answer.
     result = lookupOfflineInterlinearFromStore(text, options);
+  } else {
+    try {
+      // The legacy fallback only answers for stores SQLite does not own yet (see
+      // `lookupTerm`); without one it would load every glossary to add nothing.
+      // The boot cache warm-up runs this path, so that load used to be permanent.
+      if (!(await initYomitan())) {
+        result = lookupOfflineInterlinearFromStore(text, options);
+      } else {
+        const dicts = listYomitanDicts();
+        result = lookupOfflineInterlinearFromStore(text, options, (query) =>
+          legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
+      }
+    } catch {
+      // A legacy store that will not load must not take the database path down.
+      result = lookupOfflineInterlinearFromStore(text, options);
+    }
   }
   const ranked = options.withFrequency
     ? attachLexiconFrequency(result, interlinearFrequencyResolver(result))

@@ -14,6 +14,8 @@ vi.mock('electron', () => ({
 import { closeDictionaryDb, openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import { importLegacyIndex } from '../dictionary/migrate';
 import { lookupOfflineInterlinear, lookupOfflineInterlinearFromStore } from '../dictionary/service';
+import { buildCedictIndex, cedictInterlinearLookup } from '../dictionary/chineseLookup';
+import { interlinearFallbackLang } from '../dictionary/legacyInterlinear';
 import type { LexiconInterlinearToken } from '../../shared/lexiconInterlinear';
 import type { YomitanDictInfo } from '../../shared/types';
 
@@ -176,5 +178,39 @@ describe('lookupOfflineInterlinear', () => {
         match: { text: '猫', reading: 'ねこ', glosses: [{ lang: 'en', text: 'cat' }] },
       }],
     });
+  });
+});
+
+describe('a Chinese passage is broken down in Chinese', () => {
+  const cedict = buildCedictIndex([
+    '貓 猫 [mao1] /cat/',
+    '今天 今天 [jin1 tian1] /today/',
+    '天氣 天气 [tian1 qi4] /weather/',
+  ].join('\n'));
+
+  it('drops the Japanese headword for the same characters and grounds the token from CC-CEDICT', () => {
+    const result = lookupOfflineInterlinear(
+      db,
+      '猫',
+      { sourceLangs: ['zh'], glossLangs: ['en'] },
+      (query) => cedictInterlinearLookup(cedict, query),
+    );
+    expect(result.parts[0]).toMatchObject({
+      kind: 'token',
+      match: { text: '猫', reading: 'māo', dictId: 'cc-cedict', glosses: [{ lang: 'en', text: 'cat' }] },
+    });
+  });
+
+  it('keeps a Traditional passage in Traditional characters', () => {
+    expect(cedictInterlinearLookup(cedict, '天氣').entries[0]).toMatchObject({ text: '天氣', reading: 'tiān qì' });
+    expect(cedictInterlinearLookup(cedict, '天气').entries[0]).toMatchObject({ text: '天气' });
+  });
+
+  it('only a Japanese passage may use the Japanese legacy stores', () => {
+    expect(interlinearFallbackLang('今天天气', ['zh'])).toBe('zh');
+    expect(interlinearFallbackLang('今天天气', ['zh-Hant'])).toBe('zh');
+    expect(interlinearFallbackLang('книги', undefined)).toBe('ru');
+    expect(interlinearFallbackLang('食べる', undefined)).toBe('ja');
+    expect(interlinearFallbackLang('hello', ['en'])).toBeNull();
   });
 });

@@ -27,6 +27,7 @@
 // without Electron, which is the same reason `lexiconAdapter.ts` is separate.
 
 import type { DictEntry, DictResult } from '../../shared/types';
+import type { LexiconLookupResult } from '../../shared/lexiconInterlinear';
 import { cedictHeadwords, parseCedictLine, pinyinToneMarks, type CedictEntry } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
 import { lookup } from './dictService';
@@ -149,6 +150,41 @@ let indexPromise: Promise<CedictIndex> | null = null;
 /** Drop the cached CC-CEDICT index so a newly installed copy is picked up. */
 export function resetCedictIndexCache(): void {
   indexPromise = null;
+}
+
+/**
+ * The CC-CEDICT index itself, loading it on first use. Exported for callers that
+ * need synchronous exact probes afterwards — the passage breakdown's lookup
+ * callback and the pinyin reading aid.
+ */
+export function getCedictIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
+  return getIndex(deps);
+}
+
+/**
+ * An exact CC-CEDICT headword (simplified or traditional) in the passage
+ * breakdown's grounded-lookup shape. Exact only: `buildOfflineInterlinear`
+ * probes candidate spans itself, and a prefix hit here would ground a token on a
+ * word the passage never contained.
+ */
+export function cedictInterlinearLookup(index: CedictIndex, query: string): LexiconLookupResult {
+  const q = (query ?? '').trim();
+  const hits = q ? index.byWord.get(q) ?? [] : [];
+  return {
+    query: q,
+    detectedLangs: ['zh'],
+    entries: hits.slice(0, 8).map((entry, i) => ({
+      headwordId: -(i + 1),
+      dictId: 'cc-cedict',
+      dictTitle: 'CC-CEDICT',
+      // The script the passage is written in: a Traditional passage keeps 們.
+      text: entry.trad === q && entry.simp !== q ? entry.trad : entry.simp,
+      reading: pinyinToneMarks(entry.pinyin),
+      via: 'exact' as const,
+      score: 0,
+      senses: [{ glosses: entry.defs.map((text) => ({ lang: 'en', text })) }],
+    })),
+  };
 }
 
 function getIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
