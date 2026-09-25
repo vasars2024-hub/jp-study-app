@@ -7,6 +7,7 @@ import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '..
 import { loadDictionarySavedSearches, removeDictionarySavedSearch, saveDictionarySearch, type DictionarySavedSearch } from '../dictionarySavedSearches';
 import { useT } from '../i18n';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
+import { DICTIONARY_QUERY_EVENT, onOpenIntent, takeDictionaryQuery } from '../openIntents';
 import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
 
 /** @deprecated Prefer STUDY_LANG_KEY / getStudyLang — kept for external imports. */
@@ -60,6 +61,19 @@ export default function DictionaryView() {
       acceptingHandoffRef.current = false;
       off();
     };
+  }, []);
+
+  // A saved word or lookup opened from the Files app: search it, don't just open the window.
+  useEffect(() => {
+    const apply = (): void => {
+      const q = takeDictionaryQuery();
+      if (!q) return;
+      setInput(q);
+      setQuery(q);
+      setLookupAttempt((attempt) => attempt + 1);
+    };
+    apply();
+    return onOpenIntent(DICTIONARY_QUERY_EVENT, apply);
   }, []);
 
   function submit(e: FormEvent) {

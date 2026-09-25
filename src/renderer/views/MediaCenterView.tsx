@@ -1677,10 +1677,16 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
    * Taken once on mount — the request may have opened this window — and on every new one.
    */
   const [reviewFocus, setReviewFocus] = useState<StudyReviewFocusRequest | null>(null);
+  /** A single file asked for by id (Files "Open"); resolved below once the library lists it. */
+  const [pendingMediaId, setPendingMediaId] = useState<string | null>(null);
   useEffect(() => {
     const apply = (): void => {
       const intent = takeMediaCenterIntent();
       if (!intent) return;
+      if (intent.tab === 'title') {
+        setPendingMediaId(intent.mediaId);
+        return;
+      }
       if (intent.tab === 'review') setReviewFocus(intent.focus ?? null);
       setTab(intent.tab);
     };
@@ -1857,6 +1863,21 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     setTitleId(title.id);
     setTab('title');
   });
+
+  // The file-level intent: a video lands on its title page, audio plays in Music.
+  useEffect(() => {
+    if (!pendingMediaId) return;
+    const item = media.items.find((entry) => entry.id === pendingMediaId);
+    if (!item) return;
+    setPendingMediaId(null);
+    if (item.kind === 'audio' || item.kind === 'audiobook') {
+      playItem(item);
+      return;
+    }
+    const owner = titles.find((title) => title.items.some((entry) => entry.id === item.id));
+    if (owner) openTitle(owner);
+    else playItem(item, resumeAt(item));
+  }, [pendingMediaId, media.items, titles, playItem, openTitle, resumeAt]);
 
   const browse = useStableCallback((request: GumBrowseRequest) => {
     setLibraryPrefs((current) => {

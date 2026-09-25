@@ -130,6 +130,7 @@ import {
   onDeckLevelInputsChanged,
 } from '../../deckLevelEstimate';
 import { takeHandoffJson } from '../../pendingHandoff';
+import { FLASHCARDS_FOCUS_EVENT, onOpenIntent, takeFlashcardsFocus } from '../../openIntents';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
@@ -919,6 +920,22 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     consumeMiningHandoff();
     window.addEventListener('flashcards:openEpubMining', consumeMiningHandoff);
     return () => window.removeEventListener('flashcards:openEpubMining', consumeMiningHandoff);
+  }, []);
+
+  // "Open" on a deck folder or one card in the Files app: the deck list, filtered to it.
+  useEffect(() => {
+    function consumeFocus(): void {
+      const focus = takeFlashcardsFocus();
+      if (!focus) return;
+      const card = focus.cardId ? loadDeck().find((entry) => entry.id === focus.cardId) : undefined;
+      const folder = focus.folder ?? (card?.folder || null);
+      setFolderFilter(folder ?? 'all');
+      setSearch(card ? (card.word || card.front || '').trim() : '');
+      setOverviewTab('epub');
+      setMode('overview');
+    }
+    consumeFocus();
+    return onOpenIntent(FLASHCARDS_FOCUS_EVENT, consumeFocus);
   }, []);
 
   useEffect(() => {
