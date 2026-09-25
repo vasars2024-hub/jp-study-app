@@ -27,6 +27,8 @@ import { getLevel } from './knownWords';
 import { getSlotList } from './levelLists';
 import type { Cue } from './subtitles';
 import { getTokenizer, tokenizeSync } from './tokenizer';
+import { getStudyLang } from './studyEnvironment';
+import { studyTokens } from './studyTokens';
 
 export interface MediaStudyAnalysis extends MediaStudyCorpus {
   level: BookLevelEstimate | null;
@@ -64,26 +66,35 @@ function rankGrammar(sentences: MediaStudyCorpus['sentences']): GrammarMatchHit[
  */
 export const SEASON_STUDY_LIMITS = { maxCues: 50_000, maxCharacters: 2_000_000 } as const;
 
+/**
+ * Analyse a track in the study language: kuromoji for Japanese, ICU words for
+ * Chinese and Russian; the level on that language's scale (JLPT / HSK / CEFR).
+ * It used to be Japanese throughout, so a Chinese film's analysis found no
+ * sentences at all and a Russian one no vocabulary.
+ */
 export async function analyzeMediaStudyCues(
   cues: readonly Cue[],
   options: MediaStudyExtractionOptions = {},
 ): Promise<MediaStudyAnalysis> {
-  await getTokenizer();
-  const corpus = buildMediaStudyCorpus(cues, tokenizeSync, options);
+  const lang = options.lang ?? getStudyLang();
+  if (lang === 'ja') await getTokenizer();
+  const tokenize = lang === 'ja' ? tokenizeSync : (text: string) => studyTokens(text, lang);
+  const corpus = buildMediaStudyCorpus(cues, tokenize, { ...options, lang });
   const [level, comprehensibility] = await Promise.all([
-    estimateLevelFromText(corpus.text, 'ja'),
-    scoreTextComprehensibility(corpus.text),
+    estimateLevelFromText(corpus.text, lang),
+    scoreTextComprehensibility(corpus.text, undefined, lang),
   ]);
   return {
     ...corpus,
     level,
     comprehensibility,
-    grammar: rankGrammar(corpus.sentences),
+    // The pattern matcher is Japanese grammar; other languages report none rather than false hits.
+    grammar: lang === 'ja' ? rankGrammar(corpus.sentences) : [],
   };
 }
 
 function configuredJlptSets(): Array<{ label: string; words: ReadonlySet<string> }> {
-  return examSlotsForLang('ja').flatMap((slot) => {
+  return examSlotsForLang(getStudyLang()).flatMap((slot) => {
     const list = getSlotList(slot.id);
     return list?.words.length
       ? [{ label: slot.short, words: new Set(list.words.map((word) => word.trim()).filter(Boolean)) }]
@@ -100,13 +111,15 @@ function increment(distribution: Record<string, number>, label: string | null): 
   distribution[key] = (distribution[key] ?? 0) + 1;
 }
 
+/** Difficulty base per level label, on each language's scale (JLPT, HSK, CEFR). */
+const LEVEL_DIFFICULTY: Readonly<Record<string, number>> = {
+  N5: 20, N4: 35, N3: 55, N2: 75, N1: 90, N0: 90,
+  HSK1: 20, HSK2: 30, HSK3: 45, HSK4: 60, HSK5: 75, HSK6: 90, 'HSK7-9': 95,
+  A1: 20, A2: 35, B1: 55, B2: 75, C1: 88, C2: 95,
+};
+
 function difficultyScore(label: string | null, unknownRatio: number): number {
-  const base = label === 'N5' ? 20
-    : label === 'N4' ? 35
-      : label === 'N3' ? 55
-        : label === 'N2' ? 75
-          : label === 'N1' || label === 'N0' ? 90
-            : 50;
+  const base = (label && LEVEL_DIFFICULTY[label.replace(/\s+/g, '').toUpperCase()]) || 50;
   return Math.min(100, Math.round(base + unknownRatio * 10));
 }
 

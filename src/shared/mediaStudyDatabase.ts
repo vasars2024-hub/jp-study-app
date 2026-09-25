@@ -129,6 +129,11 @@ export function createEmptyMediaStudyDatabase(): MediaStudyDatabase {
 
 export function difficultyBandFromJlpt(level: string | null): MediaDifficultyBand {
   const normalized = level?.toUpperCase().replace(/\s+/g, '') ?? '';
+  // HSK and CEFR bands, for Chinese and Russian media.
+  if (/^HSK[12]$/.test(normalized) || normalized === 'A1' || normalized === 'A2') return 'beginner';
+  if (/^HSK[34]$/.test(normalized) || normalized === 'B1') return 'intermediate';
+  if (normalized === 'HSK5' || normalized === 'B2') return 'advanced';
+  if (/^HSK(6|7-9)$/.test(normalized) || normalized === 'C1' || normalized === 'C2') return 'native';
   if (normalized === 'N5' || normalized === 'N4') return 'beginner';
   if (normalized === 'N3') return 'intermediate';
   if (normalized === 'N2') return 'advanced';
