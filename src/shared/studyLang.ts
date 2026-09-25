@@ -77,6 +77,20 @@ export const STUDY_LANG_NAME_KEY: Readonly<Record<StudyLang, string>> = {
   ru: 'settings.study.lang.ru',
 };
 
+/** i18n key of "{lang} subtitles"; pass the name from `STUDY_LANG_NAME_KEY`. */
+export const STUDY_LANG_SUBTITLES_KEY = 'settings.study.lang.subtitles';
+
+/**
+ * i18n key of the language's reading aid: furigana over kanji, pinyin over
+ * hanzi, stress marks on Russian words. The toggles that switch it on and off
+ * are named by it, so a Chinese learner is not offered "Furigana".
+ */
+export const STUDY_LANG_READING_AID_KEY: Readonly<Record<StudyLang, string>> = {
+  ja: 'settings.study.lang.readingAid.ja',
+  zh: 'settings.study.lang.readingAid.zh',
+  ru: 'settings.study.lang.readingAid.ru',
+};
+
 /** Whisper's language name for the study language. */
 export const WHISPER_LANGUAGE: Readonly<Record<StudyLang, string>> = {
   ja: 'japanese',

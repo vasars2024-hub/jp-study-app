@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { __subtitleDiscoveryTestables, pickPlaybackSubtitle } from '../subtitleDiscovery';
+import {
+  __subtitleDiscoveryTestables,
+  alignDownloadLanguagesToStudy,
+  loadDiscoverySettings,
+  pickPlaybackSubtitle,
+  saveDiscoverySettings,
+} from '../subtitleDiscovery';
 import {
   subtitleSweepWentNowhere,
   type SubtitleDiscoveryResult,
@@ -431,5 +437,15 @@ describe('subtitleSweepWentNowhere', () => {
 
   it('is false when the sweep itself failed, which already has its own error', () => {
     expect(subtitleSweepWentNowhere(result({ ok: false, unreachable: 9, error: 'nope' }))).toBe(false);
+  });
+});
+
+describe('alignDownloadLanguagesToStudy — the download list follows a study-language switch', () => {
+  it("Japanese → Chinese → Russian keeps the helper language and the user's extras", () => {
+    saveDiscoverySettings({ ...loadDiscoverySettings(), autoDownloadLanguages: ['ja', 'en', 'ko'], helperLanguage: 'en' });
+    expect(alignDownloadLanguagesToStudy('zh', 'ja').autoDownloadLanguages).toEqual(['zh', 'en', 'ko']);
+    expect(alignDownloadLanguagesToStudy('ru', 'zh').autoDownloadLanguages).toEqual(['ru', 'en', 'ko']);
+    // Persisted: a fresh read agrees.
+    expect(loadDiscoverySettings().autoDownloadLanguages).toEqual(['ru', 'en', 'ko']);
   });
 });

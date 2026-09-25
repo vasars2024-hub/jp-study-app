@@ -32,11 +32,25 @@ import {
 import GumPopover from './GumPopover';
 import type { GumRatingDisplay } from './gumLayout';
 import { episodesBySeasonOf, gumEpisodeLabel, nextEpisodeOf, type GumTitle } from './gumModel';
+import { STUDY_LANG_NATIVE_NAME, type StudyLang } from '../../../../shared/studyLang';
+import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
+import { getStudyLang } from '../../../studyEnvironment';
+import { useStudyLanguage } from '../../../useStudyLanguage';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
-/** The Japanese autonym, shown as-is in every UI language — the language being studied. */
-const JA_AUTONYM = '日本語';
+/**
+ * The study language's autonym (日本語 / 中文 / Русский), shown as-is in every UI
+ * language — the language being studied, not always Japanese.
+ */
+function studyAutonym(study: StudyLang): string {
+  return STUDY_LANG_NATIVE_NAME[study];
+}
+
+/** Whether an item carries a track in `lang` (tags like `jpn`, `zh-Hant`, `rus` included). */
+function hasTrackIn(item: MediaItem | undefined, lang: string): boolean {
+  return (item?.subtitles ?? []).some((record) => subtitleLangMatches(record.lang, lang));
+}
 
 export type GumTitleTab = 'episodes' | 'details' | 'subtitles' | 'history';
 
@@ -135,15 +149,22 @@ export function episodeRows(title: GumTitle): Map<number, GumEpisodeRow[]> {
 }
 
 /**
- * "日本語 + English", "日本語 + English (translated)", or — while the automation is
+ * "日本語 + English", "中文 + English (translated)", or — while the automation is
  * still at work and nothing is attached — "Finding subtitles…". The automation's
  * status wins over the item's own records because it knows about work in flight.
+ * The status's `ja` line is the study line, whatever language is studied.
  */
-export function langNames(t: Translate, item: MediaItem | undefined, status: GumSubtitleStatus | undefined): string {
+export function langNames(
+  t: Translate,
+  item: MediaItem | undefined,
+  status: GumSubtitleStatus | undefined,
+  study: StudyLang = getStudyLang(),
+): string {
+  const autonym = studyAutonym(study);
   if (status) {
     const out: string[] = [];
     if (status.ja === 'found' || status.ja === 'generated') {
-      out.push(status.machineTranslated.ja ? t('gum.subs.translated', { lang: JA_AUTONYM }) : JA_AUTONYM);
+      out.push(status.machineTranslated.ja ? t('gum.subs.translated', { lang: autonym }) : autonym);
     }
     if (status.en === 'found' || status.en === 'generated') {
       out.push(status.machineTranslated.en ? t('gum.subs.translated', { lang: t('gum.subs.en') }) : t('gum.subs.en'));
@@ -153,10 +174,9 @@ export function langNames(t: Translate, item: MediaItem | undefined, status: Gum
     }
     return out.join(' + ');
   }
-  const langs = new Set((item?.subtitles ?? []).map((record) => (record.lang ?? '').trim().toLowerCase().slice(0, 2)));
   const out: string[] = [];
-  if (langs.has('ja')) out.push(JA_AUTONYM);
-  if (langs.has('en')) out.push(t('gum.subs.en'));
+  if (hasTrackIn(item, study)) out.push(autonym);
+  if (hasTrackIn(item, 'en')) out.push(t('gum.subs.en'));
   return out.join(' + ');
 }
 
@@ -327,7 +347,8 @@ function EpisodeCard({
   const inProgress = item ? !watched && (item.positionSec ?? 0) > 0 : false;
   const name = (item ? providerEpisodeTitle(item) : null) ?? row.guide?.title ?? (item && row.number === null ? item.title : null);
   const runtime = row.guide?.runtimeMin ?? item?.runtimeMin ?? (item?.durationSec ? Math.round(item.durationSec / 60) : undefined);
-  const subs = item ? langNames(t, item, status) : '';
+  const study = useStudyLanguage().lang;
+  const subs = item ? langNames(t, item, status, study) : '';
   let note: string;
   let tone: 'watched' | 'progress' | 'ready' | 'missing';
   if (!item) {
@@ -510,6 +531,7 @@ export default function GumTitlePage({
   onOpenExternalPlayerSettings,
 }: GumTitlePageProps) {
   const { t, lang } = useT();
+  const studyLanguage = useStudyLanguage();
   const rows = useMemo(() => episodeRows(title), [title]);
   const seasons = [...rows.keys()];
   const isSeries = title.kind !== 'film' && (seasons.length > 0 || title.items.length > 1);
@@ -922,14 +944,15 @@ export default function GumTitlePage({
                 <thead>
                   <tr>
                     <th scope="col">{t('gum.subs.episode')}</th>
-                    <th scope="col" lang="ja">{JA_AUTONYM}</th>
+                    <th scope="col" lang={studyLanguage.tag}>{studyAutonym(studyLanguage.lang)}</th>
                     <th scope="col">{t('gum.subs.english')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {episodesBySeasonOf(title).flatMap(({ items }) => items).map((item) => {
                     const status = statuses.get(item.id);
-                    const langs = new Set((item.subtitles ?? []).map((record) => (record.lang ?? '').trim().toLowerCase().slice(0, 2)));
+                    const hasStudy = hasTrackIn(item, studyLanguage.lang);
+                    const hasEnglish = hasTrackIn(item, 'en');
                     const cell = (state: string | undefined, has: boolean, machine?: boolean): string => {
                       const base = t(`subtitleAuto.state.${state ?? (has ? 'found' : 'none')}`);
                       return machine ? `${base} · ${t('subtitleAuto.machineTranslated')}` : base;
@@ -937,8 +960,8 @@ export default function GumTitlePage({
                     return (
                       <tr key={item.id}>
                         <th scope="row">{typeof item.episode === 'number' ? t('gum.episode.number', { n: item.episode }) : item.fileName}</th>
-                        <td data-state={status?.ja ?? (langs.has('ja') ? 'found' : 'none')}>{cell(status?.ja, langs.has('ja'), status?.machineTranslated.ja)}</td>
-                        <td data-state={status?.en ?? (langs.has('en') ? 'found' : 'none')}>{cell(status?.en, langs.has('en'), status?.machineTranslated.en)}</td>
+                        <td data-state={status?.ja ?? (hasStudy ? 'found' : 'none')}>{cell(status?.ja, hasStudy, status?.machineTranslated.ja)}</td>
+                        <td data-state={status?.en ?? (hasEnglish ? 'found' : 'none')}>{cell(status?.en, hasEnglish, status?.machineTranslated.en)}</td>
                       </tr>
                     );
                   })}

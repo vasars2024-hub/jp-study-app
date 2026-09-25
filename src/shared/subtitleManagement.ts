@@ -39,7 +39,8 @@ import { compareSubtitleQuality, gradeSubtitleQuality, type SubtitleQualityGrade
 export const SUBTITLE_MANAGEMENT_MODEL_VERSION = 1;
 
 /** The languages §8 names explicitly. Users may add their own via `customLanguages`. */
-export const BUILT_IN_SUBTITLE_LANGUAGES: string[] = ['ja', 'zh', 'ko', 'en', 'es', 'fr', 'de'];
+// Every study language (ja, zh, ru) first, then common helper languages.
+export const BUILT_IN_SUBTITLE_LANGUAGES: string[] = ['ja', 'zh', 'ru', 'ko', 'en', 'es', 'fr', 'de'];
 
 /** Saved corrections are capped at ±1 hour — beyond that it is the wrong subtitle, not a drift. */
 export const SUBTITLE_OFFSET_LIMIT_MS = 3_600_000;

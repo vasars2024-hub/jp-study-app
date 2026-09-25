@@ -34,6 +34,7 @@ import {
   pickHelperSubtitle,
   pickStudySubtitle,
   pickSubtitlePair,
+  subtitleBaseLang,
   subtitleLangMatches,
 } from '../shared/subtitleDiscoveryPick';
 import {
@@ -68,6 +69,7 @@ import { activeSubtitleNotices, onSubtitleNoticesChanged, raiseSubtitleNotice } 
 import { resolveSubtitleTranslationEngine, translateSubtitleTrack } from './subtitleDiscoveryTranslate';
 import { enqueueTranscription, onMainTranscriptionProgress } from './transcriptionJobs';
 import { listAudioStreamLanguages } from './subtitleLocalSources';
+import { getMainStudyLang, getMainStudyLangTag } from './studyLanguage';
 
 export interface SubtitleAutoHost {
   listItems: () => MediaItem[];
@@ -108,9 +110,23 @@ function findItem(id: string): MediaItem | undefined {
   return host?.listItems().find((entry) => entry.id === id);
 }
 
-/** The study line's language, exactly as `media:subtitleForPath` computes it. */
-export function studyLanguage(settings: Pick<SubtitleDiscoverySettings, 'autoDownloadLanguages'>): string {
-  return settings.autoDownloadLanguages[0] ?? 'ja';
+/**
+ * The study line's language: main's study language (`ja`, `zh`, `ru`), never
+ * the download list's first entry — that guess kept Japanese as the study line
+ * for a Chinese or Russian learner. Searches, translations and transcription
+ * ask for this bare code.
+ */
+export function studyLanguage(): string {
+  return getMainStudyLang();
+}
+
+/**
+ * The tag the study-line *pick* ranks by, exactly as `media:subtitleForPath`
+ * computes it: the bare language, or `zh-Hans` / `zh-Hant` so a Chinese
+ * learner's script wins among Chinese tracks.
+ */
+export function studyPickLanguage(): string {
+  return getMainStudyLangTag();
 }
 
 function broadcast(channel: string, payload: unknown): void {
@@ -138,7 +154,7 @@ function statusOf(item: MediaItem, settings: SubtitleDiscoverySettings, activeDi
     mediaId: item.id,
     records: item.subtitles,
     preferredSubtitleId: item.preferredSubtitleId,
-    studyLang: studyLanguage(settings),
+    studyLang: studyPickLanguage(),
     helperLang: settings.helperLanguage,
     activity: activityFor(item.id, activeDiscovery),
     now: Date.now(),
@@ -168,7 +184,7 @@ function refresh(ids: readonly string[]): void {
   const wanted = new Set(ids);
   for (const item of host.listItems()) {
     if (!wanted.has(item.id)) continue;
-    const auto = pickSubtitlePair(item.subtitles, studyLanguage(settings), settings.helperLanguage);
+    const auto = pickSubtitlePair(item.subtitles, studyPickLanguage(), settings.helperLanguage);
     const previous = item.subtitleAuto ?? {};
     if ((previous.primaryId ?? null) !== (auto.primary?.id ?? null)
       || (previous.secondaryId ?? null) !== (auto.secondary?.id ?? null)) {
@@ -315,7 +331,7 @@ async function translateInto(
   target: string,
   settings: SubtitleDiscoverySettings,
 ): Promise<void> {
-  const from = source.lang.slice(0, 2).toLowerCase();
+  const from = subtitleBaseLang(source.lang) ?? source.lang.slice(0, 2).toLowerCase();
   if (recentAttempt(item, 'translate', from, target, ['failed'])) return;
   const engine = resolveSubtitleTranslationEngine(settings.translationEngine);
   if (!engine) {
@@ -427,7 +443,7 @@ export async function prepareItem(mediaId: string): Promise<void> {
   let item = findItem(mediaId);
   if (!host || !item || !subtitleDiscoveryEligible(item)) return;
   const settings = loadDiscoverySettings();
-  const study = studyLanguage(settings);
+  const study = studyLanguage();
   const helper = settings.helperLanguage && !subtitleLangMatches(settings.helperLanguage, study)
     ? settings.helperLanguage
     : null;
@@ -445,7 +461,7 @@ export async function prepareItem(mediaId: string): Promise<void> {
   const records = item.subtitles ?? [];
   const studyTrack = pickStudySubtitle(
     records.filter((record) => subtitleLangMatches(record.lang, study)),
-    study,
+    studyPickLanguage(),
     item.preferredSubtitleId,
   );
   const helperTrack = helper ? pickHelperSubtitle(records, helper) : null;
@@ -581,7 +597,7 @@ export function secondarySubtitleForItem(item: MediaItem): SecondarySubtitlePick
   const settings = loadDiscoverySettings();
   const { secondary } = pickSubtitlePair(
     item.subtitles,
-    studyLanguage(settings),
+    studyPickLanguage(),
     settings.helperLanguage,
     item.preferredSubtitleId,
   );

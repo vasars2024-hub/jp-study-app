@@ -116,6 +116,7 @@ const {
   dismissSubtitleAutoNotice,
 } = await import('../subtitleDiscoveryAuto');
 const { resetSubtitleNoticesForTests } = await import('../subtitleDiscoveryNotices');
+const { __setStudyLanguageStateForTests } = await import('../studyLanguage');
 const { DEFAULT_SUBTITLE_DISCOVERY_SETTINGS } = await import('../../shared/subtitleDiscoveryIpc');
 
 // ---------------------------------------------------------------- the library
@@ -169,6 +170,7 @@ beforeEach(() => {
   engine = { kind: 'cloud', providerId: 'gemini-2.5-flash', label: 'gemini-2.5-flash' };
   resetSubtitleAutoForTests();
   resetSubtitleNoticesForTests();
+  __setStudyLanguageStateForTests({ lang: 'ja', script: 'simplified' });
   registerSubtitleAutoIpc({ listItems: () => items, patchItems: patch });
 });
 
@@ -239,6 +241,40 @@ describe('anime: Japanese from Jimaku, no English anywhere', () => {
     await prepareItem('ep1');
     expect(translated).toEqual([]);
     expect(statusOf('ep1').en).toBe('none');
+  });
+});
+
+// ------------------------------------------------------- the study language
+
+describe('the study line follows the study language, not the download list', () => {
+  it('a Chinese learner gets the Chinese track as the study line even when the list still says Japanese', async () => {
+    __setStudyLanguageStateForTests({ lang: 'zh', script: 'simplified' });
+    settings.autoDownloadLanguages = ['ja'];
+    items = [video({ subtitles: [track({ id: 'ja-1' }), track({ id: 'zh-1', lang: 'zh' })] })];
+
+    await prepareItem('ep1');
+
+    expect(discoveryCalls[0]?.languages).toEqual(['zh', 'en']);
+    expect(get('ep1')?.subtitleAuto?.primaryId).toBe('zh-1');
+    expect(statusOf('ep1')).toMatchObject({ ja: 'found', source: { ja: 'jimaku' } });
+    // The helper line is translated from the Chinese track, not the Japanese one.
+    expect(translated[0]).toMatchObject({ from: 'zh', to: 'en' });
+  });
+
+  it('a Traditional-script learner gets the Traditional track before the Simplified one', async () => {
+    __setStudyLanguageStateForTests({ lang: 'zh', script: 'traditional' });
+    items = [video({ subtitles: [track({ id: 'sc', lang: 'zh-hans' }), track({ id: 'tc', lang: 'zh-hant' })] })];
+    await prepareItem('ep1');
+    expect(get('ep1')?.subtitleAuto?.primaryId).toBe('tc');
+  });
+
+  it('a Russian learner searches Russian and machine-translates nothing into Japanese', async () => {
+    __setStudyLanguageStateForTests({ lang: 'ru', script: 'simplified' });
+    items = [video({ subtitles: [track({ id: 'ru-1', lang: 'rus' }), track({ id: 'ja-1' })] })];
+    await prepareItem('ep1');
+    expect(discoveryCalls[0]?.languages).toEqual(['ru', 'en']);
+    expect(get('ep1')?.subtitleAuto?.primaryId).toBe('ru-1');
+    expect(translated.every((entry) => entry.to !== 'ja')).toBe(true);
   });
 });
 
