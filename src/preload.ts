@@ -663,8 +663,8 @@ const api = {
   ): Promise<import('./shared/lexiconNotes').LexiconNoteExportResult> =>
     ipcRenderer.invoke('dict:noteExport', query),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
-  searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
-    ipcRenderer.invoke('examples:search', query, limit),
+  searchExamples: (query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<ExampleResult> =>
+    ipcRenderer.invoke('examples:search', query, limit, lang),
   examplesOfflineStatus: (): Promise<{ installed: boolean; sentenceCount: number; updatedAt: number }> =>
     ipcRenderer.invoke('examples:offlineStatus'),
   examplesImportOffline: (payload?: {

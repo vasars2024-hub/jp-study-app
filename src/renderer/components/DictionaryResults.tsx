@@ -531,7 +531,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           (['ja', 'en', 'ru', 'zh'] as const).includes(l as ExampleCountLang),
         ),
       ]),
-    ].filter((l) => l !== 'ja' && l !== 'en');
+    ].filter((l) => l !== exSource && l !== 'en');
 
     let effectiveExTrans = exTrans;
     if (picked.length > 0 && langsToTranslate.length > 0) {
@@ -542,7 +542,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         for (const tgt of langsToTranslate) {
           if (next[ex.jp][tgt as TransLang]?.trim()) continue;
           try {
-            const out = (await translateTo(ex.jp, 'ja', tgt as TransLang)).trim();
+            const out = (await translateTo(ex.jp, exSource, tgt as TransLang)).trim();
             if (out) next[ex.jp] = { ...next[ex.jp], [tgt]: out };
           } catch {
             /* skip */
@@ -557,7 +557,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       active.anki.exampleCounts,
       manual,
       (ex, code) => {
-        if (code === 'ja') return ex.jp;
+        if (code === exSource) return ex.jp;
         if (code === 'en') return ex.en || effectiveExTrans[ex.jp]?.en || '';
         return effectiveExTrans[ex.jp]?.[code as TransLang] ?? '';
       },
@@ -565,8 +565,8 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
     for (const lang of neededExLangs) {
       if (exampleByLang[lang]?.length) continue;
-      if (lang === 'ja') {
-        exampleByLang = { ...exampleByLang, ja: picked.map((ex) => ex.jp) };
+      if (lang === exSource) {
+        exampleByLang = { ...exampleByLang, [exSource]: picked.map((ex) => ex.jp) };
         continue;
       }
       if (lang === 'en') {
@@ -596,9 +596,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       }
     }
 
-    const jaParts = exampleByLang.ja ?? [];
-    const exampleSentence = jaParts[0];
-    const exampleSentences = jaParts.length > 1 ? jaParts : undefined;
+    const sourceParts = exampleByLang[exSource] ?? [];
+    const exampleSentence = sourceParts[0];
+    const exampleSentences = sourceParts.length > 1 ? sourceParts : undefined;
 
     const refs = hasFieldTemplates(templates)
       ? extractTranslationRefs(
@@ -767,7 +767,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     setSelectedEx(new Set());
     setExTrans({});
     const fetchLimit = Math.max(exDisplay, maxExampleCountNeeded(active.anki.exampleCounts));
-    const r = await window.api.searchExamples(query, fetchLimit);
+    const r = await window.api.searchExamples(query, fetchLimit, lang);
     if (r.error) {
       setExState('error');
       setExError(r.error);
@@ -811,7 +811,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     );
     let lastError = '';
     for (const candidate of candidates) {
-      const r = await window.api.searchExamples(candidate, limit);
+      const r = await window.api.searchExamples(candidate, limit, lang);
       if (r.examples.length > 0) return { examples: r.examples };
       if (r.error) lastError = r.error;
     }
@@ -827,7 +827,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   useEffect(() => {
     if (exState !== 'done' || examples.length === 0) return;
     let alive = true;
-    const qwenLangs = exLangs.filter((l) => l !== 'ja' && l !== 'en');
+    const qwenLangs = exLangs.filter((l) => l !== exSource && l !== 'en');
 
     const seedEnglish = (): Record<string, Partial<Record<TransLang, string>>> => {
       const seeded: Record<string, Partial<Record<TransLang, string>>> = {};
@@ -860,7 +860,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         for (const tgt of qwenLangs) {
           if (next[ex.jp][tgt]?.trim()) continue;
           try {
-            const out = (await translateTo(ex.jp, 'ja', tgt)).trim();
+            const out = (await translateTo(ex.jp, exSource, tgt)).trim();
             if (out) next[ex.jp] = { ...next[ex.jp], [tgt]: out };
           } catch {
             /* skip failed pair */
@@ -884,10 +884,10 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     // ("Definition for rule ... was not found") — the same dead-directive case
     // removed from MediaContent for `jsx-a11y/media-has-caption`. The dep list
     // below is intentionally narrow: `translate` and the setters are stable.
-  }, [examples, exLangs, exState, translateLimit]);
+  }, [examples, exLangs, exState, translateLimit, exSource]);
 
   function exTranslation(ex: ExampleSentence, code: TransLang): string {
-    if (code === 'ja') return ex.jp;
+    if (code === exSource) return ex.jp;
     if (code === 'en') return ex.en || exTrans[ex.jp]?.en || '';
     return exTrans[ex.jp]?.[code] ?? '';
   }
@@ -934,6 +934,12 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const gradable = variant !== 'popup' && lang === studyLang;
   /** Headwords and examples carry the dictionary's language, Chinese by script (zh-Hans / zh-Hant). */
   const contentLang = studyContentLang(lang);
+  /**
+   * The language example sentences are written in — the dictionary's, not
+   * Japanese: a Chinese entry's examples are Chinese, and their translations
+   * are made from Chinese.
+   */
+  const exSource: ExampleCountLang = lang;
 
   /**
    * This hook and the two consts above it must stay ABOVE the `showSetup` early
@@ -1242,7 +1248,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         <EntryNote word={entries[0].word} reading={entries[0].reading ?? ''} lang={lang} />
       )}
 
-      {lang === 'ja' && entries.length > 0 && (
+      {/* Every study language has examples: Tatoeba has Japanese, Mandarin and
+          Russian, and an imported corpus answers offline. */}
+      {entries.length > 0 && (
         <div className="dict-examples">
           {exState === 'idle' && (
             <button className="dict-ex-btn lq-hit" onClick={loadExamples}>
@@ -1314,7 +1322,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                       {ex.jp}
                     </span>
                     {exLangs
-                      .filter((code) => code !== 'ja')
+                      .filter((code) => code !== exSource)
                       .map((code) => {
                         const text = exTranslation(ex, code);
                         if (!text && !exTransLoading) return null;

@@ -375,7 +375,7 @@ declare global {
         queries: Array<{ expression: string; reading?: string }>,
         langs: Array<'en' | 'ja' | 'zh' | 'ru'>,
       ): Promise<Record<string, { en?: string; ja?: string; zh?: string; ru?: string }>>;
-      searchExamples(query: string, limit?: number): Promise<ExampleResult>;
+      searchExamples(query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<ExampleResult>;
       examplesOfflineStatus(): Promise<{ installed: boolean; sentenceCount: number; updatedAt: number }>;
       examplesImportOffline(payload?: {
         sentencesPath?: string;

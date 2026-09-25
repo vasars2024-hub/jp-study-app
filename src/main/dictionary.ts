@@ -50,6 +50,7 @@ import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup'
 import { interlinearFallbackLang, legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import { cedictInterlinearLookup, type CedictIndex } from './dictionary/chineseLookup';
 import { cleanReadingAidWords, type ReadingAidResult } from '../shared/readingAid';
+import { TATOEBA_LANG } from '../shared/studyLang';
 import {
   lookupChineseInDictionary,
   loadCedictIndex,
@@ -686,9 +687,9 @@ const TATOEBA_V1_URL = 'https://api.tatoeba.org/v1/sentences';
 const DEFAULT_FETCH_LIMIT = 20;
 const MAX_FETCH_LIMIT = 30;
 
-async function searchTatoebaV0(query: string, limit: number): Promise<ExampleSentence[]> {
+async function searchTatoebaV0(query: string, limit: number, from = 'jpn'): Promise<ExampleSentence[]> {
   const url =
-    `${TATOEBA_V0_URL}?from=jpn&to=eng&query=${encodeURIComponent(query)}` +
+    `${TATOEBA_V0_URL}?from=${from}&to=eng&query=${encodeURIComponent(query)}` +
     `&sort=relevance&trans_to=eng`;
   const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 15000);
   if (!res.ok) throw new Error(`Tatoeba v0 returned ${res.status}`);
@@ -706,9 +707,9 @@ async function searchTatoebaV0(query: string, limit: number): Promise<ExampleSen
   return examples;
 }
 
-async function searchTatoebaV1(query: string, limit: number): Promise<ExampleSentence[]> {
+async function searchTatoebaV1(query: string, limit: number, from = 'jpn'): Promise<ExampleSentence[]> {
   const url =
-    `${TATOEBA_V1_URL}?lang=jpn&q=${encodeURIComponent(query)}` +
+    `${TATOEBA_V1_URL}?lang=${from}&q=${encodeURIComponent(query)}` +
     `&trans:lang=eng&showtrans:lang=eng&sort=relevance`;
   const res = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, 15000);
   if (!res.ok) throw new Error(`Tatoeba v1 returned ${res.status}`);
@@ -726,27 +727,60 @@ async function searchTatoebaV1(query: string, limit: number): Promise<ExampleSen
   return examples;
 }
 
-async function searchTatoebaOnline(query: string, limit: number): Promise<ExampleSentence[]> {
+async function searchTatoebaOnline(query: string, limit: number, from = 'jpn'): Promise<ExampleSentence[]> {
   try {
-    const v0 = await searchTatoebaV0(query, limit);
+    const v0 = await searchTatoebaV0(query, limit, from);
     if (v0.length > 0) return v0;
   } catch {
     /* Tatoeba v0 is deprecated; v1 is the resilient fallback. */
   }
-  return searchTatoebaV1(query, limit);
+  return searchTatoebaV1(query, limit, from);
 }
 
-export async function searchExamples(query: string, limit = DEFAULT_FETCH_LIMIT): Promise<ExampleResult> {
+/**
+ * Offline examples in a study language from an imported example corpus (the
+ * Tatoeba import in Settings → Dictionaries keeps every language). Empty when
+ * none is installed.
+ */
+async function searchCorpusExamples(query: string, lang: 'zh' | 'ru', limit: number): Promise<ExampleSentence[]> {
+  try {
+    const found = await readDictionary('examples', {
+      text: query.slice(0, MAX_EXAMPLE_QUERY_CHARS),
+      sourceLangs: [lang],
+      glossLangs: ['en'],
+      limit: Math.min(limit, MAX_EXAMPLE_RESULTS),
+    });
+    return found.examples.map((example) => ({
+      jp: example.text,
+      en: example.translations.find((translation) => translation.lang === 'en')?.text ?? '',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Example sentences for a word in its study language: Japanese from the
+ * offline Tatoeba index and the Tatoeba API (jpn), Chinese and Russian from an
+ * imported example corpus and the Tatoeba API (cmn / rus). The Dictionary used
+ * to offer examples for Japanese entries only.
+ */
+export async function searchExamples(
+  query: string,
+  limit = DEFAULT_FETCH_LIMIT,
+  lang: 'ja' | 'zh' | 'ru' = 'ja',
+): Promise<ExampleResult> {
   const q = (query ?? '').trim();
   const cap = Math.min(Math.max(limit, 1), MAX_FETCH_LIMIT);
   if (!q) return { query: q, examples: [] };
 
-  const offline = await searchOffline(q, cap);
+  // The offline index is Japanese-only; the example corpus answers the others.
+  const offline = lang === 'ja' ? await searchOffline(q, cap) : await searchCorpusExamples(q, lang, cap);
   const examples = offline.map((s) => ({ jp: s.jp, en: s.en }));
 
   try {
     if (examples.length < cap) {
-      const online = await searchTatoebaOnline(q, cap);
+      const online = await searchTatoebaOnline(q, cap, TATOEBA_LANG[lang]);
       const seen = new Set(examples.map((e) => `${e.jp}\0${e.en}`));
       for (const ex of online) {
         const key = `${ex.jp}\0${ex.en}`;
@@ -756,7 +790,8 @@ export async function searchExamples(query: string, limit = DEFAULT_FETCH_LIMIT)
         if (examples.length >= cap) break;
       }
     }
-    if (examples.length > 0) {
+    // Only Japanese sentences belong in the Japanese offline index.
+    if (examples.length > 0 && lang === 'ja') {
       void cacheExamples(examples);
     }
     return { query: q, examples: examples.slice(0, cap) };
@@ -1469,7 +1504,8 @@ export function registerDictionaryIpc(): void {
     (_e, terms: unknown): Promise<Record<string, EnrichEntry[]>> =>
       enrichTermsBatch(Array.isArray(terms) ? terms : []),
   );
-  ipcMain.handle('examples:search', (_e, query: string, limit?: number) => searchExamples(query, limit));
+  ipcMain.handle('examples:search', (_e, query: string, limit?: number, lang?: unknown) =>
+    searchExamples(query, limit, lang === 'zh' || lang === 'ru' ? lang : 'ja'));
   ipcMain.handle('examples:offlineStatus', () => offlineStatus());
   ipcMain.handle('examples:importOffline', async (_e, payload?: { sentencesPath?: string; linksPath?: string }) => {
     const { dialog } = await import('electron');
