@@ -29,6 +29,7 @@ import {
 } from '../agentContextHandoff';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
 import { AiModelInstallControl } from '../components/ai/AiModelInstall';
+import { openNoteViewer } from '../components/notes/NoteViewer';
 
 /**
  * Translate's end of L5 bullet 1's selection contract.
@@ -202,8 +203,9 @@ export default function TranslateView() {
     </div>
   );
 
-  const openNotebook = (): void => {
-    window.dispatchEvent(new CustomEvent('os:open', { detail: 'files' }));
+  // The saved note itself, in the note viewer; Files only if it is gone.
+  const openNotebook = (noteId: string): void => {
+    if (!openNoteViewer(noteId)) window.dispatchEvent(new CustomEvent('os:open', { detail: 'files' }));
   };
 
   const historyPanel = (

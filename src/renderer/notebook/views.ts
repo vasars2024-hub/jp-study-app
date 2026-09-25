@@ -34,8 +34,36 @@ export const VIEW_STREAMS: Record<Exclude<NotebookViewId, 'overview'>, NotebookS
   translations: ['translations'],
   highlights: ['highlights'],
   // Everything that arrived from outside the app's own reading flow.
-  captures: ['extension', 'audio', 'clipboard', 'transcript'],
+  captures: ['extension', 'audio', 'clipboard', 'media', 'transcript'],
 };
+
+/**
+ * Every stream, in chip order. A `Record` over the union, so a stream added to
+ * `NotebookStream` without a place here fails to compile — the list in
+ * `NotebookContent` was a hand-kept copy, and `media` was missing from it (and
+ * from `VIEW_STREAMS`) for as long as the media assistant has written notes.
+ */
+const STREAM_ORDER: Record<NotebookStream, number> = {
+  'saved-words': 0,
+  lookups: 1,
+  flashcards: 2,
+  anki: 3,
+  mining: 4,
+  known: 5,
+  translations: 6,
+  plan: 7,
+  highlights: 8,
+  ocr: 9,
+  audio: 10,
+  clipboard: 11,
+  extension: 12,
+  media: 13,
+  transcript: 14,
+};
+
+export const ALL_NOTEBOOK_STREAMS: NotebookStream[] = (Object.keys(STREAM_ORDER) as NotebookStream[]).sort(
+  (a, b) => STREAM_ORDER[a] - STREAM_ORDER[b],
+);
 
 /** Streams shown by a view; `overview` returns every stream. */
 export function streamsForView(view: NotebookViewId, all: NotebookStream[]): NotebookStream[] {

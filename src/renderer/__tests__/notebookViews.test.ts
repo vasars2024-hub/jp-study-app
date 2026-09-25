@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { NOTEBOOK_VIEWS, VIEW_STREAMS, streamsForView, type NotebookViewId } from '../notebook/views';
+import {
+  ALL_NOTEBOOK_STREAMS,
+  NOTEBOOK_VIEWS,
+  VIEW_STREAMS,
+  streamsForView,
+  type NotebookViewId,
+} from '../notebook/views';
+import { NOTEBOOK_STREAM_ABSORPTION } from '../../shared/filesApp/notebookAbsorption';
 import type { NotebookStream } from '../notebookTimeline';
 
 // The full stream list, duplicated from `NotebookStream`. A union type has no
@@ -19,6 +26,7 @@ const ALL_STREAMS: NotebookStream[] = [
   'audio',
   'clipboard',
   'extension',
+  'media',
   'transcript',
 ];
 
@@ -40,6 +48,14 @@ describe('notebook view partition', () => {
     // the tab strip and the totals stop summing to the notebook.
     const duplicated = [...seen.entries()].filter(([, views]) => views.length > 1);
     expect(duplicated).toEqual([]);
+  });
+
+  it('lists every stream once, media-assistant notes included', () => {
+    // `media` is written by MediaStudyAssistantPanel and was absent from the
+    // chip list and every view, so those notes could not be seen at all.
+    expect(ALL_NOTEBOOK_STREAMS).toEqual(ALL_STREAMS);
+    expect(VIEW_STREAMS.captures).toContain('media');
+    for (const row of NOTEBOOK_STREAM_ABSORPTION) expect(ALL_NOTEBOOK_STREAMS).toContain(row.stream);
   });
 
   it('assigns no stream that does not exist', () => {

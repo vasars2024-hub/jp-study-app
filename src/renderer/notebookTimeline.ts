@@ -110,3 +110,58 @@ export function onNotebookTimelineChanged(cb: () => void): () => void {
   window.addEventListener(NOTEBOOK_TIMELINE_EVENT, h);
   return () => window.removeEventListener(NOTEBOOK_TIMELINE_EVENT, h);
 }
+
+/** One timeline entry by id, or `null`. */
+export function findNotebookEntry(id: string): NotebookTimelineEntry | null {
+  return loadNotebookTimeline().find((e) => e.id === id) ?? null;
+}
+
+/**
+ * Edit a saved note's title or body in place (the note viewer's Save). Same
+ * limits `appendNotebookEvent` applies; `null` when the entry is gone.
+ */
+export function updateNotebookEntry(
+  id: string,
+  patch: Partial<Pick<NotebookTimelineEntry, 'title' | 'detail'>>,
+): NotebookTimelineEntry | null {
+  const list = loadNotebookTimeline();
+  const at = list.findIndex((e) => e.id === id);
+  if (at < 0) return null;
+  const next: NotebookTimelineEntry = {
+    ...list[at],
+    ...(patch.title !== undefined ? { title: patch.title.slice(0, 200) } : {}),
+    ...(patch.detail !== undefined ? { detail: patch.detail.slice(0, 4000) } : {}),
+  };
+  const updated = list.slice();
+  updated[at] = next;
+  persist(updated);
+  return next;
+}
+
+/**
+ * "Save as note" from the translation history: one note per translation.
+ *
+ * It used to append a fresh timeline row on every click — and every completed
+ * translation had already appended one — so the same translation appeared two,
+ * three, four times. The note is keyed by the history entry's id
+ * (`meta.translationId`), a second click returns the note already saved, and
+ * it carries both texts in full rather than the 120-character preview.
+ */
+export function saveTranslationNote(entry: {
+  id: string;
+  sourceText: string;
+  resultText: string;
+  origin?: 'app' | 'extension';
+}): NotebookTimelineEntry {
+  const existing = loadNotebookTimeline().find((e) => e.meta?.translationId === entry.id);
+  if (existing) return existing;
+  return appendNotebookEvent({
+    stream: 'translations',
+    title: entry.sourceText.slice(0, 80),
+    detail: `${entry.sourceText}\n\n${entry.resultText}`,
+    folder: 'Translations',
+    origin: entry.origin,
+    href: 'translate',
+    meta: { translationId: entry.id },
+  });
+}

@@ -166,6 +166,8 @@ import { useFilesIndex } from './useFilesIndex';
 import { ScanReviewSheet } from './ScanReviewSheet';
 import { CleanupSheet } from './CleanupSheet';
 import { useFilesWatch } from './useFilesWatch';
+import FilesNoteDetails, { notebookEntryIdOf } from '../notes/FilesNoteDetails';
+import { openNoteViewer } from '../notes/NoteViewer';
 import { FilesDeletionControls, FilesDeletionReceipt } from './FilesDeletionControls';
 import {
   FILES_SOFT_DELETE_EVENT,
@@ -679,6 +681,13 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    */
   const openItem = useCallback(
     async (item: FilesItem) => {
+      // A saved note opens in the note viewer. No section owns the `note` kind
+      // (the Notebook section is gone), so the kind table refuses it.
+      const noteId = notebookEntryIdOf(item);
+      if (noteId && openNoteViewer(noteId)) {
+        setOpenState({ status: 'idle' });
+        return;
+      }
       if (!isRoutableLocation(item.location)) {
         runOpenDecision(filesOpenDecision(item, null));
         return;
@@ -2294,6 +2303,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           </>
         ) : null}
       </dl>
+      {/* A saved note's text (r2data): Files listed notes by title only. */}
+      <FilesNoteDetails item={selected} />
       {/* Gate 10. Always offered — every row has SOME answer, and where that
           answer is "nothing opens this", the refusal is the honest outcome and
           is more useful than a hidden button. */}
