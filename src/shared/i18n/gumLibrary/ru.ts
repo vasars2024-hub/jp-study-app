@@ -391,7 +391,7 @@ export const GUM_LIBRARY_RU: Catalog = {
   'gum.import.letterboxd.keeps': 'Даты дневника, оценки с половинками звёзд, лайки, пересмотры, вотчлист и ваши списки.',
   'gum.import.stat.filmsWatched': 'Просмотрено фильмов',
   'gum.import.stat.rated': 'С оценкой',
-  'gum.import.stat.watchlist': 'Вотчлист',
+  'gum.import.stat.watchlist': 'К просмотру',
   'gum.import.stat.lists': 'Списки',
   'gum.import.result': 'Прочитано {total} · новых {added} · обновлено {updated}',
   'gum.import.last': 'Последний импорт {date} · новых {added} · обновлено {updated}',

@@ -2205,7 +2205,8 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
           <ContextualSurface as="header" className="gum-topnav" ref={topnavRef}>
             <div className="gum-brand" data-topnav-fixed="">
               <span className="gum-brand__mark" aria-hidden="true"><Icon name="player" size={13} /></span>
-              <span className="gum-brand__name">{t('mediaCenter.nav.label')}</span>
+              {/* One name: the window, Start and the taskbar call this app Watch. */}
+              <span className="gum-brand__name">{t('palette.section.watch')}</span>
             </div>
             {/* Both are icon-only and disabled on a fresh trail, so the title carries the
                 REASON while disabled and the label while enabled; `aria-label` holds the
@@ -2230,7 +2231,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 <Icon name="chevron" size={12} />
               </button>
             </div>
-            <nav className="gum-nav" aria-label={t('mediaCenter.nav.label')}>
+            <nav className="gum-nav" aria-label={t('palette.section.watch')}>
               {shownPrimary.map((item) => navLink(item))}
               <GumPopover
                 className="gum-nav-more"

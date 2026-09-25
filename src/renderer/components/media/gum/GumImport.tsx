@@ -141,7 +141,7 @@ function ImportCard({
         {stats.map((stat) => (
           <div key={stat.label} className="gum-stat">
             <strong>{formatNumber(stat.n, lang)}</strong>
-            <span>{stat.label}</span>
+            <span title={stat.label}>{stat.label}</span>
           </div>
         ))}
       </div>

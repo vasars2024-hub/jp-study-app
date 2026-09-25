@@ -4228,7 +4228,7 @@ export const en: Catalog = {
   // D189 - the Aero start menu subtitles. Were a module-level literal map
   // in DesktopShell; per CLAUDE.md i18n rule 7 the map now holds these keys.
   'desktop.startApp.agent': 'Stored Agent conversations',
-  'desktop.startApp.player': 'Media Center · Library',
+  'desktop.startApp.player': 'Shows, films and anime',
   'desktop.startApp.scraper': 'Find what to watch next',
   'desktop.startApp.video': 'Media Center · Video',
   'desktop.startApp.youtube': 'Immersion playlists',
@@ -9509,7 +9509,7 @@ export const en: Catalog = {
   'mediaCenter.discover.recommended': 'Recommended for {level}',
   'mediaCenter.discover.topMatches': 'Top matches',
   'mediaCenter.discover.rankedCount': '{count} ranked titles',
-  'mediaCenter.settings.eyebrow': 'Media Center preferences',
+  'mediaCenter.settings.eyebrow': 'Watch preferences',
   'mediaCenter.settings.title': 'Playback, subtitles, and where your media comes from.',
   'mediaCenter.settings.detail': 'Quick media-specific controls live here. Advanced provider credentials and system-wide options remain in Settings.',
   'mediaCenter.settings.advanced': 'Open advanced settings',

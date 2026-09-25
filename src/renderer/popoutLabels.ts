@@ -31,7 +31,8 @@ export const POPOUT_LABEL_KEYS: Partial<Record<DesktopWinSection, string>> = {
   // open `?popout=files` and the renderer would refuse to recognise it.
   files: 'palette.section.files',
   visualnovels: 'palette.section.visualnovels',
-  player: 'mediaCenter.nav.label',
+  // The Watch window's own name (Start, taskbar and title bar all say Watch).
+  player: 'palette.section.watch',
   scraper: 'palette.section.scraper',
   // D89: `youtube` was in main's POPOUT_SECTIONS but not here, and this object is the
   // renderer's allow-list — so main opened `?popout=youtube`, `popoutSection()` returned

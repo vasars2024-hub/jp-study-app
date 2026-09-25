@@ -6805,6 +6805,9 @@
   --mc-accent: var(--accent);
   --mc-accent-2: var(--accent-text);
   --mc-accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  /* The dark default #69d8a1 is 1.76:1 on a light panel (the import card's "last import"
+     line, watched episodes, found subtitles). #17784a is 5.4:1 on white. */
+  --mc-green: #17784a;
   --mc-glass-sidebar: color-mix(in srgb, var(--panel-2) 94%, transparent);
   --mc-glass-topbar: color-mix(in srgb, var(--panel) 82%, transparent);
   --mc-glass-player: color-mix(in srgb, var(--panel-2) 94%, transparent);
