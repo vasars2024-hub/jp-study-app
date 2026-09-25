@@ -22,4 +22,5 @@ export const WIDGETS_UI_RU: Catalog = {
   'widgets.worldClock.city.tokyo': 'Токио',
   'widgets.worldClock.city.london': 'Лондон',
   'widgets.worldClock.city.newYork': 'Нью-Йорк',
+  'widgets.calculator.error': 'Неверное выражение',
 };

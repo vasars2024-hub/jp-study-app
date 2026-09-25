@@ -7942,7 +7942,6 @@ export const ja: Catalog = {
   'widgets.battery.acSuffix': '・AC電源',
   'widgets.network.online': 'オンライン',
   'widgets.network.offline': 'オフライン',
-  'widgets.recentLookups.title': '最近調べた単語',
   'widgets.recentLookups.clear': 'クリア',
   'widgets.recentLookups.emptyHint': '単語を調べるとここに表示されます。',
   'widgets.clipboardWidget.title': 'クリップボード履歴',

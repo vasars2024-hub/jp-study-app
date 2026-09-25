@@ -8773,7 +8773,6 @@ export const ru: Catalog = {
   'widgets.battery.acSuffix': ' · от сети',
   'widgets.network.online': 'В сети',
   'widgets.network.offline': 'Не в сети',
-  'widgets.recentLookups.title': 'Недавние запросы',
   'widgets.recentLookups.clear': 'Очистить',
   'widgets.recentLookups.emptyHint': 'Найдите слово, чтобы заполнить этот список.',
   'widgets.clipboardWidget.title': 'История буфера обмена',

@@ -8106,7 +8106,6 @@ export const en: Catalog = {
   'widgets.battery.acSuffix': ' · AC',
   'widgets.network.online': 'Online',
   'widgets.network.offline': 'Offline',
-  'widgets.recentLookups.title': 'Recent lookups',
   'widgets.recentLookups.clear': 'Clear',
   'widgets.recentLookups.emptyHint': 'Look up a word to populate this list.',
   'widgets.clipboardWidget.title': 'Clipboard history',

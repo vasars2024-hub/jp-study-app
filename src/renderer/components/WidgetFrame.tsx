@@ -6,6 +6,7 @@ import { getZoomFactor } from '../appZoom';
 import { useT } from '../i18n';
 import { useWiredMaterials } from './ui';
 import { wiredWidgetTitle } from '../widgets/wiredLabels';
+import { clearTimer } from '../widgets/timerStore';
 
 // Home Workspace widget host. A lighter cousin of the desktop's FloatingWindow:
 // free-positioned, drag + resize done with a compositor-only transform during
@@ -195,14 +196,17 @@ export default function WidgetFrame({
               <button onClick={() => { setSettings({ __opacity: opacity > 0.85 ? 0.7 : 1 }); setMenuOpen(false); }}>{opacity > 0.85 ? t('widgetFrame.makeTransparent') : t('widgetFrame.makeSolid')}</button>
               <button onClick={() => { onDuplicate(); setMenuOpen(false); }}>{t('widgetFrame.duplicate')}</button>
               <button onClick={() => { onPatch({ hidden: true }); setMenuOpen(false); }}>{t('widgetFrame.hide')}</button>
-              <button className="danger" onClick={() => { onRemove(); setMenuOpen(false); }}>{t('common.remove')}</button>
+              <button className="danger" onClick={() => { clearTimer(widget.id); onRemove(); setMenuOpen(false); }}>{t('common.remove')}</button>
             </div>
           </>
         )}
       </div>
+      {/* Collapsing unmounts the body. Anything that must survive that (the
+          timers) keeps its state in a module store keyed by `widget.id` —
+          see widgets/timerStore.ts. */}
       {!collapsed && (
         <div className="widget-body">
-          <Body settings={widget.settings ?? {}} setSettings={setSettings} size={{ w: widget.w, h: contentH }} />
+          <Body settings={widget.settings ?? {}} setSettings={setSettings} size={{ w: widget.w, h: contentH }} instanceId={widget.id} />
         </div>
       )}
       {!collapsed && !locked && <div className="widget-resize" title={t('widgetFrame.resize')} onPointerDown={resizeStart} />}

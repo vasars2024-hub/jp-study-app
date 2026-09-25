@@ -22,4 +22,5 @@ export const WIDGETS_UI_JA: Catalog = {
   'widgets.worldClock.city.tokyo': '東京',
   'widgets.worldClock.city.london': 'ロンドン',
   'widgets.worldClock.city.newYork': 'ニューヨーク',
+  'widgets.calculator.error': '式が正しくありません',
 };

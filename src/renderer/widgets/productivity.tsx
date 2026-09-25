@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import type { WidgetProps } from './types';
 import { readSetting } from './types';
 import { useNow } from './hooks';
@@ -10,6 +10,7 @@ import {
 } from '../calendar';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import { timerElapsedMs, timerRemainingMs, useWidgetTimer } from './timerStore';
 
 // ---------- Digital clock ----------
 export function DigitalClock({ settings, size }: WidgetProps) {
@@ -108,6 +109,13 @@ export function CalendarWidget() {
     for (let d = 1; d <= days; d++) out.push(d);
     return out;
   }, [view]);
+  // Sunday-first like the grid below (`getDay()`), one CLDR "narrow" glyph per
+  // day in the interface language: S M T W T F S / 日 月 火 … / В П В С Ч П С.
+  const weekdays = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(LANG_TAGS[lang], { weekday: 'narrow' });
+    // 2023-01-01 was a Sunday.
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2023, 0, 1 + i)));
+  }, [lang]);
   const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString(LANG_TAGS[lang], { month: 'long', year: 'numeric' });
   const shift = (delta: number, e: MouseEvent) => {
     e.stopPropagation();
@@ -125,7 +133,7 @@ export function CalendarWidget() {
         <button className="wgt-btn-icon" onClick={(e) => shift(1, e)} title={t('widgets.calendarWidget.nextMonth')} aria-label={t('widgets.calendarWidget.nextMonth')}>›</button>
       </div>
       <div className="wgt-cal-grid">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+        {weekdays.map((d, i) => (
           <span key={i} className="wgt-cal-dow">{d}</span>
         ))}
         {cells.map((d, i) => (
@@ -151,55 +159,34 @@ export function CalendarWidget() {
   );
 }
 
-// ---------- Pomodoro ----------
-export function Pomodoro({ settings, setSettings }: WidgetProps) {
+// ---------- Timers (Pomodoro / Stopwatch / Countdown) ----------
+// State lives in timerStore, keyed by the widget instance, so collapsing a
+// widget (which unmounts its body) no longer resets a running clock, and a
+// finished countdown chimes even while collapsed.
+function mmss(ms: number): string {
+  const total = Math.ceil(ms / 1000);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+export function Pomodoro({ settings, setSettings, instanceId }: WidgetProps) {
   const { t } = useT();
   const workMin = readSetting(settings, 'workMin', 25);
   const breakMin = readSetting(settings, 'breakMin', 5);
-  const [mode, setMode] = useState<'work' | 'break'>('work');
-  const [left, setLeft] = useState(workMin * 60);
-  const [running, setRunning] = useState(false);
-
-  useEffect(() => {
-    if (!running) return;
-    const t = window.setInterval(() => {
-      setLeft((v) => {
-        if (v > 1) return v - 1;
-        // Session end → flip mode.
-        const nextMode = mode === 'work' ? 'break' : 'work';
-        setMode(nextMode);
-        setRunning(false);
-        return (nextMode === 'work' ? workMin : breakMin) * 60;
-      });
-    }, 1000);
-    return () => window.clearInterval(t);
-  }, [running, mode, workMin, breakMin]);
-
-  // Reset the clock when the durations change while idle.
-  useEffect(() => {
-    if (!running) setLeft((mode === 'work' ? workMin : breakMin) * 60);
-  }, [workMin, breakMin, mode, running]);
-
-  const mm = String(Math.floor(left / 60)).padStart(2, '0');
-  const ss = String(left % 60).padStart(2, '0');
-  const total = (mode === 'work' ? workMin : breakMin) * 60;
-  const pct = total > 0 ? 1 - left / total : 0;
+  const timer = useWidgetTimer(instanceId, 'pomodoro', workMin * 60_000, {
+    work: workMin * 60_000,
+    break: breakMin * 60_000,
+  });
+  const { state, now } = timer;
+  const left = timerRemainingMs(state, now);
+  const pct = state.durationMs > 0 ? 1 - left / state.durationMs : 0;
   return (
     <div className="wgt wgt-pomo">
-      <div className="wgt-pomo-mode">{mode === 'work' ? t('widgets.pomodoro.focus') : t('widgets.pomodoro.break')}</div>
-      <div className="wgt-pomo-time">{mm}:{ss}</div>
+      <div className="wgt-pomo-mode">{state.phase === 'work' ? t('widgets.pomodoro.focus') : t('widgets.pomodoro.break')}</div>
+      <div className="wgt-pomo-time">{mmss(left)}</div>
       <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct * 100}%` }} /></div>
       <div className="wgt-row">
-        <button className="wgt-btn" onClick={() => setRunning((r) => !r)}>{running ? t('common.pause') : t('common.start')}</button>
-        <button
-          className="wgt-btn"
-          onClick={() => {
-            setRunning(false);
-            setLeft((mode === 'work' ? workMin : breakMin) * 60);
-          }}
-        >
-          {t('common.reset')}
-        </button>
+        <button className="wgt-btn" onClick={() => (state.running ? timer.pause() : timer.start())}>{state.running ? t('common.pause') : t('common.start')}</button>
+        <button className="wgt-btn" onClick={timer.reset}>{t('common.reset')}</button>
       </div>
       <div className="wgt-row wgt-pomo-cfg">
         <label>{t('widgets.pomodoro.focus')}
@@ -215,28 +202,10 @@ export function Pomodoro({ settings, setSettings }: WidgetProps) {
   );
 }
 
-// ---------- Stopwatch ----------
-export function Stopwatch() {
+export function Stopwatch({ instanceId }: WidgetProps) {
   const { t } = useT();
-  const [ms, setMs] = useState(0);
-  const [running, setRunning] = useState(false);
-  const startRef = useRef(0);
-  const baseRef = useRef(0);
-  useEffect(() => {
-    if (!running) return;
-    startRef.current = performance.now();
-    const t = window.setInterval(() => setMs(baseRef.current + (performance.now() - startRef.current)), 50);
-    return () => window.clearInterval(t);
-  }, [running]);
-  const stop = () => {
-    baseRef.current = ms;
-    setRunning(false);
-  };
-  const reset = () => {
-    baseRef.current = 0;
-    setMs(0);
-    setRunning(false);
-  };
+  const timer = useWidgetTimer(instanceId, 'stopwatch', 0);
+  const ms = timerElapsedMs(timer.state, timer.now);
   const total = Math.floor(ms / 1000);
   const cs = Math.floor((ms % 1000) / 10);
   const label = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
@@ -244,36 +213,25 @@ export function Stopwatch() {
     <div className="wgt wgt-stopwatch">
       <div className="wgt-pomo-time">{label}</div>
       <div className="wgt-row">
-        <button className="wgt-btn" onClick={() => (running ? stop() : setRunning(true))}>{running ? t('common.stop') : t('common.start')}</button>
-        <button className="wgt-btn" onClick={reset}>{t('common.reset')}</button>
+        <button className="wgt-btn" onClick={() => (timer.state.running ? timer.pause() : timer.start())}>{timer.state.running ? t('common.stop') : t('common.start')}</button>
+        <button className="wgt-btn" onClick={timer.reset}>{t('common.reset')}</button>
       </div>
     </div>
   );
 }
 
-// ---------- Countdown ----------
-export function Countdown({ settings, setSettings }: WidgetProps) {
+export function Countdown({ settings, setSettings, instanceId }: WidgetProps) {
   const { t } = useT();
   const minutes = readSetting(settings, 'minutes', 10);
-  const [left, setLeft] = useState(minutes * 60);
-  const [running, setRunning] = useState(false);
-  useEffect(() => {
-    if (!running) return;
-    const t = window.setInterval(() => setLeft((v) => (v > 1 ? v - 1 : (setRunning(false), 0))), 1000);
-    return () => window.clearInterval(t);
-  }, [running]);
-  useEffect(() => {
-    if (!running) setLeft(minutes * 60);
-  }, [minutes, running]);
-  const mm = String(Math.floor(left / 60)).padStart(2, '0');
-  const ss = String(left % 60).padStart(2, '0');
-  const done = left === 0;
+  const timer = useWidgetTimer(instanceId, 'countdown', minutes * 60_000);
+  const left = timerRemainingMs(timer.state, timer.now);
+  const done = timer.state.finishedAt !== null;
   return (
     <div className="wgt wgt-countdown">
-      <div className={`wgt-pomo-time ${done ? 'wgt-flash' : ''}`}>{mm}:{ss}</div>
+      <div className={`wgt-pomo-time ${done ? 'wgt-flash' : ''}`}>{mmss(left)}</div>
       <div className="wgt-row">
-        <button className="wgt-btn" onClick={() => setRunning((r) => !r)}>{running ? t('common.pause') : t('common.start')}</button>
-        <button className="wgt-btn" onClick={() => { setRunning(false); setLeft(minutes * 60); }}>{t('common.reset')}</button>
+        <button className="wgt-btn" onClick={() => (timer.state.running ? timer.pause() : timer.start())}>{timer.state.running ? t('common.pause') : t('common.start')}</button>
+        <button className="wgt-btn" onClick={timer.reset}>{t('common.reset')}</button>
         <label className="wgt-inline-cfg">{t('widgets.countdown.minLabel')}
           <input type="number" min={1} max={999} value={minutes}
             onChange={(e) => setSettings({ minutes: Math.max(1, Number(e.target.value) || 10) })} />

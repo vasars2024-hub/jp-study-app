@@ -22,4 +22,5 @@ export const WIDGETS_UI_ZH: Catalog = {
   'widgets.worldClock.city.tokyo': '东京',
   'widgets.worldClock.city.london': '伦敦',
   'widgets.worldClock.city.newYork': '纽约',
+  'widgets.calculator.error': '表达式无效',
 };

@@ -1,5 +1,18 @@
 /* Round-2 widget additions. The base widget styles are in styles.css. */
 
+/* System meters: the reading is the content; the title bar names the widget. */
+.wgt-sys-value {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Recent lookups / Clipboard: only the action button remains in the head row. */
+.wgt-recent-actions {
+  justify-content: flex-end;
+  min-height: 0;
+}
+
 /* Daily goal widget: the user's own goals kept from the old free-text widget. */
 .wgt-goals .wgt-goals-own {
   flex: 0 1 auto;

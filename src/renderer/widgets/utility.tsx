@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useT } from '../i18n';
 
 // ---------- Calculator ----------
 // A small, safe calculator: buttons build an expression evaluated with a tiny
@@ -36,8 +37,12 @@ function evaluate(expr: string): string {
 }
 
 export function Calculator() {
+  const { t } = useT();
   const [expr, setExpr] = useState('');
   const [showResult, setShowResult] = useState(false);
+  // An invalid expression is a state, not a string in the display: the old
+  // literal 'Error' was English in every language.
+  const [error, setError] = useState(false);
   const press = (k: string) => {
     if (k === '') return;
     // Engineering Pad key clack (§6/§8) — no-op outside the wired pack.
@@ -47,23 +52,27 @@ export function Calculator() {
     if (k === 'C') {
       setExpr('');
       setShowResult(false);
+      setError(false);
       return;
     }
     if (k === '=') {
       try {
         setExpr(evaluate(expr));
+        setError(false);
       } catch {
-        setExpr('Error');
+        setExpr('');
+        setError(true);
       }
       setShowResult(true);
       return;
     }
-    setExpr((e) => (showResult && /[0-9.]/.test(k) ? k : (showResult && e === 'Error' ? '' : e) + k));
+    setExpr((e) => (showResult && /[0-9.]/.test(k) ? k : (error ? '' : e) + k));
     setShowResult(false);
+    setError(false);
   };
   return (
     <div className="wgt wgt-calc">
-      <div className="wgt-calc-display">{expr || '0'}</div>
+      <div className="wgt-calc-display" role="status">{error ? t('widgets.calculator.error') : expr || '0'}</div>
       <div className="wgt-calc-keys">
         {KEYS.filter((k) => k !== '').map((k) => (
           <button

@@ -7893,7 +7893,6 @@ export const zh: Catalog = {
   'widgets.battery.acSuffix': ' · 交流供电',
   'widgets.network.online': '在线',
   'widgets.network.offline': '离线',
-  'widgets.recentLookups.title': '最近查词',
   'widgets.recentLookups.clear': '清除',
   'widgets.recentLookups.emptyHint': '查询一个单词后会显示在这里。',
   'widgets.clipboardWidget.title': '剪贴板历史',

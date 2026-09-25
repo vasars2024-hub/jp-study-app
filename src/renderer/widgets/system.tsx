@@ -8,6 +8,7 @@ import {
 } from '../lookupHistory';
 import { loadClipboardHistory, onClipboardHistoryChanged, type ClipboardEntry } from '../clipboardHistory';
 import { useT } from '../i18n';
+import './widgets.css';
 
 interface Metrics {
   cpuLoad: number;
@@ -47,15 +48,20 @@ function formatBytes(n: number): string {
   return `${Math.round(n / 1024)} KB`;
 }
 
+/**
+ * A reading and its bar. No label in the body: the widget's title bar already
+ * says "CPU usage" / "Memory" / "Battery", and repeating it here was the
+ * in-window title the design brief rules out. `label` still names the bar for
+ * assistive technology.
+ */
 function Meter({ label, pct, detail }: { label: string; pct: number; detail: string }) {
   const p = Math.min(100, Math.max(0, Math.round(pct * 100)));
   return (
     <div className="wgt-sys-meter">
       <div className="wgt-sys-row">
-        <span>{label}</span>
-        <span className="muted">{detail}</span>
+        <span className="wgt-sys-value">{detail}</span>
       </div>
-      <div className="wgt-sys-bar">
+      <div className="wgt-sys-bar" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p}>
         <span style={{ width: `${p}%` }} />
       </div>
     </div>
@@ -175,8 +181,7 @@ export function RecentLookupsWidget(_props: WidgetProps) {
   useEffect(() => onLookupHistoryChanged(() => setList(loadLookupHistory())), []);
   return (
     <div className="wgt wgt-recent">
-      <div className="wgt-recent-head">
-        <span className="muted">{t('widgets.recentLookups.title')}</span>
+      <div className="wgt-recent-head wgt-recent-actions">
         {list.length > 0 && (
           <button type="button" className="wgt-btn-icon sm" title={t('widgets.recentLookups.clear')} aria-label={t('widgets.recentLookups.clear')} onClick={() => clearLookupHistory()}>
             ×
@@ -211,8 +216,7 @@ export function ClipboardWidget(_props: WidgetProps) {
   const recent = entries.slice(0, 6);
   return (
     <div className="wgt wgt-clip">
-      <div className="wgt-recent-head">
-        <span className="muted">{t('widgets.clipboardWidget.title')}</span>
+      <div className="wgt-recent-head wgt-recent-actions">
         <button type="button" className="wgt-btn-icon sm" title={t('widgets.clipboardWidget.open')} aria-label={t('widgets.clipboardWidget.open')} onClick={openFull}>
           ⤢
         </button>
