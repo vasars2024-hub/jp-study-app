@@ -9,7 +9,7 @@
 // dictionary answers.
 
 /** U+0300 / U+0301: the stress accents Wiktionary and textbooks print. U+0308 is not one — ё is a letter. */
-const STRESS_MARKS = /[̀́]/g;
+const STRESS_MARKS = /[\u0300\u0301]/g;
 
 /** `соба́ка` → `собака`. Composed ё survives; a decomposed е + U+0308 is recomposed to ё. */
 export function stripRussianStress(text: string): string {
@@ -27,7 +27,7 @@ export function russianFormKey(text: string): string {
 }
 
 export function hasRussianStressMark(text: string): boolean {
-  return /[̀́]/.test(text.normalize('NFD'));
+  return /[\u0300\u0301]/.test(text.normalize('NFD'));
 }
 
 const VERB_LEMMA = ['ть', 'ться', 'ти'];
@@ -103,12 +103,12 @@ export function applyRussianStress(surface: string, stressed: string): string {
   let i = 0;
   for (let k = 0; k < letters.length; k += 1) {
     const ch = letters[k];
-    if (ch === '́' || ch === '̀') {
+    if (ch === '\u0301' || ch === '\u0300') {
       if (!out.length) return surface;
-      out.push('́');
+      out.push('\u0301');
       continue;
     }
-    if (ch === '̈') continue; // ё decomposed: its base е was matched already
+    if (ch === '\u0308') continue; // ё decomposed: its base е was matched already
     const src = plain[i];
     if (src === undefined) return surface;
     const a = foldRussianYo(src.toLowerCase());

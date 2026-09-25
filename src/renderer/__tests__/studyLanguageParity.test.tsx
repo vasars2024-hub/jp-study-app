@@ -125,7 +125,7 @@ describe('the subtitle line draws the study language, with its reading aid', () 
       readingAid: async (lang: string, words: string[]) => {
         asked.push({ lang, words });
         if (lang === 'zh') return { 今天: ['jīn', 'tiān'], 天气: ['tiān', 'qì'] };
-        return { книги: ['кни́ги'] };
+        return { книги: ['кни\u0301ги'] };
       },
     };
     host = document.createElement('div');
@@ -163,7 +163,7 @@ describe('the subtitle line draws the study language, with its reading aid', () 
     await act(async () => { await Promise.resolve(); });
     const line = host?.firstElementChild as HTMLElement;
     expect(line.getAttribute('lang')).toBe('ru');
-    expect(line.querySelector('[data-surface="книги"]')?.textContent).toBe('кни́ги');
+    expect(line.querySelector('[data-surface="книги"]')?.textContent).toBe('кни\u0301ги');
     await act(async () => {
       root?.render(createElement(SubtitleCueLine, { text: 'Две книги', furigana: false, lang: 'ru' }));
     });

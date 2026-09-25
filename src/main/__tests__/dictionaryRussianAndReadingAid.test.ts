@@ -22,7 +22,7 @@ import { chineseReadings, chineseSyllables, russianReadings } from '../dictionar
 import { buildCedictIndex } from '../dictionary/chineseLookup';
 
 // Stress marks written as escapes: a combining accent is invisible in an editor.
-const A = '́';
+const A = '\u0301';
 
 const KNIGA = {
   word: 'книга',

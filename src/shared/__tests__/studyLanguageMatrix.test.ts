@@ -77,7 +77,7 @@ describe.each(STUDY_LANGS)('study language %s', (lang) => {
 describe('reading aids', () => {
   it('Chinese pinyin pairs per character; Russian stress on the written word; both scripts of Chinese tagged', () => {
     expect(pinyinRubyPairs('天气', ['tiān', 'qì']).map((pair) => pair.rt)).toEqual(['tiān', 'qì']);
-    expect(stressedRussian('Кошку', ['ко́шку'])).toBe('Ко́шку');
+    expect(stressedRussian('Кошку', ['ко\u0301шку'])).toBe('Ко\u0301шку');
     expect(studyLangTag('zh', 'simplified')).toBe('zh-Hans');
     expect(studyLangTag('zh', 'traditional')).toBe('zh-Hant');
   });

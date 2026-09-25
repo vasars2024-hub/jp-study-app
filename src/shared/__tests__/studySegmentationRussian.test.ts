@@ -10,7 +10,7 @@ import {
 import { segmentStudyText, studyWordKey, studyWords } from '../studySegmentation';
 import { pinyinRubyPairs, stressedRussian } from '../readingAid';
 
-const A = '́';
+const A = '\u0301';
 
 describe('segmentStudyText', () => {
   it('splits Chinese into words, not characters', () => {
