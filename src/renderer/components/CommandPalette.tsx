@@ -1,11 +1,12 @@
-// Global command palette / search overlay (Ctrl+Space / Ctrl+P).
+// Global command palette / search overlay (the `nav.palette` / `nav.search`
+// commands — their chords are user-rebindable, so none is named here).
 //
-// Fuzzy-searches commands, app sections, widgets, saved words, deck flashcards,
-// grammar points and settings. Opens via the 'palette:open' CustomEvent fired
-// by the shortcut manager; mounted once in App.tsx so it works on the desktop,
-// in pop-outs and inside the reader.
+// Searches commands, app sections, widgets, settings, and (in search mode)
+// saved words, deck flashcards and grammar points. Opens via the 'palette:open'
+// CustomEvent fired by the shortcut manager; mounted once in App.tsx so it
+// works on the desktop, in pop-outs and inside the reader.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon, { type IconName } from './Icons';
 import { useModalKeyboard } from './ui/useModalKeyboard';
 import {
@@ -33,7 +34,7 @@ import { hasDiscoveredAero } from '../aeroDiscovery';
 import { hasDiscoveredWired } from '../wiredDiscovery';
 import { useT } from '../i18n';
 import { commandCategory, commandLabel } from '../commandI18n';
-import { fuzzyScore as fuzzy } from '../fuzzySearch';
+import { scoreLabelledItem } from '../fuzzySearch';
 
 type PaletteMode = 'commands' | 'search' | 'toolbox';
 
@@ -51,6 +52,13 @@ interface Item {
    * exists — and printing them in the row would be noise.
    */
   terms?: string;
+  /**
+   * Offered only once something is typed. Settings rows ride along in commands
+   * mode so a keyboard user who opens the palette and types "backup" or
+   * "subtitle style" finds the setting (round-2 J9), but the EMPTY list stays
+   * the command catalog it is for — 160 settings cards would bury it.
+   */
+  typedOnly?: boolean;
   run: () => void;
 }
 
@@ -148,6 +156,7 @@ export default function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const listId = useId();
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
   // Open/close via the shortcut manager's events.
@@ -225,7 +234,8 @@ export default function CommandPalette() {
     };
   }, [open, mode, grammarItems.length]);
 
-  // Settings cards. Same lazy treatment as grammar and for the same reason —
+  // Settings cards (search mode, and commands mode once typed — see
+  // `Item.typedOnly`). Same lazy treatment as grammar and for the same reason —
   // `settingsRegistry` is a 1,700-line data table and the palette is mounted on
   // every surface, so pulling it in eagerly would put it on the boot path.
   //
@@ -234,7 +244,7 @@ export default function CommandPalette() {
   // gone), so a subscription would only cover a theme change made while it is
   // open; a stale read is re-taken the next time it opens.
   useEffect(() => {
-    if (!open || mode !== 'search' || settingsRows.length) return undefined;
+    if (!open || mode === 'toolbox' || settingsRows.length) return undefined;
     let dead = false;
     const visibility = {
       advanced:
@@ -251,14 +261,20 @@ export default function CommandPalette() {
         const rows: SettingsRow[] = [];
         for (const e of SETTINGS_REGISTRY) {
           if (!settingsEntryRenders(e, visibility)) continue;
+          // A card that MOVED to the Files app (gate 8 — backup, factory reset,
+          // storage usage) has no Settings page any more, and was dropped here
+          // for it: "backup" found no settings row at all. Its historical
+          // `pageId` still routes — `SettingsApp.navigate` forwards it to the
+          // Files app with the card id — so only the label needs its new home.
           const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
-          if (!page) continue;
+          const pageLabelKey = e.movedTo === 'files' ? 'palette.section.files' : page?.labelKey;
+          if (!pageLabelKey) continue;
           rows.push({
             id: e.id,
             titleKey: e.titleKey,
             descKey: e.descKey,
             pageId: e.pageId,
-            pageLabelKey: page.labelKey,
+            pageLabelKey,
             terms: e.keywords.join(' '),
           });
         }
@@ -367,12 +383,18 @@ export default function CommandPalette() {
       }
       const grammarGroup = t('palette.group.grammar');
       out.push(...grammarItems.map((gi) => ({ ...gi, group: grammarGroup })));
+    }
+    if (mode !== 'toolbox') {
       // L10 bullet 3. A secondary or expert action that L8 moved behind a
       // disclosure is reachable from Settings' own search box and, before this,
       // from nowhere else — so the one surface a keyboard user reaches first
       // could not offer it. Each row lands on the card, not on the front of
       // Settings; the gates above keep out entries whose card does not render,
       // which is the misroute the registry exists to prevent.
+      //
+      // Round-2 J9: commands mode offers them too, once something is typed. The
+      // palette's default chord opens commands mode, and "the palette finds no
+      // settings" was that mode's answer to "backup" and "subtitle style".
       const settingsGroup = t('palette.group.settings');
       for (const s of settingsRows) {
         out.push({
@@ -382,6 +404,7 @@ export default function CommandPalette() {
           group: settingsGroup,
           glyph: 'settings',
           terms: `${s.terms} ${s.descKey ? t(s.descKey) : ''}`,
+          typedOnly: mode === 'commands',
           run: () => openSettingsAt(s.pageId, s.id.startsWith('page-') ? undefined : s.id),
         });
       }
@@ -395,9 +418,11 @@ export default function CommandPalette() {
     const q = query.trim();
     const scored: { item: Item; score: number }[] = [];
     for (const item of items) {
-      const s = fuzzy(q, `${item.label} ${item.sub ?? ''} ${item.terms ?? ''}`);
+      if (!q && item.typedOnly) continue;
+      const s = q ? scoreLabelledItem(q, item) : 0;
       if (s != null) scored.push({ item, score: s });
     }
+    // Stable: equal scores keep catalog order (commands, pages, widgets, …).
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, 40).map((s) => s.item);
   }, [items, query]);
@@ -441,6 +466,12 @@ export default function CommandPalette() {
 
   if (!open) return null;
 
+  const placeholder = mode === 'search'
+    ? t('palette.searchPlaceholder')
+    : mode === 'toolbox'
+      ? t('palette.toolboxPlaceholder')
+      : t('palette.commandPlaceholder');
+
   return (
     <>
       <div className="palette-backdrop" onMouseDown={close} />
@@ -454,47 +485,63 @@ export default function CommandPalette() {
       >
         <div className="palette-head">
           <Icon name={mode === 'search' ? 'search' : 'command'} size={16} />
+          {/* K10: an ARIA 1.2 combobox. Focus never leaves the input, so the
+              highlighted row is announced through `aria-activedescendant`
+              rather than by moving focus into the list. */}
           <input
             ref={inputRef}
             className="palette-input"
-            placeholder={mode === 'search' ? t('palette.searchPlaceholder') : mode === 'toolbox' ? t('palette.toolboxPlaceholder') : t('palette.commandPlaceholder')}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls={listId}
+            aria-activedescendant={results[sel] ? `${listId}-opt-${sel}` : undefined}
+            aria-label={placeholder}
+            placeholder={placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
           />
           <span className="palette-hint muted">{t('palette.escHint')}</span>
         </div>
-        <ul ref={listRef} className="palette-list">
+        <ul ref={listRef} id={listId} className="palette-list" role="listbox" aria-label={placeholder}>
           {/* An empty state has to say what was searched and how to get out of it. "No matches."
               said neither, and at 11 characters it did not even clear the honest-states message
               bar — the palette is the entry point a keyboard user reaches, so it is the one
               surface where a dead end with no way back is worst. The query is echoed so a typo
               is visible, and Esc is named because the backdrop click is the only other exit. */}
           {results.length === 0 && (
-            <li className="palette-empty muted">
+            <li className="palette-empty muted" role="presentation">
               {query.trim()
                 ? t('palette.noMatchesFor', { query: query.trim() })
                 : t('palette.noMatches')}
             </li>
           )}
+          {/* The row IS the option: a <button> inside an option would be a
+              second, separately focusable control that the listbox pattern
+              forbids. `mousedown` is prevented so a click never pulls focus
+              out of the input. */}
           {results.map((r, i) => (
-            <li key={r.key} data-idx={i}>
-              <button
-                type="button"
-                className={`palette-row ${i === sel ? 'active' : ''}`}
-                onMouseEnter={() => setSel(i)}
-                onClick={() => pick(r)}
-              >
-                <span className="palette-ic">
-                  <Icon name={r.glyph} size={15} />
-                </span>
-                <span className="palette-label">{r.label}</span>
-                {r.sub && <span className="palette-sub muted">{r.sub}</span>}
-                <span className="palette-right">
-                  {r.keys && <kbd className="palette-kbd">{r.keys}</kbd>}
-                  <span className="palette-group">{r.group}</span>
-                </span>
-              </button>
+            <li
+              key={r.key}
+              id={`${listId}-opt-${i}`}
+              data-idx={i}
+              role="option"
+              aria-selected={i === sel}
+              className={`palette-row ${i === sel ? 'active' : ''}`}
+              onMouseEnter={() => setSel(i)}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(r)}
+            >
+              <span className="palette-ic" aria-hidden="true">
+                <Icon name={r.glyph} size={15} />
+              </span>
+              <span className="palette-label">{r.label}</span>
+              {r.sub && <span className="palette-sub muted">{r.sub}</span>}
+              <span className="palette-right">
+                {r.keys && <kbd className="palette-kbd">{r.keys}</kbd>}
+                <span className="palette-group">{r.group}</span>
+              </span>
             </li>
           ))}
         </ul>

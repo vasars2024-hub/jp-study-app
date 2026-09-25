@@ -8,6 +8,7 @@ import ExtensionBridgeSection from './ExtensionBridgeSection';
 import SystemDictionarySection from './SystemDictionarySection';
 import ReadingLensSection from './ReadingLensSection';
 import AiAnalysisSection from './AiAnalysisSection';
+import SubtitleStyleCard from './SubtitleStyleCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import {
@@ -213,6 +214,7 @@ export default function StudyPage() {
       >
         <ReadingLensSection />
       </SettingsCard>
+      <SubtitleStyleCard />
     </>
   );
 }

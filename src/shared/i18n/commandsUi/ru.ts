@@ -16,4 +16,12 @@ export const COMMANDS_UI_RU: Catalog = {
   'shortcut.undo.nothing': 'Нечего отменять',
   'shortcut.undo.done': 'Отменено: {action}',
   'shortcut.undo.doneGeneric': 'Отменено',
+  // ---- Settings > Study: subtitle style (the searchable door to the player's own settings) ----
+  'playerUi.subtitleStyle.title': 'Стиль субтитров',
+  'playerUi.subtitleStyle.desc': 'Как выглядят субтитры в видеоплеере',
+  'playerUi.subtitleStyle.size': 'Размер субтитров',
+  'playerUi.subtitleStyle.px': '{size} пкс',
+  'playerUi.subtitleStyle.more':
+    'Положение и фон — в разделе «Смотреть» > «Настройки медиа». Цвет, шрифт и обводка — в меню «Учёба» плеера во время просмотра.',
+  'playerUi.subtitleStyle.open': 'Открыть настройки субтитров плеера',
 };

@@ -145,16 +145,59 @@ describe('command palette exposes settings cards', () => {
     expect(on.map((r) => r.label)).toContain('Custom CSS');
   });
 
-  it('keeps settings out of commands mode, which stays the command catalog', async () => {
-    // Ctrl+Space opens `commands`; Global search opens `search`. Settings cards
-    // belong to the everything-search, or 160 rows would bury the 83 commands
-    // the other mode exists for — L10 bullet 1's own concern.
-    // 'reset' is deliberately a query BOTH modes answer — 'Reset desktop' would
-    // have matched nothing in either, so the absence below would prove nothing.
-    const rows = await open('commands', 'reset');
+  it('keeps the EMPTY commands list the command catalog', async () => {
+    // Ctrl+Space-style commands mode opens on the command catalog; 160 settings
+    // cards would bury the commands that mode exists for (L10 bullet 1).
+    const rows = await open('commands', '');
     expect(rows.length).toBeGreaterThan(0);
     const groups = rows.map((r) => r.querySelector('.palette-group')?.textContent);
     expect(groups).not.toContain('Settings');
     expect(groups).toContain('Commands');
+  });
+
+  it('J9: commands mode finds settings once something is typed', async () => {
+    // "the palette finds no settings" — the default chord opens commands mode.
+    const rows = settingsRows(await open('commands', 'Reset desktop'));
+    expect(rows.map((r) => r.label)).toContain('Reset desktop');
+  });
+
+  it('J9: "backup" ranks Backup & restore first, and not Wallpaper', async () => {
+    for (const mode of ['commands', 'search']) {
+      const rows = await open(mode, 'backup');
+      const labels = rows.map((r) => r.querySelector('.palette-label')?.textContent);
+      expect(labels[0]).toBe('Backup & restore');
+      expect(labels).not.toContain('Wallpaper');
+      await act(async () => {
+        document.querySelector('.palette-input')?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        );
+      });
+    }
+  });
+
+  it('J9: the moved Backup card routes to the Files app through its card id', async () => {
+    const hit = settingsRows(await open('commands', 'backup')).find((r) => r.label === 'Backup & restore');
+    expect(hit).toBeDefined();
+    expect(hit?.row.querySelector('.palette-sub')?.textContent).toBe('Setting · Files');
+    const navigated: { page?: string; settingId?: string }[] = [];
+    const onNav = (e: Event) => navigated.push((e as CustomEvent).detail);
+    window.addEventListener('settings:navigate', onNav);
+    try {
+      await act(async () => {
+        hit?.row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 140));
+      });
+    } finally {
+      window.removeEventListener('settings:navigate', onNav);
+    }
+    // `SettingsApp.navigate` forwards `memory` + the card id into the Files app.
+    expect(navigated).toEqual([{ page: 'memory', settingId: 'backup' }]);
+  });
+
+  it('J9: "subtitle style" finds the Subtitle style card on the Study page', async () => {
+    const rows = settingsRows(await open('commands', 'subtitle style'));
+    expect(rows[0]?.label).toBe('Subtitle style');
   });
 });

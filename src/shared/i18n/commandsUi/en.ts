@@ -16,4 +16,12 @@ export const COMMANDS_UI_EN: Catalog = {
   'shortcut.undo.nothing': 'Nothing to undo',
   'shortcut.undo.done': 'Undid: {action}',
   'shortcut.undo.doneGeneric': 'Undone',
+  // ---- Settings > Study: subtitle style (the searchable door to the player's own settings) ----
+  'playerUi.subtitleStyle.title': 'Subtitle style',
+  'playerUi.subtitleStyle.desc': 'How subtitles look in the video player',
+  'playerUi.subtitleStyle.size': 'Subtitle size',
+  'playerUi.subtitleStyle.px': '{size} px',
+  'playerUi.subtitleStyle.more':
+    'Position and background are in Watch > Media Settings. Colour, font and outline are under Study in the player while a video plays.',
+  'playerUi.subtitleStyle.open': 'Open player subtitle settings',
 };

@@ -688,6 +688,30 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Study',
   },
   {
+    // Round-2 J9: "subtitle style" found only the subtitle PROVIDER card. The
+    // style lives with the player; `SubtitleStyleCard` mirrors its size and
+    // opens the player's own subtitle settings for the rest.
+    id: 'subtitle-style',
+    titleKey: 'playerUi.subtitleStyle.title',
+    descKey: 'playerUi.subtitleStyle.desc',
+    keywords: [
+      'subtitle style',
+      'subtitle size',
+      'subtitle font',
+      'subtitle colour',
+      'subtitle color',
+      'subtitle position',
+      'subtitle background',
+      'subtitle appearance',
+      'bigger subtitles',
+      'caption style',
+      'captions',
+      'outline',
+    ],
+    pageId: 'study',
+    group: 'Study',
+  },
+  {
     id: 'game-arena',
     titleKey: 'search.gameArena',
     descKey: 'search.gameArena.desc',
