@@ -39,6 +39,37 @@ export const SUBTITLE_FONT_STACKS = {
 export type SubtitleFontChoice = keyof typeof SUBTITLE_FONT_STACKS;
 
 /**
+ * The same three choices for the other study languages. Han characters are
+ * shared by Japanese and Chinese but drawn differently, so a Chinese line in
+ * Yu Mincho gets Japanese glyph shapes: Chinese takes Song/Ming and YaHei /
+ * JhengHei by script. Russian takes Cyrillic serif and sans faces.
+ */
+const SUBTITLE_FONT_STACKS_BY_LANG: Readonly<Record<string, Readonly<Record<SubtitleFontChoice, string>>>> = {
+  'zh-Hans': {
+    default: '',
+    mincho: '"SimSun", "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif',
+    universal: '"Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "PingFang SC", sans-serif',
+  },
+  'zh-Hant': {
+    default: '',
+    mincho: '"PMingLiU", "MingLiU", "Songti TC", "Noto Serif TC", "Source Han Serif TC", serif',
+    universal: '"Microsoft JhengHei UI", "Microsoft JhengHei", "Noto Sans TC", "PingFang TC", sans-serif',
+  },
+  ru: {
+    default: '',
+    mincho: '"Georgia", "Times New Roman", "Noto Serif", serif',
+    universal: '"Verdana", "Segoe UI", "Noto Sans", sans-serif',
+  },
+};
+
+/** The user's subtitle typeface for a line in `langTag` (`ja`, `zh-Hans`, `zh-Hant`, `ru`). '' = the stylesheet's. */
+export function subtitleFontStackFor(choice: SubtitleFontChoice, langTag = 'ja'): string {
+  const byLang = SUBTITLE_FONT_STACKS_BY_LANG[langTag]
+    ?? (langTag.startsWith('zh') ? SUBTITLE_FONT_STACKS_BY_LANG['zh-Hans'] : undefined);
+  return byLang?.[choice] ?? SUBTITLE_FONT_STACKS[choice] ?? '';
+}
+
+/**
  * Offered languages for the second subtitle line.
  *
  * A closed list rather than free text because this code is also what the mined card's

@@ -26,6 +26,7 @@ import { registerCommandHandler } from '../keyboardShortcuts';
 import { useT } from '../i18n';
 import { useModalKeyboard } from './ui/useModalKeyboard';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import { textContentLang } from '../studyEnvironment';
 
 type FilterKey = 'all' | 'word' | 'sentence' | 'dictionary' | 'reader' | 'manual';
 
@@ -82,12 +83,12 @@ function EntryCard({
 
       {entry.dictMeta ? (
         <div className="cbh-dict">
-          <span className="cbh-dict-expr" lang="ja">{entry.dictMeta.expression}</span>
-          {entry.dictMeta.reading && <span className="cbh-dict-reading" lang="ja">{entry.dictMeta.reading}</span>}
+          <span className="cbh-dict-expr" lang={textContentLang(entry.dictMeta.expression)}>{entry.dictMeta.expression}</span>
+          {entry.dictMeta.reading && <span className="cbh-dict-reading" lang={textContentLang(entry.dictMeta.expression)}>{entry.dictMeta.reading}</span>}
           {entry.dictMeta.meaning && <div className="cbh-dict-meaning muted">{entry.dictMeta.meaning}</div>}
         </div>
       ) : (
-        <div className="cbh-text" lang="ja">{shown}</div>
+        <div className="cbh-text" lang={textContentLang(shown)}>{shown}</div>
       )}
 
       {isLong && !entry.dictMeta && (

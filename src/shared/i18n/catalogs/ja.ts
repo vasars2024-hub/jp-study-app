@@ -5997,6 +5997,7 @@ export const ja: Catalog = {
   'media.lang.ariaLabel': '字幕の言語',
   'media.lang.ja.title': '音声を日本語として文字起こし',
   'media.lang.zh.title': '音声を中国語として文字起こし',
+  'media.lang.ru.title': '音声をロシア語として文字起こし',
   'media.watch.stop': '停止',
   'media.watch.autoAdd': '自動追加フォルダ…',
   'media.watch.autoAddLabel': '自動追加フォルダ',

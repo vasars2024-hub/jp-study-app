@@ -104,6 +104,7 @@ import {
 } from '../../../shared/mediaStudyOrchestrator';
 import type { StudyListeningAvailability } from '../../../shared/studyListeningFirstRecipe';
 import { inspectStudyListeningAudio } from '../../studyListeningAudio';
+import { STUDY_LANG_NATIVE_NAME } from '../../../shared/studyLang';
 
 const CARD_MIN_WIDTH = 230;
 const CARD_GAP = 12;
@@ -1846,6 +1847,18 @@ export function MediaTranscriptionControls({ state }: { state: MediaState }) {
           lang="zh"
         >
           中文
+        </button>
+        <button
+          className={`sp-seg-btn ${state.subLang === 'ru' ? 'active' : ''}`}
+          aria-pressed={state.subLang === 'ru'}
+          onClick={() => {
+            state.setSubLang('ru');
+            setStudyLang('ru');
+          }}
+          title={t('media.lang.ru.title')}
+          lang="ru"
+        >
+          {STUDY_LANG_NATIVE_NAME.ru}
         </button>
       </div>
     </>

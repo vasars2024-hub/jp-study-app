@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import DictionaryResults, { type DictLang } from './DictionaryResults';
 import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../knownWords';
 import { lemmaOf } from '../tokenizer';
+import { gradeKeyFor } from '../studyTokens';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../tts';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { getZoomFactor } from '../appZoom';
-import { getStudyLang } from '../studyEnvironment';
+import { getStudyLang, studyContentLang } from '../studyEnvironment';
 import { dictionaryAgentContext, handOffToAgent, routeAgentContext } from '../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
 import { useT } from '../i18n';
@@ -75,8 +76,11 @@ export default function DictionaryPopup({
   useEffect(() => {
     let dead = false;
     if (lang !== 'ja') {
-      setLemma(query);
-      setLvl(getLevel(query));
+      // Russian forms share one key with the reader's highlight (книги → книга
+      // or its stem); Chinese words are their own key.
+      const key = gradeKeyFor(query, lang);
+      setLemma(key);
+      setLvl(getLevel(key));
       return;
     }
     lemmaOf(query).then((lm) => {
@@ -113,7 +117,7 @@ export default function DictionaryPopup({
   const playPronunciation = () => {
     // Script-based routing (kana→ja, Cyrillic→ru, Latin→en); Han-only text
     // follows the active dictionary language so Chinese reads as Chinese.
-    const ttsLang = detectTtsLang(query, lang === 'zh' ? 'zh' : 'ja');
+    const ttsLang = detectTtsLang(query, lang);
     if (!speak(query, ttsLang)) stopSpeaking();
   };
 
@@ -125,7 +129,7 @@ export default function DictionaryPopup({
   return (
     <div className="dict-popup" style={style} onMouseDown={(e) => e.stopPropagation()}>
       <div className="dict-head">
-        <span className="dict-q" lang="ja">
+        <span className="dict-q" lang={studyContentLang(lang)}>
           {query}
         </span>
         {ttsAvailable() && (

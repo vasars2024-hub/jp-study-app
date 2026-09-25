@@ -6025,6 +6025,7 @@ export const en: Catalog = {
   'media.lang.ariaLabel': 'Subtitle language',
   'media.lang.ja.title': 'Transcribe speech as Japanese',
   'media.lang.zh.title': 'Transcribe speech as Chinese',
+  'media.lang.ru.title': 'Transcribe speech as Russian',
   'media.watch.stop': 'Stop',
   'media.watch.autoAdd': 'Auto-add folder…',
   'media.watch.autoAddLabel': 'Auto-add folder',

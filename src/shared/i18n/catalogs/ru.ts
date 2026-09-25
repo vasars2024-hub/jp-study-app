@@ -6585,6 +6585,7 @@ export const ru: Catalog = {
   'media.lang.ariaLabel': 'Язык субтитров',
   'media.lang.ja.title': 'Распознавать речь как японскую',
   'media.lang.zh.title': 'Распознавать речь как китайскую',
+  'media.lang.ru.title': 'Распознавать речь как русскую',
   'media.watch.stop': 'Остановить',
   'media.watch.autoAdd': 'Папка автодобавления…',
   'media.watch.autoAddLabel': 'Папку автодобавления',

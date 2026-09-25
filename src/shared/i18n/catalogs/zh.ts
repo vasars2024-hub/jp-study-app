@@ -5958,6 +5958,7 @@ export const zh: Catalog = {
   'media.lang.ariaLabel': '字幕语言',
   'media.lang.ja.title': '将语音转录为日语',
   'media.lang.zh.title': '将语音转录为中文',
+  'media.lang.ru.title': '将语音转录为俄语',
   'media.watch.stop': '停止',
   'media.watch.autoAdd': '自动添加文件夹…',
   'media.watch.autoAddLabel': '自动添加文件夹',

@@ -15,8 +15,8 @@ import { isVocabularySegment, segmentStudyText, studyWordKey } from '../shared/s
 /**
  * The knowledge-store key for a word. Russian: whichever of its likely
  * dictionary forms the learner already graded (книги → книга once книга is
- * known), else the form itself — so a word marked known is recognised in every
- * case it appears in. Chinese: the word.
+ * known), else the stem all its forms share — so a word marked known is
+ * recognised in every case it appears in. Chinese: the word.
  */
 export function knownKeyFor(word: string, lang: StudyLang, levelOf: (key: string) => number = getLevel): string {
   if (lang !== 'ru') return word;
@@ -31,9 +31,19 @@ export function knownKeyFor(word: string, lang: StudyLang, levelOf: (key: string
     }
   }
   if (bestLevel > 0) return best;
-  // Unknown in every form: group the forms under one stem-shaped key so the
-  // first grade of any form covers the rest of this text.
-  return levelOf(studyWordKey(plain, 'ru')) > 0 ? studyWordKey(plain, 'ru') : plain;
+  // Unknown in every form: the stem every form shares, which is also the key a
+  // grade from the dictionary pop-up lands under (`gradeKeyFor`).
+  return studyWordKey(plain, 'ru');
+}
+
+/**
+ * The key a grade is stored under: the form the learner already graded when
+ * there is one, else — for Russian — the stem every form of the word shares, so
+ * grading `книги` also colours `книгу` and `книгой`.
+ */
+export function gradeKeyFor(word: string, lang: StudyLang, levelOf: (key: string) => number = getLevel): string {
+  if (lang !== 'ru') return word;
+  return knownKeyFor(word, lang, levelOf);
 }
 
 /** Tokens of `text` in `lang`, JpToken-shaped so existing scorers read them unchanged. */

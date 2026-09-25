@@ -31,6 +31,7 @@ import {
 import { removeSaved } from '../savedWords';
 import { useT } from '../i18n';
 import { useState } from 'react';
+import { cardContentLang, studyContentLang } from '../studyEnvironment';
 
 interface FlashcardsViewProps {
   hideAiStudio?: boolean;
@@ -461,10 +462,10 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                     draggable
                                     onDragStart={(e) => state.onCardDragStart(e, card.id)}
                                   >
-                                    <span className="aero-flash-word" lang="ja">
+                                    <span className="aero-flash-word" lang={cardContentLang(card)}>
                                       {card.word}
                                     </span>
-                                    <span className="aero-flash-reading" lang="ja">
+                                    <span className="aero-flash-reading" lang={cardContentLang(card)}>
                                       {card.reading && card.reading !== card.word ? card.reading : ''}
                                     </span>
                                     <span className="aero-flash-meaning">{card.meaning || card.back || '-'}</span>
@@ -533,10 +534,10 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 <div className="aero-flash-dict-list" role="list">
                   {saved.map((word) => (
                     <div className="aero-flash-dict-row" key={word.word} role="listitem">
-                      <span className="aero-flash-word" lang="ja">
+                      <span className="aero-flash-word" lang={studyContentLang()}>
                         {word.word}
                       </span>
-                      <span className="aero-flash-reading" lang="ja">
+                      <span className="aero-flash-reading" lang={studyContentLang()}>
                         {word.reading && word.reading !== word.word ? word.reading : ''}
                       </span>
                       <span className="aero-flash-meaning">{word.meaning}</span>
@@ -608,7 +609,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                   ) : (
                     recentStrip.slice(0, 8).map((card) => (
                       <div key={card.id} className="aero-flash-recent-card">
-                        <span lang="ja">{card.word}</span>
+                        <span lang={cardContentLang(card)}>{card.word}</span>
                         <small>{card.reading && card.reading !== card.word ? card.reading : card.meaning || card.back}</small>
                       </div>
                     ))

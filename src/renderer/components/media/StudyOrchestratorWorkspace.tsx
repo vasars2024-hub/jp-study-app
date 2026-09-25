@@ -130,6 +130,7 @@ import {
 } from '../../mediaStudyStore';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { studyContentLang } from '../../studyEnvironment';
 
 interface StudyOrchestratorWorkspaceProps {
   /**
@@ -1916,7 +1917,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                     </small>
                   </div>
                 </div>
-                <blockquote lang="ja">{context.sentence}</blockquote>
+                <blockquote lang={studyContentLang()}>{context.sentence}</blockquote>
                 <button
                   type="button"
                   className="mc-button"
@@ -1994,7 +1995,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               <ul>
                 {resizeCandidates.retained.slice(0, 6).map((candidate) => (
                   <li key={candidate.id}>
-                    <span lang="ja">{candidate.word}</span>
+                    <span lang={studyContentLang()}>{candidate.word}</span>
                     <em>
                       {candidate.frequencyRank
                         ? `#${candidate.frequencyRank}`
@@ -2013,7 +2014,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               <ul>
                 {resizeCandidates.deferred.slice(0, 6).map((candidate) => (
                   <li key={candidate.id}>
-                    <span lang="ja">{candidate.word}</span>
+                    <span lang={studyContentLang()}>{candidate.word}</span>
                     <em>
                       {candidate.frequencyRank
                         ? `#${candidate.frequencyRank}`
@@ -2096,13 +2097,13 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
             {sceneSession.words.map((candidate) => (
               <article key={candidate.id}>
                 <div>
-                  <ruby lang="ja">
+                  <ruby lang={studyContentLang()}>
                     {candidate.word}
                     {candidate.reading && <rt>{candidate.reading}</rt>}
                   </ruby>
                   <span>{candidate.occurrences}×</span>
                 </div>
-                <p lang="ja">{candidate.sentence}</p>
+                <p lang={studyContentLang()}>{candidate.sentence}</p>
                 <small>{cueTime(candidate.timestamp)}</small>
               </article>
             ))}
@@ -2137,7 +2138,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               <span className="mc-eyebrow">{t('study.grammarWeakness.eyebrow')}</span>
               <div className="study-grammar-weakness-title-row">
                 <div>
-                  <h2 id="study-grammar-weakness-title" lang="ja">
+                  <h2 id="study-grammar-weakness-title" lang={studyContentLang()}>
                     {grammarWeakness.pattern}
                   </h2>
                   <strong>{grammarWeakness.meaning}</strong>
@@ -2178,7 +2179,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                       {cueTime(context.cueStartSec)}
                     </small>
                   </div>
-                  <p lang="ja">
+                  <p lang={studyContentLang()}>
                     {context.sentence.slice(0, matchAt)}
                     <mark>{context.sentence.slice(
                       matchAt,
@@ -2407,14 +2408,14 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               return (
               <article key={entry.candidateId}>
                 <div className="study-proper-names-heading">
-                  <ruby lang="ja">
+                  <ruby lang={studyContentLang()}>
                     {entry.word}
                     {furigana && <rt>{furigana}</rt>}
                   </ruby>
                   <span>{t('study.properNames.appearances', { count: entry.occurrences })}</span>
                 </div>
                 {context
-                  ? <blockquote lang="ja">{context}</blockquote>
+                  ? <blockquote lang={studyContentLang()}>{context}</blockquote>
                   : <p className="study-proper-names-nocontext">{t('study.properNames.noContext')}</p>}
                 <button
                   type="button"
@@ -2525,7 +2526,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               return (
                 <article key={entry.expression}>
                   <div className="study-anki-leech-heading">
-                    <ruby lang="ja">
+                    <ruby lang={studyContentLang()}>
                       {entry.word}
                       {entry.reading && entry.reading !== entry.word && <rt>{entry.reading}</rt>}
                     </ruby>
@@ -2536,7 +2537,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                       )}
                     </div>
                   </div>
-                  <blockquote lang="ja">
+                  <blockquote lang={studyContentLang()}>
                     {matchAt >= 0 ? (
                       <>
                         {entry.sentence.slice(0, matchAt)}
@@ -2624,7 +2625,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               <article key={lemma.lemmaKey}>
                 <div className="study-series-recurrence-heading">
                   <span>{String(index + 1).padStart(2, '0')}</span>
-                  <ruby lang="ja">
+                  <ruby lang={studyContentLang()}>
                     {lemma.word}
                     {lemma.reading && lemma.reading !== lemma.word && <rt>{lemma.reading}</rt>}
                   </ruby>
@@ -2642,7 +2643,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                       count: lemma.currentOccurrences,
                     })}
                   </small>
-                  <blockquote lang="ja">{lemma.currentSentence}</blockquote>
+                  <blockquote lang={studyContentLang()}>{lemma.currentSentence}</blockquote>
                   <button
                     type="button"
                     className="mc-button mc-button-primary"
@@ -2668,7 +2669,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                           count: context.occurrences,
                         })}
                       </small>
-                      <blockquote lang="ja">{context.sentence}</blockquote>
+                      <blockquote lang={studyContentLang()}>{context.sentence}</blockquote>
                       <button
                         type="button"
                         className="mc-button"

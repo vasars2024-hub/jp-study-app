@@ -19,7 +19,7 @@ import Icon from './Icons';
 import { loadSaved, onSavedChanged, removeSaved, SAVED_WORDS_BOOK_ID, SAVED_WORDS_BOOK_TITLE, SAVED_WORDS_FOLDER } from '../savedWords';
 import { mineToStudy, notifyMined, type MineToStudyInput } from '../studyMining';
 import { cycleLevel, getLevel, onKnowledgeChanged, type WkLevel } from '../knownWords';
-import { getStudyLang, onStudyLangChanged } from '../studyEnvironment';
+import { getStudyLang, onStudyLangChanged, studyContentLang } from '../studyEnvironment';
 import { getActiveProfile, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
 // Imported from their defining modules rather than the `shared/mining` barrel.
@@ -932,6 +932,8 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
    * that was clicked, and two controls for one word is worse than one.
    */
   const gradable = variant !== 'popup' && lang === studyLang;
+  /** Headwords and examples carry the dictionary's language, Chinese by script (zh-Hans / zh-Hant). */
+  const contentLang = studyContentLang(lang);
 
   /**
    * This hook and the two consts above it must stay ABOVE the `showSetup` early
@@ -1017,11 +1019,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           return (
             <div className="dict-entry" key={i}>
               <div className="dict-entry-head">
-                <span className="dict-word" lang={lang}>
+                <span className="dict-word" lang={contentLang}>
                   {entry.word}
                 </span>
                 {entry.reading && entry.reading !== entry.word && (
-                  <span className="dict-reading" lang={lang}>
+                  <span className="dict-reading" lang={lang === 'zh' ? 'zh-Latn-pinyin' : contentLang}>
                     {entry.reading}
                   </span>
                 )}
@@ -1308,7 +1310,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                       }
                     }}
                   >
-                    <span className="dict-ex-jp" lang="ja">
+                    <span className="dict-ex-jp" lang={contentLang}>
                       {ex.jp}
                     </span>
                     {exLangs

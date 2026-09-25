@@ -250,6 +250,33 @@
   --scrollbar-corner: transparent;
 }
 
+/* Han characters are shared by Japanese and Chinese but drawn differently, and
+   whichever CJK face comes first in a stack decides the shapes. The Japanese
+   faces lead `--font-body` for the English, Japanese and Russian UI; a Chinese
+   UI (<html lang="zh-Hans">) leads with the Chinese faces of its script, and
+   any element that says its language — study-language content, dictionary
+   headwords, subtitle lines — is drawn with that language's faces whatever the
+   UI language is. Class rules later in this file still win over these. */
+:root:lang(zh) {
+  --font-body: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+}
+:root:lang(zh-Hant) {
+  --font-body: 'Segoe UI', 'Microsoft JhengHei UI', 'Microsoft JhengHei', 'Noto Sans TC', 'PingFang TC', system-ui, sans-serif;
+}
+/* Japanese content under a Chinese UI (elsewhere `--font-body` already leads with Japanese faces). */
+:root:lang(zh) [lang|='ja']:not(html) {
+  font-family: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', system-ui, sans-serif;
+}
+[lang|='zh']:not(html),
+[lang|='zh-Hans']:not(html) {
+  font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+}
+[lang|='zh-Hant']:not(html),
+[lang='zh-TW']:not(html),
+[lang='zh-HK']:not(html) {
+  font-family: 'Segoe UI', 'Microsoft JhengHei UI', 'Microsoft JhengHei', 'Noto Sans TC', 'PingFang TC', system-ui, sans-serif;
+}
+
 /* ── WCAG 1.4.11 — the boundary of an interactive control ─────────────────────
    Measured on the packaged app (proof/packaged-a11y-deep-20260802slice58b):
    `--border` (#2d2b37) reads 1.09:1 on --panel-2, 1.26:1 on --panel and 1.40:1

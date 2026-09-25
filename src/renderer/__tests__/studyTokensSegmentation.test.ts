@@ -25,7 +25,8 @@ describe('studyTokens', () => {
   it('Russian: a form is keyed by the dictionary form the learner knows', () => {
     const levels: Record<string, number> = { книга: 3 };
     expect(knownKeyFor('Книги', 'ru', (key) => levels[key] ?? 0)).toBe('книга');
-    expect(knownKeyFor('кошку', 'ru', () => 0)).toBe('кошку');
+    // Nothing graded yet: the stem, shared by every form.
+    expect(knownKeyFor('кошку', 'ru', () => 0)).toBe(knownKeyFor('кошкой', 'ru', () => 0));
   });
 });
 

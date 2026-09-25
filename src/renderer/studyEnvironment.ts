@@ -15,6 +15,7 @@ import type { StudyLang } from '../shared/levelScale';
 import {
   DEFAULT_STUDY_LANG,
   normalizeStudyLang,
+  studyLangOfText,
   studyLangTag,
   type ChineseScript,
 } from '../shared/studyLang';
@@ -78,6 +79,23 @@ export function onChineseScriptChanged(cb: (script: ChineseScript) => void): () 
  */
 export function studyContentLang(lang: StudyLang = getStudyLang()): string {
   return studyLangTag(lang, getChineseScript());
+}
+
+/**
+ * The `lang` attribute for a card's text. A stored card with no `studyLang` is
+ * Japanese (the format predates the other languages); any other is its own.
+ */
+export function cardContentLang(card: { studyLang?: string } | null | undefined): string {
+  return studyContentLang(normalizeStudyLang(card?.studyLang));
+}
+
+/**
+ * The `lang` attribute for a piece of text whose language only its script can
+ * tell (a clipboard entry, a selected sentence): kana → ja, Cyrillic → ru, Han
+ * → the study language's reading of it (Chinese by the learner's script).
+ */
+export function textContentLang(text: string): string {
+  return studyContentLang(studyLangOfText(text, getStudyLang()));
 }
 
 /**

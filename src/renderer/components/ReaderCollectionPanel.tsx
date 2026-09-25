@@ -22,6 +22,7 @@ import { getLevel } from '../knownWords';
 import Icon from './Icons';
 import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import { normalizeStudyLang } from '../../shared/studyLang';
+import { cardContentLang, studyContentLang } from '../studyEnvironment';
 
 type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
@@ -739,7 +740,7 @@ export default function ReaderCollectionPanel({
             <label className="reader-collection-field">
               <span className="reader-collection-field-label">{t('readerCollection.reading')}</span>
               <input
-                lang="ja"
+                lang={studyContentLang()}
                 value={edit.reading}
                 placeholder={t('readerCollection.optional')}
                 onChange={(e) => setEdit((d) => (d ? { ...d, reading: e.target.value } : d))}
@@ -749,7 +750,7 @@ export default function ReaderCollectionPanel({
               <span className="reader-collection-field-label">{t('readerCollection.sentence')}</span>
               <textarea
                 className="reader-collection-sentence"
-                lang="ja"
+                lang={studyContentLang()}
                 rows={2}
                 value={edit.sentence}
                 placeholder={t('readerCollection.contextJa')}
@@ -921,14 +922,14 @@ export default function ReaderCollectionPanel({
                     {c.sceneReference && <span>{c.sceneReference}</span>}
                   </span>
                 )}
-                <span className="reader-collection-word" lang="ja">
+                <span className="reader-collection-word" lang={cardContentLang(c)}>
                   {c.word}
                 </span>
                 {(c.meaning || c.back) && (
                   <span className="reader-collection-sent">{(c.meaning || c.back || '').slice(0, 100)}</span>
                 )}
                 {c.sentence && (
-                  <span className="reader-collection-sent" lang="ja">
+                  <span className="reader-collection-sent" lang={cardContentLang(c)}>
                     {c.sentence.slice(0, 100)}
                   </span>
                 )}
