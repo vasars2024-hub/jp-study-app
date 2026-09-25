@@ -94,7 +94,7 @@ export default function CharacterMetadataPanel({ character, entries = [] }: Prop
           </ul>
         </div>
       )}
-      <CharacterWritingPractice target={character.char} expectedStrokes={character.strokes} />
+      <CharacterWritingPractice target={character.char} expectedStrokes={character.strokes} lang={character.lang} />
       <details className="lexicon-character-sources">
         <summary>{t('lexicon.character.sources', { count: character.sources.length })}</summary>
         <ul>

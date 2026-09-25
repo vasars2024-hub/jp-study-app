@@ -218,6 +218,34 @@ function getIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
   return indexPromise;
 }
 
+/**
+ * Character facts for one hanzi from CC-CEDICT: every reading it has (tone
+ * marks; surname readings last) and the meaning of each. The character panel
+ * used to ask a Chinese learner to import KANJIDIC2 — a Japanese kanji
+ * dictionary with on/kun readings — to learn about 猫. Strokes and radicals are
+ * not in CC-CEDICT and are left out rather than guessed.
+ */
+export function cedictCharacter(
+  index: CedictIndex,
+  char: string,
+  script: 'simplified' | 'traditional' = 'simplified',
+): DictResult['character'] | undefined {
+  if ([...char].length !== 1 || !CJK_RE.test(char)) return undefined;
+  const entries = index.byWord.get(char);
+  if (!entries?.length) return undefined;
+  const ordered = [...entries].sort((a, b) => Number(/^[A-Z]/.test(a.pinyin)) - Number(/^[A-Z]/.test(b.pinyin)));
+  const readings = [...new Set(ordered.map((entry) => pinyinToneMarks(entry.pinyin.toLowerCase())))];
+  const meanings = [...new Set(ordered.flatMap((entry) => entry.defs.slice(0, 2)))].slice(0, 8);
+  return {
+    lang: script === 'traditional' ? 'zh-Hant' : 'zh-Hans',
+    char,
+    components: [],
+    readings,
+    meanings,
+    sources: [{ dictId: 'cc-cedict', dictTitle: 'CC-CEDICT', licence: 'CC BY-SA 4.0', attribution: 'MDBG — https://www.mdbg.net/chinese/dictionary?page=cc-cedict' }],
+  };
+}
+
 /** Look a Chinese term (or an English gloss) up: database first, CC-CEDICT second. */
 export async function lookupChineseTerm(
   query: string,
@@ -226,19 +254,27 @@ export async function lookupChineseTerm(
 ): Promise<DictResult> {
   const q = (query ?? '').trim();
   if (!q) return { query: q, entries: [] };
+  const script = deps.script?.() ?? 'simplified';
+  let result: DictResult | null = null;
   try {
     const db = deps.db();
     if (db) {
-      const fromDb = limit === undefined ? lookupChineseInDb(db, q) : lookupChineseInDb(db, q, limit);
-      if (fromDb) return fromDb;
+      result = limit === undefined ? lookupChineseInDb(db, q) : lookupChineseInDb(db, q, limit);
     }
   } catch {
     // A database read must never take the CC-CEDICT fallback down. Same rule as
     // `dictionary.ts`'s Japanese path.
   }
   try {
-    return lookupCedictIndex(await getIndex(deps), q, deps.script?.() ?? 'simplified');
+    const index = await getIndex(deps);
+    result ??= lookupCedictIndex(index, q, script);
+    // One hanzi and no character facts from the database: CC-CEDICT's.
+    if (!result.character) {
+      const character = cedictCharacter(index, q, script);
+      if (character) result = { ...result, character };
+    }
+    return result;
   } catch (err) {
-    return { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
+    return result ?? { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
   }
 }

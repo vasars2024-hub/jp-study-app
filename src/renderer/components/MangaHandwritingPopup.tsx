@@ -3,6 +3,7 @@ import { KANJI_RADICALS } from '../../shared/kanjiRadicals';
 import { runOcr } from '../ocr';
 import { stripFuriganaFragments } from '../../shared/mangaOcrText';
 import { useT } from '../i18n';
+import { getStudyLang } from '../studyEnvironment';
 
 interface Props {
   x: number;
@@ -94,14 +95,21 @@ export default function MangaHandwritingPopup({ x, y, engineReady, onLookup, onC
     try {
       const dataUrl = c.toDataURL('image/png');
       let text = '';
-      if (engineReady) {
-        text = (await window.api.mangaOcrRecognizeImage(dataUrl)).trim();
-      }
-      if (!text) {
-        text = stripFuriganaFragments(await runOcr(dataUrl, 'jpn'), true).trim();
+      const study = getStudyLang();
+      if (study !== 'ja') {
+        // Chinese and Russian are read by their own recognizer; manga-ocr and the
+        // Tesseract fallback only know Japanese.
+        text = (await window.api.ocrRecognizeGlyph(dataUrl, study)).trim();
+      } else {
+        if (engineReady) {
+          text = (await window.api.mangaOcrRecognizeImage(dataUrl)).trim();
+        }
+        if (!text) {
+          text = stripFuriganaFragments(await runOcr(dataUrl, 'jpn'), true).trim();
+        }
       }
       // Prefer a single CJK character when the model returns a short string.
-      const chars = [...text].filter((ch) => /[\u4e00-\u9fff々〆ヵヶぁ-んァ-ン]/.test(ch));
+      const chars = [...text].filter((ch) => /[\u4e00-\u9fff々〆ヵヶぁ-んァ-ン\u0400-\u04ff]/.test(ch));
       const picked = chars[0] ?? text.replace(/\s+/g, '').slice(0, 4);
       if (picked) {
         setQuery((q) => q + picked);

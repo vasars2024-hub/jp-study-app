@@ -320,6 +320,7 @@ declare global {
       mangaOcrSaveOrder(
         req: import('../shared/mangaOcrIpc').MangaOcrOrderRequest,
       ): Promise<import('../shared/mokuroTypes').MokuroPage | null>;
+      ocrRecognizeGlyph(dataUrl: string, lang: 'ja' | 'zh' | 'ru'): Promise<string>;
       mangaOcrRecognizeImage(dataUrl: string): Promise<string>;
       onMangaOcrProgress(cb: (p: import('../shared/mangaOcrIpc').MangaOcrProgress) => void): () => void;
       mangaOcrLoadTranslateCache(

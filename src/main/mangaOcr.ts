@@ -1893,6 +1893,19 @@ export function registerMangaOcrIpc(): void {
     return recognizeMangaOcrDataUrl(dataUrl);
   });
 
+  // A hand-drawn character in a study language: manga-ocr reads Japanese, the
+  // PaddleOCR recognizer of the language reads Chinese and Russian (manga-ocr
+  // would answer a hanzi with a kanji reading of it, and never with Cyrillic).
+  ipcMain.handle('ocr:recognizeGlyph', async (_e, dataUrl: unknown, lang: unknown) => {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+      throw new Error('Invalid image data.');
+    }
+    const glyphLang = lang === 'zh' || lang === 'ru' ? lang : 'ja';
+    if (glyphLang === 'ja' && mangaOcrAvailable()) return recognizeMangaOcrDataUrl(dataUrl);
+    const read = await recognizePaddleOcrDataUrl(dataUrl, { forceLang: glyphLang });
+    return read.text;
+  });
+
   ipcMain.handle('mangaOcr:loadCache', async (_e, itemId: unknown, mediaUrl: unknown) => {
     if (typeof itemId !== 'string' || typeof mediaUrl !== 'string') return null;
     return loadMangaOcrCache(itemId, mediaUrl);

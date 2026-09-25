@@ -293,6 +293,12 @@ function glossFor(entry: DictEntry): string {
 
 export default function DictionaryResults({ query, variant = 'popup', lang = 'ja', context, onLookup }: Props) {
   const { t } = useT();
+  /**
+   * The language example sentences are written in — the dictionary's, not
+   * Japanese: a Chinese entry's examples are Chinese, and their translations
+   * are made from Chinese.
+   */
+  const exSource: ExampleCountLang = lang;
   const [result, setResult] = useState<DictResult | null>(null);
   const [anki, setAnki] = useState<AnkiStatus | null>(null);
   const [ankiLink, setAnkiLink] = useState<AnkiLinkStatus | null>(null);
@@ -934,12 +940,6 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const gradable = variant !== 'popup' && lang === studyLang;
   /** Headwords and examples carry the dictionary's language, Chinese by script (zh-Hans / zh-Hant). */
   const contentLang = studyContentLang(lang);
-  /**
-   * The language example sentences are written in — the dictionary's, not
-   * Japanese: a Chinese entry's examples are Chinese, and their translations
-   * are made from Chinese.
-   */
-  const exSource: ExampleCountLang = lang;
 
   /**
    * This hook and the two consts above it must stay ABOVE the `showSetup` early
@@ -1015,7 +1015,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       )}
 
       {result?.character && <CharacterMetadataPanel character={result.character} entries={entries} />}
-      {result && !result.character && isGroundableCharacter(result.query ?? '') && (
+      {/* The note prescribes KANJIDIC2, a Japanese kanji dictionary: a Chinese lookup
+          gets its character facts from CC-CEDICT instead, and says nothing when it has none. */}
+      {result && !result.character && lang === 'ja' && isGroundableCharacter(result.query ?? '') && (
         <CharacterMetadataUnavailable char={result.query} />
       )}
 

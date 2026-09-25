@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,7 +25,8 @@ beforeEach(() => {
   clearRect.mockReset();
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { mangaOcrRecognizeImage: recognizeImage },
+    // The panel reads a drawn glyph through the language-aware recognizer.
+    value: { ocrRecognizeGlyph: (dataUrl: string) => recognizeImage(dataUrl) },
   });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     beginPath: vi.fn(), clearRect, lineTo: vi.fn(), moveTo: vi.fn(), stroke: vi.fn(),
@@ -205,5 +206,31 @@ describe('CharacterMetadataPanel', () => {
     expect(words?.textContent).toContain('子猫');
     expect(words?.textContent).toContain('こねこ');
     expect(words?.textContent).not.toContain('犬');
+  });
+});
+
+describe('handwriting follows the character language', () => {
+  it('a Chinese character is read by the Chinese recognizer', async () => {
+    const seen: string[] = [];
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { ocrRecognizeGlyph: (_dataUrl: string, lang: string) => { seen.push(lang); return Promise.resolve('猫'); } },
+    });
+    const { default: CharacterWritingPractice } = await import('../components/lexicon/CharacterWritingPractice');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(createElement(CharacterWritingPractice, { target: '猫', lang: 'zh-Hans' })); });
+    const canvas = host.querySelector('canvas') as HTMLCanvasElement;
+    await act(async () => {
+      canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 1, clientY: 1 }));
+      canvas.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 5, clientY: 5 }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 5, clientY: 5 }));
+    });
+    const recognize = [...host.querySelectorAll('button')].find((button) => !button.disabled && button.textContent === 'manga.hw.recognize');
+    await act(async () => { recognize?.click(); });
+    expect(seen).toEqual(['zh']);
+    act(() => root.unmount());
+    host.remove();
   });
 });

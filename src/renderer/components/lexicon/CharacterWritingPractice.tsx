@@ -23,10 +23,14 @@ function recognizedGlyph(value: string): string | null {
 export default function CharacterWritingPractice({
   target,
   expectedStrokes,
+  lang = 'ja',
 }: {
   target: string;
   expectedStrokes?: number;
+  /** The character's language tag (`ja`, `zh-Hans`, `zh-Hant`): Chinese is read by the Chinese recognizer. */
+  lang?: string;
 }) {
+  const glyphLang = lang.startsWith('zh') ? 'zh' : 'ja';
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -56,7 +60,7 @@ export default function CharacterWritingPractice({
     if (!canvas || busy || strokeCount === 0) return;
     setBusy(true);
     try {
-      const value = (await window.api.mangaOcrRecognizeImage(canvas.toDataURL('image/png'))).trim();
+      const value = (await window.api.ocrRecognizeGlyph(canvas.toDataURL('image/png'), glyphLang)).trim();
       setResult(recognizedGlyph(value) ?? t('manga.hw.noChar'));
     } catch {
       setResult(t('manga.hw.failed'));
@@ -68,7 +72,7 @@ export default function CharacterWritingPractice({
     <div className="lexicon-character-practice" aria-label={t('manga.hw.title')}>
       <div className="lexicon-character-practice-heading">
         <strong>{t('manga.hw.title')}</strong>
-        <span lang="ja">{target}</span>
+        <span lang={lang}>{target}</span>
         {expectedStrokes !== undefined && (
           <span className="lexicon-character-practice-strokes">
             {t('lexicon.character.strokes')}: {strokeCount} / {expectedStrokes}
@@ -93,7 +97,7 @@ export default function CharacterWritingPractice({
           {busy ? t('manga.hw.recognizing') : t('manga.hw.recognize')}
         </button>
       </div>
-      {result && <output className="lexicon-character-practice-result" lang="ja">{result}</output>}
+      {result && <output className="lexicon-character-practice-result" lang={lang}>{result}</output>}
     </div>
   );
 }

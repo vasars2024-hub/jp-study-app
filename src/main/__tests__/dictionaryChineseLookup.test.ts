@@ -249,3 +249,15 @@ describe('Traditional Chinese', () => {
     expect(lookupCedictIndex(index, 'tradition').entries[0]?.word).toBe('传统');
   });
 });
+
+describe('hanzi character facts', () => {
+  it('a single hanzi gets its readings and meanings from CC-CEDICT, not a KANJIDIC2 prompt', async () => {
+    const { cedictCharacter } = await import('../dictionary/chineseLookup');
+    const index = buildCedictIndex(CEDICT_TEXT);
+    const cat = cedictCharacter(index, '猫');
+    expect(cat).toMatchObject({ lang: 'zh-Hans', char: '猫', readings: ['māo'], meanings: ['cat', 'CL:隻|只[zhi1]'] });
+    expect(cat?.sources[0]).toMatchObject({ dictId: 'cc-cedict', licence: 'CC BY-SA 4.0' });
+    expect(cedictCharacter(index, '貓', 'traditional')?.lang).toBe('zh-Hant');
+    expect(cedictCharacter(index, '传统')).toBeUndefined();
+  });
+});

@@ -435,6 +435,9 @@ const api = {
     req: import('./shared/mangaOcrIpc').MangaOcrOrderRequest,
   ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
     ipcRenderer.invoke('mangaOcr:saveOrder', req),
+  /** A hand-drawn character, read by the recognizer of its language (manga-ocr for Japanese, PaddleOCR otherwise). */
+  ocrRecognizeGlyph: (dataUrl: string, lang: 'ja' | 'zh' | 'ru'): Promise<string> =>
+    ipcRenderer.invoke('ocr:recognizeGlyph', dataUrl, lang),
   mangaOcrRecognizeImage: (dataUrl: string): Promise<string> =>
     ipcRenderer.invoke('mangaOcr:recognizeImage', dataUrl),
   onMangaOcrProgress: (cb: (p: import('./shared/mangaOcrIpc').MangaOcrProgress) => void): (() => void) => {
