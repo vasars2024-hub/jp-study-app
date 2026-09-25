@@ -22,14 +22,17 @@ vi.mock('../storage/db', () => ({
   },
 }));
 vi.mock('../flashcardAutoEnrich', () => ({ enrichNewCards: async () => undefined }));
+// A tokenizer that visibly "lemmatizes", so a test can tell whether it ran.
 vi.mock('../tokenizer', () => ({
-  getTokenizer: async () => {
-    throw new Error('no tokenizer in tests');
-  },
-  tokenizeSync: () => [],
-  tokenizerReady: () => false,
+  getTokenizer: async () => undefined,
+  tokenizeSync: (text: string) => [{ content: true, lemma: `lemma:${text}` }],
+  tokenizerReady: () => true,
 }));
-vi.mock('../levelService', () => ({ getActiveStudyLang: () => 'ja' }));
+const study = vi.hoisted(() => ({ lang: 'ja' as 'ja' | 'zh' }));
+vi.mock('../studyEnvironment', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getStudyLang: () => study.lang,
+}));
 
 import { apkgImportNotice, importApkgCards } from '../apkgImport';
 import { executeImport } from '../fileImportExecute';
@@ -77,6 +80,7 @@ const api = {
 };
 
 beforeEach(() => {
+  study.lang = 'ja';
   localStorage.clear();
   idb.clear();
   resetDeckMemoryForTests();
@@ -128,8 +132,20 @@ describe('Level check drop', () => {
       { onOpenSection },
     );
     expect(receipt?.levelSlot?.slot).toBe('jlpt-n4');
-    expect(getSlotList('jlpt-n4')?.words).toEqual(['猫', '犬']);
+    expect(getSlotList('jlpt-n4')?.words).toEqual(['lemma:猫', 'lemma:犬']);
     expect(onOpenSection).toHaveBeenCalledWith('stats');
+  });
+
+  it('files a Chinese deck under HSK and does not run the Japanese analyser on it', async () => {
+    study.lang = 'zh';
+    api.importApkg.mockImplementationOnce(async () => ({ ok: true, expressions: ['学习', '中国'], noteCount: 2, fileName: 'x.apkg' }));
+    const receipt = await executeImport(
+      { path: 'C:/decks/HSK 3.apkg', name: 'HSK 3.apkg', isDirectory: false },
+      'anki-level',
+      {},
+    );
+    expect(receipt?.levelSlot?.slot).toBe('hsk-3');
+    expect(getSlotList('hsk-3')?.words).toEqual(['学习', '中国']);
   });
 
   it('refuses by name when the file does not say its level', async () => {

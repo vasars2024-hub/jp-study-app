@@ -155,3 +155,28 @@ describe('planDeckUpsert', () => {
     expect(plan.added).toEqual([]);
   });
 });
+
+describe('other study languages', () => {
+  it('maps Chinese and Russian column names in a CSV header', async () => {
+    const { guessColumnMapping } = await import('../deckImport');
+    expect(guessColumnMapping(['汉字', '拼音', '意思', '例句'])).toEqual({ 0: 'word', 1: 'reading', 2: 'meaning', 3: 'sentence' });
+    expect(guessColumnMapping(['Слово', 'Ударение', 'Перевод', 'Пример'])).toEqual({ 0: 'word', 1: 'reading', 2: 'meaning', 3: 'sentence' });
+  });
+
+  it('resolves a Chinese Anki note type by name, not by position', async () => {
+    const { resolveFieldRoles } = await import('../apkgCards');
+    // Pinyin first: the old positional fallback took it as the studied word.
+    const model = { name: 'Chinese', flds: [
+      { name: 'Pinyin', ord: 0 },
+      { name: 'Hanzi', ord: 1 },
+      { name: 'English', ord: 2 },
+      { name: '例句', ord: 3 },
+    ] };
+    expect(resolveFieldRoles(model)).toEqual({ word: 1, reading: 0, meaning: 2, sentence: 3 });
+  });
+
+  it('gives a Russian deck title its own id', () => {
+    expect(deckBookId('Русские глаголы')).not.toBe(deckBookId('Русские существительные'));
+    expect(deckBookId('Русские глаголы')).toMatch(/^import-русские-глаголы-[0-9a-f]{8}$/);
+  });
+});

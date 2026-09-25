@@ -12,7 +12,7 @@ import { guessLevelSlot, type LevelSlot } from '../shared/levelScale';
 import { upsertImportedDeck, type DeckFlashcard } from './flashcardDeck';
 import { enrichNewCards } from './flashcardAutoEnrich';
 import { flushLevelListsPersistence, getSlotList, upsertSlotList, type LevelList } from './levelLists';
-import { getActiveStudyLang } from './levelService';
+import { getStudyLang } from './studyEnvironment';
 import { t } from './i18n';
 
 export interface ApkgLemmaResult {
@@ -166,7 +166,7 @@ export async function importApkgToLevel(
   fileName: string,
   onProgress?: (done: number, total: number) => void,
 ): Promise<ApkgLevelImportResult> {
-  const lang = getActiveStudyLang();
+  const lang = getStudyLang();
   const slot = guessLevelSlot(fileName, lang);
   if (!slot) return { ok: false, error: 'level-slot-unknown' };
   const res = await importApkgWords(filePath, onProgress);
@@ -202,11 +202,16 @@ export async function importApkgWords(
   const exprs = res.expressions ?? [];
 
   // Build kuromoji once up front so the fold loop can run synchronously.
-  let ready = true;
-  try {
-    await getTokenizer();
-  } catch {
-    ready = false; // fall back to raw expressions as their own "lemma"
+  // kuromoji is a JAPANESE analyser: for a Chinese study deck it would split
+  // hanzi words into characters and "lemmatize" them, so any other study
+  // language keeps its expressions as they are (Chinese does not inflect).
+  let ready = getStudyLang() === 'ja';
+  if (ready) {
+    try {
+      await getTokenizer();
+    } catch {
+      ready = false; // fall back to raw expressions as their own "lemma"
+    }
   }
 
   const seen = new Set<string>();

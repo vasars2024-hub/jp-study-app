@@ -58,7 +58,11 @@ export function modelsFromNormalizedRows(rows: readonly NormalizedAnkiFieldRow[]
  * in src/main/anki/fieldMapper.ts (kept in sync deliberately — the two live in
  * different module trees; renderer/shared code cannot import from src/main).
  */
-export const EXPRESSION_FIELD_RE = /^(term|expression|word|front|vocab(ulary)?|単語|表現|見出し語?|漢字)$/i;
+// Chinese and Russian study decks name the field differently (Hanzi,
+// Simplified, 词语, Слово); without them a Chinese deck fell back to a
+// positional guess and could mine the Pinyin field as the word.
+export const EXPRESSION_FIELD_RE =
+  /^(term|expression|word|front|vocab(ulary)?|単語|表現|見出し語?|漢字|hanzi|simplified|traditional|汉字|简体|繁體|繁体|词语|詞語|单词|單詞|слово|лексема)$/i;
 
 export function parseModels(modelsJson: string): AnkiModels {
   const raw = JSON.parse(modelsJson) as Record<string, unknown>;

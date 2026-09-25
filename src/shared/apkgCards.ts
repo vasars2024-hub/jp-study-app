@@ -27,9 +27,13 @@ import { isLocalSrsState, LOCAL_SRS_DEFAULT_EASE, LOCAL_SRS_MIN_EASE, type Local
  * renderer/shared code cannot import from `src/main`, and duplicating four
  * regexes is cheaper than restructuring the Anki module tree. Keep them in step.
  */
-export const READING_FIELD_RE = /^(reading|furigana|kana|yomi|よみ|読み|ルビ)$/i;
-export const MEANING_FIELD_RE = /^(meaning|definition|glossary|gloss|back|english|translation|意味|定義|訳)$/i;
-export const SENTENCE_FIELD_RE = /(sentence|context|example|例文|用例|^文$)/i;
+// Reading covers every study language's pronunciation field: kana, pinyin /
+// zhuyin for Chinese, stress / transcription for Russian.
+export const READING_FIELD_RE =
+  /^(reading|furigana|kana|yomi|よみ|読み|ルビ|pinyin|拼音|zhuyin|bopomofo|注音|pronunciation|transcription|stress|ударение|транскрипция|произношение)$/i;
+export const MEANING_FIELD_RE =
+  /^(meaning|definition|glossary|gloss|back|english|translation|意味|定義|訳|意思|释义|釋義|含义|英文|значение|перевод|определение)$/i;
+export const SENTENCE_FIELD_RE = /(sentence|context|example|例文|用例|^文$|例句|句子|пример|предложение)/i;
 
 export interface ApkgCard {
   /** The studied word or phrase. Never empty — cards without one are dropped. */
