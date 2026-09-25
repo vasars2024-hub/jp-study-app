@@ -615,16 +615,36 @@ export function clearLookupHistoryStore(): void {
   void clearSettingsDomain('lookups');
 }
 
-/** Read a heavy value, preferring the localStorage cache, falling back to IndexedDB. */
-export async function readHeavy<T>(lsKey: string, idbKey: string): Promise<T | null> {
+/**
+ * Read a heavy value, preferring the localStorage cache, falling back to IndexedDB.
+ *
+ * With `stampOf`, both copies are read and the one with the larger stamp wins.
+ * That is the case for values whose cache write can fail on quota while the
+ * IndexedDB mirror still lands: the cache then holds an OLDER copy, and
+ * preferring it would hand back stale data (the CSV editor lost edits so).
+ */
+export async function readHeavy<T>(
+  lsKey: string,
+  idbKey: string,
+  stampOf?: (value: unknown) => number,
+): Promise<T | null> {
+  let cachedValue: unknown = null;
   try {
     const cached = localStorage.getItem(lsKey);
-    if (cached) return JSON.parse(cached) as T;
+    if (cached) cachedValue = JSON.parse(cached);
   } catch {
     /* fall through to IndexedDB */
   }
-  const stored = await kvGet<T>(idbKey);
-  return stored ?? null;
+  if (cachedValue != null && !stampOf) return cachedValue as T;
+  let stored: T | null = null;
+  try {
+    stored = (await kvGet<T>(idbKey)) ?? null;
+  } catch {
+    stored = null;
+  }
+  if (cachedValue == null) return stored;
+  if (stored == null || !stampOf) return cachedValue as T;
+  return stampOf(stored) > stampOf(cachedValue) ? stored : (cachedValue as T);
 }
 
 export type { DomainInventoryItem };

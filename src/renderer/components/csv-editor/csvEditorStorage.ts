@@ -2,7 +2,7 @@
 
 import { emptyTable, type CsvTable } from '../../../shared/csvEditor';
 import type { CsvEditorSnapshot } from '../../../shared/csvEditorHistory';
-import { IDB_KEYS, mirrorToIdb } from '../../storage/storage';
+import { IDB_KEYS, LS_KEYS, mirrorToIdb, readHeavy } from '../../storage/storage';
 import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../../../shared/overEncodedJson';
 
 const STORAGE_KEY = 'jp-study-csv-editor-v1';
@@ -12,6 +12,66 @@ export interface StoredCsvEditorState {
   title: string;
   hiddenColumns: number[];
   savedAt: number;
+  deckId?: string;
+}
+
+/** A snapshot plus when it was written, so two copies can be ordered. */
+export interface LoadedCsvEditor {
+  snapshot: CsvEditorSnapshot;
+  savedAt: number;
+}
+
+function toSnapshot(parsed: StoredCsvEditorState): CsvEditorSnapshot {
+  return {
+    table: parsed.table,
+    title: parsed.title ?? 'imported-deck',
+    hiddenColumns: Array.isArray(parsed.hiddenColumns) ? parsed.hiddenColumns : [],
+    ...(typeof parsed.deckId === 'string' && parsed.deckId ? { deckId: parsed.deckId } : {}),
+  };
+}
+
+function isStoredState(value: unknown): value is StoredCsvEditorState {
+  const v = value as StoredCsvEditorState | null;
+  return !!v?.table?.headers && Array.isArray(v.table.rows);
+}
+
+function stampOf(value: unknown): number {
+  if (typeof value === 'string') {
+    // An over-encoded cache parses to a string; its stamp is inside.
+    return stampOf(unwrapOverEncoded<StoredCsvEditorState>(value).value);
+  }
+  const at = (value as StoredCsvEditorState | null)?.savedAt;
+  return typeof at === 'number' && Number.isFinite(at) ? at : 0;
+}
+
+/**
+ * The newest saved grid, from whichever of the localStorage cache and the
+ * IndexedDB mirror was written last.
+ *
+ * `saveStoredEditor` writes both, but a grid past the ~5 MB localStorage quota
+ * only reaches IndexedDB — and the cache keeps the last copy that fit. The
+ * synchronous `loadStoredEditor` can only see that stale cache; this is the
+ * read that settles it.
+ */
+export async function loadNewestStoredEditor(): Promise<LoadedCsvEditor | null> {
+  let value: unknown;
+  try {
+    value = await readHeavy<unknown>(LS_KEYS.csvEditor, IDB_KEYS.csvEditor, stampOf);
+  } catch {
+    return null;
+  }
+  if (typeof value === 'string') value = unwrapOverEncoded<StoredCsvEditorState>(value).value;
+  if (!isStoredState(value)) return null;
+  return { snapshot: toSnapshot(value), savedAt: stampOf(value) };
+}
+
+/** When the localStorage copy was written (0 when there is none). */
+export function storedEditorSavedAt(): number {
+  try {
+    return stampOf(localStorage.getItem(STORAGE_KEY) ?? '');
+  } catch {
+    return 0;
+  }
 }
 
 export function loadStoredEditor(): CsvEditorSnapshot | null {
@@ -23,7 +83,7 @@ export function loadStoredEditor(): CsvEditorSnapshot | null {
     // a single parse returns a string and every check below fails silently.
     const { value, layers } = unwrapOverEncoded<StoredCsvEditorState>(raw);
     const parsed = value as StoredCsvEditorState | null;
-    if (!parsed?.table?.headers || !Array.isArray(parsed.table.rows)) {
+    if (!isStoredState(parsed)) {
       // Returning null here makes the panel fall back to an empty table, and its
       // first save overwrites whatever was stored. If the value was damaged
       // rather than merely absent, keep a copy first — this is exactly how the
@@ -31,11 +91,7 @@ export function loadStoredEditor(): CsvEditorSnapshot | null {
       quarantineIfUnrepaired(localStorage, STORAGE_KEY, layers);
       return null;
     }
-    const snapshot: CsvEditorSnapshot = {
-      table: parsed.table,
-      title: parsed.title ?? 'imported-deck',
-      hiddenColumns: Array.isArray(parsed.hiddenColumns) ? parsed.hiddenColumns : [],
-    };
+    const snapshot = toSnapshot(parsed);
     // Self-heal once. saveStoredEditor writes the canonical single-layer shape.
     if (isOverEncoded(layers)) saveStoredEditor(snapshot);
     return snapshot;
@@ -50,6 +106,7 @@ export function saveStoredEditor(snapshot: CsvEditorSnapshot): void {
     title: snapshot.title,
     hiddenColumns: snapshot.hiddenColumns,
     savedAt: Date.now(),
+    ...(snapshot.deckId ? { deckId: snapshot.deckId } : {}),
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -68,10 +125,11 @@ export function clearStoredEditor(): void {
   }
 }
 
-export function defaultEditorSnapshot(): CsvEditorSnapshot {
+/** A blank grid. `title` is the UI language's default deck name. */
+export function defaultEditorSnapshot(title = 'imported-deck'): CsvEditorSnapshot {
   return {
     table: emptyTable(4, 8),
-    title: 'imported-deck',
+    title,
     hiddenColumns: [],
   };
 }

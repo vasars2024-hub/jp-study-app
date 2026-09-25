@@ -6838,6 +6838,13 @@ export const ja: Catalog = {
   'csv.redoTitle': 'やり直し (Ctrl+Y)',
   'csv.openFile': 'ファイルを開く',
   'csv.importFlashcards': 'フラッシュカードに取り込む',
+  'csv.removeMissing': 'ファイルにないカードを削除',
+  'csv.removeMissing.hint': 'オフ: 取り込みはカードの追加と更新のみで、復習の進み具合は保たれます。オン: このデッキのうちファイルにもうないカードを削除します (先に確認します)。',
+  'csv.removeMissing.confirmTitle': 'ファイルにないカードを削除しますか?',
+  'csv.removeMissing.confirmMsg': {
+    other: 'このデッキの {count} 枚のカードがファイルにありません。復習の記録ごと削除されます。',
+  },
+  'csv.removeMissing.confirm': '削除して取り込む',
   'csv.downloadCsv': 'CSV をダウンロード',
   'csv.downloadTsv': 'TSV をダウンロード',
   'csv.saving': '保存中…',
@@ -6862,6 +6869,10 @@ export const ja: Catalog = {
   'csv.clearGrid': '表をクリア',
   'csv.hiddenColumns': '非表示の列:',
   'csv.columnN': '列 {n}',
+  'csv.default.deckTitle': '取り込んだデッキ',
+  'csv.default.tagHeader': 'タグ',
+  'csv.default.tagValue': '単語セット 1',
+  'csv.default.idHeader': '番号',
   'csv.showColumn': '列を表示',
   'csv.hideColumn': '列を非表示',
   'csv.show': '表示',
@@ -6925,16 +6936,14 @@ export const ja: Catalog = {
   'csv.status.loadedRows': {
     other: '{count} 行を読み込みました。',
   },
-  'csv.status.importedCards': {
-    other: '{count} 枚のカードをフラッシュカードに取り込みました。',
-  },
-  'csv.status.reimported': {
-    other: '新しい列マッピングで {count} 枚を再取り込みしました。',
-  },
-  'csv.status.importedCount': {
-    other: '{count} 枚のカードを取り込みました。',
-  },
   'csv.status.nothingToImport': '取り込むものがありません — 列を「表層 / 単語」にマップしてください。',
+  'csv.status.upserted': '取り込みました: 新規 {added}、更新 {updated}、変更なし {unchanged}。復習の進み具合は保たれています。',
+  'csv.status.removedMissing': {
+    other: 'ファイルにない {count} 枚のカードを削除しました。',
+  },
+  'csv.status.keptMissing': {
+    other: 'このデッキの {count} 枚のカードはファイルにありませんが、残しました。',
+  },
   'csv.status.savedFile': 'ファイルを保存しました → {path}',
   'csv.status.saveFailed': 'CSV を保存できませんでした。',
   'csv.status.selectOneToSplit': '分割する列をちょうど 1 つ選択してください。',

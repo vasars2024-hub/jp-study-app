@@ -6796,6 +6796,13 @@ export const zh: Catalog = {
   'csv.redoTitle': '重做 (Ctrl+Y)',
   'csv.openFile': '打开文件',
   'csv.importFlashcards': '导入到抽认卡',
+  'csv.removeMissing': '删除文件中没有的卡片',
+  'csv.removeMissing.hint': '关闭：导入只添加和更新卡片，并保留复习进度。开启：删除此卡组中文件里已没有的卡片（会先询问）。',
+  'csv.removeMissing.confirmTitle': '删除文件中没有的卡片？',
+  'csv.removeMissing.confirmMsg': {
+    other: '此卡组中有 {count} 张卡片不在文件中。它们将连同复习进度一起被删除。',
+  },
+  'csv.removeMissing.confirm': '删除并导入',
   'csv.downloadCsv': '下载 CSV',
   'csv.downloadTsv': '下载 TSV',
   'csv.saving': '保存中…',
@@ -6820,6 +6827,10 @@ export const zh: Catalog = {
   'csv.clearGrid': '清空表格',
   'csv.hiddenColumns': '隐藏的列:',
   'csv.columnN': '列 {n}',
+  'csv.default.deckTitle': '导入的卡组',
+  'csv.default.tagHeader': '标签',
+  'csv.default.tagValue': '词汇组 1',
+  'csv.default.idHeader': '编号',
   'csv.showColumn': '显示列',
   'csv.hideColumn': '隐藏列',
   'csv.show': '显示',
@@ -6883,16 +6894,14 @@ export const zh: Catalog = {
   'csv.status.loadedRows': {
     other: '已加载 {count} 行。',
   },
-  'csv.status.importedCards': {
-    other: '已将 {count} 张卡片导入抽认卡。',
-  },
-  'csv.status.reimported': {
-    other: '已使用新列映射重新导入 {count} 张卡片。',
-  },
-  'csv.status.importedCount': {
-    other: '已导入 {count} 张卡片。',
-  },
   'csv.status.nothingToImport': '没有可导入的内容 — 请将某列映射到「表达 / 单词」。',
+  'csv.status.upserted': '已导入：新增 {added}，更新 {updated}，未变 {unchanged}。复习进度已保留。',
+  'csv.status.removedMissing': {
+    other: '已删除 {count} 张文件中没有的卡片。',
+  },
+  'csv.status.keptMissing': {
+    other: '此卡组中有 {count} 张卡片不在文件中，已保留。',
+  },
   'csv.status.savedFile': '已保存文件 → {path}',
   'csv.status.saveFailed': '无法保存 CSV。',
   'csv.status.selectOneToSplit': '请恰好选择一列进行拆分。',

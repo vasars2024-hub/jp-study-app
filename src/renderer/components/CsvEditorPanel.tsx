@@ -3,11 +3,14 @@ import {
   deleteColumn,
   deleteRow,
   emptyTable,
+  csvColumnLabel,
   insertColumn,
   insertRow,
+  isBlankTable,
   parseCsvText,
   serializeCsvTable,
   setCell,
+  setCsvColumnLabel,
   setHeader,
   tableStats,
   type CsvDelimiter,
@@ -46,8 +49,8 @@ import {
   type DeckColumnMapping,
   type DeckFieldKey,
 } from '../../shared/deckImport';
-import { promptDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from './ui';
-import { importDeckFromEntries } from '../flashcardDeck';
+import { confirmDialog, promptDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from './ui';
+import { importDeckFromEntries, previewDeckUpsert } from '../flashcardDeck';
 import { useT } from '../i18n';
 import { getActiveProfile } from '../profileState';
 import { parseCsvTextAsync } from '../csvParseAsync';
@@ -59,9 +62,12 @@ import FindReplaceModal from './csv-editor/FindReplaceModal';
 import ImportMergeModal from './csv-editor/ImportMergeModal';
 import {
   defaultEditorSnapshot,
+  loadNewestStoredEditor,
   loadStoredEditor,
   saveStoredEditor,
+  storedEditorSavedAt,
 } from './csv-editor/csvEditorStorage';
+import { editorUndoAction } from './csv-editor/editorUndoKeys';
 import {
   refreshMapping,
   remapMappingOnDelete,
@@ -103,7 +109,16 @@ function menuPosition(e: React.MouseEvent): { x: number; y: number } {
 
 export default function CsvEditorPanel({ onDeckImported }: Props) {
   const { t } = useT();
-  const initial = useMemo(() => loadStoredEditor() ?? defaultEditorSnapshot(), []);
+  // Generated column names follow the UI language (see `setCsvColumnLabel`).
+  setCsvColumnLabel(t('csv.columnN', { n: '{n}' }));
+  const initial = useMemo(
+    // Read once on mount; the default title is only a starting value.
+    () => loadStoredEditor() ?? defaultEditorSnapshot(t('csv.default.deckTitle')),
+    [],
+  );
+  // When the localStorage copy `initial` came from was written; the IndexedDB
+  // mirror is compared against it once it has been read.
+  const initialSavedAt = useMemo(() => storedEditorSavedAt(), []);
   const [history, setHistory] = useState<CsvEditorHistory>(() => createHistory(initial));
   const [mapping, setMapping] = useState<DeckColumnMapping>(() =>
     guessColumnMapping(initial.table.headers),
@@ -125,6 +140,10 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [dragCol, setDragCol] = useState<number | null>(null);
+  // Autosave waits for the IndexedDB read: saving the (possibly stale)
+  // localStorage copy first would stamp it newer than the mirror it lost to.
+  const [hydrated, setHydrated] = useState(false);
+  const [removeMissing, setRemoveMissing] = useState(false);
   // Dirty tracking by reference, not JSON.stringify: snapshots are immutable,
   // so identity comparison is exact and O(1). Stringifying a 15k-row table on
   // every render was a major source of typing lag.
@@ -147,6 +166,9 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   const snap = history.present;
   const table = snap.table;
   const title = snap.title;
+  // The deck this grid imports into. Pinned when a file is loaded, so editing
+  // the title renames that deck rather than starting a new one.
+  const deckId = snap.deckId ?? deckBookId(title);
 
   const stats = useMemo(() => tableStats(table), [table]);
   const dirty = snap.table !== baseline.table || snap.title !== baseline.title;
@@ -283,6 +305,26 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   }, [table.headers.length]);
 
   useEffect(() => {
+    let cancelled = false;
+    void loadNewestStoredEditor().then((newest) => {
+      if (cancelled) return;
+      if (newest && newest.savedAt > initialSavedAt) {
+        // The mirror is newer than the cache: a grid too big for localStorage.
+        const next = newest.snapshot;
+        setHistory(createHistory(next));
+        setBaseline(next);
+        setHiddenColumns(new Set(next.hiddenColumns));
+        setMapping(guessColumnMapping(next.table.headers));
+      }
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSavedAt]);
+
+  useEffect(() => {
+    if (!hydrated) return undefined;
     // Debounced auto-save: every edit schedules a write 600ms out; further
     // edits inside the window push it back so bursts of typing serialize the
     // table once, not per keystroke.
@@ -293,27 +335,22 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
         table,
         title,
         hiddenColumns: [...hiddenColumns],
+        deckId,
       });
       setPersistState('saved');
     }, 600);
     return () => {
       if (persistTimer.current) clearTimeout(persistTimer.current);
     };
-  }, [table, title, hiddenColumns]);
+  }, [table, title, hiddenColumns, deckId, hydrated]);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        setHistory((h) => undoHistory(h) ?? h);
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        setHistory((h) => redoHistory(h) ?? h);
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+  // Undo/redo is scoped to the editor, and leaves text fields outside the grid
+  // (deck name, search, paste box) their own native undo.
+  const onEditorKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const action = editorUndoAction(e.nativeEvent, gridWrapRef.current);
+    if (!action) return;
+    e.preventDefault();
+    setHistory((h) => (action === 'undo' ? undoHistory(h) : redoHistory(h)) ?? h);
   }, []);
 
   useEffect(() => {
@@ -333,47 +370,36 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     };
   }, [contextMenu]);
 
-  const syncToDeck = useCallback(
-    (t: CsvTable, m: DeckColumnMapping, deckTitle: string): number => {
-      const safeTitle = deckTitle.trim() || 'Imported deck';
-      const entries = rowsToDeckEntries(t, m, safeTitle, 'csv');
-      if (!entries.length) return 0;
-      importDeckFromEntries(entries);
-      onDeckImported?.();
-      return entries.length;
-    },
-    [onDeckImported],
-  );
-
   function applyImported(nextTable: CsvTable, deckTitle?: string, mode: 'append' | 'overwrite' = 'overwrite'): void {
     const merged =
-      mode === 'append' && table.rows.length
+      mode === 'append' && !isBlankTable(table)
         ? appendTables(table, nextTable)
         : nextTable;
     const nextTitle = deckTitle ?? title;
+    // Loading loads the grid and nothing else. Cards change only when the user
+    // presses Import: this used to import on every load and on every mapping
+    // change, and each import reset the deck's review progress.
     const nextSnap: CsvEditorSnapshot = {
       table: merged,
       title: nextTitle,
       hiddenColumns: mode === 'overwrite' ? [] : [...hiddenColumns],
+      deckId: mode === 'overwrite' ? deckBookId(nextTitle) : deckId,
     };
     commit(nextSnap, t('csv.status.loadedRows', { count: merged.rows.length }), true);
     setMapping(guessColumnMapping(merged.headers));
     if (mode === 'overwrite') setHiddenColumns(new Set());
     setBaseline(nextSnap);
-    const count = syncToDeck(merged, guessColumnMapping(merged.headers), nextTitle);
-    if (count) setStatusMsg(t('csv.status.importedCards', { count }), true);
   }
 
   async function loadText(raw: string, deckTitle?: string): Promise<void> {
     if (!raw.trim()) return;
     setStatusMsg(t('csv.status.parsing'));
-    // Parse in a Web Worker so a large file never freezes the grid.
-    const parsed = await parseCsvTextAsync(raw, {
-      delimiter: table.delimiter,
-      hasHeader: table.hasHeader,
-    });
+    // Parse in a Web Worker so a large file never freezes the grid. No
+    // delimiter or header flag is passed: the file's own are detected (a TSV,
+    // an Anki export), and the toolbar controls then show what was found.
+    const parsed = await parseCsvTextAsync(raw, { columnLabel: csvColumnLabel() });
     setStatusMsg('');
-    if (table.rows.length && raw.trim()) {
+    if (!isBlankTable(table)) {
       setPendingImport({ table: parsed, title: deckTitle });
       return;
     }
@@ -393,18 +419,44 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   }
 
   function updateMapping(col: number, field: DeckFieldKey): void {
-    const next = { ...mapping, [col]: field };
-    setMapping(next);
-    const count = syncToDeck(table, next, title);
-    if (count) setStatusMsg(t('csv.status.reimported', { count }), true);
+    setMapping({ ...mapping, [col]: field });
   }
 
-  function manualImport(): void {
-    const count = syncToDeck(table, mapping, title);
-    setStatusMsg(
-      count ? t('csv.status.importedCount', { count }) : t('csv.status.nothingToImport'),
-      count > 0,
-    );
+  async function manualImport(): Promise<void> {
+    const deckTitle = title.trim() || t('csv.default.deckTitle');
+    const entries = rowsToDeckEntries(table, mapping, deckTitle, 'csv').map((entry) => ({
+      ...entry,
+      bookId: deckId,
+    }));
+    if (!entries.length) {
+      setStatusMsg(t('csv.status.nothingToImport'));
+      return;
+    }
+    let prune = removeMissing;
+    if (prune) {
+      const preview = previewDeckUpsert(deckId, entries);
+      if (preview.missing > 0) {
+        prune = await confirmDialog({
+          title: t('csv.removeMissing.confirmTitle'),
+          message: t('csv.removeMissing.confirmMsg', { count: preview.missing }),
+          confirmLabel: t('csv.removeMissing.confirm'),
+          danger: true,
+        });
+        if (!prune) return;
+      }
+    }
+    const result = importDeckFromEntries(entries, { removeMissing: prune });
+    onDeckImported?.();
+    const parts = [
+      t('csv.status.upserted', {
+        added: result.added.length,
+        updated: result.updated,
+        unchanged: result.unchanged,
+      }),
+    ];
+    if (result.removed) parts.push(t('csv.status.removedMissing', { count: result.removed }));
+    else if (result.missing) parts.push(t('csv.status.keptMissing', { count: result.missing }));
+    setStatusMsg(parts.join(' '), true);
     setBaseline(snap);
   }
 
@@ -512,12 +564,13 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     });
     if (sep === null) return;
     const cols = [...selectedCols].sort((a, b) => a - b);
-    const header =
-      (await promptDialog({
-        title: t('csv.prompt.mergeTitle'),
-        message: t('csv.prompt.mergeHeader'),
-      })) ?? undefined;
-    const next = mergeColumns(table, cols, sep, header);
+    const header = await promptDialog({
+      title: t('csv.prompt.mergeTitle'),
+      message: t('csv.prompt.mergeHeader'),
+    });
+    // Cancel means cancel; an empty answer means "use the default header".
+    if (header === null) return;
+    const next = mergeColumns(table, cols, sep, header || undefined);
     updateTable(next);
     setMapping((prev) => refreshMapping(next.headers, prev));
     setSelectedCols(new Set());
@@ -531,30 +584,33 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   }
 
   async function handleTagColumn(): Promise<void> {
-    const header =
-      (await promptDialog({
-        title: t('csv.prompt.tagTitle'),
-        message: t('csv.prompt.tagHeader'),
-        defaultValue: 'Tag',
-      })) ?? 'Tag';
-    const value =
-      (await promptDialog({
-        title: t('csv.prompt.tagTitle'),
-        message: t('csv.prompt.tagValue'),
-        defaultValue: 'Vocabulary Set 1',
-      })) ?? '';
-    updateTable(addTagColumn(table, header, value));
-    setMapping((prev) => refreshMapping(table.headers, prev));
+    const defaultHeader = t('csv.default.tagHeader');
+    const header = await promptDialog({
+      title: t('csv.prompt.tagTitle'),
+      message: t('csv.prompt.tagHeader'),
+      defaultValue: defaultHeader,
+    });
+    if (header === null) return;
+    const value = await promptDialog({
+      title: t('csv.prompt.tagTitle'),
+      message: t('csv.prompt.tagValue'),
+      defaultValue: t('csv.default.tagValue'),
+    });
+    if (value === null) return;
+    const next = addTagColumn(table, header.trim() || defaultHeader, value);
+    updateTable(next);
+    setMapping((prev) => refreshMapping(next.headers, prev));
   }
 
   async function handleAutoNumber(): Promise<void> {
-    const header =
-      (await promptDialog({
-        title: t('csv.prompt.autoTitle'),
-        message: t('csv.prompt.autoHeader'),
-        defaultValue: 'ID',
-      })) ?? 'ID';
-    updateTable(addAutoNumberColumn(table, header));
+    const defaultHeader = t('csv.default.idHeader');
+    const header = await promptDialog({
+      title: t('csv.prompt.autoTitle'),
+      message: t('csv.prompt.autoHeader'),
+      defaultValue: defaultHeader,
+    });
+    if (header === null) return;
+    updateTable(addAutoNumberColumn(table, header.trim() || defaultHeader));
     setMapping((m) => remapMappingOnInsert(m, 0));
   }
 
@@ -597,7 +653,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           onSelect: () => void downloadCsv(),
         },
         { separator: true, label: '' },
-        { id: 'import', label: t('csv.importFlashcards'), onSelect: manualImport },
+        { id: 'import', label: t('csv.importFlashcards'), onSelect: () => void manualImport() },
       ],
     },
     {
@@ -669,7 +725,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
 
   return (
     <AppChrome menus={csvMenus} status={csvStatus} className="aero-csv-chrome">
-    <section className="anki-card csv-editor">
+    <section className="anki-card csv-editor" tabIndex={-1} onKeyDown={onEditorKeyDown}>
       <p className="muted csv-editor-lead">{t('csv.lead')}</p>
 
       <div className="csv-editor-toolbar">
@@ -681,7 +737,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           <input
             type="text"
             value={title}
-            onChange={(e) => updateSnap({ title: e.target.value })}
+            onChange={(e) => updateSnap({ title: e.target.value, deckId })}
             placeholder={t('csv.deckNamePlaceholder')}
           />
         </label>
@@ -689,7 +745,9 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           <span>{t('csv.delimiter')}</span>
           <select value={table.delimiter} onChange={(e) => changeDelimiter(e.target.value as CsvDelimiter)}>
             <option value=",">{t('csv.delimiter.comma')}</option>
-            <option value="\t">{t('csv.delimiter.tab')}</option>
+            {/* An expression, not value="\t": JSX attribute strings keep the
+                backslash, so the control could never show a detected tab. */}
+            <option value={'\t'}>{t('csv.delimiter.tab')}</option>
             <option value=";">{t('csv.delimiter.semicolon')}</option>
           </select>
         </label>
@@ -733,9 +791,17 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
             e.target.value = '';
           }}
         />
-        <button type="button" className="btn primary" onClick={manualImport}>
+        <button type="button" className="btn primary" onClick={() => void manualImport()}>
           {t('csv.importFlashcards')}
         </button>
+        <label className="csv-editor-check" title={t('csv.removeMissing.hint')}>
+          <input
+            type="checkbox"
+            checked={removeMissing}
+            onChange={(e) => setRemoveMissing(e.target.checked)}
+          />
+          {t('csv.removeMissing')}
+        </label>
         <button type="button" className="btn" disabled={saving} onClick={() => void downloadCsv()}>
           <Icon name="download" size={16} />
           {saving
@@ -840,7 +906,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
         {' · '}
         {t('csv.stats.cols', { count: stats.columns })}
         {' · '}
-        {t('csv.stats.deckId', { id: deckBookId(title) })}
+        {t('csv.stats.deckId', { id: deckId })}
         {dirty && t('csv.unsavedSuffix')}
         {persistState !== 'idle' && (
           <span className={`csv-editor-autosave ${persistState}`}>
@@ -1007,7 +1073,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           className="btn small subtle"
           onClick={() => {
             const empty = emptyTable(4, 8);
-            commit({ table: empty, title, hiddenColumns: [] });
+            commit({ table: empty, title, hiddenColumns: [], deckId });
             setHiddenColumns(new Set());
             setStatusMsg('');
           }}
