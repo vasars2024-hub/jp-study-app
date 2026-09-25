@@ -59,10 +59,13 @@ function buttonTag(source: string, marker: string): string {
 }
 
 describe('the shell taskbar declares its popups', () => {
-  it('the Start button is a menu button with a live expanded state', () => {
+  it('the Start button opens a dialog, with a live expanded state and the panel it controls', () => {
+    // A dialog, not a menu (round-2 K6): the panel holds a search entry, headed groups and a
+    // roving list of tiles — see shell/StartPanel.tsx.
     const tag = buttonTag(read(SHELL), 'os-start-btn');
-    expect(tag).toContain('aria-haspopup="menu"');
+    expect(tag).toContain('aria-haspopup="dialog"');
     expect(tag).toContain('aria-expanded={startOpen}');
+    expect(tag).toContain('aria-controls={startOpen ? START_PANEL_ID : undefined}');
   });
 
   it.each([

@@ -20,6 +20,7 @@ import {
 } from '../../wallpaperFit';
 import { useT } from '../../i18n';
 import { setReduceMotion as setDisplayReduceMotion } from '../../displayPrefs';
+import { useFocusReturn } from './focusReturn';
 
 const TOGGLE_EVENT = 'shell:toggleQuickSettings';
 
@@ -112,6 +113,13 @@ export default function QuickSettings() {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [open]);
+
+  // Escape, the backdrop and "All settings" all close the flyout; none of them used
+  // to say where focus should go, so it fell to <body> (round-2 audit K7). It goes
+  // back to whatever opened the flyout, or to the tray button when that is gone.
+  useFocusReturn(open, panelRef, () =>
+    document.querySelector<HTMLElement>('[data-shell-opener="quick-settings"]'),
+  );
 
   if (!open) return null;
 

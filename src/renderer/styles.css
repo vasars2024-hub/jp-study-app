@@ -15499,33 +15499,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .os-task-win.min {
   opacity: 0.6;
 }
-/* Close affordance. Space is reserved permanently and only the opacity
-   animates, so revealing it on hover never re-flows the taskbar. */
-.os-task-win .os-task-close {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin-right: -4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--muted);
-  opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
-}
-.os-task-win:hover .os-task-close,
-.os-task-win.active .os-task-close,
-.os-task-win .os-task-close:focus-visible {
-  opacity: 1;
-}
-.os-task-win .os-task-close:hover {
-  background: var(--red-deep);
-  color: #fff;
-  opacity: 1;
-}
+/* The close affordance is a sibling of this button now: see `.os-task-item` in shell/shell.css. */
 .os-tray {
   display: flex;
   align-items: center;
@@ -23059,6 +23033,11 @@ html.lockscreen-widget-root #root {
   justify-content: center;
   margin-bottom: 10px;
 }
+/* UI-language picker at the top of the first-launch card (reuses .sp-seg). */
+.consent-lang {
+  width: fit-content;
+  margin: -8px auto 18px;
+}
 .consent-card h1 {
   margin: 0 0 10px;
   font-size: 20px;
@@ -23108,8 +23087,13 @@ html.lockscreen-widget-root #root {
   border: 1px solid var(--border);
 }
 .consent-yes {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
+  /* The deep accent red, not --accent-2: --accent-2 is the accent mixed 28% toward white
+     (a highlight recipe), which painted the first CTA a new user sees salmon pink, off-brand,
+     at ~2.7:1 under white text. --red-deep is the same live accent 22% toward black
+     (osPersonalization writes it inline, so it follows the user's accent preset) and holds
+     ~5.2:1 under white text on the default accent. */
+  background: var(--red-deep);
+  border-color: var(--red-deep);
   color: #fff;
   font-weight: 600;
 }

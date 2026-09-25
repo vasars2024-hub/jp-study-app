@@ -353,7 +353,13 @@ export default function ThemeStudioPanel() {
               <legend>{t(`theme.group.${group}`)}</legend>
               {specs.map((spec) => (
                 <div className="field-row" key={spec.token}>
-                  <label htmlFor={`theme-token-${spec.token}`}>--{spec.token}</label>
+                  {/* The token's readable name in the UI language, with its CSS name kept
+                      beside it for people who theme by hand — the bare `--bg` used to be
+                      the only label, in English, in every language. */}
+                  <label htmlFor={`theme-token-${spec.token}`}>
+                    {t(`shell.themeToken.${spec.token}`)}{' '}
+                    <code className="muted">--{spec.token}</code>
+                  </label>
                   <input
                     id={`theme-token-${spec.token}`}
                     key={`${profile.id}-${spec.token}-${profile.tokens[spec.token] ?? ''}`}
