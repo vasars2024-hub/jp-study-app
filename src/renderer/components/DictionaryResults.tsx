@@ -34,9 +34,17 @@ import {
 } from '../../shared/dictionaryLookup';
 import { firstGlossSegment } from '../../shared/epubEnrichment';
 import { glossForLangFromEntries } from '../../shared/fieldRouter';
-import { isGroundableCharacter } from '../../shared/langs';
+import { isGroundableCharacter, langNativeLabel } from '../../shared/langs';
 import { recordDictionaryEntry } from '../clipboardHistory';
 import { recordLookup } from '../lookupHistory';
+import {
+  defaultGlossLangs,
+  entryGlossLangs,
+  filterEntriesByGlossLangs,
+  loadGlossLangs,
+  readStoredGlossLangs,
+  saveGlossLangs,
+} from '../dictionaryGlossLangs';
 import { useT } from '../i18n';
 import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
@@ -292,7 +300,25 @@ function glossFor(entry: DictEntry): string {
 }
 
 export default function DictionaryResults({ query, variant = 'popup', lang = 'ja', context, onLookup }: Props) {
-  const { t } = useT();
+  const { t, lang: uiLang } = useT();
+  /**
+   * Definition languages on screen (see `dictionaryGlossLangs.ts`). Display only:
+   * mining below still reads `result.entries`, every language, so `{meaning:ru}`
+   * keeps working for a profile that asks for it.
+   */
+  const [glossLangs, setGlossLangs] = useState<string[]>(() => loadGlossLangs(uiLang));
+  useEffect(() => {
+    // Follow the UI language until the user has chosen for themselves.
+    if (!readStoredGlossLangs()) setGlossLangs(defaultGlossLangs(uiLang));
+  }, [uiLang]);
+  const toggleGlossLang = (code: string): void => {
+    setGlossLangs((prev) => {
+      const next = prev.includes(code) ? prev.filter((l) => l !== code) : [...prev, code];
+      if (!next.length) return prev; // at least one language stays on
+      saveGlossLangs(next);
+      return next;
+    });
+  };
   const [result, setResult] = useState<DictResult | null>(null);
   const [anki, setAnki] = useState<AnkiStatus | null>(null);
   const [ankiLink, setAnkiLink] = useState<AnkiLinkStatus | null>(null);
@@ -919,6 +945,12 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   }
 
   const entries = result?.entries ?? [];
+  const presentGlossLangs = entryGlossLangs(entries);
+  // Indexes stay the positions in `entries`: `addState`/`addErr` are keyed by them.
+  const { visible: shownEntries, hiddenCount: hiddenGlossEntries } = filterEntriesByGlossLangs(
+    entries.map((entry, index) => ({ entry, index, sourceLangs: entry.sourceLangs })),
+    glossLangs,
+  );
 
   /**
    * Grading is offered only when the dictionary being read is the language the
@@ -1006,13 +1038,25 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         </div>
       )}
 
-      {result?.character && <CharacterMetadataPanel character={result.character} entries={entries} />}
-      {result && !result.character && isGroundableCharacter(result.query ?? '') && (
-        <CharacterMetadataUnavailable char={result.query} />
+      {presentGlossLangs.length > 1 && (
+        <div className="dict-gloss-langs" role="group" aria-label={t('readerUi.gloss.langs')}>
+          {presentGlossLangs.map((code) => (
+            <button
+              key={code}
+              type="button"
+              className={`gram-level-btn ${glossLangs.includes(code) ? 'active' : ''}`}
+              aria-pressed={glossLangs.includes(code)}
+              onClick={() => toggleGlossLang(code)}
+            >
+              {langNativeLabel(code)}
+            </button>
+          ))}
+        </div>
       )}
+      {hiddenGlossEntries > 0 && <p className="dict-gloss-hidden muted">{t('readerUi.gloss.otherHidden')}</p>}
 
       <div className="dict-entries">
-        {entries.map((entry, i) => {
+        {shownEntries.map(({ entry, index: i }) => {
           const saved = savedSet.has(entry.word);
           return (
             <div className="dict-entry" key={i}>
@@ -1050,8 +1094,10 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                   </span>
                 )}
                 <button
+                  type="button"
                   className="dict-star lq-hit"
                   title={t('dict.results.copyClipboard')}
+                  aria-label={t('dict.results.copyClipboard')}
                   onClick={() => copyDictionaryEntry(entry)}
                 >
                   <Icon name="clipboard" size={14} />
@@ -1060,9 +1106,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                     the swapped title are all sighted-only signals, and a title
                     that changes in place is not announced. */}
                 <button
+                  type="button"
                   className={`dict-star lq-hit ${saved ? 'on' : ''}`}
                   aria-pressed={saved}
                   title={saved ? t('dict.results.savedFlashcards') : t('dict.results.saveFlashcards')}
+                  aria-label={t('dict.results.saveFlashcards')}
                   onClick={() => toggleSave(entry)}
                 >
                   <Icon name="star" size={14} fill={saved} />
@@ -1138,6 +1186,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           );
         })}
       </div>
+
+      {/* The character panel (KANJIDIC readings, strokes, components) and its "not
+          installed" note come after the meanings, not before them: above the entries
+          they pushed the definition a lookup was for off the bottom of the popup. */}
+      {result?.character && <CharacterMetadataPanel character={result.character} entries={entries} />}
+      {result && !result.character && isGroundableCharacter(result.query ?? '') && (
+        <CharacterMetadataUnavailable char={result.query} />
+      )}
 
       {/*
         A page of results has to say it is a page.

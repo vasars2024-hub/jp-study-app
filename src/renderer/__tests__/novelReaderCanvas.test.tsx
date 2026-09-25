@@ -75,7 +75,10 @@ afterEach(() => {
 });
 
 /** The three toolbar triggers, in DOM order. Selecting by label is not safe: it is localised. */
-const TRIGGER = '.settings-anchor button[aria-pressed]';
+// Each anchor's own tool trigger is its first button. `[aria-pressed]` alone also matched
+// the translation-visibility toggle beside the Translate trigger once that toggle said
+// whether it is on (round-2 K12 accessible states).
+const TRIGGER = '.settings-anchor > button:first-child[aria-pressed]';
 const BOOKMARKS = 0;
 const TRANSLATE = 1;
 const SETTINGS = 2;

@@ -5373,7 +5373,6 @@ export const en: Catalog = {
   'manga.ocr.noText': 'No text was found on this page.',
   'manga.ocr.failed': 'OCR failed.',
   'manga.ocr.readFailed': 'Could not read this page image.',
-  'manga.hw.open': 'Draw',
   'manga.hw.title': 'Draw a character',
   'manga.hw.hint': 'Draw a glyph, recognize it, or tap radicals, then look it up.',
   'manga.hw.clear': 'Clear',

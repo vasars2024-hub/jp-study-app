@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { translateTo, onModelProgress } from '../translator';
 import { KNOWN_LANGS } from '../../shared/langs';
+import { useT } from '../i18n';
+import { usePopupFocus } from '../popupFocus';
+import { openAiSettings } from '../aiSetupClient';
 
 interface Props {
   /** The highlighted Japanese text. */
   text: string;
+  /** Save the sentence to the host's collection; shows a visible "Mine" action. */
+  onMine?: () => void;
   onClose: () => void;
 }
 
@@ -18,10 +23,13 @@ import { getStudyLang } from '../studyEnvironment';
 // Auto-translates a highlighted sentence from the reader — the dictionary
 // popup's sibling, for whole phrases instead of single words. Uses the same
 // shared offline worker as the Translate view, so the model loads only once.
-export default function SentenceTranslatePopup({ text, onClose }: Props) {
+export default function SentenceTranslatePopup({ text, onMine, onClose }: Props) {
+  const { t } = useT();
+  const rootRef = useRef<HTMLDivElement>(null);
+  usePopupFocus(rootRef);
   const [state, setState] = useState<State>('loading');
   const [output, setOutput] = useState('');
-  const [msg, setMsg] = useState('Preparing translator…');
+  const [msg, setMsg] = useState(() => t('readerUi.translate.preparing'));
   const [error, setError] = useState('');
   const [targetLang, setTargetLangState] = useState(getTargetLang);
   const reqRef = useRef(0);
@@ -45,21 +53,21 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
     setState('loading');
     setError('');
     setOutput('');
-    setMsg('Preparing translator…');
+    setMsg(t('readerUi.translate.preparing'));
     // Unsubscribes only this popup. It used to clear the one global slot, which stopped the
     // Translate view's and the reader's progress mid-load.
     offModelRef.current?.();
     offModelRef.current = onModelProgress((p) => {
       if (id !== reqRef.current) return;
       if (p.status === 'progress' && typeof p.progress === 'number') {
-        setMsg(`Loading model… ${Math.round(p.progress)}%`);
+        setMsg(t('readerUi.translate.loadingModel', { pct: Math.round(p.progress) }));
       }
     });
     const lang = getStudyLang();
     translateTo(text, lang, targetLang, () => {
       if (id === reqRef.current) {
         setState('translating');
-        setMsg('Translating…');
+        setMsg(t('readerUi.translate.translating'));
       }
     })
       .then((res) => {
@@ -93,12 +101,36 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
   }
 
   return (
-    <div className="dict-popup tr-popup" style={style} onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      ref={rootRef}
+      className="dict-popup tr-popup"
+      style={style}
+      role="dialog"
+      aria-label={t('readerUi.translate.popupAria', { text: text.slice(0, 60) })}
+      tabIndex={-1}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
+      }}
+    >
       <div className="dict-head">
         <span className="dict-q tr-popup-src" lang="ja">
           {text}
         </span>
-        <button className="dict-x" onClick={onClose} aria-label="Close">
+        {onMine && (
+          <button
+            type="button"
+            className="btn small dict-mine"
+            title={t('readerUi.dictPopup.mineTitle')}
+            onClick={onMine}
+          >
+            {t('readerUi.dictPopup.mine')}
+          </button>
+        )}
+        <button type="button" className="dict-x" onClick={onClose} aria-label={t('common.close')}>
           ×
         </button>
       </div>
@@ -117,22 +149,29 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
         {state === 'error' && (
           <div className="tr-popup-err">
             <p className="muted">{error}</p>
-            <button className="btn small" onClick={run}>
-              Try again
+            <button type="button" className="btn small" onClick={run}>
+              {t('common.tryAgain')}
+            </button>
+            {/* The failure is almost always the translator's setup — a model not
+                installed, or cloud not configured — and the message names
+                Settings > AI, so the way there is one click, not a hunt. */}
+            <button type="button" className="btn small" onClick={() => openAiSettings()}>
+              {t('readerUi.translate.openAiSettings')}
             </button>
           </div>
         )}
       </div>
       <div className="tr-popup-foot">
-        <span className="muted">Translate to</span>
+        <span className="muted">{t('readerUi.translate.to')}</span>
         <select
           className="tr-popup-lang"
+          aria-label={t('readerUi.translate.to')}
           value={targetLang}
           onChange={(e) => handleTargetLangChange(e.target.value)}
         >
           {KNOWN_LANGS.filter((l) => l.code !== 'ja').map((l) => (
             <option key={l.code} value={l.code}>
-              {l.label}
+              {l.nativeLabel}
             </option>
           ))}
         </select>

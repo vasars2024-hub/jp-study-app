@@ -37,6 +37,13 @@ import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
 import { runOcr, type OcrLang } from '../ocr';
 import {
+  cropPageImage,
+  orientationForBox,
+  resolveOcrOrientation,
+  type OcrOrientationChoice,
+} from '../mangaOcrOrientation';
+import { useReturnFocusOnClose } from '../readerFocusReturn';
+import {
   buildMangaCaptureTarget,
   LENS_CAPTURE_TARGET_KEY,
 } from '../../shared/lensCaptureTarget';
@@ -173,6 +180,8 @@ function savedPageIndex(item: LibraryItem): number {
 
 export default function MangaReader({ item, onClose }: Props) {
   const { t } = useT();
+  // K7: closing (Escape, Ctrl+H, Library) must hand focus back, not drop it on <body>.
+  useReturnFocusOnClose(item);
   // L3.2 — the reader is the app's third Liquid host. See `readerPresentation.ts`.
   const presentation = useReaderPresentation('manga');
   const sourceLang = getActiveProfile().targetLang;
@@ -209,7 +218,8 @@ export default function MangaReader({ item, onClose }: Props) {
   const [ocrText, setOcrText] = useState('');
   const [ocrError, setOcrError] = useState('');
   const [ocrIsFallback, setOcrIsFallback] = useState(false);
-  const [ocrLang, setOcrLang] = useState<OcrLang>('jpn_vert');
+  // J6: `auto` reads vertical/horizontal off the page's (or drawn box's) shape.
+  const [ocrLang, setOcrLang] = useState<OcrOrientationChoice>('auto');
   const [mokuroPage, setMokuroPage] = useState<MokuroPage | null>(null);
   const [showSfx, setShowSfx] = useState(false);
   const [engineReady, setEngineReady] = useState(false);
@@ -254,6 +264,7 @@ export default function MangaReader({ item, onClose }: Props) {
     query: string;
     x: number;
     y: number;
+    top?: number;
     context?: string;
   } | null>(null);
   const popupRef = useRef(popup);
@@ -397,7 +408,8 @@ export default function MangaReader({ item, onClose }: Props) {
   scanRef.current = scanWithMangaOcr;
 
   const scanWithTesseract = useCallback(
-    async (lang: OcrLang) => {
+    async (choice: OcrOrientationChoice) => {
+      const lang: OcrLang = resolveOcrOrientation(choice, pageNatSize);
       const url = pages[idx];
       if (!url) return;
       setOcrOpen(true);
@@ -421,7 +433,45 @@ export default function MangaReader({ item, onClose }: Props) {
         setOcrStatus('error');
       }
     },
-    [pages, idx, t],
+    [pages, idx, t, pageNatSize],
+  );
+
+  /**
+   * J6: a box drawn on the page without the manga-OCR engine. The engine path
+   * (`addDrawnRegion`) saves a region through main; the fallback has no region
+   * store, so it reads just the box with Tesseract, oriented by the box's shape,
+   * and shows the text in the OCR panel like a page scan.
+   */
+  const ocrDrawnBoxFallback = useCallback(
+    async (box: MokuroBox) => {
+      const url = pages[idx];
+      if (!url || regionBusy) return;
+      setRegionBusy(true);
+      setOcrOpen(true);
+      setSidePanel(true);
+      setOcrStatus('scanning');
+      setOcrProgress(0);
+      setOcrError('');
+      setOcrIsFallback(true);
+      setMokuroPage(null);
+      try {
+        const dataUrl = await window.api.readMangaPage(url);
+        if (!dataUrl) throw new Error(t('manga.ocr.readFailed'));
+        const crop = await cropPageImage(dataUrl, box);
+        const text = stripFuriganaFragments(await runOcr(crop, orientationForBox(box), setOcrProgress), true);
+        setOcrText(text);
+        setOcrStatus(text.trim() ? 'done' : 'error');
+        if (!text.trim()) setOcrError(t('manga.ocr.noText'));
+        else setDrawRegionMode(false);
+      } catch (err) {
+        console.error(err);
+        setOcrError(err instanceof Error ? err.message : t('manga.ocr.failed'));
+        setOcrStatus('error');
+      } finally {
+        setRegionBusy(false);
+      }
+    },
+    [pages, idx, regionBusy, t],
   );
 
   /**
@@ -449,7 +499,7 @@ export default function MangaReader({ item, onClose }: Props) {
   }, [item.id, item.title, item.readingSource?.chapterNumber, idx]);
 
   const scanPage = useCallback(
-    async (opts?: { force?: boolean; lang?: OcrLang }) => {
+    async (opts?: { force?: boolean; lang?: OcrOrientationChoice }) => {
       if (engineReady) return scanWithMangaOcr(!!opts?.force);
       return scanWithTesseract(opts?.lang ?? ocrLang);
     },
@@ -551,12 +601,13 @@ export default function MangaReader({ item, onClose }: Props) {
    * translator. Shared by the page overlay, clean-text and compare views.
    */
   const handleLookup = useCallback(
-    (hit: { query: string; x: number; y: number; context?: string; translate?: boolean }) => {
+    (hit: { query: string; x: number; y: number; top?: number; context?: string; translate?: boolean }) => {
       setPopup({
         kind: hit.translate ? 'translate' : 'dict',
         query: hit.query,
         x: hit.x,
         y: hit.y,
+        top: hit.top,
         context: hit.context,
       });
     },
@@ -1526,7 +1577,9 @@ export default function MangaReader({ item, onClose }: Props) {
   function renderOcrLayer(pageIdx: number) {
     if (pageIdx !== idx) return null;
     // Allow drawing more regions even while a translation overlay is shown.
-    const showDraw = drawRegionMode && engineReady && drawImgW > 0 && drawImgH > 0;
+    // The box tool works with or without the manga-OCR engine (J6): the engine
+    // saves a region, the Tesseract fallback reads just the box.
+    const showDraw = drawRegionMode && drawImgW > 0 && drawImgH > 0;
     if (!ocrOpen && !showDraw) return null;
     return (
       <>
@@ -1576,7 +1629,7 @@ export default function MangaReader({ item, onClose }: Props) {
             imgWidth={drawImgW}
             imgHeight={drawImgH}
             disabled={regionBusy}
-            onDrawComplete={(box) => void addDrawnRegion(box)}
+            onDrawComplete={(box) => void (engineReady ? addDrawnRegion(box) : ocrDrawnBoxFallback(box))}
           />
         )}
       </>
@@ -1828,10 +1881,13 @@ export default function MangaReader({ item, onClose }: Props) {
                   <summary>{t('manga.ocr.groupPageTools')}</summary>
                   <div className="manga-ocr-group-body">
                 <button
+                  type="button"
                   className={`btn small${handwritingOpen ? ' active' : ''}`}
+                  title={t('readerUi.manga.handwritingTitle')}
+                  aria-pressed={handwritingOpen}
                   onClick={() => setHandwritingOpen((v) => !v)}
                 >
-                  {t('manga.hw.open')}
+                  {t('readerUi.manga.handwriting')}
                 </button>
                 <button
                   className={`btn small${drawRegionMode ? ' active' : ''}`}
@@ -1855,6 +1911,17 @@ export default function MangaReader({ item, onClose }: Props) {
               <>
                 <div className="sp-seg" role="group" aria-label={t('manga.ocr.direction')}>
                   <button
+                    className={`sp-seg-btn ${ocrLang === 'auto' ? 'active' : ''}`}
+                    aria-pressed={ocrLang === 'auto'}
+                    title={t('readerUi.manga.ocrAutoTitle')}
+                    onClick={() => {
+                      setOcrLang('auto');
+                      void scanWithTesseract('auto');
+                    }}
+                  >
+                    {t('readerUi.manga.ocrAuto')}
+                  </button>
+                  <button
                     className={`sp-seg-btn ${ocrLang === 'jpn_vert' ? 'active' : ''}`}
                     aria-pressed={ocrLang === 'jpn_vert'}
                     onClick={() => {
@@ -1875,11 +1942,27 @@ export default function MangaReader({ item, onClose }: Props) {
                     {t('manga.ocr.horizontal')}
                   </button>
                 </div>
+                {/* "Draw" is a box on the page — what the word promises and what the
+                    engine path already did. The handwriting pad is a different tool
+                    (draw a character to look it up) and says so. */}
                 <button
+                  type="button"
+                  className={`btn small${drawRegionMode ? ' active' : ''}`}
+                  title={t('readerUi.manga.drawBoxTitle')}
+                  aria-pressed={drawRegionMode}
+                  disabled={regionBusy || ocrStatus === 'scanning' || !pages.length}
+                  onClick={() => setDrawRegionMode((v) => !v)}
+                >
+                  {t('readerUi.manga.drawBox')}
+                </button>
+                <button
+                  type="button"
                   className={`btn small${handwritingOpen ? ' active' : ''}`}
+                  title={t('readerUi.manga.handwritingTitle')}
+                  aria-pressed={handwritingOpen}
                   onClick={() => setHandwritingOpen((v) => !v)}
                 >
-                  {t('manga.hw.open')}
+                  {t('readerUi.manga.handwriting')}
                 </button>
                 <button
                   className="btn small"
@@ -1982,8 +2065,10 @@ export default function MangaReader({ item, onClose }: Props) {
           {(ocrStatus === 'error' || (volumeProgress?.phase === 'error' && volumeProgress.message)) && (
             <div className="ocr-msg muted ocr-error" role="alert">{ocrError || volumeProgress?.message}</div>
           )}
-          {engineReady && drawRegionMode && (
-            <p className="ocr-hint muted">{t('manga.ocr.drawRegionHint')}</p>
+          {drawRegionMode && (
+            <p className="ocr-hint muted">
+              {engineReady ? t('manga.ocr.drawRegionHint') : t('readerUi.manga.drawBoxHint')}
+            </p>
           )}
           {engineReady && ocrStatus === 'done' && !sidePanel && !drawRegionMode && (
             <p className="ocr-hint muted">{t('manga.ocr.overlayHint')}</p>
@@ -2366,6 +2451,7 @@ export default function MangaReader({ item, onClose }: Props) {
             query={popup.query}
             x={popup.x}
             y={popup.y}
+            anchorTop={popup.top}
             context={popup.context}
             onClose={() => setPopup(null)}
           />

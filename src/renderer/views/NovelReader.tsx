@@ -59,10 +59,12 @@ import { getTokenizer, tokenizerReady } from '../tokenizer';
 import { highlightEl, recolorEl, resetHighlightRoot } from '../wordHighlight';
 import { onKnowledgeChanged } from '../knownWords';
 import {
+  lookupWordAtPoint,
   lookupWordFromMouseUp,
   isLookupClick,
   noteLookupPointerDown,
   selectSentenceAtPoint,
+  type WordLookupHit,
 } from '../wordLookup';
 import {
   ANNO_COLORS,
@@ -102,6 +104,8 @@ import { recordEpubPageRead } from '../readingGardenProgress';
 // file, so the reader hands it an item id and renders whatever comes back.
 import ReadingListMembership from '../components/reading/ReadingListMembership';
 import { useAiReadiness } from '../aiSetupClient';
+import { useReturnFocusOnClose } from '../readerFocusReturn';
+import { showToast } from '../components/ui/Toast';
 
 interface Props {
   item: LibraryItem;
@@ -197,6 +201,33 @@ function parseLoc(loc: string | undefined): { part: number; frac: number } | nul
 }
 
 /**
+ * The word a lookup shortcut means when nothing is selected: the one under the
+ * pointer when the pointer is over the text, else the one at the centre of the
+ * page. Null when neither point lands on a word.
+ */
+export function wordForShortcutLookup(
+  content: HTMLElement | null,
+  viewport: HTMLElement | null,
+  pointer: { x: number; y: number } | null,
+  doc: Document = document,
+): WordLookupHit | null {
+  if (!content) return null;
+  const candidates: Array<{ x: number; y: number }> = [];
+  if (pointer) candidates.push(pointer);
+  const box = (viewport ?? content).getBoundingClientRect();
+  if (box.width > 0 && box.height > 0) {
+    candidates.push({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
+  }
+  for (const point of candidates) {
+    const el = doc.elementFromPoint(point.x, point.y);
+    if (!el || !content.contains(el)) continue;
+    const hit = lookupWordAtPoint(point.x, point.y, doc);
+    if (hit && !hit.translate) return hit;
+  }
+  return null;
+}
+
+/**
  * The custom novel reader.
  *
  * The loader pre-splits the book into small "parts". Pages mode renders ONE
@@ -208,6 +239,8 @@ function parseLoc(loc: string | undefined): { part: number; frac: number } | nul
  */
 export default function NovelReader({ item, onClose }: Props) {
   const aero = useAeroMaterials();
+  // K7: Ctrl+H / Escape / Library all unmount the reader; focus must not fall to <body>.
+  useReturnFocusOnClose(item);
   const aiReadiness = useAiReadiness();
   // L3.2 — the reader is the app's third Liquid host. See `readerPresentation.ts`.
   const presentation = useReaderPresentation('book');
@@ -276,7 +309,7 @@ export default function NovelReader({ item, onClose }: Props) {
   const [seek, setSeek] = useState<number | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [popup, setPopup] = useState<
-    { query: string; x: number; y: number; kind: 'dict' | 'translate'; context?: string } | null
+    { query: string; x: number; y: number; top?: number; kind: 'dict' | 'translate'; context?: string } | null
   >(null);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [annoColor, setAnnoColor] = useState<AnnoColor>('yellow');
@@ -1522,8 +1555,20 @@ export default function NovelReader({ item, onClose }: Props) {
     ];
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Something closer to the focus already handled it (a popup, a sheet).
+        if (e.defaultPrevented) return;
         if (popupRef.current) {
           setPopup(null);
+          return;
+        }
+        // J11: an open toolbar menu (Study, highlight colour) closes on Escape and
+        // the reader stays. These are <details>, which have no Escape of their own,
+        // so without this the key fell straight through to "close the book".
+        const openMenu = document.querySelector<HTMLDetailsElement>('.reader-bar details[open]');
+        if (openMenu) {
+          e.preventDefault();
+          openMenu.open = false;
+          openMenu.querySelector<HTMLElement>('summary')?.focus();
           return;
         }
         if (linkViewRef.current || canLinkBackRef.current) {
@@ -1792,6 +1837,7 @@ export default function NovelReader({ item, onClose }: Props) {
           query: hit.query,
           x: hit.x,
           y: hit.y,
+          top: hit.top,
           context: hit.context,
         });
         return;
@@ -2372,20 +2418,44 @@ export default function NovelReader({ item, onClose }: Props) {
   const openPopupFromSelection = useCallback(
     (kind: 'dict' | 'translate') => {
       const selObj = window.getSelection();
-      if (!selObj || selObj.rangeCount === 0 || selObj.isCollapsed) return;
-      const text = selObj.toString().trim();
-      if (!text) return;
+      const text = selObj && selObj.rangeCount > 0 && !selObj.isCollapsed ? selObj.toString().trim() : '';
+      if (!selObj || !text) {
+        // K8: Ctrl+D with nothing selected used to do nothing at all. Look up the
+        // word under the pointer if it is over the text, else the word at the
+        // centre of the page; if neither finds a word, say what to do instead of
+        // staying silent.
+        if (kind === 'dict') {
+          const hit = wordForShortcutLookup(contentRef.current, scrollerRef.current, lastPointerRef.current);
+          if (hit) {
+            setPopup({ kind: 'dict', query: hit.query, x: hit.x, y: hit.y, top: hit.top, context: hit.context });
+            return;
+          }
+        }
+        showToast({ message: t('readerUi.lookup.noSelection') });
+        return;
+      }
       const r = selObj.getRangeAt(0).getBoundingClientRect();
       setPopup({
         kind,
         query: kind === 'dict' ? text.slice(0, 40) : text.slice(0, 500),
         x: r.left,
         y: r.bottom,
+        top: r.top,
         context: kind === 'dict' ? currentSentence() || undefined : undefined,
       });
     },
-    [currentSentence],
+    [currentSentence, lang],
   );
+
+  /** J5: mining from the popup itself — the word (or sentence) it shows, to the collection. */
+  const mineFromPopup = useCallback(() => {
+    const current = popupRef.current;
+    if (!current) return;
+    const word = current.query.slice(0, 80);
+    const sentence = current.kind === 'dict' ? current.context : current.query.slice(0, 200);
+    setPendingAdd({ word, sentence: sentence || undefined });
+    setCollectionOpen(true);
+  }, []);
 
   // Metadata attached to clipboard-history entries copied from this reader
   // (book/chapter/position/language) — shown in the entry's expandable
@@ -3036,6 +3106,8 @@ export default function NovelReader({ item, onClose }: Props) {
               type="button"
               className={`btn primary ${translateMode !== 'original' ? 'active' : ''}`}
               title={t('epub.translate.toggleVisibility')}
+              aria-label={t('epub.translate.toggleVisibility')}
+              aria-pressed={translateMode !== 'original'}
               onClick={() => toggleTranslationVisibility()}
             >
               <Icon name="eye" size={14} />
@@ -3048,6 +3120,7 @@ export default function NovelReader({ item, onClose }: Props) {
               type="button"
               className="btn"
               title={t('epub.readWithLens')}
+              aria-label={t('epub.readWithLens')}
               disabled={!loaded}
               onClick={() => void captureWithLens()}
             >
@@ -3154,6 +3227,7 @@ export default function NovelReader({ item, onClose }: Props) {
             onClick={askAgentAboutSelection}
           >
             <Icon name="sparkle" size={14} />
+            <span className="reader-menu-label">{t('readerUi.study.askAgent')}</span>
           </button>
           {/*
             A separate icon rather than a second `sparkle`: two identical buttons
@@ -3169,14 +3243,18 @@ export default function NovelReader({ item, onClose }: Props) {
             onClick={askAgentAboutPassage}
           >
             <Icon name="note" size={14} />
+            <span className="reader-menu-label">{t('readerUi.study.askPassage')}</span>
           </button>
           <button
             type="button"
-            className={`btn ${collectionOpen ? 'active' : ''}`}
+            className={`btn small ${collectionOpen ? 'active' : ''}`}
             title={t('novel.reader.collection')}
+            aria-label={t('novel.reader.collection')}
+            aria-pressed={collectionOpen}
             onClick={() => setCollectionOpen((o) => !o)}
           >
             <Icon name="flashcards" size={14} />
+            <span className="reader-menu-label">{t('readerUi.study.collection')}</span>
           </button>
             </div>
           </details>
@@ -3363,13 +3441,15 @@ export default function NovelReader({ item, onClose }: Props) {
 
       {popup &&
         (popup.kind === 'translate' ? (
-          <SentenceTranslatePopup text={popup.query} onClose={() => setPopup(null)} />
+          <SentenceTranslatePopup text={popup.query} onMine={mineFromPopup} onClose={() => setPopup(null)} />
         ) : (
           <DictionaryPopup
             query={popup.query}
             x={popup.x}
             y={popup.y}
+            anchorTop={popup.top}
             context={popup.context}
+            onMine={mineFromPopup}
             onClose={() => setPopup(null)}
           />
         ))}

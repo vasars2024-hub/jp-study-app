@@ -5371,7 +5371,6 @@ export const ja: Catalog = {
   'manga.ocr.noText': 'このページに文字が見つかりませんでした。',
   'manga.ocr.failed': 'OCRに失敗しました。',
   'manga.ocr.readFailed': 'このページ画像を読めませんでした。',
-  'manga.hw.open': '手書き',
   'manga.hw.title': '文字を書く',
   'manga.hw.hint': '字形を書いて認識するか、部首を選んでから調べます。',
   'manga.hw.clear': '消去',

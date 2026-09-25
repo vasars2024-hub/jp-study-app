@@ -9,6 +9,11 @@ export interface WordLookupHit {
   query: string;
   x: number;
   y: number;
+  /**
+   * Top of the word's box, when one was measured. `y` is its bottom; a popup that
+   * opens *above* the word needs the top too, or it covers the line being read.
+   */
+  top?: number;
   /** Sentence the word came from — for Anki context. */
   context?: string;
   /** Long intentional selection → open sentence translator instead. */
@@ -315,6 +320,7 @@ function hitFromSpan(
     query: span.query.slice(0, 40),
     x: rect?.left ?? fallbackX,
     y: rect ? rect.bottom : fallbackY + 14,
+    ...(rect ? { top: rect.top } : {}),
     context: sentenceAround(block, span.query.slice(0, 8)),
   };
 }
@@ -334,6 +340,7 @@ function lookupWkSpan(wk: HTMLElement): WordLookupHit | null {
     query: query.slice(0, 40),
     x: rect.left,
     y: rect.bottom,
+    top: rect.top,
     context: sentenceAround(block, surface || query),
   };
 }
@@ -505,6 +512,7 @@ function selectionHit(text: string, rect: DOMRect, block: Element | null): WordL
     query: text.slice(0, 40),
     x: rect.left,
     y: rect.bottom,
+    top: rect.top,
     context: sentenceAround(block, text.slice(0, 8)),
   };
 }
@@ -619,6 +627,7 @@ export function lookupWordFromSelection(win: Window): WordLookupHit | null {
       query: selected.slice(0, 40),
       x: rect.left,
       y: rect.bottom,
+      top: rect.top,
       context: sentenceAround(block, selected.slice(0, 8)),
     };
   }

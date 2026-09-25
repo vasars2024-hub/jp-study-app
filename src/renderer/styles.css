@@ -5191,6 +5191,8 @@ details.lib-filter-bar[open] .lib-filter-summary::after {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  min-width: 24px;
+  min-height: 24px;
 }
 .dict-x:hover {
   color: var(--text);
@@ -5897,6 +5899,20 @@ mark.lookup-mark,
   line-height: 1;
   cursor: pointer;
   padding: 0 2px;
+  /* Same 14px glyph, a 24px target (WCAG 2.5.8): measured 14x16 before. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: var(--radius-sm);
+}
+/* Definition-language chips: which bundled dictionaries' glosses are on screen. */
+.dict-gloss-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
 }
 .dict-star:hover {
   color: var(--accent);
@@ -18760,6 +18776,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  /* 24px target around the 14px glyph (was 19x19). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
 }
 .dict-tts:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* "Ask the Agent" sits beside pronunciation and shares its quiet head-button look. */
@@ -18770,6 +18792,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
 }
 .dict-agent:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .reader-anno-swatches { display: flex; gap: 4px; align-items: center; margin-left: 4px; }

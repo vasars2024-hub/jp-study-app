@@ -5923,7 +5923,6 @@ export const ru: Catalog = {
   'manga.ocr.noText': 'На этой странице текст не найден.',
   'manga.ocr.failed': 'Ошибка OCR.',
   'manga.ocr.readFailed': 'Не удалось прочитать изображение страницы.',
-  'manga.hw.open': 'Рисовать',
   'manga.hw.title': 'Нарисовать иероглиф',
   'manga.hw.hint': 'Нарисуйте знак и распознайте его или выберите ключи, затем откройте словарь.',
   'manga.hw.clear': 'Очистить',

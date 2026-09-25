@@ -210,6 +210,8 @@ type CuePopup = {
   query: string;
   x: number;
   y: number;
+  /** Top of the clicked word, so a popup opened above it clears the subtitle line. */
+  top?: number;
   context: string;
 };
 
@@ -2076,6 +2078,7 @@ export default function VideoCoreStudyOverlay({
           query: hit.query,
           x: hit.x,
           y: hit.y,
+          top: hit.top,
           context: hit.context || plainText,
         });
       } else if (dismissOnly) {
@@ -3337,6 +3340,7 @@ export default function VideoCoreStudyOverlay({
           query={popup.query}
           x={popup.x}
           y={popup.y}
+          anchorTop={popup.top}
           context={popup.context}
           // Keep the lookup off whatever is docked on the right. Asked of the LAYOUT
           // rather than of the transcript preference: the right dock can now be held

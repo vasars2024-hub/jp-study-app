@@ -43,7 +43,6 @@ import {
 } from './dictionary/tatoebaOffline';
 import {
   enrichLexiconResultMetadata,
-  lookupResultToDictResult,
   lookupResultToPerLanguageDictResult,
 } from './dictionary/lexiconAdapter';
 import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup';
@@ -265,7 +264,11 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   try {
     const unified = await readDictionary('lookup', { text: q, limit: pageSize });
     if (unified.entries.length) {
-      const converted = lookupResultToDictResult(unified);
+      // One entry per gloss language (J8): the database merges JMdict English and Russian
+      // into one entry titled "JMdict (Japanese–English)" whose senses run on into the
+      // Russian ones, so the popup printed Russian glosses under the English title and
+      // its language filter could not separate them.
+      const converted = lookupResultToPerLanguageDictResult(unified);
       // Preserve the legacy popup's pitch/frequency contract while the unified
       // schema grows first-class metadata fields of its own. Only the metadata:
       // the glossaries are not read on this path.
@@ -299,7 +302,7 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   // matching, and only once every exact path has already failed, so an
   // approximate answer can never displace a real one.
   try {
-    const approximate = lookupResultToDictResult(
+    const approximate = lookupResultToPerLanguageDictResult(
       await readDictionary('lookup', { text: q, limit: pageSize, fuzzy: true }),
     );
     if (approximate.approximate) return approximate;
