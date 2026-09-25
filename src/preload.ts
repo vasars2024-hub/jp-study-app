@@ -517,6 +517,13 @@ const api = {
     ipcRenderer.invoke('dict:lookupChinese', query, limit),
   /** Drop main's cached CC-CEDICT index after a managed install finishes. */
   resetChineseDictCache: (): Promise<void> => ipcRenderer.invoke('dict:resetChineseCache'),
+  /**
+   * Readings for the study language's reading aid: pinyin per character for
+   * Chinese words, the stressed spelling for Russian words. Japanese furigana
+   * comes from kuromoji in the renderer.
+   */
+  readingAid: (lang: 'zh' | 'ru', words: string[]): Promise<Record<string, string[]>> =>
+    ipcRenderer.invoke('dict:readingAid', lang, words),
   /** Structured pitch-accent data (downstep positions), for the Blanc pitch panel. */
   dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
     ipcRenderer.invoke('dict:pitch', term, reading),

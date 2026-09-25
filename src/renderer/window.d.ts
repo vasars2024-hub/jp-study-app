@@ -370,6 +370,7 @@ declare global {
       /** Same page size as `lookupTerm`; a `truncated` result is reachable by asking again. */
       lookupChinese(query: string, limit?: number): Promise<DictResult>;
       resetChineseDictCache(): Promise<void>;
+      readingAid(lang: 'zh' | 'ru', words: string[]): Promise<Record<string, string[]>>;
       lookupTermsBatch(
         queries: Array<{ expression: string; reading?: string }>,
         langs: Array<'en' | 'ja' | 'zh' | 'ru'>,

@@ -81,6 +81,8 @@ import {
   type ChineseLookupDeps,
 } from './chineseLookup';
 import { listUserNotes, readUserNote, writeUserNote } from './notes';
+import { chineseReadings, russianReadings } from './readingAid';
+import type { ReadingAidLang, ReadingAidResult } from '../../shared/readingAid';
 import {
   clearStoredExplanations,
   readStoredExplanation,
@@ -709,6 +711,22 @@ const chineseDeps: ChineseLookupDeps = {
 /** Look a Chinese term up. Database first, CC-CEDICT file second. */
 export function lookupChineseInDictionary(query: string, limit?: number): Promise<DictResult> {
   return lookupChineseTerm(query, chineseDeps, limit);
+}
+
+/**
+ * Readings for the reading aid: pinyin per character for Chinese words (from
+ * CC-CEDICT, whichever copy is installed), stressed spellings for Russian words
+ * (from the database's Russian dictionary). Empty when the language's
+ * dictionary is not there — the line is still drawn, just without the aid.
+ */
+export async function readingAidFor(lang: ReadingAidLang, words: readonly string[]): Promise<ReadingAidResult> {
+  if (!words.length) return {};
+  try {
+    if (lang === 'zh') return chineseReadings(await loadCedictIndex(), words);
+    return russianReadings(dictionaryDb(), words);
+  } catch {
+    return {};
+  }
 }
 
 /** The CC-CEDICT index, loaded on first use (database-independent). */

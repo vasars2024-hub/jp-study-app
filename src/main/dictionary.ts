@@ -49,9 +49,11 @@ import {
 import { DICT_LOOKUP_LIMIT, clampLookupLimit } from '../shared/dictionaryLookup';
 import { interlinearFallbackLang, legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import { cedictInterlinearLookup, type CedictIndex } from './dictionary/chineseLookup';
+import { cleanReadingAidWords, type ReadingAidResult } from '../shared/readingAid';
 import {
   lookupChineseInDictionary,
   loadCedictIndex,
+  readingAidFor,
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
   findLexiconCollocationsInDb,
@@ -946,6 +948,12 @@ export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookupChinese', (_e, query: string, limit?: number) =>
     lookupChineseInDictionary(query, limit === undefined ? undefined : clampLookupLimit(limit)));
   ipcMain.handle('dict:resetChineseCache', () => resetChineseDictionaryCache());
+  // The reading aid for Chinese (pinyin) and Russian (stress marks). The words
+  // arrive from a renderer, so they are bounded here.
+  ipcMain.handle('dict:readingAid', (_e, lang: unknown, words: unknown): Promise<ReadingAidResult> =>
+    (lang === 'zh' || lang === 'ru'
+      ? readingAidFor(lang, cleanReadingAidWords(words))
+      : Promise.resolve({})));
   // A CC-CEDICT install drops the cached index wherever the download started —
   // Storage, the setup card, the agent — not only while Settings > Study is
   // mounted (which is where the renderer-side reset lived).

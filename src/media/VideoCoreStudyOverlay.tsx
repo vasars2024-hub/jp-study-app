@@ -3014,6 +3014,7 @@ export default function VideoCoreStudyOverlay({
             selectedAnnotation={selectedAnnotation}
             onSelectAnnotation={setSelectedAnnotation}
             furigana={preferences.furigana}
+            lang={studyLang}
             onMouseDown={(event) => {
               popupOpenOnDownRef.current = !!popup;
               noteLookupPointerDown(event);

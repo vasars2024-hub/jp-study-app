@@ -3,6 +3,8 @@
 
 import { tokenizeSync, tokenizerReady, type JpToken } from './tokenizer';
 import { detectSentenceBounds, isSentencePunct, sentenceAt } from '../shared/sentenceBounds';
+import { segmentStudyText, studyWords } from '../shared/studySegmentation';
+import { getChineseScript, getStudyLang } from './studyEnvironment';
 
 export interface WordLookupHit {
   /** Surface form shown in the popup title. */
@@ -74,8 +76,17 @@ function nearestBlock(node: Node): Element | null {
   return el?.closest(BLOCK_SEL) ?? el;
 }
 
+/**
+ * A block's words as written. A subtitle line that draws pinyin ruby or Russian
+ * stress accents says what it actually reads in `data-lookup-text`; its
+ * `textContent` would carry the readings too.
+ */
+function blockText(block: Element | null): string {
+  return block?.closest('[data-lookup-text]')?.getAttribute('data-lookup-text') ?? block?.textContent ?? '';
+}
+
 function sentenceAround(block: Element | null, needle: string): string {
-  return sentenceAroundText(block?.textContent ?? '', needle);
+  return sentenceAroundText(blockText(block), needle);
 }
 
 /** `sentenceAround` for callers that have the block text but not the block. */
@@ -104,9 +115,12 @@ function isLikelySentence(text: string): boolean {
   if (t.length >= 14) return true;
   if (/[。．、，！？!?「」『』]/.test(t)) return true;
   if (/\s/.test(t) && t.length >= 8) return true;
-  if (tokenizerReady() && /[぀-ヿ㐀-鿿]/.test(t)) {
+  const lang = lookupLangForText(t);
+  if (lang === 'ja' && tokenizerReady()) {
     const toks = tokenizeSync(t).filter((tk) => tk.content || tk.surface.length > 1);
     if (toks.length > 2) return true;
+  } else if (lang !== 'ja' && studyWords(t, lang).length > 2) {
+    return true;
   }
   return false;
 }
@@ -211,12 +225,45 @@ function tokenSpanAt(block: Element, globalOffset: number): { start: number; end
   if (!text) return null;
 
   let tokens: JpToken[] | undefined;
-  if (tokenizerReady() && /[぀-ヿ㐀-鿿]/.test(text)) {
+  if (tokenizerReady() && lookupLangForText(text) === 'ja') {
     const cached = tokenCache.get(block);
     tokens = cached && cached.text === text ? cached.tokens : tokenizeSync(text);
     if (!cached || cached.text !== text) tokenCache.set(block, { text, tokens });
   }
   return resolveWordSpanInText(text, globalOffset, tokens);
+}
+
+/**
+ * Which language's word rules a clicked text follows. Kana is Japanese and
+ * Cyrillic Russian by the script alone; Han with no kana is Chinese when
+ * Chinese is studied (kuromoji would split 公园 as Japanese), Japanese
+ * otherwise. Latin and the rest use the study language's segmenter.
+ */
+export function lookupLangForText(text: string): string {
+  const study = getStudyLang();
+  if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)) return 'ja';
+  if (/\p{Script=Cyrillic}/u.test(text)) return 'ru';
+  if (/\p{Script=Han}/u.test(text)) {
+    if (study !== 'zh') return 'ja';
+    return getChineseScript() === 'traditional' ? 'zh-Hant' : 'zh-Hans';
+  }
+  return study === 'zh' ? 'zh-Hans' : study;
+}
+
+/** The word segment (ICU) at `offset`, for Chinese, Russian and other non-Japanese text. */
+function segmentSpanAt(text: string, offset: number, lang: string): { start: number; end: number; query: string } | null {
+  const parts = segmentStudyText(text, lang);
+  const at = parts.find((part) => offset >= part.start && offset < part.end);
+  if (!at) return null;
+  let hit = at;
+  if (!at.wordLike) {
+    // A click on the space or the punctuation beside a word means that word.
+    const index = parts.indexOf(at);
+    hit = parts[index - 1]?.wordLike ? parts[index - 1] : parts[index + 1]?.wordLike ? parts[index + 1] : at;
+  }
+  if (!hit.wordLike) return null;
+  const query = hit.text.trim();
+  return query ? { start: hit.start, end: hit.end, query } : null;
 }
 
 /**
@@ -236,8 +283,16 @@ export function resolveWordSpanInText(
   text: string,
   globalOffset: number,
   cachedTokens?: JpToken[],
+  lang: string = lookupLangForText(text),
 ): { start: number; end: number; query: string } | null {
   if (!text) return null;
+
+  // Chinese, Russian and everything else: ICU word boundaries. The Cyrillic
+  // `кошку` in a Russian line used to resolve to nothing — the fallback below
+  // only knew kana, kanji and ASCII.
+  if (lang !== 'ja') {
+    return segmentSpanAt(text, globalOffset, lang) ?? cjkSpanAt(text, globalOffset);
+  }
 
   const tokens =
     cachedTokens ??
@@ -292,7 +347,8 @@ export function resolveWordSpanInText(
 
 function cjkSpanAt(text: string, offset: number): { start: number; end: number; query: string } | null {
   const clamp = Math.min(Math.max(offset, 0), Math.max(0, text.length - 1));
-  const isWord = (c: string) => /[぀-ヿ㐀-鿿々A-Za-z0-9]/.test(c);
+  // Any letter, mark or digit of any script — Cyrillic and accented Latin included.
+  const isWord = (c: string) => /[\p{L}\p{M}\p{N}々]/u.test(c);
   let start = clamp;
   while (start > 0 && isWord(text[start - 1])) start--;
   let end = clamp + 1;
@@ -321,8 +377,9 @@ function hitFromSpan(
 
 function lookupWkSpan(wk: HTMLElement): WordLookupHit | null {
   // Prefer surface form for popup title + annotation matching; lemma is resolved
-  // separately by the dictionary UI for grading.
-  const surface = wk.textContent?.trim() || '';
+  // separately by the dictionary UI for grading. `data-surface` is the word as
+  // written when the element also draws pinyin ruby or stress accents.
+  const surface = wk.getAttribute('data-surface')?.trim() || wk.textContent?.trim() || '';
   const query = surface || wk.getAttribute('data-lemma') || '';
   if (!query) return null;
   const doc = wk.ownerDocument;
