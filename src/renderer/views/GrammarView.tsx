@@ -133,7 +133,7 @@ export default function GrammarView() {
       {/* The classic tree is shared: WIRED skins it as a diagnostic unit, but
           Aero and the default themes render it too, and a bare "SYN / PARSE
           UNIT READY" leaked terminal fiction into a Vista glass window. */}
-      {wired && <StatusBarField>SYN / PARSE UNIT READY</StatusBarField>}
+      {wired && <StatusBarField>{t('grammar.wired.status.ready')}</StatusBarField>}
       <StatusBarField>{modeLabel}</StatusBarField>
       <StatusBarSpacer />
       {/*

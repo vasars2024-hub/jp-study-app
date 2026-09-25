@@ -2895,10 +2895,23 @@ const api = {
     ipcRenderer.on('visual-novel:changed', handler);
     return () => ipcRenderer.removeListener('visual-novel:changed', handler);
   },
+  /** Star (favorite: true, or edit tags/folder) or unstar (favorite: false) a page. */
   immersionSaveSite: (
     input: ImmersionSaveSiteInput,
-  ): Promise<{ ok: boolean; site?: ImmersionSite; error?: string }> =>
+  ): Promise<{ ok: boolean; bookmark?: import('./shared/immersion').ImmersionBookmark | null; error?: string }> =>
     ipcRenderer.invoke('immersion:saveSite', input),
+  immersionClearHistory: (
+    range: import('./shared/immersion').ImmersionHistoryRange,
+  ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>
+    ipcRenderer.invoke('immersion:clearHistory', range),
+  immersionAddFolder: (
+    name: string,
+  ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>
+    ipcRenderer.invoke('immersion:addFolder', name),
+  immersionRemoveFolder: (
+    id: string,
+  ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>
+    ipcRenderer.invoke('immersion:removeFolder', id),
   immersionRemoveSite: (
     id: string,
   ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }> =>

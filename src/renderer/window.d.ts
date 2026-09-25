@@ -1834,7 +1834,12 @@ declare global {
       ): () => void;
       immersionSaveSite(
         input: ImmersionSaveSiteInput,
-      ): Promise<{ ok: boolean; site?: ImmersionSite; error?: string }>;
+      ): Promise<{ ok: boolean; bookmark?: import('../shared/immersion').ImmersionBookmark | null; error?: string }>;
+      immersionClearHistory(
+        range: import('../shared/immersion').ImmersionHistoryRange,
+      ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;
+      immersionAddFolder(name: string): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;
+      immersionRemoveFolder(id: string): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;
       immersionRemoveSite(
         id: string,
       ): Promise<{ ok: boolean; store?: ImmersionSitesStore; error?: string }>;

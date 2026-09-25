@@ -18715,6 +18715,133 @@ html[data-taskbar-size='large'] .os-tray-btn {
   opacity: 1;
   color: var(--accent);
 }
+/* Audit r2 #11: the tab strip above the toolbar. */
+.immersion-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 8px 0;
+  min-width: 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.immersion-tab {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 200px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--panel-2);
+}
+.immersion-tab.active {
+  background: var(--panel);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.immersion-tab-button {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.immersion-tab-close,
+.immersion-tab-new {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.immersion-tab-close:hover,
+.immersion-tab-new:hover:not(:disabled) {
+  color: var(--accent);
+}
+.immersion-tab-new:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Audit r2 #12 and #14: Bookmarks / History, and today's reading. */
+.immersion-stats-card {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.immersion-stats-line {
+  margin: 0;
+  line-height: 16px;
+}
+.immersion-rail-views {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.immersion-rail-view {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.immersion-rail-view.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.immersion-history-clear,
+.immersion-folder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.immersion-folder-row select,
+.immersion-history-clear select {
+  flex: 1;
+  min-width: 0;
+}
+.immersion-bookmarks {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.immersion-bookmark-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+}
+.immersion-bookmark-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 2px;
+}
+.immersion-bookmark-edit {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px 8px;
+  font-size: 12px;
+}
+.immersion-bookmark-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .immersion-focus .immersion-stage {
   border: none;
 }

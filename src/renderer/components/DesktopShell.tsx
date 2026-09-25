@@ -128,7 +128,7 @@ import {
   removeUserWallpaper,
   type UserWallpaper,
 } from '../wallpaperLibrary';
-import { useT } from '../i18n';
+import { t as translate, useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import {
   isReadingWorkspaceOpenDetail,
@@ -302,14 +302,36 @@ const START_HINT_KEYS: Partial<Record<WinSection, string>> = {
   city: 'desktop.startApp.city',
 };
 
-const WIRED_MODULES: Partial<Record<WinSection, { code: string; name: string; hint: string; ready: string }>> = {
+/**
+ * `nameKey`/`hintKey`/`readyKey`, where present, are the translated display
+ * strings (audit r2 #15); the English beside them is the fallback.
+ */
+type WiredModuleMeta = {
+  code: string;
+  name: string;
+  hint: string;
+  ready: string;
+  nameKey?: string;
+  hintKey?: string;
+  readyKey?: string;
+};
+
+const WIRED_MODULES: Partial<Record<WinSection, WiredModuleMeta>> = {
   player: { code: 'SIG-LIB', name: 'Signal Library', hint: 'Local media catalog', ready: 'LIB READY' },
   scraper: { code: 'SCOUT', name: 'Catalogue Scout', hint: 'Remote index sweep', ready: 'INDEX ONLINE' },
   video: { code: 'SIG-VID', name: 'Signal Archive', hint: 'Recovered field recordings', ready: 'SIGNAL READY' },
   youtube: { code: 'YT-DIP', name: 'Playlist Tracker', hint: 'Immersion playlist sync', ready: 'LIST READY' },
   music: { code: 'AUD-DAT', name: 'Audio Deck', hint: 'DAT catalog / ear calibration', ready: 'DECK LINKED' },
   dictionary: { code: 'LEX', name: 'Lexeme Analyzer', hint: 'Corpus index / probe terminal', ready: 'INDEX READY' },
-  immersion: { code: 'FEED', name: 'Immersion Feed', hint: 'Remote node monitor', ready: 'FEED DEGRADED' },
+  immersion: {
+    code: 'FEED',
+    name: 'Immersion Feed',
+    hint: 'Remote node monitor',
+    ready: 'FEED DEGRADED',
+    nameKey: 'desktop.wired.immersion.name',
+    hintKey: 'desktop.wired.immersion.hint',
+    readyKey: 'desktop.wired.immersion.ready',
+  },
   library: { code: 'ARCH', name: 'Archive Bay', hint: 'Mounted local files', ready: 'BAY MOUNTED' },
   novels: { code: 'DOC', name: 'Classified Text', hint: 'Recovered documents', ready: 'TEXT VIEWER READY' },
   reading: { code: 'FIND', name: 'Reading Locator', hint: 'Comprehension-matched web texts', ready: 'LOCATOR READY' },
@@ -329,7 +351,14 @@ const WIRED_MODULES: Partial<Record<WinSection, { code: string; name: string; hi
 };
 
 function wiredModule(section: WinSection): { code: string; name: string; hint: string; ready: string } {
-  return WIRED_MODULES[section] ?? { code: section.toUpperCase(), name: section, hint: 'Module route', ready: 'READY' };
+  const meta = WIRED_MODULES[section];
+  if (!meta) return { code: section.toUpperCase(), name: section, hint: 'Module route', ready: 'READY' };
+  return {
+    code: meta.code,
+    name: meta.nameKey ? translate(meta.nameKey) : meta.name,
+    hint: meta.hintKey ? translate(meta.hintKey) : meta.hint,
+    ready: meta.readyKey ? translate(meta.readyKey) : meta.ready,
+  };
 }
 
 function wiredModuleLabel(section: WinSection): string {
