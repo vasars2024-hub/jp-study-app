@@ -7,7 +7,8 @@ import {
 describe('player preferences', () => {
   it('uses stable defaults for missing or invalid data', () => {
     expect(normalizePlayerPreferences(null)).toEqual(DEFAULT_PLAYER_PREFERENCES);
-    expect(normalizePlayerPreferences({ subtitlePosition: 'side' }).subtitlePosition).toBe('center');
+    // `bottom`: the player's own default lift is 0, the lowest position.
+    expect(normalizePlayerPreferences({ subtitlePosition: 'side' }).subtitlePosition).toBe('bottom');
   });
 
   it('bounds playback rate and subtitle font size', () => {

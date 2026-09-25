@@ -1331,11 +1331,11 @@ function SettingsPanel({
               boolean and returned. Measured live 2026-09-06: clicking each changed the pane's
               text length by 0, opened no dialog and raised no toast.
 
-              The result is now reported where it is produced. The per-check list is
-              deliberately NOT rendered yet: `buildPlayerDiagnosticReport` emits 21 English
-              prose strings, and surfacing untranslated sentences would trade one defect for
-              another. The counts are numbers and the export writes the full report to a file,
-              so nothing measured is withheld — see D80 in the pre-sweep register. */}
+              The result is now reported where it is produced, and the checks are about the
+              player that actually plays (round-2 audit B): the Seanime server and its
+              transcoder, the playback path and tracks of the video on screen, the GPU and
+              the decoders. Each check is translated keys, so "View report" lists them in the
+              UI language; the export carries the same checks. */}
           <div className="mc-settings-actions">
             <button type="button" onClick={() => void state.runPlayerDiagnostics()} disabled={state.diagnosticsRunning}>
               <Icon name="wrench" size={12} />
@@ -1367,6 +1367,19 @@ function SettingsPanel({
               : t('mediaCenter.settings.noReportYet')}
           </p>
           {state.diagnosticsOpen && state.playerDiagnostics && (
+            <ul className="mc-diagnostics-list">
+              {state.playerDiagnostics.checks.map((check) => (
+                <li key={check.id} data-status={check.status}>
+                  <span className={`mc-diagnostics-status mc-diagnostics-${check.status}`}>
+                    {t(`playerDiag.status.${check.status}`)}
+                  </span>
+                  <strong>{t(check.labelKey, check.vars)}</strong>
+                  <small>{t(check.detailKey, check.vars)}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+          {state.diagnosticsOpen && state.playerDiagnostics && (
             <div className="mc-settings-actions">
               <button type="button" onClick={state.exportPlayerDiagnostics}>
                 <Icon name="download" size={12} />
@@ -1384,7 +1397,9 @@ function SettingsPanel({
           <Toggle label={t('mediaCenter.settings.overlay')} detail={t('mediaCenter.settings.overlayDetail')} checked={state.subtitleOverlay} onChange={state.setSubtitleOverlay} />
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.subtitleSize')}</strong><small>{state.subtitleFontSize}px</small></span>
-            <input type="range" min={18} max={54} value={state.subtitleFontSize} onChange={(event) => state.setSubtitleFontSize(Number(event.target.value))} aria-label={t('mediaCenter.settings.subtitleSize')} />
+            {/* 16–48: the range the store keeps. 49–54 used to be offered and then
+                clamped to 48 on save, so the slider and the player disagreed. */}
+            <input type="range" min={16} max={48} value={state.subtitleFontSize} onChange={(event) => state.setSubtitleFontSize(Number(event.target.value))} aria-label={t('mediaCenter.settings.subtitleSize')} />
           </div>
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.subtitlePosition')}</strong><small>{t('mediaCenter.settings.subtitlePositionDetail')}</small></span>

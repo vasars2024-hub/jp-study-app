@@ -2749,6 +2749,34 @@
   font-size: var(--mc-fs-micro, 11px);
 }
 
+/* Player Diagnostics, one row per check: status, what was checked, what was found. */
+.mc-diagnostics-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.mc-diagnostics-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: baseline;
+}
+.mc-diagnostics-list li small {
+  grid-column: 2;
+  color: var(--mc-dim);
+}
+.mc-diagnostics-status {
+  font-size: var(--mc-fs-micro, 11px);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--mc-line);
+}
+.mc-diagnostics-fail { color: var(--mc-danger, #e5484d); }
+.mc-diagnostics-warning { color: var(--mc-warn, #d9a441); }
+.mc-diagnostics-pass { color: var(--mc-ok, #4caf7d); }
+
 /* A control kept focusable so its reason is reachable from the keyboard still has to
    LOOK unavailable, or the pane promises something it will not do. */
 .mc-settings-actions button[aria-disabled='true'] {

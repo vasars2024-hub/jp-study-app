@@ -149,6 +149,12 @@ export interface VideoCoreStudyPreferences {
   videoFit: VideoFitMode;
   dictationMode: boolean;
   shadowingMode: boolean;
+  /**
+   * Even out loudness with a compressor on the video's audio
+   * (`media/volumeNormalization.ts`). Set from the Media Center's toggle, which
+   * shares this key.
+   */
+  volumeNormalization: boolean;
   subtitleFontSize: number;
   /** Cue background opacity, 0 (fully transparent) to 90. */
   subtitleBgOpacity: number;
@@ -338,6 +344,7 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     videoFit: VIDEO_FIT_MODES.includes(raw.videoFit as VideoFitMode) ? raw.videoFit as VideoFitMode : 'contain',
     dictationMode: raw.dictationMode === true,
     shadowingMode: raw.shadowingMode === true,
+    volumeNormalization: raw.volumeNormalization === true,
     subtitleFontSize: fontSize,
     subtitleBgOpacity: typeof raw.subtitleBgOpacity === 'number'
       && Number.isFinite(raw.subtitleBgOpacity)

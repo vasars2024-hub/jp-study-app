@@ -93,6 +93,8 @@ export interface StudyBottomBarProps {
   onResetSubtitleDelay?: () => void;
   /** Every subtitle-appearance preference back to its default (`resetSubtitleAppearance`). */
   onResetSubtitleAppearance?: () => void;
+  /** Save the loaded subtitle track as a file. Absent while no track is loaded. */
+  onExportSubtitles?: (format: 'srt' | 'vtt') => void;
   /**
    * The key a command is bound to right now (`''` when unbound), for tooltips. Passed in
    * rather than imported: the shortcut store pulls the music bus, which talks to the main
@@ -884,6 +886,16 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               >
                 {t('mediaWorkspace.study.resetSubtitleAppearance')}
               </button>
+            )}
+            {props.onExportSubtitles && (
+              <span className="study-subtitle-export">
+                <button type="button" data-study-action="export-subtitles-srt" onClick={() => props.onExportSubtitles?.('srt')}>
+                  {t('mediaWorkspace.study.exportSubtitlesSrt')}
+                </button>
+                <button type="button" data-study-action="export-subtitles-vtt" onClick={() => props.onExportSubtitles?.('vtt')}>
+                  {t('mediaWorkspace.study.exportSubtitlesVtt')}
+                </button>
+              </span>
             )}
           </StudyToolGroup>
 
