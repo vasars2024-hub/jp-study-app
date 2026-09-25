@@ -6,6 +6,8 @@
 // This module is pure (no electron, no fs) so the state machine and the
 // pre-flight math can be unit-tested without booting the app.
 
+import type { StudyLang } from './levelScale';
+
 export type AssetKind =
   | 'dictionary'
   | 'whisper'
@@ -18,7 +20,7 @@ export type AssetKind =
   | 'llm';
 
 /** Language an asset belongs to, or 'any' for language-neutral assets. */
-export type AssetLang = 'ja' | 'zh' | 'any';
+export type AssetLang = 'ja' | 'zh' | 'ru' | 'any';
 
 export interface AssetSpec {
   id: string;
@@ -721,6 +723,37 @@ export const ASSET_CATALOG: AssetSpec[] = [
     archive: 'zip',
   },
   {
+    /*
+     * The Russian starter dictionary: every Russian entry of the English
+     * Wiktionary, as extracted by wiktextract and published by kaikki.org.
+     * Licence: CC BY-SA 4.0 (and GFDL), the licence of Wiktionary's text —
+     * attribution is written into the dictionary row by the importer
+     * (WIKTEXTRACT_LICENCE / WIKTEXTRACT_ATTRIBUTION in importers/wiktextract.ts).
+     *
+     * It is the one freely licensed Russian source with what a learner needs
+     * beyond glosses: `forms[]` carries the full declension/conjugation grid
+     * (книги → книга resolves through the `inflections` table) and the
+     * stress-marked canonical form (кни́га).
+     *
+     * Unpinned on purpose, the MDBG/Tatoeba convention: kaikki regenerates the
+     * file weekly, so a pinned hash would fail every install after the next
+     * rebuild. Size measured by HEAD on 2026-09-25 (89,235,839 bytes gzip,
+     * 939,171,418 bytes uncompressed). The gzip is kept as downloaded; the
+     * dictionary importer streams it into the database.
+     */
+    id: 'wiktionary-ru',
+    name: 'Wiktionary Russian (kaikki.org)',
+    description: 'The Russian-English dictionary, with inflected forms and stress marks. Required for Russian lookups.',
+    descriptionKey: 'storage.asset.wiktionaryRu.desc',
+    kind: 'dictionary',
+    lang: 'ru',
+    url: 'https://kaikki.org/dictionary/Russian/kaikki.org-dictionary-Russian.jsonl.gz',
+    sizeBytes: 89_235_839,
+    version: '1',
+    installDir: 'wiktionary-ru',
+    file: 'kaikki.org-dictionary-Russian.jsonl.gz',
+  },
+  {
     id: 'jmdict-yomitan',
     name: 'JMdict (Yomitan)',
     description: 'The Japanese-English dictionary pack used by the lookup popup.',
@@ -807,21 +840,22 @@ export function assetPinCoverage(assets: AssetSpec[] = ASSET_CATALOG): {
 }
 
 /** Assets a given study language needs before its features light up. */
-export function assetsForLang(assets: AssetSpec[], lang: 'ja' | 'zh'): AssetSpec[] {
+export function assetsForLang(assets: AssetSpec[], lang: StudyLang): AssetSpec[] {
   return assets.filter((a) => a.lang === lang || a.lang === 'any');
 }
 
 /**
  * Starter setup set for the study-language environment card.
  * Excludes `lang: 'any'` whispers (downloaded on demand via Transformers.js).
- * JA: empty — Yomitan JMdict auto-provisions. ZH: CC-CEDICT.
+ * JA: empty — Yomitan JMdict auto-provisions. ZH: CC-CEDICT. RU: Wiktionary.
  */
-export function starterAssetIds(lang: 'ja' | 'zh'): string[] {
+export function starterAssetIds(lang: StudyLang): string[] {
   if (lang === 'zh') return ['cc-cedict'];
+  if (lang === 'ru') return ['wiktionary-ru'];
   return [];
 }
 
-export function starterAssetsForLang(assets: AssetSpec[], lang: 'ja' | 'zh'): AssetSpec[] {
+export function starterAssetsForLang(assets: AssetSpec[], lang: StudyLang): AssetSpec[] {
   const ids = new Set(starterAssetIds(lang));
   return assets.filter((a) => ids.has(a.id));
 }

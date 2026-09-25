@@ -307,7 +307,7 @@ export function readInput(input: string): NumberReading[] {
     const n = Number(s);
     if (Number.isSafeInteger(n)) {
       const reading = numberToKana(n);
-      if (reading) out.push({ label: 'Number', surface: n.toLocaleString(), reading });
+      if (reading) out.push({ label: 'Number', surface: n.toLocaleString('ja-JP'), reading });
     }
   }
 

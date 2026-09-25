@@ -320,6 +320,7 @@ declare global {
       mangaOcrSaveOrder(
         req: import('../shared/mangaOcrIpc').MangaOcrOrderRequest,
       ): Promise<import('../shared/mokuroTypes').MokuroPage | null>;
+      ocrRecognizeGlyph(dataUrl: string, lang: 'ja' | 'zh' | 'ru'): Promise<string>;
       mangaOcrRecognizeImage(dataUrl: string): Promise<string>;
       onMangaOcrProgress(cb: (p: import('../shared/mangaOcrIpc').MangaOcrProgress) => void): () => void;
       mangaOcrLoadTranslateCache(
@@ -370,11 +371,12 @@ declare global {
       /** Same page size as `lookupTerm`; a `truncated` result is reachable by asking again. */
       lookupChinese(query: string, limit?: number): Promise<DictResult>;
       resetChineseDictCache(): Promise<void>;
+      readingAid(lang: 'zh' | 'ru', words: string[]): Promise<Record<string, string[]>>;
       lookupTermsBatch(
         queries: Array<{ expression: string; reading?: string }>,
         langs: Array<'en' | 'ja' | 'zh' | 'ru'>,
       ): Promise<Record<string, { en?: string; ja?: string; zh?: string; ru?: string }>>;
-      searchExamples(query: string, limit?: number): Promise<ExampleResult>;
+      searchExamples(query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<ExampleResult>;
       examplesOfflineStatus(): Promise<{ installed: boolean; sentenceCount: number; updatedAt: number }>;
       examplesImportOffline(payload?: {
         sentencesPath?: string;
@@ -522,6 +524,7 @@ declare global {
         variantCount: number;
         sendGloss: boolean;
         explainLanguage: string;
+        studyLang?: 'ja' | 'zh' | 'ru';
       }): Promise<AiAdditionsRunResult>;
       /** Deck Workbench field translation — gate 2. Same batch id space as above. */
       ankiAiTranslateField(request: {
@@ -2011,6 +2014,8 @@ declare global {
       onAssetStatus(cb: (status: AssetStatus) => void): () => void;
       onAssetUnload(cb: (id: string) => void): () => void;
       setUiLang(lang: string): void;
+      /** Mirror the study language (and Chinese script) into main. */
+      setStudyLanguage(value: { lang: string; script: string }): void;
 
       /** Audit C1-3: airing schedule with torrent-index releases matched onto it. */
       animeSchedule(input: AnimeScheduleRequest): Promise<AnimeScheduleResponse>;
@@ -2092,8 +2097,8 @@ declare global {
           badge: string;
           empty?: boolean;
           noLists?: boolean;
-          lang?: 'ja' | 'zh' | null;
-          scheme?: 'jlpt' | 'hsk' | null;
+          lang?: 'ja' | 'zh' | 'ru' | null;
+          scheme?: 'jlpt' | 'hsk' | 'cefr' | null;
           label?: string;
           confidence?: number;
           error?: string;

@@ -1089,9 +1089,36 @@ function buildChord(mods: { ctrl: boolean; alt: boolean; shift: boolean; meta: b
   return parts.join('+');
 }
 
-/** Chord from a keyboard event, or null if modifier-only. */
-export function chordFromEvent(e: KeyboardEvent): string | null {
+/**
+ * A keystroke that belongs to an input method mid-composition: Japanese or
+ * Chinese IME conversion (`isComposing`, Chromium's keyCode 229, key
+ * "Process"). Those keys are the IME's, and a shortcut firing on them eats a
+ * learner's typing — "k" of "kanji" opening a panel.
+ */
+export function isImeCompositionEvent(e: Pick<KeyboardEvent, 'isComposing' | 'keyCode' | 'key'>): boolean {
+  return e.isComposing === true || e.keyCode === 229 || e.key === 'Process';
+}
+
+/**
+ * The key a shortcut is bound to, independent of the keyboard layout: under a
+ * Russian (or any non-Latin) layout Ctrl+P arrives as `key` "з", which no chord
+ * names, so letters and digits fall back to the physical key (`code` "KeyP").
+ */
+function layoutIndependentKey(e: Pick<KeyboardEvent, 'key' | 'code'>): string {
   const k = e.key;
+  const nonLatinChar = k.length === 1 && !/^[\x20-\x7e]$/.test(k);
+  if (!nonLatinChar && k !== 'Dead' && k !== 'Unidentified') return k;
+  const letter = /^Key([A-Z])$/.exec(e.code ?? '');
+  if (letter) return letter[1].toLowerCase();
+  const digit = /^Digit([0-9])$/.exec(e.code ?? '');
+  if (digit) return digit[1];
+  return k;
+}
+
+/** Chord from a keyboard event, or null if modifier-only or part of an IME composition. */
+export function chordFromEvent(e: KeyboardEvent): string | null {
+  if (isImeCompositionEvent(e)) return null;
+  const k = layoutIndependentKey(e);
   if (isModifierOnlyKey(k)) return null;
   const label = k.length === 1 ? (k === ' ' ? 'Space' : k.toUpperCase()) : k;
   // For printable symbols Shift already changed the character (e.g. "+"), so

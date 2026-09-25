@@ -285,6 +285,24 @@
   line-height: 1.5;
 }
 
+/* The study line in its own language's faces. Every subtitle surface carries
+   its real `lang` (SubtitleCueLine, the transcript rail), and Han characters
+   are shared by Japanese and Chinese but drawn differently: a Chinese line in
+   Yu Gothic takes Japanese glyph shapes. Simplified and Traditional have their
+   own faces; Russian needs no CJK face at all. The Japanese stack above stays
+   the default (and the S1 guard's subject). */
+#media-workspace :lang(zh) {
+  --subtitle-font-stack: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'PingFang SC',
+    'Source Han Sans SC', 'Segoe UI', system-ui, sans-serif;
+}
+#media-workspace :lang(zh-Hant) {
+  --subtitle-font-stack: 'Microsoft JhengHei UI', 'Microsoft JhengHei', 'Noto Sans TC', 'PingFang TC',
+    'Source Han Sans TC', 'Segoe UI', system-ui, sans-serif;
+}
+#media-workspace :lang(ru) {
+  --subtitle-font-stack: 'Segoe UI', 'Noto Sans', 'Arial', system-ui, sans-serif;
+}
+
 /* Phase-3 player slice: adopted VideoCore plus a sibling Study OS cue consumer.
    The slice stays mounted while idle so the adopted player is never unmounted
    between streams (see StudyPlayerSlice.tsx), so hide it rather than letting a

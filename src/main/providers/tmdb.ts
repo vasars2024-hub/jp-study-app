@@ -140,8 +140,12 @@ export interface TmdbTv {
   origin_country?: string[] | null;
 }
 
-/** East Asian originals, whose original title is the native one worth showing. */
-const NATIVE_LANGUAGES = new Set(['ja', 'zh', 'ko', 'cn']);
+/**
+ * Originals whose original title is the native one worth showing: the East
+ * Asian languages, and Russian — a Russian learner's film is «Брат», not its
+ * English release title.
+ */
+const NATIVE_LANGUAGES = new Set(['ja', 'zh', 'ko', 'cn', 'ru']);
 
 function genreNames(ids: readonly number[] | null | undefined, named?: TmdbMovie['genres']): string[] {
   const fromNames = (named ?? []).map((genre) => text(genre?.name)).filter((name): name is string => Boolean(name));

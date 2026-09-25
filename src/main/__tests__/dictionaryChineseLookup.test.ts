@@ -72,9 +72,12 @@ describe('the CC-CEDICT fallback engine', () => {
     expect(result.entries[0].senses[0].definitions).toEqual(['tradition', 'traditional']);
   });
 
-  it('resolves a traditional headword to the same entry', () => {
+  it('resolves a traditional headword to the same entry, written the way it was asked', () => {
     const result = lookupCedictIndex(buildCedictIndex(CEDICT_TEXT), '傳統');
-    expect(result.entries[0].word).toBe('传统');
+    // The same entry (its senses), in the learner's own script — it used to
+    // come back as Simplified 传统 whatever was typed.
+    expect(result.entries[0].word).toBe('傳統');
+    expect(result.entries[0].senses[0].definitions).toEqual(['tradition', 'traditional']);
   });
 
   it('renders tone marks rather than tone digits', () => {
@@ -234,5 +237,27 @@ describe('lookupChineseTerm — database first, CC-CEDICT second', () => {
   it('survives an FTS-operator query, which is ordinary English input', async () => {
     importCedict(db, CEDICT_TEXT, { dictId: 'cc-cedict' });
     await expect(lookupChineseTerm('to run (away)', deps())).resolves.toBeTruthy();
+  });
+});
+
+describe('Traditional Chinese', () => {
+  it('a Traditional query, or a Traditional learner, sees the Traditional headword', () => {
+    const index = buildCedictIndex(CEDICT_TEXT);
+    expect(lookupCedictIndex(index, '傳統').entries[0]?.word).toBe('傳統');
+    expect(lookupCedictIndex(index, '传统').entries[0]?.word).toBe('传统');
+    expect(lookupCedictIndex(index, 'tradition', 'traditional').entries[0]?.word).toBe('傳統');
+    expect(lookupCedictIndex(index, 'tradition').entries[0]?.word).toBe('传统');
+  });
+});
+
+describe('hanzi character facts', () => {
+  it('a single hanzi gets its readings and meanings from CC-CEDICT, not a KANJIDIC2 prompt', async () => {
+    const { cedictCharacter } = await import('../dictionary/chineseLookup');
+    const index = buildCedictIndex(CEDICT_TEXT);
+    const cat = cedictCharacter(index, '猫');
+    expect(cat).toMatchObject({ lang: 'zh-Hans', char: '猫', readings: ['māo'], meanings: ['cat', 'CL:隻|只[zhi1]'] });
+    expect(cat?.sources[0]).toMatchObject({ dictId: 'cc-cedict', licence: 'CC BY-SA 4.0' });
+    expect(cedictCharacter(index, '貓', 'traditional')?.lang).toBe('zh-Hant');
+    expect(cedictCharacter(index, '传统')).toBeUndefined();
   });
 });

@@ -110,6 +110,8 @@ import {
   type SubtitleProviderCredentialState,
 } from '../../shared/subtitleDiscoveryIpc';
 import { showToast } from '../components/ui';
+import { useStudyLanguage } from '../useStudyLanguage';
+import { STUDY_LANG_NAME_KEY, STUDY_LANG_READING_AID_KEY, STUDY_LANGS } from '../../shared/studyLang';
 import './mediaCenter.css';
 
 export type MediaCenterTab =
@@ -569,6 +571,7 @@ function VideoPanel({
   workspace: MediaWorkspaceAvailability;
 }) {
   const { t } = useT();
+  const studyLang = useStudyLanguage().lang;
   const videos = useMemo(() => orderUpNext(state.items), [state.items]);
   const current = state.current;
   const stage = videoStageFor(workspace);
@@ -810,7 +813,7 @@ function VideoPanel({
             <div className="mc-toggle-list">
               <Toggle label={t('video.autoPause')} checked={state.autoPause} onChange={state.setAutoPause} />
               <Toggle label={t('video.loopLine')} checked={state.loopLine} onChange={state.setLoopLine} />
-              <Toggle label={t('video.furigana')} checked={state.furigana} onChange={state.setFurigana} />
+              <Toggle label={t(STUDY_LANG_READING_AID_KEY[studyLang])} checked={state.furigana} onChange={state.setFurigana} />
               <Toggle label={t('video.dualSubs')} checked={state.dualSubs} onChange={state.setDualSubs} />
               <Toggle label={t('mediaCenter.study.dictation')} checked={state.dictationMode} onChange={state.setDictationMode} />
               <Toggle label={t('mediaCenter.study.shadowing')} checked={state.shadowingMode} onChange={state.setShadowingMode} />
@@ -1248,6 +1251,7 @@ function SettingsPanel({
   onOpenAutomation: () => void;
 }) {
   const { t } = useT();
+  const studyLang = useStudyLanguage().lang;
   const currentRate = state.playbackRate;
   const { catalogueRows, profileRows } = useSourceRows(provenance);
   const ingest = useIngestState().state;
@@ -1395,7 +1399,7 @@ function SettingsPanel({
         <SettingsSection icon="caption" title={t('mediaCenter.settings.subtitles')} detail={t('mediaCenter.settings.subtitlesDetail')}>
           <Toggle label={t('mediaCenter.settings.primarySubs')} detail={t('mediaCenter.settings.primarySubsDetail')} checked={state.primarySubs} onChange={state.setPrimarySubs} />
           <Toggle label={t('mediaCenter.settings.dualSubs')} detail={t('mediaCenter.settings.dualSubsDetail')} checked={state.dualSubs} onChange={state.setDualSubs} />
-          <Toggle label={t('video.furigana')} detail={t('mediaCenter.settings.furiganaDetail')} checked={state.furigana} onChange={state.setFurigana} />
+          <Toggle label={t(STUDY_LANG_READING_AID_KEY[studyLang])} detail={t('mediaCenter.settings.furiganaDetail')} checked={state.furigana} onChange={state.setFurigana} />
           <Toggle label={t('mediaCenter.settings.overlay')} detail={t('mediaCenter.settings.overlayDetail')} checked={state.subtitleOverlay} onChange={state.setSubtitleOverlay} />
           <div className="mc-setting-row">
             <span><strong>{t('mediaCenter.settings.subtitleSize')}</strong><small>{state.subtitleFontSize}px</small></span>
@@ -1478,10 +1482,11 @@ function SettingsPanel({
             <select
               value={state.subLang}
               aria-label={t('mediaCenter.settings.transcriptionLanguage')}
-              onChange={(event) => state.setSubLang(event.target.value as 'ja' | 'zh')}
+              onChange={(event) => state.setSubLang(event.target.value as 'ja' | 'zh' | 'ru')}
             >
-              <option value="ja">{t('mediaCenter.settings.japanese')}</option>
-              <option value="zh">{t('mediaCenter.settings.chinese')}</option>
+              {STUDY_LANGS.map((code) => (
+                <option key={code} value={code}>{t(STUDY_LANG_NAME_KEY[code])}</option>
+              ))}
             </select>
           </div>
           <div className="mc-setting-row">

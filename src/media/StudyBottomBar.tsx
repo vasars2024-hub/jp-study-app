@@ -51,6 +51,13 @@ import {
   type VideoFitMode,
 } from '../shared/videoCoreStudy';
 import { useT } from '../renderer/i18n';
+import { useStudyLanguage } from '../renderer/useStudyLanguage';
+import {
+  STUDY_LANG_NAME_KEY,
+  STUDY_LANG_READING_AID_KEY,
+  STUDY_LANG_SUBTITLES_KEY,
+  STUDY_LANGS,
+} from '../shared/studyLang';
 import { useStudyWorkspace } from './StudyWorkspaceProvider';
 import StudyToolSheet, { StudyToolGroup } from './StudyToolSheet';
 
@@ -137,8 +144,8 @@ export interface StudyBottomBarProps {
   onWhisperDeviceChange: (device: WhisperDevice) => void;
   whisperModel: WhisperModelTier;
   onWhisperModelChange: (tier: WhisperModelTier) => void;
-  whisperLanguage: 'ja' | 'zh';
-  onWhisperLanguageChange: (language: 'ja' | 'zh') => void;
+  whisperLanguage: 'ja' | 'zh' | 'ru';
+  onWhisperLanguageChange: (language: 'ja' | 'zh' | 'ru') => void;
   whisperBusy: boolean;
   whisperCanGenerate: boolean;
   whisperState: string;
@@ -257,6 +264,9 @@ export function SubtitleColorChoice({
 
 export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactElement {
   const { t } = useT();
+  // The study line and its reading aid are named for the language studied:
+  // "Chinese subtitles" and "Pinyin", not "Japanese subtitles" and "Furigana".
+  const studyLang = useStudyLanguage().lang;
   const { doc, layout, idle, dispatch, trigger, isVisible, customizing } = useStudyWorkspace();
   const [open, setOpen] = React.useState<Category | null>(null);
 
@@ -463,7 +473,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 type="checkbox"
                 checked={preferences.primarySubs}
                 onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)}
-              /> {t('mediaWorkspace.study.japaneseSubs')}
+              /> {t(STUDY_LANG_SUBTITLES_KEY, { lang: t(STUDY_LANG_NAME_KEY[studyLang]) })}
             </label>
             <label title={shortcutTitle('video.toggleSubtitles')}>
               <input
@@ -487,7 +497,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 data-study-pref="furigana"
                 checked={preferences.furigana}
                 onChange={(event) => updatePreference('furigana', event.currentTarget.checked)}
-              /> {t('mediaWorkspace.study.furigana')}
+              /> {t(STUDY_LANG_READING_AID_KEY[studyLang])}
             </label>
             <label>
               <input
@@ -942,11 +952,12 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                   value={props.whisperLanguage}
                   disabled={props.whisperBusy}
                   onChange={(event) => props.onWhisperLanguageChange(
-                    event.currentTarget.value as 'ja' | 'zh',
+                    event.currentTarget.value as 'ja' | 'zh' | 'ru',
                   )}
                 >
-                  <option value="ja">{t('mediaCenter.settings.japanese')}</option>
-                  <option value="zh">{t('mediaCenter.settings.chinese')}</option>
+                  {STUDY_LANGS.map((code) => (
+                    <option key={code} value={code}>{t(STUDY_LANG_NAME_KEY[code])}</option>
+                  ))}
                 </select>
               </label>
               <button

@@ -57,6 +57,7 @@ import {
   runSubtitleDiscovery,
 } from './subtitleDiscovery';
 import { registerSubtitleHarvestIpc } from './subtitleHarvest';
+import { getMainStudyLangTag } from './studyLanguage';
 import {
   registerSubtitleAutoIpc,
   requestSubtitlePreparation,
@@ -1077,7 +1078,7 @@ function enrichHandoffFromLibrary(handoff: PlaybackHandoff): PlaybackHandoff {
   if (!subtitlePath) {
     const record = pickPlaybackSubtitle(
       item.subtitles,
-      loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+      getMainStudyLangTag(),
       item.preferredSubtitleId,
     );
     if (record?.path) subtitlePath = record.external ? record.path : path.join(app.getPath('userData'), record.path);
@@ -1540,7 +1541,7 @@ export function registerMediaIpc(): void {
     let subtitle: SubtitlePick | undefined;
     const record = pickPlaybackSubtitle(
       item.subtitles,
-      loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+      getMainStudyLangTag(),
       item.preferredSubtitleId,
     );
     if (record) {
@@ -1622,7 +1623,7 @@ export function registerMediaIpc(): void {
       if (item) {
         const record = pickPlaybackSubtitle(
           item.subtitles,
-          loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+          getMainStudyLangTag(),
           item.preferredSubtitleId,
         );
         if (record) {

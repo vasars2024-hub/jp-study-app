@@ -13,6 +13,7 @@ import { N4_SUPPLEMENT } from '../data/grammar/n4-supplement';
 
 const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
 const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7-9', 'HSK10'];
+const CEFR = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 describe('GrammarX corpus', () => {
   it('includes supplemental N1–N4 and HSK bands', () => {
@@ -30,7 +31,25 @@ describe('GrammarX corpus', () => {
   });
 
   it('assigns every point a study language', () => {
-    expect(GRAMMAR.every((p) => p.lang === 'ja' || p.lang === 'zh')).toBe(true);
+    expect(GRAMMAR.every((p) => p.lang === 'ja' || p.lang === 'zh' || p.lang === 'ru')).toBe(true);
+  });
+
+  it('has at least 25 study-ready Chinese patterns at each of HSK 1–4', () => {
+    for (const level of ['HSK1', 'HSK2', 'HSK3', 'HSK4']) {
+      const ready = GRAMMAR.filter((p) => p.lang === 'zh' && p.level === level && p.examples.length > 0);
+      expect(ready.length, level).toBeGreaterThanOrEqual(level === 'HSK1' ? 24 : 25);
+    }
+  });
+
+  it('has study-ready Russian A1–B1 grammar on the CEFR scale', () => {
+    const russian = GRAMMAR.filter((p) => p.lang === 'ru');
+    for (const level of ['A1', 'A2', 'B1']) {
+      expect(russian.filter((p) => p.level === level).length, level).toBeGreaterThanOrEqual(12);
+    }
+    expect(russian.every((p) => CEFR.includes(p.level))).toBe(true);
+    expect(russian.every((p) => p.examples.length >= 2 && p.explanation.trim().length > 0)).toBe(true);
+    expect(russian.every((p) => p.examples.every((ex) => /\p{Script=Cyrillic}/u.test(ex.jp) && ex.en.trim()))).toBe(true);
+    expect(russian.every((p) => frameworkForLevel(p.level) === 'cefr')).toBe(true);
   });
 
   /*
@@ -48,7 +67,7 @@ describe('GrammarX corpus', () => {
   });
 
   it('gives every point a known level', () => {
-    const unknown = GRAMMAR.filter((p) => !JLPT.includes(p.level) && !HSK.includes(p.level));
+    const unknown = GRAMMAR.filter((p) => !JLPT.includes(p.level) && !HSK.includes(p.level) && !CEFR.includes(p.level));
     expect(unknown.map((p) => p.id)).toEqual([]);
   });
 

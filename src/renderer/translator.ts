@@ -10,7 +10,7 @@ export interface ModelProgress {
   progress?: number;
 }
 
-export type TranslateLang = 'ja' | 'zh';
+export type TranslateLang = 'ja' | 'zh' | 'ru';
 /** Any BCP-47-ish language code; Qwen handles arbitrary pairs. */
 export type TransLang = string;
 

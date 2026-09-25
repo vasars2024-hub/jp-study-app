@@ -33,6 +33,7 @@ import type { GrammarFunctionId } from './functions';
 import { resolveCategories } from './taxonomy';
 import {
   frameworkForLevel,
+  isCefrLevel,
   type GrammarLang,
   type GrammarPoint,
   type GrammarProvenance,
@@ -210,7 +211,8 @@ export function deriveRegister(
    * whole corpus carried a non-neutral register.
    */
   const fields = [...patternVariants(title), title, structure ?? ''].filter(Boolean);
-  const rules = lang === 'zh' ? ZH_REGISTER_RULES : JA_REGISTER_RULES;
+  // Russian points state their register when they have one; no morphology rule guesses it.
+  const rules = lang === 'zh' ? ZH_REGISTER_RULES : lang === 'ru' ? [] : JA_REGISTER_RULES;
   for (const [re, register] of rules) {
     for (const field of fields) {
       if (re.test(field)) return register;
@@ -240,7 +242,8 @@ export function normalizeGrammarPoint(
   point: GrammarPoint,
   module: ModuleProvenance = DEFAULT_MODULE,
 ): NormalizedGrammarPoint {
-  const lang: GrammarLang = point.lang ?? (String(point.level).startsWith('HSK') ? 'zh' : 'ja');
+  const lang: GrammarLang = point.lang
+    ?? (String(point.level).startsWith('HSK') ? 'zh' : isCefrLevel(String(point.level)) ? 'ru' : 'ja');
 
   const functions = point.functions ?? [];
   const categories =

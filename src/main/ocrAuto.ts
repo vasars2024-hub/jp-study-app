@@ -157,16 +157,28 @@ async function readManga(dataUrl: string): Promise<AutoOcrResult> {
  * Throws when the requested engine's models are not installed; callers surface
  * that as a download prompt.
  */
+/**
+ * manga-ocr reads Japanese and nothing else: on a Chinese or Russian page it
+ * answers with fluent Japanese that was never there. Only a Japanese (or
+ * unstated) language may reach it.
+ */
+export function mangaOcrAllowedFor(opts: Pick<AutoOcrOptions, 'langHint' | 'forceLang'>): boolean {
+  const lang = opts.forceLang ?? opts.langHint;
+  return !lang || lang === 'ja';
+}
+
 export async function ocrAuto(dataUrl: string, opts: AutoOcrOptions = {}): Promise<AutoOcrResult> {
-  const choice = opts.engine ?? 'auto';
+  const mangaAllowed = mangaOcrAllowedFor(opts);
+  // A manga-engine request for a non-Japanese page is read by the general engine.
+  const choice = opts.engine === 'manga' && !mangaAllowed ? 'web' : opts.engine ?? 'auto';
 
   if (choice === 'manga') {
     if (!mangaOcrAvailable()) throw new Error('manga-models-missing');
     return readManga(dataUrl);
   }
   if (!paddleOcrAvailable()) {
-    // No general engine: manga-ocr alone is still better than failing outright.
-    if (choice === 'auto' && mangaOcrAvailable()) return readManga(dataUrl);
+    // No general engine: manga-ocr alone is still better than failing outright (Japanese only).
+    if (choice === 'auto' && mangaAllowed && mangaOcrAvailable()) return readManga(dataUrl);
     throw new Error('web-models-missing');
   }
 
@@ -222,7 +234,7 @@ export async function ocrAuto(dataUrl: string, opts: AutoOcrOptions = {}): Promi
   };
 
   if (choice !== 'auto') return web;
-  if (!mangaOcrAvailable()) return web;
+  if (!mangaAllowed || !mangaOcrAvailable()) return web;
 
   // Character density is only meaningful against the image's own size, and the
   // size is otherwise not needed here — decoding the header is cheap next to

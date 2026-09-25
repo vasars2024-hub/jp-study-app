@@ -26,6 +26,7 @@
 // Phase 3's own text calls for a lemma table that no importer supplies yet.
 
 import { hasCyrillic, hasHan, hasHangul, hasKana, hasLatin } from '../../shared/langs';
+import { foldRussianYo, russianLemmaCandidates, stripRussianStress } from '../../shared/russianMorphology';
 import { deinflect } from '../../shared/deinflect';
 import {
   MAX_NEIGHBOR_RESULTS,
@@ -252,13 +253,32 @@ export function candidateForms(lang: DictLangCode, text: string): { form: string
   switch (lang) {
     case 'ja':
       return deinflect(norm).map((d) => ({ form: d.term, reasons: d.reasons }));
-    case 'ru':
-      return stripSuffixes(norm, RU_SUFFIXES, 3).map((form) => ({ form, reasons: [] }));
+    case 'ru': {
+      // Stress marks are notation (a pasted `кни́ги` is `книги`), and a form is
+      // probed as its likely dictionary forms too: `книги` → `книга`,
+      // `видела` → `видеть`. Only an index hit makes a candidate an answer.
+      const plain = stripRussianStress(norm);
+      return [...new Set([...russianLemmaCandidates(plain), ...stripSuffixes(plain, RU_SUFFIXES, 3)])]
+        .map((form) => ({ form, reasons: [] }));
+    }
     case 'en':
       return stripSuffixes(norm, EN_SUFFIXES, 3).map((form) => ({ form, reasons: [] }));
     default:
       return [{ form: norm, reasons: [] }];
   }
+}
+
+/**
+ * The keys a surface is looked up by in `inflections`. Russian forms are stored
+ * without stress marks (`inflectionKey` in the importer), and the ё-folded
+ * spelling is a key of its own, so `книги`, `кни́ги` and `ежики` all reach
+ * their paradigm rows.
+ */
+export function inflectionProbeKeys(lang: DictLangCode, text: string): string[] {
+  const norm = normalizeForLookup(text);
+  if (lang !== 'ru') return [norm];
+  const plain = stripRussianStress(norm);
+  return [...new Set([plain, foldRussianYo(plain)])];
 }
 
 // ----- the service -----------------------------------------------------------
@@ -479,6 +499,12 @@ export function compareLookupEntries(a: LookupEntry, b: LookupEntry): number {
     a.headwordId - b.headwordId;
 }
 
+/**
+ * Prefix of the inflection tag that carries a form's written spelling (the
+ * Russian stressed form, `form:кни́ги`). Data for the reading aid, not a reason.
+ */
+export const INFLECTION_WRITTEN_TAG = 'form:';
+
 export function collectInflectionReasons(
   rows: { headword_id: number; name: string | null; tags: string | null }[],
 ): Map<number, string[]> {
@@ -486,7 +512,7 @@ export function collectInflectionReasons(
   for (const row of rows) {
     const existing = byHeadword.get(row.headword_id) ?? [];
     const reasons = [row.name, ...(row.tags?.split(',') ?? [])]
-      .filter((value): value is string => Boolean(value));
+      .filter((value): value is string => Boolean(value) && !value.startsWith(INFLECTION_WRITTEN_TAG));
     byHeadword.set(row.headword_id, [...new Set([...existing, ...reasons])]);
   }
   return byHeadword;
@@ -640,26 +666,38 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
 
   for (const lang of searchLangs) {
     const forms = candidateForms(lang, text);
-    for (const { form, reasons } of forms) {
+    // Russian candidates past the first are guesses (`книги` → `книга`); they
+    // are probed only when the dictionary's own paradigm rows name no lemma.
+    const guesses = lang === 'ru' ? forms.slice(1) : [];
+    for (const { form, reasons } of lang === 'ru' ? forms.slice(0, 1) : forms) {
       const via = reasons.length ? 'deinflected' : 'exact';
       for (const row of byNorm.all(pair, lang, form) as HeadwordRow[]) push(row, via, reasons);
     }
+    let inflectionHits = 0;
 
     // Importers can supply forms that a generic suffix heuristic or Japanese
     // de-inflector cannot derive (irregular paradigms are the important case).
     // The schema has always indexed these rows; consult that index before the
     // looser reading and prefix probes so imported morphology is not dead data.
-    const inflectionRows = prepareCached(
-      db,
-      // One surface may have several analyses for the same headword. `headword_id`
-      // alone leaves their order undefined, which makes the displayed reason chain
-      // depend on SQLite's query plan. `rowid` preserves importer order within a
-      // headword while keeping headwords grouped for the accumulator.
-      'select headword_id, name, tags from inflections where form = ? order by headword_id, rowid',
-    ).all(normalizeForLookup(text)) as { headword_id: number; name: string | null; tags: string | null }[];
-    const inflectionReasons = collectInflectionReasons(inflectionRows);
-    for (const row of byInflection.all(pair, lang, normalizeForLookup(text)) as HeadwordRow[]) {
-      push(row, 'deinflected', inflectionReasons.get(row.id) ?? []);
+    for (const inflectionKey of inflectionProbeKeys(lang, text)) {
+      const inflectionRows = prepareCached(
+        db,
+        // One surface may have several analyses for the same headword. `headword_id`
+        // alone leaves their order undefined, which makes the displayed reason chain
+        // depend on SQLite's query plan. `rowid` preserves importer order within a
+        // headword while keeping headwords grouped for the accumulator.
+        'select headword_id, name, tags from inflections where form = ? order by headword_id, rowid',
+      ).all(inflectionKey) as { headword_id: number; name: string | null; tags: string | null }[];
+      const inflectionReasons = collectInflectionReasons(inflectionRows);
+      for (const row of byInflection.all(pair, lang, inflectionKey) as HeadwordRow[]) {
+        push(row, 'deinflected', inflectionReasons.get(row.id) ?? []);
+        inflectionHits += 1;
+      }
+    }
+    if (!inflectionHits) {
+      for (const { form } of guesses) {
+        for (const row of byNorm.all(pair, lang, form) as HeadwordRow[]) push(row, 'deinflected', []);
+      }
     }
 
     // Reading-side probes. Kana for Japanese, toneless pinyin for Chinese — the

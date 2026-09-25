@@ -105,6 +105,8 @@ import TestMode from './TestMode';
 import WriteMode from './WriteMode';
 import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPractice';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
+import { normalizeStudyLang } from '../../../shared/studyLang';
+import { cardContentLang, studyContentLang } from '../../studyEnvironment';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, loadSavedCards, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -814,10 +816,12 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setAudioBusy(true);
     setAudioError('');
     try {
+      // The card's own language speaks it (absent is Japanese, as stored).
+      const lang = normalizeStudyLang(card.studyLang);
       const result = await window.api.flashcardSynthesizeAudio(
         card.sentence || card.word,
-        'ja',
-        preferredVoiceFor('ja'),
+        lang,
+        preferredVoiceFor(lang),
       );
       if (!result.ok || !result.path) {
         // NOT `result.error`: that is the synthesizer's own English sentence, and it
@@ -853,13 +857,16 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     try {
       // The OS synthesizer owns one voice device. Sequential generation avoids
       // competing speech engines while still keeping the renderer responsive.
-      const voice = preferredVoiceFor('ja');
+      // One voice per language, read once for the batch; each card speaks in its own language.
+      const voices = new Map<string, string | undefined>();
       for (const card of candidates) {
         if (batch.cancelled) break;
+        const lang = normalizeStudyLang(card.studyLang);
+        if (!voices.has(lang)) voices.set(lang, preferredVoiceFor(lang));
         const result = await window.api.flashcardSynthesizeAudio(
           card.sentence || card.word,
-          'ja',
-          voice,
+          lang,
+          voices.get(lang),
           batch.id,
         );
         if (batch.cancelled || result.reason === 'cancelled') break;
@@ -1284,11 +1291,11 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
         onClick={() => state.goToReviewIndex(i)}
         title={card.promptKind === 'listening' ? t('flash.prompt.listening') : card.word}
       >
-        <span className="flash-strip-word" lang="ja">
+        <span className="flash-strip-word" lang={cardContentLang(card)}>
           {card.promptKind === 'listening' ? t('flash.audioCardShort') : card.word}
         </span>
         {card.promptKind !== 'listening' && card.reading && card.reading !== card.word && (
-          <span className="flash-strip-reading" lang="ja">
+          <span className="flash-strip-reading" lang={cardContentLang(card)}>
             {card.reading}
           </span>
         )}
@@ -1480,7 +1487,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               */}
               <span
                 className={`flash-word${current.promptKind === 'comprehension' ? ' flash-sentence-prompt' : ''}`}
-                lang="ja"
+                lang={cardContentLang(current)}
               >
                 {current.promptKind === 'comprehension'
                   ? current.sentence || current.front || current.word
@@ -1488,17 +1495,17 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               </span>
             </>
           ) : (
-            <span className="flash-word" lang="ja">{current.word}</span>
+            <span className="flash-word" lang={cardContentLang(current)}>{current.word}</span>
           )}
           {flipped ? (
             <div className="flash-answer">
               {current.reading && current.reading !== current.word && (
-                <span className="flash-reading" lang="ja">
+                <span className="flash-reading" lang={cardContentLang(current)}>
                   {current.reading}
                 </span>
               )}
               {current.sentence && current.sentence !== current.word && (
-                <span className="flash-sentence" lang="ja">{current.sentence}</span>
+                <span className="flash-sentence" lang={cardContentLang(current)}>{current.sentence}</span>
               )}
               <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
             </div>
@@ -2172,11 +2179,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               <div className="flash-strip" role="list">
                 {recentStrip.map((card) => (
                   <article key={card.id} className="flash-strip-card" role="listitem">
-                    <span className="flash-strip-word" lang="ja">
+                    <span className="flash-strip-word" lang={cardContentLang(card)}>
                       {card.word}
                     </span>
                     {card.reading && card.reading !== card.word && (
-                      <span className="flash-strip-reading" lang="ja">
+                      <span className="flash-strip-reading" lang={cardContentLang(card)}>
                         {card.reading}
                       </span>
                     )}
@@ -2416,11 +2423,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                               onDragStart={(e) => state.onCardDragStart(e, card.id)}
                             >
                               <div className="flash-row-main">
-                                <span className="flash-row-word" lang="ja">
+                                <span className="flash-row-word" lang={cardContentLang(card)}>
                                   {card.word}
                                 </span>
                                 {card.reading && card.reading !== card.word && (
-                                  <span className="flash-row-reading" lang="ja">
+                                  <span className="flash-row-reading" lang={cardContentLang(card)}>
                                     {card.reading}
                                   </span>
                                 )}
@@ -2490,11 +2497,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           renderItem={(w) => (
             <div className="flash-row">
               <div className="flash-row-main">
-                <span className="flash-row-word" lang="ja">
+                <span className="flash-row-word" lang={studyContentLang()}>
                   {w.word}
                 </span>
                 {w.reading && w.reading !== w.word && (
-                  <span className="flash-row-reading" lang="ja">
+                  <span className="flash-row-reading" lang={studyContentLang()}>
                     {w.reading}
                   </span>
                 )}

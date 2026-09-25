@@ -214,3 +214,37 @@ describe('libass gets a CJK face (DEFECT S1, canvas half)', () => {
     expect(vendor).toContain('[DEFAULT_FONT_NAME]: defaultFontUrl,');
   });
 });
+
+describe('subtitle and content fonts follow the language (Chinese is not drawn with Japanese faces)', () => {
+  it('the study line swaps its stack by lang: Simplified, Traditional and Russian', () => {
+    const css = readStyleSheet();
+    const sc = css.match(/#media-workspace :lang\(zh\)\s*\{\s*--subtitle-font-stack:([^;]+);/);
+    const tc = css.match(/#media-workspace :lang\(zh-Hant\)\s*\{\s*--subtitle-font-stack:([^;]+);/);
+    const ru = css.match(/#media-workspace :lang\(ru\)\s*\{\s*--subtitle-font-stack:([^;]+);/);
+    expect(sc?.[1]).toMatch(/Microsoft YaHei/);
+    expect(tc?.[1]).toMatch(/Microsoft JhengHei/);
+    expect(ru?.[1]).toBeTruthy();
+    // Traditional must come after the generic zh rule, or zh would win for zh-Hant.
+    expect(css.indexOf('#media-workspace :lang(zh-Hant)')).toBeGreaterThan(css.indexOf('#media-workspace :lang(zh)'));
+    // No Japanese face ahead of the Chinese ones.
+    expect(sc?.[1]).not.toMatch(/Yu Gothic|Meiryo|Noto Sans JP/);
+  });
+
+  it('the app stylesheet leads with Chinese faces for Chinese UI and content', () => {
+    const app = readFileSync(path.join(__dirname, '..', '..', 'renderer', 'styles.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\r\n?/g, '\n');
+    expect(app).toMatch(/:root:lang\(zh\)\s*\{\s*--font-body:[^;]*Microsoft YaHei UI/);
+    expect(app).toMatch(/:root:lang\(zh-Hant\)\s*\{\s*--font-body:[^;]*Microsoft JhengHei UI/);
+    expect(app).toMatch(/\[lang\|='zh-Hant'\]:not\(html\)[^{]*\{\s*font-family:[^;]*JhengHei/);
+  });
+
+  it("the user's typeface choice maps to each language's own faces", async () => {
+    const { subtitleFontStackFor } = await import('../../shared/videoCoreStudy');
+    expect(subtitleFontStackFor('mincho', 'ja')).toMatch(/Yu Mincho/);
+    expect(subtitleFontStackFor('mincho', 'zh-Hans')).toMatch(/SimSun/);
+    expect(subtitleFontStackFor('universal', 'zh-Hant')).toMatch(/JhengHei/);
+    expect(subtitleFontStackFor('mincho', 'ru')).not.toMatch(/Mincho/);
+    expect(subtitleFontStackFor('default', 'zh-Hans')).toBe('');
+  });
+});

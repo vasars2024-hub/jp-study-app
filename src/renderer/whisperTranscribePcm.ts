@@ -7,6 +7,8 @@
  * same path — model tier, device preference and language resolution included.
  */
 
+import { isStudyLang, type StudyLang } from '../shared/studyLang';
+
 export interface PcmTranscription {
   ok: boolean;
   text?: string;
@@ -40,11 +42,9 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
 
   const { loadWhisperDevice, loadWhisperModelTier, whisperHfId } = await import('./whisperSettings');
   const { getStudyLang } = await import('./studyEnvironment');
-  // Model tiers exist only for the two study languages; anything else falls back
-  // to Japanese rather than asking for a tier that has no model behind it.
-  const resolved: 'ja' | 'zh' = lang === 'zh' || lang === 'ja'
-    ? lang
-    : (getStudyLang() === 'zh' ? 'zh' : 'ja');
+  // Model tiers exist only for the study languages; anything else falls back
+  // to the study language rather than asking for a tier that has no model behind it.
+  const resolved: StudyLang = isStudyLang(lang) ? lang : getStudyLang();
 
   return new Promise<PcmTranscription>((resolve) => {
     let worker: Worker;

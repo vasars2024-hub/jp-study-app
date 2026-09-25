@@ -31,7 +31,8 @@
  * writes the deck, and both agree here.
  */
 import type { MineNoteRequest } from '../anki';
-import { hasHan, hasKana } from '../langs';
+import { hasCyrillic, hasHan, hasKana } from '../langs';
+import type { StudyLang } from '../studyLang';
 import type { FilesItem, FilesItemKind, FilesProvenance } from './catalog';
 
 /* ------------------------------------------------------------------ *
@@ -177,6 +178,8 @@ export interface FilesMineCardDraft {
   textProvenance?: FilesDeckTextProvenance;
   /** Playback position, kept only where the source really carries one. */
   sceneReference?: string;
+  /** The passage's language; absent means Japanese, as on every stored card. */
+  studyLang?: StudyLang;
 }
 
 /**
@@ -193,13 +196,22 @@ export interface BuildFilesMineDraftsOptions {
   /** Words already in the deck, folded the way `dedupeKey` folds. */
   existingWords?: ReadonlySet<string>;
   maxCards?: number;
+  /** The language being mined; passages with none of its text are skipped. Japanese by default. */
+  lang?: StudyLang;
+}
+
+/** Whether a passage holds any text in `lang` (kana/kanji, hanzi, Cyrillic). */
+export function passageInStudyLang(text: string, lang: StudyLang): boolean {
+  if (lang === 'ru') return hasCyrillic(text);
+  if (lang === 'zh') return hasHan(text);
+  return hasKana(text) || hasHan(text);
 }
 
 export interface FilesMineDraftPlan {
   drafts: FilesMineCardDraft[];
   /** Passages the reader returned. */
   passagesRead: number;
-  /** Passages holding no Japanese at all — credits, `[Music]`, blank lines. */
+  /** Passages holding none of the study language — credits, `[Music]`, blank lines. (Named when only Japanese existed.) */
   skippedNotJapanese: number;
   /** Passages whose text is already a card, in this batch or in the deck. */
   skippedDuplicate: number;
@@ -291,6 +303,7 @@ export function buildFilesMineDrafts(
   const bookId = mineBookIdFor(item);
   const textProvenance = deckProvenanceFor(item.provenance);
   const source = deckSourceFor(item.kind);
+  const lang = options.lang ?? 'ja';
 
   const drafts: FilesMineCardDraft[] = [];
   let skippedNotJapanese = 0;
@@ -299,7 +312,7 @@ export function buildFilesMineDrafts(
 
   for (const passage of passages) {
     const text = passage.text.trim();
-    if (!text || !(hasKana(text) || hasHan(text))) {
+    if (!text || !passageInStudyLang(text, lang)) {
       skippedNotJapanese += 1;
       continue;
     }
@@ -324,6 +337,7 @@ export function buildFilesMineDrafts(
       bookTitle: item.name,
       ...(textProvenance ? { textProvenance } : {}),
       ...(scene ? { sceneReference: scene } : {}),
+      ...(lang !== 'ja' ? { studyLang: lang } : {}),
     });
   }
 
@@ -357,7 +371,7 @@ export function buildFilesMineNoteRequest(draft: FilesMineCardDraft): MineNoteRe
     route: {
       source: draft.source === 'epub' ? 'epub' : 'subtitle',
       cardKind: 'sentence',
-      language: 'ja',
+      language: draft.studyLang ?? 'ja',
     },
     term: draft.word,
     sentence: draft.sentence,

@@ -27,6 +27,7 @@
 // without Electron, which is the same reason `lexiconAdapter.ts` is separate.
 
 import type { DictEntry, DictResult } from '../../shared/types';
+import type { LexiconLookupResult } from '../../shared/lexiconInterlinear';
 import { cedictHeadwords, parseCedictLine, pinyinToneMarks, type CedictEntry } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
 import { lookup } from './dictService';
@@ -61,9 +62,22 @@ export function buildCedictIndex(text: string): CedictIndex {
   return { byWord, all };
 }
 
-function toDictEntry(entry: CedictEntry): DictEntry {
+/**
+ * The headword in the script the learner reads: the form the query was typed
+ * in when it names one (a Traditional query gets 傳統), else the preference.
+ * It used to be Simplified always, so a Traditional learner looked up 傳統 and
+ * was shown 传统.
+ */
+export function cedictHeadwordFor(entry: CedictEntry, query: string, script: 'simplified' | 'traditional' = 'simplified'): string {
+  if (entry.trad === entry.simp) return entry.simp;
+  if (query && query === entry.trad) return entry.trad;
+  if (query && query === entry.simp) return entry.simp;
+  return script === 'traditional' ? entry.trad : entry.simp;
+}
+
+function toDictEntry(entry: CedictEntry, query = '', script: 'simplified' | 'traditional' = 'simplified'): DictEntry {
   return {
-    word: entry.simp,
+    word: cedictHeadwordFor(entry, query, script),
     reading: pinyinToneMarks(entry.pinyin),
     isCommon: false,
     jlpt: [],
@@ -78,7 +92,11 @@ function toDictEntry(entry: CedictEntry): DictEntry {
  * "improvement" here would be a behaviour change on the path users are actually
  * on today, with no database to compare against.
  */
-export function lookupCedictIndex(index: CedictIndex, query: string): DictResult {
+export function lookupCedictIndex(
+  index: CedictIndex,
+  query: string,
+  script: 'simplified' | 'traditional' = 'simplified',
+): DictResult {
   const q = (query ?? '').trim();
   if (!q) return { query: q, entries: [] };
   const { byWord, all } = index;
@@ -92,7 +110,7 @@ export function lookupCedictIndex(index: CedictIndex, query: string): DictResult
         hit = byWord.get(q.slice(0, len));
       }
     }
-    return { query: q, entries: (hit ?? []).slice(0, 12).map(toDictEntry) };
+    return { query: q, entries: (hit ?? []).slice(0, 12).map((entry) => toDictEntry(entry, q, script)) };
   }
 
   // English → Chinese: match whole glosses first, then substrings.
@@ -109,7 +127,7 @@ export function lookupCedictIndex(index: CedictIndex, query: string): DictResult
     if (exact.length >= 20) break;
   }
   const merged = [...exact, ...partial].slice(0, 20);
-  return { query: q, entries: merged.map(toDictEntry) };
+  return { query: q, entries: merged.map((entry) => toDictEntry(entry, '', script)) };
 }
 
 /**
@@ -142,6 +160,8 @@ export interface ChineseLookupDeps {
   db: () => SqliteDb | null;
   /** The CC-CEDICT `.u8` text — managed install first, bundled copy second. */
   loadCedictText: () => Promise<string>;
+  /** Which script the learner reads, for headwords the query does not settle. */
+  script?: () => 'simplified' | 'traditional';
 }
 
 let indexPromise: Promise<CedictIndex> | null = null;
@@ -149,6 +169,41 @@ let indexPromise: Promise<CedictIndex> | null = null;
 /** Drop the cached CC-CEDICT index so a newly installed copy is picked up. */
 export function resetCedictIndexCache(): void {
   indexPromise = null;
+}
+
+/**
+ * The CC-CEDICT index itself, loading it on first use. Exported for callers that
+ * need synchronous exact probes afterwards — the passage breakdown's lookup
+ * callback and the pinyin reading aid.
+ */
+export function getCedictIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
+  return getIndex(deps);
+}
+
+/**
+ * An exact CC-CEDICT headword (simplified or traditional) in the passage
+ * breakdown's grounded-lookup shape. Exact only: `buildOfflineInterlinear`
+ * probes candidate spans itself, and a prefix hit here would ground a token on a
+ * word the passage never contained.
+ */
+export function cedictInterlinearLookup(index: CedictIndex, query: string): LexiconLookupResult {
+  const q = (query ?? '').trim();
+  const hits = q ? index.byWord.get(q) ?? [] : [];
+  return {
+    query: q,
+    detectedLangs: ['zh'],
+    entries: hits.slice(0, 8).map((entry, i) => ({
+      headwordId: -(i + 1),
+      dictId: 'cc-cedict',
+      dictTitle: 'CC-CEDICT',
+      // The script the passage is written in: a Traditional passage keeps 們.
+      text: entry.trad === q && entry.simp !== q ? entry.trad : entry.simp,
+      reading: pinyinToneMarks(entry.pinyin),
+      via: 'exact' as const,
+      score: 0,
+      senses: [{ glosses: entry.defs.map((text) => ({ lang: 'en', text })) }],
+    })),
+  };
 }
 
 function getIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
@@ -163,6 +218,34 @@ function getIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
   return indexPromise;
 }
 
+/**
+ * Character facts for one hanzi from CC-CEDICT: every reading it has (tone
+ * marks; surname readings last) and the meaning of each. The character panel
+ * used to ask a Chinese learner to import KANJIDIC2 — a Japanese kanji
+ * dictionary with on/kun readings — to learn about 猫. Strokes and radicals are
+ * not in CC-CEDICT and are left out rather than guessed.
+ */
+export function cedictCharacter(
+  index: CedictIndex,
+  char: string,
+  script: 'simplified' | 'traditional' = 'simplified',
+): DictResult['character'] | undefined {
+  if ([...char].length !== 1 || !CJK_RE.test(char)) return undefined;
+  const entries = index.byWord.get(char);
+  if (!entries?.length) return undefined;
+  const ordered = [...entries].sort((a, b) => Number(/^[A-Z]/.test(a.pinyin)) - Number(/^[A-Z]/.test(b.pinyin)));
+  const readings = [...new Set(ordered.map((entry) => pinyinToneMarks(entry.pinyin.toLowerCase())))];
+  const meanings = [...new Set(ordered.flatMap((entry) => entry.defs.slice(0, 2)))].slice(0, 8);
+  return {
+    lang: script === 'traditional' ? 'zh-Hant' : 'zh-Hans',
+    char,
+    components: [],
+    readings,
+    meanings,
+    sources: [{ dictId: 'cc-cedict', dictTitle: 'CC-CEDICT', licence: 'CC BY-SA 4.0', attribution: 'MDBG — https://www.mdbg.net/chinese/dictionary?page=cc-cedict' }],
+  };
+}
+
 /** Look a Chinese term (or an English gloss) up: database first, CC-CEDICT second. */
 export async function lookupChineseTerm(
   query: string,
@@ -171,19 +254,27 @@ export async function lookupChineseTerm(
 ): Promise<DictResult> {
   const q = (query ?? '').trim();
   if (!q) return { query: q, entries: [] };
+  const script = deps.script?.() ?? 'simplified';
+  let result: DictResult | null = null;
   try {
     const db = deps.db();
     if (db) {
-      const fromDb = limit === undefined ? lookupChineseInDb(db, q) : lookupChineseInDb(db, q, limit);
-      if (fromDb) return fromDb;
+      result = limit === undefined ? lookupChineseInDb(db, q) : lookupChineseInDb(db, q, limit);
     }
   } catch {
     // A database read must never take the CC-CEDICT fallback down. Same rule as
     // `dictionary.ts`'s Japanese path.
   }
   try {
-    return lookupCedictIndex(await getIndex(deps), q);
+    const index = await getIndex(deps);
+    result ??= lookupCedictIndex(index, q, script);
+    // One hanzi and no character facts from the database: CC-CEDICT's.
+    if (!result.character) {
+      const character = cedictCharacter(index, q, script);
+      if (character) result = { ...result, character };
+    }
+    return result;
   } catch (err) {
-    return { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
+    return result ?? { query: q, entries: [], error: err instanceof Error ? err.message : String(err) };
   }
 }

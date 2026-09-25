@@ -54,7 +54,9 @@ import {
   type SubtitleRecordFormat,
   type SubtitleSearchFailure,
 } from '../shared/subtitleRecord';
-import { pickStudySubtitle } from '../shared/subtitleDiscoveryPick';
+import { pickStudySubtitle, studyFirstDownloadLanguages, subtitleLangMatches } from '../shared/subtitleDiscoveryPick';
+import { getMainStudyLang, onMainStudyLanguageChanged } from './studyLanguage';
+import { decideAudioIsLanguage } from '../shared/subtitleDiscoveryStatus';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { shiftSubtitleText, worthShifting } from '../shared/subtitleDiscoveryTiming';
 import {
@@ -216,6 +218,21 @@ export function loadDiscoverySettings(): SubtitleDiscoverySettings {
   } catch {
     return { ...DEFAULT_SUBTITLE_DISCOVERY_SETTINGS };
   }
+}
+
+/**
+ * Puts the study language first in the auto-download list after a switch, and
+ * drops the language that was studied before. Exported for the tests; wired to
+ * main's study-language change in `registerSubtitleDiscoveryIpc`.
+ */
+export function alignDownloadLanguagesToStudy(study: string, previousStudy: string | null): SubtitleDiscoverySettings {
+  const current = loadDiscoverySettings();
+  const next = studyFirstDownloadLanguages(current.autoDownloadLanguages, study, {
+    previousStudy,
+    helperLanguage: current.helperLanguage,
+  });
+  if (next.join('|') === current.autoDownloadLanguages.join('|')) return current;
+  return saveDiscoverySettings({ ...current, autoDownloadLanguages: next });
 }
 
 export function saveDiscoverySettings(input: unknown): SubtitleDiscoverySettings {
@@ -389,7 +406,7 @@ function scoreCandidates(
   language: string,
   minConfidence: number,
 ): ScoredCandidate[] {
-  const forLanguage = candidates.filter((candidate) => candidate.language.startsWith(language.slice(0, 2)));
+  const forLanguage = candidates.filter((candidate) => subtitleLangMatches(candidate.language, language));
   if (forLanguage.length === 0) return [];
 
   const identityId = normalizeSubtitleIdentityId(item.seriesKey ?? item.id);
@@ -534,8 +551,7 @@ function keptFailures(failures: readonly SubtitleSearchFailure[]): SubtitleSearc
  * would stop every later sweep from finding the human track that replaces it.
  */
 function hasLanguage(records: readonly SubtitleRecord[], lang: string): boolean {
-  const base = lang.slice(0, 2);
-  return records.some((record) => record.lang.startsWith(base) && !isMachineTranslatedSubtitle(record));
+  return records.some((record) => subtitleLangMatches(record.lang, lang) && !isMachineTranslatedSubtitle(record));
 }
 
 /** The OSDb hash, or null for a file too small, missing, or unreadable to hash. */
@@ -1093,16 +1109,29 @@ export async function runSubtitleDiscovery(
 
         // Nothing found and the user asked for a fallback: queue Whisper. This is
         // the only thing that makes the autoTranscribe setting do anything.
-        const foundJapanese = outcome.records.some((record) => /^ja/i.test(record.lang));
+        // The study language's line, not Japanese: a Chinese learner's library is
+        // transcribed in Chinese, and only where nothing says the audio is another
+        // language (anime is Japanese audio).
+        const study = getMainStudyLang();
+        const foundStudyLine = outcome.records.some((record) => subtitleLangMatches(record.lang, study));
+        const raw = item as MediaItem & { originalLanguage?: unknown };
+        const audioElsewhere = decideAudioIsLanguage({
+          originalLanguage: typeof raw.originalLanguage === 'string' ? raw.originalLanguage : null,
+          category: item.category ?? null,
+          anilistId: item.anilistId ?? null,
+          itemLang: item.lang ?? null,
+          nativeTitle: item.nativeTitle ?? null,
+        }, study) === 'other';
         // With a helper-language track in hand, the better fallback is the fused
         // track (Whisper on the helper track's timing), which the automation queue
         // builds when the episode is first played. A plain grid transcript here
         // would be twenty minutes of Whisper spent on the worse of the two.
         const fusable = settings.autoStudyTrack && !!settings.helperLanguage
           && outcome.records.some((record) => record.source !== 'generated'
-            && record.lang.startsWith((settings.helperLanguage ?? '').slice(0, 2)));
-        if (!foundJapanese && !fusable && settings.autoTranscribe && languages.some((lang) => lang.startsWith('ja'))) {
-          enqueueTranscription({ mediaId: item.id, lang: 'ja' });
+            && subtitleLangMatches(record.lang, settings.helperLanguage));
+        if (!foundStudyLine && !fusable && !audioElsewhere && settings.autoTranscribe
+          && languages.some((lang) => subtitleLangMatches(lang, study))) {
+          enqueueTranscription({ mediaId: item.id, lang: study });
         }
 
         // D268. The baseline is what the run STARTED from, not what the item had
@@ -1595,6 +1624,13 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
       if ('subtitles' in patch) emitEvent({ type: 'records', mediaIds: [...ids] });
     },
   };
+
+  // The study line follows the study language: switching Japanese → Chinese
+  // makes Chinese the language discovery downloads, instead of the list's old
+  // first entry silently staying the study line.
+  onMainStudyLanguageChanged((next, prev) => {
+    if (next.lang !== prev.lang) alignDownloadLanguagesToStudy(next.lang, prev.lang);
+  });
 
   ipcMain.handle('subtitleDiscovery:run', (_e, request?: SubtitleDiscoveryRequest) =>
     runSubtitleDiscovery(request ?? {}));

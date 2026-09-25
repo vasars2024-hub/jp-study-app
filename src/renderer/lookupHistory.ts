@@ -2,6 +2,8 @@
 // Study Mode's repeated-lookup pack. This remains the single lookup history
 // store; repetition metadata is folded into each recent entry.
 
+import { normalizeStudyLang } from '../shared/studyLang';
+
 export interface LookupHistoryEntry {
   query: string;
   /** Canonical dictionary expression (de-inflected when available). */
@@ -10,7 +12,7 @@ export interface LookupHistoryEntry {
   meaning?: string;
   jlptLevel?: string;
   context?: string;
-  lang: 'ja' | 'zh';
+  lang: 'ja' | 'zh' | 'ru';
   at: number;
   firstAt: number;
   count: number;
@@ -25,7 +27,7 @@ export interface LookupRecordInput {
   meaning?: string;
   jlptLevel?: string;
   context?: string;
-  lang?: 'ja' | 'zh';
+  lang?: 'ja' | 'zh' | 'ru';
 }
 
 /**
@@ -71,7 +73,7 @@ function normalizeEntry(value: unknown): LookupHistoryEntry | null {
     ...(cleanText(raw.meaning, 500) ? { meaning: cleanText(raw.meaning, 500) } : {}),
     ...(cleanText(raw.jlptLevel, 16) ? { jlptLevel: cleanText(raw.jlptLevel, 16) } : {}),
     ...(cleanText(raw.context, 500) ? { context: cleanText(raw.context, 500) } : {}),
-    lang: raw.lang === 'zh' ? 'zh' : 'ja',
+    lang: normalizeStudyLang(raw.lang),
     at: lookupTimes[lookupTimes.length - 1] ?? at,
     firstAt,
     count,
@@ -113,7 +115,7 @@ export function recordLookup(input: string | LookupRecordInput, now = Date.now()
   const query = cleanText(record.query, 80);
   if (!query || !Number.isFinite(now)) return;
   const lemma = cleanText(record.lemma, 80) || query;
-  const lang = record.lang === 'zh' ? 'zh' : 'ja';
+  const lang = normalizeStudyLang(record.lang);
   const prev = loadLookupHistory();
   const match = prev.find((entry) => entry.lang === lang && entry.lemma === lemma);
   const next: LookupHistoryEntry = {

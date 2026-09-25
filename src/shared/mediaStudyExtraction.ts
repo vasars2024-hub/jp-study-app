@@ -45,6 +45,8 @@ export interface MediaStudyExtractionOptions {
   maxCues?: number;
   maxCharacters?: number;
   includeProperNouns?: boolean;
+  /** The subtitles' language. Japanese when omitted (the corpus predates the others). */
+  lang?: 'ja' | 'zh' | 'ru';
 }
 
 export interface MediaStudyFlashcardDraft {
@@ -57,6 +59,13 @@ export interface MediaStudyFlashcardDraft {
 
 const JAPANESE_TEXT_RE = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff々]/;
 const KANJI_RE = /[\u3400-\u9fff\uf900-\ufaff々]/g;
+
+/** A line (and a word) in the study language: kana/kanji, hanzi, or Cyrillic. */
+const STUDY_TEXT_RE: Readonly<Record<'ja' | 'zh' | 'ru', RegExp>> = {
+  ja: JAPANESE_TEXT_RE,
+  zh: /[\u3400-\u9fff\uf900-\ufaff]/,
+  ru: /[\u0400-\u04ff]/,
+};
 
 function normalizeSentence(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
@@ -73,6 +82,8 @@ export function buildMediaStudyCorpus(
 ): MediaStudyCorpus {
   const maxCues = Math.max(1, Math.floor(options.maxCues ?? 800));
   const maxCharacters = Math.max(1, Math.floor(options.maxCharacters ?? 60_000));
+  const lang = options.lang ?? 'ja';
+  const studyText = STUDY_TEXT_RE[lang];
   const sentences: MediaStudySentence[] = [];
   const vocabulary = new Map<string, MediaStudyVocabularyEntry>();
   const kanjiCounts = new Map<string, number>();
@@ -85,7 +96,7 @@ export function buildMediaStudyCorpus(
       break;
     }
     const normalized = normalizeSentence(cue.text);
-    if (!normalized || !JAPANESE_TEXT_RE.test(normalized)) continue;
+    if (!normalized || !studyText.test(normalized)) continue;
     const remaining = maxCharacters - characters;
     const text = normalized.slice(0, remaining);
     if (!text) {
@@ -100,14 +111,15 @@ export function buildMediaStudyCorpus(
       text,
     });
 
-    for (const character of text.match(KANJI_RE) ?? []) {
+    // Kanji / hanzi; a Russian corpus has none to count.
+    for (const character of lang === 'ru' ? [] : text.match(KANJI_RE) ?? []) {
       kanjiCounts.set(character, (kanjiCounts.get(character) ?? 0) + 1);
     }
 
     for (const token of tokenize(text)) {
       if (!token.content || (token.proper && !options.includeProperNouns)) continue;
       const word = (token.lemma || token.surface).trim();
-      if (!word || !JAPANESE_TEXT_RE.test(word)) continue;
+      if (!word || !studyText.test(word)) continue;
       const existing = vocabulary.get(word);
       if (existing) {
         existing.occurrences += 1;
@@ -129,11 +141,11 @@ export function buildMediaStudyCorpus(
   const rankedVocabulary = [...vocabulary.values()].sort(
     (a, b) => b.occurrences - a.occurrences
       || a.firstSeenAt - b.firstSeenAt
-      || a.word.localeCompare(b.word, 'ja'),
+      || a.word.localeCompare(b.word, lang),
   );
   const rankedKanji = [...kanjiCounts.entries()]
     .map(([character, occurrences]) => ({ character, occurrences }))
-    .sort((a, b) => b.occurrences - a.occurrences || a.character.localeCompare(b.character, 'ja'));
+    .sort((a, b) => b.occurrences - a.occurrences || a.character.localeCompare(b.character, lang));
 
   return {
     text: sentences.map((sentence) => sentence.text).join('\n'),

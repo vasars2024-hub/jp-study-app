@@ -42,7 +42,7 @@ export function onWhisperDeviceChanged(cb: (device: WhisperDevice) => void): () 
   return () => window.removeEventListener(DEVICE_EVENT, handler);
 }
 
-export function loadWhisperModelTier(lang: 'ja' | 'zh' = 'ja'): WhisperModelTier {
+export function loadWhisperModelTier(lang: 'ja' | 'zh' | 'ru' = 'ja'): WhisperModelTier {
   try {
     const raw = localStorage.getItem(MODEL_KEY);
     if (isWhisperModelTier(raw)) return raw;

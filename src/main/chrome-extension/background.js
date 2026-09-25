@@ -1499,7 +1499,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse(
           await apiFetch('/v1/lookup', {
             method: 'POST',
-            body: JSON.stringify({ query: msg.query || '' }),
+            body: JSON.stringify({ query: msg.query || '', lang: msg.lang || '' }),
           }),
         );
       } catch (err) {

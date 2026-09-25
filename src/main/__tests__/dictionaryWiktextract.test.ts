@@ -135,7 +135,8 @@ describe('importWiktextract', () => {
     expect(forms.every((f) => !/[̀́]/.test(f.form.normalize('NFD')))).toBe(true);
     // `name` stays null so the displayed reason chain does not repeat every tag.
     expect(forms.every((f) => f.name === null)).toBe(true);
-    expect(forms.find((f) => f.form === 'собаки')?.tags).toBe('genitive,singular');
+    // The stressed spelling rides in a `form:` tag for the reading aid; it is not a reason.
+    expect(forms.find((f) => f.form === 'собаки')?.tags).toBe('genitive,singular,form:соба\u0301ки');
   });
 
   it('makes an imported declension reachable through the unified lookup', () => {

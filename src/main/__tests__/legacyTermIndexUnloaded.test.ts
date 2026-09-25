@@ -50,6 +50,7 @@ import {
   lookupTerm,
   lookupTermOffline,
   lookupTermsBatch,
+  searchExamples,
 } from '../dictionary';
 import { candidateLookupKey } from '../../shared/epubEnrichment';
 import type { YomitanDictInfo } from '../../shared/types';
@@ -174,6 +175,25 @@ describe('legacy term index, every store migrated', () => {
     await lookupTerm('麒麟');
     await lookupOfflineInterlinearMerged('猫を食べた', { sourceLangs: ['ja'] });
     expectLegacyUntouched();
+  });
+});
+
+describe('lookups in the study language', () => {
+  it('a Russian lookup is answered from Russian headwords, never from the Japanese stores', async () => {
+    const out = await lookupTermOffline('猫', 'ru');
+    expect(out.entries).toEqual([]);
+    expectLegacyUntouched();
+  });
+
+  it('examples for a Chinese or Russian word ask Tatoeba for Mandarin / Russian, not Japanese', async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockClear();
+    await searchExamples('今天', 5, 'zh');
+    await searchExamples('книга', 5, 'ru');
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.some((url) => /[?&](from|lang)=cmn/.test(url))).toBe(true);
+    expect(urls.some((url) => /[?&](from|lang)=rus/.test(url))).toBe(true);
+    expect(urls.some((url) => /[?&](from|lang)=jpn/.test(url))).toBe(false);
   });
 });
 

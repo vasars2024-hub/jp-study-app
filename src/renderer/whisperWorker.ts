@@ -4,6 +4,7 @@
 // are produced — instead of one long silent wait. WebGPU (fast, quantised) is
 // used when available, falling back to WASM.
 import { pipeline, env } from '@huggingface/transformers';
+import { isStudyLang, WHISPER_LANGUAGE } from '../shared/studyLang';
 import {
   WHISPER_CPU_PIPELINE_OPTIONS,
   WHISPER_GPU_PIPELINE_OPTIONS,
@@ -97,7 +98,7 @@ self.onmessage = async (e: MessageEvent): Promise<void> => {
     audio?: Float32Array;
     model: string;
     prefer?: 'auto' | 'cpu';
-    lang?: 'ja' | 'zh';
+    lang?: 'ja' | 'zh' | 'ru';
     mode?: 'prefetch';
   };
 
@@ -114,7 +115,7 @@ self.onmessage = async (e: MessageEvent): Promise<void> => {
     return;
   }
 
-  const whisperLang = lang === 'zh' ? 'chinese' : 'japanese';
+  const whisperLang = WHISPER_LANGUAGE[isStudyLang(lang) ? lang : 'ja'];
   try {
     if (!audio) throw new Error('no audio provided');
     const t = await load(model, prefer ?? 'auto');

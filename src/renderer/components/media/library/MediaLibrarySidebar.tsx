@@ -28,6 +28,7 @@ import { useT } from '../../../i18n';
 import { mediaCategory, MEDIA_CATEGORIES, type MediaCategory } from '../../../../shared/mediaCategories';
 import { isContinueWatching } from '../../../../shared/mediaLibraryEntries';
 import type { MediaItem } from '../../../../shared/types';
+import { formatNumber } from '../../../stats';
 
 /** What the rail can select. Parsed/serialized as a plain string id. */
 export type LibraryShelfId = 'home' | 'recent' | 'continue' | 'queue' | 'favorites' | 'tracking';
@@ -172,7 +173,7 @@ export default function MediaLibrarySidebar({ items, value, onSelect, footer }: 
         <>
           <span className="medialib-rail__label">{t(shelf.labelKey)}</span>
           {count !== null && count > 0 && (
-            <span className="medialib-rail__count">{count.toLocaleString()}</span>
+            <span className="medialib-rail__count">{formatNumber(count)}</span>
           )}
         </>
       ),
@@ -188,7 +189,7 @@ export default function MediaLibrarySidebar({ items, value, onSelect, footer }: 
         <>
           <span className="medialib-rail__label">{t(`media.category.${category}`)}</span>
           <span className="medialib-rail__count">
-            {(counts.byCategory.get(category) ?? 0).toLocaleString()}
+            {formatNumber(counts.byCategory.get(category) ?? 0)}
           </span>
         </>
       ),
@@ -202,7 +203,7 @@ export default function MediaLibrarySidebar({ items, value, onSelect, footer }: 
       label: (
         <>
           <span className="medialib-rail__label">{name}</span>
-          <span className="medialib-rail__count">{count.toLocaleString()}</span>
+          <span className="medialib-rail__count">{formatNumber(count)}</span>
         </>
       ),
     })), [counts]);

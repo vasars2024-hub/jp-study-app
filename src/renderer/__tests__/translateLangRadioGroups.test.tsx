@@ -119,3 +119,15 @@ describe('Translate — the direction rows are declared radio groups', () => {
     expect(swap?.classList.contains('lq-hit')).toBe(true);
   });
 });
+
+describe('Translate — choosing a source language does not change what you study', () => {
+  it('picking and swapping Chinese leaves a Japanese learner studying Japanese', async () => {
+    localStorage.setItem('jp-study-dict-lang', 'ja');
+    const host = await mount();
+    const sourceRow = host.querySelectorAll('.tr-dir .dict-lang-toggle')[0];
+    const zh = [...sourceRow.querySelectorAll('[role="radio"]')].find((el) => el.textContent?.includes('中'))
+      ?? [...sourceRow.querySelectorAll('[role="radio"]')][1];
+    await act(async () => (zh as HTMLElement).click());
+    expect(localStorage.getItem('jp-study-dict-lang')).toBe('ja');
+  });
+});

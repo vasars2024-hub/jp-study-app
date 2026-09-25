@@ -157,3 +157,19 @@ describe('what an untrusted caller may send', () => {
     expect(readExplainGrounding(undefined)).toEqual({ glosses: [], partsOfSpeech: [] });
   });
 });
+
+describe('prompts name the study language', () => {
+  it('explanations, AI additions and invented decks are for the word\'s own language', async () => {
+    expect(buildExplanationPrompt('书', 'shū', 'en', GROUNDING, 'zh')).toContain('to a Chinese learner.');
+    expect(buildExplanationPrompt('книга', '', 'en', GROUNDING, 'ru')).toContain('to a Russian learner.');
+    const { buildAiAdditionsPrompt, normalizeAiAdditionsRequest } = await import('../ankiAiPrompt');
+    const request = normalizeAiAdditionsRequest({
+      kind: 'example-sentence', notes: [{ noteId: '1', term: 'книга' }], variantCount: 1, sendGloss: false,
+      explainLanguage: 'en', studyLang: 'ru',
+    });
+    const prompt = buildAiAdditionsPrompt(request!, request!.notes);
+    expect(prompt).toContain('Russian flashcards');
+    expect(prompt).toContain('natural Russian sentence');
+    expect(prompt).not.toContain('Japanese');
+  });
+});

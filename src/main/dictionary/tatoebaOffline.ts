@@ -251,7 +251,7 @@ export async function importOfflineExamples(
   try {
     onProgress?.('Reading Japanese sentences…');
     const added = await parseSentencesCsv(sentencesPath, (n) =>
-      onProgress?.(`Indexed ${n.toLocaleString()} sentences…`),
+      onProgress?.(`Indexed ${n.toLocaleString('en')} sentences…`),
     );
     if (linksPath && fs.existsSync(linksPath)) {
       onProgress?.('Merging English translations…');

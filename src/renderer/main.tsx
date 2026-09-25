@@ -17,6 +17,7 @@ import { installRewardBursts } from './motion/rewardBurst';
 import { bootWindowChrome } from './windowChrome';
 import { bootTheme, onThemeChanged } from './theme';
 import { applyLangAttribute, initI18n } from './i18n';
+import { syncStudyLangToMain } from './studyEnvironment';
 import { bootEnvironment } from './environment';
 import { installAmbientAudio } from './environment/ambientAudio';
 import { bootCustomCss } from './customCss';
@@ -259,6 +260,8 @@ applyBlancModeClass();
 // Sets <html lang> from the saved UI language before first paint — CJK glyph
 // shapes depend on it, so doing it later would flash the wrong forms.
 applyLangAttribute();
+// Main mirrors the study language for subtitle discovery, OCR and whisper.
+syncStudyLangToMain();
 bootOsLook();
 bootDisplayPrefs();
 // Motion tokens + velocity scaling (Phase 4.5). AFTER bootDisplayPrefs, which

@@ -31,6 +31,7 @@ import {
 } from '../shared/studyDetach';
 import type { CueAnalysisState } from './useCueAnalysis';
 import type { StudyLang } from '../renderer/studyEnvironment';
+import { normalizeStudyLang } from '../shared/studyLang';
 import { canPresentLiquid } from '../renderer/liquidWindowPresentation';
 import { useT } from '../renderer/i18n';
 import './mediaWorkspace.css';
@@ -145,7 +146,7 @@ export default function DetachedStudyBlock({
   */
   const liquidAllowed = canPresentLiquid(blockId, 'detached');
 
-  const lang: StudyLang = snapshot.studyLang === 'zh' ? 'zh' : 'ja';
+  const lang: StudyLang = normalizeStudyLang(snapshot.studyLang);
   const cues = snapshot.cues ?? [];
   const activeCue = snapshot.activeIndex != null
     ? cues.find((cue) => cue.index === snapshot.activeIndex) ?? null

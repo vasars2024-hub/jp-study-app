@@ -25,6 +25,7 @@ import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
+import { studyContentLang } from '../../studyEnvironment';
 
 export default function LearnMode({ onExit, deck = 'all' }: {
   onExit?: () => void;
@@ -186,7 +187,7 @@ export default function LearnMode({ onExit, deck = 'all' }: {
           ref={inputRef}
           type="text"
           value={typed}
-          lang="ja"
+          lang={studyContentLang()}
           autoComplete="off"
           spellCheck={false}
           disabled={grade?.verdict === 'correct' || grade?.verdict === 'wrong'}

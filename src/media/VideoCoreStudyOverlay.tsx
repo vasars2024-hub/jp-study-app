@@ -42,7 +42,8 @@ import {
   registerCommandHandler,
 } from '../renderer/keyboardShortcuts';
 import { t as translateUi, useT } from '../renderer/i18n';
-import { getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
+import { getChineseScript, getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
+import { studyLangTag } from '../shared/studyLang';
 import {
   loadWhisperDevice,
   loadWhisperModelTier,
@@ -76,6 +77,7 @@ import {
   resolveSecondaryLine,
   SECONDARY_SUB_LANG_LABELS,
   SUBTITLE_FONT_STACKS,
+  subtitleFontStackFor,
   subtitleOutlineShadow,
   subtitlePlacementStyle,
   recordVideoCoreComprehensionEvent,
@@ -245,6 +247,7 @@ interface Props {
 function cueBoxStyle(
   preferences: VideoCoreStudyPreferences,
   line: 'primary' | 'secondary' = 'primary',
+  langTag = 'ja',
 ): React.CSSProperties {
   const secondary = line === 'secondary';
   const fontSizePx = secondary
@@ -254,7 +257,10 @@ function cueBoxStyle(
     fontSize: `${fontSizePx}px`,
     fontWeight: preferences.subtitleFontWeight,
   };
-  const stack = SUBTITLE_FONT_STACKS[preferences.subtitleFontFamily];
+  // The study line's typeface in its own language's faces; the helper line keeps the Japanese-era default.
+  const stack = secondary
+    ? SUBTITLE_FONT_STACKS[preferences.subtitleFontFamily]
+    : subtitleFontStackFor(preferences.subtitleFontFamily, langTag);
   if (stack) style.fontFamily = stack;
   // Each line has its own colour; '' leaves the stylesheet's (off-white / pale blue).
   const color = secondary ? preferences.secondarySubColor : preferences.subtitleColor;
@@ -425,7 +431,7 @@ export default function VideoCoreStudyOverlay({
     loadWhisperDevice,
   );
   const [whisperLanguage, setWhisperLanguage] =
-    React.useState<'ja' | 'zh'>(getStudyLang);
+    React.useState<'ja' | 'zh' | 'ru'>(getStudyLang);
   const [whisperState, setWhisperState] =
     React.useState<WhisperGenerationState>('idle');
   const [whisperMessage, setWhisperMessage] = React.useState('');
@@ -3008,12 +3014,13 @@ export default function VideoCoreStudyOverlay({
               rectangle is not what a subtitle background is.
             */
             className="study-cue-text sa-palette"
-            style={cueBoxStyle(preferences)}
+            style={cueBoxStyle(preferences, 'primary', studyLangTag(studyLang, getChineseScript()))}
             text={annotated ? annotated.sentence : plainText}
             annotations={annotated?.annotations}
             selectedAnnotation={selectedAnnotation}
             onSelectAnnotation={setSelectedAnnotation}
             furigana={preferences.furigana}
+            lang={studyLang}
             onMouseDown={(event) => {
               popupOpenOnDownRef.current = !!popup;
               noteLookupPointerDown(event);

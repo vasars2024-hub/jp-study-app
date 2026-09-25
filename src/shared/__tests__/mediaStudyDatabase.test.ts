@@ -136,3 +136,14 @@ describe('media study database', () => {
     });
   });
 });
+
+describe('difficulty bands on every study language scale', () => {
+  it('maps HSK and CEFR levels as well as JLPT', async () => {
+    const { difficultyBandFromJlpt } = await import('../mediaStudyDatabase');
+    expect(difficultyBandFromJlpt('HSK2')).toBe('beginner');
+    expect(difficultyBandFromJlpt('HSK4')).toBe('intermediate');
+    expect(difficultyBandFromJlpt('B2')).toBe('advanced');
+    expect(difficultyBandFromJlpt('C1')).toBe('native');
+    expect(difficultyBandFromJlpt('N3')).toBe('intermediate');
+  });
+});

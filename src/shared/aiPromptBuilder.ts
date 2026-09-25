@@ -154,6 +154,9 @@ export interface AiPromptPreviewInput {
   sampleTerm?: AiEnrichmentRequest;
 }
 
+/** English names of the study languages, for prompts. */
+const TARGET_LANGUAGE_NAME: Readonly<Record<string, string>> = { ja: 'Japanese', zh: 'Chinese (Mandarin)', ru: 'Russian' };
+
 export function buildAiPromptPreview(input: AiPromptPreviewInput): string {
   const langOptions = normalizeLanguageOptions(input.langOptions);
   const { front, back } = effectiveLanguagePair(langOptions);
@@ -181,7 +184,8 @@ export function buildAiPromptPreview(input: AiPromptPreviewInput): string {
       `Cards per invented word: ${input.cardCount}\n` +
       `Output target: ${input.outputFormat.toUpperCase()}\n\n` +
       avoidNote +
-      `Generate exactly ${wordCount} distinct Japanese items that fit this preset.\n` +
+      // The deck's own language: a Chinese or Russian profile invents Chinese or Russian items.
+      `Generate exactly ${wordCount} distinct ${TARGET_LANGUAGE_NAME[targetLang] ?? 'Japanese'} items that fit this preset.\n` +
       `Each item needs a natural example sentence, reading, English meaning, Russian meaning (meaningRu), ` +
       `Chinese meaning when useful (meaningZh), and sentence translations.\n` +
       `Do not repeat expressions. Prefer useful study material over obscure trivia.\n\n` +

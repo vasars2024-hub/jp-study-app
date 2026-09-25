@@ -27,6 +27,7 @@ import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import './autoAudio.css';
+import { studyContentLang } from '../../studyEnvironment';
 
 const KIND_KEY: Record<TestQuestion['kind'], string> = {
   written: 'flash.test.kindWritten',
@@ -181,7 +182,7 @@ export default function TestMode({ onExit, deck = 'all' }: {
               ref={inputRef}
               type="text"
               value={given}
-              lang="ja"
+              lang={studyContentLang()}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => respond(question.id, event.target.value)}

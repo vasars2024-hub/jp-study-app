@@ -251,6 +251,7 @@ export const GRAMMAR_TAXONOMY_JA: Catalog = {
   'grammar.filter.hasExamples': '例文あり',
   'grammar.filter.levels.jlpt': 'JLPTレベル',
   'grammar.filter.levels.hsk': 'HSKレベル',
+  'grammar.filter.levels.cefr': 'CEFRレベル',
   'grammar.filter.unofficialLevel': 'HSK10 は Gum 独自の段階で、公式の級ではありません。',
   'grammar.register.neutral': '中立',
   'grammar.register.casual': 'くだけた',

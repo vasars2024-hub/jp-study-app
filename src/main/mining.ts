@@ -49,6 +49,10 @@ import {
   type ChapterRangeInput,
 } from '../shared/chapterRange';
 import { kataToHira } from '../shared/langs';
+import { studyLangOfText, type StudyLang } from '../shared/studyLang';
+import { isVocabularySegment, studyWordKey, studyWords } from '../shared/studySegmentation';
+import { getMainStudyLang } from './studyLanguage';
+import { detectListLanguage, parseFrequencyText } from '../shared/frequencyListImport';
 import { pickLemmaReading } from '../shared/readings';
 import {
   matchesChineseNameHeuristic,
@@ -541,8 +545,20 @@ export function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-function isJapaneseText(text: string): boolean {
-  return /[぀-ヿ㐀-鿿々]/.test(text);
+/**
+ * Which study language a book's text is in, or null for none of them (an
+ * English book). Sampled from the start: the script of the first 20 000
+ * characters decides.
+ */
+export function miningTextLanguage(text: string, studyLang: StudyLang = getMainStudyLang()): StudyLang | null {
+  const sample = text.slice(0, 20_000);
+  const kana = (sample.match(/[\p{Script=Hiragana}\p{Script=Katakana}]/gu) ?? []).length;
+  const cyrillic = (sample.match(/\p{Script=Cyrillic}/gu) ?? []).length;
+  const han = (sample.match(/\p{Script=Han}/gu) ?? []).length;
+  if (!kana && !cyrillic && !han) return null;
+  if (cyrillic > kana + han) return 'ru';
+  if (kana) return 'ja';
+  return studyLangOfText(sample.replace(/\p{Script=Cyrillic}/gu, ''), studyLang);
 }
 
 /**
@@ -654,6 +670,40 @@ function tokenizeJapaneseSimple(text: string): Map<string, TokenCandidate> {
     }
   }
   return byExpression;
+}
+
+/**
+ * Chinese and Russian books: ICU word boundaries. Russian forms of one word are
+ * counted together under their stem, shown as the form met most often; the
+ * dictionary lookup that glosses a candidate takes it on to the lemma.
+ * Exported for the tests.
+ */
+export function tokenizeStudyLanguage(text: string, lang: 'zh' | 'ru'): Map<string, TokenCandidate> {
+  const byKey = new Map<string, TokenCandidate & { forms: Map<string, number> }>();
+  for (const sentence of splitSentences(text)) {
+    for (const word of studyWords(sentence, lang)) {
+      if (!isVocabularySegment(word, lang)) continue;
+      const surface = lang === 'ru' ? word.toLowerCase() : word;
+      if (lang === 'ru' && surface.length < 2) continue;
+      const key = studyWordKey(surface, lang);
+      const entry = byKey.get(key) ?? {
+        expression: surface,
+        reading: '',
+        count: 0,
+        sampleSentence: sentence,
+        forms: new Map<string, number>(),
+      };
+      entry.count += 1;
+      entry.forms.set(surface, (entry.forms.get(surface) ?? 0) + 1);
+      byKey.set(key, entry);
+    }
+  }
+  const out = new Map<string, TokenCandidate>();
+  for (const { forms, ...entry } of byKey.values()) {
+    const expression = [...forms.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? entry.expression;
+    out.set(expression, { ...entry, expression });
+  }
+  return out;
 }
 
 function tokenizeSimple(text: string): Map<string, TokenCandidate> {
@@ -856,16 +906,18 @@ function parseJpdbFrequencyTsv(text: string): Record<string, number> {
 }
 
 function parseBundledRemoteFrequencyDictionary(
-  format: 'jpdb-tsv',
+  format: 'jpdb-tsv' | 'word-count',
   payload: string,
 ): Record<string, number> {
   if (format === 'jpdb-tsv') return parseJpdbFrequencyTsv(payload);
+  if (format === 'word-count') return parseFrequencyText(payload);
   return {};
 }
 
 async function ensureRemoteBundledFrequencyDictionaries(): Promise<void> {
   ensureMiningRoot();
   let changed = false;
+  const study = getMainStudyLang();
   for (const def of REMOTE_BUNDLED_FREQUENCY_DICTIONARIES) {
     const file = path.join(freqRoot(), `${def.id}.json`);
     if (fs.existsSync(file)) {
@@ -879,6 +931,9 @@ async function ensureRemoteBundledFrequencyDictionaries(): Promise<void> {
       }
       continue;
     }
+    // A language's large list is fetched when that language is studied, not
+    // for everyone (Japanese keeps its existing always-on list).
+    if (def.language !== 'ja' && def.language !== study) continue;
     try {
       const payload = await fetchText(def.url);
       const ranks = parseBundledRemoteFrequencyDictionary(def.format, payload);
@@ -903,25 +958,33 @@ async function ensureRemoteBundledFrequencyDictionaries(): Promise<void> {
   if (changed) invalidateFreqDictCache();
 }
 
+/**
+ * Once a language's large list is installed, it is the one that ranks and the
+ * few-hundred-word starter list steps aside (they disagree on every rank they
+ * share). Japanese, Chinese and Russian alike.
+ */
 function preferLargeJapaneseFrequencyDictionary(): boolean {
-  const largeJaId = new Set<string>();
+  const largeIds = new Map<string, Set<string>>();
   for (const def of REMOTE_BUNDLED_FREQUENCY_DICTIONARIES) {
-    if (def.language !== 'ja') continue;
     const file = path.join(freqRoot(), `${def.id}.json`);
-    if (fs.existsSync(file)) largeJaId.add(def.id);
+    if (!fs.existsSync(file)) continue;
+    const set = largeIds.get(def.language) ?? new Set<string>();
+    set.add(def.id);
+    largeIds.set(def.language, set);
   }
-  if (!largeJaId.size) return false;
+  if (!largeIds.size) return false;
   let changed = false;
   for (const fileName of fs.readdirSync(freqRoot()).filter((name) => name.endsWith('.json'))) {
     const file = path.join(freqRoot(), fileName);
     // Summary-only: this decides which list is enabled and never looks at a rank.
     const summary = readFrequencySummary(file);
-    if (!summary || summary.language !== 'ja') continue;
-    if (largeJaId.has(summary.id)) {
+    const large = summary?.language ? largeIds.get(summary.language) : undefined;
+    if (!summary || !large) continue;
+    if (large.has(summary.id)) {
       if (!summary.enabled && syncBundledFrequencySummary(file, summary, { enabled: true })) changed = true;
       continue;
     }
-    if (summary.id === 'bundled-freq-ja' && summary.enabled
+    if (summary.id === `bundled-freq-${summary.language}` && summary.enabled
       && syncBundledFrequencySummary(file, summary, { enabled: false })) {
       changed = true;
     }
@@ -1766,13 +1829,19 @@ async function analyzeBook(
         : 'No readable text found in this EPUB. If the book opens in the reader, try Re-importing it — some publishers use non-standard EPUB layouts.',
     );
   }
-  const japanese = isJapaneseText(text);
+  // The book's language, from its text: kana is Japanese, Cyrillic Russian,
+  // and Han alone follows the study language — a Chinese novel used to go
+  // through the Japanese analyser, and a Russian one found "no vocabulary".
+  const bookLang = miningTextLanguage(text);
+  const japanese = bookLang === 'ja';
   const analyzer =
     traditional.analyzer === 'kuromoji' && japanese ? 'kuromoji' : japanese ? 'kuromoji' : 'simple';
   let tokens: Map<string, TokenCandidate>;
   if (japanese) {
     tokens = await tokenizeJapanese(text);
     if (tokens.size === 0) tokens = tokenizeJapaneseSimple(text);
+  } else if (bookLang === 'zh' || bookLang === 'ru') {
+    tokens = tokenizeStudyLanguage(text, bookLang);
   } else {
     tokens = tokenizeSimple(text);
   }
@@ -1782,12 +1851,11 @@ async function analyzeBook(
   const blacklist = traditional.limits;
   let candidates: MiningCandidate[] = [...tokens.values()]
     .map((token) => {
-      // `japanese` is all this path knows: a book that is not Japanese may be
-      // Chinese, Russian or English, so it narrows only when it is sure.
+      // Narrowed to the book's language when the text says which it is.
       const frequencies = resolveCustomFrequencyRanks(
         token.expression,
         token.reading,
-        japanese ? 'ja' : undefined,
+        bookLang ?? undefined,
       );
       return {
         expression: token.expression,
@@ -1846,15 +1914,27 @@ async function importFrequencyDictionary(filePath?: string): Promise<{ ok: boole
     const picked = await dialog.showOpenDialog({
       title: mt('dialog.importFrequencyDict.title'),
       properties: ['openFile'],
-      filters: [{ name: mt('dialog.filter.json'), extensions: ['json'] }],
+      // JSON, and the CSV / TSV / plain word lists most published frequency
+      // lists ship as (one word per line, with or without a rank or a count).
+      filters: [
+        { name: mt('dialog.filter.json'), extensions: ['json'] },
+        { name: mt('dialog.filter.csvTsv'), extensions: ['csv', 'tsv', 'txt'] },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
+      ],
     });
     if (picked.canceled || !picked.filePaths[0]) return { ok: false, error: 'cancelled' };
     target = picked.filePaths[0];
   }
   try {
-    const raw = JSON.parse(fs.readFileSync(target, 'utf-8')) as unknown;
+    const text = fs.readFileSync(target, 'utf-8');
     const label = cleanLabel(path.basename(target, path.extname(target)));
-    const ranks = parseFrequencyDictionaryPayload(raw, label);
+    const ranks = /\.json$/i.test(target)
+      ? parseFrequencyDictionaryPayload(JSON.parse(text) as unknown, label)
+      : parseFrequencyText(text);
+    if (!Object.keys(ranks).length) throw new Error(`Could not parse any ranks from "${label}".`);
+    // The list's language, from its words, so it ranks only that language's
+    // text instead of every language's.
+    const language = detectListLanguage(Object.keys(ranks).filter((key) => !key.includes('\x01')), getMainStudyLang());
     const id = `${Date.now()}-${label.toLowerCase().replace(/\s+/g, '-')}`;
     const summary: FrequencyDictionarySummary = {
       id,
@@ -1863,6 +1943,7 @@ async function importFrequencyDictionary(filePath?: string): Promise<{ ok: boole
       entryCount: Object.keys(ranks).length,
       enabled: true,
       importedAt: Date.now(),
+      ...(language ? { language } : {}),
     };
     writeJsonAtomicSync(path.join(freqRoot(), `${id}.json`), { summary, ranks });
     invalidateFreqDictCache();

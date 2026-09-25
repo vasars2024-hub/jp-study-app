@@ -21,6 +21,7 @@ import {
 } from '../shared/flashcardAutoAudio';
 import { updateDeckCardAudioBatch, type DeckFlashcard } from './flashcardDeck';
 import { preferredVoiceFor } from './flashcardVoicePreference';
+import { normalizeStudyLang } from '../shared/studyLang';
 
 const PREF_KEY = 'jp-flashcard-auto-audio-v1';
 export const AUTO_AUDIO_EVENT = 'flashcard-auto-audio';
@@ -70,15 +71,18 @@ export async function narrateNewCards(
 
   const updates: Array<{ id: string; audioPath: string }> = [];
   const report: AutoAudioReport = { added: 0, failed: 0, deferred: selection.deferred };
-  // Read once, not once per card: the batch is one sitting, and a voice swapped
-  // halfway through it would be audible.
-  const voice = preferredVoiceFor('ja');
+  // Read once per language, not once per card: the batch is one sitting, and a
+  // voice swapped halfway through it would be audible. Each card speaks in its
+  // own language — a Chinese card read by a Japanese voice is noise.
+  const voices = new Map<string, string | undefined>();
   // Sequential on purpose: the OS synthesizer owns one voice device, and
   // parallel requests there deadlock rather than go faster.
   for (const card of selection.chosen) {
+    const lang = normalizeStudyLang(card.studyLang);
+    if (!voices.has(lang)) voices.set(lang, preferredVoiceFor(lang));
     let result: { ok: boolean; path?: string; reason?: unknown };
     try {
-      result = await window.api.flashcardSynthesizeAudio(autoAudioTextFor(card), 'ja', voice);
+      result = await window.api.flashcardSynthesizeAudio(autoAudioTextFor(card), lang, voices.get(lang));
     } catch (error) {
       result = { ok: false, reason: error };
     }

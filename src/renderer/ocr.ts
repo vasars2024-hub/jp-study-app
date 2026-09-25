@@ -6,6 +6,15 @@ import { createWorker, type Worker } from 'tesseract.js';
 /** 'jpn' = horizontal text, 'jpn_vert' = vertical (most manga speech bubbles). */
 export type OcrLang = 'jpn' | 'jpn_vert';
 
+/**
+ * Whether this bundled engine can read a study language. Only the Japanese
+ * traineddata ships (the others are tens of MB each), so Chinese and Russian
+ * pages go to PaddleOCR in main and never to this fallback.
+ */
+export function tesseractReads(lang: string): boolean {
+  return lang === 'ja';
+}
+
 const workers = new Map<OcrLang, Promise<Worker>>();
 
 // The worker's logger is global, so we route progress through one mutable slot.

@@ -7,6 +7,7 @@ import {
 } from '../../../shared/stats';
 import { useT } from '../../i18n';
 import { repairStaleTelemetryPingFlag, sendTelemetryPingIfNeeded } from '../../telemetryPing';
+import { formatNumber } from '../../stats';
 
 // Anonymous "learners by country" greeting for the Resources app. The /counts
 // GET is aggregate and non-identifying, so it renders regardless of the ping
@@ -174,7 +175,7 @@ export default function WorldHeatMap({
               <span className="heatmap-bar-track">
                 <span className="heatmap-bar-fill" style={{ width: `${max > 0 ? (count / max) * 100 : 0}%` }} />
               </span>
-              <span className="heatmap-bar-count">{count.toLocaleString()}</span>
+              <span className="heatmap-bar-count">{formatNumber(count)}</span>
             </div>
           ))}
         </div>

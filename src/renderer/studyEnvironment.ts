@@ -12,8 +12,18 @@ import {
   totalSize,
 } from '../shared/assetRegistry';
 import type { StudyLang } from '../shared/levelScale';
+import {
+  DEFAULT_STUDY_LANG,
+  normalizeStudyLang,
+  studyLangOfText,
+  studyLangTag,
+  type ChineseScript,
+} from '../shared/studyLang';
 import { defaultWhisperTier } from '../shared/whisperModels';
+import { writeLocalStorage } from './localStorageWrite';
 import { setWhisperModelTier } from './whisperSettings';
+
+export type { ChineseScript };
 
 export const STUDY_LANG_KEY = 'jp-study-dict-lang';
 export const STUDY_LANG_EVENT = 'study-lang-changed';
@@ -32,9 +42,79 @@ export type { StudyLang };
 
 export function getStudyLang(): StudyLang {
   try {
-    return localStorage.getItem(STUDY_LANG_KEY) === 'zh' ? 'zh' : 'ja';
+    return normalizeStudyLang(localStorage.getItem(STUDY_LANG_KEY));
   } catch {
-    return 'ja';
+    return DEFAULT_STUDY_LANG;
+  }
+}
+
+/** Simplified or Traditional characters, for a Chinese learner. */
+export const CHINESE_SCRIPT_KEY = 'jp-study-zh-script';
+export const CHINESE_SCRIPT_EVENT = 'study-zh-script-changed';
+
+export function getChineseScript(): ChineseScript {
+  try {
+    return localStorage.getItem(CHINESE_SCRIPT_KEY) === 'traditional' ? 'traditional' : 'simplified';
+  } catch {
+    return 'simplified';
+  }
+}
+
+export function setChineseScript(script: ChineseScript): void {
+  const next: ChineseScript = script === 'traditional' ? 'traditional' : 'simplified';
+  writeLocalStorage(CHINESE_SCRIPT_KEY, next);
+  syncStudyLangToMain();
+  window.dispatchEvent(new CustomEvent<ChineseScript>(CHINESE_SCRIPT_EVENT, { detail: next }));
+}
+
+export function onChineseScriptChanged(cb: (script: ChineseScript) => void): () => void {
+  const handler = (e: Event): void => cb((e as CustomEvent<ChineseScript>).detail);
+  window.addEventListener(CHINESE_SCRIPT_EVENT, handler);
+  return () => window.removeEventListener(CHINESE_SCRIPT_EVENT, handler);
+}
+
+/**
+ * The `lang` attribute study-language content should carry: `ja`, `ru`, or
+ * `zh-Hans` / `zh-Hant` by the script preference.
+ */
+export function studyContentLang(lang: StudyLang = getStudyLang()): string {
+  return studyLangTag(lang, getChineseScript());
+}
+
+/**
+ * The `lang` attribute for a card's text. A stored card with no `studyLang` is
+ * Japanese (the format predates the other languages); any other is its own.
+ */
+export function cardContentLang(card: { studyLang?: string } | null | undefined): string {
+  return studyContentLang(normalizeStudyLang(card?.studyLang));
+}
+
+/** The `lang` attribute for content in a given study language (Chinese by script). */
+export function contentLangOf(lang: string | undefined): string {
+  return studyContentLang(normalizeStudyLang(lang));
+}
+
+/**
+ * The `lang` attribute for a piece of text whose language only its script can
+ * tell (a clipboard entry, a selected sentence): kana → ja, Cyrillic → ru, Han
+ * → the study language's reading of it (Chinese by the learner's script).
+ */
+export function textContentLang(text: string): string {
+  return studyContentLang(studyLangOfText(text, getStudyLang()));
+}
+
+/**
+ * Tell main which language is being studied. Main has no localStorage, and its
+ * subtitle discovery, OCR, whisper and YouTube paths all need the answer — so
+ * the renderer pushes it at boot and on every change, and main persists it so
+ * work that runs before the first window (auto-discovery on startup) still reads
+ * the right language. See `main/studyLanguage.ts`.
+ */
+export function syncStudyLangToMain(): void {
+  try {
+    window.api?.setStudyLanguage?.({ lang: getStudyLang(), script: getChineseScript() });
+  } catch {
+    /* no bridge (tests, harnesses) */
   }
 }
 
@@ -43,17 +123,14 @@ export function getStudyLang(): StudyLang {
  * No-op if unchanged.
  */
 export function setStudyLang(lang: StudyLang): void {
-  const next: StudyLang = lang === 'zh' ? 'zh' : 'ja';
+  const next: StudyLang = normalizeStudyLang(lang);
   const prev = getStudyLang();
-  try {
-    localStorage.setItem(STUDY_LANG_KEY, next);
-  } catch {
-    /* storage unavailable */
-  }
+  writeLocalStorage(STUDY_LANG_KEY, next);
   // Always align whisper tier with the language default when switching.
   if (prev !== next) {
     setWhisperModelTier(defaultWhisperTier(next));
   }
+  syncStudyLangToMain();
   window.dispatchEvent(new CustomEvent<StudyLang>(STUDY_LANG_EVENT, { detail: next }));
 }
 

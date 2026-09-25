@@ -45,6 +45,8 @@ import { installedPaddleLangs, paddleOcrAvailable, type PaddleLang } from './pad
 import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
+import { getMainStudyLang } from './studyLanguage';
+import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
   decideExtensionSettingsAccess,
@@ -54,6 +56,7 @@ import {
 } from '../shared/extensionPairing';
 import {
   detectMineLanguage,
+  profileForLanguage,
   resolveProfileMatch,
   type MineCardKind,
   type MineLanguage,
@@ -130,8 +133,8 @@ export interface LevelEstimateBridgeResult {
   empty?: boolean;
   /** Settings vocab bands missing — cannot score. */
   noLists?: boolean;
-  lang?: 'ja' | 'zh' | null;
-  scheme?: 'jlpt' | 'hsk' | null;
+  lang?: 'ja' | 'zh' | 'ru' | null;
+  scheme?: 'jlpt' | 'hsk' | 'cefr' | null;
   label?: string;
   confidence?: number;
   error?: string;
@@ -141,6 +144,17 @@ const pendingLevelEstimateReplies = new Map<
   string,
   { resolve: (r: LevelEstimateBridgeResult) => void; timer: ReturnType<typeof setTimeout> }
 >();
+
+/**
+ * The study language of text mined from a page. The script decides where it
+ * can (kana, Cyrillic); Han alone follows the study language, because
+ * `detectMineLanguage` calls every kanji-only word Chinese — a Japanese learner's
+ * 猫 was routed to the Chinese profile. Text with no CJK or Cyrillic is unknown.
+ */
+function pageTextLanguage(text: string): MineLanguage {
+  if (detectMineLanguage(text) === 'unknown') return 'unknown';
+  return studyLangOfText(text, getMainStudyLang());
+}
 
 function broadcastClipboardAppend(entry: {
   text: string;
@@ -833,12 +847,14 @@ async function handleMine(body: {
       {
         source,
         cardKind: mode === 'sentence' ? 'sentence' : 'word',
-        language: detectMineLanguage(text),
+        language: pageTextLanguage(text),
         category,
       },
       active?.id || '',
     );
-    profileId = resolved.profileId;
+    profileId = resolved.usedDefault
+      ? profileForLanguage(store.getAllProfiles(), pageTextLanguage(text), resolved.profileId)
+      : resolved.profileId;
     matchedRuleLabel = resolved.matchedRule?.label;
     const profile = (profileId && store.getProfile(profileId)) || active;
     profileId = profile?.id || profileId;
@@ -1185,7 +1201,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     const subtype = kind === 'article' ? detectArticleSubtype('', pageUrl) : undefined;
     const category = detectContentCategory(pageUrl, { title });
 
-    let language: MineLanguage = detectMineLanguage(sampleText);
+    let language: MineLanguage = pageTextLanguage(sampleText);
     let profileName = 'Default';
     let profileId = '';
     let matchedRuleLabel: string | undefined;
@@ -1194,7 +1210,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       const { getProfileStore } = await import('./profiles');
       const store = getProfileStore();
       const active = store.getActiveProfile();
-      if (language === 'unknown' && (active?.targetLang === 'ja' || active?.targetLang === 'zh')) {
+      if (language === 'unknown' && active?.targetLang) {
         language = active.targetLang;
       }
       const resolved = resolveProfileMatch(
@@ -1207,7 +1223,9 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         },
         active?.id || '',
       );
-      profileId = resolved.profileId;
+      profileId = resolved.usedDefault
+        ? profileForLanguage(store.getAllProfiles(), language, resolved.profileId)
+        : resolved.profileId;
       matchedRuleLabel = resolved.matchedRule?.label;
       usedDefault = resolved.usedDefault;
       const profile = (profileId && store.getProfile(profileId)) || active;
@@ -1580,7 +1598,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         });
         return;
       }
-      const queued = enqueueTranscription({ mediaId: plan.mediaId, lang: 'ja' });
+      const queued = enqueueTranscription({ mediaId: plan.mediaId, lang: getMainStudyLang() });
       json(res, 200, {
         ok: queued.ok,
         state: queued.ok ? 'queued' : 'refused',
@@ -1913,16 +1931,20 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     if (!requireAuth(req, res)) return;
     try {
       const raw = await readBody(req);
-      const body = JSON.parse(raw || '{}') as { query?: string };
+      const body = JSON.parse(raw || '{}') as { query?: string; lang?: string };
       const query = String(body.query ?? '').trim().slice(0, 80);
       if (!query) {
         json(res, 400, { ok: false, error: 'query required' });
         return;
       }
+      // The page's language when the extension says it, else the query's script
+      // (Han alone following the study language) — a Chinese page is answered
+      // from the Chinese dictionary, not the Japanese one.
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(query, getMainStudyLang());
       // The dictionary database, one entry per gloss language — the shape the
       // legacy in-memory index answered with, without loading that index.
       const { lookupTermOffline } = await import('./dictionary');
-      const local = await lookupTermOffline(query);
+      const local = await lookupTermOffline(query, lang);
       const entries = (local.entries || []).slice(0, 8).map((e) => ({
         word: e.word,
         reading: e.reading,

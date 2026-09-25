@@ -182,7 +182,7 @@ describe('SeanimeStudyLibraryPanel', () => {
     );
     const html = await render();
     expect(html).toContain('Not analysed');
-    expect(html).toContain('Analyse the attached Japanese subtitles.');
+    expect(html).toContain('Analyse the attached study-language subtitles.');
   });
 
   it('puts a file Study OS never imported in `unlinked` with an import action', async () => {
@@ -198,8 +198,8 @@ describe('SeanimeStudyLibraryPanel', () => {
       [mediaItem({ subtitles: [] })],
     );
     const html = await render();
-    expect(html).toContain('No Japanese subtitles');
-    expect(html).toContain('Find Japanese subtitles for this file first.');
+    expect(html).toContain('No study-language subtitles');
+    expect(html).toContain('Find study-language subtitles for this file first.');
   });
 
   it('defaults to the work queue and excludes ready files from it', async () => {
@@ -501,7 +501,7 @@ describe('SeanimeStudyLibraryPanel', () => {
       // Named by title for the same reason Open and Import are — "Analyse" repeated down
       // a list gives a screen reader nothing to choose between.
       expect(button?.getAttribute('aria-label')).toBe(
-        'Analyse the Japanese subtitles of Frieren 01',
+        'Analyse the study-language subtitles of Frieren 01',
       );
     });
 
@@ -537,7 +537,7 @@ describe('SeanimeStudyLibraryPanel', () => {
       });
       const said = host?.querySelector('.study-lib-status')?.textContent ?? '';
       expect(said).toBe(
-        'Frieren 01 has no Japanese subtitles yet, so transcription was queued instead.',
+        'Frieren 01 has no study-language subtitles yet, so transcription was queued instead.',
       );
       expect(said).not.toContain('Analysed');
     });

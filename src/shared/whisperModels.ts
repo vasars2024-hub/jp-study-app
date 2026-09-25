@@ -16,9 +16,9 @@ export interface WhisperModelSpec {
   hfId: string;
   /** Approx download size for UI copy (bytes). */
   sizeBytes: number;
-  langs: Array<'ja' | 'zh' | 'any'>;
+  langs: Array<'ja' | 'zh' | 'ru' | 'any'>;
   /** Prefer this tier when study language matches. */
-  preferFor?: Array<'ja' | 'zh'>;
+  preferFor?: Array<'ja' | 'zh' | 'ru'>;
 }
 
 export const WHISPER_MODEL_SPECS: WhisperModelSpec[] = [
@@ -58,7 +58,7 @@ export function whisperSpec(id: WhisperModelTier): WhisperModelSpec {
   return WHISPER_MODEL_SPECS.find((s) => s.id === id) ?? WHISPER_MODEL_SPECS[0];
 }
 
-export function defaultWhisperTier(lang: 'ja' | 'zh'): WhisperModelTier {
+export function defaultWhisperTier(lang: 'ja' | 'zh' | 'ru'): WhisperModelTier {
   if (lang === 'ja') return 'kotoba-whisper';
   return 'whisper-small';
 }

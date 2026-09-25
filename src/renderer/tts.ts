@@ -43,9 +43,11 @@ export function stopSpeaking(): void {
  * follows `hanPreference` (the active dictionary language); Cyrillic → ru;
  * otherwise en.
  */
-export function detectTtsLang(text: string, hanPreference: 'ja' | 'zh' = 'ja'): TtsLang {
+export function detectTtsLang(text: string, hanPreference: 'ja' | 'zh' | 'ru' = 'ja'): TtsLang {
   if (/[぀-ヿ]/.test(text)) return 'ja'; // any kana is unambiguously Japanese
-  if (/[㐀-鿿]/.test(text)) return hanPreference; // Han only: ja vs zh by dictionary
+  // Han only: ja vs zh by the study language. A Russian learner's Han text is
+  // not Chinese by default either — Japanese stays the fallback.
+  if (/[㐀-鿿]/.test(text)) return hanPreference === 'zh' ? 'zh' : 'ja';
   if (/[Ѐ-ӿ]/.test(text)) return 'ru';
   return 'en';
 }

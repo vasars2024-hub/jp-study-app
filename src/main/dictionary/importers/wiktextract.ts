@@ -27,7 +27,8 @@
 
 import fs from 'node:fs';
 import type { SqliteDb } from '../db';
-import { normalizeForLookup } from '../dictService';
+import { INFLECTION_WRITTEN_TAG, normalizeForLookup } from '../dictService';
+import { foldRussianYo, hasRussianStressMark } from '../../../shared/russianMorphology';
 import { pinyinSearchKey } from '../../../shared/pinyin';
 import {
   type LexiconXrefKind,
@@ -232,17 +233,27 @@ export function pinyinReadingKey(reading: string): string {
  */
 export function classifyForms(
   record: WiktextractRecord,
-): { reading: string; inflections: { form: string; tags: string[] }[] } {
+): { reading: string; inflections: { form: string; tags: string[]; written?: string }[] } {
   const word = record.word ?? '';
+  const russian = record.lang_code === 'ru';
+  const wordKey = inflectionKey(word);
   let reading = '';
-  const inflections: { form: string; tags: string[] }[] = [];
-  const seen = new Set<string>();
+  const inflections: { form: string; tags: string[]; written?: string }[] = [];
+  const seen = new Set<string>([wordKey]);
 
   for (const entry of record.forms ?? []) {
     const form = entry?.form?.trim();
     if (!form || form === word) continue;
     const tags = (entry.tags ?? []).filter((tag): tag is string => typeof tag === 'string');
     if (tags.some((tag) => FORM_SCAFFOLD_TAGS.has(tag))) continue;
+
+    // Russian: the headword as Wiktionary prints it, with its stress (`кни́га`,
+    // tagged `canonical`), is the entry's reading — the form a learner needs to
+    // see — not an inflection of itself.
+    if (russian && inflectionKey(form) === wordKey) {
+      if (!reading && hasRussianStressMark(form)) reading = form.normalize('NFC');
+      continue;
+    }
 
     if (tags.some((tag) => FORM_READING_TAGS.has(tag))) {
       if (!reading) reading = form;
@@ -257,7 +268,25 @@ export function classifyForms(
     const key = inflectionKey(form);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    inflections.push({ form: key, tags });
+    // The stressed spelling rides along so the reading aid can show `кни́ги`
+    // for `книги` in running text; the key itself stays stress-free.
+    const written = russian && hasRussianStressMark(form) ? form.normalize('NFC') : undefined;
+    inflections.push({ form: key, tags, ...(written ? { written } : {}) });
+  }
+
+  if (russian) {
+    // Printed Russian mostly writes е for ё: `елка` must find `ёлка`, and
+    // `ежики` its paradigm row `ёжики`. The folded spelling is indexed as one
+    // more form of the same headword.
+    const folded = [wordKey, ...inflections.map((entry) => entry.form)]
+      .filter((key) => key.includes('ё'))
+      .map((key) => ({ key: foldRussianYo(key), from: key }));
+    for (const { key, from } of folded) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const source = inflections.find((entry) => entry.form === from);
+      inflections.push({ form: key, tags: source ? [...source.tags] : [], ...(source?.written ? { written: source.written } : {}) });
+    }
   }
 
   return { reading, inflections };
@@ -425,8 +454,9 @@ export function importWiktextract(
       // Chinese readings are pinyin and are searched spaceless and toneless, the
       // same key CC-CEDICT's import writes; every other language's reading is
       // already in the script it is searched in.
+      // Russian readings are the stressed headword, searched without its accents.
       const readingNorm = reading
-        ? (lang === 'zh' ? pinyinReadingKey(reading) : normalizeForLookup(reading))
+        ? (lang === 'zh' ? pinyinReadingKey(reading) : lang === 'ru' ? inflectionKey(reading) : normalizeForLookup(reading))
         : '';
       const headwordId = Number(
         insertHeadword.run(dictId, lang, word, normalizeForLookup(word), reading, readingNorm).lastInsertRowid,
@@ -458,7 +488,10 @@ export function importWiktextract(
         // `name` stays null and the paradigm lives in `tags`. `collectInflectionReasons`
         // concatenates name with the split tags, so a readable name here would
         // duplicate every tag it is built from in the displayed reason chain.
-        insertInflection.run(headwordId, inflection.form, inflection.tags.join(','));
+        // A Russian form's stressed spelling is stored as a `form:` tag, which
+        // `collectInflectionReasons` leaves out of the displayed reason chain.
+        const tags = inflection.written ? [...inflection.tags, `${INFLECTION_WRITTEN_TAG}${inflection.written}`] : inflection.tags;
+        insertInflection.run(headwordId, inflection.form, tags.join(','));
         counts.inflections += 1;
       }
     }

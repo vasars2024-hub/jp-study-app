@@ -40,6 +40,8 @@
 //     want something stable and human-traceable more than they want a real key.
 
 import type { DictEntry, YomitanDictInfo } from '../../shared/types';
+import { hasCyrillic, hasHan, hasKana } from '../../shared/langs';
+import { studyLangFromTag, type StudyLang } from '../../shared/studyLang';
 import type {
   LexiconLookupEntry,
   LexiconLookupGloss,
@@ -134,4 +136,26 @@ export function legacyBatchToLookupResult(
   });
 
   return { query, entries };
+}
+
+/**
+ * Which language's legacy store may ground a passage the database left
+ * ungrounded. The legacy Yomitan stores are Japanese, so they must only answer
+ * a Japanese passage: a Chinese sentence used to be broken down into JMdict
+ * entries (same Han characters, wrong language, wrong readings).
+ *
+ * The caller's `sourceLangs` decide when given; otherwise the script does —
+ * kana is Japanese, Cyrillic Russian, and bare Han stays Japanese as before
+ * (every Chinese surface passes its language).
+ */
+export function interlinearFallbackLang(text: string, sourceLangs?: readonly string[]): StudyLang | null {
+  for (const tag of sourceLangs ?? []) {
+    const lang = studyLangFromTag(tag);
+    if (lang) return lang;
+  }
+  if (sourceLangs?.length) return null;
+  if (hasKana(text)) return 'ja';
+  if (hasCyrillic(text)) return 'ru';
+  if (hasHan(text)) return 'ja';
+  return null;
 }

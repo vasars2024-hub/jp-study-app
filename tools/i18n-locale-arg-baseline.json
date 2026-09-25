@@ -1,17 +1,7 @@
 {
-  "src/main/dictionary/tatoebaOffline.ts": 1,
-  "src/renderer/components/AiGenerationProgressPanel.tsx": 2,
-  "src/renderer/components/media/library/MediaLibrarySidebar.tsx": 3,
-  "src/renderer/components/media/MediaContent.tsx": 1,
-  "src/renderer/components/MiningProgressPanel.tsx": 2,
-  "src/renderer/components/novels/NovelsContent.tsx": 3,
-  "src/renderer/components/resources/WorldHeatMap.tsx": 1,
   "src/renderer/components/scraper/pages/DataPages.tsx": 5,
   "src/renderer/components/scraper/pages/ManagementPages.tsx": 2,
   "src/renderer/components/scraper/pages/NewScrapePage.tsx": 1,
   "src/renderer/components/scraper/result/ResultPanels.tsx": 7,
-  "src/renderer/components/scraper/strings.ts": 7,
-  "src/renderer/environment/achievements.ts": 1,
-  "src/shared/japaneseNumbers.ts": 1,
-  "src/shared/playerDiagnostics.ts": 1
+  "src/renderer/components/scraper/strings.ts": 7
 }

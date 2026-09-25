@@ -1,4 +1,4 @@
-import type { GrammarLevel, GrammarPoint, HskLevel, JlptLevel } from './types';
+import type { CefrLevel, GrammarLevel, GrammarPoint, HskLevel, JlptLevel } from './types';
 import {
   normalizeGrammarList,
   type ModuleProvenance,
@@ -18,6 +18,9 @@ import { N1_SUPPLEMENT } from './n1-supplement';
 import { HSK } from './hsk';
 import { HSK_EXTRA } from './hsk-extra';
 import { HSK_IMPORT } from './hsk-import';
+import { RU_CEFR } from './ru-cefr';
+import { HSK_STARTER } from './hsk-starter';
+import { writeLocalStorageJson } from '../../localStorageWrite';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
@@ -126,7 +129,24 @@ const HSK_IMPORTED: ModuleProvenance = {
   verification: 'imported-unreviewed',
 };
 
-/** All grammar points (JA JLPT + ZH HSK), normalized with provenance. */
+/** HSK 2–4 everyday patterns the seed and expansion left out; authored the same way as hsk-extra. */
+const HSK_STARTER_AUTHORED: ModuleProvenance = {
+  source: 'authored:hsk-starter',
+  tagSource: 'authored',
+  verification: 'verified',
+};
+
+/*
+ * Russian A1–B1, written for this app against the taxonomy (categories, not
+ * gloss-regex functions), with examples authored alongside each point.
+ */
+const RU_AUTHORED: ModuleProvenance = {
+  source: 'authored:ru-cefr',
+  tagSource: 'authored',
+  verification: 'verified',
+};
+
+/** All grammar points (JA JLPT + ZH HSK + RU CEFR), normalized with provenance. */
 export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(N5, CORE),
   ...normalizeGrammarList(N4, CORE),
@@ -142,7 +162,58 @@ export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(HSK, HSK_SEED),
   ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
   ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),
+  ...normalizeGrammarList(HSK_STARTER, HSK_STARTER_AUTHORED),
+  ...normalizeGrammarList(RU_CEFR, RU_AUTHORED),
 ];
+
+/*
+ * Grammar lists the learner imported (CSV / TSV / JSON, any study language —
+ * `userImport.ts`). Imported content nobody here reviewed: it lands in the
+ * curation queue as `imported-unreviewed`, like the other imported modules.
+ */
+export const USER_GRAMMAR_KEY = 'jp-grammar-user-points-v1';
+
+const USER_IMPORTED: ModuleProvenance = {
+  source: 'user-import',
+  tagSource: 'imported',
+  verification: 'imported-unreviewed',
+};
+
+function readUserGrammar(): GrammarPoint[] {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(USER_GRAMMAR_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((p): p is GrammarPoint => !!p && typeof p === 'object' && typeof (p as GrammarPoint).id === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+GRAMMAR.push(...normalizeGrammarList(readUserGrammar(), USER_IMPORTED));
+
+/**
+ * Add imported points to the corpus (this session) and keep them (the next).
+ * A point already imported — same pattern and meaning — is replaced, not
+ * duplicated. Returns how many are new.
+ */
+export function importUserGrammar(points: readonly GrammarPoint[]): number {
+  const stored = readUserGrammar();
+  const byId = new Map(stored.map((p) => [p.id, p]));
+  let added = 0;
+  for (const point of points) {
+    if (!byId.has(point.id)) added += 1;
+    byId.set(point.id, point);
+  }
+  writeLocalStorageJson(USER_GRAMMAR_KEY, [...byId.values()]);
+  const incoming = new Set(points.map((p) => p.id));
+  for (let i = GRAMMAR.length - 1; i >= 0; i -= 1) {
+    if (incoming.has(GRAMMAR[i].id)) GRAMMAR.splice(i, 1);
+  }
+  GRAMMAR.push(...normalizeGrammarList([...points], USER_IMPORTED));
+  return added;
+}
 
 /** Raw per-module lists, for the corpus audit's provenance accounting. */
 export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
@@ -160,6 +231,8 @@ export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
   hsk: HSK,
   'hsk-extra': HSK_EXTRA,
   'hsk-import': HSK_IMPORT,
+  'hsk-starter': HSK_STARTER,
+  'ru-cefr': RU_CEFR,
 };
 
 function countLevel(level: GrammarLevel): number {
@@ -187,6 +260,15 @@ export const HSK_COUNTS: Record<HskLevel, number> = {
   HSK6: countLevel('HSK6'),
   'HSK7-9': countLevel('HSK7-9'),
   HSK10: countLevel('HSK10'),
+};
+
+export const CEFR_COUNTS: Record<CefrLevel, number> = {
+  A1: countLevel('A1'),
+  A2: countLevel('A2'),
+  B1: countLevel('B1'),
+  B2: countLevel('B2'),
+  C1: countLevel('C1'),
+  C2: countLevel('C2'),
 };
 
 export function grammarByLevel(level: GrammarLevel): NormalizedGrammarPoint[] {

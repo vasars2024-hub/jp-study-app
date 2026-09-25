@@ -176,3 +176,29 @@ describe('preference storage', () => {
     expect(loadAutoReadingPreferences()).toEqual(DEFAULT_AUTO_READING_PREFERENCES);
   });
 });
+
+describe('Chinese and Russian cards get their own reading aid', () => {
+  beforeEach(() => {
+    (window as unknown as { api: unknown }).api = {
+      readingAid: async (lang: string, words: string[]) => (lang === 'zh'
+        ? Object.fromEntries(words.filter((w) => w === '今天' || w === '天气')
+          .map((w) => [w, w === '今天' ? ['jīn', 'tiān'] : ['tiān', 'qì']]))
+        : Object.fromEntries(words.filter((w) => w === 'книга').map((w) => [w, [`кни${String.fromCharCode(0x301)}га`]]))),
+    };
+  });
+
+  it('pinyin for a Chinese card, stress for a Russian one, and kuromoji for neither', async () => {
+    const created = addDeckCardsTracked([
+      { word: '今天天气', reading: '', meaning: 'weather today', source: 'epub', studyLang: 'zh' },
+      { word: 'книга', reading: '', meaning: 'book', source: 'epub', studyLang: 'ru' },
+    ]);
+
+    const report = await annotateNewCards(created, ALL_ON);
+
+    expect(report).toMatchObject({ added: 2, failed: 0 });
+    const deck = loadDeck();
+    expect(deck.find((card) => card.word === '今天天气')?.reading).toBe('jīntiān tiānqì');
+    expect(deck.find((card) => card.word === 'книга')?.reading).toBe(`кни${String.fromCharCode(0x301)}га`);
+    expect(tokenizeSync).not.toHaveBeenCalled();
+  });
+});

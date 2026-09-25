@@ -43,6 +43,8 @@ import { getMainJapaneseTokenizer } from './japaneseTokenizer';
 import { deleteMinedNotes, mineNote, previewAnkiExpressions } from './anki';
 import { resolveCustomFrequencyRanks } from './mining';
 import { enqueueTranscription, onMainTranscriptionProgress } from './transcriptionJobs';
+import { getMainStudyLang } from './studyLanguage';
+import { studyLangOfText } from '../shared/studyLang';
 import type { TranscriptionProgress } from '../shared/transcriptionIpc';
 
 const FILE_NAME = 'study-orchestrator-v2.json';
@@ -128,7 +130,7 @@ function queueStudyTranscription(mediaId: string): StudyTranscriptionQueueResult
     jobs: { ...document.jobs, [job.id]: job },
   });
 
-  const result = enqueueTranscription({ mediaId, lang: 'ja' });
+  const result = enqueueTranscription({ mediaId, lang: getMainStudyLang() });
   if (result.ok) {
     return {
       ok: true,
@@ -433,7 +435,8 @@ async function exportAnki(workspaceId: string): Promise<StudyAnkiExportResult> {
       term: item.word,
       reading: item.reading,
       sentence: item.sentence,
-      route: { source: 'subtitle', cardKind: 'word', language: 'ja' },
+      // The line's language: the study language, or the script where it says otherwise.
+      route: { source: 'subtitle', cardKind: 'word', language: studyLangOfText(`${item.word} ${item.sentence ?? ''}`, getMainStudyLang()) },
       extraTags: ['jp-study-app::study-mode'],
     });
     if (outcome.ok && typeof outcome.noteId === 'number') {

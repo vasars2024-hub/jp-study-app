@@ -27,6 +27,8 @@ import {
   type SubtitleTranslationEnginePreference,
 } from '../../../../shared/subtitleDiscoveryIpc';
 import type { SubtitleAutoNotices } from '../../../../shared/subtitleDiscoveryStatus';
+import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
+import { useStudyLanguage } from '../../../useStudyLanguage';
 
 const STYLES: SubtitlePreferences['style'][] = ['full', 'signs-songs', 'forced'];
 
@@ -38,6 +40,7 @@ const KEY_URLS: Partial<Record<SubtitleProviderExecutionId, string>> = {
 
 export default function SubtitleProviderPanel() {
   const { t, lang } = useT();
+  const studyLang = useStudyLanguage().lang;
   const [management, setManagement] = useState(loadSubtitleManagementDocument);
   const [settings, setSettings] = useState<SubtitleDiscoverySettings>(DEFAULT_SUBTITLE_DISCOVERY_SETTINGS);
   const [credentials, setCredentials] = useState<SubtitleProviderCredentialState[]>([]);
@@ -291,7 +294,8 @@ export default function SubtitleProviderPanel() {
           >
             <option value="">{t('subtitle.helperNone')}</option>
             {[...new Set(['en', ...(settings.helperLanguage ? [settings.helperLanguage] : []), ...languages])]
-              .filter((lang) => lang !== 'ja')
+              // Any language but the one studied: the helper line explains the study line.
+              .filter((lang) => !subtitleLangMatches(lang, studyLang))
               .map((language) => (
               <option key={language} value={language}>{language}</option>
             ))}

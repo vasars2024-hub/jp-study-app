@@ -66,6 +66,7 @@ import { recordClipboardEntry, loadClipboardHistory, type ClipboardEntryType } f
 import { getLevel, setLevel, type WkLevel } from './knownWords';
 import { estimateLevelFromText } from './bookLevelEstimate';
 import { getStudyLang } from './studyEnvironment';
+import { studyLangOfText } from '../shared/studyLang';
 import { compactLevelBadge, resolvePageLevelLang } from '../shared/pageLevelDetect';
 import { handleExtensionUiOpen } from './extensionBridgeUi';
 import { appendNotebookEvent } from './notebookTimeline';
@@ -347,6 +348,8 @@ export default function App() {
           meaning,
           sentence,
           source: 'extension',
+          // The page's own text says which language it is; Han alone follows the study language.
+          studyLang: studyLangOfText(`${term} ${sentence ?? ''}`, getStudyLang()),
           folder,
           sourceTitle: payload.title?.trim() || undefined,
           sourceUrl: payload.url?.trim() || undefined,

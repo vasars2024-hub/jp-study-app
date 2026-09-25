@@ -34,6 +34,8 @@ import {
 } from './mediaStudyWorkflow';
 import { getTranslateTarget } from './translateTarget';
 import { mineToStudy } from './studyMining';
+import { getStudyLang } from './studyEnvironment';
+import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
 
 /** The media-item shape the deck and study stores key VN cards by (`vn:<id>`). */
 export function visualNovelMediaItem(entry: Pick<VisualNovelEntry, 'id' | 'title' | 'executablePath' | 'language' | 'createdAt'>): MediaItem {
@@ -84,6 +86,8 @@ export async function mineVisualNovelLine(
     sourceTitle: item.title,
     folder: 'Media',
     studyKind: 'sentence',
+    // The game's own language when it names one, else the line's script.
+    studyLang: studyLangFromTag(entry.language) ?? studyLangOfText(japanese, getStudyLang()),
     imagePath: capture.screenshotPath || undefined,
     audioPath: capture.audioPath || undefined,
   });

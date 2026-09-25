@@ -1,5 +1,6 @@
 import type { AiGenerationProgress } from '../../shared/mining';
 import { useT } from '../i18n';
+import { formatNumber } from '../stats';
 
 const PHASE_KEYS: Record<AiGenerationProgress['phase'], string> = {
   invent: 'aiStudio.progress.invent',
@@ -51,7 +52,7 @@ export default function AiGenerationProgressPanel({
       {progress.message && <p className="mining-progress-message">{progress.message}</p>}
       {progress.total > 0 && (
         <p className="muted mining-progress-count">
-          {progress.done.toLocaleString()} / {progress.total.toLocaleString()}
+          {formatNumber(progress.done)} / {formatNumber(progress.total)}
         </p>
       )}
     </div>

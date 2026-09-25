@@ -4,6 +4,9 @@ import {
   pickHelperSubtitle,
   pickStudySubtitle,
   pickSubtitlePair,
+  studyFirstDownloadLanguages,
+  subtitleBaseLang,
+  subtitleChineseScript,
   subtitleLangMatches,
 } from '../subtitleDiscoveryPick';
 
@@ -16,6 +19,65 @@ describe('subtitleLangMatches', () => {
     expect(subtitleLangMatches('ja-JP', 'ja')).toBe(true);
     expect(subtitleLangMatches('en', 'ja')).toBe(false);
     expect(subtitleLangMatches(undefined, 'ja')).toBe(false);
+  });
+});
+
+describe('subtitle language tags across the three study languages', () => {
+  it('reads ISO 639-2 and file-name tags as their language', () => {
+    expect(subtitleBaseLang('jpn')).toBe('ja');
+    expect(subtitleBaseLang('rus')).toBe('ru');
+    expect(subtitleBaseLang('chs')).toBe('zh');
+    expect(subtitleBaseLang('cht')).toBe('zh');
+    expect(subtitleBaseLang('zh-Hant')).toBe('zh');
+    expect(subtitleLangMatches('jpn', 'ja')).toBe(true);
+    expect(subtitleLangMatches('chs', 'zh-Hans')).toBe(true);
+    expect(subtitleLangMatches('ru-RU', 'ja')).toBe(false);
+  });
+
+  it('knows the Chinese script of a tag, and only of a Chinese one', () => {
+    expect(subtitleChineseScript('zh-Hans')).toBe('hans');
+    expect(subtitleChineseScript('zh-CN')).toBe('hans');
+    expect(subtitleChineseScript('chs')).toBe('hans');
+    expect(subtitleChineseScript('zh-TW')).toBe('hant');
+    expect(subtitleChineseScript('cht')).toBe('hant');
+    expect(subtitleChineseScript('zh')).toBeNull();
+    expect(subtitleChineseScript('ja')).toBeNull();
+  });
+
+  it("picks the study language's track for ja, zh and ru", () => {
+    const records = [
+      rec({ id: 'ja', lang: 'jpn' }),
+      rec({ id: 'zh', lang: 'zh' }),
+      rec({ id: 'ru', lang: 'rus' }),
+      rec({ id: 'en', lang: 'en', source: 'embedded' }),
+    ];
+    expect(pickStudySubtitle(records, 'ja')?.id).toBe('ja');
+    expect(pickStudySubtitle(records, 'zh-Hans')?.id).toBe('zh');
+    expect(pickStudySubtitle(records, 'ru')?.id).toBe('ru');
+  });
+
+  it("orders Chinese tracks by the learner's script before provenance", () => {
+    const records = [
+      rec({ id: 'sc', lang: 'zh-hans', source: 'embedded' }),
+      rec({ id: 'tc', lang: 'cht', source: 'provider' }),
+      rec({ id: 'bare', lang: 'zh', source: 'sidecar' }),
+    ];
+    expect(pickStudySubtitle(records, 'zh-Hant')?.id).toBe('tc');
+    expect(pickStudySubtitle(records, 'zh-Hans')?.id).toBe('sc');
+    // No script preference: provenance decides, as before.
+    expect(pickStudySubtitle(records, 'zh')?.id).toBe('sc');
+  });
+});
+
+describe('studyFirstDownloadLanguages', () => {
+  it('puts the study language first and drops the previous study language', () => {
+    expect(studyFirstDownloadLanguages(['ja', 'en'], 'zh', { previousStudy: 'ja', helperLanguage: 'en' })).toEqual(['zh', 'en']);
+    expect(studyFirstDownloadLanguages(['en', 'ru'], 'ru', {})).toEqual(['ru', 'en']);
+    expect(studyFirstDownloadLanguages(['ja'], 'ru', { previousStudy: 'ja' })).toEqual(['ru']);
+  });
+
+  it('keeps the previous study language when it is also the helper language', () => {
+    expect(studyFirstDownloadLanguages(['ja', 'en'], 'zh', { previousStudy: 'ja', helperLanguage: 'ja' })).toEqual(['zh', 'ja', 'en']);
   });
 });
 

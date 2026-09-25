@@ -56,7 +56,7 @@ import {
 } from '../../shared/lensCaptureTarget';
 import { documentCapturePage, documentCaptureSection } from '../novelLensCapture';
 import { getTokenizer, tokenizerReady } from '../tokenizer';
-import { highlightEl, recolorEl, resetHighlightRoot } from '../wordHighlight';
+import { highlightEl, highlightReady, recolorEl, resetHighlightRoot } from '../wordHighlight';
 import { onKnowledgeChanged } from '../knownWords';
 import {
   lookupWordFromMouseUp,
@@ -88,6 +88,7 @@ import {
   type WikiNavEntry,
 } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
+import { studyContentLang } from '../studyEnvironment';
 import {
   handOffToAgent,
   readingPassageAgentContext,
@@ -137,7 +138,9 @@ function writeTranslateTarget(code: string): void {
 function resolveEpubSourceLang(item: LibraryItem, sampleHtml: string, profileLang: string): string {
   // Kana is decisive — a Japanese book mistagged as zh must still translate as ja.
   if (/[\u3040-\u30ff]/u.test(sampleHtml)) return 'ja';
-  if (item.lang === 'ja' || item.lang === 'zh' || item.lang === 'en') return item.lang;
+  // Cyrillic text is Russian whatever the tag says (untagged books are common).
+  if (/\p{Script=Cyrillic}/u.test(sampleHtml)) return 'ru';
+  if (item.lang === 'ja' || item.lang === 'zh' || item.lang === 'en' || item.lang === 'ru') return item.lang;
   if (profileLang) return profileLang;
   return 'ja';
 }
@@ -234,6 +237,8 @@ export default function NovelReader({ item, onClose }: Props) {
     () => resolveEpubSourceLang(item, sampleEpubHtml(loaded?.chapters), getActiveProfile().targetLang),
     [item, loaded],
   );
+  /** The book's text carries its language: Chinese by the learner's script, so glyphs and fonts are right. */
+  const bookContentLang = sourceLang === 'zh' ? studyContentLang('zh') : sourceLang;
   const [targetLang, setTargetLang] = useState(() =>
     readTranslateTarget(getActiveProfile().targetLang),
   );
@@ -1020,7 +1025,7 @@ export default function NovelReader({ item, onClose }: Props) {
         ? [root]
         : Array.from(root.querySelectorAll<HTMLElement>('.novel-part'));
       for (const el of els.length ? els : [root]) {
-        if (settings.wordHighlight && tokenizerReady()) highlightEl(el);
+        if (settings.wordHighlight && highlightReady()) highlightEl(el);
         // Personal H-key highlights (annotations) — always, even if vocab colors off.
         const pi = el.dataset.pi != null ? Number(el.dataset.pi) : paged ? partRef.current : undefined;
         applyAnnotationsToRoot(el, annotations, pi);
@@ -3238,7 +3243,7 @@ export default function NovelReader({ item, onClose }: Props) {
               <div
                 className={`novel-content novel-link-article ${wkClass}`}
                 style={contentStyle}
-                lang="ja"
+                lang={bookContentLang}
                 dangerouslySetInnerHTML={{ __html: linkView.bodyHtml }}
               />
             </div>
@@ -3278,7 +3283,7 @@ export default function NovelReader({ item, onClose }: Props) {
                   ref={contentRef}
                   className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
                   style={contentStyle}
-                  lang="ja"
+                  lang={bookContentLang}
                   dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
                 />
               ) : (
@@ -3287,7 +3292,7 @@ export default function NovelReader({ item, onClose }: Props) {
                   ref={contentRef}
                   className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
                   style={contentStyle}
-                  lang="ja"
+                  lang={bookContentLang}
                 >
                   {winParts.map((i) => (
                     <div

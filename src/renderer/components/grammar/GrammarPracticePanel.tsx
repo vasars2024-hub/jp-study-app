@@ -19,6 +19,7 @@ import { useT } from '../../i18n';
 import VirtualList from '../VirtualList';
 import GrammarFilterPanel from './GrammarFilterPanel';
 import GrammarTestModal from './GrammarTestModal';
+import { normalizeStudyLang } from '../../../shared/studyLang';
 
 const FOLDER = 'Grammar';
 
@@ -117,7 +118,7 @@ export default function GrammarPracticePanel({
       for (const p of selectedPoints) {
         try {
           const res = await window.api.ankiMineNote({
-            route: { source: 'other', cardKind: 'word', language: p.lang === 'zh' ? 'zh' : 'ja' },
+            route: { source: 'other', cardKind: 'word', language: normalizeStudyLang(p.lang) },
             term: p.title,
             meaning: p.meaning,
             sentence: p.examples[0]?.jp,

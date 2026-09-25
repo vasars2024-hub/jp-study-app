@@ -75,10 +75,15 @@ import {
 } from './dictService';
 import {
   lookupChineseTerm,
+  getCedictIndex,
+  type CedictIndex,
   resetCedictIndexCache,
   type ChineseLookupDeps,
 } from './chineseLookup';
 import { listUserNotes, readUserNote, writeUserNote } from './notes';
+import { chineseReadings, russianReadings } from './readingAid';
+import { getMainChineseScript } from '../studyLanguage';
+import type { ReadingAidLang, ReadingAidResult } from '../../shared/readingAid';
 import {
   clearStoredExplanations,
   readStoredExplanation,
@@ -616,11 +621,18 @@ export function lookupOfflineInterlinear(
   return buildOfflineInterlinear(
     text,
     (query) => {
-      const unified = lookup(db, {
+      const found = lookup(db, {
         text: query,
         sourceLangs: options.sourceLangs ? [...options.sourceLangs] : undefined,
         limit: 8,
       });
+      // The gloss direction is not language-pinned inside `lookup()`, so a Chinese
+      // passage could be grounded on a Japanese headword (same Han characters).
+      // A passage in a named language keeps only that language's headwords.
+      const wanted = options.sourceLangs?.length ? new Set(options.sourceLangs) : null;
+      const unified = wanted
+        ? { ...found, entries: found.entries.filter((entry) => wanted.has(entry.lang)) }
+        : found;
       if (unified.entries.length || !legacyFallback) return unified;
       const legacy = legacyFallback(query);
       if (!legacy.entries.length) return unified;
@@ -695,11 +707,33 @@ const chineseDeps: ChineseLookupDeps = {
     }
   },
   loadCedictText,
+  script: () => getMainChineseScript(),
 };
 
 /** Look a Chinese term up. Database first, CC-CEDICT file second. */
 export function lookupChineseInDictionary(query: string, limit?: number): Promise<DictResult> {
   return lookupChineseTerm(query, chineseDeps, limit);
+}
+
+/**
+ * Readings for the reading aid: pinyin per character for Chinese words (from
+ * CC-CEDICT, whichever copy is installed), stressed spellings for Russian words
+ * (from the database's Russian dictionary). Empty when the language's
+ * dictionary is not there — the line is still drawn, just without the aid.
+ */
+export async function readingAidFor(lang: ReadingAidLang, words: readonly string[]): Promise<ReadingAidResult> {
+  if (!words.length) return {};
+  try {
+    if (lang === 'zh') return chineseReadings(await loadCedictIndex(), words);
+    return russianReadings(dictionaryDb(), words);
+  } catch {
+    return {};
+  }
+}
+
+/** The CC-CEDICT index, loaded on first use (database-independent). */
+export function loadCedictIndex(): Promise<CedictIndex> {
+  return getCedictIndex(chineseDeps);
 }
 
 /** Drop the cached CC-CEDICT index after a managed install finishes. */

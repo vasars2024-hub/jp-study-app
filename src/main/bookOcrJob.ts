@@ -24,11 +24,14 @@ import {
   bookOcrEngine,
   estimateEtaMs,
   judgeBookOcrRun,
+  type BookOcrLang,
   type BookOcrPhase,
   type BookOcrProgress,
   type BookOcrRequest,
   type BookOcrResult,
 } from '../shared/bookOcrIpc';
+import { studyLangFromTag } from '../shared/studyLang';
+import { getMainStudyLang } from './studyLanguage';
 
 /** Item ids whose job has been asked to stop. */
 const cancelled = new Set<string>();
@@ -72,7 +75,10 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
   // Refuse before a single page is read. Without an engine every page throws,
   // and the old per-page catch turned a book's worth of throws into a book's
   // worth of blank pages that then replaced the readable original.
-  const engine = bookOcrEngine(isInstalled);
+  // The book's language picks the recognizer: the request's, the library
+  // item's, else the study language. It used to be Japanese, always.
+  const lang: BookOcrLang = req.lang ?? studyLangFromTag(item.lang) ?? getMainStudyLang();
+  const engine = bookOcrEngine(isInstalled, lang);
   if (!engine) {
     const refusal = { error: 'models-missing', errorKey: 'bookOcr.error.modelsMissing' };
     broadcast({ itemId, phase: 'error', done: 0, total: 0, confidence: 0, ...refusal });
@@ -123,8 +129,8 @@ export async function runBookOcr(req: BookOcrRequest): Promise<BookOcrResult> {
         try {
           const result = await ocrAuto(dataUrl, {
             engine,
-            langHint: 'ja',
-            forceLang: 'ja',
+            langHint: lang,
+            forceLang: lang,
             quality: req.quality ?? 'heavy',
           });
           lines = result.lines.map((l) => ({ text: l.text, confidence: l.confidence }));

@@ -14,8 +14,12 @@ export interface RemoteBundledFrequencyDictionary {
   language: 'ja' | 'zh' | 'ru';
   source: string;
   url: string;
-  format: 'jpdb-tsv';
+  /** `jpdb-tsv`: term, reading, rank. `word-count`: one "word count" line per word, most frequent first. */
+  format: 'jpdb-tsv' | 'word-count';
   defaultEnabled?: boolean;
+  /** Licence of the list's data, recorded with the entry because it travels with the ranks. */
+  licence?: string;
+  attribution?: string;
 }
 
 const JA_CORE_WORDS = (
@@ -45,6 +49,35 @@ export const REMOTE_BUNDLED_FREQUENCY_DICTIONARIES: readonly RemoteBundledFreque
     url: 'https://raw.githubusercontent.com/Kuuuube/yomitan-dictionaries/main/data/jpdb_v2.2_freq_list_2024-10-13.csv',
     format: 'jpdb-tsv',
     defaultEnabled: true,
+  },
+  /*
+   * Word frequency for Chinese and Russian from OpenSubtitles 2018 (hermitdave/
+   * FrequencyWords, content CC BY-SA 4.0): 50,000 words each, ~1 MB. The core
+   * lists above are a few hundred entries (the Chinese one single characters),
+   * which ranks almost nothing in real text. Fetched on first use only for the
+   * language being studied.
+   */
+  {
+    id: 'bundled-freq-zh-opensubtitles',
+    label: 'Chinese frequency (OpenSubtitles 2018)',
+    language: 'zh',
+    source: 'bundled-remote',
+    url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/zh_cn/zh_cn_50k.txt',
+    format: 'word-count',
+    defaultEnabled: true,
+    licence: 'CC BY-SA 4.0',
+    attribution: 'Hermit Dave, FrequencyWords (OpenSubtitles 2018) — https://github.com/hermitdave/FrequencyWords',
+  },
+  {
+    id: 'bundled-freq-ru-opensubtitles',
+    label: 'Russian frequency (OpenSubtitles 2018)',
+    language: 'ru',
+    source: 'bundled-remote',
+    url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ru/ru_50k.txt',
+    format: 'word-count',
+    defaultEnabled: true,
+    licence: 'CC BY-SA 4.0',
+    attribution: 'Hermit Dave, FrequencyWords (OpenSubtitles 2018) — https://github.com/hermitdave/FrequencyWords',
   },
 ] as const;
 

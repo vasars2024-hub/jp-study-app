@@ -53,6 +53,7 @@ import {
 } from '../../data/novels';
 import { setHandoffJson } from '../../pendingHandoff';
 import { useT } from '../../i18n';
+import { formatNumber } from '../../stats';
 
 type TypeFilter = 'All' | 'Novel' | 'WebNovel' | 'Local';
 type DiffFilter = 'All' | Difficulty | 'Unknown';
@@ -1054,9 +1055,9 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
         <div><dt>{t('novels.meta.difficulty')}</dt><dd>{t(DIFFICULTY_KEY[selectedCandidate.difficultyLabel as Difficulty | 'Unknown'] ?? 'novels.difficulty.unknown')}</dd></div>
         <div><dt>{t('novels.meta.plan')}</dt><dd>{selectedPlan ? t(PLAN_STATUS_KEY[selectedPlan.acquisitionStatus] ?? 'novels.status.planned') : t('novels.plan.unplanned')}</dd></div>
         {selectedCandidate.jitenDeckId && <div><dt>{t('novels.meta.jitenDeck')}</dt><dd>{selectedCandidate.jitenDeckId}</dd></div>}
-        {selectedCandidate.wordCount != null && <div><dt>{t('novels.meta.words')}</dt><dd>{selectedCandidate.wordCount.toLocaleString()}</dd></div>}
-        {selectedCandidate.uniqueWordCount != null && <div><dt>{t('novels.meta.unique')}</dt><dd>{selectedCandidate.uniqueWordCount.toLocaleString()}</dd></div>}
-        {selectedCandidate.sentenceCount != null && <div><dt>{t('novels.meta.sentences')}</dt><dd>{selectedCandidate.sentenceCount.toLocaleString()}</dd></div>}
+        {selectedCandidate.wordCount != null && <div><dt>{t('novels.meta.words')}</dt><dd>{formatNumber(selectedCandidate.wordCount)}</dd></div>}
+        {selectedCandidate.uniqueWordCount != null && <div><dt>{t('novels.meta.unique')}</dt><dd>{formatNumber(selectedCandidate.uniqueWordCount)}</dd></div>}
+        {selectedCandidate.sentenceCount != null && <div><dt>{t('novels.meta.sentences')}</dt><dd>{formatNumber(selectedCandidate.sentenceCount)}</dd></div>}
       </dl>
       <div className="jiten-tags">
         {[...selectedCandidate.genres, ...selectedCandidate.tags].slice(0, 10).map((tag) => (

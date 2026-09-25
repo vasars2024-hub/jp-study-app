@@ -1,12 +1,16 @@
 import React from 'react';
 import type { VideoCoreActiveCue } from '@/app/(main)/_features/video-core/video-core-subtitles';
 import { isTypesettingCueText, stripAssCueText } from '../shared/videoCoreStudy';
-import { resolveProfileMatch } from '../shared/profileRules';
+import { profileForLanguage, resolveProfileMatch } from '../shared/profileRules';
 import { posCategoryClass } from '../shared/posCategory';
 import { getTokenizer, tokenizeSync, type JpToken } from '../renderer/tokenizer';
 import { translate } from '../renderer/translator';
 import { useT } from '../renderer/i18n';
 import type { StudyLang } from '../renderer/studyEnvironment';
+import { fetchReadingAid } from '../renderer/readingAid';
+import { useStudyLanguage } from '../renderer/useStudyLanguage';
+import { segmentStudyText, type StudySegment } from '../shared/studySegmentation';
+import { MAX_READING_AID_WORDS, stressedRussian, type ReadingAidResult } from '../shared/readingAid';
 
 /**
  * The whole subtitle track as a readable, seekable column — the transcript rail
@@ -36,7 +40,7 @@ interface MiningDestination {
   usedDefault: boolean;
 }
 
-function useMiningDestination(): MiningDestination | null {
+function useMiningDestination(lang: StudyLang): MiningDestination | null {
   const [destination, setDestination] = React.useState<MiningDestination | null>(null);
 
   React.useEffect(() => {
@@ -55,10 +59,14 @@ function useMiningDestination(): MiningDestination | null {
         const activeId = snapshot?.activeProfileId ?? '';
         const resolved = resolveProfileMatch(
           (ruleStore?.rules ?? []) as Parameters<typeof resolveProfileMatch>[0],
-          { source: 'subtitle', cardKind: 'word', language: 'ja' },
+          { source: 'subtitle', cardKind: 'word', language: lang },
           activeId,
         );
-        const profile = profiles.find((entry) => entry.id === resolved.profileId)
+        // Same fallback as the Anki gateway: no rule matched → a profile that studies this language.
+        const profileId = resolved.usedDefault
+          ? profileForLanguage(profiles, lang, resolved.profileId)
+          : resolved.profileId;
+        const profile = profiles.find((entry) => entry.id === profileId)
           ?? profiles.find((entry) => entry.id === activeId);
         if (!profile) return;
         setDestination({
@@ -73,7 +81,7 @@ function useMiningDestination(): MiningDestination | null {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [lang]);
 
   return destination;
 }
@@ -121,6 +129,27 @@ function readingLine(tokens: readonly JpToken[]): string {
     .join('');
 }
 
+/**
+ * A Chinese or Russian line's reading: pinyin word by word, or the line with
+ * its stress marks. Words with no known reading fall through as written.
+ */
+export function studyReadingLine(
+  parts: readonly StudySegment[],
+  lang: StudyLang,
+  readings: ReadingAidResult,
+): string {
+  if (lang === 'zh') {
+    return parts
+      .filter((part) => part.wordLike)
+      .map((part) => {
+        const syllables = readings[part.text]?.filter(Boolean);
+        return syllables?.length ? syllables.join('') : part.text;
+      })
+      .join(' ');
+  }
+  return parts.map((part) => (part.wordLike ? stressedRussian(part.text, readings[part.text]) : part.text)).join('');
+}
+
 function timestamp(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(total / 60);
@@ -153,6 +182,12 @@ interface RowProps {
   text: string;
   /** Colour-coded tokens, once this row has been through the tokenizer. */
   tokens?: readonly JpToken[];
+  /** A Chinese or Russian row's words (ICU), in place of kuromoji tokens. */
+  parts?: readonly StudySegment[];
+  /** `ja`, `ru`, `zh-Hans` or `zh-Hant`. */
+  langTag: string;
+  /** Pinyin / stress for a Chinese or Russian row's reading line. */
+  reading?: string;
   translation?: string;
   active: boolean;
   /** Emphasis band. See `rowDistance`. */
@@ -167,6 +202,9 @@ const TranscriptRow = React.memo(function TranscriptRow({
   cue,
   text,
   tokens,
+  parts,
+  langTag,
+  reading,
   translation,
   active,
   distance,
@@ -191,10 +229,14 @@ const TranscriptRow = React.memo(function TranscriptRow({
         onClick={() => onSeek(cue)}
       >
         <span className="study-transcript-time">{timestamp(cue.startMs)}</span>
-        <span className="study-transcript-text" lang="ja">
+        <span className="study-transcript-text" lang={langTag}>
           {/* Plain text until this row has been tokenized — the colour arrives a
               frame later rather than the line arriving a frame later. */}
-          {tokens
+          {parts
+            ? parts.map((part, i) => (part.wordLike
+              ? <span key={`${i}-${part.text}`} className="study-transcript-token">{part.text}</span>
+              : <React.Fragment key={`${i}-${part.text}`}>{part.text}</React.Fragment>))
+            : tokens
             ? tokens.map((token, i) => (
               <span
                 key={`${i}-${token.surface}`}
@@ -211,6 +253,10 @@ const TranscriptRow = React.memo(function TranscriptRow({
           gloss on a line nobody is looking at is the noise this redesign is removing. */}
       {tokens && distance !== 'far' && distance !== 'past' && readingLine(tokens) !== text && (
         <p className="study-transcript-reading" lang="ja">{readingLine(tokens)}</p>
+      )}
+      {reading && distance !== 'far' && distance !== 'past' && reading !== text && (
+        // Pinyin is Chinese written in Latin letters: `zh-Latn-pinyin`, not `zh-Hans`.
+        <p className="study-transcript-reading" lang={langTag.startsWith('zh') ? 'zh-Latn-pinyin' : langTag}>{reading}</p>
       )}
       {translation ? (
         <p className="study-transcript-translation">{translation}</p>
@@ -343,11 +389,47 @@ export default function VideoCoreTranscriptPanel({
     the next few frames. A row with no entry yet renders its text, never a gap.
   */
   const [tokenRows, setTokenRows] = React.useState<Record<number, JpToken[]>>({});
+  const study = useStudyLanguage();
+  const langTag = lang === 'zh' ? (study.lang === 'zh' ? study.tag : 'zh-Hans') : lang;
+  const japanese = lang === 'ja';
+
+  /*
+    Chinese and Russian rows: ICU words, and main's readings for them (pinyin,
+    stress) fetched once per track in batches. kuromoji is Japanese-only — a
+    Chinese transcript run through it came back as Japanese words with kana.
+  */
+  const partRows = React.useMemo<Record<number, StudySegment[]>>(() => {
+    if (japanese) return {};
+    const out: Record<number, StudySegment[]> = {};
+    for (const row of rows) out[row.cue.index] = segmentStudyText(row.text, langTag);
+    return out;
+  }, [rows, japanese, langTag]);
+  const [readings, setReadings] = React.useState<ReadingAidResult>({});
+
+  React.useEffect(() => {
+    if (japanese || (lang !== 'zh' && lang !== 'ru')) {
+      setReadings({});
+      return;
+    }
+    let cancelled = false;
+    const words = [...new Set(Object.values(partRows).flatMap((parts) =>
+      parts.filter((part) => part.wordLike).map((part) => part.text)))];
+    void (async () => {
+      for (let i = 0; i < words.length && !cancelled; i += MAX_READING_AID_WORDS) {
+        const next = await fetchReadingAid(lang, words.slice(i, i + MAX_READING_AID_WORDS));
+        if (!cancelled) setReadings((current) => ({ ...current, ...next }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partRows, japanese, lang]);
 
   React.useEffect(() => {
     let cancelled = false;
     let timer = 0;
     setTokenRows({});
+    if (!japanese) return undefined;
     void getTokenizer()
       .then(() => {
         if (cancelled) return;
@@ -371,7 +453,7 @@ export default function VideoCoreTranscriptPanel({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [rows]);
+  }, [rows, japanese]);
 
   const needle = query.trim().toLowerCase();
   const visible = React.useMemo(
@@ -474,7 +556,7 @@ export default function VideoCoreTranscriptPanel({
   );
 
   const translateLabel = t('mediaWorkspace.study.transcriptTranslate');
-  const destination = useMiningDestination();
+  const destination = useMiningDestination(lang);
 
   return (
     <aside className="study-transcript-panel" aria-label={t('mediaWorkspace.study.transcript')}>
@@ -586,6 +668,11 @@ export default function VideoCoreTranscriptPanel({
               cue={row.cue}
               text={row.text}
               tokens={tokenRows[row.cue.index]}
+              parts={partRows[row.cue.index]}
+              langTag={langTag}
+              reading={japanese || !partRows[row.cue.index]
+                ? undefined
+                : studyReadingLine(partRows[row.cue.index], lang, readings)}
               translation={translations[row.cue.index]}
               active={row.cue.index === activeIndex}
               // While filtering, every row is a search result rather than a position in

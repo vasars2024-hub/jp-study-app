@@ -74,6 +74,7 @@ import { initDownloads, registerDownloadIpc } from './main/downloads';
 import { registerMangaOcrIpc } from './main/mangaOcr';
 import { registerBookOcrIpc } from './main/bookOcrJob';
 import { registerMainI18nIpc } from './main/i18n';
+import { registerStudyLanguageIpc } from './main/studyLanguage';
 import { startDebugBridge, stopDebugBridge, recordDebugLog } from './main/debugBridge';
 import { stopLlamaHost } from './main/llamaHost';
 import {
@@ -1940,6 +1941,7 @@ app.whenReady().then(async () => {
   registerMangaOcrIpc();
   registerBookOcrIpc();
   registerMainI18nIpc();
+  registerStudyLanguageIpc();
   registerExtensionBridgeIpc();
   registerWindowChromeIpc(recreateMainWindow);
   registerPopoutIpc();

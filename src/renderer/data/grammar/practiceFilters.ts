@@ -22,6 +22,7 @@ import {
 } from './normalize';
 import { resolveCategories } from './taxonomy';
 import { LEGACY_HSK_LEVELS } from './types';
+import { getStudyLang } from '../../studyEnvironment';
 import type { GrammarLang, GrammarLevel, GrammarRegister } from './types';
 
 /**
@@ -157,6 +158,15 @@ function coerce(parsed: Partial<PracticeFilters>): PracticeFilters {
  */
 export const EXPLORER_FILTERS_KEY = 'jp-grammarx-explorer-filters-v1';
 
+/**
+ * Filters for someone who never set any: the language they study, not every
+ * language at once — a Russian learner opening Grammar for the first time used
+ * to land in a list of Japanese patterns.
+ */
+export function defaultFiltersForStudy(): PracticeFilters {
+  return { ...DEFAULT_PRACTICE_FILTERS, lang: getStudyLang() };
+}
+
 export function loadPracticeFilters(key: string = PRACTICE_FILTERS_KEY): PracticeFilters {
   try {
     const raw = localStorage.getItem(key);
@@ -165,7 +175,7 @@ export function loadPracticeFilters(key: string = PRACTICE_FILTERS_KEY): Practic
     /* fall through to the legacy read */
   }
   // Only the Practice key has a v1 predecessor to migrate from.
-  if (key !== PRACTICE_FILTERS_KEY) return { ...DEFAULT_PRACTICE_FILTERS };
+  if (key !== PRACTICE_FILTERS_KEY) return defaultFiltersForStudy();
   try {
     const legacyRaw = localStorage.getItem(LEGACY_PRACTICE_FILTERS_KEY);
     if (legacyRaw) {
@@ -176,7 +186,7 @@ export function loadPracticeFilters(key: string = PRACTICE_FILTERS_KEY): Practic
   } catch {
     /* ignore */
   }
-  return { ...DEFAULT_PRACTICE_FILTERS };
+  return defaultFiltersForStudy();
 }
 
 export function savePracticeFilters(
@@ -279,6 +289,12 @@ const LEVEL_ORDER: Record<string, number> = {
   HSK6: 5,
   'HSK7-9': 6,
   HSK10: 7,
+  A1: 0,
+  A2: 1,
+  B1: 2,
+  B2: 3,
+  C1: 4,
+  C2: 5,
 };
 
 function completenessScore(p: NormalizedGrammarPoint): number {

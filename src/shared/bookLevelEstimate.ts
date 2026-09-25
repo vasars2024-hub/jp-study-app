@@ -17,13 +17,14 @@
 
 import {
   JA_SLOTS,
+  RU_SLOTS,
   ZH_SLOTS,
   type LevelSlotId,
   type StudyLang,
 } from './levelScale';
 
 /** Exam scheme inferred from study language. */
-export type BookLevelScheme = 'jlpt' | 'hsk';
+export type BookLevelScheme = 'jlpt' | 'hsk' | 'cefr';
 
 import { schemeForLang } from './levelEstimate';
 
@@ -69,6 +70,10 @@ export function examSlotsForLang(lang: StudyLang): readonly {
 }[] {
   if (lang === 'zh') {
     return ZH_SLOTS.map((s, i) => ({ id: s.id, short: s.short.replace(/\s+/g, ''), level: i + 1 }));
+  }
+  // CEFR A1..C2 → 1..6, easiest first like HSK.
+  if (lang === 'ru') {
+    return RU_SLOTS.map((s, i) => ({ id: s.id, short: s.short, level: i + 1 }));
   }
   // JA_SLOTS ends with jlpt-n0 — drop it for book badges.
   return JA_SLOTS.filter((s) => s.id !== 'jlpt-n0').map((s, i) => ({

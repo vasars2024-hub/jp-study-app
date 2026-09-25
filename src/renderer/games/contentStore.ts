@@ -12,6 +12,9 @@ import { loadDeck } from '../flashcardDeck';
 import { getSlotList } from '../levelLists';
 import { tokenizeSync, tokenizerReady } from '../tokenizer';
 import { slotsForLang, type LevelTier } from '../../shared/levelScale';
+import { getStudyLang } from '../studyEnvironment';
+import { normalizeStudyLang } from '../../shared/studyLang';
+import { segmentStudyText, studyWordKey } from '../../shared/studySegmentation';
 import {
   buildClozePool,
   buildVocabPool,
@@ -21,8 +24,14 @@ import {
   type VocabItem,
 } from './contentSource';
 
-/** Reduce an expression to its lemma so list and deck entries meet. */
+/**
+ * Reduce an expression to its lemma so list and deck entries meet: kuromoji's
+ * lemma for Japanese, the shared stem for Russian (книга / книгу), the word
+ * itself for Chinese.
+ */
 function lemmaOf(expr: string): string {
+  const lang = getStudyLang();
+  if (lang !== 'ja') return studyWordKey(expr, lang);
   if (!tokenizerReady()) return expr;
   try {
     const tokens = tokenizeSync(expr);
@@ -42,6 +51,13 @@ function lemmaOf(expr: string): string {
  */
 export function surfaceInSentence(sentence: string, word: string): string | null {
   if (sentence.includes(word)) return word;
+  const lang = getStudyLang();
+  if (lang !== 'ja') {
+    // The inflected Russian form in the sentence (книгу for книга); Chinese
+    // words do not inflect, so only the exact hit above can match.
+    const key = studyWordKey(word, lang);
+    return segmentStudyText(sentence, lang).find((part) => part.wordLike && studyWordKey(part.text, lang) === key)?.text ?? null;
+  }
   if (!tokenizerReady()) return null;
   try {
     const target = lemmaOf(word);
@@ -56,14 +72,16 @@ export function surfaceInSentence(sentence: string, word: string): string | null
 
 /** The level slot whose tier matches, if the user bound a list to it. */
 function wordsForLevel(level: LevelTier): string[] | null {
-  const slot = slotsForLang('ja').find((s) => s.tier === level);
+  const slot = slotsForLang(getStudyLang()).find((s) => s.tier === level);
   if (!slot) return null;
   const list = getSlotList(slot.id);
   return list && list.words.length ? list.words : null;
 }
 
+/** The deck's cards in the study language only: a Russian learner's round never deals Japanese cards. */
 function deckCards(): SourceCard[] {
-  return loadDeck().map((c) => ({
+  const lang = getStudyLang();
+  return loadDeck().filter((c) => normalizeStudyLang(c.studyLang) === lang).map((c) => ({
     word: c.word,
     reading: c.reading,
     meaning: c.meaning,

@@ -435,6 +435,9 @@ const api = {
     req: import('./shared/mangaOcrIpc').MangaOcrOrderRequest,
   ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
     ipcRenderer.invoke('mangaOcr:saveOrder', req),
+  /** A hand-drawn character, read by the recognizer of its language (manga-ocr for Japanese, PaddleOCR otherwise). */
+  ocrRecognizeGlyph: (dataUrl: string, lang: 'ja' | 'zh' | 'ru'): Promise<string> =>
+    ipcRenderer.invoke('ocr:recognizeGlyph', dataUrl, lang),
   mangaOcrRecognizeImage: (dataUrl: string): Promise<string> =>
     ipcRenderer.invoke('mangaOcr:recognizeImage', dataUrl),
   onMangaOcrProgress: (cb: (p: import('./shared/mangaOcrIpc').MangaOcrProgress) => void): (() => void) => {
@@ -517,6 +520,13 @@ const api = {
     ipcRenderer.invoke('dict:lookupChinese', query, limit),
   /** Drop main's cached CC-CEDICT index after a managed install finishes. */
   resetChineseDictCache: (): Promise<void> => ipcRenderer.invoke('dict:resetChineseCache'),
+  /**
+   * Readings for the study language's reading aid: pinyin per character for
+   * Chinese words, the stressed spelling for Russian words. Japanese furigana
+   * comes from kuromoji in the renderer.
+   */
+  readingAid: (lang: 'zh' | 'ru', words: string[]): Promise<Record<string, string[]>> =>
+    ipcRenderer.invoke('dict:readingAid', lang, words),
   /** Structured pitch-accent data (downstep positions), for the Blanc pitch panel. */
   dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
     ipcRenderer.invoke('dict:pitch', term, reading),
@@ -656,8 +666,8 @@ const api = {
   ): Promise<import('./shared/lexiconNotes').LexiconNoteExportResult> =>
     ipcRenderer.invoke('dict:noteExport', query),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
-  searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
-    ipcRenderer.invoke('examples:search', query, limit),
+  searchExamples: (query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<ExampleResult> =>
+    ipcRenderer.invoke('examples:search', query, limit, lang),
   examplesOfflineStatus: (): Promise<{ installed: boolean; sentenceCount: number; updatedAt: number }> =>
     ipcRenderer.invoke('examples:offlineStatus'),
   examplesImportOffline: (payload?: {
@@ -900,6 +910,7 @@ const api = {
     variantCount: number;
     sendGloss: boolean;
     explainLanguage: string;
+    studyLang?: 'ja' | 'zh' | 'ru';
   }): Promise<AiAdditionsRunResult> => ipcRenderer.invoke('anki:aiGenerateAdditions', request),
   /**
    * Deck Workbench field translation (gate 2). A different question with the
@@ -3210,6 +3221,11 @@ const api = {
   setUiLang: (lang: string): void => {
     void ipcRenderer.invoke('i18n:setLang', lang);
   },
+  // Same shape for the study language (ja/zh/ru + Chinese script): main mirrors
+  // it for subtitle discovery, OCR, whisper and YouTube. See main/studyLanguage.ts.
+  setStudyLanguage: (value: { lang: string; script: string }): void => {
+    void ipcRenderer.invoke('study:setLanguage', value);
+  },
 
   // Chrome extension bridge (Phase 9) — loopback HTTP server status / token.
   extensionStatus: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
@@ -3500,8 +3516,8 @@ const api = {
       badge: string;
       empty?: boolean;
       noLists?: boolean;
-      lang?: 'ja' | 'zh' | null;
-      scheme?: 'jlpt' | 'hsk' | null;
+      lang?: 'ja' | 'zh' | 'ru' | null;
+      scheme?: 'jlpt' | 'hsk' | 'cefr' | null;
       label?: string;
       confidence?: number;
       error?: string;

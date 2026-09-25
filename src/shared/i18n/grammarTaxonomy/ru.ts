@@ -251,6 +251,7 @@ export const GRAMMAR_TAXONOMY_RU: Catalog = {
   'grammar.filter.hasExamples': 'С примерами',
   'grammar.filter.levels.jlpt': 'Уровень JLPT',
   'grammar.filter.levels.hsk': 'Уровень HSK',
+  'grammar.filter.levels.cefr': 'Уровень CEFR (ТРКИ)',
   'grammar.filter.unofficialLevel': 'HSK10 — ступень, введённая в Gum, а не официальный уровень.',
   'grammar.register.neutral': 'Нейтральный',
   'grammar.register.casual': 'Разговорный',

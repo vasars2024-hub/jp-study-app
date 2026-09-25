@@ -118,6 +118,7 @@ export async function runLexiconExplain(
     request.key.reading,
     request.key.glossLang,
     request.grounding,
+    request.key.lang,
   );
   let reply: { text: string };
   try {

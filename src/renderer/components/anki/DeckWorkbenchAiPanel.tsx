@@ -59,6 +59,7 @@ import {
 } from '../../../shared/ankiTranslate';
 import { loadAgentProviderPricing } from '../../agentProviderPricingStore';
 import { useT } from '../../i18n';
+import { getStudyLang } from '../../studyEnvironment';
 
 /** Which question this panel is asking. See the module note. */
 type AiPanelMode = 'additions' | 'translate';
@@ -174,6 +175,8 @@ export default function DeckWorkbenchAiPanel({
       variantCount,
       sendGloss,
       explainLanguage: lang,
+      // The deck's language: example sentences for a Russian deck are Russian.
+      studyLang: getStudyLang(),
     }),
     [kind, notes, variantCount, sendGloss, lang],
   );
@@ -301,6 +304,7 @@ export default function DeckWorkbenchAiPanel({
           variantCount: additionsReq?.variantCount ?? variantCount,
           sendGloss: additionsReq?.sendGloss ?? sendGloss,
           explainLanguage: additionsReq?.explainLanguage ?? lang,
+          studyLang: additionsReq?.studyLang ?? getStudyLang(),
         });
       if (!result.ok) {
         setError(result.error ?? 'unknown');

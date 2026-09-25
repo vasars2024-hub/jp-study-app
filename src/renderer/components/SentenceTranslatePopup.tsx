@@ -13,7 +13,7 @@ type State = 'loading' | 'translating' | 'done' | 'error';
 // Shared with the Translate view and reader collection panel through the one owner
 // of that key, so the target language chosen anywhere carries over everywhere else.
 import { getTranslateTarget as getTargetLang, setTranslateTarget as setTargetLang } from '../translateTarget';
-import { getStudyLang } from '../studyEnvironment';
+import { getStudyLang, textContentLang } from '../studyEnvironment';
 
 // Auto-translates a highlighted sentence from the reader — the dictionary
 // popup's sibling, for whole phrases instead of single words. Uses the same
@@ -95,7 +95,7 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
   return (
     <div className="dict-popup tr-popup" style={style} onMouseDown={(e) => e.stopPropagation()}>
       <div className="dict-head">
-        <span className="dict-q tr-popup-src" lang="ja">
+        <span className="dict-q tr-popup-src" lang={textContentLang(text)}>
           {text}
         </span>
         <button className="dict-x" onClick={onClose} aria-label="Close">

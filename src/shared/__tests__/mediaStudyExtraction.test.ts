@@ -78,3 +78,28 @@ describe('media study extraction', () => {
     }]);
   });
 });
+
+describe('buildMediaStudyCorpus — Chinese and Russian subtitles', () => {
+  const words = (text: string) => text.split(/[\s。，.,!?]+/u).filter(Boolean).map((w) => ({ surface: w, lemma: w.toLowerCase(), content: true }));
+
+  it('keeps Russian lines and words (a Japanese-only filter used to drop them all)', () => {
+    const corpus = buildMediaStudyCorpus(
+      [{ start: 0, end: 1, text: 'Я вижу кошку.' }, { start: 1, end: 2, text: 'Ok!' }],
+      words,
+      { lang: 'ru' },
+    );
+    expect(corpus.sentences.map((s) => s.text)).toEqual(['Я вижу кошку.']);
+    expect(corpus.vocabulary.map((v) => v.word)).toContain('кошку');
+    expect(corpus.kanji).toEqual([]);
+  });
+
+  it('keeps Chinese lines and counts their hanzi', () => {
+    const corpus = buildMediaStudyCorpus(
+      [{ start: 0, end: 1, text: '今天 天气 很好' }],
+      words,
+      { lang: 'zh' },
+    );
+    expect(corpus.vocabulary.map((v) => v.word).sort()).toEqual(['今天', '天气', '很好'].sort());
+    expect(corpus.kanji.find((k) => k.character === '天')?.occurrences).toBe(2);
+  });
+});

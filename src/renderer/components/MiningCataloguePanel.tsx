@@ -35,6 +35,8 @@ import { useFilesIndex } from './filesapp/useFilesIndex';
 import { mineFilesItem, undoMinedCards, type MineState } from './filesapp/filesMineChain';
 import { formatSize } from './filesapp/format';
 import { openSectionSurface } from '../sectionSurface';
+import { getStudyLang } from '../studyEnvironment';
+import { STUDY_LANG_NAME_KEY } from '../../shared/studyLang';
 import './miningCatalogue.css';
 
 /**
@@ -254,7 +256,7 @@ export default function MiningCataloguePanel({ onMined }: Props) {
           reads identically wherever it was run from. */}
       {mineState.status === 'refused' ? (
         <p className="mining-catalogue-receipt refused" role="status">
-          {t(mineState.reasonKey, mineState.values)}
+          {t(mineState.reasonKey, { ...mineState.values, lang: t(STUDY_LANG_NAME_KEY[getStudyLang()]) })}
           {mineState.detail ? ` ${mineState.detail}` : ''}
         </p>
       ) : null}
@@ -265,6 +267,7 @@ export default function MiningCataloguePanel({ onMined }: Props) {
             {t('filesApp.mine.skipped', {
               notJapanese: mineState.skippedNotJapanese,
               duplicate: mineState.skippedDuplicate,
+              lang: t(STUDY_LANG_NAME_KEY[getStudyLang()]),
             })}
           </p>
           {mineState.skippedOverCap > 0 ? (

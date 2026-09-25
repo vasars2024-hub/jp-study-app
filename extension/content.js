@@ -348,8 +348,10 @@
     return /[぀-ヿㇰ-ㇿ㐀-鿿ｦ-ﾟ々〆ヶ]/.test(ch || '');
   }
 
+  // Any letter of an alphabetic script — Cyrillic and accented Latin included.
+  // An ASCII `\w` made a hover over a Russian word resolve to nothing.
   function isLatinWordChar(ch) {
-    return /[\wÀ-ÿ''.-]/u.test(ch || '');
+    return /[\p{L}\p{M}\p{N}'’.-]/u.test(ch || '');
   }
 
   function isSentencePunct(ch) {
@@ -449,7 +451,9 @@
       lookupCache.set(query, hit); // LRU bump
       return hit;
     }
-    const res = await safeRuntimeSend({ type: 'lookup', query });
+    // The page's language (kana → ja, Cyrillic → ru, Han → the page hint) so the
+    // app answers from that language's dictionary, not Japanese by default.
+    const res = await safeRuntimeSend({ type: 'lookup', query, lang: lookupLangFor(query) });
     if (res?.invalidated) return res;
     // Cache only definitive answers (hits and true misses) — never offline
     // errors, so results recover as soon as the app starts.
@@ -1230,10 +1234,22 @@
     }
   }
 
+  /** The study language a looked-up string is in: its script, else the page's hint. */
+  function lookupLangFor(text) {
+    const s = String(text || '');
+    if (/[぀-ヿ]/.test(s)) return 'ja';
+    if (/[Ѐ-ӿ]/.test(s)) return 'ru';
+    const hint = currentLangHint();
+    if (/[㐀-鿿]/.test(s)) return hint === 'zh' ? 'zh' : 'ja';
+    return hint || '';
+  }
+
   function speak(text) {
     try {
       const u = new SpeechSynthesisUtterance(String(text || ''));
-      u.lang = /[぀-ヿ]/.test(text) ? 'ja-JP' : 'ja-JP';
+      // Spoken in its own language: a Chinese word read by a Japanese voice is noise.
+      const lang = lookupLangFor(text);
+      u.lang = lang === 'zh' ? 'zh-CN' : lang === 'ru' ? 'ru-RU' : 'ja-JP';
       speechSynthesis.cancel();
       speechSynthesis.speak(u);
     } catch {

@@ -106,6 +106,23 @@ export function resolveProfileMatch(
   return { profileId: defaultProfileId, usedDefault: true };
 }
 
+/**
+ * The profile a card goes to when no mining rule matched: the default one if it
+ * studies the card's language, else the first profile that does, else the
+ * default. A Chinese card mined while a Japanese profile is active lands in the
+ * Chinese profile's deck instead of the Japanese one.
+ */
+export function profileForLanguage(
+  profiles: readonly { id: string; targetLang?: string }[],
+  language: MineLanguage,
+  defaultProfileId: string,
+): string {
+  if (language === 'unknown') return defaultProfileId;
+  const current = profiles.find((profile) => profile.id === defaultProfileId);
+  if (current?.targetLang === language) return defaultProfileId;
+  return profiles.find((profile) => profile.targetLang === language)?.id ?? defaultProfileId;
+}
+
 /** First matching enabled rule's profileId, else defaultProfileId. */
 export function resolveProfileId(
   rules: ProfileRule[] | undefined,

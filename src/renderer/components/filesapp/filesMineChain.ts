@@ -19,6 +19,7 @@ import {
   mineabilityOf,
 } from '../../../shared/filesApp/mining';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
+import { getStudyLang } from '../../studyEnvironment';
 
 /**
  * The one-click mine's outcome, as a state rather than a string.
@@ -69,6 +70,9 @@ export async function mineFilesItem(item: FilesItem): Promise<SettledMineState> 
     return { status: 'refused', reasonKey: read.reasonKey, detail: read.detail };
   }
   const plan = buildFilesMineDrafts(item, read.passages, {
+    // The study language decides which passages are minable: a Russian book's
+    // lines used to be skipped, every one, as "without Japanese".
+    lang: getStudyLang(),
     existingWords: existingDeckKeys(loadDeck().map((card) => card.sentence || card.word)),
   });
   if (plan.drafts.length === 0) {

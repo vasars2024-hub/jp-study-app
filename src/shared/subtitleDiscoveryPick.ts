@@ -12,10 +12,65 @@
 
 import type { SubtitleRecord } from './subtitleRecord';
 
-/** `ja-JP` and `ja` are the same study language; `zh-hans` and `zh` are close enough here. */
+/** ISO 639-2 codes (and file-name tags) seen on subtitle tracks, to their 639-1 language. */
+const THREE_LETTER: Readonly<Record<string, string>> = {
+  jpn: 'ja', jp: 'ja', eng: 'en', chi: 'zh', zho: 'zh', cmn: 'zh', yue: 'zh', chs: 'zh', cht: 'zh',
+  sc: 'zh', tc: 'zh', rus: 'ru', kor: 'ko', spa: 'es', fra: 'fr', fre: 'fr', deu: 'de', ger: 'de',
+  por: 'pt', ita: 'it',
+};
+
+/**
+ * A track's language, as a bare ISO 639-1 code: `ja-JP` → `ja`, `jpn` → `ja`,
+ * `zh-Hant` / `chs` / `cht` → `zh`, `rus` → `ru`. Comparing the first two
+ * letters instead (as this used to) read `jpn` as `jp` and `chs` as `ch`, so a
+ * Japanese or Chinese track tagged the ISO 639-2 way never matched its language.
+ */
+export function subtitleBaseLang(tag: string | null | undefined): string | null {
+  const value = tag?.trim().toLowerCase().replace(/_/g, '-');
+  if (!value) return null;
+  const primary = value.split('-')[0];
+  return THREE_LETTER[primary] ?? (primary.length === 2 ? primary : primary.slice(0, 2) || null);
+}
+
+/**
+ * The Chinese script a tag names: `zh-Hans`, `zh-CN`, `zh-SG`, `chs`, `sc` are
+ * Simplified; `zh-Hant`, `zh-TW`, `zh-HK`, `zh-MO`, `cht`, `tc` Traditional.
+ * Null for anything else, including a bare `zh`.
+ */
+export function subtitleChineseScript(tag: string | null | undefined): 'hans' | 'hant' | null {
+  const value = tag?.trim().toLowerCase().replace(/_/g, '-');
+  if (!value) return null;
+  const parts = value.split('-');
+  if (parts[0] === 'chs' || parts[0] === 'sc') return 'hans';
+  if (parts[0] === 'cht' || parts[0] === 'tc') return 'hant';
+  if (subtitleBaseLang(value) !== 'zh') return null;
+  const rest = parts.slice(1);
+  if (rest.includes('hans') || rest.includes('cn') || rest.includes('sg') || rest.includes('chs')) return 'hans';
+  if (rest.includes('hant') || rest.includes('tw') || rest.includes('hk') || rest.includes('mo') || rest.includes('cht')) return 'hant';
+  return null;
+}
+
+/**
+ * `ja-JP`, `jpn` and `ja` are the same study language; `zh-Hans` and `zh-Hant`
+ * are both Chinese here (the script only orders tracks within the language —
+ * see `pickStudySubtitle`).
+ */
 export function subtitleLangMatches(recordLang: string | undefined, wanted: string | null | undefined): boolean {
-  if (!recordLang || !wanted) return false;
-  return recordLang.trim().toLowerCase().slice(0, 2) === wanted.trim().toLowerCase().slice(0, 2);
+  const a = subtitleBaseLang(recordLang);
+  const b = subtitleBaseLang(wanted);
+  return !!a && a === b;
+}
+
+/**
+ * 0 when a track is in the script the learner reads, 1 when the script is not
+ * known, 2 when it is the other script. Only Chinese has a script choice.
+ */
+function scriptRank(recordLang: string | undefined, wanted: string | null | undefined): number {
+  const want = subtitleChineseScript(wanted);
+  if (!want) return 0;
+  const have = subtitleChineseScript(recordLang);
+  if (!have) return 1;
+  return have === want ? 0 : 2;
 }
 
 const SOURCE_RANK: Record<SubtitleRecord['source'], number> = {
@@ -72,6 +127,10 @@ export function pickStudySubtitle(
     const aPreferred = subtitleLangMatches(a.lang, studyLang) ? 0 : 1;
     const bPreferred = subtitleLangMatches(b.lang, studyLang) ? 0 : 1;
     if (aPreferred !== bPreferred) return aPreferred - bPreferred;
+    // A Traditional-script learner gets the Traditional track before a
+    // Simplified one of the same film, and the other way round.
+    const byScript = scriptRank(a.lang, studyLang) - scriptRank(b.lang, studyLang);
+    if (byScript !== 0) return byScript;
     return compareWithinLanguage(a, b);
   })[0] ?? null;
 }
@@ -132,4 +191,28 @@ export function pickSubtitlePair(
 /** Whether a record is machine output of any kind (Whisper, fusion, or translation). */
 export function isMachineSubtitle(record: Pick<SubtitleRecord, 'source' | 'machineGenerated'>): boolean {
   return record.source === 'generated' || record.machineGenerated === true;
+}
+
+/**
+ * The languages discovery downloads without asking, with the study language
+ * first. The study language is the single source of the study line: this list
+ * used to *be* it (`autoDownloadLanguages[0] ?? 'ja'`), so a Chinese learner
+ * whose list still said `['ja']` kept downloading and playing Japanese.
+ *
+ * `previousStudy` is the language studied before a switch; it leaves the list
+ * (unless it is the helper language), because it was only there as the old
+ * study line. Other languages the user added stay, in order.
+ */
+export function studyFirstDownloadLanguages(
+  languages: readonly string[],
+  study: string,
+  options: { previousStudy?: string | null; helperLanguage?: string | null } = {},
+): string[] {
+  const { previousStudy, helperLanguage } = options;
+  const rest = languages.filter((lang) => {
+    if (subtitleLangMatches(lang, study)) return false;
+    if (previousStudy && subtitleLangMatches(lang, previousStudy) && !subtitleLangMatches(lang, helperLanguage)) return false;
+    return true;
+  });
+  return [study, ...rest];
 }
