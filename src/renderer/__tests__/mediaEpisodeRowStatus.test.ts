@@ -122,7 +122,7 @@ describe('episode rows carry a subtitle status', () => {
       Array.from({ length: 26 }, (_, i) => episode(i + 1, i < 13 ? { subtitles: [JA] } : {})),
     );
     const read = pills(el);
-    expect(read[0]).toBe('Japanese subtitles ready');
+    expect(read[0]).toBe('Study-language subtitles ready');
     expect(read[25]).toBe('Past the matched season — searched under the wrong one');
     expect(read[25]).not.toContain('No subtitles found');
   });

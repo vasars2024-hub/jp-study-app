@@ -54,7 +54,7 @@ it('localizes the recipe and opens dictation at the exact prepared context', asy
       },
       {
         code: 'listening-exact-subtitles',
-        label: 'Exact Japanese subtitles ready for reveal',
+        label: 'Exact study-language subtitles ready for reveal',
         value: 'subtitle-1',
       },
     ],
