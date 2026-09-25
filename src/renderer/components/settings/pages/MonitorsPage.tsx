@@ -68,7 +68,7 @@ export default function MonitorsPage() {
       >
         {displays.length === 0 && <p className="muted os-set-hint">{t('settings.monitors.none')}</p>}
         <div className="os-monitors-list">
-          {displays.map((display) => {
+          {displays.map((display, index) => {
             const assignment = assignmentFor(display.key);
             const enabled = assignment?.enabled ?? display.primary;
             return (
@@ -89,7 +89,9 @@ export default function MonitorsPage() {
 
                 <div className="os-monitor-body">
                   <div className="os-monitor-title">
-                    {display.label}
+                    {/* The OS's name for the monitor; unnamed ones are numbered in
+                        list order, the same numbers "Send to display" uses. */}
+                    {display.label || t('settings.monitors.displayN', { n: index + 1 })}
                     {display.primary && (
                       <span className="os-monitor-tag">{t('settings.monitors.primary')}</span>
                     )}
