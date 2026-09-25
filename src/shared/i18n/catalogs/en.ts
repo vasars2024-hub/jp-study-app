@@ -21,6 +21,14 @@ import { GUM_LIBRARY_EN } from '../gumLibrary/en';
 import { SCRAPER_UI_EN } from '../scraperUi/en';
 import { SCRAPER_DRAWER_EN } from '../scraperDrawerUi/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
+import { SHELL_UI_EN } from '../shellUi/en';
+import { COMMANDS_UI_EN } from '../commandsUi/en';
+import { MUSIC_UI_EN } from '../musicUi/en';
+import { WIDGETS_UI_EN } from '../widgetsUi/en';
+import { BLANC_UI_EN } from '../blancUi/en';
+import { READER_UI_EN } from '../readerUi/en';
+import { STUDY_UI_EN } from '../studyUi/en';
+import { SYSTEM_UI_EN } from '../systemUi/en';
 
 export const en: Catalog = {
   // Common actions
@@ -780,6 +788,14 @@ export const en: Catalog = {
   ...SCRAPER_DRAWER_EN,
   ...ANIME_SCHEDULE_EN,
   ...GRAMMAR_TAXONOMY_EN,
+  ...SHELL_UI_EN,
+  ...COMMANDS_UI_EN,
+  ...MUSIC_UI_EN,
+  ...WIDGETS_UI_EN,
+  ...BLANC_UI_EN,
+  ...READER_UI_EN,
+  ...STUDY_UI_EN,
+  ...SYSTEM_UI_EN,
 
   // Settings navigation
   'settings.appTitle': 'Settings',

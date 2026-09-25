@@ -21,6 +21,14 @@ import { GUM_LIBRARY_RU } from '../gumLibrary/ru';
 import { SCRAPER_UI_RU } from '../scraperUi/ru';
 import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
 import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
+import { SHELL_UI_RU } from '../shellUi/ru';
+import { COMMANDS_UI_RU } from '../commandsUi/ru';
+import { MUSIC_UI_RU } from '../musicUi/ru';
+import { WIDGETS_UI_RU } from '../widgetsUi/ru';
+import { BLANC_UI_RU } from '../blancUi/ru';
+import { READER_UI_RU } from '../readerUi/ru';
+import { STUDY_UI_RU } from '../studyUi/ru';
+import { SYSTEM_UI_RU } from '../systemUi/ru';
 
 export const ru: Catalog = {
   'common.download': 'Скачать',
@@ -802,6 +810,14 @@ export const ru: Catalog = {
   ...SCRAPER_DRAWER_RU,
   ...ANIME_SCHEDULE_RU,
   ...GRAMMAR_TAXONOMY_RU,
+  ...SHELL_UI_RU,
+  ...COMMANDS_UI_RU,
+  ...MUSIC_UI_RU,
+  ...WIDGETS_UI_RU,
+  ...BLANC_UI_RU,
+  ...READER_UI_RU,
+  ...STUDY_UI_RU,
+  ...SYSTEM_UI_RU,
 
   'settings.appTitle': 'Настройки',
   'settings.group.personalization': 'Персонализация',

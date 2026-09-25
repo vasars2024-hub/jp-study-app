@@ -21,6 +21,14 @@ import { GUM_LIBRARY_JA } from '../gumLibrary/ja';
 import { SCRAPER_UI_JA } from '../scraperUi/ja';
 import { SCRAPER_DRAWER_JA } from '../scraperDrawerUi/ja';
 import { ANIME_SCHEDULE_JA } from '../animeSchedule/ja';
+import { SHELL_UI_JA } from '../shellUi/ja';
+import { COMMANDS_UI_JA } from '../commandsUi/ja';
+import { MUSIC_UI_JA } from '../musicUi/ja';
+import { WIDGETS_UI_JA } from '../widgetsUi/ja';
+import { BLANC_UI_JA } from '../blancUi/ja';
+import { READER_UI_JA } from '../readerUi/ja';
+import { STUDY_UI_JA } from '../studyUi/ja';
+import { SYSTEM_UI_JA } from '../systemUi/ja';
 
 export const ja: Catalog = {
   'common.download': 'ダウンロード',
@@ -679,6 +687,14 @@ export const ja: Catalog = {
   ...SCRAPER_DRAWER_JA,
   ...ANIME_SCHEDULE_JA,
   ...GRAMMAR_TAXONOMY_JA,
+  ...SHELL_UI_JA,
+  ...COMMANDS_UI_JA,
+  ...MUSIC_UI_JA,
+  ...WIDGETS_UI_JA,
+  ...BLANC_UI_JA,
+  ...READER_UI_JA,
+  ...STUDY_UI_JA,
+  ...SYSTEM_UI_JA,
 
   'settings.appTitle': '設定',
   'settings.group.personalization': '個人設定',
