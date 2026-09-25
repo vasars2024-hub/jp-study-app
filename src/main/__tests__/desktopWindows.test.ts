@@ -34,17 +34,24 @@ const h = vi.hoisted(() => {
 
   const created: FakeWin[] = [];
   let nextId = 100;
+  // Electron's cross-scale-factor placement: the next placement lands this many times too small.
+  const placement = { shrinkNext: 0 };
+  function place(b: { x: number; y: number; width: number; height: number }) {
+    const k = placement.shrinkNext;
+    placement.shrinkNext = 0;
+    return k ? { ...b, width: Math.round(b.width / k), height: Math.round(b.height / k) } : { ...b };
+  }
 
   function makeWin(opts: Record<string, unknown>): FakeWin {
     const win: FakeWin = {
       id: ++nextId,
       destroyed: false,
-      bounds: {
+      bounds: place({
         x: Number(opts.x ?? 0),
         y: Number(opts.y ?? 0),
         width: Number(opts.width ?? 800),
         height: Number(opts.height ?? 600),
-      },
+      }),
       opts,
       url: '',
       sent: [],
@@ -60,7 +67,7 @@ const h = vi.hoisted(() => {
       isMinimized: () => false,
       getBounds: () => win.bounds,
       setBounds: (b) => {
-        win.bounds = { ...b };
+        win.bounds = place(b);
       },
       loadURL: async (url) => {
         win.url = url;
@@ -118,7 +125,7 @@ const h = vi.hoisted(() => {
     syncCalls: 0,
   };
 
-  return { created, makeWin, displays, state };
+  return { created, makeWin, displays, state, placement };
 });
 
 vi.mock('electron', () => {
@@ -147,7 +154,8 @@ vi.mock('../displays', () => ({
     h.state.present.map((d) => ({
       id: d.id,
       key: `${d.label.toLowerCase().replace(/\s+/g, '-')}|${d.bounds.width}x${d.bounds.height}|${d.scaleFactor}`,
-      label: d.label,
+      // What the OS reports as the monitor's name; '' when it reports none.
+      label: (d as { osLabel?: string }).osLabel ?? d.label,
       bounds: d.bounds,
       workArea: d.workArea,
       primary: d.primary,
@@ -212,6 +220,7 @@ function reset(): void {
   h.state.mainDisplayKey = PRIMARY_KEY;
   h.state.setMainCalls = [];
   h.state.activeDesktopIndex = 0;
+  h.placement.shrinkNext = 0;
   mod.configureDesktopWindows({
     rendererUrl: (query = '') => (query ? `app://bundle/index.html?${query}` : 'app://bundle/index.html'),
     attachNavGuards: () => undefined,
@@ -253,6 +262,89 @@ describe('desktopWindows', () => {
     h.state.assignments.find((a) => a.displayKey === SECOND_KEY)!.enabled = true;
     mod.syncDesktopWindows();
     expect(openWindows()[0].bounds).toEqual({ x: 1920, y: 0, width: 1280, height: 690 });
+  });
+
+  it('fills the second monitor even when Electron places the window at the wrong scale', () => {
+    // Measured: 1280x720 @150% primary + 1920x1080 @100% second monitor -> an 853x480
+    // desktop window (the work area divided by 1.5). Set, read back, set again.
+    mod.syncDesktopWindows();
+    h.state.assignments.find((a) => a.displayKey === SECOND_KEY)!.enabled = true;
+    h.placement.shrinkNext = 1.5;
+    mod.syncDesktopWindows();
+    const win = openWindows()[0];
+    expect(win.bounds).toEqual({ x: 1920, y: 0, width: 1280, height: 690 });
+  });
+
+  it('checks the placement again at ready-to-show, before the window is shown', () => {
+    mod.syncDesktopWindows();
+    h.state.assignments.find((a) => a.displayKey === SECOND_KEY)!.enabled = true;
+    mod.syncDesktopWindows();
+    const win = openWindows()[0];
+    // The DPI switch landed between construction and first paint.
+    win.bounds = { x: 1920, y: 0, width: 853, height: 460 };
+    for (const cb of win.listeners['ready-to-show'] ?? []) cb();
+    expect(win.bounds).toEqual({ x: 1920, y: 0, width: 1280, height: 690 });
+  });
+
+  it('corrects a mis-scaled re-placement after a display scale change', () => {
+    mod.syncDesktopWindows();
+    h.state.assignments.find((a) => a.displayKey === SECOND_KEY)!.enabled = true;
+    mod.syncDesktopWindows();
+    const win = openWindows()[0];
+    h.displays[1].workArea = { x: 1920, y: 0, width: 1280, height: 680 };
+    h.placement.shrinkNext = 1.5;
+    try {
+      mod.syncDesktopWindows(); // what display-metrics-changed runs
+      expect(win.bounds).toEqual({ x: 1920, y: 0, width: 1280, height: 680 });
+    } finally {
+      h.displays[1].workArea = { x: 1920, y: 0, width: 1280, height: 690 };
+    }
+  });
+
+  it('does not treat its own placement as the user taking the window over', () => {
+    mod.syncDesktopWindows();
+    h.state.assignments.find((a) => a.displayKey === SECOND_KEY)!.enabled = true;
+    mod.syncDesktopWindows();
+    const win = openWindows()[0];
+    // Suppose the OS reports a programmatic placement as a finished move.
+    const setBounds = win.setBounds;
+    win.setBounds = (b) => {
+      setBounds(b);
+      for (const cb of win.listeners.moved ?? []) cb();
+    };
+    try {
+      h.displays[1].workArea = { x: 1920, y: 40, width: 1280, height: 650 };
+      mod.syncDesktopWindows();
+      expect(win.bounds).toEqual({ x: 1920, y: 40, width: 1280, height: 650 });
+      // Still following the display: the move above was ours, not the user's.
+      h.displays[1].workArea = { x: 1920, y: 0, width: 1280, height: 690 };
+      mod.syncDesktopWindows();
+      expect(win.bounds).toEqual({ x: 1920, y: 0, width: 1280, height: 690 });
+      // A real drag does hand the geometry to the user.
+      win.setBounds = setBounds;
+      for (const cb of win.listeners.moved ?? []) cb();
+      h.displays[1].workArea = { x: 1920, y: 40, width: 1280, height: 650 };
+      mod.syncDesktopWindows();
+      expect(win.bounds).toEqual({ x: 1920, y: 0, width: 1280, height: 690 });
+    } finally {
+      h.displays[1].workArea = { x: 1920, y: 0, width: 1280, height: 690 };
+    }
+  });
+
+  it('titles the window with the monitor name, or a numbered one when the OS gives none', () => {
+    mod.syncDesktopWindows();
+    h.state.assignments.find((a) => a.displayKey === SECOND_KEY)!.enabled = true;
+    mod.syncDesktopWindows();
+    expect(openWindows()[0].opts.title).toBe('Gum — Second Panel');
+    mod.closeAllDesktopWindows();
+
+    (h.displays[1] as { osLabel?: string }).osLabel = '';
+    try {
+      mod.syncDesktopWindows();
+      expect(openWindows()[0].opts.title).toBe('Gum — Display 2');
+    } finally {
+      delete (h.displays[1] as { osLabel?: string }).osLabel;
+    }
   });
 
   it('never loads a bare desktop URL — jp-bridge identifies the main window by it (B6)', () => {

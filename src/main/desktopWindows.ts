@@ -16,6 +16,8 @@ import path from 'node:path';
 import type { DesktopIndex, DisplayAssignment } from '../shared/desktop';
 import { loadWindowWithRetry } from './bootLoad';
 import { desktopStore } from './desktop';
+import { mt } from './i18n';
+import { applyBoundsVerified } from './windowBounds';
 import {
   displayForKey,
   listDisplays,
@@ -38,6 +40,8 @@ let getMainWindow: () => BrowserWindow | null = () => null;
 const desktopWindows = new Map<string, BrowserWindow>();
 /** Display keys whose window the user has moved or resized by hand. */
 const userPlaced = new Set<string>();
+/** Windows whose bounds this module is setting right now — their events are not the user's. */
+const placing = new WeakSet<BrowserWindow>();
 let unsubscribeDisplays: (() => void) | null = null;
 
 export function configureDesktopWindows(opts: {
@@ -107,7 +111,35 @@ export function desktopIdentityForWindow(win: BrowserWindow): {
   };
 }
 
-function createDesktopWindow(assignment: DisplayAssignment, display: DisplaySummary): BrowserWindow {
+/**
+ * Put a desktop window exactly on `workArea`, correcting a mis-scaled placement.
+ *
+ * Measured on a 1280x720 @150% primary with a 1920x1080 @100% second monitor: the
+ * second monitor's desktop window was created 853x480 — its work area divided by the
+ * primary's scale factor. Electron on Windows converts a new window's DIP bounds with
+ * the wrong display's scale; once it is on the target monitor, setting the same bounds
+ * again sticks (`applyBoundsVerified`).
+ */
+function fitToWorkArea(win: BrowserWindow, workArea: Electron.Rectangle): void {
+  if (win.isDestroyed()) return;
+  placing.add(win);
+  try {
+    applyBoundsVerified(win, workArea);
+  } finally {
+    placing.delete(win);
+  }
+}
+
+/** Window title for a display: its OS name, or "Display N" when the OS reports none. */
+function desktopWindowTitle(display: DisplaySummary, number: number): string {
+  return `Gum — ${display.label || mt('settings.monitors.displayN', { n: number })}`;
+}
+
+function createDesktopWindow(
+  assignment: DisplayAssignment,
+  display: DisplaySummary,
+  number: number,
+): BrowserWindow {
   const { workArea } = display;
   const win = new BrowserWindow({
     x: workArea.x,
@@ -125,7 +157,7 @@ function createDesktopWindow(assignment: DisplayAssignment, display: DisplaySumm
     fullscreenable: true,
     minWidth: 480,
     minHeight: 360,
-    title: `Gum — ${display.label}`,
+    title: desktopWindowTitle(display, number),
     show: false,
     backgroundColor: '#14131a',
     autoHideMenuBar: true,
@@ -141,9 +173,17 @@ function createDesktopWindow(assignment: DisplayAssignment, display: DisplaySumm
   attachNavGuards(win);
 
   desktopWindows.set(assignment.displayKey, win);
+  // The constructor's bounds are the ones a scale-factor difference distorts.
+  fitToWorkArea(win, workArea);
 
   win.once('ready-to-show', () => {
     if (win.isDestroyed()) return;
+    // Check again right before it becomes visible, against the display's current
+    // work area, unless the user has already taken the geometry over.
+    if (!userPlaced.has(assignment.displayKey)) {
+      const current = listDisplays().find((d) => d.key === assignment.displayKey);
+      fitToWorkArea(win, (current ?? display).workArea);
+    }
     win.show();
     // Simulated displays are strips carved out of the primary monitor, so a new
     // desktop window would otherwise open *behind* the main window and read as
@@ -156,6 +196,7 @@ function createDesktopWindow(assignment: DisplayAssignment, display: DisplaySumm
   // must stop re-imposing the display's work area on every sync, or the window
   // snaps back the moment anything else changes.
   const markUserPlaced = (): void => {
+    if (placing.has(win)) return;
     userPlaced.add(assignment.displayKey);
   };
   win.on('moved', markUserPlaced);
@@ -272,7 +313,8 @@ function placeDesktopWindow(win: BrowserWindow, display: DisplaySummary, key: st
   ) {
     return;
   }
-  win.setBounds(workArea);
+  // A display's scale factor change arrives here too (display-metrics-changed).
+  fitToWorkArea(win, workArea);
 }
 
 /**
@@ -324,7 +366,7 @@ export function syncDesktopWindows(): void {
       });
       continue;
     }
-    createDesktopWindow(assignment, display);
+    createDesktopWindow(assignment, display, displays.indexOf(display) + 1);
   }
 
   broadcastDeskWindows();
