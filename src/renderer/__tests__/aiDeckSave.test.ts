@@ -77,19 +77,18 @@ describe('saveAiResultsToDeck', () => {
   });
 
   /**
-   * The reason the override exists. `deckBookId` slugs on `[^\w]+` and `\w` is
-   * ASCII-only, so two different Japanese titles derive the SAME id — and
-   * `replaceImportedDeck` matches on the `(bookId, bookTitle)` pair and deletes
-   * the match before inserting. That never bit the studio's own batches, whose
-   * titles are English preset labels, but an Agent `book` batch is named after
-   * the book.
+   * The reason the override existed: `deckBookId` used to slug on `[^\w]+`, and
+   * `\w` is ASCII-only, so two different Japanese titles derived the SAME id —
+   * and `replaceImportedDeck` matches on the `(bookId, bookTitle)` pair and
+   * deletes the match before inserting. The id now keeps CJK letters and a hash
+   * of the title, so even without the override two titles stay apart.
    */
-  it('two Japanese titles derive the same id when it is left to the title', () => {
+  it('two Japanese titles derive different ids when it is left to the title', () => {
     saveAiResultsToDeck([result('猫', ['first'])], '吾輩は猫である');
     const firstId = loadDeck()[0].bookId;
     localStorage.clear();
     saveAiResultsToDeck([result('犬', ['second'])], '雪国');
-    expect(loadDeck()[0].bookId).toBe(firstId);
+    expect(loadDeck()[0].bookId).not.toBe(firstId);
   });
 
   it('an explicit id keeps two Japanese-titled decks apart', () => {

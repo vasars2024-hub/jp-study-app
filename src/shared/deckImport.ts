@@ -79,7 +79,8 @@ export function guessColumnMapping(headers: string[]): DeckColumnMapping {
   return mapping;
 }
 
-export function deckBookId(deckTitle: string): string {
+/** The id scheme before 2026-09: `[^\w]+` is ASCII-only, so every CJK title became `import-deck`. */
+export function legacyDeckBookId(deckTitle: string): string {
   const slug = deckTitle
     .trim()
     .toLowerCase()
@@ -87,6 +88,35 @@ export function deckBookId(deckTitle: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
   return `import-${slug || 'deck'}`;
+}
+
+/** FNV-1a over UTF-16 code units, as 8 hex digits. Stable across runs and platforms. */
+function titleHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * A deck's group id, derived from its title.
+ *
+ * An all-ASCII title keeps the old slug, so decks imported before this change
+ * still match on re-import. Any other title keeps its letters (`\p{L}` covers
+ * kana and kanji) and adds a hash of the whole title, so two Japanese titles
+ * never collapse onto one id the way `legacyDeckBookId` made them.
+ */
+export function deckBookId(deckTitle: string): string {
+  const title = deckTitle.trim();
+  // eslint-disable-next-line no-control-regex -- the ASCII range is the point
+  if (/^[\x00-\x7F]*$/.test(title)) return legacyDeckBookId(title);
+  const slug = title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+  return `import-${Array.from(slug).slice(0, 24).join('') || 'deck'}-${titleHash(title)}`;
 }
 
 export function rowsToDeckEntries(

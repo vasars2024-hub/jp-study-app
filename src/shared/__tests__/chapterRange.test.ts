@@ -8,7 +8,7 @@ import {
   normalizeChapterRange,
   safeTitleSegment,
 } from '../chapterRange';
-import { deckBookId } from '../deckImport';
+import { deckBookId, legacyDeckBookId } from '../deckImport';
 
 const SECTIONS = ['a', 'b', 'c', 'd', 'e'];
 
@@ -118,11 +118,13 @@ describe('miningDeckIdentity', () => {
     expect(mined.bookId).not.toBe(generated.bookId);
   });
 
-  it('distinguishes two Japanese-titled books, which deckBookId cannot', () => {
-    // `deckBookId` slugs with `[^\w]+`, and `\w` is ASCII-only, so every
-    // Japanese title collapses to the same id. Deriving from the item id is why
-    // this identity does not inherit that collision.
-    expect(deckBookId('吾輩は猫である')).toBe(deckBookId('雪国'));
+  it('distinguishes two Japanese-titled books, which the old deckBookId could not', () => {
+    // The old `deckBookId` slugged with `[^\w]+`, and `\w` is ASCII-only, so
+    // every Japanese title collapsed to the same id (`legacyDeckBookId` keeps
+    // that scheme for matching old decks). Deriving from the item id is why
+    // this identity never inherited that collision.
+    expect(legacyDeckBookId('吾輩は猫である')).toBe(legacyDeckBookId('雪国'));
+    expect(deckBookId('吾輩は猫である')).not.toBe(deckBookId('雪国'));
 
     const a = miningDeckIdentity({ itemId: 'item-1', bookTitle: '吾輩は猫である', range: null });
     const b = miningDeckIdentity({ itemId: 'item-2', bookTitle: '雪国', range: null });
