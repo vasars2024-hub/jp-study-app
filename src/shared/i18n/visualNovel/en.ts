@@ -8,6 +8,7 @@ export const VISUAL_NOVEL_EN: Catalog = {
   'vnApp.aria.tabs': 'Visual novel sections',
   'vnApp.tab.read': 'Read',
   'vnApp.tab.study': 'Study',
+  'vnApp.engine.unknown': 'Engine unknown',
   'vnApp.tab.routes': 'Routes',
   'vnApp.tab.details': 'Details',
   'vnApp.tab.setup': 'Capture setup',

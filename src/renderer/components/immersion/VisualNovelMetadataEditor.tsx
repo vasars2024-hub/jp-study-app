@@ -158,7 +158,7 @@ export default function VisualNovelMetadataEditor({
         <label className="is-wide">{t('vnMeta.screenshotUrls')}<input value={draft.screenshotUrls} onChange={(event) => field('screenshotUrls', event.target.value)} placeholder={t('vnMeta.commaSeparated')} /></label>
         <label className="is-wide">{t('vnMeta.synopsis')}<textarea value={draft.synopsis} onChange={(event) => field('synopsis', event.target.value)} /></label>
       </div>
-      <button type="button" disabled={saving || !draft.title.trim()} onClick={() => void save()}>
+      <button className="btn small" type="button" disabled={saving || !draft.title.trim()} onClick={() => void save()}>
         {saving ? t('vnMeta.saving') : t('vnMeta.saveMetadata')}
       </button>
     </details>

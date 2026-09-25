@@ -6,6 +6,7 @@ export const VISUAL_NOVEL_ZH: Catalog = {
   'vnApp.aria.tabs': '视觉小说分区',
   'vnApp.tab.read': '阅读',
   'vnApp.tab.study': '学习',
+  'vnApp.engine.unknown': '引擎未知',
   'vnApp.tab.routes': '路线',
   'vnApp.tab.details': '详情',
   'vnApp.tab.setup': '文本获取设置',

@@ -109,9 +109,9 @@ export default function VisualNovelImportPanel({
       <div className="visual-novel-reading-head">
         <strong>{t('vnImport.head')}</strong>
         <div>
-          <button type="button" disabled={busy} onClick={() => void importLibrary()}>{t('vnImport.importJson')}</button>
-          <button type="button" disabled={busy} onClick={() => void exportLibrary()}>{t('vnImport.exportJson')}</button>
-          <button type="button" disabled={busy} onClick={() => void scan()}>
+          <button className="btn small" type="button" disabled={busy} onClick={() => void importLibrary()}>{t('vnImport.importJson')}</button>
+          <button className="btn small" type="button" disabled={busy} onClick={() => void exportLibrary()}>{t('vnImport.exportJson')}</button>
+          <button className="btn small" type="button" disabled={busy} onClick={() => void scan()}>
             {busy ? t('vnImport.working') : t('vnImport.scanFolder')}
           </button>
         </div>
@@ -146,7 +146,7 @@ export default function VisualNovelImportPanel({
               </article>
             ))}
           </div>
-          <button type="button" disabled={!selectedCount || busy} onClick={() => void importSelected()}>
+          <button className="btn small" type="button" disabled={!selectedCount || busy} onClick={() => void importSelected()}>
             {t('vnImport.importSelected', { count: selectedCount })}
           </button>
         </>
