@@ -133,7 +133,9 @@ export default function DropRouter({
       announceFilesIndexChanged();
       const summary =
         done.length === 1
-          ? t('fileDrop.toast.routedOne', { name: plans[0]?.name ?? '', target: done[0].label })
+          ? [t('fileDrop.toast.routedOne', { name: plans[0]?.name ?? '', target: done[0].label }), done[0].notice]
+              .filter(Boolean)
+              .join(' ')
           : t('fileDrop.toast.routedMany', { count: String(done.length) });
       showOsToast(
         summary,

@@ -29,6 +29,13 @@ import {
   synthesizeWithSupertonic,
 } from './flashcardTtsHost';
 import { writeLocalDeckApkgOffMain } from './anki/localDeckApkgHost';
+import {
+  MINED_MEDIA_EXTENSIONS,
+  MINED_MEDIA_MAX_BYTES,
+  minedMediaDirectoryUnder,
+  writeMinedMediaBytes,
+  type StoredMinedMedia,
+} from './minedMediaStore';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -790,24 +797,14 @@ export async function synthesizeFlashcardAudio(
   }
 }
 
-const MINED_MEDIA_EXTENSIONS = new Set([
-  '.webm', '.mp3', '.ogg', '.m4a', '.wav', '.mp4', '.png', '.jpg', '.jpeg', '.webp',
-]);
-/** A mined clip or screenshot; a larger payload is not a card asset. */
-const MINED_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
-
-export interface StoredMinedMedia {
-  ok: boolean;
-  path?: string;
-  error?: string;
-}
+export type { StoredMinedMedia };
 
 /**
  * Keep a mined card's audio or screenshot as a managed file, so the LOCAL copy
  * of a card mined from the player or the extension carries its media instead
  * of a multi-megabyte data URL in localStorage. Files are content-addressed
- * under the managed root, so mining the same line twice stores it once and the
- * existing sweep can reclaim what no card references.
+ * under the managed root (`minedMediaStore.ts`), so mining the same line twice
+ * stores it once and the existing sweep can reclaim what no card references.
  */
 export function storeMinedMedia(base64: string, filename: string): StoredMinedMedia {
   const extension = path.extname(typeof filename === 'string' ? filename : '').toLowerCase();
@@ -817,18 +814,12 @@ export function storeMinedMedia(base64: string, filename: string): StoredMinedMe
   const bytes = Buffer.from(data, 'base64');
   if (!bytes.length) return { ok: false, error: 'empty' };
   if (bytes.length > MINED_MEDIA_MAX_BYTES) return { ok: false, error: 'too-large' };
-  const directory = path.join(audioRoot(), 'mined');
-  const output = path.join(
-    directory,
-    `${crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 24)}${extension}`,
-  );
-  try {
-    fs.mkdirSync(directory, { recursive: true });
-    if (!fs.existsSync(output)) fs.writeFileSync(output, bytes);
-    return { ok: true, path: output };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
-  }
+  return writeMinedMediaBytes(minedMediaDirectory(), bytes, extension);
+}
+
+/** Where mined and imported card media live (inside the managed audio root). */
+export function minedMediaDirectory(): string {
+  return minedMediaDirectoryUnder(app.getPath('userData'));
 }
 
 const MANAGED_MEDIA_MIME: Record<string, string> = {

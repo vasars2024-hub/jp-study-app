@@ -22,7 +22,20 @@ export const IMPORTED_TEXT_FIELDS = [
   'front',
   'back',
   'bookTitle',
+  'tags',
 ] as const;
+
+/**
+ * Media a file can bring, set on a matched card only where it has none: the
+ * user may have recorded or replaced a clip since the last import, and a
+ * re-import must not take that away.
+ */
+export const IMPORTED_MEDIA_FIELDS = ['audioPath', 'imagePath'] as const;
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  return a === b;
+}
 
 export interface UpsertableCard {
   id: string;
@@ -34,6 +47,9 @@ export interface UpsertableCard {
   back?: string;
   bookId?: string;
   bookTitle?: string;
+  tags?: string[];
+  audioPath?: string;
+  imagePath?: string;
 }
 
 export interface DeckUpsertPlan<C extends UpsertableCard, E> {
@@ -110,9 +126,15 @@ export function planDeckUpsert<C extends UpsertableCard, E extends Omit<Upsertab
     let changed = card.bookId !== group.bookId;
     for (const field of IMPORTED_TEXT_FIELDS) {
       const value = (entry as Record<string, unknown>)[field];
-      if ((card as Record<string, unknown>)[field] === value) continue;
+      if (sameValue((card as Record<string, unknown>)[field], value)) continue;
       if (value === undefined) delete (next as Record<string, unknown>)[field];
       else (next as Record<string, unknown>)[field] = value;
+      changed = true;
+    }
+    for (const field of IMPORTED_MEDIA_FIELDS) {
+      const value = (entry as Record<string, unknown>)[field];
+      if (value === undefined || (card as Record<string, unknown>)[field]) continue;
+      (next as Record<string, unknown>)[field] = value;
       changed = true;
     }
     if (changed) plan.updated.push(next);

@@ -117,6 +117,8 @@ export interface DeckFlashcard {
   ankiQueueGaveUp?: boolean;
   /** Page / file the card was mined from, when the surface knows one. */
   sourceUrl?: string;
+  /** Tags carried in from an imported deck (Anki note tags). */
+  tags?: string[];
   /** Normalised word + sentence + source identity; dedupes repeated mines. */
   mineKey?: string;
   /** Study language a dictionary save belongs to (absent = Japanese). */

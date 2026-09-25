@@ -20,6 +20,7 @@ import path from 'node:path';
 import { parseApkgDraftPage, type ApkgParsedPage } from './apkgCollection';
 import { APKG_READ_CANCELLED } from '../../shared/ankiDraft';
 import type { ApkgReadWorkerIn, ApkgReadWorkerOut } from '../../shared/ankiDraft';
+import type { ApkgJobIn, ApkgJobOut, ApkgJobProgress } from '../../shared/apkgJobs';
 
 /**
  * Vite names the output after the entry file, so `apkgReadWorker.ts` builds to
@@ -182,6 +183,91 @@ export function parseApkgDraftPageOffMainLoop(
       startupTimer.unref?.();
     } catch (err) {
       finish(() => fallBackInProcess(err instanceof Error ? err.message : String(err)));
+    }
+  });
+}
+
+/**
+ * A whole-deck job (import as cards, Level Meter word list, export) in the same
+ * utility process as the draft read, with the same guarantees: an ack-bounded
+ * startup, the in-process fallback when the child never answers, and a job
+ * failure passed through as the user's message. `onProgress` receives the
+ * worker's progress messages.
+ *
+ * Added beside `parseApkgDraftPageOffMainLoop` rather than folded into it: that
+ * one's outcomes are pinned by `apkgReadHostOutcomes.test.ts`, and these jobs
+ * need no cancel.
+ */
+export function runApkgJobOffMainLoop<T>(
+  job: ApkgJobIn,
+  inProcess: () => Promise<T>,
+  opts: { onProgress?: (p: ApkgJobProgress) => void; startupTimeoutMs?: number } = {},
+): Promise<T> {
+  let child: ReturnType<typeof utilityProcess.fork>;
+  try {
+    child = utilityProcess.fork(apkgReadWorkerPath(), [], {
+      serviceName: 'jp-apkg-job',
+      stdio: 'ignore',
+    });
+  } catch {
+    return inProcess();
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    const disarmStartup = (): void => {
+      if (startupTimer === undefined) return;
+      clearTimeout(startupTimer);
+      startupTimer = undefined;
+    };
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      disarmStartup();
+      try {
+        child.kill();
+      } catch {
+        /* already gone */
+      }
+      fn();
+    };
+    const fallBack = (why: string): void => {
+      console.warn(`[apkg-job] worker gave no answer (${why}); running ${job.op} on the main loop`);
+      inProcess().then(resolve, reject);
+    };
+
+    child.on('message', (value: unknown) => {
+      const message = value as ApkgJobOut | undefined;
+      const phase = (message as { phase?: string } | undefined)?.phase;
+      if (phase === 'accepted') {
+        disarmStartup();
+        return;
+      }
+      if (phase === 'progress') {
+        opts.onProgress?.(message as ApkgJobProgress);
+        return;
+      }
+      if (!message || typeof (message as { ok?: unknown }).ok !== 'boolean') {
+        finish(() => reject(new Error('apkg-job-bad-response')));
+        return;
+      }
+      const done = message as { ok: true; result: unknown } | { ok: false; error: string };
+      if (!done.ok) finish(() => reject(new Error(done.error)));
+      else finish(() => resolve(done.result as T));
+    });
+    child.on('exit', (code: number) => {
+      finish(() => fallBack(`exit:${code}`));
+    });
+    try {
+      child.postMessage(job);
+      startupTimer = setTimeout(() => {
+        startupTimer = undefined;
+        finish(() => fallBack('no-ack'));
+      }, opts.startupTimeoutMs ?? APKG_READ_STARTUP_TIMEOUT_MS);
+      startupTimer.unref?.();
+    } catch (err) {
+      finish(() => fallBack(err instanceof Error ? err.message : String(err)));
     }
   });
 }

@@ -26,7 +26,10 @@
 // arrives in the message; nothing is resolved locally and no dialog is reachable.
 
 import { parseApkgDraftPage } from './apkgCollection';
+import { readApkgCardsFile, readApkgWordsFile } from './apkgNoteRead';
+import { runApkgExport } from './apkgExportRun';
 import type { ApkgReadWorkerIn, ApkgReadWorkerOut } from '../../shared/ankiDraft';
+import { isApkgJob, type ApkgJobIn, type ApkgJobOut } from '../../shared/apkgJobs';
 
 /**
  * `process.parentPort` is Electron's utility-process channel. Typed locally
@@ -58,9 +61,41 @@ async function handle(port: ParentPort, request: ApkgReadWorkerIn): Promise<void
   }
 }
 
+/**
+ * The whole-deck jobs (round-2 audit F, Anki item 13): import as cards, the
+ * Level Meter's word list, and export. They ran inline on Electron's main loop
+ * before; the same functions are `apkgReadHost`'s in-process fallback.
+ */
+async function runJob(port: ParentPort, job: ApkgJobIn): Promise<void> {
+  const out = (message: ApkgJobOut): void => port.postMessage(message);
+  try {
+    let result: unknown;
+    if (job.op === 'cards') {
+      result = await readApkgCardsFile(job.filePath, {
+        mediaDir: job.mediaDir,
+        onProgress: (stage, done, total) => out({ phase: 'progress', stage, done, total }),
+      });
+    } else if (job.op === 'words') {
+      result = await readApkgWordsFile(job.filePath);
+    } else {
+      result = await runApkgExport(job.sourcePath, job.outPath, job.request, (stage) =>
+        out({ phase: 'progress', stage, done: 0, total: 0 }),
+      );
+    }
+    out({ ok: true, result });
+  } catch (err) {
+    out({ ok: false, error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 const port = parentPort();
 if (port) {
   port.on('message', (event) => {
+    if (isApkgJob(event.data)) {
+      port.postMessage({ phase: 'accepted' });
+      void runJob(port, event.data);
+      return;
+    }
     const request = event.data as ApkgReadWorkerIn | undefined;
     if (!request || typeof request.filePath !== 'string') {
       send(port, { ok: false, error: 'apkg-read-bad-request' });

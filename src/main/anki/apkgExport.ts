@@ -16,17 +16,12 @@
 // what the draft was read from.
 
 import { dialog, BrowserWindow } from 'electron';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
-import AdmZip from 'adm-zip';
-import type { Database } from 'sql.js';
 import type { ApkgExportRequest, ApkgExportResult } from '../../shared/ankiApkgExport';
 import { exportChangesEmpty } from '../../shared/ankiApkgExport';
-import { stripFieldHtml } from '../../shared/apkgParse';
-import { applyExportChanges, verifyExportChanges, ExportRefusal } from './apkgExportCore';
-import { getSql, readCollection } from './apkgCollection';
+import { runApkgExport } from './apkgExportRun';
+import { runApkgJobOffMainLoop } from './apkgReadHost';
 import { mt } from '../i18n';
 
 /** Fingerprint → source path, most recent last. Small on purpose: it exists to
@@ -76,9 +71,6 @@ function samePath(a: string, b: string): boolean {
   return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 }
 
-const RECOMPRESS_HELP =
-  'This deck uses Anki’s newer compressed format and this build cannot write it back. Export the source from Anki with "Support older Anki versions" checked, and edit that file instead.';
-
 export async function exportApkg(request: ApkgExportRequest): Promise<ApkgExportResult> {
   if (!request?.changes || exportChangesEmpty(request.changes)) {
     return { ok: false, errorCode: 'nothing-to-export', error: 'The change set is empty.' };
@@ -95,124 +87,28 @@ export async function exportApkg(request: ApkgExportRequest): Promise<ApkgExport
     };
   }
 
-  let db: Database | null = null;
-  try {
-    const zip = new AdmZip(sourcePath);
-    const { bytes, entryName } = readCollection(zip);
-    const fingerprint = `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`;
-    if (fingerprint !== request.fingerprint) {
-      return {
-        ok: false,
-        errorCode: 'source-changed',
-        error:
-          'The deck file changed since it was read. Reopen it in the workbench and redo the edits there.',
-      };
-    }
-
-    // The zstd writer only matters for the newer package format; probe for it
-    // before doing any work, so the refusal comes first, not after a dialog.
-    const zstdCompress = (
-      zlib as unknown as { zstdCompressSync?: (b: Uint8Array) => Buffer }
-    ).zstdCompressSync;
-    if (entryName === 'collection.anki21b' && typeof zstdCompress !== 'function') {
-      return { ok: false, errorCode: 'compressed-unsupported', error: RECOMPRESS_HELP };
-    }
-
-    const SQL = await getSql();
-    db = new SQL.Database(bytes);
-    const applied = applyExportChanges(db, request.changes, {
-      nowMs: Date.now(),
-      normalize: stripFieldHtml,
-    });
-    const newBytes = db.export();
-    db.close();
-    db = null;
-
-    const outPath = request.outPath ?? (await pickOutPath(sourcePath));
-    if (!outPath) return { ok: false, errorCode: 'cancelled', error: 'cancelled' };
-    if (samePath(outPath, sourcePath)) {
-      return {
-        ok: false,
-        errorCode: 'overwrite-source',
-        error: 'Export writes a new package; it never overwrites the source copy.',
-      };
-    }
-
-    const outZip = new AdmZip();
-    const collectionEntry =
-      entryName === 'collection.anki21b' && zstdCompress
-        ? zstdCompress(newBytes)
-        : Buffer.from(newBytes);
-    for (const entry of zip.getEntries()) {
-      outZip.addFile(
-        entry.entryName,
-        entry.entryName === entryName ? collectionEntry : entry.getData(),
-      );
-    }
-    outZip.writeZip(outPath);
-
-    // Verify against what the DISK holds, not what memory held: re-open the
-    // written file through the same reader an import would use.
-    const checkZip = new AdmZip(outPath);
-    const written = readCollection(checkZip);
-    const checkDb: Database = new SQL.Database(written.bytes);
-    let verdict: { ok: boolean; mismatches: string[] };
-    try {
-      verdict = verifyExportChanges(checkDb, request.changes);
-    } finally {
-      checkDb.close();
-    }
-    if (!verdict.ok) {
-      // A package that fails its own read-back must not sit on disk looking
-      // importable; remove it and say exactly that.
-      try {
-        fs.unlinkSync(outPath);
-      } catch {
-        /* the report below still names the failure */
-      }
-      return {
-        ok: false,
-        errorCode: 'verify-failed',
-        error: `The written package failed read-back verification and was removed: ${verdict.mismatches
-          .slice(0, 5)
-          .join('; ')}`,
-      };
-    }
-
-    const newFingerprint = `sha1:${crypto
-      .createHash('sha1')
-      .update(written.bytes)
-      .digest('hex')}`;
-    rememberApkgSource(newFingerprint, outPath);
-    return {
-      ok: true,
-      filePath: outPath,
-      fileName: path.basename(outPath),
-      notesUpdated: applied.notesUpdated,
-      cardsUpdated: applied.cardsUpdated,
-      decksUpdated: applied.decksUpdated,
-      templatesRemoved: applied.templatesRemoved,
-      cardsDeleted: applied.cardsDeleted,
-      templatesAdded: applied.templatesAdded,
-      cardsCreated: applied.cardsCreated,
-      templatesFormatted: applied.templatesFormatted,
-      verified: true,
-      fingerprint: newFingerprint,
-    };
-  } catch (err) {
-    if (err instanceof ExportRefusal) {
-      return { ok: false, errorCode: err.code, error: err.message };
-    }
+  // The destination is asked for up front now: everything after it — read,
+  // fingerprint check, apply, write, read-back — runs in the deck utility
+  // process, which can show no dialog.
+  const outPath = request.outPath ?? (await pickOutPath(sourcePath));
+  if (!outPath) return { ok: false, errorCode: 'cancelled', error: 'cancelled' };
+  if (samePath(outPath, sourcePath)) {
     return {
       ok: false,
-      errorCode: 'io',
-      error: err instanceof Error ? err.message : String(err),
+      errorCode: 'overwrite-source',
+      error: 'Export writes a new package; it never overwrites the source copy.',
     };
-  } finally {
-    try {
-      db?.close();
-    } catch {
-      /* already closed */
-    }
   }
+
+  let result: ApkgExportResult;
+  try {
+    result = await runApkgJobOffMainLoop<ApkgExportResult>(
+      { op: 'export', sourcePath, outPath, request },
+      () => runApkgExport(sourcePath, outPath, request),
+    );
+  } catch (err) {
+    return { ok: false, errorCode: 'io', error: err instanceof Error ? err.message : String(err) };
+  }
+  if (result.ok && result.fingerprint) rememberApkgSource(result.fingerprint, outPath);
+  return result;
 }

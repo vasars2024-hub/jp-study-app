@@ -1319,6 +1319,7 @@ export const ja: Catalog = {
   'fileDrop.toast.routedMany': { other: '{count} 件を振り分けました' },
   'fileDrop.toast.noDestination': '{name} を開けるものがまだありません。',
   'fileDrop.toast.emptyFolder': '{name} には取り込めるものがありません。',
+  'fileDrop.toast.levelNoSlot': '{name} がどのレベル用か分かりません。ファイル名に N5〜N1 (または HSK 1〜6) を入れるか、設定 > 学習 > レベル から追加してください。',
   'fileDrop.toast.noPath': {
     other:
       'その {count} 件の場所を Windows が伝えなかったため、取り込めませんでした。書庫やメールの中からではなく、フォルダーからドラッグしてみてください。',
@@ -1333,6 +1334,28 @@ export const ja: Catalog = {
   'fileDrop.toast.subtitleUnreadable': '{name} はこのアプリが読める字幕形式ではありません。',
   'fileDrop.toast.subtitleMissing': '{name} はドロップ元の場所にもうありません。',
   'fileDrop.toast.undone': '取り消しました。',
+  'apkgImport.notice.updated': {
+    other: '取り込み済みの {count} 枚を更新しました。復習の進み具合は保たれています。',
+  },
+  'apkgImport.notice.scheduled': {
+    other: '{count} 枚は Anki の間隔を引き継ぎました (Anki の復習履歴は取り込まれません)。',
+  },
+  'apkgImport.notice.empty': {
+    other: '単語のないノート {count} 件はスキップしました。',
+  },
+  'apkgImport.notice.duplicates': {
+    other: '重複したノート {count} 件は前のノートにまとめました。',
+  },
+  'apkgImport.notice.extraFields': {
+    other: '{count} 件のノートには単語・読み・意味・例文以外のフィールドがあり、それらは取り込まれていません。',
+  },
+  'apkgImport.notice.mediaMissing': {
+    other: 'ノートが参照するメディア {count} 件がパッケージに含まれていません。',
+  },
+  'apkgImport.notice.mediaSkipped': {
+    other: 'メディア {count} 件は取り込まれていません (カードに保存できるのは一般的な形式の音声と画像を 1 つずつ、20 MB まで)。',
+  },
+  'apkgImport.notice.mediaUnreadable': 'パッケージのメディアを読み取れなかったため、音声と画像は取り込まれていません。',
   'desktop.task.onDesktop': '{name} — {desktop} にあります',
   // Motion & Accessibility (Phase 4.5)
   'settings.nav.motion': 'モーション',
@@ -10953,6 +10976,12 @@ export const ja: Catalog = {
   'ankiWorkbench.siblings.sampled': '{sampled} 件のノートで比較',
   'ankiWorkbench.siblings.cards': '余分な方から {cards} 枚のカードが生成されています',
   'ankiWorkbench.siblings.more': '他 {count} 件',
+  'ankiWorkbench.templates.lead': '重複したカードテンプレートがあると、同じ問題を 2 回復習することになります。テンプレートを削除するとそのカードもすべて削除されるため、比較したすべてのノートで同じ問題を出していたテンプレートだけを候補にします。',
+  'ankiWorkbench.templates.check': 'カードテンプレートを確認',
+  'ankiWorkbench.templates.checking': 'テンプレートを比較しています…',
+  'ankiWorkbench.templates.none': '他のテンプレートと同じ問題を出すテンプレートはありません。',
+  'ankiWorkbench.templates.remove': '{names} を削除 ({keep} は残す)',
+  'ankiWorkbench.templates.ambiguous': '一部のノートでだけ同じため、削除の候補にはしません。',
   'ankiWorkbench.stale.title': 'スケジュール',
   'ankiWorkbench.stale.summary':
     '{cards} 枚が停滞しています。期日を {overdue} 日以上過ぎたもの、または {dormant} 日以上復習していないものです。',

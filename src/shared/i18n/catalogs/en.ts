@@ -1442,6 +1442,7 @@ export const en: Catalog = {
   },
   'fileDrop.toast.noDestination': 'Nothing here can open {name} yet.',
   'fileDrop.toast.emptyFolder': '{name} holds nothing this app can import.',
+  'fileDrop.toast.levelNoSlot': '{name} does not say which level it is for. Put N5–N1 (or HSK 1–6) in the file name, or add it under Settings > Study > Level.',
   // Gate 11: the two ways a drop used to end in nothing at all.
   'fileDrop.toast.noPath': {
     one: 'Windows did not say where that item is, so it could not be imported. Try dragging it from a folder rather than from inside an archive or an email.',
@@ -1461,6 +1462,35 @@ export const en: Catalog = {
   'fileDrop.toast.subtitleUnreadable': '{name} is not a subtitle format this app can read.',
   'fileDrop.toast.subtitleMissing': '{name} is no longer where it was dropped from.',
   'fileDrop.toast.undone': 'Undone.',
+  'apkgImport.notice.updated': {
+    one: '{count} card already imported was updated; its review progress is kept.',
+    other: '{count} cards already imported were updated; their review progress is kept.',
+  },
+  'apkgImport.notice.scheduled': {
+    one: '{count} card kept its Anki interval (Anki\'s review history is not imported).',
+    other: '{count} cards kept their Anki intervals (Anki\'s review history is not imported).',
+  },
+  'apkgImport.notice.empty': {
+    one: '{count} note had no word and was skipped.',
+    other: '{count} notes had no word and were skipped.',
+  },
+  'apkgImport.notice.duplicates': {
+    one: '{count} duplicate note was merged into an earlier one.',
+    other: '{count} duplicate notes were merged into earlier ones.',
+  },
+  'apkgImport.notice.extraFields': {
+    one: '{count} note has fields beyond word, reading, meaning and sentence; those fields were not imported.',
+    other: '{count} notes have fields beyond word, reading, meaning and sentence; those fields were not imported.',
+  },
+  'apkgImport.notice.mediaMissing': {
+    one: '{count} media file the notes cite is not in the package.',
+    other: '{count} media files the notes cite are not in the package.',
+  },
+  'apkgImport.notice.mediaSkipped': {
+    one: '{count} media file was not imported (a card keeps one audio and one image, of a common type, up to 20 MB).',
+    other: '{count} media files were not imported (a card keeps one audio and one image, of a common type, up to 20 MB).',
+  },
+  'apkgImport.notice.mediaUnreadable': 'The package\'s media could not be read, so no audio or images were imported.',
   'desktop.task.onDesktop': '{name} — on {desktop}',
   // Motion & Accessibility (Phase 4.5)
   'settings.nav.motion': 'Motion',
@@ -11492,6 +11522,12 @@ export const en: Catalog = {
   'ankiWorkbench.siblings.sampled': 'compared over {sampled} notes',
   'ankiWorkbench.siblings.cards': '{cards} cards come from the extra one',
   'ankiWorkbench.siblings.more': 'and {count} more',
+  'ankiWorkbench.templates.lead': 'Duplicate card templates make you review the same question twice. Removing a template deletes every card it made, so only templates that asked the same thing on every compared note are offered.',
+  'ankiWorkbench.templates.check': 'Check card templates',
+  'ankiWorkbench.templates.checking': 'Comparing templates…',
+  'ankiWorkbench.templates.none': 'No template asks what another already asks.',
+  'ankiWorkbench.templates.remove': 'Remove {names} (keep {keep})',
+  'ankiWorkbench.templates.ambiguous': 'Alike on some notes only; not offered for removal.',
   'ankiWorkbench.stale.title': 'Schedule',
   'ankiWorkbench.stale.summary':
     '{cards} cards are stale: overdue by {overdue}+ days, or unreviewed for {dormant}+ days.',

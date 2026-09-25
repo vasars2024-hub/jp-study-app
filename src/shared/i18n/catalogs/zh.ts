@@ -1316,6 +1316,7 @@ export const zh: Catalog = {
   'fileDrop.toast.routedMany': { other: '已归位 {count} 个文件' },
   'fileDrop.toast.noDestination': '目前还没有能打开 {name} 的地方。',
   'fileDrop.toast.emptyFolder': '{name} 中没有本应用能导入的内容。',
+  'fileDrop.toast.levelNoSlot': '无法判断 {name} 属于哪个级别。请在文件名中写明 N5–N1（或 HSK 1–6），或在 设置 > 学习 > 级别 中添加。',
   'fileDrop.toast.noPath': {
     other:
       'Windows 没有告知这 {count} 个项目的位置，因此无法导入。请从文件夹中拖动，而不是从压缩包或邮件里。',
@@ -1330,6 +1331,28 @@ export const zh: Catalog = {
   'fileDrop.toast.subtitleUnreadable': '{name} 不是本应用能读取的字幕格式。',
   'fileDrop.toast.subtitleMissing': '{name} 已不在拖入时所在的位置。',
   'fileDrop.toast.undone': '已撤销。',
+  'apkgImport.notice.updated': {
+    other: '已更新 {count} 张先前导入的卡片，复习进度已保留。',
+  },
+  'apkgImport.notice.scheduled': {
+    other: '{count} 张卡片保留了 Anki 的间隔（Anki 的复习记录不会导入）。',
+  },
+  'apkgImport.notice.empty': {
+    other: '{count} 条笔记没有单词，已跳过。',
+  },
+  'apkgImport.notice.duplicates': {
+    other: '{count} 条重复笔记已合并到之前的笔记。',
+  },
+  'apkgImport.notice.extraFields': {
+    other: '{count} 条笔记含有单词、读音、释义、例句以外的字段，这些字段未导入。',
+  },
+  'apkgImport.notice.mediaMissing': {
+    other: '笔记引用的 {count} 个媒体文件不在包中。',
+  },
+  'apkgImport.notice.mediaSkipped': {
+    other: '{count} 个媒体文件未导入（每张卡片保留一个常见格式的音频和一张图片，最大 20 MB）。',
+  },
+  'apkgImport.notice.mediaUnreadable': '无法读取包中的媒体，因此未导入音频和图片。',
   'desktop.task.onDesktop': '{name} — 位于 {desktop}',
   // Motion & Accessibility (Phase 4.5)
   'settings.nav.motion': '动效',
@@ -10862,6 +10885,12 @@ export const zh: Catalog = {
   'ankiWorkbench.siblings.sampled': '基于 {sampled} 条笔记比较',
   'ankiWorkbench.siblings.cards': '多余的那个生成了 {cards} 张卡片',
   'ankiWorkbench.siblings.more': '另有 {count} 组',
+  'ankiWorkbench.templates.lead': '重复的卡片模板会让你把同一个问题复习两遍。删除模板会删除它生成的所有卡片，因此只提供在所有比较过的笔记上都问同一问题的模板。',
+  'ankiWorkbench.templates.check': '检查卡片模板',
+  'ankiWorkbench.templates.checking': '正在比较模板…',
+  'ankiWorkbench.templates.none': '没有模板与其他模板提出相同的问题。',
+  'ankiWorkbench.templates.remove': '删除 {names}（保留 {keep}）',
+  'ankiWorkbench.templates.ambiguous': '仅在部分笔记上相同，不提供删除。',
   'ankiWorkbench.stale.title': '排程',
   'ankiWorkbench.stale.summary':
     '{cards} 张卡片已停滞：逾期 {overdue} 天以上，或 {dormant} 天以上未复习。',

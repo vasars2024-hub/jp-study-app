@@ -539,6 +539,9 @@ declare global {
       dictPitch(term: string, reading?: string): Promise<PitchLookup>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
       importApkgCards(filePath?: string): Promise<ApkgCardsResult>;
+      onApkgImportProgress(
+        cb: (event: import('../shared/apkgJobs').ApkgImportProgressEvent) => void,
+      ): () => void;
       readApkgDraft(
         request?: import('../shared/ankiDraft').ApkgDraftRequest,
       ): Promise<import('../shared/ankiDraft').ApkgDraftResult>;

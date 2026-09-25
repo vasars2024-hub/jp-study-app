@@ -673,6 +673,14 @@ const api = {
   /** Parse an Anki .apkg into whole study cards (word/reading/meaning/sentence). */
   importApkgCards: (filePath?: string): Promise<ApkgCardsResult> =>
     ipcRenderer.invoke('apkg:importCards', filePath),
+  /** Progress of a running `importApkgCards` (notes read, media stored). */
+  onApkgImportProgress: (
+    cb: (event: import('./shared/apkgJobs').ApkgImportProgressEvent) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, event: import('./shared/apkgJobs').ApkgImportProgressEvent): void => cb(event);
+    ipcRenderer.on('apkg:importProgress', handler);
+    return () => ipcRenderer.removeListener('apkg:importProgress', handler);
+  },
   /** One page of an .apkg read as a full-fidelity workbench draft. */
   readApkgDraft: (request?: ApkgDraftRequest): Promise<ApkgDraftResult> =>
     ipcRenderer.invoke('apkg:readDraft', request),
