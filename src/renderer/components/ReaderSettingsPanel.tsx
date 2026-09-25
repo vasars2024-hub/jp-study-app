@@ -22,6 +22,7 @@ import {
   CONTENT_WIDTH_MAX,
 } from '../readerSettings';
 import { useT } from '../i18n';
+import { formatDecimal } from './shell/localeFormat';
 
 interface Props {
   settings: ReaderSettings;
@@ -108,7 +109,7 @@ function Stepper(props: {
 }
 
 export default function ReaderSettingsPanel({ settings, onChange, embedded = false }: Props) {
-  const { t } = useT();
+  const { t, lang } = useT();
   // Backfill defaults so a settings object saved before a field existed (or a
   // stale one) can never blank the panel with an undefined read.
   const s: ReaderSettings = { ...DEFAULT_SETTINGS, ...settings };
@@ -203,7 +204,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
 
       <Stepper
         label={t('settings.reader.lineHeight')}
-        value={s.lineHeight.toFixed(2)}
+        value={formatDecimal(s.lineHeight, 2, lang)}
         onDec={() => set({ lineHeight: clampLineHeight(s.lineHeight - 0.05) })}
         onInc={() => set({ lineHeight: clampLineHeight(s.lineHeight + 0.05) })}
         decDisabled={s.lineHeight <= LINE_HEIGHT_MIN}

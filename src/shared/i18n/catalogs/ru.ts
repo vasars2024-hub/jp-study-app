@@ -1579,7 +1579,7 @@ export const ru: Catalog = {
   'settings.motion.velocity.label': 'Скорость',
   'settings.motion.velocity.instant': 'Мгновенно',
   'settings.motion.velocity.hint':
-    'Влияет на все анимации приложения. 1.00× — исходная скорость, 0 — мгновенно.',
+    'Влияет на все анимации приложения. 1,00× — исходная скорость, 0 — мгновенно.',
   'settings.motion.preview': 'Предпросмотр',
   'settings.motion.preview.fill': 'Заполнить шкалу',
   'settings.motion.preview.score': 'Добавить очки',

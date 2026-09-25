@@ -3,4 +3,9 @@
 import type { Catalog } from '../core';
 
 export const SHELL_UI_RU: Catalog = {
+  'shell.unit.byte': 'Б',
+  'shell.unit.kb': 'КБ',
+  'shell.unit.mb': 'МБ',
+  'shell.unit.gb': 'ГБ',
+  'shell.unit.tb': 'ТБ',
 };

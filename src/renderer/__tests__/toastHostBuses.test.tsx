@@ -60,7 +60,7 @@ describe('ToastHost mounts both toast buses', () => {
    * `os:toast` happened to be on screen — which is almost always.
    */
   it('receives a ui:toast with no os:toast on screen', () => {
-    expect(host.querySelector('.os-toast-host')).toBeNull();
+    expect(host.querySelector('.os-toast-host .os-toast')).toBeNull();
     act(() => showToast('mined'));
     expect(host.querySelector('.ui-toast')?.textContent).toContain('mined');
   });
