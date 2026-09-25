@@ -1305,6 +1305,7 @@ declare global {
       ytDeleteFolder(folderId: string): Promise<import('../shared/ytPlaylists').YtPlaylistsStore>;
       ytAddPlaylist(
         url: string,
+        studyLang?: 'ja' | 'zh' | 'en',
       ): Promise<
         | {
             store: import('../shared/ytPlaylists').YtPlaylistsStore;
@@ -1363,6 +1364,12 @@ declare global {
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
         results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
       }>;
+      ytDownloadQueue?(): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytCancelDownloads?(videoIds?: string[]): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytPauseDownload?(videoId: string): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytResumeDownload?(videoId: string): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      ytClearFinishedDownloads?(): Promise<import('../main/ytDownloadQueue').YtQueueEntry[]>;
+      onYtQueueChanged?(cb: (entries: import('../main/ytDownloadQueue').YtQueueEntry[]) => void): () => void;
       ytFetchSubsOnly(videoIds: string[]): Promise<{
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
         results: Array<{ videoId: string; ok: boolean; error?: string }>;

@@ -1109,7 +1109,9 @@ function DiscoverPanel({ state }: { state: DiscoveryState }) {
         <DiscoverProviderChips state={state} />
       </div>
       <DiscoveryControls state={state} />
-      {state.results.length > 0 && (
+      {/* Not on the YouTube tab: these are catalogue titles, and the YouTube
+          inspector cannot show one, so a click there did nothing (audit r2 #24). */}
+      {state.results.length > 0 && state.tab !== 'youtube' && (
         <section className="mc-discover-featured">
           <div className="mc-section-head">
             <div><span className="mc-eyebrow">{t('mediaCenter.discover.recommended', { level: state.level })}</span><h2>{t('mediaCenter.discover.topMatches')}</h2></div>

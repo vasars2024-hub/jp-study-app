@@ -2108,10 +2108,12 @@ const api = {
     ipcRenderer.invoke('yt:saveFolder', folder),
   ytDeleteFolder: (folderId: string): Promise<YtPlaylistsStore> =>
     ipcRenderer.invoke('yt:deleteFolder', folderId),
+  /** `studyLang`: the new playlist's language and subtitle default (the user's study language). */
   ytAddPlaylist: (
     url: string,
+    studyLang?: 'ja' | 'zh' | 'en',
   ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> =>
-    ipcRenderer.invoke('yt:addPlaylist', url),
+    ipcRenderer.invoke('yt:addPlaylist', url, studyLang),
   ytRefreshPlaylist: (
     playlistId: string,
   ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> =>
@@ -2164,6 +2166,25 @@ const api = {
     store: YtPlaylistsStore;
     results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
   }> => ipcRenderer.invoke('yt:downloadVideos', videoIds, options),
+  /** The download queue: each video's state and progress, with pause/resume/cancel. */
+  ytDownloadQueue: (): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:downloadQueue'),
+  /** Stop downloads (all of them without ids): yt-dlp is killed and partial files removed. */
+  ytCancelDownloads: (videoIds?: string[]): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:cancelDownloads', videoIds),
+  ytPauseDownload: (videoId: string): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:pauseDownload', videoId),
+  ytResumeDownload: (videoId: string): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:resumeDownload', videoId),
+  ytClearFinishedDownloads: (): Promise<import('./main/ytDownloadQueue').YtQueueEntry[]> =>
+    ipcRenderer.invoke('yt:clearFinishedDownloads'),
+  onYtQueueChanged: (
+    cb: (entries: import('./main/ytDownloadQueue').YtQueueEntry[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, entries: import('./main/ytDownloadQueue').YtQueueEntry[]): void => cb(entries);
+    ipcRenderer.on('yt:queueChanged', handler);
+    return () => ipcRenderer.removeListener('yt:queueChanged', handler);
+  },
   ytFetchSubsOnly: (
     videoIds: string[],
   ): Promise<{

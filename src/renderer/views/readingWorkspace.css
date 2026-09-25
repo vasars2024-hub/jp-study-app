@@ -206,3 +206,36 @@
     scroll-behavior: auto;
   }
 }
+
+/* Audit r2 #24: the manga shortlisted in Discover, reachable from Reading. */
+.manga-shortlist {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.manga-shortlist-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.manga-shortlist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.manga-shortlist-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.manga-shortlist-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

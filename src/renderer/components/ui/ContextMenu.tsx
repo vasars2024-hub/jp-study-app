@@ -13,6 +13,8 @@ export interface MenuItem {
   onSelect?: () => void;
   danger?: boolean;
   disabled?: boolean;
+  /** Tooltip — for a disabled item, why it is disabled. */
+  title?: string;
   separator?: boolean;
 }
 
@@ -146,6 +148,7 @@ export function ContextMenu({ open, x, y, items, onClose }: ContextMenuProps) {
             role="menuitem"
             className={['ui-menu__item', it.danger ? 'ui-menu__item--danger' : ''].filter(Boolean).join(' ')}
             disabled={it.disabled}
+            title={it.title}
             onClick={() => {
               it.onSelect?.();
               onClose();

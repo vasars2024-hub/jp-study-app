@@ -25046,6 +25046,59 @@ html.lockscreen-widget-root #root {
   background: color-mix(in srgb, var(--border, #444) 70%, transparent);
   overflow: hidden;
 }
+.yt-queue {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel, #1a1a1a) 90%, transparent);
+  flex-shrink: 0;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+}
+.yt-queue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.yt-queue-head > span {
+  flex: 1;
+}
+.yt-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.yt-queue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+}
+.yt-queue-row .yt-download-track {
+  grid-column: 1 / -1;
+  display: block;
+}
+.yt-queue-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.yt-queue-state,
+.yt-queue-error {
+  color: var(--muted);
+}
+.yt-queue-error {
+  grid-column: 1 / -1;
+}
+.yt-queue .yt-download-fill {
+  display: block;
+}
 .yt-download-fill {
   height: 100%;
   background: var(--accent, #8b1a2b);
@@ -25317,6 +25370,16 @@ html.lockscreen-widget-root #root {
 .yt-chip.status.subs,
 .yt-chip.status.tr {
   opacity: 0.9;
+}
+/* Audit r2 #20/#21: auto captions are not "Subs", and a video gone from
+   YouTube says so rather than vanishing. */
+.yt-chip.status.autosubs {
+  border-style: dashed;
+  opacity: 0.85;
+}
+.yt-chip.status.removed {
+  border-color: color-mix(in srgb, var(--accent, #a33) 55%, transparent);
+  color: var(--muted);
 }
 .yt-list {
   flex: 1;
