@@ -267,12 +267,12 @@ export function useAnkiConfig(): AnkiConfigState {
 
   const waitingCollection = Boolean(link?.waitingCollection);
   const connLabel = loading
-    ? 'Checking…'
+    ? t('anki.checking')
     : status?.connected
-      ? 'Connected'
+      ? t('anki.status.connected')
       : waitingCollection
-        ? 'Waiting for collection'
-        : 'Not connected';
+        ? t('anki.status.waitingCollection')
+        : t('anki.status.notConnected');
 
   return {
     status,

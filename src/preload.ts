@@ -78,6 +78,7 @@ import type {
   AnkiLinkStatus,
   DeleteMinedNotesResult,
   EnsureModelResult,
+  NoteStylingPushResult,
   IntervalSnapshot,
   MineNoteRequest,
   MineNoteResult,
@@ -853,6 +854,9 @@ const api = {
     ipcRenderer.invoke('anki:deleteNotes', { noteIds, mediaFilenames }),
   ankiEnsureModel: (id?: ProfileId): Promise<EnsureModelResult> =>
     ipcRenderer.invoke('anki:ensureModel', id),
+  /** Push the profile's saved card CSS to its Anki note type, or queue it. */
+  ankiPushNoteStyling: (id?: ProfileId): Promise<NoteStylingPushResult> =>
+    ipcRenderer.invoke('anki:pushNoteStyling', id),
   /** Ordered field names of a note type (for the field-mapping editor). */
   ankiModelFields: (
     modelName: string,

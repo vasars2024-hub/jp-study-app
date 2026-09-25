@@ -268,6 +268,15 @@ export interface EnsureModelResult {
   error?: string;
 }
 
+/**
+ * What saving the card-styling CSS did in Anki (`main/anki/noteStyling.ts`):
+ * pushed now, queued until Anki is reachable, or nothing owed because the note
+ * type does not exist yet and will be created with this CSS.
+ */
+export type NoteStylingPushResult =
+  | { ok: true; status: 'updated' | 'queued' | 'not-created'; modelName: string }
+  | { ok: false; error: string };
+
 // ----- Interval reading -------------------------------------------------------
 
 export interface IntervalEntry {

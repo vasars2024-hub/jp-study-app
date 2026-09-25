@@ -20,6 +20,7 @@ import {
   resolveMiningTemplates,
   type DeleteMinedNotesResult,
   type EnsureModelResult,
+  type NoteStylingPushResult,
   type ExampleCountLang,
   type IntervalSnapshot,
   type MineNoteRequest,
@@ -34,6 +35,8 @@ import { fetchJapaneseAudio } from '../dictionary';
 import { getFrequency, getPitch } from '../dictionary/yomitan';
 import { resolveCustomFrequencyRanks } from '../mining';
 import { getDueForecast } from './forecast';
+import { configureNoteStylingQueue, flushPendingNoteStyling, pushNoteStyling } from './noteStyling';
+import { readJsonSync, writeJsonAtomic } from '../atomicJson';
 import { getProfileStore } from '../profiles';
 import { loadProfileRules } from '../profileRules';
 import { invoke, isCollectionUnavailable, setAnkiUrlProvider, toUiError } from './client';
@@ -323,6 +326,12 @@ function resolveMineTarget(req: Pick<
   'profileId' | 'route' | 'term' | 'sentence' | 'deckName'
 >): ResolvedMineTarget | null {
   const store = getProfileStore();
+
+  const stylingQueueFile = path.join(app.getPath('userData'), 'anki-styling-queue.json');
+  configureNoteStylingQueue({
+    load: () => readJsonSync<ProfileId[]>(stylingQueueFile, []),
+    save: (ids) => void writeJsonAtomic(stylingQueueFile, ids).catch(() => undefined),
+  });
   const active = store.getActiveProfile();
 
   // Profile resolution order:
@@ -864,6 +873,8 @@ export function registerAnkiIpc(): void {
   onConnected(() => {
     invalidateAnkiCaches();
     onAnkiConnected();
+    // Card styling saved while Anki was closed reaches the note type now.
+    void flushPendingNoteStyling((id) => store.getProfile(id)).catch(() => undefined);
   });
 
   // Profile store -> cache invalidation (T8) + query-union recheck (5.5).
@@ -914,6 +925,17 @@ export function registerAnkiIpc(): void {
       }
     },
   );
+  // Card styling editor save: push the profile's CSS to its note type now, or
+  // queue it for the next connect (noteStyling.ts).
+  ipcMain.handle('anki:pushNoteStyling', async (_e, id?: ProfileId): Promise<NoteStylingPushResult> => {
+    const profile = id ? getProfileStore().getProfile(id) : getProfileStore().getActiveProfile();
+    if (!profile) return { ok: false, error: `Unknown profile: ${String(id)}` };
+    try {
+      return await pushNoteStyling(profile);
+    } catch (err) {
+      return { ok: false, error: toUiError(err) };
+    }
+  });
   ipcMain.handle('anki:ensureModel', async (_e, id?: ProfileId): Promise<EnsureModelResult> => {
     const profile = id ? getProfileStore().getProfile(id) : getProfileStore().getActiveProfile();
     if (!profile) {

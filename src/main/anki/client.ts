@@ -63,6 +63,8 @@ export interface AnkiActionMap {
   modelNames: { params: undefined; result: string[] };
   modelFieldNames: { params: { modelName: string }; result: string[] };
   createModel: { params: CreateModelParams; result: unknown };
+  /** Replace a note type's CSS. The card-styling editor's save (noteStyling.ts). */
+  updateModelStyling: { params: { model: { name: string; css: string } }; result: null };
   addNote: { params: { note: AnkiNoteInput }; result: number };
   canAddNotes: { params: { notes: AnkiNoteInput[] }; result: boolean[] };
   deleteNotes: { params: { notes: number[] }; result: null };
@@ -191,6 +193,7 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   modelFieldNames: FAST_TIMEOUT_MS,
   createDeck: MUTATE_TIMEOUT_MS,
   createModel: MUTATE_TIMEOUT_MS,
+  updateModelStyling: MUTATE_TIMEOUT_MS,
   addNote: MUTATE_TIMEOUT_MS,
   canAddNotes: MUTATE_TIMEOUT_MS,
   deleteNotes: MUTATE_TIMEOUT_MS,
