@@ -19,8 +19,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ipcMain } from 'electron';
-import { ARCHIVE_EXT, BOOK_EXT, IMAGE_EXT, MEDIA_EXT, extOf } from '../shared/mediaKind';
-import { planForPath } from './fileRouterPlanning';
+import { IMAGE_EXT, extOf } from '../shared/mediaKind';
+import { listImportableFiles, planForPath } from './fileRouterPlanning';
 
 export { planForPath } from './fileRouterPlanning';
 export type { DropPlan, FolderSummary } from './fileRouterPlanning';
@@ -47,20 +47,12 @@ export function registerFileRouterIpc(): void {
     }
   });
 
-  /** Importable files directly inside a folder, for a book/media folder drop. */
+  /**
+   * Importable files inside a folder and its subfolders, for a book/media folder drop.
+   * Recursive like the planner's scan, so a parent folder of shows imports every show.
+   */
   ipcMain.handle('filedrop:listFolderFiles', (_event, dirPath: unknown): string[] => {
     if (typeof dirPath !== 'string') return [];
-    try {
-      return fs.readdirSync(dirPath, { withFileTypes: true })
-        .filter((entry) => {
-          if (entry.isDirectory()) return false;
-          const ext = extOf(entry.name);
-          return MEDIA_EXT.has(ext) || BOOK_EXT.has(ext) || ARCHIVE_EXT.has(ext);
-        })
-        .map((entry) => path.join(dirPath, entry.name))
-        .sort();
-    } catch {
-      return [];
-    }
+    return listImportableFiles(dirPath);
   });
 }

@@ -4838,6 +4838,11 @@ export const en: Catalog = {
   'malDownload.provider': 'Source',
   'malDownload.note.noEpisodeList': 'This entry publishes no episode list, so its declared episode count is offered instead. Titles and air dates are unknown.',
   'malDownload.note.nothingListed': 'The catalogue lists nothing for this entry yet.',
+  'malDownload.note.catalogueBusy': 'The episode catalogue did not answer (it may be busy). Try again in a moment.',
+  'malDownload.note.catalogueBusyPlaceholders': {
+    one: 'The episode catalogue did not answer (it may be busy), so {count} episode is listed by number only. Try again later for titles and air dates.',
+    other: 'The episode catalogue did not answer (it may be busy), so {count} episodes are listed by number only. Try again later for titles and air dates.',
+  },
   'malDownload.amount': 'How much to download',
   'malDownload.mode.all': 'Everything',
   'malDownload.mode.range': 'Range',

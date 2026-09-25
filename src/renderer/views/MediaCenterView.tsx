@@ -27,7 +27,7 @@ import {
 } from '../components/media/MediaContent';
 import SeanimeStudyLibraryPanel from '../components/reading/SeanimeStudyLibraryPanel';
 import SeanimeWatchLoopPanel from '../components/reading/SeanimeWatchLoopPanel';
-import { onMediaCenterIntent, takeMediaCenterIntent } from '../mediaCenterIntent';
+import { onMediaCenterIntent, onMediaCenterPlay, takeMediaCenterIntent, takeMediaCenterPlay } from '../mediaCenterIntent';
 import { useStudyReadiness } from '../useStudyReadiness';
 import MediaLibraryShell from '../components/media/library/MediaLibraryShell';
 import MediaArtwork from '../components/media/library/MediaArtwork';
@@ -56,6 +56,7 @@ import {
   useWatchLibrary,
 } from '../components/media/gum/gumBackend';
 import { useHomeLayout, useLibraryPrefs, useSavedViews } from '../components/media/gum/useGumPrefs';
+import { useGumRoutePersistence } from '../components/media/gum/gumRoute';
 import { fitTopNav } from '../components/media/gum/gumTopNav';
 import '../components/media/gum/gum.css';
 import MalDownloadDialog from '../components/discover/MalDownloadDialog';
@@ -1835,6 +1836,17 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     setTab('video');
   });
 
+  // A single video dropped on the window (`DropRouter`) plays, rather than only landing in
+  // the library. Taken on mount too: the drop may be what opened this window.
+  useEffect(() => {
+    const apply = (): void => {
+      const item = takeMediaCenterPlay();
+      if (item) playItem(item);
+    };
+    apply();
+    return onMediaCenterPlay(apply);
+  }, [playItem]);
+
   /** A file's resume position from the shared resume store (the workspace writes it). */
   const resumeAt = useStableCallback((item: MediaItem): number | undefined => {
     const row = continueRows.find((candidate) => candidate.item?.id === item.id);
@@ -1871,6 +1883,15 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   const openTitle = useStableCallback((title: GumTitle) => {
     setTitleId(title.id);
     setTab('title');
+  });
+
+  // A restart comes back to the title page that was open (and playing), not the grid.
+  useGumRoutePersistence({
+    enabled: initialTab === 'library' || initialTab === 'home',
+    tab,
+    titleId,
+    titles,
+    restore: openTitle,
   });
 
   const browse = useStableCallback((request: GumBrowseRequest) => {

@@ -4864,6 +4864,10 @@ export const ja: Catalog = {
   'malDownload.provider': '提供元',
   'malDownload.note.noEpisodeList': 'このエントリはエピソード一覧を公開していないため、公称エピソード数を表示しています。タイトルと放送日は不明です。',
   'malDownload.note.nothingListed': 'このエントリにはまだ何も登録されていません。',
+  'malDownload.note.catalogueBusy': 'エピソードカタログから応答がありません（混雑している可能性があります）。少し待ってからもう一度お試しください。',
+  'malDownload.note.catalogueBusyPlaceholders': {
+    other: 'エピソードカタログから応答がないため（混雑している可能性があります）、{count} 話を番号だけで表示しています。タイトルと放送日は後でもう一度お試しください。',
+  },
   'malDownload.amount': 'ダウンロードする量',
   'malDownload.mode.all': 'すべて',
   'malDownload.mode.range': '範囲',

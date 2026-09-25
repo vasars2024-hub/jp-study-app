@@ -450,6 +450,17 @@ export default function GumLibrary({
                   <button type="button" className="gum-btn gum-btn--ghost" onClick={onImport}>{t('gum.empty.import')}</button>
                 </div>
               </>
+            ) : search.trim() && prefs.status !== 'all' && counts.all > 0 ? (
+              // A search inside a status tab said "Nothing matches" while All held the
+              // matches: say where they are, one click away.
+              <>
+                <strong>{t('gum.library.matchesInAll', { count: counts.all })}</strong>
+                <div className="gum-empty__actions">
+                  <button type="button" className="gum-btn gum-btn--primary" onClick={() => setPrefs((current) => ({ ...current, status: 'all' }))}>
+                    {t('gum.library.showInAll')}
+                  </button>
+                </div>
+              </>
             ) : filtered ? (
               <>
                 <strong>{t('gum.library.noMatch')}</strong>
@@ -475,6 +486,8 @@ export default function GumLibrary({
             rowHeight={prefs.view === 'list' ? LIST_ROW : rowHeight}
             getKey={titleKey}
             renderItem={renderCard}
+            // One Tab stop and arrow keys between posters, announced as a grid (K12).
+            grid={{ label: t('gum.library.title') }}
           />
         )}
       </div>

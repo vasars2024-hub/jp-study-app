@@ -48,6 +48,7 @@ vi.mock('../scraper/http', async () => {
 });
 
 const { listMalUnits } = await import('../scraper/malUnits');
+const { MAL_UNITS_CATALOGUE_BUSY } = await import('../../shared/malDownload');
 
 const JIKAN_ANIME = {
   mal_id: 52991,
@@ -160,12 +161,42 @@ describe('listMalUnits', () => {
     expect(routes.hits.every((hit) => hit.startsWith('https://graphql.anilist.co'))).toBe(true);
   });
 
-  it('fails loudly when the catalogue has no such entry', async () => {
+  // Round-2 J3: an unanswered lookup used to throw "The catalogue has no jikan entry
+  // 34798." — English, jargon, and a dead end. It is a code now, which the dialog
+  // translates, and a known episode count still yields a list to pick from.
+  it('answers a catalogue that did not respond with a code, not an English sentence', async () => {
     routes.jikanDetailStatus = 404;
     routes.jikanDetailBody = '';
-    await expect(
-      listMalUnits({ contentType: 'anime', provider: 'jikan', id: 999_999 }),
-    ).rejects.toThrow(/no jikan entry/i);
+    const result = await listMalUnits({ contentType: 'anime', provider: 'jikan', id: 999_999 });
+    expect(result.note).toBe(MAL_UNITS_CATALOGUE_BUSY);
+    expect(result.units).toEqual([]);
+    expect(JSON.stringify(result)).not.toMatch(/no jikan entry/i);
+  });
+
+  it('falls back to placeholder episodes from the count the library knows', async () => {
+    routes.jikanDetailStatus = 404;
+    routes.jikanDetailBody = '';
+    const result = await listMalUnits({
+      contentType: 'anime',
+      provider: 'jikan',
+      id: 34798,
+      known: { title: 'Yuru Camp', nativeTitle: 'ゆるキャン△', episodeCount: 12 },
+    });
+    expect(result.note).toBe(MAL_UNITS_CATALOGUE_BUSY);
+    expect(result.units).toHaveLength(12);
+    expect(result.units[0]).toMatchObject({ number: 1, label: 'EP 01', title: '' });
+    expect(result.target).toMatchObject({ title: 'Yuru Camp', romajiTitle: 'Yuru Camp', totalUnits: 12 });
+  });
+
+  it('ignores a malformed known count instead of flooding the list', async () => {
+    routes.jikanDetailStatus = 404;
+    const result = await listMalUnits({
+      contentType: 'anime',
+      provider: 'jikan',
+      id: 1,
+      known: { title: 'x', episodeCount: Number.NaN },
+    });
+    expect(result.units).toEqual([]);
   });
 
   it('refuses manga instead of quietly entering the anime catalogue', async () => {

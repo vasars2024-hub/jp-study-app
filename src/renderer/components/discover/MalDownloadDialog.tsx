@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   DEFAULT_MAL_SELECTION,
+  MAL_UNITS_CATALOGUE_BUSY,
   chapterLabel,
   parseUnitNumber,
   filterMalReleases,
@@ -130,6 +131,8 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
   const [listedUnits, setListedUnits] = useState<MalDownloadUnit[]>([]);
   const [servedBy, setServedBy] = useState('');
   const [note, setNote] = useState('');
+  /** Bumped by "Try again" when the catalogue was busy, to re-run the unit load. */
+  const [unitsAttempt, setUnitsAttempt] = useState(0);
   const [selection, setSelection] = useState<MalDownloadSelection>(DEFAULT_MAL_SELECTION);
 
   const [providers, setProviders] = useState<ReadingMangaProvider[]>([]);
@@ -252,6 +255,13 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
       contentType: 'anime',
       provider: candidate.provider,
       id: candidate.id,
+      // A busy catalogue still yields a list from the count the caller knows.
+      known: {
+        title: candidate.title,
+        nativeTitle: candidate.nativeTitle,
+        posterUrl: candidate.posterUrl,
+        episodeCount: candidate.episodeCount,
+      },
     })
       .then((result) => {
         if (dead) return;
@@ -271,7 +281,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
     return () => {
       dead = true;
     };
-  }, [candidate.id, candidate.provider, isManga, t]);
+  }, [candidate.id, candidate.provider, candidate.title, candidate.nativeTitle, candidate.posterUrl, candidate.episodeCount, isManga, t, unitsAttempt]);
 
   // What the local library already holds for this work. Read once per open —
   // the batch below updates the set itself as chapters land, so a re-read after
@@ -1018,6 +1028,16 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
             ) : null}
             {note === 'nothing-listed' ? (
               <p className="mal-dl-note" role="status">{t('malDownload.note.nothingListed')}</p>
+            ) : null}
+            {note === MAL_UNITS_CATALOGUE_BUSY ? (
+              <p className="mal-dl-note" role="status">
+                {listedUnits.length
+                  ? t('malDownload.note.catalogueBusyPlaceholders', { count: listedUnits.length })
+                  : t('malDownload.note.catalogueBusy')}{' '}
+                <button type="button" className="btn" onClick={() => setUnitsAttempt((n) => n + 1)}>
+                  {t('common.tryAgain')}
+                </button>
+              </p>
             ) : null}
             {note === 'no-manga-provider' ? (
               <p className="mal-dl-note" role="status">{t('malDownload.note.noMangaProvider')}</p>

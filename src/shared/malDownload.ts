@@ -513,7 +513,19 @@ export interface MalUnitsInput {
   contentType: AcquisitionContentType;
   provider: DiscoveryProviderId;
   id: number;
+  /**
+   * What the caller already knows about the title (the library or the search result),
+   * used when the catalogue does not answer: a placeholder episode list from a known
+   * count beats a dead end.
+   */
+  known?: { title: string; nativeTitle?: string; posterUrl?: string; episodeCount?: number };
 }
+
+/**
+ * `MalUnitsResult.note` when the catalogue did not answer the id lookup (rate limit,
+ * 5xx, offline). A code, not a sentence: the renderer says it in the UI language.
+ */
+export const MAL_UNITS_CATALOGUE_BUSY = 'catalogue-busy';
 
 export interface MalUnitsResult {
   target: MalDownloadTarget;

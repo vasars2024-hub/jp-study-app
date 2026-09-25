@@ -109,12 +109,58 @@ function sniffJson(filePath: string): DropCandidate[] | null {
   }
 }
 
+/** How deep an import walks below the dropped folder (shows/Season 1/extras is depth 2). */
+export const FOLDER_IMPORT_MAX_DEPTH = 4;
+
+/**
+ * Folders a walk never enters: dot-folders, Windows' recycle bin and volume metadata,
+ * NAS thumbnail stores and macOS resource forks. Dropping a drive or a NAS share must
+ * not import someone's deleted files or a thumbnail cache.
+ */
+export function isSkippedFolder(name: string): boolean {
+  if (name.startsWith('.') || name.startsWith('$')) return true;
+  const lower = name.toLowerCase();
+  return lower === 'system volume information' || lower === '__macosx' || lower === '@eadir' || lower === 'node_modules';
+}
+
+/**
+ * Importable files (media, books, archives) inside a dropped folder and its subfolders,
+ * sorted. The planner already scanned recursively — a parent folder of shows was
+ * classified as media — but the import listed only the files directly inside it, found
+ * none (every episode sits in a show's own folder) and refused the drop as empty. Both
+ * now walk the same way: bounded depth, the same skip list, the same file cap.
+ */
+export function listImportableFiles(dirPath: string, maxDepth = FOLDER_IMPORT_MAX_DEPTH): string[] {
+  const found: string[] = [];
+  const stack: Array<{ dir: string; depth: number }> = [{ dir: dirPath, depth: 0 }];
+  while (stack.length && found.length < FOLDER_SCAN_LIMIT) {
+    const { dir, depth } = stack.pop() as { dir: string; depth: number };
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (depth < maxDepth && !isSkippedFolder(entry.name)) stack.push({ dir: full, depth: depth + 1 });
+        continue;
+      }
+      const ext = extOf(entry.name);
+      if (MEDIA_EXT.has(ext) || BOOK_EXT.has(ext) || ARCHIVE_EXT.has(ext)) found.push(full);
+      if (found.length >= FOLDER_SCAN_LIMIT) break;
+    }
+  }
+  return found.sort();
+}
+
 function scanFolder(dirPath: string): FolderSummary {
   const summary: FolderSummary = { images: 0, media: 0, books: 0, subtitles: 0, other: 0, truncated: false };
   let seen = 0;
-  const stack = [dirPath];
+  const stack: Array<{ dir: string; depth: number }> = [{ dir: dirPath, depth: 0 }];
   while (stack.length) {
-    const current = stack.pop() as string;
+    const { dir: current, depth } = stack.pop() as { dir: string; depth: number };
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(current, { withFileTypes: true });
@@ -128,7 +174,9 @@ function scanFolder(dirPath: string): FolderSummary {
       }
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        stack.push(full);
+        // Same bounds as the import (`listImportableFiles`), so the triage sheet counts
+        // exactly the files a confirm would bring in.
+        if (depth < FOLDER_IMPORT_MAX_DEPTH && !isSkippedFolder(entry.name)) stack.push({ dir: full, depth: depth + 1 });
         continue;
       }
       seen += 1;

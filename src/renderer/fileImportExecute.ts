@@ -25,6 +25,7 @@
  */
 import type { DropTargetId } from '../shared/fileRouting';
 import type { SubtitleAttachRefusal } from '../shared/subtitleDiscoveryIpc';
+import type { MediaItem } from '../shared/types';
 import { apkgImportNotice, importApkgCards, importApkgToLevel } from './apkgImport';
 import { removeDeckCards } from './flashcardDeck';
 import { flushLevelListsPersistence, removeLevelList, upsertSlotList, type LevelList } from './levelLists';
@@ -58,6 +59,11 @@ export interface ImportHooks {
   onOpenSection?: (section: string) => void;
   /** An i18n key plus the file it is about. Called instead of returning a receipt. */
   onRefused?: (reasonKey: string, subject: ImportSubject) => void;
+  /**
+   * A single video file landed in the media library: play it. Opt-in (the drop router
+   * sets it for a one-file drop) — a batch import must never start playing things.
+   */
+  onPlayMedia?: (item: MediaItem) => void;
 }
 
 export const IMPORT_REFUSE_FAILED = 'fileDrop.toast.failed';
@@ -127,6 +133,9 @@ export async function executeImport(
       if (!paths.length) return refuse(IMPORT_REFUSE_EMPTY_FOLDER);
       const items = await window.api.addMediaPaths(paths);
       hooks.onOpenSection?.('player');
+      // "→ Media player" used to add the file and leave the library open on the grid.
+      const added = items ?? [];
+      if (!subject.isDirectory && added.length === 1 && added[0].kind === 'video') hooks.onPlayMedia?.(added[0]);
       return {
         targetId: target,
         libraryIds: [],

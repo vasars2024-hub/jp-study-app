@@ -4839,6 +4839,10 @@ export const zh: Catalog = {
   'malDownload.provider': '来源',
   'malDownload.note.noEpisodeList': '该条目未公开分集列表，因此改用其标称集数。标题与播出日期未知。',
   'malDownload.note.nothingListed': '目录中暂无该条目的内容。',
+  'malDownload.note.catalogueBusy': '剧集目录没有响应（可能正忙）。请稍后重试。',
+  'malDownload.note.catalogueBusyPlaceholders': {
+    other: '剧集目录没有响应（可能正忙），因此仅按编号列出 {count} 集。稍后重试可获取标题和播出日期。',
+  },
   'malDownload.amount': '下载数量',
   'malDownload.mode.all': '全部',
   'malDownload.mode.range': '范围',

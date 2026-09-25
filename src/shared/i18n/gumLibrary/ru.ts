@@ -41,6 +41,7 @@ export const GUM_LIBRARY_RU: Catalog = {
   // Meta lines
   'gum.runtime.hm': '{h} ч {m} мин',
   'gum.runtime.m': '{m} мин',
+  'gum.runtime.s': '{s} с',
   'gum.meta.season': 'Сезон {n}',
   'gum.meta.seasons': { one: '{count} сезон', few: '{count} сезона', many: '{count} сезонов', other: '{count} сезона' },
   'gum.meta.episodes': { one: '{count} серия', few: '{count} серии', many: '{count} серий', other: '{count} серии' },
@@ -59,6 +60,7 @@ export const GUM_LIBRARY_RU: Catalog = {
   'gum.card.score': 'Ваша оценка: {score} из 10',
   'gum.card.minutesLeft': 'Осталось {m} мин',
   'gum.card.hoursLeft': 'Осталось {h} ч {m} мин',
+  'gum.card.secondsLeft': 'Осталось {s} с',
   'gum.badge.newEpisode': 'Новая серия',
   'gum.badge.new': 'Новое',
   'gum.badge.film': 'Фильм',
@@ -148,6 +150,13 @@ export const GUM_LIBRARY_RU: Catalog = {
   'gum.library.badges': 'Показывать на постерах',
   'gum.library.resultCount': { one: '{count} тайтл', few: '{count} тайтла', many: '{count} тайтлов', other: '{count} тайтла' },
   'gum.library.noMatch': 'Под эти фильтры ничего не подходит',
+  'gum.library.matchesInAll': {
+    one: 'В разделе «Все» найдено: {count}',
+    few: 'В разделе «Все» найдено: {count}',
+    many: 'В разделе «Все» найдено: {count}',
+    other: 'В разделе «Все» найдено: {count}',
+  },
+  'gum.library.showInAll': 'Показать в «Все»',
   'gum.library.emptyTab.all': 'Здесь пока пусто',
   'gum.library.emptyTab.watching': 'Ничего не смотрится. Начните что-нибудь — и оно появится здесь.',
   'gum.library.emptyTab.plan': 'Список «В планах» пуст',
@@ -265,6 +274,7 @@ export const GUM_LIBRARY_RU: Catalog = {
   // Title page
   'gum.title.status': 'Статус',
   'gum.title.notTracked': 'Не отслеживается',
+  'gum.title.derivedStatus': '{status} (по вашим файлам)',
   'gum.title.myRating': 'Моя оценка',
   'gum.title.ratingValue': '{n} из 10',
   'gum.title.unrated': 'Без оценки',

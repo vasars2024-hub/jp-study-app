@@ -1,4 +1,5 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { CELL_FOCUSABLE, gridKeyTarget } from './virtualGridNav';
 
 // Same windowing idea as VirtualList, but for a responsive multi-column card
 // grid (mirrors `grid-template-columns: repeat(auto-fill, minmax(minColWidth, 1fr))`).
@@ -28,7 +29,14 @@ export interface VirtualGridProps<T> {
   getKey: (item: T, index: number) => string | number;
   renderItem: (item: T, index: number) => ReactNode;
   emptyState?: ReactNode;
+  /**
+   * Opt-in ARIA grid: `role="grid"` with rows and gridcells, one Tab stop (a roving
+   * tabindex over the cells' controls) and arrow / Home / End / Page keys between cells,
+   * scrolling rows the window has not rendered yet into view. Omitted, nothing changes.
+   */
+  grid?: { label: string };
 }
+
 
 /**
  * How much to render while the viewport height is still unknown (or measured as
@@ -79,6 +87,7 @@ interface RowProps<T> {
   gap: number;
   getKey: (item: T, index: number) => string | number;
   renderItem: (item: T, index: number) => ReactNode;
+  asGrid: boolean;
 }
 
 /**
@@ -88,7 +97,7 @@ interface RowProps<T> {
  */
 function sameRow<T>(a: RowProps<T>, b: RowProps<T>): boolean {
   if (a.row !== b.row || a.top !== b.top || a.height !== b.height || a.columns !== b.columns
-    || a.template !== b.template || a.justify !== b.justify || a.gap !== b.gap
+    || a.template !== b.template || a.justify !== b.justify || a.gap !== b.gap || a.asGrid !== b.asGrid
     || a.renderItem !== b.renderItem || a.slice.length !== b.slice.length) return false;
   for (let i = 0; i < a.slice.length; i += 1) if (a.slice[i] !== b.slice[i]) return false;
   return true;
@@ -98,9 +107,11 @@ function sameRow<T>(a: RowProps<T>, b: RowProps<T>): boolean {
  * One row, memoised: scrolling by a row re-renders the row that entered and the
  * one that left, not every card on screen.
  */
-const GridRow = memo(function GridRow<T>({ row, slice, top, height, columns, template, justify, gap, getKey, renderItem }: RowProps<T>) {
+const GridRow = memo(function GridRow<T>({ row, slice, top, height, columns, template, justify, gap, getKey, renderItem, asGrid }: RowProps<T>) {
   return (
     <div
+      role={asGrid ? 'row' : undefined}
+      aria-rowindex={asGrid ? row + 1 : undefined}
       style={{
         position: 'absolute',
         top,
@@ -114,7 +125,18 @@ const GridRow = memo(function GridRow<T>({ row, slice, top, height, columns, tem
       }}
     >
       {slice.map((item, i) => (
-        <div key={getKey(item, row * columns + i)}>{renderItem(item, row * columns + i)}</div>
+        asGrid ? (
+          <div
+            key={getKey(item, row * columns + i)}
+            role="gridcell"
+            aria-colindex={i + 1}
+            data-vgrid-cell={row * columns + i}
+          >
+            {renderItem(item, row * columns + i)}
+          </div>
+        ) : (
+          <div key={getKey(item, row * columns + i)}>{renderItem(item, row * columns + i)}</div>
+        )
       ))}
     </div>
   );
@@ -132,8 +154,12 @@ export default function VirtualGrid<T>({
   getKey,
   renderItem,
   emptyState,
+  grid,
 }: VirtualGridProps<T>) {
   const [containerRef, size] = useMeasuredBox<HTMLDivElement>();
+  /** The grid's one Tab stop (a cell index), and a cell waiting to be focused once rendered. */
+  const [active, setActive] = useState(0);
+  const focusPending = useRef<number | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const rafRef = useRef<number | null>(null);
 
@@ -184,6 +210,58 @@ export default function VirtualGrid<T>({
   const template = capped ? `repeat(${columns}, ${colWidth}px)` : `repeat(${columns}, minmax(0, 1fr))`;
   const justify = capped ? 'center' : undefined;
 
+  const activeCell = Math.min(active, Math.max(0, items.length - 1));
+
+  // Roving tabindex: only the active cell's controls are in the Tab order. Written to the
+  // DOM (the cards' own markup is the caller's), after every render so recycled rows follow.
+  useLayoutEffect(() => {
+    const root = containerRef.current;
+    if (!grid || !root) return;
+    for (const cell of root.querySelectorAll<HTMLElement>('[data-vgrid-cell]')) {
+      const tabIndex = Number(cell.dataset.vgridCell) === activeCell ? 0 : -1;
+      for (const control of cell.querySelectorAll<HTMLElement>(CELL_FOCUSABLE)) control.tabIndex = tabIndex;
+    }
+    const pending = focusPending.current;
+    if (pending === null) return;
+    const target = root.querySelector<HTMLElement>(`[data-vgrid-cell="${pending}"]`)?.querySelector<HTMLElement>(CELL_FOCUSABLE);
+    if (target) {
+      focusPending.current = null;
+      target.focus({ preventScroll: true });
+    }
+  });
+
+  const onGridFocus = useCallback((event: FocusEvent<HTMLDivElement>) => {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-vgrid-cell]');
+    if (cell) setActive(Number(cell.dataset.vgridCell));
+  }, []);
+
+  const pageRows = Math.max(1, Math.floor(viewportH / resolvedRowHeight));
+  const onGridKey = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-vgrid-cell]');
+    if (!cell || event.altKey || event.metaKey) return;
+    const from = Number(cell.dataset.vgridCell);
+    const to = gridKeyTarget(event.key, event.ctrlKey, from, items.length, columns, pageRows);
+    if (to === null) return;
+    event.preventDefault();
+    if (to === from) return;
+    setActive(to);
+    focusPending.current = to;
+    // Bring the target row inside the viewport; the window then renders it and the layout
+    // effect above focuses it.
+    const root = containerRef.current;
+    if (!root) return;
+    const top = Math.floor(to / columns) * resolvedRowHeight;
+    const bottom = top + resolvedRowHeight;
+    const view = root.clientHeight || viewportH;
+    let next = root.scrollTop;
+    if (top < next) next = top;
+    else if (bottom > next + view) next = bottom - view;
+    if (next !== root.scrollTop) {
+      root.scrollTop = next;
+      setScrollTop(next);
+    }
+  }, [items.length, columns, pageRows, resolvedRowHeight, viewportH, containerRef]);
+
   const rows = useMemo(() => {
     const out: { row: number; slice: T[] }[] = [];
     for (let r = startRow; r < endRow; r++) {
@@ -193,11 +271,22 @@ export default function VirtualGrid<T>({
   }, [items, startRow, endRow, columns]);
 
   return (
-    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll}>
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ overflowY: 'auto', position: 'relative', ...style }}
+      onScroll={onScroll}
+      role={grid && items.length ? 'grid' : undefined}
+      aria-label={grid && items.length ? grid.label : undefined}
+      aria-rowcount={grid && items.length ? rowCount : undefined}
+      aria-colcount={grid && items.length ? columns : undefined}
+      onKeyDown={grid ? onGridKey : undefined}
+      onFocus={grid ? onGridFocus : undefined}
+    >
       {items.length === 0
         ? emptyState ?? null
         : (
-          <div style={{ height: totalHeight, position: 'relative' }}>
+          <div style={{ height: totalHeight, position: 'relative' }} role={grid ? 'presentation' : undefined}>
             {rows.map(({ row, slice }) => (
               <GridRow
                 key={row}
@@ -211,6 +300,7 @@ export default function VirtualGrid<T>({
                 gap={gap}
                 getKey={getKey}
                 renderItem={renderItem}
+                asGrid={!!grid}
               />
             ))}
           </div>
