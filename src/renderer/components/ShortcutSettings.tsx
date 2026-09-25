@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { confirmDialog, promptDialog } from './ui';
 import { useT } from '../i18n';
-import { commandCategory, commandLabel } from '../commandI18n';
+import { commandCategory, commandLabel, commandNote } from '../commandI18n';
 import {
   addCustomCommand,
   addShortcutProfile,
@@ -65,6 +65,11 @@ function appSectionLabel(id: string, fallback: string, t: TFn): string {
 
 function displayLabel(r: BindingRow, t: TFn): string {
   return r.custom ? r.label : commandLabel(r.id, r.label, t);
+}
+
+/** Custom rows describe themselves in the live language already (keyboardShortcuts). */
+function displayNote(r: BindingRow, t: TFn): string | undefined {
+  return r.custom ? r.note : commandNote(r.id, r.note, t, r.category === 'Toolbox' ? r.scope : undefined);
 }
 
 type CaptureMode = 'replace' | 'add';
@@ -216,7 +221,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         r.id.toLowerCase().includes(q) ||
         cat.toLowerCase().includes(q) ||
         r.category.toLowerCase().includes(q) ||
-        (r.note?.toLowerCase().includes(q) ?? false)
+        (displayNote(r, t)?.toLowerCase().includes(q) ?? false)
       );
     });
   }, [rows, query, lang]);
@@ -592,7 +597,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
               >
                 <div className="sc-row-text">
                   <span className="sc-label">{displayLabel(r, t)}</span>
-                  {r.note && <span className="sc-note muted">{r.note}</span>}
+                  {r.note && <span className="sc-note muted">{displayNote(r, t)}</span>}
                   {r.conflictsWith.length > 0 && (
                     <span className="sc-conflict">
                       {t('settings.shortcuts.alsoBound', {
