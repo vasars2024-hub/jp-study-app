@@ -55,3 +55,19 @@ describe('the reader highlight and the comprehensibility score in Russian', () =
     expect(score.knownWords).toBe(2);
   });
 });
+
+describe('Game Arena content follows the study language', () => {
+  it('deals only the study language cards, and finds a Russian form in its sentence', async () => {
+    const { addDeckCardsTracked } = await import('../flashcardDeck');
+    const { loadArenaContent, surfaceInSentence } = await import('../games/contentStore');
+    localStorage.clear();
+    addDeckCardsTracked([
+      { word: '猫', reading: 'ねこ', meaning: 'cat', source: 'epub', sentence: '猫が好き。' },
+      { word: 'книга', reading: '', meaning: 'book', source: 'epub', sentence: 'Я читаю книгу.', studyLang: 'ru' },
+    ]);
+    setStudyLang('ru');
+    const content = loadArenaContent('beginner' as never);
+    expect(content.sentences.map((card) => card.word)).toEqual(['книга']);
+    expect(surfaceInSentence('Я читаю книгу.', 'книга')).toBe('книгу');
+  });
+});
