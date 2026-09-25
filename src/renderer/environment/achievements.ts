@@ -1,7 +1,7 @@
 /**
  * Study milestone detector — emits companion events for streaks & daily goals (L5).
  */
-import { getSummary, READING_RECORDED_EVENT } from '../stats';
+import { formatNumber, getSummary, READING_RECORDED_EVENT } from '../stats';
 import { emitCompanionEvent } from './companionEvents';
 import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
 import { t } from '../i18n';
@@ -64,7 +64,7 @@ export function checkAchievements(): void {
   }
   if (bestChars > 0) {
     state.lastDailyCharsBucket = bestChars;
-    emitCompanionEvent('achievement', `${bestChars.toLocaleString()} characters today`);
+    emitCompanionEvent('achievement', `${formatNumber(bestChars)} characters today`);
   }
 
   // Additive keepsakes — never blocks or alters the streak celebration above.

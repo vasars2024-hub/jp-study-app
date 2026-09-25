@@ -105,6 +105,7 @@ import {
 import type { StudyListeningAvailability } from '../../../shared/studyListeningFirstRecipe';
 import { inspectStudyListeningAudio } from '../../studyListeningAudio';
 import { STUDY_LANG_NATIVE_NAME } from '../../../shared/studyLang';
+import { formatNumber } from '../../stats';
 
 const CARD_MIN_WIDTH = 230;
 const CARD_GAP = 12;
@@ -2446,7 +2447,7 @@ export function MediaHubStoragePanel({ items }: { items: MediaItem[] }) {
         )}
         {scan && (
           <div className="media-hub-scan" role="status">
-            {t('media.storage.scanSummary', { files: scan.files.length, bytes: scan.totalBytes.toLocaleString() })}
+            {t('media.storage.scanSummary', { files: scan.files.length, bytes: formatNumber(scan.totalBytes) })}
           </div>
         )}
       </MediaCollapsibleSection>

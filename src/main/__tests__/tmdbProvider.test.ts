@@ -165,3 +165,10 @@ describe('findTmdbTv', () => {
     expect(requested).toHaveLength(1);
   });
 });
+
+describe('native titles in every study language', () => {
+  it('keeps a Russian film\'s original title as its native title', () => {
+    const work = tmdbMovieToWork({ id: 1, title: 'Brother', original_title: 'Брат', original_language: 'ru' } as Parameters<typeof tmdbMovieToWork>[0]);
+    expect(work.nativeTitle).toBe('Брат');
+  });
+});

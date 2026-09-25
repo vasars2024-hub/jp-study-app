@@ -567,7 +567,7 @@ export default function ReaderCollectionPanel({
     setStatusKind('ok');
     setStatusMsg(
       known.length
-        ? `Removed ${known.length} familiar or known vocabulary card${known.length === 1 ? '' : 's'}.`
+        ? t('readerCollection.msg.removedKnownVocab', { count: known.length })
         : t('readerCollection.msg.noKnownVocab'),
     );
   };

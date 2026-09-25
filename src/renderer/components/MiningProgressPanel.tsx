@@ -1,5 +1,6 @@
 import type { MiningEnrichHealth, MiningEnrichProgress } from '../../shared/mining';
 import { useT } from '../i18n';
+import { formatNumber } from '../stats';
 
 type Props = {
   progress: MiningEnrichProgress | null;
@@ -100,7 +101,7 @@ export default function MiningProgressPanel({ progress, active = true, compact }
       )}
       {progress.total > 0 && (
         <p className="muted mining-progress-count">
-          {progress.done.toLocaleString()} / {progress.total.toLocaleString()}
+          {formatNumber(progress.done)} / {formatNumber(progress.total)}
         </p>
       )}
     </div>

@@ -109,6 +109,7 @@ export default function StudyLanguageSection() {
           description={t('settings.study.setup.desc', {
             count: required.length,
             size: sizeLabel,
+            lang: t(STUDY_LANG_NAME_KEY[studyLang]),
           })}
           highlight={focusSettingId === 'study-language-setup'}
         >
