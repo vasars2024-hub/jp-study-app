@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GRAMMAR, importUserGrammar, type NormalizedGrammarPoint } from '../../data/grammar';
 import { parseGrammarImport } from '../../data/grammar/userImport';
-import { getStudyLang } from '../../studyEnvironment';
+import { contentLangOf, getStudyLang } from '../../studyEnvironment';
 import { dedupeGrammarByTitle } from '../../data/grammar/practiceFilters';
 import {
   ISSUE_TYPES,
@@ -133,7 +133,7 @@ export default function GrammarCurationPanel() {
               <input type="checkbox" checked={checked} onChange={() => toggle(p.id)} />
             )}
             <span className="gram-cur-level">{p.level}</span>
-            <span className="gram-cur-title" lang="ja">
+            <span className="gram-cur-title" lang={contentLangOf(p.lang)}>
               {p.title}
             </span>
             <span className="gram-cur-meaning">{p.meaning}</span>
@@ -152,7 +152,7 @@ export default function GrammarCurationPanel() {
             <ul className="gram-cur-examples">
               {p.examples.map((ex, i) => (
                 <li key={i}>
-                  <span lang="ja">{ex.jp}</span>
+                  <span lang={contentLangOf(p.lang)}>{ex.jp}</span>
                   <span className="gram-cur-en">{ex.en}</span>
                 </li>
               ))}

@@ -27,6 +27,8 @@ import {
   routeAgentContext,
 } from '../../agentContextHandoff';
 import { useT } from '../../i18n';
+import { contentLangOf } from '../../studyEnvironment';
+import { normalizeStudyLang } from '../../../shared/studyLang';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 type CatFilter = 'All' | GuideCategory;
@@ -76,7 +78,8 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
   async function loadExamples() {
     setExState('loading');
     setExError('');
-    const r = await window.api.searchExamples(exampleQuery(point));
+    // The point's own language: a Chinese or Russian pattern's examples are not Japanese.
+    const r = await window.api.searchExamples(exampleQuery(point), undefined, normalizeStudyLang(point.lang));
     if (r.error) {
       setExState('error');
       setExError(r.error);
@@ -113,7 +116,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
       {/* `lq-hit-scope`: the Ask-agent button measured 209x31 live — half a pixel
           under the floor, which no reviewer would ever see and the walk reports. */}
       <header className="gram-card-head lq-hit-scope">
-        <h2 lang="ja">{point.title}</h2>
+        <h2 lang={contentLangOf(point.lang)}>{point.title}</h2>
         <span className={`gram-badge lv-${point.level}`}>{point.level}</span>
         <button data-ai-entry type="button" className="gram-ask-agent" onClick={askAgent}>
           {t('grammar.askAgent')}
@@ -123,7 +126,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
 
       <div className="gram-block">
         <h3>{t('grammar.structure')}</h3>
-        <p className="gram-structure" lang="ja">
+        <p className="gram-structure" lang={contentLangOf(point.lang)}>
           {point.structure}
         </p>
       </div>
@@ -138,11 +141,11 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
         <ul className="gram-examples">
           {point.examples.map((ex, i) => (
             <li key={i}>
-              <span className="gram-ex-jp" lang="ja">
+              <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
                 {ex.jp}
               </span>
               {ex.reading && (
-                <span className="gram-ex-reading" lang="ja">
+                <span className="gram-ex-reading" lang={point.lang === 'zh' ? 'zh-Latn-pinyin' : contentLangOf(point.lang)}>
                   {ex.reading}
                 </span>
               )}
@@ -169,7 +172,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
           <ul className="gram-examples gram-examples-extra">
             {examples.map((ex, i) => (
               <li key={i}>
-                <span className="gram-ex-jp" lang="ja">
+                <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
                   {ex.jp}
                 </span>
                 <span className="gram-ex-en">{ex.en}</span>

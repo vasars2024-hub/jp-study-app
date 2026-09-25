@@ -197,3 +197,19 @@ describe('Grammar opens on the study language', () => {
     expect(loadPracticeFilters().lang).toBe('zh');
   });
 });
+
+describe('content tags follow the content language', () => {
+  it('a grammar point, a card and a clipboard line get their own language tag', async () => {
+    const { contentLangOf, cardContentLang, textContentLang } = await import('../studyEnvironment');
+    localStorage.clear();
+    setStudyLang('ja');
+    expect(contentLangOf('zh')).toBe('zh-Hans');
+    expect(contentLangOf('ru')).toBe('ru');
+    expect(contentLangOf(undefined)).toBe('ja');
+    expect(cardContentLang({ studyLang: 'ru' })).toBe('ru');
+    expect(cardContentLang({})).toBe('ja');
+    expect(textContentLang('Привет')).toBe('ru');
+    setChineseScript('traditional');
+    expect(contentLangOf('zh')).toBe('zh-Hant');
+  });
+});

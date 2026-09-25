@@ -89,6 +89,11 @@ export function cardContentLang(card: { studyLang?: string } | null | undefined)
   return studyContentLang(normalizeStudyLang(card?.studyLang));
 }
 
+/** The `lang` attribute for content in a given study language (Chinese by script). */
+export function contentLangOf(lang: string | undefined): string {
+  return studyContentLang(normalizeStudyLang(lang));
+}
+
 /**
  * The `lang` attribute for a piece of text whose language only its script can
  * tell (a clipboard entry, a selected sentence): kana → ja, Cyrillic → ru, Han

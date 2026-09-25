@@ -39,6 +39,7 @@ import { Button } from '../ui';
 import VirtualList from '../VirtualList';
 import GrammarBandControl from './GrammarBandControl';
 import GrammarFilterPanel from './GrammarFilterPanel';
+import { contentLangOf, studyContentLang } from '../../studyEnvironment';
 
 /** The two regions the toolbar's disclosures name through `aria-controls`. */
 const FILTERS_PANEL_ID = 'gram-x-filters-panel';
@@ -354,7 +355,7 @@ export default function GrammarExplorer({
           </label>
           <button className="gram-x-row-main" onClick={() => focus(p.id)}>
             <span className="gram-x-row-top">
-              <span className="gram-x-title" lang="ja">
+              <span className="gram-x-title" lang={contentLangOf(p.lang)}>
                 {p.title}
               </span>
               <span className={`gram-badge lv-${p.level}`}>{p.level}</span>
@@ -400,7 +401,7 @@ export default function GrammarExplorer({
           value={filters.query}
           onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
           placeholder={t('grammar.search.placeholder')}
-          lang="ja"
+          lang={filters.lang === 'all' ? studyContentLang() : contentLangOf(filters.lang)}
         />
         {/* A real APG disclosure, not a button that happens to toggle something: the panel it
             opens is named, and its state is announced. Both this and the selection drawer
@@ -569,7 +570,7 @@ export default function GrammarExplorer({
             <ul className="gram-x-drawer-list">
               {selectedPoints.map((p) => (
                 <li key={p.id} className={visibleIds.has(p.id) ? '' : 'hidden-by-filter'}>
-                  <span lang="ja">{p.title}</span>
+                  <span lang={contentLangOf(p.lang)}>{p.title}</span>
                   <span className="gram-x-drawer-level">{p.level}</span>
                   {!visibleIds.has(p.id) && (
                     <span className="gram-x-drawer-flag">{t('grammar.explorer.hiddenFlag')}</span>
