@@ -98,6 +98,23 @@ export function slotsForLang(lang: StudyLang): readonly LevelSlot[] {
   return lang === 'zh' ? ZH_SLOTS : JA_SLOTS;
 }
 
+/**
+ * The level slot a deck names, from its file or deck name: "JLPT N3",
+ * "Core N2 vocab", "HSK 4". `null` when the name says no level (or names one
+ * of the other language's scale) — a dropped deck is then refused by name
+ * rather than filed under a level it may not be.
+ */
+export function guessLevelSlot(name: string, lang: StudyLang): LevelSlot | null {
+  const text = name.replace(/[_\-.]+/g, ' ');
+  const slots = slotsForLang(lang);
+  if (lang === 'zh') {
+    const m = /\bhsk\s*([1-6])\b/i.exec(text);
+    return m ? slots.find((s) => s.id === `hsk-${m[1]}`) ?? null : null;
+  }
+  const m = /(?:\bjlpt\s*n?\s*|\bn)([0-5])\b/i.exec(text);
+  return m ? slots.find((s) => s.id === `jlpt-n${m[1]}`) ?? null : null;
+}
+
 export function tiersForLang(lang: StudyLang): readonly TierInfo[] {
   return lang === 'zh' ? ZH_TIERS : JA_TIERS;
 }

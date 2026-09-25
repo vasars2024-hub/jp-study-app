@@ -67,18 +67,21 @@ describe('gate 7 — the Notebook streams were absorbed, not dropped', () => {
     expect(vocabulary.length).toBe(15);
     expect(NOTEBOOK_STREAM_ABSORPTION.map((r) => r.stream).sort()).toEqual(vocabulary);
 
-    // The union is WIDER than what the Notebook actually rendered: `media` is
-    // declared but absent from NotebookContent's STREAM_KEYS, so no view ever
-    // asked for it. Auditing against STREAM_KEYS alone would have missed it,
-    // which is why the vocabulary above comes from the type.
-    const rendered = read('src/renderer/components/notebook/NotebookContent.tsx');
-    const keys = rendered.slice(
-      rendered.indexOf('STREAM_KEYS'),
-      rendered.indexOf('];', rendered.indexOf('STREAM_KEYS')),
+    // The union used to be WIDER than what the Notebook rendered: `media` was
+    // declared but absent from NotebookContent's hand-kept STREAM_KEYS, so no
+    // view ever asked for it (round-2 audit F). The list now comes from an
+    // exhaustive `Record<NotebookStream, …>` in notebook/views.ts; read it the
+    // same way and require the whole vocabulary.
+    const views = read('src/renderer/notebook/views.ts');
+    const order = views.slice(
+      views.indexOf('const STREAM_ORDER'),
+      views.indexOf('};', views.indexOf('const STREAM_ORDER')),
     );
-    const streamKeys = [...keys.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]).sort();
-    expect(streamKeys).toHaveLength(14);
-    expect(vocabulary.filter((s) => !streamKeys.includes(s))).toEqual(['media']);
+    const streamKeys = [...order.matchAll(/'?([a-z][a-z-]*)'?: \d+/g)].map((m) => m[1]).sort();
+    expect(streamKeys).toEqual(vocabulary);
+    expect(read('src/renderer/components/notebook/NotebookContent.tsx')).toMatch(
+      /STREAM_KEYS: NotebookStream\[\] = ALL_NOTEBOOK_STREAMS/,
+    );
     // Control: the equality above must be able to fail. Dropping one row breaks it.
     expect(NOTEBOOK_STREAM_ABSORPTION.slice(1).map((r) => r.stream).sort()).not.toEqual(
       vocabulary,

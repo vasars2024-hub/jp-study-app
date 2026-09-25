@@ -68,7 +68,24 @@ export function aggregateNotebook(sources: NotebookSources = {}): NotebookOvervi
   const titleOf = titleResolver(library);
   const entries: NotebookTimelineEntry[] = [];
 
+  /*
+   * One translation, one row. Every completed translation used to reach this
+   * list twice — its history entry (below) and the timeline row Translate
+   * appends on completion — and "Send to Notebook" added a third. A saved
+   * translation note (`meta.translationId`) stands for its history entry; a
+   * plain timeline row that repeats a history entry's preview is dropped.
+   */
+  const history = loadTranslationHistory();
+  const trKey = (title: string, detail: string | undefined): string =>
+    `${title.slice(0, 80)}\u0000${(detail ?? '').slice(0, 120)}`;
+  const historyKeys = new Set(history.map((tr) => trKey(tr.sourceText, tr.resultText)));
+  const savedTranslations = new Set<string>();
   for (const e of loadNotebookTimeline()) {
+    const translationId = e.meta?.translationId;
+    if (e.stream === 'translations') {
+      if (typeof translationId === 'string') savedTranslations.add(translationId);
+      else if (historyKeys.has(trKey(e.title, e.detail))) continue;
+    }
     push(entries, e);
   }
 
@@ -132,7 +149,8 @@ export function aggregateNotebook(sources: NotebookSources = {}): NotebookOvervi
     });
   }
 
-  for (const tr of loadTranslationHistory()) {
+  for (const tr of history) {
+    if (savedTranslations.has(tr.id)) continue;
     push(entries, {
       id: `tr-${tr.id}`,
       stream: 'translations',

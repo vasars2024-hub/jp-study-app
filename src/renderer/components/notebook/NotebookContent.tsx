@@ -21,29 +21,22 @@ import {
   type NotebookSources,
 } from '../../notebook/aggregate';
 import type { NotebookStream } from '../../notebookTimeline';
-import { NOTEBOOK_VIEWS, streamsForView, type NotebookViewId } from '../../notebook/views';
+import {
+  ALL_NOTEBOOK_STREAMS,
+  NOTEBOOK_VIEWS,
+  streamsForView,
+  type NotebookViewId,
+} from '../../notebook/views';
 import { buildLineageIndex, lineageForEntry } from '../../notebook/lineage';
 import { collectAllAnnotationsMap } from '../../annotations';
 import { loadDeck } from '../../flashcardDeck';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import './notebookLiquid.css';
 
-export const STREAM_KEYS: NotebookStream[] = [
-  'saved-words',
-  'lookups',
-  'flashcards',
-  'anki',
-  'mining',
-  'known',
-  'translations',
-  'plan',
-  'highlights',
-  'ocr',
-  'audio',
-  'clipboard',
-  'extension',
-  'transcript',
-];
+// Every stream, from the exhaustive list in `notebook/views.ts`. This was a
+// hand-kept copy that lacked `media`, so every media-assistant note was
+// invisible here.
+export const STREAM_KEYS: NotebookStream[] = ALL_NOTEBOOK_STREAMS;
 
 /** How many timeline rows we ever render — the same cap Study OS has always had. */
 export const TIMELINE_CAP = 400;

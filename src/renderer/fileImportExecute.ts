@@ -25,8 +25,10 @@
  */
 import type { DropTargetId } from '../shared/fileRouting';
 import type { SubtitleAttachRefusal } from '../shared/subtitleDiscoveryIpc';
-import { importApkgCards } from './apkgImport';
+import { apkgImportNotice, importApkgCards, importApkgToLevel } from './apkgImport';
 import { removeDeckCards } from './flashcardDeck';
+import { flushLevelListsPersistence, removeLevelList, upsertSlotList, type LevelList } from './levelLists';
+import type { LevelSlotId } from '../shared/levelScale';
 
 /** The minimum a plan needs to be importable. `DropPlan` satisfies it. */
 export interface ImportSubject {
@@ -45,6 +47,10 @@ export interface ImportReceipt {
   previousWallpaper?: string | null;
   /** Flashcards created by an .apkg card import, for exact removal on undo. */
   deckCardIds?: string[];
+  /** Level-check drop: the slot it filled and the list it replaced, for undo. */
+  levelSlot?: { slot: LevelSlotId; previous?: LevelList; createdId?: string };
+  /** What the import could not bring across, for the success message. */
+  notice?: string;
 }
 
 export interface ImportHooks {
@@ -57,6 +63,7 @@ export interface ImportHooks {
 export const IMPORT_REFUSE_FAILED = 'fileDrop.toast.failed';
 export const IMPORT_REFUSE_NO_DESTINATION = 'fileDrop.toast.noDestination';
 export const IMPORT_REFUSE_EMPTY_FOLDER = 'fileDrop.toast.emptyFolder';
+export const IMPORT_REFUSE_LEVEL_UNKNOWN = 'fileDrop.toast.levelNoSlot';
 
 /**
  * A subtitle attach refusal, as the key the toast can actually translate.
@@ -132,14 +139,25 @@ export async function executeImport(
       return { targetId: target, libraryIds: [], mediaIds: [], previousWallpaper: previous };
     }
     case 'anki-level': {
-      await window.api.importApkg(subject.path);
-      hooks.onOpenSection?.('anki');
-      return { targetId: target, libraryIds: [], mediaIds: [] };
+      // The Level page's own upload flow, then the meter. This used to call
+      // `importApkg` and throw the words away, reporting success.
+      const res = await importApkgToLevel(subject.path, subject.name);
+      if (!res.ok || !res.slot) {
+        return refuse(res.error === 'level-slot-unknown' ? IMPORT_REFUSE_LEVEL_UNKNOWN : IMPORT_REFUSE_FAILED);
+      }
+      hooks.onOpenSection?.('stats');
+      return {
+        targetId: target,
+        libraryIds: [],
+        mediaIds: [],
+        levelSlot: { slot: res.slot.id, previous: res.previous, createdId: res.previous ? undefined : `ll-${res.slot.id}` },
+      };
     }
     case 'anki-cards': {
       const res = await importApkgCards(subject.path);
       if (!res.ok) throw new Error(res.error ?? 'apkg-card-import-failed');
       hooks.onOpenSection?.('flashcards');
+      const notice = apkgImportNotice(res);
       // Undo removes exactly the rows this import created, by id — the deck is
       // shared with every other card source, so removing "the last N" or the
       // whole deck group would take the user's own cards with it.
@@ -148,6 +166,7 @@ export async function executeImport(
         libraryIds: [],
         mediaIds: [],
         deckCardIds: (res.added ?? []).map((c) => c.id),
+        ...(notice ? { notice } : {}),
       };
     }
     case 'dictionary-yomitan': {
@@ -206,6 +225,12 @@ export async function undoImports(receipts: readonly ImportReceipt[]): Promise<v
         await window.api.setWallpaperFromPath(receipt.previousWallpaper);
       }
       if (receipt.deckCardIds?.length) removeDeckCards(receipt.deckCardIds);
+      if (receipt.levelSlot) {
+        const { previous, createdId } = receipt.levelSlot;
+        if (previous?.slot) upsertSlotList(previous.slot, previous.label, previous.kind, previous.words);
+        else if (createdId) removeLevelList(createdId);
+        await flushLevelListsPersistence();
+      }
     } catch {
       /* a partially-reversible plan still reverses what it can */
     }

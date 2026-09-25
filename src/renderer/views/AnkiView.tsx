@@ -64,9 +64,27 @@ export default function AnkiView() {
       {loading && <div className="banner">{t('anki.checkingConnection')}</div>}
 
       {!loading && status && !status.connected && (
-        <div className="anki-card">
-          <AnkiDisconnected state={state} />
-        </div>
+        <>
+          <div className="anki-card">
+            <AnkiDisconnected state={state} />
+          </div>
+          {/* The mapping and the CSS are profile settings: both save without Anki,
+              the mapping is read at the next mine and the CSS is queued for the
+              note type (`anki:pushNoteStyling`). Hiding them until Anki answered
+              made two offline-capable editors unreachable. */}
+          <div className="anki-card anki-offline-editors">
+            <p className="muted anki-sub">{t('anki.offlineEditors')}</p>
+            <h2>{t('anki.fieldMapping.title')}</h2>
+            <p className="muted anki-sub">
+              {t('anki.fieldMapping.subPrefix')} <b>{model || '—'}</b>
+              {t('anki.fieldMapping.subSuffix')}
+            </p>
+            <AnkiFieldMapping state={state} />
+          </div>
+          <div className="anki-card anki-card-flush">
+            <AnkiNoteCss state={state} />
+          </div>
+        </>
       )}
 
       {!loading && status?.connected && (

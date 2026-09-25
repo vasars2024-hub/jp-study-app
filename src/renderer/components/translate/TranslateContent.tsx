@@ -22,7 +22,7 @@ import {
   removeTranslationHistory,
   type TranslationHistoryEntry,
 } from '../../translationHistory';
-import { appendNotebookEvent } from '../../notebookTimeline';
+import { appendNotebookEvent, saveTranslationNote } from '../../notebookTimeline';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
@@ -264,14 +264,15 @@ export async function copyText(text: string): Promise<void> {
  * The history list, identical in both shells.
  *
  * `onOpenNotebook` is injected: Study OS dispatches `os:open`, which does not
- * move Blanc's tabs.
+ * move Blanc's tabs. It receives the id of the note just saved, so the shell
+ * can open that note rather than a list to find it in.
  */
 export function TranslateHistoryList({
   state,
   onOpenNotebook,
 }: {
   state: TranslateController;
-  onOpenNotebook: () => void;
+  onOpenNotebook: (noteId: string) => void;
 }) {
   const { t, lang } = useT();
 
@@ -347,15 +348,10 @@ export function TranslateHistoryList({
                   className="btn ghost"
                   aria-label={named('translate.history.toNotebook')}
                   onClick={() => {
-                    appendNotebookEvent({
-                      stream: 'translations',
-                      title: e.sourceText.slice(0, 80),
-                      detail: e.resultText.slice(0, 120),
-                      folder: 'Translations',
-                      origin: e.origin,
-                      href: 'files',
-                    });
-                    onOpenNotebook();
+                    // One note per translation: a second click opens the note
+                    // already saved instead of appending another copy.
+                    const note = saveTranslationNote(e);
+                    onOpenNotebook(note.id);
                   }}
                 >
                   {t('translate.history.toNotebook')}

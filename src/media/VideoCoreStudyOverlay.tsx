@@ -143,6 +143,17 @@ import {
   useStudyDetach,
   type StudyDetachFrame,
 } from './useStudyDetach';
+import {
+  changedPreferenceKeys,
+  onPlayerPreferencesChanged,
+  writePlayerPreferencesPatch,
+} from '../renderer/playerPreferencesStore';
+import { setVolumeNormalization } from './volumeNormalization';
+import { registerLivePlayerProbe } from './livePlayerProbe';
+import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../renderer/subtitlesExport';
+
+/** This surface's name on `playerPreferencesStore` writes, so it ignores its own echo. */
+const VIDEO_CORE_PREFS_SOURCE = 'video-core';
 
 /** Run-up when jumping to a transcript line. See `seekTranscriptCue`. */
 const TRANSCRIPT_LEAD_IN_SEC = 1;
@@ -686,9 +697,45 @@ export default function VideoCoreStudyOverlay({
     [],
   );
 
+  /*
+   * Persist only what changed, over whatever is stored (round-2 audit B). This
+   * wrote the overlay's whole copy on every change, so a Media Center change
+   * made while the player was open — speed, toggles, the normalization switch —
+   * was overwritten by the next subtitle nudge. And a change the Media Center
+   * (or another window) makes is taken here, not ignored until the next mount.
+   */
+  const lastPersistedPrefsRef = React.useRef(preferences);
   React.useEffect(() => {
-    localStorage.setItem(PLAYER_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+    const before = lastPersistedPrefsRef.current;
+    lastPersistedPrefsRef.current = preferences;
+    const changed = changedPreferenceKeys(before, preferences);
+    if (!changed.length) return;
+    const patch: Record<string, unknown> = {};
+    for (const key of changed) patch[key as string] = preferences[key];
+    writePlayerPreferencesPatch(patch, VIDEO_CORE_PREFS_SOURCE);
   }, [preferences]);
+  React.useEffect(() => onPlayerPreferencesChanged(VIDEO_CORE_PREFS_SOURCE, (stored) => {
+    const next = normalizeVideoCoreStudyPreferences(stored);
+    lastPersistedPrefsRef.current = next;
+    setPreferences(next);
+  }), []);
+
+  // Volume normalization, on the element this player actually plays through.
+  // When it cannot be applied the preference goes back off, so the Media
+  // Center's toggle shows what is true (and says why — MediaContent).
+  React.useEffect(() => {
+    if (!video) return undefined;
+    let live = true;
+    const wanted = preferences.volumeNormalization === true;
+    void setVolumeNormalization(video, wanted).then((state) => {
+      if (live && wanted && (state === 'blocked' || state === 'unavailable')) {
+        updatePreference('volumeNormalization', false);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [video, preferences.volumeNormalization, updatePreference]);
 
   // Settings' Theme Studio ("bigger subtitles") can change the size while the player
   // is open. Only that one field is taken, so nothing else the player holds is lost.
@@ -2367,6 +2414,56 @@ export default function VideoCoreStudyOverlay({
   }, []);
 
   const audioTracks: MKVParser_TrackInfo[] = playbackInfo?.mkvMetadata?.audioTracks ?? [];
+
+  /*
+   * Player Diagnostics reads this player's live state from here (the Media
+   * Center's settings hold no element and no tracks). Refs, so the reader is
+   * registered once and always answers with the current values.
+   */
+  const diagnosticsStateRef = React.useRef({ playbackInfo, video, tracks, allCues, audioTracks, localFilePath });
+  diagnosticsStateRef.current = { playbackInfo, video, tracks, allCues, audioTracks, localFilePath };
+  React.useEffect(() => registerLivePlayerProbe(() => {
+    const s = diagnosticsStateRef.current;
+    if (!s.playbackInfo || !s.video) return null;
+    const v = s.video;
+    return {
+      streamType: String(s.playbackInfo.streamType ?? s.playbackInfo.playbackType ?? ''),
+      ...(s.localFilePath ? { localFilePath: s.localFilePath } : {}),
+      video: {
+        readyState: v.readyState,
+        networkState: v.networkState,
+        ...(v.error?.code ? { errorCode: v.error.code } : {}),
+        width: v.videoWidth,
+        height: v.videoHeight,
+        durationSec: Number.isFinite(v.duration) ? v.duration : 0,
+      },
+      audioTracks: s.audioTracks.map((a) => a.name || a.language || `#${a.number}`),
+      subtitleTracks: s.tracks.map((tr) => tr.label || tr.language || `#${tr.number}`),
+      cueCount: s.allCues.length,
+    };
+  }), []);
+
+  /*
+   * "Export subtitles": the loaded track as SRT or VTT. The export helpers
+   * existed with no control since the old player's menu was deleted; this is
+   * their door, in the player's own subtitle menu.
+   */
+  const exportSubtitles = React.useCallback((format: 'srt' | 'vtt') => {
+    const cues = allCuesRef.current.map((cue) => ({
+      start: cue.startMs / 1000,
+      end: cue.endMs / 1000,
+      text: stripAssCueText(cue.text),
+    }));
+    if (!cues.length) return;
+    const source = miningSourceFromPlayback(playbackInfo);
+    const base = [source?.mediaTitle, source?.episodeNumber != null ? String(source.episodeNumber) : '']
+      .filter(Boolean)
+      .join(' ')
+      .replace(/[\\/:*?"<>|]+/g, ' ')
+      .trim() || 'subtitles';
+    if (format === 'srt') downloadSubtitles(`${base}.srt`, cuesToSrt(cues), 'text/srt');
+    else downloadSubtitles(`${base}.vtt`, cuesToVtt(cues), 'text/vtt');
+  }, [playbackInfo]);
   const whisperBusy = whisperState === 'extracting'
     || whisperState === 'loading'
     || whisperState === 'transcribing';
@@ -3172,6 +3269,7 @@ export default function VideoCoreStudyOverlay({
         onChangeSubtitleDelay={changeSubtitleDelay}
         onResetSubtitleDelay={resetSubtitleDelay}
         onResetSubtitleAppearance={() => setPreferences(resetSubtitleAppearance)}
+        onExportSubtitles={allCues.length > 0 ? exportSubtitles : undefined}
         shortcutKeysFor={shortcutKeysFor}
         pauseOnLookup={pauseOnLookup}
         setPauseOnLookup={setPauseOnLookup}

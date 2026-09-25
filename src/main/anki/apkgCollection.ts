@@ -62,7 +62,7 @@ export function getSql(): Promise<SqlJsStatic> {
 
 // ----- collection extraction --------------------------------------------------
 
-const COMPRESSED_HELP =
+export const COMPRESSED_HELP =
   'This deck uses Anki’s newer compressed format. In Anki, open File → Export, choose "Anki Deck Package (*.apkg)", CHECK "Support older Anki versions", export, and import that file instead.';
 
 /**

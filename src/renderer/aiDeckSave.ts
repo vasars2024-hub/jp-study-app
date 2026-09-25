@@ -5,9 +5,10 @@ import { replaceImportedDeck } from './flashcardDeck';
 /**
  * @param bookId Overrides the id derived from the title.
  *
- * `deckBookId` slugs on `[^\w]+` and `\w` is ASCII-only, so every Japanese title
- * collapses to the same id — `chapterRange.test.ts` asserts the collision. That
- * has never bitten this function because its only caller passed an English
+ * `deckBookId` used to slug on `[^\w]+`, and `\w` is ASCII-only, so every
+ * Japanese title collapsed to the same id (fixed 2026-09; a title-derived id is
+ * now unique per title, but still changes when the title does). That never bit
+ * this function because its only caller passed an English
  * preset label, but an Agent-generated `book` batch is named after the book, and
  * `replaceImportedDeck` DELETES the matched `(bookId, bookTitle)` group before
  * inserting. So a caller that already holds a collision-free id — the one

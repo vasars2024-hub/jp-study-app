@@ -6,6 +6,13 @@ export interface CsvEditorSnapshot {
   table: CsvTable;
   title: string;
   hiddenColumns: number[];
+  /**
+   * The flashcard deck group this grid imports into. Set when a file is
+   * loaded and kept through title edits, so renaming the deck updates the same
+   * cards instead of starting a second deck. Absent on grids saved before it
+   * existed; the panel derives it from the title then.
+   */
+  deckId?: string;
 }
 
 export interface CsvEditorHistory {
@@ -26,6 +33,7 @@ function cloneSnapshot(snap: CsvEditorSnapshot): CsvEditorSnapshot {
   return {
     title: snap.title,
     hiddenColumns: [...snap.hiddenColumns],
+    ...(snap.deckId ? { deckId: snap.deckId } : {}),
     table: {
       ...snap.table,
       headers: [...snap.table.headers],

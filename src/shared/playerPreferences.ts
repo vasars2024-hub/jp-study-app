@@ -1,3 +1,5 @@
+import { SUBTITLE_POSITION_MAX } from './videoCoreStudy';
+
 export type SubtitleVerticalPosition = 'top' | 'center' | 'bottom';
 
 export interface PlayerPreferences {
@@ -31,7 +33,10 @@ export const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
   volumeNormalization: false,
   preferredAudioLanguage: '',
   subtitleFontSize: 26,
-  subtitlePosition: 'center',
+  // The player's own default is the lowest lift (`subtitlePosition: 0`), which is
+  // `bottom` in this vocabulary. `center` here made the Media Center claim a
+  // position the player never used.
+  subtitlePosition: 'bottom',
   subtitleOverlay: true,
   subtitleOverlayBackground: 35,
 };
@@ -52,6 +57,52 @@ export const DEFAULT_PLAYER_PREFERENCES: PlayerPreferences = {
  * defect; this restores it. Both readers normalize on load, so carrying the other owner's
  * fields through is inert for this player and load-bearing for the other.
  */
+/**
+ * The lift the Media Center's `center` choice writes into the player's numeric
+ * `subtitlePosition` (0..SUBTITLE_POSITION_MAX): half way up the free band.
+ */
+export const CENTER_SUBTITLE_LIFT = Math.round(SUBTITLE_POSITION_MAX / 2);
+
+/**
+ * What the Media Center writes when the user changes some of its controls —
+ * ONLY those keys, in the player's own vocabulary (round-2 audit B).
+ *
+ * The two surfaces share `jp-media-player-preferences-v1` and each used to
+ * write its whole copy on every change, so each reset the other's fields. And
+ * two keys collided outright: the Media Center stored `subtitlePosition` as
+ * `'top' | 'center' | 'bottom'` where the player stores a number, and its
+ * "overlay background" toggle had no effect on the player at all. Here the
+ * vertical position becomes the player's `subtitleAtTop` + numeric lift, and
+ * the background toggle becomes the player's `subtitleBgOpacity`.
+ */
+export function playerPreferencesPatch(
+  changed: Partial<PlayerPreferences>,
+  stored: unknown,
+): Record<string, unknown> {
+  const base = stored && typeof stored === 'object' && !Array.isArray(stored)
+    ? (stored as Record<string, unknown>)
+    : {};
+  const patch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(changed)) {
+    if (key === 'subtitlePosition') {
+      if (value === 'top') patch.subtitleAtTop = true;
+      else {
+        patch.subtitleAtTop = false;
+        patch.subtitlePosition = value === 'center' ? CENTER_SUBTITLE_LIFT : 0;
+      }
+    } else if (key === 'subtitleOverlay') {
+      const current = typeof base.subtitleBgOpacity === 'number' ? base.subtitleBgOpacity : 0;
+      const wanted = typeof changed.subtitleOverlayBackground === 'number'
+        ? changed.subtitleOverlayBackground
+        : DEFAULT_PLAYER_PREFERENCES.subtitleOverlayBackground;
+      patch.subtitleBgOpacity = value ? (current > 0 ? current : wanted) : 0;
+    } else {
+      patch[key] = value;
+    }
+  }
+  return patch;
+}
+
 export function mergeStoredPlayerPreferences(
   stored: unknown,
   next: PlayerPreferences,
@@ -73,11 +124,22 @@ export function normalizePlayerPreferences(value: unknown): PlayerPreferences {
   const fontSize = typeof raw.subtitleFontSize === 'number' && Number.isFinite(raw.subtitleFontSize)
     ? Math.round(Math.max(16, Math.min(48, raw.subtitleFontSize)))
     : DEFAULT_PLAYER_PREFERENCES.subtitleFontSize;
-  const subtitlePosition = (
-    raw.subtitlePosition === 'top'
-    || raw.subtitlePosition === 'center'
-    || raw.subtitlePosition === 'bottom'
-  ) ? raw.subtitlePosition : DEFAULT_PLAYER_PREFERENCES.subtitlePosition;
+  // The player's fields first — it owns them — then the legacy string this
+  // surface used to store, then the default.
+  const stored = value as Record<string, unknown>;
+  const subtitlePosition: SubtitleVerticalPosition = stored.subtitleAtTop === true
+    ? 'top'
+    : typeof stored.subtitlePosition === 'number' && Number.isFinite(stored.subtitlePosition)
+      ? (stored.subtitlePosition >= CENTER_SUBTITLE_LIFT / 2 ? 'center' : 'bottom')
+      : (
+        raw.subtitlePosition === 'top'
+        || raw.subtitlePosition === 'center'
+        || raw.subtitlePosition === 'bottom'
+      ) ? raw.subtitlePosition : DEFAULT_PLAYER_PREFERENCES.subtitlePosition;
+  const subtitleOverlay = typeof stored.subtitleBgOpacity === 'number'
+    && Number.isFinite(stored.subtitleBgOpacity)
+    ? stored.subtitleBgOpacity > 0
+    : raw.subtitleOverlay !== false;
   const overlayBackground = typeof raw.subtitleOverlayBackground === 'number'
     && Number.isFinite(raw.subtitleOverlayBackground)
     ? Math.round(Math.max(0, Math.min(80, raw.subtitleOverlayBackground)))
@@ -98,7 +160,7 @@ export function normalizePlayerPreferences(value: unknown): PlayerPreferences {
       : '',
     subtitleFontSize: fontSize,
     subtitlePosition,
-    subtitleOverlay: raw.subtitleOverlay !== false,
+    subtitleOverlay,
     subtitleOverlayBackground: overlayBackground,
   };
 }

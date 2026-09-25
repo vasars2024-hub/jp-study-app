@@ -37,7 +37,6 @@ import { resolveLocalMediaIdentities } from '../../../shared/mediaFileIdentity';
 import { loadMediaHubState, saveMediaHubState } from '../../mediaHubStore';
 import { WHISPER_MODEL_SPECS, type WhisperModelTier } from '../../../shared/whisperModels';
 import { parseStudySubtitles, parseSubtitles, type Cue } from '../../subtitles';
-import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../../subtitlesExport';
 import {
   loadWhisperDevice,
   loadWhisperModelTier,
@@ -85,10 +84,19 @@ import {
   buildPlayerDiagnosticReport,
   type PlayerDiagnosticReport,
 } from '../../../shared/playerDiagnostics';
+import { collectPlayerDiagnostics } from '../../playerDiagnosticsRun';
 import {
   normalizePlayerPreferences,
+  playerPreferencesPatch,
+  type PlayerPreferences,
   type SubtitleVerticalPosition,
 } from '../../../shared/playerPreferences';
+import {
+  changedPreferenceKeys,
+  onPlayerPreferencesChanged,
+  readStoredPlayerPreferences,
+  writePlayerPreferencesPatch,
+} from '../../playerPreferencesStore';
 import { takeHandoff, takeHandoffJson } from '../../pendingHandoff';
 import {
   studyContextSeekPosition,
@@ -102,6 +110,8 @@ const CARD_GAP = 12;
 const CARD_ROW_HEIGHT = 108; // card content height + gap, generous enough to never clip
 const COLLAPSED_KEY = 'jp-media-collapsed';
 const PLAYER_PREFERENCES_KEY = 'jp-media-player-preferences-v1';
+/** This surface's name on `playerPreferencesStore` writes, so it ignores its own echo. */
+const MEDIA_CENTER_PREFS_SOURCE = 'media-center';
 export const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
 
 function loadPlayerPreferences() {
@@ -358,7 +368,6 @@ export interface MediaState {
   lookupAt: (e: React.MouseEvent) => void;
   saveProgress: () => void;
   nudge: (delta: number) => void;
-  exportSubs: (format: 'srt' | 'vtt') => void;
   clearPlayback: () => void;
   clearPlayer: () => void;
   resumeRef: React.MutableRefObject<number>;
@@ -404,10 +413,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const shadowGenerationRef = useRef(0);
   const studySessionIdRef = useRef('');
   const studySessionMediaIdRef = useRef('');
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const normalizedGainRef = useRef<GainNode | null>(null);
-  const bypassGainRef = useRef<GainNode | null>(null);
   const pendingStudyContextRef = useRef<StudyContextRef | null>(null);
 
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -524,28 +529,31 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Array.from(collapsed)));
   }, [collapsed]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(PLAYER_PREFERENCES_KEY, JSON.stringify(normalizePlayerPreferences({
-        playbackRate,
-        autoPause,
-        loopLine,
-        furigana,
-        primarySubs,
-        dualSubs,
-        dictationMode,
-        shadowingMode,
-        volumeNormalization,
-        preferredAudioLanguage,
-        subtitleFontSize,
-        subtitlePosition,
-        subtitleOverlay,
-        subtitleOverlayBackground,
-      })));
-    } catch {
-      // Player preferences remain available for the current session.
-    }
-  }, [
+  /*
+   * The Media Center's player preferences, written as a PATCH of the keys that
+   * changed (round-2 audit B). This used to write a fixed 14-field copy on
+   * mount and on every change, erasing everything else under the key — the
+   * player's subtitle font, colours and position among them — and the player
+   * did the same in reverse. `playerPreferencesPatch` also translates the two
+   * keys whose meaning differs between the surfaces (vertical position and the
+   * background toggle) into the player's own fields.
+   */
+  const playerPrefs: PlayerPreferences = useMemo(() => normalizePlayerPreferences({
+    playbackRate,
+    autoPause,
+    loopLine,
+    furigana,
+    primarySubs,
+    dualSubs,
+    dictationMode,
+    shadowingMode,
+    volumeNormalization,
+    preferredAudioLanguage,
+    subtitleFontSize,
+    subtitlePosition,
+    subtitleOverlay,
+    subtitleOverlayBackground,
+  }), [
     autoPause,
     dictationMode,
     dualSubs,
@@ -561,6 +569,47 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     subtitlePosition,
     volumeNormalization,
   ]);
+  const lastPersistedPrefs = useRef<PlayerPreferences>(initialPlayerPreferences);
+  useEffect(() => {
+    const changed = changedPreferenceKeys(
+      lastPersistedPrefs.current as unknown as Record<string, unknown>,
+      playerPrefs as unknown as Record<string, unknown>,
+    ) as (keyof PlayerPreferences)[];
+    lastPersistedPrefs.current = playerPrefs;
+    if (!changed.length) return;
+    const delta: Partial<PlayerPreferences> = {};
+    for (const key of changed) (delta as Record<string, unknown>)[key] = playerPrefs[key];
+    writePlayerPreferencesPatch(
+      playerPreferencesPatch(delta, readStoredPlayerPreferences()),
+      MEDIA_CENTER_PREFS_SOURCE,
+    );
+  }, [playerPrefs]);
+
+  // The player changed a shared preference (speed, toggles, position, …):
+  // take it, and remember it as persisted so it is not written straight back.
+  useEffect(() => onPlayerPreferencesChanged(MEDIA_CENTER_PREFS_SOURCE, (stored) => {
+    const next = normalizePlayerPreferences(stored);
+    // The player has no normalization switch of its own: when it turns the
+    // preference off, it could not apply it to the video it is playing.
+    if (lastPersistedPrefs.current.volumeNormalization && !next.volumeNormalization) {
+      setError(t('media.error.volumeNormalizationFailed'));
+    }
+    lastPersistedPrefs.current = next;
+    setPlaybackRate(next.playbackRate);
+    setAutoPause(next.autoPause);
+    setLoopLine(next.loopLine);
+    setFurigana(next.furigana);
+    setPrimarySubs(next.primarySubs);
+    setDualSubs(next.dualSubs);
+    setDictationMode(next.dictationMode);
+    setShadowingMode(next.shadowingMode);
+    setVolumeNormalization(next.volumeNormalization);
+    setPreferredAudioLanguage(next.preferredAudioLanguage);
+    setSubtitleFontSize(next.subtitleFontSize);
+    setSubtitlePosition(next.subtitlePosition);
+    setSubtitleOverlay(next.subtitleOverlay);
+    setSubtitleOverlayBackground(next.subtitleOverlayBackground);
+  }), []);
 
   const tree = useMemo(() => buildMediaTree(items), [items]);
   const searchIndex = useMemo(() => buildMediaFileSearchIndex(items), [items]);
@@ -1392,58 +1441,15 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     refreshAudioTracks();
   }, [audioTracks, refreshAudioTracks]);
 
+  /*
+   * Volume normalization is applied by the player that is actually mounted —
+   * the VideoCore study overlay (`media/volumeNormalization.ts`) — which reads
+   * this preference. The Web Audio graph that lived here was built on
+   * `videoRef`, which nothing has attached since the old player was deleted,
+   * so the toggle never touched any audio.
+   */
   const applyVolumeNormalization = useCallback(async (enabled: boolean) => {
-    const video = videoRef.current;
     setVolumeNormalization(enabled);
-    if (!video) return;
-    try {
-      let context = audioContextRef.current;
-      if (!context) {
-        if (typeof AudioContext === 'undefined') {
-          throw new Error('Web Audio volume normalization is unavailable.');
-        }
-        context = new AudioContext();
-        const source = context.createMediaElementSource(video);
-        const compressor = context.createDynamicsCompressor();
-        compressor.threshold.value = -24;
-        compressor.knee.value = 24;
-        compressor.ratio.value = 8;
-        compressor.attack.value = 0.006;
-        compressor.release.value = 0.28;
-        const normalizedGain = context.createGain();
-        normalizedGain.gain.value = enabled ? 1.25 : 0;
-        const bypassGain = context.createGain();
-        bypassGain.gain.value = enabled ? 0 : 1;
-        source.connect(compressor);
-        compressor.connect(normalizedGain);
-        normalizedGain.connect(context.destination);
-        source.connect(bypassGain);
-        bypassGain.connect(context.destination);
-        audioContextRef.current = context;
-        audioSourceRef.current = source;
-        normalizedGainRef.current = normalizedGain;
-        bypassGainRef.current = bypassGain;
-      }
-      const at = context.currentTime;
-      normalizedGainRef.current?.gain.setTargetAtTime(enabled ? 1.25 : 0, at, 0.015);
-      bypassGainRef.current?.gain.setTargetAtTime(enabled ? 0 : 1, at, 0.015);
-      if (context.state === 'suspended') await context.resume().catch(() => undefined);
-    } catch (normalizationError) {
-      setVolumeNormalization(false);
-      setError(
-        normalizationError instanceof Error
-          ? normalizationError.message
-          : t('media.error.volumeNormalizationFailed'),
-      );
-    }
-  }, [lang, t]);
-
-  useEffect(() => () => {
-    void audioContextRef.current?.close();
-    audioContextRef.current = null;
-    audioSourceRef.current = null;
-    normalizedGainRef.current = null;
-    bypassGainRef.current = null;
   }, []);
 
   const markAbStart = useCallback(() => {
@@ -1485,59 +1491,34 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     }
   }, [subtitleSearchMatches, subtitleSearchPosition]);
 
+  /*
+   * Diagnostics of the player that actually plays (`playerDiagnosticsRun.ts`):
+   * the Seanime server and its transcoder, the VideoCore element's playback
+   * path and tracks, the GPU and the decoders. This probed `videoRef`, which
+   * nothing has attached since the old player was deleted.
+   */
   const runPlayerDiagnostics = useCallback(async () => {
     setDiagnosticsRunning(true);
     try {
-      const video = videoRef.current;
-      const probe = document.createElement('video');
-      const canvas = document.createElement('canvas');
-      const audioTracks = video as HTMLVideoElement & { audioTracks?: { length: number } };
-      let currentFileBytes: number | undefined;
-      if (current?.path) {
-        const storage = await window.api.scanMediaStorage([current.path]);
-        currentFileBytes = storage.files.find((file) => file.path === current.path)?.size;
-      }
-      const allSubtitleCues = [...cues, ...secondaryCues];
-      const timelineValid = [cues, secondaryCues].every((track) => track.every((cue, index) => (
-        cue.start >= 0
-        && cue.end > cue.start
-        && (index === 0 || cue.start >= track[index - 1].start)
-      )));
-      setPlayerDiagnostics(buildPlayerDiagnosticReport({
-        formatSupport: {
-          MP4: !!probe.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"'),
-          WebM: !!probe.canPlayType('video/webm; codecs="vp9, opus"'),
-          HLS: !!probe.canPlayType('application/vnd.apple.mpegurl'),
-          MOV: !!probe.canPlayType('video/quicktime'),
-          AVI: !!probe.canPlayType('video/x-msvideo'),
-          MKV: !!probe.canPlayType('video/x-matroska'),
-        },
-        pictureInPicture: (
-          'pictureInPictureEnabled' in document
-          && !!(document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled
-        ),
-        fullscreen: document.fullscreenEnabled,
-        mediaRecorder: typeof MediaRecorder !== 'undefined',
-        webgl: !!(canvas.getContext('webgl2') || canvas.getContext('webgl')),
-        readyState: video?.readyState ?? 0,
-        networkState: video?.networkState ?? 0,
-        durationSec: Number.isFinite(video?.duration) ? video?.duration ?? 0 : 0,
-        videoWidth: video?.videoWidth ?? 0,
-        videoHeight: video?.videoHeight ?? 0,
-        audioTrackCount: audioTracks?.audioTracks?.length ?? 0,
-        subtitleCueCount: allSubtitleCues.length,
-        subtitleTimelineValid: timelineValid,
-        currentExtension: current?.fileName.split('.').pop()?.toLowerCase() ?? '',
-        currentFileBytes,
-      }));
+      setPlayerDiagnostics(buildPlayerDiagnosticReport(await collectPlayerDiagnostics()));
     } finally {
       setDiagnosticsRunning(false);
     }
-  }, [cues, current, secondaryCues]);
+  }, []);
 
   const exportPlayerDiagnostics = useCallback(() => {
     if (!playerDiagnostics) return;
-    const blob = new Blob([JSON.stringify(playerDiagnostics, null, 2)], {
+    // The keys and values, and the sentences they render to in the UI language,
+    // so the file reads on its own and still carries the raw facts.
+    const readable = {
+      ...playerDiagnostics,
+      checks: playerDiagnostics.checks.map((check) => ({
+        ...check,
+        label: t(check.labelKey, check.vars),
+        detail: t(check.detailKey, check.vars),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(readable, null, 2)], {
       type: 'application/json',
     });
     const link = document.createElement('a');
@@ -1545,7 +1526,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     link.download = `player-diagnostics-${new Date(playerDiagnostics.generatedAt).toISOString().replace(/[:.]/g, '-')}.json`;
     link.click();
     URL.revokeObjectURL(link.href);
-  }, [playerDiagnostics]);
+  }, [playerDiagnostics, t]);
 
   const translateLine = useCallback(async () => {
     if (!active) return;
@@ -1606,11 +1587,8 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   }, [current, learningModeActive]);
 
   const handlePlayerPlay = useCallback(() => {
-    if (volumeNormalization && audioContextRef.current?.state === 'suspended') {
-      void audioContextRef.current.resume();
-    }
     if (learningModeActive) beginActiveStudySession();
-  }, [beginActiveStudySession, learningModeActive, volumeNormalization]);
+  }, [beginActiveStudySession, learningModeActive]);
 
   const handlePlayerPause = useCallback(() => {
     saveProgress();
@@ -1640,16 +1618,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       });
     },
     [current],
-  );
-
-  const exportSubs = useCallback(
-    (format: 'srt' | 'vtt') => {
-      if (!cues.length) return;
-      const base = (current?.fileName ?? 'transcript').replace(/\.[^.]+$/, '');
-      if (format === 'srt') downloadSubtitles(`${base}.srt`, cuesToSrt(cues), 'text/srt');
-      else downloadSubtitles(`${base}.vtt`, cuesToVtt(cues), 'text/vtt');
-    },
-    [cues, current],
   );
 
   const clearPlayback = useCallback(() => {
@@ -1824,7 +1792,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     lookupAt,
     saveProgress,
     nudge,
-    exportSubs,
     clearPlayback,
     clearPlayer,
     resumeRef,

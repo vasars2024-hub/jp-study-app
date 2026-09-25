@@ -17,6 +17,7 @@ import type {
   AnkiLinkStatus,
   DeleteMinedNotesResult,
   EnsureModelResult,
+  NoteStylingPushResult,
   IntervalSnapshot,
   MineNoteRequest,
   MineNoteResult,
@@ -506,6 +507,7 @@ declare global {
         mediaFilenames?: string[],
       ): Promise<DeleteMinedNotesResult>;
       ankiEnsureModel(id?: ProfileId): Promise<EnsureModelResult>;
+      ankiPushNoteStyling(id?: ProfileId): Promise<NoteStylingPushResult>;
       ankiModelFields(modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }>;
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
       /** Review state for named notes only — see the note in `preload.ts`. */
@@ -537,6 +539,9 @@ declare global {
       dictPitch(term: string, reading?: string): Promise<PitchLookup>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
       importApkgCards(filePath?: string): Promise<ApkgCardsResult>;
+      onApkgImportProgress(
+        cb: (event: import('../shared/apkgJobs').ApkgImportProgressEvent) => void,
+      ): () => void;
       readApkgDraft(
         request?: import('../shared/ankiDraft').ApkgDraftRequest,
       ): Promise<import('../shared/ankiDraft').ApkgDraftResult>;

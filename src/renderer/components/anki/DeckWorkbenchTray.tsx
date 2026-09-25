@@ -67,6 +67,8 @@ import { useT } from '../../i18n';
 import DeckWorkbenchAiPanel, { type AiPanelNote } from './DeckWorkbenchAiPanel';
 import DeckWorkbenchSplit from './DeckWorkbenchSplit';
 import DeckWorkbenchGlossary from './DeckWorkbenchGlossary';
+import DeckWorkbenchTemplateRemoval from './DeckWorkbenchTemplateRemoval';
+import type { TemplateGroup } from '../../../shared/ankiSiblingAudit';
 
 export const ACTION_KINDS: TrayActionKind[] = [
   'find-replace',
@@ -235,6 +237,13 @@ export default function DeckWorkbenchTray({
     else setOwnActions(update);
   };
   const [chosenKind, setKind] = useState<TrayActionKind>(kinds[0] ?? 'find-replace');
+  /**
+   * Recipe 17's audit, run on request by the template-removal panel. Dropped
+   * whenever the draft changes: a verdict over a draft that has since moved is
+   * not evidence, and the planner then blocks on `template-no-audit` again.
+   */
+  const [templateGroups, setTemplateGroups] = useState<readonly TemplateGroup[] | undefined>(undefined);
+  useEffect(() => setTemplateGroups(undefined), [draft]);
   /**
    * A host may change the kinds it offers without remounting — the guided flow
    * does, on every step. A `kind` the current step does not own would render a
@@ -522,14 +531,18 @@ export default function DeckWorkbenchTray({
         // nothing reads to `blockingProblems` as context that exists.
         ...(rankedVocab ? { split: { vocab: rankedVocab, levels: knownLevels } } : {}),
         ...(glossary ? { glossary } : {}),
+        ...(templateGroups ? { templateGroups } : {}),
       }),
-    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels, rankedVocab, glossary],
+    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels, rankedVocab, glossary, templateGroups],
   );
   const effect = plan.mastery ? masteryEffect(plan.mastery) : null;
   const masteryChanges = plan.mastery?.changes.length ?? 0;
   // A deck rename changes no note and no card, so every count that gates Apply
   // has to know about it or a deck-only tray reads as a plan with nothing in it.
   const deckRenames = plan.deckNormalize?.renames.length ?? 0;
+  // Recipe 17 changes a note TYPE and deletes cards; neither is a changed note
+  // or a moved due day, so it needs its own count or its tray reads as empty.
+  const templatesRemoved = plan.templateRemoval?.removals.length ?? 0;
 
   /**
    * The selected notes the AI panel may ask about, with the word each declares.
@@ -826,6 +839,11 @@ export default function DeckWorkbenchTray({
           overdue: String(action.overdueDays),
           dormant: String(action.dormantDays),
           spread: String(action.spreadDays),
+        });
+      case 'remove-template':
+        return t('ankiWorkbench.tray.describe.remove-template', {
+          count: action.ords.length,
+          noteType: draft.noteTypes.find((nt) => nt.id === action.noteTypeId)?.name ?? action.noteTypeId,
         });
       case 'set-card-state':
         // Every part that is set, joined — not a count and not the action's
@@ -1505,6 +1523,27 @@ export default function DeckWorkbenchTray({
         />
       )}
 
+      {/* Recipe 17 belongs to step 4, "Fields and design" — it reshapes the note
+          type, which is the card designer's subject. `find-replace` is the
+          marker for that step. */}
+      {kinds.includes('find-replace') && (
+        <DeckWorkbenchTemplateRemoval
+          draft={draft}
+          onAudit={setTemplateGroups}
+          onQueue={(params) => {
+            setActions((prev) =>
+              addTrayAction(prev, {
+                id: `act-${(nextActionSeq += 1)}`,
+                enabled: true,
+                kind: 'remove-template',
+                ...params,
+              }),
+            );
+            setApplied(null);
+          }}
+        />
+      )}
+
       {/* Recipe 14 belongs to step 3, "Add and enrich" — it puts content into a
           note that was not in it before, from a second deck rather than from a
           dictionary. `enrich-dictionary` is the marker for that step. */}
@@ -1670,11 +1709,12 @@ export default function DeckWorkbenchTray({
             || (plan.changedNotes === 0
               && masteryChanges === 0
               && plan.changedCards === 0
-              && deckRenames === 0)
+              && deckRenames === 0
+              && templatesRemoved === 0)
           }
           onClick={() => {
             onApply(plan);
-            setApplied(plan.changedNotes + masteryChanges + plan.changedCards + deckRenames);
+            setApplied(plan.changedNotes + masteryChanges + plan.changedCards + deckRenames + templatesRemoved);
           }}
         >
           {t('ankiWorkbench.tray.apply')}

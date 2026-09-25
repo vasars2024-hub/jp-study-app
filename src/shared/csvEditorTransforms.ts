@@ -1,6 +1,8 @@
 /** Column operations and data transformations for the CSV editor. */
 
 import {
+  defaultColumnName,
+  isGeneratedColumnName,
   normalizeTable,
   insertColumn,
   type CsvTable,
@@ -225,30 +227,69 @@ export function addAutoNumberColumn(table: CsvTable, header = 'ID'): CsvTable {
   return withCol;
 }
 
+/**
+ * Append `incoming`'s rows under `base`'s, merging the two header rows.
+ *
+ * Columns line up by name where both files name them (case-insensitive), so a
+ * second export with its columns in another order still lands under the right
+ * headings; a named incoming column the base lacks becomes a new column. Where
+ * the base only has generated names ("Column 2") — a blank grid, or a file
+ * without a header row — the incoming file's real names replace them
+ * positionally instead of being dropped.
+ */
 export function appendTables(base: CsvTable, incoming: CsvTable): CsvTable {
   const a = normalizeTable(base);
   const b = normalizeTable(incoming);
-  const width = Math.max(a.headers.length, b.headers.length);
-  const padHeaders = (headers: string[], w: number): string[] => {
-    const out = headers.slice(0, w);
-    while (out.length < w) out.push(`Column ${out.length + 1}`);
+  const headers = [...a.headers];
+  const key = (h: string): string => h.trim().toLowerCase();
+  const baseNamed = headers.some((h) => !isGeneratedColumnName(h));
+  // For each incoming column, the output column it lands in.
+  const target: number[] = [];
+  const taken = new Set<number>();
+  b.headers.forEach((header, j) => {
+    const generated = !b.hasHeader || isGeneratedColumnName(header);
+    if (!generated && baseNamed) {
+      const match = headers.findIndex((h, i) => !taken.has(i) && key(h) === key(header));
+      if (match >= 0) {
+        target[j] = match;
+        taken.add(match);
+        return;
+      }
+    }
+    if (!generated && !baseNamed && j < headers.length && !taken.has(j)) {
+      headers[j] = header;
+      target[j] = j;
+      taken.add(j);
+      return;
+    }
+    if (generated && j < headers.length && !taken.has(j)) {
+      target[j] = j;
+      taken.add(j);
+      return;
+    }
+    headers.push(generated ? defaultColumnName(headers.length) : header);
+    target[j] = headers.length - 1;
+    taken.add(target[j]);
+  });
+  const width = headers.length;
+  const padRow = (row: string[]): string[] => {
+    const out = row.slice(0, width);
+    while (out.length < width) out.push('');
     return out;
   };
-  const headers = padHeaders(a.headers, width);
-  const padRow = (row: string[], w: number): string[] => {
-    const out = row.slice(0, w);
-    while (out.length < w) out.push('');
+  const moved = b.rows.map((row) => {
+    const out = Array.from({ length: width }, () => '');
+    row.forEach((cell, j) => {
+      const at = target[j];
+      if (at !== undefined) out[at] = cell;
+    });
     return out;
-  };
-  const rows = [
-    ...a.rows.map((r) => padRow(r, width)),
-    ...b.rows.map((r) => padRow(r, width)),
-  ];
+  });
   return normalizeTable({
     delimiter: a.delimiter,
-    hasHeader: a.hasHeader,
+    hasHeader: a.hasHeader || b.hasHeader,
     headers,
-    rows,
+    rows: [...a.rows.map(padRow), ...moved],
   });
 }
 

@@ -117,6 +117,8 @@ export interface DeckFlashcard {
   ankiQueueGaveUp?: boolean;
   /** Page / file the card was mined from, when the surface knows one. */
   sourceUrl?: string;
+  /** Tags carried in from an imported deck (Anki note tags). */
+  tags?: string[];
   /** Normalised word + sentence + source identity; dedupes repeated mines. */
   mineKey?: string;
   /** Study language a dictionary save belongs to (absent = Japanese). */
@@ -1105,13 +1107,98 @@ export function replaceImportedDeck(
   return store.cards;
 }
 
-import type { ImportDeckEntry } from '../shared/deckImport';
+import { legacyDeckBookId, type ImportDeckEntry } from '../shared/deckImport';
+import { planDeckUpsert, type DeckUpsertGroup } from '../shared/deckUpsert';
 
-export function importDeckFromEntries(entries: ImportDeckEntry[]): DeckFlashcard[] {
-  if (!entries.length) return loadDeck();
+export interface DeckUpsertOptions {
+  /** Delete group cards the file no longer has. The UI confirms this first. */
+  removeMissing?: boolean;
+  /** Match cards stored under the pre-2026-09 id for the same title too. */
+  legacy?: DeckUpsertGroup['legacy'];
+}
+
+export interface DeckUpsertResult {
+  added: DeckFlashcard[];
+  updated: number;
+  unchanged: number;
+  removed: number;
+  /** Group cards the file does not have (kept unless `removeMissing`). */
+  missing: number;
+}
+
+/** What `upsertImportedDeck` would do, without writing. */
+export function previewDeckUpsert(
+  bookId: string,
+  entries: readonly Omit<DeckFlashcard, 'id' | 'addedAt'>[],
+  options: Pick<DeckUpsertOptions, 'legacy'> = {},
+): { added: number; updated: number; unchanged: number; missing: number } {
+  const plan = planDeckUpsert(readStore().cards, { bookId, legacy: options.legacy }, entries);
+  return {
+    added: plan.added.length,
+    updated: plan.updated.length,
+    unchanged: plan.unchanged.length,
+    missing: plan.missing.length,
+  };
+}
+
+/**
+ * Import a deck file as an update of the cards it made before: matched cards
+ * keep their id and review state and take the file's text, new rows become new
+ * cards, and nothing is deleted unless `removeMissing` says so. See
+ * `shared/deckUpsert.ts`. One persisted write.
+ */
+export function upsertImportedDeck(
+  bookId: string,
+  entries: readonly Omit<DeckFlashcard, 'id' | 'addedAt'>[],
+  options: DeckUpsertOptions = {},
+): DeckUpsertResult {
+  const store = readStore();
+  const plan = planDeckUpsert(store.cards, { bookId, legacy: options.legacy }, entries);
+  const replaced = new Map(plan.updated.map((c) => [c.id, c]));
+  const removedIds = options.removeMissing ? new Set(plan.missing.map((c) => c.id)) : new Set<string>();
+  const now = Date.now();
+  const created: DeckFlashcard[] = plan.added.map((entry, index) => ({
+    ...entry,
+    bookId,
+    id: newId(),
+    addedAt: now + index,
+  }));
+  for (const card of created) {
+    if (card.folder && !store.folders.includes(card.folder)) store.folders = [...store.folders, card.folder];
+  }
+  store.cards = [
+    ...created,
+    ...store.cards
+      .filter((c) => !removedIds.has(c.id))
+      .map((c) => replaced.get(c.id) ?? c),
+  ];
+  if (restoring) for (const card of created) createdWhileRestoring.add(card.id);
+  if (created.length || replaced.size || removedIds.size) writeStore(store);
+  return {
+    added: created,
+    updated: plan.updated.length,
+    unchanged: plan.unchanged.length,
+    removed: removedIds.size,
+    missing: plan.missing.length,
+  };
+}
+
+/**
+ * The import path of the CSV editor and the deck import panel. An update, not
+ * a replacement: before 2026-09 this went through `replaceImportedDeck`, which
+ * reset the review progress of every card in the deck on each re-import.
+ */
+export function importDeckFromEntries(
+  entries: ImportDeckEntry[],
+  options: Omit<DeckUpsertOptions, 'legacy'> = {},
+): DeckUpsertResult {
+  if (!entries.length) return { added: [], updated: 0, unchanged: 0, removed: 0, missing: 0 };
   const bookId = entries[0].bookId;
   const bookTitle = entries[0].bookTitle;
-  return replaceImportedDeck(bookId, bookTitle, entries);
+  return upsertImportedDeck(bookId, entries, {
+    ...options,
+    legacy: { bookId: legacyDeckBookId(bookTitle), bookTitle },
+  });
 }
 
 /**

@@ -12,6 +12,56 @@ export interface CsvTable {
 export interface CsvParseOptions {
   delimiter?: CsvDelimiter;
   hasHeader?: boolean;
+  /**
+   * Template for generated column names, `{n}` standing for the 1-based
+   * index. Passed explicitly because the parse runs in a Web Worker, whose
+   * copy of this module never sees `setCsvColumnLabel`.
+   */
+  columnLabel?: string;
+}
+
+/*
+  Generated column names ("Column 3") are chrome, not content, so the editor
+  passes the UI language's `csv.columnN` template in. The English default stays
+  for callers that never set one (and for tests).
+*/
+const DEFAULT_COLUMN_LABEL = 'Column {n}';
+let columnLabelTemplate = DEFAULT_COLUMN_LABEL;
+
+/** Set the template generated column names use; `{n}` is the 1-based index. */
+export function setCsvColumnLabel(template: string | null | undefined): void {
+  columnLabelTemplate = template && template.includes('{n}') ? template : DEFAULT_COLUMN_LABEL;
+}
+
+/** The current template, for handing to the parse worker. */
+export function csvColumnLabel(): string {
+  return columnLabelTemplate;
+}
+
+/** The generated name for column `index` (0-based). */
+export function defaultColumnName(index: number, template = columnLabelTemplate): string {
+  return template.split('{n}').join(String(index + 1));
+}
+
+function templatePattern(template: string): RegExp {
+  const parts = template.split('{n}').map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${parts.join('\\d+')}$`);
+}
+
+/**
+ * True for a header the editor made up rather than one a file supplied: the
+ * current template, the English default (grids saved before the label was
+ * translated), or blank.
+ */
+export function isGeneratedColumnName(header: string): boolean {
+  const h = header.trim();
+  if (!h) return true;
+  return templatePattern(columnLabelTemplate).test(h) || templatePattern(DEFAULT_COLUMN_LABEL).test(h);
+}
+
+/** A grid with no content in any cell — nothing the user would lose by replacing it. */
+export function isBlankTable(table: CsvTable): boolean {
+  return table.rows.every((row) => row.every((cell) => !cell.trim()));
 }
 
 export function detectDelimiter(line: string): CsvDelimiter {
@@ -164,7 +214,7 @@ export function normalizeTable(table: CsvTable): CsvTable {
   const headers =
     table.headers.length >= width
       ? table.headers.slice(0, width)
-      : [...table.headers, ...Array.from({ length: width - table.headers.length }, (_, i) => `Column ${table.headers.length + i + 1}`)];
+      : [...table.headers, ...Array.from({ length: width - table.headers.length }, (_, i) => defaultColumnName(table.headers.length + i))];
   return {
     ...table,
     headers,
@@ -172,27 +222,81 @@ export function normalizeTable(table: CsvTable): CsvTable {
   };
 }
 
+/**
+ * Anki's "Notes in Plain Text" export starts with `#key:value` lines
+ * (`#separator:tab`, `#html:true`, `#columns:…`). They are instructions, not
+ * rows: read the separator and column names from them, and drop them.
+ */
+interface AnkiTextHeader {
+  body: string;
+  delimiter?: CsvDelimiter;
+  columns?: string;
+  present: boolean;
+}
+
+const ANKI_SEPARATORS: Record<string, CsvDelimiter> = {
+  tab: '\t',
+  comma: ',',
+  semicolon: ';',
+  '\t': '\t',
+  ',': ',',
+  ';': ';',
+};
+
+function readAnkiTextHeader(text: string): AnkiTextHeader {
+  let rest = text;
+  let delimiter: CsvDelimiter | undefined;
+  let columns: string | undefined;
+  let present = false;
+  for (;;) {
+    const m = /^#([a-z][a-z ]*):([^\n]*)(?:\n|$)/i.exec(rest);
+    if (!m) break;
+    present = true;
+    const key = m[1].trim().toLowerCase();
+    const value = m[2].replace(/\r$/, '');
+    if (key === 'separator') delimiter = ANKI_SEPARATORS[value.trim().toLowerCase()] ?? delimiter;
+    if (key === 'columns') columns = value;
+    rest = rest.slice(m[0].length);
+  }
+  return { body: rest, delimiter, columns, present };
+}
+
 export function parseCsvText(raw: string, opts?: CsvParseOptions): CsvTable {
-  const trimmed = raw.trim();
+  const label = opts?.columnLabel ?? columnLabelTemplate;
+  const name = (i: number): string => defaultColumnName(i, label);
+  const anki = readAnkiTextHeader(raw.replace(/^\uFEFF/, ''));
+  const trimmed = anki.body.trim();
   if (!trimmed) {
-    return { delimiter: ',', hasHeader: true, headers: ['Column 1'], rows: [] };
+    return { delimiter: ',', hasHeader: true, headers: [name(0)], rows: [] };
   }
-  const delimiter = opts?.delimiter ?? detectDelimiter(firstPhysicalLine(trimmed));
-  const parsed = parseCsvRecords(trimmed, delimiter);
+  const delimiter =
+    opts?.delimiter ?? anki.delimiter ?? detectDelimiter(firstPhysicalLine(trimmed));
+  let parsed = parseCsvRecords(trimmed, delimiter);
   if (!parsed.length) {
-    return { delimiter: ',', hasHeader: true, headers: ['Column 1'], rows: [] };
+    return { delimiter: ',', hasHeader: true, headers: [name(0)], rows: [] };
   }
-  const hasHeader = opts?.hasHeader ?? looksLikeHeader(parsed[0], parsed[1]);
+  // An Anki export has no header row; `#columns:` names the columns instead.
+  const ankiColumns = anki.columns !== undefined ? splitCsvLine(anki.columns, delimiter) : null;
+  if (ankiColumns) parsed = [ankiColumns, ...parsed];
+  const hasHeader =
+    opts?.hasHeader ??
+    (ankiColumns ? true : anki.present ? false : looksLikeHeader(parsed[0], parsed[1]));
   let headers: string[];
   let rows: string[][];
   if (hasHeader) {
-    headers = parsed[0].map((h, i) => h.trim() || `Column ${i + 1}`);
+    headers = parsed[0].map((h, i) => h.trim() || name(i));
     rows = parsed.slice(1);
   } else {
-    const colCount = Math.max(...parsed.map((r) => r.length));
-    headers = Array.from({ length: colCount }, (_, i) => `Column ${i + 1}`);
+    let colCount = 1;
+    for (const r of parsed) if (r.length > colCount) colCount = r.length;
+    headers = Array.from({ length: colCount }, (_, i) => name(i));
     rows = parsed;
   }
+  // Name any column wider than the header row here, with the caller's label,
+  // rather than leaving it to normalizeTable's module-level one.
+  let width = headers.length;
+  for (const r of rows) if (r.length > width) width = r.length;
+  while (headers.length < width) headers.push(name(headers.length));
   return normalizeTable({ delimiter, hasHeader, headers, rows });
 }
 
@@ -212,7 +316,7 @@ export function emptyTable(cols = 3, rows = 5): CsvTable {
   return normalizeTable({
     delimiter: ',',
     hasHeader: true,
-    headers: Array.from({ length: cols }, (_, i) => `Column ${i + 1}`),
+    headers: Array.from({ length: cols }, (_, i) => defaultColumnName(i)),
     rows: Array.from({ length: rows }, () => Array.from({ length: cols }, () => '')),
   });
 }
@@ -251,7 +355,7 @@ export function deleteRow(table: CsvTable, index: number): CsvTable {
 
 export function insertColumn(table: CsvTable, index: number): CsvTable {
   const next = normalizeTable(table);
-  const name = `Column ${next.headers.length + 1}`;
+  const name = defaultColumnName(next.headers.length);
   const headers = [...next.headers];
   headers.splice(Math.max(0, Math.min(index, headers.length)), 0, name);
   const rows = next.rows.map((row) => {
