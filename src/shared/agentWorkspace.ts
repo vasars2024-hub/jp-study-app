@@ -135,6 +135,8 @@ export type AgentNavigationEffect = {
   page?: string;
   controlId?: string;
   highlight?: boolean;
+  /** A Files app category, for `section: 'files'` only. */
+  filesScope?: string;
   /**
    * The question this destination was looked up from, for a card that has no
    * route context to re-derive against. Present only on an index-resolved
@@ -439,6 +441,7 @@ function normalizeEffect(value: unknown): AgentResultEffect | null {
       ...(text(raw.page, 240) ? { page: text(raw.page, 240) } : {}),
       ...(text(raw.controlId, 240) ? { controlId: text(raw.controlId, 240) } : {}),
       ...(raw.highlight === true ? { highlight: true } : {}),
+      ...(text(raw.filesScope, 120) ? { filesScope: text(raw.filesScope, 120) } : {}),
       ...(text(raw.query, 400) ? { query: text(raw.query, 400) } : {}),
     };
   }
