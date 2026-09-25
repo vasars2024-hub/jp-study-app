@@ -75,6 +75,7 @@ import {
   transcriptTimingSource,
 } from '../shared/transcriptionSentenceCards';
 import { extractFlashcardAudioClip, pruneMediaClips } from './flashcardAudio';
+import { getMainStudyLang } from './studyLanguage';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -943,7 +944,8 @@ export function enqueueTranscription(request: TranscriptionRequest): Transcripti
   queue.push({
     mediaId: item.id,
     title: item.title?.trim() || item.fileName,
-    lang: request.lang?.trim() || 'ja',
+    // The study language when the caller did not say (it used to be Japanese, always).
+    lang: request.lang?.trim() || getMainStudyLang(),
     queuedAt: Date.now(),
     attempts: 0,
     ...(kind === 'transcribe' ? {} : { kind }),

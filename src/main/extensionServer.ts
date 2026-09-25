@@ -1598,7 +1598,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         });
         return;
       }
-      const queued = enqueueTranscription({ mediaId: plan.mediaId, lang: 'ja' });
+      const queued = enqueueTranscription({ mediaId: plan.mediaId, lang: getMainStudyLang() });
       json(res, 200, {
         ok: queued.ok,
         state: queued.ok ? 'queued' : 'refused',

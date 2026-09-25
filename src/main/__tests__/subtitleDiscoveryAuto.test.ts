@@ -378,6 +378,19 @@ describe('nothing found', () => {
     await prepareItem('ep1');
     expect(enqueued).toHaveLength(1);
   });
+  it("transcribes in the study language, and never a Chinese learner's anime", async () => {
+    settings.autoTranscribe = true;
+    __setStudyLanguageStateForTests({ lang: 'ru', script: 'simplified' });
+    items = [video({ id: 'film', lang: 'ru' })];
+    await prepareItem('film');
+    expect(enqueued).toEqual([{ mediaId: 'film', lang: 'ru' }]);
+
+    enqueued.length = 0;
+    __setStudyLanguageStateForTests({ lang: 'zh', script: 'simplified' });
+    items = [video({ id: 'anime', anilistId: 9 })];
+    await prepareItem('anime');
+    expect(enqueued).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------- cost / the queue

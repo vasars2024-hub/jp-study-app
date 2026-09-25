@@ -93,3 +93,17 @@ describe('decideAudioLanguage', () => {
     expect(decideAudioLanguage({})).toBe('unknown');
   });
 });
+
+describe('decideAudioIsLanguage — the audio in each study language', () => {
+  it('reads tags, provider language, item language and native title per language', async () => {
+    const { decideAudioIsLanguage } = await import('../subtitleDiscoveryStatus');
+    expect(decideAudioIsLanguage({ streamLanguages: ['rus'] }, 'ru')).toBe('match');
+    expect(decideAudioIsLanguage({ streamLanguages: ['jpn'] }, 'zh')).toBe('other');
+    expect(decideAudioIsLanguage({ originalLanguage: 'zh-CN' }, 'zh')).toBe('match');
+    expect(decideAudioIsLanguage({ anilistId: 5 }, 'zh')).toBe('other');
+    expect(decideAudioIsLanguage({ anilistId: 5 }, 'ja')).toBe('match');
+    expect(decideAudioIsLanguage({ nativeTitle: '甄嬛传' }, 'zh')).toBe('match');
+    expect(decideAudioIsLanguage({ nativeTitle: 'Брат' }, 'ru')).toBe('match');
+    expect(decideAudioIsLanguage({}, 'ru')).toBe('unknown');
+  });
+});

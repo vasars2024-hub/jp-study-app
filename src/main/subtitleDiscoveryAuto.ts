@@ -39,10 +39,12 @@ import {
 } from '../shared/subtitleDiscoveryPick';
 import {
   SUBTITLE_AUTO_NOTICES,
+  decideAudioIsLanguage,
   decideAudioLanguage,
   deriveSubtitleAutoStatus,
   sameSubtitleAutoStatus,
   subtitleRecordStatusSource,
+  type AudioLanguageEvidence,
   type AudioLanguageVerdict,
   type SecondarySubtitlePick,
   type SubtitleAutoActivity,
@@ -276,26 +278,42 @@ function covered(records: readonly SubtitleRecord[] | undefined, lang: string): 
   return (records ?? []).some((record) => subtitleLangMatches(record.lang, lang) && !isMachineTranslatedSubtitle(record));
 }
 
-async function audioVerdict(item: MediaItem): Promise<AudioLanguageVerdict> {
-  const cached = audioVerdicts.get(item.path);
-  if (cached) return cached;
-  let streams: (string | null)[] = [];
-  try {
-    streams = await listAudioStreamLanguages(item.path);
-  } catch {
-    streams = [];
+/** Audio stream tags per file path; probing spawns ffmpeg, and the answer does not change. */
+const audioStreams = new Map<string, (string | null)[]>();
+
+async function audioEvidence(item: MediaItem): Promise<AudioLanguageEvidence> {
+  let streams = audioStreams.get(item.path);
+  if (!streams) {
+    try {
+      streams = await listAudioStreamLanguages(item.path);
+    } catch {
+      streams = [];
+    }
+    audioStreams.set(item.path, streams);
   }
   const raw = item as MediaItem & { originalLanguage?: unknown };
-  const verdict = decideAudioLanguage({
+  return {
     streamLanguages: streams,
     originalLanguage: typeof raw.originalLanguage === 'string' ? raw.originalLanguage : null,
     category: item.category ?? null,
     anilistId: item.anilistId ?? null,
     itemLang: item.lang ?? null,
     nativeTitle: item.nativeTitle ?? null,
-  });
+  };
+}
+
+async function audioVerdict(item: MediaItem): Promise<AudioLanguageVerdict> {
+  const cached = audioVerdicts.get(item.path);
+  if (cached) return cached;
+  const verdict = decideAudioLanguage(await audioEvidence(item));
   audioVerdicts.set(item.path, verdict);
   return verdict;
+}
+
+/** Whether the audio is in the study language — what Whisper must hear to transcribe it. */
+async function audioIsStudyLanguage(item: MediaItem, study: string): Promise<boolean> {
+  const lang = study === 'zh' || study === 'ru' ? study : 'ja';
+  return decideAudioIsLanguage(await audioEvidence(item), lang) === 'match';
 }
 
 /** Runs discovery for one item, waiting out a library sweep rather than racing it. */
@@ -484,7 +502,9 @@ export async function prepareItem(mediaId: string): Promise<void> {
       await translateInto(item, helperTrack, study, settings);
     }
   } else if (!studyTrack && !helperTrack && settings.autoTranscribe) {
-    if (!recentAttempt(item, 'transcribe', undefined, study, ['failed', 'queued']) && (await audioVerdict(item)) === 'ja') {
+    // Whisper hears the study language only on audio in it: Japanese anime for
+    // a Japanese learner, a Chinese drama for a Chinese one.
+    if (!recentAttempt(item, 'transcribe', undefined, study, ['failed', 'queued']) && await audioIsStudyLanguage(item, study)) {
       if (enqueueTranscription({ mediaId, lang: study }).ok) {
         recordAttempt(mediaId, { task: 'transcribe', to: study, at: Date.now(), outcome: 'queued' });
       }
@@ -720,4 +740,5 @@ export function resetSubtitleAutoForTests(): void {
   itemNotices.clear();
   lastStatus.clear();
   audioVerdicts.clear();
+  audioStreams.clear();
 }

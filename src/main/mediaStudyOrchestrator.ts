@@ -130,7 +130,7 @@ function queueStudyTranscription(mediaId: string): StudyTranscriptionQueueResult
     jobs: { ...document.jobs, [job.id]: job },
   });
 
-  const result = enqueueTranscription({ mediaId, lang: 'ja' });
+  const result = enqueueTranscription({ mediaId, lang: getMainStudyLang() });
   if (result.ok) {
     return {
       ok: true,

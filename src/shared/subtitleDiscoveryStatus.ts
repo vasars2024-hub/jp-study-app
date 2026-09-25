@@ -242,14 +242,50 @@ const JAPANESE_SCRIPT = /[぀-ヿ]/;
  * which callers treat as not Japanese — an unneeded translation costs a little;
  * a Whisper pass over English audio costs twenty minutes and produces garbage.
  */
-export function decideAudioLanguage(input: {
+export interface AudioLanguageEvidence {
   streamLanguages?: readonly (string | null | undefined)[];
   originalLanguage?: string | null;
   category?: string | null;
   anilistId?: number | null;
   itemLang?: string | null;
   nativeTitle?: string | null;
-}): AudioLanguageVerdict {
+}
+
+/** A native title's script, as evidence of the audio's language. */
+const NATIVE_TITLE_SCRIPT: Readonly<Record<'ja' | 'zh' | 'ru', (title: string) => boolean>> = {
+  ja: (title) => JAPANESE_SCRIPT.test(title),
+  zh: (title) => /\p{Script=Han}/u.test(title) && !JAPANESE_SCRIPT.test(title),
+  ru: (title) => /\p{Script=Cyrillic}/u.test(title),
+};
+
+/**
+ * Whether an item's audio is in a given study language — the same evidence and
+ * the same caution as `decideAudioLanguage`, for Chinese and Russian too: a
+ * Chinese learner's automatic transcription must not run Whisper over Japanese
+ * anime audio, nor skip a Chinese drama because its audio is "not Japanese".
+ * Anime evidence only ever says Japanese.
+ */
+export function decideAudioIsLanguage(
+  input: AudioLanguageEvidence,
+  lang: 'ja' | 'zh' | 'ru',
+): 'match' | 'other' | 'unknown' {
+  const is = (tag: string): boolean => subtitleLangMatches(tag, lang);
+  const tagged = (input.streamLanguages ?? [])
+    .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
+    .filter((tag) => tag && tag !== 'und' && tag !== 'unknown');
+  if (tagged.length) return tagged.every(is) ? 'match' : 'other';
+  const original = input.originalLanguage?.trim().toLowerCase();
+  if (original) return is(original) ? 'match' : 'other';
+  if ((typeof input.anilistId === 'number' && input.anilistId > 0) || input.category === 'anime') {
+    return lang === 'ja' ? 'match' : 'other';
+  }
+  const itemLang = input.itemLang?.trim().toLowerCase();
+  if (itemLang) return is(itemLang) ? 'match' : 'other';
+  if (input.nativeTitle && NATIVE_TITLE_SCRIPT[lang](input.nativeTitle)) return 'match';
+  return 'unknown';
+}
+
+export function decideAudioLanguage(input: AudioLanguageEvidence): AudioLanguageVerdict {
   const tagged = (input.streamLanguages ?? [])
     .map((lang) => (typeof lang === 'string' ? lang.trim().toLowerCase() : ''))
     .filter((lang) => lang && lang !== 'und' && lang !== 'unknown');

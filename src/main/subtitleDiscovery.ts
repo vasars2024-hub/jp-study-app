@@ -55,7 +55,8 @@ import {
   type SubtitleSearchFailure,
 } from '../shared/subtitleRecord';
 import { pickStudySubtitle, studyFirstDownloadLanguages, subtitleLangMatches } from '../shared/subtitleDiscoveryPick';
-import { onMainStudyLanguageChanged } from './studyLanguage';
+import { getMainStudyLang, onMainStudyLanguageChanged } from './studyLanguage';
+import { decideAudioIsLanguage } from '../shared/subtitleDiscoveryStatus';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { shiftSubtitleText, worthShifting } from '../shared/subtitleDiscoveryTiming';
 import {
@@ -1108,7 +1109,19 @@ export async function runSubtitleDiscovery(
 
         // Nothing found and the user asked for a fallback: queue Whisper. This is
         // the only thing that makes the autoTranscribe setting do anything.
-        const foundJapanese = outcome.records.some((record) => /^ja/i.test(record.lang));
+        // The study language's line, not Japanese: a Chinese learner's library is
+        // transcribed in Chinese, and only where nothing says the audio is another
+        // language (anime is Japanese audio).
+        const study = getMainStudyLang();
+        const foundStudyLine = outcome.records.some((record) => subtitleLangMatches(record.lang, study));
+        const raw = item as MediaItem & { originalLanguage?: unknown };
+        const audioElsewhere = decideAudioIsLanguage({
+          originalLanguage: typeof raw.originalLanguage === 'string' ? raw.originalLanguage : null,
+          category: item.category ?? null,
+          anilistId: item.anilistId ?? null,
+          itemLang: item.lang ?? null,
+          nativeTitle: item.nativeTitle ?? null,
+        }, study) === 'other';
         // With a helper-language track in hand, the better fallback is the fused
         // track (Whisper on the helper track's timing), which the automation queue
         // builds when the episode is first played. A plain grid transcript here
@@ -1116,8 +1129,9 @@ export async function runSubtitleDiscovery(
         const fusable = settings.autoStudyTrack && !!settings.helperLanguage
           && outcome.records.some((record) => record.source !== 'generated'
             && subtitleLangMatches(record.lang, settings.helperLanguage));
-        if (!foundJapanese && !fusable && settings.autoTranscribe && languages.some((lang) => lang.startsWith('ja'))) {
-          enqueueTranscription({ mediaId: item.id, lang: 'ja' });
+        if (!foundStudyLine && !fusable && !audioElsewhere && settings.autoTranscribe
+          && languages.some((lang) => subtitleLangMatches(lang, study))) {
+          enqueueTranscription({ mediaId: item.id, lang: study });
         }
 
         // D268. The baseline is what the run STARTED from, not what the item had
