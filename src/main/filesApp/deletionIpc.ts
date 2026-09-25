@@ -227,6 +227,13 @@ export function registerFilesDeletionIpc(
   ipc.handle(FILES_DELETE_CHANNEL, (_event, request) =>
     deleteFilesItemInMain(request, dependencies),
   );
+}
+
+/** Its own registration, so the Delete boundary above keeps exactly one channel. */
+export function registerFilesTrashOwnedFileIpc(
+  ipc: FilesIpcHandleRegistrar,
+  dependencies: FilesDeletionMainDependencies,
+): void {
   ipc.handle(FILES_TRASH_OWNED_FILE_CHANNEL, (_event, itemId) =>
     trashOwnedMediaFileInMain(itemId, dependencies),
   );

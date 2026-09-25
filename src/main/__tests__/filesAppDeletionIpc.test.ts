@@ -7,6 +7,7 @@ import {
   isAbsoluteFilePath,
   lookupFilesDeletionTarget,
   registerFilesDeletionIpc,
+  trashOwnedMediaFileInMain,
   type FilesDeletionMainDependencies,
 } from '../filesApp/deletionIpc';
 
@@ -230,6 +231,31 @@ describe('Files app main-process deletion boundary', () => {
     await expect(registered?.listener({}, { itemId: 'transcript:one' })).resolves.toMatchObject({
       ok: true,
       mode: 'trash',
+    });
+  });
+});
+
+describe('linked media: also move the file to the Recycle Bin (audit r2 #2)', () => {
+  it('trashes only a linked media row, resolved by id, never a path from the caller', async () => {
+    const linked = target({
+      id: 'media:m1',
+      kind: 'video',
+      location: { store: 'file', path: 'D:\\Anime\\ep1.mkv' },
+      referenced: true,
+    });
+    const deps = dependencies(linked);
+    await expect(trashOwnedMediaFileInMain('media:m1', deps)).resolves.toEqual({ ok: true });
+    expect(deps.trashItem).toHaveBeenCalledWith('D:\\Anime\\ep1.mkv');
+
+    const other = dependencies(target());
+    await expect(trashOwnedMediaFileInMain('transcript:one', other)).resolves.toMatchObject({ ok: false });
+    await expect(trashOwnedMediaFileInMain({ path: 'C:\\Windows' }, other)).resolves.toMatchObject({ ok: false });
+    expect(other.trashItem).not.toHaveBeenCalled();
+
+    const unlinked = dependencies(target({ id: 'media:m2', kind: 'video', referenced: false }));
+    await expect(trashOwnedMediaFileInMain('media:m2', unlinked)).resolves.toMatchObject({
+      ok: false,
+      reasonKey: 'filesApp.delete.refuseNotTrashable',
     });
   });
 });

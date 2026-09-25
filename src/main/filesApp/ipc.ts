@@ -24,7 +24,11 @@ import { folderCandidatesFrom, resolveFolders } from '../../shared/filesApp/clip
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import type { FilesScanReportWithArchives } from '../../shared/filesApp/archive';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
-import { createFilesDeletionMainDependencies, registerFilesDeletionIpc } from './deletionIpc';
+import {
+  createFilesDeletionMainDependencies,
+  registerFilesDeletionIpc,
+  registerFilesTrashOwnedFileIpc,
+} from './deletionIpc';
 import { createCleanupSoftDelete, registerFilesCleanupIpc } from './cleanupIpc';
 import type { FilesCleanupLogEntry } from '../../shared/filesApp/cleanup';
 import { readFilesMineSource } from './mineSource';
@@ -403,14 +407,14 @@ export function registerFilesAppIpc(options: FilesAppIpcOptions = {}): void {
    * file. Paying one rebuild per delete is the correct trade — a delete is a
    * rare, destructive, user-initiated act, not a render-path call.
    */
-  registerFilesDeletionIpc(
-    ipcMain,
-    createFilesDeletionMainDependencies({
-      getItems: () => getFilesIndex(true).items,
-      invalidate: invalidateFilesIndex,
-      trashItem: (target) => shell.trashItem(target),
-    }),
-  );
+  const deletionDeps = createFilesDeletionMainDependencies({
+    getItems: () => getFilesIndex(true).items,
+    invalidate: invalidateFilesIndex,
+    trashItem: (target) => shell.trashItem(target),
+  });
+  registerFilesDeletionIpc(ipcMain, deletionDeps);
+  // Linked media's "also move the file to the Recycle Bin" (audit r2 #2).
+  registerFilesTrashOwnedFileIpc(ipcMain, deletionDeps);
 
   /*
    * Gates 32-35 — cleanup.
