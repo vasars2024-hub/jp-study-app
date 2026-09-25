@@ -47,8 +47,15 @@ describe('a Blanc-only tool is not governed by the module lists', () => {
     expect(defaults.enabledTools as readonly string[]).not.toContain(id);
   });
 
-  it.each(BLANC_ONLY)('%s is still launchable', (id) => {
+  it.each(BLANC_ONLY.filter((id) => id !== 'coverage'))('%s is still launchable', (id) => {
     expect(isToolLaunchable(id, defaults, false)).toBe(true);
+  });
+
+  it('coverage, a developer tool, is launchable only with Developer tools on (round-2 Blanc)', () => {
+    // An implementation map of which features are real read as "this app is unfinished" to a
+    // learner; it is listed only behind Blanc's developer flag, off by default.
+    expect(isToolLaunchable('coverage', defaults, false)).toBe(false);
+    expect(isToolLaunchable('coverage', { ...defaults, developerTools: true }, false)).toBe(true);
   });
 });
 

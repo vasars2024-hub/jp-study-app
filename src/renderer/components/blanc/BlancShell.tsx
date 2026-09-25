@@ -8,6 +8,8 @@ import {
 import { AUTOMATION_BUILDER } from '../../../shared/automationBuilder';
 import { getToolboxModule, listBlancToolboxModules, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
 import { isRegistryGovernedTool, isToolLaunchable, mergeFavoriteTools } from './blancToolVisibility';
+import { isDeveloperOnlyTool, useBlancDeveloperTools } from './blancDeveloperTools';
+import { blancToolLabel, blancToolLabelKey } from './blancToolLabels';
 import { markSectionOpenHandled } from '../../sectionSurface';
 import { BlancToolErrorBoundary } from './BlancToolErrorBoundary';
 import {
@@ -224,16 +226,18 @@ const BlancAudioMinePanel = lazy(() =>
 // Pillar 3 — App Drawer. Supersedes workspace-launcher (retired below).
 const BlancAppDrawerPanel = lazy(() => import('./BlancAppDrawerPanel'));
 
-const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
-  read: { label: 'Read', icon: 'library' },
-  mine: { label: 'Mine', icon: 'scan' },
-  deck: { label: 'Deck', icon: 'anki' },
-  flashcards: { label: 'Cards', icon: 'flashcards' },
-  media: { label: 'Media', icon: 'player' },
-  stats: { label: 'Stats', icon: 'stats' },
-  tools: { label: 'Toolbox', icon: 'wrench' },
-  blocks: { label: 'Blocks', icon: 'app' },
-  settings: { label: 'Settings', icon: 'settings' },
+// Labels are catalog KEYS, resolved with t() at render (module-level tables
+// cannot call useT()).
+const TAB_META: Record<BlancTabId, { labelKey: string; icon: IconName }> = {
+  read: { labelKey: 'blanc.shell.tab.read', icon: 'library' },
+  mine: { labelKey: 'blanc.shell.tab.mine', icon: 'scan' },
+  deck: { labelKey: 'blanc.shell.tab.deck', icon: 'anki' },
+  flashcards: { labelKey: 'blanc.shell.tab.cards', icon: 'flashcards' },
+  media: { labelKey: 'blanc.shell.tab.media', icon: 'player' },
+  stats: { labelKey: 'blanc.shell.tab.stats', icon: 'stats' },
+  tools: { labelKey: 'blanc.shell.tab.toolbox', icon: 'wrench' },
+  blocks: { labelKey: 'blanc.shell.tab.blocks', icon: 'app' },
+  settings: { labelKey: 'blanc.shell.tab.settings', icon: 'settings' },
 };
 
 function useMinuteClock(): Date {
@@ -253,6 +257,7 @@ export default function BlancShell({
   onInitialBookConsumed: () => void;
 }) {
   const { t, lang } = useT();
+  const blancTools = useBlancTools();
   const [settings, setSettings] = useState<BlancModeSettings>(() => loadBlancMode());
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [workspaceFull, setWorkspaceFull] = useState(false);
@@ -451,7 +456,7 @@ export default function BlancShell({
     setSettings(setBlancAdvanced(on));
   };
 
-  const title = book ? 'Reader' : TAB_META[tab].label;
+  const title = book ? t('blanc.shell.reader') : t(TAB_META[tab].labelKey);
   const canExpandWorkspace = book || tab === 'mine' || tab === 'flashcards' || tab === 'media' || tab === 'stats' || tab === 'tools';
 
   return (
@@ -459,20 +464,18 @@ export default function BlancShell({
       <aside
         className="blanc-taskbar lq-liquid"
         data-lq-role="liquid"
-        aria-label="Blanc Mode sections"
+        aria-label={t('blanc.shell.sections')}
       >
-        <div className="blanc-brand">
-          <span className="blanc-brand-mark" aria-hidden />
-          <span>Blanc</span>
-        </div>
+        {/* No in-window "Blanc" brand: the window title already names the window,
+            and repeating it here only cost the taskbar a row (design brief). */}
         <button
           type="button"
           className="blanc-nav-btn blanc-taskbar-toggle"
           onClick={() => setTaskbarHidden(true)}
-          title="Hide taskbar"
+          title={t('blanc.shell.hideTaskbar')}
         >
           <Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} />
-          <span>Hide</span>
+          <span>{t('blanc.shell.hide')}</span>
         </button>
         <nav className="blanc-nav">
           {BLANC_TABS.map((id) => (
@@ -487,10 +490,10 @@ export default function BlancShell({
               // for a navigation landmark, which this <nav> is.
               aria-current={!book && tab === id ? 'page' : undefined}
               onClick={() => chooseNavTab(id)}
-              title={TAB_META[id].label}
+              title={t(TAB_META[id].labelKey)}
             >
               <Icon name={TAB_META[id].icon} size={16} />
-              <span>{TAB_META[id].label}</span>
+              <span>{t(TAB_META[id].labelKey)}</span>
             </button>
           ))}
         </nav>
@@ -499,7 +502,7 @@ export default function BlancShell({
           className="blanc-exit"
           onClick={() => void setBlancModeEnabled(false)}
         >
-          Exit Blanc
+          {t('blanc.shell.exit')}
         </button>
       </aside>
 
@@ -508,7 +511,7 @@ export default function BlancShell({
           <div className="blanc-title">
             {book && (
               <button type="button" className="blanc-small-btn" onClick={() => setBook(null)}>
-                Back
+                {t('blanc.shell.back')}
               </button>
             )}
             <span>{title}</span>
@@ -517,7 +520,7 @@ export default function BlancShell({
               time is the one thing in the top bar that is read rather than operated. A <time>
               is not a control, so keeping it visible costs the default view nothing. */}
           <time className="blanc-clock">
-            {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {clock.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' })}
           </time>
           {/* Blanc's one cross-tool capability (6b488974) and its dominant way in, so it stays
               in the bar rather than one click inside the drawer: a Ctrl+F affordance that has
@@ -527,8 +530,8 @@ export default function BlancShell({
           <button
             type="button"
             className="blanc-icon-btn primary blanc-top-search"
-            title="Search Blanc (Ctrl+F)"
-            aria-label="Search Blanc"
+            title={t('blanc.shell.searchTitle')}
+            aria-label={t('blanc.shell.search')}
             onClick={() => setMasterSearchOpen(true)}
           >
             <Icon name="search" size={15} />
@@ -540,7 +543,7 @@ export default function BlancShell({
             aria-controls="blanc-top-context"
             onClick={() => setCompactToolsOpen((open) => !open)}
           >
-            Context tools
+            {t('blanc.shell.contextTools')}
           </button>
           <div
             id="blanc-top-context"
@@ -552,7 +555,8 @@ export default function BlancShell({
               <button
                 type="button"
                 className="blanc-icon-btn"
-                title={workspaceFull ? 'Exit fullscreen workspace' : 'Fullscreen workspace'}
+                title={workspaceFull ? t('blanc.shell.exitFullscreenWorkspace') : t('blanc.shell.fullscreenWorkspace')}
+                aria-label={workspaceFull ? t('blanc.shell.exitFullscreenWorkspace') : t('blanc.shell.fullscreenWorkspace')}
                 onClick={() => setWorkspaceFull((current) => !current)}
               >
                 <Icon name={workspaceFull ? 'app' : 'monitor'} size={15} />
@@ -565,7 +569,7 @@ export default function BlancShell({
                 checked={settings.advanced}
                 onChange={(event) => patchAdvanced(event.target.checked)}
               />
-              <span>Advanced</span>
+              <span>{t('blanc.shell.advanced')}</span>
             </label>
             <label className="blanc-check">
               <input
@@ -573,14 +577,14 @@ export default function BlancShell({
                 checked={settings.darkMode}
                 onChange={(event) => patchDark(event.target.checked)}
               />
-              <span>Dark</span>
+              <span>{t('blanc.shell.dark')}</span>
             </label>
             </div>
           </div>
         </header>
 
         <section className={`blanc-content${book ? ' is-reader' : ''}`}>
-          <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
+          <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
           {book?.kind === 'manga' ? (
             <MangaReader item={book} onClose={() => setBook(null)} />
           ) : book ? (
@@ -615,19 +619,19 @@ export default function BlancShell({
         <button
           type="button"
           className="blanc-fullscreen-exit"
-          title="Exit fullscreen workspace"
+          title={t('blanc.shell.exitFullscreenWorkspace')}
           onClick={() => setWorkspaceFull(false)}
         >
           <Icon name="app" size={15} />
-          <span>Exit Fullscreen</span>
+          <span>{t('blanc.shell.exitFullscreen')}</span>
         </button>
       )}
       {taskbarHidden && !workspaceFull && (
         <button
           type="button"
           className="blanc-taskbar-reveal"
-          title="Show taskbar"
-          aria-label="Show Blanc taskbar"
+          title={t('blanc.shell.showTaskbar')}
+          aria-label={t('blanc.shell.showTaskbarAria')}
           onClick={() => setTaskbarHidden(false)}
         >
           <Icon name="chevron" size={15} />
@@ -635,7 +639,7 @@ export default function BlancShell({
       )}
       <BlancMasterSearch
         open={masterSearchOpen}
-        tools={BLANC_TOOLS}
+        tools={blancTools}
         content={masterContent}
         commands={TOOLBOX_SHORTCUT_COMMANDS.map((command) => ({
           ...command,
@@ -727,10 +731,11 @@ export default function BlancShell({
 }
 
 function LanguageSelect() {
+  const { t } = useT();
   const [lang, setLang] = useState<UiLang>(() => getUiLang());
   return (
     <label className="blanc-lang">
-      <span>Language</span>
+      <span>{t('blanc.shell.language')}</span>
       <select
         value={lang}
         onChange={(event) => {
@@ -750,6 +755,7 @@ function LanguageSelect() {
 }
 
 function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
+  const { t } = useT();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [activeFolder, setActiveFolder] = useState('all');
@@ -805,16 +811,16 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
   return (
     <div className="blanc-panel blanc-read">
       <fieldset>
-        <legend>Library</legend>
+        <legend>{t('blanc.shell.read.library')}</legend>
         <div className="blanc-toolbar">
           <button type="button" disabled={busy} onClick={() => void runBusy(async () => setItems(await window.api.importFiles()))}>
-            Upload file
+            {t('blanc.shell.read.uploadFile')}
           </button>
           <button type="button" disabled={busy} onClick={() => void runBusy(async () => setItems(await window.api.importFolder()))}>
-            Upload folder
+            {t('blanc.shell.read.uploadFolder')}
           </button>
           <button type="button" disabled={busy} onClick={() => void runBusy(refresh)}>
-            Refresh
+            {t('blanc.shell.refresh')}
           </button>
           <button
             type="button"
@@ -827,23 +833,23 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
               })
             }
           >
-            {watchFolder ? 'Change watch folder' : 'Set watch folder'}
+            {watchFolder ? t('blanc.shell.read.changeWatchFolder') : t('blanc.shell.read.setWatchFolder')}
           </button>
         </div>
         {watchFolder && (
           <p className="blanc-note">
-            Auto-import folder: <code>{watchFolder}</code>
+            {t('blanc.shell.read.autoImportFolder')} <code>{watchFolder}</code>
           </p>
         )}
         {status && <p className="blanc-error">{status}</p>}
       </fieldset>
 
       <fieldset>
-        <legend>Folders</legend>
+        <legend>{t('blanc.shell.read.folders')}</legend>
         <div className="blanc-folder-row">
           <select value={activeFolder} onChange={(event) => setActiveFolder(event.target.value)}>
-            <option value="all">All ({items.length})</option>
-            <option value="unfiled">Unfiled</option>
+            <option value="all">{t('blanc.shell.read.allCount', { count: items.length })}</option>
+            <option value="unfiled">{t('blanc.shell.read.unfiled')}</option>
             {folders.map((folder) => (
               <option key={folder} value={folder}>
                 {folder}
@@ -853,14 +859,15 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
           <input
             type="text"
             value={newFolder}
-            placeholder="New folder"
+            placeholder={t('blanc.shell.read.newFolder')}
+            aria-label={t('blanc.shell.read.newFolder')}
             onChange={(event) => setNewFolder(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') void createFolder();
             }}
           />
           <button type="button" onClick={() => void createFolder()}>
-            Add
+            {t('blanc.shell.read.add')}
           </button>
         </div>
       </fieldset>
@@ -869,10 +876,10 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
         <table className="blanc-table">
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Type</th>
-              <th>Progress</th>
-              <th>Folder</th>
+              <th>{t('blanc.shell.col.title')}</th>
+              <th>{t('blanc.shell.col.type')}</th>
+              <th>{t('blanc.shell.col.progress')}</th>
+              <th>{t('blanc.shell.col.folder')}</th>
               <th />
             </tr>
           </thead>
@@ -886,8 +893,8 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
                       {item.title}
                     </button>
                   </td>
-                  <td>{item.kind === 'manga' ? 'Manga' : item.epubFile?.endsWith('.pdf') ? 'PDF' : 'EPUB'}</td>
-                  <td>{pct}%</td>
+                  <td>{item.kind === 'manga' ? t('blanc.shell.read.kindManga') : item.epubFile?.endsWith('.pdf') ? 'PDF' : 'EPUB'}</td>
+                  <td>{new Intl.NumberFormat(LANG_TAGS[getUiLang()], { style: 'percent', maximumFractionDigits: 0 }).format(pct / 100)}</td>
                   <td>
                     <select
                       value={item.folder && folders.includes(item.folder) ? item.folder : ''}
@@ -895,7 +902,7 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
                         void window.api.setItemFolder(item.id, event.target.value || null).then(setItems)
                       }
                     >
-                      <option value="">Unfiled</option>
+                      <option value="">{t('blanc.shell.read.unfiled')}</option>
                       {folders.map((folder) => (
                         <option key={folder} value={folder}>
                           {folder}
@@ -905,7 +912,7 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
                   </td>
                   <td>
                     <button type="button" onClick={() => onOpenBook(item)}>
-                      Open
+                      {t('blanc.shell.open')}
                     </button>
                   </td>
                 </tr>
@@ -913,7 +920,7 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
             })}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={5}>No readable items in this folder.</td>
+                <td colSpan={5}>{t('blanc.shell.read.empty')}</td>
               </tr>
             )}
           </tbody>
@@ -932,6 +939,7 @@ function BlancMinePanel({ advanced }: { advanced: boolean }) {
 }
 
 function BlancDeckPanel({ advanced }: { advanced: boolean }) {
+  const { t } = useT();
   const [cards, setCards] = useState<DeckFlashcard[]>(() => loadDeck());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState('');
@@ -978,7 +986,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
         ankiExported: ok,
         ankiExportedAt: ok ? Date.now() : undefined,
         ankiNoteId: result.noteId,
-        ankiExportError: ok ? undefined : result.error ?? 'Export failed',
+        ankiExportError: ok ? undefined : result.error ?? t('blanc.shell.deck.exportFailed'),
         ankiDeck: deck || undefined,
       });
       setCards(loadDeck());
@@ -989,15 +997,15 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
   const exportSelected = async (): Promise<void> => {
     const targets = cards.filter((card) => selected.has(card.id));
     if (!targets.length) {
-      setStatus('Select cards first.');
+      setStatus(t('blanc.shell.deck.selectFirst'));
       return;
     }
-    setStatus(`Exporting ${targets.length} cards...`);
+    setStatus(t('blanc.shell.deck.exporting', { count: targets.length }));
     let ok = 0;
     for (const card of targets) {
       if (await sendCard(card)) ok += 1;
     }
-    setStatus(`Exported ${ok}/${targets.length}.`);
+    setStatus(t('blanc.shell.deck.exported', { ok, total: targets.length }));
   };
 
   const addManual = async (): Promise<void> => {
@@ -1020,9 +1028,9 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
     setSentence('');
     if (connected && created) {
       const ok = await sendCard(created);
-      setStatus(ok ? 'Card saved and exported.' : 'Card saved locally; Anki export failed.');
+      setStatus(ok ? t('blanc.shell.deck.savedExported') : t('blanc.shell.deck.savedExportFailed'));
     } else {
-      setStatus('Card saved locally.');
+      setStatus(t('blanc.shell.deck.savedLocal'));
     }
   };
 
@@ -1033,10 +1041,10 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
         <legend>Anki</legend>
         <div className="blanc-toolbar">
           <span className={`blanc-status-dot${connected ? ' ok' : ''}`} />
-          <span>{connected ? 'Connected' : 'Not connected'}</span>
-          <select value={deck} onChange={(event) => setDeck(event.target.value)}>
+          <span>{connected ? t('blanc.shell.deck.connected') : t('blanc.shell.deck.notConnected')}</span>
+          <select value={deck} aria-label={t('blanc.shell.deck.deck')} onChange={(event) => setDeck(event.target.value)}>
             {deck && !decks.includes(deck) && <option value={deck}>{deck}</option>}
-            <option value="">Profile default</option>
+            <option value="">{t('blanc.shell.deck.profileDefault')}</option>
             {decks.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -1044,34 +1052,34 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
             ))}
           </select>
           <button type="button" onClick={() => void exportSelected()}>
-            Export selected
+            {t('blanc.shell.deck.exportSelected')}
           </button>
         </div>
         {status && <p className="blanc-note">{status}</p>}
       </fieldset>
 
       <fieldset>
-        <legend>Manual card</legend>
+        <legend>{t('blanc.shell.deck.manualCard')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Word
+            {t('blanc.shell.deck.word')}
             <input value={term} lang="ja" onChange={(event) => setTerm(event.target.value)} />
           </label>
           <label>
-            Reading
+            {t('blanc.shell.deck.reading')}
             <input value={reading} lang="ja" onChange={(event) => setReading(event.target.value)} />
           </label>
           <label>
-            Meaning
+            {t('blanc.shell.deck.meaning')}
             <input value={meaning} onChange={(event) => setMeaning(event.target.value)} />
           </label>
           <label>
-            Sentence
+            {t('blanc.shell.deck.sentence')}
             <input value={sentence} lang="ja" onChange={(event) => setSentence(event.target.value)} />
           </label>
         </div>
         <button type="button" onClick={() => void addManual()} disabled={!term.trim()}>
-          Add card
+          {t('blanc.shell.deck.addCard')}
         </button>
       </fieldset>
 
@@ -1080,9 +1088,9 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
           <thead>
             <tr>
               <th />
-              <th>Word</th>
-              <th>Meaning</th>
-              <th>Source</th>
+              <th>{t('blanc.shell.deck.word')}</th>
+              <th>{t('blanc.shell.deck.meaning')}</th>
+              <th>{t('blanc.shell.deck.source')}</th>
               <th>Anki</th>
               <th />
             </tr>
@@ -1091,25 +1099,30 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
             {cards.map((card) => (
               <tr key={card.id}>
                 <td>
-                  <input type="checkbox" checked={selected.has(card.id)} onChange={() => toggle(card.id)} />
+                  <input
+                    type="checkbox"
+                    checked={selected.has(card.id)}
+                    aria-label={t('blanc.shell.deck.selectCard', { word: card.word })}
+                    onChange={() => toggle(card.id)}
+                  />
                 </td>
                 <td lang="ja">{card.word}</td>
                 <td>{card.meaning || card.back}</td>
                 <td>{card.bookTitle || card.source}</td>
-                <td>{card.ankiExported ? 'Exported' : card.ankiExportError ? 'Failed' : 'Local'}</td>
+                <td>{card.ankiExported ? t('blanc.shell.deck.stateExported') : card.ankiExportError ? t('blanc.shell.deck.stateFailed') : t('blanc.shell.deck.stateLocal')}</td>
                 <td>
                   <button type="button" onClick={() => {
                     removeDeckCard(card.id);
                     setCards(loadDeck());
                   }}>
-                    Remove
+                    {t('blanc.shell.remove')}
                   </button>
                 </td>
               </tr>
             ))}
             {cards.length === 0 && (
               <tr>
-                <td colSpan={6}>No cards yet. Mine from the reader or add one manually.</td>
+                <td colSpan={6}>{t('blanc.shell.deck.empty')}</td>
               </tr>
             )}
           </tbody>
@@ -1289,86 +1302,95 @@ interface BlancToolEntry {
   shortcut?: string;
 }
 
-const TOOL_CATEGORY_LABELS: Record<BlancToolCategory, string> = {
-  quick: 'Quick Tools',
-  productivity: 'Productivity',
-  system: 'System',
-  language: 'Language',
+const TOOL_CATEGORY_LABEL_KEYS: Record<BlancToolCategory, string> = {
+  quick: 'blanc.shell.category.quick',
+  productivity: 'blanc.shell.category.productivity',
+  system: 'blanc.shell.category.system',
+  language: 'blanc.shell.category.language',
 };
 
 const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'system', 'language'];
 
-const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; description: string; shortcut?: string }> = {
-  furigana: { category: 'language', description: 'Paste Japanese text and get ruby, Anki bracket furigana, or kana — offline.' },
-  'counter-reader': { category: 'language', description: 'Numbers, counters, dates, and clock times to kana — 3本 → さんぼん, with audio.' },
-  'dev-console': { category: 'system', description: 'Append-only event log — mining, deck writes, toasts, and errors, with copy-for-report.' },
-  'pitch-accent': { category: 'language', description: 'Pitch-accent contour for a word, with the pattern named and spoken aloud.' },
-  'audio-mine': { category: 'language', description: 'Transcribe a local audio or video file with Whisper, then click any word to look it up and mine it.' },
-  'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
-  'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
-  coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
-  agent: { category: 'system', description: 'Aim a request at local Qwen or a named cloud provider, bound its input and output, and see what it charged against the monthly ceiling.' },
-  files: { category: 'system', description: 'Everything the app stores, filed by what it is — books, decks, transcripts, dictionaries — with the real location of each.' },
-  notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
-  translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
-  music: { category: 'language', description: 'Song library, karaoke lyrics, and click-to-look-up — shares the app-wide player.' },
-  novels: { category: 'language', description: 'Search Jiten and the local catalogue, plan to read, and import or mine EPUBs.' },
-  discover: { category: 'language', description: 'What to watch next at your level, ranked against your library, with the reasons spelled out.' },
-  games: { category: 'language', description: 'The full Game Arena — sentence builder, cloze, match, kana sprint, and more; XP and mistakes sync app-wide.' },
-  immersion: { category: 'language', description: 'The full immersion browser — live guest, Reader Mode, sites rail, and click-to-look-up; feeds reading stats.' },
-  visualizer: { category: 'productivity', description: 'Live music visualizer with style, colour, and sensitivity controls — shared with the desktop wallpaper.' },
-  'local-agent': { category: 'system', description: 'Offline local assistant with reviewed plans, permissions, confirmations, and task progress.' },
-  calculator: { category: 'quick', description: 'Offline arithmetic with a compact result display.', shortcut: 'Alt+1' },
-  'unit-converter': { category: 'quick', description: 'Static length, weight, temperature, and data conversions.', shortcut: 'Alt+2' },
-  'hash-checker': { category: 'quick', description: 'Generate SHA-256 and compare downloaded files.', shortcut: 'Alt+3' },
-  'image-converter': { category: 'quick', description: 'Convert PNG, JPEG, and WebP without leaving Blanc.', shortcut: 'Alt+4' },
-  'batch-converter': { category: 'quick', description: 'Queue many images through the same canvas conversion.' },
-  'focus-timer': { category: 'productivity', description: 'Countdown, stopwatch, presets, and session rhythm.', shortcut: 'Alt+5' },
-  'quick-notes': { category: 'productivity', description: 'Local scratch notes that stay inside Blanc.', shortcut: 'Alt+6' },
-  clipboard: { category: 'productivity', description: 'Clipboard history and Japanese capture handoff.', shortcut: 'Alt+7' },
-  calendar: { category: 'productivity', description: 'Study calendar and local scheduling tools.' },
-  'system-monitor': { category: 'system', description: 'CPU, RAM, storage, uptime, and battery at a glance.', shortcut: 'Alt+8' },
-  'file-search': { category: 'system', description: 'Capped local filename search with open/copy actions.', shortcut: 'Alt+9' },
-  'automation-builder': { category: 'system', description: 'Launch the existing Windows automation builder.' },
-  'app-drawer': { category: 'system', description: 'Folders of apps, files, links, and Blanc tools — launch a whole folder in one click.' },
-  dictionary: { category: 'language', description: 'Lookup, dictionaries, examples, and study actions.' },
-  grammar: { category: 'language', description: 'Deterministic Japanese grammar reference.' },
-  'reading-finder': { category: 'language', description: 'Find and import readable Japanese sources.' },
-  resources: { category: 'language', description: 'Curated study resources and collected tools.' },
-  'notification-center': { category: 'system', description: 'Persistent notification history with dismiss and clear actions.' },
-  'difficulty-analyzer': { category: 'language', description: 'Paste text to estimate exam level and comprehension.' },
-  'immersion-tracker': { category: 'language', description: 'Read-only immersion site totals, streaks, and character counts.' },
-  'frequency-explorer': { category: 'language', description: 'Lookup corpus frequency ranks from installed dictionaries.' },
-  'subtitle-importer': { category: 'language', description: 'Parse subtitle files and send lines to the flashcard deck.' },
-  'context-search': { category: 'language', description: 'Search commands, saved words, deck cards, and grammar.' },
-  'kanji-inspector': { category: 'language', description: 'Inspect one kanji against radicals and dictionary senses.' },
-  'youtube-library': { category: 'language', description: 'Compact playlist manager with download and plan-to-watch toggles.' },
+/**
+ * Category and default shortcut per tool. The name and description are catalog
+ * keys (`blanc.tool.<id>` / `blanc.tool.<id>.desc`, see blancToolLabels.ts),
+ * resolved at render by `useBlancTools()`.
+ */
+const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; shortcut?: string }> = {
+  furigana: { category: 'language' },
+  'counter-reader': { category: 'language' },
+  'dev-console': { category: 'system' },
+  'pitch-accent': { category: 'language' },
+  'audio-mine': { category: 'language' },
+  'review-forecast': { category: 'language' },
+  'conjugation-drill': { category: 'language' },
+  coverage: { category: 'system' },
+  agent: { category: 'system' },
+  files: { category: 'system' },
+  notebook: { category: 'language' },
+  translate: { category: 'language' },
+  music: { category: 'language' },
+  novels: { category: 'language' },
+  discover: { category: 'language' },
+  games: { category: 'language' },
+  immersion: { category: 'language' },
+  visualizer: { category: 'productivity' },
+  'local-agent': { category: 'system' },
+  calculator: { category: 'quick', shortcut: 'Alt+1' },
+  'unit-converter': { category: 'quick', shortcut: 'Alt+2' },
+  'hash-checker': { category: 'quick', shortcut: 'Alt+3' },
+  'image-converter': { category: 'quick', shortcut: 'Alt+4' },
+  'batch-converter': { category: 'quick' },
+  'focus-timer': { category: 'productivity', shortcut: 'Alt+5' },
+  'quick-notes': { category: 'productivity', shortcut: 'Alt+6' },
+  clipboard: { category: 'productivity', shortcut: 'Alt+7' },
+  calendar: { category: 'productivity' },
+  'system-monitor': { category: 'system', shortcut: 'Alt+8' },
+  'file-search': { category: 'system', shortcut: 'Alt+9' },
+  'automation-builder': { category: 'system' },
+  'app-drawer': { category: 'system' },
+  dictionary: { category: 'language' },
+  grammar: { category: 'language' },
+  'reading-finder': { category: 'language' },
+  resources: { category: 'language' },
+  'notification-center': { category: 'system' },
+  'difficulty-analyzer': { category: 'language' },
+  'immersion-tracker': { category: 'language' },
+  'frequency-explorer': { category: 'language' },
+  'subtitle-importer': { category: 'language' },
+  'context-search': { category: 'language' },
+  'kanji-inspector': { category: 'language' },
+  'youtube-library': { category: 'language' },
 };
 
-/** Labels for the Blanc-only ids, which have no `TOOLBOX_MODULES` entry to read. */
-const BLANC_ONLY_LABELS: Record<BlancOnlyToolId, string> = {
-  coverage: 'Coverage',
-  agent: 'Agent',
-  files: 'Files',
-  notebook: 'Notebook',
-  translate: 'Translate',
-  music: 'Music',
-  novels: 'Novels',
-  discover: 'Discover',
-  games: 'Games',
-  immersion: 'Immersion',
-  visualizer: 'Visualizer',
-  'local-agent': 'Local AI Agent',
-};
+interface BlancToolDef {
+  id: BlancToolId;
+  icon: IconName;
+  category: BlancToolCategory;
+  shortcut?: string;
+}
 
-const BLANC_TOOLS: BlancToolEntry[] = BLANC_TOOL_IDS.map((id) => ({
+const BLANC_TOOL_DEFS: BlancToolDef[] = BLANC_TOOL_IDS.map((id) => ({
   id,
-  label: BLANC_ONLY_LABELS[id as BlancOnlyToolId] ?? getToolboxModule(id)?.label ?? id,
   icon: BLANC_TOOL_ICONS[id],
   category: TOOL_DESCRIPTIONS[id].category,
-  description: TOOL_DESCRIPTIONS[id].description,
   shortcut: TOOL_DESCRIPTIONS[id].shortcut,
 }));
+
+/** Blanc's tools with their name and description in the active UI language. */
+function useBlancTools(): BlancToolEntry[] {
+  const { t, lang } = useT();
+  const developerTools = useBlancDeveloperTools();
+  return useMemo(
+    () =>
+      BLANC_TOOL_DEFS.filter((def) => developerTools || !isDeveloperOnlyTool(def.id)).map((def) => ({
+        ...def,
+        label: blancToolLabel(t, def.id),
+        description: t(`${blancToolLabelKey(def.id) ?? def.id}.desc`),
+      })),
+    [lang, developerTools],
+  );
+}
 
 const BLANC_LAST_TOOL_KEY = 'jp-study.blanc.toolbox.lastTool';
 const BLANC_FAVORITE_TOOLS_KEY = 'jp-study.blanc.toolbox.favoriteTools';
@@ -1473,6 +1495,8 @@ function BlancToolsPanel({
   grammarRequest: { id: string; key: number } | null;
   toolRequest: { id: BlancToolId; key: number } | null;
 }) {
+  const { t } = useT();
+  const blancTools = useBlancTools();
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(() => loadToolboxSettings().sidebarExpanded);
@@ -1510,8 +1534,8 @@ function BlancToolsPanel({
     toolboxSettings.fuzzySearch
       ? fuzzyIncludes(haystack.toLowerCase(), normalizedQuery)
       : haystack.toLowerCase().includes(normalizedQuery);
-  const activeTool = BLANC_TOOLS.find((item) => item.id === tool) ?? BLANC_TOOLS[0];
-  const matchingTools = BLANC_TOOLS.filter((item) => {
+  const activeTool = blancTools.find((item) => item.id === tool) ?? blancTools[0];
+  const matchingTools = blancTools.filter((item) => {
     // The enabled/hidden lists are `ToolboxModuleId[]` and are re-sanitised
     // against TOOLBOX_MODULES on every load, so a Blanc-only id can never be a
     // member of one. Gating on them by name hid all nine Pillar 2 ports; see
@@ -1521,7 +1545,7 @@ function BlancToolsPanel({
     const haystack = [
       toolboxSettings.searchToolsByTitle ? item.label : '',
       toolboxSettings.searchToolDescriptions ? item.description : '',
-      TOOL_CATEGORY_LABELS[item.category],
+      t(TOOL_CATEGORY_LABEL_KEYS[item.category]),
     ].join(' ');
     return matches(haystack);
   });
@@ -1678,7 +1702,7 @@ function BlancToolsPanel({
   const tabStrip = (
     <div className="blanc-tool-tabs" role="tablist" aria-label="Open toolbox tools">
       {openTabs.map((id) => {
-        const item = BLANC_TOOLS.find((candidate) => candidate.id === id);
+        const item = blancTools.find((candidate) => candidate.id === id);
         if (!item) return null;
         return (
           <button
@@ -1771,7 +1795,7 @@ function BlancToolsPanel({
           {toolboxSettings.showFavoritesSection && favorites.length > 0 && (
             <div className="blanc-tool-strip" aria-label="Favorite tools">
               {favorites.map((id) => {
-                const item = BLANC_TOOLS.find((candidate) => candidate.id === id);
+                const item = blancTools.find((candidate) => candidate.id === id);
                 if (!item) return null;
                 return (
                   <button
@@ -1792,7 +1816,7 @@ function BlancToolsPanel({
             <div className="blanc-tool-recent">
               <span>Recent</span>
               {recent.map((id) => {
-                const item = BLANC_TOOLS.find((candidate) => candidate.id === id);
+                const item = blancTools.find((candidate) => candidate.id === id);
                 if (!item) return null;
                 return (
                   <button
@@ -1815,7 +1839,7 @@ function BlancToolsPanel({
             if (!tools.length) return null;
             return (
               <section key={category} className="blanc-tool-section">
-                {toolboxSettings.showCategoryHeaders && <h3>{TOOL_CATEGORY_LABELS[category]}</h3>}
+                {toolboxSettings.showCategoryHeaders && <h3>{t(TOOL_CATEGORY_LABEL_KEYS[category])}</h3>}
                 {tools.map((item) => (
                   <button
                     key={item.id}
@@ -1868,7 +1892,7 @@ function BlancToolsPanel({
         <section className="blanc-tool-workspace" aria-label={activeTool.label}>
           <header className="blanc-active-tool-head">
             <div>
-              <span className="blanc-tool-kicker">{TOOL_CATEGORY_LABELS[activeTool.category]}</span>
+              <span className="blanc-tool-kicker">{t(TOOL_CATEGORY_LABEL_KEYS[activeTool.category])}</span>
               <h2>{activeTool.label}</h2>
             {toolboxSettings.showToolDescriptions && <p>{activeTool.description}</p>}
             </div>
@@ -2867,6 +2891,7 @@ function BlancSettingsPanel({
   onPatch: (settings: BlancModeSettings) => void;
 }) {
   const { t } = useT();
+  const blancTools = useBlancTools();
   const [pin, setPin] = useState('');
   const [pinMsg, setPinMsg] = useState('');
   const [lockOn, setLockOn] = useState(() => loadLockscreen().enabled);
@@ -2947,7 +2972,7 @@ function BlancSettingsPanel({
   // Blanc setting you cannot change without a mouse. Drag is worth adding on
   // top later; it is not worth having instead.
   const orderableTools = orderToolIds(
-    BLANC_TOOLS.map((item) => item.id).filter((id): id is ToolboxModuleId =>
+    blancTools.map((item) => item.id).filter((id): id is ToolboxModuleId =>
       id !== 'coverage' && toolboxSettings.enabledTools.includes(id as ToolboxModuleId),
     ),
     toolboxSettings.toolOrder,
@@ -3465,7 +3490,7 @@ function BlancSettingsPanel({
         </p>
         <ol className="blanc-order-list">
           {orderableTools.map((id, index) => {
-            const entry = BLANC_TOOLS.find((item) => item.id === id);
+            const entry = blancTools.find((item) => item.id === id);
             return (
               <li key={id}>
                 <span className="blanc-order-index">{index + 1}</span>
@@ -3502,11 +3527,11 @@ function BlancSettingsPanel({
           {orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder).map((category, index, list) => (
             <li key={category}>
               <span className="blanc-order-index">{index + 1}</span>
-              <span className="blanc-order-label">{TOOL_CATEGORY_LABELS[category]}</span>
+              <span className="blanc-order-label">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</span>
               <button
                 type="button"
                 disabled={index === 0}
-                aria-label={`Move the ${TOOL_CATEGORY_LABELS[category]} section up`}
+                aria-label={`Move the ${t(TOOL_CATEGORY_LABEL_KEYS[category])} section up`}
                 onClick={() => moveCategory(category, -1)}
               >
                 ↑
@@ -3514,7 +3539,7 @@ function BlancSettingsPanel({
               <button
                 type="button"
                 disabled={index === list.length - 1}
-                aria-label={`Move the ${TOOL_CATEGORY_LABELS[category]} section down`}
+                aria-label={`Move the ${t(TOOL_CATEGORY_LABEL_KEYS[category])} section down`}
                 onClick={() => moveCategory(category, 1)}
               >
                 ↓

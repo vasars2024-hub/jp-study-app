@@ -19,6 +19,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
 import { alertDialog, confirmDialog, showToast } from '../ui';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
+import { blancToolLabel } from './blancToolLabels';
 import { listBlancToolboxModules } from '../../../shared/toolboxRegistry';
 import type {
   CollectedFolder,
@@ -34,7 +36,9 @@ const MIGRATED_FLAG_KEY = `${WORKSPACE_LAUNCHER_KEY}.migrated`;
  * label from (see BlancShell.tsx's BLANC_ONLY_LABELS) — duplicated here rather
  * than imported to avoid a static import from the shell into one of its own
  * lazy panels. This list is stable; it has changed twice in the project's
- * history. */
+ * history. The English label is what a new tool shortcut stores as its `name`
+ * (the store is shared with Resources' "My tools"); the drawer itself displays
+ * the translated name via `blancToolLabel`. */
 const BLANC_ONLY_TOOL_LABELS: Record<string, string> = {
   coverage: 'Coverage',
   notebook: 'Notebook',
@@ -51,13 +55,13 @@ function pickableTools(): { id: string; label: string }[] {
     .filter((m) => m.id !== 'app-drawer')
     .map((m) => ({ id: m.id, label: m.label }));
   const blancOnly = Object.entries(BLANC_ONLY_TOOL_LABELS).map(([id, label]) => ({ id, label }));
-  return [...fromRegistry, ...blancOnly].sort((a, b) => a.label.localeCompare(b.label));
+  return [...fromRegistry, ...blancOnly];
 }
 
-function kindLabel(kind: CollectedToolKind): string {
-  if (kind === 'link') return 'Link';
-  if (kind === 'tool') return 'Blanc tool';
-  return 'App / file';
+function kindLabelKey(kind: CollectedToolKind): string {
+  if (kind === 'link') return 'blanc.drawer.kind.link';
+  if (kind === 'tool') return 'blanc.drawer.kind.tool';
+  return 'blanc.drawer.kind.app';
 }
 
 function kindIcon(kind: CollectedToolKind): 'globe' | 'wrench' | 'app' {
@@ -116,7 +120,7 @@ function useAppDrawer() {
         }
       }
       window.localStorage.setItem(MIGRATED_FLAG_KEY, '1');
-      setStatus(`Migrated ${workspaces.length} workspace(s) from Workspace Launcher.`);
+      setStatus(t('blanc.drawer.status.migrated', { count: workspaces.length }));
       await reload();
     })();
     // Runs once per mount by design — this is a one-shot migration guarded by
@@ -128,11 +132,11 @@ function useAppDrawer() {
       const trimmed = name.trim();
       if (!trimmed) return;
       const result = await window.api.toolsAddFolder(trimmed, parentFolderId);
-      if (result?.ok) setStatus(`Created "${trimmed}".`);
-      else setStatus(result?.error || 'Could not create folder.');
+      if (result?.ok) setStatus(t('blanc.drawer.status.created', { name: trimmed }));
+      else setStatus(result?.error || t('blanc.drawer.status.createFailed'));
       await reload();
     },
-    [reload],
+    [reload, t],
   );
 
   const renameFolder = useCallback(
@@ -176,7 +180,7 @@ function useAppDrawer() {
         await reload();
         return false;
       }
-      setStatus('Folder deleted; its shortcuts moved to the drawer root.');
+      setStatus(t('blanc.drawer.status.folderDeleted'));
       await reload();
       return true;
     },
@@ -187,7 +191,7 @@ function useAppDrawer() {
     async (url: string, name: string, folderId: string | null) => {
       const trimmed = url.trim();
       if (!/^https?:\/\//i.test(trimmed)) {
-        setStatus('Enter a full http:// or https:// address.');
+        setStatus(t('blanc.drawer.status.linkInvalid'));
         return;
       }
       const result = await window.api.toolsAdd({
@@ -200,13 +204,13 @@ function useAppDrawer() {
       setStatus(
         result?.ok
           ? result.duplicate
-            ? 'That link is already saved.'
-            : `Added ${name.trim() || trimmed}.`
-          : result?.error || 'Could not add link.',
+            ? t('blanc.drawer.status.linkDuplicate')
+            : t('blanc.drawer.status.added', { name: name.trim() || trimmed })
+          : result?.error || t('blanc.drawer.status.linkFailed'),
       );
       await reload();
     },
-    [reload],
+    [reload, t],
   );
 
   const addPicked = useCallback(
@@ -226,20 +230,20 @@ function useAppDrawer() {
         setStatus(
           result?.ok
             ? result.duplicate
-              ? 'That shortcut is already saved.'
-              : `Added ${picked.name || picked.target}.`
-            : result?.error || 'Could not add shortcut.',
+              ? t('blanc.drawer.status.shortcutDuplicate')
+              : t('blanc.drawer.status.added', { name: picked.name || picked.target })
+            : result?.error || t('blanc.drawer.status.shortcutFailed'),
         );
       } finally {
         setBusy(false);
       }
       await reload();
     },
-    [reload],
+    [reload, t],
   );
 
   const addToolShortcut = useCallback(
-    async (toolId: string, label: string, folderId: string | null) => {
+    async (toolId: string, label: string, displayLabel: string, folderId: string | null) => {
       if (!toolId) return;
       const result = await window.api.toolsAdd({
         url: toolId,
@@ -251,13 +255,13 @@ function useAppDrawer() {
       setStatus(
         result?.ok
           ? result.duplicate
-            ? 'That tool shortcut is already saved.'
-            : `Added ${label || toolId}.`
-          : result?.error || 'Could not add tool shortcut.',
+            ? t('blanc.drawer.status.toolDuplicate')
+            : t('blanc.drawer.status.added', { name: displayLabel || label || toolId })
+          : result?.error || t('blanc.drawer.status.toolFailed'),
       );
       await reload();
     },
-    [reload],
+    [reload, t],
   );
 
   // D142/D143 — one defect, found on both branches at once, resolved to the better
@@ -303,10 +307,10 @@ function useAppDrawer() {
 
   const launchFolder = useCallback(
     async (folder: CollectedFolder) => {
-      const items = tools.filter((t) => t.folderId === folder.id);
+      const items = tools.filter((tool) => tool.folderId === folder.id);
       if (items.length === 0) return;
       setBusy(true);
-      setStatus(`Launching ${items.length} item(s)...`);
+      setStatus(t('blanc.drawer.status.launching', { count: items.length }));
       const failures: string[] = [];
       let openedTool = false;
       for (const item of items) {
@@ -326,11 +330,15 @@ function useAppDrawer() {
       const opened = items.length - failures.length;
       setStatus(
         failures.length
-          ? `Opened ${opened} of ${items.length}. Failed — ${failures.join('; ')}`
-          : `Opened all ${opened} item(s).`,
+          ? t('blanc.drawer.status.partialFailure', {
+              opened,
+              total: items.length,
+              failures: failures.join('; '),
+            })
+          : t('blanc.drawer.status.openedAll', { count: opened }),
       );
     },
-    [tools, launchItem],
+    [tools, launchItem, t],
   );
 
   return {
@@ -364,22 +372,30 @@ function AddShortcutForm({
   const [linkUrl, setLinkUrl] = useState('');
   const [linkName, setLinkName] = useState('');
   const [toolId, setToolId] = useState('');
-  const tools = useMemo(() => pickableTools(), []);
+  const { t, lang } = useT();
+  const tools = useMemo(
+    () =>
+      pickableTools()
+        .map((tool) => ({ ...tool, display: blancToolLabel(t, tool.id) }))
+        .sort((a, b) => a.display.localeCompare(b.display, LANG_TAGS[lang])),
+    // `lang` re-resolves the translated names; `t` itself is stable.
+    [lang],
+  );
 
   return (
     <div className="blanc-form-grid">
       <label>
-        Add shortcut
+        {t('blanc.drawer.form.addShortcut')}
         <select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
-          <option value="app">App or file</option>
-          <option value="link">Link</option>
-          <option value="tool">Blanc tool</option>
+          <option value="app">{t('blanc.drawer.form.kindApp')}</option>
+          <option value="link">{t('blanc.drawer.kind.link')}</option>
+          <option value="tool">{t('blanc.drawer.kind.tool')}</option>
         </select>
       </label>
       {kind === 'app' && (
         <div className="blanc-row-actions">
           <button type="button" disabled={state.busy} onClick={() => void state.addPicked(folderId)}>
-            Choose app or file...
+            {t('blanc.drawer.form.chooseApp')}
           </button>
         </div>
       )}
@@ -388,7 +404,7 @@ function AddShortcutForm({
           <input
             type="text"
             value={linkName}
-            placeholder="Name"
+            placeholder={t('blanc.drawer.form.namePlaceholder')}
             onChange={(e) => setLinkName(e.target.value)}
           />
           <input
@@ -413,17 +429,17 @@ function AddShortcutForm({
               setLinkName('');
             }}
           >
-            Add link
+            {t('blanc.drawer.form.addLink')}
           </button>
         </div>
       )}
       {kind === 'tool' && (
         <div className="blanc-row-actions">
           <select value={toolId} onChange={(e) => setToolId(e.target.value)}>
-            <option value="">Choose a tool...</option>
-            {tools.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
+            <option value="">{t('blanc.drawer.form.chooseTool')}</option>
+            {tools.map((tool) => (
+              <option key={tool.id} value={tool.id}>
+                {tool.display}
               </option>
             ))}
           </select>
@@ -431,12 +447,12 @@ function AddShortcutForm({
             type="button"
             disabled={!toolId}
             onClick={() => {
-              const label = tools.find((t) => t.id === toolId)?.label ?? toolId;
-              void state.addToolShortcut(toolId, label, folderId);
+              const picked = tools.find((tool) => tool.id === toolId);
+              void state.addToolShortcut(toolId, picked?.label ?? toolId, picked?.display ?? toolId, folderId);
               setToolId('');
             }}
           >
-            Add tool shortcut
+            {t('blanc.drawer.form.addTool')}
           </button>
         </div>
       )}
@@ -459,10 +475,12 @@ function ItemRow({
       <td>
         <span className="blanc-row-actions">
           <Icon name={kindIcon(item.kind)} size={14} />
-          {item.name}
+          {/* A tool shortcut's stored name is the registry's English label, so
+              the drawer shows the tool's name in the UI language instead. */}
+          {item.kind === 'tool' ? blancToolLabel(t, item.url) : item.name}
         </span>
       </td>
-      <td>{kindLabel(item.kind)}</td>
+      <td>{t(kindLabelKey(item.kind))}</td>
       <td className="blanc-note">{item.kind === 'tool' ? item.url : item.url}</td>
       <td>
         <div className="blanc-row-actions">
@@ -475,14 +493,14 @@ function ItemRow({
               });
             }}
           >
-            Open
+            {t('common.open')}
           </button>
           {folders.length > 0 && (
             <select
               value={item.folderId ?? ''}
               onChange={(e) => void state.moveItem(item.id, e.target.value || null)}
             >
-              <option value="">Drawer root</option>
+              <option value="">{t('blanc.drawer.root')}</option>
               {folders.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
@@ -491,7 +509,7 @@ function ItemRow({
             </select>
           )}
           <button type="button" onClick={() => void state.removeItem(item.id)}>
-            Remove
+            {t('common.remove')}
           </button>
         </div>
       </td>
@@ -500,6 +518,7 @@ function ItemRow({
 }
 
 export default function BlancAppDrawerPanel() {
+  const { t } = useT();
   const state = useAppDrawer();
   const [openFolderId, setOpenFolderId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
@@ -512,28 +531,27 @@ export default function BlancAppDrawerPanel() {
   const canHoldSubfolders = openFolder ? !openFolder.parentFolderId : true;
   const rootFolders = state.folders.filter((f) => !f.parentFolderId);
   const subfolders = openFolder ? state.folders.filter((f) => f.parentFolderId === openFolder.id) : [];
-  const visibleItems = state.tools.filter((t) => t.folderId === openFolderId);
+  const visibleItems = state.tools.filter((tool) => tool.folderId === openFolderId);
   const moveTargets = state.folders.filter((f) => f.id !== openFolderId);
 
   return (
     <div className="blanc-tool-detail blanc-app-drawer">
       <fieldset>
-        <legend>App Drawer</legend>
-        <p className="blanc-note">
-          Group the apps, files, links, and Blanc tools you use together into folders, then launch a
-          whole folder in one click.
-        </p>
+        <legend>{t('blanc.tool.appDrawer')}</legend>
+        <p className="blanc-note">{t('blanc.drawer.intro')}</p>
         {openFolder ? (
           <div className="blanc-row-actions">
             <button type="button" onClick={() => setOpenFolderId(null)}>
-              Back to drawer
+              {t('blanc.drawer.back')}
             </button>
             <button
               type="button"
               disabled={state.busy || visibleItems.length === 0}
               onClick={() => void state.launchFolder(openFolder)}
             >
-              {state.busy ? 'Launching...' : `Launch all (${visibleItems.length})`}
+              {state.busy
+                ? t('blanc.drawer.launchingBusy')
+                : t('blanc.drawer.launchAll', { count: visibleItems.length })}
             </button>
             {renaming ? (
               <span className="blanc-row-actions">
@@ -556,7 +574,7 @@ export default function BlancAppDrawerPanel() {
                     setRenaming(false);
                   }}
                 >
-                  Save
+                  {t('common.save')}
                 </button>
               </span>
             ) : (
@@ -567,7 +585,7 @@ export default function BlancAppDrawerPanel() {
                   setRenaming(true);
                 }}
               >
-                Rename
+                {t('blanc.drawer.rename')}
               </button>
             )}
             <button
@@ -580,7 +598,7 @@ export default function BlancAppDrawerPanel() {
                 })();
               }}
             >
-              Delete folder
+              {t('blancDrawer.deleteFolder.confirm')}
             </button>
           </div>
         ) : (
@@ -588,7 +606,7 @@ export default function BlancAppDrawerPanel() {
             <input
               type="text"
               value={newFolderName}
-              placeholder="New folder name"
+              placeholder={t('blanc.drawer.newFolderPlaceholder')}
               onChange={(e) => setNewFolderName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -605,7 +623,7 @@ export default function BlancAppDrawerPanel() {
                 setNewFolderName('');
               }}
             >
-              Create folder
+              {t('blanc.drawer.createFolder')}
             </button>
           </div>
         )}
@@ -613,14 +631,14 @@ export default function BlancAppDrawerPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>{openFolder ? openFolder.name : 'Drawer root'}</legend>
+        <legend>{openFolder ? openFolder.name : t('blanc.drawer.root')}</legend>
         <AddShortcutForm state={state} folderId={openFolderId} />
 
         {!openFolder && rootFolders.length > 0 && (
           <div className="blanc-row-actions">
             {rootFolders.map((f) => {
               const count =
-                state.tools.filter((t) => t.folderId === f.id).length +
+                state.tools.filter((tool) => tool.folderId === f.id).length +
                 state.folders.filter((sf) => sf.parentFolderId === f.id).length;
               return (
                 <button type="button" key={f.id} onClick={() => setOpenFolderId(f.id)}>
@@ -634,7 +652,7 @@ export default function BlancAppDrawerPanel() {
         {openFolder && canHoldSubfolders && subfolders.length > 0 && (
           <div className="blanc-row-actions">
             {subfolders.map((f) => {
-              const count = state.tools.filter((t) => t.folderId === f.id).length;
+              const count = state.tools.filter((tool) => tool.folderId === f.id).length;
               return (
                 <button type="button" key={f.id} onClick={() => setOpenFolderId(f.id)}>
                   <Icon name="folder" size={14} /> {f.name} ({count})
@@ -646,7 +664,7 @@ export default function BlancAppDrawerPanel() {
 
         {openFolder && canHoldSubfolders && (
           <details>
-            <summary className="blanc-note">Add a subfolder</summary>
+            <summary className="blanc-note">{t('blanc.drawer.addSubfolder')}</summary>
             <SubfolderForm state={state} parentFolderId={openFolder.id} />
           </details>
         )}
@@ -656,10 +674,10 @@ export default function BlancAppDrawerPanel() {
             <table className="blanc-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Kind</th>
-                  <th>Target</th>
-                  <th>Actions</th>
+                  <th>{t('blanc.drawer.col.name')}</th>
+                  <th>{t('blanc.drawer.col.kind')}</th>
+                  <th>{t('blanc.drawer.col.target')}</th>
+                  <th>{t('blanc.drawer.col.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -671,7 +689,7 @@ export default function BlancAppDrawerPanel() {
           </div>
         ) : (
           <p className="blanc-note">
-            {openFolder ? 'No shortcuts in this folder yet.' : 'No unfiled shortcuts. Add one above, or open a folder.'}
+            {openFolder ? t('blanc.drawer.emptyFolder') : t('blanc.drawer.emptyRoot')}
           </p>
         )}
       </fieldset>
@@ -680,13 +698,14 @@ export default function BlancAppDrawerPanel() {
 }
 
 function SubfolderForm({ state, parentFolderId }: { state: AppDrawerState; parentFolderId: string }) {
+  const { t } = useT();
   const [name, setName] = useState('');
   return (
     <div className="blanc-row-actions">
       <input
         type="text"
         value={name}
-        placeholder="Subfolder name"
+        placeholder={t('blanc.drawer.subfolderPlaceholder')}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -703,7 +722,7 @@ function SubfolderForm({ state, parentFolderId }: { state: AppDrawerState; paren
           setName('');
         }}
       >
-        Create
+        {t('blanc.drawer.create')}
       </button>
     </div>
   );

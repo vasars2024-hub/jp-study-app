@@ -11,12 +11,15 @@
  * of `AppChrome` / `MenuBar` / `StatusBar` (or of any Study OS `*View`, which
  * would drag that chrome in through the import graph).
  *
- * String policy: Blanc's own chrome is deliberately outside the app-wide i18n
- * sweep (BLANC_REFINEMENT_PLAN.md, Pillar 8) — the plan calls for one pass over
- * the whole surface if Blanc ever becomes primary, explicitly not piecemeal. So
- * these strings are plain English, matching every other Blanc panel.
+ * String policy: every chrome string resolves through `t()` under
+ * `blanc.native.*` (src/shared/i18n/blancUi). Study content — sample words,
+ * readings, the Japanese form names — stays as-is. Labels that the shared
+ * modules (`conjugate`, `pitchAccent`, `japaneseNumbers`, `knownWords`) keep in
+ * English are mapped to keys here, by id, and resolved at render.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '../../i18n';
+import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import {
   alignFurigana,
   segmentsToBrackets,
@@ -50,15 +53,14 @@ import {
   onBlancConsoleChanged,
 } from '../../blancConsole';
 import {
-  PITCH_PATTERN_LABELS,
   isPitchLookup,
   moraPitch,
   pitchPatternName,
   splitMorae,
   type PitchLookup,
+  type PitchPattern,
 } from '../../../shared/pitchAccent';
 import {
-  dayLabel,
   emptyForecast,
   isDueForecast,
   localBacklog,
@@ -68,7 +70,6 @@ import {
 import { loadDeck } from '../../flashcardDeck';
 import { WK_LEVELS, knowledgeCounts, type WkLevel } from '../../knownWords';
 import {
-  CLASS_LABELS,
   DRILL_WORDS,
   FORMS,
   checkAnswer,
@@ -91,12 +92,15 @@ import { formatBytes } from '../../../shared/assetRegistry';
 import { isDownloadedIn, loadDownloaded, onDownloadedChanged } from '../../whisperModelCache';
 import { getStudyLang, onStudyLangChanged } from '../../studyEnvironment';
 
+type TFn = ReturnType<typeof useT>['t'];
+
 type FuriganaFormat = 'ruby' | 'brackets' | 'kana';
 
-const FORMATS: { id: FuriganaFormat; label: string; hint: string }[] = [
-  { id: 'ruby', label: 'Ruby HTML', hint: '<ruby> markup — paste into Anki or a web page.' },
-  { id: 'brackets', label: 'Anki brackets', hint: 'Kanji[かんじ] — Anki’s furigana field syntax.' },
-  { id: 'kana', label: 'Kana only', hint: 'The whole passage rewritten in kana.' },
+/** Catalog keys, resolved with t() at render. */
+const FORMATS: { id: FuriganaFormat; labelKey: string; hintKey: string }[] = [
+  { id: 'ruby', labelKey: 'blanc.native.furigana.format.ruby', hintKey: 'blanc.native.furigana.hint.ruby' },
+  { id: 'brackets', labelKey: 'blanc.native.furigana.format.brackets', hintKey: 'blanc.native.furigana.hint.brackets' },
+  { id: 'kana', labelKey: 'blanc.native.furigana.format.kana', hintKey: 'blanc.native.furigana.hint.kana' },
 ];
 
 /**
@@ -116,6 +120,7 @@ const DEBOUNCE_MS = 250;
  * shared module, which is pure and unit-tested without the 20 MB dictionary.
  */
 export function BlancFuriganaPanel() {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [format, setFormat] = useState<FuriganaFormat>('ruby');
   const [ready, setReady] = useState(false);
@@ -172,40 +177,42 @@ export function BlancFuriganaPanel() {
   return (
     <div className="blanc-tool-detail blanc-furigana">
       <fieldset>
-        <legend>Text</legend>
+        <legend>{t('blanc.native.furigana.legend.text')}</legend>
         <textarea
           className="blanc-furigana-input"
           lang="ja"
           rows={5}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste Japanese text to annotate…"
+          placeholder={t('blanc.native.furigana.placeholder')}
         />
         <div className="blanc-status-row">
           {failed ? (
-            <span className="blanc-warning">Tokenizer failed to load — furigana is unavailable.</span>
+            <span className="blanc-warning">{t('blanc.native.furigana.tokenizerFailed')}</span>
           ) : !ready ? (
-            <span>Loading tokenizer…</span>
+            <span>{t('blanc.native.furigana.loadingTokenizer')}</span>
           ) : (
             <span>
-              {segments.length ? `${annotated} annotated of ${segments.length} runs` : 'Ready'}
+              {segments.length
+                ? t('blanc.native.furigana.annotated', { annotated, count: segments.length })
+                : t('blanc.native.ready')}
             </span>
           )}
           {truncated && (
             <span className="blanc-warning">
-              Showing the first {MAX_INPUT.toLocaleString()} characters of {text.length.toLocaleString()}
+              {t('blanc.native.furigana.truncated', { max: MAX_INPUT, count: text.length })}
             </span>
           )}
           {text && (
             <button type="button" onClick={() => setText('')}>
-              Clear
+              {t('blanc.native.clear')}
             </button>
           )}
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Preview</legend>
+        <legend>{t('blanc.native.furigana.legend.preview')}</legend>
         {segments.length ? (
           <p className="blanc-furigana-preview" lang="ja">
             {segments.map((s, i) =>
@@ -221,13 +228,15 @@ export function BlancFuriganaPanel() {
           </p>
         ) : (
           <p className="blanc-note">
-            {ready ? 'Nothing to preview yet.' : 'The preview appears once the tokenizer is ready.'}
+            {ready
+              ? t('blanc.native.furigana.previewEmpty')
+              : t('blanc.native.furigana.previewWaiting')}
           </p>
         )}
       </fieldset>
 
       <fieldset>
-        <legend>Output</legend>
+        <legend>{t('blanc.native.furigana.legend.output')}</legend>
         <div className="blanc-segmented">
           {FORMATS.map((f) => (
             <button
@@ -236,28 +245,64 @@ export function BlancFuriganaPanel() {
               className={format === f.id ? 'active' : ''}
               onClick={() => setFormat(f.id)}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
         <textarea className="blanc-furigana-output" readOnly rows={4} value={output} lang="ja" />
         <div className="blanc-status-row">
-          <span>{FORMATS.find((f) => f.id === format)?.hint}</span>
+          <span>{t(FORMATS.find((f) => f.id === format)?.hintKey ?? FORMATS[0].hintKey)}</span>
           <button type="button" disabled={!output} onClick={copy}>
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('blanc.native.copied') : t('blanc.native.copy')}
           </button>
         </div>
-        <p className="blanc-note">
-          Readings come from the bundled kuromoji dictionary. Irregular readings and names can be
-          wrong — where a reading cannot be split against the word&rsquo;s kana, the whole word is
-          annotated rather than guessing a per-kanji split.
-        </p>
+        <p className="blanc-note">{t('blanc.native.furigana.note')}</p>
       </fieldset>
     </div>
   );
 }
 
 const COUNTER_EXAMPLES = ['1234', '3本', '20歳', '5月5日', '3:45', '8'];
+
+/**
+ * `shared/japaneseNumbers.ts` labels its readings in English ('Number', 'Date',
+ * 'Clock time', or '本 — long thin things'). Map them to keys here — by the fixed
+ * kind names and by counter kanji — rather than teaching the pure module about
+ * the UI language. An unrecognised label renders as-is.
+ */
+const READING_KIND_KEYS: Record<string, string> = {
+  'Clock time': 'blanc.native.counter.kind.clock',
+  Date: 'blanc.native.counter.kind.date',
+  Number: 'blanc.native.counter.kind.number',
+};
+
+const COUNTER_WHAT_KEYS: Record<string, string> = {
+  本: 'blanc.native.counter.what.hon',
+  枚: 'blanc.native.counter.what.mai',
+  個: 'blanc.native.counter.what.ko',
+  匹: 'blanc.native.counter.what.hiki',
+  杯: 'blanc.native.counter.what.hai',
+  人: 'blanc.native.counter.what.nin',
+  歳: 'blanc.native.counter.what.sai',
+  階: 'blanc.native.counter.what.floor',
+  分: 'blanc.native.counter.what.fun',
+  冊: 'blanc.native.counter.what.satsu',
+  台: 'blanc.native.counter.what.dai',
+  回: 'blanc.native.counter.what.times',
+  つ: 'blanc.native.counter.what.tsu',
+};
+
+function readingLabel(t: TFn, label: string): string {
+  const kind = READING_KIND_KEYS[label];
+  if (kind) return t(kind);
+  const sep = label.indexOf(' — ');
+  if (sep > 0) {
+    const counter = label.slice(0, sep);
+    const what = COUNTER_WHAT_KEYS[counter];
+    if (what) return t('blanc.native.counter.kind.counter', { counter, what: t(what) });
+  }
+  return label;
+}
 
 /**
  * Study-native item 5 — counter and number reader.
@@ -268,6 +313,7 @@ const COUNTER_EXAMPLES = ['1234', '3本', '20歳', '5月5日', '3:45', '8'];
  * `speak()` so it picks the same Japanese voice as the rest of the app.
  */
 export function BlancCounterPanel() {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [spoke, setSpoke] = useState('');
 
@@ -290,23 +336,23 @@ export function BlancCounterPanel() {
   return (
     <div className="blanc-tool-detail blanc-counter">
       <fieldset>
-        <legend>Read</legend>
+        <legend>{t('blanc.native.counter.legend.read')}</legend>
         <div className="blanc-command-row">
           <input
             type="text"
             value={text}
             lang="ja"
             onChange={(e) => setText(e.target.value)}
-            placeholder="A number, 3本, 20歳, 5月5日, or 3:45"
+            placeholder={t('blanc.native.counter.placeholder')}
           />
           {text && (
             <button type="button" onClick={() => setText('')}>
-              Clear
+              {t('blanc.native.clear')}
             </button>
           )}
         </div>
         <div className="blanc-status-row">
-          <span>Try:</span>
+          <span>{t('blanc.native.counter.try')}</span>
           {COUNTER_EXAMPLES.map((ex) => (
             <button key={ex} type="button" onClick={() => setText(ex)}>
               {ex}
@@ -316,12 +362,12 @@ export function BlancCounterPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Reading</legend>
+        <legend>{t('blanc.native.counter.legend.reading')}</legend>
         {readings.length ? (
           <ul className="blanc-reading-list">
             {readings.map((r) => (
               <li key={`${r.label}-${r.reading}`}>
-                <span className="blanc-reading-label">{r.label}</span>
+                <span className="blanc-reading-label">{readingLabel(t, r.label)}</span>
                 <span className="blanc-reading-surface" lang="ja">
                   {r.surface}
                 </span>
@@ -329,25 +375,25 @@ export function BlancCounterPanel() {
                   {r.reading}
                 </span>
                 <button type="button" onClick={() => say(r.reading)}>
-                  {spoke === r.reading ? 'Speaking' : 'Hear'}
+                  {spoke === r.reading ? t('blanc.native.speaking') : t('blanc.native.hear')}
                 </button>
               </li>
             ))}
           </ul>
         ) : (
           <p className="blanc-note">
-            {text.trim() ? 'No reading for that input.' : 'Type a number or a counted phrase.'}
+            {text.trim() ? t('blanc.native.counter.noReading') : t('blanc.native.counter.empty')}
           </p>
         )}
       </fieldset>
 
       {counterTable.length > 0 && (
         <fieldset>
-          <legend>All counters</legend>
+          <legend>{t('blanc.native.counter.legend.all')}</legend>
           <ul className="blanc-reading-list">
             {counterTable.map((r) => (
               <li key={r.surface}>
-                <span className="blanc-reading-label">{r.label}</span>
+                <span className="blanc-reading-label">{readingLabel(t, r.label)}</span>
                 <span className="blanc-reading-surface" lang="ja">
                   {r.surface}
                 </span>
@@ -355,16 +401,12 @@ export function BlancCounterPanel() {
                   {r.reading}
                 </span>
                 <button type="button" onClick={() => say(r.reading)}>
-                  {spoke === r.reading ? 'Speaking' : 'Hear'}
+                  {spoke === r.reading ? t('blanc.native.speaking') : t('blanc.native.hear')}
                 </button>
               </li>
             ))}
           </ul>
-          <p className="blanc-note">
-            Counters whose reading at an exact hundred is irregular (100本 → ひゃっぽん) are omitted
-            rather than guessed, so a missing row means &ldquo;not certain&rdquo;, not
-            &ldquo;impossible&rdquo;.
-          </p>
+          <p className="blanc-note">{t('blanc.native.counter.note')}</p>
         </fieldset>
       )}
     </div>
@@ -372,6 +414,31 @@ export function BlancCounterPanel() {
 }
 
 const ALL_CLASSES: WordClass[] = ['ichidan', 'godan', 'suru', 'kuru', 'i-adj'];
+
+/** Keys for `shared/conjugate.ts`'s English CLASS_LABELS / FORMS labels, by id. */
+const CLASS_LABEL_KEYS: Record<WordClass, string> = {
+  ichidan: 'blanc.native.conj.class.ichidan',
+  godan: 'blanc.native.conj.class.godan',
+  suru: 'blanc.native.conj.class.suru',
+  kuru: 'blanc.native.conj.class.kuru',
+  'i-adj': 'blanc.native.conj.class.iAdj',
+};
+
+const FORM_LABEL_KEYS: Record<ConjugationForm, string> = {
+  polite: 'blanc.native.conj.form.polite',
+  negative: 'blanc.native.conj.form.negative',
+  politeNegative: 'blanc.native.conj.form.politeNegative',
+  past: 'blanc.native.conj.form.past',
+  pastNegative: 'blanc.native.conj.form.pastNegative',
+  politePast: 'blanc.native.conj.form.politePast',
+  te: 'blanc.native.conj.form.te',
+  potential: 'blanc.native.conj.form.potential',
+  passive: 'blanc.native.conj.form.passive',
+  causative: 'blanc.native.conj.form.causative',
+  volitional: 'blanc.native.conj.form.volitional',
+  imperative: 'blanc.native.conj.form.imperative',
+  conditional: 'blanc.native.conj.form.conditional',
+};
 
 interface Question {
   dict: string;
@@ -407,6 +474,7 @@ function nextQuestion(classes: Set<WordClass>, forms: Set<ConjugationForm>): Que
  * Game Arena: no XP, no session, no streak to protect — just the pattern.
  */
 export function BlancConjugationPanel() {
+  const { t } = useT();
   const [classes, setClasses] = useState<Set<WordClass>>(new Set(ALL_CLASSES));
   const [forms, setForms] = useState<Set<ConjugationForm>>(
     new Set<ConjugationForm>(['polite', 'negative', 'past', 'te']),
@@ -450,7 +518,7 @@ export function BlancConjugationPanel() {
   return (
     <div className="blanc-tool-detail blanc-conjugation">
       <fieldset>
-        <legend>Drill</legend>
+        <legend>{t('blanc.native.conj.legend.drill')}</legend>
         {question ? (
           <>
             <div className="blanc-drill-prompt">
@@ -459,9 +527,10 @@ export function BlancConjugationPanel() {
               <span className="blanc-drill-meaning">{question.meaning}</span>
             </div>
             <div className="blanc-status-row">
-              <span>{CLASS_LABELS[question.wordClass]}</span>
+              <span>{t(CLASS_LABEL_KEYS[question.wordClass])}</span>
               <span className="blanc-drill-target">
-                → {formSpec?.label} <span lang="ja">{formSpec?.japanese}</span>
+                → {formSpec && t(FORM_LABEL_KEYS[formSpec.id])}{' '}
+                <span lang="ja">{formSpec?.japanese}</span>
               </span>
             </div>
             <div className="blanc-command-row">
@@ -477,15 +546,17 @@ export function BlancConjugationPanel() {
                   if (verdict) draw();
                   else submit();
                 }}
-                placeholder="Type the conjugated form"
+                placeholder={t('blanc.native.conj.placeholder')}
               />
               {verdict ? (
-                <button type="button" onClick={draw}>Next</button>
+                <button type="button" onClick={draw}>{t('blanc.native.conj.next')}</button>
               ) : (
-                <button type="button" disabled={!answer.trim()} onClick={submit}>Check</button>
+                <button type="button" disabled={!answer.trim()} onClick={submit}>
+                  {t('blanc.native.conj.check')}
+                </button>
               )}
             </div>
-            {verdict === 'right' && <p className="blanc-drill-right">Correct</p>}
+            {verdict === 'right' && <p className="blanc-drill-right">{t('blanc.native.conj.correct')}</p>}
             {verdict === 'wrong' && (
               <p className="blanc-drill-wrong">
                 <span lang="ja">{question.answer}</span>
@@ -493,27 +564,35 @@ export function BlancConjugationPanel() {
             )}
             {!verdict && (
               <div className="blanc-status-row">
-                <button type="button" onClick={() => setRevealed(true)}>Show answer</button>
+                <button type="button" onClick={() => setRevealed(true)}>
+                  {t('blanc.native.conj.showAnswer')}
+                </button>
                 {revealed && <span className="blanc-drill-revealed" lang="ja">{question.answer}</span>}
-                <button type="button" onClick={() => speak(question.reading)}>Hear the word</button>
+                <button type="button" onClick={() => speak(question.reading)}>
+                  {t('blanc.native.conj.hearWord')}
+                </button>
               </div>
             )}
           </>
         ) : (
-          <p className="blanc-note">No questions for the current filters.</p>
+          <p className="blanc-note">{t('blanc.native.conj.empty')}</p>
         )}
         <div className="blanc-status-row">
           <span>
-            {score.total ? `${score.right} / ${score.total} correct` : 'No answers yet'}
+            {score.total
+              ? t('blanc.native.conj.score', { right: score.right, total: score.total })
+              : t('blanc.native.conj.noAnswers')}
           </span>
           {score.total > 0 && (
-            <button type="button" onClick={() => setScore({ right: 0, total: 0 })}>Reset score</button>
+            <button type="button" onClick={() => setScore({ right: 0, total: 0 })}>
+              {t('blanc.native.conj.resetScore')}
+            </button>
           )}
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Word classes</legend>
+        <legend>{t('blanc.native.conj.legend.classes')}</legend>
         <div className="blanc-segmented">
           {ALL_CLASSES.map((c) => (
             <button
@@ -522,14 +601,14 @@ export function BlancConjugationPanel() {
               className={classes.has(c) ? 'active' : ''}
               onClick={() => toggle(classes, c, setClasses)}
             >
-              {CLASS_LABELS[c]}
+              {t(CLASS_LABEL_KEYS[c])}
             </button>
           ))}
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Forms</legend>
+        <legend>{t('blanc.native.conj.legend.forms')}</legend>
         <div className="blanc-segmented blanc-segmented-wrap">
           {FORMS.map((f) => (
             <button
@@ -538,25 +617,42 @@ export function BlancConjugationPanel() {
               className={forms.has(f.id) ? 'active' : ''}
               onClick={() => toggle(forms, f.id, setForms)}
             >
-              {f.label}
+              {t(FORM_LABEL_KEYS[f.id])}
             </button>
           ))}
         </div>
-        <p className="blanc-note">
-          Answers are checked against the same conjugation engine the dictionary uses to look words
-          up, so the two can never disagree. い-adjectives skip the verb-only forms automatically.
-        </p>
+        <p className="blanc-note">{t('blanc.native.conj.note')}</p>
       </fieldset>
     </div>
   );
 }
 
-const VERDICT_TEXT: Record<string, string> = {
-  clear: 'Nothing scheduled — a clear week.',
-  light: 'A light week.',
-  steady: 'A steady week.',
-  heavy: 'A heavy week — consider spreading it out.',
+const VERDICT_KEYS: Record<string, string> = {
+  clear: 'blanc.native.forecast.verdict.clear',
+  light: 'blanc.native.forecast.verdict.light',
+  steady: 'blanc.native.forecast.verdict.steady',
+  heavy: 'blanc.native.forecast.verdict.heavy',
 };
+
+/** Keys for knownWords' English WK_LEVELS, by index (WkLevel 0–3). */
+const WK_LEVEL_KEYS = [
+  'blanc.native.forecast.level.new',
+  'blanc.native.forecast.level.learning',
+  'blanc.native.forecast.level.familiar',
+  'blanc.native.forecast.level.known',
+];
+
+/**
+ * Localised twin of `shared/reviewForecast.ts`'s `dayLabel`, which returns
+ * English 'Today'/'Tomorrow' and a host-locale weekday.
+ */
+function forecastDayLabel(t: TFn, lang: UiLang, offsetDays: number): string {
+  if (offsetDays === 0) return t('blanc.native.forecast.today');
+  if (offsetDays === 1) return t('blanc.native.forecast.tomorrow');
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'short' });
+}
 
 /**
  * Study-native item 7 — review forecast.
@@ -572,6 +668,7 @@ const VERDICT_TEXT: Record<string, string> = {
  *    lengths, because an interval says how long, not when.
  */
 export function BlancForecastPanel() {
+  const { t, lang } = useT();
   const [forecast, setForecast] = useState<DueForecast | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -582,7 +679,7 @@ export function BlancForecastPanel() {
     setLoading(true);
     const api = window.api?.ankiDueForecast;
     if (!api) {
-      setForecast(emptyForecast('Anki bridge unavailable in this window.'));
+      setForecast(emptyForecast(t('blanc.native.forecast.bridgeUnavailable')));
       setLoading(false);
       return;
     }
@@ -593,14 +690,16 @@ export function BlancForecastPanel() {
         setForecast(
           isDueForecast(f)
             ? f
-            : emptyForecast('The Anki forecast channel returned no data (is this a dev harness?).'),
+            : emptyForecast(t('blanc.native.forecast.noData')),
         ),
       )
       .catch((e: unknown) =>
         setForecast(emptyForecast(e instanceof Error ? e.message : String(e))),
       )
       .finally(() => setLoading(false));
-  }, []);
+    // `lang`: the messages above are stored translated, so a language switch
+    // re-asks rather than leaving a stale-language error on screen.
+  }, [lang]);
 
   useEffect(() => {
     refresh();
@@ -613,22 +712,18 @@ export function BlancForecastPanel() {
   return (
     <div className="blanc-tool-detail blanc-forecast">
       <fieldset>
-        <legend>This week</legend>
-        {loading && !forecast && <p className="blanc-note">Asking Anki…</p>}
+        <legend>{t('blanc.native.forecast.legend.week')}</legend>
+        {loading && !forecast && <p className="blanc-note">{t('blanc.native.forecast.asking')}</p>}
         {forecast && !forecast.ok && (
           <>
-            <p className="blanc-warning">Anki is not answering.</p>
+            <p className="blanc-warning">{t('blanc.native.forecast.notAnswering')}</p>
             <p className="blanc-note">{forecast.error}</p>
-            <p className="blanc-note">
-              A day-by-day forecast needs Anki&rsquo;s scheduler. Interval lengths alone say how long
-              a card&rsquo;s gap is, not when it is next due, so no forecast is shown rather than a
-              made-up one. The backlog and knowledge views below work regardless.
-            </p>
+            <p className="blanc-note">{t('blanc.native.forecast.noForecastNote')}</p>
             {/* Retry must live here too: someone who starts Anki after opening
                 the panel would otherwise have to close and reopen the tool. */}
             <div className="blanc-status-row">
               <button type="button" disabled={loading} onClick={refresh}>
-                {loading ? 'Retrying…' : 'Try again'}
+                {loading ? t('blanc.native.retrying') : t('common.tryAgain')}
               </button>
             </div>
           </>
@@ -643,83 +738,91 @@ export function BlancForecastPanel() {
                     className={`blanc-forecast-bar${summary.spikeDay === d.offsetDays ? ' spike' : ''}`}
                     style={{ height: `${Math.round((d.due / scale) * 100)}%` }}
                   />
-                  <span className="blanc-forecast-day">{dayLabel(d.offsetDays)}</span>
+                  <span className="blanc-forecast-day">
+                    {forecastDayLabel(t, lang, d.offsetDays)}
+                  </span>
                 </div>
               ))}
             </div>
             <div className="blanc-status-row">
-              <span>{summary.total} due over {forecast.days.length} days</span>
-              <span>{summary.dailyAverage}/day average</span>
+              <span>
+                {t('blanc.native.forecast.dueOver', {
+                  total: summary.total,
+                  count: forecast.days.length,
+                })}
+              </span>
+              <span>{t('blanc.native.forecast.dailyAverage', { average: summary.dailyAverage })}</span>
               {summary.overdue > 0 && (
-                <span className="blanc-warning">{summary.overdue} overdue</span>
+                <span className="blanc-warning">
+                  {t('blanc.native.forecast.overdue', { count: summary.overdue })}
+                </span>
               )}
               <button type="button" disabled={loading} onClick={refresh}>
-                {loading ? 'Refreshing…' : 'Refresh'}
+                {loading ? t('blanc.native.refreshing') : t('blanc.native.refresh')}
               </button>
             </div>
             <p className="blanc-note">
-              {VERDICT_TEXT[summary.verdict]}
+              {t(VERDICT_KEYS[summary.verdict])}
               {summary.spikeDay !== null &&
-                ` ${dayLabel(summary.spikeDay)} is more than twice the daily average.`}
+                ` ${t('blanc.native.forecast.spike', {
+                  day: forecastDayLabel(t, lang, summary.spikeDay),
+                })}`}
             </p>
             {typeof forecast.newCards === 'number' && forecast.newCards > 0 && (
               <p className="blanc-note">
-                Plus {forecast.newCards.toLocaleString()} new cards not yet started. New cards have
-                no scheduled date until you first study them, so they are not in the chart — but
-                they are still work waiting.
+                {t('blanc.native.forecast.newCards', { count: forecast.newCards })}
               </p>
             )}
-            <p className="blanc-note">
-              Counts come from Anki&rsquo;s own scheduler, excluding suspended cards, and cover
-              reviews only. &ldquo;Heavy&rdquo; and &ldquo;steady&rdquo; are rough labels, not a
-              recommendation — the numbers above are the real answer.
-            </p>
+            <p className="blanc-note">{t('blanc.native.forecast.countsNote')}</p>
           </>
         )}
       </fieldset>
 
       <fieldset>
-        <legend>Local deck backlog</legend>
+        <legend>{t('blanc.native.forecast.legend.backlog')}</legend>
         {backlog.total ? (
           <>
             <div className="blanc-status-row">
-              <span>{backlog.unknown} not yet known</span>
-              <span>{backlog.known} known</span>
-              <span>{backlog.total} cards total</span>
+              <span>{t('blanc.native.forecast.notKnown', { count: backlog.unknown })}</span>
+              <span>{t('blanc.native.forecast.known', { count: backlog.known })}</span>
+              <span>{t('blanc.native.forecast.cardsTotal', { count: backlog.total })}</span>
             </div>
             <ul className="blanc-reading-list">
               {backlog.groups.slice(0, 12).map((g) => (
                 <li key={g.folder || '(unfiled)'}>
-                  <span className="blanc-reading-label">{g.folder || 'Unfiled'}</span>
-                  <span className="blanc-reading-surface">{g.total} cards</span>
-                  <span className="blanc-reading-kana">{g.unknown} to learn</span>
+                  <span className="blanc-reading-label">
+                    {g.folder || t('blanc.native.forecast.unfiled')}
+                  </span>
+                  <span className="blanc-reading-surface">
+                    {t('blanc.native.forecast.cards', { count: g.total })}
+                  </span>
+                  <span className="blanc-reading-kana">
+                    {t('blanc.native.forecast.toLearn', { count: g.unknown })}
+                  </span>
                 </li>
               ))}
             </ul>
             {backlog.groups.length > 12 && (
               <p className="blanc-note">
-                Showing the 12 folders with the most to learn, of {backlog.groups.length}.
+                {t('blanc.native.forecast.foldersMore', { shown: 12, count: backlog.groups.length })}
               </p>
             )}
-            <p className="blanc-note">
-              Local cards carry a known / not-known flag rather than a review schedule, so this is a
-              backlog, not a due date.
-            </p>
+            <p className="blanc-note">{t('blanc.native.forecast.backlogNote')}</p>
           </>
         ) : (
-          <p className="blanc-note">No local deck cards.</p>
+          <p className="blanc-note">{t('blanc.native.forecast.noLocal')}</p>
         )}
       </fieldset>
 
       <fieldset>
-        <legend>Knowledge load</legend>
+        <legend>{t('blanc.native.forecast.legend.knowledge')}</legend>
         {knowledgeTotal ? (
           <ul className="blanc-reading-list">
             {WK_LEVELS.map((label, i) => (
               <li key={label}>
-                <span className="blanc-reading-label">{label}</span>
+                <span className="blanc-reading-label">{t(WK_LEVEL_KEYS[i])}</span>
                 <span className="blanc-reading-surface">
-                  {knowledge[i as WkLevel] ?? 0} words
+                  {t('blanc.native.forecast.words', { count: knowledge[i as WkLevel] ?? 0 })}
                 </span>
                 <span className="blanc-reading-kana">
                   {Math.round(((knowledge[i as WkLevel] ?? 0) / knowledgeTotal) * 100)}%
@@ -728,7 +831,7 @@ export function BlancForecastPanel() {
             ))}
           </ul>
         ) : (
-          <p className="blanc-note">No tracked words yet.</p>
+          <p className="blanc-note">{t('blanc.native.forecast.noWords')}</p>
         )}
       </fieldset>
     </div>
@@ -747,7 +850,16 @@ export function BlancForecastPanel() {
  * no pitch dictionary installed" are reported as different things — the panel
  * points at the asset instead of looking empty.
  */
+const PITCH_PATTERN_KEYS: Record<PitchPattern, string> = {
+  heiban: 'blanc.native.pitch.pattern.heiban',
+  atamadaka: 'blanc.native.pitch.pattern.atamadaka',
+  nakadaka: 'blanc.native.pitch.pattern.nakadaka',
+  odaka: 'blanc.native.pitch.pattern.odaka',
+  unknown: 'blanc.native.pitch.pattern.unknown',
+};
+
 export function BlancPitchPanel() {
+  const { t, lang } = useT();
   const [term, setTerm] = useState('');
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<PitchLookup | null>(null);
@@ -768,7 +880,7 @@ export function BlancPitchPanel() {
     let alive = true;
     const api = window.api?.dictPitch;
     if (!api) {
-      setError('Dictionary bridge unavailable in this window.');
+      setError(t('blanc.native.pitch.bridgeUnavailable'));
       return;
     }
     void api(query)
@@ -781,7 +893,7 @@ export function BlancPitchPanel() {
           setError('');
         } else {
           setResult(null);
-          setError('The pitch channel returned no data (is this a dev harness?).');
+          setError(t('blanc.native.pitch.noData'));
         }
       })
       .catch((e: unknown) => {
@@ -792,7 +904,8 @@ export function BlancPitchPanel() {
     return () => {
       alive = false;
     };
-  }, [query]);
+    // `lang`: the error text above is stored translated.
+  }, [query, lang]);
 
   const say = useCallback((text: string) => {
     if (speak(text)) {
@@ -804,18 +917,18 @@ export function BlancPitchPanel() {
   return (
     <div className="blanc-tool-detail blanc-pitch">
       <fieldset>
-        <legend>Word</legend>
+        <legend>{t('blanc.native.pitch.legend.word')}</legend>
         <div className="blanc-command-row">
           <input
             type="text"
             lang="ja"
             value={term}
             onChange={(e) => setTerm(e.target.value)}
-            placeholder="A word in kanji or kana — 箸, はし, 日本語"
+            placeholder={t('blanc.native.pitch.placeholder')}
           />
           {term && (
             <button type="button" onClick={() => setTerm('')}>
-              Clear
+              {t('blanc.native.clear')}
             </button>
           )}
         </div>
@@ -829,25 +942,18 @@ export function BlancPitchPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Accent</legend>
+        <legend>{t('blanc.native.pitch.legend.accent')}</legend>
         {error && <p className="blanc-warning">{error}</p>}
         {!error && result && !result.available && (
           <>
-            <p className="blanc-warning">No pitch-accent dictionary is installed.</p>
-            <p className="blanc-note">
-              Pitch data comes from the Kanjium accent dictionary, an optional download. Install it
-              from Settings → Models, then come back — nothing here works without it, and an empty
-              result would otherwise look like &ldquo;this word has no accent&rdquo;.
-            </p>
+            <p className="blanc-warning">{t('blanc.native.pitch.notInstalled')}</p>
+            <p className="blanc-note">{t('blanc.native.pitch.notInstalledNote')}</p>
           </>
         )}
         {!error && result?.available && !result.entries.length && query && (
-          <p className="blanc-note">
-            No accent data for <span lang="ja">{query}</span>. The dictionary is installed, so this
-            word is genuinely absent from it rather than unavailable.
-          </p>
+          <p className="blanc-note">{t('blanc.native.pitch.noAccent', { word: query })}</p>
         )}
-        {!error && !query && <p className="blanc-note">Type a word to see its contour.</p>}
+        {!error && !query && <p className="blanc-note">{t('blanc.native.pitch.typeWord')}</p>}
         {!error &&
           result?.entries.map((entry) => (
             <div key={`${entry.reading}-${entry.positions.join(',')}`} className="blanc-pitch-entry">
@@ -857,7 +963,11 @@ export function BlancPitchPanel() {
                 const pattern = pitchPatternName(downstep, morae.length);
                 return (
                   <div key={downstep} className="blanc-pitch-row">
-                    <div className="blanc-pitch-contour" lang="ja" aria-label={`Pitch pattern: ${pattern}`}>
+                    <div
+                      className="blanc-pitch-contour"
+                      lang="ja"
+                      aria-label={t('blanc.native.pitch.patternAria', { pattern })}
+                    >
                       {morae.map((m, i) => (
                         <span
                           key={i}
@@ -870,10 +980,14 @@ export function BlancPitchPanel() {
                       ))}
                     </div>
                     <div className="blanc-status-row">
-                      <span className="blanc-pitch-name">{PITCH_PATTERN_LABELS[pattern]}</span>
-                      <span>{downstep === 0 ? 'no downstep' : `downstep after mora ${downstep}`}</span>
+                      <span className="blanc-pitch-name">{t(PITCH_PATTERN_KEYS[pattern])}</span>
+                      <span>
+                        {downstep === 0
+                          ? t('blanc.native.pitch.noDownstep')
+                          : t('blanc.native.pitch.downstepAfter', { mora: downstep })}
+                      </span>
                       <button type="button" onClick={() => say(entry.reading)}>
-                        {spoke ? 'Speaking' : 'Hear'}
+                        {spoke ? t('blanc.native.speaking') : t('blanc.native.hear')}
                       </button>
                     </div>
                   </div>
@@ -882,10 +996,7 @@ export function BlancPitchPanel() {
             </div>
           ))}
         {!error && result?.entries.length ? (
-          <p className="blanc-note">
-            A raised mora is high. Tokyo dialect: the drop after the marked mora is what you hear —
-            for odaka it lands on the following particle, so the word alone sounds flat.
-          </p>
+          <p className="blanc-note">{t('blanc.native.pitch.note')}</p>
         ) : null}
       </fieldset>
     </div>
@@ -905,6 +1016,7 @@ const CONSOLE_LEVEL_ORDER: ConsoleLevel[] = ['debug', 'info', 'warn', 'error'];
  * and IPC payloads to disk is not something the log should decide to do.
  */
 export function BlancConsolePanel() {
+  const { t, lang } = useT();
   const [, forceRender] = useState(0);
   const [query, setQuery] = useState('');
   const [minLevel, setMinLevel] = useState<ConsoleLevel>('debug');
@@ -934,25 +1046,27 @@ export function BlancConsolePanel() {
   return (
     <div className="blanc-tool-detail blanc-console">
       <fieldset>
-        <legend>Filter</legend>
+        <legend>{t('blanc.native.console.legend.filter')}</legend>
         <div className="blanc-command-row">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search messages and payloads…"
+            placeholder={t('blanc.native.console.placeholder')}
           />
           {query && (
-            <button type="button" onClick={() => setQuery('')}>Clear</button>
+            <button type="button" onClick={() => setQuery('')}>{t('blanc.native.clear')}</button>
           )}
         </div>
+        {/* Category and level names stay as the raw identifiers: they are what
+            each entry row and the copied report show. */}
         <div className="blanc-segmented blanc-segmented-wrap">
           <button
             type="button"
             className={category === 'all' ? 'active' : ''}
             onClick={() => setCategory('all')}
           >
-            All
+            {t('blanc.native.console.all')}
           </button>
           {CONSOLE_CATEGORIES.map((c) => (
             <button
@@ -978,29 +1092,35 @@ export function BlancConsolePanel() {
           ))}
         </div>
         <div className="blanc-status-row">
-          <span>{shown.length} of {all.length} entries</span>
-          <span>{counts.error} errors · {counts.warn} warnings</span>
+          <span>{t('blanc.native.console.shown', { shown: shown.length, count: all.length })}</span>
+          <span>
+            {t('blanc.native.console.errors', { count: counts.error })}
+            {' · '}
+            {t('blanc.native.console.warnings', { count: counts.warn })}
+          </span>
           {dropped > 0 && (
             // Honest cap, same contract as toolboxFileSearch's truncation.
-            <span className="blanc-warning">{dropped} older entries dropped</span>
+            <span className="blanc-warning">
+              {t('blanc.native.console.dropped', { count: dropped })}
+            </span>
           )}
           <button type="button" disabled={!shown.length} onClick={copyReport}>
-            {copied ? 'Copied' : 'Copy for report'}
+            {copied ? t('blanc.native.copied') : t('blanc.native.console.copyReport')}
           </button>
           <button type="button" disabled={!all.length} onClick={clearBlancConsole}>
-            Clear
+            {t('blanc.native.clear')}
           </button>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Events</legend>
+        <legend>{t('blanc.native.console.legend.events')}</legend>
         {shown.length ? (
           <ol className="blanc-console-list">
             {shown.map((entry) => (
               <li key={entry.id} className={`blanc-console-entry level-${entry.level}`}>
                 <span className="blanc-console-time">
-                  {new Date(entry.at).toLocaleTimeString()}
+                  {new Date(entry.at).toLocaleTimeString(LANG_TAGS[lang])}
                 </span>
                 <span className={`blanc-console-level level-${entry.level}`}>{entry.level}</span>
                 <span className="blanc-console-cat">{entry.category}</span>
@@ -1018,9 +1138,7 @@ export function BlancConsolePanel() {
           </ol>
         ) : (
           <p className="blanc-note">
-            {all.length
-              ? 'No entries match the filter.'
-              : 'Nothing logged yet this session. Mining, deck writes, toasts, and renderer errors appear here.'}
+            {all.length ? t('blanc.native.console.noMatch') : t('blanc.native.console.empty')}
           </p>
         )}
       </fieldset>
@@ -1063,6 +1181,8 @@ function formatCueClock(sec: number): string {
  * not duplicated here, per the plan's "do not add a second downloader".
  */
 export function BlancAudioMinePanel() {
+  // `lang` below is the study (audio) language; the UI language is `uiLang`.
+  const { t, lang: uiLang } = useT();
   const transcription = useWhisperTranscribe();
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
@@ -1102,14 +1222,14 @@ export function BlancAudioMinePanel() {
     try {
       const r = await window.api.pickMedia();
       if (!r) return; // user cancelled the native dialog
-      setFileName(r.item.title || r.item.fileName || 'Selected file');
+      setFileName(r.item.title || r.item.fileName || t('blanc.native.audio.selectedFile'));
       setFileUrl(r.url);
       transcription.reset();
       corrRef.current = '';
     } catch (e) {
       setPickError(e instanceof Error ? e.message : String(e));
     }
-  }, [transcription]);
+  }, [transcription, uiLang]);
 
   const transcribe = useCallback(() => {
     if (!fileUrl) return;
@@ -1136,11 +1256,16 @@ export function BlancAudioMinePanel() {
   const statusLine = (() => {
     switch (state) {
       case 'extracting':
-        return 'Extracting audio…';
+        return t('blanc.native.audio.extracting');
       case 'loading':
-        return download ? `Downloading ${download.file} — ${download.percent}%` : 'Loading model…';
+        return download
+          ? t('blanc.native.audio.downloading', { file: download.file, percent: download.percent })
+          : t('blanc.native.audio.loadingModel');
       case 'transcribing':
-        return `Transcribing on ${ranOn === 'webgpu' ? 'GPU' : 'CPU'} — ${Math.round(progress * 100)}%`;
+        return t('blanc.native.audio.transcribing', {
+          device: ranOn === 'webgpu' ? 'GPU' : 'CPU',
+          percent: Math.round(progress * 100),
+        });
       default:
         return '';
     }

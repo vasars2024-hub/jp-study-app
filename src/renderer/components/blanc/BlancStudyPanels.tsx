@@ -62,7 +62,7 @@ import {
   WordKnowledge,
   useStats,
 } from '../stats/StatsContent';
-import { formatDuration, formatNumber } from '../../stats';
+import { formatDuration } from '../../stats';
 import {
   AnkiDeckNoteType,
   AnkiDisconnected,
@@ -108,6 +108,7 @@ import {
 void import('../../theme/studyos-compat.css');
 
 export function BlancDictionaryPanel() {
+  const { t } = useT();
   const [lang, setLang] = useState<DictLang>(() => getStudyLang());
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
@@ -139,7 +140,7 @@ export function BlancDictionaryPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Lookup</legend>
+        <legend>{t('blanc.study.lookup')}</legend>
         <form className="blanc-command-row" onSubmit={submit}>
           <input
             autoFocus
@@ -147,10 +148,10 @@ export function BlancDictionaryPanel() {
             value={input}
             lang={lang}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isZh ? 'Word or English, e.g. 你好' : 'Word or English, e.g. 食べる'}
+            placeholder={isZh ? t('blanc.study.dict.placeholderZh') : t('blanc.study.dict.placeholderJa')}
           />
           <button type="submit" disabled={!input.trim()}>
-            Search
+            {t('blanc.study.dict.search')}
           </button>
           <span className="blanc-segmented">
             <button
@@ -170,20 +171,19 @@ export function BlancDictionaryPanel() {
           </span>
         </form>
         <div className="blanc-status-row">
-          <span>{isZh ? 'Chinese' : 'Japanese'}</span>
-          <span>{isZh ? 'CC-CEDICT (offline)' : 'JMdict / Jisho'}</span>
+          <span>{isZh ? t('blanc.study.dict.langZh') : t('blanc.study.dict.langJa')}</span>
+          {/* JMdict / Jisho are product names, identical in every language. */}
+          <span>{isZh ? t('blanc.study.dict.sourceZh') : 'JMdict / Jisho'}</span>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Results</legend>
+        <legend>{t('blanc.study.dict.results')}</legend>
         {query ? (
           <DictionaryResults query={query} variant="page" lang={lang} />
         ) : (
           <p className="blanc-note">
-            {isZh
-              ? 'Offline Chinese↔English lookup. Results show pinyin with tone marks; star a result to save it to Flashcards.'
-              : 'Search a Japanese word or an English gloss. Star a result to save it to Flashcards.'}
+            {isZh ? t('blanc.study.dict.hintZh') : t('blanc.study.dict.hintJa')}
           </p>
         )}
       </fieldset>
@@ -207,6 +207,7 @@ function japaneseFragment(text: string): string {
  * skip-while-dragging rule. A second watcher would violate both.
  */
 export function BlancClipboardPanel() {
+  const { t } = useT();
   const [entries, setEntries] = useState<ClipboardEntry[]>(() => loadClipboardHistory());
   const [monitoring, setMonitoring] = useState(() => loadClipboardSettings().monitoringEnabled);
   const [autoLookup, setAutoLookup] = useState(true);
@@ -230,7 +231,7 @@ export function BlancClipboardPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Watch</legend>
+        <legend>{t('blanc.study.clip.watch')}</legend>
         <div className="blanc-row-actions">
           <label className="blanc-check">
             <input
@@ -238,7 +239,7 @@ export function BlancClipboardPanel() {
               checked={monitoring}
               onChange={(e) => toggleMonitoring(e.target.checked)}
             />
-            <span>Watch clipboard</span>
+            <span>{t('blanc.study.clip.watchClipboard')}</span>
           </label>
           <label className="blanc-check">
             <input
@@ -249,20 +250,18 @@ export function BlancClipboardPanel() {
                 setManual(null);
               }}
             />
-            <span>Auto-lookup copied text</span>
+            <span>{t('blanc.study.clip.autoLookup')}</span>
           </label>
         </div>
         <p className="blanc-note">
-          {monitoring
-            ? 'Copy Japanese text in any app; the newest capture is looked up below. Polling is shared with clipboard history (every ~4.5s, paused while a window is being dragged).'
-            : 'Watching is off — history and auto-lookup will not update until you re-enable it.'}
+          {monitoring ? t('blanc.study.clip.watchingOn') : t('blanc.study.clip.watchingOff')}
         </p>
       </fieldset>
 
       <fieldset>
-        <legend>Recent captures</legend>
+        <legend>{t('blanc.study.clip.recent')}</legend>
         {entries.length === 0 ? (
-          <p className="blanc-note">Nothing captured yet.</p>
+          <p className="blanc-note">{t('blanc.study.clip.empty')}</p>
         ) : (
           <ul className="blanc-plain-list">
             {entries.slice(0, 8).map((e) => {
@@ -275,7 +274,11 @@ export function BlancClipboardPanel() {
                     className="blanc-link-btn"
                     disabled={!pick}
                     onClick={() => setManual(pick)}
-                    title={pick ? `Look up ${pick}` : 'No Japanese text in this entry'}
+                    title={
+                      pick
+                        ? t('blanc.study.clip.lookUpItem', { term: pick })
+                        : t('blanc.study.clip.noJapanese')
+                    }
                   >
                     {label.slice(0, 80)}
                   </button>
@@ -287,14 +290,14 @@ export function BlancClipboardPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Lookup</legend>
+        <legend>{t('blanc.study.lookup')}</legend>
         {term ? (
           <>
             <div className="blanc-status-row">
               <span lang="ja">{term}</span>
               {manual && (
                 <button type="button" onClick={() => setManual(null)}>
-                  Follow clipboard again
+                  {t('blanc.study.clip.follow')}
                 </button>
               )}
             </div>
@@ -302,9 +305,7 @@ export function BlancClipboardPanel() {
           </>
         ) : (
           <p className="blanc-note">
-            {autoLookup
-              ? 'Copy some Japanese text, or pick a capture above.'
-              : 'Auto-lookup is off — pick a capture above to look it up.'}
+            {autoLookup ? t('blanc.study.clip.promptAuto') : t('blanc.study.clip.promptManual')}
           </p>
         )}
       </fieldset>
@@ -317,10 +318,6 @@ export function BlancReadingFinderPanel({
 }: {
   onOpenBook: (item: LibraryItem) => void;
 }) {
-  // Blanc's own panel prose is outside the app-chrome i18n sweep by decision
-  // (see EXEMPT_DIRS in tools/i18n-hardcoded-check.cjs), but the level range is
-  // NOT Blanc prose -- it is the shared tier vocabulary Study OS renders too, so
-  // it follows the UI language here as well.
   const { t } = useT();
   const state = useReadingFinder();
 
@@ -328,28 +325,29 @@ export function BlancReadingFinderPanel({
     <div className="blanc-tool-detail">
       {state.continueReading.length > 0 && (
         <fieldset>
-          <legend>Continue reading</legend>
+          <legend>{t('blanc.study.reading.continue')}</legend>
           <ContinueReadingRow state={state} onOpenBook={onOpenBook} />
         </fieldset>
       )}
 
       <fieldset>
-        <legend>Filters</legend>
+        <legend>{t('blanc.study.reading.filters')}</legend>
         <ReadingFinderControls state={state} />
         <div className="blanc-status-row">
-          <span>{state.list.length} sites</span>
+          <span>{t('blanc.study.reading.siteCount', { count: state.list.length })}</span>
           <span>
-            Level:{' '}
-            {levelRangeLabel(t, state.levels.size ? [...state.levels] : ALL_LEVELS)}
+            {t('blanc.study.reading.level', {
+              range: levelRangeLabel(t, state.levels.size ? [...state.levels] : ALL_LEVELS),
+            })}
           </span>
           <button type="button" onClick={state.resetFilters}>
-            Reset filters
+            {t('blanc.study.reading.resetFilters')}
           </button>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Sites</legend>
+        <legend>{t('blanc.study.reading.sites')}</legend>
         <ReadingSiteGrid state={state} />
       </fieldset>
 
@@ -365,16 +363,17 @@ export function BlancReadingFinderPanel({
 }
 
 export function BlancResourcesPanel() {
+  const { t } = useT();
   const state = useResources();
 
   if (state.selectedBundle) {
     return (
       <div className="blanc-tool-detail">
         <fieldset>
-          <legend>Bundle</legend>
+          <legend>{t('blanc.study.res.bundle')}</legend>
           <div className="blanc-row-actions">
             <button type="button" onClick={state.closeBundle}>
-              Back to catalogue
+              {t('blanc.study.res.back')}
             </button>
           </div>
           <ResourceBundleDetail state={state} />
@@ -386,42 +385,44 @@ export function BlancResourcesPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Catalogue</legend>
+        <legend>{t('blanc.study.res.catalogue')}</legend>
         <div className="blanc-command-row">
           <input
             type="text"
             value={state.query}
             onChange={(e) => state.setQuery(e.target.value)}
-            placeholder="Find a resource…"
+            placeholder={t('blanc.study.res.find')}
           />
           <button
             type="button"
             onClick={() => void state.doRefresh()}
             disabled={state.refreshState === 'refreshing'}
           >
-            {state.refreshState === 'refreshing' ? 'Refreshing…' : 'Refresh'}
+            {state.refreshState === 'refreshing'
+              ? t('blanc.study.res.refreshing')
+              : t('blanc.study.refresh')}
           </button>
           <button type="button" onClick={() => state.setFilter('All')} disabled={state.filter === 'All'}>
-            All
+            {t('blanc.study.res.all')}
           </button>
         </div>
         <div className="blanc-status-row">
-          <span>{state.total} visible</span>
-          <span>{state.allTotal} indexed</span>
-          <span>{state.bundles.length} bundles</span>
-          {state.refreshState === 'offline' && <span>Offline — showing cached catalogue</span>}
+          <span>{t('blanc.study.res.visible', { count: state.total })}</span>
+          <span>{t('blanc.study.res.indexed', { count: state.allTotal })}</span>
+          <span>{t('blanc.study.res.bundleCount', { count: state.bundles.length })}</span>
+          {state.refreshState === 'offline' && <span>{t('blanc.study.res.offline')}</span>}
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Categories</legend>
+        <legend>{t('blanc.study.res.categories')}</legend>
         <div className="blanc-segmented">
           <button
             type="button"
             className={state.filter === 'All' ? 'active' : ''}
             onClick={() => state.setFilter('All')}
           >
-            All
+            {t('blanc.study.res.all')}
           </button>
           {state.allCategories.map((cat) => (
             <button
@@ -439,27 +440,27 @@ export function BlancResourcesPanel() {
 
       {state.showLanding && state.bundles.length > 0 && (
         <fieldset>
-          <legend>Bundles</legend>
+          <legend>{t('blanc.study.res.bundles')}</legend>
           <ResourceBundles state={state} />
         </fieldset>
       )}
 
       {state.showLanding && state.tools.length > 0 && (
         <fieldset>
-          <legend>My tools</legend>
+          <legend>{t('blanc.study.res.myTools')}</legend>
           <ResourceMyTools state={state} />
         </fieldset>
       )}
 
       {state.showLanding && state.newEntries.length > 0 && (
         <fieldset>
-          <legend>Recently added</legend>
+          <legend>{t('blanc.study.res.recent')}</legend>
           <ResourceNewSection state={state} />
         </fieldset>
       )}
 
       <fieldset>
-        <legend>Resources</legend>
+        <legend>{t('blanc.study.res.resources')}</legend>
         <ResourceGroups state={state} />
       </fieldset>
     </div>
@@ -467,19 +468,22 @@ export function BlancResourcesPanel() {
 }
 
 export function BlancCalendarPanel() {
+  const { t } = useT();
   const state = useCalendar();
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Navigate</legend>
+        <legend>{t('blanc.study.cal.navigate')}</legend>
         <CalendarNav state={state} />
         <div className="blanc-status-row">
           <span>{state.headerLabel}</span>
-          <span>{state.events.length} events</span>
-          {state.agendaOverdue.length > 0 && <span>{state.agendaOverdue.length} overdue</span>}
+          <span>{t('blanc.study.cal.eventCount', { count: state.events.length })}</span>
+          {state.agendaOverdue.length > 0 && (
+            <span>{t('blanc.study.cal.overdue', { count: state.agendaOverdue.length })}</span>
+          )}
           <button type="button" onClick={() => state.openNew(toKey(state.cursor))}>
-            New event
+            {t('blanc.study.cal.newEvent')}
           </button>
         </div>
       </fieldset>
@@ -504,6 +508,7 @@ export function BlancCalendarPanel() {
  * thousand-track library from dropping frames while the window is dragged.
  */
 export function BlancMusicPanel() {
+  const { t } = useT();
   const state = useMusic();
   const { ps, currentMeta } = state;
   const lyrics = state.liveLyrics.lyrics;
@@ -511,20 +516,20 @@ export function BlancMusicPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Library</legend>
+        <legend>{t('blanc.study.music.library')}</legend>
         <MusicSearchBox state={state} />
         <div className="blanc-status-row">
-          <span>{state.baseSongs.length} songs</span>
-          <span>{state.rows.length} rows</span>
+          <span>{t('blanc.study.music.songCount', { count: state.baseSongs.length })}</span>
+          <span>{t('blanc.study.music.rowCount', { count: state.rows.length })}</span>
           <select
             value={state.sortBy}
             onChange={(e) => state.setSortBy(e.target.value as SortBy)}
-            aria-label="Sort songs"
+            aria-label={t('music.sortSelect.title')}
           >
-            <option value="recent">Recent</option>
-            <option value="title">Title</option>
-            <option value="artist">Artist</option>
-            <option value="folder">Folder</option>
+            <option value="recent">{t('music.sort.recent')}</option>
+            <option value="title">{t('music.sort.byTitle')}</option>
+            <option value="artist">{t('music.sort.byArtist')}</option>
+            <option value="folder">{t('music.sort.byFolder')}</option>
           </select>
           <label className="blanc-check">
             <input
@@ -532,7 +537,7 @@ export function BlancMusicPanel() {
               checked={state.likedOnly}
               onChange={() => state.setLikedOnly((v) => !v)}
             />
-            <span>Liked only</span>
+            <span>{t('blanc.study.music.likedOnly')}</span>
           </label>
         </div>
         <div className="blanc-music-list">
@@ -541,16 +546,18 @@ export function BlancMusicPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Now playing</legend>
+        <legend>{t('mediaCenter.music.nowPlaying')}</legend>
         {state.error && <p className="blanc-note">{state.error}</p>}
         <MusicControls state={state} />
         <MusicNowPlaying state={state} />
-        {!ps.current && <p className="blanc-note">Pick a song above to start playback.</p>}
+        {!ps.current && <p className="blanc-note">{t('blanc.study.music.pickSong')}</p>}
       </fieldset>
 
       <fieldset>
         <legend>
-          Lyrics{lyrics.kind === 'synced' ? ` (${lyrics.cues.length} cues)` : ''}
+          {lyrics.kind === 'synced'
+            ? t('blanc.study.music.lyricsCues', { count: lyrics.cues.length })
+            : t('music.controls.lyrics')}
         </legend>
         <div className="blanc-music-lyrics">
           <MusicLyricsPane state={state} />
@@ -558,7 +565,7 @@ export function BlancMusicPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Add from YouTube</legend>
+        <legend>{t('blanc.study.music.addYoutube')}</legend>
         <MusicYoutubeRow state={state} />
       </fieldset>
 
@@ -580,18 +587,19 @@ export function BlancMusicPanel() {
  * Shares `useTranslate` and the history list; the panes are Blanc-native.
  */
 export function BlancTranslatePanel() {
+  const { t } = useT();
   const state = useTranslate();
   const { source, target, input, output, busy, msg, error } = state;
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Direction</legend>
+        <legend>{t('blanc.study.translate.direction')}</legend>
         <div className="blanc-command-row">
           <select
             value={source}
             onChange={(e) => state.pickSource(e.target.value as TransLang)}
-            aria-label="Source language"
+            aria-label={t('translate.lang.sourceGroup')}
           >
             {LANG_ORDER.filter((l) => l !== target).map((l) => (
               <option key={l} value={l}>
@@ -599,13 +607,18 @@ export function BlancTranslatePanel() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={state.swap} title="Swap languages" aria-label="Swap languages">
+          <button
+            type="button"
+            onClick={state.swap}
+            title={t('translate.menu.swap')}
+            aria-label={t('translate.menu.swap')}
+          >
             ⇄
           </button>
           <select
             value={target}
             onChange={(e) => state.pickTarget(e.target.value as TransLang)}
-            aria-label="Target language"
+            aria-label={t('translate.lang.targetGroup')}
           >
             {LANG_ORDER.filter((l) => l !== source).map((l) => (
               <option key={l} value={l}>
@@ -619,26 +632,26 @@ export function BlancTranslatePanel() {
               className={state.tab === 'translate' ? 'active' : ''}
               onClick={() => state.setTab('translate')}
             >
-              Translate
+              {t('translate.tab.translate')}
             </button>
             <button
               type="button"
               className={state.tab === 'history' ? 'active' : ''}
               onClick={() => state.setTab('history')}
             >
-              History ({state.history.length})
+              {t('blanc.study.translate.historyCount', { count: state.history.length })}
             </button>
           </span>
         </div>
         <div className="blanc-status-row">
-          <span>{input.length} source chars</span>
-          <span>Runs locally — the model downloads on first use.</span>
+          <span>{t('translate.status.sourceChars', { count: input.length })}</span>
+          <span>{t('blanc.study.translate.runsLocally')}</span>
         </div>
       </fieldset>
 
       {state.tab === 'history' ? (
         <fieldset>
-          <legend>History</legend>
+          <legend>{t('translate.tab.history')}</legend>
           <div className="tr-history">
             <TranslateHistoryList
               state={state}
@@ -651,7 +664,7 @@ export function BlancTranslatePanel() {
       ) : (
         <>
           <fieldset>
-            <legend>{LANG_LABELS[source]} source</legend>
+            <legend>{t('translate.pane.sourceHeader', { lang: LANG_LABELS[source] })}</legend>
             <textarea
               lang={source}
               rows={6}
@@ -660,14 +673,14 @@ export function BlancTranslatePanel() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void state.run();
               }}
-              placeholder={`${PLACEHOLDERS[source]}  (Ctrl+Enter)`}
+              placeholder={t('blanc.study.translate.inputPlaceholder', { hint: PLACEHOLDERS[source] })}
             />
             <div className="blanc-row-actions">
               <button type="button" onClick={() => void state.run()} disabled={busy || !input.trim()}>
-                {busy ? 'Working…' : 'Translate'}
+                {busy ? t('translate.working') : t('translate.menu.translate')}
               </button>
               <button type="button" onClick={state.clear} disabled={!input && !output}>
-                Clear
+                {t('blanc.study.clear')}
               </button>
               {busy && <span className="blanc-note">{msg}</span>}
             </div>
@@ -675,14 +688,14 @@ export function BlancTranslatePanel() {
           </fieldset>
 
           <fieldset>
-            <legend>{LANG_LABELS[target]} output</legend>
+            <legend>{t('translate.pane.outputHeader', { lang: LANG_LABELS[target] })}</legend>
             <div className="blanc-output" lang={target}>
-              {output || <span className="blanc-note">Translation appears here.</span>}
+              {output || <span className="blanc-note">{t('translate.outputPlaceholder')}</span>}
             </div>
             {output && (
               <div className="blanc-row-actions">
                 <button type="button" onClick={() => void copyText(output)}>
-                  Copy
+                  {t('translate.history.copy')}
                 </button>
               </div>
             )}
@@ -728,6 +741,7 @@ const NOTEBOOK_HREF_TO_BLANC_TAB: Record<string, string> = {
 };
 
 export function BlancNotebookPanel() {
+  const { t } = useT();
   const state = useNotebook();
   const [unreachable, setUnreachable] = useState<string | null>(null);
 
@@ -751,40 +765,59 @@ export function BlancNotebookPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>View</legend>
+        <legend>{t('blanc.study.notebook.view')}</legend>
         <NotebookViewTabs state={state} />
         <div className="blanc-status-row">
-          <span>{state.visible.length} entries</span>
-          <span>{state.folders.length} folders</span>
-          {state.truncated && <span>showing first {TIMELINE_CAP}</span>}
+          <span>{t('blanc.study.notebook.entryCount', { count: state.visible.length })}</span>
+          <span>{t('blanc.study.notebook.folderCount', { count: state.folders.length })}</span>
+          {state.truncated && (
+            <span>{t('blanc.study.notebook.showingFirst', { count: TIMELINE_CAP })}</span>
+          )}
           <button type="button" onClick={state.refresh}>
-            Refresh
+            {t('blanc.study.refresh')}
           </button>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Streams</legend>
+        <legend>{t('blanc.study.notebook.streams')}</legend>
         <NotebookStreamCounts state={state} />
       </fieldset>
 
       <fieldset>
-        <legend>Folders</legend>
+        <legend>{t('blanc.study.notebook.folders')}</legend>
         <div className="gx-notebook-folders">
           <NotebookFolders state={state} />
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Timeline</legend>
+        <legend>{t('blanc.study.notebook.timeline')}</legend>
         {unreachable && (
           <p className="blanc-note">
-            Blanc has no surface for “{unreachable}” — open it from the main Gum window.
+            {t('blanc.study.notebook.unreachable', { target: unreachable })}
           </p>
         )}
         <NotebookTimeline state={state} onOpen={onOpen} />
       </fieldset>
     </div>
+  );
+}
+
+/**
+ * "Mapped onto <b>model</b>. ..." as one catalog sentence, with the model name
+ * bolded wherever the language places it.
+ */
+function MappedOnto({ model }: { model: string }) {
+  const { t } = useT();
+  const slot = '\u0000';
+  const [before, after = ''] = t('blanc.study.anki.mappedOnto', { model: slot }).split(slot);
+  return (
+    <>
+      {before}
+      <b>{model}</b>
+      {after}
+    </>
   );
 }
 
@@ -796,26 +829,30 @@ export function BlancNotebookPanel() {
  * `ProfileSettingsSection`.
  */
 export function BlancAnkiPanel() {
+  const { t } = useT();
   const state = useAnkiConfig();
   const { status, loading, active, model } = state;
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Connection</legend>
+        <legend>{t('blanc.study.anki.connection')}</legend>
         <ProfileSwitcher compact showHeading={false} />
         <div className="blanc-status-row">
           <span className={`blanc-status-dot${status?.connected ? ' ok' : ''}`} />
           <span>{state.connLabel}</span>
-          {active.label && <span>Profile: {active.label}</span>}
+          {active.label && <span>{t('blanc.study.anki.profile', { name: active.label })}</span>}
           <button type="button" onClick={() => void state.check()} disabled={loading}>
-            {loading ? 'Checking…' : 'Recheck'}
+            {loading ? t('anki.checking') : t('anki.recheck')}
           </button>
         </div>
         {!loading && status && !status.connected && <AnkiDisconnected state={state} />}
         {!loading && status?.connected && (
           <p className="blanc-note">
-            {status.decks.length} decks, {status.models.length} note types available.
+            {t('blanc.study.anki.available', {
+              decks: t('blanc.study.anki.deckCount', { count: status.decks.length }),
+              models: t('blanc.study.anki.noteTypeCount', { count: status.models.length }),
+            })}
           </p>
         )}
       </fieldset>
@@ -823,31 +860,31 @@ export function BlancAnkiPanel() {
       {!loading && status?.connected && (
         <>
           <fieldset>
-            <legend>Deck and note type</legend>
+            <legend>{t('blanc.study.anki.deckNoteType')}</legend>
             <AnkiDeckNoteType state={state} />
           </fieldset>
 
           <fieldset>
-            <legend>Field mapping</legend>
+            <legend>{t('anki.fieldMapping.title')}</legend>
             <p className="blanc-note">
-              Mapped onto <b>{model || '—'}</b>. Templates use the same variables mining does.
+              <MappedOnto model={model || '—'} />
             </p>
             <AnkiFieldMapping state={state} />
           </fieldset>
 
           <fieldset>
-            <legend>Card styling</legend>
+            <legend>{t('blanc.study.anki.cardStyling')}</legend>
             <AnkiNoteCss state={state} />
           </fieldset>
 
           <fieldset>
-            <legend>Manual card</legend>
+            <legend>{t('blanc.study.anki.manualCard')}</legend>
             <AnkiManualCardForm state={state} />
           </fieldset>
 
           {state.fields.length > 0 && (
             <fieldset>
-              <legend>Preview</legend>
+              <legend>{t('blanc.study.anki.preview')}</legend>
               <AnkiPreviewPane state={state} />
             </fieldset>
           )}
@@ -863,67 +900,69 @@ export function BlancAnkiPanel() {
  * mutating action, Reset, keeps the same `confirmDialog` guard Study OS uses.
  */
 export function BlancStatisticsPanel() {
+  const { t } = useT();
   const state = useStats();
   const s = state.summary;
 
   return (
     <div className="blanc-tool-detail blanc-statistics-panel">
       <fieldset>
-        <legend>Totals</legend>
+        <legend>{t('blanc.study.stats.totals')}</legend>
         <div className="blanc-status-row">
-          <span>{formatDuration(s.totalSeconds)} total</span>
-          <span>{formatNumber(s.totalChars)} chars</span>
-          <span>{s.daysActive} active days</span>
+          <span>{t('blanc.study.stats.totalTime', { duration: formatDuration(s.totalSeconds) })}</span>
+          <span>{t('blanc.study.stats.charCount', { count: Math.round(s.totalChars) })}</span>
+          <span>{t('blanc.study.stats.activeDays', { count: s.daysActive })}</span>
           <button type="button" onClick={state.refresh}>
-            Refresh
+            {t('blanc.study.refresh')}
           </button>
           <button type="button" disabled={!state.hasData} onClick={() => void state.resetAllStats()}>
-            Reset
+            {t('common.reset')}
           </button>
         </div>
         {state.hasData ? (
           <StatsCards state={state} />
         ) : (
           <p className="blanc-note">
-            No reading samples recorded yet. Open a book in the reader and the totals start here.
+            {t('blanc.study.stats.empty')}
           </p>
         )}
       </fieldset>
 
       {state.hasData && (
         <fieldset>
-          <legend>Last 14 days</legend>
+          <legend>{t('blanc.study.stats.last14')}</legend>
           <StatsChart state={state} />
         </fieldset>
       )}
 
       {s.books.length > 0 && (
         <fieldset>
-          <legend>By book</legend>
+          <legend>{t('stats.byBook')}</legend>
           <StatsBooks state={state} />
         </fieldset>
       )}
 
       {s.shows.length > 0 && (
         <fieldset>
-          <legend>By show</legend>
+          <legend>{t('stats.byShow')}</legend>
           <StatsShows state={state} />
         </fieldset>
       )}
 
       <fieldset>
-        <legend>Word knowledge</legend>
+        <legend>{t('stats.wk.title')}</legend>
         <WordKnowledge />
       </fieldset>
     </div>
   );
 }
 
+/** Labels are catalog keys, resolved with `t()` at render. */
 const GRAMMAR_MODES = [
-  { id: 'grammar', label: 'Points' },
-  { id: 'practice', label: 'Practice' },
-  { id: 'guides', label: 'Guides' },
-  { id: 'review', label: 'Review' },
+  { id: 'grammar', labelKey: 'blanc.study.grammar.points' },
+  { id: 'practice', labelKey: 'grammar.mode.practice' },
+  { id: 'guides', labelKey: 'blanc.study.grammar.guides' },
+  { id: 'review', labelKey: 'grammar.mode.review' },
 ] as const;
 
 type GrammarMode = (typeof GRAMMAR_MODES)[number]['id'];
@@ -933,6 +972,7 @@ export function BlancGrammarPanel({
 }: {
   focusRequest?: { id: string; key: number } | null;
 }) {
+  const { t } = useT();
   const [mode, setMode] = useState<GrammarMode>('grammar');
   const [practiceSeed, setPracticeSeed] = useState<Partial<PracticeFilters> | undefined>();
   const corpusSize = useMemo(() => dedupeGrammarByTitle(GRAMMAR).length, []);
@@ -955,7 +995,7 @@ export function BlancGrammarPanel({
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Mode</legend>
+        <legend>{t('blanc.study.grammar.mode')}</legend>
         <div className="blanc-segmented">
           {GRAMMAR_MODES.map((m) => (
             <button
@@ -964,18 +1004,20 @@ export function BlancGrammarPanel({
               className={mode === m.id ? 'active' : ''}
               onClick={() => setMode(m.id)}
             >
-              {m.label}
+              {t(m.labelKey)}
             </button>
           ))}
         </div>
         <div className="blanc-status-row">
-          <span>{corpusSize} grammar points</span>
-          <span>Deterministic corpus — no model calls</span>
+          <span>{t('blanc.study.grammar.pointCount', { count: corpusSize })}</span>
+          <span>{t('blanc.study.grammar.deterministic')}</span>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>{GRAMMAR_MODES.find((m) => m.id === mode)?.label}</legend>
+        <legend>
+          {t(GRAMMAR_MODES.find((m) => m.id === mode)?.labelKey ?? 'blanc.study.grammar.points')}
+        </legend>
         {mode === 'grammar' ? (
           <GrammarExplorer
             focusRequest={focusRequest}

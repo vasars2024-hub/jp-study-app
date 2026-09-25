@@ -32,7 +32,9 @@ import { fuzzyScore } from '../../fuzzySearch';
 import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
-import type { TVars } from '../../../shared/i18n/core';
+import { LANG_TAGS, type TVars } from '../../../shared/i18n/core';
+import { blancToolLabel } from './blancToolLabels';
+import { commandCategory, commandLabel } from '../../commandI18n';
 import type {
   AgentExecutionEvent,
   AgentTask,
@@ -102,12 +104,15 @@ export type BlancAnalyzerResult = {
   unknownLemmas: string[];
 };
 
-function formatImmersionDuration(totalSeconds: number): string {
+function formatImmersionDuration(
+  totalSeconds: number,
+  t: (key: string, vars?: TVars) => string,
+): string {
   const safe = Math.max(0, Math.floor(totalSeconds));
   if (safe >= 3600) {
     const hours = Math.floor(safe / 3600);
     const minutes = Math.floor((safe % 3600) / 60);
-    return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+    return t('blanc.ready.immersion.hoursMinutes', { h: hours, m: minutes.toString().padStart(2, '0') });
   }
   const minutes = Math.floor(safe / 60);
   const seconds = safe % 60;
@@ -778,7 +783,7 @@ export function LocalAgentPanel() {
         <fieldset>
           <legend>{t('blanc.agent.section.executionLog')}</legend>
           <ul className="blanc-note-list">
-            {events.slice(-20).map((event, index) => <li key={`${event.timestamp}-${index}`}>{event.type} · {event.operation}{event.error ? ` · ${event.error}` : ''}{event.durationMs != null ? ` · ${event.durationMs}ms` : ''}</li>)}
+            {events.slice(-20).map((event, index) => <li key={`${event.timestamp}-${index}`}>{event.type} · {event.operation}{event.error ? ` · ${event.error}` : ''}{event.durationMs != null ? ` · ${t('blanc.ready.agent.durationMs', { ms: event.durationMs })}` : ''}</li>)}
           </ul>
         </fieldset>
       )}
@@ -812,6 +817,7 @@ export function LocalAgentPanel() {
 }
 
 export function DifficultyAnalyzerPanel() {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -820,7 +826,7 @@ export function DifficultyAnalyzerPanel() {
   const runCheck = async (): Promise<void> => {
     const sample = text.trim();
     if (!sample) {
-      setError('Paste some text first.');
+      setError(t('blanc.ready.difficulty.pasteFirst'));
       setResult(null);
       return;
     }
@@ -851,20 +857,20 @@ export function DifficultyAnalyzerPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Level &amp; Difficulty Checker</legend>
+        <legend>{blancToolLabel(t, 'difficulty-analyzer')}</legend>
         <label>
-          Text sample
+          {t('blanc.ready.difficulty.textSample')}
           <textarea
             rows={6}
             value={text}
             lang="ja"
-            placeholder="Paste Japanese or Chinese text to analyze"
+            placeholder={t('blanc.ready.difficulty.placeholder')}
             onChange={(event) => setText(event.target.value)}
           />
         </label>
         <div className="blanc-row-actions">
           <button type="button" onClick={() => void runCheck()} disabled={busy || !text.trim()}>
-            {busy ? 'Checking…' : 'Check'}
+            {busy ? t('blanc.ready.difficulty.checking') : t('blanc.ready.difficulty.check')}
           </button>
         </div>
         {error && <p className="blanc-error">{error}</p>}
@@ -872,23 +878,34 @@ export function DifficultyAnalyzerPanel() {
           <div className="blanc-result-box">
             <span className="blanc-status">{result.level.label}</span>
             {' · '}
-            {Math.round(result.level.confidence * 100)}% band coverage
-            {!result.level.metThreshold ? ' (below threshold)' : ''}
+            {t(
+              result.level.metThreshold
+                ? 'blanc.ready.difficulty.bandCoverage'
+                : 'blanc.ready.difficulty.bandCoverageBelow',
+              { pct: Math.round(result.level.confidence * 100) },
+            )}
           </div>
         )}
         {score && score.totalWords > 0 && (
           <div className="blanc-result-box">
-            Comprehension: {knownPercent(score)}% known ({score.knownWords}/{score.totalWords} tokens)
+            {t('blanc.ready.difficulty.comprehension', {
+              pct: knownPercent(score),
+              known: score.knownWords,
+              count: score.totalWords,
+            })}
           </div>
         )}
         {unknownLemmas.length > 0 && (
           <p className="blanc-note">
-            Unknown lemmas ({unknownLemmas.length}): {unknownLemmas.slice(0, 20).join(', ')}
+            {t('blanc.ready.difficulty.unknownLemmas', {
+              n: unknownLemmas.length,
+              list: unknownLemmas.slice(0, 20).join(', '),
+            })}
             {unknownLemmas.length > 20 ? '…' : ''}
           </p>
         )}
         {result && !result.level && score && score.totalWords === 0 && (
-          <p className="blanc-warning">No level lists configured or text could not be tokenized.</p>
+          <p className="blanc-warning">{t('blanc.ready.difficulty.noLevel')}</p>
         )}
       </fieldset>
     </div>
@@ -896,6 +913,7 @@ export function DifficultyAnalyzerPanel() {
 }
 
 export function ImmersionTrackerPanel() {
+  const { t, lang } = useT();
   const [sites, setSites] = useState<ImmersionSite[]>([]);
   const [error, setError] = useState('');
 
@@ -911,37 +929,37 @@ export function ImmersionTrackerPanel() {
     void window.api
       .immersionListSites()
       .then(applyStore)
-      .catch(() => setError('Immersion data is not available.'));
+      .catch(() => setError(t('blanc.ready.immersion.unavailable')));
     const off = window.api.onImmersionSitesChanged(applyStore);
     return () => off?.();
-  }, [applyStore]);
+  }, [applyStore, lang]);
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Immersion Tracker</legend>
-        <p className="blanc-note">Read-only totals from your immersion site library.</p>
+        <legend>{blancToolLabel(t, 'immersion-tracker')}</legend>
+        <p className="blanc-note">{t('blanc.ready.immersion.note')}</p>
         {error && <p className="blanc-error">{error}</p>}
         {!sites.length ? (
-          <p className="blanc-note">No immersion sites tracked yet.</p>
+          <p className="blanc-note">{t('blanc.ready.immersion.empty')}</p>
         ) : (
           <div className="blanc-table-wrap">
             <table className="blanc-table">
               <thead>
                 <tr>
-                  <th>Site</th>
-                  <th>Time</th>
-                  <th>Chars</th>
-                  <th>Streak</th>
+                  <th>{t('blanc.ready.immersion.col.site')}</th>
+                  <th>{t('blanc.ready.immersion.col.time')}</th>
+                  <th>{t('blanc.ready.immersion.col.chars')}</th>
+                  <th>{t('blanc.ready.immersion.col.streak')}</th>
                 </tr>
               </thead>
               <tbody>
                 {sites.map((site) => (
                   <tr key={site.id}>
                     <td title={site.url}>{site.title || site.url}</td>
-                    <td>{formatImmersionDuration(site.totalSeconds)}</td>
-                    <td>{site.totalChars.toLocaleString()}</td>
-                    <td>{site.streakDays}d</td>
+                    <td>{formatImmersionDuration(site.totalSeconds, t)}</td>
+                    <td>{site.totalChars.toLocaleString(LANG_TAGS[lang])}</td>
+                    <td>{t('blanc.ready.immersion.streakDays', { count: site.streakDays })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -954,6 +972,7 @@ export function ImmersionTrackerPanel() {
 }
 
 export function FrequencyExplorerPanel() {
+  const { t } = useT();
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -981,14 +1000,14 @@ export function FrequencyExplorerPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Frequency Explorer</legend>
+        <legend>{blancToolLabel(t, 'frequency-explorer')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Term
+            {t('blanc.ready.frequency.term')}
             <input
               value={query}
               lang="ja"
-              placeholder="Lookup word or kanji"
+              placeholder={t('blanc.ready.frequency.placeholder')}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void lookup();
@@ -998,7 +1017,7 @@ export function FrequencyExplorerPanel() {
         </div>
         <div className="blanc-row-actions">
           <button type="button" onClick={() => void lookup()} disabled={busy || !query.trim()}>
-            {busy ? 'Looking up…' : 'Lookup'}
+            {busy ? t('blanc.ready.frequency.lookingUp') : t('blanc.ready.frequency.lookup')}
           </button>
         </div>
         {error && <p className="blanc-error">{error}</p>}
@@ -1009,20 +1028,26 @@ export function FrequencyExplorerPanel() {
               {entry.reading ? ` · ${entry.reading}` : ''}
             </div>
             {entry.frequency != null ? (
-              <div>Frequency rank: {entry.frequency.toLocaleString()}</div>
+              <div>
+                {t('blanc.ready.frequency.rank', { rank: entry.frequency })}
+              </div>
             ) : (
-              <p className="blanc-note">No frequency rank in installed dictionaries.</p>
+              <p className="blanc-note">{t('blanc.ready.frequency.noRank')}</p>
             )}
             {firstSenseSummary(entry) && <p className="blanc-note">{firstSenseSummary(entry)}</p>}
           </div>
         )}
-        {result && !entry && !error && <p className="blanc-warning">No dictionary entries found.</p>}
+        {result && !entry && !error && <p className="blanc-warning">{t('blanc.ready.frequency.noEntries')}</p>}
       </fieldset>
     </div>
   );
 }
 
+/** Deck folder the importer files cards under — a stored folder name, not UI text. */
+const SUBTITLE_FOLDER = 'Subtitles';
+
 export function SubtitleImporterPanel() {
+  const { t } = useT();
   const [cues, setCues] = useState<Cue[]>([]);
   const [fileName, setFileName] = useState('');
   const [status, setStatus] = useState('');
@@ -1036,7 +1061,11 @@ export function SubtitleImporterPanel() {
       const parsed = parseSubtitles(raw);
       setCues(parsed);
       setFileName(file.name);
-      setStatus(parsed.length ? `Parsed ${parsed.length} cues from ${file.name}.` : 'No cues found.');
+      setStatus(
+        parsed.length
+          ? t('blanc.ready.subtitle.parsed', { count: parsed.length, file: file.name })
+          : t('blanc.ready.subtitle.noCues'),
+      );
     } catch (err) {
       setCues([]);
       setFileName('');
@@ -1046,7 +1075,7 @@ export function SubtitleImporterPanel() {
 
   const sendToFlashcards = (): void => {
     if (!cues.length) {
-      setStatus('Load a subtitle file first.');
+      setStatus(t('blanc.ready.subtitle.loadFirst'));
       return;
     }
     const cards = cues
@@ -1060,35 +1089,35 @@ export function SubtitleImporterPanel() {
         front: sentence,
         back: '',
         source: 'import' as const,
-        folder: 'Subtitles',
+        folder: SUBTITLE_FOLDER,
       }));
     addDeckCards(cards);
-    setStatus(`Added ${cards.length} cards to the Subtitles folder.`);
+    setStatus(t('blanc.ready.subtitle.added', { count: cards.length, folder: SUBTITLE_FOLDER }));
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Subtitle Importer</legend>
+        <legend>{blancToolLabel(t, 'subtitle-importer')}</legend>
         <label>
-          Subtitle file
+          {t('blanc.ready.subtitle.file')}
           <input type="file" accept=".srt,.vtt,.ass,.ssa,.lrc,.txt" onChange={(event) => void onFile(event)} />
         </label>
         {fileName && <p className="blanc-note">{fileName}</p>}
         {cues.length > 0 && (
           <>
-            <div className="blanc-result-box">{cues.length} cues loaded</div>
+            <div className="blanc-result-box">{t('blanc.ready.subtitle.cuesLoaded', { count: cues.length })}</div>
             <ul className="blanc-plain-list">
               {cues.slice(0, 5).map((cue, index) => (
                 <li key={`${cue.start}-${index}`}>{cue.text.replace(/\n/g, ' / ')}</li>
               ))}
             </ul>
-            {cues.length > 5 && <p className="blanc-note">Showing first 5 cues.</p>}
+            {cues.length > 5 && <p className="blanc-note">{t('blanc.ready.subtitle.showingFirst', { count: 5 })}</p>}
           </>
         )}
         <div className="blanc-row-actions">
           <button type="button" onClick={sendToFlashcards} disabled={!cues.length}>
-            Send to flashcards
+            {t('blanc.ready.subtitle.send')}
           </button>
         </div>
         {status && <p className="blanc-note">{status}</p>}
@@ -1105,6 +1134,7 @@ type ContextSearchItem = {
 };
 
 export function ContextSearchPanel() {
+  const { t, lang } = useT();
   const [query, setQuery] = useState('');
   const [grammarItems, setGrammarItems] = useState<ContextSearchItem[]>([]);
 
@@ -1135,8 +1165,8 @@ export function ContextSearchPanel() {
     for (const command of COMMAND_CATALOG) {
       out.push({
         key: `cmd-${command.id}`,
-        label: command.label,
-        sub: command.category,
+        label: commandLabel(command.id, command.label, t),
+        sub: commandCategory(command.category, t),
         run: () => {
           void runCommand(command.id);
         },
@@ -1160,7 +1190,7 @@ export function ContextSearchPanel() {
     }
     out.push(...grammarItems);
     return out;
-  }, [grammarItems]);
+  }, [grammarItems, lang]);
 
   const results = useMemo(() => {
     const q = query.trim();
@@ -1178,17 +1208,17 @@ export function ContextSearchPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Personal Context Search</legend>
+        <legend>{blancToolLabel(t, 'context-search')}</legend>
         <label>
-          Search
+          {t('blanc.ready.context.search')}
           <input
             value={query}
-            placeholder="Commands, saved words, deck cards, grammar"
+            placeholder={t('blanc.ready.context.placeholder')}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
         {!results.length ? (
-          <p className="blanc-note">No matches.</p>
+          <p className="blanc-note">{t('blanc.ready.context.noMatches')}</p>
         ) : (
           <div className="blanc-table-wrap">
             <table className="blanc-table">
@@ -1213,6 +1243,7 @@ export function ContextSearchPanel() {
 }
 
 export function KanjiInspectorPanel() {
+  const { t } = useT();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -1221,7 +1252,7 @@ export function KanjiInspectorPanel() {
 
   const inspect = async (): Promise<void> => {
     if (!char) {
-      setError('Enter one kanji character.');
+      setError(t('blanc.ready.kanji.enterOne'));
       setEntry(null);
       return;
     }
@@ -1244,10 +1275,10 @@ export function KanjiInspectorPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Kanji Inspector</legend>
+        <legend>{blancToolLabel(t, 'kanji-inspector')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Character
+            {t('blanc.ready.kanji.character')}
             <input
               value={value}
               lang="ja"
@@ -1262,14 +1293,12 @@ export function KanjiInspectorPanel() {
         </div>
         <div className="blanc-row-actions">
           <button type="button" onClick={() => void inspect()} disabled={busy || !char}>
-            {busy ? 'Inspecting…' : 'Inspect'}
+            {busy ? t('blanc.ready.kanji.inspecting') : t('blanc.ready.kanji.inspect')}
           </button>
         </div>
         {char && (
           <p className="blanc-note">
-            {isRadical
-              ? `${char} is listed in the common radical set.`
-              : `${char} is not in the bundled radical picker list.`}
+            {t(isRadical ? 'blanc.ready.kanji.isRadical' : 'blanc.ready.kanji.notRadical', { char })}
           </p>
         )}
         {error && <p className="blanc-error">{error}</p>}
@@ -1288,6 +1317,7 @@ export function KanjiInspectorPanel() {
 }
 
 export function BlancYoutubePanel() {
+  const { t } = useT();
   const [store, setStore] = useState<YtPlaylistsStore>(() => normalizeYtStore(null));
   const [url, setUrl] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -1318,7 +1348,7 @@ export function BlancYoutubePanel() {
   const addPlaylist = async (): Promise<void> => {
     const trimmed = url.trim();
     if (!trimmed) return;
-    setBusy('Syncing playlist…');
+    setBusy(t('blanc.ready.youtube.syncing'));
     setError('');
     const result = await window.api.ytAddPlaylist(trimmed);
     setBusy('');
@@ -1333,7 +1363,7 @@ export function BlancYoutubePanel() {
   const downloadSelected = async (): Promise<void> => {
     const ids = [...selected];
     if (!ids.length) return;
-    setBusy('Downloading…');
+    setBusy(t('blanc.ready.youtube.downloading'));
     setError('');
     const result = await window.api.ytDownloadVideos(ids);
     setBusy('');
@@ -1354,10 +1384,10 @@ export function BlancYoutubePanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>YouTube Library</legend>
+        <legend>{blancToolLabel(t, 'youtube-library')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Playlist URL
+            {t('blanc.ready.youtube.playlistUrl')}
             <input
               value={url}
               placeholder="https://www.youtube.com/playlist?list=…"
@@ -1370,25 +1400,25 @@ export function BlancYoutubePanel() {
         </div>
         <div className="blanc-row-actions">
           <button type="button" onClick={() => void addPlaylist()} disabled={!!busy || !url.trim()}>
-            Add playlist
+            {t('blanc.ready.youtube.addPlaylist')}
           </button>
           <button type="button" onClick={() => void downloadSelected()} disabled={!!busy || !selected.size}>
-            Download selected
+            {t('blanc.ready.youtube.downloadSelected')}
           </button>
         </div>
         {busy && <p className="blanc-status">{busy}</p>}
         {error && <p className="blanc-error">{error}</p>}
         {!videos.length ? (
-          <p className="blanc-note">No videos yet. Add a playlist to populate the list.</p>
+          <p className="blanc-note">{t('blanc.ready.youtube.empty')}</p>
         ) : (
           <div className="blanc-table-wrap">
             <table className="blanc-table">
               <thead>
                 <tr>
                   <th />
-                  <th>Title</th>
-                  <th>Duration</th>
-                  <th>Plan</th>
+                  <th>{t('blanc.ready.youtube.col.title')}</th>
+                  <th>{t('blanc.ready.youtube.col.duration')}</th>
+                  <th>{t('blanc.ready.youtube.col.plan')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1411,7 +1441,9 @@ export function BlancYoutubePanel() {
                     <td>{formatYtDuration(video.durationSec)}</td>
                     <td>
                       <button type="button" onClick={() => void togglePlan(video)}>
-                        {planIds.has(video.id) ? 'Remove plan' : 'Plan to watch'}
+                        {planIds.has(video.id)
+                          ? t('blanc.ready.youtube.removePlan')
+                          : t('blanc.ready.youtube.planToWatch')}
                       </button>
                     </td>
                   </tr>
@@ -1447,7 +1479,7 @@ export function BlancModelsPanel() {
       {loading ? (
         <p className="blanc-note">{t('storage.reading')}</p>
       ) : !topLevel.length ? (
-        <p className="blanc-note">No downloadable models listed.</p>
+        <p className="blanc-note">{t('blanc.ready.models.empty')}</p>
       ) : (
         topLevel.map((view) => {
           const busy = isBusy(view.status.state);
@@ -1457,10 +1489,15 @@ export function BlancModelsPanel() {
               <div>
                 <strong>{view.spec.name}</strong>
                 {view.spec.lang !== 'any' && (
-                  <span className="blanc-status"> · {view.spec.lang === 'ja' ? 'JA' : 'ZH'}</span>
+                  <span className="blanc-status">
+                    {' · '}
+                    {view.spec.lang === 'ja' ? t('blanc.ready.models.langJa') : t('blanc.ready.models.langZh')}
+                  </span>
                 )}
               </div>
-              <p className="blanc-note">{view.spec.description}</p>
+              <p className="blanc-note">
+                {view.spec.descriptionKey ? t(view.spec.descriptionKey) : view.spec.description}
+              </p>
               <p className={`blanc-status${view.status.state === 'failed' ? ' blanc-error' : ''}`}>
                 {assetStatusLine(view, t)}
               </p>
@@ -1478,27 +1515,27 @@ export function BlancModelsPanel() {
               <div className="blanc-row-actions">
                 {view.status.state === 'not-installed' && (
                   <button type="button" onClick={() => void onStart(view.spec)}>
-                    Download ({formatBytes(view.spec.sizeBytes)})
+                    {t('common.downloadSize', { size: formatBytes(view.spec.sizeBytes) })}
                   </button>
                 )}
                 {view.status.state === 'failed' && (
                   <button type="button" onClick={() => void onStart(view.spec)}>
-                    Try again
+                    {t('common.tryAgain')}
                   </button>
                 )}
                 {(view.status.state === 'downloading' || view.status.state === 'queued') && (
                   <button type="button" onClick={() => pause(view.spec.id)}>
-                    Pause
+                    {t('common.pause')}
                   </button>
                 )}
                 {view.status.state === 'paused' && (
                   <button type="button" onClick={() => void onStart(view.spec)}>
-                    Resume
+                    {t('common.resume')}
                   </button>
                 )}
                 {(busy || view.status.state === 'paused') && view.status.state !== 'verifying' && (
                   <button type="button" onClick={() => cancel(view.spec.id)}>
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 )}
               </div>
@@ -1578,7 +1615,12 @@ interface BatchConvertItem {
   error: string;
 }
 
-async function convertImageFile(file: File, format: BatchImageFormat, quality: number): Promise<Blob> {
+async function convertImageFile(
+  file: File,
+  format: BatchImageFormat,
+  quality: number,
+  t: (key: string, vars?: TVars) => string,
+): Promise<Blob> {
   const sourceUrl = URL.createObjectURL(file);
   try {
     const image = new Image();
@@ -1589,7 +1631,7 @@ async function convertImageFile(file: File, format: BatchImageFormat, quality: n
     canvas.width = image.naturalWidth;
     canvas.height = image.naturalHeight;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas unavailable.');
+    if (!ctx) throw new Error(t('blanc.ready.batch.canvasUnavailable'));
     if (format === 'image/jpeg') {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1598,7 +1640,7 @@ async function convertImageFile(file: File, format: BatchImageFormat, quality: n
     const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, format, format === 'image/png' ? undefined : quality);
     });
-    if (!blob) throw new Error('Conversion failed.');
+    if (!blob) throw new Error(t('blanc.ready.batch.conversionFailed'));
     return blob;
   } finally {
     URL.revokeObjectURL(sourceUrl);
@@ -1606,6 +1648,7 @@ async function convertImageFile(file: File, format: BatchImageFormat, quality: n
 }
 
 export function BatchConverterPanel() {
+  const { t } = useT();
   const [items, setItems] = useState<BatchConvertItem[]>([]);
   const [format, setFormat] = useState<BatchImageFormat>('image/webp');
   const [quality, setQuality] = useState(0.86);
@@ -1641,7 +1684,7 @@ export function BatchConverterPanel() {
     for (const target of pending) {
       setItems((prev) => prev.map((item) => (item.id === target.id ? { ...item, state: 'converting', error: '' } : item)));
       try {
-        const blob = await convertImageFile(target.file, format, quality);
+        const blob = await convertImageFile(target.file, format, quality, t);
         const outputUrl = URL.createObjectURL(blob);
         setItems((prev) => prev.map((item) => {
           if (item.id !== target.id) return item;
@@ -1651,7 +1694,7 @@ export function BatchConverterPanel() {
       } catch (error) {
         setItems((prev) => prev.map((item) => (
           item.id === target.id
-            ? { ...item, state: 'failed', error: error instanceof Error ? error.message : 'Could not convert this image.' }
+            ? { ...item, state: 'failed', error: error instanceof Error ? error.message : t('blanc.ready.batch.couldNotConvert') }
             : item
         )));
       }
@@ -1676,15 +1719,15 @@ export function BatchConverterPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Batch Converter</legend>
-        <p className="blanc-note">Convert a queue of images locally through browser canvas. PNG, JPEG, and WebP are supported; other batch formats can use OSS adapters later.</p>
+        <legend>{blancToolLabel(t, 'batch-converter')}</legend>
+        <p className="blanc-note">{t('blanc.ready.batch.note')}</p>
         <label>
-          Images
+          {t('blanc.ready.batch.images')}
           <input type="file" accept="image/*" multiple onChange={(event) => { chooseFiles(event.target.files); event.target.value = ''; }} />
         </label>
         <div className="blanc-form-grid">
           <label>
-            Output
+            {t('blanc.ready.batch.output')}
             <select value={format} disabled={busy} onChange={(event) => setFormat(event.target.value as BatchImageFormat)}>
               <option value="image/webp">WebP</option>
               <option value="image/png">PNG</option>
@@ -1692,7 +1735,7 @@ export function BatchConverterPanel() {
             </select>
           </label>
           <label>
-            Quality
+            {t('blanc.ready.batch.quality')}
             <input
               type="range"
               min={0.4}
@@ -1706,31 +1749,37 @@ export function BatchConverterPanel() {
         </div>
         <div className="blanc-row-actions">
           <button type="button" disabled={busy || !pendingCount} onClick={() => void convertAll()}>
-            {busy ? 'Converting...' : 'Convert queued'}
+            {busy ? t('blanc.ready.batch.converting') : t('blanc.ready.batch.convertQueued')}
           </button>
           <button type="button" disabled={busy || !doneItems.length} onClick={saveAll}>
-            Save all ({doneItems.length})
+            {t('blanc.ready.batch.saveAll', { count: doneItems.length })}
           </button>
           <button type="button" disabled={busy || !items.length} onClick={clearAllItems}>
-            Clear
+            {t('blanc.ready.batch.clear')}
           </button>
           <span className="blanc-note">
-            {items.length
-              ? `${items.length} files | In ${formatBytes(totalIn)}${totalOut ? ` | Out ${formatBytes(totalOut)}` : ''}`
-              : 'Choose images to queue.'}
+            {!items.length
+              ? t('blanc.ready.batch.chooseImages')
+              : totalOut
+                ? t('blanc.ready.batch.summaryWithOut', {
+                    count: items.length,
+                    in: formatBytes(totalIn),
+                    out: formatBytes(totalOut),
+                  })
+                : t('blanc.ready.batch.summary', { count: items.length, in: formatBytes(totalIn) })}
           </span>
         </div>
       </fieldset>
       {items.length > 0 && (
         <fieldset>
-          <legend>Queue</legend>
+          <legend>{t('blanc.ready.batch.queue')}</legend>
           <div className="blanc-table-wrap">
             <table className="blanc-table">
               <thead>
                 <tr>
-                  <th>File</th>
-                  <th>Size</th>
-                  <th>Status</th>
+                  <th>{t('blanc.ready.batch.col.file')}</th>
+                  <th>{t('blanc.ready.batch.col.size')}</th>
+                  <th>{t('blanc.ready.batch.col.status')}</th>
                   <th />
                 </tr>
               </thead>
@@ -1740,15 +1789,15 @@ export function BatchConverterPanel() {
                     <td>{item.file.name}</td>
                     <td>{formatBytes(item.file.size)}</td>
                     <td>
-                      {item.state === 'queued' && 'Queued'}
-                      {item.state === 'converting' && 'Converting...'}
-                      {item.state === 'done' && `Done (${formatBytes(item.outputSize)})`}
-                      {item.state === 'failed' && (item.error || 'Failed')}
+                      {item.state === 'queued' && t('blanc.ready.batch.state.queued')}
+                      {item.state === 'converting' && t('blanc.ready.batch.converting')}
+                      {item.state === 'done' && t('blanc.ready.batch.state.done', { size: formatBytes(item.outputSize) })}
+                      {item.state === 'failed' && (item.error || t('blanc.ready.batch.state.failed'))}
                     </td>
                     <td>
                       {item.state === 'done' && (
                         <a className="blanc-file-link" href={item.outputUrl} download={batchOutputName(item.file.name, format)}>
-                          Save
+                          {t('common.save')}
                         </a>
                       )}
                     </td>

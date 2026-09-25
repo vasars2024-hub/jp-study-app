@@ -340,6 +340,7 @@
     "arcade.breakout.title",
     "arcade.pong.title",
     "arcade.snake.title",
+    "blanc.native.counter.kind.counter",
     "blanc.settings.customCss.placeholder",
     "csv.ctx.lower",
     "csv.ctx.title",

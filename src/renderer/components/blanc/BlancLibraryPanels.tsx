@@ -57,6 +57,7 @@ void import('../../theme/studyos-compat.css');
  * the `blanc-tool-detail` chrome replaces the aero `AppChrome`.
  */
 export function BlancNovelsPanel() {
+  const { t } = useT();
   const state = useNovels();
   const {
     query, setQuery, planOnly, setPlanOnly, showSources, setShowSources,
@@ -67,7 +68,7 @@ export function BlancNovelsPanel() {
   return (
     <div className="blanc-tool-detail blanc-novels">
       <fieldset>
-        <legend>Find</legend>
+        <legend>{t('blanc.library.find')}</legend>
         <div className="blanc-command-row">
           <input
             type="text"
@@ -77,39 +78,41 @@ export function BlancNovelsPanel() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') void refreshJiten();
             }}
-            placeholder="Search title, author, genre, or tag"
+            placeholder={t('novelsView.searchPlaceholder')}
           />
           <button type="button" disabled={loadingJiten} onClick={() => void refreshJiten()}>
             <Icon name="refresh" size={12} />
-            {loadingJiten ? 'Searching…' : 'Search Jiten'}
+            {loadingJiten ? t('blanc.library.searching') : t('novelsView.searchJiten')}
           </button>
           <button type="button" disabled={refreshingNovels} onClick={() => void refreshNovels()}>
             <Icon name="library" size={12} />
-            Local
+            {t('novelsView.local')}
           </button>
         </div>
         <div className="blanc-status-row">
-          <span>{candidates.length} titles</span>
-          <span>{jitenDecks.length} from Jiten</span>
+          <span>{t('novelsView.status.titles', { count: candidates.length })}</span>
+          <span>{t('blanc.library.fromJiten', { count: jitenDecks.length })}</span>
           <button type="button" className={planOnly ? 'active' : ''} aria-pressed={planOnly} onClick={() => setPlanOnly((v) => !v)}>
-            Plan {store?.plan.length ? `(${store.plan.length})` : ''}
+            {store?.plan.length
+              ? t('blanc.library.planCount', { count: store.plan.length })
+              : t('novelsView.plan')}
           </button>
           <button type="button" className={showSources ? 'active' : ''} aria-pressed={showSources} onClick={() => setShowSources((v) => !v)}>
             <Icon name="settings" size={12} />
-            Sources
+            {t('novelsView.sources')}
           </button>
         </div>
         {status && <p className="blanc-note">{status}</p>}
       </fieldset>
 
       <div className="jiten-workbench blanc-jiten-workbench">
-        <aside className="jiten-filters" aria-label="Novel filters">
+        <aside className="jiten-filters" aria-label={t('novelsView.aria.filters')}>
           <NovelsFilters state={state} />
         </aside>
-        <main className="jiten-table-wrap" aria-label="Plan to Read titles">
+        <main className="jiten-table-wrap" aria-label={t('novelsView.aria.table')}>
           <NovelsTable state={state} />
         </main>
-        <aside className="jiten-inspector" aria-label="Novel details">
+        <aside className="jiten-inspector" aria-label={t('novelsView.aria.inspector')}>
           <NovelsInspector state={state} />
         </aside>
       </div>
@@ -217,23 +220,25 @@ export function BlancDiscoverPanel() {
   );
 }
 
-const VIZ_STYLES: { id: VizSettings['style']; label: string }[] = [
-  { id: 'spectrum', label: 'Spectrum' },
-  { id: 'wave', label: 'Waveform' },
-  { id: 'particles', label: 'Particles' },
-  { id: 'xp-classic', label: 'XP Classic' },
-  { id: 'vista-aero', label: 'Vista Aero' },
+// Catalog KEYS, resolved with t() at render. The style and colour names are
+// the same strings Settings > Visualizer shows for these options.
+const VIZ_STYLES: { id: VizSettings['style']; labelKey: string }[] = [
+  { id: 'spectrum', labelKey: 'settings.visualizer.style.spectrum' },
+  { id: 'wave', labelKey: 'settings.visualizer.style.wave' },
+  { id: 'particles', labelKey: 'settings.visualizer.style.particles' },
+  { id: 'xp-classic', labelKey: 'settings.visualizer.style.xpClassic' },
+  { id: 'vista-aero', labelKey: 'settings.visualizer.style.vistaAero' },
 ];
 
-const VIZ_FREQ: { id: VizSettings['freqTarget']; label: string }[] = [
-  { id: 'full', label: 'Full spectrum' },
-  { id: 'bass', label: 'Bass only' },
+const VIZ_FREQ: { id: VizSettings['freqTarget']; labelKey: string }[] = [
+  { id: 'full', labelKey: 'blanc.library.viz.fullSpectrum' },
+  { id: 'bass', labelKey: 'settings.visualizer.freq.bass' },
 ];
 
-const VIZ_COLORS: { id: VizSettings['colorTheme']; label: string }[] = [
-  { id: 'accent', label: 'Accent' },
-  { id: 'album', label: 'Album art' },
-  { id: 'custom', label: 'Custom' },
+const VIZ_COLORS: { id: VizSettings['colorTheme']; labelKey: string }[] = [
+  { id: 'accent', labelKey: 'settings.visualizer.color.accent' },
+  { id: 'album', labelKey: 'settings.visualizer.color.album' },
+  { id: 'custom', labelKey: 'settings.visualizer.color.custom' },
 ];
 
 const FFT_SIZES: VizSettings['fftSize'][] = [256, 512, 1024, 2048];
@@ -246,26 +251,27 @@ const FFT_SIZES: VizSettings['fftSize'][] = [256, 512, 1024, 2048];
  * already playing — no second audio graph.
  */
 export function BlancVisualizerPanel() {
+  const { t } = useT();
   const { viz, playing, patchViz } = useVisualizer();
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Preview</legend>
+        <legend>{t('blanc.library.viz.preview')}</legend>
         <VizStage settings={viz} playing={playing} classes={BLANC_VIZ_CLASSES} />
         <div className="blanc-status-row">
-          <span>{playing ? 'Reacting to the current song' : 'Idle — start a song in Music'}</span>
+          <span>{playing ? t('blanc.library.viz.reacting') : t('blanc.library.viz.idle')}</span>
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('toolbox:open-tool', { detail: 'music' }))}
           >
-            Open Music
+            {t('commands.nav.open.music')}
           </button>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Style</legend>
+        <legend>{t('settings.visualizer.label.style')}</legend>
         <div className="blanc-segmented">
           {VIZ_STYLES.map((s) => (
             <button
@@ -274,14 +280,14 @@ export function BlancVisualizerPanel() {
               className={viz.style === s.id ? 'active' : ''}
               onClick={() => patchViz({ style: s.id })}
             >
-              {s.label}
+              {t(s.labelKey)}
             </button>
           ))}
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>React to</legend>
+        <legend>{t('settings.visualizer.label.reactTo')}</legend>
         <div className="blanc-segmented">
           {VIZ_FREQ.map((f) => (
             <button
@@ -290,12 +296,12 @@ export function BlancVisualizerPanel() {
               className={viz.freqTarget === f.id ? 'active' : ''}
               onClick={() => patchViz({ freqTarget: f.id })}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
         <div className="blanc-viz-control">
-          <label htmlFor="blanc-viz-intensity">Sensitivity</label>
+          <label htmlFor="blanc-viz-intensity">{t('settings.visualizer.label.sensitivity')}</label>
           <input
             id="blanc-viz-intensity"
             type="range"
@@ -308,7 +314,7 @@ export function BlancVisualizerPanel() {
           <span>{Math.round(viz.intensity * 100)}%</span>
         </div>
         <div className="blanc-viz-control">
-          <label htmlFor="blanc-viz-fft">Detail</label>
+          <label htmlFor="blanc-viz-fft">{t('settings.visualizer.label.detail')}</label>
           <select
             id="blanc-viz-fft"
             value={viz.fftSize}
@@ -316,7 +322,7 @@ export function BlancVisualizerPanel() {
           >
             {FFT_SIZES.map((n) => (
               <option key={n} value={n}>
-                FFT {n}
+                {t('blanc.library.viz.fft', { size: String(n) })}
               </option>
             ))}
           </select>
@@ -324,7 +330,7 @@ export function BlancVisualizerPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Colors</legend>
+        <legend>{t('settings.visualizer.label.colors')}</legend>
         <div className="blanc-segmented">
           {VIZ_COLORS.map((c) => (
             <button
@@ -333,31 +339,28 @@ export function BlancVisualizerPanel() {
               className={viz.colorTheme === c.id ? 'active' : ''}
               onClick={() => patchViz({ colorTheme: c.id })}
             >
-              {c.label}
+              {t(c.labelKey)}
             </button>
           ))}
         </div>
         {viz.colorTheme === 'custom' && (
           <div className="blanc-viz-control">
-            <label>Gradient</label>
+            <label>{t('blanc.library.viz.gradient')}</label>
             <input
               type="color"
               value={viz.customColors[0]}
               onChange={(e) => patchViz({ customColors: [e.target.value, viz.customColors[1]] })}
-              aria-label="Gradient start colour"
+              aria-label={t('blanc.library.viz.gradientStart')}
             />
             <input
               type="color"
               value={viz.customColors[1]}
               onChange={(e) => patchViz({ customColors: [viz.customColors[0], e.target.value] })}
-              aria-label="Gradient end colour"
+              aria-label={t('blanc.library.viz.gradientEnd')}
             />
           </div>
         )}
-        <p className="blanc-note">
-          These settings are shared with the desktop wallpaper visualizer and the pop-out widget — one
-          configuration, three surfaces.
-        </p>
+        <p className="blanc-note">{t('blanc.library.viz.sharedNote')}</p>
       </fieldset>
     </div>
   );
