@@ -79,6 +79,27 @@ describe('a lookup during the first dictionary import', () => {
   });
 });
 
+describe('a lookup during the first import whose online fallback also failed', () => {
+  // Measured on a fresh packaged profile (round-4 journeys audit): the popup showed
+  // "still being prepared (26%)" and, under it, "the offline dictionary has no entry
+  // for this word" — which is not yet known, and contradicts the line above it.
+  it('says only that the dictionary is being prepared', async () => {
+    stubApi(
+      () =>
+        ({
+          query: '窓',
+          entries: [],
+          preparing: { percent: 26 },
+          error: 'Jisho returned 403',
+          errorCode: 'unavailable',
+        }) as DictResult,
+    );
+    await render(<DictionaryResults query="窓" variant="popup" lang="ja" />);
+    expect(host.textContent).toContain('dict.results.preparingPercent {"percent":26}');
+    expect(host.textContent).not.toContain('dict.lookup.unavailable');
+  });
+});
+
 describe('a failed online fallback', () => {
   it('shows the translated reason, never the raw service error', async () => {
     stubApi(() => ({ query: 'おはよう', entries: [], error: 'Jisho returned 403', errorCode: 'unavailable' }) as DictResult);
