@@ -2044,8 +2044,9 @@ declare global {
         token: string;
         folderPath: string;
         extensionVersion: string;
+        saveFailure?: 'storage-full' | 'service-error';
       }>;
-      extensionRegenerateToken(): Promise<{ running: boolean; port: number; token: string; folderPath: string }>;
+      extensionRegenerateToken(): Promise<{ running: boolean; port: number; token: string; folderPath: string; extensionVersion: string; saveFailure?: 'storage-full' | 'service-error' }>;
       /** Opens the two-minute pairing window; resolves with when it closes. */
       extensionPairNow(): Promise<{ until: number }>;
       extensionRevealFolder(): Promise<string | null>;

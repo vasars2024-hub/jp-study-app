@@ -1786,6 +1786,8 @@ export const zh: Catalog = {
   'settings.extension.stoppedPortInUse':
     '桥接未运行 — 端口 {port} 已被其他程序占用。请关闭该程序后重启应用。',
   'settings.extension.stoppedError': '桥接未运行 — 无法启动：{detail}',
+  'settings.extension.saveFailedDiskFull': '磁盘已满，无法保存配对。之前的令牌仍然有效——请释放空间后重试。',
+  'settings.extension.saveFailed': '无法保存配对。之前的令牌仍然有效——请重试。',
   'settings.extension.token': '配对令牌',
   'settings.extension.copy': '复制令牌',
   'settings.extension.copied': '已复制',

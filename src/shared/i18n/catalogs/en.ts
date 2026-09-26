@@ -1949,6 +1949,8 @@ export const en: Catalog = {
   'settings.extension.stoppedPortInUse':
     'Bridge is not running — port {port} is already in use by another program. Close it and restart the app.',
   'settings.extension.stoppedError': 'Bridge is not running — it could not start: {detail}',
+  'settings.extension.saveFailedDiskFull': 'The disk is full, so the pairing could not be saved. The previous token is still active — free some space and try again.',
+  'settings.extension.saveFailed': 'The pairing could not be saved. The previous token is still active — try again.',
   'settings.extension.token': 'Pairing token',
   'settings.extension.copy': 'Copy token',
   'settings.extension.copied': 'Copied',

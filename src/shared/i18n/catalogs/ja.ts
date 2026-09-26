@@ -1798,6 +1798,8 @@ export const ja: Catalog = {
   'settings.extension.stoppedPortInUse':
     'ブリッジが停止しています — ポート {port} は別のプログラムが使用中です。そちらを終了してからアプリを再起動してください。',
   'settings.extension.stoppedError': 'ブリッジが停止しています — 起動できませんでした: {detail}',
+  'settings.extension.saveFailedDiskFull': 'ディスクの空き容量がないため、ペアリングを保存できませんでした。以前のトークンが引き続き有効です。空き容量を確保してからもう一度お試しください。',
+  'settings.extension.saveFailed': 'ペアリングを保存できませんでした。以前のトークンが引き続き有効です。もう一度お試しください。',
   'settings.extension.token': 'ペアリングトークン',
   'settings.extension.copy': 'トークンをコピー',
   'settings.extension.copied': 'コピーしました',

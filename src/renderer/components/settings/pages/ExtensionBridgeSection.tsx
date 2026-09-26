@@ -15,6 +15,7 @@ export default function ExtensionBridgeSection() {
     extensionVersion: string;
     stoppedReasonKey?: 'portInUse' | 'listenFailed';
     stoppedDetail?: string;
+    saveFailure?: 'storage-full' | 'service-error';
   } | null>(null);
   const [copied, setCopied] = useState(false);
   /** When the "Pair now" window closes; 0 while none is open. */
@@ -88,6 +89,13 @@ export default function ExtensionBridgeSection() {
           ? ` · ${t('settings.extension.version', { version: status.extensionVersion })}`
           : ''}
       </p>
+      {status?.saveFailure && (
+        <p className="muted os-set-hint" role="alert">
+          {t(status.saveFailure === 'storage-full'
+            ? 'settings.extension.saveFailedDiskFull'
+            : 'settings.extension.saveFailed')}
+        </p>
+      )}
       <p className="muted os-set-hint" style={{ marginTop: 10 }}>
         {t('settings.extension.installLead')}
       </p>

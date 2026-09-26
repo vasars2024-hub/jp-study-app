@@ -3271,7 +3271,7 @@ const api = {
   // Chrome extension bridge (Phase 9) — loopback HTTP server status / token.
   extensionStatus: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
     ipcRenderer.invoke('extension:status'),
-  extensionRegenerateToken: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
+  extensionRegenerateToken: (): Promise<{ running: boolean; port: number; token: string; folderPath: string; saveFailure?: 'storage-full' | 'service-error' }> =>
     ipcRenderer.invoke('extension:regenerateToken'),
   /** Open the two-minute window in which the extension's Pull pairs it without the token. */
   extensionPairNow: (): Promise<{ until: number }> => ipcRenderer.invoke('extension:pairNow'),

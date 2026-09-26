@@ -1986,6 +1986,8 @@ export const ru: Catalog = {
   'settings.extension.stoppedPortInUse':
     'Мост не запущен — порт {port} уже занят другой программой. Закройте её и перезапустите приложение.',
   'settings.extension.stoppedError': 'Мост не запущен — не удалось запустить: {detail}',
+  'settings.extension.saveFailedDiskFull': 'Диск заполнен, поэтому сопряжение не удалось сохранить. Прежний токен по-прежнему действует — освободите место и повторите.',
+  'settings.extension.saveFailed': 'Не удалось сохранить сопряжение. Прежний токен по-прежнему действует — повторите попытку.',
   'settings.extension.token': 'Токен привязки',
   'settings.extension.copy': 'Копировать токен',
   'settings.extension.copied': 'Скопировано',
