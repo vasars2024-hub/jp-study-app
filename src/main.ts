@@ -151,6 +151,7 @@ import {
   setGlobalCommandChord,
   stopGlobalCommands,
 } from './main/globalCommands';
+import { hideAllWindows, restoreHiddenWindows } from './main/appVisibility';
 import { registerLiveCaptionsIpc } from './main/liveCaptions';
 import {
   configureSystemAudioCapture,
@@ -1078,9 +1079,7 @@ function registerBlancIpc(): void {
     const mainShowing =
       mainAlive && mainWindow!.isVisible() && !mainWindow!.isMinimized();
     if (mainShowing) {
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed() && win.isVisible()) win.hide();
-      }
+      hideAllWindows(BrowserWindow.getAllWindows());
       return;
     }
     if (!mainAlive) recreateMainWindow();
@@ -1088,6 +1087,8 @@ function registerBlancIpc(): void {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
+    // The captions bar, the desktop companions, a pop-out: back as Hide found them.
+    restoreHiddenWindows(mainWindow);
   }
   function focusApp(): void {
     if (!mainWindow || mainWindow.isDestroyed()) recreateMainWindow();
