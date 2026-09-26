@@ -2328,7 +2328,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               switch (column) {
                 case 'kind':
                   return (
-                    <span key={column} role="gridcell" className="fa-cell fa-cell-kind">
+                    <span key={column} role="gridcell" className="fa-cell fa-cell-kind" title={t(`filesApp.kind.${item.kind}`)}>
                       {t(`filesApp.kind.${item.kind}`)}
                     </span>
                   );
@@ -2338,6 +2338,8 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                       key={column}
                       role="gridcell"
                       className="fa-cell fa-cell-provenance"
+                      // Cut with an ellipsis in a narrow column; the full label is the tooltip.
+                      title={t(`filesApp.provenance.${item.provenance}`)}
                       data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
                     >
                       {t(`filesApp.provenance.${item.provenance}`)}

@@ -17,7 +17,7 @@ import { Pill } from '../result/Pill';
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { sx, sxn, sxs } from '../strings';
-import { sourceKindText, tr } from '../localize';
+import { localizeScraperMessage, sourceKindText, tr } from '../localize';
 import { loadVerifiedSitesDocument } from '../../../verifiedSitesStore';
 import { verifiedSiteForSource, type VerifiedSitesDocument } from '../../../../shared/verifiedSites';
 import {
@@ -283,7 +283,7 @@ export default function SourceManagerPage() {
           <>
             <div className="scr-toolbar">
               <span>{sxn('sources.providerCount', inventory.providers.length)}</span>
-              <span className="scr-muted">{inventory.message}</span>
+              <span className="scr-muted">{localizeScraperMessage(inventory.message)}</span>
             </div>
             <ul className="scr-source-list">
               {inventory.providers.map((provider) => (
