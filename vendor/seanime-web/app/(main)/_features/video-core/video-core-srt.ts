@@ -39,3 +39,28 @@ export function srtToWebVtt(content: string | undefined | null): string | undefi
         .trim()
     return `WEBVTT\n\n${body}\n`
 }
+
+export type ConvertSubsVariables = { url: string, content: string, to: "vtt" | "ass" }
+
+/** The one part of the convert-subs mutation this needs: its promise form. */
+export type ConvertSubsMutation = {
+    mutateAsync: (variables: ConvertSubsVariables) => Promise<string | undefined>
+}
+
+/**
+ * jp-study-app: the `fetchAndConvertTo…` callback both subtitle managers are built with.
+ *
+ * It used to be `new Promise` around `mutate(variables, { onSuccess: resolve, onError: reject })`.
+ * TanStack Query runs the callbacks passed to `mutate` for the LATEST call only: a second
+ * `mutate` on the same observer detaches the first mutation, so the first promise never settled.
+ * Two conversions overlap whenever a sidecar pair opens with its preference already known — the
+ * manager's own default pick (the Japanese track) and the study overlay's second line (the
+ * English one) ask within the same tick — which is every reopen of a file. The stranded load
+ * stayed pending in `MediaCaptionsManager.trackLoads` for the rest of the session, so choosing
+ * that track again never finished: no `trackselected`, and the study line and the transcript
+ * kept the previous track (subtitle audit 7). `mutateAsync` returns each call's own promise.
+ */
+export function subtitleConverter(mutation: ConvertSubsMutation, to: "vtt" | "ass") {
+    return (url?: string, content?: string): Promise<string | undefined> =>
+        mutation.mutateAsync({ url: url ?? "", content: srtToWebVtt(content) ?? "", to })
+}
