@@ -81,6 +81,7 @@ import {
   MusicLyricsPane,
   MusicNowPlaying,
   MusicSearchBox,
+  MusicPlaylistBar,
   MusicSongList,
   MusicYoutubeRow,
   fmt,
@@ -898,8 +899,10 @@ function MusicPanel({ state }: { state: MusicState }) {
               </button>
             </div>
           </div>
+          <MusicPlaylistBar state={state} />
           <MusicSearchBox state={state} />
-          <label className="mc-music-sort">
+          {/* A playlist plays in its own order, so the library sorts step aside while one is shown. */}
+          <label className="mc-music-sort" hidden={!!state.activePlaylist}>
             <span>{t('mediaCenter.music.sort')}</span>
             <select value={state.sortBy} onChange={(event) => state.setSortBy(event.target.value as MusicState['sortBy'])}>
               <option value="recent">{t('mediaCenter.music.sortRecent')}</option>

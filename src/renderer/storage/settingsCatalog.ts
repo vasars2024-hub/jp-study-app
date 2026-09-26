@@ -143,10 +143,11 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
   {
     id: 'music',
     label: 'Music widget & likes',
-    description: 'Liked songs, sort, music widget lyrics toggle, lyrics search prefs.',
+    description: 'Liked songs, playlists, sort, music widget lyrics toggle, lyrics search prefs.',
     category: 'Media',
     lsKeys: [
       'jp-music-liked',
+      'jp-music-playlists',
       'jp-music-sort',
       'jp-music-collapsed',
       'jp-music-player',

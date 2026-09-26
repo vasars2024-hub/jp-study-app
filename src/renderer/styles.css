@@ -13176,6 +13176,81 @@ mark.lookup-mark,
 .music-row.active {
   background: rgba(255, 46, 77, 0.16);
 }
+/* User playlists: the picker row above the list, and a playlist row's move/remove
+   buttons beside its song button (a button may not hold buttons). */
+.music-playlists {
+  display: grid;
+  gap: 6px;
+  padding: 0 9px 8px;
+}
+.music-playlists__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.music-playlists__pick {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+}
+.music-playlists__pick select,
+.music-playlists__row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  font: inherit;
+}
+.music-playlists__note:empty {
+  display: none;
+}
+.music-playlists__note {
+  margin: 0;
+  font-size: 12px;
+}
+.music-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.music-playlist-row {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+.music-playlist-row > .music-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.music-playlist-row__actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.music-playlist-row__actions button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.music-playlist-row__actions button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+.music-playlist-row__actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 .music-row-folder {
   color: rgba(255, 255, 255, 0.72);
   font-size: 12.5px;
