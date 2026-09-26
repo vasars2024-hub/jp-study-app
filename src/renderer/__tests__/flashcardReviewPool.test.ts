@@ -137,7 +137,8 @@ describe('the picker call site', () => {
   // identifiers the ban below looks for, and prose about a defect is not the
   // defect. A raw-text guard that reads its own explanation is a false red.
   const PICKER = SOURCE.slice(
-    SOURCE.indexOf("<select value={reviewBookKey}"),
+    // The picker is the design-system <Select> since the Flashcards redesign.
+    SOURCE.indexOf("<Select value={reviewBookKey}"),
     SOURCE.indexOf("{t('flash.dueOnly')}"),
   ).replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 
