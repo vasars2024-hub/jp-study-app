@@ -292,8 +292,17 @@ export function useYoutubeDiscovery(level: StudyLevel, enabled = true): YoutubeD
     setBusyVideoId(candidate.videoId);
     setNotice('');
     void fetchSubs([managedVideoId])
-      .then(() => readCaptions(candidate.videoId))
+      .then((reply) => {
+        // A fetch main stopped at its deadline is not "no captions": say it
+        // timed out, so a retry is the obvious next step.
+        if (reply.results.some((result) => result.code === 'timeout')) {
+          setNotice('paceTimedOut');
+          return null;
+        }
+        return readCaptions(candidate.videoId);
+      })
       .then((cached) => {
+        if (!cached) return;
         const charsPerMinute = cached.text ? estimateSpeechRate(parseSubtitles(cached.text), 'ja') : undefined;
         if (typeof charsPerMinute !== 'number') {
           setNotice('paceUnavailable');

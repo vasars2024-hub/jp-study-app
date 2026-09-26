@@ -9265,6 +9265,7 @@ export const ja: Catalog = {
   'ytDiscovery.notice.handoffOk': 'プレイリスト管理に追加しました。ダウンロードは行っていません。',
   'ytDiscovery.notice.handoffFailed': 'この動画をプレイリスト管理に追加できませんでした。',
   'ytDiscovery.notice.paceUnavailable': '字幕ファイルを取得できなかったため、速さを計測できませんでした。',
+  'ytDiscovery.notice.paceTimedOut': '字幕の取得に時間がかかりすぎたため停止しました。もう一度お試しください。',
   'ytDiscovery.notice.probeFailed': '字幕を確認できませんでした。少し待ってからもう一度お試しください。',
   'ytDiscovery.notice.probeFailedDetail': '字幕を確認できませんでした: {detail}',
   'scraper.search.placeholder': 'タイトルでアニメを検索',

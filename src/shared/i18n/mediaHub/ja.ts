@@ -67,6 +67,8 @@ export const MEDIA_HUB_JA: Catalog = {
   'ytManager.error.playlistNotFound': 'その再生リストはリストにありません。',
   'ytManager.error.channelNotFound': 'そのチャンネルはリストにありません。',
   'ytManager.error.noYtDlp': 'yt-dlp が見つかりません。インストールして（例：pip install -U yt-dlp）アプリを開き直してください。',
+  'ytManager.error.subsTimeout': '字幕の取得に時間がかかりすぎたため停止しました。接続を確認してもう一度お試しください。',
+  'ytManager.error.subsCancelled': '字幕の取得をキャンセルしました。',
   'ytManager.error.notVideo': 'YouTube の動画リンクではありません。',
   'discover.library.planEmpty': '視聴予定はまだありません。「ブラウズ」から追加した作品は視聴予定としてライブラリに入ります。',
 };

@@ -67,6 +67,8 @@ export const MEDIA_HUB_EN: Catalog = {
   'ytManager.error.playlistNotFound': 'That playlist is no longer in the list.',
   'ytManager.error.channelNotFound': 'That channel is no longer in the list.',
   'ytManager.error.noYtDlp': 'yt-dlp was not found. Install it (for example pip install -U yt-dlp) and reopen the app.',
+  'ytManager.error.subsTimeout': 'Fetching the captions took too long and was stopped. Check the connection and try again.',
+  'ytManager.error.subsCancelled': 'Caption fetch cancelled.',
   'ytManager.error.notVideo': 'That is not a YouTube video link.',
   'discover.library.planEmpty': 'Nothing planned yet. Titles you add from Browse land in your library as Plan to watch.',
 };

@@ -67,6 +67,8 @@ export const MEDIA_HUB_RU: Catalog = {
   'ytManager.error.playlistNotFound': 'Этого плейлиста больше нет в списке.',
   'ytManager.error.channelNotFound': 'Этого канала больше нет в списке.',
   'ytManager.error.noYtDlp': 'yt-dlp не найден. Установите его (например, pip install -U yt-dlp) и перезапустите приложение.',
+  'ytManager.error.subsTimeout': 'Загрузка субтитров заняла слишком много времени и была остановлена. Проверьте подключение и повторите.',
+  'ytManager.error.subsCancelled': 'Загрузка субтитров отменена.',
   'ytManager.error.notVideo': 'Это не ссылка на видео YouTube.',
   'discover.library.planEmpty': 'Пока ничего не запланировано. Добавленное из «Обзора» попадает в библиотеку как «Буду смотреть».',
 };

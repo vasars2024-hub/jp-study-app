@@ -9853,6 +9853,7 @@ export const en: Catalog = {
   'ytDiscovery.notice.handoffOk': 'Added to the playlist manager. Nothing has been downloaded.',
   'ytDiscovery.notice.handoffFailed': 'Could not add this video to the playlist manager.',
   'ytDiscovery.notice.paceUnavailable': 'No caption file came back, so pace could not be measured.',
+  'ytDiscovery.notice.paceTimedOut': 'Fetching captions took too long and was stopped. Try again.',
   'ytDiscovery.notice.probeFailed': 'Checking the captions did not work. Try again in a moment.',
   'ytDiscovery.notice.probeFailedDetail': 'Checking the captions did not work: {detail}',
   'scraper.search.placeholder': 'Search anime by title',

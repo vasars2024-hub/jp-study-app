@@ -9216,6 +9216,7 @@ export const zh: Catalog = {
   'ytDiscovery.notice.handoffOk': '已加入播放列表管理。没有下载任何内容。',
   'ytDiscovery.notice.handoffFailed': '无法把该视频加入播放列表管理。',
   'ytDiscovery.notice.paceUnavailable': '没有取回字幕文件，无法测量语速。',
+  'ytDiscovery.notice.paceTimedOut': '获取字幕耗时过长，已停止。请重试。',
   'ytDiscovery.notice.probeFailed': '无法检查字幕。请稍后再试。',
   'ytDiscovery.notice.probeFailedDetail': '无法检查字幕：{detail}',
   'scraper.search.placeholder': '按标题搜索动画',

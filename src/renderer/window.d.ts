@@ -1397,8 +1397,9 @@ declare global {
       onYtQueueChanged?(cb: (entries: import('../main/ytDownloadQueue').YtQueueEntry[]) => void): () => void;
       ytFetchSubsOnly(videoIds: string[]): Promise<{
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
-        results: Array<{ videoId: string; ok: boolean; error?: string }>;
+        results: Array<{ videoId: string; ok: boolean; error?: string; code?: 'timeout' | 'cancelled' }>;
       }>;
+      ytCancelFetchSubs?(): Promise<void>;
       ytMarkTranscribed(
         youtubeId: string,
         cuesJson: string,

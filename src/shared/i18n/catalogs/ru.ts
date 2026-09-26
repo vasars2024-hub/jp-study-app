@@ -10141,6 +10141,7 @@ export const ru: Catalog = {
   'ytDiscovery.notice.handoffOk': 'Добавлено в менеджер плейлистов. Ничего не скачано.',
   'ytDiscovery.notice.handoffFailed': 'Не удалось добавить это видео в менеджер плейлистов.',
   'ytDiscovery.notice.paceUnavailable': 'Файл субтитров не пришёл, поэтому темп измерить не удалось.',
+  'ytDiscovery.notice.paceTimedOut': 'Загрузка субтитров заняла слишком много времени и была остановлена. Попробуйте ещё раз.',
   'ytDiscovery.notice.probeFailed':
     'Не удалось проверить субтитры. Попробуйте ещё раз чуть позже.',
   'ytDiscovery.notice.probeFailedDetail': 'Не удалось проверить субтитры: {detail}',

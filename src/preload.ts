@@ -2251,8 +2251,10 @@ const api = {
     videoIds: string[],
   ): Promise<{
     store: YtPlaylistsStore;
-    results: Array<{ videoId: string; ok: boolean; error?: string }>;
+    results: Array<{ videoId: string; ok: boolean; error?: string; code?: 'timeout' | 'cancelled' }>;
   }> => ipcRenderer.invoke('yt:fetchSubsOnly', videoIds),
+  /** Stops caption fetches in flight; their yt-dlp process trees are killed. */
+  ytCancelFetchSubs: (): Promise<void> => ipcRenderer.invoke('yt:cancelFetchSubs'),
   ytMarkTranscribed: (
     youtubeId: string,
     cuesJson: string,
