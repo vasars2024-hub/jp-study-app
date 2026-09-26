@@ -3859,6 +3859,7 @@ export const ja: Catalog = {
   'lens.reader.mineDup': 'Anki に登録済み',
   'lens.reader.mineSaved': 'デッキに保存済み',
   'lens.reader.mineQueued': '保存済み — 後で Anki へ',
+  'lens.reader.mineWaiting': 'Gum の起動後に追加',
   'lens.reader.mineRetry': '再試行',
   'lens.reader.preview': 'カードプレビュー…',
 

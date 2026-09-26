@@ -183,3 +183,43 @@ describe('the card preview window', () => {
     expect(await h.handlers.get('companion:openPreview')!({}, { word: '' })).toBe(false);
   });
 });
+
+describe('mine the last lookup', () => {
+  it('mines the word last opened in the Lens word panel, with its line and source window', async () => {
+    const m = await load();
+    h.main = new h.FakeWindow();
+    await h.handlers.get('companion:ready')!({ sender: h.main.webContents });
+    await h.handlers.get('companion:noteLookup')!({}, {
+      text: ' книга ',
+      sentence: 'Я читаю книгу.',
+      sourceTitle: 'Reader — chapter 1',
+      sourceApp: 'SumatraPDF',
+      extra: 'ignored',
+    });
+    m.startCompanion();
+    expect((await import('../globalCommands')).runGlobalCommand('companion.mineLast')).toBe(true);
+    await vi.waitFor(() => expect(minesSentTo(h.main!)).toHaveLength(1));
+    const request = (minesSentTo(h.main!)[0]! as unknown as { request: { draft: Record<string, unknown>; attachImage: boolean } }).request;
+    expect(request.draft).toMatchObject({
+      word: 'книга',
+      sentence: 'Я читаю книгу.',
+      sourceTitle: 'Reader — chapter 1',
+      sourceApp: 'SumatraPDF',
+      origin: 'last',
+    });
+    expect(request.attachImage).toBe(false);
+  });
+
+  it('ignores an empty lookup instead of replacing the last real one', async () => {
+    const m = await load();
+    m.startCompanion();
+    h.main = new h.FakeWindow();
+    await h.handlers.get('companion:ready')!({ sender: h.main.webContents });
+    await h.handlers.get('companion:noteLookup')!({}, { text: '猫' });
+    await h.handlers.get('companion:noteLookup')!({}, { text: '   ' });
+    await h.handlers.get('companion:noteLookup')!({}, null);
+    (await import('../globalCommands')).runGlobalCommand('companion.mineLast');
+    await vi.waitFor(() => expect(minesSentTo(h.main!)).toHaveLength(1));
+    expect(minesSentTo(h.main!)[0]!.request.draft.word).toBe('猫');
+  });
+});

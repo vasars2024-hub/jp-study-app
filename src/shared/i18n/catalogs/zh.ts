@@ -3842,6 +3842,7 @@ export const zh: Catalog = {
   'lens.reader.mineDup': '已在 Anki 中',
   'lens.reader.mineSaved': '已存入卡组',
   'lens.reader.mineQueued': '已保存 — 稍后加入 Anki',
+  'lens.reader.mineWaiting': 'Gum 启动后添加',
   'lens.reader.mineRetry': '重试采集',
   'lens.reader.preview': '卡片预览…',
 

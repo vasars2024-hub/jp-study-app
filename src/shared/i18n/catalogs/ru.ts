@@ -4141,6 +4141,7 @@ export const ru: Catalog = {
   'lens.reader.mineDup': 'Уже в Anki',
   'lens.reader.mineSaved': 'В колоде',
   'lens.reader.mineQueued': 'Сохранено — в Anki позже',
+  'lens.reader.mineWaiting': 'Добавится после запуска Gum',
   'lens.reader.mineRetry': 'Повторить',
   'lens.reader.preview': 'Предпросмотр карточки…',
 

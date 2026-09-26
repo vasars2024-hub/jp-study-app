@@ -492,6 +492,23 @@ export function registerCompanionIpc(): void {
     return forwardCompanionMine({ draft, attachImage: r.attachImage !== false });
   });
   ipcMain.handle('companion:getNotice', (): CompanionNotice | null => notice);
+  // A word looked up in another companion surface (the Lens word panel), so
+  // "Mine the last lookup" means the last thing looked up anywhere.
+  ipcMain.handle('companion:noteLookup', (_e, raw: unknown): void => {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const text = typeof r.text === 'string' ? r.text : '';
+    const pick = (v: unknown, max: number): string | undefined =>
+      typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined;
+    const sentence = pick(r.sentence, 2000);
+    const sourceTitle = pick(r.sourceTitle, 300);
+    const sourceApp = pick(r.sourceApp, 120);
+    noteCompanionLookup({
+      text,
+      ...(sentence ? { sentence } : {}),
+      ...(sourceTitle ? { sourceTitle } : {}),
+      ...(sourceApp ? { sourceApp } : {}),
+    });
+  });
   // The main window's side of the forward.
   ipcMain.handle('companion:ready', (e): void => onMainReady(e.sender.id));
   ipcMain.handle('companion:mineResult', (_e, id: unknown, outcome: unknown): void => {

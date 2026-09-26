@@ -3772,6 +3772,7 @@ export const en: Catalog = {
   'lens.reader.mineDup': 'Already in Anki',
   'lens.reader.mineSaved': 'Saved to deck',
   'lens.reader.mineQueued': 'Saved — Anki later',
+  'lens.reader.mineWaiting': 'Added when Gum is up',
   'lens.reader.mineRetry': 'Retry mine',
   'lens.reader.preview': 'Card preview…',
 

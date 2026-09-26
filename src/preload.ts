@@ -3200,6 +3200,9 @@ const api = {
   companionOpenPreview: (draft: Partial<import('./shared/companion').CompanionDraft>): Promise<boolean> =>
     ipcRenderer.invoke('companion:openPreview', draft),
   companionPreviewClose: (): Promise<void> => ipcRenderer.invoke('companion:previewClose'),
+  /** Remember a lookup made in an overlay (the Lens word panel) for "Mine the last lookup". */
+  companionNoteLookup: (entry: { text: string; sentence?: string; sourceTitle?: string; sourceApp?: string }): Promise<void> =>
+    ipcRenderer.invoke('companion:noteLookup', entry),
   companionMine: (request: import('./shared/companion').CompanionMineRequest): Promise<import('./shared/companion').CompanionMineOutcome> =>
     ipcRenderer.invoke('companion:mine', request),
   companionGetNotice: (): Promise<{ messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null> =>

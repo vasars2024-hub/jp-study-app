@@ -2000,6 +2000,7 @@ declare global {
       onCompanionPreview(cb: (draft: import('../shared/companion').CompanionDraft | null) => void): () => void;
       companionOpenPreview(draft: Partial<import('../shared/companion').CompanionDraft>): Promise<boolean>;
       companionPreviewClose(): Promise<void>;
+      companionNoteLookup(entry: { text: string; sentence?: string; sourceTitle?: string; sourceApp?: string }): Promise<void>;
       companionMine(request: import('../shared/companion').CompanionMineRequest): Promise<import('../shared/companion').CompanionMineOutcome>;
       companionGetNotice(): Promise<{
         messageKey: string;
