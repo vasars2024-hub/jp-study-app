@@ -84,6 +84,8 @@ export interface StudyBottomBarProps {
    * Optional so an existing caller keeps its behaviour; only the video overlay knows this.
    */
   subtitleLoading?: boolean;
+  /** Save the current delay as the default for every episode of this series. */
+  onApplyDelayToSeries?: () => void;
   /** Load a subtitle file from disk as the study track, from inside the player. */
   onImportSubtitleFile?: (file: File) => void;
   onPrevCue: () => void;
@@ -460,6 +462,15 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onClick={props.onResetSubtitleDelay}
               >
                 {t('mediaWorkspace.study.resetSubtitleDelay')}
+              </button>
+            )}
+            {props.onApplyDelayToSeries && (
+              <button
+                type="button"
+                data-study-action="apply-delay-to-series"
+                onClick={props.onApplyDelayToSeries}
+              >
+                {t('mediaWorkspace.study.applyDelayToSeries')}
               </button>
             )}
             <span className="study-tool-note">{t('mediaWorkspace.study.subtitleDelayPerFile')}</span>

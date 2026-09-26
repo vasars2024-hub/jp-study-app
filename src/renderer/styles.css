@@ -25845,6 +25845,25 @@ html.lockscreen-widget-root #root {
 .study-cue-level { display: inline-block; margin-right: 8px; padding: 0 6px; border-radius: 6px; font-size: 0.45em; font-weight: 700; vertical-align: middle; letter-spacing: 0.02em; color: #fff; background: rgba(0, 0, 0, 0.45); user-select: none; pointer-events: none; }
 .study-subtitle-import { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
 .study-subtitle-import input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* Settings › Media providers: the real metadata sources and whether they answer. */
+.media-provider-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.media-provider-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.media-provider-row:last-child { border-bottom: 0; }
+.media-provider-name { display: flex; flex-direction: column; gap: 2px; }
+.media-provider-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.media-provider-state.is-ok { color: var(--success, #3a9a5b); }
+.media-provider-state.is-down { color: var(--danger, #c0392b); }
+.media-provider-state.is-needs-key, .media-provider-state.is-checking { color: var(--muted); }
+/* Subtitle tracks: grade, stars, preferred group. */
+.subtitle-grade { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #fff; background: var(--muted); }
+.subtitle-grade--A { background: #2f8f55; } .subtitle-grade--B { background: #5c8f2f; } .subtitle-grade--C { background: #b08421; } .subtitle-grade--D { background: #b0412f; }
+.subtitle-quality { display: inline-flex; align-items: center; gap: 8px; }
+.subtitle-stars { display: inline-flex; }
+.subtitle-stars button { border: 0; background: none; padding: 0 1px; font-size: 13px; line-height: 1; cursor: pointer; color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.subtitle-stars button.is-on { color: var(--accent); }
+.subtitle-prefer { border: 0; background: none; padding: 2px 6px; border-radius: 6px; font-size: 11px; color: var(--accent); cursor: pointer; }
+.subtitle-prefer:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.subtitle-prefer:disabled { color: var(--muted); cursor: default; }
 /* Grammar review (spaced review of due points). One card, no nested panels. */
 .gx-review { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px; max-width: 760px; outline: none; }
 .gx-review-summary { font-size: 12px; }

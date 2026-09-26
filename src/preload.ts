@@ -1655,6 +1655,14 @@ const api = {
   // Media player + media library
   listMedia: (): Promise<MediaItem[]> => ipcRenderer.invoke('media:list'),
   scanMediaStorage: (paths: string[]): Promise<{ totalBytes: number; files: Array<{ path: string; size: number; modifiedAt: number }> }> => ipcRenderer.invoke('media:scanStorage', paths),
+  /** Whether each metadata source (Jikan, AniList, TVmaze, TMDB) answers right now. */
+  /** Dramas and films by title (TVmaze; TMDB with a key), for unified search. */
+  searchTvFilm: (query: string): Promise<Array<{ provider: 'tvmaze' | 'tmdb'; id: string; title: string; nativeTitle?: string; year?: number; posterUrl?: string; kind: 'tv' | 'movie'; genres: string[]; rating?: number; network?: string; country?: string }>> => ipcRenderer.invoke('search:tvFilm', query),
+  /** Whether subtitles exist for a title, per language (OpenSubtitles; null without a key). */
+  searchSubtitleAvailability: (query: string, languages: string[]): Promise<Array<{ language: string; releases: number; sample: string[] }> | null> =>
+    ipcRenderer.invoke('search:subtitleAvailability', query, languages),
+  mediaProviderStatus: (): Promise<Array<{ id: 'jikan' | 'anilist' | 'tvmaze' | 'tmdb'; state: 'ok' | 'down' | 'needs-key'; latencyMs?: number }>> =>
+    ipcRenderer.invoke('media:providerStatus'),
   updateMediaMetadata: (id: string, metadata: Partial<Pick<MediaItem, 'title' | 'artist' | 'genres' | 'actors' | 'year' | 'lang' | 'category' | 'jlptLevel' | 'vocabularyCount' | 'kanjiCount' | 'metadataSource'>>): Promise<MediaItem | null> => ipcRenderer.invoke('media:updateMetadata', id, metadata),
   previewMediaOrganization: (id: string, root: string): Promise<import('./shared/mediaHub').MediaOrganizationPreview | null> => ipcRenderer.invoke('media:organizationPreview', id, root),
   organizeMedia: (preview: import('./shared/mediaHub').MediaOrganizationPreview, choice?: import('./shared/mediaHub').MediaDuplicateChoice): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('media:organize', preview, choice),
@@ -1920,6 +1928,14 @@ const api = {
    * surface, none of which had one — a wrong track could only be got rid of by
    * removing the media item. Deletes the cached file, never a sidecar in place.
    */
+  /** OpenSubtitles releases for an item, for manual choice (dramas and films). */
+  listOpenSubtitles: (mediaId: string, languages?: string[]): Promise<import('./shared/subtitleDiscoveryIpc').OpenSubtitlesListResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:listOpenSubtitles', mediaId, languages),
+  acceptOpenSubtitles: (mediaId: string, candidateId: string): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:acceptOpenSubtitles', mediaId, candidateId),
+  /** Rate one subtitle track 1–5 (0 clears); the rating outranks the computed grade. */
+  rateSubtitleRecord: (mediaId: string, recordId: string, rating: number): Promise<boolean> =>
+    ipcRenderer.invoke('subtitleDiscovery:rateRecord', mediaId, recordId, rating),
   detachSubtitleRecord: (
     mediaId: string,
     recordId: string,

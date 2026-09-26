@@ -86,7 +86,7 @@ import {
   type ProviderWork,
 } from './mediaProviderClients';
 import { findTvmazeShow, tvmazeSearch, tvmazeShowById } from './providers/tvmaze';
-import { findTmdbMovie, findTmdbTv, tmdbAvailable, tmdbMovieById, tmdbSearchMovie } from './providers/tmdb';
+import { findTmdbMovie, findTmdbTv, tmdbAvailable, tmdbMovieById, tmdbSearchMovie, tmdbTvById } from './providers/tmdb';
 import { findLocalArtwork } from './mediaArtwork';
 import {
   cancelWatchLibraryMetadata,
@@ -485,6 +485,10 @@ function mergeWork(
   fill('relatedWorks');
   fill('relatedTitles');
   fill('country');
+  fill('cast');
+  fill('director');
+  fill('ageRating');
+  fill('schedule');
   fill('bannerUrl');
   if (merged.tmdbId === undefined && supplement.tmdbId !== undefined) {
     merged.tmdbId = supplement.tmdbId;
@@ -594,7 +598,13 @@ async function enrich(
       { title: group.title, year: work.year ?? group.year, format: 'tv' },
       [work.displayTitle, ...work.titles.slice(0, 2)],
     );
-    if (tv.match && accepted(tv.match)) work = mergeWork(work, tv.match.candidate, { backdrop: true });
+    if (tv.match && accepted(tv.match)) {
+      work = mergeWork(work, tv.match.candidate, { backdrop: true });
+      // The search row has no credits or ratings; the details call does (cast,
+      // creator, content rating), and it is one request for a confident match.
+      const details = await tmdbTvById(tv.match.candidate.id);
+      if (details) work = mergeWork(work, details);
+    }
   }
 
   // Episode titles are MyAnimeList-only and one extra request, so they are
@@ -668,6 +678,7 @@ const MATCH_OWNED: ReadonlyArray<keyof MediaItem> = [
   'nativeTitle', 'synopsis', 'status', 'episodeCount', 'genres', 'studio', 'rating', 'rank',
   'relatedTitles', 'relatedWorks', 'malId', 'anilistId', 'tvmazeId', 'tmdbId', 'tmdbType', 'imdbId',
   'runtimeMin', 'network', 'episodeTitles', 'episodeGuide', 'posterPath', 'bannerPath', 'backdropPath',
+  'cast', 'director', 'ageRating', 'country', 'schedule',
 ];
 const FILE_OWNED: ReadonlyArray<keyof MediaItem> = ['stillPath', 'episodeTitles', 'airedAt'];
 
@@ -727,6 +738,11 @@ async function buildPatch(
     imdbId: work.imdbId,
     runtimeMin: work.runtimeMin,
     network: work.network,
+    cast: work.cast?.length ? work.cast : undefined,
+    director: work.director,
+    ageRating: work.ageRating,
+    country: work.country,
+    schedule: work.schedule,
     metadataSource: work.provider,
     metadataUpdatedAt: Date.now(),
     metadataConfidence: confidence,

@@ -21,10 +21,12 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { createEmptySubtitleQualityRatings } from '../shared/subtitleQuality';
+import { normalizeTrackRating, syncGradeFromEstimate } from '../shared/subtitleTrackGrade';
 import { matchSubtitleTracks, mismatchedAutoSubtitleIds } from '../shared/subtitleMatching';
 import {
   normalizeSubtitleIdentityId,
   type SubtitleProvidersDocument,
+  type SubtitleStyle,
   type SubtitleTrack,
 } from '../shared/subtitleProviders';
 import {
@@ -46,6 +48,8 @@ import {
   type SubtitleDiscoveryResult,
   type SubtitleDiscoverySettings,
   type SubtitleProviderCredentialState,
+  type OpenSubtitlesCandidateView,
+  type OpenSubtitlesListResult,
 } from '../shared/subtitleDiscoveryIpc';
 import { QBIT_CANCELLED_REASON } from './scraper/qbittorrent';
 import {
@@ -373,7 +377,7 @@ function toProvidersDocument(
       // asked. The candidates were already filtered to this base language.
       language: language ?? candidate.language,
       format: candidate.format === 'lrc' ? 'srt' : candidate.format,
-      style: 'full',
+      style: styleOfRelease(candidate.releaseName),
       title: candidate.releaseName,
       season: candidate.season,
       episode: candidate.episode,
@@ -391,6 +395,30 @@ function toProvidersDocument(
 interface ScoredCandidate {
   candidate: ProviderSubtitleCandidate;
   score: number;
+  /** The score plus preference bonuses, uncapped; what the list is sorted by. */
+  rank?: number;
+}
+
+/** A release's track kind from its name: "Signs & Songs" and "Forced" tracks say so. */
+export function styleOfRelease(name: string | null | undefined): SubtitleStyle {
+  const text = String(name ?? '');
+  if (/signs?\s*(?:&|and|\+|\/)?\s*songs?|\bS&S\b/i.test(text)) return 'signs-songs';
+  if (/\bforced\b/i.test(text)) return 'forced';
+  return 'full';
+}
+
+/** The user's subtitle preferences that decide between otherwise acceptable tracks. */
+export interface SubtitleRankingPreferences {
+  style?: SubtitleStyle;
+  allowHearingImpaired?: boolean;
+  preferredGroups?: readonly string[];
+}
+
+/** Points a preferred group adds, most-preferred first; enough to break a tie, not to rescue a bad match. */
+export function preferredGroupBonus(group: string | null | undefined, preferred: readonly string[] = []): number {
+  if (!group) return 0;
+  const index = preferred.findIndex((p) => p.toLowerCase() === group.trim().toLowerCase());
+  return index < 0 ? 0 : Math.max(4, 12 - index * 2);
 }
 
 /**
@@ -400,13 +428,18 @@ interface ScoredCandidate {
  * OpenSubtitles matched the exact bytes of this file, which is stronger evidence
  * than any name comparison could be.
  */
-function scoreCandidates(
+export function scoreCandidates(
   candidates: readonly ProviderSubtitleCandidate[],
   item: MediaItem,
   language: string,
   minConfidence: number,
+  prefs: SubtitleRankingPreferences = {},
 ): ScoredCandidate[] {
-  const forLanguage = candidates.filter((candidate) => subtitleLangMatches(candidate.language, language));
+  const inLanguage = candidates.filter((candidate) => subtitleLangMatches(candidate.language, language));
+  // Hearing-impaired tracks are dropped only when the user said so; they are otherwise fine.
+  const forLanguage = prefs.allowHearingImpaired === false
+    ? inLanguage.filter((candidate) => !candidate.hearingImpaired)
+    : inLanguage;
   if (forLanguage.length === 0) return [];
 
   const identityId = normalizeSubtitleIdentityId(item.seriesKey ?? item.id);
@@ -418,6 +451,7 @@ function scoreCandidates(
     episode: item.episode ?? null,
     durationSeconds: item.durationSec ?? null,
     language,
+    ...(prefs.style ? { style: prefs.style } : {}),
   });
 
   // Keyed on the slug, because that is the id the matcher reports back.
@@ -446,16 +480,18 @@ function scoreCandidates(
     const candidate = byId.get(match.trackId);
     if (!candidate) continue;
     if (targetIsUnnumbered && typeof candidate.episode === 'number') continue;
-    const score = candidate.hashMatch ? Math.max(match.score, minConfidence) : match.score;
-    if (score < minConfidence) continue;
-    accepted.push({ candidate, score });
+    const matched = candidate.hashMatch ? Math.max(match.score, minConfidence) : match.score;
+    if (matched < minConfidence) continue;
+    // The preferred group decides between acceptable tracks; it never lifts a rejected one.
+    const rank = matched + preferredGroupBonus(candidate.releaseGroup, prefs.preferredGroups);
+    accepted.push({ candidate, score: Math.min(100, matched), rank });
   }
   // A hash match that the matcher rejected outright is still not attached — a
   // rejection means a discriminating signal (wrong episode) disagreed, and a
   // correctly-timed subtitle for the wrong episode is still the wrong subtitle.
   return accepted.sort((a, b) => {
     if (a.candidate.hashMatch !== b.candidate.hashMatch) return a.candidate.hashMatch ? -1 : 1;
-    return b.score - a.score || (b.candidate.downloads ?? 0) - (a.candidate.downloads ?? 0);
+    return (b.rank ?? b.score) - (a.rank ?? a.score) || (b.candidate.downloads ?? 0) - (a.candidate.downloads ?? 0);
   });
 }
 
@@ -577,7 +613,7 @@ async function alignToAudio(
   item: MediaItem,
   text: string,
   format: SubtitleRecordFormat,
-): Promise<{ text: string; offsetSec: number } | null> {
+): Promise<{ text: string; offsetSec: number; grade: 'A' | 'B' | 'C' } | null> {
   if (!item.path || !fs.existsSync(item.path)) return null;
   const cues = parseSubtitles(text);
   // Too few cues and the estimator's own gates decline anyway; skip the ffmpeg work.
@@ -590,7 +626,7 @@ async function alignToAudio(
     );
     if (!worthShifting(estimate)) return null;
     const offsetSec = Math.round(estimate.offsetSec * 1000) / 1000;
-    return { text: shiftSubtitleText(text, format, offsetSec), offsetSec };
+    return { text: shiftSubtitleText(text, format, offsetSec), offsetSec, grade: syncGradeFromEstimate(estimate) };
   } catch {
     return null;
   }
@@ -907,7 +943,11 @@ async function discoverForItem(
     for (const lang of wanted) {
       const scored = scoredByLanguage
         ? (scoredByLanguage.get(lang) ?? [])
-        : scoreCandidates(candidates, item, lang, settings.minConfidence);
+        : scoreCandidates(candidates, item, lang, settings.minConfidence, {
+          style: settings.style,
+          allowHearingImpaired: settings.allowHearingImpaired,
+          preferredGroups: settings.preferredGroups,
+        });
       const best = scored.find((entry) => !known.has(entry.candidate.providerItemId));
       if (!best) {
         // `no-match` is a claim about the catalogue. When the episode is past
@@ -977,7 +1017,9 @@ async function discoverForItem(
         label: best.candidate.releaseName,
         confidence: Math.round(best.score * 10) / 10,
         hearingImpaired: best.candidate.hearingImpaired,
-        ...(aligned ? { syncOffsetSec: aligned.offsetSec } : {}),
+        ...(aligned ? { syncOffsetSec: aligned.offsetSec, syncGrade: aligned.grade } : {}),
+        ...(best.candidate.hashMatch ? { hashMatch: true } : {}),
+        ...(best.candidate.releaseGroup ? { releaseGroup: best.candidate.releaseGroup } : {}),
         addedAt: Date.now(),
       });
     }
@@ -1315,6 +1357,7 @@ async function listNyaaCandidates(
         sizeBytes: candidate.sizeBytes,
         seeders: candidate.seeders,
         languages: candidate.language ? [candidate.language] : [],
+        ...(candidate.releaseGroup ? { releaseGroup: candidate.releaseGroup } : {}),
         score: candidate.score,
         reasons: candidate.reasons,
       })),
@@ -1424,6 +1467,91 @@ async function acceptNyaaCandidate(
     subtitlesCheckedAt: Date.now(),
   });
   emit('done', { done: 1, languages: [language] });
+  return { ok: true, message: '', lang: language };
+}
+
+// ---------------------------------------------------------------------------
+// OpenSubtitles, by hand
+// ---------------------------------------------------------------------------
+
+const openSubtitlesOffered = new Map<string, ProviderSubtitleCandidate>();
+
+/**
+ * Every OpenSubtitles release for an item, best first, for the learner to pick
+ * from — a drama or film the automatic pass left without a track. The same
+ * tiered search the sweep uses (hash, ids, title), with no confidence floor:
+ * the person choosing is the judge here.
+ */
+export async function listOpenSubtitlesCandidates(mediaId: unknown, languages?: unknown): Promise<OpenSubtitlesListResult> {
+  const item = typeof mediaId === 'string' ? host?.listItems().find((entry) => entry.id === mediaId) : undefined;
+  if (!item) return { ok: false, candidates: [], message: 'That media item is no longer in the library.' };
+  const settings = loadDiscoverySettings();
+  const wanted = Array.isArray(languages) && languages.length
+    ? languages.filter((lang): lang is string => typeof lang === 'string')
+    : settings.autoDownloadLanguages;
+  try {
+    const reply = await searchOpenSubtitlesForItem(item, wanted, await fileHash(item.path), createOpenSubtitlesBatch(), 0);
+    const candidates: OpenSubtitlesCandidateView[] = [];
+    for (const [lang, scored] of reply.byLanguage) {
+      for (const entry of scored.slice(0, 15)) {
+        openSubtitlesOffered.set(entry.candidate.providerItemId, entry.candidate);
+        candidates.push({
+          id: entry.candidate.providerItemId,
+          releaseName: entry.candidate.releaseName,
+          ...(entry.candidate.releaseGroup ? { releaseGroup: entry.candidate.releaseGroup } : {}),
+          language: lang,
+          score: Math.round(entry.score + preferredGroupBonus(entry.candidate.releaseGroup, settings.preferredGroups)),
+          hashMatch: entry.candidate.hashMatch === true,
+          hearingImpaired: entry.candidate.hearingImpaired === true,
+          downloads: entry.candidate.downloads ?? 0,
+        });
+      }
+    }
+    candidates.sort((a, b) => Number(b.hashMatch) - Number(a.hashMatch) || b.score - a.score || b.downloads - a.downloads);
+    return {
+      ok: true,
+      candidates,
+      message: candidates.length ? '' : reply.down ? 'OpenSubtitles did not answer. Try again later.' : 'OpenSubtitles has no subtitles for this title in these languages.',
+    };
+  } catch (error) {
+    return { ok: false, candidates: [], message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Download a listed OpenSubtitles release, align it to the audio, and attach it. */
+export async function acceptOpenSubtitlesCandidate(mediaId: unknown, candidateId: unknown): Promise<NyaaSubtitleAcceptResult> {
+  const item = typeof mediaId === 'string' ? host?.listItems().find((entry) => entry.id === mediaId) : undefined;
+  if (!item) return { ok: false, message: 'That media item is no longer in the library.' };
+  const candidate = typeof candidateId === 'string' ? openSubtitlesOffered.get(candidateId) : undefined;
+  if (!candidate) return { ok: false, message: 'That release is no longer in this session’s listing. Search again.' };
+  if (openSubtitlesQuotaActive()) return { ok: false, message: 'Today’s OpenSubtitles download quota is spent.' };
+  const fetched = await fetchSubtitleCandidateDetailed(candidate);
+  if (fetched.quotaExceeded) noteOpenSubtitlesQuota(fetched.resetAt);
+  if (!fetched.text) return { ok: false, message: fetched.quotaExceeded ? 'Today’s OpenSubtitles download quota is spent.' : 'The subtitle could not be downloaded.' };
+  const aligned = candidate.hashMatch ? null : await alignToAudio(item, fetched.text, candidate.format);
+  const language = (candidate.language || 'ja').toLowerCase();
+  const relative = writeSubtitleFile(
+    item.id,
+    `opensubtitles-${language}-${candidate.providerItemId.replace(/[^a-zA-Z0-9]/g, '')}.${candidate.format}`,
+    aligned?.text ?? fetched.text,
+  );
+  if (!relative) return { ok: false, message: 'The subtitle could not be written to disk.' };
+  const record: SubtitleRecord = {
+    id: crypto.randomUUID(),
+    lang: language,
+    source: 'provider',
+    format: candidate.format,
+    path: relative,
+    providerId: 'opensubtitles',
+    providerItemId: candidate.providerItemId,
+    label: candidate.releaseName,
+    hearingImpaired: candidate.hearingImpaired,
+    ...(aligned ? { syncOffsetSec: aligned.offsetSec, syncGrade: aligned.grade } : {}),
+    ...(candidate.hashMatch ? { hashMatch: true } : {}),
+    ...(candidate.releaseGroup ? { releaseGroup: candidate.releaseGroup } : {}),
+    addedAt: Date.now(),
+  };
+  host?.patchItems([item.id], { subtitles: [...(item.subtitles ?? []), record], subtitlesCheckedAt: Date.now() });
   return { ok: true, message: '', lang: language };
 }
 
@@ -1612,6 +1740,23 @@ export function detachSubtitleRecord(mediaId: unknown, recordId: unknown): NyaaS
   return { ok: true, message: '', lang: target.lang };
 }
 
+/** Store the learner's rating on a track. Returns false when the track is not found. */
+export function rateSubtitleRecord(mediaId: unknown, recordId: unknown, rating: unknown): boolean {
+  if (typeof mediaId !== 'string' || typeof recordId !== 'string' || !host) return false;
+  const item = host.listItems().find((candidate) => candidate.id === mediaId);
+  const records = item?.subtitles ?? [];
+  if (!records.some((record) => record.id === recordId)) return false;
+  const value = normalizeTrackRating(rating);
+  const next = records.map((record) => {
+    if (record.id !== recordId) return record;
+    const rest = { ...record };
+    delete rest.userRating;
+    return value ? { ...rest, userRating: value } : rest;
+  });
+  host.patchItems([mediaId], { subtitles: next });
+  return true;
+}
+
 export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHost): void {
   // Every path in this file that changes an item's tracks goes through
   // `host.patchItems` — the sweep, nyaa accept, attach, detach — so wrapping it
@@ -1639,6 +1784,13 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
   });
   ipcMain.handle('subtitleDiscovery:status', () => ({ running: subtitleDiscoveryRunning() }));
   ipcMain.handle('subtitleDiscovery:settings', () => loadDiscoverySettings());
+  ipcMain.handle('subtitleDiscovery:listOpenSubtitles', (_e, mediaId: unknown, languages?: unknown) =>
+    listOpenSubtitlesCandidates(mediaId, languages));
+  ipcMain.handle('subtitleDiscovery:acceptOpenSubtitles', (_e, mediaId: unknown, candidateId: unknown) =>
+    acceptOpenSubtitlesCandidate(mediaId, candidateId));
+  // The learner's 1–5 rating of one track (0 clears it); it outranks the computed grade.
+  ipcMain.handle('subtitleDiscovery:rateRecord', (_e, mediaId: unknown, recordId: unknown, rating: unknown) =>
+    rateSubtitleRecord(mediaId, recordId, rating));
   ipcMain.handle('subtitleDiscovery:saveSettings', (_e, input: unknown) => saveDiscoverySettings(input));
   ipcMain.handle('subtitleDiscovery:credentials', () => credentialStates());
   ipcMain.handle('subtitleDiscovery:setKey', (_e, id: string, key: string) => {

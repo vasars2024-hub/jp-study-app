@@ -68,6 +68,14 @@ export interface SubtitleRecord {
    * downloaded (`shared/subtitleSync.ts`). Absent when no shift was applied.
    */
   syncOffsetSec?: number;
+  /** How cleanly the timing locked onto the audio (see shared/subtitleTrackGrade). */
+  syncGrade?: 'A' | 'B' | 'C';
+  /** OpenSubtitles matched this exact file's hash: timing is right by construction. */
+  hashMatch?: boolean;
+  /** The release / translation group that made the track, when the provider names one. */
+  releaseGroup?: string;
+  /** The learner's own 1–5 rating of the track; absent when unrated. */
+  userRating?: number;
   /** True once the user has corrected a generated transcript. */
   edited?: boolean;
   /** Stream index, for a track extracted from the container. */

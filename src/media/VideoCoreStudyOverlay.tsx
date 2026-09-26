@@ -120,7 +120,8 @@ import VideoCoreTranscriptPanel from './VideoCoreTranscriptPanel';
 import { useCueAnalysis } from './useCueAnalysis';
 import {
   loadStudyTrackChoice,
-  loadSubtitleDelay,
+  loadSubtitleDelayFor,
+  saveSeriesSubtitleDelay,
   rememberStudyTrackChoice,
   saveSubtitleDelay,
   studySubtitleSource,
@@ -1926,10 +1927,11 @@ export default function VideoCoreStudyOverlay({
     one file to the next, because the overlay stays mounted across opens.
   */
   React.useEffect(() => {
-    const stored = loadSubtitleDelay(delayKey);
+    const stored = loadSubtitleDelayFor(delayKey, subtitleSource);
     subtitleDelayRef.current = stored;
     setSubtitleDelaySec(stored);
     void manager?.setSubtitleDelay(stored);
+    // `subtitleSource` is what `delayKey` is derived from; the key is the change signal.
   }, [delayKey, manager]);
 
   /**
@@ -3351,6 +3353,11 @@ export default function VideoCoreStudyOverlay({
         subtitleDelaySec={subtitleDelaySec}
         onChangeSubtitleDelay={changeSubtitleDelay}
         onResetSubtitleDelay={resetSubtitleDelay}
+        onApplyDelayToSeries={subtitleSource.mediaId != null ? () => {
+          if (saveSeriesSubtitleDelay(subtitleSource, subtitleDelaySec)) {
+            window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.delayAppliedToSeries'), kind: 'ok' } }));
+          }
+        } : undefined}
         onResetSubtitleAppearance={() => setPreferences(resetSubtitleAppearance)}
         onExportSubtitles={allCues.length > 0 ? exportSubtitles : undefined}
         shortcutKeysFor={shortcutKeysFor}

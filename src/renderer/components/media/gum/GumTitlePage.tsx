@@ -37,6 +37,7 @@ import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
 import { getStudyLang } from '../../../studyEnvironment';
 import { useStudyLanguage } from '../../../useStudyLanguage';
 import MediaLevelBadge from '../MediaLevelBadge';
+import MediaCreditsFacts from '../MediaCreditsFacts';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -818,6 +819,7 @@ export default function GumTitlePage({
                 </div>
               )}
               {facts.studio && <div><dt>{t('gum.facts.studio')}</dt><dd>{facts.studio}</dd></div>}
+              <MediaCreditsFacts items={title.items} />
               {facts.network && <div><dt>{t('gum.facts.network')}</dt><dd>{facts.network}</dd></div>}
               {title.score !== undefined && <div><dt>{t('gum.facts.myRating')}</dt><dd>{formatScore(title, ratingDisplay, lang)}</dd></div>}
               {title.providerScore && <div><dt>{t('gum.facts.providerRating')}</dt><dd>{formatDecimal(title.providerScore, lang)}</dd></div>}

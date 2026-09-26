@@ -82,6 +82,7 @@ const mediaTokens = new Map<string, string>();
 // `main/library.ts`. One copy now, so the drop router and the player cannot
 // disagree about what a media file is.
 import { AUDIO_EXT, MEDIA_EXT, SUBTITLE_EXT as SUBTITLE_EXT_SET, VIDEO_EXT } from '../shared/mediaKind';
+import { probeMediaProviders, searchTvAndFilm, subtitleAvailability } from './mediaProviderStatus';
 
 /** Bare, dot-less — this is what the dialog filter wants. */
 const SUBTITLE_EXT = [...SUBTITLE_EXT_SET].map((e) => e.slice(1));
@@ -1205,6 +1206,15 @@ export function registerMediaIpc(): void {
     }
   });
 
+  // Whether each metadata source answers right now (Settings › Media providers).
+  ipcMain.handle('media:providerStatus', () => probeMediaProviders());
+  // Unified search backends: dramas/films (TVmaze, TMDB) and subtitle availability.
+  ipcMain.handle('search:tvFilm', (_e, query: unknown) => searchTvAndFilm(typeof query === 'string' ? query : ''));
+  ipcMain.handle('search:subtitleAvailability', (_e, query: unknown, languages: unknown) =>
+    subtitleAvailability(
+      typeof query === 'string' ? query : '',
+      Array.isArray(languages) ? languages.filter((l): l is string => typeof l === 'string') : [],
+    ).catch(() => null));
   ipcMain.handle('media:list', () => {
     const db = readDb();
     let dirty = false;

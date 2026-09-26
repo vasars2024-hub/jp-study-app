@@ -103,6 +103,14 @@ export interface ProviderWork {
   language?: string;
   /** ISO 3166 country of origin (`JP`), when the provider states one. */
   country?: string;
+  /** Leading cast, billing order (TMDB credits, TVmaze cast). */
+  cast?: string[];
+  /** A film's director, or a series' creator/director (TMDB crew). */
+  director?: string;
+  /** Age rating as the rating board words it (`PG-13`, `TV-14`, `R15+`). */
+  ageRating?: string;
+  /** When a running show airs (`Sunday 23:00`, TVmaze schedule). */
+  schedule?: string;
   /**
    * Whether the provider says this is animation. `undefined` when it does not
    * say — Jikan and AniList list nothing else, so for them it is simply true.

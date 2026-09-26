@@ -13,6 +13,7 @@
 // cannot put this file in a cycle.
 import type { SubtitleRecordFormat } from './subtitleRecord';
 import type { NyaaUnavailableReason } from './subtitleNyaa';
+import type { SubtitleStyle } from './subtitleProviders';
 
 export type SubtitleDiscoveryPhase =
   | 'queued'
@@ -145,6 +146,18 @@ export interface SubtitleDiscoverySettings {
   autoStudyTrack: boolean;
   /** Subtitle-panel notices the user has dismissed; each is shown at most once. */
   dismissedNotices: string[];
+  /**
+   * Which kind of track to prefer: the whole dialogue, signs & songs only, or
+   * forced lines. A mismatch is a nudge down in the ranking, never a refusal.
+   */
+  style: SubtitleStyle;
+  /** Accept tracks marked for the hearing-impaired ([Door creaks]) when nothing else fits. */
+  allowHearingImpaired: boolean;
+  /**
+   * Release / translation groups to prefer, best first. A track from one of
+   * them ranks above an otherwise equal one ("prefer this group").
+   */
+  preferredGroups: string[];
 }
 
 export type SubtitleTranslationEnginePreference = 'auto' | 'cloud' | 'local';
@@ -162,6 +175,9 @@ export const DEFAULT_SUBTITLE_DISCOVERY_SETTINGS: SubtitleDiscoverySettings = {
   translationEngine: 'auto',
   autoStudyTrack: true,
   dismissedNotices: [],
+  style: 'full',
+  allowHearingImpaired: true,
+  preferredGroups: [],
   providers: [
     // Local sources first: they are free, instant, and already in sync with the
     // exact file, so a network round trip is only worth making when they fail.
@@ -273,9 +289,34 @@ export interface NyaaSubtitleCandidateView {
   sizeBytes: number;
   seeders: number;
   languages: string[];
+  /** The fansub / release group, when the release name names one. */
+  releaseGroup?: string;
   score: number;
   /** Why it ranked where it did, shown so a wrong-looking order is explicable. */
   reasons: string[];
+}
+
+/**
+ * One OpenSubtitles release offered for manual choice — the drama / film
+ * counterpart of the Nyaa listing, for titles no automatic pass attached.
+ */
+export interface OpenSubtitlesCandidateView {
+  id: string;
+  releaseName: string;
+  releaseGroup?: string;
+  language: string;
+  /** 0–100 on the shared matcher's scale. */
+  score: number;
+  hashMatch: boolean;
+  hearingImpaired: boolean;
+  downloads: number;
+}
+
+export interface OpenSubtitlesListResult {
+  ok: boolean;
+  candidates: OpenSubtitlesCandidateView[];
+  /** Why the list is empty, when it is. */
+  message: string;
 }
 
 export interface NyaaSubtitleListResult {
@@ -504,6 +545,11 @@ export function normalizeSubtitleDiscoverySettings(input: unknown): SubtitleDisc
     translationEngine: engine,
     autoStudyTrack: raw.autoStudyTrack !== false,
     dismissedNotices: dismissed,
+    style: raw.style === 'signs-songs' || raw.style === 'forced' ? raw.style : 'full',
+    allowHearingImpaired: raw.allowHearingImpaired !== false,
+    preferredGroups: Array.isArray(raw.preferredGroups)
+      ? [...new Set(raw.preferredGroups.filter((g): g is string => typeof g === 'string').map((g) => g.trim()).filter(Boolean))].slice(0, 20)
+      : [],
   };
 }
 

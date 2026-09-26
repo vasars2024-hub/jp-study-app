@@ -1,6 +1,8 @@
 # Plan — verbatim Japanese subtitles fused from English subs + Whisper
 
-**Status: PLAN ONLY. Nothing here is implemented.**
+**Status: IMPLEMENTED.** The EN→JA fusion pipeline ships (`derivation: 'en-ja-fusion'` records,
+the fuse action in the media detail panel, the arbiter status lines). The stages below are kept
+as the design record; the **Progress** section at the bottom is authoritative.
 Author: claude-backup · Drafted 2026-08-14 on direct user request · Verified against the
 tree at this date, branch `feat/nyaa-subtitles`.
 
