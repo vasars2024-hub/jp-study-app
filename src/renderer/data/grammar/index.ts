@@ -22,7 +22,7 @@ import { RU_CEFR } from './ru-cefr';
 import { HSK_STARTER } from './hsk-starter';
 import { writeLocalStorageJson } from '../../localStorageWrite';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
-import { applyAuthoredContent } from './authoredContent';
+import { AUTHORED_CONTENT_SOURCE, applyAuthoredContent } from './authoredContent';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
 // re-exported by ./types. eslint-plugin-import flags that as a duplicate export
@@ -85,12 +85,19 @@ const CORE: ModuleProvenance = {
  * keep in sync, and a record that loses its examples falls back out on its own.
  *
  * Authored examples always win; this never overwrites hand-written content.
+ * A supplement record the content pass wrote keeps its corpus sentences
+ * *after* the authored ones: the pass works through records with corpus hits
+ * first, so replacing them would have taken real sentences away from exactly
+ * the patterns learners meet most.
  */
 function withImportedExamples(list: GrammarPoint[]): GrammarPoint[] {
   return list.map((p) => {
-    if (p.examples && p.examples.length) return p;
     const imported = TATOEBA_EXAMPLES[p.id];
-    return imported ? { ...p, examples: imported } : p;
+    if (!imported) return p;
+    if (!p.examples || !p.examples.length) return { ...p, examples: imported };
+    if (p.provenance?.source !== AUTHORED_CONTENT_SOURCE) return p;
+    const seen = new Set(p.examples.map((e) => e.jp));
+    return { ...p, examples: [...p.examples, ...imported.filter((e) => !seen.has(e.jp))] };
   });
 }
 

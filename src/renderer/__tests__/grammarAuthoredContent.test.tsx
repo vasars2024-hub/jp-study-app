@@ -35,7 +35,7 @@ const byId = new Map(GRAMMAR.map((p) => [p.id, p]));
  * Ratchet: hollow records per level may only go down. When a pass authors
  * more, lower these numbers to the new counts the failure message prints.
  */
-const MAX_HOLLOW: Record<string, number> = { N4: 74, N3: 585, N2: 437, N1: 324 };
+const MAX_HOLLOW: Record<string, number> = { N4: 74, N3: 541, N2: 437, N1: 324 };
 
 describe('authored content for hollow supplement records', () => {
   const entries = Object.entries(AUTHORED_CONTENT);
@@ -72,6 +72,14 @@ describe('authored content for hollow supplement records', () => {
       expect(p.provenance.source).toBe('authored:content-pass');
       expect(p.provenance.verification).not.toBe('missing');
     }
+  });
+
+  it('keeps the corpus sentences an authored record had, after the authored examples', () => {
+    // てみたらどう: three Tatoeba hits before it was authored.
+    const p = byId.get('n4m-g-0376f5')!;
+    const authored = AUTHORED_CONTENT['n4m-g-0376f5'].examples.length;
+    expect(p.examples.slice(0, authored).every((e) => e.source !== 'tatoeba')).toBe(true);
+    expect(p.examples.slice(authored).some((e) => e.source === 'tatoeba')).toBe(true);
   });
 
   it('replaces the Vietnamese labels some dump records carried as titles', () => {
