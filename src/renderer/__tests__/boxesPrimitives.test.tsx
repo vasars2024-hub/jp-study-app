@@ -117,6 +117,20 @@ describe('ui.css control floor', () => {
     }
   });
 
+  it('paints native checkboxes and radios as the Fluent box, never un-hiding a hidden one', () => {
+    const rule = floor.slice(floor.indexOf("input[type='checkbox']:not([role='switch']), input[type='radio']"));
+    const first = rule.slice(0, rule.indexOf('}'));
+    expect(first).toContain(':where(:not([hidden]))');
+    expect(first).toContain('appearance: none');
+    expect(floor).toMatch(/:checked::before \{[^}]*border-left: 2px solid #fff/);
+    // a styled switch is never repainted as a box
+    expect(first).toContain(":not([role='switch'])");
+  });
+
+  it('never un-hides a hidden bare button', () => {
+    expect(floor).toContain('button:where(:not([class]):not([hidden]))');
+  });
+
   it('removes the fieldset frame and gives native checkboxes the accent', () => {
     expect(floor).toMatch(/fieldset:where\(:not\(\.blanc-root \*\)\) \{[^}]*border: 0;/);
     expect(floor).toMatch(/:root \{\s*accent-color: var\(--accent\);/);

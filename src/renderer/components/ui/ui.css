@@ -741,7 +741,7 @@
 
 /* Buttons with no class: the design-system button, not Chromium's grey slab. */
 :where(html:not([data-materials='aero']):not([data-materials='wired']))
-  button:where(:not([class])):where(:not(.blanc-root *)) {
+  button:where(:not([class]):not([hidden])):where(:not(.blanc-root *)) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -770,6 +770,77 @@
 }
 :where(html:not([data-materials='aero']):not([data-materials='wired']))
   button:where(:not([class])):where(:not(.blanc-root *)):disabled {
+  opacity: var(--alpha-disabled);
+  cursor: default;
+}
+
+/* Native checkboxes and radios: the Fluent box and dot instead of the OS glyph.
+   Zero specificity, so a control someone styled (a hidden input under a
+   custom box, a `.ui-switch`, a sized checkbox) keeps its own rules; `[hidden]`
+   is excluded because an author `display` would otherwise beat the UA's
+   `[hidden] { display: none }`. 16px is the Fluent box; the pointer target is
+   still the label around it. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not([hidden])):where(:not(.blanc-root *)) {
+  appearance: none;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--control-edge, var(--control-border));
+  border-radius: 4px;
+  background: var(--control-bg);
+  vertical-align: -3px;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='radio']):where(:not([hidden])):where(:not(.blanc-root *)) {
+  border-radius: 50%;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):hover:not(:disabled) {
+  border-color: var(--accent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):is(:checked, :indeterminate) {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch'])):where(:not(.blanc-root *)):checked::before {
+  content: '';
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  transform: rotate(-45deg);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch'])):where(:not(.blanc-root *)):indeterminate::before {
+  content: '';
+  width: 8px;
+  height: 2px;
+  background: #fff;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='radio']):where(:not(.blanc-root *)):checked::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):disabled {
   opacity: var(--alpha-disabled);
   cursor: default;
 }
