@@ -39,6 +39,7 @@ export {
   applyAuthoredContent,
   authoringProgress,
   grammarAuthoringQueue,
+  shadowedSupplementIds,
 } from './authoredContent';
 export { isHollowGrammarPoint, structureCopiesTitle, explanationCopiesMeaning } from './hollow';
 export type { AuthoredGrammarContent, AuthoringQueueEntry } from './authoredContent';

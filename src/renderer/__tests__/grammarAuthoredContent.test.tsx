@@ -16,9 +16,10 @@ import {
   authoringProgress,
   grammarAuthoringQueue,
   isHollowGrammarPoint,
+  shadowedSupplementIds,
   type GrammarPoint,
 } from '../data/grammar';
-import { sortGrammarPoints } from '../data/grammar/practiceFilters';
+import { grammarTitleKey, sortGrammarPoints } from '../data/grammar/practiceFilters';
 import { GrammarDetail } from '../components/grammar/GrammarContent';
 
 const SUPPLEMENTS: GrammarPoint[] = [
@@ -34,7 +35,7 @@ const byId = new Map(GRAMMAR.map((p) => [p.id, p]));
  * Ratchet: hollow records per level may only go down. When a pass authors
  * more, lower these numbers to the new counts the failure message prints.
  */
-const MAX_HOLLOW: Record<string, number> = { N4: 292, N3: 627, N2: 437, N1: 324 };
+const MAX_HOLLOW: Record<string, number> = { N4: 252, N3: 627, N2: 437, N1: 324 };
 
 describe('authored content for hollow supplement records', () => {
   const entries = Object.entries(AUTHORED_CONTENT);
@@ -113,6 +114,31 @@ describe('authoring queue', () => {
     }));
     const q = grammarAuthoringQueue(recs, { shadowed: new Set(['a']), corpusHits: { c: 3 } });
     expect(q.map((x) => x.id)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('shadows supplement records that dedupe hides behind a core point or an earlier twin', () => {
+    const core = ['n5', 'n4', 'n3', 'n2', 'n2-extra', 'n1', 'n1-extra'].flatMap((m) => GRAMMAR_MODULES[m]);
+    const shadowed = shadowedSupplementIds(core, SUPPLEMENTS, grammarTitleKey);
+    const coreKeys = new Set(core.map((p) => grammarTitleKey('ja', p.title)));
+    // Every core collision is shadowed; an authored record without one never is.
+    for (const p of SUPPLEMENTS) {
+      const collides = coreKeys.has(grammarTitleKey('ja', p.title));
+      if (collides) expect(shadowed.has(p.id), p.id).toBe(true);
+      else if (AUTHORED_CONTENT[p.id]) expect(shadowed.has(p.id), p.id).toBe(false);
+    }
+    // Exactly one visible record per remaining title key.
+    const visible = new Map<string, string>();
+    for (const p of SUPPLEMENTS) {
+      if (shadowed.has(p.id)) continue;
+      const key = grammarTitleKey('ja', p.title);
+      expect(visible.has(key), `${p.id} twins ${visible.get(key)}`).toBe(false);
+      visible.set(key, p.id);
+    }
+    // The queue puts them after every open record of the same level.
+    const n4 = grammarAuthoringQueue(SUPPLEMENTS, { shadowed })
+      .filter((q) => q.level === 'N4')
+      .map((q) => shadowed.has(q.id));
+    expect(n4.indexOf(true)).toBeGreaterThan(n4.lastIndexOf(false));
   });
 });
 

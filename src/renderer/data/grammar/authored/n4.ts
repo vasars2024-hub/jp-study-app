@@ -1463,4 +1463,438 @@ export const AUTHORED_N4: Record<string, AuthoredGrammarContent> = {
       ex('この 部屋、ちょっと 寒くない？', "Isn't this room a bit cold?", 'この へや、ちょっと さむくない？'),
     ],
   },
+  'n4m-g-12b30c': {
+    meaning: 'shall I ~?; (unsure) whether to ~',
+    structure: 'V-volitional（よう／おう）+ か（どうか／どうしようか 迷う）',
+    explanation:
+      'The volitional plus か turns an intention into a question. On its own it offers help or asks for agreement: 手伝おうか “shall I help?”. Followed by どうか, どうしようか or 迷う, it describes being torn between options: 行こうかどうか迷っている.',
+    functions: ['selective', 'invite-suggest'],
+    examples: [
+      ex('重そうだね。一つ 持とうか。', 'That looks heavy. Shall I carry one?', 'おもそうだね。ひとつ もとうか。'),
+      ex('留学しようか どうか、まだ 迷って いる。', "I still can't decide whether to study abroad.", 'りゅうがくしようか どうか、まだ まよって いる。'),
+    ],
+  },
+  'n4m-g-142e26': {
+    meaning: '~ or something (softened suggestion)',
+    structure: 'N（＋particle）+ でも + V（ませんか／しよう）',
+    explanation:
+      'でも after a noun makes it one example among possibilities, so invitations sound less pushy: お茶でも飲みませんか “shall we have tea or something?”. The speaker does not really mean only that item. It replaces が and を but follows other particles: 公園にでも行こう.',
+    functions: ['invite-suggest', 'vague'],
+    examples: [
+      ex('疲れたね。コーヒーでも 飲もうか。', "We're tired. Shall we have a coffee or something?", 'つかれたね。こーひーでも のもうか。'),
+      ex('暇なら、公園にでも 行かない？', "If you're free, why don't we go to the park or somewhere?", 'ひまなら、こうえんにでも いかない？'),
+    ],
+  },
+  'n4m-g-8e86ae': {
+    meaning: 'both ~ and ~ (does A, and also B)',
+    structure: 'N1 も + V-ば + N2 も + V',
+    explanation:
+      'Lists two things a person does or has, stressing that there is more than one: 歌も歌えばピアノも弾く “she sings and plays the piano too”. The ば here is not a real condition but a listing device. With a negative (A も V-なければ B も V-ない) it means “neither ~ nor ~”.',
+    functions: ['add', 'listed'],
+    examples: [
+      ex('彼女は 歌も 歌えば、ピアノも 弾く。', 'She sings, and she plays the piano too.', 'かのじょは うたも うたえば、ぴあのも ひく。'),
+      ex('この 町には 駅も なければ、店も ない。', 'This town has neither a station nor any shops.', 'この まちには えきも なければ、みせも ない。'),
+    ],
+  },
+  'n4m-g-ea250f': {
+    meaning: 'both ~ and ~; (with negative) neither ~ nor ~',
+    structure: 'N1 も + N2 も + predicate',
+    explanation:
+      'Repeating も after two nouns includes both: 兄も姉も医者だ “my brother and sister are both doctors”. With a negative verb it excludes both: 肉も魚も食べない. が and を disappear before も, but other particles stay: 東京にも大阪にも.',
+    functions: ['add'],
+    examples: [
+      ex('兄も 姉も 東京に 住んで います。', 'Both my brother and my sister live in Tokyo.', 'あにも あねも とうきょうに すんで います。'),
+      ex('彼は 肉も 魚も 食べない。', 'He eats neither meat nor fish.', 'かれは にくも さかなも たべない。'),
+    ],
+  },
+  'n4m-g-475479': {
+    structure: 'Plain form (N / Na without だ) + だろう（↘ guess／↗ confirm）',
+    explanation:
+      'The plain form of でしょう. With falling intonation it is a guess, “probably”, often with たぶん or きっと. With rising intonation it asks the listener to agree: 疲れただろう? “you must be tired, right?”. In speech だろう sounds masculine; women and polite speakers use でしょう.',
+    functions: ['speculation', 'confirm'],
+    examples: [
+      ex('明日は たぶん 晴れる だろう。', 'It will probably be sunny tomorrow.', 'あしたは たぶん はれる だろう。'),
+      ex('長い 旅で 疲れた だろう？', 'You must be tired after that long trip, right?', 'ながい たびで つかれた だろう？'),
+    ],
+  },
+  'n4m-g-bb679a': {
+    meaning: 'A, for its (their) part; A in its own way',
+    structure: 'N + は + (same) N + で',
+    explanation:
+      'Repeating the noun with は〜で sets it apart from what was just said: “as for A, A has its own situation”. 私は私で忙しい means “I have my own things keeping me busy (so don’t expect me to help)”. It implies each party is separate and deserves its own consideration.',
+    functions: ['perspective-way', 'contrast'],
+    examples: [
+      ex('姉は 姉で、仕事が 忙しいらしい。', 'My sister, for her part, seems busy with work.', 'あねは あねで、しごとが いそがしいらしい。'),
+      ex('都会には 都会で いい ところが ある。', 'The city has its good points in its own way.', 'とかいには とかいで いい ところが ある。'),
+    ],
+  },
+  'n4m-g-044527': {
+    meaning: 'if ~; when ~ (conditional ば)',
+    structure: 'V-ば形（行けば）／Adj-ければ／N・Na + なら(ば)',
+    explanation:
+      'The ば conditional states a condition and its result: if A, then B. It is most natural when B is a desirable outcome or a general truth, and it often appears in advice as 〜ばいい (“you just need to ~”). Unlike たら, the main clause cannot easily be a past one-off event.',
+    functions: ['condition'],
+    examples: [
+      ex('この ボタンを 押せば、ドアが 開きます。', 'If you press this button, the door opens.', 'この ぼたんを おせば、どあが あきます。'),
+      ex('分からなければ、先生に 聞けば いい。', "If you don't understand, you just need to ask the teacher.", 'わからなければ、せんせいに きけば いい。'),
+    ],
+  },
+  'n4m-g-5191e0': {
+    meaning: 'it seems ~; it looks as if ~ (inference)',
+    structure: 'Plain form (Na + な／N + の) + ようだ（ようです）',
+    explanation:
+      'ようだ draws a conclusion from what the speaker observes: “it seems, apparently”. It is more objective and written than みたいだ, its spoken equivalent. Compare らしい, which leans on what one has heard, and stem + そうだ, an impression from appearance alone.',
+    functions: ['speculation', 'similarity-degree'],
+    examples: [
+      ex('電気が 消えて いる。誰も いない ようだ。', 'The lights are off. It seems no one is in.', 'でんきが きえて いる。だれも いない ようだ。'),
+      ex('彼は 風邪を ひいた ようです。', 'He seems to have caught a cold.', 'かれは かぜを ひいた ようです。'),
+    ],
+  },
+  'n4m-g-cd7024': {
+    meaning: 'if (it is the case that) ~, then … (casual)',
+    structure: 'Plain form (Na / N + な) + んじゃ, … (negative result)',
+    explanation:
+      'A casual contraction of のでは: “if it’s the case that ~”. The result is almost always negative or a complaint: こんなに寒いんじゃ外で遊べない. On its own at the start of a sentence, じゃ (or それじゃ) means “well then”.',
+    functions: ['condition'],
+    examples: [
+      ex('こんなに 雨が 降ってるんじゃ、出かけられないね。', "If it's raining this hard, we can't go out.", 'こんなに あめが ふってるんじゃ、でかけられないね。'),
+      ex('君が 来ないんじゃ、パーティーも つまらない。', "If you aren't coming, the party will be boring.", 'きみが こないんじゃ、ぱーてぃーも つまらない。'),
+    ],
+  },
+  'n4m-g-82113a': {
+    meaning: 'because ~; so (casual ので)',
+    structure: 'Plain form (Na / N + な) + んで, …',
+    explanation:
+      'The spoken contraction of ので: it gives a reason softly, often as an excuse. It is common in casual but still polite speech: 用事があるんで、先に失礼します. In careful writing, use ので.',
+    functions: ['cause-reason'],
+    examples: [
+      ex('ちょっと 用事が ある んで、先に 帰ります。', "I have something to take care of, so I'll head home first.", 'ちょっと ようじが ある んで、さきに かえります。'),
+      ex('道が 混んでた んで、遅く なりました。', 'The roads were busy, so I was late.', 'みちが こんでた んで、おそく なりました。'),
+    ],
+  },
+  'n4m-g-57efd7': {
+    meaning: 'to let (someone) do ~ (as a favour)',
+    structure: 'Person に + V-causative-て形 + あげる',
+    explanation:
+      'The causative in its permissive sense plus あげる: the speaker (or the subject) kindly allows someone to do what they want. It is used for children, juniors or pets. Toward a superior it sounds condescending, and asking for permission yourself is させてください.',
+    functions: ['allow', 'benefit'],
+    examples: [
+      ex('今日は 子供に 好きな だけ 遊ばせて あげよう。', "Today let's let the kids play as much as they like.", 'きょうは こどもに すきな だけ あそばせて あげよう。'),
+      ex('弟に 私の ゲームを 使わせて あげた。', 'I let my little brother use my game.', 'おとうとに わたしの げーむを つかわせて あげた。'),
+    ],
+  },
+  'n4m-g-1e9a5d': {
+    meaning: "it's already ~",
+    structure: 'もう + N（time／season／age）+ だ',
+    explanation:
+      'もう with a noun predicate notices that a point has already been reached, often with surprise: もう十二時だ “it’s already midnight”. It pairs naturally with time words, seasons and ages. The opposite expectation, “not yet”, is まだ〜だ.',
+    functions: ['time', 'finish'],
+    examples: [
+      ex('えっ、もう 十二時だ。早く 寝なきゃ。', "What, it's already midnight. I need to get to bed.", 'えっ、もう じゅうにじだ。はやく ねなきゃ。'),
+      ex('もう 春ですね。桜が 咲き始めました。', "It's spring already. The cherry blossoms have started to bloom.", 'もう はるですね。さくらが さきはじめました。'),
+    ],
+  },
+  'n4m-g-646fd5': {
+    meaning: '~ and ~, so … (listing reasons)',
+    structure: 'Plain form + し、plain form + し、（それで）…',
+    explanation:
+      'し lists reasons and implies there may be more, then the conclusion follows, sometimes after それで or だから. Even a single し can suggest “among other reasons”. It sounds conversational; in writing, use て or ので.',
+    functions: ['cause-reason', 'listed'],
+    examples: [
+      ex('雨も 降ってる し、疲れた し、今日は 家に いよう。', "It's raining and I'm tired, so I'll stay home today.", 'あめも ふってる し、つかれた し、きょうは いえに いよう。'),
+      ex('この 店は 安い し、おいしい し、それで いつも 混んで いる。', "This place is cheap and good, so it's always crowded.", 'この みせは やすい し、おいしい し、それで いつも こんで いる。'),
+    ],
+  },
+  'n4m-g-660ed8': {
+    meaning: '~, (and) … (introducing a topic before the main point)',
+    structure: 'Plain form (Na / N + な) + んだが, …',
+    explanation:
+      'The explanatory ん plus the soft が: the speaker lays out the background and then comes to the point, usually a request or question. It is masculine or businesslike; んですが is the polite form and んだけど the casual one.',
+    functions: ['story-topic'],
+    examples: [
+      ex('ちょっと 相談が ある んだが、今 いいか。', 'There is something I want to talk over. Do you have a moment?', 'ちょっと そうだんが ある んだが、いま いいか。'),
+      ex('駅に 行きたい んだが、この 道で 合って いるかな。', "I'm trying to get to the station. Is this the right road?", 'えきに いきたい んだが、この みちで あって いるかな。'),
+    ],
+  },
+  'n4m-g-31f34d': {
+    meaning: '~, and ~, and besides …',
+    structure: 'Plain form + し、plain form + し、（それに）…',
+    explanation:
+      'Here し piles up points of the same kind, usually all positive or all negative, and それに adds one more on top: “and what’s more”. It is used to build an argument or a recommendation. The points should point the same way; mixing praise and complaints sounds odd.',
+    functions: ['add', 'listed'],
+    examples: [
+      ex('この 部屋は 明るい し、広い し、それに 駅にも 近い。', "This room is bright and spacious, and it's close to the station too.", 'この へやは あかるい し、ひろい し、それに えきにも ちかい。'),
+      ex('彼は 優しい し、よく 働く し、みんなに 好かれて いる。', "He's kind and hardworking, and everyone likes him.", 'かれは やさしい し、よく はたらく し、みんなに すかれて いる。'),
+    ],
+  },
+  'n4m-g-dac064': {
+    meaning: 'doing ~ is (what I like / am good at)',
+    structure: 'V-dict + のが + 好き／上手／得意／苦手 + です',
+    explanation:
+      'の turns a verb phrase into a noun so it can take が before adjectives of liking and skill: 泳ぐのが好きです “I like swimming”. こと can replace の here (読むことが好き) and sounds a little more formal; の is the everyday choice. The person is marked with は: 私は料理するのが得意です.',
+    functions: ['describe'],
+    examples: [
+      ex('私は 本を 読む のが 好きです。', 'I like reading books.', 'わたしは ほんを よむ のが すきです。'),
+      ex('兄は 絵を かく のが 上手です。', 'My older brother is good at drawing.', 'あには えを かく のが じょうずです。'),
+    ],
+  },
+  'n4m-g-156c8a': {
+    meaning: 'to go / come (in order) to ~',
+    structure: 'V-ます stem／する-noun + に + 行く／来る／帰る',
+    explanation:
+      'The purpose of a movement: stem + に before 行く, 来る or 帰る. With する-nouns, drop する: 買い物に行く. The pattern works only with verbs of motion; for other purposes use ために or ように.',
+    functions: ['purpose-goal'],
+    examples: [
+      ex('デパートへ 服を 買いに 行きました。', 'I went to the department store to buy clothes.', 'でぱーとへ ふくを かいに いきました。'),
+      ex('友達が 家に 遊びに 来ます。', 'A friend is coming over to hang out.', 'ともだちが いえに あそびに きます。'),
+    ],
+  },
+  'n4m-g-f03351': {
+    structure: 'V-ます stem + 方（かた）',
+    explanation:
+      'Adding 方 to a verb stem makes a noun meaning “the way of ~ing”. The object then takes の instead of を: 漢字の書き方 “how to write kanji”. It covers both instructions (使い方) and personal style (話し方 “way of speaking”).',
+    functions: ['means-methods'],
+    examples: [
+      ex('この 機械の 使い方を 教えて ください。', 'Please show me how to use this machine.', 'この きかいの つかいかたを おしえて ください。'),
+      ex('彼の 話し方は とても 分かりやすい。', 'His way of speaking is very easy to follow.', 'かれの はなしかたは とても わかりやすい。'),
+    ],
+  },
+  'n4m-g-4c6375': {
+    meaning: 'it is that ~ (explanation); the fact is ~ (emphatic)',
+    structure: 'Plain form (Na / N + な) + のだ（んだ／のです）',
+    explanation:
+      'のだ presents a statement as an explanation or as the real point behind a situation: 遅れたのは、電車が止まったからなのだ. It can also sound emphatic, stating a conclusion or a firm resolve: 私は行くのだ. In speech it contracts to んだ / んです.',
+    functions: ['explain', 'emphasize'],
+    examples: [
+      ex('遅れて すみません。電車が 止まって いた のです。', "Sorry I'm late. The trains had stopped, you see.", 'おくれて すみません。でんしゃが とまって いた のです。'),
+      ex('誰が 何と 言おうと、私は 行く のだ。', "Whatever anyone says, I'm going.", 'だれが なんと いおうと、わたしは いく のだ。'),
+    ],
+  },
+  'n4m-g-efa6af': {
+    structure: 'V-て形／Adj-くて + も；N・Na + でも',
+    explanation:
+      'ても states that the result does not change even if the condition holds: “even if ~, even though ~”. It is often paired with たとえ (“even supposing”) or いくら (“however much”). For nouns and な-adjectives the form is でも: 雨でも行く.',
+    functions: ['concessions'],
+    examples: [
+      ex('雨が 降っても、試合は 中止に なりません。', "Even if it rains, the match won't be cancelled.", 'あめが ふっても、しあいは ちゅうしに なりません。'),
+      ex('いくら 高くても、この かばんが 欲しい。', 'No matter how expensive it is, I want this bag.', 'いくら たかくても、この かばんが ほしい。'),
+    ],
+  },
+  'n4m-g-4804a5': {
+    meaning: '(V-stem + 上がる) completely; to the top; up',
+    structure: 'V-ます stem + 上がる（あがる）',
+    explanation:
+      'As the second half of a compound, 上がる adds either upward movement (立ち上がる “stand up”) or completion and intensity: 出来上がる “be finished”, 晴れ上がる “clear up completely”, 震え上がる “shake with fear”. It forms intransitive verbs; the transitive partner is 〜上げる.',
+    functions: ['direction', 'finish'],
+    examples: [
+      ex('料理が やっと 出来上がった。', 'The meal is finally ready.', 'りょうりが やっと できあがった。'),
+      ex('雨が 止んで、空は きれいに 晴れ上がった。', 'The rain stopped and the sky cleared up completely.', 'あめが やんで、そらは きれいに はれあがった。'),
+    ],
+  },
+  'n4m-g-93c25c': {
+    meaning: 'without even ~ing',
+    structure: 'N + も + V-ない stem + ずに（する → せずに）',
+    explanation:
+      'ずに is the written form of ないで, “without doing”. Adding も to the object stresses that even the most basic thing was skipped: 朝ご飯も食べずに出かけた. The irregular form of する is せずに. In casual speech the same idea is 〜もしないで.',
+    functions: ['negative', 'emphasize'],
+    examples: [
+      ex('彼は 朝ご飯も 食べずに 家を 出た。', 'He left home without even eating breakfast.', 'かれは あさごはんも たべずに いえを でた。'),
+      ex('彼女は 何も 言わずに 部屋を 出て 行った。', 'She left the room without saying a word.', 'かのじょは なにも いわずに へやを でて いった。'),
+    ],
+  },
+  'n4m-g-c79c56': {
+    meaning: 'after ~; since ~; from now on (以後)',
+    structure: 'Time / event + 以後；以後（、）+ clause',
+    explanation:
+      '以後 means “from that point onward”. After a time or event it marks the start of a period: 十時以後 “after ten o’clock”, 事故以後 “since the accident”. On its own it means “from now on” and is formal, as in the apology 以後気をつけます. 以降 is a close synonym, common in schedules.',
+    functions: ['time-direction'],
+    examples: [
+      ex('夜 十時 以後は 電話を しないで ください。', 'Please do not call after ten at night.', 'よる じゅうじ いごは でんわを しないで ください。'),
+      ex('申し訳 ありません。以後 気を つけます。', "I'm very sorry. I will be more careful from now on.", 'もうしわけ ありません。いご きを つけます。'),
+    ],
+  },
+  'n4m-g-9bd5ff': {
+    meaning: 'in order to ~; because of ~',
+    structure: 'V-dict + ため（に）；plain past / Adj + ため（reason）',
+    explanation:
+      'After a dictionary-form verb, ため(に) states a purpose: 家を買うために貯金する. The subjects of both clauses should be the same and the verb volitional; otherwise use ように. After a past or stative clause, ため gives a cause in a formal tone: 雪が降ったため、電車が遅れた.',
+    functions: ['purpose-goal', 'cause-reason'],
+    examples: [
+      ex('家を 買う ために、毎月 貯金して いる。', "I'm saving every month in order to buy a house.", 'いえを かう ために、まいつき ちょきんして いる。'),
+      ex('大雪が 降った ため、電車が 遅れた。', 'The trains were delayed because of heavy snow.', 'おおゆきが ふった ため、でんしゃが おくれた。'),
+    ],
+  },
+  'n4m-g-a5401f': {
+    meaning: 'if / when ~, (then naturally) …',
+    structure: 'V-dict／Adj／N・Na + だ + と, …',
+    explanation:
+      'と links a condition to a result that follows automatically or habitually: 春になると暖かくなる “when spring comes, it gets warm”. It suits natural laws, machines, directions and habits. The main clause cannot be a request, wish or invitation; use たら or ば for those.',
+    functions: ['condition'],
+    examples: [
+      ex('春に なると、暖かく なります。', 'When spring comes, it gets warm.', 'はるに なると、あたたかく なります。'),
+      ex('この 道を まっすぐ 行くと、駅が あります。', "If you go straight down this road, you'll find the station.", 'この みちを まっすぐ いくと、えきが あります。'),
+    ],
+  },
+  'n4m-g-feb367': {
+    meaning: '(V-stem + 上げる) up; completely (transitive)',
+    structure: 'V-ます stem + 上げる（あげる）',
+    explanation:
+      'As the second part of a compound verb, 上げる adds upward motion (持ち上げる “lift up”) or carries an action through to completion (書き上げる “finish writing”, 仕上げる “finish off”). These compounds are transitive and take を; the intransitive partner is 〜上がる.',
+    functions: ['direction', 'finish'],
+    examples: [
+      ex('重い 箱を 一人で 持ち上げた。', 'I lifted the heavy box up by myself.', 'おもい はこを ひとりで もちあげた。'),
+      ex('レポートを 一晩で 書き上げた。', 'I finished writing the report in one night.', 'れぽーとを ひとばんで かきあげた。'),
+    ],
+  },
+  'n4m-g-d8de02': {
+    meaning: '~ away; go on ~ing (change moving away from now)',
+    structure: 'V-て形 + いく（いきます）',
+    explanation:
+      'ていく shows movement or change heading away from the speaker or into the future: 消えていく “fade away”, 減っていく “keep decreasing”. With movement verbs it can also mean “do and then go”: 食べていく. Its mirror image, てくる, brings change toward the speaker or up to now.',
+    functions: ['process', 'direction'],
+    examples: [
+      ex('これから 人口は 減って いく だろう。', 'The population will probably keep falling from now on.', 'これから じんこうは へって いく だろう。'),
+      ex('飛行機が 雲の 中に 消えて いった。', 'The plane disappeared into the clouds.', 'ひこうきが くもの なかに きえて いった。'),
+    ],
+  },
+  'n4m-g-f28543': {
+    meaning: 'once; at some time (in the past)',
+    structure: 'いつか + V-た（ことがある／ように）',
+    explanation:
+      'With a past verb, いつか refers to an unspecified time in the past: “once, some time ago”. いつか話したように means “as I told you once”. With a non-past verb the same word points to the future (“someday”), so the verb ending decides the direction.',
+    functions: ['time', 'past-state'],
+    examples: [
+      ex('いつか 話した ように、来月 引っ越します。', "As I told you once, I'm moving next month.", 'いつか はなした ように、らいげつ ひっこします。'),
+      ex('この 曲は いつか どこかで 聞いた ことが ある。', "I've heard this song somewhere before.", 'この きょくは いつか どこかで きいた ことが ある。'),
+    ],
+  },
+  'n4m-g-145141': {
+    meaning: 'to look ~; to be acting ~ (visible manner)',
+    structure: 'V-ます stem／Adj stem + そうに + している',
+    explanation:
+      'そうに is the adverb form of the appearance そうだ, and している says the person is visibly behaving that way: 眠そうにしている “looks sleepy”. It describes someone else from the outside, so it is not used for yourself. Note いい becomes よさそう and ない becomes なさそう.',
+    functions: ['similarity-degree', 'status'],
+    examples: [
+      ex('弟は 授業中 ずっと 眠そうに して いた。', 'My little brother looked sleepy all through class.', 'おとうとは じゅぎょうちゅう ずっと ねむそうに して いた。'),
+      ex('子供たちは 楽しそうに して いる。', 'The children look like they are having fun.', 'こどもたちは たのしそうに して いる。'),
+    ],
+  },
+  'n4m-g-9c8856': {
+    meaning: 'for (the sake of) N; because of N',
+    structure: 'N + の + ため（に／の N）',
+    explanation:
+      'With a noun, のため(に) means either “for the benefit of N” (家族のために働く) or, in a formal tone, “because of N” (事故のため電車が遅れた). Context decides which. Before another noun it is のための: 子供のための本 “a book for children”.',
+    functions: ['purpose-goal', 'cause-reason'],
+    examples: [
+      ex('父は 家族の ために 毎日 働いて いる。', 'My father works every day for his family.', 'ちちは かぞくの ために まいにち はたらいて いる。'),
+      ex('事故の ため、道路が 閉鎖されて います。', 'The road is closed because of an accident.', 'じこの ため、どうろが へいさされて います。'),
+    ],
+  },
+  'n4m-g-e69e0e': {
+    meaning: "I'd be grateful if you could ~",
+    structure: 'V-て形 + もらえると ありがたい（です）',
+    explanation:
+      'A soft, indirect request: “if I could get you to ~, I would be thankful”. It sounds considerate because it states a feeling rather than giving an order. The more formal version is ていただけるとありがたいです; ありがたい can also become 助かる (“it would really help”).',
+    functions: ['request', 'benefit'],
+    examples: [
+      ex('明日までに 返事を もらえると ありがたい。', "I'd be grateful if you could reply by tomorrow.", 'あしたまでに へんじを もらえると ありがたい。'),
+      ex('少し 手伝って もらえると ありがたいんですが。', "I'd really appreciate it if you could help a little.", 'すこし てつだって もらえると ありがたいんですが。'),
+    ],
+  },
+  'n4m-g-8cc4e7': {
+    meaning: 'could you do ~ for (someone of mine)?',
+    structure: 'Person に + V-て形 + やって もらえるか（もらえますか）',
+    explanation:
+      'The speaker asks the listener to do a favour for someone on the speaker’s side, usually younger or lower: “could you ~ for my son?”. やる marks the favour going to that third person and もらえるか makes the request. The plain もらえるか is casual and masculine; あげてもらえますか is gentler.',
+    functions: ['request', 'benefit'],
+    examples: [
+      ex('息子に 数学を 教えて やって もらえるか。', 'Could you teach my son some maths?', 'むすこに すうがくを おしえて やって もらえるか。'),
+      ex('うちの 犬を 散歩に 連れて いって やって もらえますか。', 'Could you take our dog for a walk?', 'うちの いぬを さんぽに つれて いって やって もらえますか。'),
+    ],
+  },
+  'n4m-g-6c409e': {
+    structure: 'V-dict／Adj + と いい（ですね／なあ）；V-dict + と いい（advice）',
+    explanation:
+      'Two uses. As a wish, といいですね / といいなあ hopes for something outside one’s control: 晴れるといいね. As advice, V-dict + といい says “you should, it would be good to”: 早く寝るといい. Compare ばいい (the minimum needed) and たらいい (advice or wish, more conversational).',
+    functions: ['wish', 'advice'],
+    examples: [
+      ex('明日は 晴れると いいですね。', "I hope it's sunny tomorrow.", 'あしたは はれると いいですね。'),
+      ex('風邪なら、今日は 早く 寝ると いいよ。', 'If you have a cold, you should go to bed early tonight.', 'かぜなら、きょうは はやく ねると いいよ。'),
+    ],
+  },
+  'n4m-g-1b3183': {
+    structure: 'V-て形 + くる（きます）',
+    explanation:
+      'てくる brings an action toward the speaker or up to the present. It can mean “go and do, then come back” (買ってくる), movement toward the speaker (走ってくる), a change that has developed until now (寒くなってきた), or something starting to happen (雨が降ってきた). Its partner ていく points away from now.',
+    functions: ['process', 'direction'],
+    examples: [
+      ex('ちょっと コンビニで 飲み物を 買って くるね。', "I'll just go and get some drinks from the convenience store.", 'ちょっと こんびにで のみものを かって くるね。'),
+      ex('だんだん 寒く なって きました。', "It's been getting colder and colder.", 'だんだん さむく なって きました。'),
+    ],
+  },
+  'n4m-g-0c8bd6': {
+    meaning: "don't have to ~; it's all right not to ~",
+    structure: 'V-ない形 + でも いい（よい）',
+    explanation:
+      'A variant of なくてもいい: permission not to do something. ないでもいい is less common and a little old-fashioned or regional; なくてもいい is the standard form learners should produce. よい in place of いい makes it more formal and written.',
+    functions: ['allow', 'negative'],
+    examples: [
+      ex('無理に 来ないでも いいよ。', "You don't have to come if it's too much.", 'むりに こないでも いいよ。'),
+      ex('全部 答えないでも よい。', 'You need not answer every question.', 'ぜんぶ こたえないでも よい。'),
+    ],
+  },
+  'n4m-g-67fa24': {
+    meaning: 'before one knew it; at some point (unnoticed)',
+    structure: 'いつか（＝いつの間にか）+ V-た／V-ていた',
+    explanation:
+      'In narrative and written style, いつか can mean that a change happened without anyone noticing when: いつか雨はやんでいた “at some point the rain had stopped”. Everyday speech uses いつの間にか for this. The verb is past or a resulting state, which is what separates it from “someday”.',
+    functions: ['time', 'unexpected-outcome'],
+    examples: [
+      ex('話して いる うちに、いつか 外は 暗く なって いた。', 'While we talked, it had grown dark outside without our noticing.', 'はなして いる うちに、いつか そとは くらく なって いた。'),
+      ex('本を 読みながら、いつか 眠って しまって いた。', 'While reading, I had fallen asleep before I knew it.', 'ほんを よみながら、いつか ねむって しまって いた。'),
+    ],
+  },
+  'n4m-g-a8b4b5': {
+    structure: 'いつか（は）+ V-dict／V-たい',
+    explanation:
+      'With a non-past verb, いつか means “some day, one day” in the future. Adding は makes it firmer, “sooner or later, eventually”: いつかは分かる. It often carries hope (いつか行きたい); for a specific but unknown near time, use そのうち.',
+    functions: ['future-time'],
+    examples: [
+      ex('いつか 世界 一周 旅行を したい。', 'Someday I want to travel around the world.', 'いつか せかい いっしゅう りょこうを したい。'),
+      ex('本当の ことは いつかは 分かる はずだ。', 'The truth is bound to come out sooner or later.', 'ほんとうの ことは いつかは わかる はずだ。'),
+    ],
+  },
+  'n4m-g-0c6d7c': {
+    meaning: 'things like ~ing and ~ing (examples of actions)',
+    structure: 'V-dict + とか + V-dict + とか（する）',
+    explanation:
+      'とか lists actions (or nouns) as examples, implying there are others: 休みの日は本を読むとか映画を見るとかしている. It is casual; the more neutral version with verbs is たり〜たりする. A single とか also works to give one soft example.',
+    functions: ['denote-by-example', 'listed'],
+    examples: [
+      ex('休みの 日は 本を 読むとか、映画を 見るとか して いる。', 'On my days off I do things like reading and watching films.', 'やすみの ひは ほんを よむとか、えいがを みるとか して いる。'),
+      ex('少し 休むとか、水を 飲むとか したら どう？', 'Why not take a short break or drink some water or something?', 'すこし やすむとか、みずを のむとか したら どう？'),
+    ],
+  },
+  'n4m-g-5aef53': {
+    meaning: 'the ~ from the other day; that ~ (from before)',
+    structure: 'いつかの + N',
+    explanation:
+      'いつかの refers to something from an unspecified earlier occasion that both speakers remember: いつかの約束 “that promise (from before)”. It is vaguer than この間の (“the other day’s”) and suits things neither side can date exactly.',
+    functions: ['time', 'past-state'],
+    examples: [
+      ex('いつかの 約束、覚えて いますか。', 'Do you remember that promise from before?', 'いつかの やくそく、おぼえて いますか。'),
+      ex('いつかの お礼に、今日は 私が ごちそうします。', "To thank you for last time, today's meal is on me.", 'いつかの おれいに、きょうは わたしが ごちそうします。'),
+    ],
+  },
+  'n4m-g-d9a184': {
+    meaning: 'when I ~, (I found that) …',
+    structure: 'V-たら, … + V-た（discovery）',
+    explanation:
+      'With a past main clause, たら describes what the speaker discovered or what happened unexpectedly after acting: 窓を開けたら雪が降っていた. The main clause is outside the speaker’s control. と can be used the same way in narration; ば cannot.',
+    functions: ['condition', 'unexpected-outcome'],
+    examples: [
+      ex('窓を 開けたら、雪が 降って いた。', 'When I opened the window, it was snowing.', 'まどを あけたら、ゆきが ふって いた。'),
+      ex('家に 帰ったら、母から 手紙が 届いて いた。', 'When I got home, there was a letter from my mother.', 'いえに かえったら、ははから てがみが とどいて いた。'),
+    ],
+  },
 };

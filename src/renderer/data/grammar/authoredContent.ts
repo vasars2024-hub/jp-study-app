@@ -18,7 +18,7 @@
  * text). Example sentences are hand-written unless they carry `source`.
  */
 import type { GrammarFunctionId } from './functions';
-import type { GrammarExample, GrammarLevel, GrammarPoint } from './types';
+import type { GrammarExample, GrammarLang, GrammarLevel, GrammarPoint } from './types';
 import { isHollowGrammarPoint } from './hollow';
 import { AUTHORED_N4 } from './authored/n4';
 import { AUTHORED_N3 } from './authored/n3';
@@ -169,6 +169,41 @@ export function grammarAuthoringQueue(
         a.index - b.index,
     )
     .map(({ p }) => ({ id: p.id, level: p.level, title: p.title, meaning: p.meaning }));
+}
+
+/**
+ * Supplement records the explorer never shows, for `grammarAuthoringQueue`'s
+ * `shadowed` option.
+ *
+ * `dedupeGrammarByTitle` keeps one record per title key and picks it by
+ * content, so a supplement record whose key matches a core (authored) record
+ * loses to it even once written, and of two hollow supplement twins only the
+ * one written first will surface. Authoring the losers helps no one; they go
+ * to the end of their level. A twin of an already-authored record is shadowed
+ * by that record. `titleKey` is `grammarTitleKey` from practiceFilters, passed
+ * in so the data layer does not import the filter layer.
+ */
+export function shadowedSupplementIds(
+  core: readonly GrammarPoint[],
+  supplements: readonly GrammarPoint[],
+  titleKey: (lang: GrammarLang, title: string) => string,
+): Set<string> {
+  const coreKeys = new Set(core.map((p) => titleKey(p.lang ?? 'ja', p.title)));
+  const claimed = new Map<string, string>();
+  for (const p of supplements) {
+    if (AUTHORED_CONTENT[p.id]) claimed.set(titleKey(p.lang ?? 'ja', p.title), p.id);
+  }
+  const shadowed = new Set<string>();
+  for (const p of supplements) {
+    const key = titleKey(p.lang ?? 'ja', p.title);
+    const owner = claimed.get(key);
+    if (coreKeys.has(key) || (owner && owner !== p.id)) {
+      shadowed.add(p.id);
+      continue;
+    }
+    claimed.set(key, p.id);
+  }
+  return shadowed;
 }
 
 /** Authored vs still-hollow counts per level, for the audit and the tests' ratchet. */
