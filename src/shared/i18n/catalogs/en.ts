@@ -4870,6 +4870,8 @@ export const en: Catalog = {
   'translate.clear.nothing': 'Nothing to clear.',
   'translate.error.modelMissing': 'The offline AI model is not installed. Install Qwen3-1.7B in Settings › AI.',
   'translate.error.engineFailed': 'The translation engine could not start. Try restarting the app.',
+  'translate.error.engineRestarted': 'The offline model stopped and has been restarted. Try again.',
+  'translate.error.timeout': 'The offline model took too long to answer. Try again, or try a shorter selection.',
   'translate.error.failed': 'Translation failed.',
   'translate.history.copy': 'Copy',
   'translate.history.rerun': 'Re-run',

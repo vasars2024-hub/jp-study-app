@@ -263,6 +263,61 @@ describe('llamaHost — the boundary', () => {
     const pendingPrompt = session.prompt('x', { maxTokens: 16 });
     await Promise.resolve();
     child().emit('exit', 0);
-    await expect(pendingPrompt).rejects.toThrow(/exited before it answered/);
+    // Typed, so the consumer drops its cached handle rather than retrying a dead id (audit #3).
+    await expect(pendingPrompt).rejects.toMatchObject({ name: 'LlamaSessionLostError' });
+  });
+});
+
+// Resilience audit #17 and #3.
+describe('llamaHost — a host that stops answering or dies', () => {
+  it('rejects a tokenizer call the host never answers, and replaces the host', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = await acquire();
+      const counting = session.countTokens('猫').then(() => 'answered', (err: Error) => err.name);
+      await vi.advanceTimersByTimeAsync(host.LLAMA_HOST_RPC_TIMEOUT_MS + 1);
+      expect(await counting).toBe('TimeoutError');
+      expect(child().killed).toBe(1);
+      expect(host.isLlamaHostRunning()).toBe(false);
+      expect(session.isLost?.()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('treats a prompt that does not stop after an abort as a hung host', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = await acquire();
+      const controller = new AbortController();
+      const prompting = session.prompt('long', { maxTokens: 64, signal: controller.signal })
+        .then(() => 'answered', (err: Error) => err.name);
+      await Promise.resolve();
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(host.LLAMA_HOST_ABORT_GRACE_MS + 1);
+      expect(await prompting).toBe('TimeoutError');
+      expect(child().killed).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says a session from a dead host is lost, and never sends its id to the replacement', async () => {
+    const session = await acquire();
+    child().emit('exit', 1);
+    expect(session.isLost?.()).toBe(true);
+    await expect(session.countTokens('x')).rejects.toMatchObject({ name: 'LlamaSessionLostError' });
+    await expect(session.prompt('x', { maxTokens: 8 })).rejects.toMatchObject({ name: 'LlamaSessionLostError' });
+
+    // A fresh acquire forks a new child; the dead session's id was never posted to it.
+    const next = host.acquireLlamaSession('C:\models\qwen.gguf', 8192);
+    await Promise.resolve();
+    const replacement = child(1);
+    const request = lastRequest(replacement, 'acquire');
+    reply(replacement, { id: request.id, kind: 'acquire', session: 's1', warm: false });
+    const fresh = await next;
+    expect(fresh.isLost?.()).toBe(false);
+    expect(replacement.posted.filter((entry) => entry.kind !== 'acquire')).toEqual([]);
+    expect(session.isLost?.()).toBe(true);
   });
 });

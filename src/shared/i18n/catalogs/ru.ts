@@ -5298,6 +5298,8 @@ export const ru: Catalog = {
   'translate.clear.nothing': 'Нечего очищать.',
   'translate.error.modelMissing': 'Офлайн-модель ИИ не установлена. Установите Qwen3-1.7B в Настройки › ИИ.',
   'translate.error.engineFailed': 'Не удалось запустить движок перевода. Попробуйте перезапустить приложение.',
+  'translate.error.engineRestarted': 'Офлайн-модель остановилась и была перезапущена. Попробуйте ещё раз.',
+  'translate.error.timeout': 'Офлайн-модель отвечала слишком долго. Повторите попытку или выделите фрагмент покороче.',
   'translate.error.failed': 'Не удалось перевести.',
   'translate.history.copy': 'Копировать',
   'translate.history.rerun': 'Повторить',

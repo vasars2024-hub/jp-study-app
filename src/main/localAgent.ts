@@ -20,7 +20,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
-import { acquireLlamaSession, type LlamaSessionHandle } from './llamaHost';
+import { acquireLlamaSession, isLlamaSessionLost, type LlamaSessionHandle } from './llamaHost';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
@@ -132,6 +132,9 @@ function listAvailableModels(): LocalAgentModelInfo[] {
 }
 
 async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Promise<LoadedAgentRuntime> {
+  // A session whose host exited or was replaced is gone: reusing it would send a dead id to the
+  // new child on every plan until the idle unload (resilience audit #3).
+  if (runtime?.session.isLost?.()) runtime = null;
   const keyMatches = runtime?.modelPath === modelPath && runtime.contextSize === settings.contextSize;
   if (keyMatches && runtime) return runtime;
   if (loadPromise) return loadPromise;
@@ -182,8 +185,10 @@ async function countPromptTokens(session: LlamaSessionHandle, prompt: string): P
     // Asynchronous only because the tokenizer answers from the model host; it is still the exact
     // tokenizer the generation will use.
     return await session.countTokens(prompt);
-  } catch {
-    /* Fall through to the estimate; a tokenizer failure must not fail the plan. */
+  } catch (err) {
+    // A host that stopped answering or died is not a tokenizer that could not count.
+    if (isLlamaSessionLost(err) || (err instanceof Error && err.name === 'TimeoutError')) throw err;
+    /* Otherwise fall through to the estimate; a tokenizer failure must not fail the plan. */
   }
   return Math.ceil(prompt.length / 1.5);
 }

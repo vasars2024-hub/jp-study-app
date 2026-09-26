@@ -4906,6 +4906,8 @@ export const ja: Catalog = {
   'translate.clear.nothing': '消去するものがありません。',
   'translate.error.modelMissing': 'オフライン AI モデルがインストールされていません。設定 › AI で Qwen3-1.7B をインストールしてください。',
   'translate.error.engineFailed': '翻訳エンジンを起動できませんでした。アプリを再起動してください。',
+  'translate.error.engineRestarted': 'オフラインモデルが停止したため再起動しました。もう一度お試しください。',
+  'translate.error.timeout': 'オフラインモデルの応答に時間がかかりすぎました。もう一度試すか、選択範囲を短くしてください。',
   'translate.error.failed': '翻訳に失敗しました。',
   'translate.history.copy': 'コピー',
   'translate.history.rerun': '再実行',

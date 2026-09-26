@@ -51,7 +51,44 @@ export interface LlamaSessionHandle {
   countTokens(text: string): Promise<number>;
   resetHistory(): Promise<void>;
   release(): Promise<void>;
+  /**
+   * True once the host process that held this session has exited or been
+   * replaced. Every method then rejects with `LlamaSessionLostError`; the
+   * consumer drops its cached handle and acquires a fresh one.
+   */
+  isLost?(): boolean;
 }
+
+/**
+ * The host process that held a session is gone, so the session is too. Typed
+ * so a consumer can drop its cached handle instead of retrying a dead id —
+ * a replacement child does not know it (or, worse, reuses it for another).
+ */
+export class LlamaSessionLostError extends Error {
+  constructor() {
+    super('The local model process restarted; the session has to be acquired again.');
+    this.name = 'LlamaSessionLostError';
+  }
+}
+
+export function isLlamaSessionLost(err: unknown): boolean {
+  return err instanceof Error && err.name === 'LlamaSessionLostError';
+}
+
+/**
+ * Deadlines for host RPCs that must answer promptly. A host that is alive but
+ * no longer answering (a native stall) would otherwise leave every caller —
+ * and the translation queue behind it — pending forever. On expiry the call
+ * rejects with a `TimeoutError` and the host is replaced.
+ */
+export const LLAMA_HOST_RPC_TIMEOUT_MS = 30_000;
+/** Acquire loads weights, which is slow on a cold disk; still bounded. */
+export const LLAMA_HOST_ACQUIRE_TIMEOUT_MS = 240_000;
+/**
+ * After a prompt is aborted, how long the host gets to acknowledge before it
+ * is treated as hung. Generation stops within a token of an abort.
+ */
+export const LLAMA_HOST_ABORT_GRACE_MS = 15_000;
 
 interface Pending {
   resolve(value: LlamaHostResponse): void;
@@ -69,6 +106,8 @@ let forkUnavailable = false;
 /** Cleared only by a fork that answered something, so a bundle that is simply absent is not retried. */
 let everAnswered = false;
 let nextRequestId = 1;
+/** Bumped per fork; a session belongs to the generation that created it. */
+let generation = 0;
 const pending = new Map<number, Pending>();
 /** Sessions main believes the current child holds, so a child death can invalidate them. */
 const liveSessions = new Set<LlamaSessionId>();
@@ -124,6 +163,7 @@ function ensureChild(): Child | null {
     return null;
   }
   child = forked;
+  generation += 1;
   forked.on('message', (value: unknown) => {
     if (isLlamaHostFarewell(value)) {
       acceptIdleOffer(forked);
@@ -147,15 +187,59 @@ function ensureChild(): Child | null {
   return forked;
 }
 
-function post(request: LlamaHostRequest, onChunk?: (chunk: string) => void): Promise<LlamaHostResponse> {
+/**
+ * Replaces a host that stopped answering: every pending call is rejected now
+ * (not whenever the OS reaps the process), live sessions are invalidated, and
+ * the next acquire forks a fresh child.
+ */
+function replaceHungHost(hung: Child, reason: string): void {
+  if (child !== hung) return;
+  child = null;
+  liveSessions.clear();
+  rejectAllPending(reason);
+  try {
+    hung.kill();
+  } catch {
+    /* Already gone. */
+  }
+}
+
+function hostTimeoutError(kind: string, ms: number): Error {
+  const err = new Error(`The local model process did not answer ${kind} within ${Math.round(ms / 1000)} s.`);
+  err.name = 'TimeoutError';
+  return err;
+}
+
+function post(
+  request: LlamaHostRequest,
+  onChunk?: (chunk: string) => void,
+  deadlineMs?: number,
+): Promise<LlamaHostResponse> {
   const active = ensureChild();
   if (!active) return Promise.reject(new Error('llama-host: no worker process'));
   return new Promise<LlamaHostResponse>((resolve, reject) => {
-    pending.set(request.id, { resolve, reject, onChunk });
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const done = (): void => {
+      if (timer) clearTimeout(timer);
+    };
+    pending.set(request.id, {
+      resolve: (value) => { done(); resolve(value); },
+      reject: (err) => { done(); reject(err); },
+      onChunk,
+    });
+    if (deadlineMs && deadlineMs > 0) {
+      timer = setTimeout(() => {
+        if (!pending.delete(request.id)) return;
+        reject(hostTimeoutError(request.kind, deadlineMs));
+        replaceHungHost(active, 'The local model process stopped answering and was restarted.');
+      }, deadlineMs);
+      timer.unref?.();
+    }
     try {
       active.postMessage(request);
     } catch (err) {
       pending.delete(request.id);
+      done();
       // A child that died between `ensureChild` and here is the same "no worker" condition, not a
       // caller error: drop it so the next call forks a live one.
       if (child === active) child = null;
@@ -166,15 +250,38 @@ function post(request: LlamaHostRequest, onChunk?: (chunk: string) => void): Pro
 
 function remoteSession(id: LlamaSessionId, modelPath: string, contextSize: number, warm: boolean): LlamaSessionHandle {
   let released = false;
+  const owner = generation;
+  const owningChild = child;
+  // The child this session lives in exited or was replaced: its id means
+  // nothing to the current child, so nothing may be sent under it.
+  const lost = (): boolean => owner !== generation || child === null || !liveSessions.has(id);
+  const assertAlive = (): void => {
+    if (lost()) throw new LlamaSessionLostError();
+  };
   return {
     modelPath,
     contextSize,
     warm,
+    isLost: lost,
     async prompt(text, opts) {
+      assertAlive();
       const requestId = nextRequestId++;
+      let graceTimer: ReturnType<typeof setTimeout> | null = null;
       const forward = (): void => {
         // Best effort by design: a child that has already exited has already stopped generating.
         void post({ id: nextRequestId++, kind: 'abort', target: requestId }).catch(() => undefined);
+        // A generation that does not stop after an abort is a stalled host. Without this the
+        // prompt stays pending forever and everything queued behind it with it.
+        if (!graceTimer) {
+          graceTimer = setTimeout(() => {
+            const waiter = pending.get(requestId);
+            if (!waiter || !owningChild) return;
+            pending.delete(requestId);
+            waiter.reject(hostTimeoutError('an abort', LLAMA_HOST_ABORT_GRACE_MS));
+            replaceHungHost(owningChild, 'The local model process stopped answering and was restarted.');
+          }, LLAMA_HOST_ABORT_GRACE_MS);
+          graceTimer.unref?.();
+        }
       };
       // `abort` is fire-and-forget on the child's side and is never answered, so it must not be
       // awaited here — see the worker's `case 'abort'`.
@@ -186,26 +293,39 @@ function remoteSession(id: LlamaSessionId, modelPath: string, contextSize: numbe
           opts.onTextChunk,
         );
         return reply.kind === 'prompt' ? reply.text : '';
+      } catch (err) {
+        // The host died under this prompt: say so in the typed form.
+        if (lost() && !(err instanceof Error && err.name === 'TimeoutError')) throw new LlamaSessionLostError();
+        throw err;
       } finally {
+        if (graceTimer) clearTimeout(graceTimer);
         opts.signal?.removeEventListener('abort', forward);
       }
     },
     async countTokens(text) {
-      const reply = await post({ id: nextRequestId++, kind: 'countTokens', session: id, text });
+      assertAlive();
+      const reply = await post(
+        { id: nextRequestId++, kind: 'countTokens', session: id, text },
+        undefined,
+        LLAMA_HOST_RPC_TIMEOUT_MS,
+      );
       if (reply.kind === 'countTokens') return reply.tokens;
       throw new Error('llama-host: tokenizer unavailable');
     },
     async resetHistory() {
-      if (released) return;
-      await post({ id: nextRequestId++, kind: 'resetHistory', session: id });
+      if (released || lost()) return;
+      await post({ id: nextRequestId++, kind: 'resetHistory', session: id }, undefined, LLAMA_HOST_RPC_TIMEOUT_MS);
     },
     async release() {
       if (released) return;
       released = true;
+      const wasLost = lost();
       liveSessions.delete(id);
       // A child that already exited took the native memory with it, which is exactly what release
       // was asking for; only a live one needs telling.
-      if (child) await post({ id: nextRequestId++, kind: 'release', session: id });
+      if (child && !wasLost) {
+        await post({ id: nextRequestId++, kind: 'release', session: id }, undefined, LLAMA_HOST_RPC_TIMEOUT_MS);
+      }
     },
   };
 }
@@ -281,8 +401,9 @@ export async function acquireLlamaSession(modelPath: string, contextSize: number
   if (!active) return inProcessSession(modelPath, contextSize);
   let reply: LlamaHostResponse;
   try {
-    reply = await post({ id: nextRequestId++, kind: 'acquire', modelPath, contextSize });
+    reply = await post({ id: nextRequestId++, kind: 'acquire', modelPath, contextSize }, undefined, LLAMA_HOST_ACQUIRE_TIMEOUT_MS);
   } catch (err) {
+    if (err instanceof Error && err.name === 'TimeoutError') throw err;
     // A child that died on startup (a missing bundle exits 1 rather than throwing on fork) must not
     // take the feature with it. A genuine model error — a missing GGUF, out of VRAM — is the
     // product's own message and is rethrown.
@@ -304,7 +425,7 @@ export async function llamaHostStats(): Promise<{ models: LlamaModelPoolRow[]; c
   if (forkUnavailable) return { models: llamaModelPoolStats(), contexts: llamaContextPoolStats() };
   if (!child) return { models: [], contexts: [] };
   try {
-    const reply = await post({ id: nextRequestId++, kind: 'stats' });
+    const reply = await post({ id: nextRequestId++, kind: 'stats' }, undefined, LLAMA_HOST_RPC_TIMEOUT_MS);
     if (reply.kind === 'stats') return { models: reply.models, contexts: reply.contexts };
   } catch {
     /* A host that died mid-question is holding nothing, which is what the empty answer says. */

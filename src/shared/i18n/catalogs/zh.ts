@@ -4883,6 +4883,8 @@ export const zh: Catalog = {
   'translate.clear.nothing': '没有可清除的内容。',
   'translate.error.modelMissing': '未安装离线 AI 模型。请在“设置 › AI”中安装 Qwen3-1.7B。',
   'translate.error.engineFailed': '翻译引擎无法启动。请尝试重启应用。',
+  'translate.error.engineRestarted': '离线模型已停止并已重新启动。请重试。',
+  'translate.error.timeout': '离线模型响应时间过长。请重试，或缩短所选内容。',
   'translate.error.failed': '翻译失败。',
   'translate.history.copy': '复制',
   'translate.history.rerun': '重跑',

@@ -5,7 +5,7 @@ import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import crypto from 'node:crypto';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
-import { acquireLlamaSession, type LlamaSessionHandle } from './llamaHost';
+import { acquireLlamaSession, isLlamaSessionLost, type LlamaSessionHandle } from './llamaHost';
 import {
   LocalModelMissingError,
   findLocalModelFile,
@@ -167,8 +167,11 @@ async function countPromptTokens(prompt: string, on: LlamaSessionHandle | null =
     // exact tokenizer the generation will use, not a second copy loaded to count with.
     const tokens = await on?.countTokens(prompt);
     if (typeof tokens === 'number') return tokens;
-  } catch {
-    /* Fall through to the estimate; a tokenizer failure must not fail the request. */
+  } catch (err) {
+    // A host that stopped answering (deadline) or died (session lost) is not a tokenizer that
+    // could not count: prompting it next would fail the same way, only later.
+    if (isLlamaSessionLost(err) || (err instanceof Error && err.name === 'TimeoutError')) throw err;
+    /* Otherwise fall through to the estimate; a tokenizer failure must not fail the request. */
   }
   return Math.ceil(prompt.length / 1.5);
 }
@@ -210,19 +213,23 @@ async function promptWithTimeout(
   maxTokens: number,
   timeoutMs: number,
 ): Promise<string> {
-  // Every batch, strict-retry and single-sentence prompt in this module funnels through here, so
-  // this is the one place that can hold all four of them inside the context.
-  const fitted = await fitOutputBudget(prompt, maxTokens);
   const controller = new AbortController();
   activeBatchAbort = controller;
   if (batchCancelled) {
     throw new Error('Translation cancelled');
   }
+  // The deadline and the cancel poll are armed BEFORE the tokenizer is asked, not after: a host
+  // that stopped answering used to hang in `countTokens`, outside every guard, and the serial
+  // queue behind it with it.
+  let rejectCancel: (err: Error) => void = () => undefined;
+  const cancelPromise = new Promise<never>((_, reject) => {
+    rejectCancel = reject;
+  });
   const cancelPoll = setInterval(() => {
-    if (batchCancelled) controller.abort();
+    if (!batchCancelled) return;
+    controller.abort();
+    rejectCancel(new Error('Translation cancelled'));
   }, 250);
-
-  const promptPromise = s.prompt(prompt, { maxTokens: fitted, signal: controller.signal });
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -231,16 +238,26 @@ async function promptWithTimeout(
       reject(new Error(`Translation prompt timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
   });
+  void cancelPromise.catch(() => undefined);
+  void timeoutPromise.catch(() => undefined);
 
+  let promptPromise: Promise<string> | null = null;
   activeTranslations += 1;
   try {
-    return await Promise.race([promptPromise, timeoutPromise]);
+    // Every batch, strict-retry and single-sentence prompt in this module funnels through here, so
+    // this is the one place that can hold all four of them inside the context.
+    const fitted = await Promise.race([fitOutputBudget(prompt, maxTokens, s), timeoutPromise, cancelPromise]);
+    promptPromise = s.prompt(prompt, { maxTokens: fitted, signal: controller.signal });
+    return await Promise.race([promptPromise, timeoutPromise, cancelPromise]);
+  } catch (err) {
+    dropLostSession(s, err);
+    throw err;
   } finally {
     if (timer) clearTimeout(timer);
     clearInterval(cancelPoll);
     if (activeBatchAbort === controller) activeBatchAbort = null;
     // Best-effort: don't leave a late prompt resolution touching session state.
-    void promptPromise.catch(() => undefined);
+    void promptPromise?.catch(() => undefined);
     resetSessionHistory(s);
     activeTranslations -= 1;
     // Every inference in this module goes through here, so this is the one place that knows the
@@ -444,6 +461,9 @@ export function isTranslateReady(): boolean {
  */
 export function friendlyErrorKey(err: unknown): string | undefined {
   const msg = err instanceof Error ? err.message : String(err);
+  if (isLlamaSessionLost(err)) return 'translate.error.engineRestarted';
+  if (err instanceof Error && err.name === 'TimeoutError') return 'translate.error.timeout';
+  if (/timed out after/i.test(msg)) return 'translate.error.timeout';
   if (err instanceof LocalModelMissingError || /model not found|ENOENT|no such file/i.test(msg)) return 'translate.error.modelMissing';
   if (/llama|gguf|cuda|vulkan|backend|native/i.test(msg)) return 'translate.error.engineFailed';
   return undefined;
@@ -451,6 +471,7 @@ export function friendlyErrorKey(err: unknown): string | undefined {
 
 function friendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
+  if (isLlamaSessionLost(err)) return 'The offline model restarted. Try again.';
   if (err instanceof LocalModelMissingError || /model not found|ENOENT|no such file/i.test(msg)) {
     return 'The offline AI model is not installed. Install Qwen3-1.7B in Settings > AI.';
   }
@@ -521,7 +542,20 @@ function scheduleIdleUnload(): void {
   idleUnloadTimer.unref?.();
 }
 
+/**
+ * Forgets the cached session when the host that held it is gone (it exited, or it stopped
+ * answering and was replaced), so the next request acquires a fresh one instead of sending a dead
+ * id to a new child and getting the restart message forever.
+ */
+function dropLostSession(s: LlamaSessionHandle, err?: unknown): void {
+  const lost = s.isLost?.() === true || isLlamaSessionLost(err);
+  if (!lost || session !== s) return;
+  session = null;
+  loadPromise = null;
+}
+
 async function ensureSession(): Promise<LlamaSessionHandle> {
+  if (session?.isLost?.()) dropLostSession(session);
   if (session) return session;
   if (!loadPromise) {
     loadPromise = (async () => {
@@ -709,17 +743,30 @@ export async function runLocalQwenPrompt(
     const abort = () => controller.abort(options?.signal?.reason);
     let timer: ReturnType<typeof setTimeout> | null = null;
     try {
-      // After the session exists, so the weights — and therefore the real tokenizer — are loaded.
-      // The callers of this function are the ones that could ask for a whole context of output.
-      const maxTokens = await fitOutputBudget(prompt, requestedTokens, s);
       if (options?.signal?.aborted) {
         throw new Error('Local Qwen request was cancelled.');
       }
       options?.signal?.addEventListener('abort', abort, { once: true });
-      timer = setTimeout(() => {
-        timedOut = true;
-        controller.abort();
-      }, timeoutMs);
+      // Armed before the tokenizer is asked: a host that stopped answering must hit this deadline,
+      // not hang the queue in `countTokens`.
+      const expired = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(Object.assign(new Error('timed out'), { name: 'AbortError' }));
+        }, timeoutMs);
+      });
+      void expired.catch(() => undefined);
+      const aborted = new Promise<never>((_, reject) => {
+        if (controller.signal.aborted) reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        controller.signal.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        }, { once: true });
+      });
+      void aborted.catch(() => undefined);
+      // After the session exists, so the weights — and therefore the real tokenizer — are loaded.
+      // The callers of this function are the ones that could ask for a whole context of output.
+      const maxTokens = await Promise.race([fitOutputBudget(prompt, requestedTokens, s), expired, aborted]);
       const raw = await s.prompt(prompt, {
         maxTokens,
         signal: controller.signal,
@@ -728,6 +775,7 @@ export async function runLocalQwenPrompt(
       const cleaned = cleanLlmOutput(raw);
       return options?.raw ? cleaned : extractJsonish(cleaned);
     } catch (err) {
+      if (!borrowed) dropLostSession(s, err);
       if (err instanceof Error && err.name === 'AbortError') {
         if (!timedOut) throw new Error('Local Qwen request was cancelled.');
         throw new Error(`Local Qwen timed out after ${Math.round(timeoutMs / 1000)}s.`);
