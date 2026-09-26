@@ -20,6 +20,7 @@ import {
   type ProfileRuleContext,
   type ProfileRulesStore,
 } from '../../../../shared/profileRules';
+import { Toggle } from '../../ui';
 
 type SourceOpt = MineSource | 'any';
 type CardKindOpt = MineCardKind | 'any';
@@ -403,15 +404,13 @@ export default function ProfileRulesPage() {
                     <span className="pr-order">
                       {t('settings.profileRules.order', { n: index + 1 })}
                     </span>
-                    <label className="os-toggle os-toggle-compact" style={{ flexShrink: 0 }}>
-                      <input
-                        type="checkbox"
-                        checked={rule.enabled}
-                        onChange={(e) => updateRule(index, { enabled: e.target.checked })}
-                        aria-label={t('settings.profileRules.enabled')}
-                      />
-                      <span>{rule.enabled ? t('common.on') : t('common.off')}</span>
-                    </label>
+                    <Toggle
+                      className="os-toggle os-toggle-compact"
+                      checked={rule.enabled}
+                      onChange={(e) => updateRule(index, { enabled: e.target.checked })}
+                      aria-label={t('settings.profileRules.enabled')}
+                      label={rule.enabled ? t('common.on') : t('common.off')}
+                    />
                     <input
                       className="gram-search pr-rule-label"
                       type="text"

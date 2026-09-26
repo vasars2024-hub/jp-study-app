@@ -3,6 +3,7 @@ import RecommendedIconsCard from './RecommendedIconsCard';
 import { useSettings } from '../SettingsContext';
 import type { IconSizeId, IconTextColorId, SnapGridId, StartColumnsId, TaskbarSizeId } from '../../../desktopPrefs';
 import { useT } from '../../../i18n';
+import { Toggle } from '../../ui';
 
 export default function DesktopLayoutPage() {
   const { t } = useT();
@@ -98,22 +99,18 @@ export default function DesktopLayoutPage() {
           ))}
         </div>
         <p className="muted os-set-hint">{t('settings.desktop.snapHint')}</p>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={deskPrefs.singleClickOpen}
-            onChange={(e) => patchDesk({ singleClickOpen: e.target.checked })}
-          />
-          <span>{t('settings.desktop.singleClick')}</span>
-        </label>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={deskPrefs.iconsLocked}
-            onChange={(e) => patchDesk({ iconsLocked: e.target.checked })}
-          />
-          <span>{t('settings.desktop.lockIcons')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={deskPrefs.singleClickOpen}
+          onChange={(e) => patchDesk({ singleClickOpen: e.target.checked })}
+          label={t('settings.desktop.singleClick')}
+        />
+        <Toggle
+          className="os-toggle"
+          checked={deskPrefs.iconsLocked}
+          onChange={(e) => patchDesk({ iconsLocked: e.target.checked })}
+          label={t('settings.desktop.lockIcons')}
+        />
       </SettingsCard>
 
       <RecommendedIconsCard />
@@ -231,14 +228,12 @@ export default function DesktopLayoutPage() {
         description={t('search.session.desc')}
         highlight={focusSettingId === 'session'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={deskPrefs.restoreSessionWindows !== false}
-            onChange={(e) => patchDesk({ restoreSessionWindows: e.target.checked })}
-          />
-          <span>{t('settings.desktop.restoreWindows')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={deskPrefs.restoreSessionWindows !== false}
+          onChange={(e) => patchDesk({ restoreSessionWindows: e.target.checked })}
+          label={t('settings.desktop.restoreWindows')}
+        />
         <p className="muted os-set-hint">{t('settings.desktop.sessionHint')}</p>
       </SettingsCard>
 

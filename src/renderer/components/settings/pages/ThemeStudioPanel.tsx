@@ -43,6 +43,7 @@ import { readPlayerSubtitleFontSize, writePlayerSubtitleFontSize } from '../../.
 // on. `firstReason` makes the reason and the `disabled` value one expression, so they
 // cannot drift — every site below spends it as `disabled={!!why} title={why}`.
 import { firstReason } from '../../../../shared/disabledReason';
+import { SwitchRow } from '../../ui';
 
 const TOKEN_GROUPS: UiTokenGroup[] = ['color', 'typography', 'spacing', 'radius', 'shadow', 'motion', 'density'];
 
@@ -140,7 +141,7 @@ export default function ThemeStudioPanel() {
         return key ? t(key) : v;
       };
       return (
-        <div className="field-row" key={`look-${field}`}>
+        <div className="ui-control-row" key={`look-${field}`}>
           <span><strong>{t(LOOK_LABEL_KEY[field])}</strong></span>
           <span>{label(from[field])} → {label(value)}</span>
         </div>
@@ -154,7 +155,7 @@ export default function ThemeStudioPanel() {
         title={t('theme.assistant')}
         description={t('theme.assistantDesc')}
       >
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="theme-request">{t('theme.request')}</label>
           <input
             id="theme-request"
@@ -163,6 +164,7 @@ export default function ThemeStudioPanel() {
             onChange={(event) => setRequest(event.currentTarget.value)}
           />
           <button
+            className="btn"
             type="button"
             disabled={!!whyNoPreview}
             title={whyNoPreview}
@@ -186,7 +188,7 @@ export default function ThemeStudioPanel() {
           <>
             <p className="muted">{t('theme.previewNote')}</p>
             {plan.intents.map((intent) => (
-              <div className="field-row" key={intent.id}>
+              <div className="ui-control-row" key={intent.id}>
                 <span>
                   <strong>{t(`theme.intent.${intent.id}`)}</strong>
                   <small className="muted">{t('theme.matched', { phrase: intent.matched })}</small>
@@ -194,14 +196,14 @@ export default function ThemeStudioPanel() {
               </div>
             ))}
             {Object.entries(plan.tokens).map(([token, value]) => (
-              <div className="field-row" key={token}>
+              <div className="ui-control-row" key={token}>
                 <span><strong>--{token}</strong></span>
                 <span>{profile.tokens[token] ?? t('theme.inherited')} → {value}</span>
               </div>
             ))}
             {lookRows(plan.look, currentUiLook())}
             {plan.subtitleFontSize !== undefined && (
-              <div className="field-row">
+              <div className="ui-control-row">
                 <span><strong>{t('theme.subtitleSize')}</strong></span>
                 <span>
                   {t('theme.subtitleSizeValue', { size: readPlayerSubtitleFontSize() })} →{' '}
@@ -252,7 +254,7 @@ export default function ThemeStudioPanel() {
         description={t('theme.profilesDesc')}
         trailing={<span className="os-set-adv-badge">{profile.name}</span>}
       >
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="theme-active">{t('theme.activeTheme')}</label>
           <select
             id="theme-active"
@@ -271,7 +273,7 @@ export default function ThemeStudioPanel() {
         {/* Where a theme's accent, density and corners went: into the Appearance cards
             above, which keep showing the real value and can change it at any time. */}
         <p className="muted">{t('theme.lookNote')}</p>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="theme-new">{t('theme.newTheme')}</label>
           <input
             id="theme-new"
@@ -280,6 +282,7 @@ export default function ThemeStudioPanel() {
             onChange={(event) => setNewThemeName(event.currentTarget.value)}
           />
           <button
+            className="btn"
             type="button"
             disabled={!!whyNoCreate}
             title={whyNoCreate}
@@ -349,10 +352,10 @@ export default function ThemeStudioPanel() {
           const specs = UI_TOKENS.filter((spec) => spec.group === group);
           if (!specs.length) return null;
           return (
-            <fieldset key={group} className="unified-search-controls">
-              <legend>{t(`theme.group.${group}`)}</legend>
+            <fieldset key={group} className="ui-group">
+              <legend className="ui-group__title">{t(`theme.group.${group}`)}</legend>
               {specs.map((spec) => (
-                <div className="field-row" key={spec.token}>
+                <div className="ui-control-row" key={spec.token}>
                   {/* The token's readable name in the UI language, with its CSS name kept
                       beside it for people who theme by hand — the bare `--bg` used to be
                       the only label, in English, in every language. */}
@@ -393,19 +396,14 @@ export default function ThemeStudioPanel() {
         title={t('theme.developer')}
         description={t('theme.developerDesc')}
       >
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('theme.developerMode')}</strong>
-            <small className="muted">{t('theme.developerModeDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={document_.developerMode}
-            onChange={(event) => commit(setUiDeveloperMode(document_, event.currentTarget.checked))}
-          />
-        </label>
+        <SwitchRow
+          title={t('theme.developerMode')}
+          description={t('theme.developerModeDesc')}
+          checked={document_.developerMode}
+          onChange={(event) => commit(setUiDeveloperMode(document_, event.currentTarget.checked))}
+        />
         {document_.developerMode && (
-          <div className="field-row">
+          <div className="ui-control-row">
             <label htmlFor="theme-generated">{t('theme.generatedCss')}</label>
             <textarea
               id="theme-generated"
@@ -416,7 +414,7 @@ export default function ThemeStudioPanel() {
             />
           </div>
         )}
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="theme-json">{t('theme.themeJson')}</label>
           <textarea
             id="theme-json"

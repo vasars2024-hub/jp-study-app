@@ -16,6 +16,7 @@ import { persistUnifiedSearchTrackingMutation, type UnifiedSearchTrackingMutatio
 import type { UnifiedSearchMergedResult } from '../../../unifiedSearchMergedAdapter';
 import type { MediaTrackingStatus } from '../../../../shared/mediaTracking';
 import { mergeUnifiedSearchResults } from '../../../unifiedSearchBackends';
+import { Select } from '../../ui';
 
 /**
  * The built-in sources carry an English name in the stored document; these two
@@ -156,7 +157,7 @@ export default function UnifiedSearchPanel() {
       description={t('unifiedSearch.desc')}
       trailing={<span className="os-set-adv-badge">{t('unifiedSearch.providerCount', { count: state.providers.length })}</span>}
     >
-      <div className="field-row">
+      <div className="ui-control-row">
         <label htmlFor="unified-search-query">{t('unifiedSearch.label')}</label>
         <input
           id="unified-search-query"
@@ -168,16 +169,16 @@ export default function UnifiedSearchPanel() {
         />
       </div>
       {(suggestions.favorites.length > 0 || suggestions.recent.length > 0) && (
-        <div className="unified-search-controls" aria-label={t('unifiedSearch.suggestions')}>
+        <div className="ui-control-row" aria-label={t('unifiedSearch.suggestions')}>
           {suggestions.favorites.length > 0 && <div className="sp-seg"><span className="muted">{t('unifiedSearch.favoriteSuggestions')}</span>{suggestions.favorites.map((item) => <button type="button" className="btn" key={item.id} onClick={() => applySearch(item.query, item.filters)}>{item.query}</button>)}</div>}
           {suggestions.recent.length > 0 && <div className="sp-seg"><span className="muted">{t('unifiedSearch.recentSuggestions')}</span>{suggestions.recent.map((item) => <button type="button" className="btn" key={`${item.query}-${item.searchedAt}`} onClick={() => applySearch(item.query)}>{item.query}</button>)}</div>}
         </div>
       )}
-      <fieldset className="unified-search-controls">
-        <legend>{t('unifiedSearch.sources')}</legend>
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('unifiedSearch.sources')}</legend>
         {document.providers.length === 0 && <span className="muted">{t('unifiedSearch.noSources')}</span>}
         {document.providers.map((provider, index) => (
-          <div className="field-row" key={provider.id}>
+          <div className="ui-control-row" key={provider.id}>
             <label>
               <input type="checkbox" checked={provider.enabled} onChange={(event) => updateProvider(provider.id, event.currentTarget.checked)} />
               {providerName(provider.id, provider.name)}
@@ -189,42 +190,42 @@ export default function UnifiedSearchPanel() {
           </div>
         ))}
       </fieldset>
-      <fieldset className="unified-search-controls">
-        <legend>{t('unifiedSearch.filters')}</legend>
-        <div className="field-row">
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('unifiedSearch.filters')}</legend>
+        <div className="ui-control-row">
           <label htmlFor="unified-search-source-filter">{t('unifiedSearch.source')}</label>
-          <select id="unified-search-source-filter" value={filters.providerIds[0] ?? ''} onChange={(event) => setFilter('providerIds', event.currentTarget.value ? [event.currentTarget.value] : [])}>
+          <Select id="unified-search-source-filter" value={filters.providerIds[0] ?? ''} onChange={(event) => setFilter('providerIds', event.currentTarget.value ? [event.currentTarget.value] : [])}>
             <option value="">{t('unifiedSearch.any')}</option>
             {document.providers.map((provider) => <option key={provider.id} value={provider.id}>{providerName(provider.id, provider.name)}</option>)}
-          </select>
+          </Select>
         </div>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="unified-search-language">{t('unifiedSearch.language')}</label>
           <input id="unified-search-language" value={filters.languages[0] ?? ''} onChange={(event) => setFilter('languages', event.currentTarget.value ? [event.currentTarget.value] : [])} />
         </div>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="unified-search-type">{t('unifiedSearch.type')}</label>
-          <select id="unified-search-type" value={filters.mediaTypes[0] ?? ''} onChange={(event) => setFilter('mediaTypes', event.currentTarget.value ? [event.currentTarget.value as UnifiedSearchFilters['mediaTypes'][number]] : [])}>
+          <Select id="unified-search-type" value={filters.mediaTypes[0] ?? ''} onChange={(event) => setFilter('mediaTypes', event.currentTarget.value ? [event.currentTarget.value as UnifiedSearchFilters['mediaTypes'][number]] : [])}>
             <option value="">{t('unifiedSearch.any')}</option>
             {['anime', 'movie', 'tv', 'ova', 'special', 'manga', 'novel', 'other'].map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
+          </Select>
         </div>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="unified-search-genre">{t('unifiedSearch.genre')}</label>
           <input id="unified-search-genre" value={filters.genres[0] ?? ''} onChange={(event) => setFilter('genres', event.currentTarget.value ? [event.currentTarget.value] : [])} />
         </div>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="unified-search-season">{t('unifiedSearch.season')}</label>
           <input id="unified-search-season" value={filters.seasons[0] ?? ''} onChange={(event) => setFilter('seasons', event.currentTarget.value ? [event.currentTarget.value] : [])} />
         </div>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="unified-search-status">{t('unifiedSearch.statusFilter')}</label>
-          <select id="unified-search-status" value={filters.trackingStatuses[0] ?? ''} onChange={(event) => setFilter('trackingStatuses', event.currentTarget.value ? [event.currentTarget.value as UnifiedSearchFilters['trackingStatuses'][number]] : [])}>
+          <Select id="unified-search-status" value={filters.trackingStatuses[0] ?? ''} onChange={(event) => setFilter('trackingStatuses', event.currentTarget.value ? [event.currentTarget.value as UnifiedSearchFilters['trackingStatuses'][number]] : [])}>
             <option value="">{t('unifiedSearch.any')}</option>
             {['untracked', 'planned', 'watching', 'completed', 'paused', 'dropped', 'unknown'].map((status) => <option key={status} value={status}>{status}</option>)}
-          </select>
+          </Select>
         </div>
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="unified-search-year-from">{t('unifiedSearch.year')}</label>
           <div className="sp-seg">
             <input id="unified-search-year-from" type="number" placeholder={t('unifiedSearch.from')} value={filters.yearFrom ?? ''} onChange={(event) => setFilter('yearFrom', event.currentTarget.value ? Number(event.currentTarget.value) : null)} />
@@ -233,15 +234,15 @@ export default function UnifiedSearchPanel() {
         </div>
         <button type="button" className="btn" onClick={() => setFilters({ ...EMPTY_UNIFIED_SEARCH_FILTERS })}>{t('unifiedSearch.clearFilters')}</button>
         <div className="sp-seg">
-          <input aria-label={t('unifiedSearch.presetName')} placeholder={t('unifiedSearch.presetName')} value={presetName} onChange={(event) => setPresetName(event.currentTarget.value)} />
+          <input className="ui-input" aria-label={t('unifiedSearch.presetName')} placeholder={t('unifiedSearch.presetName')} value={presetName} onChange={(event) => setPresetName(event.currentTarget.value)} />
           <button type="button" className="btn" disabled={!presetName.trim()} onClick={savePreset}>{t('unifiedSearch.savePreset')}</button>
         </div>
       </fieldset>
-      {management.presets.length > 0 && <fieldset className="unified-search-controls"><legend>{t('unifiedSearch.presets')}</legend>{management.presets.map((preset) => <div className="field-row" key={preset.id}><button type="button" className="btn" onClick={() => setFilters(preset.filters)}>{preset.name}</button><button type="button" className="btn" onClick={() => setManagement(removeUnifiedSearchPreset(preset.id))}>{t('unifiedSearch.remove')}</button></div>)}</fieldset>}
-      {management.favorites.length > 0 && <fieldset className="unified-search-controls"><legend>{t('unifiedSearch.favorites')}</legend>{management.favorites.map((favorite) => <div className="field-row" key={favorite.id}><button type="button" className="btn" onClick={() => applySearch(favorite.query, favorite.filters)}>{favorite.query}</button><button type="button" className="btn" onClick={() => setManagement(removeUnifiedSearchFavorite(favorite.id))}>{t('unifiedSearch.remove')}</button></div>)}</fieldset>}
+      {management.presets.length > 0 && <fieldset className="ui-group"><legend className="ui-group__title">{t('unifiedSearch.presets')}</legend>{management.presets.map((preset) => <div className="ui-control-row" key={preset.id}><button type="button" className="btn" onClick={() => setFilters(preset.filters)}>{preset.name}</button><button type="button" className="btn" onClick={() => setManagement(removeUnifiedSearchPreset(preset.id))}>{t('unifiedSearch.remove')}</button></div>)}</fieldset>}
+      {management.favorites.length > 0 && <fieldset className="ui-group"><legend className="ui-group__title">{t('unifiedSearch.favorites')}</legend>{management.favorites.map((favorite) => <div className="ui-control-row" key={favorite.id}><button type="button" className="btn" onClick={() => applySearch(favorite.query, favorite.filters)}>{favorite.query}</button><button type="button" className="btn" onClick={() => setManagement(removeUnifiedSearchFavorite(favorite.id))}>{t('unifiedSearch.remove')}</button></div>)}</fieldset>}
       {history.length > 0 && (
-        <fieldset className="unified-search-controls">
-          <legend>{t('unifiedSearch.history')}</legend>
+        <fieldset className="ui-group">
+          <legend className="ui-group__title">{t('unifiedSearch.history')}</legend>
           <div className="sp-seg">
             {history.slice(0, 8).map((entry) => <button type="button" className="btn" key={`${entry.query}-${entry.searchedAt}`} onClick={() => setQuery(entry.query)}>{entry.query}</button>)}
             <button type="button" className="btn" onClick={() => { clearUnifiedSearchHistory(); setHistory([]); }}>{t('unifiedSearch.clearHistory')}</button>

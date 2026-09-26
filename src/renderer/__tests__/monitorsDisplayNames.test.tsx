@@ -15,7 +15,10 @@ import { getUiLang, setUiLang } from '../i18n';
  * translated, numbered "Display N" otherwise.
  */
 
-vi.mock('../components/ui', () => ({ confirmDialog: vi.fn(async () => true) }));
+vi.mock('../components/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../components/ui')>()),
+  confirmDialog: vi.fn(async () => true),
+}));
 
 const DISPLAYS = [
   {

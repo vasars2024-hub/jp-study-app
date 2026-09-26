@@ -147,6 +147,7 @@ export default function SettingsHome() {
               <div>
                 <span aria-hidden="true">&gt;</span>
                 <input
+                  className="ui-input"
                   id="wired-access-command"
                   value={diagCode}
                   autoComplete="off"
@@ -154,7 +155,7 @@ export default function SettingsHome() {
                   onChange={(event) => setDiagCode(event.currentTarget.value)}
                   placeholder={t('settings.home.diag.enterCode')}
                 />
-                <button type="submit">{t('settings.home.diag.run')}</button>
+                <button className="btn" type="submit">{t('settings.home.diag.run')}</button>
               </div>
             </form>
           )}

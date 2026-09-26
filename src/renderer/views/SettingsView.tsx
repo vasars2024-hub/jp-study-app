@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { confirmDialog } from '../components/ui';
+import { confirmDialog, Select } from '../components/ui';
 import { KNOWN_LANGS, langNativeLabel } from '../../shared/langs';
 import type { YomitanDictInfo } from '../../shared/types';
 import {
@@ -426,9 +426,9 @@ export function DictionarySettingsSection() {
           <label className="set-row-title" htmlFor="dict-pair-order">
             {t('settings.study.dict.sources.pairLabel')}
           </label>
-          <select
+          <Select
             id="dict-pair-order"
-            className="input"
+
             value={pairKey(activePair)}
             onChange={(event) => void onSelectPair(event.target.value)}
           >
@@ -438,7 +438,7 @@ export function DictionarySettingsSection() {
                 {`${langNativeLabel(pair.sourceLang)} → ${langNativeLabel(pair.targetLang)}`}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
       {!loading && !isGlobalPair(activePair) && (
@@ -563,6 +563,9 @@ function ClipboardSettingsSection() {
         </div>
         <input
           type="checkbox"
+          role="switch"
+          className="ui-switch"
+          aria-label={t('settings.clipboard.dedupe')}
           checked={settings.dedupeConsecutive}
           onChange={(e) => setSettings(saveClipboardSettings({ dedupeConsecutive: e.target.checked }))}
         />
@@ -575,6 +578,9 @@ function ClipboardSettingsSection() {
         </div>
         <input
           type="checkbox"
+          role="switch"
+          className="ui-switch"
+          aria-label={t('settings.clipboard.clearOnExit')}
           checked={settings.clearOnExit}
           onChange={(e) => setSettings(saveClipboardSettings({ clearOnExit: e.target.checked }))}
         />
@@ -587,6 +593,9 @@ function ClipboardSettingsSection() {
         </div>
         <input
           type="checkbox"
+          role="switch"
+          className="ui-switch"
+          aria-label={t('settings.clipboard.monitoring')}
           checked={settings.monitoringEnabled}
           onChange={(e) => setSettings(saveClipboardSettings({ monitoringEnabled: e.target.checked }))}
         />
@@ -625,7 +634,14 @@ function PrivacySettingsSection() {
           <div className="set-row-title">{t('settings.privacy.heatmap')}</div>
           <div className="set-row-desc muted">{t('settings.privacy.heatmap.desc')}</div>
         </div>
-        <input type="checkbox" checked={share} onChange={(e) => onToggle(e.target.checked)} />
+        <input
+          type="checkbox"
+          role="switch"
+          className="ui-switch"
+          aria-label={t('settings.privacy.heatmap')}
+          checked={share}
+          onChange={(e) => onToggle(e.target.checked)}
+        />
       </div>
     </section>
   );

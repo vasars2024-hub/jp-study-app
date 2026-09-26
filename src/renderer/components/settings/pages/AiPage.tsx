@@ -28,6 +28,7 @@ import { AiModelInstallControl } from '../../ai/AiModelInstall';
 import { AgentAutomationEditor } from '../../agent/AgentAutomationEditor';
 import { AgentSpendPanel } from '../../agent/AgentSpendPanel';
 import '../../ai/aiSetup.css';
+import { Toggle } from '../../ui';
 
 /**
  * Settings > AI — every AI decision in one place.
@@ -111,16 +112,14 @@ export default function AiPage() {
         title={t('settings.ai.enabled.title')}
         description={t('settings.ai.enabled.desc')}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            data-testid="ai-enabled"
-            checked={enabled}
-            disabled={!status}
-            onChange={(event) => void setAiFeaturesEnabled(event.currentTarget.checked)}
-          />
-          <span>{t('settings.ai.enabled.label')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          data-testid="ai-enabled"
+          checked={enabled}
+          disabled={!status}
+          onChange={(event) => void setAiFeaturesEnabled(event.currentTarget.checked)}
+          label={t('settings.ai.enabled.label')}
+        />
         <p className="muted os-set-hint">
           {enabled ? t('settings.ai.enabled.onNote') : t('settings.ai.enabled.offNote')}
         </p>
@@ -177,7 +176,7 @@ export default function AiPage() {
               <div className="ai-page-key-row">
                 <input
                   id="ai-key-input"
-                  className="os-input"
+                  className="ui-input"
                   type="password"
                   autoComplete="off"
                   value={keyDraft}
@@ -219,21 +218,19 @@ export default function AiPage() {
             title={t('settings.ai.agent.title')}
             description={t('settings.ai.agent.desc')}
           >
-            <label className="os-toggle">
-              <input
-                type="checkbox"
-                data-testid="ai-agent-enabled"
-                checked={agent.enabled}
-                onChange={(event) => writeAgent({
-                  enabled: event.currentTarget.checked,
-                  // A backend left at `disabled` forces `enabled` back off in
-                  // `normalizeLocalAgentSettings`; turning the Agent on here
-                  // means the local backend too.
-                  ...(event.currentTarget.checked ? { backend: 'local-gguf' as const } : {}),
-                })}
-              />
-              <span>{t('settings.ai.agent.enable')}</span>
-            </label>
+            <Toggle
+              className="os-toggle"
+              data-testid="ai-agent-enabled"
+              checked={agent.enabled}
+              onChange={(event) => writeAgent({
+                enabled: event.currentTarget.checked,
+                // A backend left at `disabled` forces `enabled` back off in
+                // `normalizeLocalAgentSettings`; turning the Agent on here
+                // means the local backend too.
+                ...(event.currentTarget.checked ? { backend: 'local-gguf' as const } : {}),
+              })}
+              label={t('settings.ai.agent.enable')}
+            />
             <p className="muted os-set-hint">
               {agent.enabled
                 ? readiness.agentCanPlan
@@ -359,7 +356,7 @@ function AiRatesEditor() {
                 </td>
                 <td>
                   <input
-                    className="os-input"
+                    className="ui-input"
                     type="number"
                     min={0}
                     step="0.01"
@@ -372,7 +369,7 @@ function AiRatesEditor() {
                 </td>
                 <td>
                   <input
-                    className="os-input"
+                    className="ui-input"
                     type="number"
                     min={0}
                     step="0.01"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
-import { useAeroMaterials, useWiredMaterials } from '../../ui';
+import { Toggle, useAeroMaterials, useWiredMaterials } from '../../ui';
 import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
 import {
   AERO_LEGACY_FEATURES,
@@ -369,22 +369,20 @@ export default function SpecialPage() {
         description={t('special.blanc.desc')}
         highlight={focusSettingId === 'blanc-mode'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={blancMode.enabled}
-            onChange={(event) => {
-              const next = event.currentTarget.checked;
-              setBlancMsg(t(next ? 'special.blanc.opening' : 'special.blanc.closing'));
-              void setBlancModeEnabled(next)
-                .then(setBlancMode)
-                .catch((error) => {
-                  setBlancMsg(error instanceof Error ? error.message : t('special.blanc.openFailed'));
-                });
-            }}
-          />
-          <span>{t('special.useBlancMode')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={blancMode.enabled}
+          onChange={(event) => {
+            const next = event.currentTarget.checked;
+            setBlancMsg(t(next ? 'special.blanc.opening' : 'special.blanc.closing'));
+            void setBlancModeEnabled(next)
+              .then(setBlancMode)
+              .catch((error) => {
+                setBlancMsg(error instanceof Error ? error.message : t('special.blanc.openFailed'));
+              });
+          }}
+          label={t('special.useBlancMode')}
+        />
         <p className="muted os-set-hint">
           {t('special.blanc.hint')}
         </p>
@@ -458,46 +456,36 @@ export default function SpecialPage() {
               </button>
             ))}
           </div>
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={wiredSettings.uiCues}
-              onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ uiCues: e.currentTarget.checked }))}
-            />
-            <span>{t('wired.settings.uiCues')}</span>
-          </label>
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={wiredSettings.idleAnimations}
-              onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ idleAnimations: e.currentTarget.checked }))}
-            />
-            <span>{t('wired.settings.idleAnimations')}</span>
-          </label>
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={wiredSettings.reducedStatic}
-              onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ reducedStatic: e.currentTarget.checked }))}
-            />
-            <span>{t('special.reducedStatic')}</span>
-          </label>
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={wiredSettings.ambientEnabled}
-              onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ ambientEnabled: e.currentTarget.checked }))}
-            />
-            <span>{t('special.terminalAmbient')}</span>
-          </label>
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={wiredSettings.replayBoot}
-              onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ replayBoot: e.currentTarget.checked }))}
-            />
-            <span>{t('special.replayBoot')}</span>
-          </label>
+          <Toggle
+            className="os-toggle"
+            checked={wiredSettings.uiCues}
+            onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ uiCues: e.currentTarget.checked }))}
+            label={t('wired.settings.uiCues')}
+          />
+          <Toggle
+            className="os-toggle"
+            checked={wiredSettings.idleAnimations}
+            onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ idleAnimations: e.currentTarget.checked }))}
+            label={t('wired.settings.idleAnimations')}
+          />
+          <Toggle
+            className="os-toggle"
+            checked={wiredSettings.reducedStatic}
+            onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ reducedStatic: e.currentTarget.checked }))}
+            label={t('special.reducedStatic')}
+          />
+          <Toggle
+            className="os-toggle"
+            checked={wiredSettings.ambientEnabled}
+            onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ ambientEnabled: e.currentTarget.checked }))}
+            label={t('special.terminalAmbient')}
+          />
+          <Toggle
+            className="os-toggle"
+            checked={wiredSettings.replayBoot}
+            onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ replayBoot: e.currentTarget.checked }))}
+            label={t('special.replayBoot')}
+          />
           <button
             type="button"
             className="btn small"
@@ -518,14 +506,12 @@ export default function SpecialPage() {
           description={t('special.wired.naviDesc')}
           highlight={focusSettingId === 'wired-finding-terminal'}
         >
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={wiredSettings.findingOverlayEnabled}
-              onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ findingOverlayEnabled: e.currentTarget.checked }))}
-            />
-            <span>{t('special.wired.findingOverlay')}</span>
-          </label>
+          <Toggle
+            className="os-toggle"
+            checked={wiredSettings.findingOverlayEnabled}
+            onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ findingOverlayEnabled: e.currentTarget.checked }))}
+            label={t('special.wired.findingOverlay')}
+          />
 
           <form
             className="wired-settings-terminal"
@@ -632,14 +618,12 @@ export default function SpecialPage() {
           description={t('special.aero.gadgetLabDesc')}
           highlight={focusSettingId === 'aero-gadget-lab' || anchorsModules('aero-gadget-lab')}
         >
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={aeroSettings.overlayEnabled}
-              onChange={(e) => setAeroSettings(saveAeroLegacySettings({ overlayEnabled: e.currentTarget.checked }))}
-            />
-            <span>{t('special.aeroLyricGadgets')}</span>
-          </label>
+          <Toggle
+            className="os-toggle"
+            checked={aeroSettings.overlayEnabled}
+            onChange={(e) => setAeroSettings(saveAeroLegacySettings({ overlayEnabled: e.currentTarget.checked }))}
+            label={t('special.aeroLyricGadgets')}
+          />
 
           <form
             className="aero-settings-terminal"

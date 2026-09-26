@@ -52,7 +52,7 @@ export default function MediaTrackingManager() {
             ? t('media.tracking.legacyMigratedAt', { when: new Date(mark.at).toLocaleString(LANG_TAGS[lang]) })
             : t('media.tracking.legacyNotYet')}
         </span>
-        <button type="button" disabled={busy} onClick={() => void migrateNow()}>{t('media.tracking.legacyMigrate')}</button>
+        <button className="btn" type="button" disabled={busy} onClick={() => void migrateNow()}>{t('media.tracking.legacyMigrate')}</button>
       </div>
       {message && <p role="status" className="muted">{message}</p>}
     </SettingsCard>

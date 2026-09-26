@@ -3,6 +3,7 @@ import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import type { ColorTheme, FreqTarget, VizMode, VizSettings, VizStyle } from '../../../visualizerSettings';
 import { useT } from '../../../i18n';
+import { Toggle } from '../../ui';
 
 const VIZ_MODES: { id: VizMode; labelKey: string }[] = [
   { id: 'wallpaper', labelKey: 'settings.visualizer.mode.wallpaper' },
@@ -49,15 +50,13 @@ export default function VisualizerPage() {
         description={t('search.visualizer.desc')}
         highlight={focusSettingId === 'visualizer'}
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={viz.enabled}
-              onChange={() => patchViz({ enabled: !viz.enabled })}
-              aria-label={t('settings.visualizer.enableAria')}
-            />
-            <span>{viz.enabled ? t('settings.visualizer.on') : t('settings.visualizer.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={viz.enabled}
+            onChange={() => patchViz({ enabled: !viz.enabled })}
+            aria-label={t('settings.visualizer.enableAria')}
+            label={viz.enabled ? t('settings.visualizer.on') : t('settings.visualizer.off')}
+          />
         }
         advanced={
           viz.enabled ? (
@@ -191,14 +190,12 @@ export default function VisualizerPage() {
         description={t('search.lyrics.desc')}
         highlight={focusSettingId === 'lyrics'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={lyricsSettings.useAlbumInSearch}
-            onChange={(e) => setLyricsAlbumSearch(e.target.checked)}
-          />
-          <span>{t('settings.visualizer.lyricsUseAlbum')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={lyricsSettings.useAlbumInSearch}
+          onChange={(e) => setLyricsAlbumSearch(e.target.checked)}
+          label={t('settings.visualizer.lyricsUseAlbum')}
+        />
       </SettingsCard>
     </>
   );

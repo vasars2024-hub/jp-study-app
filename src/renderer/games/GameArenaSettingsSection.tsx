@@ -9,6 +9,7 @@ import {
 } from './settings';
 import type { SourceLang } from './types';
 import { segButton as seg } from '../components/ui/segButton';
+import { Toggle } from '../components/ui';
 
 const LEVELS: ArenaLevelOverride[] = ['auto', 1, 2, 3, 4, 5, 6, 7];
 const SOURCE_LANGS: SourceLang[] = ['en', 'ru', 'zh'];
@@ -37,14 +38,12 @@ export default function GameArenaSettingsSection() {
             onChange={(e) => patch({ gameLength: Number(e.target.value) })}
           />
         </label>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={settings.sounds}
-            onChange={(e) => patch({ sounds: e.target.checked })}
-          />
-          <span>{t('games.settings.sounds')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={settings.sounds}
+          onChange={(e) => patch({ sounds: e.target.checked })}
+          label={t('games.settings.sounds')}
+        />
       </div>
 
       <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
@@ -96,6 +95,7 @@ export default function GameArenaSettingsSection() {
       <label className="field">
         <span>{t('games.settings.apiUrl')}</span>
         <input
+          className="ui-input"
           type="url"
           value={settings.mirrorApiUrl}
           placeholder="https://localhost:8000/v1/chat/completions"
@@ -106,6 +106,7 @@ export default function GameArenaSettingsSection() {
       <label className="field">
         <span>{t('games.settings.apiKey')}</span>
         <input
+          className="ui-input"
           type="password"
           value={settings.mirrorApiKey}
           onChange={(e) => patch({ mirrorApiKey: e.target.value })}

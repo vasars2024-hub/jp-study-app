@@ -31,6 +31,7 @@ import type { MalLibrarySyncReport } from '../../../../main/malLibrary';
 import type { MalPushPreview } from '../../../../shared/malPush';
 import type { MalPushResult } from '../../../../main/malPush';
 import { watchStatusFromMal, watchStatusLabelKey } from '../../../../shared/watchLibrary';
+import { Select } from '../../ui';
 
 /** Related-title walk budget per click — MAL's quota is the user's. */
 const RELATED_REQUEST_LIMIT = 60;
@@ -274,10 +275,10 @@ export default function MalSyncPanel() {
       // "mal sync" has to land on this one rather than the top of the page.
       highlight={focusSettingId === 'mal-sync'}
     >
-      <fieldset className="unified-search-controls">
-        <legend>{t('malSync.setup')}</legend>
-        <small className="muted">{t('malSync.clientIdDesc')}</small>
-        <div className="field-row">
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('malSync.setup')}</legend>
+        <p className="ui-group__desc">{t('malSync.clientIdDesc')}</p>
+        <div className="ui-control-row">
           <label htmlFor="mal-client-id">{t('malSync.clientId')}</label>
           <input
             id="mal-client-id"
@@ -288,18 +289,18 @@ export default function MalSyncPanel() {
             value={clientIdDraft}
             onChange={(event) => setClientIdDraft(event.currentTarget.value)}
           />
-          <button type="button" disabled={busy || !clientIdDraft.trim()} onClick={() => void saveClientId()}>
+          <button className="btn" type="button" disabled={busy || !clientIdDraft.trim()} onClick={() => void saveClientId()}>
             {t('malSync.clientIdSave')}
           </button>
-          <button type="button" onClick={() => window.api.openExternal(REGISTER_URL)}>
+          <button className="btn" type="button" onClick={() => window.api.openExternal(REGISTER_URL)}>
             {t('malSync.register')}
           </button>
         </div>
         {!status.configured && <p role="status" className="muted">{t('malSync.notConfigured')}</p>}
       </fieldset>
 
-      <fieldset className="unified-search-controls">
-        <legend>{t('malSync.account')}</legend>
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('malSync.account')}</legend>
         <p role="status">
           {status.connected
             ? t('malSync.connectedAs', { username: status.username ?? '' })
@@ -335,6 +336,7 @@ export default function MalSyncPanel() {
         {!status.connected && (
           <>
             <button
+              className="btn"
               type="button"
               disabled={busy || !status.configured}
               onClick={() => void beginAuth()}
@@ -342,7 +344,7 @@ export default function MalSyncPanel() {
               {t('malSync.connect')}
             </button>
             {pendingState && (
-              <div className="field-row">
+              <div className="ui-control-row">
                 <label htmlFor="mal-callback-code">{t('malSync.callbackCode')}</label>
                 <input
                   id="mal-callback-code"
@@ -353,7 +355,7 @@ export default function MalSyncPanel() {
                   value={codeDraft}
                   onChange={(event) => setCodeDraft(event.currentTarget.value)}
                 />
-                <button type="button" disabled={busy || !codeDraft.trim()} onClick={() => void completeAuth()}>
+                <button className="btn" type="button" disabled={busy || !codeDraft.trim()} onClick={() => void completeAuth()}>
                   {t('malSync.finish')}
                 </button>
               </div>
@@ -363,19 +365,19 @@ export default function MalSyncPanel() {
         )}
 
         {status.connected && (
-          <button type="button" disabled={busy} onClick={() => void run(() => window.api.malSignOut())}>
+          <button className="btn" type="button" disabled={busy} onClick={() => void run(() => window.api.malSignOut())}>
             {t('malSync.signOut')}
           </button>
         )}
       </fieldset>
 
-      <fieldset className="unified-search-controls">
-        <legend>{t('malSync.list')}</legend>
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('malSync.list')}</legend>
         {/* Read-only, one click, no schedule. The note says so out loud because
             "connected to MyAnimeList" reasonably reads as "kept in sync", and
             here it does not. */}
         <small className="muted">{t('malSync.noAutoSyncPush')}</small>
-        <div className="field-row">
+        <div className="ui-control-row">
           {/* The IPC has accepted a status all along and the panel never sent
               one, so "completed only" — the view a study user actually wants —
               was unreachable from the UI. Note the filtering happens on the
@@ -383,7 +385,7 @@ export default function MalSyncPanel() {
               `status=` query: that query silently omits anything the user is
               rewatching, which on this account was twelve real titles. */}
           <label htmlFor="mal-status-filter">{t('malSync.statusFilter')}</label>
-          <select
+          <Select
             id="mal-status-filter"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.currentTarget.value as '' | MalListStatus)}
@@ -391,8 +393,9 @@ export default function MalSyncPanel() {
             <option value="">{t('malSync.statusAll')}</option>
             <option value="completed">{t('malSync.statusCompleted')}</option>
             <option value="watching">{t('malSync.statusWatching')}</option>
-          </select>
+          </Select>
           <button
+            className="btn"
             type="button"
             disabled={busy || !status.connected}
             onClick={() => void fetchList(statusFilter || undefined)}
@@ -406,11 +409,12 @@ export default function MalSyncPanel() {
         {truncated && <small className="muted">{t('malSync.truncated')}</small>}
       </fieldset>
 
-      <fieldset className="unified-search-controls">
-        <legend>{t('malSync.library')}</legend>
-        <small className="muted">{t('malSync.libraryDesc')}</small>
-        <div className="field-row">
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('malSync.library')}</legend>
+        <p className="ui-group__desc">{t('malSync.libraryDesc')}</p>
+        <div className="ui-control-row">
           <button
+            className="btn"
             type="button"
             disabled={saving || busy || fetched.length === 0}
             onClick={() => void saveToLibrary()}
@@ -449,9 +453,9 @@ export default function MalSyncPanel() {
         )}
       </fieldset>
 
-      <fieldset className="unified-search-controls">
-        <legend>{t('malSync.push')}</legend>
-        <small className="muted">{t('malSync.pushDesc')}</small>
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('malSync.push')}</legend>
+        <p className="ui-group__desc">{t('malSync.pushDesc')}</p>
         {pushPreview?.needsFetch ? (
           <p className="muted">{t('malSync.pushNeedsFetch')}</p>
         ) : pending.length === 0 ? (
@@ -469,8 +473,9 @@ export default function MalSyncPanel() {
             {pending.length > PREVIEW_ROWS && <li>{t('malSync.pushMore', { count: pending.length - PREVIEW_ROWS })}</li>}
           </ul>
         )}
-        <div className="field-row">
+        <div className="ui-control-row">
           <button
+            className="btn"
             type="button"
             disabled={pushing || busy || !status.connected || pending.length === 0}
             onClick={() => void pushChanges()}
@@ -503,8 +508,9 @@ export default function MalSyncPanel() {
         )}
 
         <small className="muted">{t('malSync.relatedDesc', { limit: RELATED_REQUEST_LIMIT })}</small>
-        <div className="field-row">
+        <div className="ui-control-row">
           <button
+            className="btn"
             type="button"
             disabled={relatedBusy || busy || !status.connected}
             onClick={() => void includeRelated()}

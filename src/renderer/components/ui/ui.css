@@ -790,12 +790,15 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* The design-system select draws its own chevron instead of the OS arrow. */
+/* The design-system select draws its own chevron instead of the OS arrow.
+   Doubled class on purpose: a contextual rule such as `.settings-panel select`
+   sets the `background` shorthand, which would wipe the chevron image while
+   `appearance: none` had already removed the native arrow. At (0,2,0) the image
+   and the room for it survive; the context keeps its own background colour. */
 :where(html:not([data-materials='aero']):not([data-materials='wired']))
-  .ui-select:where(:not(.blanc-root *)):where(:not([multiple]):not([size])) {
+  .ui-select.ui-select:where(:not(.blanc-root *)):where(:not([multiple]):not([size])) {
   appearance: none;
   padding-right: 30px;
-  background-color: var(--control-bg);
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
@@ -843,6 +846,10 @@
 .ui-group > small {
   margin: 0;
 }
+/* A lone action in a group keeps its own width instead of stretching across the card. */
+.ui-group > :is(button, .btn, .ui-btn) {
+  align-self: flex-start;
+}
 
 /* A wrapping row of label + field + buttons: fields grow, buttons keep their width. */
 .ui-control-row {
@@ -864,6 +871,101 @@
 }
 .ui-control-row > :is(button, .ui-btn, .btn) {
   flex: 0 0 auto;
+}
+
+/* ---------- Switch on a native checkbox + SwitchRow ------------------------
+   `.ui-switch` paints a checkbox (role="switch") as the Fluent toggle: an
+   outlined pill with a small thumb when off, the accent pill with a white
+   thumb when on. Same geometry as `.ui-toggle__track` so the two never differ. */
+.ui-switch {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--control-edge, var(--control-border));
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.ui-switch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.8;
+  transform: translateY(-50%);
+  transition: transform var(--dur-normal) var(--ease-spring), width var(--dur-fast) var(--ease-standard);
+}
+.ui-switch:hover:not(:disabled)::before {
+  width: 14px;
+}
+.ui-switch:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.ui-switch:checked::before {
+  background: #fff;
+  opacity: 1;
+  transform: translate(19px, -50%);
+}
+.ui-switch:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+.ui-switch:disabled {
+  opacity: var(--alpha-disabled);
+  cursor: default;
+}
+/* Aero and Wired paint every `input` globally (a white field with a blue edge);
+   the switch keeps its own pill there. (0,4,0) beats their (0,2,1). */
+:root[data-materials] .ui-switch.ui-switch {
+  border-color: var(--control-border);
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+}
+:root[data-materials] .ui-switch.ui-switch:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.ui-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.ui-switch-row.is-disabled {
+  cursor: default;
+}
+.ui-switch-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ui-switch-row__title {
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium, 500);
+  overflow-wrap: anywhere;
+}
+.ui-switch-row__desc {
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.ui-switch-row + .ui-switch-row {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 
 /* ---------- Tile / TileList ---------------------------------------------- */

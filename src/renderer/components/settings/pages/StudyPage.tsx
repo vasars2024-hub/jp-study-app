@@ -23,6 +23,7 @@ import {
   type FocusTabId,
 } from '../../../focusMode';
 import { segButton as seg } from '../../ui/segButton';
+import { Toggle } from '../../ui';
 
 
 export default function StudyPage() {
@@ -53,15 +54,13 @@ export default function StudyPage() {
         description={t('focus.settings.desc')}
         highlight={focusSettingId === 'focus-mode'}
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={focus}
-              onChange={(e) => setFocusMode(e.target.checked)}
-              aria-label={t('focus.settings.enable')}
-            />
-            <span>{focus ? t('common.on') : t('common.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={focus}
+            onChange={(e) => setFocusMode(e.target.checked)}
+            aria-label={t('focus.settings.enable')}
+            label={focus ? t('common.on') : t('common.off')}
+          />
         }
       >
         <p className="muted os-set-hint">{t('focus.settings.shortcutHint')}</p>
@@ -106,14 +105,12 @@ export default function StudyPage() {
             </button>
           ))}
         </div>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={cfg.restoreLastTab}
-            onChange={(e) => patch({ restoreLastTab: e.target.checked })}
-          />
-          <span>{t('focus.restoreTab.label')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={cfg.restoreLastTab}
+          onChange={(e) => patch({ restoreLastTab: e.target.checked })}
+          label={t('focus.restoreTab.label')}
+        />
         <p className="muted os-set-hint">{t('focus.restoreTab.hint')}</p>
       </SettingsCard>
 
@@ -123,22 +120,18 @@ export default function StudyPage() {
         description={t('focus.distractions.desc')}
         highlight={focusSettingId === 'focus-distractions'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={cfg.hideMusicBar}
-            onChange={(e) => patch({ hideMusicBar: e.target.checked })}
-          />
-          <span>{t('focus.hideMusic.label')}</span>
-        </label>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={cfg.minimalChrome}
-            onChange={(e) => patch({ minimalChrome: e.target.checked })}
-          />
-          <span>{t('focus.minimalChrome.label')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={cfg.hideMusicBar}
+          onChange={(e) => patch({ hideMusicBar: e.target.checked })}
+          label={t('focus.hideMusic.label')}
+        />
+        <Toggle
+          className="os-toggle"
+          checked={cfg.minimalChrome}
+          onChange={(e) => patch({ minimalChrome: e.target.checked })}
+          label={t('focus.minimalChrome.label')}
+        />
       </SettingsCard>
 
       <SettingsCard
@@ -147,14 +140,12 @@ export default function StudyPage() {
         description={t('focus.autoEnter.desc')}
         highlight={focusSettingId === 'focus-auto-enter'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={cfg.autoEnterOnLaunch}
-            onChange={(e) => patch({ autoEnterOnLaunch: e.target.checked })}
-          />
-          <span>{t('focus.autoEnter.label')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={cfg.autoEnterOnLaunch}
+          onChange={(e) => patch({ autoEnterOnLaunch: e.target.checked })}
+          label={t('focus.autoEnter.label')}
+        />
         <p className="muted os-set-hint">{t('focus.autoEnter.hint')}</p>
       </SettingsCard>
 
