@@ -163,6 +163,8 @@ export interface ReviewCard {
   /** Only ever set on transcript-derived cards; see `DeckFlashcard`. */
   timingFidelity?: DeckFlashcard['timingFidelity'];
   textProvenance?: DeckFlashcard['textProvenance'];
+  /** The card's own study language (absent is Japanese, as stored); drives lang, TTS and pitch. */
+  studyLang?: DeckFlashcard['studyLang'];
 }
 
 /** Chip label for a recorded text provenance. Absent means "not recorded". */
@@ -581,6 +583,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       srs: c.srs,
       timingFidelity: c.timingFidelity,
       textProvenance: c.textProvenance,
+      studyLang: c.studyLang,
     })), { mode: reviewMode });
   }
 

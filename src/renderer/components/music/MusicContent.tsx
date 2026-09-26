@@ -481,7 +481,7 @@ function songMenuItems(
         disabled: at < 0 || at >= playlist.trackIds.length - 1,
         onSelect: () => moveTrackInPlaylist(playlist.id, song.id, at + 1),
       },
-      { separator: true },
+      { separator: true, label: '' },
       {
         id: 'remove',
         label: t('musicUi.playlists.remove'),
@@ -501,7 +501,7 @@ function songMenuItems(
       },
     };
   });
-  if (items.length) items.push({ separator: true });
+  if (items.length) items.push({ separator: true, label: '' });
   items.push({
     id: 'new',
     label: t('musicUi.playlists.newWithSong'),
