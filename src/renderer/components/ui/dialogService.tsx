@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Dialog } from './Dialog';
 import { Button } from './Button';
+import { t } from '../../i18n';
 
 export interface ConfirmOptions {
   message: ReactNode;
@@ -42,14 +43,14 @@ function ConfirmDialog({ opts, onDone }: { opts: ConfirmOptions; onDone: (ok: bo
     <Dialog
       open
       onClose={() => onDone(false)}
-      title={opts.title ?? 'Confirm'}
+      title={opts.title ?? t('common.confirm')}
       footer={
         <>
           <Button ref={cancelRef} onClick={() => onDone(false)}>
-            {opts.cancelLabel ?? 'Cancel'}
+            {opts.cancelLabel ?? t('common.cancel')}
           </Button>
           <Button ref={confirmRef} variant={opts.danger ? 'danger' : 'primary'} onClick={() => onDone(true)}>
-            {opts.confirmLabel ?? 'OK'}
+            {opts.confirmLabel ?? t('common.ok')}
           </Button>
         </>
       }
@@ -78,10 +79,10 @@ function AlertDialog({ opts, onDone }: { opts: AlertOptions; onDone: () => void 
     <Dialog
       open
       onClose={onDone}
-      title={opts.title ?? 'Notice'}
+      title={opts.title ?? t('common.notice')}
       footer={
         <Button ref={okRef} variant="primary" onClick={onDone}>
-          {opts.okLabel ?? 'OK'}
+          {opts.okLabel ?? t('common.ok')}
         </Button>
       }
     >
@@ -117,12 +118,12 @@ function PromptDialog({ opts, onDone }: { opts: PromptOptions; onDone: (value: s
     <Dialog
       open
       onClose={() => onDone(null)}
-      title={opts.title ?? 'Enter a value'}
+      title={opts.title ?? t('common.enterValue')}
       footer={
         <>
-          <Button onClick={() => onDone(null)}>{opts.cancelLabel ?? 'Cancel'}</Button>
+          <Button onClick={() => onDone(null)}>{opts.cancelLabel ?? t('common.cancel')}</Button>
           <Button variant="primary" onClick={submit}>
-            {opts.okLabel ?? 'OK'}
+            {opts.okLabel ?? t('common.ok')}
           </Button>
         </>
       }

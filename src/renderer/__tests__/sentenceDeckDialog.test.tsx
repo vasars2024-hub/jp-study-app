@@ -171,6 +171,22 @@ describe('SentenceDeckDialog', () => {
     expect(takeFlashcardsFocus()).toEqual({ folder: 'Yuru Camp - 01', cardId: null, review: 'listening' });
   });
 
+  it('says in words why a card has no audio, not in ffmpeg\u2019s English', async () => {
+    (window as unknown as { api: Record<string, unknown> }).api.sentenceDeckExtractAudio = async (request: { clips: Array<{ id: string }> }) => ({
+      ok: true,
+      cancelled: false,
+      results: request.clips.map((clip, i) => (i === 0
+        ? { id: clip.id, ok: false, error: 'nothing to hear in this range', failure: 'silent' }
+        : { id: clip.id, ok: true, audioPath: `C:/ud/mined/${clip.id}.mp3`, durationSec: 2.4 })),
+    });
+    await open();
+    await act(async () => { q<HTMLButtonElement>('[data-sd-action="make"]').click(); });
+    await flush();
+    const why = q('.sd-failed .sd-detail');
+    expect(why.textContent).toBe('No sound at this point of the video — the line may be past its end.');
+    expect(why.getAttribute('title')).toBe('nothing to hear in this range');
+  });
+
   it('undoes the whole batch', async () => {
     await open();
     await act(async () => { q<HTMLButtonElement>('[data-sd-action="make"]').click(); });
@@ -200,6 +216,31 @@ describe('SentenceDeckDialog', () => {
       cardOptions: { createCards: false, translateToEnglish: false, includeAudio: false },
     }]);
     expect(document.body.textContent).toContain('Transcription queued');
+  });
+
+  it('says the Whisper model downloads first, with its size, only when it is not here yet', async () => {
+    sources = { ok: true, videoPath: VIDEO, title: 'x', tracks: [] };
+    await open();
+    expect(q('[data-sd-model-download]').textContent).toMatch(/downloads first.*\d+(\.\d)? MB/);
+    await act(async () => { root.unmount(); });
+    host.remove();
+    // The study language's default tier, downloaded for the backend in use.
+    const { loadWhisperModelTier } = await import('../whisperSettings');
+    const { markTierDownloaded } = await import('../whisperModelCache');
+    markTierDownloaded(loadWhisperModelTier('ja'), 'wasm', 'cpu');
+    localStorage.setItem('jp-study-whisper-device', 'cpu');
+    await open();
+    expect(document.querySelector('[data-sd-model-download]')).toBeNull();
+  });
+
+  it('names an untitled stream inside the file in the UI language', async () => {
+    sources = {
+      ...sources,
+      tracks: [...sources.tracks, { id: 'embedded:1', label: '', streamNumber: 2, lang: 'zh', kind: 'embedded' }],
+    };
+    await open();
+    const options = [...document.querySelectorAll<HTMLOptionElement>('[data-sd-field="primary"] option')].map((o) => o.textContent);
+    expect(options).toContain('Subtitle stream 2 · Chinese · inside the video file');
   });
 
   it('says why when there is no video to cut', async () => {

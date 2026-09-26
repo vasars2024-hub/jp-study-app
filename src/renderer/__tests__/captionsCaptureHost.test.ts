@@ -172,6 +172,20 @@ describe('the main window side', () => {
     expect(mineCalls[0]).toMatchObject({ sentence: '我们走吧', studyLang: 'zh', audio: { base64: 'AAAA' } });
   });
 
+  it('a word mined from the pop-up is glossed in the language of the card', async () => {
+    mineImpl = async () => ({ created: true, card: { id: 'card-w' } });
+    const asked: unknown[][] = [];
+    (window as unknown as { api: unknown }).api = {
+      lookupTermOffline: async (...args: unknown[]) => {
+        asked.push(args);
+        return { query: String(args[0]), entries: [{ word: '学生', reading: 'xuésheng', senses: [{ definitions: ['student'] }], jlpt: [] }] };
+      },
+    };
+    await handleCaptionMine(payload({ requestId: 'w1', studyLang: 'zh', word: '学生', sentence: '我是学生。' }));
+    expect(asked).toEqual([['学生', 'zh']]);
+    expect(mineCalls.at(-1)).toMatchObject({ word: '学生', reading: 'xuésheng', meaning: 'student', studyLang: 'zh' });
+  });
+
   it('refuses an empty mine and reports a failure instead of throwing', async () => {
     expect(await handleCaptionMine(payload({ sentence: '', audioBase64: undefined }))).toMatchObject({ ok: false, error: 'empty' });
     mineImpl = async () => {

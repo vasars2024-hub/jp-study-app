@@ -115,15 +115,21 @@ let helperFailed = false;
 let seq = 0;
 const pending = new Map<string, Pending>();
 
+/** A helper not up in this long is stopped; the next command starts another. */
+const HELPER_START_TIMEOUT_MS = 8000;
+
 function spawnHelper(): Promise<boolean> {
   if (process.platform !== 'win32' || helperFailed) return Promise.resolve(false);
   if (helperReady) return helperReady;
   helperReady = new Promise<boolean>((resolve) => {
     let settled = false;
-    const settle = (ok: boolean): void => {
+    let startTimer: ReturnType<typeof setTimeout> | null = null;
+    /** `permanent`: PowerShell cannot run here at all, so nothing will ever ask it again. */
+    const settle = (ok: boolean, permanent = true): void => {
       if (settled) return;
       settled = true;
-      if (!ok) helperFailed = true;
+      if (startTimer) clearTimeout(startTimer);
+      if (!ok && permanent) helperFailed = true;
       resolve(ok);
     };
     try {
@@ -165,6 +171,8 @@ function spawnHelper(): Promise<boolean> {
         }
       });
       const gone = (): void => {
+        // A helper stopped for being slow must not take its successor down with it.
+        if (helper !== child) return;
         helper = null;
         helperReady = null;
         for (const [id, waiter] of pending) {
@@ -176,8 +184,22 @@ function spawnHelper(): Promise<boolean> {
       };
       child.on('exit', gone);
       child.on('error', gone);
-      // Add-Type compiles on first start; a helper that is not up in 8 s is not coming.
-      setTimeout(() => settle(false), 8000);
+      // Add-Type compiles on first start, which a busy machine can make slow. A
+      // helper not up in time is stopped (it used to be left running, and the
+      // companion was marked broken for the rest of the session); the next
+      // command tries a fresh one.
+      startTimer = setTimeout(() => {
+        if (helper === child) {
+          helper = null;
+          helperReady = null;
+        }
+        try {
+          child.kill();
+        } catch {
+          /* already gone */
+        }
+        settle(false, false);
+      }, HELPER_START_TIMEOUT_MS);
     } catch {
       settle(false);
     }
@@ -305,14 +327,64 @@ export interface CapturedSelection {
   source: ForegroundInfo | null;
 }
 
+/** Everything on the clipboard Electron can read back and write again. */
+interface ClipboardSnapshot {
+  text: string;
+  html: string;
+  rtf: string;
+  image: Electron.NativeImage | null;
+  bookmark: { title: string; url: string } | null;
+}
+
+function snapshotClipboard(): ClipboardSnapshot {
+  const read = <T>(fn: () => T, fallback: T): T => {
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
+  };
+  const image = read(() => clipboard.readImage(), null);
+  const bookmark = read(() => (process.platform === 'darwin' || process.platform === 'win32' ? clipboard.readBookmark() : null), null);
+  return {
+    text: read(() => clipboard.readText(), ''),
+    html: read(() => clipboard.readHTML(), ''),
+    rtf: read(() => clipboard.readRTF(), ''),
+    image: image && !image.isEmpty() ? image : null,
+    bookmark: bookmark && bookmark.url ? bookmark : null,
+  };
+}
+
+/**
+ * Put a snapshot back, every format at once. Restoring only the text (as this
+ * did) replaced a copied picture, and the formatting of copied rich text, with
+ * a bare string — or with nothing at all when the picture had no text.
+ */
+function restoreClipboard(snapshot: ClipboardSnapshot): void {
+  const data: Electron.Data = {};
+  if (snapshot.text) data.text = snapshot.text;
+  if (snapshot.html) data.html = snapshot.html;
+  if (snapshot.rtf) data.rtf = snapshot.rtf;
+  if (snapshot.image) data.image = snapshot.image;
+  // A bookmark is the title of the URL that is the text.
+  if (snapshot.bookmark && snapshot.text === snapshot.bookmark.url) data.bookmark = snapshot.bookmark.title;
+  try {
+    if (Object.keys(data).length) clipboard.write(data);
+    else clipboard.clear();
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Copy the selection out of the foreground window (or `target`, when a Gum
  * window such as the wheel is in front), read it, and put the user's clipboard
- * back so the lookup is non-destructive. When nothing new was copied the old
- * clipboard text is the answer, as it always was.
+ * back — every format of it — so the lookup is non-destructive. When nothing
+ * new was copied the old clipboard text is the answer, as it always was.
  */
 export async function captureSelection(target?: ForegroundInfo | null): Promise<CapturedSelection> {
-  const before = clipboard.readText();
+  const saved = snapshotClipboard();
+  const before = saved.text;
   let source: ForegroundInfo | null = target ?? null;
   const msg = await ask(`copy ${target?.hwnd ?? 0}`, 2500);
   if (msg) {
@@ -336,13 +408,7 @@ export async function captureSelection(target?: ForegroundInfo | null): Promise<
     if (after && after !== before) break;
   }
   if (after && after !== before) {
-    setTimeout(() => {
-      try {
-        clipboard.writeText(before);
-      } catch {
-        /* ignore */
-      }
-    }, 350);
+    setTimeout(() => restoreClipboard(saved), 350);
     return { text: after.trim(), fromSelection: true, source };
   }
   return { text: before.trim(), fromSelection: false, source };

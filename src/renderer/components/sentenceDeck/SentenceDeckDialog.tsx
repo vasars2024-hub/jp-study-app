@@ -27,8 +27,12 @@ import {
   type SentencePlan,
 } from '../../../shared/sentenceDeck';
 import { existingDeckKeys } from '../../../shared/filesApp/mining';
-import { STUDY_LANG_NAME_KEY } from '../../../shared/studyLang';
+import { STUDY_LANG_NAME_KEY, type StudyLang } from '../../../shared/studyLang';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { formatBytes } from '../../../shared/assetRegistry';
+import { WHISPER_MODEL_SPECS } from '../../../shared/whisperModels';
+import { isDownloadedIn, loadDownloaded } from '../../whisperModelCache';
+import { loadWhisperDevice, loadWhisperModelTier } from '../../whisperSettings';
 import { loadDeck, type FlashcardTextProvenance } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import { getStudyLang, studyContentLang } from '../../studyEnvironment';
@@ -99,6 +103,21 @@ function languageName(code: string, uiTag: string): string {
     return new Intl.DisplayNames([uiTag], { type: 'language' }).of(code) ?? code;
   } catch {
     return code;
+  }
+}
+
+/**
+ * Bytes the Whisper model for `lang` still has to download before a transcript
+ * can start, or null when it is already on this computer. "Transcribe" queues at
+ * once, and a first transcript quietly pulls a model of a few hundred megabytes.
+ */
+function whisperDownloadBytes(lang: StudyLang): number | null {
+  try {
+    const tier = loadWhisperModelTier(lang);
+    if (isDownloadedIn(loadDownloaded(), tier, loadWhisperDevice())) return null;
+    return WHISPER_MODEL_SPECS.find((spec) => spec.id === tier)?.sizeBytes ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -228,9 +247,12 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
     }
     for (const track of sources?.tracks ?? []) {
       const language = track.lang ? languageName(track.lang, LANG_TAGS[lang] ?? 'en') : t('sentenceDeck.track.langUnknown');
+      const name = track.label || (track.streamNumber
+        ? t('sentenceDeck.track.stream', { n: track.streamNumber })
+        : t(`sentenceDeck.kind.${track.kind}`));
       out.push({
         value: track.id,
-        label: t('sentenceDeck.track.option', { label: track.label, lang: language, kind: t(`sentenceDeck.kind.${track.kind}`) }),
+        label: t('sentenceDeck.track.option', { label: name, lang: language, kind: t(`sentenceDeck.kind.${track.kind}`) }),
       });
     }
     return out;
@@ -349,10 +371,16 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
       </>
     );
   } else if (stage.kind === 'setup' && !hasText) {
+    const downloadBytes = whisperDownloadBytes(studyLang);
     body = (
       <div className="sd-status">
         <p>{t('sentenceDeck.noText.body')}</p>
         <p className="sd-muted">{t('sentenceDeck.noText.hint', { language: t(STUDY_LANG_NAME_KEY[studyLang]) })}</p>
+        {downloadBytes != null && (
+          <p className="sd-muted" data-sd-model-download>
+            {t('sentenceDeck.noText.modelDownload', { size: formatBytes(downloadBytes) })}
+          </p>
+        )}
         {transcribeNote && <p className="sd-note" role="status">{transcribeNote}</p>}
       </div>
     );
@@ -569,7 +597,7 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
               {result.failedClips.slice(0, 20).map((clip) => (
                 <li key={clip.index}>
                   <span lang={contentLang}>{clip.text}</span>
-                  <span className="sd-muted sd-detail">{clip.error}</span>
+                  <span className="sd-muted sd-detail" title={clip.error}>{t(clip.reasonKey)}</span>
                 </li>
               ))}
             </ul>

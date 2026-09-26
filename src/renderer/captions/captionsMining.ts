@@ -65,10 +65,12 @@ export function captionMineInput(payload: CaptionMinePayload, audioOnlyFront: st
  * dictionary — mining never waits on the network, and a miss leaves them empty
  * (the user's auto-enrich preferences may still fill them).
  */
-async function wordGloss(term: string): Promise<{ reading: string; meaning: string }> {
+async function wordGloss(term: string, lang: CaptionMinePayload['studyLang']): Promise<{ reading: string; meaning: string }> {
   try {
     if (typeof window.api?.lookupTermOffline !== 'function') return { reading: '', meaning: '' };
-    const result = await window.api.lookupTermOffline(term);
+    // In the card's own language: a Chinese 学生 looked up by script alone is the
+    // Japanese がくせい, and that reading would land on a Chinese card.
+    const result = await window.api.lookupTermOffline(term, lang);
     const entry = result?.entries?.find((e) => e.word === term) ?? result?.entries?.[0];
     if (!entry) return { reading: '', meaning: '' };
     const meaning = entry.senses
@@ -89,7 +91,7 @@ export async function handleCaptionMine(payload: CaptionMinePayload): Promise<Ca
     }
     let enriched = payload;
     if (payload.word?.trim() && (!payload.reading || !payload.meaning)) {
-      const gloss = await wordGloss(payload.word.trim());
+      const gloss = await wordGloss(payload.word.trim(), payload.studyLang);
       enriched = { ...payload, reading: payload.reading || gloss.reading, meaning: payload.meaning || gloss.meaning };
     }
     const [{ mineToStudy }, { t }] = await Promise.all([import('../studyMining'), import('../i18n')]);

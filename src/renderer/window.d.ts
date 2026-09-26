@@ -2236,6 +2236,10 @@ declare global {
       ): Promise<{ ok: boolean; created?: boolean; cardId?: string; error?: string; errorKey?: string }>;
       captionsMineCurrentLine(): Promise<unknown>;
       captionsGetLines(): Promise<import('../shared/captionsOverlay').CaptionOverlayLine[]>;
+      captionsGetDrafts(): Promise<{
+        drafts: import('../shared/captionsOverlay').CaptionDraft[];
+        notices: import('../shared/captionsOverlay').CaptionNotice[];
+      }>;
       captionsUpdateDraft(id: string, patch: { text?: string }): Promise<{ ok: boolean }>;
       captionsConfirmDraft(
         id: string,

@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
   userData: '',
   onSend: null as null | ((wc: unknown, channel: string, payload: unknown) => void),
   displayHandler: null as null | ((request: unknown, callback: (streams: unknown) => void) => void),
+  failRecordStart: false,
 }));
 
 vi.mock('electron', async () => {
@@ -191,6 +192,8 @@ beforeAll(() => {
           durationMs: 8000,
           silent: false,
         };
+      } else if (cmd.type === 'record-start' && h.failRecordStart) {
+        reply = { ok: false, error: 'not-capturing' };
       } else if (cmd.type === 'transcribe') {
         reply = { ok: true, text: '今天天气很好' };
       }
@@ -270,6 +273,14 @@ describe('system-audio capture in main', () => {
     expect(Buffer.from(card.audioBase64!, 'base64').length).toBe(4096);
     // The draft is gone once added.
     expect(lastSent<{ drafts: CaptionDraft[] }>(overlay, 'captions:drafts')!.drafts).toEqual([]);
+    expect(((await invoke('captions:getDrafts')) as { drafts: CaptionDraft[] }).drafts).toEqual([]);
+  });
+
+  it('a draft pushed before the bar loaded can be pulled by it', async () => {
+    const r = (await invoke('captions:mineRecent')) as { ok: boolean; draftId: string };
+    const pulled = (await invoke('captions:getDrafts')) as { drafts: CaptionDraft[]; notices: unknown[] };
+    expect(pulled.drafts.map((d) => d.id)).toContain(r.draftId);
+    await invoke('captions:discardDraft', r.draftId);
   });
 
   it('a caption line mines with the audio cut by its own timestamps', async () => {
@@ -319,6 +330,51 @@ describe('system-audio capture in main', () => {
     await invoke('captions:mineLine', line.id);
     expect(hostCommands.length).toBe(before);
     expect(mineRequests.at(-1)!.audioBase64).toBeUndefined();
+  });
+
+  it('a quick on → off → on ends on with one capture window; on → off ends off, not "error"', async () => {
+    const captureWindows = (): FakeWin[] => (BrowserWindow.getAllWindows() as FakeWin[]).filter((w) => w.url.includes('audioCapture=1'));
+    const first = invoke('captions:setCapture', true);
+    const off = invoke('captions:setCapture', false);
+    const again = invoke('captions:setCapture', true);
+    await Promise.all([first, off, again]);
+    await until(() => getCaptionsState().capture !== 'starting');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getCaptionsState().capture).toBe('on');
+    expect(captureWindows()).toHaveLength(1);
+
+    await invoke('captions:setCapture', false);
+    const withdrawn = invoke('captions:setCapture', true);
+    await invoke('captions:setCapture', false);
+    await withdrawn;
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getCaptionsState().capture).toBe('off');
+    expect(getCaptionsState().captureErrorKey).toBeUndefined();
+    expect(captureWindows()).toHaveLength(0);
+  });
+
+  it('Record pressed twice while capture is still starting is start-then-stop: nothing keeps recording', async () => {
+    expect(getCaptionsState().capture).toBe('off');
+    const first = invoke('captions:toggleRecording') as Promise<{ ok: boolean; recording: boolean }>;
+    const second = invoke('captions:toggleRecording') as Promise<{ ok: boolean; recording: boolean }>;
+    const [a, b] = await Promise.all([first, second]);
+    expect(b).toEqual({ ok: true, recording: false });
+    expect(a.recording).toBe(false);
+    expect(getCaptionsState().recordingSince).toBeNull();
+    // Capture was turned on only for that recording: it goes off again.
+    await until(() => getCaptionsState().capture === 'off');
+    expect(hostCommands.filter((c) => c.type === 'record-start').length).toBeLessThanOrEqual(1);
+  });
+
+  it('a recording that cannot start leaves capture as it found it (off)', async () => {
+    h.failRecordStart = true;
+    try {
+      const r = (await invoke('captions:toggleRecording')) as { ok: boolean; errorKey?: string };
+      expect(r).toMatchObject({ ok: false, errorKey: 'captions.notice.cutFailed' });
+      expect(getCaptionsState().capture).toBe('off');
+    } finally {
+      h.failRecordStart = false;
+    }
   });
 
   it('settings are clamped and persisted without any audio', async () => {

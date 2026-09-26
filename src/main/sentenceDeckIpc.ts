@@ -35,10 +35,12 @@ import { minedMediaDirectoryUnder } from './minedMediaStore';
 import { loadDiscoverySettings, readSubtitleRecord, readableSubtitleRecords } from './subtitleDiscovery';
 import {
   extractEmbeddedSubtitle,
+  extractEmbeddedSubtitleAss,
   findSidecarSubtitles,
   listAudioStreamLanguages,
   listEmbeddedSubtitleStreams,
   normalizeStreamLanguage,
+  type EmbeddedSubtitleStream,
 } from './subtitleLocalSources';
 import { getMainStudyLang, getMainStudyLangTag } from './studyLanguage';
 
@@ -119,10 +121,25 @@ export async function listSentenceDeckSources(
 
   const item = itemForPath(host, videoPath);
   const records = readableSubtitleRecords(item?.subtitles);
+  let containerStreams: EmbeddedSubtitleStream[] = [];
+  try {
+    containerStreams = await listEmbeddedSubtitleStreams(videoPath);
+  } catch {
+    /* An unreadable container lists no streams; the other sources still count. */
+  }
+  /** 1-based position among the file's subtitle streams, for one the file leaves untitled. */
+  const streamNumber = (streamIndex: number | undefined): number | undefined => {
+    const found = containerStreams.find((stream) => stream.streamIndex === streamIndex);
+    return found ? found.subtitleIndex + 1 : undefined;
+  };
   for (const record of records) {
+    // Discovery names an untitled stream "Stream <n>" in English; the dialog names it in the UI language.
+    const untitledStream = record.source === 'embedded' && (!record.label || /^Stream \d+$/.test(record.label));
+    const number = untitledStream ? streamNumber(record.streamIndex) : undefined;
     tracks.push({
       id: `record:${record.id}`,
-      label: record.label ?? `${record.lang} (${record.source})`,
+      label: number ? '' : record.label ?? `${record.lang} (${record.source})`,
+      ...(number ? { streamNumber: number } : {}),
       lang: record.lang ?? '',
       kind: recordKind(record),
     });
@@ -140,20 +157,25 @@ export async function listSentenceDeckSources(
     tracks.push({ id: `sidecar:${sidecar.path}`, label: sidecar.fileName, lang: sidecar.language ?? '', kind: 'sidecar' });
   }
 
-  // Streams inside the container, unless discovery already extracted them.
-  if (!records.some((r) => r.source === 'embedded')) {
-    try {
-      for (const stream of await listEmbeddedSubtitleStreams(videoPath)) {
-        const lang = normalizeStreamLanguage(stream.language) ?? '';
-        tracks.push({
-          id: `embedded:${stream.subtitleIndex}`,
-          label: stream.title || `${lang || stream.codec} #${stream.subtitleIndex + 1}`,
-          lang,
-          kind: 'embedded',
-        });
-      }
-    } catch {
-      /* An unreadable container lists no streams; the other sources still count. */
+  // Streams inside the container that discovery has not already extracted.
+  // Discovery takes only the languages it was looking for, so one extracted
+  // stream must not hide the others (a zh or ru stream beside the ja one); a
+  // record from before `streamIndex` was kept cannot be matched, and then the
+  // container is left alone as it always was.
+  const embeddedRecords = records.filter((r) => r.source === 'embedded');
+  const extracted = new Set(embeddedRecords.map((r) => r.streamIndex).filter((n): n is number => typeof n === 'number'));
+  if (embeddedRecords.every((r) => typeof r.streamIndex === 'number')) {
+    for (const stream of containerStreams) {
+      if (extracted.has(stream.streamIndex)) continue;
+      const lang = normalizeStreamLanguage(stream.language) ?? '';
+      tracks.push({
+        id: `embedded:${stream.subtitleIndex}`,
+        // An untitled stream is named by the dialog ("Subtitle stream 2"), not "zh #2".
+        label: stream.title ?? '',
+        ...(stream.title ? {} : { streamNumber: stream.subtitleIndex + 1 }),
+        lang,
+        kind: 'embedded',
+      });
     }
   }
 
@@ -174,6 +196,29 @@ export async function listSentenceDeckSources(
     ...(primaryId ? { primaryId } : {}),
     ...(secondaryId ? { secondaryId } : {}),
   };
+}
+
+/**
+ * A container stream's text. An ASS/SSA stream is read as ASS: its styles are
+ * the only evidence a line is a sign (`isSignCue`), and the SRT extraction the
+ * library keeps drops them — every "山田商店" on a shop front became a card.
+ */
+async function readContainerStream(
+  videoPath: string,
+  pick: (stream: EmbeddedSubtitleStream) => boolean,
+): Promise<string | null> {
+  let stream: EmbeddedSubtitleStream | undefined;
+  try {
+    stream = (await listEmbeddedSubtitleStreams(videoPath)).find(pick);
+  } catch {
+    return null;
+  }
+  if (!stream) return null;
+  if (/^(ass|ssa)$/i.test(stream.codec)) {
+    const styled = await extractEmbeddedSubtitleAss(videoPath, stream.subtitleIndex);
+    if (styled) return styled;
+  }
+  return extractEmbeddedSubtitle(videoPath, stream.subtitleIndex);
 }
 
 function readTextFile(filePath: string): string | null {
@@ -226,7 +271,12 @@ export async function readSentenceDeckTrack(
   if (trackId.startsWith('record:')) {
     const item = itemForPath(host, videoPath);
     const record = item?.subtitles?.find((entry) => entry.id === trackId.slice('record:'.length));
-    text = record ? readSubtitleRecord(record) : null;
+    // An extracted stream is re-read from the file when it is still there, for its styles.
+    if (record?.source === 'embedded' && typeof record.streamIndex === 'number' && videoPath && fs.existsSync(videoPath)) {
+      const streamIndex = record.streamIndex;
+      text = await readContainerStream(videoPath, (stream) => stream.streamIndex === streamIndex);
+    }
+    if (text == null) text = record ? readSubtitleRecord(record) : null;
   } else if (trackId.startsWith('sidecar:') || trackId.startsWith('file:')) {
     const filePath = trackId.slice(trackId.indexOf(':') + 1);
     const ext = extOf(filePath);
@@ -236,7 +286,7 @@ export async function readSentenceDeckTrack(
   } else if (trackId.startsWith('embedded:')) {
     const index = Number(trackId.slice('embedded:'.length));
     if (!Number.isInteger(index) || index < 0 || !videoPath || !fs.existsSync(videoPath)) return unreadable;
-    text = await extractEmbeddedSubtitle(videoPath, index);
+    text = await readContainerStream(videoPath, (stream) => stream.subtitleIndex === index);
   }
   if (text == null) return unreadable;
   const cues = toCues(text);

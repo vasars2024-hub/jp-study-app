@@ -515,6 +515,7 @@ export const CAPTIONS_CHANNELS = {
   lines: 'captions:lines',
   getLines: 'captions:getLines',
   drafts: 'captions:drafts',
+  getDrafts: 'captions:getDrafts',
   updateDraft: 'captions:updateDraft',
   confirmDraft: 'captions:confirmDraft',
   discardDraft: 'captions:discardDraft',

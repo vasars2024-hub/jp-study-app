@@ -316,6 +316,11 @@ function waitForLoad(win: BrowserWindow): Promise<boolean> {
       return;
     }
     const timer = setTimeout(() => resolve(false), 30_000);
+    // Turned off while loading: a destroyed window never finishes loading.
+    win.once('closed', () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
     win.webContents.once('did-finish-load', () => {
       clearTimeout(timer);
       resolve(true);
@@ -364,9 +369,19 @@ export async function startCapture(): Promise<{ ok: boolean; errorKey?: string }
   broadcastStateNow();
   const win = createCaptureWindow();
   captureWin = win;
+  // Turned off (or off and on again) while this start was still under way: the
+  // later action owns the state and the window. This start only makes sure its
+  // own window is gone — failing here would mark capture "error", and destroy
+  // the NEW window, after the user had simply changed their mind.
+  const superseded = (): { ok: boolean } => {
+    if (!win.isDestroyed()) win.destroy();
+    return { ok: capture === 'on' };
+  };
   const loaded = waitForLoad(win);
   void win.loadURL(deps ? deps.rendererUrl('audioCapture=1') : 'app://bundle/index.html?audioCapture=1');
-  if (!(await loaded) || !(await waitForHost(win))) return failCapture('captions.error.hostFailed');
+  const hostUp = (await loaded) && (await waitForHost(win));
+  if (captureWin !== win) return superseded();
+  if (!hostUp) return failCapture('captions.error.hostFailed');
   let result: { ok?: boolean; error?: string } | null = null;
   try {
     // `userGesture: true` — getDisplayMedia wants a user activation, and this
@@ -376,10 +391,11 @@ export async function startCapture(): Promise<{ ok: boolean; errorKey?: string }
       true,
     );
   } catch (err) {
+    if (captureWin !== win) return superseded();
     return failCapture('captions.error.streamFailed', err instanceof Error ? err.message : String(err));
   }
+  if (captureWin !== win) return superseded();
   if (!result?.ok) return failCapture('captions.error.streamFailed', result?.error);
-  if (captureWin !== win) return { ok: false, errorKey: 'captions.error.streamFailed' };
   capture = 'on';
   broadcastStateNow();
   return { ok: true };
@@ -559,8 +575,22 @@ export async function mineRecent(seconds?: number): Promise<{ ok: boolean; draft
 }
 
 let recordingTimer: NodeJS.Timeout | null = null;
+/** A Record press is still bringing capture up (a second or two from off). */
+let recordingStarting = false;
+/** Record was pressed again during that start: the user meant stop. */
+let stopWhenStarted = false;
 
-export async function toggleRecording(): Promise<{ ok: boolean; recording: boolean; draftId?: string; errorKey?: string }> {
+type RecordingReply = { ok: boolean; recording: boolean; draftId?: string; errorKey?: string };
+
+export async function toggleRecording(): Promise<RecordingReply> {
+  if (recordingStarting) {
+    // Pressed again before the first press had started anything (capture was
+    // still coming up). It used to start a second recording on top — or, in the
+    // app, wait 15 s for a host that was not listening yet — and the recording
+    // the user had just stopped ran on to its limit.
+    stopWhenStarted = true;
+    return { ok: true, recording: false };
+  }
   if (recordingSince !== null) {
     if (recordingTimer) clearTimeout(recordingTimer);
     recordingTimer = null;
@@ -585,6 +615,24 @@ export async function toggleRecording(): Promise<{ ok: boolean; recording: boole
     }
     return { ...result, recording: false };
   }
+  recordingStarting = true;
+  stopWhenStarted = false;
+  let started: RecordingReply;
+  try {
+    started = await startRecording();
+  } finally {
+    recordingStarting = false;
+  }
+  if (stopWhenStarted) {
+    stopWhenStarted = false;
+    if (started.recording) await abandonRecording();
+    return { ok: true, recording: false };
+  }
+  if (started.recording) notice('captions.notice.recording', 'info', { seconds: MANUAL_RECORDING_MAX_SECONDS }, 3000);
+  return started;
+}
+
+async function startRecording(): Promise<RecordingReply> {
   if (capture !== 'on') {
     recordingOwnsCapture = true;
     const started = await startCapture();
@@ -594,15 +642,28 @@ export async function toggleRecording(): Promise<{ ok: boolean; recording: boole
     }
   }
   const ok = await hostRequest<{ ok: boolean }>({ type: 'record-start' });
-  if (!ok?.ok) return { ok: false, recording: false, errorKey: 'captions.notice.cutFailed' };
+  if (!ok?.ok) {
+    // Capture turned on only for this recording goes off again, red dot and all.
+    if (recordingOwnsCapture) stopCapture();
+    return { ok: false, recording: false, errorKey: 'captions.notice.cutFailed' };
+  }
   recordingSince = Date.now();
   recordingTimer = setTimeout(() => {
     recordingTimer = null;
     if (recordingSince !== null) void toggleRecording();
   }, MANUAL_RECORDING_MAX_SECONDS * 1000 + 250);
   broadcastStateNow();
-  notice('captions.notice.recording', 'info', { seconds: MANUAL_RECORDING_MAX_SECONDS }, 3000);
   return { ok: true, recording: true };
+}
+
+/** A recording stopped before it had begun: nothing to keep, and capture it owned goes off. */
+async function abandonRecording(): Promise<void> {
+  if (recordingTimer) clearTimeout(recordingTimer);
+  recordingTimer = null;
+  await hostRequest({ type: 'record-stop' });
+  recordingSince = null;
+  if (recordingOwnsCapture) stopCapture();
+  else broadcastStateNow();
 }
 
 /**
@@ -1037,6 +1098,9 @@ export function registerSystemAudioCaptureIpc(): void {
     mineLine(String(lineId ?? ''), extra && typeof extra === 'object' ? (extra as Record<string, string>) : {}));
   ipcMain.handle(CH.mineCurrentLine, () => mineCurrentLine());
   ipcMain.handle(CH.getLines, () => lines);
+  // The bar loads lazily: a draft or notice pushed while it was still loading
+  // (the first "mine the last seconds" creates the window) is pulled here.
+  ipcMain.handle(CH.getDrafts, () => ({ drafts, notices }));
   ipcMain.handle(CH.updateDraft, (_e, id: unknown, patch: unknown) => {
     const p = (patch && typeof patch === 'object' ? patch : {}) as { text?: unknown };
     if (typeof p.text === 'string') patchDraft(String(id), { text: p.text.slice(0, 2000) });

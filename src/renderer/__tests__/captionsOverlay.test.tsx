@@ -96,6 +96,7 @@ function installBridge(state: CaptionsState, lines: CaptionOverlayLine[] = []): 
   const api = {
     captionsGetState: vi.fn(() => Promise.resolve(state)),
     captionsGetLines: vi.fn(() => Promise.resolve(lines)),
+    captionsGetDrafts: vi.fn(() => Promise.resolve({ drafts: [] as CaptionDraft[], notices: [] as CaptionNotice[] })),
     onCaptionsState: on('state'),
     onCaptionsLines: on('lines'),
     onCaptionsDrafts: on('drafts'),
@@ -170,6 +171,17 @@ describe('CaptionsOverlay', () => {
     expect(words).toContain('今天');
     expect(words.join('')).toBe('今天天气很好');
     expect(el.querySelector('.cap-line-prev')?.textContent).toBe('你好');
+  });
+
+  it('a Traditional Chinese learner\'s lines are marked zh-Hant, so the glyphs are the right ones', async () => {
+    localStorage.setItem('jp-study-zh-script', 'traditional');
+    try {
+      installBridge(baseState(), [line({ text: '今天天氣很好' })]);
+      const el = await mount();
+      expect(el.querySelector('.cap-line-current [lang]')?.getAttribute('lang')).toBe('zh-Hant');
+    } finally {
+      localStorage.removeItem('jp-study-zh-script');
+    }
   });
 
   it('Japanese lines split on the tokenizer\'s morphemes once it has loaded', async () => {
@@ -308,6 +320,22 @@ describe('CaptionsOverlay', () => {
     spy.mockReturnValue(el.querySelector('.cap-headroom'));
     await act(async () => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: 5, clientY: 5 })); });
     expect(bridge.api.captionsOverlaySetIgnoreMouse).toHaveBeenLastCalledWith(true);
+  });
+
+  it('shows a draft and a notice that were pushed before it had loaded', async () => {
+    const bridge = installBridge(baseState({ overlayOpen: false }), []);
+    const waiting: CaptionDraft = {
+      id: 'd-early', kind: 'recent', createdAt: 1, text: '', transcript: 'model-missing', durationMs: 2100,
+      audioBase64: 'AAAA', audioMime: 'audio/mpeg', audioFilename: 'a.mp3', studyLang: 'zh', textProvenance: 'transcript',
+    };
+    bridge.api.captionsGetDrafts.mockImplementation(() => Promise.resolve({
+      drafts: [waiting],
+      notices: [{ id: 'n0', key: 'captions.notice.silent', kind: 'warning' }],
+    }));
+    const el = await mount();
+    expect(el.querySelector('.cap-draft')).not.toBeNull();
+    expect(el.querySelector('.cap-draft-meta')?.textContent).toContain('seconds=2.1');
+    expect(el.querySelector('.cap-notice')?.textContent).toBe('captions.notice.silent');
   });
 
   it('with the bar hidden it still shows a mined draft and notices', async () => {

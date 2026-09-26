@@ -15,8 +15,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { extractSentenceAudioBatch } from '../sentenceAudioBatch';
+
+/** A hook after each real store write, so a cancel can land between a clip and its still. */
+const writes = vi.hoisted(() => ({ after: null as null | (() => void) }));
+vi.mock('../minedMediaStore', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../minedMediaStore')>();
+  return {
+    ...real,
+    writeMinedMediaBytes: (...args: Parameters<typeof real.writeMinedMediaBytes>) => {
+      const out = real.writeMinedMediaBytes(...args);
+      writes.after?.();
+      return out;
+    },
+  };
+});
 import { parseSubtitles } from '../../shared/subtitleCues';
 import { SENTENCE_DECK_DEFAULTS, planSentenceDeck } from '../../shared/sentenceDeck';
 
@@ -152,6 +166,8 @@ describe('extractSentenceAudioBatch against real ffmpeg', () => {
       ['good', true], ['past-the-end', false], ['also-good', true],
     ]);
     expect(result.results[1].error).toBeTruthy();
+    // Past the end of the file there is nothing to hear: said as a kind, for the dialog to word.
+    expect(result.results[1].failure).toBe('silent');
   }, 120_000);
 
   it('refuses a file with no audio once, instead of failing every line', async () => {
@@ -187,6 +203,34 @@ describe('extractSentenceAudioBatch against real ffmpeg', () => {
     expect(result.cancelled).toBe(true);
     expect(result.results.length).toBeLessThan(clips.length);
     expect(result.results.length).toBeGreaterThanOrEqual(2);
+  }, 120_000);
+
+  it('reports every file it stored, including one finished as the cancel arrived', async () => {
+    const dir = path.join(workDir, 'cancel-media');
+    const controller = new AbortController();
+    let stored = 0;
+    // Clip 1's audio is stored, then the user cancels before its still is cut.
+    writes.after = () => {
+      stored += 1;
+      if (stored === 3) controller.abort();
+    };
+    try {
+      const clips = Array.from({ length: 6 }, (_, i) => ({ id: `k${i}`, startMs: 1000 + (i % 3) * 3000, endMs: 2500 + (i % 3) * 3000 + i * 7 }));
+      const result = await extractSentenceAudioBatch(
+        { filePath: episode, clips, withStill: true },
+        { mediaDirectory: dir, concurrency: 1, signal: controller.signal },
+      );
+      expect(result.cancelled).toBe(true);
+      const reported = new Set(
+        result.results.flatMap((r) => [r.audioPath, r.imagePath]).filter((p): p is string => Boolean(p)).map((p) => path.resolve(p)),
+      );
+      const onDisk = fs.readdirSync(dir).map((name) => path.resolve(dir, name));
+      // No encoder starts after the cancel, and nothing stored goes unreported.
+      expect(onDisk).toHaveLength(3);
+      expect(onDisk.filter((file) => !reported.has(file))).toEqual([]);
+    } finally {
+      writes.after = null;
+    }
   }, 120_000);
 
   it('adds a still from the scene when asked', async () => {

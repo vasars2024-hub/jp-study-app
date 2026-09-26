@@ -90,6 +90,12 @@ function isRevisionOf(prev: string, next: string): boolean {
  * `k === 0` with a non-empty `prev` means we lost sync — the poller stalled long
  * enough for the whole window to turn over, so text was already lost at the
  * source. We append everything and let the caller report the gap.
+ *
+ * Lines first seen in the same poll are stamped a millisecond apart, in order:
+ * the timestamp is a line's identity downstream (the captions bar keys its
+ * lines by it), and two lines with one stamp became one — the bar showed only
+ * the last line of a poll that brought several (e.g. the text already on
+ * screen when the bar opens).
  */
 export function mergeCaptionSnapshot(
   prev: readonly CaptionLine[],
@@ -102,7 +108,7 @@ export function mergeCaptionSnapshot(
   }
   if (prev.length === 0) {
     return {
-      lines: incoming.map((text) => ({ text, ts: now })),
+      lines: incoming.map((text, i) => ({ text, ts: now + i })),
       appended: incoming.length,
       desynced: false,
     };
@@ -134,7 +140,7 @@ export function mergeCaptionSnapshot(
   for (let i = 0; i < k; i++) {
     overlapped.push({ text: incoming[i]!, ts: prev[prev.length - k + i]!.ts });
   }
-  const fresh = incoming.slice(k).map((text) => ({ text, ts: now }));
+  const fresh = incoming.slice(k).map((text, i) => ({ text, ts: now + i }));
   const lines = [...kept, ...overlapped, ...fresh];
 
   return {

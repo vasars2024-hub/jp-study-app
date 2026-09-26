@@ -123,6 +123,21 @@ describe('CardPreview', () => {
     expect(lookups).toEqual(['zh:学习']);
   });
 
+  it('marks the card text with its language and script, so CJK glyphs are the right ones', async () => {
+    localStorage.setItem('jp-study-zh-script', 'traditional');
+    try {
+      await render({ ...WORD, id: 'cd-hant', word: '學習', sentence: undefined, studyLang: 'zh', imageDataUrl: undefined });
+      expect(host.querySelector('.companion-preview-card')?.getAttribute('lang')).toBe('zh-Hant');
+    } finally {
+      localStorage.removeItem('jp-study-zh-script');
+    }
+  });
+
+  it('a draft that does not say its language is marked with the one its text is in', async () => {
+    await render({ ...WORD, id: 'cd-nolang', studyLang: undefined });
+    expect(host.querySelector('.companion-preview-card')?.getAttribute('lang')).toBe('ja');
+  });
+
   it('Add sends what is on screen, edits included, with the picture', async () => {
     await render(WORD);
     await act(async () => button('Edit').click());

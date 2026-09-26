@@ -144,6 +144,84 @@ describe('readSentenceDeckTrack', () => {
   });
 });
 
+describe('a container with several text streams (ASS with a sign, zh, ru)', () => {
+  let mkv = '';
+  let extracted = '';
+  const ASS = [
+    '[Script Info]', 'ScriptType: v4.00+', '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    'Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1',
+    'Style: Sign,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,8,10,10,10,1',
+    '', '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+    'Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,おはようございます。',
+    'Dialogue: 0,0:00:02.00,0:00:05.00,Sign,,0,0,0,,山田商店',
+    'Dialogue: 0,0:00:04.00,0:00:06.00,Default,,0,0,0,,散歩に行こう。',
+    '',
+  ].join('\n');
+
+  beforeAll(async () => {
+    const dir = path.join(tmpRoot, 'container');
+    fs.mkdirSync(dir, { recursive: true });
+    const ass = path.join(dir, 'ja.ass');
+    const zh = path.join(dir, 'zh.srt');
+    const ru = path.join(dir, 'ru.srt');
+    fs.writeFileSync(ass, ASS);
+    fs.writeFileSync(zh, '1\n00:00:01,000 --> 00:00:03,000\n早上好。\n');
+    fs.writeFileSync(ru, '1\n00:00:01,000 --> 00:00:03,000\nДоброе утро.\n');
+    mkv = path.join(dir, 'Signs - 01.mkv');
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(ffmpegStatic as unknown as string, [
+        '-hide_banner', '-loglevel', 'error', '-y',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=8',
+        '-i', ass, '-i', zh, '-i', ru,
+        '-map', '0:a', '-map', '1', '-map', '2', '-map', '3',
+        '-c:a', 'aac', '-c:s:0', 'ass', '-c:s:1', 'srt', '-c:s:2', 'srt',
+        '-metadata:s:s:0', 'language=jpn', '-metadata:s:s:1', 'language=chi', '-metadata:s:s:2', 'language=rus',
+        mkv,
+      ], { windowsHide: true });
+      proc.on('error', reject);
+      proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}`))));
+    });
+    // What discovery keeps for the Japanese stream (#0:1): an SRT copy, styles gone.
+    extracted = path.join(dir, 'embedded-0-ja.srt');
+    fs.writeFileSync(extracted, '1\n00:00:01,000 --> 00:00:03,000\nおはようございます。\n\n2\n00:00:02,000 --> 00:00:05,000\n山田商店\n\n3\n00:00:04,000 --> 00:00:06,000\n散歩に行こう。\n');
+  }, 60_000);
+
+  const library = (): { listItems: () => MediaItem[] } => ({
+    listItems: () => [{
+      id: 'm2',
+      path: mkv,
+      subtitles: [{ id: 'e1', lang: 'ja', source: 'embedded', format: 'srt', path: extracted, streamIndex: 1, label: 'Stream 1' }],
+    } as unknown as MediaItem],
+  });
+
+  it('offers the streams discovery did not extract beside the one it did', async () => {
+    const sources = await listSentenceDeckSources(library(), { videoPath: mkv });
+    const ids = sources.tracks.map((t) => `${t.id}=${t.lang}`);
+    expect(ids).toEqual(expect.arrayContaining(['record:e1=ja', 'embedded:1=zh', 'embedded:2=ru']));
+    // The Japanese stream is not listed a second time.
+    expect(ids).not.toContain('embedded:0=ja');
+    expect(sources.primaryId).toBe('record:e1');
+    // Untitled streams carry their position for the dialog to name, not "zh #2" or discovery's English "Stream 1".
+    expect(sources.tracks.find((t) => t.id === 'embedded:1')).toMatchObject({ label: '', streamNumber: 2 });
+    expect(sources.tracks.find((t) => t.id === 'record:e1')).toMatchObject({ label: '', streamNumber: 1 });
+  }, 30_000);
+
+  it('reads an ASS stream with its styles, so a sign is not taken for dialogue', async () => {
+    for (const id of ['embedded:0', 'record:e1']) {
+      const read = await readSentenceDeckTrack(library(), mkv, id);
+      expect(read.ok).toBe(true);
+      expect(read.cues.find((cue) => cue.text === '山田商店')?.style).toBe('Sign');
+      expect(read.cues.find((cue) => cue.text === 'おはようございます。')?.style).toBe('Default');
+    }
+    // A plain SRT stream still reads as before.
+    const zh = await readSentenceDeckTrack(library(), mkv, 'embedded:1');
+    expect(zh.cues.map((cue) => cue.text)).toEqual(['早上好。']);
+  }, 30_000);
+});
+
 describe('runSentenceDeckAudio', () => {
   it('reports progress per clip to the window that asked', async () => {
     const sent: Array<{ done: number; total: number; failed: number }> = [];

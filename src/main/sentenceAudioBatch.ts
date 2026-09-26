@@ -54,9 +54,14 @@ export interface SentenceAudioBatchRequest {
   withStill?: boolean;
 }
 
+/** Why a clip was not cut, for the dialog to say in the UI language. */
+export type SentenceClipFailure = 'silent' | 'timeout' | 'too-large' | 'cancelled' | 'store' | 'ffmpeg';
+
 export interface SentenceAudioClipResult {
   id: string;
   ok: boolean;
+  /** On failure: which kind (the `error` text is ffmpeg's or Node's, in English). */
+  failure?: SentenceClipFailure;
   /** Managed file path of the MP3. */
   audioPath?: string;
   /** Managed file path of the still, when one was asked for and cut. */
@@ -90,6 +95,7 @@ interface RunOutcome {
   ok: boolean;
   bytes?: Buffer;
   error?: string;
+  failure?: SentenceClipFailure;
   /** Everything ffmpeg printed, for classifying a failure. */
   stderr?: string;
 }
@@ -102,11 +108,17 @@ const MIN_CLIP_BYTES = 1_024;
 
 function runToBuffer(args: string[], signal?: AbortSignal): Promise<RunOutcome> {
   return new Promise((resolve) => {
+    // An 'abort' listener added after the fact never fires: a cancelled batch
+    // must not start another encoder (the still after a clip it just stored).
+    if (signal?.aborted) {
+      resolve({ ok: false, error: 'cancelled', failure: 'cancelled' });
+      return;
+    }
     let proc: ChildProcessWithoutNullStreams;
     try {
       proc = spawn(ffmpegPath, args, { windowsHide: true });
     } catch (error) {
-      resolve({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      resolve({ ok: false, error: error instanceof Error ? error.message : String(error), failure: 'ffmpeg' });
       return;
     }
     const chunks: Buffer[] = [];
@@ -121,13 +133,13 @@ function runToBuffer(args: string[], signal?: AbortSignal): Promise<RunOutcome> 
       try { proc.kill(); } catch { /* already gone */ }
       resolve(outcome);
     };
-    const onAbort = (): void => finish({ ok: false, error: 'cancelled' });
-    const timer = setTimeout(() => finish({ ok: false, error: 'ffmpeg timed out' }), CLIP_TIMEOUT_MS);
+    const onAbort = (): void => finish({ ok: false, error: 'cancelled', failure: 'cancelled' });
+    const timer = setTimeout(() => finish({ ok: false, error: 'ffmpeg timed out', failure: 'timeout' }), CLIP_TIMEOUT_MS);
     signal?.addEventListener('abort', onAbort, { once: true });
     proc.stdout.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_CLIP_BYTES) {
-        finish({ ok: false, error: 'clip unexpectedly large' });
+        finish({ ok: false, error: 'clip unexpectedly large', failure: 'too-large' });
         return;
       }
       chunks.push(chunk);
@@ -135,10 +147,10 @@ function runToBuffer(args: string[], signal?: AbortSignal): Promise<RunOutcome> 
     proc.stderr.on('data', (chunk: Buffer) => {
       if (stderr.length < 16_000) stderr += chunk.toString();
     });
-    proc.on('error', (error) => finish({ ok: false, error: error.message }));
+    proc.on('error', (error) => finish({ ok: false, error: error.message, failure: 'ffmpeg' }));
     proc.on('close', (code) => {
       if (code !== 0 || !chunks.length) {
-        finish({ ok: false, error: stderr.trim().split('\n').at(-1) || `ffmpeg exited ${code}`, stderr });
+        finish({ ok: false, error: stderr.trim().split('\n').at(-1) || `ffmpeg exited ${code}`, failure: 'ffmpeg', stderr });
         return;
       }
       finish({ ok: true, bytes: Buffer.concat(chunks), stderr });
@@ -163,14 +175,15 @@ export async function extractSentenceClip(
       id: clip.id,
       ok: false,
       error: audio.error ?? 'no audio',
+      failure: audio.failure ?? 'ffmpeg',
       ...(/matches no streams/i.test(audio.stderr ?? '') ? { noAudioStream: true } : {}),
     };
   }
   if (audio.bytes.length < MIN_CLIP_BYTES) {
-    return { id: clip.id, ok: false, error: 'nothing to hear in this range' };
+    return { id: clip.id, ok: false, error: 'nothing to hear in this range', failure: 'silent' };
   }
   const stored = writeMinedMediaBytes(mediaDirectory, audio.bytes, '.mp3');
-  if (!stored.ok || !stored.path) return { id: clip.id, ok: false, error: stored.error ?? 'store failed' };
+  if (!stored.ok || !stored.path) return { id: clip.id, ok: false, error: stored.error ?? 'store failed', failure: 'store' };
   const result: SentenceAudioClipResult = {
     id: clip.id,
     ok: true,
@@ -193,6 +206,8 @@ export async function extractSentenceClip(
  * Cut every clip in `request`, `concurrency` at a time, in order of the
  * request. Resolves with one result per clip that was attempted; after a
  * cancel the remaining clips are simply not attempted, and `cancelled` says so.
+ * Every file stored — including one finished just as the cancel arrived — is in
+ * `results`, because the caller owns deleting what it will not use.
  */
 export async function extractSentenceAudioBatch(
   request: SentenceAudioBatchRequest,
@@ -238,7 +253,13 @@ export async function extractSentenceAudioBatch(
       const index = next;
       next += 1;
       const result = await extractSentenceClip(base, clips[index], hooks.mediaDirectory, hooks.signal);
-      if (hooks.signal?.aborted) return;
+      if (hooks.signal?.aborted) {
+        // Cut and stored before the cancel landed (its audio, or audio without the
+        // still the cancel stopped): still reported, so the caller can take the
+        // file back — a cancel must not leave clips no card will ever point at.
+        if (result.ok) results[index] = result;
+        return;
+      }
       record(index, result);
     }
   };

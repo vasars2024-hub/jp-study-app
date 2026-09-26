@@ -32,6 +32,12 @@
 .companion-pack-gallery .ui-tile {
   align-items: center;
 }
+/* The sprite sits inside the tile's icon chip. At the design system's 36px chip
+   a 44px sprite spilled past the chip's rounded square on every side. */
+.companion-pack-gallery .ui-tile__icon {
+  width: 48px;
+  height: 48px;
+}
 .companion-pack-preview {
   width: 44px;
   height: 44px;

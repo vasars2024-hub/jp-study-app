@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '../Icons';
 import { Button, IconButton, Input, Toggle } from '../ui';
 import { useT } from '../../i18n';
-import { getStudyLang } from '../../studyEnvironment';
+import { getStudyLang, studyContentLang } from '../../studyEnvironment';
 import { glossFor } from '../../companionMine';
 import { normalizeStudyLang, studyLangOfText } from '../../../shared/studyLang';
 import {
@@ -188,7 +188,10 @@ export default function CardPreview() {
             )}
           </div>
         ) : (
-          <div className="companion-preview-card" lang={draft.studyLang}>
+          <div
+            className="companion-preview-card"
+            lang={studyContentLang(normalizeStudyLang(draft.studyLang, studyLangOfText(draft.word, getStudyLang())))}
+          >
             <div className={`companion-preview-word${draft.kind === 'sentence' ? ' is-sentence' : ''}`}>{draft.word}</div>
             {draft.reading && <div className="companion-preview-reading">{draft.reading}</div>}
             {draft.meaning ? (

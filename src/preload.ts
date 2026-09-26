@@ -542,6 +542,7 @@ const api = {
   dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
     ipcRenderer.invoke('dict:pitch', term, reading),
   /** Offline-only Yomitan glossary lookup (no Jisho). */
+  /** `lang` pins the dictionary language; without it the query's script decides (Han → Japanese). */
   lookupTermOffline: (query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> =>
     ipcRenderer.invoke('dict:lookupTermOffline', query, lang),
   /** Offline segmentation and grounded glossary rows for the Lexicon Workbench. */
@@ -3512,6 +3513,11 @@ const api = {
   captionsMineCurrentLine: (): Promise<unknown> => ipcRenderer.invoke('captions:mineCurrentLine'),
   captionsGetLines: (): Promise<import('./shared/captionsOverlay').CaptionOverlayLine[]> =>
     ipcRenderer.invoke('captions:getLines'),
+  /** The drafts and notices already waiting, for a bar that loads after they were pushed. */
+  captionsGetDrafts: (): Promise<{
+    drafts: import('./shared/captionsOverlay').CaptionDraft[];
+    notices: import('./shared/captionsOverlay').CaptionNotice[];
+  }> => ipcRenderer.invoke('captions:getDrafts'),
   captionsUpdateDraft: (id: string, patch: { text?: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('captions:updateDraft', id, patch),
   captionsConfirmDraft: (

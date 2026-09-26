@@ -69,6 +69,16 @@ describe('mergeCaptionSnapshot', () => {
     expect(r.lines[0]!.text).toBe('嗯哦，在俄罗斯呃点外卖方便吗？');
   });
 
+  it('stamps lines first seen in the same poll apart, in order', () => {
+    const first = mergeCaptionSnapshot([], ['今天天气很好。', '我们去公园吧。', '走吧'], 5000);
+    expect(first.lines.map((l) => l.ts)).toEqual([5000, 5001, 5002]);
+    const more = mergeCaptionSnapshot(first.lines, ['我们去公园吧。', '走吧，快点。', '好的。', '嗯'], 9000);
+    const stamps = more.lines.map((l) => l.ts);
+    expect(new Set(stamps).size).toBe(stamps.length);
+    expect(more.lines.at(-2)).toEqual({ text: '好的。', ts: 9000 });
+    expect(more.lines.at(-1)).toEqual({ text: '嗯', ts: 9001 });
+  });
+
   it('keeps the first-seen timestamp when a line is revised', () => {
     const prev: CaptionLine[] = [{ text: '嗯哦，在俄罗斯', ts: 111 }];
     const r = mergeCaptionSnapshot(prev, ['嗯哦，在俄罗斯呃点外卖方便吗'], 999);
