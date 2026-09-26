@@ -229,9 +229,6 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.mirror.placeholder': '根据思路图，用学习语言写一段话……',
   'games.mirror.evaluating': '评估中…',
   'games.mirror.submit': '提交评估',
-  'games.mirror.modelInstalled': '本地评估器已安装',
-  'games.mirror.modelSize': '本地评估器下载：{size}',
-  'games.mirror.downloadModel': '下载评估器',
   'games.mirror.axis.grammar': '语法准确度',
   'games.mirror.axis.vocabulary': '词汇丰富度',
   'games.mirror.axis.flow': '行文自然度',
@@ -283,7 +280,6 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.mirror.error.network': '评估请求失败（{status}）。',
   'games.mirror.error.schemaInvalid': '评估返回的结果与评分结构不匹配。',
   'games.mirror.error.requestFailed': '评估请求失败。',
-  'games.mirror.error.modelMissing': '请下载本地 Mirror Writing 评估模型，或切换到已配置的 API 后端。',
 
   // Arcade panels (renderer/games/ArcadeGames.tsx): shell HUD, per-game
   // titles and subtitles, and the in-play status line.

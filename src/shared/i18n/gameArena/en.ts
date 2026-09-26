@@ -250,9 +250,6 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.mirror.placeholder': 'Write the paragraph in your study language from the idea map…',
   'games.mirror.evaluating': 'Evaluating...',
   'games.mirror.submit': 'Submit for evaluation',
-  'games.mirror.modelInstalled': 'Local evaluator installed',
-  'games.mirror.modelSize': 'Local evaluator download: {size}',
-  'games.mirror.downloadModel': 'Download evaluator',
   'games.mirror.axis.grammar': 'Grammar Accuracy',
   'games.mirror.axis.vocabulary': 'Lexical Density',
   'games.mirror.axis.flow': 'Natural Flow',
@@ -304,7 +301,6 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.mirror.error.network': 'Evaluator request failed ({status}).',
   'games.mirror.error.schemaInvalid': 'The evaluator response did not match the score schema.',
   'games.mirror.error.requestFailed': 'The evaluator request failed.',
-  'games.mirror.error.modelMissing': 'Download the local Mirror Writing evaluator or switch to a configured API backend.',
 
   // Arcade panels (renderer/games/ArcadeGames.tsx): shell HUD, per-game
   // titles and subtitles, and the in-play status line.

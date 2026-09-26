@@ -230,9 +230,6 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.mirror.placeholder': 'アイデアマップをもとに、学習言語で段落を書いてください…',
   'games.mirror.evaluating': '評価中…',
   'games.mirror.submit': '評価に提出',
-  'games.mirror.modelInstalled': 'ローカル評価エンジン導入済み',
-  'games.mirror.modelSize': 'ローカル評価エンジンのダウンロード：{size}',
-  'games.mirror.downloadModel': '評価エンジンをダウンロード',
   'games.mirror.axis.grammar': '文法の正確さ',
   'games.mirror.axis.vocabulary': '語彙の豊かさ',
   'games.mirror.axis.flow': '自然な流れ',
@@ -284,7 +281,6 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.mirror.error.network': '評価リクエストが失敗しました（{status}）。',
   'games.mirror.error.schemaInvalid': '評価の応答がスコアのスキーマと一致しませんでした。',
   'games.mirror.error.requestFailed': '評価リクエストが失敗しました。',
-  'games.mirror.error.modelMissing': 'ローカルの Mirror Writing 評価モデルをダウンロードするか、設定済みの API バックエンドに切り替えてください。',
 
   // Arcade panels (renderer/games/ArcadeGames.tsx): shell HUD, per-game
   // titles and subtitles, and the in-play status line.

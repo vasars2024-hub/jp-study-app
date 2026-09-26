@@ -233,9 +233,6 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.mirror.placeholder': 'Напишите абзац на изучаемом языке по карте идей…',
   'games.mirror.evaluating': 'Оценка…',
   'games.mirror.submit': 'Отправить на оценку',
-  'games.mirror.modelInstalled': 'Локальный оценщик установлен',
-  'games.mirror.modelSize': 'Загрузка локального оценщика: {size}',
-  'games.mirror.downloadModel': 'Скачать оценщик',
   'games.mirror.axis.grammar': 'Грамматическая точность',
   'games.mirror.axis.vocabulary': 'Лексическая плотность',
   'games.mirror.axis.flow': 'Естественность речи',
@@ -287,7 +284,6 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.mirror.error.network': 'Запрос к оценщику не удался ({status}).',
   'games.mirror.error.schemaInvalid': 'Ответ оценщика не соответствует схеме оценок.',
   'games.mirror.error.requestFailed': 'Запрос к оценщику не удался.',
-  'games.mirror.error.modelMissing': 'Загрузите локальный оценщик Mirror Writing или переключитесь на настроенный API-бэкенд.',
 
   // Arcade panels (renderer/games/ArcadeGames.tsx): shell HUD, per-game
   // titles and subtitles, and the in-play status line.
