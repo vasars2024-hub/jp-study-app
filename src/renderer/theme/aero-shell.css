@@ -1289,6 +1289,12 @@
   content: none;
 }
 
+:root[data-materials='aero'] .fwin-b {
+  /* The other Aero border styles fall back to the base 26px button, which the 32px `.lq-hit`
+     floor overhangs by 3px a side; see the aero-glass caption buttons below. */
+  width: 32px;
+}
+
 :root[data-materials='aero'] .fwin-b:hover {
   background: color-mix(in srgb, var(--shell-glass-strong) 82%, var(--accent-2) 8%);
 }
@@ -3628,8 +3634,12 @@
 }
 
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-b {
-  /* WCAG 2.5.8 target floor: 24px (was 24x20). */
-  width: 24px;
+  /* WCAG 2.5.8 target floor: 24px (was 24x20). 32 wide, not 24: every caption button
+     carries the `.lq-hit` pointer floor, a centred 32px `::after`, and inside a 22px client
+     box it hung 5px past each side: 240 of the 241 overflows the round-3 sweep counted in
+     Aero were these buttons, five per window. Vista's caption buttons are wider than tall
+     anyway, and its close button wider still (below). */
+  width: 32px;
   height: 24px;
   /* The UA button padding (1px 6px) left 12px for the glyph, and ⧉ / ◇ are
      wider than that: they overflowed the 24px cap (scrollWidth 27). */
@@ -3651,6 +3661,7 @@
 }
 
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-close {
+  width: 44px;
   border-color: rgba(131, 38, 38, 0.72);
   background:
     linear-gradient(180deg, rgba(255, 230, 218, 0.85), rgba(230, 84, 61, 0.78) 48%, rgba(154, 33, 29, 0.9));

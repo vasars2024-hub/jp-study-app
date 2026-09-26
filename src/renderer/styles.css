@@ -9438,6 +9438,9 @@ mark.lookup-mark,
 .set-row-desc {
   font-size: 13px;
   line-height: 1.55;
+  /* A dictionary's licence line ends in its source URL, which has no break opportunity and
+     ran 56px past the row in Settings > Profile & dictionary (round-3 sweep, Aero). */
+  overflow-wrap: anywhere;
 }
 .set-row-desc kbd {
   display: inline-block;
