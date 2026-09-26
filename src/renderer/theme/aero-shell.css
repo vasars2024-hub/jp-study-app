@@ -3625,6 +3625,10 @@
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-b {
   width: 24px;
   height: 20px;
+  /* The UA button padding (1px 6px) left 12px for the glyph, and ⧉ / ◇ are
+     wider than that: they overflowed the 24px cap (scrollWidth 27). */
+  padding: 0;
+  line-height: 1;
   border-radius: 0 0 3px 3px;
   color: #f8fdff;
   border: 1px solid rgba(42, 119, 190, 0.64);
