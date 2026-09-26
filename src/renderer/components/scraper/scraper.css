@@ -769,7 +769,8 @@
 }
 
 .scr-dashboard-eyebrow {
-  color: var(--accent);
+  /* The accent AS TEXT: raw `--accent` measured 4.38:1 on the hero's dark wash. */
+  color: var(--accent-text, var(--accent));
   font-size: var(--font-size-2xs);
   font-weight: 700;
   letter-spacing: 0.12em;

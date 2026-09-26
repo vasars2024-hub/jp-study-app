@@ -6815,7 +6815,11 @@
   --mc-glass-sidebar: color-mix(in srgb, var(--panel-2) 94%, transparent);
   --mc-glass-topbar: color-mix(in srgb, var(--panel) 82%, transparent);
   --mc-glass-player: color-mix(in srgb, var(--panel-2) 94%, transparent);
-  --mc-nav-ink: var(--muted);
+  /* Not plain `--muted`: over a hero the Watch top bar melts into the artwork, and the
+     palette's muted ink measured 3.2-3.8:1 on the tinted ground it leaves (round-3 sweep,
+     Classic Light, title page). Pulled 55% toward `--text` it stays secondary to the
+     active item, which also carries a plate, and clears 4.5:1 there. */
+  --mc-nav-ink: color-mix(in srgb, var(--muted) 45%, var(--text));
   --mc-nav-hover-ink: var(--text);
   --mc-nav-badge-bg: color-mix(in srgb, var(--text) 8%, transparent);
   --mc-nav-badge-text: var(--text);

@@ -303,7 +303,13 @@
 .ui-check input:checked + .ui-check__box { background: var(--accent); border-color: var(--accent); }
 .ui-check input:focus-visible + .ui-check__box { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 .ui-check input { position: absolute; opacity: 0; width: 0; height: 0; }
-.ui-check--disabled { opacity: var(--alpha-disabled); pointer-events: none; }
+.ui-check--disabled { pointer-events: none; cursor: default; }
+/* Disabled = the CONTROL fades and the sentence goes to `--muted`, never the whole label at
+   `--alpha-disabled`: 0.45 opacity put the label text at 2.7:1 on a light card and 3.9:1 on the
+   dark one (round-3 sweep, every locale), and a sentence explaining why something is off has
+   to stay readable. `--muted` clears 4.5:1 on every palette's card. */
+.ui-check--disabled .ui-check__box { opacity: var(--alpha-disabled); }
+.ui-check--disabled > span:not(.ui-check__box) { color: var(--muted); }
 
 /* Toggle switch */
 .ui-toggle { display: inline-flex; align-items: center; gap: var(--space-sm); cursor: pointer; user-select: none; }
@@ -327,7 +333,10 @@
 .ui-toggle input:checked + .ui-toggle__track .ui-toggle__thumb { transform: translateX(18px); }
 .ui-toggle input:focus-visible + .ui-toggle__track { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 .ui-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-.ui-toggle--disabled { opacity: var(--alpha-disabled); pointer-events: none; }
+.ui-toggle--disabled { pointer-events: none; cursor: default; }
+/* Same split as `.ui-check--disabled` above: the switch fades, its sentence stays legible. */
+.ui-toggle--disabled .ui-toggle__track { opacity: var(--alpha-disabled); }
+.ui-toggle--disabled > span:not(.ui-toggle__track) { color: var(--muted); }
 
 /* Slider */
 .ui-slider { width: 100%; height: 22px; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
@@ -371,7 +380,7 @@
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .ui-tab:hover { color: var(--text); }
-.ui-tab[aria-selected='true'] { color: var(--accent); border-bottom-color: var(--accent); }
+.ui-tab[aria-selected='true'] { color: var(--accent-text, var(--accent)); border-bottom-color: var(--accent); }
 .ui-tab:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: -2px; }
 
 /* ---------- Segmented control (P1.6, previously missing) -----------------

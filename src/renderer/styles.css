@@ -1234,6 +1234,14 @@ html[data-chrome='frosted'] .os-taskbar {
   --lv-n1-text: color-mix(in srgb, #c0304a 30%, var(--text));
   --gram-fam-1-text: color-mix(in srgb, #a86b00 30%, var(--text));
   --gram-fam-2-text: color-mix(in srgb, #a86b00 30%, var(--text));
+  /* The Liquid roles' secondary ink. Their defaults (liquid-tokens.css) are `--text` faded
+     to 58-66%, a recipe written for light-on-dark: over a light ground the fade moves the ink
+     TOWARD the ground and measured 2.75-4.4:1 across these six palettes (Files' modified
+     column and empty states, the rails' counts). Each palette's own `--muted` clears 4.5:1 on
+     its bg, panel and panel-2; `lightMutedTokens.test.ts` recomputes that. */
+  --lq-work-text-muted: var(--muted);
+  --lq-anchor-text-muted: var(--muted);
+  --lq-liquid-text-muted: var(--muted);
 }
 
 /* ---------- Study OS boot animation ---------- */
