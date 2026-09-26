@@ -56,8 +56,12 @@ export const CONTENT_SECURITY_POLICY_DIRECTIVES: readonly string[] = [
   // `/api/v1/directstream/stream` (StudyPlayerSlice.tsx's `{{SERVER_URL}}`
   // substitution). Fixing only the first gets the player as far as a live socket
   // and a successful POST — and still no picture. `blob:` covers the recorded
-  // shadowing audio, which never touches the sidecar.
-  "media-src 'self' app: media: playfile: localfile: blob: http://127.0.0.1:*",
+  // shadowing audio, which never touches the sidecar. `data:` is the flashcard audio:
+  // `flashcardReadAudio` hands the review a `data:audio/...` URL, and without it EVERY
+  // card clip failed in a packaged build ("no supported source") while dev — which this
+  // policy never binds — played it fine (measured 2026-09-26 on a sentence deck). `img-src`
+  // and `font-src` already allow `data:`; media cannot run script.
+  "media-src 'self' app: media: playfile: localfile: data: blob: http://127.0.0.1:*",
   "font-src 'self' app: data:",
   // HuggingFace hosts are the one exception to "self only": the on-device
   // Whisper transcription (Transformers.js) streams its ONNX model weights

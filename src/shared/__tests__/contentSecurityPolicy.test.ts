@@ -84,6 +84,12 @@ describe('packaged Content-Security-Policy', () => {
     expect(cspDirectiveSources('connect-src')).toContain('ws://127.0.0.1:*');
   });
 
+  it('lets flashcard audio play from the data: URL the review is handed', () => {
+    // flashcardReadAudio returns `data:audio/...`; without `data:` here every card clip
+    // failed in a packaged build with "no supported source" while dev played it.
+    expect(cspDirectiveSources('media-src')).toContain('data:');
+  });
+
   it('forbids plugins, form posts and base-tag rewrites outright', () => {
     expect(cspDirectiveSources('object-src')).toEqual(["'none'"]);
     expect(cspDirectiveSources('form-action')).toEqual(["'none'"]);
