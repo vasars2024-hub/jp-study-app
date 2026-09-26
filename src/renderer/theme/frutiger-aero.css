@@ -24,7 +24,10 @@
 
   /* ---- Ink — deep ocean ---- */
   --text: #123143;
-  --muted: #526f7a;
+  /* WCAG 1.4.3: #526f7a measured 3.46:1 on the pale glass rgb(158,216,242) and
+     2.77:1 on the settings nav (round-2 visual scan). #3f5a66 is the same slate,
+     deeper: 4.7:1 on that glass, 5.7:1 on the sidebar, 7:1 on the panel. */
+  --muted: #3f5a66;
   --border: #90afba;
   --grid-line: rgba(18, 49, 67, 0.14);
 
@@ -65,6 +68,11 @@
      4.76:1 on the worst backdrop the gate measured (rgb(196,228,250)) and 6.31:1 on white. */
   --state-indicator: #00697f;
   --status-info: var(--accent);
+  /* Status colours as TEXT, same recipe as the light palettes in styles.css:
+     raw --warning (#e3a008) read 2.16:1 on aero glass, --danger 3.4:1. */
+  --success-text: color-mix(in srgb, var(--success) 30%, var(--text));
+  --warning-text: color-mix(in srgb, var(--warning) 30%, var(--text));
+  --danger-text: color-mix(in srgb, var(--danger) 30%, var(--text));
 
   /* ---- Controls — frosted white ---- */
   --control-bg: rgba(255, 255, 255, 0.84);

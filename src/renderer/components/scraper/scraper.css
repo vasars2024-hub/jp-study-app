@@ -4916,7 +4916,10 @@
   padding: var(--space-xs) var(--space-sm);
   border: 1px solid color-mix(in srgb, var(--status-success) 45%, var(--border));
   border-radius: var(--radius-pill);
-  color: var(--status-success);
+  /* Its own ground and a text-strength green: the raw status green read 2.71:1
+     in Classic Light and 1.75:1 on aero glass. */
+  background: color-mix(in srgb, var(--status-success) 10%, var(--panel));
+  color: color-mix(in srgb, var(--status-success) 55%, var(--text));
   font-size: var(--font-size-xs);
 }
 

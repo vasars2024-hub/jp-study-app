@@ -5540,6 +5540,8 @@ mark.lookup-mark,
 }
 .wk-grade-btn {
   flex: 1;
+  /* WCAG 2.5.8: 11px text + 4px padding came to 23px. */
+  min-height: 24px;
   padding: 4px 2px;
   font-size: 11px;
   border: 1px solid var(--border);
@@ -18337,6 +18339,8 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border: 1px solid var(--border);
 }
 .immersion-mode-btn {
+  /* WCAG 2.5.8 target floor (was 23px tall). */
+  min-height: 24px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -20200,7 +20204,17 @@ html[data-taskbar-size='large'] .os-tray-btn {
   gap: 3px;
 }
 .cal-month-cell.out {
-  opacity: 0.45;
+  /* Days of the next/previous month stay readable (opacity 0.45 put the day
+     numbers at 1.9:1 in the light themes); they are told apart by a quieter
+     number and a flatter cell instead. */
+  background: transparent;
+}
+.cal-month-cell.out .cal-month-daynum {
+  color: var(--muted);
+  font-weight: 400;
+}
+.cal-month-cell.out > :not(.cal-month-daynum) {
+  opacity: 0.7;
 }
 .cal-month-cell.today {
   border-color: var(--accent);
