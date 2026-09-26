@@ -548,6 +548,45 @@ export async function kvScanPrefix(prefix: string): Promise<Array<[string, unkno
 }
 
 /**
+ * Delete, in ONE readwrite transaction, every entry under `prefix` whose value
+ * `predicate` accepts. The read and the deletes cannot interleave with another
+ * write, so a record rewritten meanwhile is judged by its new value. Resolves
+ * with how many were deleted.
+ */
+export async function kvDeleteWhere(prefix: string, predicate: (value: unknown, key: string) => boolean): Promise<number> {
+  if (writesBlocked) return 0;
+  return withTransaction('readwrite', (store) => new Promise<number>((resolve, reject) => {
+    const range = prefixRange(prefix);
+    // The deletes are issued from the reads' success callbacks, inside the same
+    // transaction, as kvUpdate does: nothing can land between judging a record
+    // and deleting it.
+    const keysReq = range ? store.getAllKeys(range) : store.getAllKeys();
+    keysReq.onerror = () => reject(keysReq.error ?? new Error('IndexedDB request failed'));
+    keysReq.onsuccess = () => {
+      const keys = keysReq.result.map(String);
+      const valuesReq = range ? store.getAll(range) : store.getAll();
+      valuesReq.onerror = () => reject(valuesReq.error ?? new Error('IndexedDB request failed'));
+      valuesReq.onsuccess = () => {
+        const values = valuesReq.result;
+        let deleted = 0;
+        try {
+          keys.forEach((key, i) => {
+            if (key.startsWith(prefix) && predicate(values[i], key)) {
+              store.delete(key);
+              deleted += 1;
+            }
+          });
+        } catch (err) {
+          reject(err);
+          return;
+        }
+        resolve(deleted);
+      };
+    };
+  }));
+}
+
+/**
  * Replace the whole kv store in ONE transaction: either every entry lands and
  * the old ones are gone, or the transaction aborts and the store is exactly as
  * it was. This is what a restore uses — the old restore cleared first and then

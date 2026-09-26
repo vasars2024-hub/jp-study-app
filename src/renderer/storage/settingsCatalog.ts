@@ -27,6 +27,8 @@ export interface SettingsDomainDef {
   lsPrefixes?: string[];
   /** IndexedDB kv keys. */
   idbKeys?: string[];
+  /** IndexedDB kv key prefixes (per-record layouts, e.g. one record per card). */
+  idbPrefixes?: string[];
   /** Main-process config included in full backup. */
   hostKey?: HostBlobKey;
   /** Whether Clear is offered in Memory UI. */
@@ -244,8 +246,9 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     label: 'Flashcard decks',
     description: 'Cards and folders (local cache + durable store).',
     category: 'Data',
-    lsKeys: ['jp-flashcard-deck'],
+    lsKeys: ['jp-flashcard-deck', 'jp-flashcard-deck-journal'],
     idbKeys: ['flashcard-deck'],
+    idbPrefixes: ['flashcard-deck-card:'],
     clearable: true,
     clearConfirm: 'Delete ALL flashcard decks? This cannot be undone.',
   },
