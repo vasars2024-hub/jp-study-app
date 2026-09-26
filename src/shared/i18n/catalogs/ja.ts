@@ -31,6 +31,7 @@ import { BLANC_UI_JA } from '../blancUi/ja';
 import { READER_UI_JA } from '../readerUi/ja';
 import { STUDY_UI_JA } from '../studyUi/ja';
 import { SYSTEM_UI_JA } from '../systemUi/ja';
+import { CAPTIONS_UI_JA } from '../captionsUi/ja';
 
 export const ja: Catalog = {
   'common.download': 'ダウンロード',
@@ -706,6 +707,7 @@ export const ja: Catalog = {
   ...READER_UI_JA,
   ...STUDY_UI_JA,
   ...SYSTEM_UI_JA,
+  ...CAPTIONS_UI_JA,
 
   'settings.appTitle': '設定',
   'settings.group.personalization': '個人設定',

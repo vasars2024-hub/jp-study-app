@@ -1764,6 +1764,14 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Study',
   },
   {
+    id: 'live-captions',
+    titleKey: 'settings.captions.title',
+    descKey: 'settings.captions.desc',
+    keywords: ['live captions', 'captions overlay', 'system audio', 'record audio', 'loopback', 'mine audio', 'subtitles bar'],
+    pageId: 'transcription',
+    group: 'Study',
+  },
+  {
     id: 'desktop-reset',
     titleKey: 'settings.desktop.reset.title',
     descKey: 'settings.desktop.reset.desc',

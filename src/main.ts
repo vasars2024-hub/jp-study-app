@@ -137,6 +137,10 @@ import {
   registerOsHotkeyHelperIpc,
 } from './main/osHotkeyHelper';
 import { registerLiveCaptionsIpc } from './main/liveCaptions';
+import {
+  configureSystemAudioCapture,
+  registerSystemAudioCaptureIpc,
+} from './main/systemAudioCapture';
 import { registerFlashcardAudioIpc } from './main/flashcardAudio';
 import { logDiagnostic, errorDetail } from './main/errorLog';
 import { resolveAppAsset } from './main/appProtocolResolve';
@@ -1979,6 +1983,16 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerReadingLensIpc();
+  // System-audio capture (off until the user turns it on) and the live-captions
+  // overlay; their global shortcuts come from the renderer's Shortcuts rows.
+  configureSystemAudioCapture({
+    rendererUrl,
+    getMainWindow: () => mainWindow,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+  });
+  registerSystemAudioCaptureIpc();
   // The VN reader window beside a running game (Visual Novels ▸ Launch).
   configureVisualNovelReader({
     rendererUrl,

@@ -2172,6 +2172,51 @@ declare global {
       onLiveCaptionsChanged(
         cb: (status: import('../main/liveCaptions').LiveCaptionsStatus) => void,
       ): () => void;
+      /** System-audio capture and the live-captions overlay (see main/systemAudioCapture.ts). */
+      captionsGetState(): Promise<import('../shared/captionsOverlay').CaptionsState>;
+      captionsSetSettings(
+        patch: Partial<import('../shared/captionsOverlay').CaptionsSettings>,
+      ): Promise<import('../shared/captionsOverlay').CaptionsState>;
+      captionsSetCapture(on: boolean): Promise<import('../shared/captionsOverlay').CaptionsState>;
+      captionsMineRecent(seconds?: number): Promise<{ ok: boolean; draftId?: string; errorKey?: string }>;
+      captionsToggleRecording(): Promise<{ ok: boolean; recording: boolean; draftId?: string; errorKey?: string }>;
+      captionsToggleOverlay(open?: boolean): Promise<import('../shared/captionsOverlay').CaptionsState>;
+      captionsMineLine(
+        lineId: string,
+        extra?: { word?: string; reading?: string; meaning?: string; text?: string },
+      ): Promise<{ ok: boolean; created?: boolean; cardId?: string; error?: string; errorKey?: string }>;
+      captionsMineCurrentLine(): Promise<unknown>;
+      captionsGetLines(): Promise<import('../shared/captionsOverlay').CaptionOverlayLine[]>;
+      captionsUpdateDraft(id: string, patch: { text?: string }): Promise<{ ok: boolean }>;
+      captionsConfirmDraft(
+        id: string,
+        edits?: { text?: string },
+      ): Promise<{ ok: boolean; created?: boolean; cardId?: string; error?: string; errorKey?: string }>;
+      captionsDiscardDraft(id: string): Promise<{ ok: boolean }>;
+      captionsStartWindowsLiveCaptions(): Promise<{ ok: boolean }>;
+      captionsOpenSettings(page?: 'transcription' | 'shortcuts'): Promise<{ ok: boolean }>;
+      captionsSetGlobalShortcuts(chords: Record<string, string>): Promise<{ ok: boolean; errors: Record<string, string> }>;
+      captionsOverlaySetIgnoreMouse(ignore: boolean): void;
+      captionsOverlayGetBounds(): Promise<import('../shared/captionsOverlay').OverlayBounds>;
+      captionsOverlaySetBounds(
+        bounds: import('../shared/captionsOverlay').OverlayBounds,
+      ): Promise<import('../shared/captionsOverlay').OverlayBounds | null>;
+      onCaptionsState(cb: (state: import('../shared/captionsOverlay').CaptionsState) => void): () => void;
+      onCaptionsLines(cb: (lines: import('../shared/captionsOverlay').CaptionOverlayLine[]) => void): () => void;
+      onCaptionsDrafts(
+        cb: (payload: {
+          drafts: import('../shared/captionsOverlay').CaptionDraft[];
+          notices: import('../shared/captionsOverlay').CaptionNotice[];
+        }) => void,
+      ): () => void;
+      onCaptionsMineRequest(cb: (payload: import('../shared/captionsOverlay').CaptionMinePayload) => void): () => void;
+      captionsMineReply(reply: import('../shared/captionsOverlay').CaptionMineReply): void;
+      onCaptionsOpenSettings(cb: (payload: { page: 'transcription' | 'shortcuts' }) => void): () => void;
+      onCaptionsHostCommand(cb: (command: { id: string; type: string } & Record<string, unknown>) => void): () => void;
+      captionsHostReply(reply: { id: string } & Record<string, unknown>): void;
+      captionsHostStatus(status: { bufferedMs?: number; gumModelMissing?: boolean }): void;
+      captionsHostUtterance(utterance: { text: string; startMs: number; endMs: number }): void;
+      captionsInjectSnapshot(lines: string[], windowTitle?: string): Promise<unknown>;
       cancelTranscription(mediaId?: string): Promise<void>;
       transcriptionQueue(): Promise<import('../shared/transcriptionIpc').TranscriptionJob[]>;
       fusionTrackMeta(

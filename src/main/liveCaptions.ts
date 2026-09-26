@@ -40,6 +40,8 @@ export interface LiveCaptionsStatus {
   capturing: boolean;
   /** The poller has found the Live Captions window and is reading it. */
   attached: boolean;
+  /** The poller runs and has looked: the Live Captions app is not open. */
+  waiting?: boolean;
   /** Capture should resume automatically on next launch. */
   enabled: boolean;
   lineCount: number;
@@ -70,11 +72,49 @@ let child: PollerChild | null = null;
 let archive: CaptionLine[] = [];
 let working: CaptionLine[] = [];
 let attached = false;
+/** The poller said `waiting`: it looked and Live Captions is not running. */
+let waiting = false;
 let lastError = '';
 let dirty = false;
 let flushTimer: NodeJS.Timeout | null = null;
 let loaded = false;
 let mainWindow: BrowserWindow | null = null;
+/**
+ * The poller runs for the captions overlay only (the notebook's capture is
+ * off): lines are merged in memory for the overlay and never written to
+ * `lines.json`, and nothing is armed to resume on the next launch.
+ */
+let overlayOnly = false;
+
+/** What the captions overlay hears from the poller (`main/systemAudioCapture.ts`). */
+export type LiveCaptionsEvent =
+  | { type: 'status'; status: LiveCaptionsStatus }
+  | {
+      type: 'lines';
+      /** The newest lines of the merge window, oldest first. */
+      lines: CaptionLine[];
+      /** When this snapshot was read. */
+      at: number;
+      /** Foreground window title at that moment ('' when it was Gum or unknown). */
+      windowTitle: string;
+    };
+
+const eventListeners = new Set<(event: LiveCaptionsEvent) => void>();
+
+export function onLiveCaptionsEvent(listener: (event: LiveCaptionsEvent) => void): () => void {
+  eventListeners.add(listener);
+  return () => eventListeners.delete(listener);
+}
+
+function emitEvent(event: LiveCaptionsEvent): void {
+  for (const listener of eventListeners) {
+    try {
+      listener(event);
+    } catch {
+      /* a listener's failure never stops capture */
+    }
+  }
+}
 
 function stateDir(): string {
   return path.join(app.getPath('userData'), 'live-captions');
@@ -136,6 +176,8 @@ function load(): void {
 function flush(): void {
   if (!dirty) return;
   dirty = false;
+  // Overlay-only capture shows lines live and keeps nothing.
+  if (overlayOnly) return;
   try {
     const lines = allLines().slice(-STORE_MAX_LINES);
     writeJsonAtomicSync(storePath(), { version: 1, lines }, { space: 0 });
@@ -168,6 +210,7 @@ function notifyRendererNow(): void {
     clearTimeout(notifyTimer);
     notifyTimer = null;
   }
+  emitEvent({ type: 'status', status: getLiveCaptionsStatus() });
   try {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(CHANNEL_CHANGED, getLiveCaptionsStatus());
@@ -193,11 +236,41 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+# The foreground window's title and process, so a mined line can say which
+# video or stream it came from. Electron filters out its own process. Never
+# fatal: without it the lines simply carry no title.
+$gumForegroundOk = $true
+try {
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class GumForeground {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+}
+"@
+} catch { $gumForegroundOk = $false }
 
 $intervalMs = __INTERVAL__
 $last = ''
 $block = $null
 $announcedWaiting = $false
+
+function Foreground {
+  if (-not $gumForegroundOk) { return [pscustomobject]@{ title = ''; pid = [long]0 } }
+  try {
+    $h = [GumForeground]::GetForegroundWindow()
+    $sb = New-Object System.Text.StringBuilder 512
+    [void][GumForeground]::GetWindowText($h, $sb, 512)
+    $fpid = [uint32]0
+    [void][GumForeground]::GetWindowThreadProcessId($h, [ref]$fpid)
+    return [pscustomobject]@{ title = $sb.ToString(); pid = [long]$fpid }
+  } catch {
+    return [pscustomobject]@{ title = ''; pid = [long]0 }
+  }
+}
 
 function Emit($obj) {
   Write-Output ($obj | ConvertTo-Json -Compress -Depth 4)
@@ -245,10 +318,13 @@ while ($true) {
       # the JS template literal this script is embedded in — do not use them.
       $lines = @($txt -split "\r?\n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
       if ($lines.Count -gt 0) {
+        $fg = Foreground
         Emit ([pscustomobject]@{
           type  = 'snapshot'
           t     = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
           lines = $lines
+          win   = $fg.title
+          wpid  = $fg.pid
         })
       }
     }
@@ -270,10 +346,16 @@ function writePoller(): void {
   fs.writeFileSync(scriptPath(), POLLER_PS1.replace('__INTERVAL__', String(POLL_MS)), 'utf8');
 }
 
-function applySnapshot(lines: string[], ts: number): void {
+/** Lines handed to the overlay per snapshot — the Live Captions window holds ~12. */
+const OVERLAY_TAIL = 16;
+
+function applySnapshot(lines: string[], ts: number, windowTitle = ''): void {
   const before = working.length;
   const merged = mergeCaptionSnapshot(working, lines, ts);
   working = merged.lines;
+  if (eventListeners.size) {
+    emitEvent({ type: 'lines', lines: working.slice(-OVERLAY_TAIL), at: ts, windowTitle });
+  }
   if (merged.appended === 0 && working.length === before) {
     // A pure in-place revision of the provisional tail still changes stored
     // text, so persist it — but there is nothing new for the renderer to show.
@@ -295,7 +377,14 @@ function applySnapshot(lines: string[], ts: number): void {
 function handleLine(raw: string): void {
   const trimmed = raw.trim();
   if (!trimmed || !trimmed.startsWith('{')) return;
-  let msg: { type?: string; t?: number; lines?: string[] | string; message?: string };
+  let msg: {
+    type?: string;
+    t?: number;
+    lines?: string[] | string;
+    message?: string;
+    win?: string;
+    wpid?: number;
+  };
   try {
     msg = JSON.parse(trimmed);
   } catch {
@@ -304,11 +393,13 @@ function handleLine(raw: string): void {
   switch (msg.type) {
     case 'attached':
       attached = true;
+      waiting = false;
       lastError = '';
       notifyRendererNow();
       break;
     case 'waiting':
       attached = false;
+      waiting = true;
       notifyRendererNow();
       break;
     case 'detached':
@@ -324,7 +415,12 @@ function handleLine(raw: string): void {
         : typeof msg.lines === 'string'
           ? [msg.lines]
           : [];
-      if (lines.length) applySnapshot(lines, Number(msg.t) || Date.now());
+      // Our own windows (the overlay after a click) are not where a line came from.
+      const title =
+        typeof msg.win === 'string' && Number(msg.wpid) !== process.pid && !/LiveCaptions/i.test(msg.win)
+          ? msg.win.trim().slice(0, 300)
+          : '';
+      if (lines.length) applySnapshot(lines, Number(msg.t) || Date.now(), title);
       break;
     }
     default:
@@ -332,12 +428,34 @@ function handleLine(raw: string): void {
   }
 }
 
-export function startLiveCaptionsCapture(): { ok: boolean; error?: string } {
+/**
+ * The poller event path, fed one stdout line. Exported for the captions
+ * overlay's end-to-end check (`--gum-captions-test`), which has no Live
+ * Captions window to read and injects a snapshot here instead.
+ */
+export function feedLiveCaptionsPollerLine(raw: string): void {
+  load();
+  handleLine(raw);
+}
+
+export function startLiveCaptionsCapture(
+  options: { overlayOnly?: boolean } = {},
+): { ok: boolean; error?: string } {
   if (process.platform !== 'win32') {
     return { ok: false, error: 'Live Captions capture is Windows-only.' };
   }
-  if (child) return { ok: true };
+  if (child) {
+    // The notebook arming a poller the overlay started: from now on it keeps lines.
+    if (!options.overlayOnly && overlayOnly) {
+      overlayOnly = false;
+      writeEnabled(true);
+      notifyRendererNow();
+    }
+    return { ok: true };
+  }
   load();
+  overlayOnly = Boolean(options.overlayOnly);
+  waiting = false;
   try {
     writePoller();
     const proc = spawn(
@@ -378,7 +496,7 @@ export function startLiveCaptionsCapture(): { ok: boolean; error?: string } {
         notifyRendererNow();
       }
     });
-    writeEnabled(true);
+    if (!overlayOnly) writeEnabled(true);
     notifyRendererNow();
     return { ok: true };
   } catch (err) {
@@ -389,7 +507,37 @@ export function startLiveCaptionsCapture(): { ok: boolean; error?: string } {
   }
 }
 
+/**
+ * The overlay no longer needs the poller. Stops it only when the overlay was
+ * its sole reason to run — never the notebook's own capture.
+ */
+export function releaseLiveCaptionsForOverlay(): void {
+  if (!child || !overlayOnly) return;
+  const proc = child;
+  child = null;
+  attached = false;
+  try {
+    proc.kill();
+  } catch {
+    /* already gone */
+  }
+  // Overlay-only lines were never the notebook's: reload what the notebook
+  // really holds, so nothing heard only for the overlay lingers in memory.
+  overlayOnly = false;
+  dirty = false;
+  loaded = false;
+  archive = [];
+  working = [];
+  notifyRendererNow();
+}
+
+/** The poller runs only for the overlay (status, tests). */
+export function liveCaptionsOverlayOnly(): boolean {
+  return overlayOnly;
+}
+
 export function stopLiveCaptionsCapture(): { ok: boolean } {
+  overlayOnly = false;
   const proc = child;
   child = null;
   attached = false;
@@ -421,8 +569,10 @@ export function getLiveCaptionsStatus(): LiveCaptionsStatus {
   const lines = allLines();
   return {
     supported: true,
-    capturing: Boolean(child),
+    // The overlay's own poller is not the notebook recording.
+    capturing: Boolean(child) && !overlayOnly,
     attached,
+    waiting: Boolean(child) && waiting,
     enabled: readEnabled(),
     lineCount: lines.length,
     scriptCount: segmentScripts(lines).length,

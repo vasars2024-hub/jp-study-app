@@ -118,6 +118,7 @@ import { startAiSetupSync } from './aiSetupClient';
 // Lazy: the reader pulls the tokenizer and the mining path, which no other
 // window should pay for at boot.
 const VisualNovelReaderOverlay = React.lazy(() => import('./components/immersion/VisualNovelReaderOverlay'));
+const CaptionsOverlay = React.lazy(() => import('./captions/CaptionsOverlay'));
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -179,6 +180,20 @@ const isVnReader =
 if (isVnReader) {
   document.documentElement.classList.add('vn-reader-window');
 }
+
+// The live-captions bar (main/systemAudioCapture.ts): transparent, always on top,
+// click-through except its controls. Same rule as the overlays above.
+const isCaptionsOverlay =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('captionsOverlay') === '1';
+if (isCaptionsOverlay) {
+  document.documentElement.classList.add('captions-overlay-window');
+}
+// The hidden system-audio capture window: renders nothing, boots nothing but the
+// capture host. It only exists while the user has capture turned on.
+const isAudioCapture =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('audioCapture') === '1';
 
 function runWhenIdle(fn: () => void, timeout = 5000): void {
   const idle = window.requestIdleCallback as
@@ -302,7 +317,7 @@ runWhenIdle(() => {
   installShellSounds();
 }, 3000);
 
-if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader) {
+if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !isCaptionsOverlay && !isAudioCapture) {
   bootCustomCss();
   // Theme Studio's active theme was painted only while Settings > Appearance was
   // open, so a restart dropped it until then. Paint it at boot like the sandbox.
@@ -388,6 +403,22 @@ if (container) {
           <AppErrorBoundary>
             <React.Suspense fallback={null}>
               <VisualNovelReaderOverlay />
+            </React.Suspense>
+          </AppErrorBoundary>,
+        ),
+      );
+    } else if (isAudioCapture) {
+      void import('./captions/systemAudioCaptureHost').then(({ installSystemAudioCaptureHost }) =>
+        installSystemAudioCaptureHost(),
+      );
+    } else if (isCaptionsOverlay) {
+      // Word mining writes to the active profile's deck through main; nothing else boots.
+      initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+      createRoot(container).render(
+        withStrictMode(
+          <AppErrorBoundary>
+            <React.Suspense fallback={null}>
+              <CaptionsOverlay />
             </React.Suspense>
           </AppErrorBoundary>,
         ),
