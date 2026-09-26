@@ -894,6 +894,9 @@ declare global {
       onPlayerVizFrame?(cb: (frame: unknown) => void): () => void;
       musicLocalLyrics?(id: string): Promise<import('../shared/musicLocalLyrics').LocalLyrics | null>;
       openExternal(url: string): Promise<boolean>;
+      gamesMirrorEvaluate?(
+        request: import('../shared/mirrorEvaluatorIpc').MirrorEvaluateRequest,
+      ): Promise<import('../shared/mirrorEvaluatorIpc').MirrorEvaluateResponse>;
       getWindowBorderless(): Promise<boolean>;
       setWindowBorderless(borderless: boolean): Promise<boolean>;
       getWindowChromeMode(): Promise<'standard' | 'borderless' | 'frameless'>;

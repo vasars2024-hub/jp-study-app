@@ -9,7 +9,7 @@
  * - Categories each get a GainNode under a master gain (volume/mute/duck).
  * - Respects a `soundsEnabled` pref + the performance tier (data-perf, M9):
  *   Battery Saver suppresses ambient categories (environment/companion).
- * - Buffers are fetched+decoded on demand and cached.
+ * - Buffers are read (fetched, or decoded from a data: URL) and decoded on demand, and cached.
  *
  * Builds on the same AudioContext pattern used by audioBus.ts (the music
  * visualiser); this engine keeps its own context for low-latency SFX.
@@ -49,6 +49,31 @@ export interface LoopHandle {
   stop(): void;
   setVolume(v: number): void;
   fadeTo(v: number, ms: number): void;
+}
+
+/**
+ * The bytes of one sound. The generated packs (Aero proof chimes, Wired Archive) are
+ * `data:audio/wav;base64,…` URLs, and those are decoded here rather than fetched: the
+ * packaged CSP's `connect-src` does not list `data:`, so `fetch(dataUrl)` was refused
+ * in every packaged build — "Fetch API cannot load data:audio/wav…" on each cue, and the
+ * Aero look played no sound at all (round-4 console sweep). Dev never binds the policy.
+ * Decoding locally keeps `connect-src` as tight as it is.
+ */
+export async function readSoundBytes(
+  url: string,
+  fetchImpl: (url: string) => Promise<Response> = (u) => fetch(u),
+): Promise<ArrayBuffer | null> {
+  const data = /^data:[^,]*?(;base64)?,/i.exec(url);
+  if (data) {
+    const payload = url.slice(data[0].length);
+    if (!data[1]) return new TextEncoder().encode(decodeURIComponent(payload)).buffer as ArrayBuffer;
+    const bin = atob(payload);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  const res = await fetchImpl(url);
+  return res.ok ? res.arrayBuffer() : null;
 }
 
 class SoundEngine {
@@ -270,12 +295,11 @@ class SoundEngine {
     const ctx = this.ensureCtx();
     if (!ctx) return null;
     try {
-      const res = await fetch(url);
-      if (!res.ok) {
+      const arr = await readSoundBytes(url);
+      if (!arr) {
         this.buffers.set(url, null);
         return null;
       }
-      const arr = await res.arrayBuffer();
       const buf = await ctx.decodeAudioData(arr);
       this.buffers.set(url, buf);
       return buf;

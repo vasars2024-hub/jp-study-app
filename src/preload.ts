@@ -1504,6 +1504,11 @@ const api = {
 
   /** Open an http/https link in the system browser. */
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),
+  /** Mirror Writing's API evaluation, sent by main (the packaged CSP keeps it out of the renderer). */
+  gamesMirrorEvaluate: (
+    request: import('./shared/mirrorEvaluatorIpc').MirrorEvaluateRequest,
+  ): Promise<import('./shared/mirrorEvaluatorIpc').MirrorEvaluateResponse> =>
+    ipcRenderer.invoke('games:mirrorEvaluate', request),
   getWindowBorderless: (): Promise<boolean> => ipcRenderer.invoke('shell:getWindowBorderless'),
   setWindowBorderless: (borderless: boolean): Promise<boolean> =>
     ipcRenderer.invoke('shell:setWindowBorderless', borderless),

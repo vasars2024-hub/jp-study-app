@@ -1165,8 +1165,9 @@ function hitOf(work: ProviderWork, title: string, mediaKind: 'anime' | 'tv' | 'm
     year: work.year,
     format: work.format,
     episodeCount: work.episodeCount,
-    // Only the anime databases' image hosts are in the renderer's CSP.
-    imageUrl: isAnimeDatabase(work) ? work.posterUrl : undefined,
+    // Every provider's poster host is in the renderer's img-src (TVmaze and TMDB joined
+    // MAL and AniList on 2026-09-26), so a drama or film hit shows its art too.
+    imageUrl: work.posterUrl,
     mediaKind,
     confidence,
   };

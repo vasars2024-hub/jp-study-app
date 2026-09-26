@@ -13,6 +13,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaItem } from '../../shared/types';
 import type { ProviderWork } from '../mediaProviderClients';
 import type { MetadataMatch } from '../../shared/mediaMetadataMatch';
+import { cspDirectiveSources } from '../../shared/contentSecurityPolicy';
+
+/** CSP host-source matching for the `https://host` / `https://*.host` forms img-src uses. */
+function imgSrcAllows(url: string): boolean {
+  const u = new URL(url);
+  return (cspDirectiveSources('img-src') ?? []).some((source) => {
+    const m = /^https:\/\/(\*\.)?([^/:]+)$/.exec(source);
+    if (!m || u.protocol !== 'https:') return false;
+    return m[1] ? u.hostname.endsWith(`.${m[2]}`) : u.hostname === m[2];
+  });
+}
 
 const sent: Array<{ channel: string; payload: unknown }> = [];
 
@@ -400,12 +411,24 @@ describe('retrying and topping up', () => {
 });
 
 describe('searchMediaMetadata', () => {
-  it('returns one ranked list across providers, with no remote image the CSP would block', async () => {
+  it('returns one ranked list across providers, each with art the packaged CSP loads', async () => {
     script.jikan = [frierenMal()];
     script.tvmazeSearch = [hanzawa()];
     const hits = await searchMediaMetadata('Hanzawa Naoki');
     expect(Array.isArray(hits)).toBe(true);
-    expect(hits[0]).toMatchObject({ provider: 'tvmaze', id: 13017, mediaKind: 'tv', imageUrl: undefined });
+    expect(hits[0]).toMatchObject({ provider: 'tvmaze', id: 13017, mediaKind: 'tv' });
+    expect(hits[0].imageUrl).toMatch(/^https:\/\/static\.tvmaze\.com\//);
     expect(hits.find((hit) => hit.provider === 'jikan')?.imageUrl).toMatch(/myanimelist/);
+    for (const hit of hits) if (hit.imageUrl) expect(imgSrcAllows(hit.imageUrl)).toBe(true);
+  });
+
+  it('every provider poster host is one the packaged img-src names', () => {
+    // Settings > Scraper's unified search paints TVmaze and TMDB posters directly; both
+    // hosts were missing from img-src, so every drama/film cover was a broken image.
+    for (const work of [hanzawa(), frierenTv(), spiritedAway(), frierenMal()]) {
+      expect(work.posterUrl).toBeTruthy();
+      expect(imgSrcAllows(work.posterUrl as string)).toBe(true);
+    }
+    expect(imgSrcAllows('https://evil.example/poster.jpg')).toBe(false);
   });
 });
