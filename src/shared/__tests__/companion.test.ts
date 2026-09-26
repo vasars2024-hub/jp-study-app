@@ -87,9 +87,9 @@ describe('the wheel', () => {
   it('has seven slots without live captions and eight with them, ending at Open Gum', () => {
     const without = buildWheelActions({ audioCommandId: null });
     expect(without.map((a) => a.id)).toEqual(['lookup', 'cursor', 'lens', 'preview', 'sentence', 'translate', 'open']);
-    const withAudio = buildWheelActions({ audioCommandId: 'captions.captureLast' });
+    const withAudio = buildWheelActions({ audioCommandId: 'captions.mineRecent' });
     expect(withAudio).toHaveLength(8);
-    expect(withAudio[6]).toMatchObject({ id: 'audio', commandId: 'captions.captureLast' });
+    expect(withAudio[6]).toMatchObject({ id: 'audio', commandId: 'captions.mineRecent' });
   });
 
   it('keys 1–8 from the top row or the numpad pick a slot', () => {

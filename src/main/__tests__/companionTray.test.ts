@@ -60,7 +60,7 @@ describe('tray Companion menu', () => {
     const wheel = vi.fn();
     reg.registerGlobalCommand('companion.wheel', wheel);
     reg.registerGlobalCommand('lens.region', () => undefined);
-    reg.registerGlobalCommand('captions.captureLast', () => undefined, { defaultKeys: 'Ctrl+Alt+Shift+C' });
+    reg.registerGlobalCommand('captions.mineRecent', () => undefined, { defaultKeys: 'Ctrl+Alt+Shift+M' });
     reg.applyGlobalCommandChords({ 'lens.region': 'Ctrl+Alt+ArrowUp' });
 
     const items = sysdict.companionMenuItems();
@@ -69,7 +69,7 @@ describe('tray Companion menu', () => {
       'companion:companion.lookupSelection',
       'companion:companion.lookupClipboard',
       'companion:lens.region',
-      'companion:captions.captureLast',
+      'companion:captions.mineRecent',
     ]);
     const byId = Object.fromEntries(items.map((i) => [i.id, i]));
     expect(byId['companion:companion.wheel']).toMatchObject({ accelerator: 'Alt+Shift+Q', registerAccelerator: false });

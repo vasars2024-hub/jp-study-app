@@ -95,7 +95,7 @@ describe('CompanionWheel', () => {
   });
 
   it('grows the audio slot when live captions registered its command', async () => {
-    await act(async () => push?.(wheelInit('captions.captureLast')));
+    await act(async () => push?.(wheelInit('captions.mineRecent')));
     expect(slots()).toHaveLength(8);
     expect(slots()[6]!.dataset.wheelAction).toBe('audio');
   });

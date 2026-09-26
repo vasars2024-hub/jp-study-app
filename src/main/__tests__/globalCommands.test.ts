@@ -87,9 +87,9 @@ describe('registration', () => {
 
   it('accepts commands other features add, with their own default', async () => {
     const reg = await load();
-    reg.registerGlobalCommand('captions.captureLast', () => undefined, { defaultKeys: 'Ctrl+Alt+Shift+C' });
-    expect(h.held.has('Ctrl+Alt+Shift+C')).toBe(true);
-    expect(reg.listGlobalCommands().map((s) => s.id)).toContain('captions.captureLast');
+    reg.registerGlobalCommand('captions.mineRecent', () => undefined, { defaultKeys: 'Ctrl+Alt+Shift+M' });
+    expect(h.held.has('Ctrl+Alt+Shift+M')).toBe(true);
+    expect(reg.listGlobalCommands().map((s) => s.id)).toContain('captions.mineRecent');
   });
 
   it('a handler that throws does not take the registry down', async () => {

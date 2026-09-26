@@ -193,15 +193,12 @@ export interface CompanionWheelAction {
 }
 
 /**
- * Command ids the live-captions feature registers for "save the last seconds of
- * audio as a card". The wheel shows its audio slot only when one of these has a
- * handler, so the slot never appears on a build that cannot fill it.
+ * The command live captions registers for "mine the last seconds of system
+ * audio" (`captions.mineRecent`, main/systemAudioCapture.ts). The wheel shows
+ * its audio slot only when it has a handler, so the slot never appears on a
+ * build that cannot fill it.
  */
-export const CAPTIONS_CAPTURE_COMMAND_IDS: readonly string[] = [
-  'captions.captureLast',
-  'liveCaptions.captureLast',
-  'audio.captureLast',
-];
+export const CAPTIONS_CAPTURE_COMMAND_IDS: readonly string[] = ['captions.mineRecent'];
 
 /** The wheel's slots, clockwise from the top. Keys 1–8 follow this order. */
 export function buildWheelActions(opts: { audioCommandId?: string | null }): CompanionWheelAction[] {
