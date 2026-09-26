@@ -495,6 +495,9 @@ const api = {
   },
 
   readBook: (id: string): Promise<ArrayBuffer | null> => ipcRenderer.invoke('library:readBook', id),
+  /** Picks a replacement EPUB/PDF for a book whose stored file is missing. */
+  relinkBook: (id: string): Promise<import('./main/library').RelinkBookResult> =>
+    ipcRenderer.invoke('library:relinkBook', id),
   /** Plain-text sample from an EPUB (capped) for JLPT/HSK cover level badges. */
   sampleBookText: (id: string, maxChars?: number): Promise<string | null> =>
     ipcRenderer.invoke('library:sampleBookText', id, maxChars),

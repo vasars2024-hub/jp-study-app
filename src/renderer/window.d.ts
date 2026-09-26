@@ -359,6 +359,7 @@ declare global {
         cb: (p: import('../shared/mangaOcrIpc').MangaOcrVolumeProgress) => void,
       ): () => void;
       readBook(id: string): Promise<ArrayBuffer | null>;
+      relinkBook?(id: string): Promise<import('../main/library').RelinkBookResult>;
       sampleBookText(id: string, maxChars?: number): Promise<string | null>;
       bookFileKeys(ids: string[]): Promise<Record<string, string | null>>;
       getWatchFolder(): Promise<string | null>;

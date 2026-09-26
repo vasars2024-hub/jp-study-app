@@ -2633,6 +2633,11 @@ export const en: Catalog = {
   'novel.tool.studyTools': 'Study',
   'novel.tool.bookmarks': 'Bookmarks',
   'novel.tool.readerSettings': 'Reading settings',
+  'reader.book.missing': 'This book\'s file was moved or deleted, so it cannot be opened. Locate the file to keep your progress and highlights.',
+  'reader.book.locate': 'Locate file…',
+  'reader.book.openFailed': 'This book could not be opened. The file may be damaged — try importing it again.',
+  'reader.book.relinkFailed': 'The file could not be copied into the library. Try again.',
+  'reader.book.relinkDiskFull': 'The disk is full, so the file could not be copied into the library. Free some space and try again.',
   'novel.reader.menu.file': 'File',
   'novel.reader.returnToLibrary': 'Return to library',
   'novel.reader.backToBook': 'Back to book',
@@ -3452,6 +3457,7 @@ export const en: Catalog = {
   // Native file-picker dialogs (main process — see main/i18n.ts). Titles and
   // filter names only; the OS itself localizes its own Open/Cancel chrome.
   'dialog.importBooks.title': 'Import books or manga',
+  'dialog.relinkBook.title': 'Locate the book file',
   'dialog.filter.booksManga': 'Books & Manga',
   'dialog.filter.books': 'Books',
   'dialog.filter.mangaArchive': 'Manga archive',

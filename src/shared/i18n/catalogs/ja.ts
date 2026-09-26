@@ -2466,6 +2466,11 @@ export const ja: Catalog = {
   'novel.tool.studyTools': '学習',
   'novel.tool.bookmarks': 'ブックマーク',
   'novel.tool.readerSettings': '表示設定',
+  'reader.book.missing': 'この本のファイルが移動または削除されたため開けません。ファイルを指定すると、進捗とハイライトはそのまま引き継がれます。',
+  'reader.book.locate': 'ファイルを指定…',
+  'reader.book.openFailed': 'この本を開けませんでした。ファイルが破損している可能性があります。もう一度インポートしてください。',
+  'reader.book.relinkFailed': 'ファイルをライブラリにコピーできませんでした。もう一度お試しください。',
+  'reader.book.relinkDiskFull': 'ディスクの空き容量がないため、ファイルをライブラリにコピーできませんでした。空き容量を確保してからもう一度お試しください。',
   'novel.reader.menu.file': 'ファイル',
   'novel.reader.returnToLibrary': 'ライブラリに戻る',
   'novel.reader.backToBook': '本に戻る',
@@ -3549,6 +3554,7 @@ export const ja: Catalog = {
 
 
   'dialog.importBooks.title': '本・マンガをインポート',
+  'dialog.relinkBook.title': '本のファイルを探す',
   'dialog.filter.booksManga': '本・マンガ',
   'dialog.filter.books': '本',
   'dialog.filter.mangaArchive': 'マンガアーカイブ',

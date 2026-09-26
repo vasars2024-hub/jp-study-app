@@ -2675,6 +2675,11 @@ export const ru: Catalog = {
   'novel.tool.studyTools': 'Учёба',
   'novel.tool.bookmarks': 'Закладки',
   'novel.tool.readerSettings': 'Настройки чтения',
+  'reader.book.missing': 'Файл этой книги перемещён или удалён, поэтому её нельзя открыть. Укажите файл, чтобы сохранить прогресс и выделения.',
+  'reader.book.locate': 'Указать файл…',
+  'reader.book.openFailed': 'Не удалось открыть книгу. Возможно, файл повреждён — попробуйте импортировать его снова.',
+  'reader.book.relinkFailed': 'Не удалось скопировать файл в библиотеку. Попробуйте снова.',
+  'reader.book.relinkDiskFull': 'Диск заполнен, поэтому файл не удалось скопировать в библиотеку. Освободите место и повторите.',
   'novel.reader.menu.file': 'Файл',
   'novel.reader.returnToLibrary': 'Вернуться в библиотеку',
   'novel.reader.backToBook': 'Вернуться к книге',
@@ -3821,6 +3826,7 @@ export const ru: Catalog = {
 
 
   'dialog.importBooks.title': 'Импорт книг или манги',
+  'dialog.relinkBook.title': 'Укажите файл книги',
   'dialog.filter.booksManga': 'Книги и манга',
   'dialog.filter.books': 'Книги',
   'dialog.filter.mangaArchive': 'Архив манги',

@@ -2454,6 +2454,11 @@ export const zh: Catalog = {
   'novel.tool.studyTools': '学习',
   'novel.tool.bookmarks': '书签',
   'novel.tool.readerSettings': '阅读设置',
+  'reader.book.missing': '此书的文件已被移动或删除，无法打开。请找到该文件，以保留阅读进度和高亮。',
+  'reader.book.locate': '查找文件…',
+  'reader.book.openFailed': '无法打开此书。文件可能已损坏——请尝试重新导入。',
+  'reader.book.relinkFailed': '无法将文件复制到书库。请重试。',
+  'reader.book.relinkDiskFull': '磁盘已满，无法将文件复制到书库。请释放空间后重试。',
   'novel.reader.menu.file': '文件',
   'novel.reader.returnToLibrary': '返回书库',
   'novel.reader.backToBook': '返回书籍',
@@ -3533,6 +3538,7 @@ export const zh: Catalog = {
 
 
   'dialog.importBooks.title': '导入图书或漫画',
+  'dialog.relinkBook.title': '查找书籍文件',
   'dialog.filter.booksManga': '图书与漫画',
   'dialog.filter.books': '图书',
   'dialog.filter.mangaArchive': '漫画压缩包',
