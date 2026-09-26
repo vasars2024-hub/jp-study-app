@@ -2913,7 +2913,7 @@ export default function DesktopShell({
         </button>
         <button
           type="button"
-          className={`os-start-aero-pin${pinned ? ' on' : ''}`}
+          className={`os-start-aero-pin lq-hit-placed${pinned ? ' on' : ''}`}
           title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
           aria-label={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
           // Out of the tab order: the context menu of the tile carries this command (K6).
@@ -3347,7 +3347,7 @@ export default function DesktopShell({
                             </button>
                             <button
                               type="button"
-                              className={`os-start-tile-pin${pinned ? ' on' : ''}`}
+                              className={`os-start-tile-pin lq-hit-placed${pinned ? ' on' : ''}`}
                               title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
                               aria-label={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
                               // Out of the tab order: the context menu of the tile carries this command.

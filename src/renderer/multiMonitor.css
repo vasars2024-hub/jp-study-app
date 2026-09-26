@@ -325,9 +325,10 @@
  * everywhere except this corner.
  */
 .os-toast-close {
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   border-radius: 6px;

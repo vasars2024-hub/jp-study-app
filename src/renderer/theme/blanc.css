@@ -703,8 +703,10 @@ html.blanc-shell body {
 }
 
 .blanc-tab-close {
-  width: 16px;
-  height: 16px;
+  /* WCAG 2.5.8 target floor: a 24px box (was 16x16); the -4px margin keeps the tab height. */
+  width: 24px;
+  height: 24px;
+  margin: -4px;
   display: inline-grid;
   place-items: center;
   border-radius: 4px;

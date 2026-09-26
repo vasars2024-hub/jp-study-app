@@ -217,8 +217,9 @@ html.blanc-shell .os-toast-action {
 }
 
 html.blanc-shell .os-toast-close {
-  width: 22px;
-  height: 22px;
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   font-size: 15px;

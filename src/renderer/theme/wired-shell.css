@@ -366,11 +366,12 @@
 }
 
 :root[data-materials='wired'] .os-start-aero-pin {
+  /* WCAG 2.5.8 target floor: 24px (was 20x20). */
   position: absolute;
   top: 50%;
   right: 4px;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   transform: translateY(-50%);

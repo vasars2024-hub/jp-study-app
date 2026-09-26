@@ -4202,8 +4202,11 @@
 .scr-tag-x {
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  /* WCAG 2.5.8 target floor: a 24px box (was 16x16); the -4px margin keeps the chip the
+     size the 16px glyph box gave it. */
+  width: 24px;
+  height: 24px;
+  margin: -4px;
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
