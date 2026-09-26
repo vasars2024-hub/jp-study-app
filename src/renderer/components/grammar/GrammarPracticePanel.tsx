@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GRAMMAR, type NormalizedGrammarPoint } from '../../data/grammar';
 import {
+  DEFAULT_PRACTICE_FILTERS,
   countMatching,
   dedupeGrammarByTitle,
   filterGrammarPoints,
@@ -15,6 +16,7 @@ import {
   onFamiliarityChanged,
   type FamiliarityState,
 } from '../../grammarFamiliarity';
+import { applyCollections, loadCollections, onCollectionsChanged } from '../../grammarCollections';
 import { useT } from '../../i18n';
 import VirtualList from '../VirtualList';
 import GrammarFilterPanel from './GrammarFilterPanel';
@@ -38,6 +40,7 @@ export default function GrammarPracticePanel({
   const [testOpen, setTestOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [familiarity, setFamiliarityState] = useState<FamiliarityState>(() => loadFamiliarity());
+  const [collections, setCollections] = useState(() => loadCollections());
 
   useEffect(() => {
     savePracticeFilters(filters);
@@ -46,11 +49,27 @@ export default function GrammarPracticePanel({
   // Finishing a test session writes familiarity; re-read so a "Learning only"
   // filter reflects what the session just changed.
   useEffect(() => onFamiliarityChanged(() => setFamiliarityState(loadFamiliarity())), []);
+  useEffect(() => onCollectionsChanged(() => setCollections(loadCollections())), []);
 
   // Decorated so the shared familiarity filter and its counts are correct here
   // too; dedupe stays static, decoration re-runs when learner state changes.
   const baseCorpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
-  const corpus = useMemo(() => applyFamiliarity(baseCorpus, familiarity), [baseCorpus, familiarity]);
+  const corpus = useMemo(
+    () => applyCollections(applyFamiliarity(baseCorpus, familiarity), collections),
+    [baseCorpus, familiarity, collections],
+  );
+  const queuedCount = useMemo(() => corpus.filter((p) => p.queued).length, [corpus]);
+
+  /*
+   * "Practice queue": the study queue the Explorer fills, as a one-press preset.
+   * It is a filter state rather than a separate list, so the result can still be
+   * narrowed, saved or exported like any other practice selection.
+   */
+  function practiceQueue() {
+    setFilters({ ...DEFAULT_PRACTICE_FILTERS, lists: ['queue'] });
+    setSelected(new Set());
+    setTestOpen(true);
+  }
   const filtered = useMemo(() => filterGrammarPoints(corpus, filters), [corpus, filters]);
 
   /*
@@ -151,6 +170,15 @@ export default function GrammarPracticePanel({
           title={filtered.length === 0 ? t('grammar.practice.empty') : undefined}
         >
           {t('grammar.practice.startTest')}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={practiceQueue}
+          disabled={queuedCount === 0}
+          title={queuedCount === 0 ? t('grammar.practice.queueEmpty') : undefined}
+        >
+          {t('grammar.practice.practiceQueue', { count: queuedCount })}
         </button>
         <button
           type="button"

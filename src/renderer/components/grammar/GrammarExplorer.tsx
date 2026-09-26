@@ -34,6 +34,14 @@ import {
   snapshotFilters,
   type FilterPreset,
 } from '../../grammarPresets';
+import {
+  applyCollections,
+  loadCollections,
+  onCollectionsChanged,
+  saveCollections,
+  withListMembership,
+  type GrammarCollections,
+} from '../../grammarCollections';
 import { useT } from '../../i18n';
 import { Button } from '../ui';
 import VirtualList from '../VirtualList';
@@ -67,29 +75,9 @@ const DRAWER_ID = 'gram-x-selection-drawer';
  * practice list. Skins differ by CSS class, never by behaviour.
  */
 
-const FAVORITES_KEY = 'jp-grammarx-explorer-favorites-v1';
-const STUDY_KEY = 'jp-grammarx-explorer-study-v1';
 const MAX_HISTORY = 40;
 const ROW_HEIGHT = 58;
 const FAMILIARITY_KEYS = ['new', 'learning', 'familiar', 'known'] as const;
-
-function loadIds(key: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
-    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveIds(key: string, ids: Set<string>): void {
-  try {
-    localStorage.setItem(key, JSON.stringify([...ids]));
-  } catch {
-    /* ignore */
-  }
-}
 
 export interface GrammarExplorerProps {
   /** Renders the detail pane for the focused record. Supplied by the view. */
@@ -110,8 +98,9 @@ export default function GrammarExplorer({
   );
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [favorites, setFavorites] = useState<Set<string>>(() => loadIds(FAVORITES_KEY));
-  const [studyQueue, setStudyQueue] = useState<Set<string>>(() => loadIds(STUDY_KEY));
+  const [collections, setCollections] = useState<GrammarCollections>(() => loadCollections());
+  const favorites = collections.favorites;
+  const studyQueue = collections.queue;
   const [familiarity, setFamiliarityState] = useState<FamiliarityState>(() => loadFamiliarity());
   const [curation, setCuration] = useState<CurationState>(() => loadCuration());
   const [history, setHistory] = useState<string[]>([]);
@@ -151,8 +140,8 @@ export default function GrammarExplorer({
     const active = presets.find((p) => p.id === activePresetId);
     if (!active || !sameFilters(active.filters, filters)) setActivePresetId('');
   }, [filters, presets, activePresetId]);
-  useEffect(() => saveIds(FAVORITES_KEY, favorites), [favorites]);
-  useEffect(() => saveIds(STUDY_KEY, studyQueue), [studyQueue]);
+  // Lists are shared with Practice and Review; follow edits made there.
+  useEffect(() => onCollectionsChanged(() => setCollections(loadCollections())), []);
 
   // A practice session grading a card, or another window, writes familiarity;
   // re-read so the badges and band controls here never show a stale level.
@@ -178,7 +167,10 @@ export default function GrammarExplorer({
   // something outside the Review screen (audit F20).
   const curated = useMemo(() => applyCuration(GRAMMAR, curation), [curation]);
   const baseCorpus = useMemo(() => dedupeGrammarByTitle(curated), [curated]);
-  const corpus = useMemo(() => applyFamiliarity(baseCorpus, familiarity), [baseCorpus, familiarity]);
+  const corpus = useMemo(
+    () => applyCollections(applyFamiliarity(baseCorpus, familiarity), collections),
+    [baseCorpus, familiarity, collections],
+  );
   const list = useMemo(() => filterGrammarPoints(corpus, filters), [corpus, filters]);
 
   const byId = useMemo(() => new Map(corpus.map((p) => [p.id, p])), [corpus]);
@@ -243,12 +235,11 @@ export default function GrammarExplorer({
     });
   }, []);
 
-  const toggleIn = useCallback(
-    (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
-      setter((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
+  const setListMembership = useCallback(
+    (list: keyof GrammarCollections, ids: readonly string[], member: boolean) => {
+      setCollections((prev) => {
+        const next = withListMembership(prev, list, ids, member);
+        saveCollections(next);
         return next;
       });
     },
@@ -256,7 +247,7 @@ export default function GrammarExplorer({
   );
 
   const selectedPoints = useMemo(
-    () => [...selected].map((id) => byId.get(id)).filter((p): p is NormalizedGrammarPoint => !!p),
+    () => [...selected].map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p),
     [byId, selected],
   );
 
@@ -291,12 +282,12 @@ export default function GrammarExplorer({
         : undefined;
 
   const bulkInto = useCallback(
-    (setter: React.Dispatch<React.SetStateAction<Set<string>>>, msgKey: string) => {
+    (list: keyof GrammarCollections, msgKey: string) => {
       if (!selectedPoints.length) return;
-      setter((prev) => new Set([...prev, ...selectedPoints.map((p) => p.id)]));
+      setListMembership(list, selectedPoints.map((p) => p.id), true);
       setStatus(t(msgKey, { count: selectedPoints.length }));
     },
-    [selectedPoints, t],
+    [selectedPoints, setListMembership, t],
   );
 
   const addToDeck = useCallback(() => {
@@ -548,11 +539,11 @@ export default function GrammarExplorer({
 
             <div className="gram-x-drawer-actions">
               <Button size="sm" disabled={noSelection} title={selectionReason}
-                onClick={() => bulkInto(setFavorites, 'grammar.explorer.status.favorited')}>
+                onClick={() => bulkInto('favorites', 'grammar.explorer.status.favorited')}>
                 {t('grammar.explorer.bulkFavorite')}
               </Button>
               <Button size="sm" disabled={noSelection} title={selectionReason}
-                onClick={() => bulkInto(setStudyQueue, 'grammar.explorer.status.queued')}>
+                onClick={() => bulkInto('queue', 'grammar.explorer.status.queued')}>
                 {t('grammar.explorer.bulkQueue')}
               </Button>
               <Button
@@ -592,14 +583,28 @@ export default function GrammarExplorer({
           {focused ? (
             <>
               <div className="gram-x-detail-actions lq-hit-scope">
-                <Button size="sm" onClick={() => toggleIn(setFavorites, focused.id)}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const adding = !favorites.has(focused.id);
+                    setListMembership('favorites', [focused.id], adding);
+                    setStatus(t(adding ? 'grammar.explorer.status.favoritedOne' : 'grammar.explorer.status.unfavoritedOne'));
+                  }}
+                >
                   {t(
                     favorites.has(focused.id)
                       ? 'grammar.explorer.unfavorite'
                       : 'grammar.explorer.favorite',
                   )}
                 </Button>
-                <Button size="sm" onClick={() => toggleIn(setStudyQueue, focused.id)}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const adding = !studyQueue.has(focused.id);
+                    setListMembership('queue', [focused.id], adding);
+                    setStatus(t(adding ? 'grammar.explorer.status.queuedOne' : 'grammar.explorer.status.unqueuedOne'));
+                  }}
+                >
                   {t(
                     studyQueue.has(focused.id)
                       ? 'grammar.explorer.removeFromQueue'

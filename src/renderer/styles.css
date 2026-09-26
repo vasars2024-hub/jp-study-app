@@ -25805,6 +25805,18 @@ html.lockscreen-widget-root #root {
 
 /* GrammarX Practice / Test / Notebook / Translation History */
 .gx-practice { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; }
+/* Grammar review (spaced review of due points). One card, no nested panels. */
+.gx-review { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px; max-width: 760px; outline: none; }
+.gx-review-summary { font-size: 12px; }
+.gx-review-card { display: flex; flex-direction: column; gap: 10px; }
+.gx-review-head { display: flex; align-items: baseline; gap: 10px; }
+.gx-review-head h2 { margin: 0; font-size: 28px; font-weight: 600; }
+.gx-review-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.gx-review-rate { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.gx-review-rate .ui-btn { display: inline-flex; flex-direction: column; align-items: center; min-width: 88px; gap: 2px; }
+.gx-review-interval { font-size: 11px; opacity: 0.75; }
+.gx-review-empty { display: flex; flex-direction: column; gap: 8px; }
+.gx-review-empty p { margin: 0; }
 .gx-practice-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .gx-practice-status { margin-left: auto; font-size: 12px; }
 .gx-practice-layout { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: 12px; min-height: 0; flex: 1; }

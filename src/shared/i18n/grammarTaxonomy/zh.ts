@@ -263,6 +263,9 @@ export const GRAMMAR_TAXONOMY_ZH: Catalog = {
   'grammar.practice.empty.hint': '试着减少筛选条件，或关闭「仅限已核验标签」。',
   // —— familiarity (learner state) ——
   'grammar.familiarity.legend': '熟悉度',
+  'grammar.lists.legend': '我的列表',
+  'grammar.lists.favorites': '收藏',
+  'grammar.lists.queue': '学习队列',
   'grammar.familiarity.new': '未学',
   'grammar.familiarity.learning': '学习中',
   'grammar.familiarity.familiar': '熟悉',

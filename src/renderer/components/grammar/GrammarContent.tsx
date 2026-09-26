@@ -19,6 +19,7 @@ import {
   type GuideCategory,
 } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
+import { explanationCopiesMeaning, structureCopiesTitle } from '../../data/grammar/hollow';
 import type { ExampleSentence } from '../../../shared/types';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import {
@@ -100,7 +101,11 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
    * clamps it, so nothing here needs a second length rule.
    */
   const askAgent = (): void => {
-    const summary = [point.meaning, point.structure, point.explanation]
+    const summary = [
+      point.meaning,
+      structureCopiesTitle(point) ? '' : point.structure,
+      explanationCopiesMeaning(point) ? '' : point.explanation,
+    ]
       .map((part) => (part ?? '').trim())
       .filter(Boolean)
       .join(' — ');
@@ -124,35 +129,45 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
       </header>
       <p className="gram-gloss">{point.meaning}</p>
 
-      <div className="gram-block">
-        <h3>{t('grammar.structure')}</h3>
-        <p className="gram-structure" lang={contentLangOf(point.lang)}>
-          {point.structure}
-        </p>
-      </div>
+      {/* A block that only repeats the title or the gloss says nothing; hide it
+          rather than print the same words twice under a heading. */}
+      {!structureCopiesTitle(point) && (
+        <div className="gram-block">
+          <h3>{t('grammar.structure')}</h3>
+          <p className="gram-structure" lang={contentLangOf(point.lang)}>
+            {point.structure}
+          </p>
+        </div>
+      )}
 
-      <div className="gram-block">
-        <h3>{t('grammar.howToUse')}</h3>
-        <p>{point.explanation}</p>
-      </div>
+      {!explanationCopiesMeaning(point) && (
+        <div className="gram-block">
+          <h3>{t('grammar.howToUse')}</h3>
+          <p>{point.explanation}</p>
+        </div>
+      )}
 
       <div className="gram-block">
         <h3>{t('grammar.examples')}</h3>
-        <ul className="gram-examples">
-          {point.examples.map((ex, i) => (
-            <li key={i}>
-              <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
-                {ex.jp}
-              </span>
-              {ex.reading && (
-                <span className="gram-ex-reading" lang={point.lang === 'zh' ? 'zh-Latn-pinyin' : contentLangOf(point.lang)}>
-                  {ex.reading}
+        {point.examples.length === 0 ? (
+          <p className="gram-more-status muted">{t('grammar.noExamplesYet')}</p>
+        ) : (
+          <ul className="gram-examples">
+            {point.examples.map((ex, i) => (
+              <li key={i}>
+                <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                  {ex.jp}
                 </span>
-              )}
-              <span className="gram-ex-en">{ex.en}</span>
-            </li>
-          ))}
-        </ul>
+                {ex.reading && (
+                  <span className="gram-ex-reading" lang={point.lang === 'zh' ? 'zh-Latn-pinyin' : contentLangOf(point.lang)}>
+                    {ex.reading}
+                  </span>
+                )}
+                <span className="gram-ex-en">{ex.en}</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {exState === 'idle' && (
           <button className="gram-more-btn" onClick={loadExamples}>

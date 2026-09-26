@@ -264,6 +264,9 @@ export const GRAMMAR_TAXONOMY_RU: Catalog = {
   'grammar.practice.empty.hint': 'Уберите фильтр или отключите «Только проверенные теги».',
   // —— familiarity (learner state) ——
   'grammar.familiarity.legend': 'Знание',
+  'grammar.lists.legend': 'Мои списки',
+  'grammar.lists.favorites': 'Избранное',
+  'grammar.lists.queue': 'Очередь изучения',
   'grammar.familiarity.new': 'Новое',
   'grammar.familiarity.learning': 'Изучается',
   'grammar.familiarity.familiar': 'Знакомо',

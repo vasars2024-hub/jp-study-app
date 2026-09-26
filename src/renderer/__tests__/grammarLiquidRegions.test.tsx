@@ -5,7 +5,7 @@
  *
  * Second stop on L5's own order (Dictionary → Grammar → Translate → Agent), and
  * the same shape as `dictionaryLiquidRegions.test.tsx`: exactly one region is a
- * contextual tool — the intro line plus the four-way mode switch — and everything
+ * contextual tool — the intro line plus the five-way mode switch — and everything
  * the switch selects is dense work. A grammar point's prose, a practice form, a
  * curation table and a guides browser are the four things §2.3 names as belonging
  * on stable opaque anchors, so they stay plain, and this file pins that as a
@@ -20,6 +20,9 @@ vi.mock('../components/grammar/GrammarExplorer', () => ({
 }));
 vi.mock('../components/grammar/GrammarPracticePanel', () => ({
   default: () => <div data-testid="practice" />,
+}));
+vi.mock('../components/grammar/GrammarReviewPanel', () => ({
+  default: () => <div data-testid="review" />,
 }));
 vi.mock('../components/grammar/GrammarCurationPanel', () => ({
   default: () => <div data-testid="curation" />,
@@ -83,7 +86,7 @@ describe('Grammar — contextual region adoption', () => {
     expect(head.classList.contains('lq-contextual'), '.view-head is contextual').toBe(true);
     expect(head.getAttribute('data-lq-role')).toBe('contextual');
     // The mode switch is what makes it contextual rather than decorative.
-    expect(head.querySelectorAll('button.gram-mode-btn').length).toBe(4);
+    expect(head.querySelectorAll('button.gram-mode-btn').length).toBe(5);
   });
 
   it('does NOT give it lq-liquid, which would paint in conventional windows too', async () => {
@@ -107,8 +110,9 @@ describe('Grammar — contextual region adoption', () => {
     const panels: Array<[string, string]> = [
       ['grammar.mode.points', 'explorer'],
       ['grammar.mode.practice', 'practice'],
-      ['grammar.mode.review', 'curation'],
+      ['grammar.mode.review', 'review'],
       ['grammar.mode.guides', 'guides'],
+      ['grammar.mode.curate', 'curation'],
     ];
     for (const [label, testid] of panels) {
       const button = [...host.querySelectorAll<HTMLButtonElement>('button.gram-mode-btn')]
