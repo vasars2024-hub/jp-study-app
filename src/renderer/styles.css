@@ -5955,12 +5955,26 @@ mark.lookup-mark,
   min-height: 24px;
   border-radius: var(--radius-sm);
 }
-/* Definition-language chips: which bundled dictionaries' glosses are on screen. */
+/* Definition-language chips: which bundled dictionaries' glosses are on screen.
+   They and the "other languages hidden" note sit in the entries' content column
+   (`.dict-entry`'s inline padding) — they were flush against the popup's border. */
 .dict-gloss-langs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin: 0 0 8px;
+  padding-inline: 14px;
+}
+.dict-gloss-hidden {
+  margin: 0 0 8px;
+  padding-inline: 14px;
+  font-size: 12px;
+}
+.dict-popup .dict-gloss-langs {
+  padding: 8px 10px 0;
+}
+.dict-popup .dict-gloss-hidden {
+  padding-inline: 10px;
 }
 .dict-star:hover {
   color: var(--accent);
