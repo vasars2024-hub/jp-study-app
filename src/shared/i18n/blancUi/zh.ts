@@ -121,8 +121,6 @@ export const BLANC_UI_ZH: Catalog = {
   'blanc.shell.contextTools': '上下文工具',
   'blanc.shell.exitFullscreenWorkspace': '退出全屏工作区',
   'blanc.shell.fullscreenWorkspace': '全屏工作区',
-  'blanc.shell.advanced': '高级',
-  'blanc.shell.dark': '深色',
   'blanc.shell.loading': '正在加载…',
   'blanc.shell.exitFullscreen': '退出全屏',
   'blanc.shell.showTaskbar': '显示任务栏',

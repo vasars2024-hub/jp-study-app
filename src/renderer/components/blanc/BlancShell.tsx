@@ -449,14 +449,6 @@ export default function BlancShell({
     });
   };
 
-  const patchDark = (on: boolean): void => {
-    setSettings(setBlancDarkMode(on));
-  };
-
-  const patchAdvanced = (on: boolean): void => {
-    setSettings(setBlancAdvanced(on));
-  };
-
   const title = book ? t('blanc.shell.reader') : t(TAB_META[tab].labelKey);
   const canExpandWorkspace = book || tab === 'mine' || tab === 'flashcards' || tab === 'media' || tab === 'stats' || tab === 'tools';
 
@@ -564,22 +556,9 @@ export default function BlancShell({
               </button>
             )}
             <LanguageSelect />
-            <label className="blanc-check">
-              <input
-                type="checkbox"
-                checked={settings.advanced}
-                onChange={(event) => patchAdvanced(event.target.checked)}
-              />
-              <span>{t('blanc.shell.advanced')}</span>
-            </label>
-            <label className="blanc-check">
-              <input
-                type="checkbox"
-                checked={settings.darkMode}
-                onChange={(event) => patchDark(event.target.checked)}
-              />
-              <span>{t('blanc.shell.dark')}</span>
-            </label>
+            {/* Advanced and Dark used to sit here as well as in Settings > Interface:
+                the same two checkboxes in two places, one of them a step behind
+                the other. They live in Settings only. */}
             </div>
           </div>
         </header>
@@ -3657,6 +3636,10 @@ function BlancSettingsPanel({
                 <input
                   type="checkbox"
                   checked={toolboxSettings.enabledTools.includes(module.id)}
+                  // The calculator cannot be switched off (the Toolbox would be empty);
+                  // it used to look switchable and simply stayed checked.
+                  disabled={module.id === 'calculator'}
+                  title={module.id === 'calculator' ? t('blanc.settings.calculatorLocked') : undefined}
                   onChange={(event) => toggleTool(module.id, event.target.checked)}
                 />
                 <span>{t('blanc.settings.toolEnabled')}</span>

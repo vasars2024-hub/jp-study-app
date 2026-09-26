@@ -78,3 +78,15 @@ describe('Blanc audio mining, Automation Builder and Notebook', () => {
     }
   });
 });
+
+describe('Blanc settings toggles', () => {
+  it('Advanced and Dark live in Settings only, not also in the header', () => {
+    expect(shell).not.toContain('patchAdvanced(event.target.checked)');
+    expect(shell).not.toContain('patchDark(event.target.checked)');
+    expect(shell).toContain('onPatch(setBlancAdvanced(event.target.checked))');
+  });
+
+  it('the calculator, which cannot be turned off, is shown as locked rather than stuck', () => {
+    expect(shell).toContain("disabled={module.id === 'calculator'}");
+  });
+});

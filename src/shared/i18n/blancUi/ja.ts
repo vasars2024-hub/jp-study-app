@@ -121,8 +121,6 @@ export const BLANC_UI_JA: Catalog = {
   'blanc.shell.contextTools': 'コンテキストツール',
   'blanc.shell.exitFullscreenWorkspace': '全画面ワークスペースを終了',
   'blanc.shell.fullscreenWorkspace': '全画面ワークスペース',
-  'blanc.shell.advanced': '詳細',
-  'blanc.shell.dark': 'ダーク',
   'blanc.shell.loading': '読み込み中…',
   'blanc.shell.exitFullscreen': '全画面を終了',
   'blanc.shell.showTaskbar': 'タスクバーを表示',

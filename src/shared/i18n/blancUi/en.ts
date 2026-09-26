@@ -121,8 +121,6 @@ export const BLANC_UI_EN: Catalog = {
   'blanc.shell.contextTools': 'Context tools',
   'blanc.shell.exitFullscreenWorkspace': 'Exit fullscreen workspace',
   'blanc.shell.fullscreenWorkspace': 'Fullscreen workspace',
-  'blanc.shell.advanced': 'Advanced',
-  'blanc.shell.dark': 'Dark',
   'blanc.shell.loading': 'Loading…',
   'blanc.shell.exitFullscreen': 'Exit full screen',
   'blanc.shell.showTaskbar': 'Show taskbar',
