@@ -135,6 +135,19 @@ describe('SentenceDeckDialog', () => {
     expect(loadDeck()).toHaveLength(0);
   });
 
+  it('keeps focus in the deck-name field while it is typed in', async () => {
+    await open();
+    const input = q<HTMLInputElement>('[data-sd-field="deck-name"]');
+    input.focus();
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(input, 'Yuru Camp - 01 (mine)');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(input.value).toBe('Yuru Camp - 01 (mine)');
+    expect(document.activeElement).toBe(input);
+  });
+
   it('changes the preview when an option changes', async () => {
     await open();
     await act(async () => { byText('Dialogue only').querySelector('input')?.click(); });

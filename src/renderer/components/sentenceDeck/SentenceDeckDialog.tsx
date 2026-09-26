@@ -13,7 +13,7 @@
  * pattern as `confirmDialog` — so it works from any window without each host
  * mounting it.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   SENTENCE_DECK_DEFAULTS,
@@ -245,10 +245,14 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
   }, [trackOptions, primaryId, request.playerTrack, lang]);
 
   const building = stage.kind === 'building';
-  const close = (): void => {
-    if (building) return;
+  const buildingRef = useRef(building);
+  buildingRef.current = building;
+  // Stable: `Dialog` re-runs its focus effect whenever `onClose` changes, and a
+  // new function per render would pull focus out of the field being typed in.
+  const close = useCallback((): void => {
+    if (buildingRef.current) return;
     onClose();
-  };
+  }, [onClose]);
 
   async function make(): Promise<void> {
     if (!plan || !sources?.videoPath || !plan.segments.length) return;
