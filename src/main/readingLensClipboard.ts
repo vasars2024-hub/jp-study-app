@@ -15,15 +15,22 @@ import {
 export function createReadingLensClipboardCapture(
   value: unknown,
   now = Date.now(),
+  // The study language, not a fixed 'ja': a Chinese or Russian learner's
+  // clipboard passage was stamped Japanese and tokenized as such.
+  language = 'ja',
+  // A picture on the clipboard, already OCR'd: which engine read it, and the
+  // bounded picture itself (the card a word is mined into can carry it).
+  image?: { engine?: string; screenshotDataUrl?: string },
 ): ReadingLensCapture | null {
   const capture = normalizeReadingLensCapture(
     {
       source: 'clipboard',
       sourceLabel: 'clipboard',
       capturedAt: now,
-      language: 'ja',
-      engine: 'none',
+      language,
+      engine: image?.engine || 'none',
       text: value,
+      ...(image?.screenshotDataUrl ? { screenshotDataUrl: image.screenshotDataUrl } : {}),
     },
     now,
   );

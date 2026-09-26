@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_EN } from '../scraperDrawerUi/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 import { SHELL_UI_EN } from '../shellUi/en';
 import { COMMANDS_UI_EN } from '../commandsUi/en';
+import { COMPANION_UI_EN } from '../companionUi/en';
 import { MUSIC_UI_EN } from '../musicUi/en';
 import { RESOURCES_CATALOG_EN } from '../resourcesCatalog/en';
 import { RESOURCE_BUNDLES_EN } from '../resourceBundles/en';
@@ -800,6 +801,7 @@ export const en: Catalog = {
   ...GRAMMAR_TAXONOMY_EN,
   ...SHELL_UI_EN,
   ...COMMANDS_UI_EN,
+  ...COMPANION_UI_EN,
   ...MUSIC_UI_EN,
   ...RESOURCES_CATALOG_EN,
   ...RESOURCE_BUNDLES_EN,
@@ -3420,6 +3422,7 @@ export const en: Catalog = {
   'commands.category.music': 'Music',
   'commands.category.video': 'Video',
   'commands.category.toolbox': 'Toolbox',
+  'commands.category.companion': 'Companion',
   'commands.category.utility': 'Utility',
   'commands.category.custom': 'Custom',
 
@@ -3685,8 +3688,6 @@ export const en: Catalog = {
   'settings.sysDict.desc': 'Look up selected text in any Windows app with a global hotkey.',
   'settings.sysDict.enable': 'Enable system-wide popup dictionary',
   'settings.sysDict.hotkeyLabel': 'Global hotkey',
-  'settings.sysDict.change': 'Change',
-  'settings.sysDict.capturing': 'Press keys…',
   'settings.sysDict.hint':
     'Select text in any app, then press the hotkey — the dictionary floats above everything, even when this window is minimized. It is also available from the tray icon.',
   'settings.sysDict.unsupported':
@@ -3697,7 +3698,8 @@ export const en: Catalog = {
   'lens.select.hint': 'Drag over Japanese text',
   'lens.select.sub': 'or press A to read this screen · Esc to cancel',
   'lens.select.clipboard': 'Read clipboard',
-  'lens.clipboard.empty': 'The clipboard has no text to read.',
+  'lens.clipboard.empty': 'The clipboard has no text or picture to read.',
+  'lens.clipboard.imageFailed': 'The copied picture could not be read. Check that the OCR models for your study language are installed.',
   'lens.scanning': 'Reading…',
   'lens.empty.title': 'No Japanese found here',
   'lens.empty.hint': 'Try a tighter region, or switch to Manga mode.',
@@ -3770,7 +3772,9 @@ export const en: Catalog = {
   'lens.reader.mineDup': 'Already in Anki',
   'lens.reader.mineSaved': 'Saved to deck',
   'lens.reader.mineQueued': 'Saved — Anki later',
+  'lens.reader.mineWaiting': 'Added when Gum is up',
   'lens.reader.mineRetry': 'Retry mine',
+  'lens.reader.preview': 'Card preview…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': 'What a scan opens',
@@ -3963,11 +3967,8 @@ export const en: Catalog = {
   'settings.lens.desc': 'Read Japanese on screen in any app — draw a box, OCR it, look up words in place.',
   'settings.lens.enable': 'Enable the Reading Lens',
   'settings.lens.hotkeyLabel': 'Global hotkey',
-  'settings.lens.change': 'Change',
-  'settings.lens.capturing': 'Press keys…',
   'settings.lens.hint':
     'Press the hotkey and drag a box over Japanese text in any app — a game, manga, PDF or video. Double-tap the hotkey to read the whole screen. It floats above everything, even fullscreen.',
-  'settings.lens.busy': 'That shortcut is in use by another app — pick another.',
   'settings.lens.unsupported': 'Screen capture for the Lens is available on Windows.',
   'settings.lens.openNow': 'Open the Lens now',
   'settings.lens.repeatRegion': 'Repeat last region',

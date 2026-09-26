@@ -133,9 +133,23 @@ import {
   stopReadingLens,
 } from './main/readingLens';
 import {
+  configureCompanion,
+  registerCompanionIpc,
+  startCompanion,
+  stopCompanion,
+} from './main/companion';
+import { stopCompanionContext } from './main/companionContext';
+import {
   isOsHotkeyHelperInstalled,
   registerOsHotkeyHelperIpc,
 } from './main/osHotkeyHelper';
+import {
+  legacyChordResult,
+  registerGlobalCommand,
+  registerGlobalCommandsIpc,
+  setGlobalCommandChord,
+  stopGlobalCommands,
+} from './main/globalCommands';
 import { registerLiveCaptionsIpc } from './main/liveCaptions';
 import {
   configureSystemAudioCapture,
@@ -1040,51 +1054,20 @@ function registerBlancIpc(): void {
     return { ok: true };
   });
 
-  // OS-level global shortcut for `toolbox.open`. The renderer pushes the user's
-  // current binding here on boot and on every rebind, so the registry's
-  // `global: true` claim is real, not in-app-only. Registration can fail when
-  // another application owns the accelerator; the in-app binding still works.
-  let blancGlobalAccelerator: string | null = null;
-  ipcMain.handle('blanc:setGlobalShortcut', (_event, chord: unknown): { ok: boolean; error?: string } => {
-    if (blancGlobalAccelerator) {
-      try {
-        globalShortcut.unregister(blancGlobalAccelerator);
-      } catch {
-        /* already gone */
-      }
-      blancGlobalAccelerator = null;
-    }
-    if (typeof chord !== 'string' || !chord.trim()) return { ok: true };
-    // The chord format is "Ctrl+Alt+B" (alternatives split by "|"); register the
-    // first alternative only. Electron uses "Super" where the app says "Meta".
-    const accelerator = chord.split('|')[0]!.trim().replace(/\bMeta\b/g, 'Super');
-    if (!/^([\w]+\+)+[\w,.;'[\]/\\`=-]+$/.test(accelerator)) {
-      return { ok: false, error: 'This shortcut cannot be registered system-wide.' };
-    }
-    if (!/(Ctrl|Alt|Shift|Super|CmdOrCtrl)\+/i.test(accelerator)) {
-      return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
-    }
-    try {
-      const registered = globalShortcut.register(accelerator, () => createBlancWindow());
-      if (!registered) {
-        return { ok: false, error: `"${accelerator}" is already in use by another application.` };
-      }
-      blancGlobalAccelerator = accelerator;
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'Could not register the global shortcut.' };
-    }
-  });
+  // OS-level global shortcut for `toolbox.open`, held by the one registry
+  // (main/globalCommands.ts) like every other system-wide chord. The channel
+  // stays for older callers; Settings → Shortcuts pushes the whole map instead.
+  registerGlobalCommand('toolbox.open', () => createBlancWindow());
+  ipcMain.handle('blanc:setGlobalShortcut', (_event, chord: unknown): { ok: boolean; error?: string } =>
+    legacyChordResult(setGlobalCommandChord('toolbox.open', typeof chord === 'string' ? chord : '')),
+  );
 
   app.on('will-quit', () => {
+    stopGlobalCommands();
     globalShortcut.unregisterAll();
   });
 
-  // Hide / show GrammarX. When the Windows Startup helper is installed it owns
-  // the OS accelerators (so hotkeys work even after a full quit) and we must
-  // not also RegisterHotKey here — two owners fight over the same chord.
-  let appToggleAccelerator: string | null = null;
-  let appRestartAccelerator: string | null = null;
+  // Hide / show GrammarX.
   function toggleAppVisibility(): void {
     const mainAlive = Boolean(mainWindow && !mainWindow.isDestroyed());
     const mainShowing =
@@ -1115,79 +1098,29 @@ function registerBlancIpc(): void {
   toggleAppVisibilityHandler = toggleAppVisibility;
   focusAppHandler = focusApp;
 
-  function parseGlobalAccelerator(chord: unknown): { ok: true; accelerator: string } | { ok: false; error: string } {
-    if (typeof chord !== 'string' || !chord.trim()) {
-      return { ok: true, accelerator: '' };
-    }
-    const accelerator = chord.split('|')[0]!.trim().replace(/\bMeta\b/g, 'Super');
-    if (!/^([\w]+\+)+[\w,.;'[\]/\\`=-]+$/.test(accelerator)) {
-      return { ok: false, error: 'This shortcut cannot be registered system-wide.' };
-    }
-    if (!/(Ctrl|Alt|Shift|Super|CmdOrCtrl)\+/i.test(accelerator)) {
-      return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
-    }
-    return { ok: true, accelerator };
-  }
+  // Hide / show and restart: when the Windows Startup helper is installed it
+  // owns these accelerators (so they work after a full quit) and Electron must
+  // not RegisterHotKey them too — two owners fight over the same chord. The
+  // registry re-checks this on every push, so installing or removing the
+  // helper (Settings re-pushes the chords) hands the chord over either way.
+  registerGlobalCommand('app.toggle', () => toggleAppVisibility(), {
+    available: () => !isOsHotkeyHelperInstalled(),
+  });
+  registerGlobalCommand('app.restart', () => fullyRestartApp(), {
+    available: () => !isOsHotkeyHelperInstalled(),
+  });
+  registerGlobalCommand('app.focus', () => focusApp());
 
   ipcMain.handle('app:toggle', (): { ok: boolean } => {
     toggleAppVisibility();
     return { ok: true };
   });
-  ipcMain.handle('app:setToggleShortcut', (_event, chord: unknown): { ok: boolean; error?: string } => {
-    if (appToggleAccelerator) {
-      try {
-        globalShortcut.unregister(appToggleAccelerator);
-      } catch {
-        /* already gone */
-      }
-      appToggleAccelerator = null;
-    }
-    const parsed = parseGlobalAccelerator(chord);
-    if (!parsed.ok) return parsed;
-    if (!parsed.accelerator) return { ok: true };
-    // Startup helper owns OS registration when installed — renderer syncs chords there.
-    if (isOsHotkeyHelperInstalled()) return { ok: true };
-    try {
-      const registered = globalShortcut.register(parsed.accelerator, () => toggleAppVisibility());
-      if (!registered) {
-        return { ok: false, error: `"${parsed.accelerator}" is already in use by another application.` };
-      }
-      appToggleAccelerator = parsed.accelerator;
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : 'Could not register the global shortcut.',
-      };
-    }
-  });
-  ipcMain.handle('app:setRestartShortcut', (_event, chord: unknown): { ok: boolean; error?: string } => {
-    if (appRestartAccelerator) {
-      try {
-        globalShortcut.unregister(appRestartAccelerator);
-      } catch {
-        /* already gone */
-      }
-      appRestartAccelerator = null;
-    }
-    const parsed = parseGlobalAccelerator(chord);
-    if (!parsed.ok) return parsed;
-    if (!parsed.accelerator) return { ok: true };
-    if (isOsHotkeyHelperInstalled()) return { ok: true };
-    try {
-      const registered = globalShortcut.register(parsed.accelerator, () => fullyRestartApp());
-      if (!registered) {
-        return { ok: false, error: `"${parsed.accelerator}" is already in use by another application.` };
-      }
-      appRestartAccelerator = parsed.accelerator;
-      return { ok: true };
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : 'Could not register the global shortcut.',
-      };
-    }
-  });
+  ipcMain.handle('app:setToggleShortcut', (_event, chord: unknown): { ok: boolean; error?: string } =>
+    legacyChordResult(setGlobalCommandChord('app.toggle', typeof chord === 'string' ? chord : '')),
+  );
+  ipcMain.handle('app:setRestartShortcut', (_event, chord: unknown): { ok: boolean; error?: string } =>
+    legacyChordResult(setGlobalCommandChord('app.restart', typeof chord === 'string' ? chord : '')),
+  );
 
   registerOsHotkeyHelperIpc();
 
@@ -1958,6 +1891,9 @@ app.whenReady().then(async () => {
   registerExtensionBridgeIpc();
   registerWindowChromeIpc(recreateMainWindow);
   registerPopoutIpc();
+  // Before every module that plugs a system-wide command into it (Blanc, the
+  // popup dictionary, the Reading Lens, the companion).
+  registerGlobalCommandsIpc();
   registerBlancIpc();
   registerMiniWidgetIpc();
   registerLockscreenIpc();
@@ -1993,6 +1929,20 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerSystemAudioCaptureIpc();
+
+  // The desktop companion: radial wheel, card preview and notices over any app,
+  // forwarding mines to this main window's renderer.
+  configureCompanion({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+    getMainWindow: () => mainWindow,
+    ensureMainWindow: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createWindow({ visible: false });
+    },
+  });
+  registerCompanionIpc();
   // The VN reader window beside a running game (Visual Novels ▸ Launch).
   configureVisualNovelReader({
     rendererUrl,
@@ -2015,6 +1965,8 @@ app.whenReady().then(async () => {
     startSystemDictionary();
     // Reading Lens: registers its own global hotkey (screen-region OCR reader).
     startReadingLens();
+    // Companion wheel, card preview, mine-last, Mini View: their chords go live now.
+    startCompanion();
     // Provision the offline dictionaries and load their metadata (pitch, IPA,
     // frequency) in the background. Its first step opens the dictionary database
     // synchronously, which is why it waits for the first frame. The term
@@ -2058,6 +2010,9 @@ app.on('will-quit', () => {
   stopExtensionServer();
   stopSystemDictionary();
   stopReadingLens();
+  stopCompanion();
+  stopCompanionContext();
+  stopGlobalCommands();
   stopDebugBridge();
   // The local model runtime was the one subsystem here with no stop: contexts, weights and the
   // llama.cpp backend all released on idle deadlines only, so a quit inside a 5-minute idle

@@ -46,6 +46,9 @@ const h = vi.hoisted(() => {
     ] as Array<{ id: number; bounds: Electron.Rectangle; scaleFactor: number }>,
     // Electron's cross-scale-factor placement: the next placement lands this many times too small.
     shrinkNextPlacement: 0,
+    clipText: '',
+    clipImage: { isEmpty: () => true } as { isEmpty: () => boolean },
+    clipOcr: { ok: false, text: '', engine: 'none', lang: 'ja' } as Record<string, unknown>,
   };
   const sent: Array<{ channel: string; payload: unknown }> = [];
 
@@ -115,6 +118,7 @@ vi.mock('electron', () => {
   return {
     app: { getPath: () => h.env.userData },
     BrowserWindow,
+    clipboard: { readText: () => h.env.clipText, readImage: () => h.env.clipImage },
     globalShortcut: {
       register: (acc: string, cb: () => void) => {
         h.shortcut.registerCalls.push(acc);
@@ -146,6 +150,7 @@ vi.mock('electron', () => {
 
 const ocrCalls: unknown[][] = [];
 vi.mock('../screenOcr', () => ({
+  ocrClipboardImage: async () => h.env.clipOcr,
   ocrRegion: async (...args: unknown[]) => {
     ocrCalls.push(args);
     return { ok: true, engine: 'web', lines: [], text: '', available: true, hash: 'x' };
@@ -185,6 +190,9 @@ function clearState(): void {
   fs.rmSync(path.join(tmpRoot, STATE), { force: true });
   // A .bak without its primary counts as damage and would be reinstated.
   fs.rmSync(path.join(tmpRoot, `${STATE}.bak`), { force: true });
+  // The chords themselves live in the global-command registry's file now.
+  fs.rmSync(path.join(tmpRoot, 'global-commands.json'), { force: true });
+  fs.rmSync(path.join(tmpRoot, 'global-commands.json.bak'), { force: true });
 }
 function readState(): unknown {
   return JSON.parse(fs.readFileSync(path.join(tmpRoot, STATE), 'utf8'));
@@ -284,7 +292,8 @@ describe('startReadingLens', () => {
     writeState('}}}not json{{{');
     const m = await load();
     expect(() => m.startReadingLens()).not.toThrow();
-    expect(h.shortcut.registerCalls).toEqual(['Ctrl+Shift+Space']);
+    // Region select on its default chord (the word-under-cursor read holds its own).
+    expect(h.shortcut.registerCalls).toContain('Ctrl+Shift+Space');
   });
 
   it('registers nothing when the stored settings disable the Lens', async () => {
@@ -310,35 +319,8 @@ describe('startReadingLens', () => {
   });
 });
 
-// ---- accelerator mapping ------------------------------------------------
-
-describe('toAccelerator', () => {
-  it('passes a plain chord through unchanged', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Ctrl+Shift+Space')).toBe('Ctrl+Shift+Space');
-  });
-
-  it('maps Meta to Electron’s Super', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Meta+K')).toBe('Super+K');
-    expect(t.toAccelerator('Ctrl+Meta+Alt+J')).toBe('Ctrl+Super+Alt+J');
-  });
-
-  it('takes the first alternative of a pipe-separated chord', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Ctrl+K|Meta+K')).toBe('Ctrl+K');
-  });
-
-  it('trims surrounding whitespace', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('  Ctrl+K  |Meta+K')).toBe('Ctrl+K');
-  });
-
-  it('does not rewrite Meta inside a longer word', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Ctrl+Metal')).toBe('Ctrl+Metal');
-  });
-});
+// Chord → accelerator mapping moved to the shared registry and is covered by
+// src/shared/__tests__/globalCommands.test.ts.
 
 // ---- registration lifecycle --------------------------------------------
 
@@ -385,7 +367,7 @@ describe('hotkey registration', () => {
     expect(h.shortcut.unregisterCalls).toContain('Ctrl+Shift+Space');
     expect(h.shortcut.registered.has('Ctrl+Shift+Space')).toBe(false);
     expect(h.shortcut.registered.has('Ctrl+Alt+L')).toBe(true);
-    expect([...h.shortcut.registered.keys()]).toEqual(['Ctrl+Alt+L']);
+    expect([...h.shortcut.registered.keys()].filter((k) => k === 'Ctrl+Shift+Space')).toEqual([]);
   });
 
   it('reports a busy accelerator by name and holds nothing', async () => {
@@ -398,7 +380,8 @@ describe('hotkey registration', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toContain('Ctrl+Alt+L');
     expect(res.error).toMatch(/already in use/i);
-    expect(h.shortcut.registered.size).toBe(0);
+    expect(h.shortcut.registered.has('Ctrl+Alt+L')).toBe(false);
+    expect(h.shortcut.registered.has('Ctrl+Shift+Space')).toBe(false);
   });
 
   it('surfaces a register() exception as an error result', async () => {
@@ -723,11 +706,51 @@ describe('repeat region', () => {
     await h.ipc.handlers.get('lens:ocr')!({}, region);
   };
 
+  it('the programmatic clipboard open reads a copied picture, keeping it as the capture image', async () => {
+    await booted();
+    h.env.clipText = '';
+    h.env.clipImage = { isEmpty: () => false };
+    h.env.clipOcr = { ok: true, text: '猫が好き', engine: 'web', lang: 'ja', screenshotDataUrl: 'data:image/png;base64,AAAA' };
+    await h.ipc.handlers.get('lens:open')!({}, 'clipboard');
+    const opened = init() as { mode: string; capture?: { text: string; screenshotDataUrl?: string } };
+    expect(opened.mode).toBe('clipboard');
+    expect(opened.capture).toMatchObject({ text: '猫が好き', screenshotDataUrl: 'data:image/png;base64,AAAA' });
+    h.env.clipImage = { isEmpty: () => true };
+    h.env.clipOcr = { ok: false, text: '', engine: 'none', lang: 'ja' };
+  });
+
   it('remembers the rectangle the OCR handler was actually given', async () => {
     await booted();
     await scan({ x: 100, y: 200, width: 300, height: 80 });
     expect((await status()).lastRegion)
       .toEqual({ displayId: 7, x: 100, y: 200, width: 300, height: 80 });
+  });
+
+  it('a word-under-the-cursor read does not replace the region "repeat" replays', async () => {
+    await booted();
+    await scan({ x: 100, y: 200, width: 300, height: 80 });
+    await h.ipc.handlers.get('lens:open')!({}, 'cursor');
+    const cursorInit = init() as { mode: string; region?: { width: number; height: number }; point?: unknown };
+    expect(cursorInit.mode).toBe('cursor');
+    expect(cursorInit.region).toMatchObject({ width: 420, height: 132 });
+    expect(cursorInit.point).toBeTruthy();
+    await h.ipc.handlers.get('lens:ocr')!({}, cursorInit.region);
+    expect((await status()).lastRegion)
+      .toEqual({ displayId: 7, x: 100, y: 200, width: 300, height: 80 });
+  });
+
+  it('centres the cursor box on the pointer and keeps it on the display', async () => {
+    const { __readingLensTestables: t } = await load();
+    const bounds = { x: 1920, y: 0, width: 1280, height: 720 };
+    expect(t.cursorRegion({ x: 2500, y: 300 }, bounds)).toEqual({
+      region: { x: 370, y: 234, width: 420, height: 132 },
+      point: { x: 210, y: 66 },
+    });
+    // Near the corner the box is pushed inside and the point moves within it.
+    expect(t.cursorRegion({ x: 1925, y: 5 }, bounds)).toEqual({
+      region: { x: 0, y: 0, width: 420, height: 132 },
+      point: { x: 5, y: 5 },
+    });
   });
 
   it('records nothing when the OCR arrives with no open behind it', async () => {

@@ -18,10 +18,8 @@ vi.mock('electron', () => ({
 
 import { encodeWavToMp3 } from '../captionAudioEncode';
 import { parseForegroundOutput } from '../foregroundWindow';
-import { applyCaptionsGlobalShortcuts, bindCaptionsGlobalCommand, toGlobalAccelerator } from '../captionsGlobalCommands';
 import { encodeWav } from '../../shared/systemAudioRing';
 import { allowDisplayCapture, displayCaptureAllowed } from '../securityHardening';
-import { globalShortcut } from 'electron';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-captions-encode-'));
@@ -71,34 +69,6 @@ describe('parseForegroundOutput', () => {
     expect(parseForegroundOutput('77|Gum', 77)).toBe('');
     expect(parseForegroundOutput('12|', 77)).toBe('');
     expect(parseForegroundOutput('garbage', 77)).toBe('');
-  });
-});
-
-describe('captions global shortcuts (local shim)', () => {
-  it('turns app chords into accelerators and refuses unusable ones', () => {
-    expect(toGlobalAccelerator('Ctrl+Alt+Shift+M|F9')).toEqual({ ok: true, accelerator: 'Ctrl+Alt+Shift+M' });
-    expect(toGlobalAccelerator('Meta+Shift+C')).toEqual({ ok: true, accelerator: 'Super+Shift+C' });
-    expect(toGlobalAccelerator('')).toEqual({ ok: true, accelerator: '' });
-    expect(toGlobalAccelerator('M').ok).toBe(false);
-    expect(toGlobalAccelerator('Ctrl+MouseRight').ok).toBe(false);
-  });
-
-  it('registers bound commands, unregisters on rebind, and reports what another app owns', () => {
-    const fired: string[] = [];
-    bindCaptionsGlobalCommand('captions.mineRecent', () => fired.push('mine'));
-    bindCaptionsGlobalCommand('captions.toggleOverlay', () => fired.push('overlay'));
-    const register = vi.mocked(globalShortcut.register);
-    register.mockImplementation(((accelerator: string, cb: () => void) => {
-      if (accelerator === 'Ctrl+Alt+Shift+C') return false;
-      cb();
-      return true;
-    }) as never);
-    const r = applyCaptionsGlobalShortcuts({ 'captions.mineRecent': 'Ctrl+Alt+Shift+M', 'captions.toggleOverlay': 'Ctrl+Alt+Shift+C' });
-    expect(r.ok).toBe(false);
-    expect(Object.keys(r.errors)).toEqual(['captions.toggleOverlay']);
-    expect(fired).toEqual(['mine']);
-    applyCaptionsGlobalShortcuts({ 'captions.mineRecent': '' });
-    expect(vi.mocked(globalShortcut.unregister)).toHaveBeenCalledWith('Ctrl+Alt+Shift+M');
   });
 });
 

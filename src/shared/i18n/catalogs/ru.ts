@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
 import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 import { SHELL_UI_RU } from '../shellUi/ru';
 import { COMMANDS_UI_RU } from '../commandsUi/ru';
+import { COMPANION_UI_RU } from '../companionUi/ru';
 import { MUSIC_UI_RU } from '../musicUi/ru';
 import { RESOURCES_CATALOG_RU } from '../resourcesCatalog/ru';
 import { RESOURCE_BUNDLES_RU } from '../resourceBundles/ru';
@@ -822,6 +823,7 @@ export const ru: Catalog = {
   ...GRAMMAR_TAXONOMY_RU,
   ...SHELL_UI_RU,
   ...COMMANDS_UI_RU,
+  ...COMPANION_UI_RU,
   ...MUSIC_UI_RU,
   ...RESOURCES_CATALOG_RU,
   ...RESOURCE_BUNDLES_RU,
@@ -3791,6 +3793,7 @@ export const ru: Catalog = {
   'commands.category.music': 'Музыка',
   'commands.category.video': 'Видео',
   'commands.category.toolbox': 'Инструменты',
+  'commands.category.companion': 'Компаньон',
   'commands.category.utility': 'Утилиты',
   'commands.category.custom': 'Свои',
 
@@ -4054,8 +4057,6 @@ export const ru: Catalog = {
   'settings.sysDict.desc': 'Смотрите перевод выделенного текста в любом приложении Windows по глобальной клавише.',
   'settings.sysDict.enable': 'Включить общесистемный всплывающий словарь',
   'settings.sysDict.hotkeyLabel': 'Глобальная клавиша',
-  'settings.sysDict.change': 'Изменить',
-  'settings.sysDict.capturing': 'Нажмите клавиши…',
   'settings.sysDict.hint':
     'Выделите текст в любом приложении и нажмите сочетание — словарь всплывёт поверх всего, даже если это окно свёрнуто. Также доступно из значка в трее.',
   'settings.sysDict.unsupported':
@@ -4066,7 +4067,8 @@ export const ru: Catalog = {
   'lens.select.hint': 'Выделите японский текст',
   'lens.select.sub': 'или нажмите A, чтобы прочитать весь экран · Esc — отмена',
   'lens.select.clipboard': 'Прочитать буфер обмена',
-  'lens.clipboard.empty': 'В буфере обмена нет текста для чтения.',
+  'lens.clipboard.empty': 'В буфере обмена нет текста или картинки для чтения.',
+  'lens.clipboard.imageFailed': 'Не удалось прочитать скопированную картинку. Проверьте, установлены ли модели OCR для изучаемого языка.',
   'lens.scanning': 'Чтение…',
   'lens.empty.title': 'Здесь не найдено японского текста',
   'lens.empty.hint': 'Сузьте область или переключитесь в режим манги.',
@@ -4139,7 +4141,9 @@ export const ru: Catalog = {
   'lens.reader.mineDup': 'Уже в Anki',
   'lens.reader.mineSaved': 'В колоде',
   'lens.reader.mineQueued': 'Сохранено — в Anki позже',
+  'lens.reader.mineWaiting': 'Добавится после запуска Gum',
   'lens.reader.mineRetry': 'Повторить',
+  'lens.reader.preview': 'Предпросмотр карточки…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': 'Что открывает скан',
@@ -4347,11 +4351,8 @@ export const ru: Catalog = {
   'settings.lens.desc': 'Читайте японский на экране в любом приложении — выделите область, распознайте текст и смотрите слова на месте.',
   'settings.lens.enable': 'Включить читающую линзу',
   'settings.lens.hotkeyLabel': 'Глобальная горячая клавиша',
-  'settings.lens.change': 'Изменить',
-  'settings.lens.capturing': 'Нажмите клавиши…',
   'settings.lens.hint':
     'Нажмите горячую клавишу и выделите японский текст в любом приложении — игре, манге, PDF или видео. Двойное нажатие читает весь экран. Линза поверх всего, даже в полноэкранном режиме.',
-  'settings.lens.busy': 'Это сочетание занято другим приложением — выберите другое.',
   'settings.lens.unsupported': 'Захват экрана для линзы доступен в Windows.',
   'settings.lens.openNow': 'Открыть линзу сейчас',
   'settings.lens.repeatRegion': 'Повторить последнюю область',

@@ -15,19 +15,34 @@
  * Activation is a global hotkey with tap vs. double-tap intent (Electron's
  * globalShortcut exposes no key-up, so true press-and-hold is approximated by
  * "press → draw with the mouse", which is the natural snip interaction anyway).
+ *
+ * The hotkeys (`lens.region`, `lens.auto`, `lens.repeat`, `lens.clipboard`,
+ * `lens.atCursor`) belong to the one global-command registry
+ * (`globalCommands.ts`) and are rebound in Settings → Shortcuts. The chord set
+ * on the Lens's own settings page before that is carried over once
+ * (`legacyKeys`); `settings.hotkey` is kept for that and nothing else.
  */
 
 import {
   app,
   BrowserWindow,
   clipboard,
-  globalShortcut,
   ipcMain,
   screen,
 } from 'electron';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
-import { ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
+import { ocrClipboardImage, ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
+import {
+  getGlobalCommandChord,
+  getGlobalCommandStatus,
+  legacyChordResult,
+  refreshGlobalCommands,
+  registerGlobalCommand,
+  setGlobalCommandChord,
+} from './globalCommands';
+import { quickForegroundInfo, type ForegroundInfo } from './companionContext';
+import { getMainStudyLang } from './studyLanguage';
 import {
   clearCaptures,
   getRetentionDays,
@@ -93,7 +108,16 @@ export interface ReadingLensStatus extends ReadingLensSettings {
   canRepeatRegion: boolean;
 }
 
-export type LensOpenMode = 'select' | 'auto' | 'clipboard' | 'repeat';
+/**
+ * `cursor` is "look up the word under the cursor": a small box around the
+ * pointer is read straight away and the word at the pointer opens — the
+ * OS-wide stand-in for the Chrome extension's hover lookup, which needs a
+ * page to hook and has no equivalent for a game or a video.
+ */
+export type LensOpenMode = 'select' | 'auto' | 'clipboard' | 'repeat' | 'cursor';
+
+/** The box `cursor` reads around the pointer, in DIP. */
+export const CURSOR_BOX = { width: 420, height: 132 } as const;
 
 export interface LensInit {
   /** The window covers this display; renderer coords are display-local DIP. */
@@ -115,6 +139,13 @@ export interface LensInit {
    * never asked to invent a rectangle.
    */
   region?: { x: number; y: number; width: number; height: number };
+  /** `cursor` only: the pointer, relative to `region`, whose word opens once the read lands. */
+  point?: { x: number; y: number };
+  /** The app the lens was opened over (its window title), for a mined card's source. */
+  sourceTitle?: string;
+  sourceApp?: string;
+  /** `clipboard` with a picture on it that OCR could not read. */
+  clipboardImageFailed?: boolean;
 }
 
 const STATE_FILE = 'reading-lens.json';
@@ -142,8 +173,12 @@ let attachNavGuards: NavGuardFn | null = null;
 let isDev = false;
 
 let settings: ReadingLensSettings = { ...DEFAULTS };
-let currentAccelerator: string | null = null;
+let settingsLoaded = false;
+let started = false;
+let commandsRegistered = false;
 let lens: BrowserWindow | null = null;
+/** How the lens was last opened: a `cursor` read must not replace the remembered region. */
+let openedMode: LensOpenMode = 'select';
 let lensDisplayId = 0;
 let lastTriggerAt = 0;
 let pendingInit: LensInit | null = null;
@@ -190,6 +225,12 @@ export function normalizeLensRegionMemory(value: unknown): LensRegionMemory | nu
   if (displayId <= 0 || x < 0 || y < 0) return null;
   if (width < MIN_REGION || height < MIN_REGION) return null;
   return { displayId, x, y, width, height };
+}
+
+function ensureSettings(): void {
+  if (settingsLoaded) return;
+  settings = loadSettings();
+  settingsLoaded = true;
 }
 
 function loadSettings(): ReadingLensSettings {
@@ -276,7 +317,33 @@ function repeatTargetOf(mode: LensOpenMode): ReturnType<typeof resolveRepeatRegi
   return resolveRepeatRegion(settings.lastRegion, screen.getAllDisplays());
 }
 
-function openLens(requestedMode: LensOpenMode): void {
+/**
+ * The box `cursor` reads: centred on the pointer, clamped inside the display,
+ * in display-local DIP, plus the pointer relative to that box.
+ */
+export function cursorRegion(
+  cursor: { x: number; y: number },
+  bounds: Electron.Rectangle,
+): { region: { x: number; y: number; width: number; height: number }; point: { x: number; y: number } } {
+  const width = Math.min(CURSOR_BOX.width, bounds.width);
+  const height = Math.min(CURSOR_BOX.height, bounds.height);
+  const localX = cursor.x - bounds.x;
+  const localY = cursor.y - bounds.y;
+  const x = Math.round(Math.min(Math.max(0, localX - width / 2), bounds.width - width));
+  const y = Math.round(Math.min(Math.max(0, localY - height / 2), bounds.height - height));
+  return { region: { x, y, width, height }, point: { x: Math.round(localX - x), y: Math.round(localY - y) } };
+}
+
+interface LensOpenExtras {
+  source?: ForegroundInfo | null;
+  /** A clipboard capture prepared off the open path (an OCR'd clipboard picture). */
+  capture?: ReadingLensCapture | null;
+  clipboardImageFailed?: boolean;
+  /** `cursor`: read around this screen point instead of the pointer (the wheel's centre). */
+  at?: { x: number; y: number };
+}
+
+function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): void {
   const repeat = repeatTargetOf(requestedMode);
   // A repeat with nothing replayable is an ordinary selection, decided here so
   // the renderer never receives a `repeat` init it cannot honour.
@@ -285,16 +352,22 @@ function openLens(requestedMode: LensOpenMode): void {
     ? screen.getAllDisplays().find((d) => d.id === repeat.display.id) ?? displayUnderCursor()
     : displayUnderCursor();
   lensDisplayId = display.id;
+  openedMode = mode;
   const bounds = display.bounds;
   let capture: ReadingLensCapture | null = null;
   if (mode === 'clipboard') {
-    try {
-      capture = createReadingLensClipboardCapture(clipboard.readText());
-    } catch {
-      // Clipboard access is explicit but can still be denied by the OS. The
-      // renderer receives an empty clipboard state rather than losing the Lens.
+    if (extras.capture !== undefined) {
+      capture = extras.capture;
+    } else {
+      try {
+        capture = createReadingLensClipboardCapture(clipboard.readText(), Date.now(), getMainStudyLang());
+      } catch {
+        // Clipboard access is explicit but can still be denied by the OS. The
+        // renderer receives an empty clipboard state rather than losing the Lens.
+      }
     }
   }
+  const cursor = mode === 'cursor' ? cursorRegion(extras.at ?? screen.getCursorScreenPoint(), bounds) : null;
   pendingInit = {
     bounds,
     mode,
@@ -304,6 +377,10 @@ function openLens(requestedMode: LensOpenMode): void {
     // through the same guard costs nothing and closes that path.
     defaultEngine: normalizeReadingLensEngine(settings.defaultEngine),
     ...(capture ? { capture } : {}),
+    ...(extras.clipboardImageFailed ? { clipboardImageFailed: true } : {}),
+    ...(cursor ? { region: cursor.region, point: cursor.point } : {}),
+    ...(extras.source?.title ? { sourceTitle: extras.source.title } : {}),
+    ...(extras.source?.process ? { sourceApp: extras.source.process } : {}),
     ...(repeat
       ? {
         region: {
@@ -380,61 +457,101 @@ function closeLens(): void {
 
 // ---- Activation ---------------------------------------------------------
 
-function trigger(): void {
+/** Open from a hotkey: note the app in front first, so a mined card can name it. */
+async function openFromHotkey(
+  mode: LensOpenMode,
+  source?: ForegroundInfo | null,
+  at?: { x: number; y: number },
+): Promise<void> {
+  const from = source === undefined ? await quickForegroundInfo() : source;
+  openLens(mode, { source: from, ...(at ? { at } : {}) });
+}
+
+function trigger(source?: ForegroundInfo | null): Promise<void> {
   const now = Date.now();
   const isDoubleTap = now - lastTriggerAt < DOUBLE_TAP_MS;
   lastTriggerAt = now;
-  openLens(isDoubleTap ? 'auto' : 'select');
+  return openFromHotkey(isDoubleTap ? 'auto' : 'select', source);
 }
 
-// ---- Global shortcut ----------------------------------------------------
-
-function toAccelerator(chord: string): string {
-  return (chord.split('|')[0] ?? '').trim().replace(/\bMeta\b/g, 'Super');
-}
-
-function unregisterShortcut(): void {
-  if (currentAccelerator) {
-    try {
-      globalShortcut.unregister(currentAccelerator);
-    } catch {
-      /* already gone */
-    }
-    currentAccelerator = null;
-  }
-}
-
-function registerShortcut(): { ok: boolean; error?: string } {
-  unregisterShortcut();
-  const accelerator = toAccelerator(settings.hotkey);
-  if (!/(Ctrl|Alt|Shift|Super|CmdOrCtrl)\+/i.test(accelerator)) {
-    return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
-  }
+/**
+ * Read the clipboard: text as before, and now a picture too (a Win+Shift+S
+ * snip, a copied manga panel) — OCR'd in the study language and shown as a
+ * passage, like copied text.
+ */
+async function openClipboard(source?: ForegroundInfo | null): Promise<void> {
+  const from = source === undefined ? await quickForegroundInfo() : source;
+  let text = '';
   try {
-    const ok = globalShortcut.register(accelerator, () => trigger());
-    if (!ok) return { ok: false, error: `"${accelerator}" is already in use by another application.` };
-    currentAccelerator = accelerator;
-    return { ok: true };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : 'Could not register the global shortcut.',
-    };
+    text = clipboard.readText();
+  } catch {
+    text = '';
   }
+  if (text.trim()) {
+    openLens('clipboard', { source: from });
+    return;
+  }
+  let image: Electron.NativeImage | null = null;
+  try {
+    image = clipboard.readImage();
+  } catch {
+    image = null;
+  }
+  if (!image || image.isEmpty()) {
+    openLens('clipboard', { source: from, capture: null });
+    return;
+  }
+  const read = await ocrClipboardImage(image);
+  const capture = read.ok && read.text.trim()
+    ? createReadingLensClipboardCapture(read.text, Date.now(), read.lang || getMainStudyLang(), {
+      engine: read.engine,
+      screenshotDataUrl: read.screenshotDataUrl,
+    })
+    : null;
+  openLens('clipboard', { source: from, capture, clipboardImageFailed: !capture });
+}
+
+/** Everything a companion surface can ask the Lens to do. */
+export function openReadingLens(
+  mode: LensOpenMode,
+  source?: ForegroundInfo | null,
+  at?: { x: number; y: number },
+): Promise<void> {
+  if (!settings.enabled) return Promise.resolve();
+  if (mode === 'clipboard') return openClipboard(source);
+  if (mode === 'select') return trigger(source);
+  return openFromHotkey(mode, source, at);
+}
+
+// ---- Global commands ----------------------------------------------------
+
+function ensureCommands(): void {
+  if (commandsRegistered) return;
+  commandsRegistered = true;
+  ensureSettings();
+  const available = (): boolean => started && settings.enabled;
+  registerGlobalCommand('lens.region', () => trigger(), {
+    available,
+    legacyKeys: () => settings.hotkey,
+  });
+  registerGlobalCommand('lens.auto', () => openFromHotkey('auto'), { available });
+  registerGlobalCommand('lens.repeat', () => openFromHotkey('repeat'), { available });
+  registerGlobalCommand('lens.clipboard', () => openClipboard(), { available });
+  registerGlobalCommand('lens.atCursor', () => openFromHotkey('cursor'), { available });
 }
 
 function applyEnabledState(): { ok: boolean; error?: string } {
-  if (settings.enabled) return registerShortcut();
-  unregisterShortcut();
-  closeLens();
-  return { ok: true };
+  refreshGlobalCommands();
+  if (!settings.enabled) closeLens();
+  return settings.enabled ? legacyChordResult(getGlobalCommandStatus('lens.region')) : { ok: true };
 }
 
 function getStatus(): ReadingLensStatus {
   return {
     ...settings,
+    hotkey: getGlobalCommandChord('lens.region'),
     supported: process.platform === 'win32',
-    registered: currentAccelerator !== null,
+    registered: getGlobalCommandStatus('lens.region')?.registered === true,
     open: !!(lens && !lens.isDestroyed() && lens.isVisible()),
     // Not `!!settings.lastRegion`: a region on a monitor that has since been
     // unplugged is stored but not replayable, and a Repeat control that is
@@ -454,6 +571,9 @@ function broadcastSettings(): void {
 
 export function startReadingLens(): void {
   settings = loadSettings();
+  settingsLoaded = true;
+  started = true;
+  ensureCommands();
   const res = applyEnabledState();
   if (settings.enabled && !res.ok) {
     // A busy accelerator is a normal outcome — surface it so it is diagnosable
@@ -464,12 +584,14 @@ export function startReadingLens(): void {
 }
 
 export function stopReadingLens(): void {
-  unregisterShortcut();
+  started = false;
+  refreshGlobalCommands();
   if (lens && !lens.isDestroyed()) lens.destroy();
   lens = null;
 }
 
 export function registerReadingLensIpc(): void {
+  ensureCommands();
   ipcMain.handle('lens:getSettings', (): ReadingLensStatus => getStatus());
 
   ipcMain.handle('lens:setEnabled', (_e, on: unknown): ReadingLensStatus => {
@@ -487,7 +609,7 @@ export function registerReadingLensIpc(): void {
       if (!next) return { ok: false, error: 'Enter a shortcut.', status: getStatus() };
       settings.hotkey = next;
       saveSettings();
-      const res = applyEnabledState();
+      const res = legacyChordResult(setGlobalCommandChord('lens.region', next));
       broadcastSettings();
       return { ...res, status: getStatus() };
     },
@@ -515,10 +637,12 @@ export function registerReadingLensIpc(): void {
   });
 
   // Programmatic open (Settings button / testing) mirrors the hotkey path.
-  ipcMain.handle('lens:open', (_e, mode: unknown): void => {
-    openLens(
-      mode === 'auto' || mode === 'clipboard' || mode === 'repeat' ? mode : 'select',
-    );
+  ipcMain.handle('lens:open', async (_e, mode: unknown): Promise<void> => {
+    // Clipboard goes through the hotkey's own reader, so a copied picture is
+    // OCR'd here too (openLens alone only reads clipboard text). No source
+    // window: the caller is Gum's own UI, not the app the text came from.
+    if (mode === 'clipboard') return openClipboard(null);
+    openLens(mode === 'auto' || mode === 'repeat' || mode === 'cursor' ? mode : 'select');
   });
 
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);
@@ -540,7 +664,9 @@ export function registerReadingLensIpc(): void {
     // drift from what was actually captured. Recorded before the OCR runs — a
     // region that returns no text is still the region the user chose, and a
     // repeat of it is exactly what a VN or manga reader wants next.
-    const remembered = normalizeLensRegionMemory({ ...rect, displayId: lensDisplayId });
+    // A `cursor` read is a glance at one word, not the box the user drew: it
+    // must not replace the region "repeat" replays.
+    const remembered = openedMode === 'cursor' ? null : normalizeLensRegionMemory({ ...rect, displayId: lensDisplayId });
     if (remembered && JSON.stringify(remembered) !== JSON.stringify(settings.lastRegion)) {
       settings = { ...settings, lastRegion: remembered };
       saveSettings();
@@ -602,8 +728,7 @@ export function registerReadingLensIpc(): void {
 
 export const __readingLensTestables = {
   loadSettings,
-  toAccelerator,
   statePath,
   DEFAULTS,
-  currentAccelerator: (): string | null => currentAccelerator,
+  cursorRegion,
 };

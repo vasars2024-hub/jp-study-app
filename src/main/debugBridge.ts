@@ -1053,8 +1053,12 @@ async function handle(
           await cdp('Input.dispatchKeyEvent', event as unknown as Record<string, unknown>);
         }
       } else {
-        win.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers });
-        win.webContents.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers });
+        // sendInputEvent takes Electron's modifier names only; anything else is dropped.
+        const inputModifiers = modifiers.filter((m): m is NonNullable<Electron.KeyboardInputEvent['modifiers']>[number] =>
+          ['shift', 'control', 'ctrl', 'alt', 'meta', 'command', 'cmd', 'iskeypad', 'isautorepeat', 'leftbuttondown',
+            'middlebuttondown', 'rightbuttondown', 'capslock', 'numlock', 'left', 'right'].includes(m));
+        win.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers: inputModifiers });
+        win.webContents.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers: inputModifiers });
       }
       const after = await readInputWitness(win);
       const receipt = summariseDelivery(before, after, 'key', 1, cdp ? 'cdp' : 'sendInputEvent');

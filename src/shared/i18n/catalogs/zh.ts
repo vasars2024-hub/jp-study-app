@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_ZH } from '../scraperDrawerUi/zh';
 import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 import { SHELL_UI_ZH } from '../shellUi/zh';
 import { COMMANDS_UI_ZH } from '../commandsUi/zh';
+import { COMPANION_UI_ZH } from '../companionUi/zh';
 import { MUSIC_UI_ZH } from '../musicUi/zh';
 import { RESOURCES_CATALOG_ZH } from '../resourcesCatalog/zh';
 import { RESOURCE_BUNDLES_ZH } from '../resourceBundles/zh';
@@ -697,6 +698,7 @@ export const zh: Catalog = {
   ...GRAMMAR_TAXONOMY_ZH,
   ...SHELL_UI_ZH,
   ...COMMANDS_UI_ZH,
+  ...COMPANION_UI_ZH,
   ...MUSIC_UI_ZH,
   ...RESOURCES_CATALOG_ZH,
   ...RESOURCE_BUNDLES_ZH,
@@ -3503,6 +3505,7 @@ export const zh: Catalog = {
   'commands.category.music': '音乐',
   'commands.category.video': '视频',
   'commands.category.toolbox': '工具箱',
+  'commands.category.companion': '伴侣',
   'commands.category.utility': '实用工具',
   'commands.category.custom': '自定义',
 
@@ -3761,8 +3764,6 @@ export const zh: Catalog = {
   'settings.sysDict.desc': '使用全局快捷键在任意 Windows 应用中查询选中的文本。',
   'settings.sysDict.enable': '启用系统级弹出词典',
   'settings.sysDict.hotkeyLabel': '全局快捷键',
-  'settings.sysDict.change': '更改',
-  'settings.sysDict.capturing': '请按下按键…',
   'settings.sysDict.hint':
     '在任意应用中选中文本，然后按下快捷键——即使此窗口已最小化，词典也会浮动显示在最前。也可从托盘图标使用。',
   'settings.sysDict.unsupported': '选中文本的抓取在 Windows 上有效；在其他系统上则查询剪贴板中的内容。',
@@ -3772,7 +3773,8 @@ export const zh: Catalog = {
   'lens.select.hint': '拖动框选日语文本',
   'lens.select.sub': '按 A 读取整个屏幕 · 按 Esc 取消',
   'lens.select.clipboard': '读取剪贴板',
-  'lens.clipboard.empty': '剪贴板中没有可读取的文本。',
+  'lens.clipboard.empty': '剪贴板中没有可读取的文本或图片。',
+  'lens.clipboard.imageFailed': '无法读取复制的图片。请确认已安装你学习语言的 OCR 模型。',
   'lens.scanning': '读取中…',
   'lens.empty.title': '这里没有找到日语',
   'lens.empty.hint': '请缩小框选范围，或切换到漫画模式。',
@@ -3840,7 +3842,9 @@ export const zh: Catalog = {
   'lens.reader.mineDup': '已在 Anki 中',
   'lens.reader.mineSaved': '已存入卡组',
   'lens.reader.mineQueued': '已保存 — 稍后加入 Anki',
+  'lens.reader.mineWaiting': 'Gum 启动后添加',
   'lens.reader.mineRetry': '重试采集',
+  'lens.reader.preview': '卡片预览…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': '扫描后的操作',
@@ -4022,11 +4026,8 @@ export const zh: Catalog = {
   'settings.lens.desc': '在任何应用中读取屏幕上的日语——框选、OCR 识别，就地查词。',
   'settings.lens.enable': '启用阅读取词镜',
   'settings.lens.hotkeyLabel': '全局快捷键',
-  'settings.lens.change': '更改',
-  'settings.lens.capturing': '请按键…',
   'settings.lens.hint':
     '按下快捷键，在任意应用（游戏、漫画、PDF 或视频）中框选日语文本。双击快捷键可读取整个屏幕。它会浮在一切之上，即使全屏也不例外。',
-  'settings.lens.busy': '该快捷键已被其他应用占用——请另选一个。',
   'settings.lens.unsupported': '取词镜的屏幕捕获在 Windows 上可用。',
   'settings.lens.openNow': '立即打开取词镜',
   'settings.lens.repeatRegion': '重复上次区域',

@@ -1303,6 +1303,23 @@ const api = {
     ipcRenderer.invoke('app:setToggleShortcut', chord),
   appSetRestartShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('app:setRestartShortcut', chord),
+  /** The one OS-wide hotkey registry (main/globalCommands.ts): push, list, run. */
+  globalCommandsSync: (
+    chords: Record<string, string>,
+  ): Promise<import('./shared/globalCommands').GlobalCommandStatus[]> =>
+    ipcRenderer.invoke('globalCommands:sync', chords),
+  globalCommandsList: (): Promise<import('./shared/globalCommands').GlobalCommandStatus[]> =>
+    ipcRenderer.invoke('globalCommands:list'),
+  globalCommandsRun: (id: string): Promise<boolean> => ipcRenderer.invoke('globalCommands:run', id),
+  globalCommandsLegacyChords: (): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('globalCommands:legacyChords'),
+  onGlobalCommandsChanged: (
+    cb: (list: import('./shared/globalCommands').GlobalCommandStatus[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, list: import('./shared/globalCommands').GlobalCommandStatus[]): void => cb(list);
+    ipcRenderer.on('globalCommands:changed', handler);
+    return () => ipcRenderer.removeListener('globalCommands:changed', handler);
+  },
   osHotkeyStatus: (): Promise<{
     supported: boolean;
     installed: boolean;
@@ -3159,6 +3176,69 @@ const api = {
     return () => ipcRenderer.removeListener('sysdict:settings-changed', handler);
   },
 
+  /** Presentation hints for the query just pushed (translate mode, source window). */
+  sysDictGetContext: (): Promise<{ mode: 'auto' | 'translate'; sourceTitle?: string; sourceApp?: string }> =>
+    ipcRenderer.invoke('sysdict:getContext'),
+
+  // Desktop companion (main/companion.ts): radial wheel, card preview, notices,
+  // and the main window's side of a forwarded mine.
+  companionGetWheel: (): Promise<import('./shared/companion').CompanionWheelInit | null> => ipcRenderer.invoke('companion:getWheel'),
+  onCompanionWheel: (cb: (init: import('./shared/companion').CompanionWheelInit | null) => void): (() => void) => {
+    const handler = (_e: unknown, init: import('./shared/companion').CompanionWheelInit | null): void => cb(init);
+    ipcRenderer.on('companion:wheel', handler);
+    return () => ipcRenderer.removeListener('companion:wheel', handler);
+  },
+  companionWheelRun: (id: import('./shared/companion').CompanionWheelActionId): Promise<boolean> =>
+    ipcRenderer.invoke('companion:wheelRun', id),
+  companionWheelClose: (): Promise<void> => ipcRenderer.invoke('companion:wheelClose'),
+  companionGetPreview: (): Promise<import('./shared/companion').CompanionDraft | null> => ipcRenderer.invoke('companion:getPreview'),
+  onCompanionPreview: (cb: (draft: import('./shared/companion').CompanionDraft | null) => void): (() => void) => {
+    const handler = (_e: unknown, draft: import('./shared/companion').CompanionDraft | null): void => cb(draft);
+    ipcRenderer.on('companion:preview', handler);
+    return () => ipcRenderer.removeListener('companion:preview', handler);
+  },
+  companionOpenPreview: (draft: Partial<import('./shared/companion').CompanionDraft>): Promise<boolean> =>
+    ipcRenderer.invoke('companion:openPreview', draft),
+  companionPreviewClose: (): Promise<void> => ipcRenderer.invoke('companion:previewClose'),
+  /** Remember a lookup made in an overlay (the Lens word panel) for "Mine the last lookup". */
+  companionNoteLookup: (entry: { text: string; sentence?: string; sourceTitle?: string; sourceApp?: string }): Promise<void> =>
+    ipcRenderer.invoke('companion:noteLookup', entry),
+  companionMine: (request: import('./shared/companion').CompanionMineRequest): Promise<import('./shared/companion').CompanionMineOutcome> =>
+    ipcRenderer.invoke('companion:mine', request),
+  companionGetNotice: (): Promise<{ messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null> =>
+    ipcRenderer.invoke('companion:getNotice'),
+  onCompanionNotice: (
+    cb: (notice: { messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      notice: { messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null,
+    ): void => cb(notice);
+    ipcRenderer.on('companion:notice', handler);
+    return () => ipcRenderer.removeListener('companion:notice', handler);
+  },
+  /** Main window: listening for forwarded mines; main re-sends anything unanswered. */
+  companionReady: (): Promise<void> => ipcRenderer.invoke('companion:ready'),
+  onCompanionMine: (
+    cb: (payload: { requestId: string; request: import('./shared/companion').CompanionMineRequest }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { requestId: string; request: import('./shared/companion').CompanionMineRequest }): void => cb(payload);
+    ipcRenderer.on('companion:mine', handler);
+    return () => ipcRenderer.removeListener('companion:mine', handler);
+  },
+  companionMineResult: (requestId: string, outcome: import('./shared/companion').CompanionMineOutcome): Promise<void> =>
+    ipcRenderer.invoke('companion:mineResult', requestId, outcome),
+  onCompanionRunInRenderer: (cb: (command: string) => void): (() => void) => {
+    const handler = (_e: unknown, command: string): void => cb(command);
+    ipcRenderer.on('companion:runInRenderer', handler);
+    return () => ipcRenderer.removeListener('companion:runInRenderer', handler);
+  },
+  onCompanionOpenShortcuts: (cb: (category: string) => void): (() => void) => {
+    const handler = (_e: unknown, category: string): void => cb(category);
+    ipcRenderer.on('companion:openShortcuts', handler);
+    return () => ipcRenderer.removeListener('companion:openShortcuts', handler);
+  },
+
   // Reading Lens — OS-wide screen-region OCR reader (global hotkey + overlay).
   lensGetSettings: (): Promise<ReadingLensStatus> => ipcRenderer.invoke('lens:getSettings'),
   lensSetEnabled: (enabled: boolean): Promise<ReadingLensStatus> =>
@@ -3429,9 +3509,6 @@ const api = {
     ipcRenderer.invoke('captions:startWindowsLiveCaptions'),
   captionsOpenSettings: (page?: 'transcription' | 'shortcuts'): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('captions:openSettings', page),
-  captionsSetGlobalShortcuts: (
-    chords: Record<string, string>,
-  ): Promise<{ ok: boolean; errors: Record<string, string> }> => ipcRenderer.invoke('captions:setGlobalShortcuts', chords),
   captionsOverlaySetIgnoreMouse: (ignore: boolean): void => ipcRenderer.send('captions:overlaySetIgnoreMouse', ignore),
   captionsOverlayGetBounds: (): Promise<import('./shared/captionsOverlay').OverlayBounds> =>
     ipcRenderer.invoke('captions:overlayGetBounds'),

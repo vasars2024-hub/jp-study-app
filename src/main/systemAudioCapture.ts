@@ -53,7 +53,7 @@ import {
   releaseLiveCaptionsForOverlay,
   startLiveCaptionsCapture,
 } from './liveCaptions';
-import { bindCaptionsGlobalCommand, registerCaptionsGlobalShortcutIpc } from './captionsGlobalCommands';
+import { registerGlobalCommand } from './globalCommands';
 import {
   CAPTIONS_CHANNELS as CH,
   DEFAULT_CAPTIONS_SETTINGS,
@@ -1002,18 +1002,17 @@ export function configureSystemAudioCapture(options: CaptureDeps): void {
 export function registerSystemAudioCaptureIpc(): void {
   loadSettings();
   installDisplayMediaHandler();
-  registerCaptionsGlobalShortcutIpc();
 
-  // The one place the captions commands are bound to global shortcuts (switch
-  // this call to `registerGlobalCommand` when the shared registry lands).
-  for (const [id, run] of [
-    ['captions.mineRecent', () => void mineRecent()],
-    ['captions.toggleRecording', () => void toggleRecording()],
-    ['captions.toggleOverlay', () => void toggleOverlay()],
-    ['captions.mineLine', () => void mineCurrentLine()],
-    ['captions.toggleCapture', () => void setCaptureEnabled(capture !== 'on')],
+  // The captions commands join the shared global-command registry (main/globalCommands.ts);
+  // the renderer's Shortcuts rows push the user's chords, these are the defaults.
+  for (const [id, run, defaultKeys] of [
+    ['captions.mineRecent', () => void mineRecent(), 'Ctrl+Alt+Shift+M'],
+    ['captions.toggleRecording', () => void toggleRecording(), 'Ctrl+Alt+Shift+K'],
+    ['captions.toggleOverlay', () => void toggleOverlay(), 'Ctrl+Alt+Shift+C'],
+    ['captions.mineLine', () => void mineCurrentLine(), 'Ctrl+Alt+Shift+L'],
+    ['captions.toggleCapture', () => void setCaptureEnabled(capture !== 'on'), ''],
   ] as const) {
-    bindCaptionsGlobalCommand(id, run);
+    registerGlobalCommand(id, run, { defaultKeys });
   }
 
   ipcMain.handle(CH.getState, () => getCaptionsState());

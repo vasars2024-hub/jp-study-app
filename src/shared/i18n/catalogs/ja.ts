@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_JA } from '../scraperDrawerUi/ja';
 import { ANIME_SCHEDULE_JA } from '../animeSchedule/ja';
 import { SHELL_UI_JA } from '../shellUi/ja';
 import { COMMANDS_UI_JA } from '../commandsUi/ja';
+import { COMPANION_UI_JA } from '../companionUi/ja';
 import { MUSIC_UI_JA } from '../musicUi/ja';
 import { RESOURCES_CATALOG_JA } from '../resourcesCatalog/ja';
 import { RESOURCE_BUNDLES_JA } from '../resourceBundles/ja';
@@ -699,6 +700,7 @@ export const ja: Catalog = {
   ...GRAMMAR_TAXONOMY_JA,
   ...SHELL_UI_JA,
   ...COMMANDS_UI_JA,
+  ...COMPANION_UI_JA,
   ...MUSIC_UI_JA,
   ...RESOURCES_CATALOG_JA,
   ...RESOURCE_BUNDLES_JA,
@@ -3519,6 +3521,7 @@ export const ja: Catalog = {
   'commands.category.music': '音楽',
   'commands.category.video': '動画',
   'commands.category.toolbox': 'ツールボックス',
+  'commands.category.companion': 'コンパニオン',
   'commands.category.utility': 'ユーティリティ',
   'commands.category.custom': 'カスタム',
 
@@ -3777,8 +3780,6 @@ export const ja: Catalog = {
   'settings.sysDict.desc': 'グローバルショートカットで、あらゆるWindowsアプリの選択テキストを調べます。',
   'settings.sysDict.enable': 'システム全体のポップアップ辞書を有効にする',
   'settings.sysDict.hotkeyLabel': 'グローバルショートカット',
-  'settings.sysDict.change': '変更',
-  'settings.sysDict.capturing': 'キーを押してください…',
   'settings.sysDict.hint':
     '任意のアプリでテキストを選択し、ショートカットを押すと、このウィンドウを最小化していても辞書が最前面に表示されます。トレイアイコンからも利用できます。',
   'settings.sysDict.unsupported':
@@ -3789,7 +3790,8 @@ export const ja: Catalog = {
   'lens.select.hint': '日本語をドラッグして囲む',
   'lens.select.sub': 'A キーで画面全体を読み取り · Esc でキャンセル',
   'lens.select.clipboard': 'クリップボードを読む',
-  'lens.clipboard.empty': 'クリップボードに読み取れるテキストがありません。',
+  'lens.clipboard.empty': 'クリップボードに読み取れるテキストや画像がありません。',
+  'lens.clipboard.imageFailed': 'コピーした画像を読み取れませんでした。学習言語の OCR モデルがインストールされているか確認してください。',
   'lens.scanning': '読み取り中…',
   'lens.empty.title': 'ここに日本語が見つかりません',
   'lens.empty.hint': '範囲を狭めるか、マンガモードに切り替えてください。',
@@ -3857,7 +3859,9 @@ export const ja: Catalog = {
   'lens.reader.mineDup': 'Anki に登録済み',
   'lens.reader.mineSaved': 'デッキに保存済み',
   'lens.reader.mineQueued': '保存済み — 後で Anki へ',
+  'lens.reader.mineWaiting': 'Gum の起動後に追加',
   'lens.reader.mineRetry': '再試行',
+  'lens.reader.preview': 'カードプレビュー…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': 'スキャン後の動作',
@@ -4042,11 +4046,8 @@ export const ja: Catalog = {
   'settings.lens.desc': 'どのアプリでも画面上の日本語を読み取り — 範囲を囲み、OCRして、その場で単語を調べます。',
   'settings.lens.enable': 'リーディングレンズを有効にする',
   'settings.lens.hotkeyLabel': 'グローバルホットキー',
-  'settings.lens.change': '変更',
-  'settings.lens.capturing': 'キーを押してください…',
   'settings.lens.hint':
     'ホットキーを押して、ゲーム・マンガ・PDF・動画など任意のアプリの日本語を囲みます。ホットキーを二回押すと画面全体を読み取ります。全画面表示の上にも重なって表示されます。',
-  'settings.lens.busy': 'そのショートカットは他のアプリが使用中です。別のものを選んでください。',
   'settings.lens.unsupported': 'レンズの画面キャプチャは Windows で利用できます。',
   'settings.lens.openNow': '今すぐレンズを開く',
   'settings.lens.repeatRegion': '前回の範囲を再取得',

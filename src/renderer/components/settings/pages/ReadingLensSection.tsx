@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
 import { confirmDialog, Select, Toggle } from '../../ui';
+import GlobalChordRow from '../GlobalChordRow';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
 import type { ReadingLensSource } from '../../../../shared/readingLens';
@@ -44,20 +45,6 @@ const SOURCE_LABEL_KEYS: Record<ReadingLensSource, string> = {
   image: 'settings.lens.history.source.image',
   text: 'settings.lens.history.source.text',
 };
-
-/** Build an accelerator chord ("Ctrl+Shift+D") from a captured keydown. */
-function chordFromEvent(e: KeyboardEvent): string | null {
-  const mods: string[] = [];
-  if (e.ctrlKey) mods.push('Ctrl');
-  if (e.altKey) mods.push('Alt');
-  if (e.shiftKey) mods.push('Shift');
-  if (e.metaKey) mods.push('Meta');
-  const key = e.key;
-  if (key === 'Control' || key === 'Alt' || key === 'Shift' || key === 'Meta') return null;
-  if (!mods.length) return null; // a global shortcut needs a modifier
-  const main = key.length === 1 ? key.toUpperCase() : key;
-  return [...mods, main].join('+');
-}
 
 /**
  * Every capture the Lens has read, searchable.
@@ -390,14 +377,13 @@ function LensRecognition({
 
 /**
  * Study → Reading Lens. Toggles the OS-wide screen-region OCR reader
- * (main/readingLens.ts), lets the user rebind its accelerator, and opens it on
- * demand. Mirrors SystemDictionarySection; the two are independent features.
+ * (main/readingLens.ts), shows its chords (rebound in Settings → Shortcuts;
+ * a chord Windows refused is reported on its row) and opens it on demand.
+ * Mirrors SystemDictionarySection; the two are independent features.
  */
 export default function ReadingLensSection() {
   const { t } = useT();
   const [status, setStatus] = useState<ReadingLensStatus>(DEFAULT_STATUS);
-  const [capturing, setCapturing] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -414,13 +400,6 @@ export default function ReadingLensSection() {
     };
   }, []);
 
-  // A hotkey that reports enabled-but-not-registered was rejected by the OS
-  // (another app holds it) — surface that so the user knows to rebind.
-  useEffect(() => {
-    if (status.enabled && status.supported && !status.registered) setError(t('settings.lens.busy'));
-    else setError('');
-  }, [status.enabled, status.supported, status.registered, t]);
-
   const toggle = useCallback(async (on: boolean) => {
     const next = await window.api.lensSetEnabled(on);
     setStatus(next);
@@ -433,26 +412,6 @@ export default function ReadingLensSection() {
     setStatus(await window.api.lensSetDefaultEngine(engine));
   }, []);
 
-  useEffect(() => {
-    if (!capturing) return;
-    const onKey = async (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === 'Escape') {
-        setCapturing(false);
-        return;
-      }
-      const chord = chordFromEvent(e);
-      if (!chord) return;
-      setCapturing(false);
-      const res = await window.api.lensSetHotkey(chord);
-      setStatus(res.status);
-      if (!res.ok) setError(res.error || t('settings.lens.busy'));
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [capturing, t]);
-
   return (
     <>
       <Toggle
@@ -463,23 +422,16 @@ export default function ReadingLensSection() {
         label={status.enabled ? t('common.on') : t('common.off')}
       />
 
-      <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 8 }}>
-        <span className="muted">{t('settings.lens.hotkeyLabel')}</span>
-        <kbd className="sc-keys">{capturing ? t('settings.lens.capturing') : status.hotkey}</kbd>
-        <button
-          type="button"
-          className="btn small"
-          disabled={capturing}
-          onClick={() => {
-            setError('');
-            setCapturing(true);
-          }}
-        >
-          {t('settings.lens.change')}
-        </button>
-      </div>
+      {/*
+        The chords are rebound in Settings → Shortcuts with every other
+        system-wide command (one list, one conflict check); shown here so the
+        page still says how to open what it configures.
+      */}
+      <GlobalChordRow commandId="lens.region" label={t('settings.lens.hotkeyLabel')} />
+      <GlobalChordRow commandId="lens.atCursor" label={t('cmd.lens.atCursor')} />
+      <GlobalChordRow commandId="lens.repeat" label={t('cmd.lens.repeat')} />
+      <GlobalChordRow commandId="lens.clipboard" label={t('cmd.lens.clipboard')} />
 
-      {error && <p className="dict-add-err">{error}</p>}
 
       <p className="muted os-set-hint">{t('settings.lens.hint')}</p>
       {!status.supported && <p className="muted os-set-hint">{t('settings.lens.unsupported')}</p>}

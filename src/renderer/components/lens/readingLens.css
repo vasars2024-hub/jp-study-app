@@ -664,6 +664,24 @@
 .lens-reader-mine.done {
   background: rgba(255, 255, 255, 0.12);
 }
+/* Card preview: the same card, editable first, with the region's picture. */
+.lens-reader-preview {
+  margin-top: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--lens-ink);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: background 0.1s ease, opacity 0.1s ease;
+}
+.lens-reader-preview:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
 
 /* Deep — the source line as a walkable chip strip */
 .lens-reader-sentence {

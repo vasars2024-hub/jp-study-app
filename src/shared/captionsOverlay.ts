@@ -524,7 +524,6 @@ export const CAPTIONS_CHANNELS = {
   overlayGetBounds: 'captions:overlayGetBounds',
   openSettings: 'captions:openSettings',
   openSettingsInMain: 'captions:open-settings',
-  setGlobalShortcuts: 'captions:setGlobalShortcuts',
   mineRequest: 'captions:mine-request',
   mineReply: 'captions:mine-reply',
   // capture window <-> main

@@ -7,7 +7,7 @@ import { lemmaOf, type JpToken } from '../../tokenizer';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../../tts';
 import { getStudyLang } from '../../studyEnvironment';
 import type { DictEntry, DictResult } from '../../../shared/types';
-import { mineToStudy, requestStudyInput } from '../../studyMining';
+import { newDraftId, type CompanionDraft, type CompanionMineOutcome } from '../../../shared/companion';
 
 /**
  * The Reading Lens' progressive word panel.
@@ -35,7 +35,25 @@ const TIERS: Tier[] = ['glance', 'expand', 'deep'];
 const TIER_KEY = 'jp-study-lens-tier';
 const PANEL_W = 340;
 
-type MineState = 'idle' | 'adding' | 'added' | 'dup' | 'saved' | 'queued' | 'error';
+type MineState = 'idle' | 'adding' | 'added' | 'dup' | 'saved' | 'queued' | 'waiting' | 'error';
+
+/** What the main window answered for a forwarded Lens mine, as the button's state. */
+function lensMineState(outcome: CompanionMineOutcome): MineState {
+  if (outcome.status === 'failed') return 'error';
+  if (outcome.status === 'waiting') return 'waiting';
+  switch (outcome.anki) {
+    case 'added':
+      return 'added';
+    case 'duplicate':
+      return 'dup';
+    case 'queued':
+      return 'queued';
+    case 'failed':
+      return 'error';
+    default:
+      return 'saved';
+  }
+}
 
 interface Props {
   /** The clicked word's surface. */
@@ -48,6 +66,11 @@ interface Props {
   x: number;
   y: number;
   onClose: () => void;
+  /** The scanned region's picture — attached to a mined card as its image. */
+  screenshotDataUrl?: string;
+  /** The window the Lens was opened over — a mined card's source. */
+  sourceTitle?: string;
+  sourceApp?: string;
 }
 
 function loadTier(): Tier {
@@ -73,7 +96,17 @@ function glanceGloss(entry: DictEntry): string {
     .join(' / ');
 }
 
-export default function LensReaderPanel({ query, context, tokens, x, y, onClose }: Props) {
+export default function LensReaderPanel({
+  query,
+  context,
+  tokens,
+  x,
+  y,
+  onClose,
+  screenshotDataUrl,
+  sourceTitle,
+  sourceApp,
+}: Props) {
   const { t } = useT();
   const lang = getStudyLang() as DictLang;
   const [tier, setTier] = useState<Tier>(loadTier);
@@ -82,6 +115,16 @@ export default function LensReaderPanel({ query, context, tokens, x, y, onClose 
   // overlay reopening it; a fresh word clicked in the overlay resets it via props.
   const [target, setTarget] = useState({ query, context });
   useEffect(() => setTarget({ query, context }), [query, context]);
+  // "Mine the last lookup" (a global hotkey) mines whatever was opened here last.
+  useEffect(() => {
+    if (!target.query.trim()) return;
+    void window.api.companionNoteLookup?.({
+      text: target.query,
+      ...(target.context.trim() ? { sentence: target.context.trim() } : {}),
+      ...(sourceTitle ? { sourceTitle } : {}),
+      ...(sourceApp ? { sourceApp } : {}),
+    }).catch(() => undefined);
+  }, [target.query, target.context, sourceTitle, sourceApp]);
 
   const pickTier = useCallback((next: Tier) => {
     setTier(next);
@@ -161,6 +204,9 @@ export default function LensReaderPanel({ query, context, tokens, x, y, onClose 
           context={target.context}
           lang={lang}
           onNeedAnki={() => pickTier('expand')}
+          screenshotDataUrl={screenshotDataUrl}
+          sourceTitle={sourceTitle}
+          sourceApp={sourceApp}
         />
       ) : (
         <div className="lens-reader-body">
@@ -210,11 +256,17 @@ function GlanceBody({
   context,
   lang,
   onNeedAnki,
+  screenshotDataUrl,
+  sourceTitle,
+  sourceApp,
 }: {
   query: string;
   context: string;
   lang: DictLang;
   onNeedAnki: () => void;
+  screenshotDataUrl?: string;
+  sourceTitle?: string;
+  sourceApp?: string;
 }) {
   const { t } = useT();
   const [result, setResult] = useState<DictResult | null>(null);
@@ -226,7 +278,8 @@ function GlanceBody({
     let alive = true;
     setResult(null);
     if (!query.trim()) return;
-    window.api.lookupTerm(query).then((r) => {
+    // Chinese has its own dictionary; Japanese and Russian share lookupTerm.
+    (lang === 'zh' ? window.api.lookupChinese(query) : window.api.lookupTerm(query)).then((r) => {
       if (alive) setResult(r);
     });
     return () => {
@@ -259,26 +312,44 @@ function GlanceBody({
 
   const entry = result?.entries?.[0] ?? null;
 
+  // The card as the companion drafts it: the scanned region is its picture and
+  // the window the Lens was opened over its source — a card mined over a game
+  // or a PDF says where it came from, the way an extension card carries its page.
+  function lensDraft(found: DictEntry): CompanionDraft {
+    const gloss = glanceGloss(found);
+    return {
+      id: newDraftId(),
+      kind: 'word',
+      word: found.word,
+      ...(found.reading && found.reading !== found.word ? { reading: found.reading } : {}),
+      ...(gloss ? { meaning: gloss } : {}),
+      ...(context.trim() ? { sentence: context.trim() } : {}),
+      ...(sourceTitle ? { sourceTitle } : {}),
+      ...(sourceApp ? { sourceApp } : {}),
+      ...(screenshotDataUrl ? { imageDataUrl: screenshotDataUrl } : {}),
+      studyLang: lang,
+      origin: 'lens',
+      createdAt: Date.now(),
+    };
+  }
+
   async function mineNow() {
     if (!entry) return;
     setMine('adding');
-    // Local study card first, whatever Anki's state; the Anki half joins it now
-    // or when Anki next opens. `onNeedAnki` is kept for a setup that has never
-    // had Anki, where the card is saved to the deck only.
-    const mined = await mineToStudy(requestStudyInput({
-      route: { source: 'dictionary', cardKind: 'word' },
-      term: entry.word,
-      reading: entry.reading && entry.reading !== entry.word ? entry.reading : undefined,
-      meaning: glanceGloss(entry) || undefined,
-      sentence: context.trim() || undefined,
-    }, 'reader', { studyLang: lang }));
-    if (mined.anki === 'added') setMine('added');
-    else if (mined.anki === 'duplicate') setMine('dup');
-    else if (mined.anki === 'queued') setMine('queued');
-    else if (mined.anki === 'local') {
-      setMine('saved');
-      onNeedAnki();
-    } else setMine('error');
+    // Mined in the main window, like every companion card: the deck and the
+    // pending-Anki queue live in that window, which sees the card at once (and
+    // a closed main window is started and handed it when it is up). The local
+    // card is made whatever Anki's state; `onNeedAnki` opens Expand's setup for
+    // a profile that has never had Anki.
+    let outcome: CompanionMineOutcome;
+    try {
+      outcome = await window.api.companionMine({ draft: lensDraft(entry), attachImage: true });
+    } catch (err) {
+      outcome = { status: 'failed', error: err instanceof Error ? err.message : String(err) };
+    }
+    const next = lensMineState(outcome);
+    setMine(next);
+    if (next === 'saved') onNeedAnki();
   }
 
   const mineLabel = () => {
@@ -293,6 +364,8 @@ function GlanceBody({
         return t('lens.reader.mineSaved');
       case 'queued':
         return t('lens.reader.mineQueued');
+      case 'waiting':
+        return t('lens.reader.mineWaiting');
       case 'error':
         return t('lens.reader.mineRetry');
       default:
@@ -343,6 +416,14 @@ function GlanceBody({
               <Icon name="check" size={12} style={{ marginRight: 4, verticalAlign: '-1px' }} />
             )}
             {mineLabel()}
+          </button>
+          <button
+            type="button"
+            className="lens-reader-preview"
+            data-lens-preview
+            onClick={() => void window.api.companionOpenPreview?.(lensDraft(entry))}
+          >
+            {t('lens.reader.preview')}
           </button>
         </>
       )}

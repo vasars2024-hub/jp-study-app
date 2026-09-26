@@ -508,6 +508,53 @@ export async function ocrRegion(
   };
 }
 
+/**
+ * OCR a picture that is not on screen — the clipboard's (a Win+Shift+S snip, a
+ * copied manga panel) — in the study language, as one passage. The Lens shows
+ * it the way it shows copied text, so no line geometry is needed.
+ */
+export async function ocrClipboardImage(image: Electron.NativeImage): Promise<{
+  ok: boolean;
+  text: string;
+  engine: string;
+  lang: string;
+  screenshotDataUrl?: string;
+  error?: string;
+}> {
+  const lang = getMainStudyLang();
+  if (image.isEmpty()) return { ok: false, text: '', engine: 'none', lang, error: 'empty' };
+  if (!paddleOcrAvailable() && !(lang === 'ja' && mangaOcrAvailable())) {
+    return { ok: false, text: '', engine: 'none', lang, error: 'web-models-missing' };
+  }
+  try {
+    const engine: OcrEngineChoice = paddleOcrAvailable() ? 'auto' : 'manga';
+    const { result } = await ocrAdaptive(image, lang, engine);
+    const lines = orderReadingLensLines(
+      result.lines.map((l) => ({
+        text: l.text,
+        box: [l.box[0], l.box[1], Math.max(1, l.box[2] - l.box[0]), Math.max(1, l.box[3] - l.box[1])] as [
+          number,
+          number,
+          number,
+          number,
+        ],
+        vertical: l.vertical,
+        confidence: l.confidence,
+      })),
+    );
+    const text = lines.map((l) => l.text).join('\n').trim() || result.text.trim();
+    return {
+      ok: Boolean(text),
+      text,
+      engine: result.engine,
+      lang: result.lang || lang,
+      screenshotDataUrl: boundedScreenshotDataUrl(image),
+    };
+  } catch (err) {
+    return { ok: false, text: '', engine: 'none', lang, error: err instanceof Error ? err.message : 'ocr-failed' };
+  }
+}
+
 function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
   const size = image.getSize();
   const longest = Math.max(size.width, size.height);
