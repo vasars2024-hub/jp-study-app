@@ -250,6 +250,21 @@ describe('also sending to Anki', () => {
     expect(loadDeck().every((card) => card.ankiPending)).toBe(true);
   });
 
+  it('a cancel during the Anki pass still accounts for every card', async () => {
+    linkState = 'connected';
+    markAnkiSeen();
+    let sends = 0;
+    const done = await buildSentenceDeck(input({ sendToAnki: true }), {
+      jobId: 'a4',
+      onProgress: (p) => { if (p.phase === 'anki' && p.done >= 1) sends = p.done; },
+      isCancelled: () => sends >= 1,
+    }) as SentenceDeckDone;
+    expect(done.anki?.added).toBe(1);
+    const t = done.anki!;
+    expect(t.added + t.queued + t.duplicate + t.failed + t.local).toBe(3);
+    expect(t.local).toBe(2);
+  });
+
   it('queues the notes while Anki is closed, keeping the local cards', async () => {
     markAnkiSeen();
     const done = await buildSentenceDeck(input({ sendToAnki: true }), { jobId: 'a2' }) as SentenceDeckDone;

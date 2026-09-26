@@ -232,6 +232,10 @@ async function sendCardsToAnki(
     else tally.failed += 1;
     onProgress(i + 1);
   }
+  // Cancelled part-way: the cards not sent stay in Gum only, and the summary
+  // counts them ("not sent") instead of adding up to fewer than were made.
+  const sent = tally.added + tally.queued + tally.duplicate + tally.failed + tally.local;
+  tally.local += cards.length - sent;
   return tally;
 }
 
