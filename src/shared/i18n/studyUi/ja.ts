@@ -69,6 +69,7 @@ export const STUDY_UI_JA: Catalog = {
   'sentenceDeck.track.player': 'プレーヤーで表示中：{label}',
   'sentenceDeck.track.option': '{label}・{lang}・{kind}',
   'sentenceDeck.track.langUnknown': '言語タグなし',
+  'sentenceDeck.track.stream': '字幕ストリーム {n}',
   'sentenceDeck.kind.downloaded': 'ダウンロード済み',
   'sentenceDeck.kind.sidecar': '動画と同じフォルダーのファイル',
   'sentenceDeck.kind.embedded': '動画ファイル内',

@@ -84,6 +84,7 @@ export const STUDY_UI_RU: Catalog = {
   'sentenceDeck.track.player': 'В плеере: {label}',
   'sentenceDeck.track.option': '{label} — {lang}, {kind}',
   'sentenceDeck.track.langUnknown': 'язык не указан',
+  'sentenceDeck.track.stream': 'Поток субтитров {n}',
   'sentenceDeck.kind.downloaded': 'загружены',
   'sentenceDeck.kind.sidecar': 'файл рядом с видео',
   'sentenceDeck.kind.embedded': 'внутри видеофайла',

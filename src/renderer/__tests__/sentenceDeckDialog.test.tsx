@@ -217,6 +217,16 @@ describe('SentenceDeckDialog', () => {
     expect(document.querySelector('[data-sd-model-download]')).toBeNull();
   });
 
+  it('names an untitled stream inside the file in the UI language', async () => {
+    sources = {
+      ...sources,
+      tracks: [...sources.tracks, { id: 'embedded:1', label: '', streamNumber: 2, lang: 'zh', kind: 'embedded' }],
+    };
+    await open();
+    const options = [...document.querySelectorAll<HTMLOptionElement>('[data-sd-field="primary"] option')].map((o) => o.textContent);
+    expect(options).toContain('Subtitle stream 2 · Chinese · inside the video file');
+  });
+
   it('says why when there is no video to cut', async () => {
     sources = { ok: false, reasonKey: 'sentenceDeck.error.noVideoForSubtitle', tracks: [] };
     await open({ subtitlePath: 'E:/x/Lonely.ja.srt' });

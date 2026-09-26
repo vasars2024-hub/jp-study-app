@@ -121,10 +121,25 @@ export async function listSentenceDeckSources(
 
   const item = itemForPath(host, videoPath);
   const records = readableSubtitleRecords(item?.subtitles);
+  let containerStreams: EmbeddedSubtitleStream[] = [];
+  try {
+    containerStreams = await listEmbeddedSubtitleStreams(videoPath);
+  } catch {
+    /* An unreadable container lists no streams; the other sources still count. */
+  }
+  /** 1-based position among the file's subtitle streams, for one the file leaves untitled. */
+  const streamNumber = (streamIndex: number | undefined): number | undefined => {
+    const found = containerStreams.find((stream) => stream.streamIndex === streamIndex);
+    return found ? found.subtitleIndex + 1 : undefined;
+  };
   for (const record of records) {
+    // Discovery names an untitled stream "Stream <n>" in English; the dialog names it in the UI language.
+    const untitledStream = record.source === 'embedded' && (!record.label || /^Stream \d+$/.test(record.label));
+    const number = untitledStream ? streamNumber(record.streamIndex) : undefined;
     tracks.push({
       id: `record:${record.id}`,
-      label: record.label ?? `${record.lang} (${record.source})`,
+      label: number ? '' : record.label ?? `${record.lang} (${record.source})`,
+      ...(number ? { streamNumber: number } : {}),
       lang: record.lang ?? '',
       kind: recordKind(record),
     });
@@ -150,19 +165,17 @@ export async function listSentenceDeckSources(
   const embeddedRecords = records.filter((r) => r.source === 'embedded');
   const extracted = new Set(embeddedRecords.map((r) => r.streamIndex).filter((n): n is number => typeof n === 'number'));
   if (embeddedRecords.every((r) => typeof r.streamIndex === 'number')) {
-    try {
-      for (const stream of await listEmbeddedSubtitleStreams(videoPath)) {
-        if (extracted.has(stream.streamIndex)) continue;
-        const lang = normalizeStreamLanguage(stream.language) ?? '';
-        tracks.push({
-          id: `embedded:${stream.subtitleIndex}`,
-          label: stream.title || `${lang || stream.codec} #${stream.subtitleIndex + 1}`,
-          lang,
-          kind: 'embedded',
-        });
-      }
-    } catch {
-      /* An unreadable container lists no streams; the other sources still count. */
+    for (const stream of containerStreams) {
+      if (extracted.has(stream.streamIndex)) continue;
+      const lang = normalizeStreamLanguage(stream.language) ?? '';
+      tracks.push({
+        id: `embedded:${stream.subtitleIndex}`,
+        // An untitled stream is named by the dialog ("Subtitle stream 2"), not "zh #2".
+        label: stream.title ?? '',
+        ...(stream.title ? {} : { streamNumber: stream.subtitleIndex + 1 }),
+        lang,
+        kind: 'embedded',
+      });
     }
   }
 

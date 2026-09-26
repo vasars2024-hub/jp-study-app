@@ -204,6 +204,9 @@ describe('a container with several text streams (ASS with a sign, zh, ru)', () =
     // The Japanese stream is not listed a second time.
     expect(ids).not.toContain('embedded:0=ja');
     expect(sources.primaryId).toBe('record:e1');
+    // Untitled streams carry their position for the dialog to name, not "zh #2" or discovery's English "Stream 1".
+    expect(sources.tracks.find((t) => t.id === 'embedded:1')).toMatchObject({ label: '', streamNumber: 2 });
+    expect(sources.tracks.find((t) => t.id === 'record:e1')).toMatchObject({ label: '', streamNumber: 1 });
   }, 30_000);
 
   it('reads an ASS stream with its styles, so a sign is not taken for dialogue', async () => {

@@ -69,6 +69,7 @@ export const STUDY_UI_ZH: Catalog = {
   'sentenceDeck.track.player': '播放器中的：{label}',
   'sentenceDeck.track.option': '{label}（{lang}，{kind}）',
   'sentenceDeck.track.langUnknown': '未标注语言',
+  'sentenceDeck.track.stream': '字幕流 {n}',
   'sentenceDeck.kind.downloaded': '已下载',
   'sentenceDeck.kind.sidecar': '视频旁的文件',
   'sentenceDeck.kind.embedded': '视频文件内',

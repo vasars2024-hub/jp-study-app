@@ -74,6 +74,7 @@ export const STUDY_UI_EN: Catalog = {
   'sentenceDeck.track.player': 'In the player: {label}',
   'sentenceDeck.track.option': '{label} · {lang} · {kind}',
   'sentenceDeck.track.langUnknown': 'language not tagged',
+  'sentenceDeck.track.stream': 'Subtitle stream {n}',
   'sentenceDeck.kind.downloaded': 'downloaded',
   'sentenceDeck.kind.sidecar': 'file beside the video',
   'sentenceDeck.kind.embedded': 'inside the video file',

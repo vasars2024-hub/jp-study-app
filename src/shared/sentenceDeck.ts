@@ -38,8 +38,10 @@ import { MAX_CLIP_SEC, MIN_CLIP_SEC } from './videoClip';
  */
 export interface SentenceDeckTrack {
   id: string;
-  /** Track name as the source labels it — study content, shown as-is. */
+  /** Track name as the source labels it — study content, shown as-is. '' for an untitled stream. */
   label: string;
+  /** An untitled stream inside the file: its 1-based position, which the dialog names it by. */
+  streamNumber?: number;
   /** Normalised language tag (`ja`, `zh-hans`, `en`), or '' when unknown. */
   lang: string;
   kind: 'downloaded' | 'sidecar' | 'embedded' | 'transcript' | 'translation' | 'file';

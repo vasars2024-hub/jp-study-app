@@ -247,9 +247,12 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
     }
     for (const track of sources?.tracks ?? []) {
       const language = track.lang ? languageName(track.lang, LANG_TAGS[lang] ?? 'en') : t('sentenceDeck.track.langUnknown');
+      const name = track.label || (track.streamNumber
+        ? t('sentenceDeck.track.stream', { n: track.streamNumber })
+        : t(`sentenceDeck.kind.${track.kind}`));
       out.push({
         value: track.id,
-        label: t('sentenceDeck.track.option', { label: track.label, lang: language, kind: t(`sentenceDeck.kind.${track.kind}`) }),
+        label: t('sentenceDeck.track.option', { label: name, lang: language, kind: t(`sentenceDeck.kind.${track.kind}`) }),
       });
     }
     return out;
