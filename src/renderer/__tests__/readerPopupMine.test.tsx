@@ -97,6 +97,16 @@ describe('Mine from the reader’s dictionary popup', () => {
     expect(translateTo, 'no translator needed when the dictionary answered').not.toHaveBeenCalled();
   });
 
+  it('with no dictionary answer and no translator, the answer is left empty — not the word again', async () => {
+    // A fresh profile: the offline dictionary is still being prepared, the translator model is absent.
+    lookupTerm.mockResolvedValue({ entries: [] });
+    await mine({ word: '窓', sentence: '窓を開けた。', lookup: true });
+    const card = await savedCard('窓');
+    expect(card, 'the card is still saved').toBeTruthy();
+    expect(card?.back).toBe('');
+    expect(card?.meaning).toBe('');
+  });
+
   it('looks a Chinese book’s word up in the Chinese dictionary and translates from Chinese', async () => {
     localStorage.setItem('jp-study-lang', 'zh');
     const { setStudyLang } = await import('../studyEnvironment');

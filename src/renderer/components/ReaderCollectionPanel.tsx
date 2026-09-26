@@ -387,8 +387,11 @@ export default function ReaderCollectionPanel({
       }
 
       let front = word;
-      let back = meaning || word;
-      if (swapDefault && meaning) {
+      // No meaning found (the offline dictionary still building, no translator
+      // model): leave the answer empty — Flashcards says "No meaning saved" —
+      // rather than saving the word as its own answer.
+      let back = meaning === word ? '' : meaning;
+      if (swapDefault && back) {
         front = meaning;
         back = word;
       }
