@@ -13,6 +13,13 @@ import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '
 /** @deprecated Prefer STUDY_LANG_KEY / getStudyLang — kept for external imports. */
 export const DICT_LANG_KEY = STUDY_LANG_KEY;
 
+/** The dictionary switch: each language named in itself (endonyms, not translated). */
+const DICT_LANG_BUTTONS: readonly { id: DictLang; label: string }[] = [
+  { id: 'ja', label: '日本語' },
+  { id: 'zh', label: '中文' },
+  { id: 'ru', label: 'Русский' },
+];
+
 export default function DictionaryView() {
   const { t } = useT();
   const [lang, setLang] = useState<DictLang>(() => getStudyLang());
@@ -107,7 +114,7 @@ export default function DictionaryView() {
    * none at all, and the reader asked for *that* note's word.
    */
   function openNotedWord(word: string, noteLang: string) {
-    if (noteLang === 'ja' || noteLang === 'zh') pickLang(noteLang);
+    if (noteLang === 'ja' || noteLang === 'zh' || noteLang === 'ru') pickLang(noteLang);
     setInput(word);
     setQuery(word);
     setLookupAttempt((attempt) => attempt + 1);
@@ -135,7 +142,10 @@ export default function DictionaryView() {
     setLookupAttempt((attempt) => attempt + 1);
   }, []);
 
-  const isZh = lang === 'zh';
+  // Every study language has its own dictionary and copy. The view was a
+  // two-way ja/zh switch, so a Russian learner saw 日本語 selected and the
+  // Japanese description, placeholder and source.
+  const langKey: DictLang = lang === 'zh' || lang === 'ru' ? lang : 'ja';
 
   // View menu (language) + source status — Aero only (AppChrome pass-through in
   // the default theme). Drives the existing pickLang handler.
@@ -146,14 +156,15 @@ export default function DictionaryView() {
       items: [
         { id: 'ja', label: t('dict.view.menu.ja'), onSelect: () => pickLang('ja') },
         { id: 'zh', label: t('dict.view.menu.zh'), onSelect: () => pickLang('zh') },
+        { id: 'ru', label: t('dict.view.menu.ru'), onSelect: () => pickLang('ru') },
       ],
     },
   ];
   const dictStatus = (
     <>
-      <StatusBarField>{t(isZh ? 'dict.view.status.zh' : 'dict.view.status.ja')}</StatusBarField>
+      <StatusBarField>{t(`dict.view.status.${langKey}`)}</StatusBarField>
       <StatusBarSpacer />
-      <StatusBarField>{t(isZh ? 'dict.view.source.zh' : 'dict.view.source.ja')}</StatusBarField>
+      <StatusBarField>{t(`dict.view.source.${langKey}`)}</StatusBarField>
     </>
   );
 
@@ -165,23 +176,20 @@ export default function DictionaryView() {
           (§2’s first non-negotiable), so conventional pixels are unchanged. */}
       <ContextualSurface className="view-head">
         <p className="muted">
-          {t(isZh ? 'dict.view.desc.zh' : 'dict.view.desc.ja')}
+          {t(`dict.view.desc.${langKey}`)}
         </p>
         <div className="dict-lang-toggle">
-          <button
-            className={`gram-level-btn ${!isZh ? 'active' : ''}`}
-            aria-pressed={!isZh}
-            onClick={() => pickLang('ja')}
-          >
-            日本語
-          </button>
-          <button
-            className={`gram-level-btn ${isZh ? 'active' : ''}`}
-            aria-pressed={isZh}
-            onClick={() => pickLang('zh')}
-          >
-            中文
-          </button>
+          {DICT_LANG_BUTTONS.map(({ id, label }) => (
+            <button
+              key={id}
+              className={`gram-level-btn ${langKey === id ? 'active' : ''}`}
+              aria-pressed={langKey === id}
+              lang={id}
+              onClick={() => pickLang(id)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </ContextualSurface>
 
@@ -191,7 +199,7 @@ export default function DictionaryView() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={t(isZh ? 'dict.view.placeholder.zh' : 'dict.view.placeholder.ja')}
+          placeholder={t(`dict.view.placeholder.${langKey}`)}
           lang={lang}
         />
         <button
@@ -230,7 +238,7 @@ export default function DictionaryView() {
 
       {!query ? (
         <p className="dict-hint muted">
-          {t(isZh ? 'dict.view.hint.zh' : 'dict.view.hint.ja')}
+          {t(`dict.view.hint.${langKey}`)}
         </p>
       ) : (
         <LexiconWorkbenchResults

@@ -5,20 +5,27 @@ export const MINING_UI_ZH: Catalog = {
   'dict.view.menu.view': '视图',
   'dict.view.menu.ja': '日语',
   'dict.view.menu.zh': '中文',
+  'dict.view.menu.ru': '俄语',
   'dict.view.status.ja': '日语',
   'dict.view.status.zh': '中文',
+  'dict.view.status.ru': '俄语',
   'dict.view.source.ja': 'JMdict / Jisho',
   'dict.view.source.zh': 'CC-CEDICT',
+  'dict.view.source.ru': '维基词典',
   'dict.view.desc.ja': '搜索日语或英语，使用离线 JMdict 词典。',
   'dict.view.desc.zh': '搜索中文或英语——离线，由 CC-CEDICT 提供支持。',
+  'dict.view.desc.ru': '搜索俄语或英语——离线，基于 Wiktionary，支持词形变化和重音标记。',
   'dict.view.placeholder.ja': '输入词语，例如 食べる 或“eat”…',
   'dict.view.placeholder.zh': '输入词语，例如 你好 或“hello”…',
+  'dict.view.placeholder.ru': '输入词语，例如 читать 或“read”…',
   'dict.view.search': '搜索',
   'dict.view.reason.needsQuery': '请输入要搜索的词语。',
   'dict.view.hint.ja':
     '提示：读书时选中任意词语即可立即查询。点击结果上的星标，即可保存到闪卡。',
   'dict.view.hint.zh':
     '中英离线词典（CC-CEDICT）。结果会显示带声调符号的拼音。阅读时选中词语即可查询，或点击星标保存到闪卡。',
+  'dict.view.hint.ru':
+    '离线俄英词典（Wiktionary）。变化形式会追溯到词典原形，并显示重音标记。阅读时点击单词即可查词，或点星标图标将其存入闪卡。',
 
   'jiten.mining.title': 'Jiten 词汇挖取',
   'jiten.mining.desc': '把 Jiten 的媒体牌组直接挖取到本地闪卡库。',

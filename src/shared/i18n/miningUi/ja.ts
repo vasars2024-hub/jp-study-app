@@ -5,20 +5,27 @@ export const MINING_UI_JA: Catalog = {
   'dict.view.menu.view': '表示',
   'dict.view.menu.ja': '日本語',
   'dict.view.menu.zh': '中国語',
+  'dict.view.menu.ru': 'ロシア語',
   'dict.view.status.ja': '日本語',
   'dict.view.status.zh': '中国語',
+  'dict.view.status.ru': 'ロシア語',
   'dict.view.source.ja': 'JMdict / Jisho',
   'dict.view.source.zh': 'CC-CEDICT',
+  'dict.view.source.ru': 'ウィクショナリー',
   'dict.view.desc.ja': '日本語または英語で検索します（オフラインの JMdict 辞書）。',
   'dict.view.desc.zh': '中国語または英語で検索します。CC-CEDICT によるオフライン辞書です。',
+  'dict.view.desc.ru': 'ロシア語または英語で検索します。Wiktionary によるオフライン辞書で、変化形とアクセント記号に対応しています。',
   'dict.view.placeholder.ja': '単語を入力（例：食べる、「eat」）…',
   'dict.view.placeholder.zh': '単語を入力（例：你好、「hello」）…',
+  'dict.view.placeholder.ru': '単語を入力（例：читать、「read」）…',
   'dict.view.search': '検索',
   'dict.view.reason.needsQuery': '検索する単語を入力してください。',
   'dict.view.hint.ja':
     'ヒント：本を読んでいるときは、単語を選択するとその場で辞書を引けます。検索結果の星アイコンを押すと、フラッシュカードに保存できます。',
   'dict.view.hint.zh':
     '中国語↔英語のオフライン辞書（CC-CEDICT）。結果には声調記号つきのピンインが表示されます。読書中に単語を選択して調べるか、星アイコンでフラッシュカードに保存できます。',
+  'dict.view.hint.ru':
+    'オフラインのロシア語–英語辞書（Wiktionary）です。変化形は辞書形にたどり、アクセント記号も表示します。読書中に単語をクリックして調べたり、星アイコンでフラッシュカードに保存したりできます。',
 
   'jiten.mining.title': 'Jiten 語彙マイニング',
   'jiten.mining.desc': 'Jiten のメディアデッキを、ローカルのフラッシュカードに直接取り込みます。',
