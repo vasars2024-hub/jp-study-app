@@ -582,8 +582,16 @@
 
 .fa-search {
   flex: 1 1 auto;
-  min-width: 0;
+  /* The design-system SearchBox (glyph + field). A floor so the field never
+     collapses to a clipped sliver of its placeholder; the container query below
+     wraps the toolbar before that floor would push anything out of the frame. */
+  min-width: 8rem;
   display: flex;
+}
+
+.fa-search > .ui-search {
+  flex: 1;
+  min-width: 0;
 }
 
 .fa-search input,
@@ -1608,15 +1616,28 @@
   grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 0 var(--lq-space-3);
   margin: 0;
-  padding: var(--lq-space-2);
-  border: 1px solid var(--lq-work-border);
-  border-radius: var(--lq-work-radius);
+  /* A group, not a framed box inside the sheet (round 3). */
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
 }
 
-.fa-review-categories > legend {
-  padding: 0 var(--lq-space-1);
-  color: var(--lq-work-text-muted);
-  font-size: 0.86em;
+.fa-review-categories > legend,
+.fa-review-watched > legend {
+  padding: 0;
+  margin-bottom: var(--lq-space-2);
+  color: var(--lq-work-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.fa-review-watched {
+  min-inline-size: 0;
+  margin: var(--lq-space-3) 0 0;
+  padding: var(--lq-space-3) 0 0;
+  border: 0;
+  border-top: 1px solid var(--lq-work-border);
 }
 
 /* An error and a warning must differ by more than colour: each carries weight
@@ -1741,10 +1762,11 @@
    before. Below it: 620px 1 control outside -> 0, 420px 3 -> 0, 320px 4 -> 0,
    and the search comes back to 322/364/264px respectively.
 
-   The breakpoint has margin on purpose. The toolbar's min-content is 670px, so
-   the failure begins around a 672px container; 700 sits just above it and never
-   fires while the one-row layout still fits. */
-@container fa (max-width: 700px) {
+   The breakpoint has margin on purpose. The toolbar's min-content was 670px, so
+   the failure began around a 672px container and 700 sat just above it. Round 3
+   gave the search an 8rem floor (it used to shrink to a clipped 42px sliver of
+   its placeholder), which adds ~26px of min-content; 730 keeps the same margin. */
+@container fa (max-width: 730px) {
   .fa-toolbar {
     flex-wrap: wrap;
     row-gap: var(--lq-space-2);
