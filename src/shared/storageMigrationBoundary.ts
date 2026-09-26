@@ -59,15 +59,49 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * The retained entries, in key order. Values are shared, not copied: the plan
+ * only reads them, and each copy of the heavy stores (a 3.7 MB deck among them)
+ * cost a full JSON round trip — four or five per boot before this.
+ */
 function normalizeEntries(input: Record<string, unknown>, retained: string[]): StorageMigrationEntry[] {
   return Object.entries(input)
     .filter(([key]) => retained.includes(key))
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => ({ key, value: clone(value) }));
+    .map(([key, value]) => ({ key, value }));
 }
 
 function snapshotFromEntries(entries: StorageMigrationEntry[]): Record<string, unknown> {
-  return Object.fromEntries(entries.map((entry) => [entry.key, clone(entry.value)]));
+  return Object.fromEntries(entries.map((entry) => [entry.key, entry.value]));
+}
+
+/**
+ * Cheap health check for a stored text: a JSON object or array starts with
+ * `{` / `[` and ends with `}` / `]`. Anything else (a truncated write, a bare
+ * word, an over-encoded string) gets the full `isDamagedValue` parse. Used to
+ * skip the migration on a boot where nothing needs it without parsing every
+ * heavy store.
+ */
+export function looksLikeJsonContainer(text: string): boolean {
+  let start = 0;
+  while (start < text.length && /\s/.test(text[start])) start += 1;
+  let end = text.length - 1;
+  while (end > start && /\s/.test(text[end])) end -= 1;
+  const open = text[start];
+  const close = text[end];
+  return (open === '{' && close === '}') || (open === '[' && close === ']');
+}
+
+/** Whether a boot at `currentVersion`, with these localStorage texts, has migration work to do. */
+export function storageMigrationNeeded(
+  currentVersion: number,
+  localTexts: Iterable<string>,
+): boolean {
+  if (currentVersion < STORAGE_MIGRATION_VERSION) return true;
+  for (const text of localTexts) {
+    if (!looksLikeJsonContainer(text) && isDamagedValue(text)) return true;
+  }
+  return false;
 }
 
 /**
@@ -96,14 +130,14 @@ export function planStorageMigration(
   const issues: string[] = [];
   const localStorage = { ...snapshot.localStorage };
   const indexedDb = { ...snapshot.indexedDb };
+  const retainedLocal = normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS);
+  const retainedIdb = normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS);
 
   // Heavy stores are never dropped here: a value that does not parse is copied
   // aside (quarantine) and left in place for its reader, which already treats
   // it as empty — the copy is what survives if that reader later overwrites it.
-  const damagedLocal = normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS)
-    .filter((entry) => isDamagedValue(entry.value));
-  const damagedIdb = normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS)
-    .filter((entry) => isDamagedValue(entry.value));
+  const damagedLocal = retainedLocal.filter((entry) => isDamagedValue(entry.value));
+  const damagedIdb = retainedIdb.filter((entry) => isDamagedValue(entry.value));
 
   if (damagedLocal.length) issues.push(`Quarantined a copy of ${damagedLocal.length} unreadable localStorage entr${damagedLocal.length === 1 ? 'y' : 'ies'} (${damagedLocal.map((e) => e.key).join(', ')}).`);
   if (damagedIdb.length) issues.push(`Quarantined a copy of ${damagedIdb.length} unreadable IndexedDB entr${damagedIdb.length === 1 ? 'y' : 'ies'} (${damagedIdb.map((e) => e.key).join(', ')}).`);
@@ -116,12 +150,12 @@ export function planStorageMigration(
       keepIndexedDbKeys: [...HEAVY_INDEXED_DB_KEYS],
     },
     replace: {
-      localStorage: normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS),
-      indexedDb: normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS),
+      localStorage: retainedLocal,
+      indexedDb: retainedIdb,
     },
     recover: {
-      localStorage: normalizeEntries(localStorage, HEAVY_LOCAL_STORAGE_KEYS),
-      indexedDb: normalizeEntries(indexedDb, HEAVY_INDEXED_DB_KEYS),
+      localStorage: retainedLocal.slice(),
+      indexedDb: retainedIdb.slice(),
     },
     quarantine: { localStorage: damagedLocal, indexedDb: damagedIdb },
     issues,

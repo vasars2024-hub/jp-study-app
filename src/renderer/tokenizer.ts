@@ -44,6 +44,25 @@ interface Tokenizer {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BaseLoader = DictionaryLoader as any;
 
+/**
+ * Inflate a dictionary file without holding the UI thread. The browser's
+ * DecompressionStream inflates natively and hands back the bytes
+ * asynchronously; `fflate.gunzipSync` did the same work in JavaScript on the
+ * UI thread at boot (1.28 s for the IPADIC files, measured). The synchronous
+ * path stays as the fallback for a runtime without DecompressionStream.
+ */
+export async function gunzipOffThread(raw: Uint8Array): Promise<Uint8Array> {
+  if (typeof DecompressionStream === 'function' && typeof Blob === 'function' && typeof Response === 'function') {
+    try {
+      const stream = new Blob([raw as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch {
+      /* a platform whose stream refuses: inflate synchronously below */
+    }
+  }
+  return gunzipSync(raw);
+}
+
 class SniffingLoader extends BaseLoader {
   loadArrayBuffer(url: string, callback: (err: unknown, buf: ArrayBuffer | null) => void): void {
     // The dict is stored as "*.dat.bin" (gzip BYTES under a non-.gz name):
@@ -55,7 +74,7 @@ class SniffingLoader extends BaseLoader {
       .then(async (res) => {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
         const raw = new Uint8Array(await res.arrayBuffer());
-        const data = raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw;
+        const data = raw[0] === 0x1f && raw[1] === 0x8b ? await gunzipOffThread(raw) : raw;
         // Hand over an exact-size ArrayBuffer (a larger backing buffer breaks
         // kuromoji's typed-array views).
         return data.byteLength === data.buffer.byteLength
