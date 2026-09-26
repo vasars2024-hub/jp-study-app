@@ -17,6 +17,17 @@ describe('extension settings access', () => {
     expect(decideExtensionSettingsAccess({ ...base, origin: 'chrome-extension://short' }).allow).toBe(false);
   });
 
+  it("pairs the real extension, whose Pull Chrome sends with no Origin (Sec-Fetch-Site: none, mode cors)", () => {
+    const ext = { ...base, origin: undefined, secFetchSite: 'none', secFetchMode: 'cors' };
+    expect(decideExtensionSettingsAccess({ ...ext, pairingOpen: true })).toEqual({ allow: true, pin: null });
+    expect(decideExtensionSettingsAccess({ ...ext, authorized: true })).toEqual({ allow: true, pin: null });
+    expect(decideExtensionSettingsAccess(ext)).toMatchObject({ allow: false, status: 401 });
+    // An address-bar visit and a web page's fetch are still refused.
+    expect(decideExtensionSettingsAccess({ ...ext, secFetchMode: 'navigate', pairingOpen: true }).allow).toBe(false);
+    expect(decideExtensionSettingsAccess({ ...ext, secFetchSite: 'same-origin', pairingOpen: true }).allow).toBe(false);
+    expect(decideExtensionSettingsAccess({ ...ext, host: 'evil.example:48971', pairingOpen: true }).allow).toBe(false);
+  });
+
   it('refuses a rebinding Host even with an extension-looking Origin', () => {
     expect(decideExtensionSettingsAccess({ ...base, origin: GUM, host: 'evil.example:48971' }).allow).toBe(false);
     expect(decideExtensionSettingsAccess({ ...base, origin: GUM, host: '127.0.0.1:1' }).allow).toBe(false);

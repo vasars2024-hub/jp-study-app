@@ -27,6 +27,16 @@
  *
  * A local process running as the same user is out of scope: it can read the
  * token from userData directly.
+ *
+ * Chrome sends NO Origin header on a fetch from an extension page to a host
+ * the extension has permission for (measured, Chrome 153: the options page's
+ * Pull arrives with `Sec-Fetch-Site: none`, `Sec-Fetch-Mode: cors` and no
+ * Origin). Rule 2 therefore refused the real extension on every Pull, token or
+ * "Pair now" alike. Such a request is recognised by those two headers instead:
+ * a web page's fetch is never `Sec-Fetch-Site: none`, an address-bar visit is
+ * `navigate`, and a tool that forges them is a local process (out of scope).
+ * With no Origin there is nothing to pin, so it pulls with the token or inside
+ * the pairing window only.
  */
 
 const EXTENSION_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;
@@ -55,8 +65,16 @@ export function decideExtensionSettingsAccess(input: {
   pinnedOrigin: string | null;
   /** The user pressed "Pair now" in the app less than two minutes ago. */
   pairingOpen?: boolean;
+  /** `Sec-Fetch-Site` / `Sec-Fetch-Mode` request headers. */
+  secFetchSite?: string;
+  secFetchMode?: string;
 }): PairingDecision {
   if (!isLoopbackHost(input.host, input.port)) return { allow: false, status: 403, reason: 'host' };
+  if (input.origin === undefined && input.secFetchSite === 'none' && input.secFetchMode === 'cors') {
+    // An extension context's fetch (see above): no origin to pin or match.
+    if (input.authorized || input.pairingOpen) return { allow: true, pin: null };
+    return { allow: false, status: 401, reason: 'not-paired' };
+  }
   if (!isWellFormedExtensionOrigin(input.origin)) return { allow: false, status: 403, reason: 'origin' };
   if (input.authorized) return { allow: true, pin: input.origin === input.pinnedOrigin ? null : input.origin };
   if (input.pinnedOrigin && input.origin === input.pinnedOrigin) return { allow: true, pin: null };

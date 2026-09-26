@@ -1151,23 +1151,25 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
     const state = bridgeState ?? loadOrCreateState();
     const auth = req.headers.authorization;
+    const authorized = checkBearerToken(typeof auth === 'string' ? auth : undefined, state.token);
     const decision = decideExtensionSettingsAccess({
       origin,
       host: typeof req.headers.host === 'string' ? req.headers.host : undefined,
       port: effectivePort(state),
-      authorized: checkBearerToken(typeof auth === 'string' ? auth : undefined, state.token),
+      authorized,
       pinnedOrigin: state.pairedOrigin ?? null,
       pairingOpen: pairingWindowOpen(),
+      secFetchSite: typeof req.headers['sec-fetch-site'] === 'string' ? req.headers['sec-fetch-site'] : undefined,
+      secFetchMode: typeof req.headers['sec-fetch-mode'] === 'string' ? req.headers['sec-fetch-mode'] : undefined,
     });
     if (!decision.allow) {
       json(res, decision.status, { ok: false, error: decision.status === 401 ? 'Unauthorized' : 'Forbidden origin' });
       return;
     }
-    if (decision.pin) {
-      pinExtensionOrigin(decision.pin);
-      // One pairing per "Pair now": a second extension waiting in line is refused.
-      pairingOpenUntil = 0;
-    }
+    if (decision.pin) pinExtensionOrigin(decision.pin);
+    // One pairing per "Pair now": a pull that got in through the window (not by
+    // the token or a pinned origin) closes it, so a second extension is refused.
+    if (!authorized && !(origin && origin === state.pairedOrigin)) pairingOpenUntil = 0;
     const status = getExtensionBridgeStatus();
     json(res, 200, {
       ok: true,
