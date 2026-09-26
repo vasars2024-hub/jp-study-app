@@ -1973,6 +1973,17 @@ h1 {
 .dict-lang-select {
   max-width: 150px;
   font-size: 0.78rem;
+  /* The same surface as .set-select; left bare it drew the browser's own select. */
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.dict-lang-select:focus-visible {
+  outline: none;
+  border-color: var(--accent-2);
 }
 
 .mining-toolbar {

@@ -3811,6 +3811,23 @@
   border-color: var(--border);
 }
 
+/* A pill that is a button (Discover's plan count) must not fall back to the
+   browser's grey button face. */
+button.scr-pill {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-2xs);
+  height: auto;
+  min-height: 24px;
+  cursor: pointer;
+}
+button.scr-pill:hover,
+button.scr-pill:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
 /* The `--status-*` tokens are FILL colours and are kept as the border, which is
    where the tone lives. The readable copy takes the `--*-text` family from
    styles.css, which is the same colour on every dark palette and is remapped on
