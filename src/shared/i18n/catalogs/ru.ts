@@ -14048,6 +14048,7 @@ export const ru: Catalog = {
   'filesApp.source.ytSubs': 'Субтитры YouTube',
   'filesApp.source.subtitles': 'Субтитры',
   'filesApp.source.downloads': 'Загрузки',
+  'filesApp.source.sidecars': 'Рядом с видео',
   'filesApp.source.decks': 'Колоды Anki',
   'filesApp.source.drafts': 'Черновики Anki',
   'filesApp.source.exports': 'Экспорт',

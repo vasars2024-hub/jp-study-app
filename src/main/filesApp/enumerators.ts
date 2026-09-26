@@ -524,6 +524,62 @@ export const downloadsEnumerator: FilesEnumerator = {
   },
 };
 
+/**
+ * Subtitle files sitting beside a library video that the library has not
+ * attached (yet): `Show - 01.ja.srt` next to `Show - 01.mkv` before discovery
+ * reached it, or a language discovery was not asked for.
+ *
+ * Without this such a file had no row, so "Make a sentence deck" from a
+ * subtitle file could not be reached for it. The same stem rule as discovery's
+ * sidecar scan (`findSidecarSubtitles`): a folder of many episodes must not
+ * hand episode 1's subtitle to all of them. Each folder is read once.
+ *
+ * Runs after the record-backed readers; a file a record already claims is
+ * dropped by the path dedupe in `buildFilesIndex`, keeping the record's row.
+ */
+export const sidecarSubtitleEnumerator: FilesEnumerator = {
+  source: 'sidecars',
+  run(ctx) {
+    const db = readJson<unknown>(path.join(ctx.userDataPath, MEDIA_LIBRARY_STORE_FILE), {});
+    const folders = new Map<string, fs.Dirent[]>();
+    const taken = new Set<string>();
+    const out: FilesItem[] = [];
+    for (const row of mediaItemsFromStoredDocument(db) as unknown as MediaRow[]) {
+      const videoPath = typeof row?.path === 'string' ? row.path : null;
+      if (!videoPath || !VIDEO_EXT.has(extOf(videoPath))) continue;
+      const dir = path.dirname(videoPath);
+      const stem = path.basename(videoPath, path.extname(videoPath)).toLowerCase();
+      if (!stem) continue;
+      let entries = folders.get(dir);
+      if (!entries) {
+        entries = listDir(dir);
+        folders.set(dir, entries);
+      }
+      for (const entry of entries) {
+        if (!entry.isFile() || !SUBTITLE_EXT.has(extOf(entry.name))) continue;
+        if (!entry.name.toLowerCase().startsWith(stem)) continue;
+        const full = path.join(dir, entry.name);
+        const key = full.toLowerCase();
+        if (taken.has(key)) continue;
+        taken.add(key);
+        out.push(
+          fileItem({
+            id: `sidecar:${full.replaceAll('\\', '/')}`,
+            name: entry.name,
+            kind: 'subtitle',
+            filePath: full,
+            provenance: isAutoCaptionName(entry.name) ? 'auto-captions' : 'human-subs',
+            source: 'sidecars',
+            // The user's own file, read where it is.
+            flags: { referenced: true },
+          }),
+        );
+      }
+    }
+    return out;
+  },
+};
+
 /* ------------------------------------------------------------------ *
  * Outputs.
  * ------------------------------------------------------------------ */
@@ -1108,6 +1164,8 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   cachedSubtitleEnumerator,
   mediaSubtitleEnumerator,
   downloadsEnumerator,
+  // After every record-backed reader: a sidecar a record claims keeps that row.
+  sidecarSubtitleEnumerator,
   exportsEnumerator,
   deckEnumerator,
   draftEnumerator,

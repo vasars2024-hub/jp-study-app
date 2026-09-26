@@ -13561,6 +13561,7 @@ export const en: Catalog = {
   'filesApp.source.ytSubs': 'YouTube subtitles',
   'filesApp.source.subtitles': 'Subtitles',
   'filesApp.source.downloads': 'Downloads',
+  'filesApp.source.sidecars': 'Beside the video',
   'filesApp.source.decks': 'Anki decks',
   'filesApp.source.drafts': 'Anki drafts',
   'filesApp.source.exports': 'Exports',

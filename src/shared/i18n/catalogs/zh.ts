@@ -12772,6 +12772,7 @@ export const zh: Catalog = {
   'filesApp.source.ytSubs': 'YouTube 字幕',
   'filesApp.source.subtitles': '字幕',
   'filesApp.source.downloads': '下载',
+  'filesApp.source.sidecars': '视频所在文件夹',
   'filesApp.source.decks': 'Anki 卡组',
   'filesApp.source.drafts': 'Anki 草稿',
   'filesApp.source.exports': '导出',

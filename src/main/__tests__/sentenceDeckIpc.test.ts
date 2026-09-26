@@ -119,6 +119,24 @@ describe('listSentenceDeckSources', () => {
       ok: false, reasonKey: 'sentenceDeck.error.noVideoForSubtitle',
     });
   });
+
+  it('opened on a library subtitle stored away from its video, finds the episode through the library', async () => {
+    // A downloaded track lives in the app's own subtitle folder, relative to userData.
+    const cached = path.join(tmpRoot, 'subtitles', 'm9', 'jimaku-ja.srt');
+    fs.mkdirSync(path.dirname(cached), { recursive: true });
+    fs.writeFileSync(cached, SRT_JA);
+    const host = {
+      listItems: (): MediaItem[] => [{
+        id: 'm9',
+        path: video,
+        subtitles: [{ id: 'd1', lang: 'ja', source: 'provider', format: 'srt', path: path.join('subtitles', 'm9', 'jimaku-ja.srt') }],
+      } as unknown as MediaItem],
+    };
+    const sources = await listSentenceDeckSources(host, { subtitlePath: cached });
+    expect(sources).toMatchObject({ ok: true, videoPath: video, primaryId: `file:${cached}` });
+    // The record is that same file: listed once.
+    expect(sources.tracks.filter((t) => t.id === 'record:d1' || t.id === `file:${cached}`)).toHaveLength(1);
+  });
 });
 
 describe('readSentenceDeckTrack', () => {

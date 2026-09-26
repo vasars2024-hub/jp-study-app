@@ -12906,6 +12906,7 @@ export const ja: Catalog = {
   'filesApp.source.ytSubs': 'YouTubeの字幕',
   'filesApp.source.subtitles': '字幕',
   'filesApp.source.downloads': 'ダウンロード',
+  'filesApp.source.sidecars': '動画と同じフォルダー',
   'filesApp.source.decks': 'Ankiデッキ',
   'filesApp.source.drafts': 'Ankiの下書き',
   'filesApp.source.exports': 'エクスポート',

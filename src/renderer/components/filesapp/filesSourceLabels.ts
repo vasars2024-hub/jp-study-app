@@ -14,6 +14,7 @@ const SOURCE_LABEL_KEYS: Readonly<Record<string, string>> = {
   'yt-subs': 'filesApp.source.ytSubs',
   subtitles: 'filesApp.source.subtitles',
   downloads: 'filesApp.source.downloads',
+  sidecars: 'filesApp.source.sidecars',
   decks: 'filesApp.source.decks',
   drafts: 'filesApp.source.drafts',
   exports: 'filesApp.source.exports',
