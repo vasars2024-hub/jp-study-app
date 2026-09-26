@@ -11,10 +11,13 @@
 import { loadDeck } from '../flashcardDeck';
 import { getSlotList } from '../levelLists';
 import { tokenizeSync, tokenizerReady } from '../tokenizer';
-import { slotsForLang, type LevelTier } from '../../shared/levelScale';
+import { slotsForLang, type LevelTier, type StudyLang } from '../../shared/levelScale';
 import { getStudyLang } from '../studyEnvironment';
 import { normalizeStudyLang } from '../../shared/studyLang';
 import { segmentStudyText, studyWordKey } from '../../shared/studySegmentation';
+import { packFor } from '../data/gamePacks';
+import type { GamePack } from '../data/gamePacks/types';
+import { listCards, loadGameLists, packExtrasFromLists } from './gameItemImport';
 import {
   buildClozePool,
   buildVocabPool,
@@ -78,10 +81,15 @@ function wordsForLevel(level: LevelTier): string[] | null {
   return list && list.words.length ? list.words : null;
 }
 
-/** The deck's cards in the study language only: a Russian learner's round never deals Japanese cards. */
-function deckCards(): SourceCard[] {
+/**
+ * The deck's cards in the study language only: a Russian learner's round never
+ * deals Japanese cards. `folder` narrows to one deck folder.
+ */
+function deckCards(folder?: string): SourceCard[] {
   const lang = getStudyLang();
-  return loadDeck().filter((c) => normalizeStudyLang(c.studyLang) === lang).map((c) => ({
+  return loadDeck()
+    .filter((c) => normalizeStudyLang(c.studyLang) === lang && (!folder || c.folder === folder))
+    .map((c) => ({
     word: c.word,
     reading: c.reading,
     meaning: c.meaning,
@@ -95,6 +103,9 @@ export interface ArenaContent {
   sentences: SourceCard[];
   /** True when the deck produced nothing usable and the caller must fall back. */
   usingFallback: boolean;
+  studyLang: StudyLang;
+  /** The bundled pack for the study language, extended by the learner's imported lists. */
+  pack: GamePack;
 }
 
 /**
@@ -104,9 +115,32 @@ export interface ArenaContent {
  * deck is eligible, since showing the player nothing is worse than showing them
  * their own words at an approximate level.
  */
-export function loadArenaContent(level: LevelTier): ArenaContent {
-  const cards = deckCards();
-  const vocab = buildVocabPool(cards, wordsForLevel(level), level, lemmaOf);
+export function loadArenaContent(level: LevelTier, material = 'auto'): ArenaContent {
+  const studyLang = getStudyLang();
+  const lists = loadGameLists().filter((l) => l.lang === studyLang);
+  // "Make a game from my list": one imported list, or one deck folder, is the
+  // whole session's material; nothing bundled is mixed in.
+  if (material.startsWith('list:')) {
+    const list = lists.find((l) => l.id === material.slice(5));
+    if (list) {
+      const cards = listCards(list);
+      const extras = packExtrasFromLists([list]);
+      const vocab = buildVocabPool(cards, null, level, lemmaOf);
+      const cloze = buildClozePool(cards, surfaceInSentence);
+      const onlyList = packFor(studyLang, undefined);
+      const pack: GamePack = {
+        ...onlyList,
+        sentences: extras.sentences?.length ? extras.sentences : onlyList.sentences,
+        vocab: extras.vocab?.length ? extras.vocab : onlyList.vocab,
+        cloze: extras.cloze?.length ? extras.cloze : onlyList.cloze,
+        reading: extras.reading?.length ? extras.reading : onlyList.reading,
+      };
+      return { vocab, cloze, sentences: buildSentencePool(cards), usingFallback: false, studyLang, pack };
+    }
+  }
+  const folder = material.startsWith('folder:') ? material.slice(7) : undefined;
+  const cards = deckCards(folder);
+  const vocab = buildVocabPool(cards, folder ? null : wordsForLevel(level), level, lemmaOf);
   const cloze = buildClozePool(cards, surfaceInSentence);
   const sentences = buildSentencePool(cards);
   return {
@@ -114,6 +148,8 @@ export function loadArenaContent(level: LevelTier): ArenaContent {
     cloze,
     sentences,
     usingFallback: vocab.length === 0 && cloze.length === 0 && sentences.length === 0,
+    studyLang,
+    pack: packFor(studyLang, lists.length ? packExtrasFromLists(lists) : undefined),
   };
 }
 

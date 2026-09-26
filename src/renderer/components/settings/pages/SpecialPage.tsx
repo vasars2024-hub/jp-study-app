@@ -36,7 +36,7 @@ import {
 } from '../../../blancMode';
 import { nextHistoryEntry } from '../../../secretHistory';
 
-type ArcadeGameId = 'star-invaders' | 'comet-courier' | 'capsule-sorter' | 'signal-simon';
+import type { ArcadeGameId } from '../../../games/ArcadeGames';
 
 const WIRED_GAME_MODULES: {
   id: ArcadeGameId;
@@ -56,10 +56,10 @@ const AERO_GAME_MODULES: {
   descKey: string;
   command: string;
 }[] = [
-  { id: 'star-invaders', command: 'breakout', titleKey: 'special.game.aero.breakout.title', descKey: 'special.game.aero.breakout.desc' },
-  { id: 'comet-courier', command: 'blocks', titleKey: 'special.game.aero.blocks.title', descKey: 'special.game.aero.blocks.desc' },
-  { id: 'capsule-sorter', command: 'pong', titleKey: 'special.game.aero.pong.title', descKey: 'special.game.aero.pong.desc' },
-  { id: 'signal-simon', command: 'snake', titleKey: 'special.game.aero.snake.title', descKey: 'special.game.aero.snake.desc' },
+  { id: 'aero-breakout', command: 'breakout', titleKey: 'special.game.aero.breakout.title', descKey: 'special.game.aero.breakout.desc' },
+  { id: 'aero-blocks', command: 'blocks', titleKey: 'special.game.aero.blocks.title', descKey: 'special.game.aero.blocks.desc' },
+  { id: 'aero-pong', command: 'pong', titleKey: 'special.game.aero.pong.title', descKey: 'special.game.aero.pong.desc' },
+  { id: 'aero-snake', command: 'snake', titleKey: 'special.game.aero.snake.title', descKey: 'special.game.aero.snake.desc' },
 ];
 
 // Module-level catalogs can't call useT() at declaration time, so each entry

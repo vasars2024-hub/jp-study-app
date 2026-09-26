@@ -1,7 +1,6 @@
 import type { MirrorText } from '../../data/mirrorTexts';
 import type { GameArenaSettings } from '../settings';
-
-export const MIRROR_EVALUATOR_ASSET_ID = 'mirror-writing-evaluator';
+import type { StudyLang } from '../../../shared/levelScale';
 
 export type MirrorAxis = 'grammar' | 'vocabulary' | 'flow' | 'fidelity';
 
@@ -36,8 +35,6 @@ export interface MirrorEvaluation {
 }
 
 export type MirrorEvaluationFailure =
-  | 'model-missing'
-  | 'local-runtime-unavailable'
   | 'api-missing'
   | 'network'
   | 'schema-invalid';
@@ -115,13 +112,16 @@ function extractJson(value: unknown): unknown {
   return value;
 }
 
+const LANG_NAME: Record<StudyLang, string> = { ja: 'Japanese', zh: 'Chinese (Mandarin)', ru: 'Russian' };
+
 function buildPrompt(text: MirrorText, draft: string): string {
+  const lang = text.lang ?? 'ja';
   const ideaMap = text.ideaMap.map((idea, index) => `${index + 1}. ${idea.concepts.en}`).join('\n');
   return [
-    'Grade this Japanese active-recall writing exercise.',
+    `Grade this ${LANG_NAME[lang]} active-recall writing exercise.`,
     'Return strict JSON only with: evaluatorVersion, total, axes.grammar/vocabulary/flow/fidelity, summary.',
     'Each axis must have score 0-100 and tips [{span,message}].',
-    'Do not invent a score if the draft is empty or not Japanese; use low scores with concrete tips.',
+    `Do not invent a score if the draft is empty or not ${LANG_NAME[lang]}; use low scores with concrete tips.`,
     '',
     `Idea map:\n${ideaMap}`,
     '',
@@ -131,55 +131,127 @@ function buildPrompt(text: MirrorText, draft: string): string {
   ].join('\n');
 }
 
+/**
+ * The same task as a request to the app's own AI (the Agent), for a learner who
+ * has AI set up: the quick check scores coverage and shape; the Agent can say
+ * what is actually wrong with a sentence.
+ */
+export function buildMirrorFeedbackRequest(text: MirrorText, draft: string): string {
+  const lang = text.lang ?? 'ja';
+  const ideaMap = text.ideaMap.map((idea, index) => `${index + 1}. ${idea.concepts.en}`).join('\n');
+  return [
+    `Please review my ${LANG_NAME[lang]} writing. I wrote it from this idea map:`,
+    ideaMap,
+    '',
+    `My draft:\n${draft}`,
+    '',
+    `A model answer:\n${text.reference}`,
+    '',
+    'Point out grammar and word-choice mistakes with corrections, say which ideas I missed, and suggest one more natural way to phrase it.',
+  ].join('\n');
+}
+
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-function japaneseChars(value: string): string[] {
-  return [...value].filter((ch) => /[\u3040-\u30ff\u3400-\u9fff]/.test(ch));
+interface ScriptProfile {
+  /** Characters that count as the study language's script. */
+  script: RegExp;
+  sentenceEnd: RegExp;
+  /** A finished sentence ending (ja: です/ます…; zh/ru: terminal punctuation). */
+  politeOrFinal: RegExp;
+  connective: RegExp;
+  terms: (value: string) => string[];
+  /** Level-appropriate vocabulary signal (distinct kanji / hanzi, long words). */
+  richness: (value: string) => number;
+  /** i18n key suffix for the tips that name language-specific things. */
+  keySuffix: string;
 }
 
-function contentTerms(value: string): string[] {
-  const matches = value.match(/[\u3400-\u9fff]{2,}|[\u30a0-\u30ff]{2,}|[\u3040-\u309f]{3,}/g) ?? [];
-  return [...new Set(matches.filter((term) => !['ています', 'ました', 'です', 'ます', 'ください'].includes(term)))];
-}
+const JA_STOP = ['ています', 'ました', 'です', 'ます', 'ください'];
+const RU_STOP = new Set(['который', 'которая', 'которое', 'потому', 'только', 'очень', 'также', 'этого', 'чтобы']);
+const HAN = /[\u3400-\u9fff]/;
 
-function axis(score: number, tips: { span?: string; message: string }[]): MirrorAxisScore {
+const PROFILES: Record<StudyLang, ScriptProfile> = {
+  ja: {
+    script: /[\u3040-\u30ff\u3400-\u9fff]/,
+    sentenceEnd: /[。！？]/g,
+    politeOrFinal: /(です|ます|ました|ません|でしょう|ください)(。|$)/,
+    connective: /(ので|から|ただし|また|そして|しかし|ため|によって|として|ではなく)/,
+    terms: (value) => [
+      ...new Set((value.match(/[\u3400-\u9fff]{2,}|[\u30a0-\u30ff]{2,}|[\u3040-\u309f]{3,}/g) ?? []).filter((t) => !JA_STOP.includes(t))),
+    ],
+    richness: (value) => new Set([...value].filter((ch) => HAN.test(ch))).size,
+    keySuffix: '',
+  },
+  zh: {
+    script: HAN,
+    sentenceEnd: /[。！？]/g,
+    politeOrFinal: /[。！？]$/,
+    connective: /(因为|所以|但是|而且|然后|虽然|如果|不过|因此|并且)/,
+    // Hanzi bigrams stand in for words: Chinese is written without spaces.
+    terms: (value) => {
+      const han = [...value].filter((ch) => HAN.test(ch));
+      const out = new Set<string>();
+      for (let i = 0; i + 1 < han.length; i += 1) out.add(han[i] + han[i + 1]);
+      return [...out];
+    },
+    richness: (value) => new Set([...value].filter((ch) => HAN.test(ch))).size / 2,
+    keySuffix: '.zh',
+  },
+  ru: {
+    script: /[а-яё]/i,
+    sentenceEnd: /[.!?…]/g,
+    politeOrFinal: /[.!?…]$/,
+    connective: /(потому что|поэтому|однако|кроме того|так как|если|хотя|а также|\bно\b)/i,
+    // A five-letter stem stands in for the lemma, so книга / книгу / книги meet.
+    terms: (value) => [
+      ...new Set((value.toLowerCase().match(/[а-яё]{4,}/g) ?? []).filter((w) => !RU_STOP.has(w)).map((w) => w.slice(0, 5))),
+    ],
+    richness: (value) => (value.match(/[а-яё]{7,}/gi) ?? []).length,
+    keySuffix: '.ru',
+  },
+};
+
+function axis(score: number, tips: MirrorTip[]): MirrorAxisScore {
   return { score: clampPercent(score), tips: tips.slice(0, 4) };
 }
 
-function localRubricEvaluate(text: MirrorText, draft: string): MirrorEvaluation {
+export function localRubricEvaluate(text: MirrorText, draft: string): MirrorEvaluation {
+  const profile = PROFILES[text.lang ?? 'ja'];
+  const k = (key: string) => `${key}${profile.keySuffix}`;
   const trimmed = draft.trim();
-  const chars = [...trimmed];
-  const jpChars = japaneseChars(trimmed);
-  const jpRatio = chars.length ? jpChars.length / chars.length : 0;
-  const sentenceCount = Math.max(1, (trimmed.match(/[。！？]/g) ?? []).length);
-  const referenceTerms = contentTerms(text.reference);
-  const draftTerms = contentTerms(trimmed);
-  const coveredTerms = referenceTerms.filter((term) => trimmed.includes(term));
+  const letters = [...trimmed].filter((ch) => /\S/.test(ch) && !/[\p{P}\d]/u.test(ch));
+  const jpRatio = letters.length ? letters.filter((ch) => profile.script.test(ch)).length / letters.length : 0;
+  const sentenceCount = Math.max(1, (trimmed.match(profile.sentenceEnd) ?? []).length);
+  const referenceTerms = profile.terms(text.reference);
+  const draftTerms = profile.terms(trimmed);
+  const draftTermSet = new Set(draftTerms);
+  const coveredTerms = referenceTerms.filter((term) => draftTermSet.has(term) || trimmed.includes(term));
   const coverage = referenceTerms.length ? coveredTerms.length / referenceTerms.length : 0;
-  const uniqueKanji = new Set([...trimmed].filter((ch) => /[\u3400-\u9fff]/.test(ch))).size;
-  const hasPoliteEnding = /(です|ます|ました|ません|でしょう|ください)(。|$)/.test(trimmed);
-  const hasConnective = /(ので|から|ただし|また|そして|しかし|ため|によって|として|ではなく)/.test(trimmed);
+  const uniqueKanji = profile.richness(trimmed);
+  const hasPoliteEnding = profile.politeOrFinal.test(trimmed);
+  const hasConnective = profile.connective.test(trimmed);
   const lengthRatio = Math.min(1.25, trimmed.length / Math.max(1, text.reference.length));
 
-  const grammarTips: { span?: string; message: string }[] = [];
-  if (jpRatio < 0.75) grammarTips.push({ message: 'Use mostly Japanese script in the answer.', messageKey: 'games.mirror.tip.grammar.script' });
-  if (!hasPoliteEnding) grammarTips.push({ message: 'Add a clear sentence ending such as です, ます, ました, or ください where appropriate.', messageKey: 'games.mirror.tip.grammar.ending' });
-  if (sentenceCount < Math.min(2, text.ideaMap.length)) grammarTips.push({ message: 'Split the ideas into clear Japanese sentences.', messageKey: 'games.mirror.tip.grammar.split' });
+  const grammarTips: MirrorTip[] = [];
+  if (jpRatio < 0.75) grammarTips.push({ message: 'Use mostly Japanese script in the answer.', messageKey: k('games.mirror.tip.grammar.script') });
+  if (!hasPoliteEnding) grammarTips.push({ message: 'Add a clear sentence ending such as です, ます, ました, or ください where appropriate.', messageKey: k('games.mirror.tip.grammar.ending') });
+  if (sentenceCount < Math.min(2, text.ideaMap.length)) grammarTips.push({ message: 'Split the ideas into clear Japanese sentences.', messageKey: k('games.mirror.tip.grammar.split') });
   if (grammarTips.length === 0) grammarTips.push({ message: 'Sentence endings and script balance look stable for this level.', messageKey: 'games.mirror.tip.grammar.ok' });
 
-  const vocabularyTips: { span?: string; message: string }[] = [];
+  const vocabularyTips: MirrorTip[] = [];
   if (draftTerms.length < Math.max(2, text.level)) vocabularyTips.push({ message: 'Use more content words from the idea map rather than only short function words.', messageKey: 'games.mirror.tip.vocabulary.contentWords' });
-  if (uniqueKanji < Math.max(1, text.level - 1)) vocabularyTips.push({ message: 'Try using the core kanji vocabulary expected at this level.', messageKey: 'games.mirror.tip.vocabulary.kanji' });
+  if (uniqueKanji < Math.max(1, text.level - 1)) vocabularyTips.push({ message: 'Try using the core kanji vocabulary expected at this level.', messageKey: k('games.mirror.tip.vocabulary.kanji') });
   if (vocabularyTips.length === 0) vocabularyTips.push({ message: 'Vocabulary density is healthy for this prompt.', messageKey: 'games.mirror.tip.vocabulary.ok' });
 
-  const flowTips: { span?: string; message: string }[] = [];
-  if (!hasConnective && text.ideaMap.length >= 3) flowTips.push({ message: 'Connect ideas with words like ので, そして, ただし, or ため.', messageKey: 'games.mirror.tip.flow.connect' });
+  const flowTips: MirrorTip[] = [];
+  if (!hasConnective && text.ideaMap.length >= 3) flowTips.push({ message: 'Connect ideas with words like ので, そして, ただし, or ため.', messageKey: k('games.mirror.tip.flow.connect') });
   if (sentenceCount > text.ideaMap.length + 2) flowTips.push({ message: 'The draft is fragmented; combine related clauses for a smoother paragraph.', messageKey: 'games.mirror.tip.flow.fragmented' });
   if (flowTips.length === 0) flowTips.push({ message: 'The draft has a readable paragraph shape.', messageKey: 'games.mirror.tip.flow.ok' });
 
-  const fidelityTips: { span?: string; message: string }[] = [];
+  const fidelityTips: MirrorTip[] = [];
   if (coverage < 0.45) fidelityTips.push({ message: 'Several core ideas from the prompt are missing or expressed too indirectly.', messageKey: 'games.mirror.tip.fidelity.missing' });
   if (lengthRatio < 0.45) fidelityTips.push({ message: 'The answer is much shorter than the reference, so it likely omits required meaning.', messageKey: 'games.mirror.tip.fidelity.short' });
   if (coveredTerms[0]) fidelityTips.push({ span: coveredTerms[0], message: 'This key idea is represented clearly.', messageKey: 'games.mirror.tip.fidelity.covered' });
@@ -192,7 +264,7 @@ function localRubricEvaluate(text: MirrorText, draft: string): MirrorEvaluation 
   const total = Math.round((grammar.score + vocabulary.score + flow.score + fidelity.score) / 4);
 
   return {
-    evaluatorVersion: 'local-rubric-v1',
+    evaluatorVersion: 'quick-check-v2',
     total,
     axes: { grammar, vocabulary, flow, fidelity },
     summary:
@@ -201,7 +273,7 @@ function localRubricEvaluate(text: MirrorText, draft: string): MirrorEvaluation 
         : total >= 65
           ? 'Solid draft. Tighten missing ideas and sentence flow before comparing with the reference.'
           : 'Early draft. Focus on covering every idea in clear Japanese sentences.',
-    summaryKey: total >= 85 ? 'games.mirror.summary.strong' : total >= 65 ? 'games.mirror.summary.solid' : 'games.mirror.summary.early',
+    summaryKey: total >= 85 ? 'games.mirror.summary.strong' : total >= 65 ? 'games.mirror.summary.solid' : k('games.mirror.summary.early'),
   };
 }
 
@@ -228,7 +300,7 @@ async function callApi(settings: GameArenaSettings, text: MirrorText, draft: str
           {
             role: 'system',
             content:
-              'You are a strict Japanese writing evaluator. Return valid JSON matching the requested schema and nothing else.',
+              `You are a strict ${LANG_NAME[text.lang ?? 'ja']} writing evaluator. Return valid JSON matching the requested schema and nothing else.`,
           },
           { role: 'user', content: buildPrompt(text, draft) },
         ],
@@ -265,24 +337,20 @@ async function callApi(settings: GameArenaSettings, text: MirrorText, draft: str
   }
 }
 
+/**
+ * Score a draft. `local` is the quick check: a rubric over script, sentence
+ * shape, connectives and idea coverage, instant and with nothing to download
+ * (a 28.9 MB "evaluator" download used to gate it, and that model was never
+ * run). `api` sends the draft to the endpoint set in Game Arena settings.
+ * Detailed feedback from the app's own AI goes through the Agent instead.
+ */
 export async function evaluateMirrorWriting(
   settings: GameArenaSettings,
   text: MirrorText,
   draft: string,
-  localModelInstalled: boolean,
 ): Promise<MirrorEvaluationResult> {
   if (settings.mirrorBackend === 'api') {
     return callApi(settings, text, draft, false);
   }
-
-  if (!localModelInstalled) {
-    return {
-      ok: false,
-      reason: 'model-missing',
-      message: 'Download the local Mirror Writing evaluator or switch to a configured API backend.',
-      messageKey: 'games.mirror.error.modelMissing',
-    };
-  }
-
   return { ok: true, evaluation: localRubricEvaluate(text, draft) };
 }

@@ -9,7 +9,7 @@
  * — Study OS raw, Blanc inside `blanc-tool-detail`. Nothing here imports
  * `AppChrome`/`MenuBar`/`StatusBar`, and it never did.
  */
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import './gameArenaLiquid.css';
 import { useCountUp } from '../../motion/hooks';
 import { fireRewardAt } from '../../motion/rewardBurst';
@@ -18,17 +18,41 @@ import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import Icon from '../Icons';
 import { ContextualSurface } from '../liquid/LiquidSurface';
-import { addDeckCards, onDeckChanged } from '../../flashcardDeck';
+import { addDeckCards, loadDeckFolders, onDeckChanged } from '../../flashcardDeck';
 import { onLevelListsChanged } from '../../levelLists';
 import { loadArenaContent, levelCoverage } from '../../games/contentStore';
-import { useAssets } from '../../assetStore';
-import { formatBytes } from '../../../shared/assetRegistry';
-import { MIRROR_TEXTS, type MirrorText } from '../../data/mirrorTexts';
+import { mirrorRotation, mirrorTextsFor, type MirrorText } from '../../data/mirrorTexts';
+import { useStudyLanguage } from '../../useStudyLanguage';
+import { useAiReadiness } from '../../aiSetupClient';
+import { handOffToAgent, routeAgentContext } from '../../agentContextHandoff';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
+import type { StudyLang } from '../../../shared/levelScale';
+import { bankArenaAnswer, bankArenaSession } from '../../games/arenaStudyBridge';
+import {
+  GAME_LIST_TEMPLATE_CSV,
+  GAME_LIST_TEMPLATE_JSON,
+  addGameList,
+  deleteGameList,
+  loadGameLists,
+  onGameListsChanged,
+  parseGameList,
+  type GameListRow,
+} from '../../games/gameItemImport';
+import {
+  MIRROR_TEMPLATE_CSV,
+  MIRROR_TEMPLATE_JSON,
+  MIRROR_USER_EVENT,
+  addUserMirrorTexts,
+  loadUserMirrorTexts,
+  parseMirrorTexts,
+} from '../../games/mirrorTextImport';
+import ContentImportDialog from '../ContentImportDialog';
+import { Button, Select } from '../ui';
 import {
   GAME_DEFINITIONS,
   advanceToNextRound,
   applyRoundOutcome,
-  buildGameRound,
+  buildSessionRounds,
   completionScore,
   evaluateRound,
   gamePoolSize,
@@ -49,8 +73,8 @@ import {
   type GameArenaSettings,
 } from '../../games/settings';
 import { KANA_GROUPS, type KanaGroupId, type KanaScript, type KanaSelection } from '../../games/kanaGroups';
-import { markItemSeen, onSeenProgressChanged, seenProgress } from '../../games/seenProgress';
-import { ArcadeGamePanel, type ArcadeGameId, type ArcadeTheme } from '../../games/ArcadeGames';
+import { markItemSeen, onSeenProgressChanged, seenItems, seenProgress } from '../../games/seenProgress';
+import { AERO_ARCADE_IDS, ArcadeGamePanel, type ArcadeGameId, type ArcadeTheme } from '../../games/ArcadeGames';
 import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../aeroDiscovery';
 import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../../wiredDiscovery';
 import type { ArenaMistake, GameId } from '../../games/types';
@@ -61,7 +85,7 @@ import {
   type GameProgressData,
 } from '../../stats';
 import {
-  MIRROR_EVALUATOR_ASSET_ID,
+  buildMirrorFeedbackRequest,
   evaluateMirrorWriting,
   type MirrorAxis,
   type MirrorEvaluation,
@@ -73,7 +97,16 @@ const ARCADE_GAME_IDS: readonly ArcadeGameId[] = [
   'comet-courier',
   'capsule-sorter',
   'signal-simon',
+  ...AERO_ARCADE_IDS,
 ];
+
+/** The Aero-only games reuse the Special page's names for them. */
+const AERO_GAME_KEYS: Partial<Record<GameId, string>> = {
+  'aero-breakout': 'special.game.aero.breakout',
+  'aero-blocks': 'special.game.aero.blocks',
+  'aero-pong': 'special.game.aero.pong',
+  'aero-snake': 'special.game.aero.snake',
+};
 
 function isArcadeGame(id: GameId): id is ArcadeGameId {
   return ARCADE_GAME_IDS.includes(id as ArcadeGameId);
@@ -107,11 +140,13 @@ function activeLevel(settings: GameArenaSettings, serviceLevel: number): 1 | 2 |
   return Math.min(7, Math.max(1, serviceLevel)) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
 }
 
-function speakJapanese(text: string): void {
+const SPEECH_TAG: Record<StudyLang, string> = { ja: 'ja-JP', zh: 'zh-CN', ru: 'ru-RU' };
+
+function speakStudy(text: string, lang: StudyLang): void {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'ja-JP';
+  utterance.lang = SPEECH_TAG[lang];
   utterance.rate = 0.9;
   window.speechSynthesis.speak(utterance);
 }
@@ -127,17 +162,23 @@ function openArenaSettings(): void {
   }, 80);
 }
 
-function addMistakeToDeck(mistake: ArenaMistake, answerLabel: string): void {
+/**
+ * Mined mistakes land in a folder named in the UI language (it used to be the
+ * English "Game Arena" for everyone), and carry their study language so a
+ * Chinese mistake never turns up in a Japanese review.
+ */
+function addMistakeToDeck(mistake: ArenaMistake, answerLabel: string, folder: string): void {
   addDeckCards([
     {
-      word: mistake.jp || mistake.expected,
+      word: mistake.word || mistake.jp || mistake.expected,
       reading: mistake.reading ?? '',
       meaning: mistake.meaning || mistake.expected,
       sentence: mistake.jp,
       source: 'import',
       bookId: 'game-arena',
-      bookTitle: 'Game Arena',
-      folder: 'Game Arena',
+      bookTitle: folder,
+      folder,
+      ...(mistake.studyLang ? { studyLang: mistake.studyLang } : {}),
       front: mistake.prompt,
       back: `${mistake.expected}${mistake.answer ? `\n\n${answerLabel}: ${mistake.answer}` : ''}`,
     },
@@ -149,23 +190,43 @@ function highScoreFor(progress: GameProgressData, gameId: GameId, level: number,
   return progress.highScores[key]?.score ?? null;
 }
 
-function gameTitleKey(id: GameId): string {
-  return `games.def.${id}.title`;
+/**
+ * Four games test a different skill per study language (kana → pinyin tones /
+ * the Cyrillic alphabet; kanji readings → pinyin / stress; particles → Chinese
+ * particles / Russian case endings; counters → measure words / number
+ * agreement), so they carry their own names there.
+ */
+const PER_LANGUAGE_GAMES = new Set<GameId>(['kana-sprint', 'kanji-reading', 'particle-panic', 'counter-quiz']);
+
+function gameTitleKey(id: GameId, lang: StudyLang = 'ja'): string {
+  if (AERO_GAME_KEYS[id]) return `${AERO_GAME_KEYS[id]}.title`;
+  return lang !== 'ja' && PER_LANGUAGE_GAMES.has(id) ? `games.def.${id}.${lang}.title` : `games.def.${id}.title`;
 }
 
-function gameDescKey(id: GameId): string {
-  return `games.def.${id}.desc`;
+function gameDescKey(id: GameId, lang: StudyLang = 'ja'): string {
+  if (AERO_GAME_KEYS[id]) return `${AERO_GAME_KEYS[id]}.desc`;
+  return lang !== 'ja' && PER_LANGUAGE_GAMES.has(id) ? `games.def.${id}.${lang}.desc` : `games.def.${id}.desc`;
 }
 
-function makeSession(
+/**
+ * A fresh session. The salt makes every session a new draw (the seed used to be
+ * the round index, so "play again" replayed the same questions); items the
+ * player has not met yet come first, and recently missed ones come back.
+ */
+export function makeSession(
   gameId: FastGameId,
   settings: GameArenaSettings,
   level: 1 | 2 | 3 | 4 | 5 | 6 | 7,
   content?: GameContent,
+  history?: { seen?: ReadonlySet<string>; weak?: ReadonlySet<string> },
+  now = Date.now(),
 ): Session {
-  const rounds = Array.from({ length: settings.gameLength }, (_, i) =>
-    buildGameRound(gameId, level, settings.sourceLang, i, content),
-  );
+  const salt = (now ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+  const rounds = buildSessionRounds(gameId, level, settings.sourceLang, settings.gameLength, content, {
+    salt,
+    seen: history?.seen,
+    weak: history?.weak,
+  });
   return {
     gameId,
     rounds,
@@ -176,7 +237,7 @@ function makeSession(
     mistakes: [],
     complete: false,
     reveal: false,
-    startedAt: Date.now(),
+    startedAt: now,
     timeLimitMs: settings.gameLength * 12_000,
   };
 }
@@ -184,7 +245,11 @@ function makeSession(
 export function GameArena() {
   const { t, lang } = useT();
   const [settings, setSettings] = useState(loadGameArenaSettings);
-  const [serviceLevel, setServiceLevel] = useState(() => getUserLevel('ja'));
+  const { lang: studyLang, tag: studyTag } = useStudyLanguage();
+  const [serviceLevel, setServiceLevel] = useState(() => getUserLevel(studyLang));
+  const [importOpen, setImportOpen] = useState(false);
+  const [listName, setListName] = useState('');
+  const [listsNonce, setListsNonce] = useState(0);
   const [progress, setProgress] = useState(loadGameProgress);
   const [selected, setSelected] = useState<GameId>('sentence-builder');
   const [session, setSession] = useState<Session | null>(null);
@@ -196,7 +261,11 @@ export function GameArena() {
   );
 
   useEffect(() => onGameArenaSettingsChanged(() => setSettings(loadGameArenaSettings())), []);
-  useEffect(() => onLevelChange(() => setServiceLevel(getUserLevel('ja'))), []);
+  useEffect(() => {
+    setServiceLevel(getUserLevel(studyLang));
+    return onLevelChange(() => setServiceLevel(getUserLevel(studyLang)));
+  }, [studyLang]);
+  useEffect(() => onGameListsChanged(() => setListsNonce((n) => n + 1)), []);
   useEffect(() => onWiredDiscoveryChanged(setWiredUnlocked), []);
   useEffect(() => onAeroDiscoveryChanged(setAeroUnlocked), []);
   useEffect(() => {
@@ -224,10 +293,13 @@ export function GameArena() {
       offLists();
     };
   }, []);
-  const content = useMemo<GameContent>(
-    () => ({ ...loadArenaContent(level), kana: settings.kana }),
-    [level, deckNonce, settings.kana],
+  const content = useMemo<GameContent & { usingFallback: boolean }>(
+    () => ({ ...loadArenaContent(level, settings.material), kana: settings.kana }),
+    [level, deckNonce, listsNonce, settings.kana, settings.material, studyLang],
   );
+  // Where a session can draw from: everything, one deck folder, or one imported list.
+  const gameLists = useMemo(() => loadGameLists().filter((l) => l.lang === studyLang), [listsNonce, studyLang]);
+  const deckFolders = useMemo(() => loadDeckFolders(), [deckNonce]);
   const coverage = useMemo(() => levelCoverage(level), [level, deckNonce]);
   // Per-game material coverage: how much of this level's pool the player has
   // actually met in this game (the numerator lives in seenProgress).
@@ -237,8 +309,8 @@ export function GameArena() {
     if (selected === 'mirror-writing' || isArcadeGame(selected)) return null;
     // seenNonce is a storage-read trigger: the store changed, re-derive.
     void seenNonce;
-    return seenProgress(selected, level, gamePoolSize(selected, level, content));
-  }, [selected, level, content, seenNonce]);
+    return seenProgress(selected, level, gamePoolSize(selected, level, content), studyLang);
+  }, [selected, level, content, seenNonce, studyLang]);
   // Every finished round is already persisted with its score, accuracy and
   // missed items (`stats.ts` keeps the last 30), and nothing has ever shown it
   // back to the player. The ready state is where it belongs: it is the only
@@ -250,8 +322,13 @@ export function GameArena() {
   );
   const arcadeUnlocked = wiredUnlocked || aeroUnlocked;
   const availableGames = useMemo(
-    () => GAME_DEFINITIONS.filter((game) => arcadeUnlocked || !isArcadeGame(game.id)),
-    [arcadeUnlocked],
+    () =>
+      GAME_DEFINITIONS.filter((game) =>
+        AERO_ARCADE_IDS.includes(game.id as ArcadeGameId)
+          ? aeroUnlocked
+          : arcadeUnlocked || !isArcadeGame(game.id),
+      ),
+    [arcadeUnlocked, aeroUnlocked],
   );
   const selectedDef = availableGames.find((game) => game.id === selected) ?? availableGames[0];
   const highScore = highScoreFor(progress, selected, level, settings.sourceLang);
@@ -283,9 +360,24 @@ export function GameArena() {
     return () => window.removeEventListener('game-arena:select', onSelect);
   }, [arcadeUnlocked, availableGames]);
 
+  // Items met before, and items recently missed, for this game in this language.
+  const historyFor = useCallback(
+    (gameId: FastGameId) => ({
+      seen: seenItems(gameId, level, studyLang),
+      weak: new Set(
+        progress.recent
+          .filter((entry) => entry.gameId === gameId)
+          .flatMap((entry) => entry.mistakes)
+          .filter((m) => (m.studyLang ?? 'ja') === studyLang && !!m.jp)
+          .map((m) => m.jp as string),
+      ),
+    }),
+    [level, progress.recent, studyLang],
+  );
+
   const startSelected = (): void => {
     if (selected === 'mirror-writing' || isArcadeGame(selected)) return;
-    setSession(makeSession(selected, settings, level, content));
+    setSession(makeSession(selected, settings, level, content, historyFor(selected)));
   };
 
   // Both call sites are `setSession` updaters, and a React updater must be
@@ -323,6 +415,8 @@ export function GameArena() {
       accuracy: session.accuracy ?? 0,
       mistakes: session.mistakes,
     });
+    // Session time is study time: it reaches the day's totals in Statistics.
+    bankArenaSession(session.startedAt, session.startedAt + (session.elapsedMs ?? 0));
   }, [session?.complete, session?.startedAt]);
 
   // Scoring lands immediately; advancing waits for REVEAL_MS so the player
@@ -330,7 +424,11 @@ export function GameArena() {
   const submitOutcome = (outcome: RoundOutcome): void => {
     // Any answered round counts as "met this item" — coverage measures
     // exposure to the material, not getting it right.
-    if (currentRound) markItemSeen(currentRound.gameId, level, roundItemKey(currentRound));
+    if (currentRound) {
+      markItemSeen(currentRound.gameId, level, roundItemKey(currentRound), studyLang);
+      // Each answer is study evidence: review log, and the word's card or known level.
+      bankArenaAnswer(currentRound, outcome.correct);
+    }
     setSession((current) => (current ? applyRoundOutcome(current, outcome) : current));
   };
 
@@ -382,8 +480,8 @@ export function GameArena() {
             >
               <Icon name={game.mode === 'writing' ? 'edit' : game.mode === 'arcade' ? 'sparkle' : 'dice'} size={16} />
               <span>
-                <b>{t(gameTitleKey(game.id))}</b>
-                <small>{t(gameDescKey(game.id))}</small>
+                <b>{t(gameTitleKey(game.id, studyLang))}</b>
+                <small>{t(gameDescKey(game.id, studyLang))}</small>
               </span>
             </button>
           ))}
@@ -392,8 +490,8 @@ export function GameArena() {
         <main className="game-stage">
           <ContextualSurface as="section" className="game-stage-head">
             <div>
-              <h3>{t(gameTitleKey(selectedDef.id))}</h3>
-              <p className="muted">{t(gameDescKey(selectedDef.id))}</p>
+              <h3>{t(gameTitleKey(selectedDef.id, studyLang))}</h3>
+              <p className="muted">{t(gameDescKey(selectedDef.id, studyLang))}</p>
             </div>
             <div className="game-stage-meta">
               <span>{t('games.level.n', { level })}</span>
@@ -445,7 +543,7 @@ export function GameArena() {
           ) : isArcadeGame(selected) ? (
             <ArcadeGamePanel
               gameId={selected}
-              theme={arcadeTheme}
+              theme={AERO_ARCADE_IDS.includes(selected) ? 'aero' : arcadeTheme}
               level={level}
               sourceLang={settings.sourceLang}
               onProgress={() => setProgress(loadGameProgress())}
@@ -460,9 +558,39 @@ export function GameArena() {
                         <Icon name="settings" size={14} /> {t('games.roundOptions')}
                       </summary>
                       <div className="game-ready-options-body">
-                        {selected === 'kana-sprint' && (
+                        {selected === 'kana-sprint' && studyLang === 'ja' && (
                           <KanaScopePicker selection={settings.kana} />
                         )}
+                        {/* "Make a game from my deck or list": any deck folder or imported list can be the whole session. */}
+                        <label className="game-material">
+                          <span>{t('games.material.label')}</span>
+                          <Select
+                            value={settings.material}
+                            onChange={(e) => saveGameArenaSettings({ material: e.target.value })}
+                            options={[
+                              { value: 'auto', label: t('games.material.auto') },
+                              ...deckFolders.map((f) => ({ value: `folder:${f}`, label: t('games.material.folder', { name: f }) })),
+                              ...gameLists.map((l) => ({ value: `list:${l.id}`, label: t('games.material.list', { name: l.name, count: l.rows.length }) })),
+                            ]}
+                          />
+                        </label>
+                        <div className="game-material-actions">
+                          <Button size="sm" onClick={() => setImportOpen(true)}>
+                            {t('games.lists.import')}
+                          </Button>
+                          {settings.material.startsWith('list:') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                deleteGameList(settings.material.slice(5));
+                                saveGameArenaSettings({ material: 'auto' });
+                              }}
+                            >
+                              {t('games.lists.delete')}
+                            </Button>
+                          )}
+                        </div>
                         <button type="button" className="btn small" onClick={openArenaSettings}>
                           <Icon name="settings" size={14} /> {t('games.settings')}
                         </button>
@@ -525,7 +653,7 @@ export function GameArena() {
                       })
                   : ''}
               </p>
-              {currentRound && (
+              {currentRound && session && (
                 <RoundPanel
                   key={currentRound.id}
                   round={currentRound}
@@ -543,13 +671,42 @@ export function GameArena() {
               {session?.complete && (
                 <ResultPanel
                   session={session}
-                  onRestart={() => setSession(makeSession(session.gameId, settings, level, content))}
+                  onRestart={() => setSession(makeSession(session.gameId, settings, level, content, historyFor(session.gameId)))}
                 />
               )}
             </>
           )}
         </main>
       </div>
+
+      <ContentImportDialog<GameListRow>
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title={t('games.lists.importTitle')}
+        description={t('games.lists.importDesc')}
+        templates={{ csv: GAME_LIST_TEMPLATE_CSV, json: GAME_LIST_TEMPLATE_JSON }}
+        templateName="game-word-list"
+        parse={(text, fileName) => parseGameList(text, fileName, studyLang)}
+        columns={[
+          { label: t('games.lists.col.word'), value: (r) => r.word, lang: () => studyTag },
+          { label: t('games.lists.col.reading'), value: (r) => r.reading ?? '' },
+          { label: t('games.lists.col.meaning'), value: (r) => r.meaning },
+          { label: t('games.lists.col.sentence'), value: (r) => r.sentence ?? '', lang: () => studyTag },
+        ]}
+        extra={
+          <label className="content-import-name">
+            <span>{t('games.lists.name')}</span>
+            <input className="ui-input" value={listName} onChange={(e) => setListName(e.target.value)} placeholder={t('games.lists.namePlaceholder')} />
+          </label>
+        }
+        commitBlockedReason={listName.trim() ? undefined : t('games.lists.nameRequired')}
+        onCommit={(rows) => {
+          const list = addGameList(listName, studyLang, rows);
+          saveGameArenaSettings({ material: `list:${list.id}` });
+          setListName('');
+          return t('games.lists.imported', { count: rows.length, name: list.name });
+        }}
+      />
 
       {!!progress.badges.length && (
         <section className="game-badges" aria-label={t('games.badges')}>
@@ -766,18 +923,18 @@ function TypeRoundPanel({
   // Audio rounds speak on their own so the player isn't hunting for a button
   // before the round can even start; the button is there to hear it again.
   useEffect(() => {
-    if (round.speak && sounds) speakJapanese(round.jp);
+    if (round.speak && sounds) speakStudy(round.jp, round.studyLang);
   }, [round.id]);
   return (
     <div className="game-round">
       <PromptBlock round={round} />
       {round.speak && (
-        <button type="button" className="btn" disabled={!sounds} onClick={() => speakJapanese(round.jp)}>
+        <button type="button" className="btn" disabled={!sounds} onClick={() => speakStudy(round.jp, round.studyLang)}>
           <Icon name="volume" size={14} /> {t('games.action.listen')}
         </button>
       )}
       <textarea
-        lang={round.inputLang === 'ja' ? 'ja' : round.inputLang === 'zh' ? 'zh' : undefined}
+        lang={round.inputLang === 'en' ? undefined : round.inputLang}
         className="game-answer-box"
         // The one unnamed control on the surface: no label, no placeholder and
         // no id to point a label at, so it announced as a bare edit field while
@@ -797,7 +954,7 @@ function TypeRoundPanel({
           }
         }}
       />
-      <RoundVerdict outcome={result} expected={round.answer} />
+      <RoundVerdict outcome={result} expected={round.answer} lang={round.inputLang === 'en' || round.inputLang === round.sourceLang ? undefined : round.studyLang} />
       <button type="button" className="btn primary" disabled={!value.trim() || locked} onClick={submit}>
         {t('games.action.check')}
       </button>
@@ -806,7 +963,7 @@ function TypeRoundPanel({
 }
 
 /** Shared correct/incorrect line for the games that check on demand. */
-function RoundVerdict({ outcome, expected }: { outcome: RoundOutcome | null; expected: string }) {
+function RoundVerdict({ outcome, expected, lang }: { outcome: RoundOutcome | null; expected: string; lang?: string }) {
   const { t } = useT();
   if (!outcome) return null;
   return (
@@ -819,7 +976,7 @@ function RoundVerdict({ outcome, expected }: { outcome: RoundOutcome | null; exp
         <>
           <Icon name="close" size={14} />{' '}
           <span>
-            {t('games.verdict.answer')} <b lang="ja">{expected}</b>
+            {t('games.verdict.answer')} <b lang={lang}>{expected}</b>
           </span>
         </>
       )}
@@ -862,21 +1019,21 @@ function BuilderRoundPanel({
   return (
     <div className="game-round">
       <PromptBlock round={round} />
-      <div className={`game-builder-answer ${result ? (result.correct ? 'ok' : 'bad') : ''}`.trim()} lang="ja">
+      <div className={`game-builder-answer ${result ? (result.correct ? 'ok' : 'bad') : ''}`.trim()} lang={round.studyLang}>
         {answer.map((token) => (
           <button key={token.id} type="button" disabled={locked} onClick={() => undo(token.id)}>
             {token.token}
           </button>
         ))}
       </div>
-      <div className="game-token-bank" lang="ja">
+      <div className="game-token-bank" lang={round.studyLang}>
         {bank.map((token) => (
           <button key={token.id} type="button" disabled={locked} onClick={() => pick(token.id)}>
             {token.token}
           </button>
         ))}
       </div>
-      <RoundVerdict outcome={result} expected={round.answerTokens.join('')} />
+      <RoundVerdict outcome={result} expected={round.answerTokens.join(round.studyLang === 'ru' ? ' ' : '')} lang={round.studyLang} />
       <button
         type="button"
         className="btn primary"
@@ -952,7 +1109,7 @@ function MatchRoundPanel({
                 style={{ '--i': i } as CSSProperties}
                 onClick={() => (paired ? clear(pairItem.jp) : setSelected(pairItem.jp))}
               >
-                <span lang="ja">
+                <span lang={round.studyLang}>
                   {pairItem.jp}
                   <small>{pairItem.reading}</small>
                 </span>
@@ -1049,7 +1206,7 @@ function ResultPanel({ session, onRestart }: { session: Session; onRestart: () =
                 type="button"
                 className="btn small"
                 onClick={() => {
-                  addMistakeToDeck(mistake, t('games.mistake.yourAnswer'));
+                  addMistakeToDeck(mistake, t('games.mistake.yourAnswer'), t('games.deck.folder'));
                   window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('games.toast.savedToFlashcards'), kind: 'ok' } }));
                 }}
               >
@@ -1063,10 +1220,6 @@ function ResultPanel({ session, onRestart }: { session: Session; onRestart: () =
   );
 }
 
-function selectMirrorText(level: number): MirrorText {
-  return MIRROR_TEXTS.find((text) => text.level === level) ?? MIRROR_TEXTS[0];
-}
-
 function MirrorWritingPanel({
   settings,
   level,
@@ -1075,22 +1228,42 @@ function MirrorWritingPanel({
   level: 1 | 2 | 3 | 4 | 5 | 6 | 7;
 }) {
   const { t } = useT();
-  const { views, start } = useAssets();
+  const { lang: studyLang, tag: studyTag } = useStudyLanguage();
+  const ai = useAiReadiness();
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [evaluation, setEvaluation] = useState<MirrorEvaluation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [ownNonce, setOwnNonce] = useState(0);
+  useEffect(() => {
+    const bump = () => setOwnNonce((n) => n + 1);
+    window.addEventListener(MIRROR_USER_EVENT, bump);
+    return () => window.removeEventListener(MIRROR_USER_EVENT, bump);
+  }, []);
 
-  const text = useMemo(() => selectMirrorText(level), [level]);
-  const asset = views.find((view) => view.spec.id === MIRROR_EVALUATOR_ASSET_ID);
-  const installed = asset?.status.state === 'installed';
-  const downloadable = asset?.status.state === 'not-installed' || asset?.status.state === 'failed';
+  // Every text for this language, the current level first. The picker used to
+  // take the first text at the level, so 7 of 98 could ever appear.
+  const rotation = useMemo(
+    () => mirrorRotation(mirrorTextsFor(studyLang, loadUserMirrorTexts()), level),
+    [studyLang, level, ownNonce],
+  );
+  const [offset, setOffset] = useState(() => Math.floor(Math.random() * 1000));
+  const levelCount = useMemo(() => rotation.filter((r) => r.level === level).length || rotation.length, [rotation, level]);
+  const text: MirrorText = rotation[offset % Math.max(1, levelCount)] ?? rotation[0];
+
+  const nextText = (): void => {
+    setOffset((o) => o + 1);
+    setDraft('');
+    setEvaluation(null);
+    setError(null);
+  };
 
   const submit = async (): Promise<void> => {
     setBusy(true);
     setError(null);
     setEvaluation(null);
-    const result = await evaluateMirrorWriting(settings, text, draft, installed);
+    const result = await evaluateMirrorWriting(settings, text, draft);
     setBusy(false);
     if (!result.ok) {
       // The evaluator is a plain module, so it hands back a key and resolves it
@@ -1109,6 +1282,22 @@ function MirrorWritingPanel({
     });
   };
 
+  const askAi = (): void => {
+    const request = buildMirrorFeedbackRequest(text, draft);
+    void handOffToAgent(
+      {
+        kind: 'selected-text',
+        label: draft.trim().slice(0, 80),
+        preview: request,
+        source: { app: 'games', entityId: text.id },
+        identity: `mirror/${text.id}/${draft.trim().slice(0, 200)}`,
+        now: Date.now(),
+      },
+      t('games.mirror.aiConversation', { title: text.title }),
+      routeAgentContext('games', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.games)),
+    );
+  };
+
   return (
     <div className="mirror-writing">
       <div className="mirror-idea-map">
@@ -1116,7 +1305,7 @@ function MirrorWritingPanel({
         {text.ideaMap.map((idea, index) => (
           <div key={idea.id} className="mirror-idea">
             <b>{index + 1}</b>
-            <span>{idea.concepts[settings.sourceLang] || idea.concepts.en}</span>
+            <span>{(settings.sourceLang as string) === studyLang ? idea.concepts.en : idea.concepts[settings.sourceLang] || idea.concepts.en}</span>
           </div>
         ))}
       </div>
@@ -1124,7 +1313,7 @@ function MirrorWritingPanel({
       <label className="mirror-draft">
         <span>{t('games.mirror.draft')}</span>
         <textarea
-          lang="ja"
+          lang={studyTag}
           rows={8}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -1136,18 +1325,25 @@ function MirrorWritingPanel({
         <button type="button" className="btn primary" disabled={busy || draft.trim().length < 8} onClick={() => void submit()}>
           {busy ? t('games.mirror.evaluating') : t('games.mirror.submit')}
         </button>
-        {settings.mirrorBackend === 'local' && asset && (
-          <span className="muted">
-            {installed
-              ? t('games.mirror.modelInstalled')
-              : t('games.mirror.modelSize', { size: formatBytes(asset.spec.sizeBytes) })}
-          </span>
-        )}
-        {settings.mirrorBackend === 'local' && downloadable && (
-          <button type="button" className="btn" onClick={() => void start(MIRROR_EVALUATOR_ASSET_ID)}>
-            <Icon name="download" size={14} /> {t('games.mirror.downloadModel')}
+        {settings.mirrorBackend === 'local' && <span className="muted">{t('games.mirror.quickCheckNote')}</span>}
+        {ai.loaded && ai.enabled && ai.ready && (
+          <button
+            data-ai-entry
+            type="button"
+            className="btn"
+            disabled={draft.trim().length < 8}
+            title={draft.trim().length < 8 ? t('games.mirror.aiNeedsDraft') : undefined}
+            onClick={askAi}
+          >
+            {t('games.mirror.aiFeedback')}
           </button>
         )}
+        <button type="button" className="btn" onClick={nextText}>
+          {t('games.mirror.nextText')}
+        </button>
+        <button type="button" className="btn small" onClick={() => setImportOpen(true)}>
+          {t('games.mirror.importTexts')}
+        </button>
         <button type="button" className="btn small" onClick={openArenaSettings}>
           {t('games.settings')}
         </button>
@@ -1176,10 +1372,27 @@ function MirrorWritingPanel({
           ))}
           <details className="mirror-reference">
             <summary>{t('games.mirror.reference')}</summary>
-            <p lang="ja">{text.reference}</p>
+            <p lang={studyTag}>{text.reference}</p>
           </details>
         </div>
       )}
+
+      <ContentImportDialog<MirrorText>
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title={t('games.mirror.importTitle')}
+        description={t('games.mirror.importDesc')}
+        templates={{ csv: MIRROR_TEMPLATE_CSV, json: MIRROR_TEMPLATE_JSON }}
+        templateName="mirror-writing-texts"
+        parse={(raw, fileName) => parseMirrorTexts(raw, fileName, studyLang)}
+        columns={[
+          { label: t('games.mirror.col.title'), value: (r) => r.title },
+          { label: t('games.mirror.col.level'), value: (r) => t('games.level.n', { level: r.level }) },
+          { label: t('games.mirror.col.ideas'), value: (r) => r.ideaMap.length },
+          { label: t('games.mirror.col.reference'), value: (r) => r.reference, lang: (r) => r.lang },
+        ]}
+        onCommit={(rows) => t('games.mirror.imported', { count: addUserMirrorTexts(rows) })}
+      />
     </div>
   );
 }

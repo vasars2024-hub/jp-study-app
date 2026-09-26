@@ -4,7 +4,18 @@ import { localizeArcadeText } from './arcadeText';
 import type { SourceLang } from './types';
 import { recordGameResult } from '../stats';
 
-export type ArcadeGameId = 'star-invaders' | 'comet-courier' | 'capsule-sorter' | 'signal-simon';
+export type ArcadeGameId =
+  | 'star-invaders'
+  | 'comet-courier'
+  | 'capsule-sorter'
+  | 'signal-simon'
+  | 'aero-breakout'
+  | 'aero-blocks'
+  | 'aero-pong'
+  | 'aero-snake';
+
+/** The four Aero-only games (the Special page's Aero collection). */
+export const AERO_ARCADE_IDS: readonly ArcadeGameId[] = ['aero-breakout', 'aero-blocks', 'aero-pong', 'aero-snake'];
 export type ArcadeTheme = 'wired' | 'aero';
 
 interface ArcadeGamePanelProps {
@@ -138,13 +149,17 @@ function ArcadeShell({
   );
 }
 
+/**
+ * One game per id, in either theme. The Aero theme used to swap every title for
+ * a different game (Space Invaders launched Breakout, LanderSim launched the
+ * block puzzle…), while the themed games already carry their own Aero look;
+ * the four Aero-only games now have ids of their own.
+ */
 export function ArcadeGamePanel(props: ArcadeGamePanelProps) {
-  if (props.theme === 'aero') {
-    if (props.gameId === 'star-invaders') return <AeroBreakout {...props} />;
-    if (props.gameId === 'comet-courier') return <AeroTetris {...props} />;
-    if (props.gameId === 'capsule-sorter') return <AeroPong {...props} />;
-    return <AeroSnake {...props} />;
-  }
+  if (props.gameId === 'aero-breakout') return <AeroBreakout {...props} />;
+  if (props.gameId === 'aero-blocks') return <AeroTetris {...props} />;
+  if (props.gameId === 'aero-pong') return <AeroPong {...props} />;
+  if (props.gameId === 'aero-snake') return <AeroSnake {...props} />;
   if (props.gameId === 'star-invaders') return <ThemedInvaders {...props} />;
   if (props.gameId === 'comet-courier') return <ThemedLander {...props} />;
   if (props.gameId === 'capsule-sorter') return <ThemedCapsuleStack {...props} />;

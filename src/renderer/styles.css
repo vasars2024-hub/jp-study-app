@@ -25805,6 +25805,28 @@ html.lockscreen-widget-root #root {
 
 /* GrammarX Practice / Test / Notebook / Translation History */
 .gx-practice { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; }
+/* "Import your own" dialog, shared by every importer. Flat sections, no inner boxes. */
+.content-import { width: min(760px, 92vw); }
+.content-import .content-import-desc { margin: 0 0 12px; }
+.content-import-template-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 600; font-size: 12px; }
+.content-import-seg { display: inline-flex; gap: 2px; margin-left: auto; }
+.content-import-sample { margin: 8px 0 4px; padding: 8px 10px; max-height: 140px; overflow: auto; font-size: 12px; line-height: 1.5; background: var(--hover, rgba(127,127,127,0.08)); border-radius: 8px; white-space: pre; }
+.content-import-note { font-size: 11px; margin: 0 0 12px; }
+.content-import-source { display: flex; align-items: center; gap: 10px; margin: 10px 0 6px; }
+.content-import-file { position: relative; overflow: hidden; cursor: pointer; }
+.content-import-file input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.content-import-paste { width: 100%; box-sizing: border-box; resize: vertical; font: 12px/1.5 var(--font-mono, ui-monospace, monospace); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: inherit; }
+.content-import-paste:focus { outline: none; border-color: var(--accent); }
+.content-import-name { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 12px; }
+.content-import-name .ui-input { flex: 1; }
+.content-import-preview { margin-top: 10px; max-height: 240px; overflow: auto; }
+.content-import-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.content-import-table th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.content-import-table td { padding: 4px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Game Arena: what a session draws from. */
+.game-material { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.game-material > span { color: var(--muted); }
+.game-material-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 /* Grammar review (spaced review of due points). One card, no nested panels. */
 .gx-review { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px; max-width: 760px; outline: none; }
 .gx-review-summary { font-size: 12px; }

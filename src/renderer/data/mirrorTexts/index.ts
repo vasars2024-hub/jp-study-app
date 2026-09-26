@@ -1,17 +1,25 @@
-import type { LevelTier } from '../../../shared/levelScale';
+import type { LevelTier, StudyLang } from '../../../shared/levelScale';
 import type { SourceLang } from '../../games/types';
+import { RU_MIRROR_TEXTS, ZH_MIRROR_TEXTS } from './zhRu';
+
+export { RU_MIRROR_TEXTS, ZH_MIRROR_TEXTS };
 
 export interface MirrorIdea {
   id: string;
-  concepts: Record<SourceLang, string>;
+  /** What to express, in the player's languages. English is required; the rest fall back to it. */
+  concepts: { en: string } & Partial<Record<SourceLang, string>>;
 }
 
 export interface MirrorText {
   id: string;
+  /** The language the reference is written in. Absent means Japanese (the original set). */
+  lang?: StudyLang;
   level: LevelTier;
   title: string;
   ideaMap: MirrorIdea[];
   reference: string;
+  /** Set on texts the learner imported. */
+  userImported?: boolean;
 }
 
 // Authoring rules — the Mirror Writing flow and its evaluator depend on these:
@@ -1115,3 +1123,20 @@ export const MIRROR_TEXTS: MirrorText[] = [
     reference: '問いが誤っていれば、いかに正しい答えを得ようとも救われることはない。多くの研究は、測りやすいものばかりを測っているのが実情である。問題をどう立てるかということこそ、最も困難な仕事なのだ。',
   },
 ];
+
+/** Every bundled text for a study language, plus the learner's own. */
+export function mirrorTextsFor(lang: StudyLang, own: readonly MirrorText[] = []): MirrorText[] {
+  const bundled = lang === 'zh' ? ZH_MIRROR_TEXTS : lang === 'ru' ? RU_MIRROR_TEXTS : MIRROR_TEXTS;
+  return [...bundled, ...own.filter((text) => (text.lang ?? 'ja') === lang)];
+}
+
+/**
+ * The texts to rotate through at a level: the level itself first, then one
+ * either side, then anything — so a level with few texts still has a "next".
+ */
+export function mirrorRotation(texts: readonly MirrorText[], level: LevelTier): MirrorText[] {
+  const exact = texts.filter((t) => t.level === level);
+  const near = texts.filter((t) => Math.abs(t.level - level) === 1);
+  const rest = texts.filter((t) => Math.abs(t.level - level) > 1);
+  return [...exact, ...near, ...rest];
+}

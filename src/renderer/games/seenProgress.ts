@@ -3,7 +3,8 @@
 // through X% of this level's material" bar. Distinct from stats.ts (XP,
 // badges, high scores): this measures coverage of material, not performance.
 
-import type { LevelTier } from '../../shared/levelScale';
+import type { LevelTier, StudyLang } from '../../shared/levelScale';
+import { writeLocalStorageJson } from '../localStorageWrite';
 import type { GameId } from './types';
 
 const KEY = 'jp-game-arena-seen-v1';
@@ -14,8 +15,12 @@ const MAX_KEYS_PER_BUCKET = 4000;
 
 type SeenMap = Record<string, string[]>;
 
-function bucketKey(gameId: GameId, level: LevelTier): string {
-  return `${gameId}|${level}`;
+/**
+ * Japanese keeps the original bucket name so progress recorded before other
+ * study languages existed still counts; Chinese and Russian get their own.
+ */
+function bucketKey(gameId: GameId, level: LevelTier, lang: StudyLang = 'ja'): string {
+  return lang === 'ja' ? `${gameId}|${level}` : `${gameId}|${level}|${lang}`;
 }
 
 function load(): SeenMap {
@@ -29,26 +34,28 @@ function load(): SeenMap {
 }
 
 function persist(map: SeenMap): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(map));
-  } catch {
-    /* storage full — progress display degrades, play is unaffected */
-  }
+  // A full store only degrades the progress display; play is unaffected.
+  writeLocalStorageJson(KEY, map);
   window.dispatchEvent(new CustomEvent(SEEN_PROGRESS_EVENT));
 }
 
-export function markItemSeen(gameId: GameId, level: LevelTier, itemKey: string): void {
+export function markItemSeen(gameId: GameId, level: LevelTier, itemKey: string, lang: StudyLang = 'ja'): void {
   if (!itemKey) return;
   const map = load();
-  const key = bucketKey(gameId, level);
+  const key = bucketKey(gameId, level, lang);
   const bucket = map[key] ?? [];
   if (bucket.includes(itemKey)) return;
   map[key] = [...bucket, itemKey].slice(-MAX_KEYS_PER_BUCKET);
   persist(map);
 }
 
-export function seenCount(gameId: GameId, level: LevelTier): number {
-  return (load()[bucketKey(gameId, level)] ?? []).length;
+export function seenCount(gameId: GameId, level: LevelTier, lang: StudyLang = 'ja'): number {
+  return (load()[bucketKey(gameId, level, lang)] ?? []).length;
+}
+
+/** The items met so far, so a new session can prefer the ones not met yet. */
+export function seenItems(gameId: GameId, level: LevelTier, lang: StudyLang = 'ja'): Set<string> {
+  return new Set(load()[bucketKey(gameId, level, lang)] ?? []);
 }
 
 export interface SeenProgress {
@@ -62,8 +69,13 @@ export interface SeenProgress {
  * seen (deck edited, kana scope narrowed), so `seen` is clamped to `total` —
  * a bar past 100% would read as a bug, not an achievement.
  */
-export function seenProgress(gameId: GameId, level: LevelTier, poolSize: number): SeenProgress {
-  const seen = Math.min(seenCount(gameId, level), poolSize);
+export function seenProgress(
+  gameId: GameId,
+  level: LevelTier,
+  poolSize: number,
+  lang: StudyLang = 'ja',
+): SeenProgress {
+  const seen = Math.min(seenCount(gameId, level, lang), poolSize);
   return {
     seen,
     total: poolSize,

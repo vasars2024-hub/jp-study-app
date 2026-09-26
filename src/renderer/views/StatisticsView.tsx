@@ -122,6 +122,18 @@ export default function StatisticsView() {
                     </div>
                   </>
                 )}
+                {s.totalStudySeconds > 0 && (
+                  <>
+                    <div>
+                      <dt>{t('stats.card.studiedToday')}</dt>
+                      <dd>{formatDuration(s.todayStudySeconds)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('stats.card.totalStudied')}</dt>
+                      <dd>{formatDuration(s.totalStudySeconds)}</dd>
+                    </div>
+                  </>
+                )}
               </dl>
             </aside>
 

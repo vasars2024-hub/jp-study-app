@@ -36,7 +36,7 @@ const evaluateAll = async () => {
   const out = [];
   for (const draft of DRAFTS) {
     for (const t of MIRROR_TEXTS.slice(0, 4)) {
-      const result = await evaluateMirrorWriting(local, t, draft, true);
+      const result = await evaluateMirrorWriting(local, t, draft);
       expect(result.ok, `local rubric refused a draft of ${draft.length} chars`).toBe(true);
       if (result.ok) out.push(result.evaluation);
     }
@@ -80,16 +80,12 @@ describe('Mirror Writing explains itself in the UI language', () => {
   });
 
   it('keys the refusals it writes itself, and leaves a platform exception alone', async () => {
-    const noModel = await evaluateMirrorWriting(local, text, 'こんにちは。', false);
-    expect(noModel.ok).toBe(false);
-    if (!noModel.ok) {
-      expect(noModel.reason).toBe('model-missing');
-      expect(noModel.messageKey).toBe('games.mirror.error.modelMissing');
-      expect(GAME_ARENA_CHROME_EN).toHaveProperty('games.mirror.error.modelMissing');
-    }
+    // The quick check has no refusal of its own any more: it always grades.
+    const quick = await evaluateMirrorWriting(local, text, 'こんにちは。');
+    expect(quick.ok).toBe(true);
 
     const api = { ...DEFAULT_GAME_ARENA_SETTINGS, mirrorBackend: 'api' as const, mirrorApiUrl: '', mirrorApiKey: '' };
-    const noKey = await evaluateMirrorWriting(api, text, 'こんにちは。', true);
+    const noKey = await evaluateMirrorWriting(api, text, 'こんにちは。');
     expect(noKey.ok).toBe(false);
     if (!noKey.ok) {
       expect(noKey.reason).toBe('api-missing');
