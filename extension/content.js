@@ -707,13 +707,15 @@
     const first = hit.entries && hit.entries[0];
     termEl.textContent = hit.term;
     readingEl.textContent = first && first.reading && first.reading !== hit.term ? first.reading : '';
+    termEl.lang = studyLangAttr(hit.term);
+    readingEl.lang = termEl.lang;
     backBtn.hidden = hitHistory.length === 0;
 
     const bits = [];
     if (hit.deinflection && hit.deinflection.term && hit.deinflection.term !== hit.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
       bits.push(
-        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="ja">${esc(hit.deinflection.term)}</b>${
+        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="${studyLangAttr(hit.deinflection.term)}">${esc(hit.deinflection.term)}</b>${
           reasons ? ` <span class="rp-deinf" title="${uiHtml('content_rpDeinfTitle')}">${esc(reasons)}</span>` : ''
         }</span>`,
       );
@@ -786,8 +788,8 @@
         : '';
       block.innerHTML = `
         <div class="rp-entry-head">
-          <span class="rp-entry-word" lang="ja">${esc(word)}</span>
-          ${reading && reading !== word ? `<span class="rp-entry-reading" lang="ja">${esc(reading)}</span>` : ''}
+          <span class="rp-entry-word" lang="${studyLangAttr(word)}">${esc(word)}</span>
+          ${reading && reading !== word ? `<span class="rp-entry-reading" lang="${studyLangAttr(word)}">${esc(reading)}</span>` : ''}
           ${entry.source ? `<span class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(entry.source)}</span>` : ''}
         </div>
         ${idx === 0 ? pitch : ''}
@@ -828,7 +830,7 @@
     const matches = Array.isArray(res.matches) ? res.matches : [];
     if (!matches.length) {
       body.innerHTML = `
-        <div class="rp-sentence-line" lang="ja">${highlightTermInSentence(sentence, hit.term)}</div>
+        <div class="rp-sentence-line" lang="${studyLangAttr(sentence)}">${highlightTermInSentence(sentence, hit.term)}</div>
         <div class="rp-empty">${uiHtml('content_rpNoGrammar')}</div>`;
       return;
     }
@@ -840,7 +842,7 @@
         return `
         <div class="rp-grammar" data-pattern="${esc(pattern)}">
           <div class="rp-grammar-head">
-            <span class="rp-grammar-title" lang="ja">${esc(pattern)}</span>
+            <span class="rp-grammar-title" lang="${studyLangAttr(sentence)}">${esc(pattern)}</span>
             ${m.level ? `<span class="rp-badge jlpt">${esc(m.level)}</span>` : ''}
             ${span ? `<span class="rp-badge span-ok" title="${uiHtml('content_rpInSentenceTitle')}">${uiHtml('content_rpInSentence')}</span>` : `<span class="rp-badge span-guess" title="${uiHtml('content_rpPatternMatchTitle')}">${uiHtml('content_rpPatternMatch')}</span>`}
           </div>
@@ -849,7 +851,7 @@
       })
       .join('');
     body.innerHTML = `
-      <div class="rp-sentence-line" lang="ja">${highlightGrammarSpans(sentence, matches, hit.term)}</div>
+      <div class="rp-sentence-line" lang="${studyLangAttr(sentence)}">${highlightGrammarSpans(sentence, matches, hit.term)}</div>
       ${items}
       <div class="rp-note">${uiHtml('content_rpGrammarNote')}</div>
       <div class="rp-row">
@@ -921,7 +923,7 @@
     }
     const sentence = hit.sentence.text;
     body.innerHTML = `
-      <div class="rp-sentence-line big" lang="ja">${highlightTermInSentence(sentence, hit.term)}</div>
+      <div class="rp-sentence-line big" lang="${studyLangAttr(sentence)}">${highlightTermInSentence(sentence, hit.term)}</div>
       <div class="rp-row rp-sentence-tools">
         <button type="button" class="rp-mini" data-act="sent-extend-left" title="${uiHtml('content_rpExtendPrevTitle')}">${uiHtml('content_rpExtendPrev')}</button>
         <button type="button" class="rp-mini" data-act="sent-extend-right" title="${uiHtml('content_rpExtendNextTitle')}">${uiHtml('content_rpExtendNext')}</button>
@@ -1014,9 +1016,9 @@
           : '';
         return `
         <div class="rp-kanji">
-          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="ja" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
+          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="${studyLangAttr(hit.term)}" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
           <div class="rp-kanji-meta">
-            ${r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="ja">${esc(r.entry.reading)}</div>` : ''}
+            ${r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="${studyLangAttr(hit.term)}">${esc(r.entry.reading)}</div>` : ''}
             <div class="rp-kanji-meanings">${esc(meanings || uiMsg('content_rpNoKanjiEntry'))}</div>
           </div>
         </div>`;
@@ -1047,7 +1049,7 @@
         .map(
           (ex, i) => `
         <div class="rp-example" data-idx="${i}">
-          <div class="rp-example-jp" lang="ja">${highlightTermInSentence(String(ex.jp || ''), query)}</div>
+          <div class="rp-example-jp" lang="${studyLangAttr(String(ex.jp || '') || query)}">${highlightTermInSentence(String(ex.jp || ''), query)}</div>
           ${ex.en ? `<div class="rp-example-en">${esc(ex.en)}</div>` : ''}
           <div class="rp-example-tools">
             <button type="button" class="rp-mini" data-act="example-tts" data-text="${esc(ex.jp || '')}">${uiHtml('content_rpPlayExample')}</button>
@@ -1074,7 +1076,7 @@
     if (hit.deinflection && hit.deinflection.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
       rows.push(
-        `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpDeconjugation')}</span><span class="rp-more-v" lang="ja">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
+        `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpDeconjugation')}</span><span class="rp-more-v" lang="${studyLangAttr(hit.term)}">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
       );
     }
     rows.push(
@@ -1268,6 +1270,22 @@
     const hint = currentLangHint();
     if (/[㐀-鿿]/.test(s)) return hint === 'zh' ? 'zh' : 'ja';
     return hint || '';
+  }
+
+  /**
+   * The `lang` study text is marked with. It was `ja` everywhere, so a Chinese
+   * word or sentence was drawn with Japanese glyph shapes (Han unification) and
+   * Cyrillic in a Japanese font. A Chinese page's own zh-* tag (Hant/Hans) wins.
+   */
+  function studyLangAttr(text) {
+    return langAttrOf(lookupLangFor(text));
+  }
+
+  function langAttrOf(lang) {
+    if (lang === 'ru') return 'ru';
+    if (lang !== 'zh') return 'ja';
+    const page = String((document.documentElement && document.documentElement.lang) || '').toLowerCase();
+    return /^zh(-|$)/.test(page) ? page : 'zh-CN';
   }
 
   function speak(text) {
@@ -1907,6 +1925,7 @@
     } else if (cardSource?.text) {
       ta.value = cardSource.text;
     }
+    ta.lang = studyLangAttr(ta.value);
   }
 
   function openCardPreview(kindOverride) {
@@ -3344,6 +3363,8 @@
       return;
     }
     body.value = (res.text || '').trim();
+    // The language the OCR engine read, else the text's own script.
+    body.lang = res.lang === 'ja' || res.lang === 'zh' || res.lang === 'ru' ? langAttrOf(res.lang) : studyLangAttr(body.value);
     hint.textContent = body.value
       ? uiMsg('content_ocrReadHint', describeOcrEngine(res))
       : uiMsg('content_ocrNothing');

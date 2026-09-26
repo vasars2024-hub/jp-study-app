@@ -5,7 +5,9 @@
  *   language), not the old fixed ja → en;
  * - a missing translation model (the app's 503) is named in the UI language;
  * - an OCR whose models are still downloading, or missing, says so in the UI
- *   language — the app's English `error` used to win over both.
+ *   language — the app's English `error` used to win over both;
+ * - Chinese / Russian study text is marked with its own `lang` (it was `ja`
+ *   everywhere, drawing Chinese with Japanese glyph shapes).
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -90,5 +92,23 @@ describe('content script — messages in the page and UI language', () => {
     expect(hint()).toBe(ja.getMessage('content_ocrNoModels'));
     deliver({ type: 'jp-show-ocr', result: { ok: false, available: true, error: 'boom' } });
     expect(hint()).toBe('boom');
+  });
+
+  it('marks Chinese and Russian study text with its own lang, not ja', async () => {
+    document.documentElement.lang = 'zh-CN';
+    reply = (msg) =>
+      msg.type === 'lookup'
+        ? { ok: true, entries: String(msg.query) === '学习' ? [{ word: '学习', reading: 'xuéxí', meanings: ['to study'] }] : [] }
+        : { ok: true };
+    deliver({ type: 'jp-lookup-selection', text: '学习' });
+    for (let i = 0; i < 20 && !document.querySelector('#jp-study-popup .rp-entry-word'); i++) await flush();
+    expect(document.querySelector('#jp-study-popup .rp-term')?.getAttribute('lang')).toBe('zh-cn');
+    expect(document.querySelector('#jp-study-popup .rp-entry-word')?.getAttribute('lang')).toBe('zh-cn');
+
+    deliver({ type: 'jp-show-ocr', result: { ok: true, text: '我喜欢学习', lang: 'zh', engine: 'web' } });
+    expect(document.querySelector('.jp-ocr-body')?.getAttribute('lang')).toBe('zh-cn');
+    deliver({ type: 'jp-show-ocr', result: { ok: true, text: 'Я читаю книгу', lang: 'ru', engine: 'web' } });
+    expect(document.querySelector('.jp-ocr-body')?.getAttribute('lang')).toBe('ru');
+    document.documentElement.lang = '';
   });
 });
