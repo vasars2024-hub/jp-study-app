@@ -27,16 +27,34 @@ export interface MediaLanguageGrammar {
   level: string;
 }
 
+/**
+ * What an analysis covered. Every analysis — one episode, a season harvest, a
+ * time range, a visual novel — is one profile in this store, keyed by the
+ * media item (or `series:<id>` for a harvest); this says which kind it is.
+ */
+export interface MediaProfileScope {
+  kind: 'episode' | 'series' | 'range' | 'visual-novel';
+  /** Human-readable extent, e.g. "1–12" or "12:30–24:00". */
+  label?: string;
+}
+
 export interface MediaLanguageProfile {
   mediaId: string;
   title: string;
   updatedAt: number;
+  scope?: MediaProfileScope;
   analyzedCharacters: number;
   truncated: boolean;
   difficulty: {
     score: number;
     band: MediaDifficultyBand;
     jlptLevel: string | null;
+    /**
+     * Where the level came from: the learner's uploaded lists, or an estimate
+     * from the offline dictionary (KANJIDIC2 JLPT, HSK, frequency ranks).
+     * Absent on profiles written before the estimate existed.
+     */
+    levelSource?: 'lists' | 'dictionary';
     confidence: number;
     knownRatio: number;
     unknownRatio: number;
@@ -153,10 +171,14 @@ function normalizeProfile(value: unknown): MediaLanguageProfile | null {
   const sentences = raw.sentences ?? ({} as MediaLanguageProfile['sentences']);
   const jlptLevel = text(difficulty.jlptLevel) || null;
   const band = difficulty.band;
+  const scopeKind = raw.scope?.kind;
   return {
     mediaId,
     title: text(raw.title, 'Untitled media'),
     updatedAt: nonNegative(raw.updatedAt),
+    ...(scopeKind === 'episode' || scopeKind === 'series' || scopeKind === 'range' || scopeKind === 'visual-novel'
+      ? { scope: { kind: scopeKind, ...(text(raw.scope?.label) ? { label: text(raw.scope?.label) } : {}) } }
+      : {}),
     analyzedCharacters: Math.floor(nonNegative(raw.analyzedCharacters)),
     truncated: raw.truncated === true,
     difficulty: {
@@ -165,6 +187,9 @@ function normalizeProfile(value: unknown): MediaLanguageProfile | null {
         ? band
         : difficultyBandFromJlpt(jlptLevel),
       jlptLevel,
+      ...(difficulty.levelSource === 'lists' || difficulty.levelSource === 'dictionary'
+        ? { levelSource: difficulty.levelSource }
+        : {}),
       confidence: ratio(difficulty.confidence),
       knownRatio: ratio(difficulty.knownRatio),
       unknownRatio: ratio(difficulty.unknownRatio),
@@ -438,4 +463,44 @@ export function summarizeMediaStudySessions(
     cardsCreated: 0,
     lastStudiedAt: null,
   });
+}
+
+/** A title's difficulty at a glance: its level and how much of it the learner knows. */
+export interface MediaLevelSummary {
+  level: string | null;
+  /** 0..1, weighted by each profile's vocabulary size. */
+  knownRatio: number | null;
+  /** True when the level is the dictionary estimate, not the learner's lists. */
+  estimated: boolean;
+  profiles: number;
+}
+
+/**
+ * Fold every profile a title has (the series analysis and each episode's) into
+ * one line. The hardest level wins — a series is as hard as its hardest
+ * episode — and known % is weighted by vocabulary so a 2-minute clip cannot
+ * outvote a feature film.
+ */
+export function summarizeMediaLevels(
+  profiles: Readonly<Record<string, MediaLanguageProfile>>,
+  ids: readonly string[],
+  levelOrder: readonly string[] = ['N5', 'N4', 'N3', 'N2', 'N1', 'HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
+): MediaLevelSummary | null {
+  const found = [...new Set(ids)].map((id) => profiles[id]).filter((p): p is MediaLanguageProfile => !!p);
+  if (!found.length) return null;
+  let level: string | null = null;
+  let estimated = false;
+  let weight = 0;
+  let known = 0;
+  for (const p of found) {
+    const label = p.difficulty.jlptLevel?.replace(/\s+/g, '') ?? null;
+    if (label && (level === null || levelOrder.indexOf(label) > levelOrder.indexOf(level))) {
+      level = label;
+      estimated = p.difficulty.levelSource === 'dictionary';
+    }
+    const w = Math.max(1, p.vocabulary.uniqueWords);
+    weight += w;
+    known += p.difficulty.knownRatio * w;
+  }
+  return { level, knownRatio: weight ? known / weight : null, estimated, profiles: found.length };
 }

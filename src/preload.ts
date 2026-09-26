@@ -589,6 +589,9 @@ const api = {
     options?: { sourceLangs?: string[] },
   ): Promise<Record<string, number>> =>
     ipcRenderer.invoke('dict:frequencyRanks', texts, options),
+  /** KANJIDIC2 JLPT / HSK levels for many characters; a character with none is absent. */
+  dictCharLevels: (chars: string[]): Promise<Record<string, { jlpt?: string; hsk?: string }>> =>
+    ipcRenderer.invoke('dict:charLevels', chars),
   /**
    * Offline dictionary hits for a whole deck selection, for the Deck Workbench's
    * enrichment. A word nothing answered for is absent, never an empty array.

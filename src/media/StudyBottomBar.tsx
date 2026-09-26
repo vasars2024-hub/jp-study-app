@@ -61,7 +61,7 @@ import {
 import { useStudyWorkspace } from './StudyWorkspaceProvider';
 import StudyToolSheet, { StudyToolGroup } from './StudyToolSheet';
 
-const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+const RATE_PRESETS = [0.5, 0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
 
 /** One enum over the two mutually exclusive stored booleans. */
 export type PracticeMode = 'off' | 'dictation' | 'shadowing';
@@ -84,6 +84,8 @@ export interface StudyBottomBarProps {
    * Optional so an existing caller keeps its behaviour; only the video overlay knows this.
    */
   subtitleLoading?: boolean;
+  /** Load a subtitle file from disk as the study track, from inside the player. */
+  onImportSubtitleFile?: (file: File) => void;
   onPrevCue: () => void;
   onReplayCue: () => void;
   onNextCue: () => void;
@@ -507,7 +509,40 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
                 onChange={(event) => updatePreference('grammarHighlight', event.currentTarget.checked)}
               /> {t('mediaWorkspace.study.grammarHighlight')}
             </label>
+            <label>
+              <input
+                type="checkbox"
+                data-study-pref="knownHighlight"
+                checked={preferences.knownHighlight}
+                onChange={(event) => updatePreference('knownHighlight', event.currentTarget.checked)}
+              /> {t('mediaWorkspace.study.knownHighlight')}
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                data-study-pref="lineLevel"
+                checked={preferences.lineLevel}
+                onChange={(event) => updatePreference('lineLevel', event.currentTarget.checked)}
+              /> {t('mediaWorkspace.study.lineLevel')}
+            </label>
           </StudyToolGroup>
+
+          {props.onImportSubtitleFile && (
+            <StudyToolGroup labelKey="mediaWorkspace.study.subtitleFileGroup">
+              <label className="study-subtitle-import">
+                {t('mediaWorkspace.study.importSubtitle')}
+                <input
+                  type="file"
+                  accept=".srt,.ass,.ssa,.vtt,.sub,text/vtt"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = '';
+                    if (file) props.onImportSubtitleFile?.(file);
+                  }}
+                />
+              </label>
+            </StudyToolGroup>
+          )}
 
           <StudyToolGroup labelKey="studyWorkspace.group.lookup">
             <label>

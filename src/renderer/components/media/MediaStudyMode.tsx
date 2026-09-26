@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MediaItem } from '../../../shared/types';
 import type { Cue } from '../../subtitles';
 import {
@@ -8,7 +8,7 @@ import {
   type MediaStudyRequest,
 } from '../../../shared/mediaStudyIntegration';
 import {
-  addMediaStudyFlashcards,
+  addVisualNovelStudyFlashcards,
   analyzeMediaStudyCues,
   createMediaLanguageProfile,
   type MediaStudyAnalysis,
@@ -25,6 +25,9 @@ import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNaviga
 import { openMediaWorkspace, reachMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { useT } from '../../i18n';
 import MediaLanguageProfileCard from './MediaLanguageProfileCard';
+import { Checkbox } from '../ui';
+import { guessSeriesTitle, seriesDeckFor, subscribeSeriesDeck, unsubscribeSeriesDeck } from '../../mediaDecks';
+import type { VisualNovelStudyCardKind } from '../../../shared/visualNovelStudyCards';
 import MediaStudyAssistantPanel from './MediaStudyAssistantPanel';
 import { clearHandoff, peekHandoff } from '../../pendingHandoff';
 import { mediaStudyActionLabel, mediaStudyActionReason } from './mediaStudyActionsText';
@@ -128,6 +131,28 @@ export default function MediaStudyMode({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const positionRef = useRef(positionSec);
   positionRef.current = positionSec;
+  /**
+   * Time-range analysis: the whole episode, the part watched so far, or the
+   * rest. Only a whole-episode analysis is written to the title's profile.
+   */
+  const [range, setRange] = useState<'all' | 'toHere' | 'fromHere'>('all');
+  const [rangeAt, setRangeAt] = useState(0);
+  const [kinds, setKinds] = useState<VisualNovelStudyCardKind[]>(['vocabulary', 'kanji', 'sentence', 'grammar']);
+  const [deckName, setDeckName] = useState('');
+  const [keepUpdated, setKeepUpdated] = useState(false);
+  // A series already kept current shows as such, with its deck name.
+  const currentTitle = current?.title ?? '';
+  useEffect(() => {
+    const deck = currentTitle ? seriesDeckFor(currentTitle) : null;
+    setKeepUpdated(!!deck);
+    if (deck) setDeckName(deck.folder);
+  }, [currentTitle]);
+  const rangedCues = useMemo(
+    () => (range === 'all'
+      ? cues
+      : cues.filter((cue) => (range === 'toHere' ? cue.start <= rangeAt : cue.end >= rangeAt))),
+    [cues, range, rangeAt],
+  );
 
   useEffect(() => {
     const onStudy = (event: Event): void => {
@@ -199,8 +224,8 @@ export default function MediaStudyMode({
   }, [cues.length, current?.id, isTranscribing, onTranscribe, request, t, lang]);
 
   const needsAnalysis = request?.action !== 'study-episode';
-  const analysisKey = current && cues.length
-    ? `${current.id}:${cues.length}:${cues[0]?.start ?? 0}:${cues[cues.length - 1]?.end ?? 0}`
+  const analysisKey = current && rangedCues.length
+    ? `${current.id}:${range}:${rangedCues.length}:${rangedCues[0]?.start ?? 0}:${rangedCues[rangedCues.length - 1]?.end ?? 0}`
     : '';
 
   useEffect(() => {
@@ -209,11 +234,16 @@ export default function MediaStudyMode({
     let cancelled = false;
     setBusy(true);
     setError('');
-    void analyzeMediaStudyCues(cues)
+    void analyzeMediaStudyCues(rangedCues)
       .then((value) => {
         if (cancelled) return;
         setAnalysisState({ key: analysisKey, value });
-        saveMediaLanguageProfile(createMediaLanguageProfile(current, value));
+        if (range === 'all') {
+          saveMediaLanguageProfile(createMediaLanguageProfile(current, value, Date.now(), { kind: 'episode' }));
+          // A series deck the learner asked to keep current takes this episode's new cards.
+          const deck = seriesDeckFor(current.title);
+          if (deck) addVisualNovelStudyFlashcards(current, value, new Map(), { folder: deck.folder, kinds: deck.kinds });
+        }
         if (activeSessionId) {
           addMediaStudySessionProgress(activeSessionId, {
             positionSec: positionRef.current,
@@ -230,7 +260,7 @@ export default function MediaStudyMode({
     return () => {
       cancelled = true;
     };
-  }, [activeSessionId, analysisKey, analysisState?.key, cues, current, needsAnalysis, request]);
+  }, [activeSessionId, analysisKey, analysisState?.key, rangedCues, range, current, needsAnalysis, request]);
 
   if (!request) return null;
   const item = items.find((candidate) => candidate.id === request.mediaId);
@@ -285,7 +315,9 @@ export default function MediaStudyMode({
   };
   const createFlashcards = (): void => {
     if (!analysis) return;
-    const added = addMediaStudyFlashcards(item, analysis);
+    const folder = deckName.trim() || t('media.study.deckDefault', { title: guessSeriesTitle(item.title) });
+    const added = addVisualNovelStudyFlashcards(item, analysis, new Map(), { folder, kinds }).total;
+    if (keepUpdated) subscribeSeriesDeck(item.title, folder, kinds);
     if (activeSessionId && added) {
       addMediaStudySessionProgress(activeSessionId, {
         positionSec,
@@ -348,13 +380,59 @@ export default function MediaStudyMode({
           <button type="button" onClick={() => void onLoadSubtitles()}>{t('media.study.loadSubtitles')}</button>
         </div>
       )}
+      {needsAnalysis && current?.id === item.id && cues.length > 0 && (
+        <div className="media-study-mode-actions media-study-range" role="group" aria-label={t('media.study.range.label')}>
+          {(['all', 'toHere', 'fromHere'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={range === value}
+              onClick={() => {
+                setRangeAt(positionRef.current);
+                setRange(value);
+              }}
+            >
+              {t(`media.study.range.${value}`)}
+            </button>
+          ))}
+        </div>
+      )}
       {busy && <p className="muted" role="status">{t('media.study.analyzing')}</p>}
       {error && <p className="media-error" role="alert">{error}</p>}
       {analysis && (request.action === 'mine-vocabulary' || request.action === 'create-flashcards') && (
         <div className="media-study-results">
           <div className="media-study-result-head">
             <strong>{t('media.study.vocabularyCandidates', { count: analysis.vocabulary.length })}</strong>
-            <button type="button" onClick={createFlashcards}>{t('media.study.createUpToCards', { count: 30 })}</button>
+            <button type="button" onClick={createFlashcards}>{t('media.study.createCards')}</button>
+          </div>
+          {/* Which cards, into which deck: anime used to get vocabulary cards in "Media" only. */}
+          <div className="media-study-deck-options">
+            {(['vocabulary', 'kanji', 'sentence', 'grammar'] as const).map((kind) => (
+              <Checkbox
+                key={kind}
+                label={t(`media.study.kind.${kind}`)}
+                checked={kinds.includes(kind)}
+                onChange={() => setKinds((prev) => (prev.includes(kind) ? prev.filter((k) => k !== kind) : [...prev, kind]))}
+              />
+            ))}
+            <label className="media-study-deck-name">
+              <span>{t('media.study.deckName')}</span>
+              <input
+                className="ui-input"
+                value={deckName}
+                placeholder={t('media.study.deckDefault', { title: guessSeriesTitle(item.title) })}
+                onChange={(e) => setDeckName(e.target.value)}
+              />
+            </label>
+            <Checkbox
+              label={t('media.study.keepUpdated')}
+              checked={keepUpdated}
+              onChange={(e) => {
+                const on = e.currentTarget.checked;
+                setKeepUpdated(on);
+                if (!on) unsubscribeSeriesDeck(item.title);
+              }}
+            />
           </div>
           <ol className="media-study-vocabulary">
             {analysis.vocabulary.slice(0, VOCAB_ROWS).map((entry) => (

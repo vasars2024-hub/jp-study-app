@@ -14,6 +14,7 @@ import GumIcon, { type GumGlyph } from './GumIcons';
 import { useTitleArtUrl } from './gumBackend';
 import type { GumBadge, GumRatingDisplay } from './gumLayout';
 import type { GumTitle } from './gumModel';
+import MediaLevelBadge from '../MediaLevelBadge';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -261,6 +262,7 @@ export const GumPosterCard = memo(function GumPosterCard({ title, badges, layout
           <strong className="gum-card__title">{title.title}</strong>
           <span className="gum-card__meta">
             <span>{meta}</span>
+            <MediaLevelBadge ids={[title.id, ...title.items.map((item) => item.id)]} fallbackLevel={title.items.find((item) => item.jlptLevel)?.jlptLevel} />
             {score && (
               <em className="gum-card__score">
                 <span aria-hidden="true">{score}</span>

@@ -36,6 +36,7 @@ import { STUDY_LANG_NATIVE_NAME, type StudyLang } from '../../../../shared/study
 import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
 import { getStudyLang } from '../../../studyEnvironment';
 import { useStudyLanguage } from '../../../useStudyLanguage';
+import MediaLevelBadge from '../MediaLevelBadge';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -663,6 +664,7 @@ export default function GumTitlePage({
           </div>
           <div>
             <h1 className="gum-title__name">{title.title}</h1>
+            <MediaLevelBadge className="media-level-badge--title" ids={[title.id, ...title.items.map((item) => item.id)]} fallbackLevel={title.items.find((item) => item.jlptLevel)?.jlptLevel} />
             {title.originalTitle && title.originalTitle !== title.title && (
               <div className="gum-title__native" lang="ja">{title.originalTitle}</div>
             )}

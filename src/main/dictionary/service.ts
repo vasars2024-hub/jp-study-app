@@ -59,6 +59,8 @@ import {
   findLexiconEtymology,
   findLexiconFrequency,
   findLexiconFrequencyRanks,
+  findCharacterLevels,
+  type CharacterLevels,
   findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
@@ -535,6 +537,10 @@ export function findLexiconFrequencyInDb(query: FrequencyQuery): LexiconFrequenc
  * words rather than one per word, which is what keeps a whole-deck frequency
  * filter off the main thread's back.
  */
+export function findCharacterLevelsInDb(chars: readonly string[]): Record<string, CharacterLevels> {
+  return findCharacterLevels(dictionaryDb(), chars);
+}
+
 export function findLexiconFrequencyRanksInDb(
   terms: readonly string[],
   sourceLangs?: DictLangCode[],

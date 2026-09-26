@@ -214,6 +214,10 @@ export interface VideoCoreStudyPreferences {
   secondarySubLang: string;
   /** Colour-code the active cue by grammar/vocab/particle and allow click-to-explain. */
   grammarHighlight: boolean;
+  /** Mark words the learner does not know yet on the subtitle line. On by default. */
+  knownHighlight: boolean;
+  /** Tag each subtitle line with its level (JLPT / HSK / CEFR). On by default. */
+  lineLevel: boolean;
   /** Show the whole subtitle track as a seekable transcript rail. */
   transcriptPanel: boolean;
   /** Seconds the rewind / fast-forward shortcuts move, 1–60. */
@@ -398,6 +402,8 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
       ? raw.secondarySubLang
       : 'en',
     grammarHighlight: raw.grammarHighlight === true,
+    knownHighlight: raw.knownHighlight !== false,
+    lineLevel: raw.lineLevel !== false,
     transcriptPanel: raw.transcriptPanel === true,
     seekStepSec: typeof raw.seekStepSec === 'number' && Number.isFinite(raw.seekStepSec)
       ? Math.round(Math.max(1, Math.min(60, raw.seekStepSec)))

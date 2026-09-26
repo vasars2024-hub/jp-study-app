@@ -427,6 +427,8 @@ declare global {
         texts: string[],
         options?: { sourceLangs?: string[] },
       ): Promise<Record<string, number>>;
+      /** KANJIDIC2 JLPT / HSK levels for many characters; a character with none is absent. */
+      dictCharLevels(chars: string[]): Promise<Record<string, { jlpt?: string; hsk?: string }>>;
       dictEnrichTerms(
         terms: string[],
       ): Promise<Record<string, import('../shared/ankiEnrich').EnrichEntry[]>>;

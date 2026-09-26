@@ -59,6 +59,7 @@ import {
   resetChineseDictionaryCache,
   findLexiconCollocationsInDb,
   findLexiconFrequencyRanksInDb,
+  findCharacterLevelsInDb,
   getHeadwordAudioFromDb,
   listDictionarySources,
   listDictionaryPairs,
@@ -1264,6 +1265,17 @@ export function registerDictionaryIpc(): void {
       }
     },
   );
+  // Exam levels (KANJIDIC2 JLPT, HSK) for many characters, for the media
+  // difficulty estimate when no level lists are uploaded.
+  ipcMain.handle('dict:charLevels', (_e, chars: unknown): Record<string, { jlpt?: string; hsk?: string }> => {
+    const list = Array.isArray(chars) ? chars.filter((c): c is string => typeof c === 'string').slice(0, 5000) : [];
+    if (!list.length) return {};
+    try {
+      return findCharacterLevelsInDb(list);
+    } catch {
+      return {};
+    }
+  });
   ipcMain.handle(
     'dict:xrefs',
     async (_e, text: unknown, options?: unknown): Promise<LexiconXrefResult> => {
