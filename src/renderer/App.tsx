@@ -66,7 +66,7 @@ import { recordClipboardEntry, loadClipboardHistory, type ClipboardEntryType } f
 import { getLevel, setLevel, type WkLevel } from './knownWords';
 import { estimateLevelFromText } from './bookLevelEstimate';
 import { getStudyLang } from './studyEnvironment';
-import { studyLangOfText } from '../shared/studyLang';
+import { studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { compactLevelBadge, resolvePageLevelLang } from '../shared/pageLevelDetect';
 import { handleExtensionUiOpen } from './extensionBridgeUi';
 import { installCompanionMining } from './companionMine';
@@ -143,10 +143,12 @@ function isLockscreenWindow(): boolean {
  * with an empty back. Offline dictionary only: mining must not wait on a
  * network lookup, and a miss simply leaves the fields empty as before.
  */
-async function extensionWordGloss(term: string): Promise<{ reading: string; meaning: string }> {
+async function extensionWordGloss(term: string, lang: StudyLang): Promise<{ reading: string; meaning: string }> {
   try {
     if (typeof window.api?.lookupTermOffline !== 'function') return { reading: '', meaning: '' };
-    const result = await window.api.lookupTermOffline(term);
+    // In the word's own language: unfiltered, a Chinese word was glossed from
+    // whichever dictionary answered first, or from none.
+    const result = await window.api.lookupTermOffline(term, lang);
     const entry = result?.entries?.find((e) => e.word === term) ?? result?.entries?.[0];
     if (!entry) return { reading: '', meaning: '' };
     const meaning = entry.senses
@@ -333,8 +335,11 @@ export default function App() {
             : 'Extension';
         let reading = (payload.reading || '').trim();
         let meaning = (payload.meaning || '').trim();
+        // The page's language when the extension said it; else the text's own
+        // script (Han alone follows the study language).
+        const wordLang: StudyLang = payload.lang ?? studyLangOfText(`${term} ${payload.sentence ?? ''}`, getStudyLang());
         if (mode === 'word' && (!reading || !meaning)) {
-          const found = await extensionWordGloss(term);
+          const found = await extensionWordGloss(term, wordLang);
           reading ||= found.reading;
           meaning ||= found.meaning;
         }
@@ -350,8 +355,8 @@ export default function App() {
           meaning,
           sentence,
           source: 'extension',
-          // The page's own text says which language it is; Han alone follows the study language.
-          studyLang: studyLangOfText(`${term} ${sentence ?? ''}`, getStudyLang()),
+          // The page's language (from the extension), else its text; Han alone follows the study language.
+          studyLang: payload.lang ?? studyLangOfText(`${term} ${sentence ?? ''}`, getStudyLang()),
           folder,
           sourceTitle: payload.title?.trim() || undefined,
           sourceUrl: payload.url?.trim() || undefined,

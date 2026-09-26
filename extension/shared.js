@@ -656,7 +656,9 @@ function formatSaveResultMessage(res) {
   const anki = res.anki || (res.destinations && res.destinations.anki) || null;
   if (anki && anki.ok) {
     const deck = [res.profileName, res.deckName].filter(Boolean).join(' / ');
-    return jpMsg('save_cardCreated', [term, deck ? jpMsg('save_deckSuffix', deck) : '']);
+    // One substitution: Chrome reads "$1$2" as a named placeholder "$1$" and
+    // refuses to load the extension, so term and deck travel together.
+    return jpMsg('save_cardCreated', term + (deck ? jpMsg('save_deckSuffix', deck) : ''));
   }
 
   const parts = [jpMsg(res.mode === 'sentence' ? 'save_savedSentence' : 'save_savedWord', term)];
@@ -761,6 +763,29 @@ function detectScriptLang(text) {
   if (/[\u4E00-\u9FFF\u3400-\u4DBF]/.test(s) && !/[\u3040-\u30FF]/.test(s)) return 'zh';
   if (/[\u3040-\u30FF\u4E00-\u9FFF]/.test(s)) return 'ja';
   return '';
+}
+
+/**
+ * Source and target for "Translate" on a selection. The source is the text's
+ * own language (kana → ja, Cyrillic → ru, Han alone → the page's zh/ja hint,
+ * like the lookup), never a fixed 'ja': a Russian or Chinese sentence sent as
+ * Japanese comes back as a wrong or refused translation. The target is the
+ * reader's language when it is one of the app's four, else English — and never
+ * the source itself.
+ * @returns {{ source: 'ja'|'zh'|'ru', target: string }}
+ */
+function translateLangs(text, pageHint, uiLang) {
+  const s = String(text || '');
+  const hint = pageHint === 'ja' || pageHint === 'zh' || pageHint === 'ru' ? pageHint : '';
+  let source;
+  if (/[぀-ヿ]/.test(s)) source = 'ja';
+  else if (/[Ѐ-ӿ]/.test(s)) source = 'ru';
+  else if (/[㐀-䶿一-鿿]/.test(s)) source = hint === 'zh' ? 'zh' : 'ja';
+  else source = hint || 'ja';
+  const ui = String(uiLang || '').slice(0, 2).toLowerCase();
+  let target = ['en', 'ja', 'zh', 'ru'].includes(ui) ? ui : 'en';
+  if (target === source) target = 'en';
+  return { source, target };
 }
 
 /**
@@ -1228,6 +1253,7 @@ if (typeof globalThis !== 'undefined') {
     langTagToOcrLang,
     detectScriptLang,
     detectPageLangHint,
+    translateLangs,
     AI_CATEGORIES,
     AI_CATEGORY_LABELS,
     AI_KEY_COMMANDS,

@@ -470,20 +470,23 @@
   const LOOKUP_CACHE_MAX = 120;
 
   async function cachedLookup(query) {
-    if (lookupCache.has(query)) {
-      const hit = lookupCache.get(query);
-      lookupCache.delete(query);
-      lookupCache.set(query, hit); // LRU bump
+    // The page's language (kana → ja, Cyrillic → ru, Han → the page hint) so the
+    // app answers from that language's dictionary, not Japanese by default. The
+    // cache is per language: the same Han word is a different entry in each.
+    const lang = lookupLangFor(query);
+    const key = `${lang}:${query}`;
+    if (lookupCache.has(key)) {
+      const hit = lookupCache.get(key);
+      lookupCache.delete(key);
+      lookupCache.set(key, hit); // LRU bump
       return hit;
     }
-    // The page's language (kana → ja, Cyrillic → ru, Han → the page hint) so the
-    // app answers from that language's dictionary, not Japanese by default.
-    const res = await safeRuntimeSend({ type: 'lookup', query, lang: lookupLangFor(query) });
+    const res = await safeRuntimeSend({ type: 'lookup', query, lang });
     if (res?.invalidated) return res;
     // Cache only definitive answers (hits and true misses) — never offline
     // errors, so results recover as soon as the app starts.
     if (res && res.ok) {
-      lookupCache.set(query, res);
+      lookupCache.set(key, res);
       while (lookupCache.size > LOOKUP_CACHE_MAX) {
         lookupCache.delete(lookupCache.keys().next().value);
       }
@@ -516,10 +519,29 @@
       if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
       if (res?.offline) return { matched: '', entries: [], offline: true, error: res?.error };
       if (res?.ok && res.entries?.length) {
-        return { matched: q, entries: res.entries, deinflection: res.deinflection };
+        return { matched: matchedSurface(q, res), entries: res.entries, deinflection: res.deinflection };
       }
     }
     return { matched: '', entries: [] };
+  }
+
+  /**
+   * How much of `q` the app's answer actually covers. The app segments a
+   * window itself (the Chinese dictionary answers 学习中文 with 学习), so a
+   * hit is not proof the whole window is one word — taken as such, the popup
+   * headed "学习中文" and Save word stored that as the card's word.
+   */
+  function matchedSurface(q, res) {
+    const src = res.deinflection && res.deinflection.source;
+    if (src && q.startsWith(src)) return src;
+    const forms = [];
+    for (const e of res.entries || []) {
+      if (e && e.word) forms.push(String(e.word));
+      if (e && e.reading) forms.push(String(e.reading));
+    }
+    if (forms.includes(q)) return q;
+    const prefix = forms.filter((f) => f && q.startsWith(f)).sort((a, b) => b.length - a.length)[0];
+    return prefix || q;
   }
 
   /* ----------------------------- reader popup ------------------------------ */
@@ -707,13 +729,15 @@
     const first = hit.entries && hit.entries[0];
     termEl.textContent = hit.term;
     readingEl.textContent = first && first.reading && first.reading !== hit.term ? first.reading : '';
+    termEl.lang = studyLangAttr(hit.term);
+    readingEl.lang = termEl.lang;
     backBtn.hidden = hitHistory.length === 0;
 
     const bits = [];
     if (hit.deinflection && hit.deinflection.term && hit.deinflection.term !== hit.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
       bits.push(
-        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="ja">${esc(hit.deinflection.term)}</b>${
+        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="${studyLangAttr(hit.deinflection.term)}">${esc(hit.deinflection.term)}</b>${
           reasons ? ` <span class="rp-deinf" title="${uiHtml('content_rpDeinfTitle')}">${esc(reasons)}</span>` : ''
         }</span>`,
       );
@@ -786,8 +810,8 @@
         : '';
       block.innerHTML = `
         <div class="rp-entry-head">
-          <span class="rp-entry-word" lang="ja">${esc(word)}</span>
-          ${reading && reading !== word ? `<span class="rp-entry-reading" lang="ja">${esc(reading)}</span>` : ''}
+          <span class="rp-entry-word" lang="${studyLangAttr(word)}">${esc(word)}</span>
+          ${reading && reading !== word ? `<span class="rp-entry-reading" lang="${studyLangAttr(word)}">${esc(reading)}</span>` : ''}
           ${entry.source ? `<span class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(entry.source)}</span>` : ''}
         </div>
         ${idx === 0 ? pitch : ''}
@@ -828,7 +852,7 @@
     const matches = Array.isArray(res.matches) ? res.matches : [];
     if (!matches.length) {
       body.innerHTML = `
-        <div class="rp-sentence-line" lang="ja">${highlightTermInSentence(sentence, hit.term)}</div>
+        <div class="rp-sentence-line" lang="${studyLangAttr(sentence)}">${highlightTermInSentence(sentence, hit.term)}</div>
         <div class="rp-empty">${uiHtml('content_rpNoGrammar')}</div>`;
       return;
     }
@@ -840,7 +864,7 @@
         return `
         <div class="rp-grammar" data-pattern="${esc(pattern)}">
           <div class="rp-grammar-head">
-            <span class="rp-grammar-title" lang="ja">${esc(pattern)}</span>
+            <span class="rp-grammar-title" lang="${studyLangAttr(sentence)}">${esc(pattern)}</span>
             ${m.level ? `<span class="rp-badge jlpt">${esc(m.level)}</span>` : ''}
             ${span ? `<span class="rp-badge span-ok" title="${uiHtml('content_rpInSentenceTitle')}">${uiHtml('content_rpInSentence')}</span>` : `<span class="rp-badge span-guess" title="${uiHtml('content_rpPatternMatchTitle')}">${uiHtml('content_rpPatternMatch')}</span>`}
           </div>
@@ -849,7 +873,7 @@
       })
       .join('');
     body.innerHTML = `
-      <div class="rp-sentence-line" lang="ja">${highlightGrammarSpans(sentence, matches, hit.term)}</div>
+      <div class="rp-sentence-line" lang="${studyLangAttr(sentence)}">${highlightGrammarSpans(sentence, matches, hit.term)}</div>
       ${items}
       <div class="rp-note">${uiHtml('content_rpGrammarNote')}</div>
       <div class="rp-row">
@@ -921,7 +945,7 @@
     }
     const sentence = hit.sentence.text;
     body.innerHTML = `
-      <div class="rp-sentence-line big" lang="ja">${highlightTermInSentence(sentence, hit.term)}</div>
+      <div class="rp-sentence-line big" lang="${studyLangAttr(sentence)}">${highlightTermInSentence(sentence, hit.term)}</div>
       <div class="rp-row rp-sentence-tools">
         <button type="button" class="rp-mini" data-act="sent-extend-left" title="${uiHtml('content_rpExtendPrevTitle')}">${uiHtml('content_rpExtendPrev')}</button>
         <button type="button" class="rp-mini" data-act="sent-extend-right" title="${uiHtml('content_rpExtendNextTitle')}">${uiHtml('content_rpExtendNext')}</button>
@@ -1014,9 +1038,9 @@
           : '';
         return `
         <div class="rp-kanji">
-          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="ja" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
+          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="${studyLangAttr(hit.term)}" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
           <div class="rp-kanji-meta">
-            ${r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="ja">${esc(r.entry.reading)}</div>` : ''}
+            ${r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="${studyLangAttr(hit.term)}">${esc(r.entry.reading)}</div>` : ''}
             <div class="rp-kanji-meanings">${esc(meanings || uiMsg('content_rpNoKanjiEntry'))}</div>
           </div>
         </div>`;
@@ -1031,7 +1055,7 @@
     body.innerHTML = `<div class="rp-loading">${uiHtml('content_rpSearchingExamples')}</div>`;
     const token = lookupToken;
     const query = hit.deinflection?.term || hit.term;
-    const res = await safeRuntimeSend({ type: 'examples', query, limit: 8 });
+    const res = await safeRuntimeSend({ type: 'examples', query, limit: 8, lang: lookupLangFor(query) });
     if (token !== lookupToken || popupTab !== 'examples') return;
     if (res?.invalidated) return;
     if (!res?.ok || !Array.isArray(res.examples) || !res.examples.length) {
@@ -1047,7 +1071,7 @@
         .map(
           (ex, i) => `
         <div class="rp-example" data-idx="${i}">
-          <div class="rp-example-jp" lang="ja">${highlightTermInSentence(String(ex.jp || ''), query)}</div>
+          <div class="rp-example-jp" lang="${studyLangAttr(String(ex.jp || '') || query)}">${highlightTermInSentence(String(ex.jp || ''), query)}</div>
           ${ex.en ? `<div class="rp-example-en">${esc(ex.en)}</div>` : ''}
           <div class="rp-example-tools">
             <button type="button" class="rp-mini" data-act="example-tts" data-text="${esc(ex.jp || '')}">${uiHtml('content_rpPlayExample')}</button>
@@ -1074,7 +1098,7 @@
     if (hit.deinflection && hit.deinflection.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
       rows.push(
-        `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpDeconjugation')}</span><span class="rp-more-v" lang="ja">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
+        `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpDeconjugation')}</span><span class="rp-more-v" lang="${studyLangAttr(hit.term)}">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
       );
     }
     rows.push(
@@ -1265,9 +1289,37 @@
     const s = String(text || '');
     if (/[぀-ヿ]/.test(s)) return 'ja';
     if (/[Ѐ-ӿ]/.test(s)) return 'ru';
-    const hint = currentLangHint();
+    const hint = hanLangHint();
     if (/[㐀-鿿]/.test(s)) return hint === 'zh' ? 'zh' : 'ja';
     return hint || '';
+  }
+
+  /**
+   * Which language Han-only text on this page is in. A page that declares
+   * itself ja or zh (<html lang>) is taken at its word before the level
+   * badge: the badge's language is inferred from sample text, and Han alone
+   * (or one quoted Japanese line) reads as the study language — so on a
+   * Chinese page the Chinese words were looked up in the Japanese dictionary.
+   */
+  function hanLangHint() {
+    const declared = S.langTagToOcrLang ? S.langTagToOcrLang((document.documentElement && document.documentElement.lang) || '') : '';
+    return declared === 'ja' || declared === 'zh' ? declared : currentLangHint();
+  }
+
+  /**
+   * The `lang` study text is marked with. It was `ja` everywhere, so a Chinese
+   * word or sentence was drawn with Japanese glyph shapes (Han unification) and
+   * Cyrillic in a Japanese font. A Chinese page's own zh-* tag (Hant/Hans) wins.
+   */
+  function studyLangAttr(text) {
+    return langAttrOf(lookupLangFor(text));
+  }
+
+  function langAttrOf(lang) {
+    if (lang === 'ru') return 'ru';
+    if (lang !== 'zh') return 'ja';
+    const page = String((document.documentElement && document.documentElement.lang) || '').toLowerCase();
+    return /^zh(-|$)/.test(page) ? page : 'zh-CN';
   }
 
   function speak(text) {
@@ -1315,7 +1367,7 @@
     const working = saveWorkingLabel(forceAnki);
     toast(working, 'pending');
     setFabBusy(working);
-    const res = await safeRuntimeSend({ type: 'save-text', text: t, mode, forceAnki });
+    const res = await safeRuntimeSend({ type: 'save-text', text: t, mode, forceAnki, lang: lookupLangFor(t) });
     setFabBusy('');
     if (res?.invalidated) return;
     toast(formatSaveToast(res), res?.ok || res?.queued ? 'ok' : 'err');
@@ -1342,18 +1394,24 @@
     const host = popup && popup.querySelector('.rp-more-translate');
     if (host) host.innerHTML = `<div class="rp-loading-inline">${uiHtml('content_translating')}</div>`;
     else toast(uiMsg('content_translating'), 'pending');
-    const res = await safeRuntimeSend({ type: 'translate', text, source: 'ja', target: 'en' });
+    const res = await safeRuntimeSend({ type: 'translate', text, ...S.translateLangs(text, hanLangHint(), aiUiLang()) });
     if (res?.invalidated) return;
     const out = String(res?.text || '').trim();
     if (host && host.isConnected) {
       host.innerHTML = res?.ok
         ? `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpTranslation')}</span><span class="rp-more-v">${esc(out || uiMsg('content_rpEmpty'))}</span></div>`
-        : `<div class="rp-empty">${esc(res?.error || uiMsg('content_rpTranslateFailed'))}</div>`;
+        : `<div class="rp-empty">${esc(translateError(res))}</div>`;
     } else if (res?.ok) {
       toast(out.slice(0, 140) || uiMsg('content_translated'), 'ok');
     } else {
-      toast(res?.error || uiMsg('content_translationFailed'), 'err');
+      toast(translateError(res), 'err');
     }
+  }
+
+  /** A missing translation model (503) is named in the UI language, not the app's English. */
+  function translateError(res) {
+    if (res?.status === 503) return uiMsg('content_rpTranslateFailed');
+    return res?.error || uiMsg('content_translationFailed');
   }
 
   /* ----- opening the popup ----- */
@@ -1901,6 +1959,7 @@
     } else if (cardSource?.text) {
       ta.value = cardSource.text;
     }
+    ta.lang = studyLangAttr(ta.value);
   }
 
   function openCardPreview(kindOverride) {
@@ -2299,10 +2358,14 @@
           return;
         }
         toast(uiMsg('content_translating'), 'pending');
-        const res = await safeRuntimeSend({ type: 'translate', text: payload.text, source: 'ja', target: 'en' });
+        const res = await safeRuntimeSend({
+          type: 'translate',
+          text: payload.text,
+          ...S.translateLangs(payload.text, hanLangHint(), aiUiLang()),
+        });
         if (res?.invalidated) return;
         if (res?.ok) toast(String(res.text || '').slice(0, 140) || uiMsg('content_translated'), 'ok', { label: uiMsg('content_openInApp'), openTarget: 'translate' });
-        else toast(res?.error || uiMsg('content_translationFailed'), 'err');
+        else toast(translateError(res), 'err');
         return;
       }
       case 'grammar.match': {
@@ -2889,7 +2952,17 @@
       recording = true;
       toast(uiMsg('content_recording'), 'ok');
     } catch (err) {
-      toast(String(err.message || err || uiMsg('content_micDenied')), 'err');
+      // Chromium's DOMException messages are English ("Permission denied");
+      // the two a user can act on are named in the UI language.
+      const name = err && err.name;
+      toast(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? uiMsg('content_micDenied')
+          : name === 'NotFoundError' || name === 'NotReadableError'
+            ? uiMsg('content_micUnavailable')
+            : String((err && err.message) || err || uiMsg('content_micDenied')),
+        'err',
+      );
     }
   }
 
@@ -3182,7 +3255,7 @@
       setFabBusy('');
       if (res?.invalidated) return;
       if (res?.selecting) return;
-      if (!res?.ok) toast(res?.error || uiMsg('content_ocrFailed'), 'err');
+      if (!res?.ok) toast(ocrErrorText(res), 'err');
       showOcrResult(res);
     });
   }
@@ -3324,15 +3397,13 @@
     const hint = el.querySelector('.jp-ocr-hint');
     if (!res?.ok) {
       body.value = '';
-      hint.textContent =
-        res?.error ||
-        (res?.available === false
-          ? uiMsg('content_ocrNoModels')
-          : uiMsg('content_ocrFailed'));
+      hint.textContent = ocrErrorText(res);
       el.classList.add('open');
       return;
     }
     body.value = (res.text || '').trim();
+    // The language the OCR engine read, else the text's own script.
+    body.lang = res.lang === 'ja' || res.lang === 'zh' || res.lang === 'ru' ? langAttrOf(res.lang) : studyLangAttr(body.value);
     hint.textContent = body.value
       ? uiMsg('content_ocrReadHint', describeOcrEngine(res))
       : uiMsg('content_ocrNothing');
@@ -3344,6 +3415,16 @@
       el.classList.remove('open');
       void runSentenceAnalysis(body.value, { anchorY: 80, context: document.title || '' });
     }
+  }
+
+  /**
+   * Why an OCR failed. The app's `error` is English; the two states the
+   * extension can name (models missing, models still downloading) are said in
+   * the UI language — in the toast and in the OCR box alike.
+   */
+  function ocrErrorText(res) {
+    if (res?.available === false) return uiMsg(res?.downloading ? 'content_ocrDownloading' : 'content_ocrNoModels');
+    return res?.error || uiMsg('content_ocrFailed');
   }
 
   /** Which engine and language actually read the capture — confirms auto-detection. */

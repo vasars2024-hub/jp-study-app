@@ -130,6 +130,10 @@ function zipSource(file: string): PackSource | null {
     read(entry) {
       const e = byName.get(entry);
       if (!e || e.header.size > COMPANION_PACK_LIMITS.maxFileBytes) return null;
+      // adm-zip bounds inflation by the declared size — except a declared 0,
+      // which it inflates with no bound at all. An entry that claims to be empty
+      // yet carries compressed bytes is lying, and is never inflated.
+      if (e.header.size === 0 && e.header.compressedSize > 0) return null;
       try {
         const data = e.getData();
         return data.length > COMPANION_PACK_LIMITS.maxFileBytes ? null : data;

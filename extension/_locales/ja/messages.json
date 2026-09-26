@@ -156,7 +156,7 @@
     "message": "（$1）"
   },
   "save_cardCreated": {
-    "message": "Anki にカードを作成しました$1$2 · Gum にも保存"
+    "message": "Anki にカードを作成しました$1 · Gum にも保存"
   },
   "save_savedWord": {
     "message": "単語$1を Gum に保存しました"
@@ -733,6 +733,9 @@
   },
   "content_ocrNoModels": {
     "message": "OCR モデルがインストールされていません。Gum → 設定 → モデルと辞書 を開いてください。"
+  },
+  "content_ocrDownloading": {
+    "message": "Gum が OCR モデルをダウンロードしています。少し待ってからもう一度お試しください。"
   },
   "content_ocrReadHint": {
     "message": "$1 · 単語をダブルクリックで検索できます。"

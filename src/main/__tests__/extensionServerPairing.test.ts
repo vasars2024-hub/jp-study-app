@@ -124,6 +124,22 @@ describe('pairing the extension', () => {
     expect((await request('GET', '/v1/extension-settings', { Origin: GUM })).status).toBe(200);
   });
 
+  it("pairs the extension's real Pull, which Chrome sends without an Origin, once per \"Pair now\"", async () => {
+    // Measured on Chrome 153: an extension page's fetch to a permitted host
+    // carries Sec-Fetch-Site: none / Sec-Fetch-Mode: cors and no Origin header.
+    const chromePull = { 'Sec-Fetch-Site': 'none', 'Sec-Fetch-Mode': 'cors' };
+    expect((await request('GET', '/v1/extension-settings', chromePull)).status).toBe(401);
+    mod.openExtensionPairingWindow();
+    const first = await request('GET', '/v1/extension-settings', chromePull);
+    expect(first.status).toBe(200);
+    expect(first.json.token).toBe(mod.getExtensionBridgeStatus().token);
+    // The window closed with that pull.
+    expect((await request('GET', '/v1/extension-settings', chromePull)).status).toBe(401);
+    // With the pasted token the same Pull works any time.
+    const token = mod.getExtensionBridgeStatus().token;
+    expect((await request('GET', '/v1/extension-settings', { ...chromePull, Authorization: `Bearer ${token}` })).status).toBe(200);
+  });
+
   it('the pairing window expires after two minutes', async () => {
     mod.openExtensionPairingWindow(Date.now() - 121_000);
     expect((await request('GET', '/v1/extension-settings', { Origin: GUM })).status).toBe(401);

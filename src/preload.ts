@@ -542,8 +542,8 @@ const api = {
   dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
     ipcRenderer.invoke('dict:pitch', term, reading),
   /** Offline-only Yomitan glossary lookup (no Jisho). */
-  lookupTermOffline: (query: string): Promise<DictResult> =>
-    ipcRenderer.invoke('dict:lookupTermOffline', query),
+  lookupTermOffline: (query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> =>
+    ipcRenderer.invoke('dict:lookupTermOffline', query, lang),
   /** Offline segmentation and grounded glossary rows for the Lexicon Workbench. */
   lookupOfflineInterlinear: (
     text: string,
@@ -3420,6 +3420,8 @@ const api = {
       folder?: string;
       audioDataUrl?: string;
       profileId?: string;
+      /** The page's language for the word, when the extension said it. */
+      lang?: 'ja' | 'zh' | 'ru';
       anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
       /** The exact note main sent; a queued mine is replayed from it. */
       ankiRequest?: import('./shared/anki').MineNoteRequest;
@@ -3439,6 +3441,7 @@ const api = {
         folder?: string;
         audioDataUrl?: string;
         profileId?: string;
+        lang?: 'ja' | 'zh' | 'ru';
         anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
         ankiRequest?: import('./shared/anki').MineNoteRequest;
       },

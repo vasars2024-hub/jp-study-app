@@ -156,7 +156,7 @@
     "message": " ($1)"
   },
   "save_cardCreated": {
-    "message": "Card created in Anki$1$2 · saved in Gum"
+    "message": "Card created in Anki$1 · saved in Gum"
   },
   "save_savedWord": {
     "message": "Word saved$1 to Gum"
@@ -739,6 +739,9 @@
   },
   "content_ocrNoModels": {
     "message": "OCR models are not installed. Open Gum → Settings → Models & dictionaries."
+  },
+  "content_ocrDownloading": {
+    "message": "Gum is downloading the OCR models — try again in a moment."
   },
   "content_ocrReadHint": {
     "message": "$1 · Double-click a word to look it up."

@@ -445,6 +445,9 @@ async function saveText(tab, text, mode, opts = {}) {
     category: S.detectContentCategory(pageUrl, { title: pageTitle }),
     preferAnki,
     forceAnki,
+    // The page's language for the selection, so the app glosses a Chinese
+    // word from the Chinese dictionary (Han alone would follow the study language).
+    ...(opts.lang === 'ja' || opts.lang === 'zh' || opts.lang === 'ru' ? { lang: opts.lang } : {}),
   };
   try {
     const out = await apiFetch('/v1/mine', { method: 'POST', body: JSON.stringify(payload) });
@@ -912,7 +915,16 @@ async function ocrVisibleTab(tab, region, opts = {}) {
     });
     if (result?.ok) await recordActivity({ kind: 'ocr', label: String(result.text || '').slice(0, 48) });
   } catch (err) {
-    result = { ok: false, error: String(err.message || err), available: true, payload: err.payload };
+    // The app's 503 says whether the models are missing or still downloading;
+    // the page names either state in its own language instead of the English error.
+    const p = err.payload || {};
+    result = {
+      ok: false,
+      error: String(err.message || err),
+      available: p.available === false ? false : true,
+      downloading: p.downloading === true,
+      payload: err.payload,
+    };
   }
   await chrome.tabs.sendMessage(tab.id, { type: 'jp-show-ocr', result });
   return result;
@@ -1365,7 +1377,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         return;
       }
       sendResponse(
-        await saveText(tab, text, msg.mode || 'auto', { forceAnki: msg.forceAnki === true }),
+        await saveText(tab, text, msg.mode || 'auto', { forceAnki: msg.forceAnki === true, lang: msg.lang }),
       );
       return;
     }
@@ -1573,7 +1585,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse(
           await apiFetch('/v1/examples', {
             method: 'POST',
-            body: JSON.stringify({ query: msg.query || '', limit: msg.limit || 8 }),
+            body: JSON.stringify({ query: msg.query || '', limit: msg.limit || 8, lang: msg.lang || '' }),
           }),
         );
       } catch (err) {
@@ -1658,13 +1670,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             method: 'POST',
             body: JSON.stringify({
               text: msg.text || '',
-              source: msg.source || 'ja',
+              // No source: the app reads it from the text (never a blanket 'ja').
+              source: msg.source || '',
               target: msg.target || 'en',
             }),
           }),
         );
       } catch (err) {
-        sendResponse({ ok: false, error: String(err.message || err) });
+        // `status` lets the page name a missing model (503) in its own language.
+        sendResponse({ ok: false, status: err.status, offline: !!err.offline, error: String(err.message || err) });
       }
       return;
     }

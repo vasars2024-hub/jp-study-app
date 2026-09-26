@@ -1081,7 +1081,10 @@ export function registerDictionaryIpc(): void {
     await initYomitanMeta().catch(() => undefined);
     return getPitchData(term, reading);
   });
-  ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
+  // `lang` narrows the lookup to one source language (a Chinese word mined from
+  // a Chinese page must not be glossed from the Japanese dictionary).
+  ipcMain.handle('dict:lookupTermOffline', (_e, query: string, lang?: unknown) =>
+    lookupTermOffline(query, lang === 'ja' || lang === 'zh' || lang === 'ru' ? lang : undefined));
   ipcMain.handle(
     'dict:lookupOfflineInterlinear',
     (_e, text: unknown, options?: unknown): Promise<LexiconInterlinearResult> => {

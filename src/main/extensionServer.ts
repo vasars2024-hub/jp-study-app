@@ -46,7 +46,7 @@ import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
 import { getMainStudyLang } from './studyLanguage';
-import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
+import { studyLangFromTag, studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { isStorageFullError } from '../shared/resilience';
 import {
@@ -576,21 +576,26 @@ function setCors(res: http.ServerResponse, origin: string | undefined): void {
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
+/** Largest request body any route reads. */
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    const MAX = 8 * 1024 * 1024;
+    let tooLarge = false;
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > MAX) {
-        reject(new Error('Payload too large'));
-        req.destroy();
+      if (size > MAX_BODY_BYTES) {
+        // Keep reading and discard: destroying the socket here made the answer
+        // a connection reset, which the extension cannot tell from a closed app.
+        tooLarge = true;
+        chunks.length = 0;
         return;
       }
       chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => (tooLarge ? reject(new Error('Payload too large')) : resolve(Buffer.concat(chunks).toString('utf8'))));
     req.on('error', reject);
   });
 }
@@ -719,6 +724,8 @@ function broadcastMineQueued(payload: {
   folder?: string;
   audioDataUrl?: string;
   profileId?: string;
+  /** The page's language for this word, when the extension said it. */
+  lang?: StudyLang;
 }): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send('extension:mined', payload);
@@ -788,6 +795,8 @@ async function handleMine(body: {
   audioBase64?: string;
   audioFilename?: string;
   audioDataUrl?: string;
+  /** The page's language for the selection (ja / zh / ru), from the content script. */
+  lang?: string;
   /** When false, skip AnkiConnect and save only to Gum flashcards. */
   preferAnki?: boolean;
   /** Force Anki attempt regardless of preferAnki (dictionary “Add to Anki”). */
@@ -851,6 +860,7 @@ async function handleMine(body: {
 
   const forceAnki = body.forceAnki === true;
   const preferAnki = forceAnki || body.preferAnki !== false;
+  const pageLang = studyLangFromTag(body.lang);
   const ankiAttempted = preferAnki;
 
   let profileId = '';
@@ -934,6 +944,7 @@ async function handleMine(body: {
     folder,
     audioDataUrl: audioDataUrl || undefined,
     profileId: profileId || undefined,
+    ...(pageLang ? { lang: pageLang } : {}),
   });
 
   const primaryDestination: 'anki' | 'app' = anki.ok ? 'anki' : 'app';
@@ -1128,6 +1139,15 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     return;
   }
 
+  // A body no route would read is refused up front with a real answer (the
+  // rest of it drained), never a reset connection — the extension reads a
+  // reset as "Gum is not running" and queues the request forever.
+  if (Number(req.headers['content-length'] || 0) > MAX_BODY_BYTES) {
+    req.resume();
+    json(res, 413, { ok: false, error: 'Payload too large' });
+    return;
+  }
+
   const url = new URL(req.url ?? '/', `http://127.0.0.1`);
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
@@ -1137,23 +1157,25 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
     const state = bridgeState ?? loadOrCreateState();
     const auth = req.headers.authorization;
+    const authorized = checkBearerToken(typeof auth === 'string' ? auth : undefined, state.token);
     const decision = decideExtensionSettingsAccess({
       origin,
       host: typeof req.headers.host === 'string' ? req.headers.host : undefined,
       port: effectivePort(state),
-      authorized: checkBearerToken(typeof auth === 'string' ? auth : undefined, state.token),
+      authorized,
       pinnedOrigin: state.pairedOrigin ?? null,
       pairingOpen: pairingWindowOpen(),
+      secFetchSite: typeof req.headers['sec-fetch-site'] === 'string' ? req.headers['sec-fetch-site'] : undefined,
+      secFetchMode: typeof req.headers['sec-fetch-mode'] === 'string' ? req.headers['sec-fetch-mode'] : undefined,
     });
     if (!decision.allow) {
       json(res, decision.status, { ok: false, error: decision.status === 401 ? 'Unauthorized' : 'Forbidden origin' });
       return;
     }
-    if (decision.pin) {
-      pinExtensionOrigin(decision.pin);
-      // One pairing per "Pair now": a second extension waiting in line is refused.
-      pairingOpenUntil = 0;
-    }
+    if (decision.pin) pinExtensionOrigin(decision.pin);
+    // One pairing per "Pair now": a pull that got in through the window (not by
+    // the token or a pinned origin) closes it, so a second extension is refused.
+    if (!authorized && !(origin && origin === state.pairedOrigin)) pairingOpenUntil = 0;
     const status = getExtensionBridgeStatus();
     json(res, 200, {
       ok: true,
@@ -1901,7 +1923,9 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         json(res, 503, { ok: false, error: 'Translation model not installed' });
         return;
       }
-      const source = String(body.source || 'ja').slice(0, 8);
+      // No source named: the text's own script says (Han alone follows the
+      // study language) — a Russian sentence is never translated "from Japanese".
+      const source = String(body.source || studyLangOfText(text, getMainStudyLang())).slice(0, 8);
       const target = String(body.target || 'en').slice(0, 8);
       const results = await runTranslationBatch([{ id: 'ext', text, source, target }]);
       const resultText = results[0]?.text || '';
@@ -2128,15 +2152,19 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     if (!requireAuth(req, res)) return;
     try {
       const raw = await readBody(req);
-      const body = JSON.parse(raw || '{}') as { query?: string; limit?: number };
+      const body = JSON.parse(raw || '{}') as { query?: string; limit?: number; lang?: string };
       const query = String(body.query ?? '').trim().slice(0, 80);
       if (!query) {
         json(res, 400, { ok: false, error: 'query required' });
         return;
       }
       const limit = Math.min(30, Math.max(1, Number(body.limit) || 8));
+      // Examples in the word's own language, chosen like /v1/lookup: a Russian
+      // or Chinese word searched in the Japanese corpus finds nothing, or worse,
+      // Japanese sentences that happen to share a kanji.
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(query, getMainStudyLang());
       const { searchExamples } = await import('./dictionary');
-      const result = await searchExamples(query, limit);
+      const result = await searchExamples(query, limit, lang);
       json(res, 200, {
         ok: true,
         query,
