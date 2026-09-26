@@ -62,7 +62,7 @@ function looksLikeReadingColumn(values: string[]): boolean {
   if (!cells.length) return false;
   const reading = cells.filter(
     (v) =>
-      /^[\p{Script=Hiragana}\p{Script=Katakana}ー・ 　]+$/u.test(v) ||
+      /^[\p{Script=Hiragana}\p{Script=Katakana}ー・ \u3000]+$/u.test(v) ||
       /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/i.test(v) ||
       /^([a-zü]+[1-5] ?)+$/i.test(v) ||
       /́/.test(v.normalize('NFD')),
