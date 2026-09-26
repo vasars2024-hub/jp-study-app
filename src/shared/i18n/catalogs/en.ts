@@ -22,6 +22,7 @@ import { SCRAPER_UI_EN } from '../scraperUi/en';
 import { SCRAPER_DRAWER_EN } from '../scraperDrawerUi/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 import { SHELL_UI_EN } from '../shellUi/en';
+import { TOUR_UI_EN } from '../tourUi/en';
 import { COMMANDS_UI_EN } from '../commandsUi/en';
 import { COMPANION_UI_EN } from '../companionUi/en';
 import { MUSIC_UI_EN } from '../musicUi/en';
@@ -800,6 +801,7 @@ export const en: Catalog = {
   ...ANIME_SCHEDULE_EN,
   ...GRAMMAR_TAXONOMY_EN,
   ...SHELL_UI_EN,
+  ...TOUR_UI_EN,
   ...COMMANDS_UI_EN,
   ...COMPANION_UI_EN,
   ...MUSIC_UI_EN,
@@ -4201,28 +4203,6 @@ export const en: Catalog = {
   'ui.menubar.aria': 'Application menu',
   'ui.splitPane.aria': 'Resize panes',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
-  'tour.progress': 'Step {current} of {total}',
-  'tour.next': 'Next',
-  'tour.back': 'Back',
-  'tour.skip': 'Skip tour',
-  'tour.takeMeThere': 'Take me there',
-  'tour.done': 'Finish',
-  'tour.welcome.title': 'Welcome',
-  'tour.welcome.body': 'This is your desktop. Nothing here is required — you can close this at any time with Esc, and replay it later from Settings → {help}.',
-  'tour.start.title': 'Everything lives behind Start',
-  'tour.start.body': 'The desktop opens empty on purpose. Start holds every app — the reader, the dictionary, grammar, games, media and settings. Give it a click.',
-  'tour.taskbar.title': 'The taskbar',
-  'tour.taskbar.body': 'Open windows collect here, alongside the clock, notifications and quick settings. Windows can be dragged, resized and stacked like any desktop.',
-  'tour.lens.title': 'Read anything on screen',
-  'tour.lens.body': 'The Reading Lens works anywhere in Windows, not just inside this app. Press the hotkey, drag a box over any Japanese text — a game, a PDF, a video — and it is read, looked up and ready to mine.',
-  'tour.study.title': 'Reading, and everything under it',
-  'tour.study.body': 'Mine a sentence anywhere and it flows to the same place: your dictionary lookups, grammar breakdowns, flashcards and Anki export all read from one library.',
-  'tour.language.title': 'Two languages, set separately',
-  'tour.language.body': 'The interface language and the language you are studying are independent settings. Change the interface language in Settings → {appearance} and the study language in Settings → {study}; this tour follows the interface language as you switch it.',
-  'tour.assets.title': 'Downloads are opt-in',
-  'tour.assets.body': 'Dictionaries, OCR and speech models are not bundled — nothing large is fetched until you ask. Settings → {storage} lists every optional asset with its size before you commit.',
-  'tour.outro.title': 'That is the whole shell',
-  'tour.outro.body': 'Everything else is discoverable from Start. Companions, themes and the desktop layout are all in Settings — and you can replay this tour from Settings → {help} whenever you like.',
   'settings.nav.help': 'Help',
   'settings.nav.help.desc': 'Guided tour and keyboard shortcuts',
   // ---- Settings ▸ Help: offline assistant (aero 5.6) ----
@@ -4254,7 +4234,8 @@ export const en: Catalog = {
   'help.diagnostics.copied': 'Copied to the clipboard.',
   'help.diagnostics.openFolder': 'Open log folder',
   'help.diagnostics.refresh': 'Refresh',
-  'help.tour.body': 'A short walkthrough of the desktop, the Reading Lens and where study material goes. It runs once on a new profile.',
+  'help.tour.body': 'A walkthrough of Gum in short chapters — the desktop first, then whichever parts you want. It runs once on a new profile.',
+  'help.tour.chapters': 'Or take a single chapter:',
   'help.tour.replay': 'Replay tour',
   'help.tour.replayed': 'The tour will start again now.',
   'help.tour.armed': 'The tour is armed. It starts the next time the desktop window opens.',

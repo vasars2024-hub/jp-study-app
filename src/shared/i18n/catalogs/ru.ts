@@ -22,6 +22,7 @@ import { SCRAPER_UI_RU } from '../scraperUi/ru';
 import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
 import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 import { SHELL_UI_RU } from '../shellUi/ru';
+import { TOUR_UI_RU } from '../tourUi/ru';
 import { COMMANDS_UI_RU } from '../commandsUi/ru';
 import { COMPANION_UI_RU } from '../companionUi/ru';
 import { MUSIC_UI_RU } from '../musicUi/ru';
@@ -822,6 +823,7 @@ export const ru: Catalog = {
   ...ANIME_SCHEDULE_RU,
   ...GRAMMAR_TAXONOMY_RU,
   ...SHELL_UI_RU,
+  ...TOUR_UI_RU,
   ...COMMANDS_UI_RU,
   ...COMPANION_UI_RU,
   ...MUSIC_UI_RU,
@@ -4614,28 +4616,6 @@ export const ru: Catalog = {
   'ui.menubar.aria': 'Меню приложения',
   'ui.splitPane.aria': 'Изменить размер панелей',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
-  'tour.progress': 'Шаг {current} из {total}',
-  'tour.next': 'Далее',
-  'tour.back': 'Назад',
-  'tour.skip': 'Пропустить',
-  'tour.takeMeThere': 'Перейти туда',
-  'tour.done': 'Готово',
-  'tour.welcome.title': 'Добро пожаловать',
-  'tour.welcome.body': 'Это ваш рабочий стол. Ничего обязательного здесь нет — закройте в любой момент клавишей Esc, а позже запустите снова из «Настройки → {help}».',
-  'tour.start.title': 'Всё живёт за кнопкой «Пуск»',
-  'tour.start.body': 'Рабочий стол намеренно открывается пустым. В «Пуске» собраны все приложения — читалка, словарь, грамматика, игры, медиа и настройки. Нажмите на неё.',
-  'tour.taskbar.title': 'Панель задач',
-  'tour.taskbar.body': 'Открытые окна собираются здесь, рядом с часами, уведомлениями и быстрыми настройками. Окна можно перетаскивать, менять размер и накладывать друг на друга.',
-  'tour.lens.title': 'Читайте что угодно на экране',
-  'tour.lens.body': '«Читающая линза» работает во всей Windows, а не только внутри приложения. Нажмите горячую клавишу и выделите рамкой любой японский текст — в игре, PDF или видео — он будет распознан, найден в словаре и готов к добыче карточек.',
-  'tour.study.title': 'Чтение и всё, что под ним',
-  'tour.study.body': 'Добывайте предложение где угодно — оно попадёт в одно место: словарные запросы, разбор грамматики, карточки и экспорт в Anki читают из одной библиотеки.',
-  'tour.language.title': 'Два языка, настраиваются отдельно',
-  'tour.language.body': 'Язык интерфейса и язык, который вы изучаете, — независимые настройки. Язык интерфейса меняется в «Настройки → {appearance}», язык изучения — в «Настройки → {study}»; этот тур следует за языком интерфейса.',
-  'tour.assets.title': 'Загрузки — по вашему выбору',
-  'tour.assets.body': 'Словари, OCR и речевые модели не входят в комплект — ничего большого не загружается, пока вы не попросите. В «Настройки → {storage}» перечислены все дополнительные ресурсы с их размером.',
-  'tour.outro.title': 'Вот и вся оболочка',
-  'tour.outro.body': 'Всё остальное можно найти через «Пуск». Компаньоны, темы и раскладка рабочего стола — в настройках, а этот тур можно повторить из «Настройки → {help}» когда угодно.',
   'settings.nav.help': 'Справка',
   'settings.nav.help.desc': 'Обучающий тур и горячие клавиши',
   'help.assistant.title': 'Спросить о настройке',
@@ -4666,7 +4646,8 @@ export const ru: Catalog = {
   'help.diagnostics.copied': 'Скопировано в буфер обмена.',
   'help.diagnostics.openFolder': 'Открыть папку журналов',
   'help.diagnostics.refresh': 'Обновить',
-  'help.tour.body': 'Краткий обзор рабочего стола, «Читающей линзы» и того, куда попадают учебные материалы. На новом профиле запускается один раз.',
+  'help.tour.body': 'Обзор Gum короткими главами — сначала рабочий стол, затем любые разделы на ваш выбор. Запускается один раз в новом профиле.',
+  'help.tour.chapters': 'Или пройдите одну главу:',
   'help.tour.replay': 'Повторить тур',
   'help.tour.replayed': 'Тур начнётся заново прямо сейчас.',
   'help.tour.armed': 'Тур снова включён. Он начнётся при следующем открытии окна рабочего стола.',

@@ -1299,7 +1299,15 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     movedTo: 'files',
     group: 'System',
   },
-  // Settings > Help: the diagnostic log and the update check (audit robust #5, #7).
+  // Settings > Help: the guided tour, the diagnostic log and the update check (audit robust #5, #7).
+  {
+    id: 'guided-tour',
+    titleKey: 'help.tour.title',
+    descKey: 'help.tour.body',
+    keywords: ['tour', 'guided tour', 'tutorial', 'onboarding', 'walkthrough', 'getting started', 'help', 'chapters'],
+    pageId: 'help',
+    group: 'System',
+  },
   {
     id: 'diagnostics',
     titleKey: 'help.diagnostics.title',

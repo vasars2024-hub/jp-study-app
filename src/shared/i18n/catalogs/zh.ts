@@ -22,6 +22,7 @@ import { SCRAPER_UI_ZH } from '../scraperUi/zh';
 import { SCRAPER_DRAWER_ZH } from '../scraperDrawerUi/zh';
 import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 import { SHELL_UI_ZH } from '../shellUi/zh';
+import { TOUR_UI_ZH } from '../tourUi/zh';
 import { COMMANDS_UI_ZH } from '../commandsUi/zh';
 import { COMPANION_UI_ZH } from '../companionUi/zh';
 import { MUSIC_UI_ZH } from '../musicUi/zh';
@@ -697,6 +698,7 @@ export const zh: Catalog = {
   ...ANIME_SCHEDULE_ZH,
   ...GRAMMAR_TAXONOMY_ZH,
   ...SHELL_UI_ZH,
+  ...TOUR_UI_ZH,
   ...COMMANDS_UI_ZH,
   ...COMPANION_UI_ZH,
   ...MUSIC_UI_ZH,
@@ -4242,28 +4244,6 @@ export const zh: Catalog = {
   'ui.menubar.aria': '应用程序菜单',
   'ui.splitPane.aria': '调整窗格大小',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
-  'tour.progress': '第 {current} 步，共 {total} 步',
-  'tour.next': '下一步',
-  'tour.back': '返回',
-  'tour.skip': '跳过引导',
-  'tour.takeMeThere': '带我去',
-  'tour.done': '完成',
-  'tour.welcome.title': '欢迎',
-  'tour.welcome.body': '这是你的桌面。这里没有任何必做的步骤 — 随时可以按 Esc 关闭，之后也能从 设置 → {help} 重新播放。',
-  'tour.start.title': '一切都在「开始」里',
-  'tour.start.body': '桌面刻意保持空白。「开始」中包含全部应用 — 阅读器、词典、语法、游戏、媒体和设置。点击试试。',
-  'tour.taskbar.title': '任务栏',
-  'tour.taskbar.body': '打开的窗口会收集在这里，旁边是时钟、通知和快捷设置。窗口可以像普通桌面一样拖动、调整大小和堆叠。',
-  'tour.lens.title': '读取屏幕上的任何文字',
-  'tour.lens.body': '阅读透镜可在整个 Windows 中使用，不限于本应用。按下快捷键，在任意日语文本上拖出方框 — 游戏、PDF、视频皆可 — 即可识别、查词并准备制卡。',
-  'tour.study.title': '阅读，以及它背后的一切',
-  'tour.study.body': '在任何地方挖掘句子，去向都是同一处：词典查询、语法拆解、记忆卡与 Anki 导出都读取同一个库。',
-  'tour.language.title': '两种语言，分别设置',
-  'tour.language.body': '界面语言与你正在学习的语言是彼此独立的设置。界面语言在 设置 → {appearance} 中更改，学习语言在 设置 → {study} 中更改；本引导会跟随界面语言切换。',
-  'tour.assets.title': '下载均需你同意',
-  'tour.assets.body': '词典、OCR 与语音模型并未内置 — 在你主动请求之前，不会下载任何大文件。设置 → {storage} 会在你决定之前列出每个可选资源及其体积。',
-  'tour.outro.title': '外壳部分就是这些',
-  'tour.outro.body': '其余内容都可以从「开始」中找到。伙伴、主题与桌面布局都在设置里 — 你也可以随时从 设置 → {help} 重新播放本引导。',
   'settings.nav.help': '帮助',
   'settings.nav.help.desc': '引导教程与键盘快捷键',
   'help.assistant.title': '询问某项设置',
@@ -4294,7 +4274,8 @@ export const zh: Catalog = {
   'help.diagnostics.copied': '已复制到剪贴板。',
   'help.diagnostics.openFolder': '打开日志文件夹',
   'help.diagnostics.refresh': '刷新',
-  'help.tour.body': '简要介绍桌面、阅读透镜以及学习材料的去向。在新的配置文件上只会运行一次。',
+  'help.tour.body': '以简短章节介绍 Gum——先是桌面，然后是你想看的任何部分。在新的配置文件中只运行一次。',
+  'help.tour.chapters': '或者只看其中一个章节：',
   'help.tour.replay': '重新播放引导',
   'help.tour.replayed': '引导将立即重新开始。',
   'help.tour.armed': '导览已重新启用，将在下次打开桌面窗口时开始。',

@@ -20,9 +20,20 @@ export interface OnboardingState {
   replays: number;
   /** The step the user was on when they last left, for a resumed run. */
   lastStepId: string | null;
+  /**
+   * Chapters walked to their last step. The chapter menu ticks them; nothing
+   * else depends on it, so a lost list only loses the ticks.
+   */
+  chaptersDone: string[];
+  /**
+   * The chapter a replay asked for (Help or Start → one chapter). Read once by
+   * the overlay when it takes the replay, so it starts there instead of at the
+   * welcome step.
+   */
+  requestedChapter: string | null;
 }
 
-const EMPTY: OnboardingState = { completedAt: null, replays: 0, lastStepId: null };
+const EMPTY: OnboardingState = { completedAt: null, replays: 0, lastStepId: null, chaptersDone: [], requestedChapter: null };
 
 export function loadOnboarding(): OnboardingState {
   try {
@@ -35,6 +46,10 @@ export function loadOnboarding(): OnboardingState {
       completedAt: typeof parsed.completedAt === 'string' ? parsed.completedAt : null,
       replays: typeof parsed.replays === 'number' && parsed.replays >= 0 ? Math.floor(parsed.replays) : 0,
       lastStepId: typeof parsed.lastStepId === 'string' ? parsed.lastStepId : null,
+      chaptersDone: Array.isArray(parsed.chaptersDone)
+        ? [...new Set(parsed.chaptersDone.filter((id): id is string => typeof id === 'string'))].slice(0, 64)
+        : [],
+      requestedChapter: typeof parsed.requestedChapter === 'string' ? parsed.requestedChapter : null,
     };
   } catch {
     // Unparseable storage means we have no evidence the tour ran. Showing it a
@@ -59,11 +74,32 @@ export function shouldRunTour(): boolean {
 /** Called on finish *and* on skip — both mean "do not fire again unprompted". */
 export function markTourComplete(): void {
   const current = loadOnboarding();
-  save({ ...current, completedAt: current.completedAt ?? new Date().toISOString(), lastStepId: null });
+  save({
+    ...current,
+    completedAt: current.completedAt ?? new Date().toISOString(),
+    lastStepId: null,
+    requestedChapter: null,
+  });
 }
 
+/** A step id, or `TOUR_MENU_ID` for the chapter menu, so a tour left there resumes at the menu. */
 export function rememberStep(stepId: string): void {
   save({ ...loadOnboarding(), lastStepId: stepId });
+}
+
+/** A chapter walked to its last step; the menu ticks it. */
+export function markChapterDone(chapterId: string): void {
+  const current = loadOnboarding();
+  if (current.chaptersDone.includes(chapterId)) return;
+  save({ ...current, chaptersDone: [...current.chaptersDone, chapterId] });
+}
+
+/** The chapter a replay asked for, consumed by the overlay that takes it. */
+export function takeRequestedChapter(): string | null {
+  const current = loadOnboarding();
+  if (!current.requestedChapter) return null;
+  save({ ...current, requestedChapter: null });
+  return current.requestedChapter;
 }
 
 /**
@@ -128,9 +164,19 @@ export function onTourArmChanged(cb: () => void): () => void {
   };
 }
 
-/** Settings → Help → Replay. Re-arms the tour without erasing that it ran. */
-export function replayTour(): void {
+/**
+ * Settings → Help → Replay, the Start menu's "Guided tour", and a chapter
+ * picked on Help. Re-arms the tour without erasing that it ran; with a
+ * chapter, the overlay starts at that chapter's first step.
+ */
+export function replayTour(chapterId?: string): void {
   const current = loadOnboarding();
-  save({ completedAt: null, replays: current.replays + 1, lastStepId: null });
+  save({
+    completedAt: null,
+    replays: current.replays + 1,
+    lastStepId: null,
+    chaptersDone: current.chaptersDone,
+    requestedChapter: chapterId ?? null,
+  });
   window.dispatchEvent(new CustomEvent(REPLAY_EVENT));
 }

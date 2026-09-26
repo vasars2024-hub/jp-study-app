@@ -85,6 +85,38 @@ describe('the tour spotlight sits on its anchor at 80% zoom', () => {
   });
 });
 
+describe('the tour bubble stays on screen at 80% zoom', () => {
+  it('beside an anchor that fills the window, the bubble is placed inside it — never off screen', async () => {
+    const { rememberStep } = await import('../onboardingStore');
+    rememberStep('flash-review');
+    const win = document.createElement('section');
+    win.className = 'fwin';
+    win.dataset.section = 'flashcards';
+    const card = document.createElement('div');
+    card.className = 'flash-review-setup';
+    // Nearly the whole window, in viewport pixels.
+    card.getBoundingClientRect = () => clientRect(10, 10, window.innerWidth - 20, window.innerHeight - 20);
+    win.append(card);
+    document.body.append(win);
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<TourOverlay />);
+    });
+    const bubble = host.querySelector<HTMLElement>('.tour-bubble');
+    expect(host.querySelector('.tour-ring'), 'the card is spotlit').toBeTruthy();
+    const vp = layoutViewport();
+    const left = parseFloat(bubble?.style.left ?? 'NaN');
+    const top = parseFloat(bubble?.style.top ?? 'NaN');
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(top).toBeGreaterThanOrEqual(0);
+    // The bubble's fallback size (jsdom lays nothing out) must fit inside the layout viewport.
+    expect(left + 340).toBeLessThanOrEqual(vp.width);
+    expect(top + 220).toBeLessThanOrEqual(vp.height);
+  });
+});
+
 describe('a Gum popover opens under its trigger at 80% zoom', () => {
   it('places the panel at the summary, not a fifth short of it', async () => {
     const gumRoot = document.createElement('div');

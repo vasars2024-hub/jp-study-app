@@ -84,6 +84,18 @@ describe('Settings → Help → Replay tour', () => {
     expect(status()).toBe('The tour will start again now.');
   });
 
+  it('offers every chapter on its own; picking one re-arms the tour at that chapter', async () => {
+    markTourComplete();
+    await mount();
+    const tile = host.querySelector<HTMLButtonElement>('[data-tour-chapter="companion"]');
+    expect(tile, 'Help lists the chapters').toBeTruthy();
+    expect(host.querySelectorAll('[data-tour-chapter]').length).toBe(12);
+    await act(async () => { tile?.click(); });
+    expect(loadOnboarding().completedAt, 're-armed').toBeNull();
+    expect(loadOnboarding().requestedChapter, 'at the chapter that was picked').toBe('companion');
+    expect(host.querySelector('#guided-tour, [data-setting-id="guided-tour"]'), 'the card is the tour’s anchor').toBeTruthy();
+  });
+
   it('an answer that arrives late is still reported as armed, not as started', async () => {
     markTourComplete();
     await mount();

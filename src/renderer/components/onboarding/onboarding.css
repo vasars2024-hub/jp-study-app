@@ -74,20 +74,75 @@
   opacity: 0.86;
 }
 
-.tour-bubble__hotkey {
+.tour-bubble__hotkeys {
+  display: grid;
+  gap: 6px;
   margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.tour-bubble__hotkey kbd {
-  display: inline-block;
-  padding: 4px 9px;
+.tour-hotkey {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.tour-hotkey kbd {
+  flex: none;
+  padding: 3px 8px;
   font: inherit;
   font-size: 12px;
-  background: rgb(255 255 255 / 8%);
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--text, #e8e8ef) 8%, transparent);
   border: 1px solid var(--control-border, #3a3a44);
   border-bottom-width: 2px;
   border-radius: 6px;
 }
+
+.tour-hotkey__unset {
+  flex: none;
+  padding: 3px 8px;
+  font-size: 11px;
+  border: 1px dashed var(--control-border, #3a3a44);
+  border-radius: 6px;
+  opacity: 0.72;
+}
+
+.tour-hotkey__label {
+  min-width: 0;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+/* The chapter menu: a wider bubble with the chapters as a two-column list. */
+.tour-bubble--menu {
+  width: 560px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.tour-chapters {
+  margin: 14px 0 0;
+}
+
+.tour-chapter__done {
+  display: inline-flex;
+  flex: none;
+  color: var(--accent, #d84a68);
+}
+
+.tour-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 
 .tour-bubble__actions {
   display: flex;
