@@ -178,6 +178,24 @@ export async function extractEmbeddedSubtitle(file: string, subtitleIndex: numbe
   return text.length > 0 && /\d+:\d{2}:\d{2}/.test(text) ? text : null;
 }
 
+/**
+ * One embedded ASS/SSA stream as ASS text, styles and all — for a reader that
+ * needs them (the sentence deck tells a sign from dialogue by its style, and
+ * `extractEmbeddedSubtitle`'s SRT drops that). Null when the stream cannot be
+ * copied out as ASS; the caller falls back to the SRT extraction.
+ */
+export async function extractEmbeddedSubtitleAss(file: string, subtitleIndex: number): Promise<string | null> {
+  const { code, stdout } = await runFfmpeg([
+    '-hide_banner', '-loglevel', 'error',
+    '-i', file,
+    '-map', `0:s:${subtitleIndex}`,
+    '-c:s', 'copy', '-f', 'ass', 'pipe:1',
+  ], 60_000);
+  if (code !== 0 || stdout.length === 0) return null;
+  const text = stdout.toString('utf-8');
+  return /^\s*Dialogue:/m.test(text) ? text : null;
+}
+
 /** Normalizes container language tags (`jpn`, `ja-JP`) to the app's short form. */
 export function normalizeStreamLanguage(raw: string | null | undefined): string | null {
   const value = raw?.trim().toLowerCase();
