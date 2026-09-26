@@ -33,7 +33,6 @@ import {
   createBackupArchive,
   currentFilesMissingFromArchive,
   inventoryUserData,
-  isRendererSnapshotText,
   listAutoBackups,
   pruneAutoBackups,
   stageArchive,
@@ -42,6 +41,7 @@ import {
   type BackupManifest,
   type StagedRestore,
 } from './backupArchive';
+import { isRendererSnapshotText } from './snapshotText';
 import { drainAtomicWrites, flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites, writeJsonAtomicSync } from '../atomicJson';
 import { logDiagnostic } from '../errorLog';
 import { mt } from '../i18n';

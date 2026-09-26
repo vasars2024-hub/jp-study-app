@@ -49,6 +49,7 @@ import zlib from 'node:zlib';
 import { once } from 'node:events';
 import { finished } from 'node:stream/promises';
 import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
+export { RENDERER_SNAPSHOT_TEXT_PREFIX, isRendererSnapshotText } from './snapshotText';
 
 export const BACKUP_APP = 'jp-study-app';
 export const BACKUP_KIND = 'gum-backup';
@@ -217,21 +218,6 @@ export interface CreateBackupResult {
   path: string;
   bytes: number;
   manifest: BackupManifest;
-}
-
-/** The start every serialized renderer snapshot has (`backupSnapshot.ts`). */
-export const RENDERER_SNAPSHOT_TEXT_PREFIX = '{"app":"jp-study-app","kind":"renderer-snapshot",';
-
-/**
- * A renderer snapshot sent as JSON text: checked by its fixed header and its
- * closing brace, without parsing the (multi-MB) body on the main process. The
- * archive stores it verbatim; restore parses and validates it as before.
- */
-export function isRendererSnapshotText(value: unknown): value is string {
-  if (typeof value !== 'string' || !value.startsWith(RENDERER_SNAPSHOT_TEXT_PREFIX)) return false;
-  let end = value.length - 1;
-  while (end > 0 && /\s/.test(value[end])) end -= 1;
-  return value[end] === '}' && value.includes('"localStorage":') && value.includes('"indexedDb":');
 }
 
 /**
