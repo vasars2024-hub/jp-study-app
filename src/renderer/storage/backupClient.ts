@@ -14,7 +14,7 @@
  *      and swaps the files in — and if any swap fails it undoes its own steps,
  *      and this module rolls the renderer data back and lets writes resume.
  */
-import { applyRendererSnapshot, collectRendererSnapshot, isLegacyBackup, isRendererSnapshot, legacyToSnapshot, SnapshotApplyError } from './backupSnapshot';
+import { applyRendererSnapshot, collectRendererSnapshot, collectRendererSnapshotText, isLegacyBackup, isRendererSnapshot, legacyToSnapshot, SnapshotApplyError } from './backupSnapshot';
 import { flushPendingMirrors, setRendererWriteBlock } from './storage';
 import type { CreateBackupReply } from '../../main/backup/backupService';
 import type { BackupManifest } from '../../main/backup/backupArchive';
@@ -33,7 +33,8 @@ export function backupAvailable(): boolean {
 export async function backUpNow(includeBookFiles: boolean): Promise<CreateBackupReply> {
   const a = api();
   if (!a?.backupCreate) return { ok: false, error: 'unavailable' };
-  const renderer = await collectRendererSnapshot();
+  // Serialized here, in slices: main stores the text as renderer.json as is.
+  const renderer = await collectRendererSnapshotText();
   return a.backupCreate({ includeBookFiles, renderer });
 }
 
@@ -61,7 +62,7 @@ export async function runAutoBackupIfDue(
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       if (!(await a.backupAutoDue())) return;
-      const renderer = await collectRendererSnapshot();
+      const renderer = await collectRendererSnapshotText();
       const reply = await a.backupCreateAuto({ renderer });
       if (!isBusyReply(reply)) return;
     } catch (err) {
