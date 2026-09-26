@@ -2,8 +2,15 @@ import { GRAMMAR } from './data/grammar';
 import type { NormalizedGrammarPoint } from './data/grammar/normalize';
 import { grammarSurfaceCore } from '../shared/grammarPatternSurface';
 import {
+  findPatternSpans,
+  patternAlternatives,
+  toSimplifiedForMatch,
+  type MatchLang,
+} from '../shared/grammarPatternMatch';
+import {
   alignAnnotations,
   normalizeAnalysisText,
+  type SentenceAnnotation,
   type SentenceAnalysisResult,
   type UnalignedAnnotation,
 } from '../shared/sentenceAnalysisCore';
@@ -20,6 +27,11 @@ import {
  * a short kana fragment (に, て) that occurs inside unrelated words is never claimed. That
  * under-reports on purpose: a highlight that points at the wrong characters teaches the
  * wrong thing, while a missing one only teaches less.
+ *
+ * Chinese and Russian are matched by `grammarPatternMatch` instead: a pattern there is an
+ * ordered frame of literal parts (虽然…但是…, если бы … бы), Traditional lines are compared
+ * in Simplified, and Russian parts are whole words. Each part found is its own highlighted
+ * span pointing at the same library point.
  */
 
 interface LibraryEntry {
@@ -49,6 +61,75 @@ function libraryFor(lang: string): LibraryEntry[] {
   return entries;
 }
 
+/** Chinese / Russian: each point's alternatives, each an ordered list of literal parts. */
+interface FrameEntry {
+  alternatives: string[][];
+  point: NormalizedGrammarPoint;
+}
+
+const framesByLang = new Map<MatchLang, FrameEntry[]>();
+
+function framesFor(lang: MatchLang): FrameEntry[] {
+  const cached = framesByLang.get(lang);
+  if (cached) return cached;
+  const seen = new Set<string>();
+  const entries: FrameEntry[] = [];
+  for (const point of GRAMMAR) {
+    if (point.lang !== lang) continue;
+    const alternatives = patternAlternatives(point.title, lang).filter((parts) => {
+      const key = parts.join('…');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (alternatives.length) entries.push({ alternatives, point });
+  }
+  framesByLang.set(lang, entries);
+  return entries;
+}
+
+function annotationFor(point: NormalizedGrammarPoint, text: string): UnalignedAnnotation {
+  return {
+    text,
+    category: 'grammar',
+    headword: point.title,
+    level: String(point.level),
+    meaning: point.meaning,
+    explanation: point.explanation,
+    examples: point.examples.slice(0, MAX_EXAMPLES).map((example) => ({
+      text: example.jp,
+      translation: example.en,
+    })),
+    vocabulary: [],
+  };
+}
+
+/** Chinese / Russian spans, placed by offset and kept in reading order without overlaps. */
+function frameAnnotations(sentence: string, lang: MatchLang): SentenceAnnotation[] {
+  const haystack = lang === 'zh' ? toSimplifiedForMatch(sentence) : sentence;
+  const placed: SentenceAnnotation[] = [];
+  for (const { alternatives, point } of framesFor(lang)) {
+    for (const parts of alternatives) {
+      const spans = findPatternSpans(haystack, parts, lang);
+      if (!spans) continue;
+      for (const span of spans) {
+        placed.push({ ...annotationFor(point, sentence.slice(span.start, span.end)), start: span.start, end: span.end });
+      }
+      break;
+    }
+  }
+  // Longest first at one position, the more specific claim, as `alignAnnotations` does.
+  placed.sort((a, b) => a.start - b.start || b.end - a.end);
+  const kept: SentenceAnnotation[] = [];
+  let lastEnd = 0;
+  for (const annotation of placed) {
+    if (annotation.start < lastEnd) continue;
+    kept.push(annotation);
+    lastEnd = annotation.end;
+  }
+  return kept;
+}
+
 const MAX_EXAMPLES = 2;
 const CACHE_LIMIT = 200;
 const resultCache = new Map<string, SentenceAnalysisResult | null>();
@@ -64,28 +145,21 @@ export function localSentenceAnalysis(raw: string, lang: string): SentenceAnalys
   const key = `${lang}::${sentence}`;
   if (resultCache.has(key)) return resultCache.get(key) ?? null;
 
-  const hits: Array<{ at: number; annotation: UnalignedAnnotation }> = [];
-  for (const { core, point } of libraryFor(lang)) {
-    const at = sentence.indexOf(core);
-    if (at < 0) continue;
-    hits.push({ at, annotation: {
-      text: core,
-      category: 'grammar',
-      headword: point.title,
-      level: String(point.level),
-      meaning: point.meaning,
-      explanation: point.explanation,
-      examples: point.examples.slice(0, MAX_EXAMPLES).map((example) => ({
-        text: example.jp,
-        translation: example.en,
-      })),
-      vocabulary: [],
-    } });
+  let annotations: SentenceAnnotation[];
+  if (lang === 'zh' || lang === 'ru') {
+    annotations = frameAnnotations(sentence, lang);
+  } else {
+    const hits: Array<{ at: number; annotation: UnalignedAnnotation }> = [];
+    for (const { core, point } of libraryFor(lang)) {
+      const at = sentence.indexOf(core);
+      if (at < 0) continue;
+      hits.push({ at, annotation: annotationFor(point, core) });
+    }
+    // Reading order, longest first at one position: `alignAnnotations` keeps the longer of
+    // two overlapping spans, the more specific claim (〜なければならない over 〜ならない).
+    hits.sort((a, b) => a.at - b.at || b.annotation.text.length - a.annotation.text.length);
+    annotations = alignAnnotations(sentence, hits.map((hit) => hit.annotation));
   }
-  // Reading order, longest first at one position: `alignAnnotations` keeps the longer of
-  // two overlapping spans, the more specific claim (〜なければならない over 〜ならない).
-  hits.sort((a, b) => a.at - b.at || b.annotation.text.length - a.annotation.text.length);
-  const annotations = alignAnnotations(sentence, hits.map((hit) => hit.annotation));
   const result = annotations.length
     ? { sentence, translations: {}, annotations, nuance: [], pitfalls: [] }
     : null;
