@@ -124,19 +124,47 @@ function isContent(t: IpadicFeatures): boolean {
  * same line never tokenizes differently, so it is done once. Bounded, oldest out first.
  */
 const TOKENIZE_CACHE_MAX = 4000;
-const tokenizeCache = new Map<string, JpToken[]>();
+/**
+ * The cache is for lines and paragraphs. A whole-chapter or book-sample text is
+ * tokenized once and never asked for again, and caching it kept hundreds of
+ * thousands of token objects resident (the Library's 40k-character samples held
+ * ~120 MB), so long texts are not cached and the total is capped by size too.
+ */
+export const TOKENIZE_CACHE_MAX_TEXT = 1_000;
+/** Estimated bytes the cache may hold (text + token objects). */
+export const TOKENIZE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+/** Rough heap cost of one token object with its strings. */
+const TOKEN_BYTES = 160;
+const tokenizeCache = new Map<string, { tokens: JpToken[]; bytes: number }>();
+let tokenizeCacheBytes = 0;
+
+function cacheCost(text: string, tokens: readonly JpToken[]): number {
+  return text.length * 2 + tokens.length * TOKEN_BYTES;
+}
 
 export function tokenizeSync(text: string): JpToken[] {
   if (!tok) return [];
   const cached = tokenizeCache.get(text);
-  if (cached) return cached;
+  if (cached) return cached.tokens;
   const tokens = tokenizeUncached(text);
-  if (tokenizeCache.size >= TOKENIZE_CACHE_MAX) {
+  if (text.length > TOKENIZE_CACHE_MAX_TEXT) return tokens;
+  const bytes = cacheCost(text, tokens);
+  while (
+    tokenizeCache.size && (tokenizeCache.size >= TOKENIZE_CACHE_MAX || tokenizeCacheBytes + bytes > TOKENIZE_CACHE_MAX_BYTES)
+  ) {
     const oldest = tokenizeCache.keys().next().value;
-    if (oldest !== undefined) tokenizeCache.delete(oldest);
+    if (oldest === undefined) break;
+    tokenizeCacheBytes -= tokenizeCache.get(oldest)?.bytes ?? 0;
+    tokenizeCache.delete(oldest);
   }
-  tokenizeCache.set(text, tokens);
+  tokenizeCache.set(text, { tokens, bytes });
+  tokenizeCacheBytes += bytes;
   return tokens;
+}
+
+/** What the tokenize cache holds now. For tests and diagnostics. */
+export function tokenizeCacheStats(): { entries: number; bytes: number } {
+  return { entries: tokenizeCache.size, bytes: tokenizeCacheBytes };
 }
 
 /**

@@ -26,7 +26,8 @@ import { bookOcrViewOf } from '../../shared/bookOcrIpc';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
 import { fetchReadableArticle, articleBodyHtml } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
-import { enrichInboxItems } from '../inboxEnrich';
+import { enrichLibraryInBackground, mergeScoredItems, needsLevelEnrich } from '../inboxEnrich';
+import { forgetBookFileKeys } from '../bookProfiles';
 import {
   enrichBookLevelEstimates,
   getCachedBookLevel,
@@ -278,9 +279,11 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   }, [revealItemId]);
 
   useEffect(() => {
-    // Scan the watch folder for anything new, then load.
-    window.api.syncLibrary().then(async (list) => {
-      setItems(await enrichInboxItems(list));
+    // Scan the watch folder for anything new, then show it at once: levels are
+    // scored in the background (below) and fill in as they arrive.
+    forgetBookFileKeys();
+    window.api.syncLibrary().then((list) => {
+      if (Array.isArray(list)) setItems(list);
     });
     window.api.getWatchFolder().then(setWatchFolder);
     window.api.getLibraryFolders().then((fs) => {
@@ -291,10 +294,37 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     if (focus) setActive(focus);
     // Live updates when files are dropped into the watch folder while open.
     const unsub = window.api.onLibraryChanged((list) => {
-      void enrichInboxItems(list).then(setItems);
+      setItems(list);
     });
     return unsub;
   }, []);
+
+  /*
+    Progressive level scoring. The ids still waiting for a score are the key: a
+    scored batch drops out of it, so applying a batch does not restart the pass,
+    and a new import (a new id) does. Each book's profile is cached per file,
+    so a restart only re-scores from the cache.
+  */
+  const unscoredKey = useMemo(
+    () => items.filter(needsLevelEnrich).map((it) => it.id).join('|'),
+    [items],
+  );
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  useEffect(() => {
+    if (!unscoredKey) return;
+    const signal = { cancelled: false };
+    void enrichLibraryInBackground(
+      itemsRef.current,
+      (scored) => {
+        if (!signal.cancelled) setItems((prev) => mergeScoredItems(prev, scored));
+      },
+      { signal },
+    );
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [unscoredKey]);
 
   // Seed badges from cache, then idle-enrich missing EPUB estimates.
   useEffect(() => {
@@ -333,7 +363,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   async function importFiles() {
     setBusy(true);
     try {
-      setItems(await enrichInboxItems(await window.api.importFiles()));
+      setItems(await window.api.importFiles());
     } finally {
       setBusy(false);
     }
@@ -342,7 +372,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   async function importFolder() {
     setBusy(true);
     try {
-      setItems(await enrichInboxItems(await window.api.importFolder()));
+      setItems(await window.api.importFolder());
     } finally {
       setBusy(false);
     }
@@ -353,7 +383,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     try {
       const res = await window.api.setWatchFolder();
       setWatchFolder(res.folder);
-      setItems(await enrichInboxItems(res.items));
+      setItems(res.items);
     } finally {
       setBusy(false);
     }
@@ -367,7 +397,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
   async function syncNow() {
     setBusy(true);
     try {
-      setItems(await enrichInboxItems(await window.api.syncLibrary()));
+      setItems(await window.api.syncLibrary());
     } finally {
       setBusy(false);
     }
@@ -451,13 +481,11 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     } catch (err) {
       return err instanceof Error ? err.message : String(err);
     }
-    const next = await enrichInboxItems(
-      await window.api.importGenerated({
-        title: art.title,
-        html: articleBodyHtml(art.title, art.html, art.meta),
-        source: art.url,
-      }),
-    );
+    const next = await window.api.importGenerated({
+      title: art.title,
+      html: articleBodyHtml(art.title, art.html, art.meta),
+      source: art.url,
+    });
     setItems(next);
     return next;
   }
@@ -512,12 +540,10 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
       .split(/\r?\n\s*\r?\n/)
       .map((pg) => `<p>${pg.split(/\r?\n/).map(esc).join('<br/>')}</p>`)
       .join('');
-    const next = await enrichInboxItems(
-      await window.api.importGenerated({
-        title: pasteTitle.trim() || body.replace(/\s+/g, ' ').slice(0, 28),
-        html,
-      }),
-    );
+    const next = await window.api.importGenerated({
+      title: pasteTitle.trim() || body.replace(/\s+/g, ' ').slice(0, 28),
+      html,
+    });
     setItems(next);
     setImportOpen(false);
     setPasteTitle('');
