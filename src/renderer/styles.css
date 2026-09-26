@@ -2940,15 +2940,17 @@ h1 {
   font-size: 0.85rem;
 }
 .csv-editor-fieldset {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px 12px;
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
   margin: 0 0 12px;
 }
 .csv-editor-fieldset legend {
-  font-size: 0.75rem;
-  color: var(--muted);
-  padding: 0 4px;
+  margin-bottom: 6px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text);
+  padding: 0;
 }
 .csv-editor-col-picks {
   display: flex;
@@ -6254,6 +6256,32 @@ mark.lookup-mark,
 .collapse-body {
   padding: 0 14px 14px;
   border-top: 1px solid var(--border);
+}
+/* Round 3, "no ugly boxes": a disclosure is a tinted surface, not a framed box,
+   and inside a card it is part of the card (no second surface, no second frame).
+   The summary wraps instead of ellipsizing: a Russian lead was cut mid-word.
+   Same guard as the IR-2 card refinement above — Aero/Wired/Blanc keep theirs. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .collapse-section:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-1);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :is(.anki-card, .ui-card, .os-set-card) > .collapse-section:where(:not(.blanc-root *)) {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :is(.anki-card, .ui-card, .os-set-card) > .collapse-section:where(:not(.blanc-root *)) > :is(.collapse-header, .collapse-body) {
+  padding-left: 0;
+  padding-right: 0;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .collapse-summary:where(:not(.blanc-root *)) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .collapse-body:where(:not(.blanc-root *)) {
+  border-top-color: color-mix(in srgb, var(--border) 70%, transparent);
 }
 .collapse-lead {
   font-size: 12px;
@@ -26063,8 +26091,8 @@ html.lockscreen-widget-root #root {
 .gx-test-field > span { color: var(--muted); white-space: nowrap; }
 .gx-test-field select { flex: 1 1 auto; min-width: 0; max-width: 260px; }
 .gx-test-field input[type="range"] { flex: 1 1 auto; min-width: 0; max-width: 260px; }
-.gx-test-types { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 10px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
-.gx-test-types legend { font-size: 11px; color: var(--muted); padding: 0 4px; }
+.gx-test-types { min-inline-size: 0; border: 0; padding: 0; margin: 10px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+.gx-test-types legend { margin-bottom: 6px; font-size: var(--font-size-sm); font-weight: 600; color: var(--text); padding: 0; }
 .gx-test-type { display: flex; align-items: center; gap: 6px; font-size: 12px; min-width: 0; }
 .gx-test-type input { flex: 0 0 auto; }
 .gx-test-hint { font-size: 11px; margin: -4px 0 10px; }

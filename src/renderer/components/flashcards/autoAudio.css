@@ -12,10 +12,12 @@
   flex-direction: column;
   gap: var(--space-xs);
   margin: 0 0 var(--space-sm);
-  padding: var(--space-sm);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  /* A group, not a framed box inside the window's panel (round 3, "no ugly
+     boxes"): consecutive groups are split by one hairline instead. */
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: var(--font-size-sm);
   /* A fieldset's UA `min-inline-size` is `min-content`, so these panels refused to
      shrink below the widest label they hold. At the 260 px window minimum
@@ -70,11 +72,18 @@
   grid-column: 1 / -1;
 }
 
+:is(.auto-audio-options, .auto-reading-options) + :is(.auto-audio-options, .auto-reading-options) {
+  padding-top: var(--space-md, 12px);
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
 .auto-audio-options > legend,
 .auto-reading-options > legend {
-  padding: 0 var(--space-xs);
-  font-size: var(--font-size-xs);
-  color: var(--muted);
+  padding: 0;
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text);
 }
 
 .auto-audio-options > .muted,

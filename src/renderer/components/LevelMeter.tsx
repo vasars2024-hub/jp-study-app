@@ -191,6 +191,7 @@ function SlotRow({
       {state.pasting && (
         <div className="level-slot-paste">
           <textarea
+            className="ui-textarea"
             value={state.paste}
             placeholder={t('settings.study.level.pastePlaceholder')}
             onChange={(e) => setState((s) => ({ ...s, paste: e.target.value }))}
@@ -272,6 +273,7 @@ export function LevelSettingsSection() {
         </label>
         <input
           id="level-threshold-range"
+          className="ui-slider"
           type="range"
           min={50}
           max={100}
