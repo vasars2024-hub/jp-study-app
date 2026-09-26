@@ -119,6 +119,11 @@ export interface StudyBottomBarProps {
   onTranslateLine: () => void;
   translationBusy: boolean;
   onMineCurrentLine: () => void;
+  /**
+   * "Make a sentence deck from this video". Absent where the playback has no
+   * local file to cut audio from (a stream), so the button is not offered there.
+   */
+  onMakeSentenceDeck?: () => void;
 
   /* practice */
   practiceMode: PracticeMode;
@@ -606,6 +611,19 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
             >
               {t('mediaWorkspace.mining.mine')}
             </button>
+            {props.onMakeSentenceDeck && (
+              <button
+                type="button"
+                data-study-action="sentence-deck"
+                title={t('sentenceDeck.open.hint')}
+                onClick={() => {
+                  close();
+                  props.onMakeSentenceDeck?.();
+                }}
+              >
+                {t('sentenceDeck.open')}
+              </button>
+            )}
           </StudyToolGroup>
         </StudyToolSheet>
       )}

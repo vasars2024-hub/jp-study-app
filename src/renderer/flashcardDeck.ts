@@ -1373,6 +1373,17 @@ export function filterDeckByBook(cards: DeckFlashcard[], bookKey: string): DeckF
   return cards.filter((c) => `${c.bookId || 'unknown'}::${c.bookTitle || 'Unknown source'}` === bookKey);
 }
 
+/**
+ * Several decks at once — a "mix" sitting (two episodes' sentence decks and a
+ * book, say). The same key as `filterDeckByBook`, asked of a set; an empty
+ * set is an empty mix, never "all".
+ */
+export function filterDeckByBooks(cards: DeckFlashcard[], bookKeys: readonly string[]): DeckFlashcard[] {
+  if (bookKeys.includes('all')) return cards;
+  const wanted = new Set(bookKeys);
+  return cards.filter((c) => wanted.has(`${c.bookId || 'unknown'}::${c.bookTitle || 'Unknown source'}`));
+}
+
 export function removeBookGroup(bookId: string, bookTitle: string): DeckFlashcard[] {
   const store = readStore();
   store.cards = store.cards.filter(
@@ -1537,11 +1548,11 @@ export function filterDeckCards(cards: DeckFlashcard[], filter: DeckFolderFilter
  */
 export function reviewSessionCards(
   pool: DeckFlashcard[],
-  bookKey: string,
+  bookKey: string | readonly string[],
   dueOnly: boolean,
   mode: FlashcardReviewMode,
 ): DeckFlashcard[] {
-  const byBook = filterDeckByBook(pool, bookKey);
+  const byBook = typeof bookKey === 'string' ? filterDeckByBook(pool, bookKey) : filterDeckByBooks(pool, bookKey);
   const due = dueOnly ? dueDeckCards(byBook) : byBook;
   return mode === 'audio' ? due.filter((card) => card.audioDataUrl || card.audioPath) : due;
 }

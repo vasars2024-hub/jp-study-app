@@ -1,0 +1,128 @@
+/*
+ * "Make a sentence deck" dialog. Built from the design system's Dialog, Group,
+ * SwitchRow, Input, Select and Progress; this file only lays them out. No
+ * frames inside the dialog: groups are split by the design system's hairline,
+ * the preview is a quiet tinted surface, never a bordered box in a box.
+ */
+.ui-dialog.sd-dialog {
+  width: min(620px, 94vw);
+  max-width: min(620px, 94vw);
+}
+
+.sd-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sd-row > .ui-field {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.sd-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.sd-status p {
+  margin: 0;
+}
+
+.sd-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.sd-detail {
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.sd-note {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+.sd-summary {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The preview: what Make will write, on a faint accent wash. */
+.sd-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.sd-skips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+
+.sd-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sd-lines li {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr;
+  column-gap: 10px;
+  align-items: baseline;
+}
+
+.sd-time {
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-text {
+  overflow-wrap: anywhere;
+}
+
+.sd-translation {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.sd-failed summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.sd-failed ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sd-failed li {
+  display: flex;
+  flex-direction: column;
+}

@@ -30,6 +30,7 @@ import {
   type GumSubtitleStatus,
 } from './gumBackend';
 import GumPopover from './GumPopover';
+import { openSentenceDeckDialog } from '../../sentenceDeck/SentenceDeckDialog';
 import type { GumRatingDisplay } from './gumLayout';
 import { episodesBySeasonOf, gumEpisodeLabel, nextEpisodeOf, type GumTitle } from './gumModel';
 import { STUDY_LANG_NATIVE_NAME, type StudyLang } from '../../../../shared/studyLang';
@@ -320,6 +321,19 @@ function ExternalPlayerMenu({
                   </button>
                 )}
               </>
+            )}
+            {/* The episode as audio sentence cards — the same dialog the player's
+                Study sheet and the Files app open. */}
+            {item.kind !== 'audio' && (
+              <button
+                type="button"
+                className="gum-menu__item"
+                data-gum-action="sentence-deck"
+                title={t('sentenceDeck.open.hint')}
+                onClick={() => { close(); void openSentenceDeckDialog({ videoPath: item.path }); }}
+              >
+                <span>{t('sentenceDeck.open')}</span>
+              </button>
             )}
           </div>
         );

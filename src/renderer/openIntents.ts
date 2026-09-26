@@ -22,6 +22,11 @@ export interface FlashcardsFocus {
   folder: string | null;
   /** One card to find inside the deck. */
   cardId: string | null;
+  /**
+   * Start a sitting straight away: `listening` is the audio-first review of
+   * the folder (a sentence deck just made from a video). Absent opens the deck.
+   */
+  review?: 'listening';
 }
 
 function announce(eventName: string): void {
@@ -54,7 +59,8 @@ export function takeFlashcardsFocus(): FlashcardsFocus | null {
   if (!raw || typeof raw !== 'object') return null;
   const folder = typeof raw.folder === 'string' && raw.folder ? raw.folder : null;
   const cardId = typeof raw.cardId === 'string' && raw.cardId ? raw.cardId : null;
-  return folder || cardId ? { folder, cardId } : null;
+  if (!folder && !cardId) return null;
+  return raw.review === 'listening' ? { folder, cardId, review: 'listening' } : { folder, cardId };
 }
 
 export function requestDictionaryQuery(query: string): void {

@@ -185,6 +185,7 @@ import { useFilesWatch } from './useFilesWatch';
 import FilesNoteDetails, { notebookEntryIdOf } from '../notes/FilesNoteDetails';
 import { openNoteViewer } from '../notes/NoteViewer';
 import { FilesDeletionControls, FilesDeletionReceipt } from './FilesDeletionControls';
+import { openSentenceDeckDialog } from '../sentenceDeck/SentenceDeckDialog';
 import {
   FILES_SOFT_DELETE_EVENT,
   createWindowFilesDeletionSession,
@@ -2755,6 +2756,27 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       ) : (
         <p className="fa-details-note fa-mine-refusal">{t(mineability.reasonKey)}</p>
       )}
+      {/* A video, or a subtitle beside its video: the episode as audio sentence
+          cards. The same dialog as the player's; the subtitle row starts from
+          that file and finds its episode itself. */}
+      {selected.location.store === 'file'
+      && !selected.flags.brokenLink
+      && (selected.kind === 'video' || selected.kind === 'subtitle') ? (
+        <button
+          type="button"
+          className="fa-action fa-action-sentence-deck"
+          title={t('sentenceDeck.open.hint')}
+          onClick={() => {
+            const location = selected.location;
+            if (location.store !== 'file') return;
+            void openSentenceDeckDialog(
+              selected.kind === 'video' ? { videoPath: location.path } : { subtitlePath: location.path },
+            );
+          }}
+        >
+          {t('sentenceDeck.open')}
+        </button>
+      ) : null}
       {/* D422: the two mine receipts used to render HERE. They now live in the
           receipts region beside the list, because this inspector is resolved
           from the FILTERED row (`selected` reads `visible`, not `allItems`) and

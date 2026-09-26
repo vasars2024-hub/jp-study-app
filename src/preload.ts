@@ -1622,6 +1622,34 @@ const api = {
     req: import('./shared/videoClip').VideoClipRequest,
   ): Promise<import('./main/videoClip').VideoClipResult> =>
     ipcRenderer.invoke('video:extractClip', req),
+  // "Sentence deck from a video": the text tracks, one track's cues, and the
+  // batch audio cut with progress and Cancel (main/sentenceDeckIpc.ts).
+  sentenceDeckSources: (input: {
+    videoPath?: string;
+    subtitlePath?: string;
+  }): Promise<import('./shared/sentenceDeck').SentenceDeckSources> =>
+    ipcRenderer.invoke('sentenceDeck:sources', input),
+  sentenceDeckReadTrack: (
+    videoPath: string,
+    trackId: string,
+  ): Promise<import('./shared/sentenceDeck').SentenceDeckTrackRead> =>
+    ipcRenderer.invoke('sentenceDeck:readTrack', videoPath, trackId),
+  sentenceDeckExtractAudio: (
+    request: import('./main/sentenceDeckIpc').SentenceDeckAudioRequest,
+  ): Promise<import('./main/sentenceAudioBatch').SentenceAudioBatchResult> =>
+    ipcRenderer.invoke('sentenceDeck:extractAudio', request),
+  sentenceDeckCancel: (jobId: string): Promise<boolean> =>
+    ipcRenderer.invoke('sentenceDeck:cancel', jobId),
+  onSentenceDeckProgress: (
+    cb: (progress: import('./main/sentenceDeckIpc').SentenceDeckProgress) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      progress: import('./main/sentenceDeckIpc').SentenceDeckProgress,
+    ): void => cb(progress);
+    ipcRenderer.on('sentenceDeck:progress', handler);
+    return () => ipcRenderer.removeListener('sentenceDeck:progress', handler);
+  },
   // Cloud-LLM whole-sentence annotation — AI OCR mode (needs an API key)
   sentenceAnalyze: (
     req: import('./shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
