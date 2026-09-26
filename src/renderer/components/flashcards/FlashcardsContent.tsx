@@ -63,6 +63,7 @@ import {
   removeBookGroup,
   renameBookGroup,
   reviewSessionCards,
+  reviewSessionCounts,
   dueDeckCards,
   undoLastReview,
   peekReviewUndo,
@@ -477,19 +478,28 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
    * uses. D310 — it used to read off `filteredDeck`, which the find box narrows
    * and the session ignores.
    */
-  const reviewSourceCount = useCallback(
-    (bookKey: string) => reviewSessionCards(epubReviewPool, bookKey, reviewDueOnly, reviewMode).length,
+  const reviewSourceCounts = useMemo(
+    () => reviewSessionCounts(epubReviewPool, reviewDueOnly, reviewMode),
     [epubReviewPool, reviewDueOnly, reviewMode],
+  );
+  const reviewSourceCount = useCallback(
+    (bookKey: string) => reviewSourceCounts.get(bookKey) ?? 0,
+    [reviewSourceCounts],
   );
   const audioCandidateCount = useMemo(
     () => epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath).length,
     [epubReviewCandidates],
   );
 
+  // A book's level is a property of its cards in the folder, not of whatever the
+  // find box narrows it to: keyed on the search-filtered groups, every keystroke
+  // changed every fingerprint and re-ran the estimate for each visible book.
+  const levelGroups = useMemo(() => groupDeckByBook(epubReviewPool), [epubReviewPool]);
+
   // Seed deck level badges from cache, then idle-enrich missing estimates.
   useEffect(() => {
     const seed: Record<string, BookLevelEstimate> = {};
-    for (const g of bookGroups) {
+    for (const g of levelGroups) {
       const id = deckGroupKey(g.bookId, g.bookTitle);
       const cached = getCachedDeckLevel(id, deckContentFingerprint(g.cards));
       if (cached) seed[id] = cached;
@@ -500,7 +510,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const signal = { cancelled: false };
     levelEnrichCancel.current = signal;
     void enrichDeckLevelEstimates(
-      bookGroups,
+      levelGroups,
       (deckId, estimate) => {
         if (signal.cancelled) return;
         setDeckLevels((prev) => (prev[deckId] === estimate ? prev : { ...prev, [deckId]: estimate }));
@@ -510,7 +520,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     return () => {
       signal.cancelled = true;
     };
-  }, [bookGroups]);
+  }, [levelGroups]);
 
   useEffect(() => {
     return onDeckLevelInputsChanged(() => {
@@ -1825,6 +1835,24 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   // once and every one of them exits back to the same place.
   const [practice, setPractice] = useState<PracticeMode>('none');
 
+  // The source picker's options, built once per deck/folder/filter change: typing
+  // in the find box re-renders this view, and the picker does not depend on it.
+  const reviewSourceOptions = useMemo(
+    () => [
+      <option key="all" value="all">{t('flash.allInFolder', { count: reviewSourceCount('all') })}</option>,
+      ...epubReviewBooks.map((group) => {
+        const key = `${group.bookId}::${group.bookTitle}`;
+        return (
+          <option key={key} value={key}>
+            {group.bookTitle} ({reviewSourceCount(key)})
+          </option>
+        );
+      }),
+    ],
+    // `lang`, not `t`: t's identity is stable across a language switch.
+    [epubReviewBooks, reviewSourceCount, lang],
+  );
+
   /**
    * Which local deck a practice sitting draws from.
    *
@@ -2086,15 +2114,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                     it: a book with nothing in scope printed its whole-deck total
                     rather than the 0 it actually offers.
                   */}
-                  <option value="all">{t('flash.allInFolder', { count: reviewSourceCount('all') })}</option>
-                  {epubReviewBooks.map((group) => {
-                    const key = `${group.bookId}::${group.bookTitle}`;
-                    return (
-                      <option key={key} value={key}>
-                        {group.bookTitle} ({reviewSourceCount(key)})
-                      </option>
-                    );
-                  })}
+                  {reviewSourceOptions}
                 </select>
               </label>
               <label className="flash-review-setup-check">

@@ -38,7 +38,6 @@ export type FlashcardTextProvenance =
   | 'book-text';
 
 import {
-  countIntroducedToday,
   filterLocalReviewsDue,
   limitNewCards,
   type LocalSrsAlgorithm,
@@ -286,6 +285,22 @@ function safeGetCache(): string | null {
   }
 }
 
+/**
+ * The last parse of the cache, by the exact text it came from. The deck is one
+ * 3.7 MB JSON string on a 10k-card profile and nearly every surface reads it —
+ * the Flashcards window parsed it ~43 times per render (every due count asked
+ * `loadDeck()` again). A read whose text is the text we last parsed or wrote
+ * returns that parse. Keyed on the text itself rather than on a stamp, so a
+ * write from any source (another window, a restore, a test) invalidates it
+ * with no extra bookkeeping; comparing the text is one pointer check when
+ * Blink hands back the same string, a memcmp otherwise — never a parse.
+ */
+let parsedCache: { raw: string; store: FlashcardDeckStore } | null = null;
+
+function rememberParse(raw: string, store: FlashcardDeckStore): void {
+  parsedCache = { raw, store: copyStore(store) };
+}
+
 function readStore(): FlashcardDeckStore {
   lastReadSuspect = null;
   const marker = readOverflowMarker();
@@ -310,11 +325,17 @@ function readStore(): FlashcardDeckStore {
       lastReadSuspect = { baseText: null };
       return { folders: [], cards: [] };
     }
+    if (parsedCache && parsedCache.raw === raw) {
+      const store = copyStore(parsedCache.store);
+      if (marker !== null && marker > (store.savedAt ?? 0)) lastReadSuspect = { baseText: raw };
+      return store;
+    }
     // v1.0 audit 5.1 — this key accumulated one JSON layer per boot from an old
     // migration-runner bug. A single parse then yields a *string*, both checks
     // below fail, and a real deck reads as empty (measured: 3,221 cards gone,
     // 37.25 MB of text, 5.2 s of blocked main thread per read).
     const { store, layers } = parseFlashcardDeckStore(raw);
+    if (layers === 1) rememberParse(raw, store);
     if (layers === 0) {
       lastReadSuspect = { baseText: null };
     } else if (marker !== null && marker > (store.savedAt ?? 0)) {
@@ -355,6 +376,7 @@ function writeCache(store: FlashcardDeckStore, unverified = false): boolean {
   try {
     text = JSON.stringify(store);
     setCacheItem(FLASHCARD_DECK_STORAGE_KEY, text);
+    rememberParse(text, store);
     overflowStore = null;
     overflowText = null;
     setOverflowMarker(unverified ? DECK_UNVERIFIED : null);
@@ -610,6 +632,8 @@ export async function restoreDeckFromIdb(
 
 /** Test seam: forget the in-memory overflow copy. */
 export function resetDeckMemoryForTests(): void {
+  parsedCache = null;
+  introducedMemo = null;
   overflowStore = null;
   overflowText = null;
   restoring = false;
@@ -1254,9 +1278,72 @@ export function dueDeckCards<T extends { srs?: unknown }>(
   cards: readonly T[],
   now = Date.now(),
   newPerDay: number | undefined = getActiveProfile().deckParams.newPerDay,
-  introducedToday: number = countIntroducedToday(loadDeck(), now),
+  introducedToday: number = introducedTodayCount(now),
 ): T[] {
   return limitNewCards(filterLocalReviewsDue(cards, now), newPerDay, introducedToday);
+}
+
+let introducedMemo: { cards: readonly DeckFlashcard[]; from: number; stamps: number[] } | null = null;
+
+/**
+ * Cards introduced today across the whole deck — the new-card budget already
+ * spent. Same answer as `countIntroducedToday(loadDeck(), now)`, but the scan is
+ * done once per deck version and day: it was a default parameter, so every due
+ * count parsed and scanned the whole deck again.
+ */
+export function introducedTodayCount(now = Date.now()): number {
+  const cards = loadDeck();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const from = start.getTime();
+  if (!introducedMemo || introducedMemo.cards !== cards || introducedMemo.from !== from) {
+    const stamps: number[] = [];
+    for (const card of cards) {
+      if (typeof card.introducedAt === 'number' && card.introducedAt >= from) stamps.push(card.introducedAt);
+    }
+    stamps.sort((a, b) => a - b);
+    introducedMemo = { cards, from, stamps };
+  }
+  // Introduced at or before `now` (binary search over today's stamps).
+  const { stamps } = introducedMemo;
+  let lo = 0;
+  let hi = stamps.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (stamps[mid] <= now) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * `reviewSessionCards(pool, key, dueOnly, mode).length` for every source the
+ * review picker offers — `'all'` and each `bookId::bookTitle` in `pool` — in
+ * one pass. The picker asked the predicate once per <option>, and each ask
+ * scanned the pool and parsed the whole deck.
+ */
+export function reviewSessionCounts(
+  pool: DeckFlashcard[],
+  dueOnly: boolean,
+  mode: FlashcardReviewMode,
+  now = Date.now(),
+): Map<string, number> {
+  const newPerDay = getActiveProfile().deckParams.newPerDay;
+  const introduced = introducedTodayCount(now);
+  const sessionSize = (cards: DeckFlashcard[]): number => {
+    const due = dueOnly ? dueDeckCards(cards, now, newPerDay, introduced) : cards;
+    return mode === 'audio' ? due.filter((card) => card.audioDataUrl || card.audioPath).length : due.length;
+  };
+  const byBook = new Map<string, DeckFlashcard[]>();
+  for (const card of pool) {
+    const key = `${card.bookId || 'unknown'}::${card.bookTitle || 'Unknown source'}`;
+    const list = byBook.get(key);
+    if (list) list.push(card);
+    else byBook.set(key, [card]);
+  }
+  const counts = new Map<string, number>([['all', sessionSize(pool)]]);
+  for (const [key, cards] of byBook) counts.set(key, sessionSize(cards));
+  return counts;
 }
 
 /**
@@ -1297,12 +1384,20 @@ export function groupDeckByBook(cards: DeckFlashcard[]): BookGroup[] {
   return [...map.values()].sort((a, b) => a.bookTitle.localeCompare(b.bookTitle));
 }
 
+/** Storage keys whose change (from another window) can change what `loadDeck` returns. */
+const DECK_STORAGE_KEYS = new Set<string | null>([FLASHCARD_DECK_STORAGE_KEY, FLASHCARD_DECK_OVERFLOW_KEY, null]);
+
 export function onDeckChanged(cb: () => void): () => void {
   const handler = (): void => cb();
+  // Any other key's `storage` event is someone else's data. Re-reading the deck
+  // for each of them (theme, known words, every setting) re-parsed 3.7 MB each.
+  const storageHandler = (e: StorageEvent): void => {
+    if (DECK_STORAGE_KEYS.has(e.key)) cb();
+  };
   window.addEventListener(FLASHCARD_DECK_EVENT, handler);
-  window.addEventListener('storage', handler);
+  window.addEventListener('storage', storageHandler);
   return () => {
     window.removeEventListener(FLASHCARD_DECK_EVENT, handler);
-    window.removeEventListener('storage', handler);
+    window.removeEventListener('storage', storageHandler);
   };
 }
