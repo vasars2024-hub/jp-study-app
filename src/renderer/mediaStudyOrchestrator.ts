@@ -65,10 +65,10 @@ import {
   studySeriesRecurrenceForecasts,
   type StudySeriesRecurrenceForecast,
 } from '../shared/studySeriesRecurrenceForecast';
-import type { SubtitleRecord } from '../shared/subtitleRecord';
+import { subtitleRecordLabel, type SubtitleRecord } from '../shared/subtitleRecord';
 import type { MediaItem } from '../shared/types';
 import { GRAMMAR } from './data/grammar';
-import { t } from './i18n';
+import { getUiLang, t } from './i18n';
 import { loadDeck, addDeckCardsTracked, removeDeckCards } from './flashcardDeck';
 import { getSlotList } from './levelLists';
 import { getLevel, listKnownEntries } from './knownWords';
@@ -222,7 +222,7 @@ export async function buildStudyAnalysisRequest(
     cues: cues.map((cue) => ({ start: cue.start, end: cue.end, text: cue.text })),
     subtitle: subtitle ? {
       recordId: subtitle.id,
-      source: subtitle.label ?? `${subtitle.lang} ${subtitle.source}`,
+      source: subtitleRecordLabel(subtitle, t, getUiLang()) ?? `${subtitle.lang} ${subtitle.source}`,
       fingerprint: [
         subtitle.id,
         subtitle.addedAt,
@@ -335,7 +335,7 @@ export function collectStudyOpportunities(
       media,
       subtitle: subtitle ? {
         recordId: subtitle.id,
-        source: subtitle.label ?? `${subtitle.lang} ${subtitle.source}`,
+        source: subtitleRecordLabel(subtitle, t, getUiLang()) ?? `${subtitle.lang} ${subtitle.source}`,
       } : undefined,
       readiness,
       activeWorkspace,

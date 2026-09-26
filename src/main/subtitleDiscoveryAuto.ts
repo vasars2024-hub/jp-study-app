@@ -404,6 +404,8 @@ async function translateInto(
       machineGenerated: true,
       derivation: 'machine-translation',
       translatedFromId: source.id,
+      translatedFromLabel: source.label?.trim() ?? '',
+      translatedFromLang: from,
       translationEngine: result.engine,
       addedAt: Date.now(),
     };

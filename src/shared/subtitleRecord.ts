@@ -61,6 +61,12 @@ export interface SubtitleRecord {
    * study track can be recognised as stale and redone.
    */
   translatedFromId?: string;
+  /**
+   * For a machine translation: the source track's own label (blank when it had none)
+   * and its language, so the UI can name the track in the interface language.
+   */
+  translatedFromLabel?: string;
+  translatedFromLang?: string;
   /** Which engine produced a machine translation (`gemini-2.5-flash`, `local-qwen`, …). */
   translationEngine?: string;
   /**
@@ -125,15 +131,42 @@ export function untitledStreamNumber(
   return typeof record.streamIndex === 'number' ? record.streamIndex : undefined;
 }
 
+/** What discovery wrote into `label` for a machine translation before 2026-09. */
+const LEGACY_MT_LABEL = / · machine translation of (.+)$/;
+
+/** A language code's name in the interface language (`Intl`), or the code itself. */
+function languageName(code: string | undefined, locale: string): string {
+  if (!code) return '';
+  try {
+    return new Intl.DisplayNames([locale], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 /**
  * A record's name for the UI. An untitled container stream is named in the
- * interface language through `translate('sentenceDeck.track.stream', { n })`;
- * everything else is its own label (undefined when it has none).
+ * interface language through `translate('sentenceDeck.track.stream', { n })`, and a
+ * machine translation through `translate('subtitleTrack.machineTranslation', …)` with
+ * its languages named in `locale` (records from before 2026-09 carried an English
+ * sentence; its source part is recovered). Everything else is its own label
+ * (undefined when it has none).
  */
 export function subtitleRecordLabel(
-  record: Pick<SubtitleRecord, 'source' | 'label' | 'subtitleNumber' | 'streamIndex'>,
-  translate: (key: string, vars: { n: number }) => string,
+  record: Pick<SubtitleRecord, 'source' | 'label' | 'subtitleNumber' | 'streamIndex'>
+    & Partial<Pick<SubtitleRecord, 'lang' | 'derivation' | 'translatedFromLabel' | 'translatedFromLang'>>,
+  translate: (key: string, vars: Record<string, string | number>) => string,
+  locale = 'en',
 ): string | undefined {
+  if (record.derivation === 'machine-translation') {
+    const legacy = LEGACY_MT_LABEL.exec(record.label ?? '');
+    const source = record.translatedFromLabel?.trim()
+      || languageName(record.translatedFromLang, locale)
+      || legacy?.[1]?.trim();
+    if (source) {
+      return translate('subtitleTrack.machineTranslation', { lang: languageName(record.lang, locale), source });
+    }
+  }
   const n = untitledStreamNumber(record);
   return n === undefined ? record.label : translate('sentenceDeck.track.stream', { n });
 }

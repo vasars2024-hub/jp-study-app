@@ -85,6 +85,7 @@ export const STUDY_UI_RU: Catalog = {
   'sentenceDeck.track.option': '{label} — {lang}, {kind}',
   'sentenceDeck.track.langUnknown': 'язык не указан',
   'sentenceDeck.track.stream': 'Поток субтитров {n}',
+  'subtitleTrack.machineTranslation': '{lang} · машинный перевод: {source}',
   'sentenceDeck.kind.downloaded': 'загружены',
   'sentenceDeck.kind.sidecar': 'файл рядом с видео',
   'sentenceDeck.kind.embedded': 'внутри видеофайла',
