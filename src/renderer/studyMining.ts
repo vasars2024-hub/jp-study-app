@@ -177,6 +177,17 @@ async function ankiConnected(): Promise<boolean> {
       markAnkiSeen();
       return true;
     }
+    // The link state is main's heartbeat, which re-probes a closed Anki only every
+    // ten seconds. An Add clicked just after Anki starts used to land in that gap:
+    // on a setup that had never seen Anki it was saved locally and never sent or
+    // queued (measured with a fake AnkiConnect brought up 4 s before the click).
+    // The user asked for Anki, so ask Anki itself before deciding it is away.
+    if (typeof window.api?.ankiStatus !== 'function') return false;
+    const live = await window.api.ankiStatus();
+    if (live?.connected) {
+      markAnkiSeen();
+      return true;
+    }
     return false;
   } catch {
     return false;
