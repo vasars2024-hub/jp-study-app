@@ -171,6 +171,22 @@ describe('SentenceDeckDialog', () => {
     expect(takeFlashcardsFocus()).toEqual({ folder: 'Yuru Camp - 01', cardId: null, review: 'listening' });
   });
 
+  it('says in words why a card has no audio, not in ffmpeg\u2019s English', async () => {
+    (window as unknown as { api: Record<string, unknown> }).api.sentenceDeckExtractAudio = async (request: { clips: Array<{ id: string }> }) => ({
+      ok: true,
+      cancelled: false,
+      results: request.clips.map((clip, i) => (i === 0
+        ? { id: clip.id, ok: false, error: 'nothing to hear in this range', failure: 'silent' }
+        : { id: clip.id, ok: true, audioPath: `C:/ud/mined/${clip.id}.mp3`, durationSec: 2.4 })),
+    });
+    await open();
+    await act(async () => { q<HTMLButtonElement>('[data-sd-action="make"]').click(); });
+    await flush();
+    const why = q('.sd-failed .sd-detail');
+    expect(why.textContent).toBe('No sound at this point of the video — the line may be past its end.');
+    expect(why.getAttribute('title')).toBe('nothing to hear in this range');
+  });
+
   it('undoes the whole batch', async () => {
     await open();
     await act(async () => { q<HTMLButtonElement>('[data-sd-action="make"]').click(); });

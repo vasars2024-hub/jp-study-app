@@ -166,6 +166,8 @@ describe('extractSentenceAudioBatch against real ffmpeg', () => {
       ['good', true], ['past-the-end', false], ['also-good', true],
     ]);
     expect(result.results[1].error).toBeTruthy();
+    // Past the end of the file there is nothing to hear: said as a kind, for the dialog to word.
+    expect(result.results[1].failure).toBe('silent');
   }, 120_000);
 
   it('refuses a file with no audio once, instead of failing every line', async () => {

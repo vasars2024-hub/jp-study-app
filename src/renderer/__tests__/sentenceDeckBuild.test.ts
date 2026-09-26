@@ -45,7 +45,7 @@ function okBatch(): SentenceAudioBatchResult {
     cancelled: false,
     results: [
       { id: '1', ok: true, audioPath: 'C:/ud/flashcard-audio/mined/aaa.mp3', durationSec: 3.4 },
-      { id: '2', ok: false, error: 'nothing to hear in this range' },
+      { id: '2', ok: false, error: 'nothing to hear in this range', failure: 'silent' },
       { id: '3', ok: true, audioPath: 'C:/ud/flashcard-audio/mined/ccc.mp3', imagePath: 'C:/ud/flashcard-audio/mined/ccc.jpg', durationSec: 3.9 },
     ],
   };
@@ -132,7 +132,8 @@ describe('buildSentenceDeck', () => {
     expect(cards[0].mineKey).toBeTruthy();
     // The clip that failed: the card is kept, without audio, and the reason is reported.
     expect(cards[1].audioPath).toBeUndefined();
-    expect(done.failedClips).toEqual([{ index: 2, text: '散歩に行きませんか？', error: 'nothing to hear in this range' }]);
+    // The reason is an i18n key for the dialog; ffmpeg's English stays a technical detail.
+    expect(done.failedClips).toEqual([{ index: 2, text: '散歩に行きませんか？', error: 'nothing to hear in this range', reasonKey: 'sentenceDeck.clip.silent' }]);
     expect(cards[2].imagePath).toBe('C:/ud/flashcard-audio/mined/ccc.jpg');
   });
 

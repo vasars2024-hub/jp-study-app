@@ -148,6 +148,11 @@ export const STUDY_UI_JA: Catalog = {
     other: '{count} 枚は音声がありません。理由を表示',
   },
   'sentenceDeck.done.anki': 'Anki：追加 {added}、待機 {queued}、未送信 {other}',
+  'sentenceDeck.clip.silent': '動画のこの位置に音がありません。字幕が動画の終わりより後にある可能性があります。',
+  'sentenceDeck.clip.timeout': 'このクリップの切り出しに時間がかかりすぎました。',
+  'sentenceDeck.clip.tooLarge': 'このクリップは大きすぎるため保存できません。',
+  'sentenceDeck.clip.store': 'クリップを保存できませんでした（ディスクの空き容量を確認してください）。',
+  'sentenceDeck.clip.failed': '動画からこのクリップを切り出せませんでした。',
   'sentenceDeck.undo': '元に戻す',
   'sentenceDeck.listenNow': '今すぐ聞く',
   'sentenceDeck.undone': {

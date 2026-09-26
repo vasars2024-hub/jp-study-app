@@ -168,6 +168,11 @@ export const STUDY_UI_EN: Catalog = {
     other: '{count} cards have no audio. Why?',
   },
   'sentenceDeck.done.anki': 'Anki: {added} added, {queued} waiting for Anki, {other} not sent.',
+  'sentenceDeck.clip.silent': 'No sound at this point of the video — the line may be past its end.',
+  'sentenceDeck.clip.timeout': 'Cutting this clip took too long.',
+  'sentenceDeck.clip.tooLarge': 'This clip came out far too large to keep.',
+  'sentenceDeck.clip.store': 'The clip could not be saved (is the disk full?).',
+  'sentenceDeck.clip.failed': 'This clip could not be cut from the video.',
   'sentenceDeck.undo': 'Undo',
   'sentenceDeck.listenNow': 'Listen now',
   'sentenceDeck.undone': {

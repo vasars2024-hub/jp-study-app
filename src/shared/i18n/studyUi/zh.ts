@@ -148,6 +148,11 @@ export const STUDY_UI_ZH: Catalog = {
     other: '{count} 张卡片没有音频，查看原因',
   },
   'sentenceDeck.done.anki': 'Anki：已添加 {added}，等待 {queued}，未发送 {other}。',
+  'sentenceDeck.clip.silent': '视频在这个时间点没有声音——这行字幕可能在视频结束之后。',
+  'sentenceDeck.clip.timeout': '截取这段音频用时过长。',
+  'sentenceDeck.clip.tooLarge': '这段音频过大，无法保存。',
+  'sentenceDeck.clip.store': '无法保存这段音频（磁盘是否已满？）。',
+  'sentenceDeck.clip.failed': '无法从视频中截取这段音频。',
   'sentenceDeck.undo': '撤销',
   'sentenceDeck.listenNow': '立即收听',
   'sentenceDeck.undone': {

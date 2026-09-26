@@ -59,7 +59,26 @@ export interface SentenceDeckProgressState {
 export interface SentenceDeckFailedClip {
   index: number;
   text: string;
+  /** ffmpeg's or Node's own words — a technical detail, English. */
   error: string;
+  /** Why, as an i18n key the dialog shows. */
+  reasonKey: string;
+}
+
+/** The i18n key for a clip that was not cut. */
+export function clipFailureKey(failure: string | undefined): string {
+  switch (failure) {
+    case 'silent':
+      return 'sentenceDeck.clip.silent';
+    case 'timeout':
+      return 'sentenceDeck.clip.timeout';
+    case 'too-large':
+      return 'sentenceDeck.clip.tooLarge';
+    case 'store':
+      return 'sentenceDeck.clip.store';
+    default:
+      return 'sentenceDeck.clip.failed';
+  }
 }
 
 export interface SentenceDeckAnkiTally {
@@ -93,6 +112,7 @@ interface ClipOutcome {
   audioPath?: string;
   imagePath?: string;
   error?: string;
+  failure?: string;
 }
 
 /** The deck rows for a finished audio batch. Exported for the tests. */
@@ -298,11 +318,15 @@ export async function buildSentenceDeck(
   const clips = new Map(batch.results.map((result) => [result.id, result]));
   const failedClips: SentenceDeckFailedClip[] = input.segments
     .filter((segment) => !clips.get(String(segment.index))?.ok)
-    .map((segment) => ({
-      index: segment.index,
-      text: segment.text,
-      error: clips.get(String(segment.index))?.error ?? 'not cut',
-    }));
+    .map((segment) => {
+      const clip = clips.get(String(segment.index));
+      return {
+        index: segment.index,
+        text: segment.text,
+        error: clip?.error ?? 'not cut',
+        reasonKey: clipFailureKey(clip?.failure),
+      };
+    });
 
   hooks.onProgress?.({ phase: 'cards', done: 0, total, failed: failedClips.length });
   const folderCreated = !loadDeckFolders().includes(folder);

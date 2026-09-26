@@ -208,6 +208,11 @@ export const STUDY_UI_RU: Catalog = {
     other: 'У {count} карточки нет аудио. Почему?',
   },
   'sentenceDeck.done.anki': 'Anki: добавлено {added}, ждут Anki {queued}, не отправлено {other}.',
+  'sentenceDeck.clip.silent': 'В этом месте видео нет звука — возможно, строка идёт уже после конца видео.',
+  'sentenceDeck.clip.timeout': 'Вырезать этот фрагмент получилось слишком долго.',
+  'sentenceDeck.clip.tooLarge': 'Фрагмент вышел слишком большим, чтобы его сохранить.',
+  'sentenceDeck.clip.store': 'Не удалось сохранить фрагмент (возможно, диск заполнен).',
+  'sentenceDeck.clip.failed': 'Не удалось вырезать этот фрагмент из видео.',
   'sentenceDeck.undo': 'Отменить',
   'sentenceDeck.listenNow': 'Слушать',
   'sentenceDeck.undone': {
