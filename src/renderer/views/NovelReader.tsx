@@ -31,6 +31,7 @@ import Icon from '../components/Icons';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
 import {
   AppChrome,
+  Select,
   StatusBarField,
   StatusBarSpacer,
   type MenuBarMenu,
@@ -2860,7 +2861,7 @@ export default function NovelReader({ item, onClose }: Props) {
         <div className="epub-translate-panel-body">
           <label>
             {t('epub.translate.target')}
-            <select
+            <Select
               value={targetLang}
               onChange={(event) => setTranslateTarget(event.target.value)}
             >
@@ -2869,18 +2870,18 @@ export default function NovelReader({ item, onClose }: Props) {
                   {l.nativeLabel}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             {t('epub.translate.view')}
-            <select
+            <Select
               value={translateMode}
               onChange={(event) => onTranslateModeChange(event.target.value as EpubTranslateMode)}
             >
               <option value="original">{t('epub.translate.view.original')}</option>
               <option value="translation">{t('epub.translate.view.translation')}</option>
               <option value="bilingual">{t('epub.translate.view.bilingual')}</option>
-            </select>
+            </Select>
           </label>
           <button
             className="btn small"

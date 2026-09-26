@@ -633,7 +633,8 @@ textarea {
 .visual-novel-add-disclosure .visual-novel-add { padding-bottom: 0; border-bottom: 0; }
 .visual-novel-progress-disclosure[open] > summary,
 .visual-novel-route-disclosure[open] > summary { margin-bottom: 7px; }
-.visual-novel-workspace { box-sizing: border-box; min-height: 0; overflow: visible; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+/* The reading canvas around it is the surface; the workspace is not a second framed box inside it (round 3). */
+.visual-novel-workspace { box-sizing: border-box; min-height: 0; overflow: visible; border: 0; border-radius: 10px; background: transparent; }
 .visual-novel-library { display: grid; align-content: start; gap: 10px; }
 .visual-novel-add { display: grid; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .visual-novel-add > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
@@ -641,7 +642,7 @@ textarea {
 .visual-novel-import { display: grid; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .visual-novel-import .visual-novel-reading-head > div { display: flex; flex-wrap: wrap; gap: 5px; }
 .visual-novel-import-list { display: grid; gap: 5px; max-height: 230px; overflow: auto; }
-.visual-novel-import-list article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); }
+.visual-novel-import-list article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 7px; border: 0; border-radius: 7px; background: var(--surface-2); }
 .visual-novel-import-list article.is-imported { opacity: 0.65; }
 .visual-novel-import-list article > div { display: grid; gap: 3px; min-width: 0; }
 .visual-novel-import-list article small { overflow: hidden; color: var(--text-muted); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -675,7 +676,7 @@ textarea {
 .visual-novel-summary-title { display: grid; gap: 2px; min-width: 0; }
 .visual-novel-summary-title span, .visual-novel-summary > span, .visual-novel-summary small { color: var(--text-muted); font-size: 0.74rem; }
 .visual-novel-summary-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.visual-novel-metadata { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.visual-novel-metadata { padding: 9px 10px; border: 0; border-radius: 8px; background: var(--surface-2); }
 .visual-novel-metadata summary { cursor: pointer; font-weight: 600; }
 .visual-novel-metadata-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
 .visual-novel-metadata-grid label { display: grid; gap: 4px; color: var(--text-muted); font-size: 0.72rem; }
