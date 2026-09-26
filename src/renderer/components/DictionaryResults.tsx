@@ -1055,7 +1055,9 @@ export default function DictionaryResults({
             : t('dict.results.preparingPercent', { percent: result.preparing.percent })}
         </div>
       )}
-      {result?.error && (
+      {/* Not while the offline dictionary is still being built: its "no entry
+          for this word" contradicts the line above, and it is not yet true. */}
+      {result?.error && !result.preparing && (
         <div className="dict-empty">
           {result.errorCode ? t(`dict.lookup.${result.errorCode}`) : result.error}
         </div>

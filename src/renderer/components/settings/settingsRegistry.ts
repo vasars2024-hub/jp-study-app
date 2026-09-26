@@ -128,7 +128,9 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'caption',
     group: 'Study',
     descKey: 'settings.nav.transcription.desc',
-    advanced: true,
+    // Not advanced: it holds live captions and system-audio capture, a study
+    // feature. Behind Advanced it was missing from the rail AND from Settings
+    // search — "live captions" and "system audio" found nothing.
   },
   {
     id: 'scraper',
@@ -1176,7 +1178,25 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     id: 'study-language',
     titleKey: 'settings.study.lang.title',
     descKey: 'settings.study.lang.desc',
-    keywords: ['study', 'language', 'japanese', 'chinese', 'environment', 'dictionary', 'zh', 'ja'],
+    // Russian and the per-language reading aid (furigana / pinyin / stress marks)
+    // live on this card too; searching for them found nothing, or the UI-language card.
+    keywords: [
+      'study',
+      'language',
+      'japanese',
+      'chinese',
+      'russian',
+      'environment',
+      'dictionary',
+      'zh',
+      'ja',
+      'ru',
+      'reading aid',
+      'furigana',
+      'pinyin',
+      'stress marks',
+      'accent marks',
+    ],
     pageId: 'study',
     group: 'Study',
   },
@@ -1299,7 +1319,15 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     movedTo: 'files',
     group: 'System',
   },
-  // Settings > Help: the diagnostic log and the update check (audit robust #5, #7).
+  // Settings > Help: the guided tour, the diagnostic log and the update check (audit robust #5, #7).
+  {
+    id: 'guided-tour',
+    titleKey: 'help.tour.title',
+    descKey: 'help.tour.body',
+    keywords: ['tour', 'guided tour', 'tutorial', 'onboarding', 'walkthrough', 'getting started', 'help', 'chapters'],
+    pageId: 'help',
+    group: 'System',
+  },
   {
     id: 'diagnostics',
     titleKey: 'help.diagnostics.title',

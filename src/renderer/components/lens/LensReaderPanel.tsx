@@ -3,6 +3,7 @@ import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
 import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../../knownWords';
+import { KNOWLEDGE_LEVEL_KEYS, KNOWLEDGE_LEVEL_SHORT_KEYS } from '../lexicon/WordKnowledge';
 import { lemmaOf, type JpToken } from '../../tokenizer';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../../tts';
 import { getStudyLang } from '../../studyEnvironment';
@@ -377,16 +378,17 @@ function GlanceBody({
   return (
     <div className="lens-reader-glance">
       <div className="wk-grade lens-reader-grade">
-        {WK_LEVELS.map((label, i) => (
+        {WK_LEVELS.map((id, i) => (
           <button
-            key={label}
+            key={id}
             type="button"
             className={`wk-grade-btn wk-g-${i} ${level === i ? 'active' : ''}`}
-            title={label}
-            aria-label={label}
+            title={t(KNOWLEDGE_LEVEL_KEYS[i])}
+            aria-label={t(KNOWLEDGE_LEVEL_KEYS[i])}
+            aria-pressed={level === i}
             onClick={() => grade(i as WkLevel)}
           >
-            {label[0]}
+            {t(KNOWLEDGE_LEVEL_SHORT_KEYS[i])}
           </button>
         ))}
       </div>

@@ -172,6 +172,20 @@ describe('mineToStudy', () => {
     expect(loadDeck()).toHaveLength(2);
   });
 
+  it('an Add clicked just after Anki starts reaches it, before the heartbeat has noticed', async () => {
+    // Main's link state still says "disconnected" (it re-probes every 10 s), but Anki answers.
+    const api = (window as unknown as { api: Record<string, unknown> }).api;
+    api.ankiStatus = async () => ({ connected: true, decks: ['Mining'], models: [] });
+    api.ankiMineNote = async (req: MineNoteRequest) => {
+      mined.push(req);
+      return nextResult();
+    };
+    const result = await mineCat();
+    expect(result.anki, 'sent, not saved locally only').toBe('added');
+    expect(mined).toHaveLength(1);
+    expect(loadDeck()[0]).toMatchObject({ ankiNoteId: 4242, ankiExported: true });
+  });
+
   it('never queues for a setup that has never had Anki', async () => {
     const result = await mineCat();
     expect(result.anki).toBe('local');

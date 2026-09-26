@@ -11,7 +11,10 @@ import { useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { loadOnboarding, onTourStarted, replayTour } from '../../../onboardingStore';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
+import { TOUR_CHAPTERS } from '../../../../shared/onboarding/tourScript';
 import { useT } from '../../../i18n';
+import Icon, { type IconName } from '../../Icons';
+import { Tile, TileList } from '../../ui/Tile';
 import SettingsAssistantCard from './SettingsAssistantCard';
 import { DiagnosticsCard, UpdateCard } from './DiagnosticsCard';
 import HelpShortcutsCard from './HelpShortcutsCard';
@@ -30,7 +33,8 @@ export default function HelpPage() {
   const [state, setState] = useState(loadOnboarding);
   const [outcome, setOutcome] = useState<ReplayOutcome>('idle');
 
-  const onReplay = (): void => {
+  /** The whole tour from the welcome step, or one chapter of it. */
+  const onReplay = (chapterId?: string): void => {
     // Synchronous by construction: `replayTour` dispatches, a mounted overlay
     // handles it and announces, all inside this call. Anything that answers
     // later is correctly reported as "armed" rather than as "started".
@@ -39,7 +43,7 @@ export default function HelpPage() {
       started = true;
     });
     try {
-      replayTour();
+      replayTour(chapterId);
     } finally {
       stop();
     }
@@ -53,7 +57,7 @@ export default function HelpPage() {
           opens Help already has a question, and replaying an 8-step tour is the
           slower answer to "where is X". */}
       <SettingsAssistantCard />
-    <SettingsCard title={t('help.tour.title')} description={t('help.tour.body')}>
+    <SettingsCard id="guided-tour" title={t('help.tour.title')} description={t('help.tour.body')}>
       <p className="muted">
         {state.completedAt
           ? t('help.tour.lastRun', {
@@ -65,10 +69,32 @@ export default function HelpPage() {
           : t('help.tour.neverRun')}
       </p>
       <div className="fm-actions">
-        <button type="button" className="btn primary" onClick={onReplay}>
+        <button type="button" className="btn primary" onClick={() => onReplay()}>
           {t('help.tour.replay')}
         </button>
       </div>
+      {/* Any chapter on its own — the tour is chapters so nobody has to sit through all of it. */}
+      <p className="muted">{t('help.tour.chapters')}</p>
+      <TileList layout="grid" className="help-tour-chapters">
+        {TOUR_CHAPTERS.map((chapter) => (
+          <li key={chapter.id}>
+            <Tile
+              data-tour-chapter={chapter.id}
+              icon={<Icon name={chapter.icon as IconName} size={18} />}
+              title={t(chapter.titleKey)}
+              description={t(chapter.descKey)}
+              meta={
+                state.chaptersDone.includes(chapter.id) ? (
+                  <span className="help-tour-done" role="img" title={t('tour.menu.done')} aria-label={t('tour.menu.done')}>
+                    <Icon name="check" size={14} />
+                  </span>
+                ) : undefined
+              }
+              onClick={() => onReplay(chapter.id)}
+            />
+          </li>
+        ))}
+      </TileList>
       {outcome === 'idle' ? null : (
         <p className="muted" role="status">
           {t(outcome === 'started' ? 'help.tour.replayed' : 'help.tour.armed')}

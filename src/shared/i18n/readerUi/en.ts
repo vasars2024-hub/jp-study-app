@@ -6,6 +6,8 @@ export const READER_UI_EN: Catalog = {
   'readerUi.dictPopup.aria': 'Dictionary: {query}',
   'readerUi.dictPopup.levels': 'How well you know this word',
   'readerUi.dictPopup.mine': 'Mine',
+  'reader.pdf.page': 'Page {page}',
+  'reader.pdf.blankPage': '(Page {page} has no text)',
   'readerUi.dictPopup.mineTitle': 'Save this word and its sentence to the reader collection',
   'readerUi.lookup.noSelection': 'Select a word, or point at one in the text, then press the shortcut again to look it up.',
   'readerUi.gloss.langs': 'Definition languages',

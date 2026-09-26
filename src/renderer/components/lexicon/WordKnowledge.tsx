@@ -14,6 +14,18 @@ export const KNOWLEDGE_LEVEL_KEYS = [
   'lexicon.knowledge.known',
 ] as const;
 
+/**
+ * The one-letter face of each level on the grading buttons (popup, Lens reader).
+ * Its own key rather than the label's first letter: that letter was English
+ * (N/L/F/K) in every language, and two Russian labels start with the same one.
+ */
+export const KNOWLEDGE_LEVEL_SHORT_KEYS = [
+  'lexicon.knowledge.short.new',
+  'lexicon.knowledge.short.learning',
+  'lexicon.knowledge.short.familiar',
+  'lexicon.knowledge.short.known',
+] as const;
+
 interface Props {
   /** The dictionary headword this level is stored against. */
   word: string;

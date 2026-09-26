@@ -31,6 +31,7 @@ import { appendReviewLog } from '../../reviewLog';
 import { useT } from '../../i18n';
 import { contentLangOf } from '../../studyEnvironment';
 import { Button } from '../ui';
+import { srsIntervalLabel } from '../../srsIntervalLabel';
 
 const RATINGS: Array<{ rating: LocalSrsRating; key: string; grade: AnswerGrade }> = [
   { rating: 'again', key: 'grammar.review.again', grade: 'hard' },
@@ -116,8 +117,8 @@ export default function GrammarReviewPanel() {
     }
   };
 
-  const dayLabel = (days: number) =>
-    days < 1 ? t('grammar.review.interval.soon') : t('grammar.review.interval.days', { count: Math.round(days) });
+  // The same hint Flashcards shows under its grade buttons.
+  const dayLabel = (days: number) => srsIntervalLabel(days, t);
 
   const locale = LANG_TAGS[lang] ?? 'en';
 

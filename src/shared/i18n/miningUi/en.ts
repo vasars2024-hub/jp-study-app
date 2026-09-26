@@ -18,20 +18,27 @@ export const MINING_UI_EN: Catalog = {
   'dict.view.menu.view': 'View',
   'dict.view.menu.ja': '日本語 (Japanese)',
   'dict.view.menu.zh': '中文 (Chinese)',
+  'dict.view.menu.ru': 'Русский (Russian)',
   'dict.view.status.ja': 'Japanese',
   'dict.view.status.zh': 'Chinese',
+  'dict.view.status.ru': 'Russian',
   'dict.view.source.ja': 'JMdict / Jisho',
   'dict.view.source.zh': 'CC-CEDICT',
+  'dict.view.source.ru': 'Wiktionary',
   'dict.view.desc.ja': 'Search Japanese or English — offline JMdict dictionaries.',
   'dict.view.desc.zh': 'Search Chinese or English — offline, powered by CC-CEDICT.',
+  'dict.view.desc.ru': 'Search Russian or English — offline, from Wiktionary, with inflected forms and stress marks.',
   'dict.view.placeholder.ja': 'Type a word, e.g. 食べる or “eat”…',
   'dict.view.placeholder.zh': 'Type a word, e.g. 你好 or “hello”…',
+  'dict.view.placeholder.ru': 'Type a word, e.g. читать or “read”…',
   'dict.view.search': 'Search',
   'dict.view.reason.needsQuery': 'Type a word to search for.',
   'dict.view.hint.ja':
     'Tip: while reading a book you can highlight any word to look it up instantly. Tap the star icon on a result to save it to Flashcards.',
   'dict.view.hint.zh':
     'Offline Chinese↔English dictionary (CC-CEDICT). Results show pinyin with tone marks. Highlight a word while reading to look it up, or tap the star icon to save it to Flashcards.',
+  'dict.view.hint.ru':
+    'Offline Russian–English dictionary (Wiktionary). Inflected forms lead to their dictionary form, with stress marks. Click a word while reading to look it up, or tap the star icon to save it to Flashcards.',
 
   // JitenMiningPanel
   'jiten.mining.title': 'Jiten vocab mining',

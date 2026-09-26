@@ -81,6 +81,8 @@ import WiredBreachOverlay from './shell/WiredBreachOverlay';
 import DesktopLayerHost from './shell/DesktopLayerHost';
 import StartPanel from './shell/StartPanel';
 import StartHereCard from './shell/StartHereCard';
+import { replayTour } from '../onboardingStore';
+import { TOUR_MENU_ID } from '../../shared/onboarding/tourScript';
 import { resetWidgetLayoutWithUndo } from './shell/widgetLayoutReset';
 import { captureFocus, firstMeaningfulControl, focusIsLostOrInside, restoreFocus } from './shell/focusReturn';
 import { ContextMenu, confirmDialog, alertDialog, useAppMaterialSet } from './ui';
@@ -871,6 +873,15 @@ export default function DesktopShell({
   const [startOpen, setStartOpen] = useState(false);
   /** The Start button, so the panel can hand focus back to it (round-2 audit K6). */
   const startBtnRef = useRef<HTMLButtonElement | null>(null);
+  // The guided tour opens Start for its search step and closes it again after.
+  useEffect(() => {
+    const onStartRequest = (e: Event) => {
+      const open = (e as CustomEvent<{ open?: boolean } | null>).detail?.open;
+      if (typeof open === 'boolean') setStartOpen(open);
+    };
+    window.addEventListener('shell:start', onStartRequest);
+    return () => window.removeEventListener('shell:start', onStartRequest);
+  }, []);
   /** Right-click / Shift+F10 menu on a Start tile: where the pin command lives now. */
   const [startTileCtx, setStartTileCtx] = useState<{ x: number; y: number; app: AppMeta } | null>(null);
   /**
@@ -2076,7 +2087,14 @@ export default function DesktopShell({
   useEffect(() => {
     const onWidgets = () => setGalleryOpen((o) => !o);
     const onAddWidget = (e: Event) => addWidgetRef.current((e as CustomEvent<string>).detail);
-    const onCloseWin = () => {
+    // No detail: the top window (the Close-window command). `{ section }`: that
+    // section's window — the guided tour closes exactly the windows it opened.
+    const onCloseWin = (e: Event) => {
+      const section = (e as CustomEvent<{ section?: string } | null>).detail?.section;
+      if (section) {
+        winsRef.current.filter((w) => w.section === section).forEach((w) => closeRef.current(w.id));
+        return;
+      }
       const ws = winsRef.current.filter((w) => !w.min);
       if (!ws.length) return;
       const top = ws.reduce((a, b) => (b.z > a.z ? b : a));
@@ -3431,6 +3449,17 @@ export default function DesktopShell({
                   </svg>
                   <span>{t('desktop.quick')}</span>
                 </button>
+                <button
+                  type="button"
+                  className="os-start-foot-btn os-start-tour"
+                  onClick={() => {
+                    setStartOpen(false);
+                    replayTour(TOUR_MENU_ID);
+                  }}
+                >
+                  <Icon name="help" size={16} />
+                  <span>{t('desktop.startMenu.tour')}</span>
+                </button>
                 <span className="os-start-foot-spacer" />
                 <button
                   type="button"
@@ -3551,6 +3580,17 @@ export default function DesktopShell({
                     >
                       <Icon name="wrench" size={17} />
                       <span>{wired ? t('desktop.startMenu.wired.quick') : t('quickSettings.title')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="os-start-aero-tool os-start-tour"
+                      onClick={() => {
+                        setStartOpen(false);
+                        replayTour(TOUR_MENU_ID);
+                      }}
+                    >
+                      <Icon name="help" size={17} />
+                      <span>{t('desktop.startMenu.tour')}</span>
                     </button>
                   </div>
                 </aside>

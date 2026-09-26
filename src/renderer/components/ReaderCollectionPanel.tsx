@@ -21,8 +21,9 @@ import type { VisualNovelStudyCardKind } from '../../shared/visualNovelStudyCard
 import { getLevel } from '../knownWords';
 import Icon from './Icons';
 import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
-import { normalizeStudyLang } from '../../shared/studyLang';
-import { cardContentLang, studyContentLang } from '../studyEnvironment';
+import { normalizeStudyLang, studyLangOfText, type StudyLang } from '../../shared/studyLang';
+import { cardContentLang, getStudyLang, studyContentLang } from '../studyEnvironment';
+import { glossFor } from '../companionMine';
 
 type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
@@ -33,6 +34,13 @@ export interface CollectionAddPayload {
   reading?: string;
   meaning?: string;
   sentence?: string;
+  /**
+   * The word came out of a dictionary lookup (the reader's popup "Mine"): fill a
+   * missing reading and meaning from the dictionary before trying the offline
+   * translator. Without it an offline machine saved the word as its own meaning
+   * — a card whose answer was its question.
+   */
+  lookup?: boolean;
 }
 
 interface Props {
@@ -192,8 +200,8 @@ export default function ReaderCollectionPanel({
     });
   }, []);
 
-  const runTranslate = useCallback(async (jpText: string, lang: TargetLang) => {
-    const text = jpText.trim();
+  const runTranslate = useCallback(async (sourceText: string, lang: TargetLang, source: StudyLang = 'ja') => {
+    const text = sourceText.trim();
     if (!text) {
       setTxStatus('idle');
       setTxMsg('');
@@ -208,14 +216,15 @@ export default function ReaderCollectionPanel({
     offModelRef.current = onModelProgress((p) => {
       if (id !== txReqRef.current) return;
       if (p.status === 'progress' && typeof p.progress === 'number') {
-        setTxMsg(`Loading model… ${Math.round(p.progress)}%`);
+        setTxMsg(t('readerCollection.msg.loadingModelPct', { percent: Math.round(p.progress) }));
       }
     });
     try {
-      const result = await translateTo(text, 'ja' as TransLang, lang, (prog) => {
+      // From the card's own language: a Chinese or Russian book was translated as Japanese.
+      const result = await translateTo(text, source as TransLang, lang, (prog) => {
         if (id !== txReqRef.current) return;
         setTxStatus('translating');
-        setTxMsg(`Translating… ${Math.round(prog * 100)}%`);
+        setTxMsg(t('readerCollection.msg.translatingPct', { percent: Math.round(prog * 100) }));
       });
       if (id !== txReqRef.current) return '';
       setTxStatus('done');
@@ -349,28 +358,40 @@ export default function ReaderCollectionPanel({
     if (!pendingAdd?.word) return;
     const word = pendingAdd.word.trim();
     const sentence = (pendingAdd.sentence ?? '').trim();
-    const reading = (pendingAdd.reading ?? '').trim();
+    let reading = (pendingAdd.reading ?? '').trim();
     const seedMeaning = (pendingAdd.meaning ?? '').trim();
+    const fromLookup = pendingAdd.lookup === true;
     onPendingConsumed?.();
     if (!word) return;
 
     const seq = ++addSeqRef.current;
     const { targetLang, swapDefault, autoFlashcards, autoAnki, ankiDeck } = prefsRef.current;
+    // The book's language, read off the text itself — a zh or ru book is not Japanese.
+    const sourceLang = studyLangOfText(`${word} ${sentence}`, getStudyLang());
 
     void (async () => {
       setStatusKind('busy');
       setStatusMsg(seedMeaning ? t('readerCollection.msg.saving') : t('readerCollection.translating'));
 
       let meaning = seedMeaning;
+      if (fromLookup && (!reading || !meaning)) {
+        const found = await glossFor(word, sourceLang);
+        if (seq !== addSeqRef.current) return;
+        reading = reading || found.reading;
+        meaning = meaning || found.meaning;
+      }
       if (!meaning || meaning === word) {
-        const tx = await runTranslate(word, targetLang);
+        const tx = await runTranslate(word, targetLang, sourceLang);
         if (seq !== addSeqRef.current) return;
         if (tx) meaning = tx;
       }
 
       let front = word;
-      let back = meaning || word;
-      if (swapDefault && meaning) {
+      // No meaning found (the offline dictionary still building, no translator
+      // model): leave the answer empty — Flashcards says "No meaning saved" —
+      // rather than saving the word as its own answer.
+      let back = meaning === word ? '' : meaning;
+      if (swapDefault && back) {
         front = meaning;
         back = word;
       }
@@ -420,7 +441,11 @@ export default function ReaderCollectionPanel({
       if (saveToDeck) parts.push(autoFlashcards ? t('readerCollection.flashcards') : t('readerCollection.title'));
       // The deck name is the user's own data; only the stem is translated.
       if (autoAnki) parts.push(ankiOk ? `${t('readerCollection.anki')}${ankiDeck ? ` (${ankiDeck})` : ''}` : t('readerCollection.msg.ankiFailed'));
-      setStatusMsg(parts.length ? `Saved → ${parts.join(' · ')}` : 'Saved');
+      setStatusMsg(
+        parts.length
+          ? t('readerCollection.msg.savedTo', { targets: parts.join(' · ') })
+          : t('readerCollection.msg.saved'),
+      );
       if (card) {
         const cardId = card.id;
         setFlashId(cardId);

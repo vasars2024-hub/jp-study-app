@@ -2485,7 +2485,8 @@ export default function NovelReader({ item, onClose }: Props) {
     if (!current) return;
     const word = current.query.slice(0, 80);
     const sentence = current.kind === 'dict' ? current.context : current.query.slice(0, 200);
-    setPendingAdd({ word, sentence: sentence || undefined });
+    // A dictionary popup's word: the panel fills its reading and meaning from the dictionary.
+    setPendingAdd({ word, sentence: sentence || undefined, lookup: current.kind === 'dict' });
     setCollectionOpen(true);
   }, []);
 

@@ -8,36 +8,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 // eslint-disable-next-line import/no-unresolved
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { LoadedEpub, EpubChapter, EpubTocEntry } from './epubLoader';
+import { t } from './i18n';
+import { cleanPdfText, linesToParagraphs } from './pdfText';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// Turn a page's positioned text fragments into paragraphs: join wrapped lines,
-// and start a new paragraph after sentence/quote-ending punctuation. Japanese
-// lines are joined without spaces (there are none between words).
-function linesToParagraphs(lines: string[]): string[] {
-  const paras: string[] = [];
-  let buf = '';
-  for (const raw of lines) {
-    const t = raw.trim();
-    if (!t) {
-      if (buf) {
-        paras.push(buf);
-        buf = '';
-      }
-      continue;
-    }
-    buf += t;
-    if (/[。．.！？!?」』）)”"]$/.test(t)) {
-      paras.push(buf);
-      buf = '';
-    }
-  }
-  if (buf) paras.push(buf);
-  return paras;
 }
 
 export async function loadPdf(
@@ -76,7 +53,7 @@ export async function loadPdf(
       const lines: string[] = [];
       let cur = '';
       for (const it of content.items as Array<{ str?: string; hasEOL?: boolean }>) {
-        cur += it.str ?? '';
+        cur += cleanPdfText(it.str ?? '');
         if (it.hasEOL) {
           lines.push(cur);
           cur = '';
@@ -94,13 +71,13 @@ export async function loadPdf(
     chapters.push({
       href: `page-${p}`,
       absPath: '',
-      html: html || `<p class="pdf-blank">（ページ ${p}）</p>`,
+      html: html || `<p class="pdf-blank">${esc(t('reader.pdf.blankPage', { page: p }))}</p>`,
       chars,
-      label: `Page ${p}`,
+      label: t('reader.pdf.page', { page: p }),
     });
     // A TOC entry every 10 pages keeps the dropdown usable for long PDFs.
     if (p === 1 || p % 10 === 0) {
-      toc.push({ label: `Page ${p}`, chapterIndex: p - 1, anchor: '', depth: 0 });
+      toc.push({ label: t('reader.pdf.page', { page: p }), chapterIndex: p - 1, anchor: '', depth: 0 });
     }
     onProgress?.(p / pageCount);
   }

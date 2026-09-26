@@ -81,7 +81,6 @@ import {
   type BookGroup,
 } from '../../flashcardDeck';
 import {
-  LOCAL_SRS_RELEARN_MINUTES,
   type LocalSrsState,
   type LocalSrsRating,
 } from '../../../shared/localSrs';
@@ -141,6 +140,7 @@ import {
 import { takeHandoffJson } from '../../pendingHandoff';
 import { FLASHCARDS_FOCUS_EVENT, onOpenIntent, takeFlashcardsFocus } from '../../openIntents';
 import { openMediaWorkspace, reachMediaWorkspace } from '../../mediaWorkspaceBridge';
+import { srsIntervalLabel } from '../../srsIntervalLabel';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
@@ -1524,6 +1524,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   const nextIntervals = reviewSource === 'epub'
     ? previewSchedule(current.srs, loadSchedulingConfig())
     : null;
+  const nextAgainInterval = nextIntervals ? nextIntervals.again : null;
   const nextGoodInterval = nextIntervals ? nextIntervals.good : null;
   const nextHardInterval = nextIntervals ? nextIntervals.hard : null;
   const nextEasyInterval = nextIntervals ? nextIntervals.easy : null;
@@ -1749,7 +1750,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               {t('flash.rating.again')}
               {reviewSource === 'epub' && (
                 <span className="flash-srs-hint">
-                  {t('flash.srs.againDue', { minutes: LOCAL_SRS_RELEARN_MINUTES })}
+                  {srsIntervalLabel(nextAgainInterval ?? 0, t)}
                 </span>
               )}
             </button>
@@ -1757,7 +1758,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               {t('flash.rating.hard')}
               {nextHardInterval != null && (
                 <span className="flash-srs-hint">
-                  {t('flash.srs.daysDue', { days: nextHardInterval })}
+                  {srsIntervalLabel(nextHardInterval, t)}
                 </span>
               )}
             </button>
@@ -1765,7 +1766,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               {t('flash.rating.good')}
               {nextGoodInterval != null && (
                 <span className="flash-srs-hint">
-                  {t('flash.srs.goodDue', { days: nextGoodInterval })}
+                  {srsIntervalLabel(nextGoodInterval, t)}
                 </span>
               )}
             </button>
@@ -1773,7 +1774,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               {t('flash.rating.easy')}
               {nextEasyInterval != null && (
                 <span className="flash-srs-hint">
-                  {t('flash.srs.daysDue', { days: nextEasyInterval })}
+                  {srsIntervalLabel(nextEasyInterval, t)}
                 </span>
               )}
             </button>

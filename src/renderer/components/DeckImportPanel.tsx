@@ -41,7 +41,8 @@ export default function DeckImportPanel({ onImported }: Props) {
     const looksCsv = trimmed.includes(',') || trimmed.includes('\t') || trimmed.includes(';');
     if (looksCsv && trimmed.split('\n').length > 1) {
       const table = parseCsvText(trimmed);
-      const mapping = guessColumnMapping(table.headers);
+      // Rows too: a pasted list usually has no header row to name its columns.
+      const mapping = guessColumnMapping(table.headers, table.rows);
       const entries = rowsToDeckEntries(table, mapping, deckTitle, 'import');
       count = entries.length;
       if (count) importDeckFromEntries(entries);
