@@ -21,7 +21,7 @@
  *    off it and a test can assert the contract without a real window.
  */
 import {
-  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ElementType,
@@ -104,23 +104,41 @@ type ScaffoldProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
 };
 
 /**
+ * The scaffold's content-box width in its own CSS px — the number `ResizeObserver`'s
+ * `contentRect` reports, so the first reading and every later one agree.
+ *
+ * `getBoundingClientRect()` is NOT that number: it includes transforms (the window's
+ * `fwinIn` scale) and the app zoom on `#root` (80% by default), so a scaffold 1300px
+ * wide measured 1040 on the first reading, took `medium`, and flipped to `wide` when
+ * the observer answered — the gap went 8px -> 16px and the toolbar, rail, canvas and
+ * dock all moved on open (V12 layout jumps, Files CLS 0.055).
+ */
+export function contentWidthOf(el: HTMLElement): number {
+  const style = getComputedStyle(el);
+  const pad = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+  return Math.max(0, el.clientWidth - pad);
+}
+
+/**
  * Observe the scaffold's own width. Returns `null` until something is measured,
  * so the first paint never claims a breakpoint it has not seen — reporting
- * `compact` for one frame is how a wide layout flashes a collapsed rail.
+ * `compact` for one frame is how a wide layout flashes a collapsed rail. The
+ * first reading is taken before paint, so the first frame is already the
+ * measured class rather than the `wide` fallback.
  */
 function useMeasuredWidthClass(
   ref: React.RefObject<HTMLElement | null>,
   enabled: boolean,
 ): LiquidWidthClass | null {
   const [cls, setCls] = useState<LiquidWidthClass | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enabled) return;
     const el = ref.current;
     if (!el) return;
     const apply = (width: number) => {
       if (width > 0) setCls(widthClassFor(width));
     };
-    apply(el.getBoundingClientRect().width);
+    apply(contentWidthOf(el));
     // Not every host provides one (jsdom, older embedders). Without it the
     // scaffold stays on its measured-once value rather than throwing.
     if (typeof ResizeObserver === 'undefined') return;

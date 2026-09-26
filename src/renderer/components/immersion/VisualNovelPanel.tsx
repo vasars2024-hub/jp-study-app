@@ -281,6 +281,11 @@ export default function VisualNovelPanel({
   const { t, lang } = useT();
   const [libraryOpen, setLibraryOpen] = useState(() => readPanelState().libraryOpen);
   const [database, setDatabase] = useState<VisualNovelDatabase>(createEmptyVisualNovelDatabase);
+  // False until the first list answer. Until then the library and the workspace render nothing,
+  // so the first paint is the settled layout: painting the empty library and its 'add a novel'
+  // prompt, then the real list and summary a frame later, moved the Discover button and the
+  // workspace on every open (V12 layout jumps, CLS 0.03).
+  const [loaded, setLoaded] = useState(false);
   const [studyProfiles, setStudyProfiles] = useState(() => loadMediaStudyDatabase().profiles);
   const [selectedId, setSelectedId] = useState(() => readPanelState().selectedId);
   const [tab, setTab] = useState<VisualNovelTab>(() => readPanelState().tab);
@@ -341,6 +346,9 @@ export default function VisualNovelPanel({
       if (!active) return;
       setDatabase(next);
       setSelectedId((current) => current || next.entries[0]?.id || '');
+      setLoaded(true);
+    }, () => {
+      if (active) setLoaded(true);
     });
     const off = window.api.onVisualNovelChanged((next) => {
       if (!active) return;
@@ -854,7 +862,9 @@ export default function VisualNovelPanel({
     minWidth: 220,
     preferredWidth: 290,
     onClose: () => setLibraryOpen(false),
-    content: (
+    content: !loaded ? (
+      <div className="visual-novel-library" aria-busy="true" />
+    ) : (
       <div className="visual-novel-library">
         {/* The rail opened with eight SETUP controls stacked above the list it is named for —
             three add-form fields, Browse, Add to library, and the JSON import/export/scan row —
@@ -1025,9 +1035,9 @@ export default function VisualNovelPanel({
         policy={READING_CANVAS_FILL_POLICY}
         tools={libraryOpen ? [libraryTool] : []}
       >
-        <main className="visual-novel-workspace is-tabbed">
+        <main className="visual-novel-workspace is-tabbed" aria-busy={loaded ? undefined : true}>
           {/* `muted` is presentation; `visual-novel-empty` is what says this IS the empty state. */}
-          {!selected && <p className="muted visual-novel-empty">{t('vnPanel.emptyPrompt')}</p>}
+          {loaded && !selected && <p className="muted visual-novel-empty">{t('vnPanel.emptyPrompt')}</p>}
           {selected && (
             <>
               <div className="visual-novel-column visual-novel-column--primary">

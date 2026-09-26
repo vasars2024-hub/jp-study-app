@@ -2970,10 +2970,15 @@
   box-shadow: inset 0 -1px 0 var(--lq-liquid-highlight);
 }
 
-/* A toolbar is a row of controls, not a card around them. */
+/* A toolbar is a row of controls, not a card around them. The card grows OUTWARD: the
+   6px padding and 1px edge are paid back by an equal negative margin, so the controls keep
+   the box they have in conventional presentation. Without it the row lost 14px of width on
+   the Liquid flip, the filters wrapped to a second line (27px -> 60px) and the grid under
+   them jumped 45px (V12 layout jumps, CLS 0.11). */
 :is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .gum-toolbar.lq-contextual {
   padding: 6px;
   border-radius: 14px;
+  margin: -7px;
 }
 
 :is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .gum-title__bar.lq-contextual {
