@@ -8612,7 +8612,7 @@ export const en: Catalog = {
   'widgets.levels.saveList': 'Save list',
   'widgets.levels.addList': '+ Add level list',
   'widgets.studyStreak.dayStreak': 'day streak',
-  'widgets.studyStreak.daysStudiedTotal': '{count} days studied total',
+  'widgets.studyStreak.daysStudiedTotal': { one: '{count} day studied in total', other: '{count} days studied in total' },
   'widgets.todayStudyTime.studiedToday': 'studied today',
   'widgets.todayStudyTime.readValue': '{duration} read',
   'widgets.todayStudyTime.watchedValue': '{duration} watched',
