@@ -246,7 +246,7 @@ function fullStopEnds(chars: readonly string[], at: number): boolean {
 }
 
 /** A line cut into its sentences, punctuation kept with the sentence it ends. */
-export function splitSentences(text: string): string[] {
+export function splitCueSentences(text: string): string[] {
   const chars = [...text];
   const pieces: string[] = [];
   let current = '';
@@ -277,7 +277,7 @@ export function splitSentences(text: string): string[] {
  * internal sentence boundary to cut at.
  */
 export function splitAtSentences(entry: Working): Working[] {
-  const pieces = splitSentences(entry.text);
+  const pieces = splitCueSentences(entry.text);
   const joined: string[] = [];
   for (const piece of pieces) {
     if (joined.length && letterCount(piece) <= 3) joined[joined.length - 1] = joinSubtitleText([joined.at(-1) ?? '', piece]);
