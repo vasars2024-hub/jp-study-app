@@ -266,7 +266,15 @@ export interface SubtitleDiscoveryResult {
   unreachable: number;
   /** Subtitle files written in total. */
   files: number;
+  /**
+   * Items whose downloaded subtitle could not be saved because the disk was
+   * full. Their previous tracks were kept; freeing space and searching again
+   * finishes the job.
+   */
+  storageFull?: number;
+  /** Raw diagnostic; the renderer shows `errorCode` translated instead. */
   error?: string;
+  errorCode?: 'busy' | 'service-error';
 }
 
 /**
@@ -601,4 +609,22 @@ export function orderedSubtitleProviders(settings: SubtitleDiscoverySettings): S
  */
 export function subtitleSweepWentNowhere(result: SubtitleDiscoveryResult): boolean {
   return result.ok && result.files === 0 && result.unreachable > 0;
+}
+
+/**
+ * The toast a finished "Search now" shows, as an i18n key: one decision for
+ * every surface with that button, so none of them shows the raw English
+ * `error` or calls an outage "0 subtitles".
+ */
+export function subtitleSweepMessage(result: SubtitleDiscoveryResult): {
+  key: string;
+  params?: Record<string, number>;
+  kind: 'success' | 'default' | 'error';
+} {
+  if (!result.ok) {
+    return { key: result.errorCode === 'busy' ? 'media.subtitles.searchBusy' : 'media.subtitles.searchFailed', kind: 'error' };
+  }
+  if ((result.storageFull ?? 0) > 0) return { key: 'media.subtitles.searchStorageFull', kind: 'error' };
+  if (subtitleSweepWentNowhere(result)) return { key: 'media.subtitles.searchUnreachable', kind: 'error' };
+  return { key: 'media.subtitles.searchDone', params: { count: result.files }, kind: result.files ? 'success' : 'default' };
 }

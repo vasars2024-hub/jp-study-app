@@ -11,6 +11,7 @@ import {
   saveDiscoverySettings,
 } from '../subtitleDiscovery';
 import {
+  subtitleSweepMessage,
   subtitleSweepWentNowhere,
   type SubtitleDiscoveryResult,
 } from '../../shared/subtitleDiscoveryIpc';
@@ -404,6 +405,28 @@ describe('hasUnattachedSidecar', () => {
  * two obvious cheaper readings — "just check `ok`" and "check `attached === 0`" —
  * both fail.
  */
+describe('subtitleSweepMessage', () => {
+  const result = (over: Partial<SubtitleDiscoveryResult>): SubtitleDiscoveryResult =>
+    ({ ok: true, attached: 0, empty: 0, unreachable: 0, files: 0, ...over });
+
+  it('never hands the raw English error to the toast', () => {
+    const busy = subtitleSweepMessage(result({ ok: false, error: 'A subtitle sweep is already running.', errorCode: 'busy' }));
+    expect(busy).toEqual({ key: 'media.subtitles.searchBusy', kind: 'error' });
+    expect(subtitleSweepMessage(result({ ok: false, error: 'boom' })).key).toBe('media.subtitles.searchFailed');
+  });
+
+  it('says the disk was full, ahead of any count', () => {
+    expect(subtitleSweepMessage(result({ storageFull: 1, empty: 1 })).key).toBe('media.subtitles.searchStorageFull');
+  });
+
+  it('says the services were unreachable rather than "0 subtitles"', () => {
+    expect(subtitleSweepMessage(result({ empty: 3, unreachable: 3 })).key).toBe('media.subtitles.searchUnreachable');
+    expect(subtitleSweepMessage(result({ attached: 1, files: 1 }))).toEqual({
+      key: 'media.subtitles.searchDone', params: { count: 1 }, kind: 'success',
+    });
+  });
+});
+
 describe('subtitleSweepWentNowhere', () => {
   const result = (over: Partial<SubtitleDiscoveryResult>): SubtitleDiscoveryResult =>
     ({ ok: true, attached: 0, empty: 0, unreachable: 0, files: 0, ...over });

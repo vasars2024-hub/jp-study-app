@@ -69,6 +69,7 @@ vi.mock('../subtitleDiscovery', () => ({
   loadDiscoverySettings: () => ({}),
   pickPlaybackSubtitle: () => null,
   readSubtitleRecord: () => null,
+  readableSubtitleRecords: (records?: unknown[]) => records ?? [],
   registerSubtitleDiscoveryIpc: () => undefined,
   runSubtitleDiscovery: () => Promise.resolve(null),
 }));

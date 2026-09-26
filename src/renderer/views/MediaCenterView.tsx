@@ -107,7 +107,7 @@ import {
   videoSubtitlesDisabledReason,
 } from '../../shared/mediaVideoActionReason';
 import {
-  subtitleSweepWentNowhere,
+  subtitleSweepMessage,
   type SubtitleProviderCredentialState,
 } from '../../shared/subtitleDiscoveryIpc';
 import { showToast } from '../components/ui';
@@ -1305,13 +1305,12 @@ function SettingsPanel({
       const result = await window.api.runSubtitleDiscovery();
       // `ok` alone is not "we got an answer" — a sweep with no network returns
       // ok:true and zero files, indistinguishable from a library that genuinely
-      // has none. Same predicate the per-episode button uses (D247).
-      const wentNowhere = subtitleSweepWentNowhere(result);
-      showToast(result.ok && !wentNowhere
-        ? { message: t('media.subtitles.searchDone', { count: result.files }), kind: result.files ? 'success' : 'default' }
-        : { message: result.error ?? t('media.subtitles.searchFailed'), kind: 'error' });
-    } catch (error) {
-      showToast({ message: error instanceof Error ? error.message : String(error), kind: 'error' });
+      // has none. Same decision the per-episode button uses (D247), and never
+      // main's raw English `error`.
+      const message = subtitleSweepMessage(result);
+      showToast({ message: t(message.key, message.params), kind: message.kind });
+    } catch {
+      showToast({ message: t('media.subtitles.searchFailed'), kind: 'error' });
     } finally {
       setLibraryJob(null);
     }

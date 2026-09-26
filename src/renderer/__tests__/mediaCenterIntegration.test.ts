@@ -386,7 +386,8 @@ describe('Media Center video stage', () => {
       expect(code).toContain('const result = await window.api.runSubtitleDiscovery()');
       expect(code).toContain("t('mediaCenter.settings.metadataDone'");
       expect(code).toContain("t('mediaCenter.settings.metadataFailed')");
-      expect(code).toContain("t('media.subtitles.searchDone'");
+      // The outcome is worded by the shared `subtitleSweepMessage` decision.
+      expect(code).toContain('subtitleSweepMessage(result)');
       expect(code).toContain("t('media.subtitles.searchFailed')");
     });
 
@@ -395,8 +396,9 @@ describe('Media Center video stage', () => {
       // empty library both return. Without this predicate the settings button
       // would toast a neutral "Attached 0 subtitle files" for a dead network —
       // the exact defect just fixed one file away in MediaDetailPanel.
-      expect(code).toContain('subtitleSweepWentNowhere(result)');
-      expect(code).toMatch(/result\.ok && !wentNowhere/);
+      // Decided once in shared `subtitleSweepMessage` (unit-tested beside
+      // `subtitleSweepWentNowhere`), so this surface cannot drift from the others.
+      expect(code).toContain('subtitleSweepMessage(result)');
     });
 
     it('disables both buttons while either sweep runs', () => {

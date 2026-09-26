@@ -49,6 +49,13 @@ fs.writeFileSync(path.join(tmpRoot, 'subtitle-discovery.json'), JSON.stringify({
   retryAfterDays: 7,
 }), 'utf-8');
 
+// Stored records in these cases point at files that exist. A record whose file
+// is gone is treated as missing — which has its own cases at the end.
+for (const relative of ['p', path.join('subtitles', 'm1', 'old.srt')]) {
+  fs.mkdirSync(path.dirname(path.join(tmpRoot, relative)), { recursive: true });
+  fs.writeFileSync(path.join(tmpRoot, relative), '1\n00:00:01,000 --> 00:00:02,000\nold\n', 'utf-8');
+}
+
 vi.mock('electron', () => ({
   app: { getPath: () => tmpRoot },
   ipcMain: { handle: () => undefined },
@@ -167,7 +174,12 @@ vi.mock('../transcriptionJobs', () => ({
 
 vi.mock('../subtitleHarvest', () => ({ storedMalFacts: () => null }));
 
-const { registerSubtitleDiscoveryIpc, runSubtitleDiscovery } = await import('../subtitleDiscovery');
+const {
+  registerSubtitleDiscoveryIpc,
+  runSubtitleDiscovery,
+  readSubtitleRecordForRenderer,
+  writeSubtitleFile,
+} = await import('../subtitleDiscovery');
 const { resetSubtitleNoticesForTests, activeSubtitleNotices } = await import('../subtitleDiscoveryNotices');
 
 // ------------------------------------------------------------------- the driver
@@ -737,5 +749,108 @@ describe('an import that lands while a sweep is running', () => {
     await vi.waitFor(() => {
       expect(jimakuAsked.map((call) => call.episode)).toEqual([7, 8]);
     });
+  });
+});
+
+// Resilience audit #19: a forced search used to drop every rediscoverable record
+// before asking anyone, then write back whatever the (failed) search found.
+describe('a forced search never loses working tracks', () => {
+  const oldTrack = (): MediaItem => mediaItem({
+    subtitles: [{
+      id: 'rec-1', lang: 'ja', source: 'provider', providerId: 'jimaku',
+      path: path.join('subtitles', 'm1', 'old.srt'), format: 'srt', addedAt: 1,
+    }],
+  } as Partial<MediaItem>);
+
+  it('keeps the old track when every provider is down', async () => {
+    script.jimaku = { candidates: [], down: true, downStatus: 503 };
+    script.opensubtitles = { candidates: [], down: true, downStatus: 503 };
+    const out = await sweepResult(oldTrack(), { force: true });
+    expect(out.records.map((record) => (record as { id?: string }).id)).toEqual(['rec-1']);
+  });
+
+  it('keeps the old track when the providers answer nothing', async () => {
+    const out = await sweep(oldTrack(), { force: true });
+    expect(out.records.map((record) => (record as { id?: string }).id)).toEqual(['rec-1']);
+  });
+
+  it('keeps a track in a language this search could not reacquire', async () => {
+    script.opensubtitles = { candidates: [osCandidate()], down: false, downStatus: 200 };
+    const item = oldTrack();
+    item.subtitles = [...(item.subtitles ?? []), {
+      id: 'en-1', lang: 'en', source: 'provider', providerId: 'opensubtitles', path: 'p', format: 'srt', addedAt: 1,
+    }];
+    const out = await sweep(item, { force: true });
+    const ids = out.records.map((record) => (record as { id?: string }).id);
+    expect(ids).toContain('en-1');
+    // …while the Japanese one that WAS reacquired is replaced, not duplicated.
+    expect(ids).not.toContain('rec-1');
+    expect(out.records.filter((record) => record.lang === 'ja')).toHaveLength(1);
+  });
+});
+
+// Resilience audit #5: a moved/deleted subtitle file used to keep its record,
+// block rediscovery for its language, and read back as a silent null.
+describe('a subtitle whose file is gone', () => {
+  const deadTrack = (): MediaItem => mediaItem({
+    subtitles: [{
+      id: 'dead', lang: 'ja', source: 'provider', providerId: 'jimaku',
+      path: path.join('subtitles', 'm1', 'deleted.srt'), format: 'srt', addedAt: 1,
+    }],
+  } as Partial<MediaItem>);
+
+  it('does not count as having the language, so the sweep searches again', async () => {
+    script.opensubtitles = { candidates: [osCandidate()], down: false, downStatus: 200 };
+    const out = await sweep(deadTrack());
+    expect(out.asked).toContain('jimaku');
+    expect(out.records.map((record) => (record as { id?: string }).id)).not.toContain('dead');
+    expect(out.records.map((record) => record.lang)).toEqual(['ja']);
+  });
+
+  it('reads back as missing, and is detached', async () => {
+    let current = deadTrack();
+    registerSubtitleDiscoveryIpc({
+      listItems: () => [current],
+      patchItems: (_ids, patch) => { current = { ...current, ...patch }; },
+    });
+    const pick = readSubtitleRecordForRenderer('m1', 'dead');
+    expect(pick).toMatchObject({ missing: true, text: '' });
+    expect(current.subtitles ?? []).toEqual([]);
+  });
+});
+
+// Resilience audit #6: a full disk used to be swallowed (no failure, no count)
+// and the direct write could truncate the file a forced re-download reuses.
+describe('a full disk while saving a downloaded subtitle', () => {
+  it('keeps the previous file intact, keeps the record, and reports storage-full', async () => {
+    const previous = writeSubtitleFile('m1', 'opensubtitles-ja-opensubtitles1.srt', 'previous copy');
+    expect(previous).toBeTruthy();
+    const item = mediaItem({
+      subtitles: [{
+        id: 'prev', lang: 'ja', source: 'provider', providerId: 'opensubtitles',
+        path: previous as string, format: 'srt', addedAt: 1,
+      }],
+    } as Partial<MediaItem>);
+    script.opensubtitles = { candidates: [osCandidate()], down: false, downStatus: 200 };
+    const realOpen = fs.openSync;
+    const spy = vi.spyOn(fs, 'openSync').mockImplementation(((file: fs.PathLike, ...rest: unknown[]) => {
+      if (String(file).includes('opensubtitles-ja')) {
+        throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
+      }
+      return (realOpen as (...args: unknown[]) => number)(file, ...rest);
+    }) as typeof fs.openSync);
+    try {
+      let current = item;
+      registerSubtitleDiscoveryIpc({
+        listItems: () => [current],
+        patchItems: (_ids, patch) => { current = { ...current, ...patch }; },
+      });
+      const result = await runSubtitleDiscovery({ force: true });
+      expect(result).toMatchObject({ ok: true, storageFull: 1 });
+      expect((current.subtitles ?? []).map((record) => record.id)).toEqual(['prev']);
+      expect(fs.readFileSync(path.join(tmpRoot, previous as string), 'utf-8')).toBe('previous copy');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

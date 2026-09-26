@@ -401,6 +401,11 @@ export interface SubtitlePick {
   name: string;
   /** Raw subtitle file text (.srt/.vtt/.ass), parsed in the renderer. */
   text: string;
+  /**
+   * The stored track's file was moved or deleted (`text` is empty). The
+   * record has been detached and a new search queued; say so, don't go silent.
+   */
+  missing?: boolean;
 }
 
 /**
