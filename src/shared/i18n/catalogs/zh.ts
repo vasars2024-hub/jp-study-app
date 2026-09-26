@@ -5787,6 +5787,7 @@ export const zh: Catalog = {
   'manga.ocr.noText': '本页未找到文字。',
   'manga.ocr.fallbackJapaneseOnly': '离线备用识别只能读取日文。要扫描此页，请安装{lang}文字识别。',
   'manga.ocr.failed': 'OCR 失败。',
+  'manga.ocr.timedOut': 'OCR 耗时过长，已停止。请重新扫描。',
   'manga.ocr.readFailed': '无法读取此页图片。',
   'manga.hw.title': '手写汉字',
   'manga.hw.hint': '手写字形并识别，或点选部首，然后查阅。',

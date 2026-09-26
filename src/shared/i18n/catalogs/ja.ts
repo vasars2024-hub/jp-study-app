@@ -5819,6 +5819,7 @@ export const ja: Catalog = {
   'manga.ocr.noText': 'このページに文字が見つかりませんでした。',
   'manga.ocr.fallbackJapaneseOnly': 'オフラインの予備エンジンは日本語しか読めません。このページを読み取るには{lang}の文字認識をインストールしてください。',
   'manga.ocr.failed': 'OCRに失敗しました。',
+  'manga.ocr.timedOut': 'OCR に時間がかかりすぎたため停止しました。もう一度スキャンしてください。',
   'manga.ocr.readFailed': 'このページ画像を読めませんでした。',
   'manga.hw.title': '文字を書く',
   'manga.hw.hint': '字形を書いて認識するか、部首を選んでから調べます。',

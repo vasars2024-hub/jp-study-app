@@ -5829,6 +5829,7 @@ export const en: Catalog = {
   'manga.ocr.noText': 'No text was found on this page.',
   'manga.ocr.fallbackJapaneseOnly': 'The offline fallback reader only reads Japanese. Install {lang} text recognition to scan this page.',
   'manga.ocr.failed': 'OCR failed.',
+  'manga.ocr.timedOut': 'OCR took too long and was stopped. Scan again to retry.',
   'manga.ocr.readFailed': 'Could not read this page image.',
   'manga.hw.title': 'Draw a character',
   'manga.hw.hint': 'Draw a glyph, recognize it, or tap radicals, then look it up.',
