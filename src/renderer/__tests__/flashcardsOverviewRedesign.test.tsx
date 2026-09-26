@@ -161,4 +161,21 @@ describe('the review strip before a card is revealed', () => {
     expect(named).toHaveLength(1);
     expect(named[0]?.dataset.reviewActive).toBe('true');
   });
+
+  /**
+   * Round-4 journeys audit, measured on the packaged app: a new card's grade buttons read
+   * "Again in 10 min · In 0.5 d · Next review in 1 d · In 4 d" — three phrasings on four
+   * buttons and a fractional day — while Grammar review said "< 1 day" for both Again and Hard.
+   */
+  it('the grade buttons say when the card comes back, one format for all four', async () => {
+    await mount();
+    await act(async () => {
+      byText(/^Start review \(\d+\)$/)?.click();
+    });
+    await act(async () => {
+      byText(/^Show answer$/)?.click();
+    });
+    const hints = [...host.querySelectorAll('.flash-actions .flash-srs-hint')].map((h) => h.textContent);
+    expect(hints).toEqual(['10 min', '12 h', '1 d', '4 d']);
+  });
 });
