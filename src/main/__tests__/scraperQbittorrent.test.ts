@@ -890,15 +890,21 @@ describe('qbitTransfers', () => {
     await qbitTransfers({ config });
     // qBittorrent restarted: the cached cookie is now rejected once.
     sessionValid = false;
-    const rejected = await qbitTransfers({ config });
-    expect(rejected).toEqual([]);
+    // A rejected session is a typed failure now, never an empty list that the
+    // pages would render as "no transfers" (resilience audit #13).
+    await expect(qbitTransfers({ config })).rejects.toThrow(/qbit-list-failed:/);
     sessionValid = true;
     const recovered = await qbitTransfers({ config });
     expect(recovered).toHaveLength(2);
   });
 
-  it('returns an empty list rather than throwing when the client is down', async () => {
-    await expect(qbitTransfers({ config: { ...config, port: 1 } })).resolves.toEqual([]);
+  // Resilience audit #13: offline used to resolve [] — indistinguishable from
+  // "no transfers" — and the pages replaced the user's rows with it.
+  it('throws a typed offline failure when the client is down, instead of an empty list', async () => {
+    const err = await qbitTransfers({ config: { ...config, port: 1 } }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as { code?: string }).code).toBe('offline');
+    expect((err as Error).message).toMatch(/^qbit-list-failed:offline /);
   });
 
   it('returns nothing when sending is switched off', async () => {
@@ -2092,7 +2098,7 @@ describe('Phase 9.4 gate 18 — a reverse-proxy base path, in both auth modes', 
     await qbitTest({ config: mounted() });
     const loginsAfterFirst = seenWire.filter((r) => r.target.endsWith('/auth/login')).length;
     expect(loginsAfterFirst).toBe(1);
-    await qbitTransfers({ config: mounted({ basePath: '/other' }) });
+    await qbitTransfers({ config: mounted({ basePath: '/other' }) }).catch(() => []);
     // The second base path is unmounted here, so it 404s — the point is that it
     // tried to log in again instead of riding the first mount's cookie.
     expect(seenWire.filter((r) => r.target === '/other/api/v2/auth/login').length).toBe(1);
@@ -2156,7 +2162,7 @@ describe('Phase 9.1 gate 3 — the key never leaves the vault', () => {
     // transfer list, and a send that the daemon refuses with a body.
     const rejected = await qbitTest({ config: keyConfig() });
     expect(rejected.status).toBe('unauthorized');
-    const transfers = await qbitTransfers({ config: keyConfig() });
+    const transfers = await qbitTransfers({ config: keyConfig() }).catch((error: Error) => error.message);
     addResponse = { status: 409, body: 'Conflict' };
     const send = await qbitSend({
       config: keyConfig(),
@@ -2227,7 +2233,7 @@ describe('Phase 9.1 gate 4 — switching modes clears the cached session', () =>
     // The user changed the password in qBittorrent; the app's stored one is now
     // wrong. A client holding the old SID would still list transfers.
     await setScraperSecret('test/qbit', 'the-password-was-changed');
-    const after = await qbitTransfers({ config });
+    const after = await qbitTransfers({ config }).catch(() => []);
     expect(after).toEqual([]);
     expect(loginBodies).toHaveLength(2);
     expect(loginBodies[1]).toBe('username=admin&password=the-password-was-changed');
@@ -2251,7 +2257,7 @@ describe('Phase 9.1 gate 4 — switching modes clears the cached session', () =>
     expect((await qbitTransfers({ config: keyConfig() })).length).toBe(2);
     // No cookie was ever minted in key mode, so password mode must log in.
     await setScraperSecret('test/qbit', 'the-password-was-changed');
-    expect(await qbitTransfers({ config })).toEqual([]);
+    expect(await qbitTransfers({ config }).catch(() => [])).toEqual([]);
     expect(loginBodies).toHaveLength(1);
     expect(loginBodies[0]).toBe('username=admin&password=the-password-was-changed');
   });
@@ -2294,7 +2300,7 @@ describe('gate 9 — every acquisition operation authenticates, in both modes', 
       { index: 1, name: 'Episode 02.srt', size: 240, progress: 1, priority: 1 },
     ];
     return {
-      transfers: (await qbitTransfers(input)).length,
+      transfers: (await qbitTransfers(input).catch(() => [])).length,
       info: await qbitTorrentInfo(input, HASH),
       files: await qbitFiles(input, HASH),
       prio: await qbitSetFilePriorities(input, HASH, [0, 1], 1),

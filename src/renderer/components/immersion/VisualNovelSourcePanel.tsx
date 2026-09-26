@@ -12,6 +12,7 @@ import {
   type VisualNovelLearnerContext,
 } from '../../../shared/visualNovelRecommendations';
 import VisualNovelArt from './VisualNovelArt';
+import { vndbFailureKey } from '../../../shared/visualNovelSourceFailure';
 
 function preferredReleaseFacts(
   releases: VisualNovelRelease[],
@@ -60,7 +61,9 @@ export default function VisualNovelSourcePanel({
     const response = await window.api.visualNovelSearchSource(query);
     setBusy(false);
     if (!response.ok) {
-      onStatus(response.error ?? t('vnSource.msg.searchFailed'), true);
+      // Typed code, a sentence in the UI language with what to do next. The
+      // raw error (a native fetch message, an HTTP status) is never shown.
+      onStatus(t(vndbFailureKey(response.errorCode)), true);
       return;
     }
     setResults(response.results ?? []);

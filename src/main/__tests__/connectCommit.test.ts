@@ -74,6 +74,8 @@ class FakeCollection {
   filteredDecks = new Set<string>();
   /** Actions that must throw, by `${action}:${id}`. */
   failures = new Map<string, Error>();
+  /** `setDeckConfigId` answers `false` instead of applying the preset. */
+  refuseConfig = false;
   /** Frozen so a write cannot move it — used to force `verify-failed`. */
   swallowWrites = false;
 
@@ -193,6 +195,8 @@ class FakeCollection {
         const names = params.decks as string[];
         const fail = this.failures.get(`setDeckConfigId:${names.join(',')}`);
         if (fail) throw fail;
+        // AnkiConnect's in-band refusal: a 200 whose result is `false`.
+        if (this.refuseConfig) return false;
         for (const name of names) this.deckConfig[name] = Number(params.configId);
         return true;
       }
@@ -617,6 +621,31 @@ describe('commitConnectDraft — recipe 13 split', () => {
     expect(collection.deckConfig['JP::N5']).toBe(1782214589999);
     // The card that was not in the split stayed exactly where it was.
     expect(collection.cards.find((c) => c.id === CARD_B)?.deck).toBe('JP');
+  });
+
+  // Resilience audit #11: the preset write was best effort — its exception
+  // swallowed and its boolean never read — and the cards moved anyway.
+  it('does not move the cards when the preset answers false, and names it', async () => {
+    collection.refuseConfig = true;
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: splitOneCard() });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toEqual([
+      expect.objectContaining({ kind: 'card', id: String(CARD_A), code: 'preset-not-applied', deck: 'JP::N5' }),
+    ]);
+    expect(callsTo('changeDeck')).toHaveLength(0);
+    expect(collection.cards.find((c) => c.id === CARD_A)?.deck).toBe('JP');
+  });
+
+  it('does not move the cards when the preset write throws', async () => {
+    collection.failures.set('setDeckConfigId:JP::N5', new Error('deck config not found'));
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: splitOneCard() });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures?.[0]).toMatchObject({ code: 'preset-not-applied' });
+    expect(collection.cards.find((c) => c.id === CARD_A)?.deck).toBe('JP');
   });
 
   it('sends one changeDeck call for every card going to the same deck', async () => {

@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../../i18n';
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import type { MalListEntry, MalListStatus } from '../../../../shared/malSync';
@@ -45,6 +46,7 @@ const ERROR_KEYS = [
   'not-authenticated',
   'reauth-required',
   'transient',
+  'rate-limited',
   'request-failed',
 ] as const;
 
@@ -482,6 +484,11 @@ export default function MalSyncPanel() {
           <p role="status">
             {t('malSync.pushResult', { sent: pushResult.sent, failed: pushResult.failed.length })}
             {pushResult.remaining > 0 ? ` ${t('malSync.pushRemaining', { count: pushResult.remaining })}` : ''}
+            {pushResult.retryAt
+              ? ` ${t('malSync.pushRetryAt', {
+                time: new Date(pushResult.retryAt).toLocaleTimeString(LANG_TAGS[lang], { hour: 'numeric', minute: '2-digit' }),
+              })}`
+              : ''}
           </p>
         )}
         {pushResult && pushResult.failed.length > 0 && (

@@ -60,6 +60,9 @@ export const MEDIA_HUB_ZH: Catalog = {
   'watchAiring.error.offline': '离线，稍后重试',
   'watchAiring.error.unreachable': 'AniList 未响应，稍后重试',
   'watchAiring.checkNow': '立即检查',
+  'watchMeta.unavailable': { other: '无法获取 {count} 个标题的详细信息——元数据服务未响应。' },
+  'watchMeta.retryAt': '将在 {when} 自动重试。',
+  'watchMeta.retryNow': '立即重试',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': '这不是 YouTube 播放列表或频道链接。请粘贴播放列表（含 list=）或频道（@用户名、/channel/UC…、/c/…、/user/…）。',
   'ytManager.error.removedWhileSyncing': '该播放列表在同步期间已被移除。',
@@ -67,6 +70,8 @@ export const MEDIA_HUB_ZH: Catalog = {
   'ytManager.error.playlistNotFound': '该播放列表已不在列表中。',
   'ytManager.error.channelNotFound': '该频道已不在列表中。',
   'ytManager.error.noYtDlp': '未找到 yt-dlp。请先安装（例如 pip install -U yt-dlp），然后重新打开应用。',
+  'ytManager.error.subsTimeout': '获取字幕耗时过长，已停止。请检查网络连接后重试。',
+  'ytManager.error.subsCancelled': '已取消获取字幕。',
   'ytManager.error.notVideo': '这不是 YouTube 视频链接。',
   'discover.library.planEmpty': '还没有计划观看的作品。从“浏览”添加的作品会以“计划观看”加入资料库。',
 };

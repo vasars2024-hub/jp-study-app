@@ -32,7 +32,7 @@ import {
   type LibraryEntry,
 } from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
-import { subtitleSweepWentNowhere } from '../../../../shared/subtitleDiscoveryIpc';
+import { subtitleSweepMessage } from '../../../../shared/subtitleDiscoveryIpc';
 import {
   fusionArbitrationStatus,
   fusionCueCounts,
@@ -201,15 +201,10 @@ export default function MediaDetailPanel({
       // for their whole library the moment their connection dropped, in a neutral
       // toast, with nothing anywhere saying the search never reached anyone.
       // `unreachable` is the count the runner already knew and did not report.
-      const wentNowhere = subtitleSweepWentNowhere(result);
-      showToast(result.ok && !wentNowhere
-        ? { message: t('media.subtitles.searchDone', { count: result.files }), kind: result.files ? 'success' : 'default' }
-        : { message: result.error ?? t('media.subtitles.searchFailed'), kind: 'error' });
-    } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : t('media.subtitles.searchFailed'),
-        kind: 'error',
-      });
+      const message = subtitleSweepMessage(result);
+      showToast({ message: t(message.key, message.params), kind: message.kind });
+    } catch {
+      showToast({ message: t('media.subtitles.searchFailed'), kind: 'error' });
     } finally {
       setSearching(false);
     }

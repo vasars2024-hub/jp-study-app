@@ -27,8 +27,12 @@ export interface MalListWriter {
   readListStatus?(animeId: number): Promise<MalLiveListStatus>;
 }
 
-/** Errors that would fail every remaining title the same way. */
-const FATAL_CODES = new Set(['not-configured', 'not-authenticated', 'reauth-required', 'transient']);
+/**
+ * Errors that would fail every remaining title the same way. `rate-limited`
+ * above all: continuing after a 429 is exactly the request storm MAL is
+ * asking us to stop, and every further PATCH digs the hole deeper.
+ */
+const FATAL_CODES = new Set(['not-configured', 'not-authenticated', 'reauth-required', 'transient', 'rate-limited']);
 
 /** At most this many PATCHes per click; the rest wait for the next one. */
 export const MAL_PUSH_LIMIT = 300;
@@ -50,6 +54,8 @@ export interface MalPushResult {
   remaining: number;
   /** The code that stopped the run early, if one did. */
   stoppedBy?: string;
+  /** Epoch ms after which another push is worth trying (set on `rate-limited`). */
+  retryAt?: number;
 }
 
 /** Whether MAL's row moved away from the snapshot the diff was made against. */
@@ -104,7 +110,11 @@ export async function pushWatchChangesToMal(
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : undefined;
       result.failed.push({ animeId: change.animeId, title: change.title, code, message: error instanceof Error ? error.message : String(error) });
-      if (code && FATAL_CODES.has(code)) result.stoppedBy = code;
+      if (code && FATAL_CODES.has(code)) {
+        result.stoppedBy = code;
+        const retryAt = error && typeof error === 'object' ? (error as { retryAt?: unknown }).retryAt : undefined;
+        if (typeof retryAt === 'number' && Number.isFinite(retryAt)) result.retryAt = retryAt;
+      }
     }
   }
   if (result.sent) writeMalLibrary(document);

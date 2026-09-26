@@ -359,6 +359,7 @@ declare global {
         cb: (p: import('../shared/mangaOcrIpc').MangaOcrVolumeProgress) => void,
       ): () => void;
       readBook(id: string): Promise<ArrayBuffer | null>;
+      relinkBook?(id: string): Promise<import('../main/library').RelinkBookResult>;
       sampleBookText(id: string, maxChars?: number): Promise<string | null>;
       bookFileKeys(ids: string[]): Promise<Record<string, string | null>>;
       getWatchFolder(): Promise<string | null>;
@@ -1128,6 +1129,8 @@ declare global {
       /** Airing-schedule job status (AniList next episodes) and a manual check. */
       watchAiringStatus(): Promise<import('../main/watchAiring').WatchAiringStatus>;
       watchAiringRefresh(): Promise<import('../main/watchAiring').WatchAiringStatus>;
+      watchMetadataStatus?(): Promise<import('../main/watchLibraryMetadata').WatchMetadataStatus>;
+      watchMetadataRetry?(): Promise<import('../main/watchLibraryMetadata').WatchMetadataStatus>;
       /** Episodes of titles being watched that have just aired — once per episode. */
       onWatchAiringAired(cb: (episodes: import('../shared/watchAiring').AiredEpisode[]) => void): () => void;
       /** Phase 0 credentials vault. No channel returns a secret — by design. */
@@ -1397,8 +1400,9 @@ declare global {
       onYtQueueChanged?(cb: (entries: import('../main/ytDownloadQueue').YtQueueEntry[]) => void): () => void;
       ytFetchSubsOnly(videoIds: string[]): Promise<{
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
-        results: Array<{ videoId: string; ok: boolean; error?: string }>;
+        results: Array<{ videoId: string; ok: boolean; error?: string; code?: 'timeout' | 'cancelled' }>;
       }>;
+      ytCancelFetchSubs?(): Promise<void>;
       ytMarkTranscribed(
         youtubeId: string,
         cuesJson: string,
@@ -1675,11 +1679,13 @@ declare global {
         ok: boolean;
         results?: import('../shared/visualNovel').VisualNovelSourceResult[];
         error?: string;
+        errorCode?: import('../shared/resilience').FailureCode;
       }>;
       visualNovelSourceDetails(providerId: string): Promise<{
         ok: boolean;
         details?: import('../shared/visualNovel').VisualNovelSourceDetails;
         error?: string;
+        errorCode?: import('../shared/resilience').FailureCode;
       }>;
       visualNovelPickExecutable(): Promise<string | null>;
       visualNovelDiscoverFolder(): Promise<import('../shared/visualNovel').VisualNovelDiscoveryCandidate[]>;
@@ -1824,7 +1830,7 @@ declare global {
       visualNovelReadCaptureAudio(
         filePath: string,
       ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }>;
-      visualNovelLaunch(id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }>;
+      visualNovelLaunch(id: string): Promise<{ ok: boolean; error?: string; errorCode?: 'no-executable' | 'missing-file' | 'launch-failed'; startedAt?: number }>;
       /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
       visualNovelArt(url: string): Promise<{ ok: boolean; url?: string; error?: string }>;
       visualNovelCaptureState(): Promise<import('../shared/visualNovelCapture').VisualNovelCaptureState>;
@@ -1860,6 +1866,7 @@ declare global {
         ok: boolean;
         results?: import('../shared/visualNovel').VisualNovelSourceResult[];
         error?: string;
+        errorCode?: import('../shared/resilience').FailureCode;
       }>;
       onVisualNovelChanged(
         cb: (database: import('../shared/visualNovel').VisualNovelDatabase) => void,
@@ -2043,8 +2050,9 @@ declare global {
         token: string;
         folderPath: string;
         extensionVersion: string;
+        saveFailure?: 'storage-full' | 'service-error';
       }>;
-      extensionRegenerateToken(): Promise<{ running: boolean; port: number; token: string; folderPath: string }>;
+      extensionRegenerateToken(): Promise<{ running: boolean; port: number; token: string; folderPath: string; extensionVersion: string; saveFailure?: 'storage-full' | 'service-error' }>;
       /** Opens the two-minute pairing window; resolves with when it closes. */
       extensionPairNow(): Promise<{ until: number }>;
       extensionRevealFolder(): Promise<string | null>;

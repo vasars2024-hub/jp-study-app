@@ -48,6 +48,7 @@ import { loadProfileRules } from './profileRules';
 import { getMainStudyLang } from './studyLanguage';
 import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { isStorageFullError } from '../shared/resilience';
 import {
   decideExtensionSettingsAccess,
   EXTENSION_PAIRING_WINDOW_MS,
@@ -385,10 +386,18 @@ export interface ExtensionBridgeStatus {
   stoppedReasonKey?: 'portInUse' | 'listenFailed';
   /** Free-form detail for `listenFailed`; the port is already in `port`. */
   stoppedDetail?: string;
+  /**
+   * The pairing could not be saved. On a regenerate the old token stays
+   * active (nothing changed); on first creation the token works until the
+   * app restarts. Cleared by the next successful save.
+   */
+  saveFailure?: 'storage-full' | 'service-error';
 }
 
 let server: http.Server | null = null;
 let bridgeState: ExtensionBridgeState | null = null;
+/** The last pairing write failed; surfaced in the status until one succeeds. */
+let saveFailure: ExtensionBridgeStatus['saveFailure'] | null = null;
 /** Set by the listen error handler, cleared once a listen succeeds. */
 let listenFailure: Pick<ExtensionBridgeStatus, 'stoppedReasonKey' | 'stoppedDetail'> | null = null;
 
@@ -472,16 +481,22 @@ function loadOrCreateState(): ExtensionBridgeState {
   } catch {
     /* create fresh */
   }
-  bridgeState = {
+  const fresh: ExtensionBridgeState = {
     token: crypto.randomBytes(24).toString('hex'),
     port: EXTENSION_PORT,
   };
-  saveState(bridgeState);
-  return bridgeState;
+  // Nothing older to protect: a first token that cannot be saved still works
+  // for this session, and the status says it will not survive a restart.
+  if (!saveState(fresh)) bridgeState = fresh;
+  return fresh;
 }
 
-function saveState(state: ExtensionBridgeState): void {
-  bridgeState = state;
+/**
+ * Persists `state` and only then makes it the active state. A failed write
+ * (a full disk above all) leaves the previous pairing active and on disk, so
+ * the app never hands out a token a restart would silently undo.
+ */
+function saveState(state: ExtensionBridgeState): boolean {
   try {
     const payload: ExtensionBridgeStateFile = {
       token: encryptToken(state.token),
@@ -492,7 +507,12 @@ function saveState(state: ExtensionBridgeState): void {
     writeJsonAtomicSync(statePath(), payload, { mode: 0o600 });
   } catch (err) {
     console.error('[extensionServer] failed to persist bridge state', err);
+    saveFailure = isStorageFullError(err) ? 'storage-full' : 'service-error';
+    return false;
   }
+  bridgeState = state;
+  saveFailure = null;
+  return true;
 }
 
 export function getExtensionBridgeStatus(): ExtensionBridgeStatus {
@@ -505,15 +525,16 @@ export function getExtensionBridgeStatus(): ExtensionBridgeStatus {
     folderPath: getChromeExtensionFolder(),
     extensionVersion: readInstalledExtensionVersion() || '',
     ...(running ? {} : (listenFailure ?? {})),
+    ...(saveFailure ? { saveFailure } : {}),
   };
 }
 
 export function regenerateExtensionToken(): ExtensionBridgeStatus {
   const state = bridgeState ?? loadOrCreateState();
-  state.token = crypto.randomBytes(24).toString('hex');
+  // A copy, published only once it is on disk: a regenerate that cannot be
+  // saved must not change the token the paired extension is using.
   // A new token is a new pairing: the old extension origin loses token-less pull.
-  state.pairedOrigin = null;
-  saveState(state);
+  saveState({ ...state, token: crypto.randomBytes(24).toString('hex'), pairedOrigin: null });
   return getExtensionBridgeStatus();
 }
 
@@ -521,8 +542,7 @@ function pinExtensionOrigin(origin: string | null): void {
   if (!origin) return;
   const state = bridgeState ?? loadOrCreateState();
   if (state.pairedOrigin === origin) return;
-  state.pairedOrigin = origin;
-  saveState(state);
+  saveState({ ...state, pairedOrigin: origin });
 }
 
 /**

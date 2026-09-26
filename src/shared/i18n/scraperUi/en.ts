@@ -916,6 +916,9 @@ export const SCRAPER_UI_EN: Catalog = {
   'scrApp.transfer.removedKept': 'Removed {value} from qBittorrent. Its downloaded files were kept.',
   'scrApp.transfer.removedDeleted': 'Removed {value} from qBittorrent and deleted its downloaded files.',
   'scrApp.transfer.failed': 'qBittorrent did not do it: {value}',
+  'scrApp.qbitList.offline': 'qBittorrent is not reachable, so these rows are from the last successful read. Check that it is running with the Web UI on, then refresh.',
+  'scrApp.qbitList.auth': 'qBittorrent rejected the login, so these rows are from the last successful read. Check the username, password or API key in Settings.',
+  'scrApp.qbitList.service': 'qBittorrent answered with an error, so these rows are from the last successful read. Refresh in a moment.',
   'scrApp.torrent.pieces': 'Piece progress',
   'scrApp.torrent.matches': { one: '{count} matching release', other: '{count} matching releases' },
   'scrApp.torrent.alreadyInLibrary': {

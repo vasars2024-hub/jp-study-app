@@ -14,6 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
   root: '',
+  /** When set, spawn fails the way Node does: no pid, 'error' on the next tick. */
+  spawnFails: null as null | Error,
+  shellResult: '',
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   sent: [] as Array<{ channel: string; payload: unknown }>,
   clipboard: '',
@@ -34,14 +37,19 @@ vi.mock('electron', () => ({
   clipboard: { readText: () => fixture.clipboard },
   dialog: {},
   ipcMain: { handle: (channel: string, fn: (...args: unknown[]) => unknown) => fixture.handlers.set(channel, fn) },
-  shell: { openPath: vi.fn(async () => '') },
+  shell: { openPath: vi.fn(async () => fixture.shellResult) },
 }));
 
 vi.mock('node:child_process', () => ({
   spawn: (command: string, args: string[]) => {
     fixture.spawnCalls.push({ command, args });
-    const child = Object.assign(new EventEmitter(), { pid: 9000 + fixture.children.length, unref: () => undefined });
-    fixture.children.push(child);
+    const fails = fixture.spawnFails;
+    const child = Object.assign(new EventEmitter(), {
+      pid: fails ? undefined : 9000 + fixture.children.length,
+      unref: () => undefined,
+    });
+    if (fails) process.nextTick(() => child.emit('error', fails));
+    fixture.children.push(child as EventEmitter & { pid: number; unref: () => void });
     return child;
   },
   execFile: vi.fn(),
@@ -75,6 +83,8 @@ beforeEach(() => {
   fixture.spawnCalls.length = 0;
   fixture.readerOpened.length = 0;
   fixture.clipboard = '';
+  fixture.spawnFails = null;
+  fixture.shellResult = '';
   registerVisualNovelIpc();
 });
 
@@ -160,5 +170,41 @@ describe('VNDB art goes through the vetted cache only', () => {
     expect(result.ok).toBe(false);
     const offHost = await invoke('visual-novel:art', 'https://example.com/a.jpg');
     expect(offHost.ok).toBe(false);
+  });
+});
+
+// Resilience audit #12: a spawn failure was handled asynchronously while the
+// handler had already started the reading session, capture and the reader and
+// returned success; the shell fallback's own failure was discarded.
+describe('a launch that does not start the game', () => {
+  it('fails, and starts no session, capture or reader, when the shell fallback fails too', async () => {
+    const id = await addNovel();
+    fixture.spawnFails = Object.assign(new Error('spawn EACCES'), { code: 'EACCES' });
+    fixture.shellResult = 'Access is denied.';
+    const launched = await invoke('visual-novel:launch', id);
+    expect(launched).toMatchObject({ ok: false, errorCode: 'launch-failed' });
+    expect((await invoke('visual-novel:captureState')).active).toBe(false);
+    expect(fixture.readerOpened).toEqual([]);
+    expect(await invoke('visual-novel:sessionState', id)).toMatchObject({ startedAt: null });
+    const database = await invoke('visual-novel:list');
+    expect(database.entries[0].lastPlayedAt ?? null).toBeNull();
+  });
+
+  it('succeeds through the shell when a direct spawn needs elevation', async () => {
+    const id = await addNovel();
+    fixture.spawnFails = Object.assign(new Error('spawn UNKNOWN'), { errno: -4094 });
+    fixture.shellResult = '';
+    const launched = await invoke('visual-novel:launch', id);
+    expect(launched.ok).toBe(true);
+    expect((await invoke('visual-novel:captureState')).active).toBe(true);
+  });
+
+  it('can be retried after a failure', async () => {
+    const id = await addNovel();
+    fixture.spawnFails = new Error('spawn ENOENT');
+    fixture.shellResult = 'not found';
+    expect((await invoke('visual-novel:launch', id)).ok).toBe(false);
+    fixture.spawnFails = null;
+    expect((await invoke('visual-novel:launch', id)).ok).toBe(true);
   });
 });

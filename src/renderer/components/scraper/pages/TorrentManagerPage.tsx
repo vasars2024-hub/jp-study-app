@@ -26,7 +26,8 @@ import {
 } from '../data/credentialPresence';
 import { sx, sx2, sx3, sxn, sxs, type ScraperTextKey } from '../strings';
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
-import { errorText, qbitActionNotice, type ActionNotice } from '../data/qbitActions';
+import { errorText, qbitActionNotice, qbitListFailureKey, type ActionNotice } from '../data/qbitActions';
+import { t } from '../../../i18n';
 import type { ScraperQbitTorrentAction } from '../../../../shared/scraperIpc';
 import { engineReason, firstReason, type ReasonCheck } from '../disabledReason';
 import {
@@ -210,7 +211,10 @@ export default function TorrentManagerPage() {
     try {
       setTransfers(await port.qbitTransfers());
     } catch (error) {
-      setTransferNotice({ text: sxs('transfer.failed', errorText(error)), bad: true });
+      // The last rows that were read stay on screen (not replaced by an empty
+      // list), and the line says why they are stale and what to do.
+      const key = qbitListFailureKey(error);
+      setTransferNotice({ text: key ? t(key) : sxs('transfer.failed', errorText(error)), bad: true });
     }
   }, [port]);
 

@@ -1141,7 +1141,11 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         context.mediaId,
         context.subtitleRecordId,
       );
-      if (subtitle) applySubtitleFile(subtitle.name, subtitle.text);
+      // A track whose file was moved or deleted: main has detached it and
+      // queued a new search, and the user is told rather than left with no
+      // subtitles and no reason.
+      if (subtitle?.missing) setError(t('media.subtitles.fileMissing', { name: subtitle.name }));
+      else if (subtitle) applySubtitleFile(subtitle.name, subtitle.text);
     }
     if (context.listeningMode === 'dictation') {
       stopShadowRecording();

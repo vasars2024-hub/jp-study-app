@@ -186,13 +186,31 @@ async function commitConnectDraftInner(
       if (write.create) {
         await invoke('createDeck', { deck: write.deck });
         if (write.configId !== undefined) {
-          // Best effort by design: the cards belong in the deck either way, and
-          // failing the whole move because a preset would not apply would be a
-          // worse outcome than a new subdeck on Anki's default limits.
+          // The preset is what keeps the split cards on the parent's review
+          // limits. It used to be best effort — an exception swallowed and a
+          // `false` answer never read — so a "successful" split could leave
+          // cards on Anki's defaults with nothing said. Now a preset that did
+          // not apply stops THIS group's move (the cards stay where they are,
+          // on the limits they had) and is named as a partial result.
+          let applied = false;
+          let why = 'AnkiConnect answered false';
           try {
-            await invoke('setDeckConfigId', { decks: [write.deck], configId: write.configId });
-          } catch {
-            /* the deck exists and the cards still move */
+            applied = (await invoke('setDeckConfigId', { decks: [write.deck], configId: write.configId })) === true;
+          } catch (err) {
+            if (isUnreachable(err) || isCollectionUnavailable(err)) throw err;
+            why = toUiError(err);
+          }
+          if (!applied) {
+            for (const id of ids) {
+              failures.push({
+                kind: 'card',
+                id,
+                code: 'preset-not-applied',
+                deck: write.deck,
+                reason: `options preset ${write.configId} could not be applied to ${write.deck} (${why})`,
+              });
+            }
+            continue;
           }
         }
       }

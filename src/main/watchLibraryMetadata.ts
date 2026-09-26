@@ -31,7 +31,7 @@
  * title, so the watch library's own document stays the tracking module's.
  */
 
-import { app } from 'electron';
+import { app, ipcMain } from 'electron';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
@@ -305,6 +305,67 @@ export interface WatchMetadataResult {
   looked: number;
   /** Titles that received anything. */
   filled: number;
+  /**
+   * Titles whose lookup got no answer (offline, a refused TMDB key, a 429 or
+   * 5xx after the client's own retries). Not "nothing found": they are asked
+   * again on the backoff below, without waiting for another import.
+   */
+  unavailable: number;
+  /** The providers those unanswered lookups were planned against. */
+  providersDown: MediaMetadataProviderId[];
+}
+
+/** What the library can show about the metadata pass. */
+export interface WatchMetadataStatus {
+  running: boolean;
+  lastResult: WatchMetadataResult | null;
+  lastRunAt: number | null;
+  /** When the automatic retry after an outage is due; null when none is. */
+  nextRetryAt: number | null;
+}
+
+/** Backoff for a pass that met an outage: 1 min, 2, 4 … capped at 30 min. */
+export const WATCH_METADATA_RETRY_BASE_MS = 60_000;
+export const WATCH_METADATA_RETRY_MAX_MS = 30 * 60_000;
+/** After this many retries in a row the pass waits for the next ordinary trigger. */
+export const WATCH_METADATA_RETRY_LIMIT = 8;
+
+let lastResult: WatchMetadataResult | null = null;
+let lastRunAt: number | null = null;
+let retryAttempt = 0;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let nextRetryAt: number | null = null;
+
+export function watchLibraryMetadataStatus(): WatchMetadataStatus {
+  return { running, lastResult, lastRunAt, nextRetryAt };
+}
+
+function clearRetry(): void {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  nextRetryAt = null;
+}
+
+/**
+ * After a pass, either arms the next bounded retry (some lookups went
+ * unanswered) or resets the backoff (every provider answered).
+ */
+function planRetry(result: WatchMetadataResult, at: number): void {
+  clearRetry();
+  if (result.unavailable === 0) {
+    retryAttempt = 0;
+    return;
+  }
+  if (retryAttempt >= WATCH_METADATA_RETRY_LIMIT) return;
+  const wait = Math.min(WATCH_METADATA_RETRY_BASE_MS * 2 ** retryAttempt, WATCH_METADATA_RETRY_MAX_MS);
+  retryAttempt += 1;
+  nextRetryAt = at + wait;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    nextRetryAt = null;
+    void runWatchLibraryMetadata();
+  }, wait);
+  retryTimer.unref?.();
 }
 
 export function watchLibraryMetadataRunning(): boolean {
@@ -316,16 +377,19 @@ export function cancelWatchLibraryMetadata(): void {
     clearTimeout(timer);
     timer = null;
   }
+  clearRetry();
   if (running) cancelled = true;
 }
 
 /** Runs one pass over every title that lacks metadata. Never throws. */
 export async function runWatchLibraryMetadata(now: () => number = Date.now): Promise<WatchMetadataResult> {
-  if (running) return { looked: 0, filled: 0 };
+  if (running) return { looked: 0, filled: 0, unavailable: 0, providersDown: [] };
   running = true;
   cancelled = false;
   let looked = 0;
   let filled = 0;
+  let unavailable = 0;
+  const providersDown = new Set<MediaMetadataProviderId>();
   const attempts = readAttempts();
   let dirty = false;
   try {
@@ -352,9 +416,14 @@ export async function runWatchLibraryMetadata(now: () => number = Date.now): Pro
         if (found.work || !found.down) {
           attempts[title.id] = { at: now(), providers: plan.providers };
           dirty = true;
+        } else {
+          unavailable += 1;
+          for (const provider of plan.providers) providersDown.add(provider);
         }
       } catch {
         // One title that fails must not abandon the pass; it is asked again later.
+        unavailable += 1;
+        for (const provider of plan.providers) providersDown.add(provider);
       }
       if (dirty && looked % 10 === 0) {
         writeAttempts(attempts);
@@ -370,9 +439,23 @@ export async function runWatchLibraryMetadata(now: () => number = Date.now): Pro
   } finally {
     if (dirty) writeAttempts(attempts);
     running = false;
-    cancelled = false;
   }
-  return { looked, filled };
+  const result: WatchMetadataResult = { looked, filled, unavailable, providersDown: [...providersDown] };
+  const wasCancelled = cancelled;
+  cancelled = false;
+  lastResult = result;
+  lastRunAt = now();
+  // A cancelled pass (quit, a restore) must not re-arm itself.
+  if (!wasCancelled) planRetry(result, lastRunAt);
+  return result;
+}
+
+/** "Retry now" from the library: resets the backoff and runs a pass. */
+export async function retryWatchLibraryMetadata(): Promise<WatchMetadataStatus> {
+  clearRetry();
+  retryAttempt = 0;
+  await runWatchLibraryMetadata();
+  return watchLibraryMetadataStatus();
 }
 
 /** Debounced: an import that writes in bursts schedules one pass. */
@@ -397,4 +480,8 @@ export function registerWatchLibraryMetadata(isBusy: () => boolean): void {
     }
   });
   scheduleWatchLibraryMetadata(20_000);
+  ipcMain.removeHandler('watchMetadata:status');
+  ipcMain.handle('watchMetadata:status', () => watchLibraryMetadataStatus());
+  ipcMain.removeHandler('watchMetadata:retry');
+  ipcMain.handle('watchMetadata:retry', () => retryWatchLibraryMetadata());
 }

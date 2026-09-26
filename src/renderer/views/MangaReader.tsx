@@ -35,7 +35,7 @@ import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
-import { runOcr, tesseractReads, type OcrLang } from '../ocr';
+import { ocrFailureKey, runOcr, tesseractReads, type OcrLang } from '../ocr';
 import { STUDY_LANG_NAME_KEY } from '../../shared/studyLang';
 import {
   cropPageImage,
@@ -438,7 +438,7 @@ export default function MangaReader({ item, onClose }: Props) {
         if (!text.trim()) setOcrError(t('manga.ocr.noText'));
       } catch (err) {
         console.error(err);
-        setOcrError(err instanceof Error ? err.message : t('manga.ocr.failed'));
+        setOcrError(t(ocrFailureKey(err)));
         setOcrStatus('error');
       }
     },
@@ -474,7 +474,7 @@ export default function MangaReader({ item, onClose }: Props) {
         else setDrawRegionMode(false);
       } catch (err) {
         console.error(err);
-        setOcrError(err instanceof Error ? err.message : t('manga.ocr.failed'));
+        setOcrError(t(ocrFailureKey(err)));
         setOcrStatus('error');
       } finally {
         setRegionBusy(false);

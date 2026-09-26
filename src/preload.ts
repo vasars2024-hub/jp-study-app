@@ -495,6 +495,9 @@ const api = {
   },
 
   readBook: (id: string): Promise<ArrayBuffer | null> => ipcRenderer.invoke('library:readBook', id),
+  /** Picks a replacement EPUB/PDF for a book whose stored file is missing. */
+  relinkBook: (id: string): Promise<import('./main/library').RelinkBookResult> =>
+    ipcRenderer.invoke('library:relinkBook', id),
   /** Plain-text sample from an EPUB (capped) for JLPT/HSK cover level badges. */
   sampleBookText: (id: string, maxChars?: number): Promise<string | null> =>
     ipcRenderer.invoke('library:sampleBookText', id, maxChars),
@@ -1817,6 +1820,11 @@ const api = {
   /** The airing-schedule job (AniList next episodes): when it last ran, and a manual check. */
   watchAiringStatus: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:status'),
   watchAiringRefresh: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:refresh'),
+  /** The metadata pass: whether providers were unreachable, and when it retries on its own. */
+  watchMetadataStatus: (): Promise<import('./main/watchLibraryMetadata').WatchMetadataStatus> =>
+    ipcRenderer.invoke('watchMetadata:status'),
+  watchMetadataRetry: (): Promise<import('./main/watchLibraryMetadata').WatchMetadataStatus> =>
+    ipcRenderer.invoke('watchMetadata:retry'),
   /** Episodes of titles being watched that have just aired — once per episode. */
   onWatchAiringAired: (
     cb: (episodes: import('./shared/watchAiring').AiredEpisode[]) => void,
@@ -2251,8 +2259,10 @@ const api = {
     videoIds: string[],
   ): Promise<{
     store: YtPlaylistsStore;
-    results: Array<{ videoId: string; ok: boolean; error?: string }>;
+    results: Array<{ videoId: string; ok: boolean; error?: string; code?: 'timeout' | 'cancelled' }>;
   }> => ipcRenderer.invoke('yt:fetchSubsOnly', videoIds),
+  /** Stops caption fetches in flight; their yt-dlp process trees are killed. */
+  ytCancelFetchSubs: (): Promise<void> => ipcRenderer.invoke('yt:cancelFetchSubs'),
   ytMarkTranscribed: (
     youtubeId: string,
     cuesJson: string,
@@ -2730,6 +2740,7 @@ const api = {
     ok: boolean;
     results?: import('./shared/visualNovel').VisualNovelSourceResult[];
     error?: string;
+    errorCode?: import('./shared/resilience').FailureCode;
   }> => ipcRenderer.invoke('visual-novel:searchSource', query),
   visualNovelSourceDetails: (
     providerId: string,
@@ -2737,6 +2748,7 @@ const api = {
     ok: boolean;
     details?: import('./shared/visualNovel').VisualNovelSourceDetails;
     error?: string;
+    errorCode?: import('./shared/resilience').FailureCode;
   }> => ipcRenderer.invoke('visual-novel:sourceDetails', providerId),
   visualNovelPickExecutable: (): Promise<string | null> =>
     ipcRenderer.invoke('visual-novel:pickExecutable'),
@@ -2912,7 +2924,7 @@ const api = {
     filePath: string,
   ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }> =>
     ipcRenderer.invoke('visual-novel:readCaptureAudio', filePath),
-  visualNovelLaunch: (id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }> =>
+  visualNovelLaunch: (id: string): Promise<{ ok: boolean; error?: string; errorCode?: 'no-executable' | 'missing-file' | 'launch-failed'; startedAt?: number }> =>
     ipcRenderer.invoke('visual-novel:launch', id),
   /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
   visualNovelArt: (url: string): Promise<{ ok: boolean; url?: string; error?: string }> =>
@@ -2970,6 +2982,7 @@ const api = {
     ok: boolean;
     results?: import('./shared/visualNovel').VisualNovelSourceResult[];
     error?: string;
+    errorCode?: import('./shared/resilience').FailureCode;
   }> => ipcRenderer.invoke('visual-novel:recommendCandidates', request),
   onVisualNovelChanged: (
     cb: (database: import('./shared/visualNovel').VisualNovelDatabase) => void,
@@ -3269,7 +3282,7 @@ const api = {
   // Chrome extension bridge (Phase 9) — loopback HTTP server status / token.
   extensionStatus: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
     ipcRenderer.invoke('extension:status'),
-  extensionRegenerateToken: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
+  extensionRegenerateToken: (): Promise<{ running: boolean; port: number; token: string; folderPath: string; saveFailure?: 'storage-full' | 'service-error' }> =>
     ipcRenderer.invoke('extension:regenerateToken'),
   /** Open the two-minute window in which the extension's Pull pairs it without the token. */
   extensionPairNow: (): Promise<{ until: number }> => ipcRenderer.invoke('extension:pairNow'),

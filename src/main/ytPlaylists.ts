@@ -51,6 +51,7 @@ import {
 import { YtDownloadQueue, type YtQueueEntry, type YtQueueRunResult } from './ytDownloadQueue';
 import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
 import { logDiagnostic } from './errorLog';
+import { killProcessTree } from './processTree';
 import { readJsonDetailedSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomicJson';
 
 const DEFAULT_AUTO_UPDATE_HOURS = 12;
@@ -615,11 +616,27 @@ export async function downloadVideosByIds(
   }
 }
 
-async function fetchSubsOnly(
+/**
+ * How long one caption fetch may take. yt-dlp answers a captions-only request
+ * in seconds; a stall (offline, a service that never replies, a hung helper)
+ * used to keep the IPC — and the "measuring" state in the UI — pending forever.
+ */
+export const YT_SUBS_FETCH_TIMEOUT_MS = 90_000;
+
+/** Caption fetches in flight, so `yt:cancelFetchSubs` can stop them. */
+const activeSubsFetches = new Set<AbortController>();
+
+/** Stops every caption fetch in flight (their process trees are killed). */
+export function cancelYtSubsFetches(): void {
+  for (const controller of [...activeSubsFetches]) controller.abort();
+}
+
+export async function fetchSubsOnly(
   youtubeId: string,
   url: string,
   preferSubs: YtSubLang[],
-): Promise<{ ok: true; hasSubs: boolean } | { ok: false; error: string }> {
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
+): Promise<{ ok: true; hasSubs: boolean } | { ok: false; error: string; code?: 'timeout' | 'cancelled' }> {
   const bin = await findYtDlp();
   if (!bin) return { ok: false, error: mt('ytManager.error.noYtDlp') };
   const langs = preferSubsToDownloadOptions(preferSubs).subtitleLangs ?? [];
@@ -639,21 +656,42 @@ async function fetchSubsOnly(
     '-o',
     path.join(outDir, '%(id)s'),
   ]);
+  if (options.signal?.aborted) return { ok: false, error: mt('ytManager.error.subsCancelled'), code: 'cancelled' };
   return new Promise((resolve) => {
     const proc = spawn(bin, args);
     let err = '';
-    proc.stderr.on('data', (d: Buffer) => (err += d.toString()));
-    proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+    let settled = false;
+    const finish = (value: Awaited<ReturnType<typeof fetchSubsOnly>>): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onAbort);
+      resolve(value);
+    };
+    // Deadline and cancel both kill the whole tree and settle at once, so the
+    // caller always leaves "busy" — a stalled child never gets to decide that.
+    const timer = setTimeout(() => {
+      killProcessTree(proc);
+      finish({ ok: false, error: mt('ytManager.error.subsTimeout'), code: 'timeout' });
+    }, options.timeoutMs ?? YT_SUBS_FETCH_TIMEOUT_MS);
+    const onAbort = (): void => {
+      killProcessTree(proc);
+      finish({ ok: false, error: mt('ytManager.error.subsCancelled'), code: 'cancelled' });
+    };
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    proc.stderr?.on('data', (d: Buffer) => (err += d.toString()));
+    proc.on('error', (e) => finish({ ok: false, error: e.message }));
     proc.on('close', (code) => {
+      if (settled) return;
       if (code !== 0) {
         const last = err.trim().split('\n').pop()?.trim();
-        resolve({ ok: false, error: last || `yt-dlp exited with code ${code}` });
+        finish({ ok: false, error: last || `yt-dlp exited with code ${code}` });
         return;
       }
       const files = fs.existsSync(outDir)
         ? fs.readdirSync(outDir).filter((f) => /\.(vtt|srt|ass|ssa)$/i.test(f))
         : [];
-      resolve({ ok: true, hasSubs: files.length > 0 });
+      finish({ ok: true, hasSubs: files.length > 0 });
     });
   });
 }
@@ -1175,8 +1213,15 @@ export function registerYtPlaylistsIpc(): void {
       _e,
       videoIds: string[],
     ): Promise<{ store: YtPlaylistsStore; results: Array<{ videoId: string; ok: boolean; error?: string }> }> => {
-      const results: Array<{ videoId: string; ok: boolean; error?: string }> = [];
+      const results: Array<{ videoId: string; ok: boolean; error?: string; code?: 'timeout' | 'cancelled' }> = [];
+      const controller = new AbortController();
+      activeSubsFetches.add(controller);
+      try {
       for (const videoId of Array.isArray(videoIds) ? videoIds : []) {
+        if (controller.signal.aborted) {
+          results.push({ videoId, ok: false, error: mt('ytManager.error.subsCancelled'), code: 'cancelled' });
+          continue;
+        }
         const snapshot = readStore();
         const video = snapshot.videos.find((v) => v.id === videoId);
         if (!video) {
@@ -1184,9 +1229,14 @@ export function registerYtPlaylistsIpc(): void {
           continue;
         }
         const pl = snapshot.playlists.find((p) => p.id === video.playlistId);
-        const out = await fetchSubsOnly(video.youtubeId, video.url, pl?.preferSubs ?? [pl?.lang === 'zh' ? 'zh' : 'ja']);
+        const out = await fetchSubsOnly(
+          video.youtubeId,
+          video.url,
+          pl?.preferSubs ?? [pl?.lang === 'zh' ? 'zh' : 'ja'],
+          { signal: controller.signal },
+        );
         if (!out.ok) {
-          results.push({ videoId, ok: false, error: out.error });
+          results.push({ videoId, ok: false, error: out.error, ...(out.code ? { code: out.code } : {}) });
           continue;
         }
         commitStore((fresh) => {
@@ -1198,9 +1248,15 @@ export function registerYtPlaylistsIpc(): void {
         });
         results.push({ videoId, ok: true });
       }
+      } finally {
+        activeSubsFetches.delete(controller);
+      }
       return { store: readStore(), results };
     },
   );
+  ipcMain.handle('yt:cancelFetchSubs', (): void => {
+    cancelYtSubsFetches();
+  });
 
   ipcMain.handle(
     'yt:markTranscribed',

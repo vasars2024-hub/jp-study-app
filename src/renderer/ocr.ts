@@ -28,6 +28,24 @@ let activeProgress: ((p: number) => void) | null = null;
 // it at local, same-origin files makes a scan work without any internet.
 const TESS_BASE = '/tesseract';
 
+/**
+ * How long one recognition may take before the worker is presumed dead. A
+ * full manga page takes a few seconds; a worker whose WASM crashed never
+ * answers at all.
+ */
+export const OCR_RECOGNIZE_TIMEOUT_MS = 120_000;
+
+/**
+ * Drops a cached worker (only if it is still the cached one) and terminates
+ * it. A failed start or a worker that died mid-call must not poison every
+ * later scan until the renderer reloads — the next scan builds a fresh one.
+ */
+function evictWorker(lang: OcrLang, cached: Promise<Worker>): void {
+  if (workers.get(lang) !== cached) return;
+  workers.delete(lang);
+  void cached.then((worker) => worker.terminate()).catch(() => undefined);
+}
+
 function getWorker(lang: OcrLang): Promise<Worker> {
   let w = workers.get(lang);
   if (!w) {
@@ -43,6 +61,12 @@ function getWorker(lang: OcrLang): Promise<Worker> {
       },
     });
     workers.set(lang, w);
+    const created = w;
+    // A rejected start is not cached: removing it here is what lets a retry
+    // (after the user fixes whatever broke it) create a new worker.
+    created.catch(() => {
+      if (workers.get(lang) === created) workers.delete(lang);
+    });
   }
   return w;
 }
@@ -86,11 +110,40 @@ export async function runOcr(
   onProgress?: (p: number) => void,
 ): Promise<string> {
   activeProgress = onProgress ?? null;
+  const cached = getWorker(lang);
+  let timer: ReturnType<typeof setTimeout> | null = null;
   try {
-    const worker = await getWorker(lang);
-    const { data } = await withoutTesseractParamWarnings(() => worker.recognize(dataUrl));
+    const worker = await cached;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(Object.assign(new Error('OCR did not finish in time.'), { name: 'TimeoutError' }));
+      }, OCR_RECOGNIZE_TIMEOUT_MS);
+    });
+    const { data } = await Promise.race([
+      withoutTesseractParamWarnings(() => worker.recognize(dataUrl)),
+      deadline,
+    ]);
     return cleanJapanese(data.text);
+  } catch (err) {
+    // A worker that timed out or threw mid-call may be dead; never hand it to
+    // the next scan. (A start failure has already removed itself.)
+    evictWorker(lang, cached);
+    throw err;
   } finally {
+    if (timer) clearTimeout(timer);
     activeProgress = null;
   }
+}
+
+/**
+ * The catalog key that explains an OCR failure. The raw engine message is
+ * English (and often a WASM stack line), so it goes to the console only.
+ */
+export function ocrFailureKey(err: unknown): string {
+  return err instanceof Error && err.name === 'TimeoutError' ? 'manga.ocr.timedOut' : 'manga.ocr.failed';
+}
+
+/** Test seam: forget every cached worker. */
+export function resetOcrWorkersForTests(): void {
+  workers.clear();
 }

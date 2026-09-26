@@ -68,6 +68,7 @@ export const MAL_SYNC_ZH: Catalog = {
   'malSync.pushPushing': '正在推送…',
   'malSync.pushResult': '已发送 {sent} 项，失败 {failed} 项。',
   'malSync.pushRemaining': { other: '还有 {count} 项将在下次推送时发送。' },
+  'malSync.pushRetryAt': 'MyAnimeList 要求稍候：请在 {time} 之后重试。',
   'malSync.pushChangedOnMal': { other: '有 {count} 项在上次获取后已在 MyAnimeList 上更改，已保持原样未覆盖。请重新获取列表后再比较：' },
   'malSync.pushAdded': '在 MyAnimeList 上新增',
   'malSync.pushField.status': '状态',
@@ -93,5 +94,6 @@ export const MAL_SYNC_ZH: Catalog = {
   'malSync.error.not-authenticated': '尚未连接 MyAnimeList，请先连接账号。',
   'malSync.error.reauth-required': 'MyAnimeList 需要你重新登录，请再连接一次账号。',
   'malSync.error.transient': 'MyAnimeList 没有响应，请稍后重试。',
+  'malSync.error.rate-limited': 'MyAnimeList 目前正在限制请求。你仍保持登录——请等待几分钟后重试。',
   'malSync.error.request-failed': '向 MyAnimeList 发出的请求失败。',
 };

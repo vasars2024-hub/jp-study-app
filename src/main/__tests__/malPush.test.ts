@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [], getFocusedWindow: () => null },
 }));
 
-import { MalSyncClient, type MalHttpRequest, type MalTokens } from '../malSync';
+import { MalSyncClient, MalSyncError, type MalHttpRequest, type MalTokens } from '../malSync';
 import { malPushPreview, pushWatchChangesToMal } from '../malPush';
 import { __setMalLibraryPathForTests, applyMalLibrarySync, readMalLibrary } from '../malLibrary';
 import {
@@ -153,6 +153,39 @@ describe('push changes to MAL', () => {
     expect(result.failed).toHaveLength(1);
     expect(result.remaining).toBe(1);
     expect(malPushPreview().changes).toHaveLength(2);
+  });
+
+  // Resilience audit #4: a 429 used to map to `request-failed`, which was not
+  // fatal, so the push went on to attempt every remaining title.
+  it('stops at a rate limit, keeps the rest unattempted, and says when to retry', async () => {
+    updateWatchTitle(idOf(1), { progress: 5 }, NOW);
+    updateWatchTitle(idOf(2), { progress: 1 }, NOW);
+    failWith = 429;
+    const result = await pushWatchChangesToMal(client(), undefined, () => NOW);
+    expect(result.stoppedBy).toBe('rate-limited');
+    expect(result.retryAt).toBe(NOW + 60_000);
+    expect(result.failed).toHaveLength(1);
+    expect(result.remaining).toBe(1);
+    // One title's GET, then nothing: the second title was never asked about.
+    expect(sent).toHaveLength(1);
+    expect(malPushPreview().changes).toHaveLength(2);
+  });
+
+  it('stops when the transport itself fails (offline), rather than trying every title', async () => {
+    updateWatchTitle(idOf(1), { progress: 5 }, NOW);
+    updateWatchTitle(idOf(2), { progress: 1 }, NOW);
+    const offline = new MalSyncClient({
+      transport: async (request) => {
+        sent.push(request);
+        throw new MalSyncError('transient', 'MyAnimeList could not be reached.');
+      },
+      store: { read: () => ({ accessToken: 'FAKE', refreshToken: 'R', expiresAt: 4_000_000_000_000 }), write: () => undefined, clear: () => undefined, encrypted: () => true },
+      config: () => ({ clientId: 'fake-client', clientSecret: '', redirectUri: undefined }),
+      now: () => NOW,
+    });
+    const result = await pushWatchChangesToMal(offline, undefined, () => NOW);
+    expect(result.stoppedBy).toBe('transient');
+    expect(sent).toHaveLength(1);
   });
 
   it('sends a push only for the ids asked for', async () => {

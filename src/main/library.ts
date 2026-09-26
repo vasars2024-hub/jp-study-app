@@ -593,14 +593,64 @@ export function listMangaPageUrls(id: string): string[] {
   return getMangaPages(id);
 }
 
-/** Read a book's epub bytes for the renderer (avoids cross-origin fetch on media://). */
-function readBook(id: string): ArrayBuffer | null {
+/**
+ * Read a book's epub bytes for the renderer (avoids cross-origin fetch on media://).
+ * `null` means the stored file is missing — moved or deleted behind the app —
+ * which the reader explains (translated) and offers `relinkBook` for.
+ */
+export function readBook(id: string): ArrayBuffer | null {
   const it = readDb().find((x) => x.id === id);
   const file = it?.epubFile ?? 'original.epub';
   const full = path.join(itemDir(id), file);
-  if (!fs.existsSync(full)) return null;
-  const buf = fs.readFileSync(full);
+  let buf: Buffer;
+  try {
+    buf = fs.readFileSync(full);
+  } catch (err) {
+    // Gone between the listing and the read is the same "missing" answer.
+    if ((err as { code?: string }).code === 'ENOENT') return null;
+    throw err;
+  }
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
+export type RelinkBookResult =
+  | { ok: true }
+  | { ok: false; canceled?: boolean; errorCode?: 'not-found' | 'storage-full' | 'service-error' };
+
+/**
+ * Puts a book file back under a library item whose stored copy is missing:
+ * the chosen EPUB/PDF is copied in (staged, then swapped), so progress,
+ * highlights and folder placement all survive — a re-import would not.
+ */
+export async function relinkBook(id: string, chosenPath?: string): Promise<RelinkBookResult> {
+  const item = readDb().find((x) => x.id === id);
+  if (!item) return { ok: false, errorCode: 'not-found' };
+  let source = chosenPath;
+  if (!source) {
+    const picked = await dialog.showOpenDialog({
+      title: mt('dialog.relinkBook.title'),
+      properties: ['openFile'],
+      filters: [{ name: mt('dialog.filter.books'), extensions: ['epub', 'pdf'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return { ok: false, canceled: true };
+    source = picked.filePaths[0];
+  }
+  const dest = path.join(itemDir(id), item.epubFile ?? 'original.epub');
+  const staged = `${dest}.relink-${process.pid}.tmp`;
+  try {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(source, staged);
+    fs.renameSync(staged, dest);
+  } catch (err) {
+    try {
+      fs.rmSync(staged, { force: true });
+    } catch {
+      /* nothing staged */
+    }
+    const code = (err as { code?: string }).code;
+    return { ok: false, errorCode: code === 'ENOSPC' ? 'storage-full' : 'service-error' };
+  }
+  return { ok: true };
 }
 
 function stripHtmlToText(raw: string): string {
@@ -2136,6 +2186,7 @@ export function registerLibraryIpc(): void {
   ipcMain.handle('manga:readPage', (_e, mediaUrl: string) => readMangaPage(mediaUrl));
 
   ipcMain.handle('library:readBook', (_e, id: string) => readBook(id));
+  ipcMain.handle('library:relinkBook', (_e, id: string) => relinkBook(id));
 
   ipcMain.handle('library:sampleBookText', (_e, id: string, maxChars?: number) =>
     sampleBookText(id, typeof maxChars === 'number' && maxChars > 0 ? maxChars : 40_000),

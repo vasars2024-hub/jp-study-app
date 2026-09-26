@@ -31,6 +31,7 @@ vi.mock('electron', () => ({
   ipcMain: { handle: () => undefined },
 }));
 vi.mock('../llamaHost', () => ({
+  isLlamaSessionLost: () => false,
   acquireLlamaSession: async () => {
     h.acquired += 1;
     throw new Error('llamaHost must not be reached');

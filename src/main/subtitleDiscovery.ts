@@ -19,7 +19,8 @@ import { BrowserWindow, app, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { readJsonSync, writeFileAtomicSync, writeJsonAtomicSync } from './atomicJson';
+import { isStorageFullError } from '../shared/resilience';
 import { createEmptySubtitleQualityRatings } from '../shared/subtitleQuality';
 import { normalizeTrackRating, syncGradeFromEstimate } from '../shared/subtitleTrackGrade';
 import { matchSubtitleTracks, mismatchedAutoSubtitleIds } from '../shared/subtitleMatching';
@@ -68,7 +69,7 @@ import {
   SUBTITLE_LIBRARY_DIRECTORY,
   subtitleStorageMediaId,
 } from '../shared/subtitleStorage';
-import type { MediaItem } from '../shared/types';
+import type { MediaItem, SubtitlePick } from '../shared/types';
 import {
   READABLE_EXTENSIONS,
   extractEmbeddedSubtitle,
@@ -260,29 +261,62 @@ function cacheDirFor(mediaId: string): string {
   return path.join(SUBTITLE_LIBRARY_DIRECTORY, subtitleStorageMediaId(mediaId));
 }
 
-/** Writes a cue file into the cache and returns its userData-relative path. */
-export function writeSubtitleFile(mediaId: string, name: string, text: string): string | null {
+export type SubtitleWriteOutcome =
+  | { ok: true; path: string }
+  | { ok: false; code: 'storage-full' | 'service-error' };
+
+/**
+ * Writes a cue file into the cache, staged and swapped: a full disk leaves the
+ * previous copy of the same file intact (a forced re-download reuses the
+ * name) and says so, instead of truncating it and reporting nothing.
+ */
+export function writeSubtitleFileDetailed(mediaId: string, name: string, text: string): SubtitleWriteOutcome {
   const relativeDir = cacheDirFor(mediaId);
-  const absoluteDir = path.join(app.getPath('userData'), relativeDir);
   const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
   const relative = path.join(relativeDir, safeName);
   try {
-    fs.mkdirSync(absoluteDir, { recursive: true });
-    fs.writeFileSync(path.join(app.getPath('userData'), relative), text, 'utf-8');
-    return relative;
+    writeFileAtomicSync(path.join(app.getPath('userData'), relative), text, { backup: false });
+    return { ok: true, path: relative };
+  } catch (err) {
+    return { ok: false, code: isStorageFullError(err) ? 'storage-full' : 'service-error' };
+  }
+}
+
+/** Writes a cue file into the cache and returns its userData-relative path. */
+export function writeSubtitleFile(mediaId: string, name: string, text: string): string | null {
+  const written = writeSubtitleFileDetailed(mediaId, name, text);
+  return written.ok ? written.path : null;
+}
+
+function subtitleRecordFile(record: SubtitleRecord): string {
+  return record.external ? record.path : path.join(app.getPath('userData'), record.path);
+}
+
+/** Reads a record's text, whether it is cached in userData or a sidecar in place. */
+export function readSubtitleRecord(record: SubtitleRecord): string | null {
+  try {
+    return fs.readFileSync(subtitleRecordFile(record), 'utf-8');
   } catch {
     return null;
   }
 }
 
-/** Reads a record's text, whether it is cached in userData or a sidecar in place. */
-export function readSubtitleRecord(record: SubtitleRecord): string | null {
-  const file = record.external ? record.path : path.join(app.getPath('userData'), record.path);
+/**
+ * Whether a record's file is still there. A record whose file was moved or
+ * deleted must not count as "this language is covered": it would block every
+ * later search for a track nothing can play.
+ */
+export function subtitleRecordReadable(record: SubtitleRecord): boolean {
   try {
-    return fs.readFileSync(file, 'utf-8');
+    return fs.statSync(subtitleRecordFile(record)).isFile();
   } catch {
-    return null;
+    return false;
   }
+}
+
+/** The records whose files are still readable. */
+export function readableSubtitleRecords(records: readonly SubtitleRecord[] | undefined): SubtitleRecord[] {
+  return (records ?? []).filter(subtitleRecordReadable);
 }
 
 /**
@@ -511,6 +545,41 @@ export function retainedOnForce(records: readonly SubtitleRecord[] | undefined):
   return (records ?? []).filter((record) => record.source === 'generated');
 }
 
+/**
+ * What a forced re-search leaves on the item.
+ *
+ * The search runs as if the rediscoverable records were gone, so every
+ * provider is asked again — but they are only *replaced* when this run
+ * actually reacquired their language. Offline, during an outage, on a full
+ * disk or with nothing better found, the working tracks the user had stay
+ * attached: pressing "Search now" must never be what loses a subtitle.
+ *
+ * A record re-found at the same path (a sidecar, a re-extracted embedded
+ * stream) keeps its old id and rating, so an explicit track choice survives.
+ */
+export function mergeForcedRecords(
+  previous: readonly SubtitleRecord[] | undefined,
+  found: readonly SubtitleRecord[],
+): SubtitleRecord[] {
+  const before = previous ?? [];
+  const beforeIds = new Set(before.map((record) => record.id));
+  const merged = found.map((record) => {
+    if (beforeIds.has(record.id)) return record;
+    const same = before.find((old) => old.path === record.path && !found.some((entry) => entry.id === old.id));
+    if (!same) return record;
+    return { ...record, id: same.id, ...(same.userRating !== undefined ? { userRating: same.userRating } : {}) };
+  });
+  const fresh = merged.filter((record) => !beforeIds.has(record.id) || !found.some((entry) => entry.id === record.id));
+  for (const old of before) {
+    if (merged.some((record) => record.id === old.id)) continue;
+    if (!subtitleRecordReadable(old)) continue;
+    const reacquired = fresh.some((record) =>
+      subtitleLangMatches(record.lang, old.lang) && !isMachineTranslatedSubtitle(record));
+    if (!reacquired) merged.push(old);
+  }
+  return merged;
+}
+
 /** Whether a previous failed search for this language is still fresh enough to trust. */
 /**
  * Failure reasons that say nothing about whether the subtitle exists.
@@ -544,6 +613,10 @@ const NON_EVIDENTIAL_FAILURES = new Set<string>([
   // OpenSubtitles' daily download allowance ran out. "Not today" is a fact about
   // this machine's quota, not about the show, and it resets within a day.
   'quota',
+  // The disk was full when the downloaded file was written: a fact about this
+  // machine, and freeing space should make the next sweep try again at once.
+  'storage-full',
+  'write-failed',
   ...NYAA_UNAVAILABLE_REASONS,
 ]);
 
@@ -661,22 +734,28 @@ async function discoverForItem(
   emit: (phase: SubtitleDiscoveryPhase, extra?: Partial<SubtitleDiscoveryProgress>) => void,
   acquisition?: NyaaAcquisitionConfig,
   run: DiscoveryRun = { remote: languages, openSubtitles: createOpenSubtitlesBatch() },
-): Promise<{ records: SubtitleRecord[]; failures: SubtitleSearchFailure[]; files: number }> {
+): Promise<{ records: SubtitleRecord[]; failures: SubtitleSearchFailure[]; files: number; storageFull: boolean }> {
   // A forced re-search rediscovers everything the pipeline can produce, so those
   // records are dropped and rebuilt. Machine transcripts are the exception: this
   // pass cannot regenerate one, so clearing them would orphan the Whisper output
   // on disk, revert Analyze Japanese to "Transcribe & analyze", and cost the user
   // the whole transcription again — from pressing "Search now".
-  const existing = force ? retainedOnForce(item.subtitles) : [...(item.subtitles ?? [])];
+  //
+  // A record whose file is gone is left out as well: it cannot be played, and
+  // counting it as "this language is covered" would stop discovery from ever
+  // finding a replacement.
+  const readable = readableSubtitleRecords(item.subtitles);
+  const existing = force ? retainedOnForce(readable) : readable;
   const records: SubtitleRecord[] = [...existing];
   const failures: SubtitleSearchFailure[] = [];
   let files = 0;
+  let storageFull = false;
 
   const providers = orderedSubtitleProviders(settings);
   const known = new Set(records.map((record) => record.providerItemId ?? record.path));
 
   for (const providerId of providers) {
-    if (cancelled.has(item.id)) return { records, failures, files };
+    if (cancelled.has(item.id)) return { records, failures, files, storageFull };
 
     // Nothing left to *fetch*. `autoDownloadLanguages` gates downloads, so it
     // gates the remote half of the ladder only. A sidecar already sitting next
@@ -711,8 +790,15 @@ async function discoverForItem(
         if (stream.forced && helperOnly(target)) continue;
         const text = await extractEmbeddedSubtitle(item.path, stream.subtitleIndex);
         if (!text) continue;
-        const relative = writeSubtitleFile(item.id, `embedded-${stream.subtitleIndex}-${target}.srt`, text);
-        if (!relative) continue;
+        const written = writeSubtitleFileDetailed(item.id, `embedded-${stream.subtitleIndex}-${target}.srt`, text);
+        if (!written.ok) {
+          if (written.code === 'storage-full') {
+            storageFull = true;
+            failures.push({ providerId, lang: target, attemptedAt: Date.now(), reason: 'storage-full' });
+          }
+          continue;
+        }
+        const relative = written.path;
         files += 1;
         records.push({
           id: crypto.randomUUID(),
@@ -919,7 +1005,7 @@ async function discoverForItem(
       continue;
     }
 
-    if (cancelled.has(item.id)) return { records, failures, files };
+    if (cancelled.has(item.id)) return { records, failures, files, storageFull };
 
     // An outage is not an answer about this title. Recording `no-match` here is
     // what the client's own comment warns against — measured 2026-08-17, eight
@@ -999,12 +1085,25 @@ async function discoverForItem(
       const aligned = best.candidate.hashMatch
         ? null
         : await alignToAudio(item, fetched.text, best.candidate.format);
-      const relative = writeSubtitleFile(
+      const written = writeSubtitleFileDetailed(
         item.id,
         `${providerId}-${lang}-${best.candidate.providerItemId.replace(/[^a-zA-Z0-9]/g, '')}.${best.candidate.format}`,
         aligned?.text ?? fetched.text,
       );
-      if (!relative) continue;
+      if (!written.ok) {
+        // Not `download-failed`: the bytes arrived, the disk refused them. The
+        // prior copy of this file (if any) is untouched by the staged write.
+        known.delete(best.candidate.providerItemId);
+        failures.push({
+          providerId,
+          lang,
+          attemptedAt: Date.now(),
+          reason: written.code === 'storage-full' ? 'storage-full' : 'write-failed',
+        });
+        if (written.code === 'storage-full') storageFull = true;
+        continue;
+      }
+      const relative = written.path;
       files += 1;
       records.push({
         id: crypto.randomUUID(),
@@ -1025,7 +1124,7 @@ async function discoverForItem(
     }
   }
 
-  return { records, failures, files };
+  return { records, failures, files, storageFull };
 }
 
 // ---------------------------------------------------------------------------
@@ -1052,7 +1151,7 @@ export function subtitleDiscoveryEligible(item: MediaItem): boolean {
 export async function runSubtitleDiscovery(
   request: SubtitleDiscoveryRequest = {},
 ): Promise<SubtitleDiscoveryResult> {
-  if (!host) return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'Subtitle discovery host is not registered.' };
+  if (!host) return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'Subtitle discovery host is not registered.', errorCode: 'service-error' };
   if (sweeping) {
     // A library-wide request that lands mid-sweep is almost always an import
     // (a watch folder, a finished download) whose new files the running sweep
@@ -1060,7 +1159,7 @@ export async function runSubtitleDiscovery(
     // until the next launch; one follow-up sweep after this one picks them up,
     // and costs nothing for the items this sweep already answered.
     if (!request.mediaIds?.length && !request.force && request.acquisition === undefined) followUpSweep = true;
-    return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'A subtitle sweep is already running.' };
+    return { ok: false, attached: 0, empty: 0, unreachable: 0, files: 0, error: 'A subtitle sweep is already running.', errorCode: 'busy' };
   }
 
   const settings = loadDiscoverySettings();
@@ -1094,7 +1193,9 @@ export async function runSubtitleDiscovery(
     // Selected on the languages this run can actually fetch. An item missing only
     // the helper language is not re-walked on every launch for a language the
     // sweep would not download anyway; the first play takes care of it.
-    if (!remote.every((lang) => hasLanguage(item.subtitles ?? [], lang))) return true;
+    // Only a track that can still be read counts: a moved or deleted file must
+    // put the item back into the sweep rather than block it forever.
+    if (!remote.every((lang) => hasLanguage(readableSubtitleRecords(item.subtitles), lang))) return true;
     // Every wanted language is present, but a sidecar the user placed beside the
     // file can still be unattached, and the language filter alone would never
     // reach it. One readdir per item, and only for items we would otherwise skip.
@@ -1114,6 +1215,7 @@ export async function runSubtitleDiscovery(
   // `SubtitleDiscoveryResult.unreachable` for why this is counted separately.
   let unreachable = 0;
   let files = 0;
+  let storageFull = 0;
   let done = 0;
 
   try {
@@ -1184,7 +1286,8 @@ export async function runSubtitleDiscovery(
         // subtitles" about a search that worked. Measured live 2026-09-07 on
         // `The Big O - 07`: `{attached: 0, empty: 3, files: 1}` while the store
         // held the freshly attached record.
-        const before = request.force === true ? retainedOnForce(item.subtitles).length : (item.subtitles?.length ?? 0);
+        const readableBefore = readableSubtitleRecords(item.subtitles);
+        const before = request.force === true ? retainedOnForce(readableBefore).length : readableBefore.length;
         const gained = outcome.records.length > before;
         if (gained) attached += 1;
         else {
@@ -1195,9 +1298,11 @@ export async function runSubtitleDiscovery(
           if (outcome.failures.some((failure) => failure.reason === 'provider-down')) unreachable += 1;
         }
         files += outcome.files;
+        if (outcome.storageFull) storageFull += 1;
 
         host.patchItems([item.id], {
-          subtitles: outcome.records,
+          // A forced search replaces only what it reacquired; see `mergeForcedRecords`.
+          subtitles: request.force === true ? mergeForcedRecords(item.subtitles, outcome.records) : outcome.records,
           // Failures accumulate but are bounded, so the record cannot grow forever.
           subtitleFailures: keptFailures([...(item.subtitleFailures ?? []), ...outcome.failures]).slice(-24),
           subtitlesCheckedAt: Date.now(),
@@ -1229,7 +1334,7 @@ export async function runSubtitleDiscovery(
     }
   }
 
-  return { ok: true, attached, empty, unreachable, files };
+  return { ok: true, attached, empty, unreachable, files, ...(storageFull ? { storageFull } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1757,6 +1862,29 @@ export function rateSubtitleRecord(mediaId: unknown, recordId: unknown, rating: 
   return true;
 }
 
+/**
+ * A record's text for the player and study tools — or, when its file was moved
+ * or deleted, a `missing` answer the renderer can explain. The dead record is
+ * detached and a search for that item queued, so the language can be found
+ * again rather than stay blocked by a track nothing can read.
+ */
+export function readSubtitleRecordForRenderer(mediaId: string, recordId: string): SubtitlePick | null {
+  const item = host?.listItems().find((entry) => entry.id === mediaId);
+  const record = item?.subtitles?.find((entry) => entry.id === recordId);
+  if (!item || !record) return null;
+  const text = readSubtitleRecord(record);
+  if (text !== null) return { name: record.label ?? record.lang, text };
+  const name = record.label ?? record.lang;
+  if (subtitleRecordReadable(record)) return null;
+  host?.patchItems([item.id], { subtitles: (item.subtitles ?? []).filter((entry) => entry.id !== record.id) });
+  if (!sweeping && subtitleDiscoveryEligible(item)) {
+    setTimeout(() => {
+      void runSubtitleDiscovery({ mediaIds: [item.id] }).catch(() => undefined);
+    }, 0);
+  }
+  return { name, text: '', missing: true };
+}
+
 export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHost): void {
   // Every path in this file that changes an item's tracks goes through
   // `host.patchItems` — the sweep, nyaa accept, attach, detach — so wrapping it
@@ -1828,16 +1956,11 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
   ipcMain.handle('subtitleDiscovery:detach', (_e, mediaId: unknown, recordId: unknown) =>
     detachSubtitleRecord(mediaId, recordId));
   /** Reads a stored record's cue text, for the player and the study tools. */
-  ipcMain.handle('subtitleDiscovery:read', (_e, mediaId: string, recordId: string) => {
-    const item = host?.listItems().find((entry) => entry.id === mediaId);
-    const record = item?.subtitles?.find((entry) => entry.id === recordId);
-    if (!record) return null;
-    const text = readSubtitleRecord(record);
-    return text === null ? null : { name: record.label ?? record.lang, text };
-  });
+  ipcMain.handle('subtitleDiscovery:read', (_e, mediaId: string, recordId: string) =>
+    readSubtitleRecordForRenderer(mediaId, recordId));
 }
 
 export const __subtitleDiscoveryTestables = {
   scoreCandidates, toProvidersDocument, recentlyFailed, hasLanguage, retainedOnForce,
-  hasUnattachedSidecar, keptFailures,
+  hasUnattachedSidecar, keptFailures, mergeForcedRecords,
 };

@@ -34,6 +34,7 @@ import type { GumRatingDisplay } from './gumLayout';
 import { episodesBySeasonOf, gumEpisodeLabel, nextEpisodeOf, type GumTitle } from './gumModel';
 import { STUDY_LANG_NATIVE_NAME, type StudyLang } from '../../../../shared/studyLang';
 import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
+import { subtitleSweepMessage } from '../../../../shared/subtitleDiscoveryIpc';
 import { getStudyLang } from '../../../studyEnvironment';
 import { useStudyLanguage } from '../../../useStudyLanguage';
 import MediaLevelBadge from '../MediaLevelBadge';
@@ -703,11 +704,10 @@ export default function GumTitlePage({
     setBusy(true);
     try {
       const result = await window.api.runSubtitleDiscovery({ mediaIds: title.items.map((item) => item.id), force: true });
-      showToast(result.ok
-        ? { message: t('media.subtitles.searchDone', { count: result.files }), kind: result.files ? 'success' : 'default' }
-        : { message: result.error ?? t('media.subtitles.searchFailed'), kind: 'error' });
-    } catch (error) {
-      showToast({ message: error instanceof Error ? error.message : t('media.subtitles.searchFailed'), kind: 'error' });
+      const message = subtitleSweepMessage(result);
+      showToast({ message: t(message.key, message.params), kind: message.kind });
+    } catch {
+      showToast({ message: t('media.subtitles.searchFailed'), kind: 'error' });
     } finally {
       setBusy(false);
     }

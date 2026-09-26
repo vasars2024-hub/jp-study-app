@@ -255,6 +255,10 @@ export default function NovelReader({ item, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [pdfProgress, setPdfProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The stored book file is gone; the reader offers to locate it. */
+  const [bookMissing, setBookMissing] = useState(false);
+  /** Bumped after a relink so the load effect reads the book again. */
+  const [bookReload, setBookReload] = useState(0);
   const [settings, setSettings] = useState<ReaderSettings>(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [translateOpen, setTranslateOpen] = useState(false);
@@ -890,11 +894,18 @@ export default function NovelReader({ item, onClose }: Props) {
     positionRestoredRef.current = false;
     setLoading(true);
     setError(null);
+    setBookMissing(false);
     (async () => {
       try {
         const buf = (await window.api.readBook(item.id)) as ArrayBuffer;
         if (dead) return;
-        if (!buf) throw new Error('The book file is missing from the library.');
+        if (!buf) {
+          // Typed, translated, and recoverable (locate the file) — never an
+          // English sentence built here.
+          setBookMissing(true);
+          setLoading(false);
+          return;
+        }
         sourceIsPdfRef.current = isPdf(buf);
         if (sourceIsPdfRef.current) {
           setPdfProgress(0);
@@ -958,7 +969,8 @@ export default function NovelReader({ item, onClose }: Props) {
       } catch (err) {
         if (dead) return;
         console.error(err);
-        setError(`Could not open this book.\n${err instanceof Error ? err.message : String(err)}`);
+        // The engine's message is English and technical: console only.
+        setError(t('reader.book.openFailed'));
         setLoading(false);
       }
     })();
@@ -984,7 +996,19 @@ export default function NovelReader({ item, onClose }: Props) {
         ),
       );
     };
-  }, [item.id]);
+  }, [item.id, bookReload]);
+
+  /** Locate a moved/deleted book file; on success the book loads again. */
+  const relinkMissingBook = async (): Promise<void> => {
+    const result = await window.api.relinkBook?.(item.id);
+    if (!result || (!result.ok && result.canceled)) return;
+    if (result.ok) {
+      setBookMissing(false);
+      setBookReload((n) => n + 1);
+      return;
+    }
+    setError(t(result.errorCode === 'storage-full' ? 'reader.book.relinkDiskFull' : 'reader.book.relinkFailed'));
+  };
 
   // ----- track the viewport size -----
   useEffect(() => {
@@ -3286,6 +3310,16 @@ export default function NovelReader({ item, onClose }: Props) {
           </div>
         )}
         {error && !linkView && <div className="reader-msg error">{error}</div>}
+        {bookMissing && !linkView && (
+          <div className="reader-msg error" role="alert">
+            <p>{t('reader.book.missing')}</p>
+            {window.api.relinkBook ? (
+              <button type="button" className="btn small primary" onClick={() => void relinkMissingBook()}>
+                {t('reader.book.locate')}
+              </button>
+            ) : null}
+          </div>
+        )}
         {linkBusy && <div className="reader-msg">{t('novel.reader.importingArticle')}</div>}
         {linkStatus && !linkBusy && (
           <div className="reader-link-status" role="status">

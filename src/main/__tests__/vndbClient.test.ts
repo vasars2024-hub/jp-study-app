@@ -9,9 +9,11 @@ import {
   createRateLimiter,
   isVndbArtUrl,
   vndbArtFileStem,
+  vndbFailureCode,
   vndbQuery,
   type FetchLike,
 } from '../immersion/vndbClient';
+import { vndbFailureKey } from '../../shared/visualNovelSourceFailure';
 import { cspDirectiveSources } from '../../shared/contentSecurityPolicy';
 
 let root = '';
@@ -111,8 +113,40 @@ describe('VNDB API courtesy', () => {
     await expect(strict.acquire()).rejects.toThrow(/rate limit/i);
   });
 
-  it('reports a 429 as rate limiting', async () => {
-    const fetch: FetchLike = async () => new Response('', { status: 429 });
-    await expect(vndbQuery('release', { x: 1 }, { fetch, limiter: unlimited })).rejects.toThrow(/rate limiting/);
+  it('reports a 429 as rate limiting, typed and with its Retry-After', async () => {
+    const fetch: FetchLike = async () => new Response('', { status: 429, headers: { 'retry-after': '30' } });
+    const now = () => 1_000_000;
+    const err = await vndbQuery('release', { x: 1 }, { fetch, limiter: unlimited, now }).catch((e: unknown) => e);
+    expect(vndbFailureCode(err)).toBe('rate-limited');
+    expect((err as { failure?: { retryAt?: number } }).failure?.retryAt).toBe(1_030_000);
+  });
+});
+
+// Resilience audit #9: offline and 5xx used to reach the renderer as a native
+// fetch error or an English sentence, displayed verbatim in a ja/zh/ru UI.
+describe('VNDB failures are typed, and translated by the renderer', () => {
+  it('an offline machine is offline, not a raw fetch error', async () => {
+    const fetch: FetchLike = async () => {
+      throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+    };
+    const err = await vndbQuery('vn', { q: 1 }, { fetch, limiter: unlimited }).catch((e: unknown) => e);
+    expect(vndbFailureCode(err)).toBe('offline');
+    expect(vndbFailureKey(vndbFailureCode(err))).toBe('vnSource.error.offline');
+  });
+
+  it('a deadline is a timeout', async () => {
+    const fetch: FetchLike = async () => {
+      throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+    };
+    const err = await vndbQuery('vn', { q: 2 }, { fetch, limiter: unlimited }).catch((e: unknown) => e);
+    expect(vndbFailureCode(err)).toBe('timeout');
+  });
+
+  it('a 5xx is a service error, with a translated key', async () => {
+    const fetch: FetchLike = async () => new Response('', { status: 503 });
+    const err = await vndbQuery('vn', { q: 3 }, { fetch, limiter: unlimited }).catch((e: unknown) => e);
+    expect(vndbFailureCode(err)).toBe('service-error');
+    expect(vndbFailureKey('service-error')).toBe('vnSource.error.service');
+    expect(vndbFailureKey(undefined)).toBe('vnSource.msg.searchFailed');
   });
 });

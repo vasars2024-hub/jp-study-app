@@ -60,6 +60,9 @@ export const MEDIA_HUB_EN: Catalog = {
   'watchAiring.error.offline': 'offline, will retry',
   'watchAiring.error.unreachable': 'AniList did not answer, will retry',
   'watchAiring.checkNow': 'Check now',
+  'watchMeta.unavailable': { one: 'Details for {count} title could not be fetched — the metadata services did not answer.', other: 'Details for {count} titles could not be fetched — the metadata services did not answer.' },
+  'watchMeta.retryAt': 'Retrying automatically at {when}.',
+  'watchMeta.retryNow': 'Retry now',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': 'That is not a YouTube playlist or channel link. Paste a playlist (with list=) or a channel (@handle, /channel/UC…, /c/…, /user/…).',
   'ytManager.error.removedWhileSyncing': 'That playlist was removed while it was syncing.',
@@ -67,6 +70,8 @@ export const MEDIA_HUB_EN: Catalog = {
   'ytManager.error.playlistNotFound': 'That playlist is no longer in the list.',
   'ytManager.error.channelNotFound': 'That channel is no longer in the list.',
   'ytManager.error.noYtDlp': 'yt-dlp was not found. Install it (for example pip install -U yt-dlp) and reopen the app.',
+  'ytManager.error.subsTimeout': 'Fetching the captions took too long and was stopped. Check the connection and try again.',
+  'ytManager.error.subsCancelled': 'Caption fetch cancelled.',
   'ytManager.error.notVideo': 'That is not a YouTube video link.',
   'discover.library.planEmpty': 'Nothing planned yet. Titles you add from Browse land in your library as Plan to watch.',
 };

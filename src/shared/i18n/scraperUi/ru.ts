@@ -924,6 +924,9 @@ export const SCRAPER_UI_RU: Catalog = {
   'scrApp.transfer.removedKept': '{value} удалено из qBittorrent. Скачанные файлы сохранены.',
   'scrApp.transfer.removedDeleted': '{value} удалено из qBittorrent вместе со скачанными файлами.',
   'scrApp.transfer.failed': 'qBittorrent не выполнил действие: {value}',
+  'scrApp.qbitList.offline': 'qBittorrent недоступен, поэтому строки показаны по последнему успешному чтению. Убедитесь, что он запущен с включённым Web UI, и обновите.',
+  'scrApp.qbitList.auth': 'qBittorrent отклонил вход, поэтому строки показаны по последнему успешному чтению. Проверьте имя пользователя, пароль или API-ключ в настройках.',
+  'scrApp.qbitList.service': 'qBittorrent ответил ошибкой, поэтому строки показаны по последнему успешному чтению. Обновите чуть позже.',
   'scrApp.torrent.pieces': 'Прогресс по частям',
   'scrApp.torrent.matches': {
     one: '{count} подходящий релиз',

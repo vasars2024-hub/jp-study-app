@@ -860,6 +860,9 @@ export const SCRAPER_UI_ZH: Catalog = {
   'scrApp.transfer.removedKept': '已从 qBittorrent 移除 {value}，已下载的文件已保留。',
   'scrApp.transfer.removedDeleted': '已从 qBittorrent 移除 {value} 并删除了已下载的文件。',
   'scrApp.transfer.failed': 'qBittorrent 未能执行：{value}',
+  'scrApp.qbitList.offline': '无法连接 qBittorrent，因此这些条目来自上次成功读取。请确认它已运行并开启 Web UI，然后刷新。',
+  'scrApp.qbitList.auth': 'qBittorrent 拒绝了登录，因此这些条目来自上次成功读取。请在设置中检查用户名、密码或 API 密钥。',
+  'scrApp.qbitList.service': 'qBittorrent 返回了错误，因此这些条目来自上次成功读取。请稍后刷新。',
   'scrApp.torrent.pieces': '分块进度',
   'scrApp.torrent.matches': { other: '{count} 个匹配的发布' },
   'scrApp.torrent.alreadyInLibrary': {

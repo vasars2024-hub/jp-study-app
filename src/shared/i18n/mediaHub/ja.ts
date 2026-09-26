@@ -60,6 +60,9 @@ export const MEDIA_HUB_JA: Catalog = {
   'watchAiring.error.offline': 'オフラインのため後で再試行します',
   'watchAiring.error.unreachable': 'AniList が応答しないため後で再試行します',
   'watchAiring.checkNow': '今すぐ確認',
+  'watchMeta.unavailable': { other: '{count} 件のタイトルの詳細を取得できませんでした — メタデータサービスが応答しませんでした。' },
+  'watchMeta.retryAt': '{when} に自動で再試行します。',
+  'watchMeta.retryNow': '今すぐ再試行',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': 'YouTube の再生リストまたはチャンネルのリンクではありません。再生リスト（list= 付き）かチャンネル（@ハンドル、/channel/UC…、/c/…、/user/…）を貼り付けてください。',
   'ytManager.error.removedWhileSyncing': '同期中にその再生リストが削除されました。',
@@ -67,6 +70,8 @@ export const MEDIA_HUB_JA: Catalog = {
   'ytManager.error.playlistNotFound': 'その再生リストはリストにありません。',
   'ytManager.error.channelNotFound': 'そのチャンネルはリストにありません。',
   'ytManager.error.noYtDlp': 'yt-dlp が見つかりません。インストールして（例：pip install -U yt-dlp）アプリを開き直してください。',
+  'ytManager.error.subsTimeout': '字幕の取得に時間がかかりすぎたため停止しました。接続を確認してもう一度お試しください。',
+  'ytManager.error.subsCancelled': '字幕の取得をキャンセルしました。',
   'ytManager.error.notVideo': 'YouTube の動画リンクではありません。',
   'discover.library.planEmpty': '視聴予定はまだありません。「ブラウズ」から追加した作品は視聴予定としてライブラリに入ります。',
 };

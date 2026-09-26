@@ -62,6 +62,17 @@ export type SeanimeStatusKind =
   | 'offline'
   | 'failed';
 
+/**
+ * Sidecar failure codes (resilience audit #14): `missing-exe` → install,
+ * `crashed` → restart, the rest → retry. `disabled` is an explicit opt-out.
+ */
+export type SeanimeFailureCode = 'disabled' | 'missing-exe' | 'port' | 'spawn-failed' | 'unhealthy' | 'crashed';
+
+/** The i18n key that explains a sidecar failure in the UI language. */
+export function seanimeFailureKey(code: SeanimeFailureCode | null | undefined): string | null {
+  return code ? `mediaWorkspace.failure.${code}` : null;
+}
+
 export interface SeanimeStatus {
   kind: SeanimeStatusKind;
   /** Loopback port once bound; 0 before that. */
@@ -74,8 +85,14 @@ export interface SeanimeStatus {
   version: string | null;
   /** True when the server is running without an AniList account (simulated user). */
   simulatedUser: boolean | null;
-  /** Populated on `failed` / `offline`. */
+  /**
+   * Populated on `failed` / `offline`. A raw diagnostic (English, paths,
+   * exit codes) — shown only as an optional details line; the UI words the
+   * failure from `errorCode`.
+   */
   error: string | null;
+  /** Why the sidecar is not running, for a translated message and recovery. */
+  errorCode?: SeanimeFailureCode | null;
   /** Last few lines of server stderr/stdout, for diagnosing a failed start. */
   logTail: string[];
 }

@@ -53,6 +53,7 @@ import {
   loadDiscoverySettings,
   pickPlaybackSubtitle,
   readSubtitleRecord,
+  readableSubtitleRecords,
   registerSubtitleDiscoveryIpc,
   runSubtitleDiscovery,
 } from './subtitleDiscovery';
@@ -1142,7 +1143,7 @@ function enrichHandoffFromLibrary(handoff: PlaybackHandoff): PlaybackHandoff {
   let subtitlePath = handoff.subtitlePath;
   if (!subtitlePath) {
     const record = pickPlaybackSubtitle(
-      item.subtitles,
+      readableSubtitleRecords(item.subtitles),
       getMainStudyLangTag(),
       item.preferredSubtitleId,
     );
@@ -1609,8 +1610,10 @@ export function registerMediaIpc(): void {
     // whole discovery pipeline is write-only: tracks are downloaded, listed in the
     // drawer, and never actually shown while watching.
     let subtitle: SubtitlePick | undefined;
+    // Only tracks whose file is still there: a moved/deleted file must fall
+    // through to the next-best track, not leave the player with nothing.
     const record = pickPlaybackSubtitle(
-      item.subtitles,
+      readableSubtitleRecords(item.subtitles),
       getMainStudyLangTag(),
       item.preferredSubtitleId,
     );
@@ -1672,7 +1675,7 @@ export function registerMediaIpc(): void {
       if (lang) {
         if (item) {
           const record = pickPlaybackSubtitle(
-            (item.subtitles ?? []).filter((entry) => sidecarTagMatches(entry.lang ?? '', lang)),
+            readableSubtitleRecords(item.subtitles).filter((entry) => sidecarTagMatches(entry.lang ?? '', lang)),
             lang,
           );
           const text = record ? readSubtitleRecord(record) : null;
@@ -1692,7 +1695,7 @@ export function registerMediaIpc(): void {
 
       if (item) {
         const record = pickPlaybackSubtitle(
-          item.subtitles,
+          readableSubtitleRecords(item.subtitles),
           getMainStudyLangTag(),
           item.preferredSubtitleId,
         );

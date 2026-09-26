@@ -27,6 +27,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { failureFromError, failureFromStatus, type FailureCode, type TypedFailure } from '../../shared/resilience';
 
 export const VNDB_API_BASE = 'https://api.vndb.org/kana';
 export const VNDB_ART_HOSTS: ReadonlySet<string> = new Set(['t.vndb.org', 's.vndb.org']);
@@ -87,6 +88,24 @@ export function createRateLimiter(options: {
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
+/**
+ * A VNDB failure with a typed code, so the renderer can say "offline" or
+ * "rate limited" in the UI language instead of showing a native fetch error
+ * or an English HTTP sentence.
+ */
+export class VndbError extends Error {
+  constructor(readonly failure: TypedFailure) {
+    super(failure.detail ?? failure.code);
+    this.name = 'VndbError';
+  }
+}
+
+/** The failure code for anything a VNDB call threw. */
+export function vndbFailureCode(err: unknown): FailureCode {
+  if (err instanceof VndbError) return err.failure.code;
+  return failureFromError(err).code;
+}
+
 const apiLimiter = createRateLimiter({ max: 120, windowMs: 5 * 60_000 });
 const artLimiter = createRateLimiter({ max: 90, windowMs: 60_000 });
 
@@ -115,15 +134,26 @@ export async function vndbQuery(
   if (pending) return pending;
   const run = (async () => {
     await (deps.limiter ?? apiLimiter).acquire();
-    const response = await (deps.fetch ?? fetch)(`${VNDB_API_BASE}/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (response.status === 429) throw new Error('VNDB is rate limiting requests. Try again in a minute.');
-    if (!response.ok) throw new Error(`VNDB request failed (${response.status}).`);
-    const value = await response.json() as unknown;
+    let response: Response;
+    try {
+      response = await (deps.fetch ?? fetch)(`${VNDB_API_BASE}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch (err) {
+      // Offline, DNS, reset, or the 12 s deadline: typed, never the native message.
+      throw new VndbError(failureFromError(err));
+    }
+    const failure = failureFromStatus(response.status, response.headers?.get?.('retry-after') ?? null, now());
+    if (failure) throw new VndbError(failure);
+    let value: unknown;
+    try {
+      value = await response.json() as unknown;
+    } catch (err) {
+      throw new VndbError({ code: 'service-error', detail: err instanceof Error ? err.message : String(err) });
+    }
     responseCache.set(key, { at: now(), value });
     while (responseCache.size > RESPONSE_CACHE_LIMIT) {
       const oldest = responseCache.keys().next().value;

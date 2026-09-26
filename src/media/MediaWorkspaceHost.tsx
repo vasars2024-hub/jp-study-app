@@ -18,7 +18,7 @@
  * temporary Phases 2–3 exemption was removed at the Phase-4 exit gate.
  */
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import type { SeanimeStatus } from '../shared/seanime';
+import { seanimeFailureKey, type SeanimeStatus } from '../shared/seanime';
 import {
   MEDIA_WORKSPACE_OPEN_EVENT,
   normalizeMediaWorkspaceOpenRequest,
@@ -369,7 +369,17 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
         ) : status.kind !== 'ready' ? (
           <div className="seanime-host-state" role="status">
             <p>{t('mediaWorkspace.serverState', { status: statusLabel })}</p>
-            {status.error ? <p className="seanime-host-state-detail">{status.error}</p> : null}
+            {/* The failure in the UI language, with its recovery; the raw
+                diagnostic (paths, exit codes) only behind a details line. */}
+            {seanimeFailureKey(status.errorCode) ? (
+              <p className="seanime-host-state-detail">{t(seanimeFailureKey(status.errorCode) as string)}</p>
+            ) : null}
+            {status.error ? (
+              <details className="seanime-host-state-detail">
+                <summary>{t('mediaWorkspace.failure.details')}</summary>
+                {status.error}
+              </details>
+            ) : null}
             {retryable ? (
               <button
                 type="button"

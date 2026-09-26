@@ -635,24 +635,47 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   };
 }
 
+/**
+ * Why the transfer list could not be read. Carried in the thrown error's
+ * message as `qbit-list-failed:<code>` so it survives the IPC boundary (which
+ * keeps only the message) and the renderer can word it in the UI language.
+ */
+export type QbitListFailureCode = 'offline' | 'auth' | 'service-error';
+
+export class QbitListError extends Error {
+  constructor(readonly code: QbitListFailureCode, readonly detail: string) {
+    super(`qbit-list-failed:${code} ${detail}`);
+    this.name = 'QbitListError';
+  }
+}
+
+/**
+ * The transfer list — or a thrown `QbitListError`. It used to log and resolve
+ * `[]` for an offline client, a rejected login and a 500 alike, which the
+ * pages rendered as "no transfers", replacing the rows the user was watching.
+ * A throw leaves the last good rows on screen, marked stale, with the reason.
+ */
 export async function qbitTransfers(rawInput: ScraperQbitInput): Promise<QbitTransferRow[]> {
   const input = normalizeQbitInput(rawInput);
   if (!input.config.enabled) return [];
   const response = await authed(input, '/api/v2/torrents/info');
   if ('error' in response) {
     scraperLog('warn', 'qbit', `Could not list transfers: ${response.error.message}`);
-    return [];
+    throw new QbitListError(response.error.status === 'unauthorized' ? 'auth' : 'offline', response.error.message);
   }
   if (response.status !== 200) {
     scraperLog('warn', 'qbit', `Transfer list answered ${response.status}.`);
-    return [];
+    throw new QbitListError(
+      response.status === 401 || response.status === 403 ? 'auth' : 'service-error',
+      `HTTP ${response.status}`,
+    );
   }
   try {
     const parsed = JSON.parse(response.body) as QbitTorrentInfo[];
     return Array.isArray(parsed) ? parsed.map(mapTransfer) : [];
   } catch {
     scraperLog('warn', 'qbit', 'Transfer list was not valid JSON.');
-    return [];
+    throw new QbitListError('service-error', 'Transfer list was not valid JSON.');
   }
 }
 
