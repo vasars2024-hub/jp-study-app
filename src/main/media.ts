@@ -84,6 +84,7 @@ const mediaTokens = new Map<string, string>();
 // `main/library.ts`. One copy now, so the drop router and the player cannot
 // disagree about what a media file is.
 import { AUDIO_EXT, MEDIA_EXT, SUBTITLE_EXT as SUBTITLE_EXT_SET, VIDEO_EXT } from '../shared/mediaKind';
+import { playfileToken } from '../shared/playfileUrl';
 import { probeMediaProviders, searchTvAndFilm, subtitleAvailability } from './mediaProviderStatus';
 
 /** Bare, dot-less — this is what the dialog filter wants. */
@@ -111,7 +112,7 @@ function tokenFor(file: string): string {
 }
 function pathForUrl(url: string): string | undefined {
   try {
-    return mediaTokens.get(new URL(url).host);
+    return mediaTokens.get(playfileToken(url));
   } catch {
     return undefined;
   }
@@ -1235,7 +1236,7 @@ export function registerMediaIpc(): void {
   // Stream a token's file, honouring HTTP Range so the <video> can seek.
   protocol.handle('playfile', (request) => {
     try {
-      const file = mediaTokens.get(new URL(request.url).host);
+      const file = mediaTokens.get(playfileToken(request.url));
       if (!file || !fs.existsSync(file)) return new Response('Not found', { status: 404 });
       const total = fs.statSync(file).size;
       const type = MEDIA_MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
