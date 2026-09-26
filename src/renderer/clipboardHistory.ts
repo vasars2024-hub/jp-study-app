@@ -53,6 +53,21 @@ const SETTINGS_KEY = 'jp-clipboard-settings';
 const EVENT = 'clipboard-history-changed';
 const SETTINGS_EVENT = 'clipboard-settings-changed';
 
+/** Bounds of the history size setting (the Settings box shows the same). */
+export const CLIPBOARD_MAX_SIZE_MIN = 10;
+export const CLIPBOARD_MAX_SIZE_MAX = 2000;
+
+/**
+ * A history size inside the bounds. The number box declared max=2000 but
+ * nothing enforced it: typing 100000 stored 100000, and the unvirtualized list
+ * then rendered every entry.
+ */
+export function clampClipboardMaxSize(value: unknown, fallback = 200): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(CLIPBOARD_MAX_SIZE_MAX, Math.max(CLIPBOARD_MAX_SIZE_MIN, Math.round(n)));
+}
+
 const DEFAULT_SETTINGS: ClipboardSettings = {
   maxSize: 200,
   dedupeConsecutive: true,
@@ -92,14 +107,16 @@ export function loadClipboardSettings(): ClipboardSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<ClipboardSettings>) };
+    const stored = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<ClipboardSettings>) };
+    return { ...stored, maxSize: clampClipboardMaxSize(stored.maxSize, DEFAULT_SETTINGS.maxSize) };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
 }
 
 export function saveClipboardSettings(patch: Partial<ClipboardSettings>): ClipboardSettings {
-  const next = { ...loadClipboardSettings(), ...patch };
+  const merged = { ...loadClipboardSettings(), ...patch };
+  const next = { ...merged, maxSize: clampClipboardMaxSize(merged.maxSize, DEFAULT_SETTINGS.maxSize) };
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
   } catch {
