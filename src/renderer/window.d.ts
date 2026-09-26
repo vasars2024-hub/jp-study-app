@@ -368,7 +368,8 @@ declare global {
       syncLibrary(): Promise<LibraryItem[]>;
       lookupWord(query: string): Promise<DictResult>;
       /** `limit` is the page size, defaulting to eight and clamped in main. */
-      lookupTerm(query: string, limit?: number): Promise<DictResult>;
+      /** `lang` is the word's language: zh and ru are answered by their own dictionaries only. */
+      lookupTerm(query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult>;
       lookupTermOffline(query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult>;
       lookupOfflineInterlinear(
         text: string,
@@ -2250,7 +2251,7 @@ declare global {
       ): Promise<{ ok: boolean; created?: boolean; cardId?: string; error?: string; errorKey?: string }>;
       captionsDiscardDraft(id: string): Promise<{ ok: boolean }>;
       captionsStartWindowsLiveCaptions(): Promise<{ ok: boolean }>;
-      captionsOpenSettings(page?: 'transcription' | 'shortcuts'): Promise<{ ok: boolean }>;
+      captionsOpenSettings(page?: 'transcription' | 'shortcuts' | 'dictionaries'): Promise<{ ok: boolean }>;
       captionsOverlaySetIgnoreMouse(ignore: boolean): void;
       captionsOverlayGetBounds(): Promise<import('../shared/captionsOverlay').OverlayBounds>;
       captionsOverlaySetBounds(
@@ -2266,7 +2267,7 @@ declare global {
       ): () => void;
       onCaptionsMineRequest(cb: (payload: import('../shared/captionsOverlay').CaptionMinePayload) => void): () => void;
       captionsMineReply(reply: import('../shared/captionsOverlay').CaptionMineReply): void;
-      onCaptionsOpenSettings(cb: (payload: { page: 'transcription' | 'shortcuts' }) => void): () => void;
+      onCaptionsOpenSettings(cb: (payload: { page: 'transcription' | 'shortcuts' | 'dictionaries' }) => void): () => void;
       onCaptionsHostCommand(cb: (command: { id: string; type: string } & Record<string, unknown>) => void): () => void;
       captionsHostReply(reply: { id: string } & Record<string, unknown>): void;
       captionsHostStatus(status: { bufferedMs?: number; gumModelMissing?: boolean }): void;

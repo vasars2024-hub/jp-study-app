@@ -278,8 +278,9 @@ function GlanceBody({
     let alive = true;
     setResult(null);
     if (!query.trim()) return;
-    // Chinese has its own dictionary; Japanese and Russian share lookupTerm.
-    (lang === 'zh' ? window.api.lookupChinese(query) : window.api.lookupTerm(query)).then((r) => {
+    // Chinese has its own dictionary; a Russian word is looked up in Russian
+    // dictionaries only, never through a Japanese dictionary's Russian glosses.
+    (lang === 'zh' ? window.api.lookupChinese(query) : window.api.lookupTerm(query, undefined, lang)).then((r) => {
       if (alive) setResult(r);
     });
     return () => {

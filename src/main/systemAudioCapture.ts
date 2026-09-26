@@ -1119,7 +1119,11 @@ export function registerSystemAudioCaptureIpc(): void {
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
-    sendTo(win, CH.openSettingsInMain, { page: page === 'shortcuts' ? 'shortcuts' : 'transcription' });
+    // `dictionaries`: the lookup pop-up's "no dictionary for this language" link,
+    // from any window without a Settings of its own (captions, lens, desktop lookup).
+    sendTo(win, CH.openSettingsInMain, {
+      page: page === 'shortcuts' || page === 'dictionaries' ? page : 'transcription',
+    });
     return { ok: true };
   });
 

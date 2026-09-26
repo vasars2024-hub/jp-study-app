@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  borrowCueStyles,
   SENTENCE_DECK_DEFAULTS,
   buildSentenceDeckNoteRequest,
   cleanSubtitleText,
@@ -239,5 +240,29 @@ describe('names and the Anki half', () => {
       audioFilename: 'gum-sentence-1.mp3',
     });
     expect(request.imageBase64).toBeUndefined();
+  });
+});
+
+describe('borrowCueStyles', () => {
+  const styled = [
+    { startMs: 1000, endMs: 3000, text: '{\\blur2}おはよう。', style: 'Default' },
+    { startMs: 2000, endMs: 5000, text: '{\\pos(320,40)}山田商店', style: 'Sign' },
+    { startMs: 9000, endMs: 11000, text: '山田商店', style: 'Default' },
+  ];
+
+  it('gives each of the player’s cues the style of the same line nearest in time', () => {
+    const shown = [
+      { startMs: 1500, endMs: 3500, text: 'おはよう。' },
+      { startMs: 2500, endMs: 5500, text: '{\\pos(320,40)}山田商店' },
+      { startMs: 9500, endMs: 11500, text: '山田商店' },
+    ];
+    expect(borrowCueStyles(shown, styled)?.map((cue) => cue.style)).toEqual(['Default', 'Sign', 'Default']);
+  });
+
+  it('changes nothing when the other track is not this one, or has no styles', () => {
+    const other = [{ startMs: 0, endMs: 1000, text: 'Good morning.' }, { startMs: 2000, endMs: 3000, text: 'Hi.' }];
+    expect(borrowCueStyles(other, styled)).toBeNull();
+    const plain = styled.map((cue) => ({ startMs: cue.startMs, endMs: cue.endMs, text: cue.text }));
+    expect(borrowCueStyles(plain, plain)).toBeNull();
   });
 });

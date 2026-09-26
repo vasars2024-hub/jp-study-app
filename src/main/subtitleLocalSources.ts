@@ -160,10 +160,10 @@ export async function listEmbeddedSubtitleStreams(file: string): Promise<Embedde
 /**
  * Extracts one embedded stream as SRT text.
  *
- * Converted to SRT rather than kept as ASS on purpose: the renderer's parser reads
- * both, but ASS carries positioning and karaoke tags that the study overlay would
- * have to strip anyway, and SRT is what every downstream consumer here expects.
- * Styling is a fair trade for one predictable format.
+ * The format for every non-ASS codec, and the fallback for an ASS/SSA stream
+ * that cannot be copied out as ASS. An ASS stream is otherwise kept as ASS
+ * (`extractEmbeddedSubtitleAss`): its styles are what tells a sign or a song
+ * from dialogue, and this conversion drops them.
  */
 export async function extractEmbeddedSubtitle(file: string, subtitleIndex: number): Promise<string | null> {
   const { code, stdout } = await runFfmpeg([

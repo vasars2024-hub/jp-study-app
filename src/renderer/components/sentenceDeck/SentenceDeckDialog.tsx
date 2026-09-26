@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createRoot } from 'react-dom/client';
 import {
   SENTENCE_DECK_DEFAULTS,
+  borrowCueStyles,
   planSentenceDeck,
   sentenceDeckNameFromPath,
   sentenceTimeLabel,
@@ -27,6 +28,7 @@ import {
   type SentencePlan,
 } from '../../../shared/sentenceDeck';
 import { existingDeckKeys } from '../../../shared/filesApp/mining';
+import { subtitleLangMatches } from '../../../shared/subtitleDiscoveryPick';
 import { STUDY_LANG_NAME_KEY, type StudyLang } from '../../../shared/studyLang';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { formatBytes } from '../../../shared/assetRegistry';
@@ -191,6 +193,40 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
     })();
     return () => { alive = false; };
   }, [request]);
+
+  // The player's cues carry no ASS style, so a deck made from them could not skip
+  // signs the way one made from the file does. Read the same track from its
+  // source and borrow the styles; a track that does not match changes nothing.
+  useEffect(() => {
+    const videoPath = sources?.videoPath;
+    const player = request.playerTrack;
+    if (!videoPath || !player?.cues.length || player.cues.some((cue) => cue.style)) return;
+    const candidates = (sources?.tracks ?? [])
+      .filter((track) => track.kind !== 'transcript' && track.kind !== 'translation')
+      .filter((track) => !track.lang || subtitleLangMatches(track.lang, studyLang))
+      .slice(0, 4);
+    let alive = true;
+    void (async () => {
+      for (const track of candidates) {
+        let read: Awaited<ReturnType<typeof window.api.sentenceDeckReadTrack>>;
+        try {
+          read = await window.api.sentenceDeckReadTrack(videoPath, track.id);
+        } catch {
+          continue;
+        }
+        if (!alive) return;
+        const styled = read.ok ? borrowCueStyles(player.cues, read.cues) : null;
+        if (!styled) continue;
+        setCues((prev) => ({
+          ...prev,
+          [PLAYER_ID]: { status: 'ready', cues: styled },
+          [track.id]: prev[track.id] ?? { status: 'ready', cues: read.cues },
+        }));
+        return;
+      }
+    })();
+    return () => { alive = false; };
+  }, [sources, request.playerTrack, studyLang]);
 
   // Read a chosen track the first time it is chosen.
   useEffect(() => {

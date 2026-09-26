@@ -324,6 +324,48 @@ export function translationFor(
 }
 
 /**
+ * The player's copy of a track with the ASS styles its cues arrived without.
+ *
+ * The player hands the dialog the lines it shows, and its cues carry no style,
+ * so a deck made from the player could not skip signs (`isSignCue`) the way one
+ * made from the Files app does. `styled` is the same track read from its source;
+ * each cue takes the style of the styled cue with the same text nearest in time
+ * (the player's copy is shifted by the user's delay). Null when `styled` has no
+ * styles or is not this track — fewer than half of the lines found in it.
+ */
+export function borrowCueStyles(
+  cues: readonly SentenceDeckCue[],
+  styled: readonly SentenceDeckCue[],
+): SentenceDeckCue[] | null {
+  if (!cues.length || !styled.some((cue) => cue.style)) return null;
+  const byText = new Map<string, SentenceDeckCue[]>();
+  for (const cue of styled) {
+    if (!cue.style) continue;
+    const key = cleanSubtitleText(cue.text);
+    if (!key) continue;
+    const list = byText.get(key);
+    if (list) list.push(cue);
+    else byText.set(key, [cue]);
+  }
+  let matched = 0;
+  const out = cues.map((cue) => {
+    if (cue.style) {
+      matched += 1;
+      return cue;
+    }
+    const candidates = byText.get(cleanSubtitleText(cue.text));
+    if (!candidates?.length) return cue;
+    let best = candidates[0];
+    for (const candidate of candidates) {
+      if (Math.abs(candidate.startMs - cue.startMs) < Math.abs(best.startMs - cue.startMs)) best = candidate;
+    }
+    matched += 1;
+    return { ...cue, style: best.style };
+  });
+  return matched * 2 >= cues.length ? out : null;
+}
+
+/**
  * Turn a subtitle track into sentences. Every line that does not become one
  * is counted in a named bucket, so the dialog can say where the rest went.
  */

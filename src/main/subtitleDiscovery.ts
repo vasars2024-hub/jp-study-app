@@ -61,6 +61,7 @@ import {
 } from '../shared/subtitleRecord';
 import { pickStudySubtitle, studyFirstDownloadLanguages, subtitleLangMatches } from '../shared/subtitleDiscoveryPick';
 import { getMainStudyLang, onMainStudyLanguageChanged } from './studyLanguage';
+import { subtitleRecordName } from './subtitleRecordName';
 import { decideAudioIsLanguage } from '../shared/subtitleDiscoveryStatus';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { shiftSubtitleText, worthShifting } from '../shared/subtitleDiscoveryTiming';
@@ -73,10 +74,12 @@ import type { MediaItem, SubtitlePick } from '../shared/types';
 import {
   READABLE_EXTENSIONS,
   extractEmbeddedSubtitle,
+  extractEmbeddedSubtitleAss,
   findSidecarSubtitles,
   guessSidecarLanguage,
   listEmbeddedSubtitleStreams,
   normalizeStreamLanguage,
+  type EmbeddedSubtitleStream,
 } from './subtitleLocalSources';
 import {
   fetchSubtitleCandidateDetailed,
@@ -726,6 +729,49 @@ interface DiscoveryRun {
   openSubtitles: OpenSubtitlesBatch;
 }
 
+/**
+ * One container stream, extracted into the cache as a record.
+ *
+ * An ASS/SSA stream stays ASS: its styles are the only evidence a line is a sign
+ * or a song (`isSignCue`), and the SRT conversion dropped them, so the player and
+ * the sentence deck could not tell a shop sign from dialogue. SRT is the fallback
+ * when a stream cannot be copied out as ASS, and the format for every other codec.
+ *
+ * An untitled stream gets no English "Stream N" label: it keeps its position
+ * (`subtitleNumber`) and the UI names it in the interface language.
+ */
+async function extractEmbeddedRecord(
+  item: Pick<MediaItem, 'id' | 'path'>,
+  stream: EmbeddedSubtitleStream,
+  lang: string,
+): Promise<{ record: SubtitleRecord } | { storageFull: true } | null> {
+  let format: SubtitleRecordFormat = 'srt';
+  let text: string | null = null;
+  if (/^(ass|ssa)$/i.test(stream.codec)) {
+    text = await extractEmbeddedSubtitleAss(item.path, stream.subtitleIndex);
+    if (text) format = 'ass';
+  }
+  if (!text) text = await extractEmbeddedSubtitle(item.path, stream.subtitleIndex);
+  if (!text) return null;
+  const written = writeSubtitleFileDetailed(item.id, `embedded-${stream.subtitleIndex}-${lang}.${format}`, text);
+  if (!written.ok) return written.code === 'storage-full' ? { storageFull: true } : null;
+  const title = stream.title?.trim();
+  return {
+    record: {
+      id: crypto.randomUUID(),
+      lang,
+      source: 'embedded',
+      format,
+      path: written.path,
+      ...(title ? { label: title } : {}),
+      streamIndex: stream.streamIndex,
+      subtitleNumber: stream.subtitleIndex + 1,
+      hearingImpaired: stream.hearingImpaired,
+      addedAt: Date.now(),
+    },
+  };
+}
+
 async function discoverForItem(
   item: MediaItem,
   settings: SubtitleDiscoverySettings,
@@ -788,29 +834,15 @@ async function discoverForItem(
         // A forced (signs-only) stream is not a helper line: it would satisfy the
         // language and leave nine lines in ten with nothing under them.
         if (stream.forced && helperOnly(target)) continue;
-        const text = await extractEmbeddedSubtitle(item.path, stream.subtitleIndex);
-        if (!text) continue;
-        const written = writeSubtitleFileDetailed(item.id, `embedded-${stream.subtitleIndex}-${target}.srt`, text);
-        if (!written.ok) {
-          if (written.code === 'storage-full') {
-            storageFull = true;
-            failures.push({ providerId, lang: target, attemptedAt: Date.now(), reason: 'storage-full' });
-          }
+        const extracted = await extractEmbeddedRecord(item, stream, target);
+        if (!extracted) continue;
+        if ('storageFull' in extracted) {
+          storageFull = true;
+          failures.push({ providerId, lang: target, attemptedAt: Date.now(), reason: 'storage-full' });
           continue;
         }
-        const relative = written.path;
         files += 1;
-        records.push({
-          id: crypto.randomUUID(),
-          lang: target,
-          source: 'embedded',
-          format: 'srt',
-          path: relative,
-          label: stream.title ?? `Stream ${stream.streamIndex}`,
-          streamIndex: stream.streamIndex,
-          hearingImpaired: stream.hearingImpaired,
-          addedAt: Date.now(),
-        });
+        records.push(extracted.record);
       }
       continue;
     }
@@ -1873,8 +1905,8 @@ export function readSubtitleRecordForRenderer(mediaId: string, recordId: string)
   const record = item?.subtitles?.find((entry) => entry.id === recordId);
   if (!item || !record) return null;
   const text = readSubtitleRecord(record);
-  if (text !== null) return { name: record.label ?? record.lang, text };
-  const name = record.label ?? record.lang;
+  if (text !== null) return { name: subtitleRecordName(record, record.lang), text };
+  const name = subtitleRecordName(record, record.lang);
   if (subtitleRecordReadable(record)) return null;
   host?.patchItems([item.id], { subtitles: (item.subtitles ?? []).filter((entry) => entry.id !== record.id) });
   if (!sweeping && subtitleDiscoveryEligible(item)) {
@@ -1962,5 +1994,5 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
 
 export const __subtitleDiscoveryTestables = {
   scoreCandidates, toProvidersDocument, recentlyFailed, hasLanguage, retainedOnForce,
-  hasUnattachedSidecar, keptFailures, mergeForcedRecords,
+  hasUnattachedSidecar, keptFailures, mergeForcedRecords, extractEmbeddedRecord,
 };

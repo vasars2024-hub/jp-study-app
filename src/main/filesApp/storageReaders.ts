@@ -22,6 +22,7 @@ import {
   type StoredSubtitleProvenance,
 } from '../../shared/subtitleStorage';
 import { YOUTUBE_SUBTITLE_DIRECTORY_LAYOUTS } from '../../shared/youtubeStorage';
+import { untitledStreamNumber } from '../../shared/subtitleRecord';
 
 export interface FilesTextAsset {
   id: string;
@@ -99,7 +100,10 @@ export function readMediaSubtitleAssets(
   return mediaSubtitleRecordsFromStoredDocument(storedMediaDocument).map(
     ({ mediaId, mediaTitle, record }) => ({
       id: `media-subtitle:${mediaId}:${record.id}`,
-      name: record.label?.trim() || `${mediaTitle} — ${record.lang || record.id}`,
+      // An untitled container stream's old label is the English "Stream 3":
+      // the episode and language name it better than that.
+      name: (untitledStreamNumber(record) === undefined ? record.label?.trim() : '')
+        || `${mediaTitle} — ${record.lang || record.id}`,
       filePath: path.isAbsolute(record.path)
         ? record.path
         : path.join(userDataPath, record.path),

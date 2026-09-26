@@ -121,7 +121,11 @@ export function installCaptionsMining(): () => void {
           window.setTimeout(() => {
             window.dispatchEvent(
               new CustomEvent('settings:navigate', {
-                detail: page === 'shortcuts' ? { page: 'shortcuts' } : { page: 'transcription', settingId: 'live-captions' },
+                detail: page === 'shortcuts'
+                  ? { page: 'shortcuts' }
+                  : page === 'dictionaries'
+                    ? { page: 'storage', settingId: 'storage-models' }
+                    : { page: 'transcription', settingId: 'live-captions' },
               }),
             );
           }, 80);

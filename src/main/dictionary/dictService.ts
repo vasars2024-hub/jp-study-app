@@ -194,6 +194,14 @@ export interface LookupResult {
    * exactly complete.
    */
   truncated?: true;
+  /**
+   * The pinned `sourceLangs` that no enabled word dictionary is installed for.
+   *
+   * Set only on an empty result, so a surface can say "no Russian dictionary —
+   * install one" instead of a bare "no match" (or, as before the pin, a Japanese
+   * dictionary answering a Russian word through its Russian glosses).
+   */
+  missingSourceLangs?: DictLangCode[];
 }
 
 // ----- language detection ----------------------------------------------------
@@ -635,6 +643,10 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     reasons: string[],
     fuzzyDistance?: number,
   ) => {
+    // One headword, one entry. A Russian row's reading is its stressed spelling,
+    // which normalises back to the headword, so the reading probe found the row
+    // the exact probe already had and the pop-up listed every word twice.
+    if (seen.has(row.id)) return;
     const entry = toEntry(db, row, via, reasons, query.glossLangs, fuzzyDistance);
     // A target-language filter can remove every sourced sense from an otherwise
     // matching headword. Do not let that empty shell consume the result limit or
@@ -820,7 +832,26 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const ipa = readEntryIpa(db, entry);
     if (ipa.length) entry.ipa = ipa;
   }
+  if (result.entries.length === 0 && query.sourceLangs?.length) {
+    const missing = missingSourceDictionaries(db, query.sourceLangs);
+    if (missing.length) result.missingSourceLangs = missing;
+  }
   return result;
+}
+
+/**
+ * Which of `langs` no enabled word dictionary declares as its source language.
+ * `source_lang` may be a list (a multilingual Wiktionary import writes
+ * `ja,zh,ru`). The dictionaries table is a few dozen rows; asked only on a miss.
+ */
+export function missingSourceDictionaries(db: SqliteDb, langs: readonly DictLangCode[]): DictLangCode[] {
+  const wanted = [...new Set(langs.filter((lang) => lang && lang !== 'und'))];
+  if (!wanted.length) return [];
+  const has = prepareCached(
+    db,
+    `select 1 as present from dictionaries d where ${WORD_SOURCE_WHERE} and d.kind not in ('freq', 'pitch') and (',' || replace(d.source_lang, ' ', '') || ',') like ('%,' || ? || ',%') limit 1`,
+  );
+  return wanted.filter((lang) => !has.get(lang));
 }
 
 /** The most one `lookupBatch` call answers; a longer list is the caller's to chunk. */

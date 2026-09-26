@@ -16,7 +16,7 @@ import type { MediaItem } from '../shared/types';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { SUBTITLE_EXT, VIDEO_EXT, extOf } from '../shared/mediaKind';
 import { pickSubtitlePair, subtitleLangMatches } from '../shared/subtitleDiscoveryPick';
-import { isMachineTranslatedSubtitle, type SubtitleRecord } from '../shared/subtitleRecord';
+import { isMachineTranslatedSubtitle, untitledStreamNumber, type SubtitleRecord } from '../shared/subtitleRecord';
 import {
   studyAudioStreamIndex,
   type SentenceDeckCue,
@@ -82,6 +82,34 @@ export function videoForSubtitle(subtitlePath: string): string | null {
   return candidates[0] ? path.join(dir, candidates[0].entry) : null;
 }
 
+/**
+ * The episode a library subtitle record belongs to, for a subtitle file that
+ * does not sit beside its video (a downloaded or generated track in the app's
+ * own subtitle folder). The library knows the pairing even where the folder
+ * does not.
+ */
+export function videoForSubtitleRecord(host: SentenceDeckHost, subtitlePath: string): string | null {
+  const wanted = pathKey(path.resolve(subtitlePath));
+  for (const item of host.listItems()) {
+    if (!item.path) continue;
+    if ((item.subtitles ?? []).some((record) => recordFileKey(record) === wanted)) return item.path;
+  }
+  return null;
+}
+
+/** A record's file as a comparable key: cached tracks are relative to userData. */
+function recordFileKey(record: SubtitleRecord): string {
+  let file = record.path;
+  if (!path.isAbsolute(file)) {
+    try {
+      file = path.join(app.getPath('userData'), file);
+    } catch {
+      /* no app paths: compare as stored */
+    }
+  }
+  return pathKey(path.resolve(file));
+}
+
 function recordKind(record: SubtitleRecord): SentenceDeckTrack['kind'] {
   if (isMachineTranslatedSubtitle(record)) return 'translation';
   if (record.source === 'generated') return 'transcript';
@@ -97,7 +125,9 @@ export async function listSentenceDeckSources(
 ): Promise<SentenceDeckSources> {
   const subtitlePath = typeof input?.subtitlePath === 'string' ? input.subtitlePath : '';
   let videoPath = typeof input?.videoPath === 'string' ? input.videoPath : '';
-  if (!videoPath && subtitlePath) videoPath = videoForSubtitle(subtitlePath) ?? '';
+  if (!videoPath && subtitlePath) {
+    videoPath = videoForSubtitle(subtitlePath) ?? videoForSubtitleRecord(host, subtitlePath) ?? '';
+  }
   if (!videoPath) {
     return { ok: false, reasonKey: subtitlePath ? 'sentenceDeck.error.noVideoForSubtitle' : 'sentenceDeck.error.noFile', tracks: [] };
   }
@@ -132,10 +162,15 @@ export async function listSentenceDeckSources(
     const found = containerStreams.find((stream) => stream.streamIndex === streamIndex);
     return found ? found.subtitleIndex + 1 : undefined;
   };
+  const openedOn = subtitlePath ? pathKey(path.resolve(subtitlePath)) : '';
   for (const record of records) {
-    // Discovery names an untitled stream "Stream <n>" in English; the dialog names it in the UI language.
-    const untitledStream = record.source === 'embedded' && (!record.label || /^Stream \d+$/.test(record.label));
-    const number = untitledStream ? streamNumber(record.streamIndex) : undefined;
+    // The file the dialog was opened on is already the first track.
+    if (openedOn && recordFileKey(record) === openedOn) continue;
+    // An untitled stream is named by the dialog in the UI language ("Subtitle stream 2").
+    const untitled = untitledStreamNumber(record);
+    const number = untitled !== undefined
+      ? record.subtitleNumber ?? streamNumber(record.streamIndex) ?? untitled
+      : undefined;
     tracks.push({
       id: `record:${record.id}`,
       label: number ? '' : record.label ?? `${record.lang} (${record.source})`,
@@ -146,7 +181,7 @@ export async function listSentenceDeckSources(
   }
   const pair = pickSubtitlePair(records, studyTag, helper, item?.preferredSubtitleId);
   if (!primaryId && pair.primary) primaryId = `record:${pair.primary.id}`;
-  if (pair.secondary) secondaryId = `record:${pair.secondary.id}`;
+  if (pair.secondary && !(openedOn && recordFileKey(pair.secondary) === openedOn)) secondaryId = `record:${pair.secondary.id}`;
 
   // Files beside the video that the library has not attached (or a video the
   // library has never seen).

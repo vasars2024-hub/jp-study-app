@@ -595,6 +595,7 @@ export default function CaptionsOverlay() {
           y={lookup.y}
           anchorTop={lookup.top}
           context={lookup.context}
+          lang={studyLang}
           onMine={() => {
             const line = lines.find((l) => l.id === lookup.lineId);
             if (line) void mineLine(line, lookup.query);

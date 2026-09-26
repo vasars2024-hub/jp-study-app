@@ -205,6 +205,30 @@ describe('SentenceDeckDialog', () => {
     expect(planCount()).toBe(1);
   });
 
+  it('skips signs in the player’s track too, with the styles read from the file', async () => {
+    // The player hands over its lines without ASS styles; the same stream read
+    // from the file has them. Before, 山田商店 on a shop front became a card.
+    const STREAM = 'embedded:0';
+    const styled: SentenceDeckCue[] = [
+      { startMs: 1000, endMs: 3000, text: '{\\blur2}おはようございます。', style: 'Default' },
+      { startMs: 2000, endMs: 5000, text: '{\\pos(320,40)}山田商店', style: 'Sign' },
+      { startMs: 6000, endMs: 8000, text: '散歩に行きませんか？', style: 'Default' },
+    ];
+    sources = { ...sources, tracks: [{ id: STREAM, label: '', streamNumber: 1, lang: 'ja', kind: 'embedded' }] };
+    const read = vi.fn(async (_video: string, id: string) => ({ ok: true, cues: id === STREAM ? styled : [] }));
+    (window as unknown as { api: Record<string, unknown> }).api = { ...api(), sentenceDeckReadTrack: read };
+    // Shifted by a 0.5 s subtitle delay, as the player hands them over.
+    const shown = styled.map((cue) => ({ startMs: cue.startMs + 500, endMs: cue.endMs + 500, text: cue.text }));
+    await open({ videoPath: VIDEO, playerTrack: { label: 'Japanese', cues: shown } });
+    await flush();
+    expect(read).toHaveBeenCalledWith(VIDEO, STREAM);
+    expect(q<HTMLSelectElement>('[data-sd-field="primary"]').value).toBe('player');
+    const preview = q('.sd-preview').textContent ?? '';
+    expect(preview).not.toContain('山田商店');
+    expect(preview).toMatch(/1 not dialogue/);
+    expect(planCount()).toBe(2);
+  });
+
   it('offers Whisper when the video has no text at all, adding it to the library first', async () => {
     sources = { ok: true, videoPath: VIDEO, title: 'x', tracks: [] };
     await open();

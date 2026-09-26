@@ -190,6 +190,25 @@ interface Props {
 }
 
 /**
+ * Settings → Models & dictionaries, for the "no dictionary for this language"
+ * state. The pop-up also lives in windows with no Settings of their own (the
+ * live-captions bar, the reading lens, the desktop lookup), so the main process
+ * brings the main window forward and navigates it; in-window is the fallback.
+ */
+async function openDictionarySettings(): Promise<void> {
+  try {
+    const reply = await window.api.captionsOpenSettings?.('dictionaries');
+    if (reply?.ok) return;
+  } catch {
+    // Fall through to this window's own Settings.
+  }
+  window.dispatchEvent(new CustomEvent('os:open', { detail: 'settings' }));
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('settings:navigate', { detail: { page: 'storage', settingId: 'storage-models' } }));
+  }, 80);
+}
+
+/**
  * `saved`: in the local deck, Anki not set up here. `queued`: in the local deck,
  * waiting for Anki to open. Both are successes — the card exists.
  */
@@ -299,7 +318,13 @@ function glossFor(entry: DictEntry): string {
     .join(' / ');
 }
 
-export default function DictionaryResults({ query, variant = 'popup', lang = 'ja', context, onLookup }: Props) {
+export default function DictionaryResults({
+  query,
+  variant = 'popup',
+  lang = 'ja',
+  context,
+  onLookup,
+}: Props) {
   const { t, lang: uiLang } = useT();
   /**
    * The language example sentences are written in — the dictionary's, not
@@ -387,7 +412,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     setExTrans({});
     if (!query.trim()) return;
     const lookup =
-      lang === 'zh' ? window.api.lookupChinese(query, limit) : window.api.lookupTerm(query, limit);
+      // The word's own language: unpinned, a Russian word was answered by the
+      // Russian glosses of a Japanese dictionary (погода → 天気).
+      lang === 'zh' ? window.api.lookupChinese(query, limit) : window.api.lookupTerm(query, limit, lang);
     lookup.then((r) => {
       if (!alive) return;
       setResult(r);
@@ -1034,7 +1061,16 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         </div>
       )}
       {result && !result.error && !result.preparing && entries.length === 0 && (
-        <div className="dict-empty">{t('dict.results.noMatch', { query })}</div>
+        result.missingSourceLangs?.includes(lang) ? (
+          <div className="dict-empty" role="status">
+            <p>{t(`dict.results.noDictionary.${lang}`, { query })}</p>
+            <button type="button" className="dict-more-btn lq-hit" onClick={() => void openDictionarySettings()}>
+              {t('dict.results.getDictionary')}
+            </button>
+          </div>
+        ) : (
+          <div className="dict-empty">{t('dict.results.noMatch', { query })}</div>
+        )
       )}
 
       {result?.approximate && entries.length > 0 && (

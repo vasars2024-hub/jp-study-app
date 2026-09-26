@@ -80,6 +80,12 @@ export interface SubtitleRecord {
   edited?: boolean;
   /** Stream index, for a track extracted from the container. */
   streamIndex?: number;
+  /**
+   * 1-based position among the container's subtitle streams, for an extracted
+   * stream. An untitled stream is shown by it ("Subtitle stream 2") in the UI
+   * language; `label` stays empty rather than holding English.
+   */
+  subtitleNumber?: number;
   hearingImpaired?: boolean;
   addedAt: number;
 }
@@ -97,6 +103,41 @@ export interface SubtitleSearchFailure {
 }
 
 /** A track this app machine-translated from another language's track. */
+/** What discovery wrote into `label` for an untitled container stream before 2026-09. */
+const LEGACY_STREAM_LABEL = /^Stream (\d+)$/;
+
+/**
+ * The number an untitled embedded stream is shown by, or undefined when the
+ * record carries a real label (stream title, release or file name).
+ *
+ * A record from before `subtitleNumber` keeps the number its old English label
+ * showed, so the same track does not change its number under the user.
+ */
+export function untitledStreamNumber(
+  record: Pick<SubtitleRecord, 'source' | 'label' | 'subtitleNumber' | 'streamIndex'>,
+): number | undefined {
+  if (record.source !== 'embedded') return undefined;
+  const label = record.label?.trim() ?? '';
+  const legacy = LEGACY_STREAM_LABEL.exec(label);
+  if (label && !legacy) return undefined;
+  if (typeof record.subtitleNumber === 'number' && record.subtitleNumber > 0) return record.subtitleNumber;
+  if (legacy) return Number(legacy[1]);
+  return typeof record.streamIndex === 'number' ? record.streamIndex : undefined;
+}
+
+/**
+ * A record's name for the UI. An untitled container stream is named in the
+ * interface language through `translate('sentenceDeck.track.stream', { n })`;
+ * everything else is its own label (undefined when it has none).
+ */
+export function subtitleRecordLabel(
+  record: Pick<SubtitleRecord, 'source' | 'label' | 'subtitleNumber' | 'streamIndex'>,
+  translate: (key: string, vars: { n: number }) => string,
+): string | undefined {
+  const n = untitledStreamNumber(record);
+  return n === undefined ? record.label : translate('sentenceDeck.track.stream', { n });
+}
+
 export function isMachineTranslatedSubtitle(record: Pick<SubtitleRecord, 'derivation'>): boolean {
   return record.derivation === 'machine-translation';
 }
