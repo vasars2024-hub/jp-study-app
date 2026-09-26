@@ -14,8 +14,9 @@ beforeAll(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   setUiLang('ja');
   // setUiLang lands once the catalog chunk resolves.
-  await vi.waitFor(() => expect(document.documentElement.lang).toBe('ja'));
-});
+  // The Japanese catalog is a lazily imported chunk; under a busy machine it takes a while.
+  await vi.waitFor(() => expect(document.documentElement.lang).toBe('ja'), { timeout: 20_000, interval: 50 });
+}, 30_000);
 
 afterEach(async () => {
   await act(async () => {
