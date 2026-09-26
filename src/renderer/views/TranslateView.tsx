@@ -335,6 +335,15 @@ export default function TranslateView() {
                 />
               )}
 
+              {/* The sentence analysis (particles, formality, declension, measure
+                  words) was missing from the Aero layout entirely. */}
+              <SentenceAnalysisPanel
+                sourceText={state.translatedInput}
+                translatedText={output}
+                source={source}
+                target={target}
+              />
+
               {(busy || error) && (
                 <div className="aero-translate-status">
                   {busy && (
@@ -517,6 +526,17 @@ export default function TranslateView() {
                 source={source}
                 className="btn tr-ask-agent"
               />
+              {/* The default theme renders no menu bar, so File › Clear was the only
+                  way to empty the panes and it was unreachable there. */}
+              <button
+                type="button"
+                className="btn ghost tr-clear"
+                onClick={state.clear}
+                disabled={!input && !output}
+                title={!input && !output ? t('translate.clear.nothing') : undefined}
+              >
+                {t('translate.menu.clear')}
+              </button>
               {busy && (
                 <div className="tr-status">
                   <span className="media-gen-dot" />

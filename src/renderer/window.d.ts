@@ -952,7 +952,7 @@ declare global {
         source: string;
         target: string;
         senseHints?: import('../shared/translateCore').TranslateSenseHint[];
-      }): Promise<{ ok: boolean; text?: string; error?: string }>;
+      }): Promise<{ ok: boolean; text?: string; error?: string; errorKey?: string }>;
       translateRunBatch(req: {
         items: Array<{ id: string; text: string; source: string; target: string }>;
       }): Promise<{

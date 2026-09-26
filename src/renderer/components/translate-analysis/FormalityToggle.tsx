@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import type { FormalityVariants } from '../../../shared/translateAnalysisCore';
+import { useT } from '../../i18n';
 
 type Register = 'casual' | 'polite' | 'businessSafe';
 
-const REGISTERS: Array<{ id: Register; label: string }> = [
-  { id: 'casual', label: 'Casual' },
-  { id: 'polite', label: 'Polite' },
-  { id: 'businessSafe', label: 'Business-safe' },
+const REGISTERS: Array<{ id: Register; labelKey: string }> = [
+  { id: 'casual', labelKey: 'translate.analysis.casual' },
+  { id: 'polite', labelKey: 'translate.analysis.polite' },
+  { id: 'businessSafe', labelKey: 'translate.analysis.businessSafe' },
 ];
 
 // Three discrete registers, so a segmented control (the app's existing
@@ -19,13 +20,14 @@ export default function FormalityToggle({
   variants: FormalityVariants;
   lang: string;
 }) {
+  const { t } = useT();
   const [register, setRegister] = useState<Register>('polite');
   const activeIndex = REGISTERS.findIndex((r) => r.id === register);
 
   return (
     <div className="tr-analysis-section formality-section">
-      <h4 className="tr-analysis-title">Formality</h4>
-      <div className="formality-toggle" role="radiogroup" aria-label="Formality register">
+      <h4 className="tr-analysis-title">{t('translate.analysis.formality')}</h4>
+      <div className="formality-toggle" role="radiogroup" aria-label={t('translate.analysis.formalityRegister')}>
         <span
           className="formality-thumb"
           aria-hidden
@@ -40,7 +42,7 @@ export default function FormalityToggle({
             className={`formality-btn ${register === r.id ? 'active' : ''}`}
             onClick={() => setRegister(r.id)}
           >
-            {r.label}
+            {t(r.labelKey)}
           </button>
         ))}
       </div>

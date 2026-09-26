@@ -25,6 +25,7 @@ import {
 import { appendNotebookEvent, saveTranslationNote } from '../../notebookTimeline';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import { confirmDialog } from '../ui';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { getTranslateTarget, onTranslateTargetChanged, setTranslateTarget } from '../../translateTarget';
 import { getTranslateSource, onTranslateSourceChanged, setTranslateSource } from '../../translateSource';
@@ -208,7 +209,9 @@ export function useTranslate(): TranslateController {
   }
 
   function mineEntry(e: TranslationHistoryEntry) {
-    createDeckFolder('Translations');
+    // The folder is named in the UI language, like every folder the app creates for the learner.
+    const folder = t('translate.deckFolder');
+    createDeckFolder(folder);
     addDeckCards([
       {
         word: e.sourceText.slice(0, 80),
@@ -216,9 +219,11 @@ export function useTranslate(): TranslateController {
         meaning: e.resultText.slice(0, 400),
         sentence: e.sourceText.slice(0, 2000),
         source: 'import',
-        folder: 'Translations',
+        folder,
       },
     ]);
+    // Mining used to succeed silently; say where the card went.
+    window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('translate.history.mined', { folder }), kind: 'ok' } }));
   }
 
   function clear() {
@@ -289,7 +294,20 @@ export function TranslateHistoryList({
   return (
     <>
       <div className="tr-history-actions">
-        <button type="button" className="btn ghost" onClick={() => clearTranslationHistory()}>
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => {
+            void confirmDialog({
+              title: t('translate.history.clearConfirmTitle'),
+              message: t('translate.history.clearConfirmBody', { count: state.history.length }),
+              confirmLabel: t('translate.history.clear'),
+              danger: true,
+            }).then((ok) => {
+              if (ok) clearTranslationHistory();
+            });
+          }}
+        >
           {t('translate.history.clear')}
         </button>
       </div>
@@ -315,7 +333,7 @@ export function TranslateHistoryList({
               <div className="tr-history-meta muted">
                 {/* A bare toLocaleString() follows the OS locale, not the UI language,
                     so every one of these history stamps read US-style in a ru desktop. */}
-                {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString(LANG_TAGS[lang])} · {e.origin}
+                {e.sourceLang} → {e.targetLang} · {new Date(e.ts).toLocaleString(LANG_TAGS[lang])} · {t(`translate.history.origin.${e.origin}`)}
               </div>
               <p className="tr-history-src">{e.sourceText}</p>
               <p className="tr-history-dst muted">{e.resultText}</p>

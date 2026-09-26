@@ -1567,7 +1567,7 @@ const api = {
     target: string;
     /** Reader-pinned word senses the model must honour (see shared/translateCore). */
     senseHints?: import('./shared/translateCore').TranslateSenseHint[];
-  }): Promise<{ ok: boolean; text?: string; error?: string }> =>
+  }): Promise<{ ok: boolean; text?: string; error?: string; errorKey?: string }> =>
     ipcRenderer.invoke('translate:run', req),
   translateRunBatch: (req: {
     items: Array<{ id: string; text: string; source: string; target: string }>;

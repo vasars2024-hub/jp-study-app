@@ -1,5 +1,6 @@
 import { particleRole } from '../../../shared/particleRoles';
 import type { JpToken } from '../../tokenizer';
+import { useT } from '../../i18n';
 
 // Fully offline particle view: the sentence with particle tokens rendered as
 // colored chips, plus a list explaining each one. Explanations come from the
@@ -13,13 +14,14 @@ export default function ParticleBreakdown({
   /** Sentence-specific LLM notes, aligned to the particle tokens in order. */
   notes?: string[];
 }) {
+  const { t: tr } = useT();
   const particles = tokens.filter((t) => t.pos === '助詞');
   if (!particles.length) return null;
 
   let particleIndex = -1;
   return (
     <div className="tr-analysis-section particle-breakdown">
-      <h4 className="tr-analysis-title">Particles</h4>
+      <h4 className="tr-analysis-title">{tr('translate.analysis.particles')}</h4>
       <p className="particle-sentence" lang="ja">
         {tokens.map((t, i) => {
           if (t.pos !== '助詞') return <span key={i}>{t.surface}</span>;
@@ -42,8 +44,8 @@ export default function ParticleBreakdown({
               <span className={`particle-chip particle-cat-${role.category}`} lang="ja">
                 {t.surface}
               </span>
-              <span className="particle-role">{role.label}</span>
-              <span className="particle-explanation muted">{note || role.explanation}</span>
+              <span className="particle-role" title={tr(`particle.${role.key}.role`)}>{tr(`particle.${role.key}.label`)}</span>
+              <span className="particle-explanation muted">{note || tr(`particle.${role.key}.explanation`)}</span>
             </li>
           );
         })}

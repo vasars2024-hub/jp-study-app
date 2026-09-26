@@ -3,6 +3,7 @@
 // Anki mining field translation.
 
 import type { TranslateSenseHint } from '../shared/translateCore';
+import { t } from './i18n';
 
 export interface ModelProgress {
   status?: string;
@@ -96,7 +97,8 @@ export function translateTo(
       ...(senseHints?.length ? { senseHints: [...senseHints] } : {}),
     })
     .then((res) => {
-      if (!res.ok) throw new Error(res.error ?? 'Translation failed.');
+      // Errors main words itself arrive with a catalog key and are said in the UI language.
+      if (!res.ok) throw new Error(res.errorKey ? t(res.errorKey) : res.error ?? t('translate.error.failed'));
       return res.text ?? '';
     })
     .finally(() => partialListeners.delete(onPartial));

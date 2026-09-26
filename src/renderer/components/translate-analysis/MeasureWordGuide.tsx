@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import CollapsibleSection from '../CollapsibleSection';
 import { parseClassifiers, type ClassifierHint } from '../../../shared/pinyin';
 import type { AspectNoteItem, MeasureWordItem } from '../../../shared/translateAnalysisCore';
+import { useT } from '../../i18n';
 
 // The LLM names the noun and its contextual classifier; CEDICT's embedded
 // "CL:只[zhi1],条[tiao2]" hints act as an offline cross-check — shown as a
@@ -41,13 +42,14 @@ export default function MeasureWordGuide({
     };
   }, [measureWords]);
 
+  const { t } = useT();
   const count = (measureWords?.length ?? 0) + (aspectNotes?.length ?? 0);
 
   return (
     <CollapsibleSection
       className="tr-analysis-section measure-word-section"
-      title="Measure words & aspect (Chinese)"
-      summary={`${count} ${count === 1 ? 'note' : 'notes'}`}
+      title={t('translate.analysis.measureTitle')}
+      summary={t('translate.analysis.notes', { count })}
       defaultOpen
     >
       {measureWords && measureWords.length > 0 && (
@@ -66,7 +68,7 @@ export default function MeasureWordGuide({
                 {m.reason && <span className="measure-word-reason muted">{m.reason}</span>}
                 {others.length > 0 && (
                   <span className="measure-word-dict muted">
-                    dictionary also lists:{' '}
+                    {t('translate.analysis.dictAlso')}{' '}
                     {others.map((h) => `${h.simp}${h.pinyin ? ` (${h.pinyin})` : ''}`).join(', ')}
                   </span>
                 )}
@@ -84,7 +86,7 @@ export default function MeasureWordGuide({
               </span>
               {a.afterWord && (
                 <span lang="zh" className="muted">
-                  after {a.afterWord}
+                  {t('translate.analysis.after', { word: a.afterWord })}
                 </span>
               )}
               {a.reason && <span className="muted">{a.reason}</span>}

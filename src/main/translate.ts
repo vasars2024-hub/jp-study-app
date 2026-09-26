@@ -437,6 +437,18 @@ export function isTranslateReady(): boolean {
   return session !== null;
 }
 
+/**
+ * The catalog key for an error this module words itself, so the renderer can
+ * say it in the interface language (the English sentence stays as fallback
+ * and for logs). A platform message has no key and is passed on verbatim.
+ */
+export function friendlyErrorKey(err: unknown): string | undefined {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (err instanceof LocalModelMissingError || /model not found|ENOENT|no such file/i.test(msg)) return 'translate.error.modelMissing';
+  if (/llama|gguf|cuda|vulkan|backend|native/i.test(msg)) return 'translate.error.engineFailed';
+  return undefined;
+}
+
 function friendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (err instanceof LocalModelMissingError || /model not found|ENOENT|no such file/i.test(msg)) {
@@ -571,15 +583,16 @@ async function ensureSession(): Promise<LlamaSessionHandle> {
 }
 
 /** Force-load the model so EPUB range jobs can show load progress before the first chapter. */
-export async function ensureTranslateReady(): Promise<{ ok: boolean; error?: string }> {
+export async function ensureTranslateReady(): Promise<{ ok: boolean; error?: string; errorKey?: string }> {
   try {
     if (!isTranslateAvailable()) {
-      return { ok: false, error: friendlyError(new LocalModelMissingError()) };
+      return { ok: false, error: friendlyError(new LocalModelMissingError()), errorKey: 'translate.error.modelMissing' };
     }
     await ensureSession();
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: friendlyError(err) };
+    const errorKey = friendlyErrorKey(err);
+    return { ok: false, error: friendlyError(err), ...(errorKey ? { errorKey } : {}) };
   }
 }
 
@@ -847,7 +860,8 @@ export function registerTranslateIpc(): void {
         return { ok: true, text };
       } catch (err) {
         console.error('[translate]', err);
-        return { ok: false, error: friendlyError(err) };
+        const errorKey = friendlyErrorKey(err);
+        return { ok: false, error: friendlyError(err), ...(errorKey ? { errorKey } : {}) };
       }
     },
   );
