@@ -35,7 +35,7 @@ const byId = new Map(GRAMMAR.map((p) => [p.id, p]));
  * Ratchet: hollow records per level may only go down. When a pass authors
  * more, lower these numbers to the new counts the failure message prints.
  */
-const MAX_HOLLOW: Record<string, number> = { N4: 212, N3: 627, N2: 437, N1: 324 };
+const MAX_HOLLOW: Record<string, number> = { N4: 172, N3: 627, N2: 437, N1: 324 };
 
 describe('authored content for hollow supplement records', () => {
   const entries = Object.entries(AUTHORED_CONTENT);
@@ -71,6 +71,14 @@ describe('authored content for hollow supplement records', () => {
       expect(p.examples[0].jp).toBe(c.examples[0].jp);
       expect(p.provenance.source).toBe('authored:content-pass');
       expect(p.provenance.verification).not.toBe('missing');
+    }
+  });
+
+  it('replaces the Vietnamese labels some dump records carried as titles', () => {
+    for (const [id, c] of entries) {
+      const shown = byId.get(id)!.title;
+      if (c.title) expect(shown, id).toBe(c.title);
+      expect(shown, id).not.toMatch(/[Ạ-ỹ]|từ/);
     }
   });
 
@@ -120,9 +128,10 @@ describe('authoring queue', () => {
     const core = ['n5', 'n4', 'n3', 'n2', 'n2-extra', 'n1', 'n1-extra'].flatMap((m) => GRAMMAR_MODULES[m]);
     const shadowed = shadowedSupplementIds(core, SUPPLEMENTS, grammarTitleKey);
     const coreKeys = new Set(core.map((p) => grammarTitleKey('ja', p.title)));
+    const keyOf = (p: GrammarPoint) => grammarTitleKey('ja', AUTHORED_CONTENT[p.id]?.title ?? p.title);
     // Every core collision is shadowed; an authored record without one never is.
     for (const p of SUPPLEMENTS) {
-      const collides = coreKeys.has(grammarTitleKey('ja', p.title));
+      const collides = coreKeys.has(keyOf(p));
       if (collides) expect(shadowed.has(p.id), p.id).toBe(true);
       else if (AUTHORED_CONTENT[p.id]) expect(shadowed.has(p.id), p.id).toBe(false);
     }
@@ -130,7 +139,7 @@ describe('authoring queue', () => {
     const visible = new Map<string, string>();
     for (const p of SUPPLEMENTS) {
       if (shadowed.has(p.id)) continue;
-      const key = grammarTitleKey('ja', p.title);
+      const key = keyOf(p);
       expect(visible.has(key), `${p.id} twins ${visible.get(key)}`).toBe(false);
       visible.set(key, p.id);
     }

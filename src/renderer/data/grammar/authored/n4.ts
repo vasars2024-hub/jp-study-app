@@ -2332,4 +2332,444 @@ export const AUTHORED_N4: Record<string, AuthoredGrammarContent> = {
       ex('帰り道で 雨に 降られて しまった。', 'I got caught in the rain on the way home.', 'かえりみちで あめに ふられて しまった。'),
     ],
   },
+  'n4m-g-03858c': {
+    meaning: 'imperative (command) form: do ~!',
+    structure: 'う-verb: え-row（行け・書け）；る-verb: ろ（食べろ・見ろ）；する → しろ（せよ）；来る → 来い（こい）',
+    explanation:
+      'The plain imperative gives a blunt order. In daily life it is heard from coaches, in emergencies (逃げろ!), on signs and in reported speech (早く寝ろと言われた), and mostly from men. Ordinary requests use てください, and even among friends て alone is far more common.',
+    functions: ['order'],
+    examples: [
+      ex('危ない！早く 逃げろ！', 'Look out! Run, quickly!', 'あぶない！はやく にげろ！'),
+      ex('父に 早く 寝ろと 言われた。', 'My father told me to go to bed early.', 'ちちに はやく ねろと いわれた。'),
+    ],
+  },
+  'n4m-g-d629f5': {
+    meaning: 'which is more ~, A or B?',
+    structure: 'A と B と（では）、どちらが + Adj + ですか',
+    explanation:
+      'The standard question for comparing two things. どちら (casual どっち) is used for two items even when they are people or places; for three or more use 何／どれ／誰 + が一番. The answer is usually B のほうが〜.',
+    functions: ['compare'],
+    examples: [
+      ex('犬と 猫と、どちらが 好きですか。', 'Which do you like better, dogs or cats?', 'いぬと ねこと、どちらが すきですか。'),
+      ex('東京と 大阪では、どちらが 人口が 多いですか。', 'Which has the larger population, Tokyo or Osaka?', 'とうきょうと おおさかでは、どちらが じんこうが おおいですか。'),
+    ],
+  },
+  'n4m-g-48ce6b': {
+    meaning: 'to begin ~ing; to start to ~',
+    structure: 'V-ます stem + 始める（はじめる）',
+    explanation:
+      '始める after a verb stem marks the start of an action or a change: 読み始める “start reading”, 雨が降り始めた “it began to rain”. It works with intentional and unintentional events alike. 出す is similar but stresses suddenness.',
+    functions: ['process'],
+    examples: [
+      ex('去年から ピアノを 習い始めました。', 'I started learning the piano last year.', 'きょねんから ぴあのを ならいはじめました。'),
+      ex('急に 雨が 降り始めた。', 'It suddenly started to rain.', 'きゅうに あめが ふりはじめた。'),
+    ],
+  },
+  'n4m-g-b893c8': {
+    meaning: 'to receive; to get (from someone)',
+    structure: 'Receiver は + Giver に／から + N を + もらう',
+    explanation:
+      'もらう is told from the receiver’s side: the speaker, or someone close, gets something. The giver takes に or から, and から is preferred when the giver is an organisation. For receiving from a superior, the humble form is いただく.',
+    functions: ['give', 'benefit'],
+    examples: [
+      ex('誕生日に 友達から 花を もらった。', 'I got flowers from a friend for my birthday.', 'たんじょうびに ともだちから はなを もらった。'),
+      ex('妹は 祖母に お小遣いを もらった。', 'My little sister got some pocket money from our grandmother.', 'いもうとは そぼに おこづかいを もらった。'),
+    ],
+  },
+  'n4m-g-853b65': {
+    meaning: 'can ~; be able to ~',
+    structure: 'V-dict + こと が できる（できます）；N + が できる',
+    explanation:
+      'ことができる expresses ability or possibility and sounds a little more formal than the potential form: 泳ぐことができる = 泳げる. It is common in rules and notices: ここで写真を撮ることができます. With a noun, just が できる: 日本語ができる.',
+    functions: ['ability'],
+    examples: [
+      ex('この 図書館では 本を 二週間 借りる ことが できます。', 'You can borrow books from this library for two weeks.', 'この としょかんでは ほんを にしゅうかん かりる ことが できます。'),
+      ex('妹は 三歳で 字を 読む ことが できた。', 'My sister could read at the age of three.', 'いもうとは さんさいで じを よむ ことが できた。'),
+    ],
+  },
+  'n4m-g-8aac33': {
+    meaning: 'that ~ (quoting what is thought, said or considered)',
+    structure: 'Plain form + と + 思う／言う／考える',
+    explanation:
+      'と marks the content of thinking or speech. The clause before it is in plain form, and nouns and な-adjectives keep だ: 便利だと思う. For your own opinion use と思う; for someone else’s thoughts use と思っている. Direct quotes go in 「」 before と.',
+    functions: ['speak', 'judge'],
+    examples: [
+      ex('明日は 雨が 降ると 思います。', 'I think it will rain tomorrow.', 'あしたは あめが ふると おもいます。'),
+      ex('彼は 来週 国へ 帰ると 言って いた。', 'He said he is going back to his country next week.', 'かれは らいしゅう くにへ かえると いって いた。'),
+    ],
+  },
+  'n4m-g-6d4368': {
+    meaning: 'easy to ~; tends to ~',
+    structure: 'V-ます stem + やすい',
+    explanation:
+      'やすい after a verb stem says an action is easy: 分かりやすい “easy to understand”. With unintentional verbs it means something readily happens, even when that is bad: 壊れやすい “fragile”, 風邪をひきやすい. It conjugates as an い-adjective, and its opposite is にくい.',
+    functions: ['evaluate', 'ability'],
+    examples: [
+      ex('先生の 説明は とても 分かりやすい。', "The teacher's explanations are very easy to understand.", 'せんせいの せつめいは とても わかりやすい。'),
+      ex('この グラスは 割れやすいので、気を つけて。', 'These glasses break easily, so be careful.', 'この ぐらすは われやすいので、きを つけて。'),
+    ],
+  },
+  'n4m-g-b0be0a': {
+    meaning: '(casual, warm) question: ~?',
+    structure: 'Question word … + plain form (Na / N + な) + んだい',
+    explanation:
+      'A casual, somewhat masculine or fatherly way to ask for an explanation, used with question words: どうしたんだい “what’s wrong?”. It sounds kinder than んだ? and is common in fiction and from older speakers. Without a question word, speakers use のかい instead.',
+    functions: ['asked'],
+    examples: [
+      ex('そんな 顔を して、どうしたんだい。', "Why the long face? What's the matter?", 'そんな かおを して、どうしたんだい。'),
+      ex('こんな 時間に 何を して いるんだい。', 'What are you doing at this hour?', 'こんな じかんに なにを して いるんだい。'),
+    ],
+  },
+  'n4m-g-bc00ae': {
+    meaning: 'B is more ~ than A',
+    structure: 'A より B の 方（ほう）が + Adj',
+    explanation:
+      'The usual answer to a “which one” question: B のほうが puts B in focus and A より marks the standard. The order can be flipped (B のほうが A より〜). Plain A は B より〜 states a fact about A without a question being asked.',
+    functions: ['compare'],
+    examples: [
+      ex('バスより 電車の 方が 速いです。', 'The train is faster than the bus.', 'ばすより でんしゃの ほうが はやいです。'),
+      ex('夏より 冬の 方が 好きだ。', 'I like winter better than summer.', 'なつより ふゆの ほうが すきだ。'),
+    ],
+  },
+  'n4m-g-75e9f6': {
+    meaning: 'potential form: can ~; be able to ~',
+    structure: 'う-verb: え-row + る（書ける）；る-verb: られる（食べられる）；する → できる；来る → 来られる',
+    explanation:
+      'The potential form turns a verb into “can do”. The object often switches from を to が: 漢字が読める. In casual speech る-verbs often drop ら (食べれる), which is widespread but still marked as non-standard in writing. ことができる is the more formal alternative.',
+    functions: ['ability'],
+    examples: [
+      ex('私は 漢字が 少し 読めます。', 'I can read a little kanji.', 'わたしは かんじが すこし よめます。'),
+      ex('明日の パーティーに 来られますか。', 'Can you come to the party tomorrow?', 'あしたの ぱーてぃーに こられますか。'),
+    ],
+  },
+  'n4m-g-efe313': {
+    meaning: 'such as ~; ~ and so on; things like ~',
+    structure: 'N（や N）+ など',
+    explanation:
+      'など marks the preceding items as examples from a longer list: りんごやみかんなど. It often pairs with や. After a single noun it can also make an offer sound modest (お茶などいかがですか) or belittle something (私などには無理です). Casual speech uses なんか.',
+    functions: ['denote-by-example'],
+    examples: [
+      ex('スーパーで 野菜や 果物などを 買った。', 'I bought vegetables, fruit and so on at the supermarket.', 'すーぱーで やさいや くだものなどを かった。'),
+      ex('京都や 奈良などの 古い 町が 好きです。', 'I like old towns such as Kyoto and Nara.', 'きょうとや ならなどの ふるい まちが すきです。'),
+    ],
+  },
+  'n4m-g-cffd99': {
+    meaning: 'by ~ (deadline); before ~',
+    structure: 'N（time）／V-dict + までに',
+    explanation:
+      'までに sets a deadline: the action happens at some point before the time given. まで alone describes an action that continues up to that time. Compare 五時まで働く “work until five” with 五時までに帰る “be home by five”.',
+    functions: ['time-direction'],
+    examples: [
+      ex('レポートは 金曜日までに 出して ください。', 'Please hand in the report by Friday.', 'れぽーとは きんようびまでに だして ください。'),
+      ex('暗く なる までに 家に 帰りなさい。', 'Be home before it gets dark.', 'くらく なる までに いえに かえりなさい。'),
+    ],
+  },
+  'n4m-g-0dc524': {
+    meaning: 'than ~; (formal) from ~',
+    structure: 'A は + B より + Adj；（formal）Time / place + より',
+    explanation:
+      'より marks the standard of comparison: A は B より高い “A is more expensive than B”. When nothing is being asked, this plain order is the neutral statement. In formal notices より also means “from”: 午後三時より開始します.',
+    functions: ['compare'],
+    examples: [
+      ex('今年の 夏は 去年より 暑い。', "This summer is hotter than last year's.", 'ことしの なつは きょねんより あつい。'),
+      ex('会議は 午後 二時より 始めます。', 'The meeting will begin from two in the afternoon.', 'かいぎは ごご にじより はじめます。'),
+    ],
+  },
+  'n4m-g-8c8cbd': {
+    meaning: '(a superior) gives (to me / us)',
+    structure: 'Giver が + Receiver に + N を + 下さる（くださる）',
+    explanation:
+      '下さる is the honorific form of くれる: someone you respect gives something to you or your group. The giver is the subject. Its masu form is 下さいます, and ください, the everyday request word, is its imperative. For giving upward, use さしあげる.',
+    functions: ['give', 'reverent-humble'],
+    examples: [
+      ex('先生が 私に 辞書を 下さいました。', 'My teacher gave me a dictionary.', 'せんせいが わたしに じしょを くださいました。'),
+      ex('お客様が 皆さんに お菓子を 下さった。', 'A customer gave everyone some sweets.', 'おきゃくさまが みなさんに おかしを くださった。'),
+    ],
+  },
+  'n4m-g-cd8f61': {
+    meaning: "prohibitive form: don't ~!",
+    structure: 'V-dict + な（走るな・触るな）',
+    explanation:
+      'Dictionary form plus な is a blunt ban, the negative counterpart of the imperative. It appears on signs, in emergencies, in sports and in quoted orders (触るなと言われた). It sounds harsh in conversation; ないで(ください) is the normal way to ask someone not to do something.',
+    functions: ['ban'],
+    examples: [
+      ex('危ないから、ここで 走るな。', "It's dangerous, so don't run here.", 'あぶないから、ここで はしるな。'),
+      ex('あきらめるな。もう 少しだ。', "Don't give up. You're nearly there.", 'あきらめるな。もう すこしだ。'),
+    ],
+  },
+  'n4m-g-4e5029': {
+    meaning: 'causative: to make / let (someone) do ~',
+    structure: 'う-verb: あ-row + せる（書かせる）；る-verb: させる；する → させる；来る → 来させる',
+    explanation:
+      'The causative means either forcing (make someone do) or permitting (let someone do); context and benefit verbs decide which. The doer takes に when there is a を-object, and を or に with intransitive verbs. させてください asks to be allowed to do something yourself.',
+    functions: ['forced', 'allow'],
+    examples: [
+      ex('母は 毎日 弟に 部屋を 掃除させる。', 'Every day my mother makes my brother clean his room.', 'ははは まいにち おとうとに へやを そうじさせる。'),
+      ex('子供を 公園で 自由に 遊ばせた。', 'I let the children play freely in the park.', 'こどもを こうえんで じゆうに あそばせた。'),
+    ],
+  },
+  'n4m-g-bf56de': {
+    meaning: 'to give (to someone lower, an animal or a plant)',
+    structure: 'Receiver に + N を + やる',
+    explanation:
+      'やる is a plain, low-register “give” used toward younger family members, animals and plants: 花に水をやる, 犬にえさをやる. For people it sounds rough or condescending; あげる is the neutral choice, and many speakers now use あげる for pets too.',
+    functions: ['give'],
+    examples: [
+      ex('毎朝 花に 水を やります。', 'I water the flowers every morning.', 'まいあさ はなに みずを やります。'),
+      ex('弟に 古い 自転車を やった。', 'I gave my old bike to my little brother.', 'おとうとに ふるい じてんしゃを やった。'),
+    ],
+  },
+  'n4m-g-fdb449': {
+    meaning: "you'd better ~; it would be better to ~",
+    structure: 'V-た + 方（ほう）が いい（です）',
+    explanation:
+      'Strong, specific advice. The past form (行ったほうがいい) is standard for positive advice, while the negative uses the non-past (行かないほうがいい). V-dict + ほうがいい also exists but sounds more general. To a superior, it can sound presumptuous.',
+    functions: ['advice'],
+    examples: [
+      ex('熱が あるなら、病院に 行った 方が いいですよ。', "If you have a fever, you'd better go to the doctor.", 'ねつが あるなら、びょういんに いった ほうが いいですよ。'),
+      ex('雨が 降りそうだから、傘を 持って いった 方が いい。', "It looks like rain, so you'd better take an umbrella.", 'あめが ふりそうだから、かさを もって いった ほうが いい。'),
+    ],
+  },
+  'n4m-g-a6d361': {
+    meaning: 'causative-passive: to be made to ~ (short and long forms)',
+    structure: 'Long: V-ない stem + せられる（書かせられる）；Short (う-verbs not ending in す): V-ない stem + される（書かされる）',
+    explanation:
+      'Two shapes exist for う-verbs: the full せられる and the contracted される, which is far more common in speech (飲まされる, 待たされる). Verbs ending in す keep the long form (話させられる), and る-verbs and する only have it (食べさせられる, させられる). Either way the meaning is “forced to”.',
+    functions: ['passive', 'forced'],
+    examples: [
+      ex('飲み会で 先輩に お酒を 飲まされた。', 'A senior made me drink at the party.', 'のみかいで せんぱいに おさけを のまされた。'),
+      ex('学校で 毎日 作文を 書かせられた。', 'At school we were made to write compositions every day.', 'がっこうで まいにち さくぶんを かかせられた。'),
+    ],
+  },
+  'n4m-g-689bf9': {
+    meaning: 'can be seen; to be visible; to look (~)',
+    structure: 'N が + 見える；Adj-く／N に + 見える',
+    explanation:
+      '見える says something is naturally visible, without effort: 窓から富士山が見える. It differs from 見られる, which is the potential “can (manage to) see”, for example a film. With an adjective or noun it means “look, appear”: 若く見える.',
+    functions: ['ability', 'similarity-degree'],
+    examples: [
+      ex('この 部屋から 海が 見えます。', 'You can see the sea from this room.', 'この へやから うみが みえます。'),
+      ex('彼は 年より ずっと 若く 見える。', 'He looks much younger than his age.', 'かれは としより ずっと わかく みえる。'),
+    ],
+  },
+  'n4m-g-0bcfde': {
+    meaning: 'how to ~; the way of ~ (する-verbs: 仕方)',
+    structure: 'V-ます stem + かた；N（する-verb）の + 仕方（しかた）',
+    explanation:
+      'For する-verbs the stem + かた is 仕方 and the noun joins with の: 勉強の仕方 “how to study”, 運転の仕方. Separately, 方 (かた) is a polite word for “person”: あの方 “that person”. 仕方がない, “it can’t be helped”, grew out of the first meaning.',
+    functions: ['means-methods'],
+    examples: [
+      ex('効果的な 勉強の 仕方を 教えて ください。', 'Please tell me an effective way to study.', 'こうかてきな べんきょうの しかたを おしえて ください。'),
+      ex('あの 方が 新しい 先生です。', 'That person is the new teacher.', 'あの かたが あたらしい せんせいです。'),
+    ],
+  },
+  'n4m-g-667067': {
+    meaning: 'to suddenly start ~ing; ~ out',
+    structure: 'V-ます stem + 出す（だす）',
+    explanation:
+      '出す after a verb stem has two uses. It marks a sudden, often uncontrolled start: 泣き出す “burst into tears”, 降り出す. It also adds outward movement: 取り出す “take out”. Compared with 始める, 出す does not suit planned actions (勉強し始める, not 勉強し出す for a schedule).',
+    functions: ['process', 'direction'],
+    examples: [
+      ex('赤ちゃんが 急に 泣き出した。', 'The baby suddenly burst into tears.', 'あかちゃんが きゅうに なきだした。'),
+      ex('かばんから 財布を 取り出した。', 'I took my wallet out of my bag.', 'かばんから さいふを とりだした。'),
+    ],
+  },
+  'n4m-g-7a44d0': {
+    meaning: 'to do ~ for (someone lower); (defiant) I’ll ~!',
+    structure: 'Person に + V-て形 + やる',
+    explanation:
+      'てやる is a blunt てあげる, used for favours to younger family members, pets or plants: 弟に宿題を見てやる. It also expresses defiance or a threat when the action benefits no one: 絶対に勝ってやる “I’ll win, just watch”. Toward equals, てあげる is safer.',
+    functions: ['benefit', 'determination-decision'],
+    examples: [
+      ex('弟に 算数を 教えて やった。', 'I helped my little brother with his arithmetic.', 'おとうとに さんすうを おしえて やった。'),
+      ex('次の 試合では 絶対に 勝って やる。', "I'm going to win the next match, no matter what.", 'つぎの しあいでは ぜったいに かって やる。'),
+    ],
+  },
+  'n4m-g-9adc60': {
+    meaning: 'without ~ing',
+    structure: 'V-ない stem + ずに（する → せずに）',
+    explanation:
+      'ずに is the written or formal version of ないで, “without doing”: 傘を持たずに出かけた. The only irregular form is せずに for する. It cannot replace ないで in requests: ないでください, never ずにください.',
+    functions: ['negative'],
+    examples: [
+      ex('今朝は 朝ご飯を 食べずに 家を 出た。', 'I left home this morning without having breakfast.', 'けさは あさごはんを たべずに いえを でた。'),
+      ex('辞書を 使わずに この 本を 読みました。', 'I read this book without using a dictionary.', 'じしょを つかわずに この ほんを よみました。'),
+    ],
+  },
+  'n4m-g-454699': {
+    meaning: 'to give (humbly, to someone of higher status)',
+    structure: 'Receiver に + N を + さしあげる',
+    explanation:
+      'The humble form of あげる: the speaker’s side gives something to a superior or customer. It is common in shop and business language (お客様にさしあげます). Saying it directly to the receiver can sound like you expect thanks, so in person people often phrase it as どうぞ.',
+    functions: ['give', 'reverent-humble'],
+    examples: [
+      ex('先生に 旅行の お土産を さしあげました。', 'I gave my teacher a souvenir from my trip.', 'せんせいに りょこうの おみやげを さしあげました。'),
+      ex('ご来店の お客様に 小さな プレゼントを さしあげて います。', 'We are giving a small gift to every customer who visits.', 'ごらいてんの おきゃくさまに ちいさな ぷれぜんとを さしあげて います。'),
+    ],
+  },
+  'n4m-g-c3ba56': {
+    meaning: 'I think (it is) probably ~',
+    structure: 'Plain form (N / Na without だ) + だろうと 思う（思います）',
+    explanation:
+      'だろう (guess) plus と思う (my opinion) makes a hedged prediction: “I suppose ~ will probably ~”. It is softer than と思う alone and common in explanations and forecasts. Keep だろう plain inside the quote even in polite speech: だろうと思います, not でしょうと思います.',
+    functions: ['speculation'],
+    examples: [
+      ex('この 雨は 夜まで 続く だろうと 思う。', 'I think this rain will probably go on until night.', 'この あめは よるまで つづく だろうと おもう。'),
+      ex('彼なら きっと 合格する だろうと 思います。', 'I think he will surely pass.', 'かれなら きっと ごうかくする だろうと おもいます。'),
+    ],
+  },
+  'n4m-g-5f45fe': {
+    meaning: "I'm thinking of ~ing; I intend to ~",
+    structure: 'V-volitional（よう／おう）+ と 思う（思って いる）',
+    explanation:
+      'Volitional plus と思う states an intention: “I think I’ll ~”. と思っている suggests the plan has been held for some time, and it is the form for describing other people’s intentions. つもりだ is firmer; ようと思う sounds like the idea is still forming.',
+    functions: ['intent', 'plan'],
+    examples: [
+      ex('夏休みに 北海道へ 行こうと 思って います。', "I'm thinking of going to Hokkaido during the summer holiday.", 'なつやすみに ほっかいどうへ いこうと おもって います。'),
+      ex('今日は 早く 寝ようと 思う。', "I think I'll go to bed early tonight.", 'きょうは はやく ねようと おもう。'),
+    ],
+  },
+  'n4m-g-de9413': {
+    meaning: 'looks ~; seems about to ~ (from appearance)',
+    structure: 'V-ます stem／Adj stem + そうだ（いい → よさそう、ない → なさそう）',
+    explanation:
+      'After a stem, そうだ reports an impression from appearance: おいしそうだ “looks delicious”, 雨が降りそうだ “looks like it will rain”. It is different from the hearsay そうだ, which follows a full plain form (降るそうだ “I hear it will rain”). It is not used for things obvious at a glance, such as きれい of a person you see.',
+    functions: ['similarity-degree', 'speculation'],
+    examples: [
+      ex('この ケーキ、とても おいしそうですね。', 'This cake looks really delicious.', 'この けーき、とても おいしそうですね。'),
+      ex('空が 暗い。今にも 雨が 降りそうだ。', 'The sky is dark. It looks like it will rain any minute.', 'そらが くらい。いまにも あめが ふりそうだ。'),
+    ],
+  },
+  'n4m-g-fef869': {
+    meaning: 'to come (here) to ~',
+    structure: 'V-ます stem／N（action）+ に + 来る（きます）',
+    explanation:
+      'Purpose plus 来る: someone comes toward the speaker’s location in order to do something: 迎えに来る “come to pick up”, 遊びに来てください “come and visit”. The pattern is a standard invitation formula. To describe going away to do something, use に行く.',
+    functions: ['purpose-goal'],
+    examples: [
+      ex('今度、うちに 遊びに 来て ください。', 'Please come and visit us sometime.', 'こんど、うちに あそびに きて ください。'),
+      ex('父が 駅まで 迎えに 来て くれた。', 'My father came to pick me up at the station.', 'ちちが えきまで むかえに きて くれた。'),
+    ],
+  },
+  'n4m-g-880bef': {
+    meaning: '-ness (turns an adjective into a noun)',
+    structure: 'Adj stem + さ（高さ・大きさ・便利さ）',
+    explanation:
+      'さ turns an い- or な-adjective into a noun for its degree or quality: 高い → 高さ “height”, 便利 → 便利さ “convenience”. It is productive and neutral. Some adjectives also take み, which is more about a felt quality: 甘み “sweetness (as a taste)”.',
+    functions: ['adjective'],
+    examples: [
+      ex('この 山の 高さは どのくらいですか。', 'How high is this mountain?', 'この やまの たかさは どのくらいですか。'),
+      ex('田舎の 静かさが 好きです。', 'I love the quietness of the countryside.', 'いなかの しずかさが すきです。'),
+    ],
+  },
+  'n4m-g-da772c': {
+    meaning: 'to go (somewhere) to ~',
+    structure: 'V-ます stem／N（action noun）+ に + 行く',
+    explanation:
+      'The purpose of going: 買い物に行く, 映画を見に行く. Action nouns like 散歩, 旅行 and 食事 attach directly with に. Compare へ／に行く after a place, which marks the destination; both can appear together: 京都へ写真を撮りに行く.',
+    functions: ['purpose-goal', 'direction'],
+    examples: [
+      ex('週末は 家族と 買い物に 行きました。', 'At the weekend I went shopping with my family.', 'しゅうまつは かぞくと かいものに いきました。'),
+      ex('京都へ 写真を 撮りに 行きたい。', 'I want to go to Kyoto to take photos.', 'きょうとへ しゃしんを とりに いきたい。'),
+    ],
+  },
+  'n4m-g-380f6b': {
+    meaning: 'must not ~; you may not ~',
+    structure: 'V-て形 + は いけません（いけない／だめです）',
+    explanation:
+      'てはいけません forbids an action and usually states a rule or a firm instruction: ここでたばこを吸ってはいけません. In speech it contracts to ちゃいけない / じゃいけない. It sounds strict, so to ask politely use ないでください.',
+    functions: ['ban', 'negative'],
+    examples: [
+      ex('ここで 写真を 撮っては いけません。', 'You must not take photos here.', 'ここで しゃしんを とっては いけません。'),
+      ex('授業中に 携帯電話を 使っては いけない。', 'You must not use your phone during class.', 'じゅぎょうちゅうに けいたいでんわを つかっては いけない。'),
+    ],
+  },
+  'n4m-g-b1808f': {
+    meaning: 'looking at ~ / judging from ~, (it seems) …',
+    structure: 'N を + 見ると（見れば／見て）, … ようだ／らしい',
+    explanation:
+      'Uses what one sees as evidence for a judgement: 彼の顔を見ると、怒っているようだ “judging from his face, he seems angry”. The second half is usually a guess (ようだ, らしい, にちがいない). から見ると (“from the viewpoint of”) is related but names a standpoint rather than evidence.',
+    functions: ['judge', 'grounds'],
+    examples: [
+      ex('彼の 顔を 見ると、何か あった ようだ。', 'Judging from his face, something seems to have happened.', 'かれの かおを みると、なにか あった ようだ。'),
+      ex('道が ぬれて いる のを 見ると、夜中に 雨が 降った らしい。', 'Seeing that the road is wet, it must have rained in the night.', 'みちが ぬれて いる のを みると、よなかに あめが ふった らしい。'),
+    ],
+  },
+  'n4m-g-20c0d4': {
+    meaning: '~ or something like that',
+    structure: 'N + や 何か（なにか／なんか）',
+    explanation:
+      'や何か adds vagueness after a noun: “~ or that sort of thing”. It lets the speaker name one example and wave at others: 本や何かを入れる箱. It is close to か何か, but や何か lists similar items rather than offering alternatives.',
+    functions: ['vague', 'denote-by-example'],
+    examples: [
+      ex('ペンや 何か 書く ものを 持って いますか。', 'Do you have a pen or something to write with?', 'ぺんや なにか かく ものを もって いますか。'),
+      ex('机の 上に 本や 何かが 置いて ある。', 'There are books and things on the desk.', 'つくえの うえに ほんや なにかが おいて ある。'),
+    ],
+  },
+  'n4m-g-1fc82b': {
+    meaning: 'still; (comparing) … is still better / at least',
+    structure: 'まだ + V-ている／Adj；（A より）B の ほうが まだ + Adj',
+    explanation:
+      'まだ means “still” for a situation continuing (まだ雨が降っている) and “not yet” with a negative. In comparisons it marks the lesser evil: 雨よりは雪のほうがまだいい “snow is still better than rain”. まだまし is the fixed phrase for “better than nothing”.',
+    functions: ['continuity', 'compare'],
+    examples: [
+      ex('もう 十時なのに、弟は まだ 寝て いる。', "It's already ten, and my brother is still asleep.", 'もう じゅうじなのに、おとうとは まだ ねて いる。'),
+      ex('暑い のも いやだが、寒い より まだ いい。', "I don't like the heat, but it's still better than the cold.", 'あつい のも いやだが、さむい より まだ いい。'),
+    ],
+  },
+  'n4m-g-714094': {
+    meaning: "let's ~ (firm invitation); isn't it ~! (exclamation)",
+    structure: 'V-ない + か（↘）；N／Adj + じゃないか',
+    explanation:
+      'With falling intonation, V-ないか is a firm, masculine invitation or urging: 一緒にやらないか. じゃないか after nouns and adjectives expresses discovery or reproach: いいじゃないか “well, that’s nice!”, 言ったじゃないか “I told you, didn’t I!”. Softer equivalents are ないですか and じゃないですか.',
+    functions: ['invite-suggest', 'exclamatory'],
+    examples: [
+      ex('今度の 日曜日、一緒に 釣りに 行かないか。', "How about going fishing with me this Sunday?", 'こんどの にちようび、いっしょに つりに いかないか。'),
+      ex('なんだ、ちゃんと できる じゃないか。', "Hey, you can do it properly after all!", 'なんだ、ちゃんと できる じゃないか。'),
+    ],
+  },
+  'n4m-g-82f47e': {
+    meaning: 'to be allowed to ~; (humbly) I will ~',
+    structure: 'V-causative-て形 + もらう（もらいます／もらえますか）',
+    explanation:
+      'Literally “receive the favour of being made to do”: someone permits the speaker to act. It describes permission gratefully received (休ませてもらった) and, in requests, asks for it (使わせてもらえますか). In business Japanese the humbler させていただく is often used even when no permission is needed.',
+    functions: ['request-permission', 'benefit'],
+    examples: [
+      ex('熱が あったので、会社を 休ませて もらった。', 'I had a fever, so they let me take the day off work.', 'ねつが あったので、かいしゃを やすませて もらった。'),
+      ex('ちょっと 電話を 使わせて もらえますか。', 'Could I use your phone for a moment?', 'ちょっと でんわを つかわせて もらえますか。'),
+    ],
+  },
+  'n4m-v-e4e2ef': {
+    meaning: '(the topic) is in a state of ~',
+    structure: 'N は + V-て いる（state verbs: 開く・結婚する・知る・住む）',
+    explanation:
+      'With change-of-state verbs, ている describes the resulting condition, not an action in progress: 窓は開いている “the window is open”, 兄は結婚している “my brother is married”. The topic は is the thing whose state is described. Compare action verbs, where ている means “is ~ing”.',
+    functions: ['action-status', 'results-state'],
+    examples: [
+      ex('その 店は もう 閉まって いる。', 'That shop is already closed.', 'その みせは もう しまって いる。'),
+      ex('姉は 大阪に 住んで いて、結婚して います。', 'My older sister lives in Osaka and is married.', 'あねは おおさかに すんで いて、けっこんして います。'),
+    ],
+  },
+  'n4m-g-fdb567': {
+    meaning: 'there is (a sound / smell / taste); (time) passes',
+    structure: 'N（音・におい・味・気）+ が する；Time + する + と',
+    explanation:
+      'With nouns of perception, がする says the sensation is present: いい匂いがする, 変な音がする, 気がする (“have a feeling”). With a length of time, する means “pass”: 一時間もすると “once an hour or so has passed”. It is also used for price: このかばんは十万円もする.',
+    functions: ['feel'],
+    examples: [
+      ex('台所から いい においが する。', 'There is a nice smell coming from the kitchen.', 'だいどころから いい においが する。'),
+      ex('あと 十分 すると、バスが 来ます。', 'The bus will come in another ten minutes.', 'あと じゅっぷん すると、ばすが きます。'),
+    ],
+  },
+  'n4m-g-5bc145': {
+    meaning: 'since ~ (as we both know), …',
+    structure: 'Plain form (Na / N + な) + のだから（んだから）',
+    explanation:
+      'のだから gives a reason the listener already accepts or cannot deny, and draws a conclusion that should follow: 約束したんだから、守らなきゃ. It often carries insistence or reproach. The main clause is typically advice, a request or a judgement.',
+    functions: ['cause-reason', 'grounds'],
+    examples: [
+      ex('約束した んだから、ちゃんと 守りなさい。', 'You promised, so keep your word.', 'やくそくした んだから、ちゃんと まもりなさい。'),
+      ex('せっかく 来た のだから、ゆっくり して いって ください。', "Now that you've come all this way, please stay and relax.", 'せっかく きた のだから、ゆっくり して いって ください。'),
+    ],
+  },
 };
