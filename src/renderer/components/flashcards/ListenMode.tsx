@@ -61,6 +61,12 @@ export default function ListenMode({ onExit, deck = 'all' }: {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playsRef = useRef(0);
+  // Read when a line ends, not when it starts: changing either while a line is
+  // playing must not start that line over (it did — the play effect re-ran).
+  const repeatsRef = useRef(repeats);
+  const gapRef = useRef(gapSec);
+  repeatsRef.current = repeats;
+  gapRef.current = gapSec;
 
   const clearTimer = (): void => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -120,11 +126,11 @@ export default function ListenMode({ onExit, deck = 'all' }: {
       audio.onended = () => {
         playsRef.current += 1;
         setHeard(true);
-        if (playsRef.current < repeats) {
-          timerRef.current = setTimeout(() => { void audio.play()?.catch(() => undefined); }, gapSec * 1000);
+        if (playsRef.current < repeatsRef.current) {
+          timerRef.current = setTimeout(() => { void audio.play()?.catch(() => undefined); }, gapRef.current * 1000);
           return;
         }
-        timerRef.current = setTimeout(advance, gapSec * 1000);
+        timerRef.current = setTimeout(advance, gapRef.current * 1000);
       };
       const started = audio.play();
       if (started && typeof started.catch === 'function') {
@@ -136,7 +142,7 @@ export default function ListenMode({ onExit, deck = 'all' }: {
       stopAudio();
     };
     // `t` is stable across language switches; the clip does not change with the language.
-  }, [playing, finished, index, queue, repeats, gapSec, advance, stopAudio]);
+  }, [playing, finished, index, queue, advance, stopAudio]);
 
   const go = (delta: number): void => {
     stopAudio();

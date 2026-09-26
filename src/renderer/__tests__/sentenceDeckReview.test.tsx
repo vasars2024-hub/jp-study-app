@@ -155,6 +155,38 @@ describe('ListenMode', () => {
     expect(onExit).toHaveBeenCalled();
   }, 20_000);
 
+  it('changing the repeat or the pause while a line plays does not start it over', async () => {
+    seed();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () => { root.render(<ListenMode deck="all" onExit={() => undefined} />); });
+    const selects = [...host.querySelectorAll('select')];
+    const repeat = selects.find((el) => [...el.options].some((o) => o.textContent === '3 times'));
+    const gap = selects.find((el) => [...el.options].some((o) => o.textContent === '6 seconds'));
+    const choose = async (select: HTMLSelectElement | undefined, value: string): Promise<void> => {
+      await act(async () => {
+        if (!select) throw new Error('no select');
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await flush();
+    };
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-listen-action="toggle"]')?.click(); });
+    await flush();
+    expect(played).toHaveLength(1);
+    await choose(gap, '1');
+    await choose(repeat, '2');
+    // Still the one play of the first line — nothing restarted it.
+    expect(played).toHaveLength(1);
+    // The new values apply when it ends: heard twice, a one-second pause between.
+    await act(async () => { lastAudio()?.onended?.(new Event('ended')); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1100)); });
+    await flush();
+    expect(played).toHaveLength(2);
+    expect(played[1]).toBe(played[0]);
+  }, 20_000);
+
   it('says so when the deck has no audio at all', async () => {
     addDeckCards([card({ sentence: '音声なし。' })]);
     host = document.createElement('div');
