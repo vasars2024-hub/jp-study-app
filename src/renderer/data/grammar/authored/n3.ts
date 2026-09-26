@@ -2447,4 +2447,510 @@ export const AUTHORED_N3: Record<string, AuthoredGrammarContent> = {
       ex('冷蔵庫に 牛乳が まだ 少し ある。', 'There is still a little milk in the fridge.', 'れいぞうこに ぎゅうにゅうが まだ すこし ある。'),
     ],
   },
+  'n3m-g-a486bc': {
+    meaning: '(a respected person) kindly does ~; please do ~ (honorific request)',
+    structure: 'お + V-ます stem + くださる ／ お + V-ます stem + ください',
+    explanation:
+      'お〜くださる is the honorific way to say someone of higher status kindly does something: 先生がお書きくださった. Its imperative, お〜ください, is a very common polite request in shops and notices: お待ちください, お入りください. It is more formal than てください.',
+    functions: ['reverent-humble', 'request'],
+    examples: [
+      ex('少々 お待ち ください。', 'Please wait a moment.', 'しょうしょう おまち ください。'),
+      ex('先生が 推薦状を お書き くださいました。', 'The professor kindly wrote me a letter of recommendation.', 'せんせいが すいせんじょうを おかき くださいました。'),
+    ],
+  },
+  'n3m-g-0d2f4a': {
+    meaning: 'still (even now, surprisingly)',
+    structure: 'いまだに + V-ている／negative',
+    explanation:
+      'いまだに stresses that something continues to this day when it might have been expected to end: いまだに覚えている, いまだに連絡がない "still no word". It is more emphatic than まだ and often carries surprise or frustration.',
+    functions: ['continuity', 'time'],
+    examples: [
+      ex('子供の ころの ことを いまだに よく 覚えて いる。', 'I still remember my childhood well.', 'こどもの ころの ことを いまだに よく おぼえて いる。'),
+      ex('あの 事件の 犯人は いまだに 見つかって いない。', 'The culprit in that case has still not been found.', 'あの じけんの はんにんは いまだに みつかって いない。'),
+    ],
+  },
+  'n3m-g-21358e': {
+    meaning: 'if (it is really the case that) ~',
+    structure: 'Plain form (Na／N + な) + のだったら（んだったら）',
+    explanation:
+      'のだったら takes what the other person has said or shown as the premise: 行きたくないんだったら、行かなくていい "if you really don’t want to go, you don’t have to". It is conversational and close to のなら.',
+    functions: ['condition'],
+    examples: [
+      ex('疲れて いるんだったら、少し 休んだら？', "If you're tired, why don't you rest a bit?", 'つかれて いるんだったら、すこし やすんだら？'),
+      ex('本当に 好きなんだったら、はっきり 言った ほうが いい。', "If you really like her, you'd better say so clearly.", 'ほんとうに すきなんだったら、はっきり いった ほうが いい。'),
+    ],
+  },
+  'n3m-g-537fa5': {
+    meaning: 'how (very) ~ it would be / must be!',
+    structure: 'どんなに + Adj／V + だろう（か）',
+    explanation:
+      'どんなに〜だろう is an exclamation imagining the intensity of a feeling or situation: 一人でどんなに寂しかっただろう "how lonely she must have been on her own". It often follows a condition with たら or ば.',
+    functions: ['exclamatory', 'speculation'],
+    examples: [
+      ex('家族に 会えたら、どんなに うれしい だろう。', 'How happy I would be if I could see my family.', 'かぞくに あえたら、どんなに うれしい だろう。'),
+      ex('知らない 国で、彼は どんなに 心細かった だろうか。', 'How lonely he must have felt in a strange country.', 'しらない くにで、かれは どんなに こころぼそかった だろうか。'),
+    ],
+  },
+  'n3m-g-997d49': {
+    meaning: '(go) as far as ~; up to the point where ~',
+    structure: 'V-dict／V-た + ところ まで',
+    explanation:
+      'ところまで marks how far an action goes: 行けるところまで行こう "let’s go as far as we can", 昨日読んだところまで "up to where I read yesterday". It can refer to a point in a process or a physical place.',
+    functions: ['range', 'time-direction'],
+    examples: [
+      ex('今日は 行ける ところまで 歩いて みよう。', "Let's walk as far as we can today.", 'きょうは いける ところまで あるいて みよう。'),
+      ex('昨日 読んだ ところまで 復習しましょう。', "Let's review up to where we read yesterday.", 'きのう よんだ ところまで ふくしゅうしましょう。'),
+    ],
+  },
+  'n3m-g-b2f28c': {
+    meaning: 'if you keep ~ing (like this, it will be bad)',
+    structure: 'V-て + いては, … (negative outcome)',
+    explanation:
+      'ていては warns that continuing a habit will lead to a bad result: 毎日遊んでいては合格できない "if you keep playing every day, you won’t pass". The main clause is negative or a warning. In speech it contracts to てちゃ.',
+    functions: ['condition', 'warning'],
+    examples: [
+      ex('そんなに 休んで いては、仕事が 終わらないよ。', "If you keep resting like that, the work won't get done.", 'そんなに やすんで いては、しごとが おわらないよ。'),
+      ex('文句ばかり 言って いては、何も 変わらない。', 'Nothing will change if all you do is complain.', 'もんくばかり いって いては、なにも かわらない。'),
+    ],
+  },
+  'n3m-g-42b672': {
+    meaning: 'sometimes; at times; on occasion',
+    structure: '時には（ときには）+ V',
+    explanation:
+      '時には means "now and then, on occasion" and often suggests a break from the usual: 時には休むことも大切だ "it’s important to rest sometimes". It is slightly more emphatic than 時々 and often used in advice.',
+    functions: ['frequency'],
+    examples: [
+      ex('時には 休む ことも 必要だ。', 'Sometimes you need to rest, too.', 'ときには やすむ ことも ひつようだ。'),
+      ex('時には 家族と ゆっくり 話す 時間を 作りたい。', 'I want to make time now and then to talk with my family.', 'ときには かぞくと ゆっくり はなす じかんを つくりたい。'),
+    ],
+  },
+  'n3m-g-bae494': {
+    meaning: 'it is only because of ~; it was done with ~ in mind',
+    structure: 'V-て + の こと（だ）',
+    explanation:
+      'てのこと says an action was taken with a specific reason or consideration behind it: 君のためを思ってのことだ "I did it with your best interests in mind". It defends or explains an action and is somewhat formal.',
+    functions: ['cause-reason', 'explain'],
+    examples: [
+      ex('厳しく 言ったのは、君の ことを 思っての ことだ。', 'I was strict with you because I had your interests at heart.', 'きびしく いったのは、きみの ことを おもっての ことだ。'),
+      ex('今回の 値上げは、材料費の 高騰を 考えての ことです。', 'This price rise was made in view of the soaring cost of materials.', 'こんかいの ねあげは、ざいりょうひの こうとうを かんがえての ことです。'),
+    ],
+  },
+  'n3m-g-d7e891': {
+    meaning: 'the reason ~ is (because of) …; ~ is for the purpose of …',
+    structure: 'Clause + のは + N の／plain form + ためだ',
+    explanation:
+      'This cleft pattern puts the result first and the reason or purpose in focus: 遅れたのは事故のためだ "the reason for the delay was an accident". It is more formal than のは〜からだ and common in explanations and reports.',
+    functions: ['cause-reason', 'purpose-goal'],
+    examples: [
+      ex('電車が 遅れたのは、大雪の ためだ。', 'The train was late because of the heavy snow.', 'でんしゃが おくれたのは、おおゆきの ためだ。'),
+      ex('毎朝 走って いるのは、健康の ためです。', 'I run every morning for my health.', 'まいあさ はしって いるのは、けんこうの ためです。'),
+    ],
+  },
+  'n3m-g-f25d26': {
+    meaning: 'truly; really; (as a reply) quite so',
+    structure: 'いかにも + Adj／V ／（reply）いかにも',
+    explanation:
+      'いかにも stresses that something truly looks or is a certain way: いかにも高そうな時計 "a watch that looks really expensive". As a formal reply it means "exactly, quite so". It often implies the impression is typical or obvious.',
+    functions: ['emphasize', 'similarity-degree'],
+    examples: [
+      ex('いかにも 高そうな 時計を して いる。', 'He is wearing a watch that looks really expensive.', 'いかにも たかそうな とけいを して いる。'),
+      ex('彼は いかにも 困った 顔を して いた。', 'He looked thoroughly troubled.', 'かれは いかにも こまった かおを して いた。'),
+    ],
+  },
+  'n3m-g-299796': {
+    meaning: 'typical of ~; just like ~ (to do that)',
+    structure: 'いかにも + N + らしい（らしく）',
+    explanation:
+      'いかにも〜らしい says something embodies the typical qualities of N: いかにも彼らしい答えだ "that answer is so like him". らしい here is the "typical of" suffix, not hearsay. いかにも strengthens it.',
+    functions: ['characteristics', 'similarity-degree'],
+    examples: [
+      ex('それは いかにも 彼らしい 考え方だ。', "That's exactly his way of thinking.", 'それは いかにも かれらしい かんがえかただ。'),
+      ex('今日は いかにも 秋らしい さわやかな 天気だ。', 'Today is fresh, typically autumnal weather.', 'きょうは いかにも あきらしい さわやかな てんきだ。'),
+    ],
+  },
+  'n3m-g-823dc4': {
+    meaning: 'just because ~; merely for (being) ~',
+    structure: 'Plain form／N + と いう だけで',
+    explanation:
+      'というだけで says a single fact is enough to cause a reaction, often unfairly: 若いというだけで信用されない "not trusted just because I’m young". It suggests the reaction is disproportionate.',
+    functions: ['limit', 'cause-reason'],
+    examples: [
+      ex('若いと いう だけで、意見を 聞いて もらえない。', 'Just because I am young, nobody listens to my opinion.', 'わかいと いう だけで、いけんを きいて もらえない。'),
+      ex('有名な 店と いう だけで、人が 集まる。', 'People flock to it just because it is a famous shop.', 'ゆうめいな みせと いう だけで、ひとが あつまる。'),
+    ],
+  },
+  'n3m-g-c5efc4': {
+    meaning: 'merely ~ing is not enough',
+    structure: 'ただ + V-dict + だけでは, … (不十分／だめだ)',
+    explanation:
+      'ただ〜だけでは says that doing only this will not achieve the goal: ただ読むだけでは覚えられない "you can’t memorise it just by reading". The second half is usually negative or says something more is needed.',
+    functions: ['limit', 'condition-requirement'],
+    examples: [
+      ex('ただ 本を 読む だけでは、会話は 上手に ならない。', "Just reading books won't make you good at conversation.", 'ただ ほんを よむ だけでは、かいわは じょうずに ならない。'),
+      ex('ただ 謝る だけでは、問題は 解決しない。', 'Simply apologising will not solve the problem.', 'ただ あやまる だけでは、もんだいは かいけつしない。'),
+    ],
+  },
+  'n3m-g-dd909f': {
+    meaning: 'rather than (calling it) ~, (it is more) …',
+    structure: 'A と いうより（は）、（むしろ）B',
+    explanation:
+      'というより re-labels something more accurately: 先生というより友達のような人だ "more like a friend than a teacher". The first term is not wrong, but the second fits better. むしろ often reinforces the correction.',
+    functions: ['compare', 'corrections'],
+    examples: [
+      ex('彼は 先生と いうより、友達の ような 存在だ。', 'He is more like a friend than a teacher.', 'かれは せんせいと いうより、ともだちの ような そんざいだ。'),
+      ex('この 部屋は 広いと いうより、何も ないだけだ。', "This room isn't so much spacious as just empty.", 'この へやは ひろいと いうより、なにも ないだけだ。'),
+    ],
+  },
+  'n3m-g-9d26c7': {
+    meaning: 'only; nothing but (emphatic)',
+    structure: 'N（particle）+ だけしか + negative',
+    explanation:
+      'だけしか is a doubled limiter, stressing the smallness or exclusiveness: 彼にだけしか話していない "I have told only him". Particles other than が and を go before it. It is conversational and emphatic.',
+    functions: ['limit'],
+    examples: [
+      ex('その ことは 母に だけしか 話して いない。', 'I have told only my mother about it.', 'その ことは ははに だけしか はなして いない。'),
+      ex('参加者は 三人 だけしか 集まらなかった。', 'Only three participants turned up.', 'さんかしゃは さんにん だけしか あつまらなかった。'),
+    ],
+  },
+  'n3m-g-9c7cde': {
+    meaning: '(please) do ~ for him / her (blunt request)',
+    structure: 'Person に + V-て + あげて くれ（あげて くれないか）',
+    explanation:
+      'The speaker asks the listener to do a favour for a third person: 妹に教えてあげてくれ "teach my sister, would you?". あげる marks the third person as beneficiary, くれ is a blunt, masculine request. The polite form is てあげてください.',
+    functions: ['request', 'benefit'],
+    examples: [
+      ex('弟が 困って いるから、手伝って あげて くれ。', 'My brother is in trouble, so help him out, will you?', 'おとうとが こまって いるから、てつだって あげて くれ。'),
+      ex('あの 子に 道を 教えて あげて くれないか。', 'Could you show that child the way?', 'あの こに みちを おしえて あげて くれないか。'),
+    ],
+  },
+  'n3m-g-727eaa': {
+    meaning: 'very; extremely (formal)',
+    structure: '非常に（ひじょうに）+ Adj／V',
+    explanation:
+      '非常に is a formal "very", common in writing, news and speeches: 非常に危険だ. In conversation とても or すごく is more natural. As a noun, 非常 means "emergency" (非常口 "emergency exit").',
+    functions: ['level'],
+    examples: [
+      ex('この 川は 流れが 速くて、非常に 危険です。', 'This river flows fast and is extremely dangerous.', 'この かわは ながれが はやくて、ひじょうに きけんです。'),
+      ex('ご協力 いただき、非常に 助かりました。', 'Your cooperation was a great help.', 'ごきょうりょく いただき、ひじょうに たすかりました。'),
+    ],
+  },
+  'n3m-g-1f0ffa': {
+    meaning: 'half-done; in the middle of ~ (left unfinished)',
+    structure: 'V-ます stem + かけの + N ／ かけだ ／ かける',
+    explanation:
+      'かけ describes an action begun but not finished: 読みかけの本 "a half-read book", 食べかけのパン. The verb かける after a stem means "start to, be about to": 言いかけてやめた "started to say something and stopped".',
+    functions: ['halfway'],
+    examples: [
+      ex('机の 上に 読みかけの 本が ある。', 'There is a half-read book on the desk.', 'つくえの うえに よみかけの ほんが ある。'),
+      ex('彼は 何か 言いかけて、黙って しまった。', 'He started to say something, then fell silent.', 'かれは なにか いいかけて、だまって しまった。'),
+    ],
+  },
+  'n3m-g-b44660': {
+    meaning: 'it is not impossible that ~; there is a slight chance',
+    structure: 'Plain form (V-ない／ありえない) + ことは ない',
+    explanation:
+      'With a non-potential verb, ないことはない acknowledges a remote possibility: 雨が降らないことはない "it’s not impossible that it’ll rain". With adjectives it gives grudging agreement: おいしくないことはない "it’s not that it’s bad". The tone is hesitant.',
+    functions: ['negative', 'speculation'],
+    examples: [
+      ex('今から でも 間に合わない ことは ない。', "It's not impossible that we'll make it, even now.", 'いまから でも まにあわない ことは ない。'),
+      ex('おいしくない ことは ないが、少し 高い。', "It's not bad, but it is a little expensive.", 'おいしくない ことは ないが、すこし たかい。'),
+    ],
+  },
+  'n3m-g-a0b172': {
+    meaning: 'to get off with (only) ~; ~ is enough',
+    structure: 'V-て／N で + 済む（済んだ）／ V-ずに 済む',
+    explanation:
+      '済む says a matter is settled with less than expected: 電話で済む "a phone call will do", 軽いけがで済んだ "escaped with a minor injury". ずに済む means avoiding something: 謝らずに済んだ "got away without having to apologise".',
+    functions: ['condition-requirement', 'result'],
+    examples: [
+      ex('幸い、軽い けがで 済んだ。', 'Fortunately, I got away with only a slight injury.', 'さいわい、かるい けがで すんだ。'),
+      ex('友達が 貸して くれたので、新しいのを 買わずに 済んだ。', 'A friend lent me one, so I did not need to buy a new one.', 'ともだちが かして くれたので、あたらしいのを かわずに すんだ。'),
+    ],
+  },
+  'n3m-g-2f3e63': {
+    meaning: 'do things like ~ (and so on)',
+    structure: 'V-ます stem／N + など + する',
+    explanation:
+      'などする gives one action as an example of what was done: 本を読むなどして過ごした "spent the time reading and so on". It softens a statement by implying other activities. In writing, V-stem + などして is common.',
+    functions: ['denote-by-example'],
+    examples: [
+      ex('休みの 日は 散歩を するなど して 過ごして いる。', 'On days off I spend my time taking walks and so on.', 'やすみの ひは さんぽを するなど して すごして いる。'),
+      ex('資料を 調べるなど して、準備を 進めた。', 'I got ready by looking over the materials and so on.', 'しりょうを しらべるなど して、じゅんびを すすめた。'),
+    ],
+  },
+  'n3m-g-64abd6': {
+    meaning: 'no matter what; at any cost',
+    structure: '何が 何でも（なにが なんでも）+ V（volitional／たい）',
+    explanation:
+      '何が何でも is a very strong "no matter what", showing determination: 何が何でも勝ちたい "I want to win at all costs". It is stronger and more emotional than どうしても or なんとしても.',
+    functions: ['determination-decision'],
+    examples: [
+      ex('今度の 試合は 何が 何でも 勝ちたい。', 'I want to win the next match no matter what.', 'こんどの しあいは なにが なんでも かちたい。'),
+      ex('何が 何でも、明日までに 終わらせる。', 'I will finish it by tomorrow, whatever it takes.', 'なにが なんでも、あしたまでに おわらせる。'),
+    ],
+  },
+  'n3m-g-6f625f': {
+    meaning: 'yet again; once again',
+    structure: 'またもや + V-た',
+    explanation:
+      'またもや is a literary, emphatic "again", used for repeated and usually unwelcome events: またもや事故が起きた. It is common in news and narration. またしても is a close synonym.',
+    functions: ['repeat-habits'],
+    examples: [
+      ex('同じ 交差点で、またもや 事故が 起きた。', 'Another accident occurred at the same intersection.', 'おなじ こうさてんで、またもや じこが おきた。'),
+      ex('彼は またもや 約束を 忘れた。', 'He forgot his promise yet again.', 'かれは またもや やくそくを わすれた。'),
+    ],
+  },
+  'n3m-g-a53bff': {
+    meaning: "it's nothing; no big deal",
+    structure: 'なんて こと（は）ない ／ なんて ことない + N',
+    explanation:
+      'なんてことない says something is trivial or easy: こんな仕事、なんてことないよ "this job is nothing". Before a noun it means "ordinary, unremarkable": なんてことない毎日. It is casual.',
+    functions: ['negative', 'evaluate'],
+    examples: [
+      ex('この くらいの 距離、歩いても なんて ことない。', 'Walking this far is no big deal.', 'この くらいの きょり、あるいても なんて ことない。'),
+      ex('なんて ことない 毎日が、実は 幸せなのだ。', 'Ordinary days are, in fact, happiness.', 'なんて ことない まいにちが、じつは しあわせなのだ。'),
+    ],
+  },
+  'n3m-g-78e188': {
+    meaning: 'cannot readily / lightly ~',
+    structure: 'おいそれと（は）+ V-potential negative',
+    explanation:
+      'おいそれとは〜ない says something cannot be done casually or on the spot: おいそれとは買えない値段 "a price you can’t just pay on a whim". It always goes with a negative, usually a potential.',
+    functions: ['negative', 'ability'],
+    examples: [
+      ex('こんなに 高い 物は、おいそれとは 買えない。', "I can't just casually buy something this expensive.", 'こんなに たかい ものは、おいそれとは かえない。'),
+      ex('大事な 決定なので、おいそれと 返事は できない。', "It's an important decision, so I can't give an answer right away.", 'だいじな けっていなので、おいそれと へんじは できない。'),
+    ],
+  },
+  'n3m-g-eec334': {
+    meaning: '~ or perhaps …',
+    structure: 'A か あるいは B',
+    explanation:
+      'かあるいは joins two alternatives with a slight formality: 電話かあるいはメールで "by phone or perhaps email". It is more written than か alone and less formal than または. It can also join clauses of possibility.',
+    functions: ['selective'],
+    examples: [
+      ex('ご質問は 電話か あるいは メールで どうぞ。', 'For questions, please use phone or email.', 'ごしつもんは でんわか あるいは めーるで どうぞ。'),
+      ex('彼は 図書館か あるいは カフェに いる だろう。', 'He is probably at the library or perhaps a café.', 'かれは としょかんか あるいは かふぇに いる だろう。'),
+    ],
+  },
+  'n3m-g-59fc38': {
+    meaning: 'even if (by some slim chance) ~',
+    structure: 'もし + plain form + と しても',
+    explanation:
+      'もし〜としても concedes a hypothetical the speaker thinks unlikely: もし宝くじが当たったとしても、仕事は辞めない. The main clause states that the speaker’s position still holds.',
+    functions: ['concessions', 'assumptions'],
+    examples: [
+      ex('もし 宝くじが 当たったと しても、仕事は 続ける。', 'Even if I won the lottery, I would keep working.', 'もし たからくじが あたったと しても、しごとは つづける。'),
+      ex('もし 反対されたと しても、自分で 決めた ことを やる。', 'Even if people were to object, I would do what I decided.', 'もし はんたいされたと しても、じぶんで きめた ことを やる。'),
+    ],
+  },
+  'n3m-g-66adcc': {
+    meaning: '~ or something (casual)',
+    structure: 'N／V + か なんか',
+    explanation:
+      'かなんか is the casual pronunciation of か何か: 風邪かなんかで休んでいる "off with a cold or something". It also follows verbs: 映画を見るかなんかしよう "let’s watch a film or something".',
+    functions: ['vague'],
+    examples: [
+      ex('お茶か なんか 飲む？', 'Want some tea or something?', 'おちゃか なんか のむ？'),
+      ex('週末は 映画を 見るか なんか しよう。', "Let's watch a film or something this weekend.", 'しゅうまつは えいがを みるか なんか しよう。'),
+    ],
+  },
+  'n3m-g-fb48aa': {
+    meaning: 'and yet; despite that (critical)',
+    structure: 'Sentence／clause + そのくせ、+ contradicting fact',
+    explanation:
+      'そのくせ points out an inconsistency in someone’s behaviour, with criticism: 彼は文句ばかり言う。そのくせ、自分は何もしない "he complains all the time, yet does nothing himself". It is about other people, not the speaker.',
+    functions: ['contrast', 'criticize'],
+    examples: [
+      ex('彼は 早く 寝ろと 言う。そのくせ、自分は 夜中まで 起きて いる。', 'He tells me to go to bed early, yet he stays up until midnight himself.', 'かれは はやく ねろと いう。そのくせ、じぶんは よなかまで おきて いる。'),
+      ex('妹は 太ると 言いながら、そのくせ お菓子ばかり 食べて いる。', 'My sister says she will put on weight, yet she eats nothing but sweets.', 'いもうとは ふとると いいながら、そのくせ おかしばかり たべて いる。'),
+    ],
+  },
+  'n3m-g-f884d0': {
+    meaning: 'can be seen; (a person) arrives / shows up (honorific)',
+    structure: 'N が + 見える ／ Person が + 見える（＝来る, respectful）',
+    explanation:
+      '見える means something is naturally visible: 窓から海が見える. It is also a respectful way to say a guest has arrived: お客様が見えました "the guest has arrived". This second use is common in offices and homes.',
+    functions: ['ability', 'reverent-humble'],
+    examples: [
+      ex('晴れた 日には、ここから 富士山が 見える。', 'On clear days you can see Mount Fuji from here.', 'はれた ひには、ここから ふじさんが みえる。'),
+      ex('部長、お客様が 見えました。', 'Sir, the visitor has arrived.', 'ぶちょう、おきゃくさまが みえました。'),
+    ],
+  },
+  'n3m-g-6a2f94': {
+    meaning: 'even supposing ~ (casual としたって)',
+    structure: 'もし + plain form + と したって',
+    explanation:
+      'としたって is the colloquial form of としても: もし遅れたとしたって、誰も怒らないよ. It sounds relaxed or dismissive. It is common in speech between friends.',
+    functions: ['concessions'],
+    examples: [
+      ex('もし 少し 遅れたと したって、大丈夫だよ。', "Even if we're a bit late, it'll be fine.", 'もし すこし おくれたと したって、だいじょうぶだよ。'),
+      ex('今から 行ったと したって、もう 閉まってるよ。', "Even if we went now, it'd be closed.", 'いまから いったと したって、もう しまってるよ。'),
+    ],
+  },
+  'n3m-g-fd4c45': {
+    meaning: 'nothing is as ~ as …; there is nothing more ~ than …',
+    structure: 'N／V-dict + くらい（ほど）+ Adj + N は ない',
+    explanation:
+      'くらい〜はない picks out something as the extreme case: 家族ほど大切なものはない "nothing is as precious as family". くらい and ほど are interchangeable here. The speaker expresses a strong personal evaluation.',
+    functions: ['highest-level', 'compare'],
+    examples: [
+      ex('健康 くらい 大切な ものは ない。', 'Nothing is as important as health.', 'けんこう くらい たいせつな ものは ない。'),
+      ex('夏の 夜に 飲む ビール くらい おいしい ものは ない。', 'There is nothing as delicious as beer on a summer night.', 'なつの よるに のむ びーる くらい おいしい ものは ない。'),
+    ],
+  },
+  'n3m-g-4cc658': {
+    meaning: '(respected person) is ~ing (honorific ている)',
+    structure: 'V-て + おられる（おられます）',
+    explanation:
+      'ておられる is おる (humble いる) made respectful with られる, used for the continuing actions of respected people: 先生は研究を続けておられる. It is common in western Japan and formal speech; ていらっしゃる is the standard alternative.',
+    functions: ['reverent-humble'],
+    examples: [
+      ex('先生は 今も 研究を 続けて おられます。', 'The professor is still continuing his research.', 'せんせいは いまも けんきゅうを つづけて おられます。'),
+      ex('社長は 何と 言って おられましたか。', 'What was the president saying?', 'しゃちょうは なんと いって おられましたか。'),
+    ],
+  },
+  'n3m-g-4da6a7': {
+    meaning: '(humbly) I will ~; allow me to ~',
+    structure: 'V-causative-て + いただく（させて いただきます）',
+    explanation:
+      'させていただく presents the speaker’s own action as done with the listener’s permission, which makes it humble: 本日は休ませていただきます. In business it is used very widely, sometimes where no permission is involved, which some people find overdone.',
+    functions: ['request-permission', 'reverent-humble'],
+    examples: [
+      ex('本日は 体調不良の ため、休ませて いただきます。', 'I will be taking today off as I am unwell.', 'ほんじつは たいちょうふりょうの ため、やすませて いただきます。'),
+      ex('それでは、説明させて いただきます。', 'Now, allow me to explain.', 'それでは、せつめいさせて いただきます。'),
+    ],
+  },
+  'n3m-g-bf71cb': {
+    meaning: 'everything; all of it (without exception)',
+    structure: '何もかも（なにもかも）+ V',
+    explanation:
+      '何もかも means "absolutely everything", stronger than 全部: 何もかも忘れたい "I want to forget everything". It is often used emotionally, for a clean slate or total loss.',
+    functions: ['emphasize', 'amount'],
+    examples: [
+      ex('火事で 何もかも 失って しまった。', 'I lost everything in the fire.', 'かじで なにもかも うしなって しまった。'),
+      ex('何もかも 忘れて、旅に 出たい。', 'I want to forget everything and go travelling.', 'なにもかも わすれて、たびに でたい。'),
+    ],
+  },
+  'n3m-g-7f1426': {
+    meaning: 'not to the extent of (being called) ~',
+    structure: 'Plain form／N + と いう ほどでは ない',
+    explanation:
+      'というほどではない says a word would overstate the case: 病気というほどではない "it’s not so bad you’d call it an illness". It softens a description. ほどではない alone also works after verbs and adjectives.',
+    functions: ['level', 'negative'],
+    examples: [
+      ex('少し 熱が あるが、病気と いう ほどでは ない。', "I have a slight fever, but it's not bad enough to call it being ill.", 'すこし ねつが あるが、びょうきと いう ほどでは ない。'),
+      ex('料理は 得意と いう ほどでは ないが、好きだ。', "I wouldn't say I'm good at cooking, but I like it.", 'りょうりは とくいと いう ほどでは ないが、すきだ。'),
+    ],
+  },
+  'n3m-g-9b78d2': {
+    meaning: 'nothing special; for no particular reason',
+    structure: 'なんと いう ことも ない（なんと いう ことも なく）',
+    explanation:
+      'なんということもない describes something unremarkable: なんということもない風景 "an ordinary landscape". As an adverb, なんということもなく means "for no particular reason, idly": なんということもなく町を歩いた.',
+    functions: ['negative', 'vague'],
+    examples: [
+      ex('それは なんと いう ことも ない 普通の 一日だった。', 'It was an ordinary day, nothing special.', 'それは なんと いう ことも ない ふつうの いちにちだった。'),
+      ex('なんと いう ことも なく、駅前を ぶらぶら 歩いた。', 'I wandered around by the station for no particular reason.', 'なんと いう ことも なく、えきまえを ぶらぶら あるいた。'),
+    ],
+  },
+  'n3m-g-ec0b7d': {
+    meaning: 'however much you say ~, (still) …',
+    structure: 'いくら + plain form／N + と いっても',
+    explanation:
+      'いくら〜といっても concedes an argument but insists on a limit: いくら安いといっても、これは買いすぎだ "cheap or not, this is buying too much". It pushes back against an excuse.',
+    functions: ['concessions'],
+    examples: [
+      ex('いくら 安いと いっても、こんなに 買う 必要は ない。', "Cheap or not, there's no need to buy this much.", 'いくら やすいと いっても、こんなに かう ひつようは ない。'),
+      ex('いくら 子供だと いっても、それは 許されない。', "He may be a child, but that can't be allowed.", 'いくら こどもだと いっても、それは ゆるされない。'),
+    ],
+  },
+  'n3m-g-714604': {
+    meaning: 'if ~ had happened, (it) would have been …',
+    structure: 'V-ば + … + ところだった ／ V-ば + … + ところだ',
+    explanation:
+      'A counterfactual: if the condition had been met, the result would have happened. もう少し遅ければ事故に遭うところだった "a little later and I would have been in an accident". It often expresses relief at a narrow escape.',
+    functions: ['condition-contrary'],
+    examples: [
+      ex('もう 少し 遅ければ、電車に 乗り遅れる ところだった。', 'Any later and I would have missed the train.', 'もう すこし おそければ、でんしゃに のりおくれる ところだった。'),
+      ex('君が 注意して くれなければ、間違える ところだった。', 'If you had not warned me, I would have made a mistake.', 'きみが ちゅういして くれなければ、まちがえる ところだった。'),
+    ],
+  },
+  'n3m-g-9bc4e1': {
+    meaning: 'supposing ~; for argument’s sake, if ~',
+    structure: '仮に（かりに）+ V-たら／V-ば／と したら',
+    explanation:
+      '仮に marks a condition as purely hypothetical, for discussion or planning: 仮に明日雨が降ったら、どうしますか. It is a little more formal than もし and common in business and debate.',
+    functions: ['condition', 'assumptions'],
+    examples: [
+      ex('仮に 明日 雨だったら、試合は どう なりますか。', 'Supposing it rains tomorrow, what happens to the match?', 'かりに あした あめだったら、しあいは どう なりますか。'),
+      ex('仮に 百万円 あれば、何に 使いますか。', 'Say you had a million yen, what would you spend it on?', 'かりに ひゃくまんえん あれば、なにに つかいますか。'),
+    ],
+  },
+  'n3m-g-9cc8f9': {
+    meaning: 'no matter how (much) ~ (formal)',
+    structure: 'いかに + V-volitional + と（も）',
+    explanation:
+      'いかに〜ようと(も) is a formal concession, "however much one may ~": いかに努力しようと、結果が全てだ. It is written and rhetorical. The everyday version is どんなに〜ても.',
+    functions: ['concessions'],
+    examples: [
+      ex('いかに 反対されようと、私は 考えを 変えない。', 'However strongly I am opposed, I will not change my mind.', 'いかに はんたいされようと、わたしは かんがえを かえない。'),
+      ex('いかに 急ごうとも、もう 間に合わない。', 'No matter how fast we hurry, we will not make it now.', 'いかに いそごうとも、もう まにあわない。'),
+    ],
+  },
+  'n3m-g-df5b15': {
+    meaning: 'hardly any; not much (at all)',
+    structure: 'いくらも + negative',
+    explanation:
+      'いくらも with a negative says an amount is very small: 時間はいくらも残っていない "there’s hardly any time left". It is close to あまり〜ない but stresses scarcity more.',
+    functions: ['amount', 'negative'],
+    examples: [
+      ex('締め切りまで、時間は いくらも 残って いない。', 'There is hardly any time left before the deadline.', 'しめきりまで、じかんは いくらも のこって いない。'),
+      ex('財布には お金が いくらも 入って いなかった。', 'There was hardly any money in the wallet.', 'さいふには おかねが いくらも はいって いなかった。'),
+    ],
+  },
+  'n3m-g-b7ca07': {
+    meaning: 'really does look ~ (appearance)',
+    structure: 'いかにも + V-stem／Adj stem + そうだ',
+    explanation:
+      'いかにも strengthens the appearance そうだ: いかにもおいしそうだ "it looks absolutely delicious". The impression is obvious to anyone looking. It is not the hearsay そうだ, which follows a full plain form.',
+    functions: ['similarity-degree', 'emphasize'],
+    examples: [
+      ex('この ケーキは いかにも おいしそうだ。', 'This cake looks absolutely delicious.', 'この けーきは いかにも おいしそうだ。'),
+      ex('彼は いかにも 退屈そうに 話を 聞いて いた。', 'He was listening with a thoroughly bored look.', 'かれは いかにも たいくつそうに はなしを きいて いた。'),
+    ],
+  },
+  'n3m-g-bbaa86': {
+    meaning: 'not displeased; actually rather pleased',
+    structure: 'まんざらでも ない（様子／顔）',
+    explanation:
+      'まんざらでもない is a fixed understatement: someone looks outwardly modest but is actually pleased: 褒められてまんざらでもない顔 "a face that says he didn’t mind the praise". It describes other people’s reactions.',
+    functions: ['evaluate', 'feel'],
+    examples: [
+      ex('「いい 声だね」と 言われて、彼は まんざらでも ない 様子だった。', 'Told he had a good voice, he looked rather pleased.', '「いい こえだね」と いわれて、かれは まんざらでも ない ようすだった。'),
+      ex('妹は 文句を 言いながらも、まんざらでも ない 顔を して いた。', 'My sister grumbled, but she looked quite pleased.', 'いもうとは もんくを いいながらも、まんざらでも ない かおを して いた。'),
+    ],
+  },
+  'n3m-g-b490d6': {
+    meaning: 'it seems like ~, and also like … (mixed impression)',
+    structure: 'A ようでも あり, B ようでも ある',
+    explanation:
+      'This pattern expresses an ambivalent impression: 嬉しいようでもあり、寂しいようでもある "I feel both happy and sad". Both halves are uncertain, and neither is chosen. It is reflective and a little literary.',
+    functions: ['speculation', 'listed'],
+    examples: [
+      ex('卒業は うれしい ようでも あり、寂しい ようでも ある。', 'Graduating feels both happy and sad.', 'そつぎょうは うれしい ようでも あり、さびしい ようでも ある。'),
+      ex('その 話は 本当の ようでも あり、嘘の ようでも ある。', 'That story sounds both true and false.', 'その はなしは ほんとうの ようでも あり、うその ようでも ある。'),
+    ],
+  },
+  'n3m-g-dea9b2': {
+    meaning: 'it goes without saying that ~',
+    structure: 'Plain form (N／Na である) + の は 言う までも ない',
+    explanation:
+      'At the end of a sentence, のは言うまでもない states something as self-evident: 健康が大切なのは言うまでもない. It is formal and common in essays. As a sentence opener, 言うまでもなく does the same job.',
+    functions: ['of-course'],
+    examples: [
+      ex('健康が 何より 大切なのは 言う までも ない。', 'It goes without saying that health comes first.', 'けんこうが なにより たいせつなのは いう までも ない。'),
+      ex('準備が 必要なのは 言う までも ありません。', 'Needless to say, preparation is necessary.', 'じゅんびが ひつようなのは いう までも ありません。'),
+    ],
+  },
 };
