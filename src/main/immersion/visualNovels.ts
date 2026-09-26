@@ -50,7 +50,7 @@ import type {
   VisualNovelSessionState,
   VisualNovelStudyTime,
 } from '../../shared/visualNovelCapture';
-import { cacheVndbArt, isVndbArtUrl, vndbQuery } from './vndbClient';
+import { cacheVndbArt, isVndbArtUrl, vndbFailureCode, vndbQuery } from './vndbClient';
 import { createCaptureSession, type CaptureSocket } from './visualNovelCaptureSession';
 import {
   candidateGameNames,
@@ -914,7 +914,11 @@ export function registerVisualNovelIpc(): void {
     try {
       return { ok: true as const, results: await searchVndb(query) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false as const,
+        errorCode: vndbFailureCode(error),
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
 
@@ -933,7 +937,11 @@ export function registerVisualNovelIpc(): void {
     try {
       return { ok: true as const, results: await recommendVndbCandidates(request) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false as const,
+        errorCode: vndbFailureCode(error),
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
 
@@ -941,7 +949,11 @@ export function registerVisualNovelIpc(): void {
     try {
       return { ok: true as const, details: await fetchVndbSourceDetails(providerId) };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ok: false as const,
+        errorCode: vndbFailureCode(error),
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   });
 

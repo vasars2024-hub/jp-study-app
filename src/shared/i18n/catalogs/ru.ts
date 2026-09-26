@@ -767,6 +767,10 @@ export const ru: Catalog = {
   'vnSource.view': 'Открыть',
   'vnSource.apply': 'Применить',
   'vnSource.msg.searchFailed': 'Не удалось выполнить поиск в VNDB.',
+  'vnSource.error.offline': 'Не удалось связаться с VNDB. Проверьте подключение и повторите поиск.',
+  'vnSource.error.timeout': 'VNDB слишком долго не отвечал. Повторите поиск чуть позже.',
+  'vnSource.error.rateLimited': 'VNDB сейчас ограничивает запросы. Подождите минуту и повторите поиск.',
+  'vnSource.error.service': 'У VNDB сейчас неполадки. Попробуйте позже.',
   'vnSource.msg.found': {
     one: 'Найдено {count} совпадение в VNDB.',
     few: 'Найдено {count} совпадения в VNDB.',

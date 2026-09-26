@@ -2732,6 +2732,7 @@ const api = {
     ok: boolean;
     results?: import('./shared/visualNovel').VisualNovelSourceResult[];
     error?: string;
+    errorCode?: import('./shared/resilience').FailureCode;
   }> => ipcRenderer.invoke('visual-novel:searchSource', query),
   visualNovelSourceDetails: (
     providerId: string,
@@ -2739,6 +2740,7 @@ const api = {
     ok: boolean;
     details?: import('./shared/visualNovel').VisualNovelSourceDetails;
     error?: string;
+    errorCode?: import('./shared/resilience').FailureCode;
   }> => ipcRenderer.invoke('visual-novel:sourceDetails', providerId),
   visualNovelPickExecutable: (): Promise<string | null> =>
     ipcRenderer.invoke('visual-novel:pickExecutable'),
@@ -2972,6 +2974,7 @@ const api = {
     ok: boolean;
     results?: import('./shared/visualNovel').VisualNovelSourceResult[];
     error?: string;
+    errorCode?: import('./shared/resilience').FailureCode;
   }> => ipcRenderer.invoke('visual-novel:recommendCandidates', request),
   onVisualNovelChanged: (
     cb: (database: import('./shared/visualNovel').VisualNovelDatabase) => void,

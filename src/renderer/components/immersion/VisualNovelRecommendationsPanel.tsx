@@ -13,6 +13,7 @@ import {
   type VisualNovelRecommendation,
 } from '../../../shared/visualNovelRecommendations';
 import VisualNovelArt from './VisualNovelArt';
+import { vndbFailureKey } from '../../../shared/visualNovelSourceFailure';
 
 function reasonText(
   codes: readonly VisualNovelReasonCode[],
@@ -52,10 +53,10 @@ export default function VisualNovelRecommendationsPanel({
   const discover = async (): Promise<void> => {
     setBusy(true);
     const response = await window.api.visualNovelRecommendCandidates(visualNovelCandidateRequest(entries, context))
-      .catch(() => ({ ok: false as const, results: undefined, error: undefined }));
+      .catch(() => ({ ok: false as const, results: undefined, error: undefined, errorCode: undefined }));
     setBusy(false);
     if (!response.ok || !response.results) {
-      onStatus(response.error ?? t('vnRecs.discoverFailed'), true);
+      onStatus(t(vndbFailureKey(response.errorCode, 'vnRecs.discoverFailed')), true);
       return;
     }
     setCandidates(rankVisualNovelSourceResults(response.results, context).slice(0, 6));

@@ -1676,11 +1676,13 @@ declare global {
         ok: boolean;
         results?: import('../shared/visualNovel').VisualNovelSourceResult[];
         error?: string;
+        errorCode?: import('../shared/resilience').FailureCode;
       }>;
       visualNovelSourceDetails(providerId: string): Promise<{
         ok: boolean;
         details?: import('../shared/visualNovel').VisualNovelSourceDetails;
         error?: string;
+        errorCode?: import('../shared/resilience').FailureCode;
       }>;
       visualNovelPickExecutable(): Promise<string | null>;
       visualNovelDiscoverFolder(): Promise<import('../shared/visualNovel').VisualNovelDiscoveryCandidate[]>;
@@ -1861,6 +1863,7 @@ declare global {
         ok: boolean;
         results?: import('../shared/visualNovel').VisualNovelSourceResult[];
         error?: string;
+        errorCode?: import('../shared/resilience').FailureCode;
       }>;
       onVisualNovelChanged(
         cb: (database: import('../shared/visualNovel').VisualNovelDatabase) => void,

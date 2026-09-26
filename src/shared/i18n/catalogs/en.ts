@@ -751,6 +751,10 @@ export const en: Catalog = {
   'vnSource.view': 'View',
   'vnSource.apply': 'Apply',
   'vnSource.msg.searchFailed': 'VNDB search failed.',
+  'vnSource.error.offline': 'VNDB could not be reached. Check your connection and search again.',
+  'vnSource.error.timeout': 'VNDB took too long to answer. Search again in a moment.',
+  'vnSource.error.rateLimited': 'VNDB is limiting requests right now. Wait a minute, then search again.',
+  'vnSource.error.service': 'VNDB is having trouble right now. Try again later.',
   'vnSource.msg.found': {
     one: 'Found {count} VNDB match.',
     other: 'Found {count} VNDB matches.',
