@@ -1032,4 +1032,435 @@ export const AUTHORED_N4: Record<string, AuthoredGrammarContent> = {
       ex('私にも 少し 運転させて くれない？', "Won't you let me drive a bit too?", 'わたしにも すこし うんてんさせて くれない？'),
     ],
   },
+  'n4m-g-0376f5': {
+    meaning: 'why not try ~?; how about trying ~?',
+    structure: 'V-て形 + みたらどう（ですか／かな）',
+    explanation:
+      'Combines てみる (“try doing”) with たらどう (“how about if”), so it suggests the listener give something a try. It is friendly advice between equals; to a superior use てみてはいかがですか. Without みる, たらどう suggests the action itself rather than an experiment.',
+    functions: ['advice', 'invite-suggest'],
+    examples: [
+      ex('一度 先生に 相談してみたら どう？', 'Why not try talking it over with your teacher?', 'いちど せんせいに そうだんしてみたら どう？'),
+      ex('そんなに 気に なるなら、本人に 聞いてみたら どうですか。', "If it bothers you that much, why don't you try asking them directly?", 'そんなに きに なるなら、ほんにんに きいてみたら どうですか。'),
+    ],
+  },
+  'n4m-g-e0ea88': {
+    structure: 'V-ない形 → V-なければ／なくちゃ／ないと + いけない／だめだ',
+    explanation:
+      'Literally “if you do not ~, it will not do”: must, have to. ないといけない is the everyday spoken form; なければならない is the written or formal one, and なくちゃ / ないと alone are the casual clipped versions. だめだ in place of いけない sounds more personal and emphatic.',
+    functions: ['necessary-obligation'],
+    examples: [
+      ex('明日は 早く 起きないと いけない。', 'I have to get up early tomorrow.', 'あしたは はやく おきないと いけない。'),
+      ex('薬は 毎日 飲まないと だめですよ。', 'You must take the medicine every day.', 'くすりは まいにち のまないと だめですよ。'),
+    ],
+  },
+  'n4m-g-3a2041': {
+    meaning: "it's not (that) ~, but …; not to ~, but …",
+    structure: 'N + じゃないが（ではないが）, …',
+    explanation:
+      'Sets up a disclaimer before the real point: “It is not ~, but …”. Fixed openers such as 自慢じゃないが (“not to brag, but”) and 言い訳じゃないが (“this is no excuse, but”) are the common uses. The tone is casual and slightly masculine; ではないが or じゃないけど is softer.',
+    functions: ['contrast'],
+    examples: [
+      ex('自慢じゃないが、料理は 得意なんだ。', "Not to brag, but I'm a good cook.", 'じまんじゃないが、りょうりは とくいなんだ。'),
+      ex('言い訳じゃないが、電車が 止まって いたんだ。', "It's no excuse, but the trains had stopped.", 'いいわけじゃないが、でんしゃが とまって いたんだ。'),
+    ],
+  },
+  'n4m-g-0d5e06': {
+    meaning: "unless you ~, you can't …; if you don't ~, … won't",
+    structure: 'V-ない形 + と、… + V-ない（できない／分からない）',
+    explanation:
+      'A negative condition followed by a negative result: without A, B does not happen. It states a requirement and is close to なければ〜ない. The second half is typically a potential or 分からない, e.g. 予約しないと入れない “you can’t get in without booking”.',
+    functions: ['condition-requirement', 'negative'],
+    examples: [
+      ex('予約しないと その 店には 入れない。', "You can't get into that restaurant without a reservation.", 'よやくしないと その みせには はいれない。'),
+      ex('実際に 使ってみないと 分からない。', "You won't know until you actually try it.", 'じっさいに つかってみないと わからない。'),
+    ],
+  },
+  'n4m-g-18306f': {
+    meaning: 'to make something ~ (change its state on purpose)',
+    structure: 'N を + Adj-く／Na-adj に + する',
+    explanation:
+      'Someone deliberately changes the state of something: い-adjectives take く (小さくする), な-adjectives and nouns take に (きれいにする, 半分にする). Compare 〜くなる / 〜になる, which describe a change that simply happens.',
+    functions: ['modify', 'action-effort'],
+    examples: [
+      ex('テレビの 音を 小さく して ください。', 'Please turn the TV down.', 'てれびの おとを ちいさく して ください。'),
+      ex('お客さんが 来るから、部屋を きれいに しよう。', "We have guests coming, so let's tidy the room.", 'おきゃくさんが くるから、へやを きれいに しよう。'),
+    ],
+  },
+  'n4m-g-82504f': {
+    structure: 'Plain form (N / Na without だ) + だろうか',
+    explanation:
+      'A question addressed mainly to oneself: “I wonder if ~”. It is reflective and fairly written; in speech people usually say かな or でしょうか. In essays it can also pose a rhetorical question the writer goes on to answer.',
+    functions: ['speculation'],
+    examples: [
+      ex('この 計画は 本当に うまく いくだろうか。', 'I wonder whether this plan will really work.', 'この けいかくは ほんとうに うまく いくだろうか。'),
+      ex('彼は なぜ 何も 言わなかったのだろうか。', 'I wonder why he said nothing.', 'かれは なぜ なにも いわなかったのだろうか。'),
+    ],
+  },
+  'n4m-g-99e6b1': {
+    meaning: "I'd like to ~ (so could you help?)",
+    structure: 'V-ます stem + たいんですが（…）',
+    explanation:
+      'A soft opener for a request or inquiry: the speaker states what they want and leaves the rest unsaid, inviting the listener to help. The ん gives the reason-for-talking nuance and が trails off politely. It is the standard way to start at a counter or on the phone.',
+    functions: ['desire', 'request'],
+    examples: [
+      ex('すみません、この 荷物を 送りたいんですが。', "Excuse me, I'd like to send this package.", 'すみません、この にもつを おくりたいんですが。'),
+      ex('来週の 予約を 変えたいんですが、大丈夫ですか。', "I'd like to change next week's booking. Is that possible?", 'らいしゅうの よやくを かえたいんですが、だいじょうぶですか。'),
+    ],
+  },
+  'n4m-g-5a5b8d': {
+    meaning: 'no matter how much (often) ~; whether ~ or ~',
+    structure: 'V-て形 + も + (same) V-て形 + も',
+    explanation:
+      'Repeating the same verb in ても stresses that the effort keeps failing: 洗っても洗っても落ちない “however much I wash it, it won’t come off”. With two different verbs or adjectives it means “whether A or B, the result is the same”.',
+    functions: ['concessions', 'emphasize'],
+    examples: [
+      ex('洗っても 洗っても、汚れが 落ちない。', "No matter how much I wash it, the stain won't come out.", 'あらっても あらっても、よごれが おちない。'),
+      ex('雨が 降っても 雪が 降っても、試合は 行われる。', 'Rain or snow, the match will go ahead.', 'あめが ふっても ゆきが ふっても、しあいは おこなわれる。'),
+    ],
+  },
+  'n4m-g-4a8027': {
+    structure: 'V-て形 + くれない（か／？）',
+    explanation:
+      'A request phrased as a negative question: “won’t you ~ for me?”. てくれない? with rising intonation is casual and gentle; てくれないか is blunter and masculine. The polite forms are てくれませんか and, more politely, てくださいませんか.',
+    functions: ['request'],
+    examples: [
+      ex('ちょっと 窓を 開けて くれない？', "Could you open the window a bit?", 'ちょっと まどを あけて くれない？'),
+      ex('悪いけど、駅まで 送って くれないか。', "Sorry, but would you drive me to the station?", 'わるいけど、えきまで おくって くれないか。'),
+    ],
+  },
+  'n4m-g-c1b64d': {
+    meaning: '(a new ~) is built / opens (at a place); ~ is ready',
+    structure: 'Place + に + N + が + できる（できた）',
+    explanation:
+      'Besides “can do”, できる means “come into being”: a building, shop or road is completed, or something is ready. The place takes に and the new thing takes が: 駅前にコンビニができた. It also covers food and work being finished: 晩ご飯ができたよ.',
+    functions: ['result', 'finish'],
+    examples: [
+      ex('駅の 前に 新しい 図書館が できた。', 'A new library has opened in front of the station.', 'えきの まえに あたらしい としょかんが できた。'),
+      ex('晩ご飯が できたよ。早く おいで。', "Dinner's ready. Come and eat.", 'ばんごはんが できたよ。はやく おいで。'),
+    ],
+  },
+  'n4m-g-084748': {
+    meaning: "I'll show you (I will definitely ~); to show someone how",
+    structure: 'V-て形 + みせる',
+    explanation:
+      'Two uses. As a declaration, the speaker vows to succeed as if to prove it to others: 絶対に合格してみせる. As a plain action, someone demonstrates how something is done: やってみせる “show by doing it”. The first use is emotional and sounds like a public promise.',
+    functions: ['determination-decision', 'intent'],
+    examples: [
+      ex('来年こそ 絶対に 合格して みせる。', "Next year I'll pass, just you watch.", 'らいねんこそ ぜったいに ごうかくして みせる。'),
+      ex('先生が まず 実際に やって みせて くれた。', 'The teacher first showed us by actually doing it.', 'せんせいが まず じっさいに やって みせて くれた。'),
+    ],
+  },
+  'n4m-g-916b4d': {
+    structure: 'N + に + します（する／しよう）',
+    explanation:
+      'Announces a choice: “I’ll have ~ / I’ve decided on ~”. It is the standard way to order in a restaurant (コーヒーにします) and to settle plans. For a decision about an action, use V-dict + ことにする; になる instead of する means the decision was made for you.',
+    functions: ['decision'],
+    examples: [
+      ex('私は コーヒーに します。', "I'll have coffee.", 'わたしは こーひーに します。'),
+      ex('旅行は 京都に しよう。', "Let's make Kyoto our trip.", 'りょこうは きょうとに しよう。'),
+    ],
+  },
+  'n4m-g-d8cef4': {
+    meaning: 'perhaps; possibly (…may be the case)',
+    structure: 'あるいは + clause + かもしれない',
+    explanation:
+      'Used as an adverb, あるいは means “possibly, perhaps” and prepares a guess that ends in かもしれない. It is somewhat literary; in conversation もしかしたら does the same job. Do not confuse it with the conjunction あるいは “or”, which links two nouns or clauses.',
+    functions: ['speculation'],
+    examples: [
+      ex('あるいは 彼の 言う ことが 正しいのかもしれない。', 'Perhaps what he says is right.', 'あるいは かれの いう ことが ただしいのかもしれない。'),
+      ex('この 雲だと、あるいは 夕方から 雨に なるかもしれない。', 'With these clouds, it may possibly rain from the evening.', 'この くもだと、あるいは ゆうがたから あめに なるかもしれない。'),
+    ],
+  },
+  'n4m-g-14f095': {
+    structure: 'N / Na-adj + じゃないだろうか（ではないだろうか）',
+    explanation:
+      'A cautious opinion framed as a question: “isn’t it ~? / I suspect it is ~”. It attaches directly to nouns and な-adjectives; after verbs and い-adjectives the form is んじゃないだろうか. ではないだろうか is the written version and is common in essays for stating a view modestly.',
+    functions: ['speculation', 'judge'],
+    examples: [
+      ex('それは 大きな 問題じゃないだろうか。', "Isn't that a serious problem?", 'それは おおきな もんだいじゃないだろうか。'),
+      ex('この 部屋は 一人には 少し 広すぎるのではないだろうか。', 'I suspect this room is a bit too big for one person.', 'この へやは ひとりには すこし ひろすぎるのではないだろうか。'),
+    ],
+  },
+  'n4m-g-a83836': {
+    meaning: 'to leave (something) as it is; keep it ~',
+    structure: 'V-た形／N の／Adj + まま + にする（しておく）',
+    explanation:
+      'Someone deliberately leaves a state unchanged: 窓を開けたままにする “leave the window open”. With ておく it adds “for a purpose”. Compare ままになる (it stays that way without anyone acting) and plain まま (“in the state of”).',
+    functions: ['continuity'],
+    examples: [
+      ex('暑いので、窓を 開けた ままに して おいて ください。', "It's hot, so please leave the window open.", 'あついので、まどを あけた ままに して おいて ください。'),
+      ex('料理は 温かい ままに して おきたい。', 'I want to keep the food warm.', 'りょうりは あたたかい ままに して おきたい。'),
+    ],
+  },
+  'n4m-g-69525f': {
+    structure: 'Plain form (Na / N + な) + んじゃないだろうか',
+    explanation:
+      'A careful guess: “could it be that ~? / I rather think ~”. The ん (の) lets it follow verbs and い-adjectives, which じゃないだろうか alone cannot. It is less pushy than んじゃないか and a common way to offer an opinion without asserting it; のではないだろうか is the written form.',
+    functions: ['speculation', 'judge'],
+    examples: [
+      ex('彼は もう 家を 出たんじゃないだろうか。', "Couldn't he have already left home?", 'かれは もう いえを でたんじゃないだろうか。'),
+      ex('その 値段なら、もっと 売れるんじゃないだろうか。', 'At that price, surely it would sell better.', 'その ねだんなら、もっと うれるんじゃないだろうか。'),
+    ],
+  },
+  'n4m-g-628b30': {
+    meaning: 'please do ~ for (someone else)',
+    structure: 'Person に + V-て形 + あげて ください',
+    explanation:
+      'Asks the listener to do a favour for a third person: “please ~ for him / her”. あげる shows the favour goes away from the speaker. Speaking about your own family or someone younger this is natural; for a superior, use てさしあげてください.',
+    functions: ['request', 'benefit'],
+    examples: [
+      ex('妹に 宿題を 教えて あげて ください。', 'Please help my little sister with her homework.', 'いもうとに しゅくだいを おしえて あげて ください。'),
+      ex('困って いる 人が いたら、助けて あげて ね。', "If someone's in trouble, help them out, OK?", 'こまって いる ひとが いたら、たすけて あげて ね。'),
+    ],
+  },
+  'n4m-g-8fc93d': {
+    structure: 'N + か何か（かなにか）',
+    explanation:
+      'Makes a noun vague: “~ or something (like that)”. It softens offers and guesses: お茶か何か飲む? “Want tea or something?”. For people use か誰か, for places か何処か; かなんか is the casual pronunciation.',
+    functions: ['vague'],
+    examples: [
+      ex('お茶か 何か 飲みませんか。', 'Would you like tea or something?', 'おちゃか なにか のみませんか。'),
+      ex('風邪か 何かで 休んで いるらしい。', "Apparently he's off with a cold or something.", 'かぜか なにかで やすんで いるらしい。'),
+    ],
+  },
+  'n4m-g-e59595': {
+    meaning: "shall I have (someone) ~?; I'll have you ~ (firm)",
+    structure: 'Person に + V-て形 + もらおうか',
+    explanation:
+      'The volitional てもらおう with か. Said to a third party it proposes getting someone to act: 専門家に見てもらおうか “shall we have an expert look at it?”. Said directly to the listener, it is a firm, sometimes intimidating demand: 説明してもらおうか “let’s hear you explain”.',
+    functions: ['request', 'invite-suggest'],
+    examples: [
+      ex('この パソコン、店の 人に 見て もらおうか。', "Shall we have someone at the shop look at this computer?", 'この ぱそこん、みせの ひとに みて もらおうか。'),
+      ex('どういう ことか、きちんと 説明して もらおうか。', "Let's have you explain properly what this is about.", 'どういう ことか、きちんと せつめいして もらおうか。'),
+    ],
+  },
+  'n4m-g-a70e21': {
+    meaning: 'all that is left is ~; now just ~',
+    structure: 'あとは + N／V-dict + だけ（だ）',
+    explanation:
+      'あと (“remaining”) with だけ says only one step is left: “now all that’s left is to ~”. It is used when a task is nearly finished. あとは〜ばいい (“you only need to ~”) is a close variant that gives instructions.',
+    functions: ['limit'],
+    examples: [
+      ex('荷物は 全部 詰めた。あとは 寝る だけだ。', "I've packed everything. Now all that's left is to sleep.", 'にもつは ぜんぶ つめた。あとは ねる だけだ。'),
+      ex('あとは 名前を 書く だけですよ。', 'All you need to do now is write your name.', 'あとは なまえを かく だけですよ。'),
+    ],
+  },
+  'n4m-g-f0c0d0': {
+    meaning: 'A makes B look ~',
+    structure: 'A が + B を + Adj-く／Na-adj に + 見せる',
+    explanation:
+      '見せる here is “make appear”: A (clothes, lighting, a hairstyle) makes B look a certain way. い-adjectives take く and な-adjectives take に, as with 〜くする. Compare 〜く見える, where B simply looks that way with no cause named.',
+    functions: ['similarity-degree', 'modify'],
+    examples: [
+      ex('その 髪型は 彼女を 若く 見せる。', 'That hairstyle makes her look young.', 'その かみがたは かのじょを わかく みせる。'),
+      ex('明るい 色の カーテンが 部屋を 広く 見せて いる。', 'The bright curtains make the room look bigger.', 'あかるい いろの かーてんが へやを ひろく みせて いる。'),
+    ],
+  },
+  'n4m-g-f90c7c': {
+    meaning: 'in various ways; for one reason or another',
+    structure: '何かと（なにかと）+ V／Adj',
+    explanation:
+      'An adverb meaning “in all sorts of ways” without naming them. It is typical in greetings and thanks: 何かとお世話になりました “thank you for all your help”. 何かと忙しい means busy with this and that.',
+    functions: ['vague'],
+    examples: [
+      ex('引っ越したばかりで、何かと 忙しい。', "I've just moved, so I'm busy with one thing and another.", 'ひっこしたばかりで、なにかと いそがしい。'),
+      ex('今年は 何かと お世話に なりました。', 'Thank you for all your help this year.', 'ことしは なにかと おせわに なりました。'),
+    ],
+  },
+  'n4m-g-5029fe': {
+    meaning: 'to remain ~ (left in that state)',
+    structure: 'V-た形／N の + まま + に なる（なっている）',
+    explanation:
+      'A state has been left as it was, usually longer than it should: 借りたままになっている “it is still borrowed (and not returned)”. Unlike ままにする, no one is deliberately keeping it that way. The ている form is most common.',
+    functions: ['continuity'],
+    examples: [
+      ex('友達に 借りた 本が 借りた ままに なって いる。', "I still haven't returned the book I borrowed from my friend.", 'ともだちに かりた ほんが かりた ままに なって いる。'),
+      ex('去年の 計画は 途中の ままに なって いる。', "Last year's plan is still left half-done.", 'きょねんの けいかくは とちゅうの ままに なって いる。'),
+    ],
+  },
+  'n4m-g-adbdf2': {
+    meaning: 'to go home (back) to do ~',
+    structure: 'V-ます stem + に + 帰る（戻る）',
+    explanation:
+      'The purpose pattern stem + に with a verb of returning: “go back in order to ~”. Like 〜に行く and 〜に来る, it only works with movement verbs. 忘れ物を取りに帰る “go home to get something I left” is a typical use.',
+    functions: ['purpose-goal', 'direction'],
+    examples: [
+      ex('昼ご飯を 食べに 家へ 帰ります。', "I'm going home to have lunch.", 'ひるごはんを たべに いえへ かえります。'),
+      ex('財布を 忘れたので、取りに 帰った。', 'I forgot my wallet, so I went back to get it.', 'さいふを わすれたので、とりに かえった。'),
+    ],
+  },
+  'n4m-g-3db9ae': {
+    meaning: 'polite language (です／ます, お／ご)',
+    structure: 'V-ます／です + お／ご + N（お茶, ご家族）',
+    explanation:
+      '丁寧語 is the neutral polite layer of keigo: です and ます endings plus the beautifying prefixes お and ご. It shows politeness to the listener without raising or lowering anyone, unlike 尊敬語 and 謙譲語. お generally goes on native words and ご on Sino-Japanese ones: お茶, ご家族.',
+    functions: ['reverent-humble'],
+    examples: [
+      ex('駅は あちらに あります。', 'The station is over there.', 'えきは あちらに あります。'),
+      ex('ご家族は お元気ですか。', 'Is your family well?', 'ごかぞくは おげんきですか。'),
+    ],
+  },
+  'n4m-g-a4cfe0': {
+    meaning: 'the same as ~',
+    structure: 'N + と 同じ（だ／N）／N + と 同じように',
+    explanation:
+      'Says two things match: A は B と同じだ. Before a noun it stays 同じ with no な: 私と同じ本. と同じように means “in the same way as”. For partial likeness use に似ている, and for difference と違う.',
+    functions: ['similarity-degree', 'compare'],
+    examples: [
+      ex('私も 田中さんと 同じ 意見です。', 'I have the same opinion as Tanaka.', 'わたしも たなかさんと おなじ いけんです。'),
+      ex('この 時計は 父の ものと 同じだ。', 'This watch is the same as my father’s.', 'この とけいは ちちの ものと おなじだ。'),
+    ],
+  },
+  'n4m-g-17bd5c': {
+    meaning: 'made from ~ (から) / made of ~ (で)',
+    structure: 'Material + から／で + 作る（作られる）',
+    explanation:
+      'Both mark a material, but から is used when the raw material is transformed and no longer visible (wine from grapes), and で when you can still see it in the product (a desk of wood). The passive 作られている is common in descriptions.',
+    functions: ['means-methods'],
+    examples: [
+      ex('日本酒は 米から 作られます。', 'Sake is made from rice.', 'にほんしゅは こめから つくられます。'),
+      ex('この 机は 木で 作って あります。', 'This desk is made of wood.', 'この つくえは きで つくって あります。'),
+    ],
+  },
+  'n4m-g-b26282': {
+    meaning: 'do you know that ~?',
+    structure: 'Plain form (Na / N + な) + のを 知っていますか',
+    explanation:
+      'の turns the clause into a noun so it can be the object of 知っている: “do you know that ~?”. For a known fact the answer uses 知っています; “I didn’t know” is 知りませんでした. ことを can replace のを in writing.',
+    functions: ['asked'],
+    examples: [
+      ex('来週 テストが ある のを 知って いますか。', 'Do you know there is a test next week?', 'らいしゅう てすとが ある のを しって いますか。'),
+      ex('彼が 会社を 辞めた のを 知って いた？', 'Did you know he quit the company?', 'かれが かいしゃを やめた のを しって いた？'),
+    ],
+  },
+  'n4m-g-9d6e1c': {
+    structure: 'N／clause + の + に 気が つく（気づく）',
+    explanation:
+      'To notice or realise something, usually suddenly. The thing noticed takes に, and a clause is nominalised with の or こと. 気づく is the contracted form; for realising a truth after thought, 分かる or 悟る may fit better.',
+    functions: ['feel'],
+    examples: [
+      ex('駅に 着いてから、傘を 忘れた のに 気が ついた。', 'After I got to the station, I realised I had forgotten my umbrella.', 'えきに ついてから、かさを わすれた のに きが ついた。'),
+      ex('彼女の 髪型が 変わった ことに 気が つきましたか。', 'Did you notice her hairstyle had changed?', 'かのじょの かみがたが かわった ことに きが つきましたか。'),
+    ],
+  },
+  'n4m-g-0adaa5': {
+    meaning: 'could you please let me ~?',
+    structure: 'V-causative-て形 + いただけませんか',
+    explanation:
+      'A very polite request for permission: literally “could I humbly receive your letting me ~?”. The speaker is the one who acts. It is common at work: 今日は早く帰らせていただけませんか. Less formal: させてもらえませんか; direct: させてください.',
+    functions: ['request-permission', 'reverent-humble'],
+    examples: [
+      ex('今日は 少し 早く 帰らせて いただけませんか。', 'Could you please let me go home a little early today?', 'きょうは すこし はやく かえらせて いただけませんか。'),
+      ex('その 資料を コピーさせて いただけませんか。', 'May I please make a copy of that document?', 'その しりょうを こぴーさせて いただけませんか。'),
+    ],
+  },
+  'n4m-g-3a5e09': {
+    meaning: 'honorific (respectful) language',
+    structure: 'お + V-stem + に なる／V-られる／special verbs（いらっしゃる, 召し上がる）',
+    explanation:
+      '尊敬語 raises the person who acts, so it is used only for other people’s actions, never your own. There are three routes: special verbs (いらっしゃる, おっしゃる, 召し上がる), お〜になる, and the passive-shaped られる. Using it for yourself is a common mistake; your own actions take 謙譲語.',
+    functions: ['reverent-humble'],
+    examples: [
+      ex('社長は もう お帰りに なりました。', 'The president has already left for home.', 'しゃちょうは もう おかえりに なりました。'),
+      ex('先生は 何時ごろ いらっしゃいますか。', 'What time will the teacher be coming?', 'せんせいは なんじごろ いらっしゃいますか。'),
+    ],
+  },
+  'n4m-g-a7f692': {
+    meaning: 'I wonder ~; something or other',
+    structure: '何かしら（なにかしら）／clause + かしら',
+    explanation:
+      'かしら is a soft “I wonder”, traditionally feminine though older men use it too; 何かしら means “I wonder what it is”. As an adverb, 何かしら also means “something or other”: 何かしら理由がある. かな is the neutral equivalent.',
+    functions: ['vague', 'speculation'],
+    examples: [
+      ex('この 音は 何かしら。', 'I wonder what this noise is.', 'この おとは なにかしら。'),
+      ex('毎日 何かしら 新しい ことを 学んで いる。', 'Every day I learn something or other new.', 'まいにち なにかしら あたらしい ことを まなんで いる。'),
+    ],
+  },
+  'n4m-g-7a9445': {
+    meaning: '(someone of higher status) kindly does ~ for me / us',
+    structure: 'Person が + V-て形 + くださる（くださいます）',
+    explanation:
+      'The respectful form of てくれる: a superior or someone you respect does a favour for the speaker or the speaker’s group. The giver is the subject, marked with が or は. The masu form is くださいます, not くださります. Seen from the receiver’s side, the same event is ていただく.',
+    functions: ['benefit', 'reverent-humble'],
+    examples: [
+      ex('先生が 推薦状を 書いて くださいました。', 'My teacher kindly wrote me a letter of recommendation.', 'せんせいが すいせんじょうを かいて くださいました。'),
+      ex('部長が 駅まで 車で 送って くださった。', 'The manager kindly drove me to the station.', 'ぶちょうが えきまで くるまで おくって くださった。'),
+    ],
+  },
+  'n4m-g-568cbf': {
+    meaning: 'something; anything (in questions)',
+    structure: '何か（なにか）+ V／何か + Adj + N',
+    explanation:
+      '何か is the indefinite “something”; in questions it becomes “anything”. が and を are usually dropped after it (何か飲む?), and a describing adjective follows it: 何か冷たいもの “something cold”. With a negative, use 何も instead: 何も飲まない.',
+    functions: ['vague'],
+    examples: [
+      ex('何か 冷たい ものを 飲みたい。', 'I want something cold to drink.', 'なにか つめたい ものを のみたい。'),
+      ex('何か 質問は ありますか。', 'Are there any questions?', 'なにか しつもんは ありますか。'),
+    ],
+  },
+  'n4m-g-c720da': {
+    structure: 'Plain / polite form + けれど, …',
+    explanation:
+      'The middle register of the けれども → けれど → けど scale: “but, although”. It is common in writing that stays friendly and in careful speech. At the end of a sentence it softens a statement or leaves a request hanging for the listener to pick up.',
+    functions: ['contrast'],
+    examples: [
+      ex('少し 高い けれど、この 靴に しよう。', "They're a bit expensive, but I'll take these shoes.", 'すこし たかい けれど、この くつに しよう。'),
+      ex('道を 聞きたいんです けれど…。', "I'd like to ask the way, if I may...", 'みちを ききたいんです けれど…。'),
+    ],
+  },
+  'n4m-g-36941f': {
+    meaning: '~ or more; at least; (以上です) that is all',
+    structure: 'Number / N + 以上（いじょう）',
+    explanation:
+      '以上 means “that amount or more”, and unlike English “more than” it includes the number itself: 18歳以上 is 18 and over. Its opposite is 以下 (“or less”). At the end of a speech or list, 以上です means “that’s all”.',
+    functions: ['amount', 'compare'],
+    examples: [
+      ex('この 映画は 十八歳 以上しか 見られない。', 'Only people aged 18 and over can see this film.', 'この えいがは じゅうはっさい いじょうしか みられない。'),
+      ex('報告は 以上です。', 'That is the end of my report.', 'ほうこくは いじょうです。'),
+    ],
+  },
+  'n4m-g-f323ba': {
+    meaning: 'not even one ~; not ~ at all',
+    structure: 'Counter / 少し／一度 + も + negative',
+    explanation:
+      'も after a minimal amount (一人, 一つ, 一度, 少し) with a negative means “not even that much”: nothing at all. It is stronger than a plain negative. With question words the same shape makes 誰も, 何も, どこも “no one, nothing, nowhere”.',
+    functions: ['emphasize-negative', 'negative'],
+    examples: [
+      ex('パーティーには 一人も 来なかった。', 'Not a single person came to the party.', 'ぱーてぃーには ひとりも こなかった。'),
+      ex('昨日は 少しも 眠れなかった。', "I couldn't sleep at all last night.", 'きのうは すこしも ねむれなかった。'),
+    ],
+  },
+  'n4m-g-316fd1': {
+    meaning: '~ is impossible; ~ is too much (to ask)',
+    structure: 'N／V-dict + の + は 無理だ（無理です）',
+    explanation:
+      '無理 is something beyond what can reasonably be done. A task is nominalised with の and marked with は. 無理です is also the everyday way to refuse politely but firmly, and 無理しないで means “don’t overdo it”.',
+    functions: ['ability', 'refuse'],
+    examples: [
+      ex('一日で この 本を 全部 読む のは 無理だ。', "It's impossible to read this whole book in one day.", 'いちにちで この ほんを ぜんぶ よむ のは むりだ。'),
+      ex('すみません、明日までは ちょっと 無理です。', "I'm sorry, but by tomorrow is not really possible.", 'すみません、あしたまでは ちょっと むりです。'),
+    ],
+  },
+  'n4m-g-7cd68e': {
+    meaning: "(so) that's why ~; I told you so",
+    structure: 'だから + clause（だから 言ったでしょう）',
+    explanation:
+      'At the start of a sentence だから means “so, therefore”. In conversation it often carries irritation: “that’s what I’m saying” or “I told you so” (だから言ったのに). The polite form is ですから; the neutral written connector is そのため.',
+    functions: ['cause-reason', 'conclude'],
+    examples: [
+      ex('だから 言ったでしょう。傘を 持って いけって。', 'I told you so. I said to take an umbrella.', 'だから いったでしょう。かさを もって いけって。'),
+      ex('明日は 試験だ。だから 今日は 早く 寝る。', "I have an exam tomorrow, so I'm going to bed early tonight.", 'あしたは しけんだ。だから きょうは はやく ねる。'),
+    ],
+  },
+  'n4m-g-580e5c': {
+    meaning: "why don't we ~?; isn't it ~?",
+    structure: 'V-ない／Adj-くない + か（？）',
+    explanation:
+      'A plain negative question works two ways. With a verb it is an invitation: 一緒に行かない? “Why don’t we go together?”. With an adjective it asks for agreement: 寒くない? “Isn’t it cold?”. The version with か (行かないか) is blunt and masculine; ませんか is the polite form.',
+    functions: ['invite-suggest', 'confirm'],
+    examples: [
+      ex('週末、一緒に 映画を 見に 行かない？', "Why don't we go and see a film this weekend?", 'しゅうまつ、いっしょに えいがを みに いかない？'),
+      ex('この 部屋、ちょっと 寒くない？', "Isn't this room a bit cold?", 'この へや、ちょっと さむくない？'),
+    ],
+  },
 };
