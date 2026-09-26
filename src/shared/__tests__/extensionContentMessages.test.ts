@@ -94,6 +94,24 @@ describe('content script — messages in the page and UI language', () => {
     expect(hint()).toBe('boom');
   });
 
+  it('names a refused or missing microphone in the UI language', async () => {
+    const fail = (name: string) => {
+      Object.defineProperty(window.navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: async () => { throw new DOMException('Permission denied', name); } },
+      });
+    };
+    const toast = () => document.getElementById('jp-study-toast')?.querySelector('.jp-toast-text')?.textContent ?? '';
+    fail('NotAllowedError');
+    deliver({ type: 'jp-record-toggle' });
+    await flush();
+    expect(toast()).toBe(ja.getMessage('content_micDenied'));
+    fail('NotFoundError');
+    deliver({ type: 'jp-record-toggle' });
+    await flush();
+    expect(toast()).toBe(ja.getMessage('content_micUnavailable'));
+  });
+
   it('marks Chinese and Russian study text with its own lang, not ja', async () => {
     document.documentElement.lang = 'zh-CN';
     reply = (msg) =>

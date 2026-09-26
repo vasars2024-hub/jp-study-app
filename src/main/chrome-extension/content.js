@@ -2918,7 +2918,17 @@
       recording = true;
       toast(uiMsg('content_recording'), 'ok');
     } catch (err) {
-      toast(String(err.message || err || uiMsg('content_micDenied')), 'err');
+      // Chromium's DOMException messages are English ("Permission denied");
+      // the two a user can act on are named in the UI language.
+      const name = err && err.name;
+      toast(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? uiMsg('content_micDenied')
+          : name === 'NotFoundError' || name === 'NotReadableError'
+            ? uiMsg('content_micUnavailable')
+            : String((err && err.message) || err || uiMsg('content_micDenied')),
+        'err',
+      );
     }
   }
 
