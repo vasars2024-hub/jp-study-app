@@ -47,6 +47,7 @@ import { resolveSubtitleFallbackFont } from './subtitleFallbackFont';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
 import { registerMediaDiscoveryIpc } from './mediaDiscovery';
 import { registerTranscriptionIpc } from './transcriptionJobs';
+import { registerSentenceDeckIpc } from './sentenceDeckIpc';
 import { getMediaIngest, registerMediaIngest } from './mediaIngest';
 import {
   clearSubtitleCache,
@@ -1180,6 +1181,9 @@ export function registerMediaIpc(): void {
     listItems: () => readDb().items,
     patchItems,
   });
+  // "Sentence deck from a video" reads the same tracks the player does, so it
+  // gets the library read-only — it never patches an item.
+  registerSentenceDeckIpc({ listItems: () => readDb().items });
   // Discovery reads the same two provider APIs but touches nothing in the
   // library, so it gets no host at all — it can only search and browse.
   registerMediaDiscoveryIpc();

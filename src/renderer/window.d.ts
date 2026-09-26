@@ -992,6 +992,22 @@ declare global {
       extractVideoClip(
         req: import('../shared/videoClip').VideoClipRequest,
       ): Promise<import('../main/videoClipExtract').VideoClipResult>;
+      // "Sentence deck from a video" (main/sentenceDeckIpc.ts).
+      sentenceDeckSources(input: {
+        videoPath?: string;
+        subtitlePath?: string;
+      }): Promise<import('../shared/sentenceDeck').SentenceDeckSources>;
+      sentenceDeckReadTrack(
+        videoPath: string,
+        trackId: string,
+      ): Promise<import('../shared/sentenceDeck').SentenceDeckTrackRead>;
+      sentenceDeckExtractAudio(
+        request: import('../main/sentenceDeckIpc').SentenceDeckAudioRequest,
+      ): Promise<import('../main/sentenceAudioBatch').SentenceAudioBatchResult>;
+      sentenceDeckCancel(jobId: string): Promise<boolean>;
+      onSentenceDeckProgress(
+        cb: (progress: import('../main/sentenceDeckIpc').SentenceDeckProgress) => void,
+      ): () => void;
       // Whole-sentence AI annotation — AI OCR mode in the Lens and the extension.
       sentenceAnalyze(
         req: import('../shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
