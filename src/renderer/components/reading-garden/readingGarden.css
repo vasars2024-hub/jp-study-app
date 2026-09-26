@@ -1358,9 +1358,9 @@
   border: 1px solid rgba(151, 209, 207, 0.28);
   border-radius: 12px;
   color: rgba(224, 242, 237, 0.92);
-  background: linear-gradient(145deg, rgba(10, 22, 34, 0.46), rgba(4, 10, 18, 0.32));
-  backdrop-filter: blur(18px) saturate(1.2);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  /* Solid enough to read without a backdrop blur (flatten.css would have to
+     cover a blurred one for the reduced-effects mode). */
+  background: linear-gradient(145deg, rgba(10, 22, 34, 0.78), rgba(4, 10, 18, 0.66));
   font: inherit;
   text-align: left;
   cursor: pointer;
