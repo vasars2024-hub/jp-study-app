@@ -103,10 +103,15 @@ const GridRow = memo(function GridRow<T>({ row, slice, top, height, columns, tem
     <div
       style={{
         position: 'absolute',
-        top,
+        top: 0,
         left: 0,
         right: 0,
         height,
+        // Placed by transform, not `top`, and contained: a row entering the
+        // window is laid out and painted on its own, without invalidating the
+        // rows around it (47 ms of layout per row added, measured on the Gum grid).
+        transform: `translateY(${top}px)`,
+        contain: 'layout paint',
         display: 'grid',
         gridTemplateColumns: template,
         justifyContent: justify,
@@ -192,8 +197,22 @@ export default function VirtualGrid<T>({
     return out;
   }, [items, startRow, endRow, columns]);
 
+  // Strict containment makes the scroller a layout boundary: nothing inside it
+  // can resize or re-lay out anything outside. Its size containment is only
+  // safe when a parent gives the scroller its height (it is scrolling, so it is
+  // shorter than its content); a grid that grows with its content keeps
+  // layout+paint containment, which never changes its size.
+  const constrained = size.height > 0 && size.height < totalHeight;
+  const contain = constrained ? 'strict' : 'layout paint';
+
   return (
-    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll}>
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ overflowY: 'auto', position: 'relative', contain, ...style }}
+      onScroll={onScroll}
+      data-contain={contain}
+    >
       {items.length === 0
         ? emptyState ?? null
         : (
