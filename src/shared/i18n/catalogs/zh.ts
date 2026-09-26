@@ -2687,6 +2687,8 @@ export const zh: Catalog = {
   'assetError.checksumMismatch': '校验和不匹配 — 下载内容已损坏，或源文件已发生变化。',
   'assetError.sizeMismatch': '预期大小约为 {expected}，但实际收到 {actual}。',
   'assetError.enospc': '磁盘空间不足。请释放空间后再继续。',
+  'assetError.missingFiles': '{name} 的文件已被移动或删除。请重新下载以修复。',
+  'assetError.storageUnavailable': '无法准备模型文件夹——磁盘可能已满。请释放空间后再次点击下载。',
   'assetError.inUse': '{name} 正在使用中。请先关闭正在使用它的程序，然后重试。',
   'assetError.deleteFailed': '无法删除 {name}。',
   'assetError.httpFailed': '下载失败（HTTP {status}）。',

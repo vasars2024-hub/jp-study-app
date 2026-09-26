@@ -2700,6 +2700,8 @@ export const ja: Catalog = {
     'チェックサムが一致しません — ダウンロードが破損しているか、配布元のファイルが変更された可能性があります。',
   'assetError.sizeMismatch': '想定していたサイズは約 {expected} でしたが、実際には {actual} を受信しました。',
   'assetError.enospc': 'ディスク容量が不足しました。空き容量を確保してから再開してください。',
+  'assetError.missingFiles': '{name} のファイルが移動または削除されました。もう一度ダウンロードして修復してください。',
+  'assetError.storageUnavailable': 'モデル用フォルダーを準備できませんでした。ディスクの空き容量が不足している可能性があります。空き容量を確保してから、もう一度ダウンロードを押してください。',
   'assetError.inUse': '{name} は現在使用中です。使用しているものを閉じてから、もう一度お試しください。',
   'assetError.deleteFailed': '{name} を削除できませんでした。',
   'assetError.httpFailed': 'ダウンロードに失敗しました（HTTP {status}）。',

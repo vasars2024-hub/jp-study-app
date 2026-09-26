@@ -112,6 +112,22 @@ function partialMetaFor(id: string): string {
   return path.join(partialRoot(), `${id}.meta.json`);
 }
 
+/**
+ * The install record, written BEFORE the verified payload is promoted and
+ * removed only once `state.json` holds it. If `state.json` cannot be written
+ * (a full disk right after a multi-GB install), the payload is not orphaned:
+ * `reconcile` finds the journal next to a promoted payload and records it,
+ * instead of offering a false "resume" that downloads the whole asset again.
+ */
+function installJournalFor(id: string): string {
+  return path.join(partialRoot(), `${id}.install.json`);
+}
+
+function payloadTarget(spec: AssetSpec): string {
+  const dir = installDirFor(spec);
+  return spec.file ? path.join(dir, spec.file) : dir;
+}
+
 function ensureDirs(): void {
   fs.mkdirSync(modelsRoot(), { recursive: true });
   fs.mkdirSync(partialRoot(), { recursive: true });
@@ -208,7 +224,29 @@ function broadcast(id: string, force = false): void {
  * calls this and renders a "Download (size)" button instead of throwing.
  */
 export function isInstalled(id: string): boolean {
-  return statuses.get(id)?.state === 'installed';
+  return revalidateInstalled(id);
+}
+
+/**
+ * Whether an asset marked installed still has its payload on disk — and if it
+ * does not (moved or deleted while the app runs), demotes it to not-installed,
+ * forgets the record and broadcasts, so Settings stops claiming it and a
+ * repair download is allowed instead of short-circuiting on the stale flag.
+ */
+function revalidateInstalled(id: string): boolean {
+  const status = statuses.get(id);
+  if (status?.state !== 'installed') return false;
+  const spec = catalog.find((a) => a.id === id);
+  if (!spec) return false;
+  if (fs.existsSync(payloadTarget(spec))) return true;
+  statuses.set(id, { ...blankStatus(spec), error: { key: 'assetError.missingFiles', vars: { name: spec.name } } });
+  broadcast(id, true);
+  try {
+    forgetInstall(id);
+  } catch {
+    /* the in-memory demotion is what matters; reconcile redoes the record */
+  }
+  return false;
 }
 
 export function getAssetStatus(id: string): AssetStatus | undefined {
@@ -220,8 +258,7 @@ export function assetPath(id: string): string | null {
   if (!isInstalled(id)) return null;
   const spec = catalog.find((a) => a.id === id);
   if (!spec) return null;
-  const dir = installDirFor(spec);
-  return spec.file ? path.join(dir, spec.file) : dir;
+  return payloadTarget(spec);
 }
 
 // ---- Integrity: re-verify and change detection (audit T6) ----------------
@@ -443,10 +480,31 @@ async function dirSize(dir: string): Promise<number> {
 async function reconcile(): Promise<void> {
   const state = readState();
   let dirty = false;
+  /** Journals whose records were folded into `state`; dropped once it is saved. */
+  const recoveredJournals: string[] = [];
 
   for (const spec of catalog) {
     if (!statuses.has(spec.id)) statuses.set(spec.id, blankStatus(spec));
-    const record = state[spec.id];
+    let record = state[spec.id];
+    const journal = await readJson<InstallRecord | null>(installJournalFor(spec.id), null, {
+      validate: (v) => !!v && typeof v === 'object',
+    }).catch(() => null);
+    if (journal) {
+      const partialLeft = await fsp.stat(partialFor(spec.id)).catch(() => null);
+      const promoted = await fsp.stat(payloadTarget(spec)).catch(() => null);
+      if (!partialLeft && promoted && journal.version === spec.version) {
+        // The payload was verified and promoted, and only the record failed to
+        // land: record it now rather than downloading it again.
+        record = journal;
+        state[spec.id] = journal;
+        dirty = true;
+        recoveredJournals.push(installJournalFor(spec.id));
+      } else {
+        // With the partial still present the promotion never happened (or the
+        // payload is gone): the journal is stale and the partial resumes as usual.
+        await fsp.rm(installJournalFor(spec.id), { force: true }).catch(() => undefined);
+      }
+    }
     if (!record) {
       // No record: an orphaned partial may still exist and be resumable.
       const partial = await fsp.stat(partialFor(spec.id)).catch(() => null);
@@ -482,7 +540,16 @@ async function reconcile(): Promise<void> {
     });
   }
 
-  if (dirty) writeState(state);
+  if (dirty) {
+    try {
+      writeState(state);
+      for (const journal of recoveredJournals) await fsp.rm(journal, { force: true }).catch(() => undefined);
+    } catch (err) {
+      // Still full: the statuses above are right for this session, and the
+      // journals that were not deleted recover the records next time.
+      console.warn('[downloads] could not update state.json during reconcile:', err);
+    }
+  }
 }
 
 // ----- disk space --------------------------------------------------------
@@ -773,14 +840,26 @@ async function run(id: string): Promise<void> {
       contentChanged.delete(id);
     }
 
-    await installFromPartial(spec, file);
-    recordInstall(id, {
+    const record: InstallRecord = {
       version: spec.version,
       sha256: outcome.actualSha256,
       verifyMode: outcome.mode,
       bytes,
       installedAt: Date.now(),
-    });
+    };
+    // Journal first: a full disk here fails BEFORE anything moves, so the
+    // verified partial is still there and "paused / resume" is the truth.
+    await writeJsonAtomic(installJournalFor(id), record, { backup: false });
+    await installFromPartial(spec, file);
+    try {
+      recordInstall(id, record);
+      await fsp.rm(installJournalFor(id), { force: true });
+    } catch (err) {
+      // The payload is verified and in place; only state.json failed. It IS
+      // installed — the journal lets the next start record it — so it is not
+      // reported as a resumable download that would fetch it all again.
+      console.warn(`[downloads] ${id}: installed, but the install record could not be saved yet:`, err);
+    }
     setStatus(id, {
       state: 'installed',
       receivedBytes: bytes,
@@ -854,15 +933,22 @@ async function queueDownload(
   // single "Download" on the parent pulls the whole set.
   for (const depId of spec.requires ?? []) {
     const depStatus = statusOf(depId);
-    if (depStatus && depStatus.state !== 'installed') {
+    if (depStatus && !revalidateInstalled(depId)) {
       const depResult = await queueDownload(depId, seen);
       if (!depResult.ok) return depResult;
     }
   }
 
-  if (status.state === 'installed') return { ok: true };
+  // Revalidated, not trusted: an asset whose files vanished is repaired.
+  if (revalidateInstalled(id)) return { ok: true };
 
-  ensureDirs();
+  try {
+    ensureDirs();
+  } catch (err) {
+    const error: AssetError = isEnospc(err) ? { key: 'assetError.enospc' } : { key: 'assetError.storageUnavailable' };
+    setStatus(id, { error });
+    return { ok: false, error };
+  }
 
   setStatus(id, { state: 'queued', bytesPerSecond: 0, error: undefined });
   broadcast(id, true);
@@ -872,15 +958,23 @@ async function queueDownload(
 }
 
 export async function startDownload(id: string): Promise<StartResult> {
+  // Startup could not prepare the models folder (a full disk): try again now
+  // that the user is asking, instead of refusing until the next launch.
+  if (storageInitFailed) await retryStorageInit();
   const spec = catalog.find((asset) => asset.id === id);
   const status = statusOf(id);
   if (!spec || !status) return { ok: false, error: UNKNOWN_ASSET };
+  if (storageInitFailed) {
+    const error: AssetError = { key: 'assetError.storageUnavailable' };
+    setStatus(id, { error });
+    return { ok: false, error };
+  }
 
   // Pre-flight the visible bundle as one operation. Checking each companion
   // independently against the same free-space number could queue a 401 MB TTS
   // bundle on a volume that only had room for any one of its files.
   const pending = assetDependencyClosure(catalog, id).filter(
-    (asset) => statusOf(asset.id)?.state !== 'installed',
+    (asset) => !revalidateInstalled(asset.id),
   );
   if (pending.length) {
     const payloadBytes = pending.reduce((sum, asset) => sum + asset.sizeBytes, 0);
@@ -1059,25 +1153,63 @@ async function refreshRegistry(): Promise<void> {
  * server and skips the network registry fetch, so the download/resume/verify
  * paths can be exercised for real without hitting HuggingFace.
  */
+/** Startup could not create the models folder; retried on the next start/list. */
+let storageInitFailed = false;
+
+/**
+ * Directory setup and reconciliation, separated from the catalog so a disk
+ * that is full at launch leaves every asset listed (with the reason) and
+ * startable once space is freed — not "unknown asset" until a restart.
+ */
+async function retryStorageInit(): Promise<boolean> {
+  try {
+    ensureDirs();
+  } catch (err) {
+    storageInitFailed = true;
+    console.warn('[downloads] models folder unavailable:', err);
+    for (const spec of catalog) {
+      const status = statuses.get(spec.id);
+      if (status && status.state !== 'installed') {
+        statuses.set(spec.id, { ...status, error: { key: 'assetError.storageUnavailable' } });
+      }
+    }
+    return false;
+  }
+  const wasFailed = storageInitFailed;
+  storageInitFailed = false;
+  if (wasFailed) {
+    for (const spec of catalog) {
+      const status = statuses.get(spec.id);
+      if (status?.error?.key === 'assetError.storageUnavailable') statuses.set(spec.id, { ...status, error: undefined });
+    }
+  }
+  await reconcile();
+  return true;
+}
+
 export async function initDownloads(options?: { catalog?: AssetSpec[] }): Promise<void> {
-  ensureDirs();
   if (options?.catalog) {
     catalog = options.catalog;
     statuses.clear();
   } else {
-    await refreshRegistry();
+    await refreshRegistry().catch((err: unknown) => {
+      console.warn('[downloads] registry refresh failed; using the bundled catalog:', err);
+    });
   }
   for (const spec of catalog) {
     if (!statuses.has(spec.id)) statuses.set(spec.id, blankStatus(spec));
   }
-  await reconcile();
+  await retryStorageInit();
 }
 
 export function registerDownloadIpc(): void {
-  ipcMain.handle('assets:list', (): { assets: AssetSpec[]; statuses: AssetStatus[] } => ({
-    assets: catalog,
-    statuses: [...statuses.values()],
-  }));
+  ipcMain.handle('assets:list', async (): Promise<{ assets: AssetSpec[]; statuses: AssetStatus[] }> => {
+    // Opening Settings is the refresh: retry a failed startup, and demote
+    // anything whose files disappeared since it was installed.
+    if (storageInitFailed) await retryStorageInit();
+    for (const id of [...statuses.keys()]) revalidateInstalled(id);
+    return { assets: catalog, statuses: [...statuses.values()] };
+  });
   ipcMain.handle('assets:start', (_e, id: unknown) =>
     typeof id === 'string' ? startDownload(id) : { ok: false, error: UNKNOWN_ASSET },
   );

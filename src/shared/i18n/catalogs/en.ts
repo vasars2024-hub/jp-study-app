@@ -2884,6 +2884,8 @@ export const en: Catalog = {
     'Checksum mismatch — the download is corrupt or the file changed upstream.',
   'assetError.sizeMismatch': 'Expected about {expected} but received {actual}.',
   'assetError.enospc': 'Ran out of disk space. Free some space, then resume.',
+  'assetError.missingFiles': 'The files for {name} were moved or deleted. Download it again to repair it.',
+  'assetError.storageUnavailable': 'The models folder could not be prepared — the disk may be full. Free some space, then press Download again.',
   'assetError.inUse': '{name} is still in use. Close anything using it and try again.',
   'assetError.deleteFailed': 'Could not delete {name}.',
   'assetError.httpFailed': 'Download failed (HTTP {status}).',
