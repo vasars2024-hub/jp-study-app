@@ -60,6 +60,9 @@ export const MEDIA_HUB_ZH: Catalog = {
   'watchAiring.error.offline': '离线，稍后重试',
   'watchAiring.error.unreachable': 'AniList 未响应，稍后重试',
   'watchAiring.checkNow': '立即检查',
+  'watchMeta.unavailable': { other: '无法获取 {count} 个标题的详细信息——元数据服务未响应。' },
+  'watchMeta.retryAt': '将在 {when} 自动重试。',
+  'watchMeta.retryNow': '立即重试',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': '这不是 YouTube 播放列表或频道链接。请粘贴播放列表（含 list=）或频道（@用户名、/channel/UC…、/c/…、/user/…）。',
   'ytManager.error.removedWhileSyncing': '该播放列表在同步期间已被移除。',

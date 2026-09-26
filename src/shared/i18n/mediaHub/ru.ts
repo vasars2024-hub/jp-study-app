@@ -60,6 +60,9 @@ export const MEDIA_HUB_RU: Catalog = {
   'watchAiring.error.offline': 'нет сети, повторим позже',
   'watchAiring.error.unreachable': 'AniList не ответил, повторим позже',
   'watchAiring.checkNow': 'Проверить сейчас',
+  'watchMeta.unavailable': { one: 'Не удалось получить сведения о {count} тайтле — службы метаданных не ответили.', few: 'Не удалось получить сведения о {count} тайтлах — службы метаданных не ответили.', many: 'Не удалось получить сведения о {count} тайтлах — службы метаданных не ответили.', other: 'Не удалось получить сведения о {count} тайтла — службы метаданных не ответили.' },
+  'watchMeta.retryAt': 'Автоматический повтор в {when}.',
+  'watchMeta.retryNow': 'Повторить сейчас',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': 'Это не ссылка на плейлист или канал YouTube. Вставьте плейлист (с list=) или канал (@имя, /channel/UC…, /c/…, /user/…).',
   'ytManager.error.removedWhileSyncing': 'Этот плейлист удалили во время синхронизации.',

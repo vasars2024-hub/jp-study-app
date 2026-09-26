@@ -1129,6 +1129,8 @@ declare global {
       /** Airing-schedule job status (AniList next episodes) and a manual check. */
       watchAiringStatus(): Promise<import('../main/watchAiring').WatchAiringStatus>;
       watchAiringRefresh(): Promise<import('../main/watchAiring').WatchAiringStatus>;
+      watchMetadataStatus?(): Promise<import('../main/watchLibraryMetadata').WatchMetadataStatus>;
+      watchMetadataRetry?(): Promise<import('../main/watchLibraryMetadata').WatchMetadataStatus>;
       /** Episodes of titles being watched that have just aired — once per episode. */
       onWatchAiringAired(cb: (episodes: import('../shared/watchAiring').AiredEpisode[]) => void): () => void;
       /** Phase 0 credentials vault. No channel returns a secret — by design. */

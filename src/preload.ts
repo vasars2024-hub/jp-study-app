@@ -1820,6 +1820,11 @@ const api = {
   /** The airing-schedule job (AniList next episodes): when it last ran, and a manual check. */
   watchAiringStatus: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:status'),
   watchAiringRefresh: (): Promise<import('./main/watchAiring').WatchAiringStatus> => ipcRenderer.invoke('watchAiring:refresh'),
+  /** The metadata pass: whether providers were unreachable, and when it retries on its own. */
+  watchMetadataStatus: (): Promise<import('./main/watchLibraryMetadata').WatchMetadataStatus> =>
+    ipcRenderer.invoke('watchMetadata:status'),
+  watchMetadataRetry: (): Promise<import('./main/watchLibraryMetadata').WatchMetadataStatus> =>
+    ipcRenderer.invoke('watchMetadata:retry'),
   /** Episodes of titles being watched that have just aired — once per episode. */
   onWatchAiringAired: (
     cb: (episodes: import('./shared/watchAiring').AiredEpisode[]) => void,

@@ -26,6 +26,8 @@ const written: Array<{ id: string; meta: WatchMetadataPatch }> = [];
 const script = {
   tmdbKey: true,
   tmdbMovie: null as MetadataMatch<ProviderWork> | null,
+  /** TMDB unanswered (offline, refused key, 429/5xx after retries). */
+  tmdbDown: false,
   tvmaze: null as MetadataMatch<ProviderWork> | null,
   anilistByMal: null as ProviderWork | null,
   anilistSearch: [] as ProviderWork[],
@@ -72,14 +74,17 @@ vi.mock('../providers/tmdb', () => ({
   tmdbAvailable: () => script.tmdbKey,
   findTmdbMovie: async (target: { title: string; year?: number | null }) => {
     asked.push(`tmdb:movie:${target.title}:${target.year}`);
-    return { match: script.tmdbMovie, down: false };
+    return { match: script.tmdbDown ? null : script.tmdbMovie, down: script.tmdbDown };
   },
   findTmdbTv: async () => ({ match: null, down: false }),
   tmdbMovieById: async () => null,
 }));
 
 const {
+  cancelWatchLibraryMetadata,
   runWatchLibraryMetadata,
+  watchLibraryMetadataStatus,
+  WATCH_METADATA_RETRY_BASE_MS,
   watchAttemptRests,
   watchLookupPlan,
   watchRuntimeMinutes,
@@ -106,7 +111,7 @@ beforeEach(() => {
   store.titles = [];
   written.length = 0;
   asked.length = 0;
-  Object.assign(script, { tmdbKey: true, tmdbMovie: null, tvmaze: null, anilistByMal: null, anilistSearch: [] });
+  Object.assign(script, { tmdbKey: true, tmdbMovie: null, tmdbDown: false, tvmaze: null, anilistByMal: null, anilistSearch: [] });
   merges.length = 0;
   rmSync(join(userData, 'watch-metadata-attempts.json'), { force: true });
 });
@@ -161,7 +166,7 @@ describe('runWatchLibraryMetadata', () => {
     script.tmdbMovie = match(tmdbMovieToWork(fixture('tmdb-movie-129.json')));
 
     const result = await runWatchLibraryMetadata();
-    expect(result).toEqual({ looked: 1, filled: 1 });
+    expect(result).toEqual({ looked: 1, filled: 1, unavailable: 0, providersDown: [] });
     expect(asked).toEqual(['tmdb:movie:Spirited Away:2001']);
     expect(written[0]?.meta).toMatchObject({
       tmdbId: 129,
@@ -216,7 +221,7 @@ describe('runWatchLibraryMetadata', () => {
     };
     // Same name, wrong year and wrong format: never accepted.
     script.anilistSearch = [{ ...film, id: 5, anilistId: 5, malId: 5, year: 2019, format: 'TV' }, film];
-    expect(await runWatchLibraryMetadata()).toEqual({ looked: 1, filled: 1 });
+    expect(await runWatchLibraryMetadata()).toMatchObject({ looked: 1, filled: 1, unavailable: 0 });
     expect(asked).toEqual(['anilist:search:Spirited Away']);
     expect(written[0].meta).toMatchObject({
       anilistId: 199, malId: 199, anime: true,
@@ -229,12 +234,53 @@ describe('runWatchLibraryMetadata', () => {
   it('leaves a live-action film alone when AniList has no film of that year', async () => {
     script.tmdbKey = false;
     store.titles = [title('lb:boxd.it/1Ekq', { title: 'Crouching Tiger, Hidden Dragon', year: 2000 })];
-    expect(await runWatchLibraryMetadata()).toEqual({ looked: 1, filled: 0 });
+    expect(await runWatchLibraryMetadata()).toMatchObject({ looked: 1, filled: 0, unavailable: 0 });
     expect(written).toEqual([]);
     // …and a key added later reaches it at once: TMDB is a new provider for the plan.
     script.tmdbKey = true;
     asked.length = 0;
     await runWatchLibraryMetadata();
     expect(asked).toEqual(['tmdb:movie:Crouching Tiger, Hidden Dragon:2000']);
+  });
+});
+
+// Resilience audit #18: an outage used to be discarded — the pass returned
+// only looked/filled, its caller dropped even that, and nothing retried until
+// the next launch, import or MAL sync.
+describe('a metadata outage is visible and retried on its own', () => {
+  it('reports unanswered lookups, schedules a bounded retry, and recovers', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      store.titles = [title('lb:boxd.it/down', { title: 'Spirited Away', year: 2001, letterboxdUri: 'https://boxd.it/down' })];
+      script.tmdbDown = true;
+      const first = await runWatchLibraryMetadata(() => 1_000);
+      expect(first).toMatchObject({ looked: 1, filled: 0, unavailable: 1, providersDown: ['tmdb'] });
+      expect(watchLibraryMetadataStatus()).toMatchObject({
+        lastResult: { unavailable: 1 },
+        nextRetryAt: 1_000 + WATCH_METADATA_RETRY_BASE_MS,
+      });
+
+      // The service comes back; the retry fires without any import or restart.
+      script.tmdbDown = false;
+      script.tmdbMovie = match(tmdbMovieToWork(fixture('tmdb-movie-129.json')));
+      await vi.advanceTimersByTimeAsync(WATCH_METADATA_RETRY_BASE_MS + 1);
+      await vi.waitFor(() => expect(written).toHaveLength(1));
+      await vi.waitFor(() => expect(watchLibraryMetadataStatus().running).toBe(false));
+      expect(watchLibraryMetadataStatus()).toMatchObject({ lastResult: { filled: 1, unavailable: 0 }, nextRetryAt: null });
+    } finally {
+      cancelWatchLibraryMetadata();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the unanswered title eligible (its attempt is not recorded as "nothing found")', async () => {
+    store.titles = [title('lb:boxd.it/down2', { title: 'Kiki', year: 1989 })];
+    script.tmdbDown = true;
+    await runWatchLibraryMetadata();
+    cancelWatchLibraryMetadata();
+    script.tmdbDown = false;
+    await runWatchLibraryMetadata();
+    cancelWatchLibraryMetadata();
+    expect(asked.filter((entry) => entry.startsWith('tmdb:movie:Kiki'))).toHaveLength(2);
   });
 });

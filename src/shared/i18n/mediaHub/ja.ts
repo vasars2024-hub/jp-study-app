@@ -60,6 +60,9 @@ export const MEDIA_HUB_JA: Catalog = {
   'watchAiring.error.offline': 'オフラインのため後で再試行します',
   'watchAiring.error.unreachable': 'AniList が応答しないため後で再試行します',
   'watchAiring.checkNow': '今すぐ確認',
+  'watchMeta.unavailable': { other: '{count} 件のタイトルの詳細を取得できませんでした — メタデータサービスが応答しませんでした。' },
+  'watchMeta.retryAt': '{when} に自動で再試行します。',
+  'watchMeta.retryNow': '今すぐ再試行',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': 'YouTube の再生リストまたはチャンネルのリンクではありません。再生リスト（list= 付き）かチャンネル（@ハンドル、/channel/UC…、/c/…、/user/…）を貼り付けてください。',
   'ytManager.error.removedWhileSyncing': '同期中にその再生リストが削除されました。',

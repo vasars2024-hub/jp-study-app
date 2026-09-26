@@ -60,6 +60,9 @@ export const MEDIA_HUB_EN: Catalog = {
   'watchAiring.error.offline': 'offline, will retry',
   'watchAiring.error.unreachable': 'AniList did not answer, will retry',
   'watchAiring.checkNow': 'Check now',
+  'watchMeta.unavailable': { one: 'Details for {count} title could not be fetched — the metadata services did not answer.', other: 'Details for {count} titles could not be fetched — the metadata services did not answer.' },
+  'watchMeta.retryAt': 'Retrying automatically at {when}.',
+  'watchMeta.retryNow': 'Retry now',
   // YouTube playlist manager errors
   'ytManager.error.notPlaylistOrChannel': 'That is not a YouTube playlist or channel link. Paste a playlist (with list=) or a channel (@handle, /channel/UC…, /c/…, /user/…).',
   'ytManager.error.removedWhileSyncing': 'That playlist was removed while it was syncing.',
