@@ -169,7 +169,7 @@ export default function ScraperSearch() {
                     <span>{sx('app.searchRecent')}</span>
                     <button
                       type="button"
-                      className="scr-link-btn"
+                      className="btn small"
                       onClick={() => {
                         clearRecentScraperQueries();
                         setRecentQueries([]);

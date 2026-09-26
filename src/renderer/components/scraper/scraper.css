@@ -5621,3 +5621,40 @@
     transition: none;
   }
 }
+
+/* ------------------------------------------------ round 3: no boxes in boxes ---
+   Metric tiles and the stat chips inside inspectors were each a bordered box, and
+   the panels nested inside a card were a second frame inside the first. They keep
+   their tint and their geometry (the border goes transparent, so nothing moves) and
+   lose the frame. Default themes only, same guard as the P1.4 refinements. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :is(
+    .scr-tile,
+    .scr-results-inspector-stats > span,
+    .scr-setting-metric-grid > span,
+    .scr-profile-stats span,
+    .scr-schedule-timing > span,
+    .scr-permission-audit > span,
+    .scr-transfer-inspector-stats > span,
+    .scr-http-stats > span,
+    .scr-calendar-strip span
+  ):where(:not(.blanc-root *)) {
+  border-color: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :is(.scr-card, .scr-form-card, .scr-results-inspector, .scr-image-inspector, .scr-transfer-inspector)
+  :is(
+    .scr-card,
+    .scr-form-card,
+    .scr-export-preview,
+    .scr-export-sample,
+    .scr-pair-editor,
+    .scr-tool-controls,
+    .scr-selection-preview,
+    .scr-batch-actions,
+    .scr-result-controls,
+    .scr-recent-setting-list,
+    .scr-image-inspector-preview
+  ):where(:not(.blanc-root *)) {
+  border-color: transparent;
+}
