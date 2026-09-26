@@ -127,6 +127,19 @@ describe('content script — messages in the page and UI language', () => {
     document.documentElement.lang = '';
   });
 
+  it('heads the popup with the word the dictionary matched, not the whole scan window', async () => {
+    document.documentElement.lang = 'zh-CN';
+    // The app's Chinese lookup segments the window itself: 学习中文 is answered with 学习.
+    reply = (msg) =>
+      msg.type === 'lookup'
+        ? { ok: true, entries: String(msg.query).startsWith('学习') ? [{ word: '学习', reading: 'xué xí', meanings: ['to study'] }] : [] }
+        : { ok: true };
+    deliver({ type: 'jp-lookup-selection', text: '学习中文' });
+    for (let i = 0; i < 20 && !document.querySelector('#jp-study-popup.open .rp-entry-word'); i++) await flush();
+    expect(document.querySelector('#jp-study-popup .rp-term')?.textContent).toBe('学习');
+    document.documentElement.lang = '';
+  });
+
   it('marks Chinese and Russian study text with its own lang, not ja', async () => {
     document.documentElement.lang = 'zh-CN';
     reply = (msg) =>

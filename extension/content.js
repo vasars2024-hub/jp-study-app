@@ -519,10 +519,29 @@
       if (res?.invalidated) return { matched: '', entries: [], invalidated: true };
       if (res?.offline) return { matched: '', entries: [], offline: true, error: res?.error };
       if (res?.ok && res.entries?.length) {
-        return { matched: q, entries: res.entries, deinflection: res.deinflection };
+        return { matched: matchedSurface(q, res), entries: res.entries, deinflection: res.deinflection };
       }
     }
     return { matched: '', entries: [] };
+  }
+
+  /**
+   * How much of `q` the app's answer actually covers. The app segments a
+   * window itself (the Chinese dictionary answers 学习中文 with 学习), so a
+   * hit is not proof the whole window is one word — taken as such, the popup
+   * headed "学习中文" and Save word stored that as the card's word.
+   */
+  function matchedSurface(q, res) {
+    const src = res.deinflection && res.deinflection.source;
+    if (src && q.startsWith(src)) return src;
+    const forms = [];
+    for (const e of res.entries || []) {
+      if (e && e.word) forms.push(String(e.word));
+      if (e && e.reading) forms.push(String(e.reading));
+    }
+    if (forms.includes(q)) return q;
+    const prefix = forms.filter((f) => f && q.startsWith(f)).sort((a, b) => b.length - a.length)[0];
+    return prefix || q;
   }
 
   /* ----------------------------- reader popup ------------------------------ */
