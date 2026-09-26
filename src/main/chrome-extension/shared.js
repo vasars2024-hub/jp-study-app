@@ -806,14 +806,17 @@ function detectPageLangHint(opts) {
 
 const AI_CATEGORIES = ['grammar', 'vocabulary', 'particle', 'expression', 'idiom', 'name'];
 
-const AI_CATEGORY_LABELS = {
-  grammar: 'Grammar',
-  vocabulary: 'Vocabulary',
-  particle: 'Particle',
-  expression: 'Expression',
-  idiom: 'Idiom',
-  name: 'Name',
+/** Catalogue keys for the category names; the labels below are read through chrome.i18n. */
+const AI_CATEGORY_LABEL_KEYS = {
+  grammar: 'content_aiCat_grammar',
+  vocabulary: 'content_aiCat_vocabulary',
+  particle: 'content_aiCat_particle',
+  expression: 'content_aiCat_expression',
+  idiom: 'content_aiCat_idiom',
+  name: 'content_aiCat_name',
 };
+const AI_CATEGORY_LABELS = {};
+for (const [category, key] of Object.entries(AI_CATEGORY_LABEL_KEYS)) AI_CATEGORY_LABELS[category] = jpMsg(key);
 
 /** Letter shortcuts — mirrors src/shared/analysisShortcuts.ts. */
 const AI_KEY_COMMANDS = {
@@ -828,8 +831,18 @@ const AI_KEY_COMMANDS = {
 };
 
 const AI_ACTION_LABELS = {
-  mine: { idle: 'Add to flashcards', busy: 'Adding\u2026', done: 'Added', error: 'Retry add' },
-  snapshot: { idle: 'Snapshot', busy: 'Saving\u2026', done: 'In notebook', error: 'Retry snapshot' },
+  mine: {
+    idle: jpMsg('content_aiMine_idle'),
+    busy: jpMsg('content_aiMine_busy'),
+    done: jpMsg('content_aiMine_done'),
+    error: jpMsg('content_aiMine_error'),
+  },
+  snapshot: {
+    idle: jpMsg('content_aiSnap_idle'),
+    busy: jpMsg('content_aiSnap_busy'),
+    done: jpMsg('content_aiSnap_done'),
+    error: jpMsg('content_aiSnap_error'),
+  },
 };
 
 /**
@@ -916,7 +929,7 @@ function aiTranslationsHtml(result, state) {
   if (others.length) {
     html +=
       '<button type="button" class="ai-link" data-act="translations">' +
-      (state.showTranslations ? 'Hide translations' : 'Show all translations') +
+      aiEsc(jpMsg(state.showTranslations ? 'content_aiHideTranslations' : 'content_aiShowTranslations')) +
       '</button>';
     if (state.showTranslations) {
       html += '<ul class="ai-translations">';
@@ -929,7 +942,7 @@ function aiTranslationsHtml(result, state) {
           '">' +
           aiEsc(t[code]) +
           '</span>' +
-          (code === state.lang ? '<span class="ai-dim">simplified</span>' : '') +
+          (code === state.lang ? '<span class="ai-dim">' + aiEsc(jpMsg('content_aiSimplified')) + '</span>' : '') +
           '</li>';
       }
       html += '</ul>';
@@ -937,7 +950,7 @@ function aiTranslationsHtml(result, state) {
   }
   if (result.literal) {
     html +=
-      '<div class="ai-literal"><span class="ai-label">Literal</span>' + aiEsc(result.literal) + '</div>';
+      '<div class="ai-literal"><span class="ai-label">' + aiEsc(jpMsg('content_aiLiteral')) + '</span>' + aiEsc(result.literal) + '</div>';
   }
   return html + '</div>';
 }
@@ -953,8 +966,8 @@ function aiDetailHtml(annotation, state) {
 
   let meta =
     '<div class="ai-field"><span class="ai-label">' +
-    label +
-    ' point</span><span class="ai-headword" lang="' +
+    aiEsc(jpMsg('content_aiPoint', label)) +
+    '</span><span class="ai-headword" lang="' +
     state.lang +
     '">' +
     aiEsc(annotation.headword || annotation.text) +
@@ -964,26 +977,26 @@ function aiDetailHtml(annotation, state) {
     '</span></div>';
   if (annotation.level) {
     meta +=
-      '<div class="ai-field"><span class="ai-label">Level</span><span class="ai-level">' +
+      '<div class="ai-field"><span class="ai-label">' + aiEsc(jpMsg('content_aiLevel')) + '</span><span class="ai-level">' +
       aiEsc(annotation.level) +
       '</span></div>';
   }
   meta +=
-    '<div class="ai-field"><span class="ai-label">Meaning / function</span><span>' +
+    '<div class="ai-field"><span class="ai-label">' + aiEsc(jpMsg('content_aiMeaning')) + '</span><span>' +
     aiEsc(annotation.meaning || '') +
     '</span></div>';
   if (annotation.formality) {
     meta +=
-      '<div class="ai-field"><span class="ai-label">Formality</span><span class="ai-dim">' +
+      '<div class="ai-field"><span class="ai-label">' + aiEsc(jpMsg('content_aiFormality')) + '</span><span class="ai-dim">' +
       aiEsc(annotation.formality) +
       '</span></div>';
   }
-  meta += '<button type="button" class="ai-link" data-act="dictionary">Open in dictionary</button>';
+  meta += '<button type="button" class="ai-link" data-act="dictionary">' + aiEsc(jpMsg('content_aiOpenDict')) + '</button>';
 
   let main = '';
   if (annotation.explanation) {
     main +=
-      '<h5 class="ai-label">In-depth explanation</h5><p class="ai-prose">' +
+      '<h5 class="ai-label">' + aiEsc(jpMsg('content_aiInDepth')) + '</h5><p class="ai-prose">' +
       aiEsc(annotation.explanation) +
       '</p>';
   }
@@ -1006,7 +1019,7 @@ function aiDetailHtml(annotation, state) {
   }
   if (vocabulary.length) {
     main +=
-      '<h5 class="ai-label">Vocabulary notes</h5><ul class="ai-vocab">' +
+      '<h5 class="ai-label">' + aiEsc(jpMsg('content_aiVocabNotes')) + '</h5><ul class="ai-vocab">' +
       vocabulary
         .map(
           (v) =>
@@ -1032,25 +1045,25 @@ function aiDetailHtml(annotation, state) {
     '">' +
     aiEsc(annotation.text) +
     '</span><span class="ai-badge">' +
-    label +
+    aiEsc(label) +
     '</span></div><div class="ai-detail-body"><div class="ai-detail-meta">' +
     meta +
     '</div><div class="ai-detail-main">' +
     main +
     '</div></div><div class="ai-actions">' +
-    '<button type="button" data-act="copy" title="C">Copy</button>' +
+    '<button type="button" data-act="copy" title="C">' + aiEsc(jpMsg('content_aiCopy')) + '</button>' +
     '<button type="button" data-act="mine" title="A"' +
     (state.mine === 'busy' ? ' disabled' : '') +
     '>' +
     mineLabel +
     '</button>' +
-    '<button type="button" data-act="listen" title="L">Listen</button>' +
+    '<button type="button" data-act="listen" title="L">' + aiEsc(jpMsg('content_aiListen')) + '</button>' +
     '<button type="button" data-act="snapshot" title="S"' +
     (state.snapshot === 'busy' ? ' disabled' : '') +
     '>' +
     snapLabel +
     '</button></div><div class="ai-actions ai-actions-secondary">' +
-    '<button type="button" data-act="saveSentence" title="W">Save whole sentence</button>' +
+    '<button type="button" data-act="saveSentence" title="W">' + aiEsc(jpMsg('content_aiSaveSentence')) + '</button>' +
     '</div></div>'
   );
 }
@@ -1068,12 +1081,26 @@ function aiNotesHtml(title, notes, warn) {
   );
 }
 
+/** The key legend: [key, catalogue key for what it does]. */
+const AI_SHORTCUT_KEYS = [
+  ['1\u20139', 'content_aiKey_pick'],
+  ['\u2190/\u2192', 'content_aiKey_move'],
+  ['C', 'content_aiKey_copy'],
+  ['A', 'content_aiKey_card'],
+  ['W', 'content_aiKey_sentence'],
+  ['S', 'content_aiKey_snapshot'],
+  ['L', 'content_aiKey_listen'],
+  ['D', 'content_aiKey_dictionary'],
+  ['T', 'content_aiKey_translations'],
+  ['R', 'content_aiKey_reanalyze'],
+  ['Esc', 'content_aiKey_close'],
+];
 const AI_SHORTCUT_LEGEND =
-  '<div class="ai-card ai-keys"><h5 class="ai-label">Shortcuts</h5>' +
-  '<span><kbd>1\u20139</kbd> pick</span><span><kbd>\u2190/\u2192</kbd> move</span><span><kbd>C</kbd> copy</span>' +
-  '<span><kbd>A</kbd> card</span><span><kbd>W</kbd> sentence</span><span><kbd>S</kbd> snapshot</span>' +
-  '<span><kbd>L</kbd> listen</span><span><kbd>D</kbd> dictionary</span><span><kbd>T</kbd> translations</span>' +
-  '<span><kbd>R</kbd> re-analyze</span><span><kbd>Esc</kbd> close</span></div>';
+  '<div class="ai-card ai-keys"><h5 class="ai-label">' +
+  aiEsc(jpMsg('content_aiShortcuts')) +
+  '</h5>' +
+  AI_SHORTCUT_KEYS.map(([k, key]) => '<span><kbd>' + k + '</kbd> ' + aiEsc(jpMsg(key)) + '</span>').join('') +
+  '</div>';
 
 /**
  * The whole panel body for one state.
@@ -1090,7 +1117,9 @@ function aiPanelHtml(state) {
       state.lang +
       '">' +
       aiEsc(state.text) +
-      '</p><p class="ai-loading">Analyzing the sentence\u2026</p></div>'
+      '</p><p class="ai-loading">' +
+      aiEsc(jpMsg('content_aiAnalyzing')) +
+      '</p></div>'
     );
   }
   if (state.status === 'error') {
@@ -1102,8 +1131,12 @@ function aiPanelHtml(state) {
       '</p><p class="ai-prose">' +
       aiEsc(state.error) +
       '</p><div class="ai-actions">' +
-      '<button type="button" data-act="reanalyze">Try again</button>' +
-      '<button type="button" data-act="close">Close</button></div></div>'
+      '<button type="button" data-act="reanalyze">' +
+      aiEsc(jpMsg('content_aiTryAgain')) +
+      '</button>' +
+      '<button type="button" data-act="close">' +
+      aiEsc(jpMsg('content_close')) +
+      '</button></div></div>'
     );
   }
   const result = state.result || { sentence: '', annotations: [] };
@@ -1115,18 +1148,22 @@ function aiPanelHtml(state) {
     if (legend.indexOf(c) === -1) legend.push(c);
   }
   return (
-    '<div class="ai-card"><div class="ai-card-head"><h5 class="ai-label">Recognized sentence</h5>' +
+    '<div class="ai-card"><div class="ai-card-head"><h5 class="ai-label">' +
+    aiEsc(jpMsg('content_aiRecognized')) +
+    '</h5>' +
     (result.difficulty ? '<span class="ai-band">' + aiEsc(result.difficulty) + '</span>' : '') +
     '</div><p class="ai-sentence" lang="' +
     state.lang +
     '">' +
     aiSentenceHtml(result, state.selected) +
-    '</p><p class="ai-hint">Click any highlighted part to see grammar and vocabulary explained.</p>' +
+    '</p><p class="ai-hint">' +
+    aiEsc(jpMsg('content_aiHint')) +
+    '</p>' +
     (legend.length > 1
       ? '<ul class="ai-legend">' +
         legend
           .map(
-            (c) => '<li><span class="ai-dot ai-cat-' + c + '"></span>' + AI_CATEGORY_LABELS[c] + '</li>',
+            (c) => '<li><span class="ai-dot ai-cat-' + c + '"></span>' + aiEsc(AI_CATEGORY_LABELS[c]) + '</li>',
           )
           .join('') +
         '</ul>'
@@ -1134,7 +1171,9 @@ function aiPanelHtml(state) {
     '</div>' +
     aiTranslationsHtml(result, state) +
     (result.formality
-      ? '<div class="ai-card"><div class="ai-card-head"><h5 class="ai-label">Formality</h5>' +
+      ? '<div class="ai-card"><div class="ai-card-head"><h5 class="ai-label">' +
+        aiEsc(jpMsg('content_aiFormality')) +
+        '</h5>' +
         '<span class="ai-band ai-band-plain">' +
         aiEsc(result.formality.level || '') +
         '</span></div>' +
@@ -1143,12 +1182,14 @@ function aiPanelHtml(state) {
       : '') +
     aiDetailHtml(active, state) +
     (result.structure
-      ? '<div class="ai-card"><h5 class="ai-label">Structure</h5><p class="ai-prose">' +
+      ? '<div class="ai-card"><h5 class="ai-label">' +
+        aiEsc(jpMsg('content_aiStructure')) +
+        '</h5><p class="ai-prose">' +
         aiEsc(result.structure) +
         '</p></div>'
       : '') +
-    aiNotesHtml('Nuance', result.nuance, false) +
-    aiNotesHtml('Watch out', result.pitfalls, true) +
+    aiNotesHtml(aiEsc(jpMsg('content_aiNuance')), result.nuance, false) +
+    aiNotesHtml(aiEsc(jpMsg('content_aiWatchOut')), result.pitfalls, true) +
     AI_SHORTCUT_LEGEND
   );
 }

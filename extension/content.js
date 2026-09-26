@@ -11,13 +11,13 @@
   const TRAIL_CLOSE = new Set(['」', '』', '）', ')', '"', "'", '”', '’']);
   const WK_LABELS = ['content_wkNew', 'content_wkLearning', 'content_wkFamiliar', 'content_wkKnown'];
   const POPUP_TABS = ['meaning', 'grammar', 'sentence', 'kanji', 'examples', 'more'];
-  const TAB_LABELS = {
-    meaning: 'Meaning',
-    grammar: 'Grammar',
-    sentence: 'Sentence',
-    kanji: 'Kanji',
-    examples: 'Examples',
-    more: 'More',
+  const TAB_LABEL_KEYS = {
+    meaning: 'content_rpTab_meaning',
+    grammar: 'content_rpTab_grammar',
+    sentence: 'content_rpTab_sentence',
+    kanji: 'content_rpTab_kanji',
+    examples: 'content_rpTab_examples',
+    more: 'content_rpTab_more',
   };
 
   /** Normalized v2 settings (defaults until storage loads). */
@@ -168,7 +168,7 @@
     return new Promise((resolve) => {
       if (!isExtensionAlive()) {
         markExtensionDead();
-        resolve({ ok: false, invalidated: true, error: 'Extension reloaded — refresh this tab' });
+        resolve({ ok: false, invalidated: true, error: reloadedMsg() });
         return;
       }
       try {
@@ -179,7 +179,7 @@
           } catch (err) {
             if (isContextInvalidatedError(err)) {
               markExtensionDead();
-              resolve({ ok: false, invalidated: true, error: 'Extension reloaded — refresh this tab' });
+              resolve({ ok: false, invalidated: true, error: reloadedMsg() });
               return;
             }
           }
@@ -187,10 +187,10 @@
             const msg = lastErr.message || '';
             if (/context invalidated/i.test(msg)) {
               markExtensionDead();
-              resolve({ ok: false, invalidated: true, error: 'Extension reloaded — refresh this tab' });
+              resolve({ ok: false, invalidated: true, error: reloadedMsg() });
               return;
             }
-            resolve({ ok: false, error: msg || 'Extension error' });
+            resolve({ ok: false, error: msg || uiMsg('content_extError') });
             return;
           }
           resolve(res);
@@ -198,7 +198,7 @@
       } catch (err) {
         if (isContextInvalidatedError(err)) {
           markExtensionDead();
-          resolve({ ok: false, invalidated: true, error: 'Extension reloaded — refresh this tab' });
+          resolve({ ok: false, invalidated: true, error: reloadedMsg() });
           return;
         }
         resolve({ ok: false, error: err?.message || String(err) });
@@ -236,6 +236,26 @@
   /** Toast / label text from _locales (shared.js jpMsg); the key if shared.js is missing. */
   function uiMsg(key, subs) {
     return S.msg ? S.msg(key, subs) : key;
+  }
+
+  /** uiMsg, escaped for markup assembled in template strings. */
+  function uiHtml(key, subs) {
+    return esc(uiMsg(key, subs));
+  }
+
+  /** A counted message (`<key>_one` / `_few` / `_many` / `_other`); `$1` is the count. */
+  function tn(key, count, subs) {
+    return S.msgCount ? S.msgCount(key, count, subs) : key;
+  }
+
+  /**
+   * "Extension reloaded" is shown exactly when the extension context has died, and
+   * chrome.i18n can die with it — then the key would reach the page. English is the
+   * last resort, not the message.
+   */
+  function reloadedMsg() {
+    const m = uiMsg('content_extReloaded');
+    return m && m !== 'content_extReloaded' ? m : 'Extension reloaded — refresh this tab';
   }
 
   function toast(msg, variant, action) {
@@ -538,46 +558,46 @@
     popup = document.createElement('div');
     popup.id = 'jp-study-popup';
     popup.setAttribute('role', 'dialog');
-    popup.setAttribute('aria-label', 'Gum lookup');
+    popup.setAttribute('aria-label', uiMsg('content_popupLabel'));
     popup.innerHTML = `
       <div class="rp-head">
-        <button type="button" class="rp-back" data-act="back" title="Back to previous lookup" aria-label="Back" hidden>‹</button>
+        <button type="button" class="rp-back" data-act="back" title="${uiHtml('content_rpBackTitle')}" aria-label="${uiHtml('content_rpBack')}" hidden>‹</button>
         <div class="rp-headline">
           <span class="rp-term" lang="ja"></span>
           <span class="rp-reading" lang="ja"></span>
         </div>
         <div class="rp-head-actions">
-          <button type="button" class="rp-icon" data-act="tts" title="Play pronunciation" aria-label="Play pronunciation">&#9835;</button>
-          <button type="button" class="rp-icon rp-pin" data-act="pin" title="Pin popup (P)" aria-label="Pin popup">&#8859;</button>
-          <button type="button" class="rp-icon" data-act="close" title="Close (Esc)" aria-label="Close">×</button>
+          <button type="button" class="rp-icon" data-act="tts" title="${uiHtml('content_rpPronounce')}" aria-label="${uiHtml('content_rpPronounce')}">&#9835;</button>
+          <button type="button" class="rp-icon rp-pin" data-act="pin" title="${uiHtml('content_rpPinTitle')}" aria-label="${uiHtml('content_rpPin')}">&#8859;</button>
+          <button type="button" class="rp-icon" data-act="close" title="${uiHtml('content_rpCloseTitle')}" aria-label="${uiHtml('content_close')}">×</button>
         </div>
       </div>
       <div class="rp-sub"></div>
-      <div class="rp-known" role="group" aria-label="How well do you know this word?">
-        <span class="rp-known-label">Known:</span>
-        <button type="button" class="rp-known-btn" data-act="wk" data-level="0">New</button>
-        <button type="button" class="rp-known-btn" data-act="wk" data-level="1">Learning</button>
-        <button type="button" class="rp-known-btn" data-act="wk" data-level="2">Familiar</button>
-        <button type="button" class="rp-known-btn" data-act="wk" data-level="3">Known</button>
+      <div class="rp-known" role="group" aria-label="${uiHtml('content_rpKnownGroup')}">
+        <span class="rp-known-label">${uiHtml('content_rpKnownLabel')}</span>
+        <button type="button" class="rp-known-btn" data-act="wk" data-level="0">${uiHtml('content_rpLevel0')}</button>
+        <button type="button" class="rp-known-btn" data-act="wk" data-level="1">${uiHtml('content_rpLevel1')}</button>
+        <button type="button" class="rp-known-btn" data-act="wk" data-level="2">${uiHtml('content_rpLevel2')}</button>
+        <button type="button" class="rp-known-btn" data-act="wk" data-level="3">${uiHtml('content_rpLevel3')}</button>
       </div>
       <div class="rp-tabs" role="tablist">
         ${POPUP_TABS.map(
           (t) =>
-            `<button type="button" role="tab" class="rp-tab" data-tab="${t}" aria-selected="false">${TAB_LABELS[t]}</button>`,
+            `<button type="button" role="tab" class="rp-tab" data-tab="${t}" aria-selected="false">${uiHtml(TAB_LABEL_KEYS[t])}</button>`,
         ).join('')}
       </div>
       <div class="rp-body" tabindex="-1"></div>
       <div class="rp-foot">
-        <button type="button" class="rp-act" data-act="save-word">Save word</button>
-        <button type="button" class="rp-act" data-act="save-sentence">Save sentence</button>
-        <button type="button" class="rp-act rp-primary" data-act="create-card">Create card</button>
-        <button type="button" class="rp-icon rp-overflow" data-act="overflow" title="More actions" aria-label="More actions">⋯</button>
+        <button type="button" class="rp-act" data-act="save-word">${uiHtml('content_rpSaveWord')}</button>
+        <button type="button" class="rp-act" data-act="save-sentence">${uiHtml('content_rpSaveSentence')}</button>
+        <button type="button" class="rp-act rp-primary" data-act="create-card">${uiHtml('content_rpCreateCard')}</button>
+        <button type="button" class="rp-icon rp-overflow" data-act="overflow" title="${uiHtml('content_rpMoreActions')}" aria-label="${uiHtml('content_rpMoreActions')}">⋯</button>
       </div>
       <div class="rp-overflow-menu" hidden>
-        <button type="button" data-act="clip">Add to clipboard history</button>
-        <button type="button" data-act="translate">Translate sentence</button>
-        <button type="button" data-act="copy">Copy sentence</button>
-        <button type="button" data-act="open-app">Open Gum</button>
+        <button type="button" data-act="clip">${uiHtml('content_rpAddClip')}</button>
+        <button type="button" data-act="translate">${uiHtml('content_rpTranslateSentence')}</button>
+        <button type="button" data-act="copy">${uiHtml('content_rpCopySentence')}</button>
+        <button type="button" data-act="open-app">${uiHtml('content_rpOpenGum')}</button>
       </div>
     `;
     popup.addEventListener('pointerenter', () => {
@@ -693,19 +713,19 @@
     if (hit.deinflection && hit.deinflection.term && hit.deinflection.term !== hit.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
       bits.push(
-        `<span class="rp-base">Base: <b lang="ja">${esc(hit.deinflection.term)}</b>${
-          reasons ? ` <span class="rp-deinf" title="Deconjugation path">${esc(reasons)}</span>` : ''
+        `<span class="rp-base">${uiHtml('content_rpBase')} <b lang="ja">${esc(hit.deinflection.term)}</b>${
+          reasons ? ` <span class="rp-deinf" title="${uiHtml('content_rpDeinfTitle')}">${esc(reasons)}</span>` : ''
         }</span>`,
       );
     }
     if (first) {
       const pos = first.senses && first.senses[0] && first.senses[0].partsOfSpeech;
       if (Array.isArray(pos) && pos.length) bits.push(`<span class="rp-pos">${esc(pos.slice(0, 2).join(', '))}</span>`);
-      if (first.isCommon) bits.push('<span class="rp-badge common">common</span>');
+      if (first.isCommon) bits.push(`<span class="rp-badge common">${uiHtml('content_rpCommon')}</span>`);
       const jlpt = Array.isArray(first.jlpt) ? first.jlpt[0] : first.jlpt;
-      if (jlpt) bits.push(`<span class="rp-badge jlpt" title="JLPT level is an estimate">${esc(jlpt)}</span>`);
+      if (jlpt) bits.push(`<span class="rp-badge jlpt" title="${uiHtml('content_rpJlptTitle')}">${esc(jlpt)}</span>`);
       if (first.frequency != null && first.frequency !== '') {
-        bits.push(`<span class="rp-badge freq" title="Frequency rank">#${esc(first.frequency)}</span>`);
+        bits.push(`<span class="rp-badge freq" title="${uiHtml('content_rpFreqTitle')}">#${esc(first.frequency)}</span>`);
       }
     }
     sub.innerHTML = bits.join(' ');
@@ -726,8 +746,8 @@
     const hit = currentHit;
     if (!hit.entries || !hit.entries.length) {
       const offlineNote = hit.lookupOffline
-        ? 'Gum is not running — dictionaries live in the app. Open Gum and try again.'
-        : 'No dictionary entries found.';
+        ? uiMsg('content_rpDictOffline')
+        : uiMsg('content_rpNoEntries');
       body.innerHTML = `<div class="rp-empty">${esc(offlineNote)}</div>`;
       return;
     }
@@ -759,16 +779,16 @@
         sensesHtml =
           '<ol class="rp-senses">' + entry.meanings.map((m) => `<li>${esc(m)}</li>`).join('') + '</ol>';
       } else {
-        sensesHtml = '<div class="rp-empty">(no gloss)</div>';
+        sensesHtml = `<div class="rp-empty">${uiHtml('content_rpNoGloss')}</div>`;
       }
       const pitch = entry.pitchHtml
-        ? `<div class="rp-pitch"><span class="rp-pitch-label">Pitch</span> ${entry.pitchHtml}</div>`
+        ? `<div class="rp-pitch"><span class="rp-pitch-label">${uiHtml('content_rpPitch')}</span> ${entry.pitchHtml}</div>`
         : '';
       block.innerHTML = `
         <div class="rp-entry-head">
           <span class="rp-entry-word" lang="ja">${esc(word)}</span>
           ${reading && reading !== word ? `<span class="rp-entry-reading" lang="ja">${esc(reading)}</span>` : ''}
-          ${entry.source ? `<span class="rp-entry-src" title="Dictionary source">${esc(entry.source)}</span>` : ''}
+          ${entry.source ? `<span class="rp-entry-src" title="${uiHtml('content_rpDictSource')}">${esc(entry.source)}</span>` : ''}
         </div>
         ${idx === 0 ? pitch : ''}
         ${sensesHtml}
@@ -778,7 +798,7 @@
     if (hit.entries.length > 5) {
       const more = document.createElement('div');
       more.className = 'rp-note';
-      more.textContent = `${hit.entries.length - 5} more entr${hit.entries.length - 5 === 1 ? 'y' : 'ies'} — see More tab.`;
+      more.textContent = tn('content_rpMoreEntries', hit.entries.length - 5);
       body.appendChild(more);
     }
   }
@@ -789,10 +809,10 @@
     const hit = currentHit;
     const sentence = hit.sentence?.text || '';
     if (!sentence) {
-      body.innerHTML = '<div class="rp-empty">No surrounding sentence was detected for this word.</div>';
+      body.innerHTML = `<div class="rp-empty">${uiHtml('content_rpNoSentence')}</div>`;
       return;
     }
-    body.innerHTML = '<div class="rp-loading">Matching grammar patterns…</div>';
+    body.innerHTML = `<div class="rp-loading">${uiHtml('content_rpMatchingGrammar')}</div>`;
     const token = lookupToken;
     const res = await safeRuntimeSend({ type: 'grammar-match', text: sentence });
     if (token !== lookupToken || popupTab !== 'grammar') return;
@@ -800,16 +820,16 @@
     if (!res?.ok) {
       body.innerHTML = `<div class="rp-empty">${esc(
         res?.offline
-          ? 'Gum is not running — grammar matching needs the app.'
-          : res?.error || 'Grammar matching failed.',
-      )}</div><div class="rp-row"><button type="button" class="rp-mini" data-act="retry-grammar">Retry</button></div>`;
+          ? uiMsg('content_rpGrammarOffline')
+          : res?.error || uiMsg('content_rpGrammarFailed'),
+      )}</div><div class="rp-row"><button type="button" class="rp-mini" data-act="retry-grammar">${uiHtml('content_rpRetry')}</button></div>`;
       return;
     }
     const matches = Array.isArray(res.matches) ? res.matches : [];
     if (!matches.length) {
       body.innerHTML = `
         <div class="rp-sentence-line" lang="ja">${highlightTermInSentence(sentence, hit.term)}</div>
-        <div class="rp-empty">No known grammar patterns matched this sentence.</div>`;
+        <div class="rp-empty">${uiHtml('content_rpNoGrammar')}</div>`;
       return;
     }
     const items = matches
@@ -822,7 +842,7 @@
           <div class="rp-grammar-head">
             <span class="rp-grammar-title" lang="ja">${esc(pattern)}</span>
             ${m.level ? `<span class="rp-badge jlpt">${esc(m.level)}</span>` : ''}
-            ${span ? '<span class="rp-badge span-ok" title="This form appears literally in the sentence">in sentence</span>' : '<span class="rp-badge span-guess" title="Matched by pattern rules — the exact span could not be located">pattern match</span>'}
+            ${span ? `<span class="rp-badge span-ok" title="${uiHtml('content_rpInSentenceTitle')}">${uiHtml('content_rpInSentence')}</span>` : `<span class="rp-badge span-guess" title="${uiHtml('content_rpPatternMatchTitle')}">${uiHtml('content_rpPatternMatch')}</span>`}
           </div>
           ${m.meaning ? `<div class="rp-grammar-meaning">${esc(m.meaning)}</div>` : ''}
         </div>`;
@@ -831,10 +851,10 @@
     body.innerHTML = `
       <div class="rp-sentence-line" lang="ja">${highlightGrammarSpans(sentence, matches, hit.term)}</div>
       ${items}
-      <div class="rp-note">Matches are found by Gum's pattern rules on this sentence's text. When several overlap, judgement is yours — open grammar practice for full explanations.</div>
+      <div class="rp-note">${uiHtml('content_rpGrammarNote')}</div>
       <div class="rp-row">
-        <button type="button" class="rp-mini" data-act="open-grammar">Open grammar practice</button>
-        <button type="button" class="rp-mini" data-act="save-sentence">Save sentence</button>
+        <button type="button" class="rp-mini" data-act="open-grammar">${uiHtml('content_rpOpenGrammar')}</button>
+        <button type="button" class="rp-mini" data-act="save-sentence">${uiHtml('content_rpSaveSentence')}</button>
       </div>`;
   }
 
@@ -896,24 +916,24 @@
   async function renderSentenceTab(body) {
     const hit = currentHit;
     if (!hit.sentence || !hit.sentence.text) {
-      body.innerHTML = '<div class="rp-empty">No sentence detected around this word.</div>';
+      body.innerHTML = `<div class="rp-empty">${uiHtml('content_rpNoSentenceAround')}</div>`;
       return;
     }
     const sentence = hit.sentence.text;
     body.innerHTML = `
       <div class="rp-sentence-line big" lang="ja">${highlightTermInSentence(sentence, hit.term)}</div>
       <div class="rp-row rp-sentence-tools">
-        <button type="button" class="rp-mini" data-act="sent-extend-left" title="Include the previous sentence">‹ extend</button>
-        <button type="button" class="rp-mini" data-act="sent-extend-right" title="Include the next sentence">extend ›</button>
-        <button type="button" class="rp-mini" data-act="sent-reset">Reset</button>
-        <button type="button" class="rp-mini" data-act="sent-edit">Edit</button>
+        <button type="button" class="rp-mini" data-act="sent-extend-left" title="${uiHtml('content_rpExtendPrevTitle')}">${uiHtml('content_rpExtendPrev')}</button>
+        <button type="button" class="rp-mini" data-act="sent-extend-right" title="${uiHtml('content_rpExtendNextTitle')}">${uiHtml('content_rpExtendNext')}</button>
+        <button type="button" class="rp-mini" data-act="sent-reset">${uiHtml('content_rpReset')}</button>
+        <button type="button" class="rp-mini" data-act="sent-edit">${uiHtml('content_rpEdit')}</button>
       </div>
       <textarea class="rp-sentence-edit" hidden rows="3"></textarea>
-      <div class="rp-sentence-stats"><span class="rp-loading-inline">Analyzing…</span></div>
+      <div class="rp-sentence-stats"><span class="rp-loading-inline">${uiHtml('content_rpAnalyzing')}</span></div>
       <div class="rp-row">
-        <button type="button" class="rp-mini" data-act="copy">Copy</button>
-        <button type="button" class="rp-mini" data-act="save-sentence">Save sentence</button>
-        <button type="button" class="rp-mini" data-act="card-sentence">Create card</button>
+        <button type="button" class="rp-mini" data-act="copy">${uiHtml('content_rpCopy')}</button>
+        <button type="button" class="rp-mini" data-act="save-sentence">${uiHtml('content_rpSaveSentence')}</button>
+        <button type="button" class="rp-mini" data-act="card-sentence">${uiHtml('content_rpCreateCard')}</button>
       </div>`;
     const statsEl = body.querySelector('.rp-sentence-stats');
     const token = lookupToken;
@@ -924,14 +944,14 @@
     if (token !== lookupToken || popupTab !== 'sentence' || !statsEl.isConnected) return;
     const bits = [];
     if (level?.badge && level.badge !== '—' && level.badge !== 'X') {
-      bits.push(`<span class="rp-stat">Difficulty <b>${esc(level.badge)}</b> <span class="rp-dim">(estimate)</span></span>`);
+      bits.push(`<span class="rp-stat">${uiHtml('content_rpDifficulty')} <b>${esc(level.badge)}</b> <span class="rp-dim">${uiHtml('content_rpEstimate')}</span></span>`);
     }
     if (comp?.ok && typeof comp.percent === 'number') {
-      bits.push(`<span class="rp-stat">Known words <b>${Math.round(comp.percent)}%</b></span>`);
+      bits.push(`<span class="rp-stat">${uiHtml('content_rpKnownWords')} <b>${Math.round(comp.percent)}%</b></span>`);
     }
-    bits.push(`<span class="rp-stat">${sentence.length} chars</span>`);
+    bits.push(`<span class="rp-stat">${esc(tn('content_rpChars', sentence.length))}</span>`);
     if ((level && level.offline) || (comp && !comp.ok && !level?.badge)) {
-      bits.push('<span class="rp-dim">Gum offline — stats unavailable</span>');
+      bits.push(`<span class="rp-dim">${uiHtml('content_rpStatsOffline')}</span>`);
     }
     statsEl.innerHTML = bits.join(' · ');
   }
@@ -967,10 +987,10 @@
     const hit = currentHit;
     const kanji = [...new Set((hit.term.match(/[㐀-鿿]/g) || []))].slice(0, 6);
     if (!kanji.length) {
-      body.innerHTML = '<div class="rp-empty">No kanji in this expression.</div>';
+      body.innerHTML = `<div class="rp-empty">${uiHtml('content_rpNoKanji')}</div>`;
       return;
     }
-    body.innerHTML = '<div class="rp-loading">Loading kanji…</div>';
+    body.innerHTML = `<div class="rp-loading">${uiHtml('content_rpLoadingKanji')}</div>`;
     const token = lookupToken;
     const results = [];
     for (const ch of kanji) {
@@ -980,7 +1000,7 @@
       results.push({ ch, entry: res?.ok && res.entries && res.entries[0] ? res.entries[0] : null, offline: !!res?.offline });
     }
     if (results.every((r) => r.offline)) {
-      body.innerHTML = '<div class="rp-empty">Gum is not running — kanji data needs the app.</div>';
+      body.innerHTML = `<div class="rp-empty">${uiHtml('content_rpKanjiOffline')}</div>`;
       return;
     }
     body.innerHTML = results
@@ -994,10 +1014,10 @@
           : '';
         return `
         <div class="rp-kanji">
-          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="ja" title="Look up ${esc(r.ch)}">${esc(r.ch)}</button>
+          <button type="button" class="rp-kanji-char" data-act="lookup-nested" data-term="${esc(r.ch)}" lang="ja" title="${uiHtml('content_rpLookUpChar', r.ch)}">${esc(r.ch)}</button>
           <div class="rp-kanji-meta">
             ${r.entry && r.entry.reading ? `<div class="rp-kanji-reading" lang="ja">${esc(r.entry.reading)}</div>` : ''}
-            <div class="rp-kanji-meanings">${esc(meanings || 'No entry in your dictionaries')}</div>
+            <div class="rp-kanji-meanings">${esc(meanings || uiMsg('content_rpNoKanjiEntry'))}</div>
           </div>
         </div>`;
       })
@@ -1008,14 +1028,14 @@
 
   async function renderExamplesTab(body) {
     const hit = currentHit;
-    body.innerHTML = '<div class="rp-loading">Searching examples…</div>';
+    body.innerHTML = `<div class="rp-loading">${uiHtml('content_rpSearchingExamples')}</div>`;
     const token = lookupToken;
     const query = hit.deinflection?.term || hit.term;
     const res = await safeRuntimeSend({ type: 'examples', query, limit: 8 });
     if (token !== lookupToken || popupTab !== 'examples') return;
     if (res?.invalidated) return;
     if (!res?.ok || !Array.isArray(res.examples) || !res.examples.length) {
-      body.innerHTML = `<div class="rp-empty">${esc(res?.error || 'No example sentences found.')}</div>`;
+      body.innerHTML = `<div class="rp-empty">${esc(res?.error || uiMsg('content_rpNoExamples'))}</div>`;
       return;
     }
     // These come from `/v1/examples`, which is `searchExamples` in the app's
@@ -1030,14 +1050,15 @@
           <div class="rp-example-jp" lang="ja">${highlightTermInSentence(String(ex.jp || ''), query)}</div>
           ${ex.en ? `<div class="rp-example-en">${esc(ex.en)}</div>` : ''}
           <div class="rp-example-tools">
-            <button type="button" class="rp-mini" data-act="example-tts" data-text="${esc(ex.jp || '')}">Play</button>
-            <button type="button" class="rp-mini" data-act="example-save" data-text="${esc(ex.jp || '')}">Save sentence</button>
+            <button type="button" class="rp-mini" data-act="example-tts" data-text="${esc(ex.jp || '')}">${uiHtml('content_rpPlayExample')}</button>
+            <button type="button" class="rp-mini" data-act="example-save" data-text="${esc(ex.jp || '')}">${uiHtml('content_rpSaveSentence')}</button>
           </div>
         </div>`,
         )
         .join('') +
       '<p class="rp-example-credit"><a href="https://tatoeba.org" target="_blank" rel="noreferrer">' +
-      'Example sentences from Tatoeba, licensed CC-BY 2.0 FR</a></p>';
+      uiHtml('content_rpTatoeba') +
+      '</a></p>';
   }
 
   /* ----- More tab ----- */
@@ -1048,29 +1069,29 @@
     const sources = [...new Set((hit.entries || []).map((e) => e.source).filter(Boolean))];
     const rows = [];
     if (first && first.pitchHtml) {
-      rows.push(`<div class="rp-more-row"><span class="rp-more-k">Pitch accent</span><span class="rp-more-v">${first.pitchHtml}</span></div>`);
+      rows.push(`<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpPitchAccent')}</span><span class="rp-more-v">${first.pitchHtml}</span></div>`);
     }
     if (hit.deinflection && hit.deinflection.term) {
       const reasons = Array.isArray(hit.deinflection.reasons) ? hit.deinflection.reasons.join(' ‹ ') : '';
       rows.push(
-        `<div class="rp-more-row"><span class="rp-more-k">Deconjugation</span><span class="rp-more-v" lang="ja">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
+        `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpDeconjugation')}</span><span class="rp-more-v" lang="ja">${esc(hit.deinflection.source || hit.term)} → ${esc(hit.deinflection.term)}${reasons ? ` <span class="rp-dim">(${esc(reasons)})</span>` : ''}</span></div>`,
       );
     }
     rows.push(
-      `<div class="rp-more-row"><span class="rp-more-k">Entries</span><span class="rp-more-v">${(hit.entries || []).length} from ${sources.length ? esc(sources.join(', ')) : 'your dictionaries'}</span></div>`,
+      `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpEntries')}</span><span class="rp-more-v">${uiHtml('content_rpEntriesFrom', [(hit.entries || []).length, sources.length ? sources.join(', ') : uiMsg('content_rpYourDicts')])}</span></div>`,
     );
     rows.push(
-      `<div class="rp-more-row"><span class="rp-more-k">Source page</span><span class="rp-more-v rp-ellipsis" title="${esc(location.href)}">${esc(document.title || location.href)}</span></div>`,
+      `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpSourcePage')}</span><span class="rp-more-v rp-ellipsis" title="${esc(location.href)}">${esc(document.title || location.href)}</span></div>`,
     );
     body.innerHTML = `
       ${rows.join('')}
       <div class="rp-more-translate"></div>
       <div class="rp-row">
-        <button type="button" class="rp-mini" data-act="translate">Translate sentence</button>
-        <button type="button" class="rp-mini" data-act="clip">Add to clipboard history</button>
-        <button type="button" class="rp-mini" data-act="open-app">Open Gum</button>
+        <button type="button" class="rp-mini" data-act="translate">${uiHtml('content_rpTranslateSentence')}</button>
+        <button type="button" class="rp-mini" data-act="clip">${uiHtml('content_rpAddClip')}</button>
+        <button type="button" class="rp-mini" data-act="open-app">${uiHtml('content_rpOpenGum')}</button>
       </div>
-      <div class="rp-note">All dictionary, grammar, and difficulty data comes from your Gum desktop app over the local bridge.</div>`;
+      <div class="rp-note">${uiHtml('content_rpBridgeNote')}</div>`;
   }
 
   /* ----- popup event handling ----- */
@@ -1319,15 +1340,15 @@
     const text = hit?.sentence?.text || hit?.term || '';
     if (!text) return;
     const host = popup && popup.querySelector('.rp-more-translate');
-    if (host) host.innerHTML = '<div class="rp-loading-inline">Translating…</div>';
+    if (host) host.innerHTML = `<div class="rp-loading-inline">${uiHtml('content_translating')}</div>`;
     else toast(uiMsg('content_translating'), 'pending');
     const res = await safeRuntimeSend({ type: 'translate', text, source: 'ja', target: 'en' });
     if (res?.invalidated) return;
     const out = String(res?.text || '').trim();
     if (host && host.isConnected) {
       host.innerHTML = res?.ok
-        ? `<div class="rp-more-row"><span class="rp-more-k">Translation</span><span class="rp-more-v">${esc(out || '(empty)')}</span></div>`
-        : `<div class="rp-empty">${esc(res?.error || 'Translation failed — is the model installed in Gum?')}</div>`;
+        ? `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpTranslation')}</span><span class="rp-more-v">${esc(out || uiMsg('content_rpEmpty'))}</span></div>`
+        : `<div class="rp-empty">${esc(res?.error || uiMsg('content_rpTranslateFailed'))}</div>`;
     } else if (res?.ok) {
       toast(out.slice(0, 140) || uiMsg('content_translated'), 'ok');
     } else {
@@ -1815,24 +1836,24 @@
     cardPreviewEl = document.createElement('div');
     cardPreviewEl.id = 'jp-study-card-preview';
     cardPreviewEl.setAttribute('role', 'dialog');
-    cardPreviewEl.setAttribute('aria-label', 'Create card');
+    cardPreviewEl.setAttribute('aria-label', uiMsg('content_rpCreateCard'));
     cardPreviewEl.innerHTML = `
       <div class="cp-panel">
         <div class="cp-head">
-          <strong>Create card</strong>
-          <button type="button" class="rp-icon" data-act="cancel" aria-label="Close">×</button>
+          <strong>${uiHtml('content_rpCreateCard')}</strong>
+          <button type="button" class="rp-icon" data-act="cancel" aria-label="${uiHtml('content_close')}">×</button>
         </div>
-        <div class="cp-kind" role="group" aria-label="Card type">
-          <button type="button" class="cp-kind-btn" data-kind="word">Word card</button>
-          <button type="button" class="cp-kind-btn" data-kind="sentence">Sentence card</button>
+        <div class="cp-kind" role="group" aria-label="${uiHtml('content_cpKind')}">
+          <button type="button" class="cp-kind-btn" data-kind="word">${uiHtml('content_cpWord')}</button>
+          <button type="button" class="cp-kind-btn" data-kind="sentence">${uiHtml('content_cpSentence')}</button>
         </div>
-        <textarea class="cp-text" rows="3" lang="ja" aria-label="Card text"></textarea>
+        <textarea class="cp-text" rows="3" lang="ja" aria-label="${uiHtml('content_cpText')}"></textarea>
         <div class="cp-source"></div>
         <div class="cp-dest"></div>
-        <div class="cp-note">Gum fills the card fields (reading, definition, audio) from its dictionaries and your Anki field mapping.</div>
+        <div class="cp-note">${uiHtml('content_cpNote')}</div>
         <div class="cp-actions">
-          <button type="button" class="rp-act" data-act="cancel">Cancel</button>
-          <button type="button" class="rp-act rp-primary" data-act="send">Create card</button>
+          <button type="button" class="rp-act" data-act="cancel">${uiHtml('common_cancel')}</button>
+          <button type="button" class="rp-act rp-primary" data-act="send">${uiHtml('content_rpCreateCard')}</button>
         </div>
       </div>`;
     cardPreviewEl.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -1904,8 +1925,8 @@
     el.querySelector('.cp-source').textContent = uiMsg('content_cardSource', document.title || location.href);
     el.querySelector('.cp-dest').innerHTML =
       cfg.saveDestination === 'both'
-        ? 'Destination: <b>Anki</b> (falls back to Gum if Anki is closed) · copy kept in Gum'
-        : 'Destination: <b>Gum flashcards</b> — Anki is attempted because you asked for a card';
+        ? uiMsg('content_cpDestBoth')
+        : uiMsg('content_cpDestGum');
     el.classList.add('open');
     el.querySelector('.cp-text').focus();
   }
@@ -1972,7 +1993,7 @@
     wheelEl = document.createElement('div');
     wheelEl.id = 'jp-study-wheel';
     wheelEl.setAttribute('role', 'menu');
-    wheelEl.setAttribute('aria-label', 'Gum actions');
+    wheelEl.setAttribute('aria-label', uiMsg('content_wheelLabel'));
     document.documentElement.appendChild(wheelEl);
     wheelEl.addEventListener('pointermove', onWheelPointerMove);
     wheelEl.addEventListener('pointerup', onWheelPointerUp);
@@ -1999,7 +2020,7 @@
       lab.title = cmd
         ? available
           ? `${cmd.label} (${i + 1})`
-          : `${cmd.label} — not available on this page`
+          : uiMsg('content_wheelUnavailable', cmd.label)
         : id;
       lab.innerHTML = `<span class="jp-wheel-key">${i + 1}</span><span class="jp-wheel-label">${esc(cmd ? cmd.shortLabel : id)}</span>`;
       const mid = -90 + slice * i + slice / 2;
@@ -2022,7 +2043,7 @@
     if (center) {
       const cmds = wheelCommands();
       const cmd = idx >= 0 && S.getCommand ? S.getCommand(cmds[idx]) : null;
-      center.textContent = cmd ? cmd.shortLabel : 'Cancel';
+      center.textContent = cmd ? cmd.shortLabel : uiMsg('common_cancel');
       center.classList.toggle('previewing', !!cmd);
     }
   }
@@ -2520,17 +2541,17 @@
     fab.dataset.corner = cfg.fabCorner || 'bottom-right';
     fab.innerHTML = `
       <div class="jp-fab-pills">
-        <span id="jp-study-level-badge" title="Estimated page difficulty (JLPT / HSK bands from your Gum settings)">—</span>
-        <span id="jp-study-comp-badge" title="Share of sampled words you already know">—</span>
-        <button type="button" class="jp-fab-toggle" data-act="toggle" title="Expand page tools" aria-label="Expand page tools">▾</button>
+        <span id="jp-study-level-badge" title="${uiHtml('content_fabLevelTitle')}">—</span>
+        <span id="jp-study-comp-badge" title="${uiHtml('content_fabCompTitle')}">—</span>
+        <button type="button" class="jp-fab-toggle" data-act="toggle" title="${uiHtml('content_fabExpand')}" aria-label="${uiHtml('content_fabExpand')}">▾</button>
       </div>
       <div id="jp-study-fab-status" hidden></div>
       <div class="jp-fab-actions">
-        <button type="button" data-act="theme">Theme</button>
-        <button type="button" data-act="hlmode">Highlight</button>
-        <button type="button" data-act="learn">Known tint</button>
-        <button type="button" data-act="ocr">OCR</button>
-        <button type="button" data-act="hide-site" title="Hide this panel on this site">Hide here</button>
+        <button type="button" data-act="theme">${uiHtml('content_themeButton', uiMsg('content_theme_off'))}</button>
+        <button type="button" data-act="hlmode">${uiHtml('content_fabHighlight')}</button>
+        <button type="button" data-act="learn">${uiHtml('content_fabKnownTint')}</button>
+        <button type="button" data-act="ocr">${uiHtml('content_fabOcr')}</button>
+        <button type="button" data-act="hide-site" title="${uiHtml('content_fabHideTitle')}">${uiHtml('content_fabHide')}</button>
       </div>
     `;
     fab.addEventListener('mousedown', (e) => {
@@ -2616,12 +2637,12 @@
     }
     if (hlBtn) {
       hlBtn.hidden = !cfg.fabShowHighlight;
-      hlBtn.textContent = highlightMode ? 'Highlight: on' : 'Highlight';
+      hlBtn.textContent = uiMsg(highlightMode ? 'content_fabHighlightOn' : 'content_fabHighlight');
       hlBtn.classList.toggle('on', highlightMode);
     }
     if (learnBtn) {
       learnBtn.hidden = !cfg.fabShowLearn;
-      learnBtn.textContent = learningOn ? 'Known tint: on' : 'Known tint';
+      learnBtn.textContent = uiMsg(learningOn ? 'content_fabKnownTintOn' : 'content_fabKnownTint');
       learnBtn.classList.toggle('on', learningOn);
     }
     if (ocrBtn) ocrBtn.hidden = !cfg.fabShowOcr;
@@ -2683,10 +2704,10 @@
     el.dataset.lang = meta?.lang || '';
     el.classList.toggle('offline', next === '—' || !!meta?.offline);
     el.title = meta?.offline
-      ? 'Difficulty estimate unavailable — Gum is not running'
+      ? uiMsg('content_levelOffline')
       : next === 'X' || next === '—'
-        ? 'No Japanese or Chinese text detected on this page'
-        : `Estimated page difficulty: ${next} (vocabulary-band estimate, not an official rating)`;
+        ? uiMsg('content_levelNoText')
+        : uiMsg('content_levelTitle', next);
   }
 
   async function refreshComprehensibility() {
@@ -3214,19 +3235,19 @@
     ocrOverlay = document.createElement('div');
     ocrOverlay.id = 'jp-study-ocr-overlay';
     ocrOverlay.setAttribute('role', 'dialog');
-    ocrOverlay.setAttribute('aria-label', 'OCR result');
+    ocrOverlay.setAttribute('aria-label', uiMsg('content_ocrLabel'));
     ocrOverlay.innerHTML = `
       <div class="jp-ocr-head">
-        <h3>OCR result</h3>
-        <button type="button" class="rp-icon" data-act="close" aria-label="Close">×</button>
+        <h3>${uiHtml('content_ocrLabel')}</h3>
+        <button type="button" class="rp-icon" data-act="close" aria-label="${uiHtml('content_close')}">×</button>
       </div>
-      <textarea class="jp-ocr-body" lang="ja" rows="4" aria-label="Recognized text — edit before saving"></textarea>
-      <div class="jp-ocr-hint">Double-click a word to look it up. Edit the text if the recognition missed characters.</div>
+      <textarea class="jp-ocr-body" lang="ja" rows="4" aria-label="${uiHtml('content_ocrText')}"></textarea>
+      <div class="jp-ocr-hint">${uiHtml('content_ocrHint')}</div>
       <div class="jp-actions">
-        <button type="button" class="rp-act rp-primary" data-act="analyze">AI analysis</button>
-        <button type="button" class="rp-act" data-act="lookup">Look up</button>
-        <button type="button" class="rp-act" data-act="save">Save to Gum</button>
-        <button type="button" class="rp-act" data-act="retry">Re-select</button>
+        <button type="button" class="rp-act rp-primary" data-act="analyze">${uiHtml('content_ocrAnalyze')}</button>
+        <button type="button" class="rp-act" data-act="lookup">${uiHtml('content_ocrLookUp')}</button>
+        <button type="button" class="rp-act" data-act="save">${uiHtml('content_ocrSave')}</button>
+        <button type="button" class="rp-act" data-act="retry">${uiHtml('content_ocrReselect')}</button>
       </div>
     `;
     ocrOverlay.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -3306,15 +3327,15 @@
       hint.textContent =
         res?.error ||
         (res?.available === false
-          ? 'OCR models are not installed. Open Gum → Settings → Models & dictionaries.'
-          : 'OCR failed.');
+          ? uiMsg('content_ocrNoModels')
+          : uiMsg('content_ocrFailed'));
       el.classList.add('open');
       return;
     }
     body.value = (res.text || '').trim();
     hint.textContent = body.value
-      ? `${describeOcrEngine(res)} · Double-click a word to look it up.`
-      : 'No text was recognized in that area — try a tighter box.';
+      ? uiMsg('content_ocrReadHint', describeOcrEngine(res))
+      : uiMsg('content_ocrNothing');
     el.classList.add('open');
     // AI OCR mode analyses the read straight away. The overlay still opens first
     // so the recognized text — and the chance to correct it — stays reachable
@@ -3327,10 +3348,10 @@
 
   /** Which engine and language actually read the capture — confirms auto-detection. */
   function describeOcrEngine(res) {
-    if (res?.engine === 'manga-ocr') return 'Read with manga OCR';
-    const names = { ja: 'Japanese', zh: 'Chinese', ru: 'Russian' };
+    if (res?.engine === 'manga-ocr') return uiMsg('content_ocrEngineManga');
+    const names = { ja: 'content_langName_ja', zh: 'content_langName_zh', ru: 'content_langName_ru' };
     const lang = names[res?.lang];
-    return lang ? `Read as ${lang}` : 'Read with web OCR';
+    return lang ? uiMsg('content_ocrEngineLang', uiMsg(lang)) : uiMsg('content_ocrEngineWeb');
   }
 
   /* --------------------------- AI sentence analysis -------------------------- */
@@ -3377,12 +3398,12 @@
     aiPanel = document.createElement('div');
     aiPanel.id = 'jp-study-ai';
     aiPanel.setAttribute('role', 'dialog');
-    aiPanel.setAttribute('aria-label', 'AI sentence analysis');
+    aiPanel.setAttribute('aria-label', uiMsg('content_aiLabel'));
     aiPanel.innerHTML = `
       <div class="ai-head">
-        <span class="ai-title">AI OCR \u00b7 Sentence analysis</span>
-        <button type="button" class="rp-icon" data-act="reanalyze" title="Re-analyze (R)">\u21bb</button>
-        <button type="button" class="rp-icon" data-act="close" aria-label="Close">\u00d7</button>
+        <span class="ai-title">${uiHtml('content_aiTitle')}</span>
+        <button type="button" class="rp-icon" data-act="reanalyze" title="${uiHtml('content_aiReanalyze')}" aria-label="${uiHtml('content_aiReanalyze')}">\u21bb</button>
+        <button type="button" class="rp-icon" data-act="close" aria-label="${uiHtml('content_close')}">\u00d7</button>
       </div>
       <div class="ai-body"></div>`;
     aiPanel.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -3535,7 +3556,7 @@
       type: 'sentence-analysis-snapshot',
       result: aiState.result,
       lang: aiState.lang,
-      sourceLabel: `Captured from ${document.title || location.hostname}`,
+      sourceLabel: uiMsg('content_aiCapturedFrom', document.title || location.hostname),
     });
     aiState.snapshot = res && res.ok ? 'done' : 'error';
     renderAiAnalysis();
@@ -3621,12 +3642,12 @@
       const rawErr = (res && res.error) || '';
       aiState.error =
         (res && res.needsKey
-          ? 'AI analysis needs an API key. Add one in Gum → Flashcards → AI Card Studio.'
+          ? uiMsg('content_aiNeedsKey')
           : res && res.needsLocalModel
-            ? 'AI analysis needs the local Qwen model. Install Qwen3-1.7B via Gum → Translate, or switch to Cloud in Flashcards → AI Card Studio.'
+            ? uiMsg('content_aiNeedsLocal')
             : rawErr === 'Not found'
-              ? 'Gum is outdated or not fully started — restart the app, then reload this extension.'
-              : rawErr) || 'The analysis failed.';
+              ? uiMsg('content_aiOutdated')
+              : rawErr) || uiMsg('content_aiFailed');
     }
     renderAiAnalysis();
   }

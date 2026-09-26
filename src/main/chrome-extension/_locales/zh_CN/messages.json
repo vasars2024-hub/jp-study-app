@@ -386,6 +386,543 @@
   "content_snapshotFailed": {
     "message": "快照失败"
   },
+  "content_extReloaded": {
+    "message": "扩展已重新加载——请刷新此标签页"
+  },
+  "content_extError": {
+    "message": "扩展出错"
+  },
+  "content_close": {
+    "message": "关闭"
+  },
+  "content_popupLabel": {
+    "message": "Gum 查词"
+  },
+  "content_rpBack": {
+    "message": "返回"
+  },
+  "content_rpBackTitle": {
+    "message": "返回上一个查询"
+  },
+  "content_rpPronounce": {
+    "message": "播放发音"
+  },
+  "content_rpPin": {
+    "message": "固定弹窗"
+  },
+  "content_rpPinTitle": {
+    "message": "固定弹窗 (P)"
+  },
+  "content_rpCloseTitle": {
+    "message": "关闭 (Esc)"
+  },
+  "content_rpKnownGroup": {
+    "message": "你对这个词有多熟悉？"
+  },
+  "content_rpKnownLabel": {
+    "message": "熟悉度："
+  },
+  "content_rpLevel0": {
+    "message": "新词"
+  },
+  "content_rpLevel1": {
+    "message": "学习中"
+  },
+  "content_rpLevel2": {
+    "message": "熟悉"
+  },
+  "content_rpLevel3": {
+    "message": "已掌握"
+  },
+  "content_rpTab_meaning": {
+    "message": "释义"
+  },
+  "content_rpTab_grammar": {
+    "message": "语法"
+  },
+  "content_rpTab_sentence": {
+    "message": "句子"
+  },
+  "content_rpTab_kanji": {
+    "message": "汉字"
+  },
+  "content_rpTab_examples": {
+    "message": "例句"
+  },
+  "content_rpTab_more": {
+    "message": "更多"
+  },
+  "content_rpSaveWord": {
+    "message": "保存单词"
+  },
+  "content_rpSaveSentence": {
+    "message": "保存句子"
+  },
+  "content_rpCreateCard": {
+    "message": "制作卡片"
+  },
+  "content_rpMoreActions": {
+    "message": "更多操作"
+  },
+  "content_rpAddClip": {
+    "message": "添加到剪贴板历史"
+  },
+  "content_rpTranslateSentence": {
+    "message": "翻译句子"
+  },
+  "content_rpCopySentence": {
+    "message": "复制句子"
+  },
+  "content_rpOpenGum": {
+    "message": "打开 Gum"
+  },
+  "content_rpBase": {
+    "message": "原形："
+  },
+  "content_rpDeinfTitle": {
+    "message": "变形还原路径"
+  },
+  "content_rpCommon": {
+    "message": "常用"
+  },
+  "content_rpJlptTitle": {
+    "message": "JLPT 级别为估计值"
+  },
+  "content_rpFreqTitle": {
+    "message": "词频排名"
+  },
+  "content_rpDictOffline": {
+    "message": "Gum 未运行——词典在应用内。请打开 Gum 后重试。"
+  },
+  "content_rpNoEntries": {
+    "message": "未找到词典条目。"
+  },
+  "content_rpNoGloss": {
+    "message": "（无释义）"
+  },
+  "content_rpPitch": {
+    "message": "音调"
+  },
+  "content_rpDictSource": {
+    "message": "词典来源"
+  },
+  "content_rpMoreEntries_other": {
+    "message": "还有 $1 个条目——请查看“更多”标签。"
+  },
+  "content_rpNoSentence": {
+    "message": "未检测到这个词所在的句子。"
+  },
+  "content_rpMatchingGrammar": {
+    "message": "正在匹配语法句型…"
+  },
+  "content_rpGrammarOffline": {
+    "message": "Gum 未运行——语法匹配需要应用。"
+  },
+  "content_rpGrammarFailed": {
+    "message": "语法匹配失败。"
+  },
+  "content_rpRetry": {
+    "message": "重试"
+  },
+  "content_rpNoGrammar": {
+    "message": "这个句子没有匹配到已知的语法句型。"
+  },
+  "content_rpInSentence": {
+    "message": "句中出现"
+  },
+  "content_rpInSentenceTitle": {
+    "message": "这个形式原样出现在句子中"
+  },
+  "content_rpPatternMatch": {
+    "message": "句型匹配"
+  },
+  "content_rpPatternMatchTitle": {
+    "message": "由句型规则匹配——无法定位确切位置"
+  },
+  "content_rpGrammarNote": {
+    "message": "匹配结果由 Gum 的句型规则根据这个句子的文本得出。多个结果重叠时请自行判断——完整讲解请打开语法练习。"
+  },
+  "content_rpOpenGrammar": {
+    "message": "打开语法练习"
+  },
+  "content_rpNoSentenceAround": {
+    "message": "这个词周围没有检测到句子。"
+  },
+  "content_rpExtendPrev": {
+    "message": "‹ 扩展"
+  },
+  "content_rpExtendPrevTitle": {
+    "message": "包含上一句"
+  },
+  "content_rpExtendNext": {
+    "message": "扩展 ›"
+  },
+  "content_rpExtendNextTitle": {
+    "message": "包含下一句"
+  },
+  "content_rpReset": {
+    "message": "重置"
+  },
+  "content_rpEdit": {
+    "message": "编辑"
+  },
+  "content_rpAnalyzing": {
+    "message": "正在分析…"
+  },
+  "content_rpCopy": {
+    "message": "复制"
+  },
+  "content_rpDifficulty": {
+    "message": "难度"
+  },
+  "content_rpEstimate": {
+    "message": "（估计）"
+  },
+  "content_rpKnownWords": {
+    "message": "已掌握词"
+  },
+  "content_rpChars_other": {
+    "message": "$1 个字"
+  },
+  "content_rpStatsOffline": {
+    "message": "Gum 离线——无法显示统计"
+  },
+  "content_rpNoKanji": {
+    "message": "这个表达里没有汉字。"
+  },
+  "content_rpLoadingKanji": {
+    "message": "正在载入汉字…"
+  },
+  "content_rpKanjiOffline": {
+    "message": "Gum 未运行——汉字数据需要应用。"
+  },
+  "content_rpLookUpChar": {
+    "message": "查询 $1"
+  },
+  "content_rpNoKanjiEntry": {
+    "message": "你的词典里没有这个条目"
+  },
+  "content_rpSearchingExamples": {
+    "message": "正在搜索例句…"
+  },
+  "content_rpNoExamples": {
+    "message": "未找到例句。"
+  },
+  "content_rpPlayExample": {
+    "message": "播放"
+  },
+  "content_rpTatoeba": {
+    "message": "例句来自 Tatoeba，采用 CC-BY 2.0 FR 许可"
+  },
+  "content_rpPitchAccent": {
+    "message": "音高重音"
+  },
+  "content_rpDeconjugation": {
+    "message": "变形还原"
+  },
+  "content_rpEntries": {
+    "message": "条目"
+  },
+  "content_rpEntriesFrom": {
+    "message": "$1 个，来自 $2"
+  },
+  "content_rpYourDicts": {
+    "message": "你的词典"
+  },
+  "content_rpSourcePage": {
+    "message": "来源页面"
+  },
+  "content_rpBridgeNote": {
+    "message": "所有词典、语法和难度数据都通过本地连接来自你的 Gum 桌面应用。"
+  },
+  "content_rpTranslation": {
+    "message": "翻译"
+  },
+  "content_rpEmpty": {
+    "message": "（空）"
+  },
+  "content_rpTranslateFailed": {
+    "message": "翻译失败——Gum 中安装了模型吗？"
+  },
+  "content_cpKind": {
+    "message": "卡片类型"
+  },
+  "content_cpWord": {
+    "message": "单词卡"
+  },
+  "content_cpSentence": {
+    "message": "句子卡"
+  },
+  "content_cpText": {
+    "message": "卡片文本"
+  },
+  "content_cpNote": {
+    "message": "Gum 会根据词典和你的 Anki 字段映射填写卡片字段（读音、释义、音频）。"
+  },
+  "content_cpDestBoth": {
+    "message": "保存到：<b>Anki</b>（Anki 未打开时改存 Gum）· Gum 中保留副本"
+  },
+  "content_cpDestGum": {
+    "message": "保存到：<b>Gum 卡片</b>——因为你要求制作卡片，也会尝试 Anki"
+  },
+  "content_wheelLabel": {
+    "message": "Gum 操作"
+  },
+  "content_wheelUnavailable": {
+    "message": "$1——此页面不可用"
+  },
+  "content_fabLevelTitle": {
+    "message": "页面难度估计（依据你在 Gum 中的设置）"
+  },
+  "content_fabCompTitle": {
+    "message": "抽样词中你已掌握的比例"
+  },
+  "content_fabExpand": {
+    "message": "展开页面工具"
+  },
+  "content_fabHighlight": {
+    "message": "高亮"
+  },
+  "content_fabHighlightOn": {
+    "message": "高亮：开"
+  },
+  "content_fabKnownTint": {
+    "message": "已掌握词着色"
+  },
+  "content_fabKnownTintOn": {
+    "message": "已掌握词着色：开"
+  },
+  "content_fabOcr": {
+    "message": "OCR"
+  },
+  "content_fabHide": {
+    "message": "在此隐藏"
+  },
+  "content_fabHideTitle": {
+    "message": "在此网站隐藏此面板"
+  },
+  "content_levelOffline": {
+    "message": "无法估计难度——Gum 未运行"
+  },
+  "content_levelNoText": {
+    "message": "此页面未检测到学习语言的文本"
+  },
+  "content_levelTitle": {
+    "message": "页面难度估计：$1（依据词汇级别估计，并非官方评级）"
+  },
+  "content_ocrLabel": {
+    "message": "OCR 结果"
+  },
+  "content_ocrText": {
+    "message": "识别出的文本——保存前可编辑"
+  },
+  "content_ocrHint": {
+    "message": "双击单词即可查询。如有漏识的字，请编辑文本。"
+  },
+  "content_ocrAnalyze": {
+    "message": "AI 分析"
+  },
+  "content_ocrLookUp": {
+    "message": "查询"
+  },
+  "content_ocrSave": {
+    "message": "保存到 Gum"
+  },
+  "content_ocrReselect": {
+    "message": "重新框选"
+  },
+  "content_ocrNoModels": {
+    "message": "未安装 OCR 模型。请打开 Gum → 设置 → 模型与词典。"
+  },
+  "content_ocrReadHint": {
+    "message": "$1 · 双击单词即可查询。"
+  },
+  "content_ocrNothing": {
+    "message": "该区域未识别到文本——请框得更紧一些。"
+  },
+  "content_ocrEngineManga": {
+    "message": "使用漫画 OCR 识别"
+  },
+  "content_ocrEngineLang": {
+    "message": "按$1识别"
+  },
+  "content_ocrEngineWeb": {
+    "message": "使用网页 OCR 识别"
+  },
+  "content_langName_ja": {
+    "message": "日语"
+  },
+  "content_langName_zh": {
+    "message": "中文"
+  },
+  "content_langName_ru": {
+    "message": "俄语"
+  },
+  "content_aiLabel": {
+    "message": "AI 句子分析"
+  },
+  "content_aiTitle": {
+    "message": "AI OCR · 句子分析"
+  },
+  "content_aiReanalyze": {
+    "message": "重新分析 (R)"
+  },
+  "content_aiCapturedFrom": {
+    "message": "采集自 $1"
+  },
+  "content_aiNeedsKey": {
+    "message": "AI 分析需要 API 密钥。请在 Gum → 卡片 → AI 卡片工作室中添加。"
+  },
+  "content_aiNeedsLocal": {
+    "message": "AI 分析需要本地 Qwen 模型。请通过 Gum → 翻译 安装 Qwen3-1.7B，或在 卡片 → AI 卡片工作室 中切换到云端。"
+  },
+  "content_aiOutdated": {
+    "message": "Gum 版本过旧或尚未完全启动——请重启应用，然后重新加载此扩展。"
+  },
+  "content_aiFailed": {
+    "message": "分析失败。"
+  },
+  "content_aiAnalyzing": {
+    "message": "正在分析句子…"
+  },
+  "content_aiTryAgain": {
+    "message": "再试一次"
+  },
+  "content_aiRecognized": {
+    "message": "识别出的句子"
+  },
+  "content_aiHint": {
+    "message": "点击任一高亮部分即可查看语法和词汇讲解。"
+  },
+  "content_aiFormality": {
+    "message": "语体"
+  },
+  "content_aiStructure": {
+    "message": "结构"
+  },
+  "content_aiNuance": {
+    "message": "语感"
+  },
+  "content_aiWatchOut": {
+    "message": "注意"
+  },
+  "content_aiShowTranslations": {
+    "message": "显示全部译文"
+  },
+  "content_aiHideTranslations": {
+    "message": "隐藏译文"
+  },
+  "content_aiSimplified": {
+    "message": "简化"
+  },
+  "content_aiLiteral": {
+    "message": "直译"
+  },
+  "content_aiPoint": {
+    "message": "$1要点"
+  },
+  "content_aiLevel": {
+    "message": "级别"
+  },
+  "content_aiMeaning": {
+    "message": "意义 / 功能"
+  },
+  "content_aiOpenDict": {
+    "message": "在词典中打开"
+  },
+  "content_aiInDepth": {
+    "message": "深入讲解"
+  },
+  "content_aiVocabNotes": {
+    "message": "词汇注释"
+  },
+  "content_aiCopy": {
+    "message": "复制"
+  },
+  "content_aiListen": {
+    "message": "收听"
+  },
+  "content_aiSaveSentence": {
+    "message": "保存整句"
+  },
+  "content_aiShortcuts": {
+    "message": "快捷键"
+  },
+  "content_aiKey_pick": {
+    "message": "选择"
+  },
+  "content_aiKey_move": {
+    "message": "移动"
+  },
+  "content_aiKey_copy": {
+    "message": "复制"
+  },
+  "content_aiKey_card": {
+    "message": "卡片"
+  },
+  "content_aiKey_sentence": {
+    "message": "句子"
+  },
+  "content_aiKey_snapshot": {
+    "message": "快照"
+  },
+  "content_aiKey_listen": {
+    "message": "收听"
+  },
+  "content_aiKey_dictionary": {
+    "message": "词典"
+  },
+  "content_aiKey_translations": {
+    "message": "译文"
+  },
+  "content_aiKey_reanalyze": {
+    "message": "重新分析"
+  },
+  "content_aiKey_close": {
+    "message": "关闭"
+  },
+  "content_aiCat_grammar": {
+    "message": "语法"
+  },
+  "content_aiCat_vocabulary": {
+    "message": "词汇"
+  },
+  "content_aiCat_particle": {
+    "message": "助词"
+  },
+  "content_aiCat_expression": {
+    "message": "表达"
+  },
+  "content_aiCat_idiom": {
+    "message": "惯用语"
+  },
+  "content_aiCat_name": {
+    "message": "专有名词"
+  },
+  "content_aiMine_idle": {
+    "message": "添加到卡片"
+  },
+  "content_aiMine_busy": {
+    "message": "正在添加…"
+  },
+  "content_aiMine_done": {
+    "message": "已添加"
+  },
+  "content_aiMine_error": {
+    "message": "重试添加"
+  },
+  "content_aiSnap_idle": {
+    "message": "快照"
+  },
+  "content_aiSnap_busy": {
+    "message": "正在保存…"
+  },
+  "content_aiSnap_done": {
+    "message": "已存入笔记本"
+  },
+  "content_aiSnap_error": {
+    "message": "重试快照"
+  },
   "popup_statusApp": {
     "message": "Gum 应用"
   },
