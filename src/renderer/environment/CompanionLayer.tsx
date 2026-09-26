@@ -3,6 +3,7 @@
  * Wander updates DOM positions (not React every frame) to avoid lag/persist thrash.
  * Left-click = primary routine; right-click / menu button = actions menu.
  */
+import { COMPANION_IDLE_FRAMES, companionFrameDelay } from './companionSchedule';
 import {
   useCallback,
   useEffect,
@@ -438,10 +439,30 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     if (document.documentElement.classList.contains('reduce-motion')) return;
 
     let raf = 0;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let idleFrames = 0;
     let last = performance.now();
     let lastPersist = performance.now();
     let lastReactSync = performance.now();
     let frameN = 0;
+    /** The next frame: now, or after an idle poll delay (see `companionFrameDelay`). */
+    const schedule = (): void => {
+      if (!running) return;
+      const delay = companionFrameDelay(idleFrames, listRef.current.length);
+      if (delay === 0) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      pollTimer = setTimeout(() => {
+        pollTimer = null;
+        if (running) raf = requestAnimationFrame(frame);
+      }, delay);
+    };
+    const stopScheduled = (): void => {
+      cancelAnimationFrame(raf);
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = null;
+    };
     let running = !document.hidden && !secretLifecycleSuspended();
     /** Cache companion nodes — querySelector every frame was expensive. */
     const elCache = new Map<string, HTMLElement | null>();
@@ -476,20 +497,25 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         || document.querySelector('.seanime-host') !== null
       ) {
         last = now;
-        raf = requestAnimationFrame(frame);
+        schedule();
         return;
       }
-      // Half-rate wander (~30fps) — smooth enough, half the main-thread cost
-      if (frameN % 2 === 1) {
+      // Half-rate wander (~30fps) — smooth enough, half the main-thread cost.
+      // (An idle poll is already slow: it always does its step.)
+      if (frameN % 2 === 1 && idleFrames < COMPANION_IDLE_FRAMES) {
         raf = requestAnimationFrame(frame);
         return;
       }
 
-      const dt = Math.min(0.08, (now - last) / 1000);
+      // `rawDt` keeps the chance of starting a wander step per SECOND the same
+      // at the idle poll rate; the step itself stays capped at `dt`.
+      const rawDt = Math.min(0.5, (now - last) / 1000);
+      const dt = Math.min(0.08, rawDt);
       last = now;
       // Nothing to move, nothing to measure.
       if (!listRef.current.length) {
-        raf = requestAnimationFrame(frame);
+        idleFrames = COMPANION_IDLE_FRAMES;
+        schedule();
         return;
       }
       const root = rootRef.current;
@@ -502,7 +528,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const pauseStudy = envRef.current.companionPauseWhenStudying;
       const prev = listRef.current;
       if (!prev.length) {
-        raf = requestAnimationFrame(frame);
+        schedule();
         return;
       }
 
@@ -533,7 +559,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
           continue;
         }
 
-        if (Math.random() < dt * 0.28) {
+        if (Math.random() < rawDt * 0.28) {
           const tx = clamp(c.x + (Math.random() - 0.5) * 120, 8, w - SIZE);
           const ty = clamp(c.y + (Math.random() - 0.5) * 80, 8, h - SIZE);
           const dx = tx - c.x;
@@ -558,6 +584,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       }
 
       if (moved) dirtyRef.current = true;
+      idleFrames = moved ? 0 : idleFrames + 1;
       if (needsReact && now - lastReactSync > 180) {
         lastReactSync = now;
         const snapshot = listRef.current.map((c) => ({ ...c }));
@@ -571,20 +598,21 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         flushPersist(false);
       }
 
-      raf = requestAnimationFrame(frame);
+      schedule();
     };
 
     const onVis = () => {
       const shouldRun = !document.hidden && !secretLifecycleSuspended();
       if (!shouldRun) {
         running = false;
-        cancelAnimationFrame(raf);
+        stopScheduled();
         if (dirtyRef.current && listRef.current.length) {
           lastPersist = performance.now();
           flushPersist(true);
         }
       } else if (!running) {
         running = true;
+        idleFrames = 0;
         last = performance.now();
         raf = requestAnimationFrame(frame);
       }
@@ -592,10 +620,22 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('secret:lifecycle', onVis);
 
+    // Something new to move (placed, dragged, un-hidden): back to full rate.
+    const wake = (): void => {
+      idleFrames = 0;
+      if (running && pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+        raf = requestAnimationFrame(frame);
+      }
+    };
+    window.addEventListener('pointerdown', wake, { passive: true });
+
     if (running) raf = requestAnimationFrame(frame);
     return () => {
       running = false;
-      cancelAnimationFrame(raf);
+      stopScheduled();
+      window.removeEventListener('pointerdown', wake);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('secret:lifecycle', onVis);
       elCache.clear();
