@@ -576,21 +576,26 @@ function setCors(res: http.ServerResponse, origin: string | undefined): void {
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
+/** Largest request body any route reads. */
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    const MAX = 8 * 1024 * 1024;
+    let tooLarge = false;
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > MAX) {
-        reject(new Error('Payload too large'));
-        req.destroy();
+      if (size > MAX_BODY_BYTES) {
+        // Keep reading and discard: destroying the socket here made the answer
+        // a connection reset, which the extension cannot tell from a closed app.
+        tooLarge = true;
+        chunks.length = 0;
         return;
       }
       chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => (tooLarge ? reject(new Error('Payload too large')) : resolve(Buffer.concat(chunks).toString('utf8'))));
     req.on('error', reject);
   });
 }
@@ -1125,6 +1130,15 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     }
     res.statusCode = 204;
     res.end();
+    return;
+  }
+
+  // A body no route would read is refused up front with a real answer (the
+  // rest of it drained), never a reset connection — the extension reads a
+  // reset as "Gum is not running" and queues the request forever.
+  if (Number(req.headers['content-length'] || 0) > MAX_BODY_BYTES) {
+    req.resume();
+    json(res, 413, { ok: false, error: 'Payload too large' });
     return;
   }
 
