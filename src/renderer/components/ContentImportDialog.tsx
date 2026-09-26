@@ -95,6 +95,10 @@ export default function ContentImportDialog<T>({
   const template = templates[format];
   const noRows = result.rows.length === 0;
 
+  // Nothing is mounted while closed: hosts keep one of these per list, and a
+  // closed dialog has no reason to exist in the tree.
+  if (!open) return null;
+
   return (
     <Dialog
       open={open}

@@ -76,7 +76,7 @@ export function readImportTable(
       const list = Array.isArray(parsed)
         ? parsed
         : parsed && typeof parsed === 'object'
-          ? (['items', 'rows', 'entries', 'data', 'points', 'texts', 'resources']
+          ? (['items', 'rows', 'entries', 'data', 'points', 'texts', 'resources', 'examples', 'sentences']
               .map((key) => (parsed as Record<string, unknown>)[key])
               .find(Array.isArray) as unknown[] | undefined) ?? []
           : [];

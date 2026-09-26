@@ -10299,6 +10299,42 @@ mark.lookup-mark,
   margin: 12px 0 0;
   font-size: 13px;
 }
+/* "More examples" and "Add your own examples" side by side. */
+.gram-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.gram-more-actions .gram-more-btn {
+  flex: 1 1 180px;
+  width: auto;
+}
+.gram-examples-own {
+  margin-top: 8px;
+}
+.gram-ex-own-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+}
+.gram-ex-own-tag {
+  color: var(--accent-text);
+}
+.gram-ex-own-remove {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.gram-ex-own-remove:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
 .gram-examples-extra {
   margin-top: 12px;
 }
