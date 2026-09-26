@@ -1031,7 +1031,7 @@
     body.innerHTML = `<div class="rp-loading">${uiHtml('content_rpSearchingExamples')}</div>`;
     const token = lookupToken;
     const query = hit.deinflection?.term || hit.term;
-    const res = await safeRuntimeSend({ type: 'examples', query, limit: 8 });
+    const res = await safeRuntimeSend({ type: 'examples', query, limit: 8, lang: lookupLangFor(query) });
     if (token !== lookupToken || popupTab !== 'examples') return;
     if (res?.invalidated) return;
     if (!res?.ok || !Array.isArray(res.examples) || !res.examples.length) {
@@ -1342,7 +1342,7 @@
     const host = popup && popup.querySelector('.rp-more-translate');
     if (host) host.innerHTML = `<div class="rp-loading-inline">${uiHtml('content_translating')}</div>`;
     else toast(uiMsg('content_translating'), 'pending');
-    const res = await safeRuntimeSend({ type: 'translate', text, source: 'ja', target: 'en' });
+    const res = await safeRuntimeSend({ type: 'translate', text, ...S.translateLangs(text, currentLangHint(), aiUiLang()) });
     if (res?.invalidated) return;
     const out = String(res?.text || '').trim();
     if (host && host.isConnected) {
@@ -2299,7 +2299,11 @@
           return;
         }
         toast(uiMsg('content_translating'), 'pending');
-        const res = await safeRuntimeSend({ type: 'translate', text: payload.text, source: 'ja', target: 'en' });
+        const res = await safeRuntimeSend({
+          type: 'translate',
+          text: payload.text,
+          ...S.translateLangs(payload.text, currentLangHint(), aiUiLang()),
+        });
         if (res?.invalidated) return;
         if (res?.ok) toast(String(res.text || '').slice(0, 140) || uiMsg('content_translated'), 'ok', { label: uiMsg('content_openInApp'), openTarget: 'translate' });
         else toast(res?.error || uiMsg('content_translationFailed'), 'err');

@@ -1901,7 +1901,9 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         json(res, 503, { ok: false, error: 'Translation model not installed' });
         return;
       }
-      const source = String(body.source || 'ja').slice(0, 8);
+      // No source named: the text's own script says (Han alone follows the
+      // study language) — a Russian sentence is never translated "from Japanese".
+      const source = String(body.source || studyLangOfText(text, getMainStudyLang())).slice(0, 8);
       const target = String(body.target || 'en').slice(0, 8);
       const results = await runTranslationBatch([{ id: 'ext', text, source, target }]);
       const resultText = results[0]?.text || '';
@@ -2128,15 +2130,19 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     if (!requireAuth(req, res)) return;
     try {
       const raw = await readBody(req);
-      const body = JSON.parse(raw || '{}') as { query?: string; limit?: number };
+      const body = JSON.parse(raw || '{}') as { query?: string; limit?: number; lang?: string };
       const query = String(body.query ?? '').trim().slice(0, 80);
       if (!query) {
         json(res, 400, { ok: false, error: 'query required' });
         return;
       }
       const limit = Math.min(30, Math.max(1, Number(body.limit) || 8));
+      // Examples in the word's own language, chosen like /v1/lookup: a Russian
+      // or Chinese word searched in the Japanese corpus finds nothing, or worse,
+      // Japanese sentences that happen to share a kanji.
+      const lang = studyLangFromTag(body.lang) ?? studyLangOfText(query, getMainStudyLang());
       const { searchExamples } = await import('./dictionary');
-      const result = await searchExamples(query, limit);
+      const result = await searchExamples(query, limit, lang);
       json(res, 200, {
         ok: true,
         query,

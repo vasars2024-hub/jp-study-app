@@ -1573,7 +1573,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse(
           await apiFetch('/v1/examples', {
             method: 'POST',
-            body: JSON.stringify({ query: msg.query || '', limit: msg.limit || 8 }),
+            body: JSON.stringify({ query: msg.query || '', limit: msg.limit || 8, lang: msg.lang || '' }),
           }),
         );
       } catch (err) {
@@ -1658,7 +1658,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             method: 'POST',
             body: JSON.stringify({
               text: msg.text || '',
-              source: msg.source || 'ja',
+              // No source: the app reads it from the text (never a blanket 'ja').
+              source: msg.source || '',
               target: msg.target || 'en',
             }),
           }),

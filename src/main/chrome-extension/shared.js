@@ -764,6 +764,29 @@ function detectScriptLang(text) {
 }
 
 /**
+ * Source and target for "Translate" on a selection. The source is the text's
+ * own language (kana → ja, Cyrillic → ru, Han alone → the page's zh/ja hint,
+ * like the lookup), never a fixed 'ja': a Russian or Chinese sentence sent as
+ * Japanese comes back as a wrong or refused translation. The target is the
+ * reader's language when it is one of the app's four, else English — and never
+ * the source itself.
+ * @returns {{ source: 'ja'|'zh'|'ru', target: string }}
+ */
+function translateLangs(text, pageHint, uiLang) {
+  const s = String(text || '');
+  const hint = pageHint === 'ja' || pageHint === 'zh' || pageHint === 'ru' ? pageHint : '';
+  let source;
+  if (/[぀-ヿ]/.test(s)) source = 'ja';
+  else if (/[Ѐ-ӿ]/.test(s)) source = 'ru';
+  else if (/[㐀-䶿一-鿿]/.test(s)) source = hint === 'zh' ? 'zh' : 'ja';
+  else source = hint || 'ja';
+  const ui = String(uiLang || '').slice(0, 2).toLowerCase();
+  let target = ['en', 'ja', 'zh', 'ru'].includes(ui) ? ui : 'en';
+  if (target === source) target = 'en';
+  return { source, target };
+}
+
+/**
  * Best-effort OCR language hint from page metadata + a text sample.
  * Used when the level badge has not classified the page (Russian never does).
  *
@@ -1228,6 +1251,7 @@ if (typeof globalThis !== 'undefined') {
     langTagToOcrLang,
     detectScriptLang,
     detectPageLangHint,
+    translateLangs,
     AI_CATEGORIES,
     AI_CATEGORY_LABELS,
     AI_KEY_COMMANDS,
