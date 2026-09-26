@@ -7909,11 +7909,17 @@ mark.lookup-mark,
 }
 /* Filters can be on while the panel is shut. The marker is a SHAPE, not a colour — a colour
    swap alone would say nothing to anyone who cannot see it, and the button also carries an
-   `aria-label` naming the state. Positioned rather than appended so it cannot reflow the row. */
+   `aria-label` naming the state. Positioned rather than appended so it cannot reflow the row.
+
+   `::before`, never `::after`: the row is a `.lq-hit-scope`, whose pointer floor is an
+   `::after` on every button in it (liquid-controls.css) at the same specificity and a later
+   sheet. On `::after` the dot kept this rule's colour and radius but took the floor's
+   `left: 50%`, `width: max(100%, 32px)` and centring transform — a pink ellipse laid over
+   the whole button, hiding its label (round-3 sweep, every locale). */
 .gram-x-filters-btn.is-on {
   position: relative;
 }
-.gram-x-filters-btn.is-on::after {
+.gram-x-filters-btn.is-on::before {
   content: '';
   position: absolute;
   top: 3px;
