@@ -734,6 +734,9 @@
   "content_ocrNoModels": {
     "message": "未安装 OCR 模型。请打开 Gum → 设置 → 模型与词典。"
   },
+  "content_ocrDownloading": {
+    "message": "Gum 正在下载 OCR 模型，请稍后再试。"
+  },
   "content_ocrReadHint": {
     "message": "$1 · 双击单词即可查询。"
   },

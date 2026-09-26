@@ -1348,12 +1348,18 @@
     if (host && host.isConnected) {
       host.innerHTML = res?.ok
         ? `<div class="rp-more-row"><span class="rp-more-k">${uiHtml('content_rpTranslation')}</span><span class="rp-more-v">${esc(out || uiMsg('content_rpEmpty'))}</span></div>`
-        : `<div class="rp-empty">${esc(res?.error || uiMsg('content_rpTranslateFailed'))}</div>`;
+        : `<div class="rp-empty">${esc(translateError(res))}</div>`;
     } else if (res?.ok) {
       toast(out.slice(0, 140) || uiMsg('content_translated'), 'ok');
     } else {
-      toast(res?.error || uiMsg('content_translationFailed'), 'err');
+      toast(translateError(res), 'err');
     }
+  }
+
+  /** A missing translation model (503) is named in the UI language, not the app's English. */
+  function translateError(res) {
+    if (res?.status === 503) return uiMsg('content_rpTranslateFailed');
+    return res?.error || uiMsg('content_translationFailed');
   }
 
   /* ----- opening the popup ----- */
@@ -2306,7 +2312,7 @@
         });
         if (res?.invalidated) return;
         if (res?.ok) toast(String(res.text || '').slice(0, 140) || uiMsg('content_translated'), 'ok', { label: uiMsg('content_openInApp'), openTarget: 'translate' });
-        else toast(res?.error || uiMsg('content_translationFailed'), 'err');
+        else toast(translateError(res), 'err');
         return;
       }
       case 'grammar.match': {
@@ -3328,11 +3334,12 @@
     const hint = el.querySelector('.jp-ocr-hint');
     if (!res?.ok) {
       body.value = '';
+      // The app's `error` is English; the two states the extension can name
+      // (models missing, models still downloading) are said in the UI language.
       hint.textContent =
-        res?.error ||
-        (res?.available === false
-          ? uiMsg('content_ocrNoModels')
-          : uiMsg('content_ocrFailed'));
+        res?.available === false
+          ? uiMsg(res?.downloading ? 'content_ocrDownloading' : 'content_ocrNoModels')
+          : res?.error || uiMsg('content_ocrFailed');
       el.classList.add('open');
       return;
     }

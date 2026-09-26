@@ -740,6 +740,9 @@
   "content_ocrNoModels": {
     "message": "OCR models are not installed. Open Gum → Settings → Models & dictionaries."
   },
+  "content_ocrDownloading": {
+    "message": "Gum is downloading the OCR models — try again in a moment."
+  },
   "content_ocrReadHint": {
     "message": "$1 · Double-click a word to look it up."
   },

@@ -912,7 +912,16 @@ async function ocrVisibleTab(tab, region, opts = {}) {
     });
     if (result?.ok) await recordActivity({ kind: 'ocr', label: String(result.text || '').slice(0, 48) });
   } catch (err) {
-    result = { ok: false, error: String(err.message || err), available: true, payload: err.payload };
+    // The app's 503 says whether the models are missing or still downloading;
+    // the page names either state in its own language instead of the English error.
+    const p = err.payload || {};
+    result = {
+      ok: false,
+      error: String(err.message || err),
+      available: p.available === false ? false : true,
+      downloading: p.downloading === true,
+      payload: err.payload,
+    };
   }
   await chrome.tabs.sendMessage(tab.id, { type: 'jp-show-ocr', result });
   return result;
@@ -1665,7 +1674,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }),
         );
       } catch (err) {
-        sendResponse({ ok: false, error: String(err.message || err) });
+        // `status` lets the page name a missing model (503) in its own language.
+        sendResponse({ ok: false, status: err.status, offline: !!err.offline, error: String(err.message || err) });
       }
       return;
     }
