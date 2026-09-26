@@ -46,7 +46,7 @@ import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
 import { getMainStudyLang } from './studyLanguage';
-import { studyLangFromTag, studyLangOfText } from '../shared/studyLang';
+import { studyLangFromTag, studyLangOfText, type StudyLang } from '../shared/studyLang';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { isStorageFullError } from '../shared/resilience';
 import {
@@ -724,6 +724,8 @@ function broadcastMineQueued(payload: {
   folder?: string;
   audioDataUrl?: string;
   profileId?: string;
+  /** The page's language for this word, when the extension said it. */
+  lang?: StudyLang;
 }): void {
   for (const w of BrowserWindow.getAllWindows()) {
     w.webContents.send('extension:mined', payload);
@@ -793,6 +795,8 @@ async function handleMine(body: {
   audioBase64?: string;
   audioFilename?: string;
   audioDataUrl?: string;
+  /** The page's language for the selection (ja / zh / ru), from the content script. */
+  lang?: string;
   /** When false, skip AnkiConnect and save only to Gum flashcards. */
   preferAnki?: boolean;
   /** Force Anki attempt regardless of preferAnki (dictionary “Add to Anki”). */
@@ -856,6 +860,7 @@ async function handleMine(body: {
 
   const forceAnki = body.forceAnki === true;
   const preferAnki = forceAnki || body.preferAnki !== false;
+  const pageLang = studyLangFromTag(body.lang);
   const ankiAttempted = preferAnki;
 
   let profileId = '';
@@ -939,6 +944,7 @@ async function handleMine(body: {
     folder,
     audioDataUrl: audioDataUrl || undefined,
     profileId: profileId || undefined,
+    ...(pageLang ? { lang: pageLang } : {}),
   });
 
   const primaryDestination: 'anki' | 'app' = anki.ok ? 'anki' : 'app';

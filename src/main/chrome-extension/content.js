@@ -1367,7 +1367,7 @@
     const working = saveWorkingLabel(forceAnki);
     toast(working, 'pending');
     setFabBusy(working);
-    const res = await safeRuntimeSend({ type: 'save-text', text: t, mode, forceAnki });
+    const res = await safeRuntimeSend({ type: 'save-text', text: t, mode, forceAnki, lang: lookupLangFor(t) });
     setFabBusy('');
     if (res?.invalidated) return;
     toast(formatSaveToast(res), res?.ok || res?.queued ? 'ok' : 'err');

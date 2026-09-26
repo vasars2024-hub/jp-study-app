@@ -369,7 +369,7 @@ declare global {
       lookupWord(query: string): Promise<DictResult>;
       /** `limit` is the page size, defaulting to eight and clamped in main. */
       lookupTerm(query: string, limit?: number): Promise<DictResult>;
-      lookupTermOffline(query: string): Promise<DictResult>;
+      lookupTermOffline(query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult>;
       lookupOfflineInterlinear(
         text: string,
         options?: import('../shared/lexiconInterlinear').LexiconInterlinearOptions,
@@ -2133,6 +2133,8 @@ declare global {
           folder?: string;
           audioDataUrl?: string;
           profileId?: string;
+          /** The page's language for the word, when the extension said it. */
+          lang?: 'ja' | 'zh' | 'ru';
           anki: { ok: boolean; noteId?: number; error?: string; deckName?: string };
           /** The exact note main sent; a queued mine is replayed from it. */
           ankiRequest?: import('../shared/anki').MineNoteRequest;

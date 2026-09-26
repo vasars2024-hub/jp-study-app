@@ -445,6 +445,9 @@ async function saveText(tab, text, mode, opts = {}) {
     category: S.detectContentCategory(pageUrl, { title: pageTitle }),
     preferAnki,
     forceAnki,
+    // The page's language for the selection, so the app glosses a Chinese
+    // word from the Chinese dictionary (Han alone would follow the study language).
+    ...(opts.lang === 'ja' || opts.lang === 'zh' || opts.lang === 'ru' ? { lang: opts.lang } : {}),
   };
   try {
     const out = await apiFetch('/v1/mine', { method: 'POST', body: JSON.stringify(payload) });
@@ -1374,7 +1377,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         return;
       }
       sendResponse(
-        await saveText(tab, text, msg.mode || 'auto', { forceAnki: msg.forceAnki === true }),
+        await saveText(tab, text, msg.mode || 'auto', { forceAnki: msg.forceAnki === true, lang: msg.lang }),
       );
       return;
     }

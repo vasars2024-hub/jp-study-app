@@ -20,12 +20,15 @@ if (!process.resourcesPath) {
 const h = vi.hoisted(() => ({
   exampleCalls: [] as Array<{ query: string; limit: number; lang: string | undefined }>,
   translateCalls: [] as Array<{ text: string; source: string; target: string }>,
+  sent: [] as Array<{ channel: string; payload: unknown }>,
 }));
 
 vi.mock('electron', () => ({
   app: { getPath: () => tmpRoot, getAppPath: () => tmpRoot, isPackaged: false },
   ipcMain: { handle: () => undefined, on: () => undefined },
-  BrowserWindow: { getAllWindows: () => [] },
+  BrowserWindow: {
+    getAllWindows: () => [{ isDestroyed: () => false, webContents: { send: (channel: string, payload: unknown) => h.sent.push({ channel, payload }) } }],
+  },
   safeStorage: { isEncryptionAvailable: () => false },
 }));
 vi.mock('../dictionary', () => ({
@@ -83,6 +86,22 @@ afterAll(() => {
 beforeEach(() => {
   h.exampleCalls.length = 0;
   h.translateCalls.length = 0;
+  h.sent.length = 0;
+});
+
+describe('/v1/mine', () => {
+  it("hands the renderer the page's language, so a Chinese word is glossed from the Chinese dictionary", async () => {
+    const res = await post('/v1/mine', { text: '学习', mode: 'word', lang: 'zh', preferAnki: false, url: 'https://zh.wikipedia.org/wiki/学习' });
+    expect(res.status).toBe(200);
+    const mined = h.sent.find((s) => s.channel === 'extension:mined')?.payload as { term?: string; lang?: string } | undefined;
+    expect(mined).toMatchObject({ term: '学习', lang: 'zh' });
+  });
+
+  it('sends no language it was not told', async () => {
+    await post('/v1/mine', { text: '学习', mode: 'word', lang: 'xx', preferAnki: false });
+    const mined = h.sent.find((s) => s.channel === 'extension:mined')?.payload as Record<string, unknown> | undefined;
+    expect(mined && 'lang' in mined).toBe(false);
+  });
 });
 
 describe('/v1/examples', () => {

@@ -50,6 +50,14 @@ describe('extension translate languages', () => {
     expect(JSON.parse(String(tr?.body))).toEqual({ text: 'Я читаю книгу.', source: '', target: 'en' });
   });
 
+  it("a saved word carries the page's language to /v1/mine", async () => {
+    const h = bootBackground({ responder: () => ({ status: 200, json: { ok: true, mode: 'word', term: '学习' } }) });
+    await h.send({ type: 'save-text', text: '学习', mode: 'word', lang: 'zh' });
+    const mine = h.fetches.find((entry) => entry.url.endsWith('/v1/mine'));
+    expect(JSON.parse(String(mine?.body))).toMatchObject({ text: '学习', lang: 'zh' });
+    expect(readExtensionFile('content.js')).toContain("type: 'save-text', text: t, mode, forceAnki, lang: lookupLangFor(t)");
+  });
+
   it('the in-app copy is byte-identical', () => {
     const root = path.join(__dirname, '..', '..', '..');
     for (const file of ['content.js', 'background.js', 'shared.js']) {
