@@ -277,6 +277,48 @@ export function localRubricEvaluate(text: MirrorText, draft: string): MirrorEval
   };
 }
 
+/** The request body an OpenAI-compatible chat endpoint is sent. */
+function requestBody(text: MirrorText, draft: string): unknown {
+  return {
+    temperature: 0,
+    messages: [
+      {
+        role: 'system',
+        content:
+          `You are a strict ${LANG_NAME[text.lang ?? 'ja']} writing evaluator. Return valid JSON matching the requested schema and nothing else.`,
+      },
+      { role: 'user', content: buildPrompt(text, draft) },
+    ],
+  };
+}
+
+type ApiReply = { ok: true; data: unknown } | { ok: false; status?: number; detail?: string };
+
+/**
+ * One POST to the configured endpoint. In the app it is sent by main
+ * (`window.api.gamesMirrorEvaluate`): the packaged CSP's `connect-src` refuses a
+ * renderer `fetch` to any endpoint a user can type here, so a direct fetch failed with
+ * "Failed to fetch" in every packaged build (round-4 console sweep). The direct fetch
+ * is kept only for a page with no preload bridge (tests, harness pages).
+ */
+async function postToEndpoint(settings: GameArenaSettings, body: unknown): Promise<ApiReply> {
+  const url = settings.mirrorApiUrl.trim();
+  const apiKey = settings.mirrorApiKey.trim();
+  const bridge = typeof window !== 'undefined' ? window.api?.gamesMirrorEvaluate : undefined;
+  if (bridge) {
+    const reply = await bridge({ url, apiKey, body });
+    if (reply.ok) return { ok: true, data: reply.data };
+    return { ok: false, status: reply.reason === 'http' ? reply.status : undefined, detail: reply.detail };
+  }
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) return { ok: false, status: response.status };
+  return { ok: true, data: await response.json() };
+}
+
 async function callApi(settings: GameArenaSettings, text: MirrorText, draft: string, retry: boolean): Promise<MirrorEvaluationResult> {
   if (!settings.mirrorApiUrl.trim() || !settings.mirrorApiKey.trim()) {
     return {
@@ -288,34 +330,27 @@ async function callApi(settings: GameArenaSettings, text: MirrorText, draft: str
   }
 
   try {
-    const response = await fetch(settings.mirrorApiUrl.trim(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.mirrorApiKey.trim()}`,
-      },
-      body: JSON.stringify({
-        temperature: 0,
-        messages: [
-          {
-            role: 'system',
-            content:
-              `You are a strict ${LANG_NAME[text.lang ?? 'ja']} writing evaluator. Return valid JSON matching the requested schema and nothing else.`,
-          },
-          { role: 'user', content: buildPrompt(text, draft) },
-        ],
-      }),
-    });
-    if (!response.ok) {
+    const reply = await postToEndpoint(settings, requestBody(text, draft));
+    if (!reply.ok) {
+      if (reply.status !== undefined) {
+        return {
+          ok: false,
+          reason: 'network',
+          message: `Evaluator request failed (${reply.status}).`,
+          messageKey: 'games.mirror.error.network',
+          messageVars: { status: reply.status },
+        };
+      }
       return {
         ok: false,
         reason: 'network',
-        message: `Evaluator request failed (${response.status}).`,
-        messageKey: 'games.mirror.error.network',
-        messageVars: { status: response.status },
+        // A platform exception is not our prose, so it carries no key and stays
+        // verbatim; only our own fallback sentence is translatable.
+        message: reply.detail ?? 'The evaluator request failed.',
+        messageKey: reply.detail ? undefined : 'games.mirror.error.requestFailed',
       };
     }
-    const parsed = extractJson(await response.json());
+    const parsed = extractJson(reply.data);
     const evaluation = validateMirrorEvaluation(parsed);
     if (evaluation) return { ok: true, evaluation };
     if (!retry) return callApi(settings, text, draft, true);
@@ -329,8 +364,6 @@ async function callApi(settings: GameArenaSettings, text: MirrorText, draft: str
     return {
       ok: false,
       reason: 'network',
-      // A platform exception is not our prose, so it carries no key and stays
-      // verbatim; only our own fallback sentence is translatable.
       message: err instanceof Error ? err.message : 'The evaluator request failed.',
       messageKey: err instanceof Error ? undefined : 'games.mirror.error.requestFailed',
     };

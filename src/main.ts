@@ -92,6 +92,7 @@ import {
 import { guardWindowToWorkArea, MAIN_WINDOW_MIN_SIZE, minimumSizeAt } from './main/windowBounds';
 import { installAppMenu } from './main/appMenu';
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
+import { registerMirrorEvaluatorIpc } from './main/mirrorEvaluatorProxy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
 import { livePlayerWindowIds, releasePlayerLeadership } from './shared/playerSync';
@@ -1808,6 +1809,7 @@ app.whenReady().then(async () => {
   registerStorageRecoveryIpc();
   registerBackupIpc();
   registerShellIpc();
+  registerMirrorEvaluatorIpc();
   registerAppLifecycleIpc();
   registerToolboxIpc();
   registerMediaIpc();
