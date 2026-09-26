@@ -10,6 +10,7 @@ import { N1_SUPPLEMENT } from '../data/grammar/n1-supplement';
 import { N2_SUPPLEMENT } from '../data/grammar/n2-supplement';
 import { N3_SUPPLEMENT } from '../data/grammar/n3-supplement';
 import { N4_SUPPLEMENT } from '../data/grammar/n4-supplement';
+import { dedupeGrammarByTitle } from '../data/grammar/practiceFilters';
 
 const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
 const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7-9', 'HSK10'];
@@ -38,6 +39,16 @@ describe('GrammarX corpus', () => {
     for (const level of ['HSK1', 'HSK2', 'HSK3', 'HSK4']) {
       const ready = GRAMMAR.filter((p) => p.lang === 'zh' && p.level === level && p.examples.length > 0);
       expect(ready.length, level).toBeGreaterThanOrEqual(level === 'HSK1' ? 24 : 25);
+    }
+  });
+
+  it('shows the authored Chinese point, not its hollow imported twin', () => {
+    const shown = dedupeGrammarByTitle(GRAMMAR.filter((p) => p.lang === 'zh'));
+    for (const title of ['或者', '既然…就…', '要不是', '除非…才…', '否则', '怎么样']) {
+      const hits = shown.filter((p) => p.title === title);
+      expect(hits.length, title).toBe(1);
+      expect(hits[0].provenance.source, title).toBe('authored:hsk-starter');
+      expect(hits[0].examples.length, title).toBeGreaterThanOrEqual(2);
     }
   });
 
