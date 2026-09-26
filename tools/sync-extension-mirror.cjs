@@ -23,6 +23,12 @@ const FILES = [
   'shared.js',
   'tabs.html',
   'tabs.js',
+  // chrome.i18n catalogues (manifest default_locale "en"); Chrome refuses to
+  // load the extension if the default one is missing.
+  '_locales/en/messages.json',
+  '_locales/ja/messages.json',
+  '_locales/zh_CN/messages.json',
+  '_locales/ru/messages.json',
 ];
 
 let changed = 0;
@@ -37,6 +43,7 @@ for (const name of FILES) {
   const srcContent = fs.readFileSync(srcPath);
   const destContent = fs.existsSync(destPath) ? fs.readFileSync(destPath) : null;
   if (!destContent || !srcContent.equals(destContent)) {
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
     fs.writeFileSync(destPath, srcContent);
     console.log(`sync-extension-mirror: updated ${name}`);
     changed++;
@@ -44,7 +51,7 @@ for (const name of FILES) {
 }
 
 if (changed === 0) {
-  console.log('sync-extension-mirror: mirror already up to date (12/12 files match)');
+  console.log(`sync-extension-mirror: mirror already up to date (${FILES.length}/${FILES.length} files match)`);
 } else {
   console.log(`sync-extension-mirror: synced ${changed} file(s) from extension/ to src/main/chrome-extension/`);
 }

@@ -257,11 +257,11 @@
     </header>
 
     <div id="status-detail" hidden>
-      <div class="row"><span class="k">Gum app</span><span class="v" id="st-app">…</span></div>
-      <div class="row"><span class="k">Pairing</span><span class="v" id="st-pair">…</span></div>
-      <div class="row"><span class="k">Anki profile</span><span class="v" id="st-anki">…</span></div>
-      <div class="row"><span class="k">Waiting to sync</span><span class="v" id="st-pending">0</span></div>
-      <div class="row"><button type="button" class="linklike" id="fix-connection">Open connection settings</button></div>
+      <div class="row"><span class="k" data-i18n="popup_statusApp">Gum app</span><span class="v" id="st-app">…</span></div>
+      <div class="row"><span class="k" data-i18n="popup_statusPairing">Pairing</span><span class="v" id="st-pair">…</span></div>
+      <div class="row"><span class="k" data-i18n="popup_statusAnki">Anki profile</span><span class="v" id="st-anki">…</span></div>
+      <div class="row"><span class="k" data-i18n="popup_statusPending">Waiting to sync</span><span class="v" id="st-pending">0</span></div>
+      <div class="row"><button type="button" class="linklike" id="fix-connection" data-i18n="popup_openConnection">Open connection settings</button></div>
     </div>
 
     <section>
@@ -275,39 +275,40 @@
       <!-- Mode is the one setting worth switching mid-session, so it lives here
            rather than only on the options page. -->
       <div class="mode-row">
-        <span class="mode-label">Highlight</span>
-        <div class="mode-seg" id="mode-highlight" role="radiogroup" aria-label="What a highlight opens">
-          <button type="button" role="radio" data-mode="dictionary">Dictionary AI</button>
-          <button type="button" role="radio" data-mode="ai">AI OCR</button>
+        <span class="mode-label" data-i18n="popup_modeHighlight">Highlight</span>
+        <div class="mode-seg" id="mode-highlight" role="radiogroup" aria-label="What a highlight opens" data-i18n-aria-label="popup_modeHighlightAria">
+          <button type="button" role="radio" data-mode="dictionary" data-i18n="popup_modeDictionary">Dictionary AI</button>
+          <button type="button" role="radio" data-mode="ai" data-i18n="popup_modeAi">AI OCR</button>
         </div>
       </div>
       <div class="mode-row">
-        <span class="mode-label">Screenshot OCR</span>
-        <div class="mode-seg" id="mode-ocr" role="radiogroup" aria-label="What an OCR opens">
-          <button type="button" role="radio" data-mode="dictionary">Dictionary AI</button>
-          <button type="button" role="radio" data-mode="ai">AI OCR</button>
+        <span class="mode-label" data-i18n="popup_modeOcr">Screenshot OCR</span>
+        <div class="mode-seg" id="mode-ocr" role="radiogroup" aria-label="What an OCR opens" data-i18n-aria-label="popup_modeOcrAria">
+          <button type="button" role="radio" data-mode="dictionary" data-i18n="popup_modeDictionary">Dictionary AI</button>
+          <button type="button" role="radio" data-mode="ai" data-i18n="popup_modeAi">AI OCR</button>
         </div>
       </div>
 
       <div id="recent-wrap" hidden>
-        <h2>Recent</h2>
+        <h2 data-i18n="popup_recent">Recent</h2>
         <div id="recent"></div>
       </div>
     </section>
 
     <div id="pending-bar" hidden>
       <span id="pending-text"></span>
-      <button type="button" id="retry-queue">Retry now</button>
+      <button type="button" id="retry-queue" data-i18n="popup_retryNow">Retry now</button>
     </div>
 
     <div id="feedback"></div>
 
     <footer>
-      <button type="button" id="nav-tabs">Reading list</button>
-      <button type="button" id="nav-app">Open Gum</button>
-      <button type="button" id="nav-settings">Settings</button>
+      <button type="button" id="nav-tabs" data-i18n="popup_navTabs">Reading list</button>
+      <button type="button" id="nav-app" data-i18n="popup_navApp">Open Gum</button>
+      <button type="button" id="nav-settings" data-i18n="popup_navSettings">Settings</button>
     </footer>
 
+    <script src="shared.js"></script>
     <script src="settings.js"></script>
     <script src="popup.js"></script>
   </body>

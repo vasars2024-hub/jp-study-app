@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Gum — Reader Companion",
+  "name": "__MSG_ext_name__",
   "version": "3.2.0",
-  "description": "Read Japanese in the browser: hover lookup with grammar and sentence analysis, save words and sentences to Gum, create Anki cards, OCR, and page capture.",
+  "description": "__MSG_ext_description__",
+  "default_locale": "en",
   "permissions": ["activeTab", "scripting", "storage", "contextMenus", "alarms", "tabs"],
   "host_permissions": ["http://127.0.0.1:18765/*", "<all_urls>"],
   "action": {
-    "default_title": "Gum",
+    "default_title": "__MSG_ext_actionTitle__",
     "default_popup": "popup.html"
   },
   "options_ui": {
@@ -28,25 +29,25 @@
   "commands": {
     "save-page": {
       "suggested_key": { "default": "Alt+Shift+R" },
-      "description": "Save page to Gum"
+      "description": "__MSG_manifestCmd_savePage__"
     },
     "dictionary-popup": {
       "suggested_key": { "default": "Alt+Shift+D" },
-      "description": "Look up selection / word under cursor"
+      "description": "__MSG_manifestCmd_lookup__"
     },
     "mine-selection": {
       "suggested_key": { "default": "Alt+Shift+M" },
-      "description": "Save selection (word or sentence)"
+      "description": "__MSG_manifestCmd_saveSelection__"
     },
     "action-wheel": {
       "suggested_key": { "default": "Alt+Shift+W" },
-      "description": "Open the action wheel"
+      "description": "__MSG_manifestCmd_wheel__"
     },
     "bulk-tabs": {
-      "description": "Open the reading list (assign a shortcut in the browser if desired)"
+      "description": "__MSG_manifestCmd_bulkTabs__"
     },
     "analyze-selection": {
-      "description": "AI analysis of the selected sentence (assign a shortcut in the browser if desired)"
+      "description": "__MSG_manifestCmd_analyze__"
     }
   }
 }

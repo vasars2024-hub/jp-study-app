@@ -6,7 +6,7 @@
    The `?raw` suffix is Vite's inline-as-string import, resolved by the bundler at
    build time. eslint-plugin-import's resolver does not understand query suffixes
    and reports every one of these as unresolved; the files are all present in
-   ./chrome-extension/. Disabled for the file rather than 12 separate lines. */
+   ./chrome-extension/. Disabled for the file rather than line by line. */
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +23,10 @@ import optionsJs from './chrome-extension/options.js?raw';
 import settingsJs from './chrome-extension/settings.js?raw';
 import tabsHtml from './chrome-extension/tabs.html?raw';
 import tabsJs from './chrome-extension/tabs.js?raw';
+import localeEn from './chrome-extension/_locales/en/messages.json?raw';
+import localeJa from './chrome-extension/_locales/ja/messages.json?raw';
+import localeZhCn from './chrome-extension/_locales/zh_CN/messages.json?raw';
+import localeRu from './chrome-extension/_locales/ru/messages.json?raw';
 
 /** Files written from the Vite-bundled fallback when `extension/` is unavailable. */
 const BUNDLED_FILES = [
@@ -38,6 +42,12 @@ const BUNDLED_FILES = [
   'settings.js',
   'tabs.html',
   'tabs.js',
+  // chrome.i18n catalogues; the manifest names "en" as default_locale, so a
+  // folder without them does not load at all.
+  '_locales/en/messages.json',
+  '_locales/ja/messages.json',
+  '_locales/zh_CN/messages.json',
+  '_locales/ru/messages.json',
 ] as const;
 
 const BUNDLED: Record<(typeof BUNDLED_FILES)[number], string> = {
@@ -53,6 +63,10 @@ const BUNDLED: Record<(typeof BUNDLED_FILES)[number], string> = {
   'settings.js': settingsJs,
   'tabs.html': tabsHtml,
   'tabs.js': tabsJs,
+  '_locales/en/messages.json': localeEn,
+  '_locales/ja/messages.json': localeJa,
+  '_locales/zh_CN/messages.json': localeZhCn,
+  '_locales/ru/messages.json': localeRu,
 };
 
 let installedDir: string | null = null;
@@ -79,21 +93,25 @@ function candidateSourceDirs(): string[] {
   return candidates.filter(hasManifest);
 }
 
-/** Copy every file from the live `extension/` tree (keeps options/settings in sync). */
+/**
+ * Copy every file from the live `extension/` tree (keeps options/settings in
+ * sync), including sub-folders such as `_locales/<lang>/messages.json`.
+ */
 function copyExtensionDir(src: string, dest: string): void {
   fs.mkdirSync(dest, { recursive: true });
   for (const name of fs.readdirSync(src)) {
     if (name === 'README.md' || name.startsWith('.')) continue;
     const from = path.join(src, name);
     const st = fs.statSync(from);
-    if (!st.isFile()) continue;
-    fs.copyFileSync(from, path.join(dest, name));
+    if (st.isDirectory()) copyExtensionDir(from, path.join(dest, name));
+    else if (st.isFile()) fs.copyFileSync(from, path.join(dest, name));
   }
 }
 
 function writeBundledExtension(dest: string): void {
   fs.mkdirSync(dest, { recursive: true });
   for (const file of BUNDLED_FILES) {
+    fs.mkdirSync(path.dirname(path.join(dest, file)), { recursive: true });
     fs.writeFileSync(path.join(dest, file), BUNDLED[file], 'utf8');
   }
 }

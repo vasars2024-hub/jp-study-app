@@ -1,0 +1,1529 @@
+{
+  "locale_code": {
+    "message": "ru"
+  },
+  "ext_name": {
+    "message": "Gum — помощник для чтения"
+  },
+  "ext_description": {
+    "message": "Поиск по наведению, разбор грамматики и предложений, сохранение слов и фраз в Gum, карточки Anki, OCR и сохранение страниц."
+  },
+  "ext_actionTitle": {
+    "message": "Gum"
+  },
+  "manifestCmd_savePage": {
+    "message": "Сохранить страницу в Gum"
+  },
+  "manifestCmd_lookup": {
+    "message": "Найти выделенное или слово под курсором"
+  },
+  "manifestCmd_saveSelection": {
+    "message": "Сохранить выделенное (слово или предложение)"
+  },
+  "manifestCmd_wheel": {
+    "message": "Открыть колесо действий"
+  },
+  "manifestCmd_bulkTabs": {
+    "message": "Открыть список чтения (при желании назначьте сочетание клавиш в браузере)"
+  },
+  "manifestCmd_analyze": {
+    "message": "ИИ-разбор выделенного предложения (при желании назначьте сочетание клавиш в браузере)"
+  },
+  "bg_scriptsFailed": {
+    "message": "Не удалось загрузить скрипты расширения — перезагрузите Gum на странице chrome://extensions"
+  },
+  "bg_appOutdated": {
+    "message": "Gum устарел или ещё не запустился полностью — перезапустите приложение, затем перезагрузите расширение."
+  },
+  "bg_authFailed": {
+    "message": "Gum отклонил это расширение — скопируйте токен в Gum (Настройки → Профиль и словарь → Расширение Chrome) и вставьте его в параметрах расширения, в разделе «Подключение»."
+  },
+  "bg_offline": {
+    "message": "Gum не запущен — откройте приложение и повторите."
+  },
+  "bg_storageFull": {
+    "message": "Локальное хранилище заполнено — откройте Gum, чтобы синхронизировать очередь, затем повторите."
+  },
+  "bg_needYoutubeTab": {
+    "message": "Сначала откройте вкладку с видео или плейлистом YouTube"
+  },
+  "bg_needYoutubeVideo": {
+    "message": "Сначала откройте вкладку с видео YouTube"
+  },
+  "bg_nothingSelected": {
+    "message": "Нечего сохранять — ничего не выделено"
+  },
+  "bg_selectFirst": {
+    "message": "Сначала выделите на странице слово или предложение"
+  },
+  "bg_noRecording": {
+    "message": "Записи пока нет — сначала используйте «Записать звук», затем остановите запись"
+  },
+  "bg_scanFailed": {
+    "message": "Не удалось просканировать страницу"
+  },
+  "bg_noPanels": {
+    "message": "На этой странице не найдено изображений страниц"
+  },
+  "bg_tabRestricted": {
+    "message": "Нет доступа к этой вкладке"
+  },
+  "bg_actionFailed": {
+    "message": "Действие не выполнено"
+  },
+  "bg_commandFailed": {
+    "message": "Команда не выполнена"
+  },
+  "bg_httpStatus": {
+    "message": "Gum ответил HTTP $1."
+  },
+  "menu_lookup": {
+    "message": "Найти выделенное"
+  },
+  "menu_analyze": {
+    "message": "ИИ-разбор выделенного"
+  },
+  "menu_saveWord": {
+    "message": "Сохранить слово"
+  },
+  "menu_saveSentence": {
+    "message": "Сохранить предложение"
+  },
+  "menu_createCard": {
+    "message": "Создать карточку"
+  },
+  "menu_savePage": {
+    "message": "Сохранить страницу в Gum"
+  },
+  "menu_ocr": {
+    "message": "OCR-захват (обведите область)"
+  },
+  "menu_openApp": {
+    "message": "Открыть Gum"
+  },
+  "common_gumNotRunning": {
+    "message": "Gum не запущен."
+  },
+  "common_noResponse": {
+    "message": "Нет ответа"
+  },
+  "common_readingListFailed": {
+    "message": "Не удалось открыть список чтения"
+  },
+  "common_queuedWillSync": {
+    "message": "В очереди — синхронизируется, когда Gum будет открыт"
+  },
+  "common_dragLarger": {
+    "message": "Выделите область побольше"
+  },
+  "common_cancel": {
+    "message": "Отмена"
+  },
+  "category_news": {
+    "message": "Новости"
+  },
+  "category_novel": {
+    "message": "Веб-роман"
+  },
+  "category_manga": {
+    "message": "Манга"
+  },
+  "category_video": {
+    "message": "Видео"
+  },
+  "category_article": {
+    "message": "Статья"
+  },
+  "category_webpage": {
+    "message": "Веб-страница"
+  },
+  "save_working_card": {
+    "message": "Создание карточки…"
+  },
+  "save_working_app": {
+    "message": "Сохранение в Gum…"
+  },
+  "save_failed": {
+    "message": "Не удалось сохранить"
+  },
+  "save_termQuoted": {
+    "message": " «$1»"
+  },
+  "save_queued": {
+    "message": "В очереди$1 — синхронизируется, когда Gum будет открыт"
+  },
+  "save_deckSuffix": {
+    "message": " ($1)"
+  },
+  "save_cardCreated": {
+    "message": "Карточка создана в Anki$1$2 · сохранено в Gum"
+  },
+  "save_savedWord": {
+    "message": "Слово$1 сохранено в Gum"
+  },
+  "save_savedSentence": {
+    "message": "Предложение$1 сохранено в Gum"
+  },
+  "save_ankiUnavailable": {
+    "message": "Anki недоступен: $1"
+  },
+  "clip_failed": {
+    "message": "Не удалось добавить в историю буфера обмена"
+  },
+  "clip_added": {
+    "message": "Добавлено в историю буфера обмена Gum"
+  },
+  "capture_failed": {
+    "message": "Не удалось сохранить страницу"
+  },
+  "capture_queued": {
+    "message": "Страница в очереди — синхронизируется, когда Gum будет открыт"
+  },
+  "capture_playlistSaved": {
+    "message": "Плейлист сохранён в Gum"
+  },
+  "capture_videoDuplicate": {
+    "message": "Это видео уже есть в Gum"
+  },
+  "capture_videoSaved": {
+    "message": "Видео сохранено в Gum"
+  },
+  "capture_pageSaved": {
+    "message": "Страница сохранена во «Входящие» Gum"
+  },
+  "content_wkNew": {
+    "message": "Новое"
+  },
+  "content_wkLearning": {
+    "message": "Изучаю"
+  },
+  "content_wkFamiliar": {
+    "message": "Знакомое"
+  },
+  "content_wkKnown": {
+    "message": "Знаю"
+  },
+  "content_knownSet": {
+    "message": "$1 · $2"
+  },
+  "content_saved": {
+    "message": "Сохранено"
+  },
+  "content_failed": {
+    "message": "Ошибка"
+  },
+  "content_added": {
+    "message": "Добавлено"
+  },
+  "content_done": {
+    "message": "Готово"
+  },
+  "content_copied": {
+    "message": "Скопировано"
+  },
+  "content_copyBlocked": {
+    "message": "Не удалось скопировать — страница запретила доступ к буферу обмена"
+  },
+  "content_knownFailed": {
+    "message": "Не удалось обновить статус слова — Gum запущен?"
+  },
+  "content_nothingToSave": {
+    "message": "Нечего сохранять"
+  },
+  "content_addingClip": {
+    "message": "Добавление в историю буфера обмена…"
+  },
+  "content_translating": {
+    "message": "Перевод…"
+  },
+  "content_translated": {
+    "message": "Переведено"
+  },
+  "content_translationFailed": {
+    "message": "Не удалось перевести"
+  },
+  "content_selectText": {
+    "message": "Сначала выделите текст"
+  },
+  "content_highlighted": {
+    "message": "Выделено цветом"
+  },
+  "content_selectWordOrSentence": {
+    "message": "Сначала выделите слово или предложение"
+  },
+  "content_cardEmpty": {
+    "message": "Текст карточки пуст"
+  },
+  "content_cardSource": {
+    "message": "Источник: $1"
+  },
+  "content_notAvailable": {
+    "message": "«$1» недоступно на этой странице"
+  },
+  "content_actionNotAvailable": {
+    "message": "Это действие недоступно на этой странице"
+  },
+  "content_selectOrHover": {
+    "message": "Сначала выделите слово или наведите на него курсор"
+  },
+  "content_selectToTranslate": {
+    "message": "Выделите текст для перевода"
+  },
+  "content_openInApp": {
+    "message": "Открыть в приложении"
+  },
+  "content_openInbox": {
+    "message": "Открыть «Входящие»"
+  },
+  "content_selectSentence": {
+    "message": "Сначала выделите предложение"
+  },
+  "content_savingPage": {
+    "message": "Сохранение страницы…"
+  },
+  "content_queueingDownload": {
+    "message": "Постановка загрузки в очередь…"
+  },
+  "content_scanningManga": {
+    "message": "Сканирование страниц манги…"
+  },
+  "content_savingAudio": {
+    "message": "Сохранение звука…"
+  },
+  "content_mangaImported": {
+    "message": "Страниц импортировано в мангу Gum: $1"
+  },
+  "content_importFailed": {
+    "message": "Не удалось импортировать"
+  },
+  "content_downloadQueued": {
+    "message": "Загрузка поставлена в очередь в Gum"
+  },
+  "content_downloadFailed": {
+    "message": "Не удалось скачать"
+  },
+  "content_themeOn": {
+    "message": "Тема для чтения: $1"
+  },
+  "content_themeOff": {
+    "message": "Тема для чтения выключена"
+  },
+  "content_themeButton": {
+    "message": "Тема: $1"
+  },
+  "content_theme_off": {
+    "message": "выкл."
+  },
+  "content_theme_night": {
+    "message": "ночь"
+  },
+  "content_theme_sepia": {
+    "message": "сепия"
+  },
+  "content_theme_paper": {
+    "message": "бумага"
+  },
+  "content_theme_gray": {
+    "message": "серая"
+  },
+  "content_highlightOn": {
+    "message": "Режим выделения включён — выделите текст, чтобы отметить его"
+  },
+  "content_highlightOff": {
+    "message": "Режим выделения выключен"
+  },
+  "content_highlightModeOn": {
+    "message": "Режим выделения: вкл."
+  },
+  "content_tintOn": {
+    "message": "Подсветка известных слов включена"
+  },
+  "content_tintOff": {
+    "message": "Подсветка известных слов выключена"
+  },
+  "content_tintModeOn": {
+    "message": "Подсветка известных слов: вкл."
+  },
+  "content_stopRecording": {
+    "message": "Остановить запись"
+  },
+  "content_panelHidden": {
+    "message": "Панель скрыта на этом сайте — вернуть её можно в «Настройки → Панель страницы»"
+  },
+  "content_micUnavailable": {
+    "message": "Запись с микрофона здесь недоступна"
+  },
+  "content_recordingEmpty": {
+    "message": "Запись пуста"
+  },
+  "content_recordingReady": {
+    "message": "Запись готова — отправьте её в Gum командой «Сохранить звук»"
+  },
+  "content_recordingUnreadable": {
+    "message": "Не удалось прочитать запись"
+  },
+  "content_recording": {
+    "message": "Идёт запись… чтобы остановить, снова выполните «Записать звук»"
+  },
+  "content_micDenied": {
+    "message": "Доступ к микрофону запрещён"
+  },
+  "content_ocrCancelled": {
+    "message": "Выбор области для OCR отменён"
+  },
+  "content_runningOcr": {
+    "message": "Распознавание текста…"
+  },
+  "content_ocrFailed": {
+    "message": "Не удалось распознать текст"
+  },
+  "content_speechUnavailable": {
+    "message": "Озвучивание здесь недоступно"
+  },
+  "content_cardAddFailed": {
+    "message": "Не удалось добавить карточку"
+  },
+  "content_snapshotFailed": {
+    "message": "Не удалось сохранить снимок"
+  },
+  "popup_statusApp": {
+    "message": "Приложение Gum"
+  },
+  "popup_statusPairing": {
+    "message": "Привязка"
+  },
+  "popup_statusAnki": {
+    "message": "Профиль Anki"
+  },
+  "popup_statusPending": {
+    "message": "Ждут синхронизации"
+  },
+  "popup_openConnection": {
+    "message": "Открыть настройки подключения"
+  },
+  "popup_modeHighlight": {
+    "message": "Выделение"
+  },
+  "popup_modeHighlightAria": {
+    "message": "Что открывается при выделении"
+  },
+  "popup_modeDictionary": {
+    "message": "Словарь ИИ"
+  },
+  "popup_modeAi": {
+    "message": "ИИ-OCR"
+  },
+  "popup_modeOcr": {
+    "message": "OCR скриншота"
+  },
+  "popup_modeOcrAria": {
+    "message": "Что открывается после OCR"
+  },
+  "popup_recent": {
+    "message": "Недавнее"
+  },
+  "popup_retryNow": {
+    "message": "Повторить сейчас"
+  },
+  "popup_navTabs": {
+    "message": "Список чтения"
+  },
+  "popup_navApp": {
+    "message": "Открыть Gum"
+  },
+  "popup_navSettings": {
+    "message": "Настройки"
+  },
+  "popup_chipConnected": {
+    "message": "Подключено"
+  },
+  "popup_chipConnectedQueued_one": {
+    "message": "Подключено · в очереди $1"
+  },
+  "popup_chipConnectedQueued_few": {
+    "message": "Подключено · в очереди $1"
+  },
+  "popup_chipConnectedQueued_many": {
+    "message": "Подключено · в очереди $1"
+  },
+  "popup_chipConnectedQueued_other": {
+    "message": "Подключено · в очереди $1"
+  },
+  "popup_chipPairingNeeded": {
+    "message": "Нужна привязка"
+  },
+  "popup_chipAppNotRunning": {
+    "message": "Приложение не запущено"
+  },
+  "popup_appRunning": {
+    "message": "Работает"
+  },
+  "popup_appNotRunning": {
+    "message": "Не запущено"
+  },
+  "popup_pairTokenNeeded": {
+    "message": "Нужен токен"
+  },
+  "popup_pairOk": {
+    "message": "ОК"
+  },
+  "popup_pendingItems_one": {
+    "message": "$1 элемент ждёт синхронизации"
+  },
+  "popup_pendingItems_few": {
+    "message": "$1 элемента ждут синхронизации"
+  },
+  "popup_pendingItems_many": {
+    "message": "$1 элементов ждут синхронизации"
+  },
+  "popup_pendingItems_other": {
+    "message": "$1 элемента ждут синхронизации"
+  },
+  "popup_pageRestricted": {
+    "message": "Эта страница ограничена браузером"
+  },
+  "popup_pageRestrictedHint": {
+    "message": "На внутренних страницах браузера поиск и сохранение недоступны."
+  },
+  "popup_currentPage": {
+    "message": "Текущая страница"
+  },
+  "popup_difficultyTitle": {
+    "message": "Оценка по уровню лексики, не официальный рейтинг"
+  },
+  "popup_difficulty": {
+    "message": "Сложность $1"
+  },
+  "popup_difficultyCached": {
+    "message": "Сложность $1 (из кэша)"
+  },
+  "popup_knownWords": {
+    "message": "Знакомых слов $1%"
+  },
+  "popup_noJapanese": {
+    "message": "На этой странице нет текста на изучаемых языках"
+  },
+  "popup_noJapaneseHint": {
+    "message": "Поиск по наведению срабатывает, если держать клавишу поиска над текстом на изучаемом языке."
+  },
+  "popup_transcribedTitle": {
+    "message": "Уже в каталоге Gum — собирайте материал, не возвращаясь сюда"
+  },
+  "popup_transcribedCues_one": {
+    "message": "Расшифровано · $1 реплика"
+  },
+  "popup_transcribedCues_few": {
+    "message": "Расшифровано · $1 реплики"
+  },
+  "popup_transcribedCues_many": {
+    "message": "Расшифровано · $1 реплик"
+  },
+  "popup_transcribedCues_other": {
+    "message": "Расшифровано · $1 реплики"
+  },
+  "popup_transcribing": {
+    "message": "Расшифровка"
+  },
+  "popup_transcribingFor": {
+    "message": "Расшифровка · $1 с"
+  },
+  "popup_transcriptionEmptyTitle": {
+    "message": "Повторите из медиатеки"
+  },
+  "popup_transcriptionEmpty": {
+    "message": "Расшифровка не дала текста"
+  },
+  "popup_savePlaylist": {
+    "message": "Сохранить плейлист"
+  },
+  "popup_saveVideo": {
+    "message": "Сохранить видео"
+  },
+  "popup_downloadVideo": {
+    "message": "Скачать видео"
+  },
+  "popup_transcribeAudio": {
+    "message": "Расшифровать звук"
+  },
+  "popup_lookupSelection": {
+    "message": "Найти выделенное"
+  },
+  "popup_saveSelection": {
+    "message": "Сохранить выделенное"
+  },
+  "popup_ocrCapture": {
+    "message": "OCR-захват"
+  },
+  "popup_importManga": {
+    "message": "Импортировать страницы манги"
+  },
+  "popup_savePage": {
+    "message": "Сохранить страницу"
+  },
+  "popup_lookupFailed": {
+    "message": "Не удалось открыть окно поиска"
+  },
+  "popup_savingSelection": {
+    "message": "Сохранение выделенного…"
+  },
+  "popup_savingPage": {
+    "message": "Сохранение страницы…"
+  },
+  "popup_queueingDownload": {
+    "message": "Постановка загрузки в очередь…"
+  },
+  "popup_downloadQueued": {
+    "message": "Загрузка поставлена в очередь в Gum."
+  },
+  "popup_downloadFailed": {
+    "message": "Не удалось скачать"
+  },
+  "popup_askingTranscribe": {
+    "message": "Отправка расшифровки в Gum…"
+  },
+  "popup_ocrFailed": {
+    "message": "Не удалось начать выбор области для OCR"
+  },
+  "popup_scanningManga": {
+    "message": "Сканирование страниц манги… страница будет прокручиваться"
+  },
+  "popup_mangaImported_one": {
+    "message": "Импортирована $1 страница в мангу Gum."
+  },
+  "popup_mangaImported_few": {
+    "message": "Импортировано $1 страницы в мангу Gum."
+  },
+  "popup_mangaImported_many": {
+    "message": "Импортировано $1 страниц в мангу Gum."
+  },
+  "popup_mangaImported_other": {
+    "message": "Импортировано $1 страницы в мангу Gum."
+  },
+  "popup_importFailed": {
+    "message": "Не удалось импортировать"
+  },
+  "popup_refuseNotAVideoPage": {
+    "message": "Сначала откройте страницу с видео — на этой нет звука."
+  },
+  "popup_refuseNoVideoId": {
+    "message": "В этой ссылке YouTube нет видео."
+  },
+  "popup_refuseNotDownloaded": {
+    "message": "Сначала скачайте это видео — Whisper читает файл, а не страницу."
+  },
+  "popup_refuseAudioMissing": {
+    "message": "В Gum есть запись об этом видео, но его файл пропал."
+  },
+  "popup_refuseTranscriberOffline": {
+    "message": "Gum работает, но расшифровщик ещё не готов."
+  },
+  "popup_refuseItemNotFound": {
+    "message": "Этого видео больше нет в медиатеке Gum."
+  },
+  "popup_transcribedDone_one": {
+    "message": "Расшифровано — $1 реплика. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_transcribedDone_few": {
+    "message": "Расшифровано — $1 реплики. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_transcribedDone_many": {
+    "message": "Расшифровано — $1 реплик. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_transcribedDone_other": {
+    "message": "Расшифровано — $1 реплики. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_transcriptionEnded": {
+    "message": "Расшифровка завершилась без текста. Повторите из медиатеки."
+  },
+  "popup_transcriptionNotStarted": {
+    "message": "Это видео ещё не скачано, поэтому расшифровка не запускалась."
+  },
+  "popup_transcribingElapsed": {
+    "message": "Расшифровка в Gum… $1 с"
+  },
+  "popup_stillTranscribing": {
+    "message": "Gum всё ещё расшифровывает — результат появится в каталоге."
+  },
+  "popup_transcriptionFailed": {
+    "message": "Не удалось расшифровать"
+  },
+  "popup_alreadyTranscribed_one": {
+    "message": "Уже расшифровано — $1 реплика. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_alreadyTranscribed_few": {
+    "message": "Уже расшифровано — $1 реплики. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_alreadyTranscribed_many": {
+    "message": "Уже расшифровано — $1 реплик. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_alreadyTranscribed_other": {
+    "message": "Уже расшифровано — $1 реплики. Собирайте материал в «Файлах» или «Сборе»."
+  },
+  "popup_transcribeQueued": {
+    "message": "Gum расшифровывает — результат появится в каталоге."
+  },
+  "popup_alreadyTranscribing": {
+    "message": "Gum уже расшифровывает — ничего нового не добавлено."
+  },
+  "popup_alreadyTranscribingFor": {
+    "message": "Gum уже $1 с расшифровывает — ничего нового не добавлено."
+  },
+  "popup_transcriptionRefused": {
+    "message": "Расшифровка отклонена"
+  },
+  "popup_cardCreated": {
+    "message": "Карточка создана в Anki · сохранено в Gum."
+  },
+  "popup_savedToGum": {
+    "message": "Сохранено в Gum."
+  },
+  "popup_recentWord": {
+    "message": "Слово сохранено"
+  },
+  "popup_recentSentence": {
+    "message": "Предложение сохранено"
+  },
+  "popup_recentCard": {
+    "message": "Карточка создана"
+  },
+  "popup_recentPage": {
+    "message": "Страница сохранена"
+  },
+  "popup_recentDownload": {
+    "message": "Загрузка в очереди"
+  },
+  "popup_recentOcr": {
+    "message": "Текст распознан"
+  },
+  "popup_recentManga": {
+    "message": "Манга импортирована"
+  },
+  "popup_recentQueued": {
+    "message": "В очереди"
+  },
+  "popup_recentSaved": {
+    "message": "Сохранено"
+  },
+  "popup_gumNotRunningStart": {
+    "message": "Gum не запущен — запустите настольное приложение."
+  },
+  "popup_retrying": {
+    "message": "Повторная отправка очереди…"
+  },
+  "popup_retryDropped_one": {
+    "message": "$1 элемент не удалось сохранить, он удалён — см. недавнее."
+  },
+  "popup_retryDropped_few": {
+    "message": "$1 элемента не удалось сохранить, они удалены — см. недавнее."
+  },
+  "popup_retryDropped_many": {
+    "message": "$1 элементов не удалось сохранить, они удалены — см. недавнее."
+  },
+  "popup_retryDropped_other": {
+    "message": "$1 элемента не удалось сохранить, они удалены — см. недавнее."
+  },
+  "popup_retrySent_one": {
+    "message": "Отправлен $1 элемент из очереди."
+  },
+  "popup_retrySent_few": {
+    "message": "Отправлено $1 элемента из очереди."
+  },
+  "popup_retrySent_many": {
+    "message": "Отправлено $1 элементов из очереди."
+  },
+  "popup_retrySent_other": {
+    "message": "Отправлено $1 элемента из очереди."
+  },
+  "popup_retryStillPending_one": {
+    "message": "Ещё $1 ждёт отправки."
+  },
+  "popup_retryStillPending_few": {
+    "message": "Ещё $1 ждут отправки."
+  },
+  "popup_retryStillPending_many": {
+    "message": "Ещё $1 ждут отправки."
+  },
+  "popup_retryStillPending_other": {
+    "message": "Ещё $1 ждут отправки."
+  },
+  "popup_retryUnreachable_one": {
+    "message": "Приложение всё ещё недоступно — в очереди $1 элемент."
+  },
+  "popup_retryUnreachable_few": {
+    "message": "Приложение всё ещё недоступно — в очереди $1 элемента."
+  },
+  "popup_retryUnreachable_many": {
+    "message": "Приложение всё ещё недоступно — в очереди $1 элементов."
+  },
+  "popup_retryUnreachable_other": {
+    "message": "Приложение всё ещё недоступно — в очереди $1 элемента."
+  },
+  "popup_retryNothing": {
+    "message": "Повторять нечего."
+  },
+  "opt_pageTitle": {
+    "message": "Gum — настройки расширения"
+  },
+  "opt_searchAria": {
+    "message": "Поиск по настройкам"
+  },
+  "opt_searchPlaceholder": {
+    "message": "Поиск по настройкам…"
+  },
+  "opt_searchEmpty": {
+    "message": "Подходящих настроек нет."
+  },
+  "opt_navLookup": {
+    "message": "Поиск по наведению"
+  },
+  "opt_navAi": {
+    "message": "ИИ-OCR"
+  },
+  "opt_navPopup": {
+    "message": "Окно словаря"
+  },
+  "opt_navSaving": {
+    "message": "Сохранение и карточки"
+  },
+  "opt_navWheel": {
+    "message": "Колесо действий"
+  },
+  "opt_navPanel": {
+    "message": "Панель страницы"
+  },
+  "opt_navMedia": {
+    "message": "Видео и медиа"
+  },
+  "opt_navConnection": {
+    "message": "Подключение"
+  },
+  "opt_navShortcuts": {
+    "message": "Сочетания клавиш"
+  },
+  "opt_navAdvanced": {
+    "message": "Дополнительно"
+  },
+  "opt_lookupLead": {
+    "message": "Удерживайте клавишу и наведите курсор на текст на изучаемом языке — откроется окно словаря."
+  },
+  "opt_hoverEnable": {
+    "message": "Включить поиск по наведению"
+  },
+  "opt_hoverEnableSub": {
+    "message": "Удерживайте клавишу активации и наведите курсор на слово."
+  },
+  "opt_hoverKey": {
+    "message": "Клавиша активации"
+  },
+  "opt_hoverKeyDesc": {
+    "message": "Удерживается при наведении; также работает с поиском по щелчку и выделению."
+  },
+  "opt_hoverDelay": {
+    "message": "Задержка наведения"
+  },
+  "opt_hoverDelayDesc": {
+    "message": "Сколько курсор должен задержаться на слове, прежде чем откроется окно."
+  },
+  "opt_scanLength": {
+    "message": "Длина поиска"
+  },
+  "opt_scanLengthDesc": {
+    "message": "Сколько символов максимум учитывается при поиске. Больше — находит длинные составные слова, меньше — быстрее."
+  },
+  "opt_closeOnRelease": {
+    "message": "Закрывать окно, когда клавиша отпущена"
+  },
+  "opt_closeOnReleaseSub": {
+    "message": "Выключено: окно остаётся, пока вы не щёлкнете в другом месте или не нажмёте Esc. Закреплённые окна остаются всегда."
+  },
+  "opt_clickLookup": {
+    "message": "Искать также по клавише + щелчку и клавише + выделению"
+  },
+  "opt_clickLookupSub": {
+    "message": "Обычные щелчки всегда передаются странице."
+  },
+  "opt_lookupEditable": {
+    "message": "Разрешить поиск в текстовых полях"
+  },
+  "opt_lookupEditableSub": {
+    "message": "По умолчанию выключено, чтобы не мешать вводу."
+  },
+  "opt_aiTitle": {
+    "message": "ИИ-OCR / словарь ИИ"
+  },
+  "opt_aiLead": {
+    "message": "Выберите, что открывает выделение и что — OCR. ИИ-OCR размечает всё предложение (грамматика, лексика, уровень, вежливость, оттенки) и позволяет сделать карточку или снимок в блокнот. Словарь ИИ оставляет мгновенный офлайн-поиск. Эти два действия настраиваются отдельно."
+  },
+  "opt_aiOnHighlight": {
+    "message": "ИИ-OCR при выделении текста"
+  },
+  "opt_aiOnHighlightSub": {
+    "message": "Выключено: выделение, как и раньше, открывает окно словаря."
+  },
+  "opt_aiOnOcr": {
+    "message": "ИИ-OCR после OCR скриншота"
+  },
+  "opt_aiOnOcrSub": {
+    "message": "Выключено: результат OCR открывается с кнопкой «ИИ-разбор»."
+  },
+  "opt_aiMinChars": {
+    "message": "Минимальное выделение"
+  },
+  "opt_aiMinCharsDesc": {
+    "message": "Более короткие выделения остаются в офлайн-словаре — облачный запрос ради одного слова медленнее и стоит денег за ответ, который в словаре уже есть."
+  },
+  "opt_aiWhere": {
+    "message": "Состав разбора, колода для карточек и автоматические снимки в блокнот настраиваются в Gum → Настройки → Профиль и словарь → ИИ-разбор. Нужен API-ключ (Карточки → ИИ-студия карточек)."
+  },
+  "opt_popupLead": {
+    "message": "Словарь на странице с вкладками «Значение», «Грамматика», «Предложение», «Иероглифы» и «Примеры»."
+  },
+  "opt_popupWidth": {
+    "message": "Ширина"
+  },
+  "opt_popupFont": {
+    "message": "Размер шрифта"
+  },
+  "opt_popupCompact": {
+    "message": "Компактный режим"
+  },
+  "opt_popupCompactSub": {
+    "message": "Меньше значений в статье — легче при долгом чтении."
+  },
+  "opt_popupPin": {
+    "message": "Закреплять окно по клавише + щелчку"
+  },
+  "opt_popupPinSub": {
+    "message": "Закреплённое окно можно перетаскивать за заголовок, и оно остаётся открытым, пока вы читаете."
+  },
+  "opt_popupKeysHtml": {
+    "message": "В окне: <kbd>←</kbd><kbd>→</kbd> вкладки · <kbd>S</kbd> сохранить слово · <kbd>Shift+S</kbd> сохранить предложение · <kbd>C</kbd> создать карточку · <kbd>P</kbd> закрепить · <kbd>A</kbd> звук · <kbd>Esc</kbd> закрыть."
+  },
+  "opt_savingLead": {
+    "message": "Куда попадают сохранённые слова, предложения и карточки. (Раньше это называлось «сбор».)"
+  },
+  "opt_destLabel": {
+    "message": "Когда я сохраняю слово или предложение"
+  },
+  "opt_destBoth": {
+    "message": "Gum + карточка Anki"
+  },
+  "opt_destBothSub": {
+    "message": "Создаёт карточку Anki, если Anki запущен; копия всегда остаётся в библиотеке Gum."
+  },
+  "opt_destApp": {
+    "message": "Только Gum"
+  },
+  "opt_destAppSub": {
+    "message": "Сохраняет в библиотеку Gum. «Создать карточку» по-прежнему явно отправляет в Anki."
+  },
+  "opt_confirmCard": {
+    "message": "Показывать карточку перед созданием"
+  },
+  "opt_confirmCardSub": {
+    "message": "Перед отправкой показывает текст, тип карточки и место назначения. Поля карточки заполняет Gum по своим словарям и вашему сопоставлению полей Anki."
+  },
+  "opt_folderLabel": {
+    "message": "Название папки в библиотеке"
+  },
+  "opt_folderLabelDesc": {
+    "message": "Сохранённое из расширения появится в этой папке в карточках Gum."
+  },
+  "opt_savingHintHtml": {
+    "message": "Колода, тип записи и сопоставление полей настраиваются в приложении Gum — прямые ссылки в разделе <b>Подключение</b>."
+  },
+  "opt_wheelLeadHtml": {
+    "message": "Кольцо быстрых действий, открывается по <kbd>Alt+Shift+W</kbd>. Одна команда на позицию; центр всегда отменяет."
+  },
+  "opt_wheelEnable": {
+    "message": "Включить колесо действий"
+  },
+  "opt_wheelEnableSub": {
+    "message": "Если выключено, сочетание клавиш открывает компактный список действий."
+  },
+  "opt_wheelHintHtml": {
+    "message": "Каждую команду можно назначить один раз — если выбрать уже размещённую, позиции поменяются местами. Команды, неприменимые к текущей странице (например, «Скачать видео» вне YouTube), на колесе недоступны. Клавиатура: <kbd>1</kbd>–<kbd>6</kbd> выполняют позицию, стрелки двигают выделение, <kbd>Esc</kbd> отменяет."
+  },
+  "opt_panelLead": {
+    "message": "Небольшая панель в углу с оценкой сложности и инструментами страницы."
+  },
+  "opt_fabVisible": {
+    "message": "Показывать панель страницы"
+  },
+  "opt_fabCollapsed": {
+    "message": "Изначально свёрнута"
+  },
+  "opt_fabCorner": {
+    "message": "Положение"
+  },
+  "opt_cornerBottomRight": {
+    "message": "Справа внизу"
+  },
+  "opt_cornerBottomRightMid": {
+    "message": "Справа внизу (выше)"
+  },
+  "opt_cornerTopRight": {
+    "message": "Справа вверху"
+  },
+  "opt_badgesHeading": {
+    "message": "Значки и кнопки"
+  },
+  "opt_fabLevel": {
+    "message": "Оценка сложности"
+  },
+  "opt_fabComp": {
+    "message": "Доля знакомых слов"
+  },
+  "opt_fabTheme": {
+    "message": "Кнопка темы для чтения"
+  },
+  "opt_fabHl": {
+    "message": "Кнопка режима выделения"
+  },
+  "opt_fabLearn": {
+    "message": "Кнопка подсветки известных слов"
+  },
+  "opt_fabOcr": {
+    "message": "Кнопка OCR"
+  },
+  "opt_fabClearHidden": {
+    "message": "Снова показывать панель на всех сайтах"
+  },
+  "opt_fabHint": {
+    "message": "«Скрыть здесь» на панели скрывает её для отдельного сайта; эта кнопка очищает этот список."
+  },
+  "opt_mediaLead": {
+    "message": "Что делает «Сохранить страницу» на YouTube, и параметры медиа."
+  },
+  "opt_ytMode": {
+    "message": "Сохранение страницы YouTube"
+  },
+  "opt_ytModeDownload": {
+    "message": "Скачивать медиа в Gum"
+  },
+  "opt_ytModeMetadata": {
+    "message": "Сохранять только метаданные (отслеживать видео или плейлист)"
+  },
+  "opt_ytAudio": {
+    "message": "При скачивании — только звук"
+  },
+  "opt_ytAudioSub": {
+    "message": "Файлы меньше — удобно для тренировки аудирования."
+  },
+  "opt_mediaHint": {
+    "message": "«Скачать видео» на страницах YouTube всегда доступно явно — из окна расширения, колеса и меню «Ещё»."
+  },
+  "opt_connLead": {
+    "message": "Привязка к настольному приложению Gum. Всё остальное — сопоставление Anki, правила сбора, история буфера обмена — находится в самом приложении."
+  },
+  "opt_pairingHeading": {
+    "message": "Привязка"
+  },
+  "opt_connUnknown": {
+    "message": "неизвестно"
+  },
+  "opt_token": {
+    "message": "Токен привязки"
+  },
+  "opt_tokenDesc": {
+    "message": "В Gum откройте «Настройки → Профиль и словарь → Расширение Chrome». Скопируйте токен и вставьте его сюда — или нажмите там «Связать сейчас», а здесь «Получить токен из приложения»."
+  },
+  "opt_port": {
+    "message": "Порт моста"
+  },
+  "opt_savePair": {
+    "message": "Сохранить привязку"
+  },
+  "opt_test": {
+    "message": "Проверить подключение"
+  },
+  "opt_pull": {
+    "message": "Получить токен из приложения"
+  },
+  "opt_openInApp": {
+    "message": "Открыть в приложении Gum"
+  },
+  "opt_openAnki": {
+    "message": "Anki и сопоставление полей"
+  },
+  "opt_openRules": {
+    "message": "Правила сохранения (профили)"
+  },
+  "opt_openClipboard": {
+    "message": "История буфера обмена"
+  },
+  "opt_openFlashcards": {
+    "message": "Карточки"
+  },
+  "opt_openInbox": {
+    "message": "Входящие"
+  },
+  "opt_shortcutsLead": {
+    "message": "Сочетания клавиш уровня браузера настраивает Chrome; клавиши на странице работают, когда открыто окно словаря или колесо."
+  },
+  "opt_browserShortcuts": {
+    "message": "Сочетания клавиш браузера"
+  },
+  "opt_openShortcuts": {
+    "message": "Изменить в настройках сочетаний клавиш Chrome"
+  },
+  "opt_inPageKeys": {
+    "message": "Клавиши на странице"
+  },
+  "opt_inPageKeysHtml": {
+    "message": "Окно словаря: <kbd>←</kbd><kbd>→</kbd> вкладки · <kbd>S</kbd> сохранить слово · <kbd>Shift+S</kbd> сохранить предложение · <kbd>C</kbd> создать карточку · <kbd>P</kbd> закрепить · <kbd>A</kbd> звук · <kbd>Backspace</kbd> назад · <kbd>Esc</kbd> закрыть.<br /> Колесо: <kbd>1</kbd>–<kbd>6</kbd> выполнить · стрелки — выделение · <kbd>Enter</kbd> выполнить · <kbd>Esc</kbd> отмена.<br /> Выбор области для OCR: обведите рамку · <kbd>Esc</kbd> отмена."
+  },
+  "opt_advancedLead": {
+    "message": "Данные, перенос и всё, что не обязательно включать по умолчанию."
+  },
+  "opt_logImmersion": {
+    "message": "Записывать время чтения в Gum"
+  },
+  "opt_logImmersionSub": {
+    "message": "Учитывает активное время на страницах на изучаемом языке в статистике погружения."
+  },
+  "opt_notes": {
+    "message": "Заметки"
+  },
+  "opt_notesPlaceholder": {
+    "message": "Заметки для себя (необязательно)"
+  },
+  "opt_settingsData": {
+    "message": "Данные настроек"
+  },
+  "opt_export": {
+    "message": "Экспортировать настройки"
+  },
+  "opt_import": {
+    "message": "Импортировать настройки"
+  },
+  "opt_reset": {
+    "message": "Сбросить по умолчанию"
+  },
+  "opt_resetHint": {
+    "message": "Сброс сохраняет токен привязки и порт. Настройки из старых версий (включая «Предпочитать Anki при сборе» и старые ячейки колеса) переносятся автоматически — «сбор» теперь называется просто «сохранение»."
+  },
+  "opt_unitMs": {
+    "message": "$1 мс"
+  },
+  "opt_unitPx": {
+    "message": "$1 пкс"
+  },
+  "opt_unitChars_one": {
+    "message": "$1 символ"
+  },
+  "opt_unitChars_few": {
+    "message": "$1 символа"
+  },
+  "opt_unitChars_many": {
+    "message": "$1 символов"
+  },
+  "opt_unitChars_other": {
+    "message": "$1 символа"
+  },
+  "opt_posTop": {
+    "message": "Сверху"
+  },
+  "opt_posUpperRight": {
+    "message": "Справа вверху"
+  },
+  "opt_posLowerRight": {
+    "message": "Справа внизу"
+  },
+  "opt_posBottom": {
+    "message": "Снизу"
+  },
+  "opt_posLowerLeft": {
+    "message": "Слева внизу"
+  },
+  "opt_posUpperLeft": {
+    "message": "Слева вверху"
+  },
+  "opt_posAria": {
+    "message": "Команда для позиции «$1»"
+  },
+  "opt_shortcutsFailed": {
+    "message": "Не удалось прочитать сочетания клавиш браузера."
+  },
+  "opt_scSavePage": {
+    "message": "Сохранить страницу в Gum"
+  },
+  "opt_scLookup": {
+    "message": "Найти выделенное или слово под курсором"
+  },
+  "opt_scSaveSelection": {
+    "message": "Сохранить выделенное (слово или предложение)"
+  },
+  "opt_scWheel": {
+    "message": "Открыть колесо действий"
+  },
+  "opt_scBulkTabs": {
+    "message": "Открыть список чтения"
+  },
+  "opt_scToolbarPopup": {
+    "message": "Открыть окно расширения на панели"
+  },
+  "opt_scNotSet": {
+    "message": "не задано"
+  },
+  "opt_connReachable": {
+    "message": "приложение доступно"
+  },
+  "opt_connNotRunning": {
+    "message": "приложение не запущено"
+  },
+  "opt_statusReachable": {
+    "message": "Gum доступен."
+  },
+  "opt_statusNotRunning": {
+    "message": "Gum не запущен или порт указан неверно."
+  },
+  "opt_statusPairSaved": {
+    "message": "Привязка сохранена."
+  },
+  "opt_statusPullNeedsPairNow": {
+    "message": "Gum пока не принимает запрос — нажмите «Связать сейчас» в Gum (Настройки → Профиль и словарь → Расширение Chrome) и в течение двух минут запросите снова. Или скопируйте токен там и вставьте его сюда."
+  },
+  "opt_statusPulled": {
+    "message": "Привязка получена из приложения."
+  },
+  "opt_statusPullNoToken": {
+    "message": "Приложение ответило, но не прислало токен — скопируйте его вручную в настройках."
+  },
+  "opt_statusPullFailed": {
+    "message": "Не удалось получить — откройте Gum и вставьте токен вручную."
+  },
+  "opt_statusOpened": {
+    "message": "Открыто в Gum."
+  },
+  "opt_statusExported": {
+    "message": "Настройки экспортированы (без токена)."
+  },
+  "opt_statusImported": {
+    "message": "Настройки импортированы."
+  },
+  "opt_statusImportFailed": {
+    "message": "Не удалось импортировать — файл не является экспортом настроек."
+  },
+  "opt_statusReset": {
+    "message": "Настройки сброшены (привязка сохранена)."
+  },
+  "opt_statusPanelRestored": {
+    "message": "Панель снова будет показываться на всех сайтах."
+  },
+  "opt_statusSaved": {
+    "message": "Сохранено."
+  },
+  "tabs_pageTitle": {
+    "message": "Gum — список чтения"
+  },
+  "tabs_heading": {
+    "message": "Список чтения"
+  },
+  "tabs_allWindows": {
+    "message": "Все окна"
+  },
+  "tabs_selectAll": {
+    "message": "Выбрать все"
+  },
+  "tabs_selectNone": {
+    "message": "Снять выбор"
+  },
+  "tabs_refresh": {
+    "message": "Обновить"
+  },
+  "tabs_loading": {
+    "message": "Загрузка вкладок…"
+  },
+  "tabs_capture": {
+    "message": "Сохранить страницы в Gum"
+  },
+  "tabs_download": {
+    "message": "Скачать видео"
+  },
+  "tabs_hint": {
+    "message": "Выберите вкладки и сохраните их разом — статьи попадут во «Входящие» Gum, видео и плейлисты — в отслеживание YouTube. Цветная кромка показывает определённый тип источника (новости, роман, манга, видео, статья). Скачивание работает только для вкладок YouTube."
+  },
+  "tabs_catNews": {
+    "message": "Новости"
+  },
+  "tabs_catNovel": {
+    "message": "Роман"
+  },
+  "tabs_selected_one": {
+    "message": "Выбрана $1"
+  },
+  "tabs_selected_few": {
+    "message": "Выбрано $1"
+  },
+  "tabs_selected_many": {
+    "message": "Выбрано $1"
+  },
+  "tabs_selected_other": {
+    "message": "Выбрано $1"
+  },
+  "tabs_empty": {
+    "message": "В этой области вкладок нет."
+  },
+  "tabs_untitled": {
+    "message": "Вкладка $1"
+  },
+  "tabs_badgeTitle": {
+    "message": "Определённый тип источника (по адресу и заголовку)"
+  },
+  "tabs_listFailed": {
+    "message": "Не удалось получить список вкладок."
+  },
+  "tabs_summary": {
+    "message": "$1 · $2"
+  },
+  "tabs_count_one": {
+    "message": "$1 вкладка"
+  },
+  "tabs_count_few": {
+    "message": "$1 вкладки"
+  },
+  "tabs_count_many": {
+    "message": "$1 вкладок"
+  },
+  "tabs_count_other": {
+    "message": "$1 вкладки"
+  },
+  "tabs_saveable_one": {
+    "message": "можно сохранить $1"
+  },
+  "tabs_saveable_few": {
+    "message": "можно сохранить $1"
+  },
+  "tabs_saveable_many": {
+    "message": "можно сохранить $1"
+  },
+  "tabs_saveable_other": {
+    "message": "можно сохранить $1"
+  },
+  "tabs_noYoutube": {
+    "message": "Не выбрано ни одной вкладки YouTube."
+  },
+  "tabs_selectOne": {
+    "message": "Выберите хотя бы одну вкладку."
+  },
+  "tabs_progressSaving": {
+    "message": "Сохранение… $1/$2"
+  },
+  "tabs_progressDownloading": {
+    "message": "Постановка загрузок в очередь… $1/$2"
+  },
+  "tabs_progressWorking": {
+    "message": "Выполняется… $1/$2"
+  },
+  "tabs_progressWithFailures": {
+    "message": "$1 · ошибок: $2"
+  },
+  "tabs_queuedNote_one": {
+    "message": " (в очереди: $1 — синхронизируется, когда Gum будет открыт)"
+  },
+  "tabs_queuedNote_few": {
+    "message": " (в очереди: $1 — синхронизируется, когда Gum будет открыт)"
+  },
+  "tabs_queuedNote_many": {
+    "message": " (в очереди: $1 — синхронизируется, когда Gum будет открыт)"
+  },
+  "tabs_queuedNote_other": {
+    "message": " (в очереди: $1 — синхронизируется, когда Gum будет открыт)"
+  },
+  "tabs_done": {
+    "message": "Готово — сохранено $1/$2$3."
+  },
+  "tabs_finished": {
+    "message": "Завершено — успешно $1/$2, ошибок: $3$4."
+  },
+  "cmd_lookup_selection_label": {
+    "message": "Найти"
+  },
+  "cmd_lookup_selection_short": {
+    "message": "Найти"
+  },
+  "cmd_lookup_selection_desc": {
+    "message": "Открыть окно словаря для выделенного текста или текста под курсором."
+  },
+  "cmd_save_word_label": {
+    "message": "Сохранить слово"
+  },
+  "cmd_save_word_short": {
+    "message": "Слово"
+  },
+  "cmd_save_word_desc": {
+    "message": "Сохранить выделенное слово в библиотеку Gum."
+  },
+  "cmd_save_sentence_label": {
+    "message": "Сохранить предложение"
+  },
+  "cmd_save_sentence_short": {
+    "message": "Фраза"
+  },
+  "cmd_save_sentence_desc": {
+    "message": "Сохранить выделенное или найденное предложение в библиотеку Gum."
+  },
+  "cmd_card_create_label": {
+    "message": "Создать карточку"
+  },
+  "cmd_card_create_short": {
+    "message": "Карточка"
+  },
+  "cmd_card_create_desc": {
+    "message": "Создать карточку из выделенного (в Anki, если он доступен; копия всегда остаётся в Gum)."
+  },
+  "cmd_capture_page_label": {
+    "message": "Сохранить страницу"
+  },
+  "cmd_capture_page_short": {
+    "message": "Страница"
+  },
+  "cmd_capture_page_desc": {
+    "message": "Сохранить эту страницу (статью, видео или плейлист) в Gum."
+  },
+  "cmd_capture_ocr_label": {
+    "message": "OCR-захват"
+  },
+  "cmd_capture_ocr_short": {
+    "message": "OCR"
+  },
+  "cmd_capture_ocr_desc": {
+    "message": "Обведите область на изображении, чтобы распознать текст."
+  },
+  "cmd_capture_audio_record_label": {
+    "message": "Записать звук"
+  },
+  "cmd_capture_audio_record_short": {
+    "message": "Запись"
+  },
+  "cmd_capture_audio_record_desc": {
+    "message": "Записать звук с микрофона для следующего «Сохранить звук»."
+  },
+  "cmd_capture_audio_save_label": {
+    "message": "Сохранить звук"
+  },
+  "cmd_capture_audio_save_short": {
+    "message": "Звук"
+  },
+  "cmd_capture_audio_save_desc": {
+    "message": "Сохранить последнюю запись в Gum."
+  },
+  "cmd_capture_manga_label": {
+    "message": "Импортировать страницы манги"
+  },
+  "cmd_capture_manga_short": {
+    "message": "Манга"
+  },
+  "cmd_capture_manga_desc": {
+    "message": "Просканировать длинную ленту или вебтун и импортировать страницы в Gum."
+  },
+  "cmd_media_download_label": {
+    "message": "Скачать видео"
+  },
+  "cmd_media_download_short": {
+    "message": "Скачать"
+  },
+  "cmd_media_download_desc": {
+    "message": "Скачать текущее видео или плейлист YouTube в Gum."
+  },
+  "cmd_media_transcribe_label": {
+    "message": "Расшифровать звук"
+  },
+  "cmd_media_transcribe_short": {
+    "message": "Расшифровка"
+  },
+  "cmd_media_transcribe_desc": {
+    "message": "Расшифровать звук текущего видео с помощью Whisper и добавить в каталог."
+  },
+  "cmd_clipboard_send_label": {
+    "message": "В историю буфера обмена"
+  },
+  "cmd_clipboard_send_short": {
+    "message": "Буфер"
+  },
+  "cmd_clipboard_send_desc": {
+    "message": "Добавить выделенное в историю буфера обмена Gum."
+  },
+  "cmd_translate_selection_label": {
+    "message": "Перевести"
+  },
+  "cmd_translate_selection_short": {
+    "message": "Перевод"
+  },
+  "cmd_translate_selection_desc": {
+    "message": "Перевести выделенное моделью перевода Gum."
+  },
+  "cmd_grammar_match_label": {
+    "message": "Найти грамматику"
+  },
+  "cmd_grammar_match_short": {
+    "message": "Грамматика"
+  },
+  "cmd_grammar_match_desc": {
+    "message": "Найти грамматические конструкции в выделенном предложении."
+  },
+  "cmd_reader_theme_label": {
+    "message": "Тема для чтения"
+  },
+  "cmd_reader_theme_short": {
+    "message": "Тема"
+  },
+  "cmd_reader_theme_desc": {
+    "message": "Переключить тему страницы для чтения (ночь, сепия, бумага, серая)."
+  },
+  "cmd_reader_highlight_label": {
+    "message": "Режим выделения"
+  },
+  "cmd_reader_highlight_short": {
+    "message": "Выделение"
+  },
+  "cmd_reader_highlight_desc": {
+    "message": "Включить или выключить выделение цветом на этой странице."
+  },
+  "cmd_reader_knownTint_label": {
+    "message": "Подсветка известных слов"
+  },
+  "cmd_reader_knownTint_short": {
+    "message": "Подсветка"
+  },
+  "cmd_reader_knownTint_desc": {
+    "message": "Подсветить слова на странице по тому, насколько хорошо вы их знаете."
+  },
+  "cmd_tabs_picker_label": {
+    "message": "Список чтения"
+  },
+  "cmd_tabs_picker_short": {
+    "message": "Вкладки"
+  },
+  "cmd_tabs_picker_desc": {
+    "message": "Открыть список вкладок, чтобы сохранить несколько страниц сразу."
+  },
+  "cmd_app_open_label": {
+    "message": "Открыть Gum"
+  },
+  "cmd_app_open_short": {
+    "message": "Gum"
+  },
+  "cmd_app_open_desc": {
+    "message": "Вывести настольное приложение Gum на передний план."
+  },
+  "cmd_settings_special_label": {
+    "message": "Особые модули"
+  },
+  "cmd_settings_special_short": {
+    "message": "Особые"
+  },
+  "cmd_settings_special_desc": {
+    "message": "Открыть скрытую страницу настроек «Особые модули» в Gum."
+  },
+  "cmd_wheel_more_label": {
+    "message": "Ещё…"
+  },
+  "cmd_wheel_more_short": {
+    "message": "Ещё"
+  },
+  "cmd_wheel_more_desc": {
+    "message": "Открыть дополнительный список действий (OCR, медиа, инструменты страницы)."
+  }
+}

@@ -225,6 +225,26 @@ export const EXTENSION_BRIDGE_ROUTES = [
 ] as const;
 export type ExtensionBridgeRoute = (typeof EXTENSION_BRIDGE_ROUTES)[number];
 
+/**
+ * Routes the bridge serves that the shipped extension never calls. They are
+ * kept on purpose, not forgotten:
+ *  - `/v1/page-kind`: the extension classifies pages itself (shared.js
+ *    detectPageKind, kept in step with ./extensionCapture); the route answers
+ *    the same question for diagnostics and scripted clients.
+ *  - `/v1/download/status`: the popup reports a download as queued and the app
+ *    shows its progress; the route lets a client poll a job id it was given.
+ *  - `/v1/sentence-analysis/prefs`: read-only view of the app-owned analysis
+ *    preferences, for clients that want to show them; the shipped extension
+ *    keeps its own highlight / OCR mode switch in its settings.
+ * extensionContract tests assert the extension does not start calling one of
+ * these without it moving out of this list (and that nothing else is unused).
+ */
+export const EXTENSION_SERVER_ONLY_ROUTES: readonly ExtensionBridgeRoute[] = [
+  '/v1/page-kind',
+  '/v1/download/status',
+  '/v1/sentence-analysis/prefs',
+];
+
 /* -------------------------------------------------------------------------- */
 /* Narrowing helpers                                                           */
 /* -------------------------------------------------------------------------- */

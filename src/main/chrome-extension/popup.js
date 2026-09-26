@@ -1,6 +1,12 @@
 /* global chrome */
 /* Task-oriented toolbar popup: what can I do on this page right now? */
 
+// Every visible string comes from _locales via shared.js; the English in
+// popup.html is only what shows for the instant before this runs.
+const t = (key, subs) => globalThis.jpStudyShared.msg(key, subs);
+const tn = (key, count, subs) => globalThis.jpStudyShared.msgCount(key, count, subs);
+globalThis.jpStudyShared.applyI18n(document);
+
 const chipEl = document.getElementById('status-chip');
 const detailEl = document.getElementById('status-detail');
 const stApp = document.getElementById('st-app');
@@ -26,7 +32,7 @@ function send(msg) {
         resolve({ ok: false, error: chrome.runtime.lastError.message });
         return;
       }
-      resolve(res || { ok: false, error: 'No response' });
+      resolve(res || { ok: false, error: t('common_noResponse') });
     });
   });
 }
@@ -43,19 +49,19 @@ async function refreshStatus() {
   const pending = st?.pending || 0;
 
   if (st?.app && st?.paired !== false) {
-    chipEl.textContent = pending > 0 ? `Connected · ${pending} queued` : 'Connected';
+    chipEl.textContent = pending > 0 ? tn('popup_chipConnectedQueued', pending) : t('popup_chipConnected');
     chipEl.className = 'status-chip' + (pending > 0 ? ' warn' : ' ok');
   } else if (st?.app) {
-    chipEl.textContent = 'Pairing needed';
+    chipEl.textContent = t('popup_chipPairingNeeded');
     chipEl.className = 'status-chip warn';
   } else {
-    chipEl.textContent = 'App not running';
+    chipEl.textContent = t('popup_chipAppNotRunning');
     chipEl.className = 'status-chip err';
   }
 
-  stApp.textContent = st?.app ? 'Running' : 'Not running';
+  stApp.textContent = st?.app ? t('popup_appRunning') : t('popup_appNotRunning');
   stApp.className = 'v ' + (st?.app ? 'ok' : 'err');
-  stPair.textContent = !st?.app ? '—' : st?.paired === false ? 'Token needed' : 'OK';
+  stPair.textContent = !st?.app ? '—' : st?.paired === false ? t('popup_pairTokenNeeded') : t('popup_pairOk');
   stPair.className = 'v ' + (!st?.app ? '' : st?.paired === false ? 'warn' : 'ok');
   stAnki.textContent = st?.profileName
     ? st.deckName
@@ -68,7 +74,7 @@ async function refreshStatus() {
 
   pendingBar.hidden = pending === 0;
   if (pending > 0) {
-    pendingText.textContent = `${pending} item${pending === 1 ? '' : 's'} waiting to sync`;
+    pendingText.textContent = tn('popup_pendingItems', pending);
   }
 }
 
@@ -88,18 +94,18 @@ async function refreshPage() {
   detect = await send({ type: 'detect' });
   if (!detect?.ok || !detect.scriptable) {
     pageCardEl.classList.add('empty');
-    pageTitleEl.textContent = 'This page is browser-restricted';
+    pageTitleEl.textContent = t('popup_pageRestricted');
     pageMetaEl.innerHTML = '';
     if (detect?.ok && !detect.scriptable) {
-      pageMetaEl.innerHTML = '<span>Lookup and capture are unavailable on internal browser pages.</span>';
+      pageMetaEl.innerHTML = `<span>${escapeHtml(t('popup_pageRestrictedHint'))}</span>`;
     }
     renderActions();
     return;
   }
-  pageTitleEl.textContent = detect.title || detect.url || 'Current page';
+  pageTitleEl.textContent = detect.title || detect.url || t('popup_currentPage');
   pageTitleEl.title = detect.url || '';
 
-  const pills = [`<span class="pill">${escapeHtml(detect.categoryLabel || 'Webpage')}</span>`];
+  const pills = [`<span class="pill">${escapeHtml(detect.categoryLabel || t('category_webpage'))}</span>`];
 
   // Difficulty + known coverage come from the content script's page scan.
   try {
@@ -108,17 +114,18 @@ async function refreshPage() {
       const badge = await chrome.tabs.sendMessage(tab.id, { type: 'jp-get-level-badge' });
       if (badge?.badge && badge.badge !== '—' && badge.badge !== 'X') {
         pills.push(
-          `<span class="pill" title="Vocabulary-band estimate, not an official rating">Difficulty ${escapeHtml(badge.badge)}${badge.offline ? ' (cached)' : ''}</span>`,
+          `<span class="pill" title="${escapeHtml(t('popup_difficultyTitle'))}">${escapeHtml(
+            t(badge.offline ? 'popup_difficultyCached' : 'popup_difficulty', badge.badge),
+          )}</span>`,
         );
       }
       if (typeof badge?.comprehensibility === 'number') {
-        pills.push(`<span class="pill">Known words ${badge.comprehensibility}%</span>`);
+        pills.push(`<span class="pill">${escapeHtml(t('popup_knownWords', badge.comprehensibility))}</span>`);
       }
       if (badge?.empty) {
         pageCardEl.classList.add('empty');
-        pageTitleEl.textContent = 'No Japanese text detected on this page';
-        pageMetaEl.innerHTML =
-          '<span>Hover lookup activates when you hold the lookup key over Japanese text.</span>';
+        pageTitleEl.textContent = t('popup_noJapanese');
+        pageMetaEl.innerHTML = `<span>${escapeHtml(t('popup_noJapaneseHint'))}</span>`;
         renderActions();
         return;
       }
@@ -158,12 +165,12 @@ async function showTranscriptionPill() {
   if (!res || res.state === 'notStarted') return;
   let pill = null;
   if (res.state === 'transcribed') {
-    pill = `<span class="pill" title="Already in the Gum catalogue — mine it without returning here">Transcribed · ${escapeHtml(String(res.cueCount))} cues</span>`;
+    pill = `<span class="pill" title="${escapeHtml(t('popup_transcribedTitle'))}">${escapeHtml(tn('popup_transcribedCues', res.cueCount))}</span>`;
   } else if (res.state === 'pending') {
     const secs = Number.isFinite(res.queuedAt) ? Math.round((Date.now() - res.queuedAt) / 1000) : null;
-    pill = `<span class="pill">Transcribing${secs === null ? '' : ` · ${secs}s`}</span>`;
+    pill = `<span class="pill">${escapeHtml(secs === null ? t('popup_transcribing') : t('popup_transcribingFor', secs))}</span>`;
   } else if (res.state === 'failed') {
-    pill = '<span class="pill" title="Retry from the Media library">Transcription left no text</span>';
+    pill = `<span class="pill" title="${escapeHtml(t('popup_transcriptionEmptyTitle'))}">${escapeHtml(t('popup_transcriptionEmpty'))}</span>`;
   }
   if (!pill) return;
   pageMetaEl.insertAdjacentHTML('beforeend', pill);
@@ -194,31 +201,31 @@ function renderActions() {
   const scriptable = !!detect?.scriptable;
   let items;
   if (!scriptable) {
-    items = [{ id: 'open-app', label: 'Open Gum', primary: true }];
+    items = [{ id: 'open-app', label: t('popup_navApp'), primary: true }];
   } else if (kind === 'youtube-video' || kind === 'youtube-playlist') {
     items = [
-      { id: 'capture-page', label: kind === 'youtube-playlist' ? 'Save playlist' : 'Save video', primary: true },
-      { id: 'download', label: 'Download video' },
+      { id: 'capture-page', label: kind === 'youtube-playlist' ? t('popup_savePlaylist') : t('popup_saveVideo'), primary: true },
+      { id: 'download', label: t('popup_downloadVideo') },
       // MINING gate 11. Only on a single video: a playlist has no one audio
       // track to transcribe, and offering it there would be a button that can
       // only refuse.
-      ...(kind === 'youtube-video' ? [{ id: 'transcribe', label: 'Transcribe audio' }] : []),
-      { id: 'lookup', label: 'Look up selection' },
-      { id: 'save-selection', label: 'Save selection' },
+      ...(kind === 'youtube-video' ? [{ id: 'transcribe', label: t('popup_transcribeAudio') }] : []),
+      { id: 'lookup', label: t('popup_lookupSelection') },
+      { id: 'save-selection', label: t('popup_saveSelection') },
     ];
   } else if (category === 'manga') {
     items = [
-      { id: 'ocr', label: 'OCR capture', primary: true },
-      { id: 'scan-strip', label: 'Import manga pages' },
-      { id: 'lookup', label: 'Look up selection' },
-      { id: 'capture-page', label: 'Save page' },
+      { id: 'ocr', label: t('popup_ocrCapture'), primary: true },
+      { id: 'scan-strip', label: t('popup_importManga') },
+      { id: 'lookup', label: t('popup_lookupSelection') },
+      { id: 'capture-page', label: t('popup_savePage') },
     ];
   } else {
     items = [
-      { id: 'lookup', label: 'Look up selection', primary: true },
-      { id: 'save-selection', label: 'Save selection' },
-      { id: 'capture-page', label: 'Save page' },
-      { id: 'ocr', label: 'OCR capture' },
+      { id: 'lookup', label: t('popup_lookupSelection'), primary: true },
+      { id: 'save-selection', label: t('popup_saveSelection') },
+      { id: 'capture-page', label: t('popup_savePage') },
+      { id: 'ocr', label: t('popup_ocrCapture') },
     ];
   }
   actionsEl.innerHTML = items
@@ -238,21 +245,21 @@ actionsEl.addEventListener('click', async (e) => {
     if (action === 'lookup') {
       const res = await send({ type: 'run-command', command: 'lookup.selection' });
       if (res?.ok) window.close();
-      else feedback(res?.error || 'Could not open the lookup popup', 'err');
+      else feedback(res?.error || t('popup_lookupFailed'), 'err');
     } else if (action === 'save-selection') {
-      feedback('Saving selection…', 'pending');
+      feedback(t('popup_savingSelection'), 'pending');
       const res = await send({ type: 'save-selection', mode: 'auto' });
       feedback(formatSave(res), res?.ok || res?.queued ? 'ok' : 'err');
     } else if (action === 'capture-page') {
-      feedback('Saving page…', 'pending');
+      feedback(t('popup_savingPage'), 'pending');
       const res = await send({ type: 'capture' });
       feedback(formatCapture(res), res?.ok || res?.queued ? 'ok' : 'err');
     } else if (action === 'download') {
-      feedback('Queueing download…', 'pending');
+      feedback(t('popup_queueingDownload'), 'pending');
       const res = await send({ type: 'run-command', command: 'media.download' });
-      feedback(res?.ok ? 'Download queued in Gum.' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
+      feedback(res?.ok ? t('popup_downloadQueued') : res?.error || t('popup_downloadFailed'), res?.ok ? 'ok' : 'err');
     } else if (action === 'transcribe') {
-      feedback('Asking Gum to transcribe…', 'pending');
+      feedback(t('popup_askingTranscribe'), 'pending');
       const res = await send({ type: 'run-command', command: 'media.transcribe' });
       feedback(formatTranscribe(res), res?.ok ? 'ok' : 'err');
       // Not awaited: the job runs for minutes and the button must not stay
@@ -263,19 +270,19 @@ actionsEl.addEventListener('click', async (e) => {
     } else if (action === 'ocr') {
       const res = await send({ type: 'run-command', command: 'capture.ocr' });
       if (res?.ok) window.close();
-      else feedback(res?.error || 'Could not start OCR selection', 'err');
+      else feedback(res?.error || t('popup_ocrFailed'), 'err');
     } else if (action === 'scan-strip') {
-      feedback('Scanning manga pages… this scrolls the page', 'pending');
+      feedback(t('popup_scanningManga'), 'pending');
       const res = await send({ type: 'scan-strip' });
       feedback(
         res?.ok
-          ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into Gum Manga.`
-          : res?.error || 'Import failed',
+          ? tn('popup_mangaImported', res.pageCount ?? res.imageCount ?? 0)
+          : res?.error || t('popup_importFailed'),
         res?.ok ? 'ok' : 'err',
       );
     } else if (action === 'open-app') {
       const res = await send({ type: 'ui-open', target: 'inbox' });
-      if (!res?.ok) feedback(res?.error || 'Gum is not running', 'err');
+      if (!res?.ok) feedback(res?.error || t('common_gumNotRunning'), 'err');
       else window.close();
     }
   } finally {
@@ -291,13 +298,13 @@ actionsEl.addEventListener('click', async (e) => {
  * that is working correctly look broken.
  */
 const TRANSCRIBE_REFUSALS = {
-  notAVideoPage: 'Open a video page first — there is no audio on this one.',
-  noVideoId: 'This YouTube URL has no video in it.',
-  notDownloaded: 'Download this video first — Whisper reads the file, not the page.',
-  audioMissing: 'Gum has a record of this video but its file is gone.',
-  transcriberOffline: 'Gum is running but its transcriber is not ready yet.',
-  'host-not-registered': 'Gum is running but its transcriber is not ready yet.',
-  'item-not-found': 'Gum no longer has this video in its media library.',
+  notAVideoPage: 'popup_refuseNotAVideoPage',
+  noVideoId: 'popup_refuseNoVideoId',
+  notDownloaded: 'popup_refuseNotDownloaded',
+  audioMissing: 'popup_refuseAudioMissing',
+  transcriberOffline: 'popup_refuseTranscriberOffline',
+  'host-not-registered': 'popup_refuseTranscriberOffline',
+  'item-not-found': 'popup_refuseItemNotFound',
 };
 
 /**
@@ -332,76 +339,77 @@ async function followTranscription(videoId, startedAt) {
   // The JOB's clock when the app gave us one, not the poll's. Clicking a
   // second time on a job eight minutes in used to restart the counter at 0s.
   let clock = Number.isFinite(startedAt) ? startedAt : Date.now();
-  const elapsed = () => `${Math.round((Date.now() - clock) / 1000)}s`;
+  const elapsed = () => Math.round((Date.now() - clock) / 1000);
   for (let i = 0; i < TRANSCRIBE_POLL_LIMIT; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, TRANSCRIBE_POLL_MS));
     const res = await send({ type: 'transcribe-status', videoId });
     if (!res) continue;
     if (Number.isFinite(res.queuedAt)) clock = res.queuedAt;
     if (res.state === 'transcribed') {
-      feedback(`Transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`, 'ok');
+      feedback(tn('popup_transcribedDone', res.cueCount), 'ok');
       return;
     }
     if (res.state === 'failed') {
-      feedback('The transcription ended without a transcript. Retry from the Media library.', 'err');
+      feedback(t('popup_transcriptionEnded'), 'err');
       return;
     }
     if (res.state === 'notStarted') {
-      feedback('Nothing has been downloaded for this video yet, so no transcription has run.', 'err');
+      feedback(t('popup_transcriptionNotStarted'), 'err');
       return;
     }
-    feedback(`Transcribing in Gum… ${elapsed()}`, 'pending');
+    feedback(t('popup_transcribingElapsed', elapsed()), 'pending');
   }
-  feedback('Still transcribing in Gum — it will appear in the catalogue.', 'pending');
+  feedback(t('popup_stillTranscribing'), 'pending');
 }
 
 function formatTranscribe(res) {
-  if (!res) return 'Transcription failed';
+  if (!res) return t('popup_transcriptionFailed');
   if (res.state === 'transcribed') {
-    return `Already transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`;
+    return tn('popup_alreadyTranscribed', res.cueCount);
   }
-  if (res.state === 'queued') return 'Transcribing in Gum — it will appear in the catalogue.';
+  if (res.state === 'queued') return t('popup_transcribeQueued');
   // A second click on a job already running. Saying "queued" here would claim a
   // new job was started; nothing was, and `enqueueTranscription` deduplicated.
   if (res.state === 'running') {
     const secs = Number.isFinite(res.queuedAt) ? Math.round((Date.now() - res.queuedAt) / 1000) : null;
     return secs === null
-      ? 'Already transcribing in Gum — nothing new was queued.'
-      : `Already transcribing in Gum for ${secs}s — nothing new was queued.`;
+      ? t('popup_alreadyTranscribing')
+      : t('popup_alreadyTranscribingFor', secs);
   }
   if (res.state === 'refused') {
-    return TRANSCRIBE_REFUSALS[res.reason] || res.reason || 'Transcription refused';
+    const key = TRANSCRIBE_REFUSALS[res.reason];
+    return key ? t(key) : res.reason || t('popup_transcriptionRefused');
   }
-  return res.error || 'Transcription failed';
+  return res.error || t('popup_transcriptionFailed');
 }
 
 function formatSave(res) {
-  if (!res) return 'Save failed';
-  if (!res.ok && !res.queued) return res.error || 'Save failed';
-  if (res.queued) return 'Queued — will sync when Gum is open.';
-  if (res.anki?.ok) return 'Card created in Anki · saved in Gum.';
-  return 'Saved to Gum.';
+  if (!res) return t('save_failed');
+  if (!res.ok && !res.queued) return res.error || t('save_failed');
+  if (res.queued) return t('common_queuedWillSync');
+  if (res.anki?.ok) return t('popup_cardCreated');
+  return t('popup_savedToGum');
 }
 
 function formatCapture(res) {
-  if (!res) return 'Could not save this page';
-  if (!res.ok && !res.queued) return res.error || 'Could not save this page';
-  if (res.queued) return 'Page queued — will sync when Gum is open.';
-  if (res.action === 'playlist') return 'Playlist saved to Gum.';
-  if (res.action === 'video') return res.duplicate ? 'Video is already in Gum.' : 'Video saved to Gum.';
-  return 'Page saved to your Gum inbox.';
+  if (!res) return t('capture_failed');
+  if (!res.ok && !res.queued) return res.error || t('capture_failed');
+  if (res.queued) return t('capture_queued');
+  if (res.action === 'playlist') return t('capture_playlistSaved');
+  if (res.action === 'video') return res.duplicate ? t('capture_videoDuplicate') : t('capture_videoSaved');
+  return t('capture_pageSaved');
 }
 
 /* --------------------------------- recent ---------------------------------- */
 
 const RECENT_LABELS = {
-  word: 'Word saved',
-  sentence: 'Sentence saved',
-  card: 'Card created',
-  page: 'Page saved',
-  download: 'Download queued',
-  ocr: 'OCR captured',
-  manga: 'Manga imported',
+  word: 'popup_recentWord',
+  sentence: 'popup_recentSentence',
+  card: 'popup_recentCard',
+  page: 'popup_recentPage',
+  download: 'popup_recentDownload',
+  ocr: 'popup_recentOcr',
+  manga: 'popup_recentManga',
 };
 
 async function refreshRecent() {
@@ -414,7 +422,7 @@ async function refreshRecent() {
       <div class="recent-item">
         <span class="term" lang="ja" title="${escapeHtml(it.label || '')}">${escapeHtml(it.label || '')}</span>
         <span class="what${it.queued ? ' queued' : ''}">${escapeHtml(
-          it.queued ? 'Queued' : RECENT_LABELS[it.kind] || 'Saved',
+          t(it.queued ? 'popup_recentQueued' : RECENT_LABELS[it.kind] || 'popup_recentSaved'),
         )}</span>
       </div>`,
     )
@@ -426,13 +434,13 @@ async function refreshRecent() {
 document.getElementById('nav-tabs').addEventListener('click', async () => {
   const res = await send({ type: 'open-tab-picker' });
   if (res?.ok) window.close();
-  else feedback(res?.error || 'Could not open the reading list', 'err');
+  else feedback(res?.error || t('common_readingListFailed'), 'err');
 });
 
 document.getElementById('nav-app').addEventListener('click', async () => {
   const res = await send({ type: 'ui-open', target: 'inbox' });
   if (res?.ok) window.close();
-  else feedback(res?.error || 'Gum is not running — start the desktop app.', 'err');
+  else feedback(res?.error || t('popup_gumNotRunningStart'), 'err');
 });
 
 document.getElementById('nav-settings').addEventListener('click', () => {
@@ -440,24 +448,23 @@ document.getElementById('nav-settings').addEventListener('click', () => {
 });
 
 document.getElementById('retry-queue').addEventListener('click', async () => {
-  feedback('Retrying queued items…', 'pending');
+  feedback(t('popup_retrying'), 'pending');
   const res = await send({ type: 'flush' });
   // A drop is the queue giving up on a save the user was told would sync, so it
   // has to be said out loud here. Without it a flush that discarded everything
   // reads as "Nothing to retry." — the queue's worst outcome reported as its
   // most boring one. Details of each drop go to the recent-activity list.
-  const dropped = res?.dropped
-    ? ` ${res.dropped} item${res.dropped === 1 ? '' : 's'} could not be saved and ${res.dropped === 1 ? 'was' : 'were'} discarded — see recent activity.`
-    : '';
+  const dropped = res?.dropped ? tn('popup_retryDropped', res.dropped) : '';
+  const join = (...parts) => parts.filter(Boolean).join(' ');
   if (res?.flushed) {
     feedback(
-      `Sent ${res.flushed} queued item${res.flushed === 1 ? '' : 's'}${res.left ? ` — ${res.left} still pending` : ''}.${dropped}`,
+      join(tn('popup_retrySent', res.flushed), res.left ? tn('popup_retryStillPending', res.left) : '', dropped),
       res.left || res.dropped ? 'err' : 'ok',
     );
   } else if (res?.left) {
-    feedback(`App still unreachable — ${res.left} item(s) queued.${dropped}`, 'err');
+    feedback(join(tn('popup_retryUnreachable', res.left), dropped), 'err');
   } else {
-    feedback(dropped ? dropped.trim() : 'Nothing to retry.', dropped ? 'err' : 'ok');
+    feedback(dropped || t('popup_retryNothing'), dropped ? 'err' : 'ok');
   }
   void refreshStatus();
 });

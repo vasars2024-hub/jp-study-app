@@ -21,13 +21,16 @@
  * ships today so it cannot change unnoticed.
  */
 import { describe, expect, it } from 'vitest';
-import { bootBackground, readExtensionFile, type BackgroundHarness, type Responder } from './extensionHarness';
+import { bootBackground, extensionMessage, readExtensionFile, type BackgroundHarness, type Responder } from './extensionHarness';
 
 const OFFLINE_MSG = 'Gum is not running — open the app, then retry.';
 const OUTDATED_MSG =
   'Gum is outdated or not fully started — restart the app, then reload this extension.';
-/** What a 401/403 reads as, whatever the app's own wording was. */
-const AUTH_MSG = "Gum rejected this extension — re-pair it from the app's Companions settings.";
+/**
+ * What a 401/403 reads as, whatever the app's own wording was. It names where
+ * the token lives (it used to send people to "Companions", the desktop-pet page).
+ */
+const AUTH_MSG = extensionMessage('bg_authFailed');
 
 const APP_DOWN: Responder = () => 'network-error';
 

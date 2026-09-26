@@ -1,0 +1,1394 @@
+{
+  "locale_code": {
+    "message": "ja"
+  },
+  "ext_name": {
+    "message": "Gum — リーダーコンパニオン"
+  },
+  "ext_description": {
+    "message": "ホバー辞書、文法・文の解析、単語と例文の Gum への保存、Anki カード、OCR、ページの保存。"
+  },
+  "ext_actionTitle": {
+    "message": "Gum"
+  },
+  "manifestCmd_savePage": {
+    "message": "ページを Gum に保存"
+  },
+  "manifestCmd_lookup": {
+    "message": "選択範囲・カーソル下の語を調べる"
+  },
+  "manifestCmd_saveSelection": {
+    "message": "選択範囲を保存（単語または文）"
+  },
+  "manifestCmd_wheel": {
+    "message": "アクションホイールを開く"
+  },
+  "manifestCmd_bulkTabs": {
+    "message": "リーディングリストを開く（必要ならブラウザでショートカットを割り当て）"
+  },
+  "manifestCmd_analyze": {
+    "message": "選択した文の AI 解析（必要ならブラウザでショートカットを割り当て）"
+  },
+  "bg_scriptsFailed": {
+    "message": "拡張機能のスクリプトを読み込めませんでした — chrome://extensions で Gum を再読み込みしてください"
+  },
+  "bg_appOutdated": {
+    "message": "Gum が古いか、まだ起動しきっていません — アプリを再起動してから、この拡張機能を再読み込みしてください。"
+  },
+  "bg_authFailed": {
+    "message": "Gum がこの拡張機能を拒否しました — Gum（設定 → プロフィールと辞書 → Chrome 拡張機能）でトークンをコピーし、拡張機能のオプションの「接続」に貼り付けてください。"
+  },
+  "bg_offline": {
+    "message": "Gum が起動していません — アプリを開いてから再試行してください。"
+  },
+  "bg_storageFull": {
+    "message": "ローカルストレージがいっぱいです — Gum を開いてキューの項目を同期してから再試行してください。"
+  },
+  "bg_needYoutubeTab": {
+    "message": "先に YouTube の動画か再生リストのタブを開いてください"
+  },
+  "bg_needYoutubeVideo": {
+    "message": "先に YouTube の動画タブを開いてください"
+  },
+  "bg_nothingSelected": {
+    "message": "保存する選択範囲がありません"
+  },
+  "bg_selectFirst": {
+    "message": "先にページ上の単語か文を選択してください"
+  },
+  "bg_noRecording": {
+    "message": "まだ録音がありません — 先に「録音」を使い、停止してください"
+  },
+  "bg_scanFailed": {
+    "message": "このページをスキャンできませんでした"
+  },
+  "bg_noPanels": {
+    "message": "このページにコマ画像が見つかりません"
+  },
+  "bg_tabRestricted": {
+    "message": "このタブにはアクセスできません"
+  },
+  "bg_actionFailed": {
+    "message": "操作に失敗しました"
+  },
+  "bg_commandFailed": {
+    "message": "コマンドに失敗しました"
+  },
+  "bg_httpStatus": {
+    "message": "Gum が HTTP $1 を返しました。"
+  },
+  "menu_lookup": {
+    "message": "選択範囲を調べる"
+  },
+  "menu_analyze": {
+    "message": "選択範囲の AI 解析"
+  },
+  "menu_saveWord": {
+    "message": "単語を保存"
+  },
+  "menu_saveSentence": {
+    "message": "文を保存"
+  },
+  "menu_createCard": {
+    "message": "フラッシュカードを作成"
+  },
+  "menu_savePage": {
+    "message": "ページを Gum に保存"
+  },
+  "menu_ocr": {
+    "message": "OCR キャプチャ（枠をドラッグ）"
+  },
+  "menu_openApp": {
+    "message": "Gum を開く"
+  },
+  "common_gumNotRunning": {
+    "message": "Gum が起動していません。"
+  },
+  "common_noResponse": {
+    "message": "応答がありません"
+  },
+  "common_readingListFailed": {
+    "message": "リーディングリストを開けませんでした"
+  },
+  "common_queuedWillSync": {
+    "message": "キューに追加しました — Gum を開くと同期します"
+  },
+  "common_dragLarger": {
+    "message": "もっと大きな範囲をドラッグしてください"
+  },
+  "common_cancel": {
+    "message": "キャンセル"
+  },
+  "category_news": {
+    "message": "ニュース"
+  },
+  "category_novel": {
+    "message": "Web 小説"
+  },
+  "category_manga": {
+    "message": "マンガ"
+  },
+  "category_video": {
+    "message": "動画"
+  },
+  "category_article": {
+    "message": "記事"
+  },
+  "category_webpage": {
+    "message": "Web ページ"
+  },
+  "save_working_card": {
+    "message": "カードを作成中…"
+  },
+  "save_working_app": {
+    "message": "Gum に保存中…"
+  },
+  "save_failed": {
+    "message": "保存に失敗しました"
+  },
+  "save_termQuoted": {
+    "message": "「$1」"
+  },
+  "save_queued": {
+    "message": "キューに追加しました$1 — Gum を開くと同期します"
+  },
+  "save_deckSuffix": {
+    "message": "（$1）"
+  },
+  "save_cardCreated": {
+    "message": "Anki にカードを作成しました$1$2 · Gum にも保存"
+  },
+  "save_savedWord": {
+    "message": "単語$1を Gum に保存しました"
+  },
+  "save_savedSentence": {
+    "message": "文$1を Gum に保存しました"
+  },
+  "save_ankiUnavailable": {
+    "message": "Anki を使用できません: $1"
+  },
+  "clip_failed": {
+    "message": "クリップボード履歴に追加できませんでした"
+  },
+  "clip_added": {
+    "message": "Gum のクリップボード履歴に追加しました"
+  },
+  "capture_failed": {
+    "message": "このページを保存できませんでした"
+  },
+  "capture_queued": {
+    "message": "ページをキューに追加しました — Gum を開くと同期します"
+  },
+  "capture_playlistSaved": {
+    "message": "再生リストを Gum に保存しました"
+  },
+  "capture_videoDuplicate": {
+    "message": "この動画はすでに Gum にあります"
+  },
+  "capture_videoSaved": {
+    "message": "動画を Gum に保存しました"
+  },
+  "capture_pageSaved": {
+    "message": "ページを Gum の受信箱に保存しました"
+  },
+  "content_wkNew": {
+    "message": "未学習"
+  },
+  "content_wkLearning": {
+    "message": "学習中"
+  },
+  "content_wkFamiliar": {
+    "message": "なじみあり"
+  },
+  "content_wkKnown": {
+    "message": "既知"
+  },
+  "content_knownSet": {
+    "message": "$1 · $2"
+  },
+  "content_saved": {
+    "message": "保存しました"
+  },
+  "content_failed": {
+    "message": "失敗しました"
+  },
+  "content_added": {
+    "message": "追加しました"
+  },
+  "content_done": {
+    "message": "完了"
+  },
+  "content_copied": {
+    "message": "コピーしました"
+  },
+  "content_copyBlocked": {
+    "message": "コピーできませんでした — ページがクリップボードへのアクセスをブロックしています"
+  },
+  "content_knownFailed": {
+    "message": "既知状態を更新できませんでした — Gum は起動していますか？"
+  },
+  "content_nothingToSave": {
+    "message": "保存するものがありません"
+  },
+  "content_addingClip": {
+    "message": "クリップボード履歴に追加中…"
+  },
+  "content_translating": {
+    "message": "翻訳中…"
+  },
+  "content_translated": {
+    "message": "翻訳しました"
+  },
+  "content_translationFailed": {
+    "message": "翻訳に失敗しました"
+  },
+  "content_selectText": {
+    "message": "先にテキストを選択してください"
+  },
+  "content_highlighted": {
+    "message": "ハイライトしました"
+  },
+  "content_selectWordOrSentence": {
+    "message": "先に単語か文を選択してください"
+  },
+  "content_cardEmpty": {
+    "message": "カードのテキストが空です"
+  },
+  "content_cardSource": {
+    "message": "出典: $1"
+  },
+  "content_notAvailable": {
+    "message": "このページでは「$1」を使えません"
+  },
+  "content_actionNotAvailable": {
+    "message": "この操作はこのページでは使えません"
+  },
+  "content_selectOrHover": {
+    "message": "先に単語を選択するか、カーソルを合わせてください"
+  },
+  "content_selectToTranslate": {
+    "message": "翻訳するテキストを選択してください"
+  },
+  "content_openInApp": {
+    "message": "アプリで開く"
+  },
+  "content_openInbox": {
+    "message": "受信箱を開く"
+  },
+  "content_selectSentence": {
+    "message": "先に文を選択してください"
+  },
+  "content_savingPage": {
+    "message": "ページを保存中…"
+  },
+  "content_queueingDownload": {
+    "message": "ダウンロードをキューに追加中…"
+  },
+  "content_scanningManga": {
+    "message": "マンガのページをスキャン中…"
+  },
+  "content_savingAudio": {
+    "message": "音声を保存中…"
+  },
+  "content_mangaImported": {
+    "message": "Gum マンガに取り込んだページ: $1"
+  },
+  "content_importFailed": {
+    "message": "取り込みに失敗しました"
+  },
+  "content_downloadQueued": {
+    "message": "Gum でダウンロードをキューに追加しました"
+  },
+  "content_downloadFailed": {
+    "message": "ダウンロードに失敗しました"
+  },
+  "content_themeOn": {
+    "message": "読書テーマ: $1"
+  },
+  "content_themeOff": {
+    "message": "読書テーマをオフにしました"
+  },
+  "content_themeButton": {
+    "message": "テーマ: $1"
+  },
+  "content_theme_off": {
+    "message": "オフ"
+  },
+  "content_theme_night": {
+    "message": "ナイト"
+  },
+  "content_theme_sepia": {
+    "message": "セピア"
+  },
+  "content_theme_paper": {
+    "message": "ペーパー"
+  },
+  "content_theme_gray": {
+    "message": "グレー"
+  },
+  "content_highlightOn": {
+    "message": "ハイライトモード オン — テキストを選択するとマークします"
+  },
+  "content_highlightOff": {
+    "message": "ハイライトモード オフ"
+  },
+  "content_highlightModeOn": {
+    "message": "ハイライトモード: オン"
+  },
+  "content_tintOn": {
+    "message": "既知語の色分け オン"
+  },
+  "content_tintOff": {
+    "message": "既知語の色分け オフ"
+  },
+  "content_tintModeOn": {
+    "message": "既知語の色分け: オン"
+  },
+  "content_stopRecording": {
+    "message": "録音を停止"
+  },
+  "content_panelHidden": {
+    "message": "このサイトではパネルを非表示にしました — 設定 → ページパネルで元に戻せます"
+  },
+  "content_micUnavailable": {
+    "message": "ここではマイク録音を使えません"
+  },
+  "content_recordingEmpty": {
+    "message": "録音が空でした"
+  },
+  "content_recordingReady": {
+    "message": "録音できました — 「音声を保存」で Gum に送れます"
+  },
+  "content_recordingUnreadable": {
+    "message": "録音を読み取れませんでした"
+  },
+  "content_recording": {
+    "message": "録音中… もう一度「録音」を実行すると停止します"
+  },
+  "content_micDenied": {
+    "message": "マイクの使用が許可されませんでした"
+  },
+  "content_ocrCancelled": {
+    "message": "OCR の範囲選択をキャンセルしました"
+  },
+  "content_runningOcr": {
+    "message": "OCR を実行中…"
+  },
+  "content_ocrFailed": {
+    "message": "OCR に失敗しました"
+  },
+  "content_speechUnavailable": {
+    "message": "ここでは読み上げを使えません"
+  },
+  "content_cardAddFailed": {
+    "message": "カードを追加できませんでした"
+  },
+  "content_snapshotFailed": {
+    "message": "スナップショットに失敗しました"
+  },
+  "popup_statusApp": {
+    "message": "Gum アプリ"
+  },
+  "popup_statusPairing": {
+    "message": "ペアリング"
+  },
+  "popup_statusAnki": {
+    "message": "Anki プロファイル"
+  },
+  "popup_statusPending": {
+    "message": "同期待ち"
+  },
+  "popup_openConnection": {
+    "message": "接続設定を開く"
+  },
+  "popup_modeHighlight": {
+    "message": "ハイライト"
+  },
+  "popup_modeHighlightAria": {
+    "message": "ハイライトで開くもの"
+  },
+  "popup_modeDictionary": {
+    "message": "辞書 AI"
+  },
+  "popup_modeAi": {
+    "message": "AI OCR"
+  },
+  "popup_modeOcr": {
+    "message": "スクリーンショット OCR"
+  },
+  "popup_modeOcrAria": {
+    "message": "OCR で開くもの"
+  },
+  "popup_recent": {
+    "message": "最近"
+  },
+  "popup_retryNow": {
+    "message": "今すぐ再試行"
+  },
+  "popup_navTabs": {
+    "message": "リーディングリスト"
+  },
+  "popup_navApp": {
+    "message": "Gum を開く"
+  },
+  "popup_navSettings": {
+    "message": "設定"
+  },
+  "popup_chipConnected": {
+    "message": "接続済み"
+  },
+  "popup_chipConnectedQueued_other": {
+    "message": "接続済み · キュー $1 件"
+  },
+  "popup_chipPairingNeeded": {
+    "message": "ペアリングが必要"
+  },
+  "popup_chipAppNotRunning": {
+    "message": "アプリ未起動"
+  },
+  "popup_appRunning": {
+    "message": "起動中"
+  },
+  "popup_appNotRunning": {
+    "message": "未起動"
+  },
+  "popup_pairTokenNeeded": {
+    "message": "トークンが必要"
+  },
+  "popup_pairOk": {
+    "message": "OK"
+  },
+  "popup_pendingItems_other": {
+    "message": "$1 件が同期待ち"
+  },
+  "popup_pageRestricted": {
+    "message": "このページはブラウザにより制限されています"
+  },
+  "popup_pageRestrictedHint": {
+    "message": "ブラウザの内部ページでは、辞書引きと保存は使えません。"
+  },
+  "popup_currentPage": {
+    "message": "現在のページ"
+  },
+  "popup_difficultyTitle": {
+    "message": "語彙レベルからの推定で、公式の評価ではありません"
+  },
+  "popup_difficulty": {
+    "message": "難易度 $1"
+  },
+  "popup_difficultyCached": {
+    "message": "難易度 $1（キャッシュ）"
+  },
+  "popup_knownWords": {
+    "message": "既知語 $1%"
+  },
+  "popup_noJapanese": {
+    "message": "このページには学習中の言語のテキストが見つかりません"
+  },
+  "popup_noJapaneseHint": {
+    "message": "ホバー辞書は、学習中の言語のテキストの上で調べるキーを押し続けると動きます。"
+  },
+  "popup_transcribedTitle": {
+    "message": "すでに Gum のカタログにあります — ここに戻らずに収集できます"
+  },
+  "popup_transcribedCues_other": {
+    "message": "文字起こし済み · $1 キュー"
+  },
+  "popup_transcribing": {
+    "message": "文字起こし中"
+  },
+  "popup_transcribingFor": {
+    "message": "文字起こし中 · $1 秒"
+  },
+  "popup_transcriptionEmptyTitle": {
+    "message": "メディアライブラリから再試行してください"
+  },
+  "popup_transcriptionEmpty": {
+    "message": "文字起こしでテキストが得られませんでした"
+  },
+  "popup_savePlaylist": {
+    "message": "再生リストを保存"
+  },
+  "popup_saveVideo": {
+    "message": "動画を保存"
+  },
+  "popup_downloadVideo": {
+    "message": "動画をダウンロード"
+  },
+  "popup_transcribeAudio": {
+    "message": "音声を文字起こし"
+  },
+  "popup_lookupSelection": {
+    "message": "選択範囲を調べる"
+  },
+  "popup_saveSelection": {
+    "message": "選択範囲を保存"
+  },
+  "popup_ocrCapture": {
+    "message": "OCR キャプチャ"
+  },
+  "popup_importManga": {
+    "message": "マンガのページを取り込む"
+  },
+  "popup_savePage": {
+    "message": "ページを保存"
+  },
+  "popup_lookupFailed": {
+    "message": "辞書ポップアップを開けませんでした"
+  },
+  "popup_savingSelection": {
+    "message": "選択範囲を保存中…"
+  },
+  "popup_savingPage": {
+    "message": "ページを保存中…"
+  },
+  "popup_queueingDownload": {
+    "message": "ダウンロードをキューに追加中…"
+  },
+  "popup_downloadQueued": {
+    "message": "Gum でダウンロードをキューに追加しました。"
+  },
+  "popup_downloadFailed": {
+    "message": "ダウンロードに失敗しました"
+  },
+  "popup_askingTranscribe": {
+    "message": "Gum に文字起こしを依頼中…"
+  },
+  "popup_ocrFailed": {
+    "message": "OCR の範囲選択を開始できませんでした"
+  },
+  "popup_scanningManga": {
+    "message": "マンガのページをスキャン中… ページがスクロールします"
+  },
+  "popup_mangaImported_other": {
+    "message": "Gum マンガに $1 ページを取り込みました。"
+  },
+  "popup_importFailed": {
+    "message": "取り込みに失敗しました"
+  },
+  "popup_refuseNotAVideoPage": {
+    "message": "まず動画ページを開いてください — このページには音声がありません。"
+  },
+  "popup_refuseNoVideoId": {
+    "message": "この YouTube の URL には動画が含まれていません。"
+  },
+  "popup_refuseNotDownloaded": {
+    "message": "まずこの動画をダウンロードしてください — Whisper はページではなくファイルを読みます。"
+  },
+  "popup_refuseAudioMissing": {
+    "message": "Gum にこの動画の記録はありますが、ファイルが見つかりません。"
+  },
+  "popup_refuseTranscriberOffline": {
+    "message": "Gum は起動していますが、文字起こし機能がまだ準備できていません。"
+  },
+  "popup_refuseItemNotFound": {
+    "message": "この動画はもう Gum のメディアライブラリにありません。"
+  },
+  "popup_transcribedDone_other": {
+    "message": "文字起こし完了 — $1 キュー。ファイルまたは収集から収集できます。"
+  },
+  "popup_transcriptionEnded": {
+    "message": "文字起こしはテキストなしで終了しました。メディアライブラリから再試行してください。"
+  },
+  "popup_transcriptionNotStarted": {
+    "message": "この動画はまだダウンロードされていないため、文字起こしは実行されていません。"
+  },
+  "popup_transcribingElapsed": {
+    "message": "Gum で文字起こし中… $1 秒"
+  },
+  "popup_stillTranscribing": {
+    "message": "Gum で文字起こしを続けています — 完了するとカタログに表示されます。"
+  },
+  "popup_transcriptionFailed": {
+    "message": "文字起こしに失敗しました"
+  },
+  "popup_alreadyTranscribed_other": {
+    "message": "文字起こし済みです — $1 キュー。ファイルまたは収集から収集できます。"
+  },
+  "popup_transcribeQueued": {
+    "message": "Gum で文字起こし中 — 完了するとカタログに表示されます。"
+  },
+  "popup_alreadyTranscribing": {
+    "message": "Gum ですでに文字起こし中です — 新たには追加していません。"
+  },
+  "popup_alreadyTranscribingFor": {
+    "message": "Gum で $1 秒前から文字起こし中です — 新たには追加していません。"
+  },
+  "popup_transcriptionRefused": {
+    "message": "文字起こしを受け付けませんでした"
+  },
+  "popup_cardCreated": {
+    "message": "Anki にカードを作成しました · Gum にも保存しました。"
+  },
+  "popup_savedToGum": {
+    "message": "Gum に保存しました。"
+  },
+  "popup_recentWord": {
+    "message": "単語を保存"
+  },
+  "popup_recentSentence": {
+    "message": "文を保存"
+  },
+  "popup_recentCard": {
+    "message": "カードを作成"
+  },
+  "popup_recentPage": {
+    "message": "ページを保存"
+  },
+  "popup_recentDownload": {
+    "message": "ダウンロード待ち"
+  },
+  "popup_recentOcr": {
+    "message": "OCR で取得"
+  },
+  "popup_recentManga": {
+    "message": "マンガを取り込み"
+  },
+  "popup_recentQueued": {
+    "message": "キュー済み"
+  },
+  "popup_recentSaved": {
+    "message": "保存済み"
+  },
+  "popup_gumNotRunningStart": {
+    "message": "Gum が起動していません — デスクトップアプリを起動してください。"
+  },
+  "popup_retrying": {
+    "message": "キューの項目を再試行中…"
+  },
+  "popup_retryDropped_other": {
+    "message": "$1 件は保存できなかったため破棄しました — 最近の履歴を確認してください。"
+  },
+  "popup_retrySent_other": {
+    "message": "キューの $1 件を送信しました。"
+  },
+  "popup_retryStillPending_other": {
+    "message": "$1 件はまだ保留中です。"
+  },
+  "popup_retryUnreachable_other": {
+    "message": "アプリにまだ接続できません — $1 件がキューにあります。"
+  },
+  "popup_retryNothing": {
+    "message": "再試行するものはありません。"
+  },
+  "opt_pageTitle": {
+    "message": "Gum — 拡張機能の設定"
+  },
+  "opt_searchAria": {
+    "message": "設定を検索"
+  },
+  "opt_searchPlaceholder": {
+    "message": "設定を検索…"
+  },
+  "opt_searchEmpty": {
+    "message": "一致する設定はありません。"
+  },
+  "opt_navLookup": {
+    "message": "ホバー辞書"
+  },
+  "opt_navAi": {
+    "message": "AI OCR"
+  },
+  "opt_navPopup": {
+    "message": "リーダーポップアップ"
+  },
+  "opt_navSaving": {
+    "message": "保存とカード"
+  },
+  "opt_navWheel": {
+    "message": "ラジアルホイール"
+  },
+  "opt_navPanel": {
+    "message": "ページパネル"
+  },
+  "opt_navMedia": {
+    "message": "動画とメディア"
+  },
+  "opt_navConnection": {
+    "message": "接続"
+  },
+  "opt_navShortcuts": {
+    "message": "ショートカット"
+  },
+  "opt_navAdvanced": {
+    "message": "詳細"
+  },
+  "opt_lookupLead": {
+    "message": "キーを押しながら学習中の言語のテキストを指すと、リーダーポップアップが開きます。"
+  },
+  "opt_hoverEnable": {
+    "message": "ホバー辞書を有効にする"
+  },
+  "opt_hoverEnableSub": {
+    "message": "起動キーを押しながら、カーソルを単語の上に動かします。"
+  },
+  "opt_hoverKey": {
+    "message": "起動キー"
+  },
+  "opt_hoverKeyDesc": {
+    "message": "ホバー中に押し続けるキー。クリックや選択での辞書引きにも使います。"
+  },
+  "opt_hoverDelay": {
+    "message": "ホバーの遅延"
+  },
+  "opt_hoverDelayDesc": {
+    "message": "ポップアップが開くまでカーソルを単語に置いておく時間です。"
+  },
+  "opt_scanLength": {
+    "message": "スキャンする長さ"
+  },
+  "opt_scanLengthDesc": {
+    "message": "一致を探すときに見る最大文字数。長くすると長い複合語も拾え、短くすると速くなります。"
+  },
+  "opt_closeOnRelease": {
+    "message": "キーを離したらポップアップを閉じる"
+  },
+  "opt_closeOnReleaseSub": {
+    "message": "オフ: 他の場所をクリックするか Esc を押すまで表示されます。固定したポップアップは常に残ります。"
+  },
+  "opt_clickLookup": {
+    "message": "キー + クリック / キー + 選択でも調べる"
+  },
+  "opt_clickLookupSub": {
+    "message": "通常のクリックは常にページに渡されます。"
+  },
+  "opt_lookupEditable": {
+    "message": "テキスト入力欄の中でも調べる"
+  },
+  "opt_lookupEditableSub": {
+    "message": "入力が妨げられないよう、既定ではオフです。"
+  },
+  "opt_aiTitle": {
+    "message": "AI OCR / 辞書 AI"
+  },
+  "opt_aiLead": {
+    "message": "ハイライトと OCR のそれぞれで何を開くかを選びます。AI OCR は文全体に注釈を付け（文法・語彙・レベル・丁寧さ・ニュアンス）、カード化やノートへのスナップショットができます。辞書 AI は即時のオフライン辞書引きのままです。2 つの操作は別々に設定します。"
+  },
+  "opt_aiOnHighlight": {
+    "message": "テキストをハイライトしたら AI OCR"
+  },
+  "opt_aiOnHighlightSub": {
+    "message": "オフ: ハイライトすると従来どおり辞書ポップアップが開きます。"
+  },
+  "opt_aiOnOcr": {
+    "message": "スクリーンショット OCR の後に AI OCR"
+  },
+  "opt_aiOnOcrSub": {
+    "message": "オフ: OCR の結果は「AI 解析」ボタン付きで開きます。"
+  },
+  "opt_aiMinChars": {
+    "message": "最小の選択文字数"
+  },
+  "opt_aiMinCharsDesc": {
+    "message": "これより短い選択はオフライン辞書のままです — 1 語のためのクラウド呼び出しは遅く、辞書にすでにある答えに費用がかかります。"
+  },
+  "opt_aiWhere": {
+    "message": "解析の内容、カードの送り先デッキ、ノートへの自動スナップショットは Gum → 設定 → プロフィールと辞書 → AI 解析 で設定します。API キーが必要です（フラッシュカード → AI カードスタジオ）。"
+  },
+  "opt_popupLead": {
+    "message": "意味・文法・文・漢字・例文のタブを持つページ内辞書です。"
+  },
+  "opt_popupWidth": {
+    "message": "幅"
+  },
+  "opt_popupFont": {
+    "message": "文字サイズ"
+  },
+  "opt_popupCompact": {
+    "message": "コンパクトモード"
+  },
+  "opt_popupCompactSub": {
+    "message": "1 項目あたりの定義を減らし、長時間の読書でも軽くします。"
+  },
+  "opt_popupPin": {
+    "message": "キー + クリックでポップアップを固定"
+  },
+  "opt_popupPinSub": {
+    "message": "固定したポップアップはヘッダーをドラッグして動かせ、読んでいる間ずっと開いたままです。"
+  },
+  "opt_popupKeysHtml": {
+    "message": "ポップアップ内: <kbd>←</kbd><kbd>→</kbd> タブ切り替え · <kbd>S</kbd> 単語を保存 · <kbd>Shift+S</kbd> 文を保存 · <kbd>C</kbd> カード作成 · <kbd>P</kbd> 固定 · <kbd>A</kbd> 音声 · <kbd>Esc</kbd> 閉じる。"
+  },
+  "opt_savingLead": {
+    "message": "保存した単語・文・フラッシュカードの送り先です（以前は「収集」と呼んでいました）。"
+  },
+  "opt_destLabel": {
+    "message": "単語や文を保存するとき"
+  },
+  "opt_destBoth": {
+    "message": "Gum + Anki カード"
+  },
+  "opt_destBothSub": {
+    "message": "Anki が起動していれば Anki カードを作成します。コピーは常に Gum のライブラリに残ります。"
+  },
+  "opt_destApp": {
+    "message": "Gum のみ"
+  },
+  "opt_destAppSub": {
+    "message": "Gum のライブラリに保存します。「カードを作成」は引き続き明示的に Anki へ送ります。"
+  },
+  "opt_confirmCard": {
+    "message": "カード作成前にプレビュー"
+  },
+  "opt_confirmCardSub": {
+    "message": "送信前にテキスト・カードの種類・送り先を表示します。カードのフィールドは Gum が辞書と Anki のフィールド対応から埋めます。"
+  },
+  "opt_folderLabel": {
+    "message": "ライブラリのフォルダ名"
+  },
+  "opt_folderLabelDesc": {
+    "message": "拡張機能から保存したものは、Gum のフラッシュカードでこのフォルダに表示されます。"
+  },
+  "opt_savingHintHtml": {
+    "message": "デッキ、ノートタイプ、フィールド対応は Gum アプリで設定します — 直接のリンクは<b>接続</b>を参照してください。"
+  },
+  "opt_wheelLeadHtml": {
+    "message": "<kbd>Alt+Shift+W</kbd> で開くクイックアクションの輪です。位置ごとにコマンドを 1 つ置けます。中央は常にキャンセルです。"
+  },
+  "opt_wheelEnable": {
+    "message": "ラジアルホイールを有効にする"
+  },
+  "opt_wheelEnableSub": {
+    "message": "無効にすると、ショートカットでは代わりにコンパクトなアクション一覧が開きます。"
+  },
+  "opt_wheelHintHtml": {
+    "message": "各コマンドは 1 回だけ割り当てられます — すでに置かれているコマンドを選ぶと 2 つの位置が入れ替わります。現在のページで使えないコマンド（YouTube 以外での「動画をダウンロード」など）はホイール上で無効表示になります。キーボード: <kbd>1</kbd>–<kbd>6</kbd> で位置を実行、矢印でハイライト移動、<kbd>Esc</kbd> でキャンセル。"
+  },
+  "opt_panelLead": {
+    "message": "難易度の推定とページツールを表示する、隅の小さなパネルです。"
+  },
+  "opt_fabVisible": {
+    "message": "ページパネルを表示"
+  },
+  "opt_fabCollapsed": {
+    "message": "折りたたんだ状態で開始"
+  },
+  "opt_fabCorner": {
+    "message": "位置"
+  },
+  "opt_cornerBottomRight": {
+    "message": "右下"
+  },
+  "opt_cornerBottomRightMid": {
+    "message": "右下（少し上）"
+  },
+  "opt_cornerTopRight": {
+    "message": "右上"
+  },
+  "opt_badgesHeading": {
+    "message": "バッジとボタン"
+  },
+  "opt_fabLevel": {
+    "message": "難易度の推定"
+  },
+  "opt_fabComp": {
+    "message": "既知語の割合"
+  },
+  "opt_fabTheme": {
+    "message": "読書テーマのボタン"
+  },
+  "opt_fabHl": {
+    "message": "ハイライトモードのボタン"
+  },
+  "opt_fabLearn": {
+    "message": "既知語の色分けボタン"
+  },
+  "opt_fabOcr": {
+    "message": "OCR ボタン"
+  },
+  "opt_fabClearHidden": {
+    "message": "すべてのサイトで再びパネルを表示"
+  },
+  "opt_fabHint": {
+    "message": "パネルの「ここでは隠す」はサイトごとに非表示にします。これはその一覧を消去します。"
+  },
+  "opt_mediaLead": {
+    "message": "YouTube での「ページを保存」の動作と、メディアのオプションです。"
+  },
+  "opt_ytMode": {
+    "message": "YouTube ページの保存"
+  },
+  "opt_ytModeDownload": {
+    "message": "メディアを Gum にダウンロード"
+  },
+  "opt_ytModeMetadata": {
+    "message": "メタデータのみ保存（動画・再生リストを追跡）"
+  },
+  "opt_ytAudio": {
+    "message": "ダウンロード時は音声のみ"
+  },
+  "opt_ytAudioSub": {
+    "message": "ファイルが小さくなり、リスニング練習に便利です。"
+  },
+  "opt_mediaHint": {
+    "message": "「動画をダウンロード」は YouTube ページでは、ポップアップ・ホイール・「その他」メニューからいつでも明示的に使えます。"
+  },
+  "opt_connLead": {
+    "message": "Gum デスクトップアプリとのペアリングです。それ以外（Anki の対応、収集ルール、クリップボード履歴）はアプリ側にあります。"
+  },
+  "opt_pairingHeading": {
+    "message": "ペアリング"
+  },
+  "opt_connUnknown": {
+    "message": "不明"
+  },
+  "opt_token": {
+    "message": "ペアリングトークン"
+  },
+  "opt_tokenDesc": {
+    "message": "Gum で 設定 → プロフィールと辞書 → Chrome 拡張機能 を開きます。トークンをコピーしてここに貼り付けるか、あちらで「今すぐペアリング」を押してから、こちらで「アプリからトークンを取得」を押します。"
+  },
+  "opt_port": {
+    "message": "ブリッジのポート"
+  },
+  "opt_savePair": {
+    "message": "ペアリングを保存"
+  },
+  "opt_test": {
+    "message": "接続をテスト"
+  },
+  "opt_pull": {
+    "message": "アプリからトークンを取得"
+  },
+  "opt_openInApp": {
+    "message": "Gum アプリで開く"
+  },
+  "opt_openAnki": {
+    "message": "Anki とフィールド対応"
+  },
+  "opt_openRules": {
+    "message": "保存ルール（プロファイル）"
+  },
+  "opt_openClipboard": {
+    "message": "クリップボード履歴"
+  },
+  "opt_openFlashcards": {
+    "message": "フラッシュカード"
+  },
+  "opt_openInbox": {
+    "message": "受信箱"
+  },
+  "opt_shortcutsLead": {
+    "message": "ブラウザ全体のショートカットは Chrome が管理します。ページ内のキーはリーダーポップアップかホイールが開いているときに使えます。"
+  },
+  "opt_browserShortcuts": {
+    "message": "ブラウザのショートカット"
+  },
+  "opt_openShortcuts": {
+    "message": "Chrome のショートカット設定で変更"
+  },
+  "opt_inPageKeys": {
+    "message": "ページ内のキー"
+  },
+  "opt_inPageKeysHtml": {
+    "message": "リーダーポップアップ: <kbd>←</kbd><kbd>→</kbd> タブ · <kbd>S</kbd> 単語を保存 · <kbd>Shift+S</kbd> 文を保存 · <kbd>C</kbd> カード作成 · <kbd>P</kbd> 固定 · <kbd>A</kbd> 音声 · <kbd>Backspace</kbd> 戻る · <kbd>Esc</kbd> 閉じる。<br /> ホイール: <kbd>1</kbd>–<kbd>6</kbd> 実行 · 矢印でハイライト · <kbd>Enter</kbd> 実行 · <kbd>Esc</kbd> キャンセル。<br /> OCR の範囲選択: 枠をドラッグ · <kbd>Esc</kbd> キャンセル。"
+  },
+  "opt_advancedLead": {
+    "message": "データ、移行、既定でオンにする必要のないものすべてです。"
+  },
+  "opt_logImmersion": {
+    "message": "読書時間を Gum に記録"
+  },
+  "opt_logImmersionSub": {
+    "message": "学習中の言語のページで実際に読んでいた時間を、イマージョン統計に加えます。"
+  },
+  "opt_notes": {
+    "message": "メモ"
+  },
+  "opt_notesPlaceholder": {
+    "message": "自分用のメモ（任意）"
+  },
+  "opt_settingsData": {
+    "message": "設定データ"
+  },
+  "opt_export": {
+    "message": "設定を書き出す"
+  },
+  "opt_import": {
+    "message": "設定を読み込む"
+  },
+  "opt_reset": {
+    "message": "既定に戻す"
+  },
+  "opt_resetHint": {
+    "message": "リセットしてもペアリングトークンとポートは残ります。以前のバージョンの設定（「収集は Anki を優先」や旧ホイールの配置を含む）は自動で移行されます — 「収集」は今は単に「保存」と呼びます。"
+  },
+  "opt_unitMs": {
+    "message": "$1 ミリ秒"
+  },
+  "opt_unitPx": {
+    "message": "$1 ピクセル"
+  },
+  "opt_unitChars_other": {
+    "message": "$1 文字"
+  },
+  "opt_posTop": {
+    "message": "上"
+  },
+  "opt_posUpperRight": {
+    "message": "右上"
+  },
+  "opt_posLowerRight": {
+    "message": "右下"
+  },
+  "opt_posBottom": {
+    "message": "下"
+  },
+  "opt_posLowerLeft": {
+    "message": "左下"
+  },
+  "opt_posUpperLeft": {
+    "message": "左上"
+  },
+  "opt_posAria": {
+    "message": "位置「$1」のコマンド"
+  },
+  "opt_shortcutsFailed": {
+    "message": "ブラウザのショートカットを読み取れませんでした。"
+  },
+  "opt_scSavePage": {
+    "message": "ページを Gum に保存"
+  },
+  "opt_scLookup": {
+    "message": "選択範囲・カーソル下の語を調べる"
+  },
+  "opt_scSaveSelection": {
+    "message": "選択範囲を保存（単語または文）"
+  },
+  "opt_scWheel": {
+    "message": "アクションホイールを開く"
+  },
+  "opt_scBulkTabs": {
+    "message": "リーディングリストを開く"
+  },
+  "opt_scToolbarPopup": {
+    "message": "ツールバーのポップアップを開く"
+  },
+  "opt_scNotSet": {
+    "message": "未設定"
+  },
+  "opt_connReachable": {
+    "message": "アプリに接続できます"
+  },
+  "opt_connNotRunning": {
+    "message": "アプリ未起動"
+  },
+  "opt_statusReachable": {
+    "message": "Gum に接続できます。"
+  },
+  "opt_statusNotRunning": {
+    "message": "Gum が起動していないか、ポートが違います。"
+  },
+  "opt_statusPairSaved": {
+    "message": "ペアリングを保存しました。"
+  },
+  "opt_statusPullNeedsPairNow": {
+    "message": "Gum はまだ取得を受け付けていません — Gum で「今すぐペアリング」（設定 → プロフィールと辞書 → Chrome 拡張機能）を押し、2 分以内にもう一度取得してください。または、あちらでトークンをコピーしてここに貼り付けてください。"
+  },
+  "opt_statusPulled": {
+    "message": "アプリからペアリングを取得しました。"
+  },
+  "opt_statusPullNoToken": {
+    "message": "アプリは応答しましたがトークンを送りませんでした — 設定から手動でコピーしてください。"
+  },
+  "opt_statusPullFailed": {
+    "message": "取得できませんでした — Gum を開き、トークンを手動で貼り付けてください。"
+  },
+  "opt_statusOpened": {
+    "message": "Gum で開きました。"
+  },
+  "opt_statusExported": {
+    "message": "設定を書き出しました（トークンは含みません）。"
+  },
+  "opt_statusImported": {
+    "message": "設定を読み込みました。"
+  },
+  "opt_statusImportFailed": {
+    "message": "読み込めませんでした — 有効な設定の書き出しファイルではありません。"
+  },
+  "opt_statusReset": {
+    "message": "設定を既定に戻しました（ペアリングは維持）。"
+  },
+  "opt_statusPanelRestored": {
+    "message": "すべてのサイトで再びパネルが表示されます。"
+  },
+  "opt_statusSaved": {
+    "message": "保存しました。"
+  },
+  "tabs_pageTitle": {
+    "message": "Gum — リーディングリスト"
+  },
+  "tabs_heading": {
+    "message": "リーディングリスト"
+  },
+  "tabs_allWindows": {
+    "message": "すべてのウィンドウ"
+  },
+  "tabs_selectAll": {
+    "message": "すべて選択"
+  },
+  "tabs_selectNone": {
+    "message": "選択解除"
+  },
+  "tabs_refresh": {
+    "message": "更新"
+  },
+  "tabs_loading": {
+    "message": "タブを読み込み中…"
+  },
+  "tabs_capture": {
+    "message": "ページを Gum に保存"
+  },
+  "tabs_download": {
+    "message": "動画をダウンロード"
+  },
+  "tabs_hint": {
+    "message": "タブを選んでまとめて保存します — 記事は Gum の受信箱へ、動画と再生リストは YouTube の追跡へ送られます。色付きの縁は検出したソースの種類（ニュース・小説・マンガ・動画・記事）を示します。ダウンロードは YouTube のタブにだけ使えます。"
+  },
+  "tabs_catNews": {
+    "message": "ニュース"
+  },
+  "tabs_catNovel": {
+    "message": "小説"
+  },
+  "tabs_selected_other": {
+    "message": "$1 件選択"
+  },
+  "tabs_empty": {
+    "message": "この範囲にタブはありません。"
+  },
+  "tabs_untitled": {
+    "message": "タブ $1"
+  },
+  "tabs_badgeTitle": {
+    "message": "検出したソースの種類（URL とタイトルから推定）"
+  },
+  "tabs_listFailed": {
+    "message": "タブの一覧を取得できませんでした。"
+  },
+  "tabs_summary": {
+    "message": "$1 · $2"
+  },
+  "tabs_count_other": {
+    "message": "タブ $1 件"
+  },
+  "tabs_saveable_other": {
+    "message": "$1 件を保存可能"
+  },
+  "tabs_noYoutube": {
+    "message": "YouTube のタブが選ばれていません。"
+  },
+  "tabs_selectOne": {
+    "message": "タブを 1 つ以上選んでください。"
+  },
+  "tabs_progressSaving": {
+    "message": "保存中… $1/$2"
+  },
+  "tabs_progressDownloading": {
+    "message": "ダウンロードをキューに追加中… $1/$2"
+  },
+  "tabs_progressWorking": {
+    "message": "処理中… $1/$2"
+  },
+  "tabs_progressWithFailures": {
+    "message": "$1 · $2 件失敗"
+  },
+  "tabs_queuedNote_other": {
+    "message": "（$1 件はキュー済み — Gum を開くと同期します）"
+  },
+  "tabs_done": {
+    "message": "完了 — $1/$2 件を保存しました$3。"
+  },
+  "tabs_finished": {
+    "message": "終了 — $1/$2 件成功、$3 件失敗$4。"
+  },
+  "cmd_lookup_selection_label": {
+    "message": "調べる"
+  },
+  "cmd_lookup_selection_short": {
+    "message": "調べる"
+  },
+  "cmd_lookup_selection_desc": {
+    "message": "選択中または最後にカーソルを合わせたテキストでリーダーポップアップを開きます。"
+  },
+  "cmd_save_word_label": {
+    "message": "単語を保存"
+  },
+  "cmd_save_word_short": {
+    "message": "単語"
+  },
+  "cmd_save_word_desc": {
+    "message": "選択した単語を Gum のライブラリに保存します。"
+  },
+  "cmd_save_sentence_label": {
+    "message": "文を保存"
+  },
+  "cmd_save_sentence_short": {
+    "message": "文"
+  },
+  "cmd_save_sentence_desc": {
+    "message": "選択した文、または検出した文を Gum のライブラリに保存します。"
+  },
+  "cmd_card_create_label": {
+    "message": "カードを作成"
+  },
+  "cmd_card_create_short": {
+    "message": "カード"
+  },
+  "cmd_card_create_desc": {
+    "message": "選択範囲からフラッシュカードを作成します（使えれば Anki に。コピーは常に Gum に残ります）。"
+  },
+  "cmd_capture_page_label": {
+    "message": "ページを保存"
+  },
+  "cmd_capture_page_short": {
+    "message": "ページ"
+  },
+  "cmd_capture_page_desc": {
+    "message": "このページ（記事・動画・再生リスト）を Gum に保存します。"
+  },
+  "cmd_capture_ocr_label": {
+    "message": "OCR キャプチャ"
+  },
+  "cmd_capture_ocr_short": {
+    "message": "OCR"
+  },
+  "cmd_capture_ocr_desc": {
+    "message": "画像の上で枠をドラッグして文字を認識します。"
+  },
+  "cmd_capture_audio_record_label": {
+    "message": "録音"
+  },
+  "cmd_capture_audio_record_short": {
+    "message": "録音"
+  },
+  "cmd_capture_audio_record_desc": {
+    "message": "次の「音声を保存」のためにマイクで録音します。"
+  },
+  "cmd_capture_audio_save_label": {
+    "message": "音声を保存"
+  },
+  "cmd_capture_audio_save_short": {
+    "message": "音声"
+  },
+  "cmd_capture_audio_save_desc": {
+    "message": "最後の録音を Gum に保存します。"
+  },
+  "cmd_capture_manga_label": {
+    "message": "マンガのページを取り込む"
+  },
+  "cmd_capture_manga_short": {
+    "message": "マンガ"
+  },
+  "cmd_capture_manga_desc": {
+    "message": "縦読み・Web トゥーンのページをスキャンし、コマを Gum に取り込みます。"
+  },
+  "cmd_media_download_label": {
+    "message": "動画をダウンロード"
+  },
+  "cmd_media_download_short": {
+    "message": "DL"
+  },
+  "cmd_media_download_desc": {
+    "message": "現在の YouTube 動画または再生リストを Gum にダウンロードします。"
+  },
+  "cmd_media_transcribe_label": {
+    "message": "音声を文字起こし"
+  },
+  "cmd_media_transcribe_short": {
+    "message": "文字起こし"
+  },
+  "cmd_media_transcribe_desc": {
+    "message": "現在の動画の音声を Whisper で文字起こしし、カタログに追加します。"
+  },
+  "cmd_clipboard_send_label": {
+    "message": "クリップボード履歴に送る"
+  },
+  "cmd_clipboard_send_short": {
+    "message": "クリップ"
+  },
+  "cmd_clipboard_send_desc": {
+    "message": "選択範囲を Gum のクリップボード履歴に追加します。"
+  },
+  "cmd_translate_selection_label": {
+    "message": "翻訳"
+  },
+  "cmd_translate_selection_short": {
+    "message": "翻訳"
+  },
+  "cmd_translate_selection_desc": {
+    "message": "選択範囲を Gum の翻訳モデルで翻訳します。"
+  },
+  "cmd_grammar_match_label": {
+    "message": "文法を照合"
+  },
+  "cmd_grammar_match_short": {
+    "message": "文法"
+  },
+  "cmd_grammar_match_desc": {
+    "message": "選択した文の中の文法パターンを探します。"
+  },
+  "cmd_reader_theme_label": {
+    "message": "読書テーマ"
+  },
+  "cmd_reader_theme_short": {
+    "message": "テーマ"
+  },
+  "cmd_reader_theme_desc": {
+    "message": "ページの読書テーマを切り替えます（ナイト・セピア・ペーパー・グレー）。"
+  },
+  "cmd_reader_highlight_label": {
+    "message": "ハイライトモード"
+  },
+  "cmd_reader_highlight_short": {
+    "message": "ハイライト"
+  },
+  "cmd_reader_highlight_desc": {
+    "message": "このページで、選択してハイライトする機能を切り替えます。"
+  },
+  "cmd_reader_knownTint_label": {
+    "message": "既知語の色分け"
+  },
+  "cmd_reader_knownTint_short": {
+    "message": "色分け"
+  },
+  "cmd_reader_knownTint_desc": {
+    "message": "ページ上の単語を、どれだけ知っているかで色分けします。"
+  },
+  "cmd_tabs_picker_label": {
+    "message": "リーディングリスト"
+  },
+  "cmd_tabs_picker_short": {
+    "message": "タブ"
+  },
+  "cmd_tabs_picker_desc": {
+    "message": "タブの一覧を開き、複数のページをまとめて保存します。"
+  },
+  "cmd_app_open_label": {
+    "message": "Gum を開く"
+  },
+  "cmd_app_open_short": {
+    "message": "アプリ"
+  },
+  "cmd_app_open_desc": {
+    "message": "Gum デスクトップアプリを前面に表示します。"
+  },
+  "cmd_settings_special_label": {
+    "message": "特別モジュール"
+  },
+  "cmd_settings_special_short": {
+    "message": "特別"
+  },
+  "cmd_settings_special_desc": {
+    "message": "Gum の隠れた「特別モジュール」設定ページを開きます。"
+  },
+  "cmd_wheel_more_label": {
+    "message": "その他…"
+  },
+  "cmd_wheel_more_short": {
+    "message": "その他"
+  },
+  "cmd_wheel_more_desc": {
+    "message": "補助のアクション一覧（OCR・メディア・ページツール）を開きます。"
+  }
+}

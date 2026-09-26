@@ -27,6 +27,7 @@ import {
   EXTENSION_DIR,
   loadExtensionSandbox,
   MIRROR_DIR,
+  extensionMessage,
   readExtensionFile,
   type ChromeStub,
 } from './extensionHarness';
@@ -262,7 +263,9 @@ describe('manifest — keyboard commands', () => {
 
   it('keeps the legacy mine-selection id, because user shortcuts are stored by id', () => {
     expect(commands['mine-selection']).toBeTruthy();
-    expect(commands['mine-selection'].description).toBe('Save selection (word or sentence)');
+    // Descriptions are __MSG_ references resolved from _locales by Chrome.
+    expect(commands['mine-selection'].description).toBe('__MSG_manifestCmd_saveSelection__');
+    expect(extensionMessage('manifestCmd_saveSelection')).toBe('Save selection (word or sentence)');
   });
 });
 
@@ -302,7 +305,14 @@ describe('manifest — context menu', () => {
 describe('the bundled mirror is byte-identical to the shipped folder', () => {
   const sha = (file: string): string =>
     createHash('sha256').update(readFileSync(file)).digest('hex');
-  const listing = (dir: string): string[] => readdirSync(dir).sort();
+  // Recursive, so _locales/<lang>/messages.json is compared like any other file.
+  const listing = (dir: string, prefix = ''): string[] =>
+    readdirSync(path.join(dir, prefix))
+      .flatMap((name) => {
+        const rel = prefix ? `${prefix}/${name}` : name;
+        return statSync(path.join(dir, rel)).isDirectory() ? listing(dir, rel) : [rel];
+      })
+      .sort();
 
   it('contains exactly the same files', () => {
     expect(listing(MIRROR_DIR)).toEqual(listing(EXTENSION_DIR));

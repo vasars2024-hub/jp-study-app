@@ -9,7 +9,7 @@
   const HL_COLORS = ['jp-study-hl', 'jp-study-hl-yellow', 'jp-study-hl-blue', 'jp-study-hl-green'];
   const ENDERS = new Set(['。', '．', '！', '？', '!', '?', '…', '‥']);
   const TRAIL_CLOSE = new Set(['」', '』', '）', ')', '"', "'", '”', '’']);
-  const WK_LABELS = ['New', 'Learning', 'Familiar', 'Known'];
+  const WK_LABELS = ['content_wkNew', 'content_wkLearning', 'content_wkFamiliar', 'content_wkKnown'];
   const POPUP_TABS = ['meaning', 'grammar', 'sentence', 'kanji', 'examples', 'more'];
   const TAB_LABELS = {
     meaning: 'Meaning',
@@ -233,6 +233,11 @@
 
   /* --------------------------------- toast --------------------------------- */
 
+  /** Toast / label text from _locales (shared.js jpMsg); the key if shared.js is missing. */
+  function uiMsg(key, subs) {
+    return S.msg ? S.msg(key, subs) : key;
+  }
+
   function toast(msg, variant, action) {
     if (!toastEl) {
       toastEl = document.createElement('div');
@@ -289,12 +294,12 @@
     return S.saveWorkingMessage
       ? S.saveWorkingMessage(cfg.saveDestination, forceAnki)
       : forceAnki || cfg.saveDestination === 'both'
-        ? 'Creating card…'
-        : 'Saving to Gum…';
+        ? uiMsg('save_working_card')
+        : uiMsg('save_working_app');
   }
 
   function formatSaveToast(res) {
-    return S.formatSaveResultMessage ? S.formatSaveResultMessage(res) : res?.ok ? 'Saved' : res?.error || 'Failed';
+    return S.formatSaveResultMessage ? S.formatSaveResultMessage(res) : res?.ok ? uiMsg('content_saved') : res?.error || uiMsg('content_failed');
   }
 
   /* --------------------------- text scanning core --------------------------- */
@@ -1131,12 +1136,12 @@
         return;
       case 'open-app':
         void safeRuntimeSend({ type: 'ui-open', target: 'inbox' }).then((res) => {
-          if (!res?.ok) toast(res?.error || 'Gum is not running', 'err');
+          if (!res?.ok) toast(res?.error || uiMsg('common_gumNotRunning'), 'err');
         });
         return;
       case 'open-grammar':
         void safeRuntimeSend({ type: 'ui-open', target: 'grammar' }).then((res) => {
-          if (!res?.ok) toast(res?.error || 'Gum is not running', 'err');
+          if (!res?.ok) toast(res?.error || uiMsg('common_gumNotRunning'), 'err');
         });
         return;
       case 'retry-grammar':
@@ -1244,9 +1249,9 @@
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(String(text || ''));
-      toast('Copied', 'ok');
+      toast(uiMsg('content_copied'), 'ok');
     } catch {
-      toast('Could not copy — page blocked clipboard access', 'err');
+      toast(uiMsg('content_copyBlocked'), 'err');
     }
   }
 
@@ -1256,18 +1261,18 @@
     const res = await safeRuntimeSend({ type: 'known-level', term: t, level });
     if (res?.invalidated) return;
     if (!res?.ok) {
-      toast(res?.error || 'Could not update known status — is Gum running?', 'err');
+      toast(res?.error || uiMsg('content_knownFailed'), 'err');
       return;
     }
     if (currentHit) currentHit.knownLevel = level;
     refreshKnownButtons(level);
-    toast(`${WK_LABELS[level]} · ${t.slice(0, 24)}`, 'ok');
+    toast(uiMsg('content_knownSet', [uiMsg(WK_LABELS[level]), t.slice(0, 24)]), 'ok');
   }
 
   async function doSave(text, mode, forceAnki) {
     const t = String(text || '').trim();
     if (!t) {
-      toast('Nothing to save', 'err');
+      toast(uiMsg('content_nothingToSave'), 'err');
       return;
     }
     const working = saveWorkingLabel(forceAnki);
@@ -1282,14 +1287,14 @@
   async function doClipboard(text) {
     const t = String(text || '').trim();
     if (!t) return;
-    toast('Adding to clipboard history…', 'pending');
+    toast(uiMsg('content_addingClip'), 'pending');
     const res = await safeRuntimeSend({
       type: 'clipboard-text',
       text: t,
       entryType: S.classifyMineSelection ? S.classifyMineSelection(t) : 'text',
     });
     if (res?.invalidated) return;
-    const msg = S.formatClipboardResultMessage ? S.formatClipboardResultMessage(res) : res?.ok ? 'Added' : 'Failed';
+    const msg = S.formatClipboardResultMessage ? S.formatClipboardResultMessage(res) : res?.ok ? uiMsg('content_added') : uiMsg('content_failed');
     toast(msg, res?.ok || res?.queued ? 'ok' : 'err');
   }
 
@@ -1299,7 +1304,7 @@
     if (!text) return;
     const host = popup && popup.querySelector('.rp-more-translate');
     if (host) host.innerHTML = '<div class="rp-loading-inline">Translating…</div>';
-    else toast('Translating…', 'pending');
+    else toast(uiMsg('content_translating'), 'pending');
     const res = await safeRuntimeSend({ type: 'translate', text, source: 'ja', target: 'en' });
     if (res?.invalidated) return;
     const out = String(res?.text || '').trim();
@@ -1308,9 +1313,9 @@
         ? `<div class="rp-more-row"><span class="rp-more-k">Translation</span><span class="rp-more-v">${esc(out || '(empty)')}</span></div>`
         : `<div class="rp-empty">${esc(res?.error || 'Translation failed — is the model installed in Gum?')}</div>`;
     } else if (res?.ok) {
-      toast(out.slice(0, 140) || 'Translated', 'ok');
+      toast(out.slice(0, 140) || uiMsg('content_translated'), 'ok');
     } else {
-      toast(res?.error || 'Translation failed', 'err');
+      toast(res?.error || uiMsg('content_translationFailed'), 'err');
     }
   }
 
@@ -1408,7 +1413,7 @@
   async function lookupText(text, x, y) {
     const t = String(text || '').trim();
     if (!t) {
-      toast('Select some text first', 'err');
+      toast(uiMsg('content_selectText'), 'err');
       return;
     }
     const mode = S.classifyMineSelection ? S.classifyMineSelection(t) : 'word';
@@ -1685,7 +1690,7 @@
     if (highlightMode) {
       wrapSelection(HL_COLORS[hlColorIdx % HL_COLORS.length]);
       hlColorIdx += 1;
-      toast('Highlighted');
+      toast(uiMsg('content_highlighted'));
       return;
     }
     // Selection lookup also requires the hover key so drag-select stays normal.
@@ -1867,7 +1872,7 @@
     const hit = popup && popup.classList.contains('open') ? currentHit : null;
     const payload = hit ? null : getSavePayload();
     if (!hit && !payload?.text) {
-      toast('Select a word or sentence first', 'err');
+      toast(uiMsg('content_selectWordOrSentence'), 'err');
       return;
     }
     if (!cfg.confirmBeforeCard) {
@@ -1880,7 +1885,7 @@
     const el = ensureCardPreview();
     cardSource = hit ? { hit } : { text: payload.text };
     setCardKind(kindOverride || (hit ? (hit.mode === 'sentence' ? 'sentence' : 'word') : payload.mode));
-    el.querySelector('.cp-source').textContent = `Source: ${document.title || location.href}`;
+    el.querySelector('.cp-source').textContent = uiMsg('content_cardSource', document.title || location.href);
     el.querySelector('.cp-dest').innerHTML =
       cfg.saveDestination === 'both'
         ? 'Destination: <b>Anki</b> (falls back to Gum if Anki is closed) · copy kept in Gum'
@@ -1897,7 +1902,7 @@
     const el = ensureCardPreview();
     const text = el.querySelector('.cp-text').value.trim();
     if (!text) {
-      toast('Card text is empty', 'err');
+      toast(uiMsg('content_cardEmpty'), 'err');
       return;
     }
     hideCardPreview();
@@ -1963,7 +1968,7 @@
     const cmds = wheelCommands();
     const n = Math.max(cmds.length, 1);
     const slice = 360 / n;
-    el.innerHTML = `<button type="button" class="jp-wheel-center" data-idx="-1" aria-label="Cancel">Cancel</button>`;
+    el.innerHTML = `<button type="button" class="jp-wheel-center" data-idx="-1" aria-label="${esc(uiMsg('common_cancel'))}">${esc(uiMsg('common_cancel'))}</button>`;
     cmds.forEach((id, i) => {
       const cmd = S.getCommand ? S.getCommand(id) : null;
       const available = S.commandAvailableOnPage
@@ -2037,7 +2042,7 @@
       // whose kind failed to detect).
       const cmd = S.getCommand ? S.getCommand(wheelCommands()[idx]) : null;
       closeWheel(false);
-      toast(`${cmd ? cmd.label : 'That action'} is not available on this page`, 'err');
+      toast(cmd ? uiMsg('content_notAvailable', cmd.label) : uiMsg('content_actionNotAvailable'), 'err');
       return;
     }
     closeWheel(true, idx, activatingEvent || null);
@@ -2199,9 +2204,9 @@
         .map((id) => {
           const cmd = S.getCommand ? S.getCommand(id) : null;
           let label = cmd ? cmd.label : id;
-          if (id === 'capture.audio.record' && recording) label = 'Stop recording';
-          if (id === 'reader.highlight' && highlightMode) label = 'Highlight mode: on';
-          if (id === 'reader.knownTint' && learningOn) label = 'Known-word tint: on';
+          if (id === 'capture.audio.record' && recording) label = uiMsg('content_stopRecording');
+          if (id === 'reader.highlight' && highlightMode) label = uiMsg('content_highlightModeOn');
+          if (id === 'reader.knownTint' && learningOn) label = uiMsg('content_tintModeOn');
           return `<button type="button" role="menuitem" data-cmd="${esc(id)}">${esc(label)}</button>`;
         })
         .join('');
@@ -2227,7 +2232,7 @@
       case 'lookup.selection': {
         const payload = getSavePayload();
         if (!payload.text) {
-          toast('Select or hover a word first', 'err');
+          toast(uiMsg('content_selectOrHover'), 'err');
           return;
         }
         void lookupText(payload.text, lastHoverPoint.x || window.innerWidth / 2, lastHoverPoint.y || 120);
@@ -2253,20 +2258,20 @@
       case 'translate.selection': {
         const payload = getSavePayload();
         if (!payload.text) {
-          toast('Select text to translate', 'err');
+          toast(uiMsg('content_selectToTranslate'), 'err');
           return;
         }
-        toast('Translating…', 'pending');
+        toast(uiMsg('content_translating'), 'pending');
         const res = await safeRuntimeSend({ type: 'translate', text: payload.text, source: 'ja', target: 'en' });
         if (res?.invalidated) return;
-        if (res?.ok) toast(String(res.text || '').slice(0, 140) || 'Translated', 'ok', { label: 'Open in app', openTarget: 'translate' });
-        else toast(res?.error || 'Translation failed', 'err');
+        if (res?.ok) toast(String(res.text || '').slice(0, 140) || uiMsg('content_translated'), 'ok', { label: uiMsg('content_openInApp'), openTarget: 'translate' });
+        else toast(res?.error || uiMsg('content_translationFailed'), 'err');
         return;
       }
       case 'grammar.match': {
         const payload = getSavePayload();
         if (!payload.text) {
-          toast('Select a sentence first', 'err');
+          toast(uiMsg('content_selectSentence'), 'err');
           return;
         }
         void lookupText(payload.text, lastHoverPoint.x, lastHoverPoint.y);
@@ -2299,13 +2304,13 @@
         // Background-owned command.
         const pending =
           id === 'capture.page'
-            ? 'Saving page…'
+            ? uiMsg('content_savingPage')
             : id === 'media.download'
-              ? 'Queueing download…'
+              ? uiMsg('content_queueingDownload')
               : id === 'capture.manga'
-                ? 'Scanning manga pages…'
+                ? uiMsg('content_scanningManga')
                 : id === 'capture.audio.save'
-                  ? 'Saving audio…'
+                  ? uiMsg('content_savingAudio')
                   : '';
         if (pending) {
           toast(pending, 'pending');
@@ -2315,21 +2320,21 @@
         if (pending) setFabBusy('');
         if (res?.invalidated) return;
         if (id === 'capture.page') {
-          const msg = S.formatCaptureResultMessage ? S.formatCaptureResultMessage(res) : res?.ok ? 'Saved' : res?.error;
+          const msg = S.formatCaptureResultMessage ? S.formatCaptureResultMessage(res) : res?.ok ? uiMsg('content_saved') : res?.error;
           toast(msg, res?.ok || res?.queued ? 'ok' : 'err', captureToastAction(res));
         } else if (id === 'capture.manga') {
           toast(
-            res?.ok ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into Gum Manga` : res?.error || 'Import failed',
+            res?.ok ? uiMsg('content_mangaImported', res.pageCount ?? res.imageCount ?? '?') : res?.error || uiMsg('content_importFailed'),
             res?.ok ? 'ok' : 'err',
           );
         } else if (id === 'media.download') {
-          toast(res?.ok ? 'Download queued in Gum' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
+          toast(res?.ok ? uiMsg('content_downloadQueued') : res?.error || uiMsg('content_downloadFailed'), res?.ok ? 'ok' : 'err');
         } else if (id === 'tabs.picker') {
-          if (!res?.ok) toast(res?.error || 'Could not open the reading list', 'err');
+          if (!res?.ok) toast(res?.error || uiMsg('common_readingListFailed'), 'err');
         } else if (id === 'app.open') {
-          if (!res?.ok) toast(res?.error || 'Gum is not running', 'err');
+          if (!res?.ok) toast(res?.error || uiMsg('common_gumNotRunning'), 'err');
         } else {
-          toast(res?.ok || res?.queued ? 'Done' : res?.error || 'Failed', res?.ok || res?.queued ? 'ok' : 'err');
+          toast(res?.ok || res?.queued ? uiMsg('content_done') : res?.error || uiMsg('content_failed'), res?.ok || res?.queued ? 'ok' : 'err');
         }
       }
     }
@@ -2343,7 +2348,7 @@
         ? 'youtube'
         : 'inbox');
     return {
-      label: t === 'youtube' ? 'Open in app' : 'Open inbox',
+      label: t === 'youtube' ? uiMsg('content_openInApp') : uiMsg('content_openInbox'),
       openTarget: t,
     };
   }
@@ -2362,7 +2367,7 @@
     themeIdx = (themeIdx + 1) % THEMES.length;
     const name = THEMES[themeIdx];
     setTheme(name);
-    toast(name ? `Reading theme: ${name}` : 'Reading theme off');
+    toast(name ? uiMsg('content_themeOn', uiMsg(`content_theme_${name}`)) : uiMsg('content_themeOff'));
     updateFab();
     return name || 'off';
   }
@@ -2371,7 +2376,7 @@
     highlightMode = !highlightMode;
     document.documentElement.classList.toggle('jp-study-hl-mode', highlightMode);
     safeStorageSet({ [`jpHlMode:${location.origin}`]: highlightMode });
-    toast(highlightMode ? 'Highlight mode on — select text to mark it' : 'Highlight mode off', 'ok');
+    toast(highlightMode ? uiMsg('content_highlightOn') : uiMsg('content_highlightOff'), 'ok');
     updateFab();
   }
 
@@ -2380,7 +2385,7 @@
     safeStorageSet({ [`jpLearn:${location.origin}`]: learningOn });
     if (learningOn) void applyLearningHighlights();
     else clearLearningHighlights();
-    toast(learningOn ? 'Known-word tint on' : 'Known-word tint off', 'ok');
+    toast(learningOn ? uiMsg('content_tintOn') : uiMsg('content_tintOff'), 'ok');
     updateFab();
   }
 
@@ -2537,7 +2542,7 @@
           const raw = data.jpStudySettings || {};
           void safeStorageSet({ jpStudySettings: { ...raw, fabHiddenOrigins: origins } });
         });
-        toast('Panel hidden on this site — restore it in Settings → Page panel', 'ok');
+        toast(uiMsg('content_panelHidden'), 'ok');
         rebuildFab();
       } else if (act === 'theme') cycleTheme();
       else if (act === 'hlmode') toggleHighlightMode();
@@ -2591,7 +2596,7 @@
     const ocrBtn = el.querySelector('[data-act="ocr"]');
     if (themeBtn) {
       themeBtn.hidden = !cfg.fabShowTheme;
-      themeBtn.textContent = `Theme: ${THEMES[themeIdx] || 'off'}`;
+      themeBtn.textContent = uiMsg('content_themeButton', uiMsg(THEMES[themeIdx] ? `content_theme_${THEMES[themeIdx]}` : 'content_theme_off'));
     }
     if (hlBtn) {
       hlBtn.hidden = !cfg.fabShowHighlight;
@@ -2811,7 +2816,7 @@
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      toast('Microphone recording is not available here', 'err');
+      toast(uiMsg('content_micUnavailable'), 'err');
       return;
     }
     try {
@@ -2832,22 +2837,22 @@
         const blob = new Blob(recordChunks, { type: audioClipboardMime });
         recordChunks = [];
         if (!blob.size) {
-          toast('Recording was empty', 'err');
+          toast(uiMsg('content_recordingEmpty'), 'err');
           return;
         }
         const reader = new FileReader();
         reader.onload = () => {
           audioClipboardDataUrl = String(reader.result || '');
-          toast('Recording ready — use Save audio to send it to Gum', 'ok');
+          toast(uiMsg('content_recordingReady'), 'ok');
         };
-        reader.onerror = () => toast('Could not read the recording', 'err');
+        reader.onerror = () => toast(uiMsg('content_recordingUnreadable'), 'err');
         reader.readAsDataURL(blob);
       };
       mediaRecorder.start();
       recording = true;
-      toast('Recording… run Record audio again to stop', 'ok');
+      toast(uiMsg('content_recording'), 'ok');
     } catch (err) {
-      toast(String(err.message || err || 'Microphone permission denied'), 'err');
+      toast(String(err.message || err || uiMsg('content_micDenied')), 'err');
     }
   }
 
@@ -2946,7 +2951,7 @@
       ocrSelectEl.classList.remove('open');
       updateOcrSelectRect(null);
     }
-    if (showToast) toast('OCR selection cancelled', 'ok');
+    if (showToast) toast(uiMsg('content_ocrCancelled'), 'ok');
   }
 
   function armOcrRegionSelect() {
@@ -3058,7 +3063,7 @@
       const box = ocrSelectBoxFromDrag(drag);
       if (box.width < OCR_SELECT_MIN_PX || box.height < OCR_SELECT_MIN_PX) {
         updateOcrSelectRect(null);
-        toast('Drag a larger area', 'err');
+        toast(uiMsg('common_dragLarger'), 'err');
         return;
       }
       void finishOcrRegionSelect(box);
@@ -3127,8 +3132,8 @@
       markExtensionDead();
       return;
     }
-    toast('Running OCR…', 'pending');
-    setFabBusy('Running OCR…');
+    toast(uiMsg('content_runningOcr'), 'pending');
+    setFabBusy(uiMsg('content_runningOcr'));
     void safeRuntimeSend({
       type: 'ocr',
       region,
@@ -3140,7 +3145,7 @@
       setFabBusy('');
       if (res?.invalidated) return;
       if (res?.selecting) return;
-      if (!res?.ok) toast(res?.error || 'OCR failed', 'err');
+      if (!res?.ok) toast(res?.error || uiMsg('content_ocrFailed'), 'err');
       showOcrResult(res);
     });
   }
@@ -3453,7 +3458,7 @@
           result.sentence,
         ];
         void navigator.clipboard?.writeText(parts.filter(Boolean).join('\n'));
-        toast('Copied');
+        toast(uiMsg('content_copied'));
         return true;
       }
       case 'listen': {
@@ -3464,7 +3469,7 @@
           speechSynthesis.cancel();
           speechSynthesis.speak(utter);
         } catch {
-          toast('Speech is unavailable here', 'err');
+          toast(uiMsg('content_speechUnavailable'), 'err');
         }
         return true;
       }
@@ -3503,7 +3508,7 @@
     // the outcome they asked for \u2014 reporting it as a failure would be wrong.
     aiState.mine = res && (res.ok || res.error === 'duplicate') ? 'done' : 'error';
     renderAiAnalysis();
-    if (aiState.mine === 'error') toast((res && res.error) || 'Could not add the card', 'err');
+    if (aiState.mine === 'error') toast((res && res.error) || uiMsg('content_cardAddFailed'), 'err');
   }
 
   async function aiSnapshot() {
@@ -3518,7 +3523,7 @@
     });
     aiState.snapshot = res && res.ok ? 'done' : 'error';
     renderAiAnalysis();
-    if (aiState.snapshot === 'error') toast((res && res.error) || 'Snapshot failed', 'err');
+    if (aiState.snapshot === 'error') toast((res && res.error) || uiMsg('content_snapshotFailed'), 'err');
   }
 
   function aiSelectSegment(index) {
@@ -3558,7 +3563,7 @@
   async function runSentenceAnalysis(text, opts = {}) {
     const value = String(text || '').trim();
     if (!value) {
-      toast('Select a sentence first', 'err');
+      toast(uiMsg('content_selectSentence'), 'err');
       return;
     }
     if (!isExtensionAlive()) {
@@ -3652,7 +3657,7 @@
     // not consult cfg.aiOnHighlight the way a bare drag-select does.
     if (msg?.type === 'jp-analyze-selection') {
       const text = String(msg.text || '').trim() || getSavePayload().text;
-      if (!text) toast('Select a sentence first', 'err');
+      if (!text) toast(uiMsg('content_selectSentence'), 'err');
       else void runSentenceAnalysis(text, { anchorY: lastHoverPoint.y || 80, context: document.title || '' });
       sendResponse({ ok: true });
       return true;
@@ -3660,7 +3665,7 @@
     if (msg?.type === 'jp-lookup-selection' || msg?.type === 'jp-dictionary') {
       const text = String(msg.text || '').trim() || getSavePayload().text;
       if (!text) {
-        toast('Select or hover a word first', 'err');
+        toast(uiMsg('content_selectOrHover'), 'err');
       } else {
         void lookupText(text, lastHoverPoint.x || window.innerWidth / 2, lastHoverPoint.y || 120);
       }
@@ -3670,7 +3675,7 @@
     if (msg?.type === 'jp-grammar') {
       const text = String(msg.text || '').trim() || getSavePayload().text;
       if (text) void lookupText(text, lastHoverPoint.x, lastHoverPoint.y);
-      else toast('Select a sentence first', 'err');
+      else toast(uiMsg('content_selectSentence'), 'err');
       sendResponse({ ok: true });
       return true;
     }

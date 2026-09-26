@@ -128,7 +128,10 @@ describe('extension popup — transcription pill', () => {
 
     const meta = harness.document.getElementById('page-meta');
     expect(meta?.querySelector('img')).toBeNull();
-    expect(meta?.innerHTML).toContain('&lt;img');
+    // The count now goes through the counted message, which takes a number:
+    // markup in it can neither render nor reach the pill as text.
+    expect(meta?.innerHTML).not.toContain('<img');
+    expect(meta?.textContent).toContain('Transcribed · 0 cues');
   });
 
   it('asks nothing about transcription on a page that is not a YouTube video', async () => {
