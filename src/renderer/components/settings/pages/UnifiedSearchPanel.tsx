@@ -19,13 +19,14 @@ import { mergeUnifiedSearchResults } from '../../../unifiedSearchBackends';
 import { Select } from '../../ui';
 
 /**
- * The built-in sources carry an English name in the stored document; these two
+ * The built-in sources carry an English name in the stored document; these three
  * are chrome, so they are shown translated. The catalogue source is named after
  * the two services it asks, which are not translated anywhere.
  */
 const BUILT_IN_NAME_KEY: Record<string, string> = {
   'local-library': 'unifiedSearch.builtin.localLibrary',
   'torrent-indexes': 'unifiedSearch.builtin.torrentIndexes',
+  'subtitle-availability': 'unifiedSearch.builtin.subtitleAvailability',
 };
 
 const PROVIDER_STATUS_KEY: Record<UnifiedSearchProviderExecutionStatus, string> = {

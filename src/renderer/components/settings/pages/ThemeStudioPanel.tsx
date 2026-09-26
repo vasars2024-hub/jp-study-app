@@ -6,6 +6,7 @@ import {
   activeUiProfile,
   addUiProfile,
   applyUiPlan,
+  builtInUiThemeNameKey,
   createUiThemeProfile,
   deleteUiProfile,
   discardUiPreview,
@@ -57,6 +58,12 @@ const LOOK_LABEL_KEY: Record<keyof UiLook, string> = {
   radius: 'settings.appearance.label.corners',
   shadow: 'settings.appearance.label.shadows',
 };
+
+/** A profile's name as shown: a built-in's in the interface language, a user's as typed. */
+function themeProfileName(t: (key: string) => string, profile: { id: string; name: string }): string {
+  const key = builtInUiThemeNameKey(profile);
+  return key ? t(key) : profile.name;
+}
 
 function lookValueKey(field: keyof UiLook, value: string): string | null {
   if (field === 'density') return `settings.appearance.density.${value}`;
@@ -252,7 +259,7 @@ export default function ThemeStudioPanel() {
         id="theme-studio-profiles"
         title={t('theme.profiles')}
         description={t('theme.profilesDesc')}
-        trailing={<span className="os-set-adv-badge">{profile.name}</span>}
+        trailing={<span className="os-set-adv-badge">{themeProfileName(t, profile)}</span>}
       >
         <div className="ui-control-row">
           <label htmlFor="theme-active">{t('theme.activeTheme')}</label>
@@ -266,7 +273,7 @@ export default function ThemeStudioPanel() {
             }}
           >
             {document_.profiles.map((entry) => (
-              <option key={entry.id} value={entry.id}>{entry.name}</option>
+              <option key={entry.id} value={entry.id}>{themeProfileName(t, entry)}</option>
             ))}
           </select>
         </div>

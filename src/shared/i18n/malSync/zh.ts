@@ -8,7 +8,7 @@ export const MAL_SYNC_ZH: Catalog = {
   'malSync.setup': '设置',
   'malSync.clientIdDesc':
     '在 MyAnimeList 上注册一个 API 应用，然后把它的 Client ID 粘贴到这里。本应用不会接触你的 MyAnimeList 密码。',
-  'malSync.clientId': 'Client ID',
+  'malSync.clientId': '客户端 ID',
   'malSync.clientIdStored': '已保存——粘贴新的 ID 即可替换',
   'malSync.clientIdPlaceholder': '粘贴你的 MyAnimeList Client ID',
   'malSync.clientIdSave': '保存',

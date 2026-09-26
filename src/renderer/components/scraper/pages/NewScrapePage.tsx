@@ -22,7 +22,7 @@ import { resolveColumns, rowMatches, sortRows, type GroupKey } from '../result/c
 import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { formatEtaClock } from '../data/charts';
-import { sx, sxn, sxNumber } from '../strings';
+import { sx, sxn, sxNumber, sxs } from '../strings';
 import { profileName, tr } from '../localize';
 import {
   SCRAPER_PAGE_SIZES,
@@ -425,7 +425,7 @@ export default function NewScrapePage() {
         <div className="scr-preflight">
           <span><b>{sx('scrape.preflightUrl')}</b> {preflight}</span>
           <span><b>{sx('scrape.preflightProvider')}</b> {looksLikeUrl ? sx('scrape.detected') : '—'}</span>
-          <span><b>{sx('scrape.preflightProfile')}</b> {activeProfile?.name ?? '—'}</span>
+          <span><b>{sx('scrape.preflightProfile')}</b> {activeProfile ? profileName(activeProfile) : '—'}</span>
           <span>
             <b>{sx('scrape.preflightSpace')}</b>{' '}
             {freeBytes === null ? sx('downloads.freeUnknown') : formatBytes(freeBytes)}
@@ -524,7 +524,7 @@ export default function NewScrapePage() {
               emptyMessage={sx('result.emptyEpisodes')}
               onOpen={(row) => {
                 setPreviewRow(row);
-                setActionNotice(`Opened ${row.titleEn} in the episode preview.`);
+                setActionNotice(sxs('result.openedPreview', row.titleEn));
               }}
             />
 
