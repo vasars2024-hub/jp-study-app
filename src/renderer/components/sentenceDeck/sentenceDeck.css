@@ -4,6 +4,15 @@
  * frames inside the dialog: groups are split by the design system's hairline,
  * the preview is a quiet tinted surface, never a bordered box in a box.
  */
+
+/* The dialog opens from inside the player, whose host is an opaque full-screen view
+   (--z-shell-view). At the ui/* tier's --z-modal it mounted invisibly BEHIND the video,
+   and a click on "Make" landed on the player. It is a view-scoped modal, so it takes
+   the view-overlay tier: above the player, under the palette, toasts and taskbar. */
+.sd-host .ui-overlay {
+  z-index: var(--z-view-overlay, 12501);
+}
+
 .ui-dialog.sd-dialog {
   width: min(620px, 94vw);
   max-width: min(620px, 94vw);

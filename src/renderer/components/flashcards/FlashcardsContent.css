@@ -465,8 +465,9 @@
   box-shadow: none;
 }
 
-/* Practice sizes its four tiles by its own width, so they read 1×4, 2×2 or one column,
-   never three and a straggler. The queries read .flash-view, already an inline-size container. */
+/* Practice sizes its five tiles by its own width — one row of five, 3 + 2, pairs, or one
+   column — and never leaves a lone tile under a row: in pairs, the odd one out spans the row.
+   The queries read .flash-view, already an inline-size container. */
 .flash-practice .ui-tile-list--grid.flash-practice__modes {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -474,10 +475,21 @@
   .flash-practice .ui-tile-list--grid.flash-practice__modes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .flash-practice .flash-practice__modes > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
-@container (min-width: 62rem) {
+@container (min-width: 48rem) {
   .flash-practice .ui-tile-list--grid.flash-practice__modes {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .flash-practice .flash-practice__modes > li:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+@container (min-width: 76rem) {
+  .flash-practice .ui-tile-list--grid.flash-practice__modes {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 

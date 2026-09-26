@@ -8,7 +8,7 @@ import {
   sentenceClipBounds,
   sentenceDeckBookId,
   sentenceDeckNameFromPath,
-  sentencePieces,
+  splitSentences,
   sentenceStillFfmpegArgs,
   sentenceTimeLabel,
   spokenText,
@@ -45,10 +45,10 @@ describe('cleaning a subtitle line', () => {
   });
 
   it('splits at sentence punctuation in all three languages', () => {
-    expect(sentencePieces('おはよう。元気？うん！')).toEqual(['おはよう。', '元気？', 'うん！']);
-    expect(sentencePieces('你好。你去哪儿？')).toEqual(['你好。', '你去哪儿？']);
-    expect(sentencePieces('Привет. Как дела? Т.е. 3.5 часа.')).toEqual(['Привет.', 'Как дела?', 'Т.е. 3.5 часа.']);
-    expect(sentencePieces('「行こう。」と言った')).toEqual(['「行こう。」', 'と言った']);
+    expect(splitSentences('おはよう。元気？うん！')).toEqual(['おはよう。', '元気？', 'うん！']);
+    expect(splitSentences('你好。你去哪儿？')).toEqual(['你好。', '你去哪儿？']);
+    expect(splitSentences('Привет. Как дела? Т.е. 3.5 часа.')).toEqual(['Привет.', 'Как дела?', 'Т.е. 3.5 часа.']);
+    expect(splitSentences('「行こう。」と言った')).toEqual(['「行こう。」', 'と言った']);
   });
 });
 

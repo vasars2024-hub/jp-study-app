@@ -79,18 +79,19 @@ async function mount(): Promise<void> {
 }
 
 describe('Flashcards overview', () => {
-  it('practice is four tiles of one shape, named by their action and described', async () => {
+  it('practice is five tiles of one shape, named by their action and described', async () => {
     await mount();
     const practice = host.querySelector('section.flash-practice');
     expect(practice, 'the practice section').toBeTruthy();
     expect(host.querySelector('fieldset.flash-practice'), 'no nested fieldset box').toBeNull();
     const tiles = [...host.querySelectorAll<HTMLButtonElement>('.flash-practice__tile')];
-    expect(tiles).toHaveLength(4);
+    expect(tiles).toHaveLength(5);
     expect(tiles.map((b) => b.getAttribute('aria-label'))).toEqual([
       'Start learning',
       'Start writing',
       'Start a match round',
       'Take a test',
+      'Start listening',
     ]);
     for (const tile of tiles) {
       expect(tile.classList.contains('ui-tile'), 'the shared Tile primitive').toBe(true);
@@ -106,6 +107,7 @@ describe('Flashcards overview', () => {
       'Write',
       'Match',
       'Test',
+      'Listen',
     ]);
     // The deck picker is the design system's select, and counts in the right number.
     const select = practice?.querySelector('select');
