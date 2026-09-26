@@ -35,7 +35,7 @@ const byId = new Map(GRAMMAR.map((p) => [p.id, p]));
  * Ratchet: hollow records per level may only go down. When a pass authors
  * more, lower these numbers to the new counts the failure message prints.
  */
-const MAX_HOLLOW: Record<string, number> = { N4: 74, N3: 627, N2: 437, N1: 324 };
+const MAX_HOLLOW: Record<string, number> = { N4: 74, N3: 585, N2: 437, N1: 324 };
 
 describe('authored content for hollow supplement records', () => {
   const entries = Object.entries(AUTHORED_CONTENT);
