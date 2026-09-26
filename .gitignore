@@ -106,6 +106,17 @@ public/cedict/
 public/kuromoji/
 public/tesseract/
 
+# Owner-only third-party art (fan-made companion sprite packs, reference
+# images). Never part of the public GPL tree: a public clone simply has no such
+# folder and the app falls back to its own original art. When present, the
+# renderer bundles it through `import.meta.glob('/private-assets/...')` (see
+# src/renderer/privateAssets.ts) and private-assets/public/ is served by the
+# app:// protocol after public/ (src/main/appProtocolResolve.ts). Layout:
+#   private-assets/shimeji/<pack>/*.png   companion packs, listed like built-ins
+#   private-assets/images/*               reference images and wallpapers
+#   private-assets/public/*               files the adopted media UI asks for by URL
+/private-assets/
+
 # Stray/accidental artifacts found at repo root (zero-byte or shell-redirect junk)
 /a
 /npm

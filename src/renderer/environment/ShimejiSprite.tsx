@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CompanionMood } from './companionCatalog';
-import { getShimejiPack, type ShimejiMotion, type ShimejiPackId } from './shimejiPacks';
+import { companionTypeForDefaultPack, type CompanionMood } from './companionCatalog';
+import { resolveCompanionPack, usePackChoices } from './companionPackChoice';
+import { getShimejiPack, useCompanionPacks, type ShimejiMotion, type ShimejiPackId } from './shimejiPacks';
 
 function sequenceFor(
   packId: ShimejiPackId | undefined,
@@ -47,7 +48,16 @@ export default function ShimejiSprite({
   /** 0–1 locomotion / frame pace from companion settings. */
   activeness?: number;
 }) {
-  const seq = useMemo(() => sequenceFor(pack, motion, mood, dragging), [dragging, mood, motion, pack]);
+  // `pack` is the companion's built-in character; the user may have dressed it
+  // in another pack (Settings › Companions), which is resolved here so every
+  // surface that draws a companion follows the choice.
+  const packs = useCompanionPacks();
+  const choices = usePackChoices();
+  const worn = useMemo(
+    () => resolveCompanionPack(companionTypeForDefaultPack(pack), pack, choices),
+    [pack, choices, packs],
+  );
+  const seq = useMemo(() => sequenceFor(worn, motion, mood, dragging), [dragging, mood, motion, worn, packs]);
   const delay = delayFor(motion, mood, dragging, activeness);
   const [tick, setTick] = useState(0);
 

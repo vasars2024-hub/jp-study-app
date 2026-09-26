@@ -14,12 +14,12 @@ import { pulseCalendarCompanions } from './schedules';
 import { onCalendarChanged } from '../calendar';
 import { onAeroDiscoveryChanged, showsTreasureCompanion } from '../aeroDiscovery';
 
-const TREASURE_BONZI_ENV = (base: EnvironmentSettings): EnvironmentSettings => ({
+const TREASURE_COMPANION_ENV = (base: EnvironmentSettings): EnvironmentSettings => ({
   ...base,
   enabled: true,
   companionsEnabled: true,
-  companionTypes: ['miko-shimeji'],
-  companions: (base.companions ?? []).filter((c) => c.typeId === 'miko-shimeji'),
+  companionTypes: ['aero-assistant'],
+  companions: (base.companions ?? []).filter((c) => c.typeId === 'aero-assistant'),
 });
 
 export default function EnvironmentStack({
@@ -75,12 +75,12 @@ export default function EnvironmentStack({
     if (!treasure) return null;
     return (
       <div className="os-env-stack os-env-stack-treasure" aria-hidden={false} data-companions="1">
-        <CompanionLayer env={TREASURE_BONZI_ENV(env)} />
+        <CompanionLayer env={TREASURE_COMPANION_ENV(env)} />
       </div>
     );
   }
 
-  const showTreasureBonzi = treasure && !env.companionsEnabled;
+  const showTreasureCompanion = treasure && !env.companionsEnabled;
   const showLivingWallpaper = env.rotationEnabled && !suppressWallpaper;
 
   return (
@@ -89,7 +89,7 @@ export default function EnvironmentStack({
       aria-hidden={false}
       data-env-tier={env.performanceTier}
       data-particles={env.particlesEnabled ? '1' : '0'}
-      data-companions={env.companionsEnabled || showTreasureBonzi ? '1' : '0'}
+      data-companions={env.companionsEnabled || showTreasureCompanion ? '1' : '0'}
       data-rotation={showLivingWallpaper ? '1' : '0'}
       data-lighting={env.dayCycleLighting ? '1' : '0'}
       data-weather={env.weather?.mode && env.weather.mode !== 'off' ? env.weather.mode : '0'}
@@ -98,8 +98,8 @@ export default function EnvironmentStack({
       {env.dayCycleLighting && <DayCycleLighting env={env} />}
       {env.weather?.mode !== 'off' && env.performanceTier !== 'off' && <WeatherLayer env={env} />}
       {env.particlesEnabled && env.performanceTier !== 'off' && <ParticleLayer env={env} />}
-      {(env.companionsEnabled || showTreasureBonzi) && (
-        <CompanionLayer env={showTreasureBonzi ? TREASURE_BONZI_ENV(env) : env} />
+      {(env.companionsEnabled || showTreasureCompanion) && (
+        <CompanionLayer env={showTreasureCompanion ? TREASURE_COMPANION_ENV(env) : env} />
       )}
     </div>
   );

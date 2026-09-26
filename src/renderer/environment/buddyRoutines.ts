@@ -156,9 +156,9 @@ export function getDefaultBuddyRoutines(): BuddyRoutine[] {
       ],
     },
     {
-      id: 'br-miko-climb',
+      id: 'br-aero-climb',
       name: 'Climb show',
-      forType: 'miko-shimeji',
+      forType: 'aero-assistant',
       builtin: true,
       steps: [
         { type: 'setMood', mood: 'curious', status: 'Scaling the desktop frame' },
@@ -167,9 +167,9 @@ export function getDefaultBuddyRoutines(): BuddyRoutine[] {
       ],
     },
     {
-      id: 'br-miko-cheer',
+      id: 'br-aero-cheer',
       name: 'Cheer',
-      forType: 'miko-shimeji',
+      forType: 'aero-assistant',
       builtin: true,
       steps: [
         { type: 'setMood', mood: 'celebrate', status: 'Secret OS discovered' },
@@ -238,8 +238,8 @@ export function defaultRoutineIdsForType(typeId: CompanionTypeId): {
       return { primary: 'br-critter-weather', secondary: 'br-critter-dance', menu: ['br-critter-weather', 'br-critter-dance'] };
     case 'timekeeper':
       return { primary: 'br-time-calendar', secondary: 'br-time-stats', menu: ['br-time-calendar', 'br-time-stats'] };
-    case 'miko-shimeji':
-      return { primary: 'br-miko-climb', secondary: 'br-miko-cheer', menu: ['br-miko-climb', 'br-miko-cheer'] };
+    case 'aero-assistant':
+      return { primary: 'br-aero-climb', secondary: 'br-aero-cheer', menu: ['br-aero-climb', 'br-aero-cheer'] };
     default:
       return { primary: 'br-buddy-review', secondary: 'br-buddy-focus', menu: [] };
   }
@@ -329,7 +329,7 @@ export function sanitizeRoutine(raw: unknown): BuddyRoutine | null {
     r.forType === 'study-buddy' ||
     r.forType === 'critter' ||
     r.forType === 'timekeeper' ||
-    r.forType === 'miko-shimeji' ||
+    r.forType === 'aero-assistant' ||
     r.forType === 'wired-navi'
       ? r.forType
       : undefined;

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadArenaContent } from './games/contentStore';
 import { loadEnvironment, saveEnvironment } from './environment/environmentStore';
 import type { CompanionInstance, CompanionTypeId } from './environment/companionCatalog';
+import { migrateLegacyCompanionStorage } from './environment/companionLegacyIds';
 import { getUserLevel, onLevelChange } from './levelService';
 import { getLevel, knowledgeCounts, onKnowledgeChanged } from './knownWords';
 import { getSummary } from './stats';
@@ -138,7 +139,7 @@ export function useFindingReadouts(enabled: boolean): FindingReadouts {
 /** The companion each theme summons. Both sprites already ship in the catalog. */
 const SUMMON_TYPE = {
   wired: 'wired-navi',
-  aero: 'miko-shimeji',
+  aero: 'aero-assistant',
 } as const;
 
 export type SummonTheme = keyof typeof SUMMON_TYPE;
@@ -159,6 +160,7 @@ interface SummonRestore {
 }
 
 function readRestore(): SummonRestore | null {
+  migrateLegacyCompanionStorage();
   try {
     const raw = localStorage.getItem(SUMMON_RESTORE_KEY);
     return raw ? (JSON.parse(raw) as SummonRestore) : null;

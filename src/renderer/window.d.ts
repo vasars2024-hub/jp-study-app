@@ -851,6 +851,11 @@ declare global {
       lockscreenSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
       lockscreenIsOpen(): Promise<boolean>;
       onLockscreenUnlocked(cb: () => void): () => void;
+      companionPacksList?(): Promise<unknown[]>;
+      companionPacksImport?(opts?: { kind?: 'file' | 'folder' }): Promise<import('../shared/companionPacks').CompanionPackImportResult>;
+      companionPacksRename?(id: string, name: string): Promise<boolean>;
+      companionPacksRemove?(id: string): Promise<boolean>;
+      onCompanionPacksChanged?(cb: () => void): () => void;
       companionHostSetEnabled(enabled: boolean, span?: 'primary' | 'all'): Promise<{ ok: boolean }>;
       companionHostSetSpan(span: 'primary' | 'all'): Promise<{ ok: boolean }>;
       companionHostIsOpen(): Promise<boolean>;

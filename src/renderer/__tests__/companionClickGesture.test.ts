@@ -10,7 +10,7 @@ import {
   noteHold,
 } from '../environment/companionClickGesture';
 
-const PET = 'c-bonzi';
+const PET = 'c-aero';
 
 describe('companion click gesture arbitration', () => {
   it('defers the primary on a lone click instead of running it immediately', () => {

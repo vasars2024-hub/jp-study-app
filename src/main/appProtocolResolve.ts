@@ -30,6 +30,11 @@ export interface AppAssetRoots {
   rendererRoot: string;
   /** Bundled runtime blobs — `public/`, or `resources/public` when packaged. */
   publicRoot: string;
+  /**
+   * The owner's git-ignored `private-assets/public/`, consulted last. Absent in a
+   * public clone (the path simply never exists), so nothing depends on it.
+   */
+  privatePublicRoot?: string;
 }
 
 /**
@@ -44,7 +49,7 @@ export function resolveAppAsset(
   pathname: string,
   exists: (candidate: string) => boolean,
 ): AppAssetResolution {
-  const { rendererRoot, publicRoot } = roots;
+  const { rendererRoot, publicRoot, privatePublicRoot } = roots;
   const rel = !pathname || pathname === '/' ? '/index.html' : pathname;
 
   const fromRenderer = path.join(rendererRoot, rel);
@@ -61,6 +66,11 @@ export function resolveAppAsset(
     return isUnder(publicRoot, fromPublic)
       ? { kind: 'file', path: fromPublic }
       : { kind: 'forbidden' };
+  }
+
+  const fromPrivate = privatePublicRoot ? path.join(privatePublicRoot, rel.replace(/^\//, '')) : null;
+  if (fromPrivate && privatePublicRoot && isUnder(privatePublicRoot, fromPrivate) && exists(fromPrivate)) {
+    return { kind: 'file', path: fromPrivate };
   }
 
   // Absent. A traversal attempt that lands outside both roots is reported as

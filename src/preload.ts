@@ -1395,6 +1395,18 @@ const api = {
     return () => ipcRenderer.removeListener('lockscreen:unlocked', handler);
   },
 
+  // Imported companion sprite packs (main/companionPacks.ts). The import opens a
+  // native picker in main; the renderer never hands main a path to read.
+  companionPacksList: (): Promise<unknown[]> => ipcRenderer.invoke('companionPacks:list'),
+  companionPacksImport: (opts?: { kind?: 'file' | 'folder' }): Promise<import('./shared/companionPacks').CompanionPackImportResult> =>
+    ipcRenderer.invoke('companionPacks:import', opts ?? {}),
+  companionPacksRename: (id: string, name: string): Promise<boolean> => ipcRenderer.invoke('companionPacks:rename', id, name),
+  companionPacksRemove: (id: string): Promise<boolean> => ipcRenderer.invoke('companionPacks:remove', id),
+  onCompanionPacksChanged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('companionPacks:changed', handler);
+    return () => ipcRenderer.removeListener('companionPacks:changed', handler);
+  },
   // L4 — transparent OS companion host over the real desktop
   companionHostSetEnabled: (
     enabled: boolean,

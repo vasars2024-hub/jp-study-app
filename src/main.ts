@@ -119,6 +119,7 @@ import {
   registerCompanionHostIpc,
   closeCompanionHost,
 } from './main/companionHost';
+import { registerCompanionPacksIpc } from './main/companionPacks';
 import { registerBuddySchedulerIpc, stopBuddyScheduler } from './main/buddyScheduler';
 import {
   configureSystemDictionary,
@@ -341,12 +342,16 @@ function registerAppProtocol(): void {
   const publicRoot = app.isPackaged
     ? path.join(process.resourcesPath, 'public')
     : path.join(app.getAppPath(), 'public');
+  // Owner-only third-party files (git-ignored; forge ships the folder only when it exists).
+  const privatePublicRoot = app.isPackaged
+    ? path.join(process.resourcesPath, 'private-assets', 'public')
+    : path.join(app.getAppPath(), 'private-assets', 'public');
 
   protocol.handle('app', (request) => {
     try {
       const url = new URL(request.url);
       const decision = resolveAppAsset(
-        { rendererRoot, publicRoot },
+        { rendererRoot, publicRoot, privatePublicRoot },
         decodeURIComponent(url.pathname),
         (candidate) => fs.existsSync(candidate),
       );
@@ -1898,6 +1903,7 @@ app.whenReady().then(async () => {
   registerMiniWidgetIpc();
   registerLockscreenIpc();
   registerPlayerSyncIpc();
+  registerCompanionPacksIpc();
   configureCompanionHost({
     rendererUrl,
     forwardConsole: forwardRendererConsole,

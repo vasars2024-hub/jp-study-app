@@ -273,7 +273,7 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'special', controlId: 'blanc-mode', titleKey: 'search.blancMode', terms: ['blanc mode', 'blanc', 'toolbox', 'toolbox os', 'minimal', 'plain mode', 'white mode', 'simple shell', 'mode', 'side agent'] },
   { section: 'settings', page: 'special', controlId: 'special-locked', titleKey: 'search.specialLocked', terms: ['special modules locked', 'modules locked'] },
   { section: 'settings', page: 'special', controlId: 'wired-archive', titleKey: 'search.wiredArchive', terms: ['wired archive', 'crt', 'boot replay', 'static', 'terminal ambient'] },
-  { section: 'settings', page: 'special', controlId: 'wired-finding-terminal', titleKey: 'search.wiredFinding', terms: ['navi terminal', 'wired finding', 'lyrics', 'shimeji', 'radar', 'surveillance', 'hacker terminal', 'fateburn'] },
+  { section: 'settings', page: 'special', controlId: 'wired-finding-terminal', titleKey: 'search.wiredFinding', terms: ['navi terminal', 'wired finding', 'lyrics', 'shimeji', 'radar', 'surveillance', 'hacker terminal', 'signal guide'] },
   { section: 'settings', page: 'special', controlId: 'wired-arcade', titleKey: 'search.wiredArcade', terms: ['wired games', 'wired arcade'] },
   { section: 'settings', page: 'special', controlId: 'aero-gadget-lab', titleKey: 'search.aeroGadgets', terms: ['aero gadget lab', 'xp', 'vista', 'windows media player', 'msn', 'cmd', 'legacy'] },
   { section: 'settings', page: 'special', controlId: 'aero-arcade', titleKey: 'search.aeroArcade', terms: ['aero games', 'aero arcade'] },

@@ -20,7 +20,7 @@ export type DialogueContext =
 
 const POOLS: Record<CompanionTypeId, Partial<Record<DialogueContext, string[]>>> = {
   'study-buddy': {
-    idle: ['Ready when you are.', 'Shall we review?', 'I brought flashcards.'],
+    idle: ['Ready when you are.', 'Shall we review?', 'I brought flashcards.', 'Bookmark ready.'],
     morning: ['Good morning — warm-up cards?', 'Sunlight and kanji.'],
     afternoon: ['Afternoon focus!', 'One more page?'],
     evening: ['Evening review time.', 'Wind down with a deck.'],
@@ -29,19 +29,19 @@ const POOLS: Record<CompanionTypeId, Partial<Record<DialogueContext, string[]>>>
     study: ['Nice reading streak.', 'That sentence was solid.'],
     flashcard: ['Card cleared!', 'Keep going.'],
     levelUp: ['Level up! You earned that.', 'Stronger every day.'],
-    click: ['Hi!', 'Let’s study.', 'Tap me anytime.'],
+    click: ['Hi!', 'Let’s study.', 'Tap me anytime.', 'Page by page.'],
   },
   critter: {
-    idle: ['Sniff sniff…', 'What’s over there?', 'Boop.'],
+    idle: ['Sniff sniff…', 'What’s over there?', 'Boop.', 'Warm spot found.'],
     morning: ['Morning stretch!', 'Floor feels warm.'],
     night: ['Curling up…', 'Zzz… almost.'],
     music: ['Dance paws!', 'Wiggle wiggle.'],
     study: ['You read; I explore.', 'Found a dust bunny.'],
     levelUp: ['You leveled! Bounce!', 'Sparkles!'],
-    click: ['Hey!', 'Pet? Okay.', 'Boop.'],
+    click: ['Hey!', 'Pet? Okay.', 'Boop.', 'Tail swish.'],
   },
   timekeeper: {
-    idle: ['Tick.', 'Still on schedule.', 'Watching the clock.'],
+    idle: ['Tick.', 'Still on schedule.', 'Watching the clock.', 'Tick, tock, study o’clock.'],
     morning: ['Good morning.', 'Day watch begins.'],
     afternoon: ['Midday check.', 'Hours are steady.'],
     evening: ['Evening hours.', 'Wind the dial.'],
@@ -49,24 +49,34 @@ const POOLS: Record<CompanionTypeId, Partial<Record<DialogueContext, string[]>>>
     music: ['Tempo noted.', 'In time.'],
     study: ['Logged.', 'Progress stamped.'],
     levelUp: ['Milestone clocked.', 'Level advanced.'],
-    click: ['Yes?', 'On the hour.', 'Listening.'],
+    click: ['Yes?', 'On the hour.', 'Listening.', 'Right on time.'],
   },
-  'miko-shimeji': {
-    idle: ['Still climbing.', 'Wall or ceiling?', 'Hmm.'],
-    morning: ['Morning climb!', 'Up we go.'],
+  // The Aero theme's desktop helper (Orbi by default): a chatty retro assistant.
+  'aero-assistant': {
+    idle: [
+      'Need a hand? I know every shortcut.',
+      'Five minutes free? I have a quick quiz ready.',
+      'Tip: double-click me for my second trick.',
+      'Wall or ceiling?',
+    ],
+    morning: ['Good morning! Your cards missed you.', 'Morning climb!'],
+    afternoon: ['Afternoon check-in: one quick deck?'],
+    evening: ['Evening already? Let us wrap up a deck.'],
+    night: ['Studying late? I will keep the screen glowing.'],
     music: ['Climb to the beat.', 'Higher!'],
-    study: ['You study; I scale.', 'Frame feels sturdy.'],
-    levelUp: ['Secret strength!', 'You leveled — celebrate.'],
-    click: ['Yes?', 'Climb show?', 'Hehe.'],
+    study: ['Nice reading. I bookmarked your place.', 'You study; I scale.'],
+    flashcard: ['Card cleared. Filed it for you.'],
+    levelUp: ['Level up! Cue the glossy fanfare.', 'Secret strength!'],
+    click: ['Hello again!', 'How can I help?', 'Hehe.'],
   },
   'wired-navi': {
-    idle: ['Signal acquired.', 'Channel open.', '…'],
+    idle: ['Signal acquired.', 'Channel open.', '…', 'Packet received.'],
     morning: ['Boot sequence… morning.', 'Link online.'],
     night: ['Night band clear.', 'Low power mode?'],
     music: ['Audio channel locked.', 'Waveform pretty.'],
     study: ['Data ingested.', 'Knowledge uplink.'],
     levelUp: ['Level packet received.', 'Upgrade complete.'],
-    click: ['Ready.', 'Command?', 'Ping.'],
+    click: ['Ready.', 'Command?', 'Ping.', 'Signal strong.'],
   },
 };
 

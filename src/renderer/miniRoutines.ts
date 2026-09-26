@@ -5,7 +5,7 @@
  * `CompanionLayer`, and while Mini is on there is no layer anywhere: the main
  * window renders `MiniMainBridge` instead of `DesktopShell`, and the floating
  * widget is a window of its own that never mounted the living layer. Measured
- * before this change — with Mini active, `buddy:run {c-bonzi, br-miko-cheer}`
+ * before this change — with Mini active, `buddy:run {c-aero, br-aero-cheer}`
  * produced no toast and no mood change, while the same dispatch on the desktop
  * ran the routine.
  *
@@ -105,7 +105,7 @@ export type MiniRoutineResult = { ok: boolean; error?: string };
 
 /**
  * Run one pinned routine. `onPatch` is how the widget shows `setMood` happening
- * — without it every miko routine (which is nothing but mood steps) would look
+ * — without it every Aero-assistant routine (which is nothing but mood steps) would look
  * like a button that does nothing.
  */
 export async function runMiniRoutine(

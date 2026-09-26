@@ -64,6 +64,7 @@ import {
 import { BUDDY_SPEECH_EVENT, speakBeepLine, voiceForType, type BuddySpeechDetail } from './beepSpeech';
 import { pickDialogueLine, type DialogueContext } from './dialoguePools';
 import { buddyText } from './buddyText';
+import { importSpritePack } from './companionPackImport';
 import { getUserLevel, onLevelChange } from '../levelService';
 import { useT } from '../i18n';
 
@@ -126,8 +127,8 @@ function secretLifecycleSuspended(): boolean {
   return document.documentElement.classList.contains('secret-lifecycle-suspended');
 }
 
-function isTreasureLockedBonzi(c: CompanionInstance): boolean {
-  return c.typeId === 'miko-shimeji' && !hasDiscoveredAero();
+function isTreasureLocked(c: CompanionInstance): boolean {
+  return c.typeId === 'aero-assistant' && !hasDiscoveredAero();
 }
 
 function wanderSpeed(reactivity: CompanionReactivity, activeness = 0.4): number {
@@ -230,7 +231,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const runRoutine = useCallback(
     (c: CompanionInstance, routineId: string) => {
-      if (isTreasureLockedBonzi(c)) return;
+      if (isTreasureLocked(c)) return;
       void runBuddyRoutine(routineId, {
         companionId: c.id,
         typeId: c.typeId,
@@ -851,7 +852,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     if (musicIsPlaying()) react('music-play');
   }, [env.enabled, env.companionsEnabled]);
 
-  const rejectTreasureBonzi = useCallback(
+  const rejectTreasureLocked = useCallback(
     (c: CompanionInstance) => {
       setShakeId(c.id);
       window.setTimeout(() => setShakeId((id) => (id === c.id ? null : id)), 420);
@@ -880,7 +881,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
    */
   const fireHold = (c: CompanionInstance) => {
     holdTimerRef.current = 0;
-    if (isTreasureLockedBonzi(c)) return;
+    if (isTreasureLocked(c)) return;
     const d = dragRef.current;
     if (d && d.id === c.id) {
       dragRef.current = null;
@@ -905,9 +906,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const onPointerDown = (c: CompanionInstance) => (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
-    if (isTreasureLockedBonzi(c)) {
+    if (isTreasureLocked(c)) {
       e.stopPropagation();
-      rejectTreasureBonzi(c);
+      rejectTreasureLocked(c);
       return;
     }
     // Armed before the `locked` bail-out: a locked pet cannot be dragged, but it
@@ -1009,8 +1010,8 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const onBuddyClick = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.stopPropagation();
-    if (isTreasureLockedBonzi(c)) {
-      rejectTreasureBonzi(c);
+    if (isTreasureLocked(c)) {
+      rejectTreasureLocked(c);
       return;
     }
     const { action, next } = decideClick(gestureRef.current, c.id, Date.now());
@@ -1047,7 +1048,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const onBuddyContext = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isTreasureLockedBonzi(c)) {
+    if (isTreasureLocked(c)) {
       // Right-click is the way out: the locked pet refuses everything else, so
       // without this it could never leave the desktop.
       setTreasureCompanionHidden(true);
@@ -1080,7 +1081,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         // routine whose forType does not match, so offering more would be a
         // picker with dead entries.
         const bindableRoutines = routinesForType(routines, c.typeId);
-        const lockedTreasure = isTreasureLockedBonzi(c);
+        const lockedTreasure = isTreasureLocked(c);
         return (
           <div
             key={c.id}
@@ -1234,6 +1235,22 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                   }}
                 >
                   {t('companion.menu.hideHour')}
+                </button>
+                <button
+                  type="button"
+                  className="btn small"
+                  onClick={() => {
+                    setMenuId(null);
+                    // Dress this pet in the imported pack straight away.
+                    void importSpritePack('file', c.typeId).then((res) => {
+                      if (!res) return;
+                      window.dispatchEvent(
+                        new CustomEvent('os:toast', { detail: { message: res.message, kind: res.ok ? 'info' : 'warn' } }),
+                      );
+                    });
+                  }}
+                >
+                  {t('companion.menu.importPack')}
                 </button>
                 <button
                   type="button"
