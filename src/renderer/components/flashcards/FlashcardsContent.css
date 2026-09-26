@@ -389,6 +389,22 @@
   box-shadow: none;
 }
 
+/* Practice sizes its four tiles by its own width, so they read 1×4, 2×2 or one column,
+   never three and a straggler. The queries read .flash-view, already an inline-size container. */
+.flash-practice .ui-tile-list--grid.flash-practice__modes {
+  grid-template-columns: minmax(0, 1fr);
+}
+@container (min-width: 32rem) {
+  .flash-practice .ui-tile-list--grid.flash-practice__modes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 62rem) {
+  .flash-practice .ui-tile-list--grid.flash-practice__modes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* Practice: a head row (name + lead, deck picker) over four mode tiles of one shape. */
 .flash-practice__head {
   display: flex;
