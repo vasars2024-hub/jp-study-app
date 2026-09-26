@@ -25,7 +25,7 @@ export async function glossFor(term: string, lang: StudyLang): Promise<{ reading
   try {
     const result = lang === 'zh'
       ? await window.api.lookupChinese?.(term, 4)
-      : await window.api.lookupTerm?.(term, 4);
+      : await window.api.lookupTerm?.(term, 4, lang);
     const entry = result?.entries?.find((e) => e.word === term) ?? result?.entries?.[0];
     if (!entry) return { reading: '', meaning: '' };
     const meaning = entry.senses

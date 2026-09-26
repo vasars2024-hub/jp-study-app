@@ -45,6 +45,11 @@ interface Props {
    */
   onMine?: () => void;
   onClose: () => void;
+  /**
+   * The language the word is in, when the host knows it better than the app-wide
+   * study language (the live-captions bar reads its own spoken language).
+   */
+  lang?: DictLang;
 }
 
 const POPUP_W = 340;
@@ -58,6 +63,7 @@ export default function DictionaryPopup({
   anchorTop,
   onMine,
   onClose,
+  lang: langProp,
 }: Props) {
   const { t } = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -94,7 +100,7 @@ export default function DictionaryPopup({
       : { left, top: Math.min(ly + 12, vh - 120), width: POPUP_W, maxHeight };
   }, [x, y, anchorTop, rightInsetPx]);
 
-  const lang = getStudyLang() as DictLang;
+  const lang = langProp ?? (getStudyLang() as DictLang);
 
   // Resolve the word to its dictionary form for knowledge grading (JP only).
   const [lemma, setLemma] = useState('');

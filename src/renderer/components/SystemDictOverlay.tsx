@@ -101,7 +101,9 @@ export default function SystemDictOverlay() {
       {translate ? (
         <SentenceTranslatePopup text={query} onClose={close} />
       ) : (
-        <DictionaryPopup query={query} x={12} y={12} onClose={close} />
+        // The word's own language: a Russian word copied while studying Japanese is
+        // looked up in a Russian dictionary, not through Japanese glosses.
+        <DictionaryPopup query={query} x={12} y={12} lang={studyLangOfText(query, getStudyLang())} onClose={close} />
       )}
       <div className="sysdict-actions">
         <Button size="sm" leftIcon={<Icon name="flashcards" size={16} />} onClick={openPreview} data-sysdict-preview>

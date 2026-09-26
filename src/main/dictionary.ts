@@ -263,11 +263,41 @@ export async function lookupWord(query: string): Promise<DictResult> {
   }
 }
 
-/** Merged offline Yomitan + pitch/freq enrichment, with Jisho fallback. */
-export async function lookupTerm(query: string, limit?: number): Promise<DictResult> {
+/**
+ * A Russian word, from dictionaries whose *headwords* are Russian.
+ *
+ * Unpinned, the database also searched every dictionary's glosses, so JMdict's
+ * Japanese–Russian glosses answered «погода» with 天気 as if it were a Russian
+ * entry. The source language is pinned, and a Cyrillic query is matched on
+ * headwords only: a Russian word is looked up as a Russian word. The legacy
+ * stores and Jisho are Japanese and are never asked. An empty result carries
+ * `missingSourceLangs` when no Russian dictionary is installed at all.
+ */
+async function lookupRussianTerm(q: string, pageSize: number): Promise<DictResult> {
+  const query = { text: q, limit: pageSize, sourceLangs: ['ru'], headwordsOnly: textMatchesLang('ru', q) };
+  try {
+    const exact = await readDictionary('lookup', query);
+    if (exact.entries.length) return lookupResultToPerLanguageDictResult(exact);
+    // Same last resort as the unpinned path: close spellings, only after every
+    // exact probe missed, labelled approximate by the adapter.
+    return lookupResultToPerLanguageDictResult(await readDictionary('lookup', { ...query, fuzzy: true }));
+  } catch {
+    return { query: q, entries: [] };
+  }
+}
+
+/**
+ * Merged offline Yomitan + pitch/freq enrichment, with Jisho fallback. `lang`
+ * is the language the word is in (the study language of the surface that asked):
+ * Chinese and Russian are answered by their own dictionaries only; Japanese, or
+ * no language, keeps the any-to-any search the Dictionary app relies on.
+ */
+export async function lookupTerm(query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> {
   const q = normalizeLexiconText(query ?? '');
   if (!q) return { query: q, entries: [] };
   const pageSize = clampLookupLimit(limit);
+  if (lang === 'zh') return lookupChineseInDictionary(q, pageSize);
+  if (lang === 'ru') return lookupRussianTerm(q, pageSize);
 
   // SQLite/FTS is the canonical any-to-any path. It is additive during the
   // migration: installations whose legacy JSON stores have not been imported
@@ -412,7 +442,8 @@ async function lookupOfflineMany(
       continue;
     }
     if (lang === 'ru') {
-      out.push({ query: q, entries: [] });
+      // Carries `missingSourceLangs` when no Russian dictionary is installed.
+      out.push(hit ? lookupResultToPerLanguageDictResult(hit) : { query: q, entries: [] });
       continue;
     }
     if (legacyReady === undefined) legacyReady = await initYomitan().catch(() => false);
@@ -1028,7 +1059,8 @@ export function registerDictionaryIpc(): void {
   // `dictionary/cacheWarmup.ts` for the measurement that separates the two.
   scheduleDictionaryCacheWarmup({ legs: dictionaryCacheWarmupLegs() });
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
-  ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number) => lookupTerm(query, limit));
+  ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number, lang?: unknown) =>
+    lookupTerm(query, limit, lang === 'ja' || lang === 'zh' || lang === 'ru' ? lang : undefined));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
   // `limit` is clamped here rather than trusted: it arrives from a renderer.
   ipcMain.handle('dict:lookupChinese', (_e, query: string, limit?: number) =>

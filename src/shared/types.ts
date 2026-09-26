@@ -136,6 +136,12 @@ export interface DictResult {
    * complete one is indistinguishable from "that is all this word has".
    */
   truncated?: true;
+  /**
+   * The study language(s) this lookup was pinned to that have no dictionary
+   * installed — the surface says "no Russian dictionary, install one" and links
+   * to Models & dictionaries rather than a bare "no match". Empty results only.
+   */
+  missingSourceLangs?: string[];
   /** Set when the lookup itself failed (e.g. offline). */
   error?: string;
   /**

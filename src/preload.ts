@@ -521,8 +521,8 @@ const api = {
    * that carries `truncated` had more matches than that, and asking again with a
    * larger limit is the only way to reach them.
    */
-  lookupTerm: (query: string, limit?: number): Promise<DictResult> =>
-    ipcRenderer.invoke('dict:lookupTerm', query, limit),
+  lookupTerm: (query: string, limit?: number, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> =>
+    ipcRenderer.invoke('dict:lookupTerm', query, limit, lang),
   /**
    * Chinese lookup — the dictionary database first, CC-CEDICT second. Replaces
    * `renderer/chineseDict.ts`, which parsed 9.4 MB of CC-CEDICT on the UI thread.
@@ -3528,7 +3528,7 @@ const api = {
   captionsDiscardDraft: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('captions:discardDraft', id),
   captionsStartWindowsLiveCaptions: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('captions:startWindowsLiveCaptions'),
-  captionsOpenSettings: (page?: 'transcription' | 'shortcuts'): Promise<{ ok: boolean }> =>
+  captionsOpenSettings: (page?: 'transcription' | 'shortcuts' | 'dictionaries'): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('captions:openSettings', page),
   captionsOverlaySetIgnoreMouse: (ignore: boolean): void => ipcRenderer.send('captions:overlaySetIgnoreMouse', ignore),
   captionsOverlayGetBounds: (): Promise<import('./shared/captionsOverlay').OverlayBounds> =>
@@ -3571,8 +3571,8 @@ const api = {
   },
   captionsMineReply: (reply: import('./shared/captionsOverlay').CaptionMineReply): void =>
     ipcRenderer.send('captions:mine-reply', reply),
-  onCaptionsOpenSettings: (cb: (payload: { page: 'transcription' | 'shortcuts' }) => void): (() => void) => {
-    const handler = (_e: unknown, payload: { page: 'transcription' | 'shortcuts' }): void => cb(payload);
+  onCaptionsOpenSettings: (cb: (payload: { page: 'transcription' | 'shortcuts' | 'dictionaries' }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { page: 'transcription' | 'shortcuts' | 'dictionaries' }): void => cb(payload);
     ipcRenderer.on('captions:open-settings', handler);
     return () => ipcRenderer.removeListener('captions:open-settings', handler);
   },
