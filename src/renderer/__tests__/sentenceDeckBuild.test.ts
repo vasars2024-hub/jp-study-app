@@ -21,7 +21,7 @@ import type { MineNoteRequest } from '../../shared/anki';
 import type { SentenceAudioBatchResult } from '../../main/sentenceAudioBatch';
 import type { SentenceSegment } from '../../shared/sentenceDeck';
 import { sentenceDeckBookId } from '../../shared/sentenceDeck';
-import { createDeckFolder, loadDeck, loadDeckFolders } from '../flashcardDeck';
+import { addDeckCardsTracked, createDeckFolder, loadDeck, loadDeckFolders } from '../flashcardDeck';
 import { markAnkiSeen } from '../studyMining';
 import { buildSentenceDeck, undoSentenceDeck, type SentenceDeckDone } from '../sentenceDeckBuild';
 
@@ -37,6 +37,7 @@ let progressListener: ((p: { jobId: string; done: number; total: number; failed:
 let extractRequests: unknown[];
 let mined: MineNoteRequest[];
 let linkState: 'connected' | 'disconnected';
+let released: string[];
 
 function okBatch(): SentenceAudioBatchResult {
   return {
@@ -58,7 +59,12 @@ beforeEach(() => {
   extractRequests = [];
   mined = [];
   linkState = 'disconnected';
+  released = [];
   (window as unknown as { api: unknown }).api = {
+    flashcardReleaseAudio: async (paths: string[]) => {
+      released.push(...paths);
+      return { removed: paths.length, skipped: 0 };
+    },
     onSentenceDeckProgress: (cb: typeof progressListener) => {
       progressListener = cb;
       return () => { progressListener = null; };
@@ -157,6 +163,31 @@ describe('buildSentenceDeck', () => {
     expect(loadDeckFolders()).toHaveLength(0);
   });
 
+  it('gives back the clips a cancelled batch had already cut, except one an older card uses', async () => {
+    addDeckCardsTracked([{
+      word: '前のカード', reading: '', meaning: '', source: 'subtitle',
+      audioPath: 'C:/ud/flashcard-audio/mined/SHARED.mp3',
+    }]);
+    batch = {
+      ok: true,
+      cancelled: true,
+      results: [
+        { id: '1', ok: true, audioPath: 'C:/ud/flashcard-audio/mined/new1.mp3', imagePath: 'C:/ud/flashcard-audio/mined/new1.jpg' },
+        // The same line cut before: content-addressed, so the very same file.
+        { id: '2', ok: true, audioPath: ['c:', 'ud', 'flashcard-audio', 'mined', 'shared.mp3'].join(String.fromCharCode(92)) },
+      ],
+    };
+    expect(await buildSentenceDeck(input(), { jobId: 'c1' })).toEqual({ status: 'cancelled' });
+    expect(released.sort()).toEqual(['C:/ud/flashcard-audio/mined/new1.jpg', 'C:/ud/flashcard-audio/mined/new1.mp3']);
+    expect(loadDeck()).toHaveLength(1);
+  });
+
+  it('gives back the clips when the audio job is refused after cutting some', async () => {
+    batch = { ok: false, cancelled: false, results: [{ id: '1', ok: true, audioPath: 'C:/ud/flashcard-audio/mined/x.mp3' }], reasonKey: 'sentenceDeck.error.audioFailed' };
+    await buildSentenceDeck(input(), { jobId: 'c2' });
+    expect(released).toEqual(['C:/ud/flashcard-audio/mined/x.mp3']);
+  });
+
   it('refuses an unnamed deck and an empty plan before cutting anything', async () => {
     expect(await buildSentenceDeck(input({ deckName: '  ' }), { jobId: 'j5' })).toMatchObject({ reasonKey: 'sentenceDeck.error.noName' });
     expect(await buildSentenceDeck(input({ segments: [] }), { jobId: 'j6' })).toMatchObject({ reasonKey: 'sentenceDeck.error.nothingToAdd' });
@@ -170,6 +201,19 @@ describe('undoSentenceDeck', () => {
     expect(undoSentenceDeck(done)).toBe(3);
     expect(loadDeck()).toHaveLength(0);
     expect(loadDeckFolders()).not.toContain('Yuru Camp - 01');
+  });
+
+  it('deletes the clips and stills it cut, but not a file an older card still uses', async () => {
+    addDeckCardsTracked([{
+      word: '前のカード', reading: '', meaning: '', source: 'subtitle',
+      audioPath: 'C:/ud/flashcard-audio/mined/aaa.mp3',
+    }]);
+    const done = await buildSentenceDeck(input({ withStill: true }), { jobId: 'u3' }) as SentenceDeckDone;
+    expect(released).toEqual([]);
+    undoSentenceDeck(done);
+    // aaa.mp3 is also the older card's clip; ccc's audio and still were this batch's alone.
+    expect(released.sort()).toEqual(['C:/ud/flashcard-audio/mined/ccc.jpg', 'C:/ud/flashcard-audio/mined/ccc.mp3']);
+    expect(loadDeck().map((card) => card.word)).toEqual(['前のカード']);
   });
 
   it('keeps a folder that existed before the batch', async () => {
@@ -197,6 +241,13 @@ describe('also sending to Anki', () => {
       audioFilename: 'gum-sentence-aaa.mp3',
     });
     expect(first?.audioBase64).toBe(btoa('C:/ud/flashcard-audio/mined/aaa.mp3'));
+  });
+
+  it('queues the notes while Anki is closed even on a profile that has never reached Anki', async () => {
+    // No markAnkiSeen(): the switch itself says Anki is part of this setup.
+    const done = await buildSentenceDeck(input({ sendToAnki: true }), { jobId: 'a3' }) as SentenceDeckDone;
+    expect(done.anki).toEqual({ added: 0, queued: 3, duplicate: 0, failed: 0, local: 0 });
+    expect(loadDeck().every((card) => card.ankiPending)).toBe(true);
   });
 
   it('queues the notes while Anki is closed, keeping the local cards', async () => {

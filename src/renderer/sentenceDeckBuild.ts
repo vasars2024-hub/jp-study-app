@@ -31,7 +31,7 @@ import {
   type FlashcardTextProvenance,
 } from './flashcardDeck';
 import { enrichNewCards } from './flashcardAutoEnrich';
-import { mineKeyFor, mineToStudy, type MineAnkiOutcome } from './studyMining';
+import { markAnkiSeen, mineKeyFor, mineToStudy, type MineAnkiOutcome } from './studyMining';
 
 export interface SentenceDeckBuildInput {
   videoPath: string;
@@ -138,6 +138,30 @@ export function sentenceDeckDrafts(
     if (clip?.ok && clip.imagePath) draft.imagePath = clip.imagePath;
     return draft;
   });
+}
+
+function mediaKey(path: string): string {
+  return path.trim().replace(/\\/g, '/').toLowerCase();
+}
+
+/**
+ * Delete the managed clips and stills a batch cut that no card points at — after
+ * a cancel, a failed write, or Undo. The store is content-addressed, so a file
+ * this batch cut can be the very file an older card already uses (the same line
+ * cut twice); only what the deck no longer references goes, and main refuses
+ * anything outside the managed root.
+ */
+function releaseUnreferencedMedia(paths: ReadonlyArray<string | undefined>): void {
+  const cut = [...new Set(paths.filter((path): path is string => Boolean(path)))];
+  if (!cut.length || typeof window.api?.flashcardReleaseAudio !== 'function') return;
+  const referenced = new Set(
+    loadDeck()
+      .flatMap((card) => [card.audioPath, card.imagePath])
+      .filter((path): path is string => Boolean(path))
+      .map(mediaKey),
+  );
+  const free = cut.filter((path) => !referenced.has(mediaKey(path)));
+  if (free.length) void window.api.flashcardReleaseAudio(free).catch(() => undefined);
 }
 
 async function managedBase64(path: string | undefined): Promise<string | undefined> {
@@ -256,8 +280,14 @@ export async function buildSentenceDeck(
   } finally {
     unsubscribe?.();
   }
-  if (batch.cancelled || cancelled()) return { status: 'cancelled' };
+  // What this batch stored; given back unless cards end up pointing at it.
+  const cutMedia = (batch.results ?? []).flatMap((result) => [result.audioPath, result.imagePath]);
+  if (batch.cancelled || cancelled()) {
+    releaseUnreferencedMedia(cutMedia);
+    return { status: 'cancelled' };
+  }
   if (!batch.ok) {
+    releaseUnreferencedMedia(cutMedia);
     return { status: 'refused', reasonKey: batch.reasonKey ?? 'sentenceDeck.error.audioFailed', detail: batch.error };
   }
 
@@ -277,6 +307,7 @@ export async function buildSentenceDeck(
     createDeckFolder(folder);
     created = addDeckCardsTracked(sentenceDeckDrafts(input, clips));
   } catch (error) {
+    releaseUnreferencedMedia(cutMedia);
     return {
       status: 'refused',
       reasonKey: 'sentenceDeck.error.writeFailed',
@@ -298,6 +329,10 @@ export async function buildSentenceDeck(
     bookId: sentenceDeckBookId(input.videoPath),
   };
   if (input.sendToAnki) {
+    // Switching "Also send to Anki" on says Anki is part of this setup, and the
+    // switch promises "queued while Anki is closed": without this a profile that
+    // had never reached Anki kept every note local and reported them "not sent".
+    markAnkiSeen();
     hooks.onProgress?.({ phase: 'anki', done: 0, total: created.length, failed: 0 });
     done.anki = await sendCardsToAnki(
       input,
@@ -310,15 +345,20 @@ export async function buildSentenceDeck(
 }
 
 /**
- * Take the whole batch back: its cards, and its folder when this batch made it
- * and nothing else has been filed there since. Notes already sent to Anki stay
- * in Anki — the dialog says so rather than deleting from a collection this app
- * does not own.
+ * Take the whole batch back: its cards, the clips and stills cut for them, and
+ * its folder when this batch made it and nothing else has been filed there
+ * since. Notes already sent to Anki stay in Anki — the dialog says so rather
+ * than deleting from a collection this app does not own.
  */
 export function undoSentenceDeck(result: Pick<SentenceDeckDone, 'addedIds' | 'folder' | 'folderCreated'>): number {
+  const ids = new Set(result.addedIds);
+  const media = loadDeck()
+    .filter((card) => ids.has(card.id))
+    .flatMap((card) => [card.audioPath, card.imagePath]);
   removeDeckCards(result.addedIds);
   if (result.folderCreated && !loadDeck().some((card) => card.folder === result.folder)) {
     deleteDeckFolder(result.folder);
   }
+  releaseUnreferencedMedia(media);
   return result.addedIds.length;
 }

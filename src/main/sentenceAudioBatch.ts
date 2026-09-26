@@ -102,6 +102,12 @@ const MIN_CLIP_BYTES = 1_024;
 
 function runToBuffer(args: string[], signal?: AbortSignal): Promise<RunOutcome> {
   return new Promise((resolve) => {
+    // An 'abort' listener added after the fact never fires: a cancelled batch
+    // must not start another encoder (the still after a clip it just stored).
+    if (signal?.aborted) {
+      resolve({ ok: false, error: 'cancelled' });
+      return;
+    }
     let proc: ChildProcessWithoutNullStreams;
     try {
       proc = spawn(ffmpegPath, args, { windowsHide: true });
@@ -193,6 +199,8 @@ export async function extractSentenceClip(
  * Cut every clip in `request`, `concurrency` at a time, in order of the
  * request. Resolves with one result per clip that was attempted; after a
  * cancel the remaining clips are simply not attempted, and `cancelled` says so.
+ * Every file stored — including one finished just as the cancel arrived — is in
+ * `results`, because the caller owns deleting what it will not use.
  */
 export async function extractSentenceAudioBatch(
   request: SentenceAudioBatchRequest,
@@ -238,7 +246,13 @@ export async function extractSentenceAudioBatch(
       const index = next;
       next += 1;
       const result = await extractSentenceClip(base, clips[index], hooks.mediaDirectory, hooks.signal);
-      if (hooks.signal?.aborted) return;
+      if (hooks.signal?.aborted) {
+        // Cut and stored before the cancel landed (its audio, or audio without the
+        // still the cancel stopped): still reported, so the caller can take the
+        // file back — a cancel must not leave clips no card will ever point at.
+        if (result.ok) results[index] = result;
+        return;
+      }
       record(index, result);
     }
   };
