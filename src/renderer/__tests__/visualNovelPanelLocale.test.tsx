@@ -100,6 +100,7 @@ describe('every vn* key has a consumer', () => {
     'renderer/components/immersion/VisualNovelScriptImportPanel.tsx',
     'renderer/components/immersion/captureKindKeys.ts',
     'shared/vnActionReason.ts',
+    'shared/visualNovelSourceFailure.ts',
   ].map((rel) => readFileSync(join(SRC, rel), 'utf8')).join('\n');
 
   const en = readFileSync(join(SRC, 'shared/i18n/catalogs/en.ts'), 'utf8');

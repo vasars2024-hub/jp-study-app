@@ -165,6 +165,12 @@ describe('learner map', () => {
     };
     const { default: WorldHeatMap } = await import('../components/resources/WorldHeatMap');
     const host = await mount(<WorldHeatMap />);
+    // The full-size card holds a placeholder until the lazy map chunk is in (no layout
+    // jump), so wait for the real caption rather than one microtask.
+    await vi.waitFor(async () => {
+      await act(async () => { await Promise.resolve(); });
+      expect(host.querySelector('.heatmap-section[aria-busy]')).toBeNull();
+    }, { timeout: 5_000 });
     const caption = host.querySelector('.heatmap-caption')?.textContent ?? '';
     expect(caption).toContain('"count":1');
     expect(caption).toContain('"total":3');
