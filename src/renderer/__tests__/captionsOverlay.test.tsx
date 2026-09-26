@@ -173,6 +173,17 @@ describe('CaptionsOverlay', () => {
     expect(el.querySelector('.cap-line-prev')?.textContent).toBe('你好');
   });
 
+  it('a Traditional Chinese learner\'s lines are marked zh-Hant, so the glyphs are the right ones', async () => {
+    localStorage.setItem('jp-study-zh-script', 'traditional');
+    try {
+      installBridge(baseState(), [line({ text: '今天天氣很好' })]);
+      const el = await mount();
+      expect(el.querySelector('.cap-line-current [lang]')?.getAttribute('lang')).toBe('zh-Hant');
+    } finally {
+      localStorage.removeItem('jp-study-zh-script');
+    }
+  });
+
   it('Japanese lines split on the tokenizer\'s morphemes once it has loaded', async () => {
     installBridge(baseState({ studyLang: 'ja' }), [line({ text: '猫が好きです' })]);
     const el = await mount();

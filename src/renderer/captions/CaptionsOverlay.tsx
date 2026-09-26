@@ -36,6 +36,7 @@ import {
   type OverlayBounds,
 } from '../../shared/captionsOverlay';
 import type { StudyLang } from '../../shared/studyLang';
+import { studyContentLang } from '../studyEnvironment';
 import './captionsOverlay.css';
 
 const SOURCE_LABEL_KEYS: Record<CaptionSource, string> = {
@@ -102,7 +103,7 @@ function CaptionLineText({
 }) {
   const spans = useMemo(() => lineSpans(line.text, lang, tokenize), [line.text, lang, tokenize]);
   return (
-    <span className={className} lang={lang === 'zh' ? 'zh-Hans' : lang}>
+    <span className={className} lang={studyContentLang(lang)}>
       {spans.map((span) =>
         span.word ? (
           <span
@@ -199,7 +200,7 @@ function DraftCard({ draft, onDone }: { draft: CaptionDraft; onDone: () => void 
         className="cap-draft-text"
         value={text}
         rows={2}
-        lang={draft.studyLang === 'zh' ? 'zh-Hans' : draft.studyLang}
+        lang={studyContentLang(draft.studyLang)}
         placeholder={t('captions.draft.placeholder')}
         aria-label={t('captions.draft.editLabel')}
         onChange={(e) => {
