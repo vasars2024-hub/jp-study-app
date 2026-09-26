@@ -39,6 +39,7 @@ import {
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import Icon from '../Icons';
+import WindowedStrip from './WindowedStrip';
 import VirtualList from '../VirtualList';
 import EpubMiningPanel from '../EpubMiningPanel';
 import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
@@ -173,6 +174,8 @@ const TEXT_PROVENANCE_KEYS: Record<
   transcript: 'flash.provenance.transcript',
   'book-text': 'flash.provenance.bookText',
 };
+
+const reviewCardKey = (card: { id: string }): string => card.id;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -1262,6 +1265,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
     if (current?.promptKind === 'listening') void state.playCurrentAudio();
   }, [current?.id, current?.promptKind]);
 
+  // Each strip chip looked its own index up with findIndex: O(n²) per render.
+  const sessionIndexById = useMemo(
+    () => new Map(sessionCards.map((card, index) => [card.id, index] as const)),
+    [sessionCards],
+  );
+
   /**
    * "Ask about how this session went" — a different gesture from asking about the
    * saved-word list, which is why it lives here rather than in the overview.
@@ -1289,7 +1298,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   };
 
   function reviewStripCard(card: ReviewCard, mastered: boolean): JSX.Element {
-    const i = sessionCards.findIndex((c) => c.id === card.id);
+    const i = sessionIndexById.get(card.id) ?? -1;
     const active = i === reviewIndex;
     return (
       <button
@@ -1391,9 +1400,13 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               <span className="flash-review-group-label">
                 {t('flash.dontKnowGroup', { count: unknownReviewCards.length })}
               </span>
-              <div className="flash-strip flash-review-strip" role="list">
-                {unknownReviewCards.map((card) => reviewStripCard(card, false))}
-              </div>
+              <WindowedStrip
+                className="flash-strip flash-review-strip"
+                items={unknownReviewCards}
+                itemKey={reviewCardKey}
+                activeKey={current?.id}
+                renderItem={(card) => reviewStripCard(card, false)}
+              />
             </div>
           )}
           {knownReviewCards.length > 0 && (
@@ -1401,9 +1414,13 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               <span className="flash-review-group-label">
                 {t('flash.knowGroup', { count: knownReviewCards.length })}
               </span>
-              <div className="flash-strip flash-review-strip" role="list">
-                {knownReviewCards.map((card) => reviewStripCard(card, true))}
-              </div>
+              <WindowedStrip
+                className="flash-strip flash-review-strip"
+                items={knownReviewCards}
+                itemKey={reviewCardKey}
+                activeKey={current?.id}
+                renderItem={(card) => reviewStripCard(card, true)}
+              />
             </div>
           )}
           {sessionCards.length > 1 && (
