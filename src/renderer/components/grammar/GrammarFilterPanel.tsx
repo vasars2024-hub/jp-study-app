@@ -18,6 +18,9 @@ import {
   categoryCounts,
   familiarityFilterCounts,
   functionCounts,
+  listFilterCounts,
+  GRAMMAR_LIST_IDS,
+  type FilterablePoint,
   type PracticeFilters,
 } from '../../data/grammar/practiceFilters';
 import type { GxLevel } from '../../grammarFamiliarity';
@@ -42,7 +45,7 @@ export default function GrammarFilterPanel({
   onChange,
 }: {
   filters: PracticeFilters;
-  corpus: readonly NormalizedGrammarPoint[];
+  corpus: readonly (NormalizedGrammarPoint | FilterablePoint)[];
   onChange: (next: PracticeFilters) => void;
 }) {
   const { t, lang: uiLang } = useT();
@@ -88,6 +91,9 @@ export default function GrammarFilterPanel({
   const famCounts = useMemo(() => familiarityFilterCounts(corpus, filters), [corpus, filters]);
 
   const fnCounts = useMemo(() => functionCounts(corpus, filters), [corpus, filters]);
+
+  /* Favourites / study queue — the learner's own lists, counted the same way. */
+  const listCounts = useMemo(() => listFilterCounts(corpus, filters), [corpus, filters]);
 
   const groups = useMemo(() => {
     const langFilter = filters.lang === 'all' ? undefined : filters.lang;
@@ -149,6 +155,13 @@ export default function GrammarFilterPanel({
         key: `reg-${r}`,
         label: t(`grammar.register.${r}`),
         clear: () => patch({ registers: filters.registers.filter((x) => x !== r) }),
+      });
+    }
+    for (const l of filters.lists) {
+      chips.push({
+        key: `list-${l}`,
+        label: t(`grammar.lists.${l}`),
+        clear: () => patch({ lists: filters.lists.filter((x) => x !== l) }),
       });
     }
     for (const b of filters.familiarity) {
@@ -303,6 +316,31 @@ export default function GrammarFilterPanel({
               {t(`grammar.register.${r}`)}
             </label>
           ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="gx-filters-section">
+        <legend className="gx-filters-label">{t('grammar.lists.legend')}</legend>
+        <div className="gx-filters-chiprow">
+          {GRAMMAR_LIST_IDS.map((l) => {
+            const n = listCounts[l] || 0;
+            const checked = filters.lists.includes(l);
+            return (
+              <label
+                key={l}
+                className={`gx-chip${checked ? ' is-on' : ''}${n === 0 && !checked ? ' is-empty' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={n === 0 && !checked}
+                  onChange={() => patch({ lists: toggleIn(filters.lists, l) })}
+                />
+                {t(`grammar.lists.${l}`)}
+                <span className="muted gx-filters-cat-count">{n}</span>
+              </label>
+            );
+          })}
         </div>
       </fieldset>
 

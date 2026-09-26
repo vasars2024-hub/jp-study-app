@@ -22,6 +22,7 @@ import { RU_CEFR } from './ru-cefr';
 import { HSK_STARTER } from './hsk-starter';
 import { writeLocalStorageJson } from '../../localStorageWrite';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
+import { applyAuthoredContent } from './authoredContent';
 
 // `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
 // re-exported by ./types. eslint-plugin-import flags that as a duplicate export
@@ -32,6 +33,15 @@ export * from './types';
 /* eslint-disable-next-line import/export */
 export * from './functions';
 export * from './taxonomy';
+export {
+  AUTHORED_CONTENT,
+  TAG_CORRECTIONS,
+  applyAuthoredContent,
+  authoringProgress,
+  grammarAuthoringQueue,
+} from './authoredContent';
+export { isHollowGrammarPoint, structureCopiesTitle, explanationCopiesMeaning } from './hollow';
+export type { AuthoredGrammarContent, AuthoringQueueEntry } from './authoredContent';
 export { GUIDES } from './guides';
 export {
   normalizeGrammarPoint,
@@ -150,15 +160,15 @@ const RU_AUTHORED: ModuleProvenance = {
 export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(N5, CORE),
   ...normalizeGrammarList(N4, CORE),
-  ...normalizeGrammarList(withImportedExamples(N4_SUPPLEMENT), supplement('n4')),
+  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N4_SUPPLEMENT)), supplement('n4')),
   ...normalizeGrammarList(N3, CORE),
-  ...normalizeGrammarList(withImportedExamples(N3_SUPPLEMENT), supplement('n3')),
+  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N3_SUPPLEMENT)), supplement('n3')),
   ...normalizeGrammarList(N2, CORE),
   ...normalizeGrammarList(N2_EXTRA, CORE),
-  ...normalizeGrammarList(withImportedExamples(N2_SUPPLEMENT), supplement('n2')),
+  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N2_SUPPLEMENT)), supplement('n2')),
   ...normalizeGrammarList(N1, CORE),
   ...normalizeGrammarList(N1_EXTRA, CORE),
-  ...normalizeGrammarList(withImportedExamples(N1_SUPPLEMENT), supplement('n1')),
+  ...normalizeGrammarList(withImportedExamples(applyAuthoredContent(N1_SUPPLEMENT)), supplement('n1')),
   ...normalizeGrammarList(HSK, HSK_SEED),
   ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
   ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),

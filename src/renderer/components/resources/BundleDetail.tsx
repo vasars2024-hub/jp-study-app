@@ -2,6 +2,7 @@ import Icon, { type IconName } from '../Icons';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import type { Bundle } from '../../../shared/resourcesCatalog';
 import { useT } from '../../i18n';
+import { costLabel } from './costLabel';
 
 function hostOf(url: string): string {
   try {
@@ -146,7 +147,7 @@ export default function BundleDetail({
             <button key={r.url} className="res-card" onClick={() => onOpenLink(r.url)}>
               <span className="res-card-top">
                 <span className="res-name">{r.name}</span>
-                <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
+                <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{costLabel(t, r.cost)}</span>
               </span>
               <span className="res-desc">{r.description}</span>
               <span className="res-host">

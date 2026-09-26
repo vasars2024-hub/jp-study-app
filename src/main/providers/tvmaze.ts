@@ -39,7 +39,7 @@ import {
 } from './providerHttp';
 
 const TVMAZE = 'https://api.tvmaze.com';
-const EMBEDS = 'embed%5B%5D=episodes&embed%5B%5D=akas&embed%5B%5D=images';
+const EMBEDS = 'embed%5B%5D=episodes&embed%5B%5D=akas&embed%5B%5D=images&embed%5B%5D=cast';
 
 /** 20 per 10 s is TVmaze's published ceiling; this stays just under it. */
 const limiter = new RateLimiter(2, 110);
@@ -94,7 +94,23 @@ export interface TvmazeShow {
     episodes?: TvmazeEpisode[] | null;
     akas?: Array<{ name?: string | null; country?: { code?: string | null } | null }> | null;
     images?: TvmazeImage[] | null;
+    cast?: Array<{ person?: { name?: string | null } | null }> | null;
   } | null;
+  schedule?: { time?: string | null; days?: string[] | null } | null;
+}
+
+/** The first billed cast members, deduplicated. */
+export function tvmazeCast(show: TvmazeShow, limit = 8): string[] | undefined {
+  const names = [...new Set((show._embedded?.cast ?? []).map((c) => text(c?.person?.name)).filter((n): n is string => Boolean(n)))];
+  return names.length ? names.slice(0, limit) : undefined;
+}
+
+/** A weekly slot such as "Sunday 23:00" from a TVmaze schedule; nothing for a show with no fixed slot. */
+export function tvmazeSchedule(show: TvmazeShow): string | undefined {
+  const days = (show.schedule?.days ?? []).filter(Boolean);
+  const time = text(show.schedule?.time);
+  if (!days.length && !time) return undefined;
+  return [days.join(', '), time].filter(Boolean).join(' ');
 }
 
 /** Han, kana and hangul — what makes an alternate title a native one. */
@@ -183,6 +199,8 @@ export function tvmazeToWork(show: TvmazeShow): ProviderWork {
     imdbId: text(show.externals?.imdb),
     runtimeMin: num(show.averageRuntime ?? undefined) ?? num(show.runtime ?? undefined),
     network: text(channel?.name),
+    cast: tvmazeCast(show),
+    schedule: tvmazeSchedule(show),
     language: text(show.language)?.toLowerCase(),
     country: text(channel?.country?.code)?.toUpperCase(),
     animation: text(show.type)?.toLowerCase() === 'animation',

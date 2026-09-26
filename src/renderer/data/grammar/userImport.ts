@@ -195,3 +195,35 @@ export function parseGrammarImport(text: string, fileName: string, fallbackLang:
   }
   return parseTable(text, lang);
 }
+
+/** A small working list in each format, shown in the import dialog. */
+export const GRAMMAR_TEMPLATE_CSV = [
+  'pattern,meaning,structure,level,lang,example,translation',
+  '〜てもいい,may; it is all right to,Vて + もいい,N5,ja,ここに座ってもいいですか。,May I sit here?',
+  '是……的,stresses when/where/how something happened,是 + detail + V + 的,HSK2,zh,我是坐火车来的。,I came by train.',
+  'нужно + inf.,it is necessary to,dative + нужно + infinitive,A2,ru,Мне нужно работать.,I need to work.',
+].join('\n');
+
+export const GRAMMAR_TEMPLATE_JSON = JSON.stringify(
+  {
+    points: [
+      {
+        pattern: '〜てもいい',
+        meaning: 'may; it is all right to',
+        structure: 'Vて + もいい',
+        level: 'N5',
+        lang: 'ja',
+        examples: [{ sentence: 'ここに座ってもいいですか。', translation: 'May I sit here?' }],
+      },
+      {
+        pattern: 'нужно + inf.',
+        meaning: 'it is necessary to',
+        level: 'A2',
+        lang: 'ru',
+        examples: [{ sentence: 'Мне нужно работать.', translation: 'I need to work.' }],
+      },
+    ],
+  },
+  null,
+  2,
+);

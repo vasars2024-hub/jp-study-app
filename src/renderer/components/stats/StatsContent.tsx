@@ -178,6 +178,7 @@ export function useStats(): StatsState {
       summary.totalSeconds > 0
       || summary.totalChars > 0
       || summary.totalWatchSeconds > 0
+      || summary.totalStudySeconds > 0
       || summary.totalReviews > 0,
     refresh,
     resetAllStats,
@@ -480,6 +481,11 @@ export function StatsReviews() {
           ? t('stats.reviews.practice', { count: log.practiceAnswers, correct: log.practiceCorrect })
           : t('stats.reviews.note')}
       </p>
+      {log && log.gameAnswers > 0 && (
+        <p className="muted stats-reviews-note">
+          {t('stats.reviews.games', { count: log.gameAnswers, correct: log.gameCorrect })}
+        </p>
+      )}
     </section>
   );
 }
@@ -630,6 +636,19 @@ export function StatsCards({ state }: { state: StatsState }) {
           <div className="stats-card">
             <span className="stats-card-val">{state.shows.length}</span>
             <span className="stats-card-lbl">{t('stats.card.showsWatched')}</span>
+          </div>
+        </>
+      )}
+      {/* Games and player study mode: study time that is neither reading nor watching. */}
+      {s.totalStudySeconds > 0 && (
+        <>
+          <div className="stats-card">
+            <span className="stats-card-val">{formatDuration(s.todayStudySeconds)}</span>
+            <span className="stats-card-lbl">{t('stats.card.studiedToday')}</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-val">{formatDuration(s.totalStudySeconds)}</span>
+            <span className="stats-card-lbl">{t('stats.card.totalStudied')}</span>
           </div>
         </>
       )}

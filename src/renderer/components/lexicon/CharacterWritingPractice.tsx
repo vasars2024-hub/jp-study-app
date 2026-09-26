@@ -20,6 +20,19 @@ function recognizedGlyph(value: string): string | null {
   return [...value].length === 1 ? value : null;
 }
 
+/**
+ * The canvas starts transparent, and a transparent PNG reads as black to the
+ * recognizer — every drawing arrived as black strokes on black. The practice
+ * surface is painted white, so the image is dark ink on white paper.
+ */
+export function paintBlank(context: Pick<CanvasRenderingContext2D, 'save' | 'restore' | 'fillRect' | 'fillStyle' | 'globalCompositeOperation'>): void {
+  context.save();
+  context.globalCompositeOperation = 'source-over';
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, SIZE, SIZE);
+  context.restore();
+}
+
 export default function CharacterWritingPractice({
   target,
   expectedStrokes,
@@ -38,17 +51,22 @@ export default function CharacterWritingPractice({
   const [result, setResult] = useState('');
   const [strokeCount, setStrokeCount] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [verdict, setVerdict] = useState<'match' | 'miss' | null>(null);
   useEffect(() => {
     const context = canvasRef.current?.getContext('2d');
-    if (context) { context.lineWidth = 4; context.lineCap = 'round'; context.lineJoin = 'round'; context.strokeStyle = '#111'; }
+    if (context) {
+      paintBlank(context);
+      context.lineWidth = 4; context.lineCap = 'round'; context.lineJoin = 'round'; context.strokeStyle = '#111';
+    }
   }, []);
 
   const clear = () => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
-    context.clearRect(0, 0, SIZE, SIZE);
+    paintBlank(context);
     setResult('');
+    setVerdict(null);
     setStrokeCount(0);
   };
   const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -61,7 +79,10 @@ export default function CharacterWritingPractice({
     setBusy(true);
     try {
       const value = (await window.api.ocrRecognizeGlyph(canvas.toDataURL('image/png'), glyphLang)).trim();
-      setResult(recognizedGlyph(value) ?? t('manga.hw.noChar'));
+      const glyph = recognizedGlyph(value);
+      setResult(glyph ?? t('manga.hw.noChar'));
+      // Graded against the character being practised, not just read back.
+      setVerdict(glyph ? (glyph === target ? 'match' : 'miss') : null);
     } catch {
       setResult(t('manga.hw.failed'));
     } finally {
@@ -98,6 +119,11 @@ export default function CharacterWritingPractice({
         </button>
       </div>
       {result && <output className="lexicon-character-practice-result" lang={lang}>{result}</output>}
+      {verdict && (
+        <p className={`lexicon-character-practice-verdict is-${verdict}`} role="status">
+          {verdict === 'match' ? t('lexicon.character.match') : t('lexicon.character.miss', { target })}
+        </p>
+      )}
     </div>
   );
 }

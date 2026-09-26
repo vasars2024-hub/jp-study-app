@@ -1,18 +1,17 @@
 import type { LevelTier } from '../../shared/levelScale';
+import type { StudyLang } from '../../shared/levelScale';
 import {
-  CLOZE_PROMPTS,
-  COUNTER_PROMPTS,
-  GRADED_SENTENCES,
   KANA_PROMPTS,
-  KANJI_READING_PROMPTS,
-  PARTICLE_PROMPTS,
-  VOCAB_PROMPTS,
   type ClozePrompt,
   type CounterPrompt,
+  type Glosses,
   type GradedSentence,
+  type KanaPrompt,
   type KanjiReadingPrompt,
   type ParticlePrompt,
 } from '../data/gradedSentences';
+import { GAME_PACKS } from '../data/gamePacks';
+import type { GamePack } from '../data/gamePacks/types';
 import { CLOZE_BLANK, type ClozeItem, type SourceCard, type VocabItem } from './contentSource';
 import { autoSelection, kanaInScope, type KanaSelection } from './kanaGroups';
 import type { ArenaMistake, GameDefinition, GameId, SourceLang } from './types';
@@ -116,6 +115,10 @@ export const GAME_DEFINITIONS: readonly GameDefinition[] = [
     description: 'Recursive Minesweeper board logic adapted from the linked Python version.',
     mode: 'arcade',
   },
+  { id: 'aero-breakout', title: 'Aero Breakout', shortTitle: 'Breakout', description: 'Break glossy bricks with a paddle and ball.', mode: 'arcade' },
+  { id: 'aero-blocks', title: 'Aero Blocks', shortTitle: 'Blocks', description: 'Fit falling blocks together and clear lines.', mode: 'arcade' },
+  { id: 'aero-pong', title: 'Aero Pong', shortTitle: 'Pong', description: 'A paddle match on a glass court.', mode: 'arcade' },
+  { id: 'aero-snake', title: 'Aero Snake', shortTitle: 'Snake', description: 'Collect food and grow a snake.', mode: 'arcade' },
   {
     id: 'mirror-writing',
     title: 'Mirror Writing',
@@ -130,14 +133,16 @@ export interface RoundBase {
   gameId: Exclude<GameId, 'mirror-writing'>;
   level: LevelTier;
   sourceLang: SourceLang;
+  /** The language being studied in this round (Japanese, Chinese or Russian). */
+  studyLang: StudyLang;
   prompt: string;
   /**
    * The language `prompt` is actually written in. Half these games ask their
    * question in the player's own language — Sentence Builder and Speed Type
-   * show the meaning and want the Japanese back — so a blanket `lang="ja"` on
-   * the prompt element announced English in a Japanese voice and picked the
-   * Japanese font stack for Latin text. Required, not optional, so a new game
-   * cannot be added without answering the question.
+   * show the meaning and want the study-language sentence back — so a blanket
+   * study-language `lang` on the prompt announced English in a Japanese voice
+   * and picked the wrong font stack for Latin text. Required, not optional, so
+   * a new game cannot be added without answering the question.
    */
   promptLang: 'ja' | SourceLang;
   /**
@@ -147,10 +152,24 @@ export interface RoundBase {
    * a key renders in the UI language, so it carries no `lang` override at all.
    */
   promptKey?: string;
+  /** The study-language item (the mining payload; also the coverage key). Field name is historical. */
   jp: string;
   reading?: string;
   mineMeaning: string;
+  /**
+   * Set when the round tests one word, so a right or wrong answer can count as
+   * evidence about that word (known-words, and its deck card if it has one).
+   */
+  word?: string;
 }
+
+/**
+ * How a typed answer is compared, when plain text comparison is wrong:
+ *   pinyin       tones optional (hǎo, hao3 and hao all match)
+ *   pinyin-tone  the tone is the point (mā must come back as ma1 or mā)
+ *   stress       Russian stress: the stressed vowel in capitals (молокО) or with an accent
+ */
+export type AnswerMode = 'pinyin' | 'pinyin-tone' | 'stress';
 
 /**
  * Every recall game is a typed round: picking from four options let the player
@@ -162,6 +181,7 @@ export interface TypeRound extends RoundBase {
   answer: string;
   acceptable: string[];
   inputLang: 'ja' | SourceLang;
+  answerMode?: AnswerMode;
   /**
    * The translated meaning of the missing word — the only clue in a cloze. The
    * prompt itself is the sentence with the word removed.
@@ -187,7 +207,7 @@ export type GameRound = TypeRound | BuilderRound | MatchRound;
 
 /**
  * The player's own material for one level, from contentStore. Optional: with an
- * empty deck the games fall back to the bundled tables rather than locking.
+ * empty deck the games fall back to the bundled pack rather than locking.
  */
 export interface GameContent {
   vocab: VocabItem[];
@@ -195,6 +215,27 @@ export interface GameContent {
   sentences: SourceCard[];
   /** Kana Sprint's scope — kana aren't vocabulary, so they get their own picker. */
   kana?: KanaSelection;
+  /** The study language. Absent reads as Japanese, the only language the games once had. */
+  studyLang?: StudyLang;
+  /** The bundled pack for that language, already extended by the player's imported items. */
+  pack?: GamePack;
+}
+
+/**
+ * How a session chooses its rounds. Without this every session dealt the same
+ * rounds in the same order: the seed was the round index, so "play again" was
+ * a replay. A per-session salt varies the draw; `seen` and `weak` bias it
+ * towards material the player has not met yet and material they got wrong.
+ */
+export interface PickContext {
+  /** Per-session salt (e.g. the session's start time). */
+  salt?: number;
+  /** Item keys already met in this game at this level (seenProgress). Preferred last. */
+  seen?: ReadonlySet<string>;
+  /** Item keys recently answered wrong. They come back about one round in three. */
+  weak?: ReadonlySet<string>;
+  /** Keys dealt so far this session; filled in as rounds are built so none repeats while others remain. */
+  used?: Set<string>;
 }
 
 export interface RoundOutcome {
@@ -210,32 +251,57 @@ export interface CompletionScoreInput {
   timeLimitMs?: number;
 }
 
-function pickByLevel<T extends { level: LevelTier }>(items: readonly T[], level: LevelTier, seed: number): T {
+function hashText(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mixSeed(...parts: number[]): number {
+  let h = 2166136261;
+  for (const part of parts) {
+    h ^= part | 0;
+    h = Math.imul(h, 16777619);
+    h ^= h >>> 13;
+  }
+  return h >>> 0;
+}
+
+/**
+ * The pick every round goes through. Tiers, best first: a recently missed item
+ * (about one round in three), then an item never seen, then anything not yet
+ * dealt this session, then anything at all.
+ */
+function choose<T>(pool: readonly T[], seed: number, keyOf: (item: T) => string, ctx?: PickContext): T | null {
+  if (pool.length === 0) return null;
+  const used = ctx?.used;
+  const fresh = used ? pool.filter((item) => !used.has(keyOf(item))) : [...pool];
+  const base = fresh.length ? fresh : [...pool];
+  const weakSet = ctx?.weak;
+  const seenSet = ctx?.seen;
+  const weak = weakSet && weakSet.size ? base.filter((item) => weakSet.has(keyOf(item))) : [];
+  const unseen = seenSet ? base.filter((item) => !seenSet.has(keyOf(item))) : [];
+  const tier = weak.length && seed % 3 === 0 ? weak : unseen.length ? unseen : base;
+  const item = tier[seed % tier.length];
+  used?.add(keyOf(item));
+  return item;
+}
+
+function pickByLevel<T extends { level: LevelTier }>(
+  items: readonly T[],
+  level: LevelTier,
+  seed: number,
+  keyOf: (item: T) => string,
+  ctx?: PickContext,
+): T {
   const near = items.filter((item) => Math.abs(item.level - level) <= 1);
-  const pool = near.length ? near : items;
-  return pool[Math.abs(seed) % pool.length];
+  return choose(near.length ? near : items, seed, keyOf, ctx) ?? items[0];
 }
 
-function sentenceFor(level: LevelTier, sourceLang: SourceLang, seed: number): GradedSentence {
-  const direct = pickByLevel(GRADED_SENTENCES, level, seed);
-  return direct.translations[sourceLang] ? direct : GRADED_SENTENCES[0];
-}
-
-function clozeFor(level: LevelTier, seed: number): ClozePrompt {
-  return pickByLevel(CLOZE_PROMPTS, level, seed);
-}
-
-function kanjiFor(level: LevelTier, seed: number): KanjiReadingPrompt {
-  return pickByLevel(KANJI_READING_PROMPTS, level, seed);
-}
-
-function particleFor(level: LevelTier, seed: number): ParticlePrompt {
-  return pickByLevel(PARTICLE_PROMPTS, level, seed);
-}
-
-function counterFor(level: LevelTier, seed: number): CounterPrompt {
-  return pickByLevel(COUNTER_PROMPTS, level, seed);
-}
+const fillBlank = (prompt: string, answer: string): string => prompt.replace('___', answer);
 
 function shuffled<T>(items: readonly T[], seed: number): T[] {
   const out = [...items];
@@ -256,8 +322,10 @@ function shuffledDifferent<T>(items: readonly T[], seed: number): T[] {
   return out;
 }
 
-function sourceText(sentence: GradedSentence, lang: SourceLang): string {
-  return sentence.translations[lang] || sentence.translations.en;
+/** A gloss in the player's language; English when the pack has none (or the player studies that language). */
+function gloss(glosses: Glosses, lang: SourceLang, studyLang: StudyLang): string {
+  if ((lang as string) === studyLang) return glosses.en;
+  return glosses[lang] || glosses.en;
 }
 
 function normalizeJapanese(input: string): string {
@@ -268,11 +336,81 @@ function normalizeJapanese(input: string): string {
     .toLowerCase();
 }
 
+/** Tone and stress marks are optional in a typed answer; ё and е are the same letter to a typist. */
+const TONE_AND_STRESS_MARKS = /[\u0300\u0301\u0304\u030c]/g;
+
 function normalizeLoose(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[\s、。,.!?！？'"]/g, '');
+    .normalize('NFD')
+    .replace(TONE_AND_STRESS_MARKS, '')
+    .normalize('NFC')
+    .replace(/ё/g, 'е')
+    .replace(/[\s、。，,.!?！？；;：:'"“”«»‘’()（）-]/g, '');
+}
+
+/** Pinyin with tones ignored: hǎo, hao3 and hao all read as "hao". ü may be typed as v or u:. */
+function normalizePinyin(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/u\u0308|u:/g, 'v')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[0-5\s'’·.,!?，。！？]/g, '');
+}
+
+const TONE_OF_MARK: Record<string, string> = { '\u0304': '1', '\u0301': '2', '\u030c': '3', '\u0300': '4' };
+
+/** A single syllable as letters + tone number: mā → ma1, ma1 → ma1, nǚ / nu:3 / nv3 → nv3. */
+function toneNumbered(input: string): string {
+  const decomposed = input.trim().toLowerCase().normalize('NFD').replace(/u\u0308|u:/g, 'v');
+  let tone = '';
+  let letters = '';
+  for (const ch of decomposed) {
+    if (TONE_OF_MARK[ch]) tone = TONE_OF_MARK[ch];
+    else if (/[1-5]/.test(ch)) tone = ch;
+    else if (/[a-z]/.test(ch)) letters += ch;
+  }
+  return `${letters}${tone}`;
+}
+
+const RU_VOWELS = 'аеёиоуыэюя';
+
+/**
+ * A Russian word as its letters plus the positions of its stressed vowels.
+ * Stress is read from a combining acute after a vowel, an upper-case vowel in an
+ * otherwise lower-case word (молокО), or ё, which is always stressed.
+ */
+function stressShape(input: string): { letters: string; stressed: string } {
+  const chars = [...input.trim().normalize('NFD')];
+  const hasLower = chars.some((ch) => ch !== ch.toUpperCase());
+  let letters = '';
+  const stressed: number[] = [];
+  const accents: number[] = [];
+  const capitals: number[] = [];
+  chars.forEach((ch, i) => {
+    if (ch === '\u0301') return;
+    const lower = ch.toLowerCase();
+    if (!/[а-яё]/.test(lower)) return;
+    const index = letters.length;
+    if (RU_VOWELS.includes(lower)) {
+      if (chars[i + 1] === '\u0301') accents.push(index);
+      if (hasLower && ch !== lower) capitals.push(index);
+      if (lower === 'ё') stressed.push(index);
+    }
+    letters += lower === 'ё' ? 'е' : lower;
+  });
+  // An accent mark wins over capitals (a sentence-initial capital is not stress).
+  stressed.push(...(accents.length ? accents : capitals));
+  return { letters, stressed: [...new Set(stressed)].sort((a, b) => a - b).join(',') };
+}
+
+function sameStress(given: string, target: string): boolean {
+  const a = stressShape(given);
+  const b = stressShape(target);
+  return a.letters === b.letters && a.stressed !== '' && a.stressed === b.stressed;
 }
 
 function distance(a: string, b: string): number {
@@ -292,7 +430,22 @@ function distance(a: string, b: string): number {
   return prev[b.length];
 }
 
-function fuzzyIncludes(answer: string, acceptable: readonly string[], inputLang: 'ja' | SourceLang): boolean {
+function fuzzyIncludes(
+  answer: string,
+  acceptable: readonly string[],
+  inputLang: 'ja' | SourceLang,
+  mode?: AnswerMode,
+): boolean {
+  if (!answer.trim()) return false;
+  if (mode === 'stress') return acceptable.some((target) => sameStress(answer, target));
+  if (mode === 'pinyin-tone') {
+    const given = toneNumbered(answer);
+    return acceptable.some((target) => toneNumbered(target) === given && /\d$/.test(given));
+  }
+  if (mode === 'pinyin') {
+    const given = normalizePinyin(answer);
+    return !!given && acceptable.some((target) => normalizePinyin(target) === given);
+  }
   const normalize = inputLang === 'ja' ? normalizeJapanese : normalizeLoose;
   const given = normalize(answer);
   if (!given) return false;
@@ -307,7 +460,7 @@ function fuzzyIncludes(answer: string, acceptable: readonly string[], inputLang:
 function makeMistake(round: GameRound, answer?: string): ArenaMistake {
   const expected =
     round.kind === 'builder'
-      ? round.answerTokens.join('')
+      ? round.answerTokens.join(round.studyLang === 'ru' ? ' ' : '')
       : round.kind === 'match'
         ? round.pairs.map((p) => `${p.jp} = ${p.meaning}`).join('; ')
         : round.answer;
@@ -321,14 +474,10 @@ function makeMistake(round: GameRound, answer?: string): ArenaMistake {
     meaning: round.mineMeaning,
     level: round.level,
     sourceLang: round.sourceLang,
+    studyLang: round.studyLang,
+    word: round.word,
     createdAt: Date.now(),
   };
-}
-
-/** Pick from the player's own pool, or null when it can't fill this round. */
-function fromPool<T>(pool: readonly T[] | undefined, seed: number): T | null {
-  if (!pool || pool.length === 0) return null;
-  return pool[Math.abs(seed) % pool.length];
 }
 
 /**
@@ -355,8 +504,32 @@ const ROMAJI_ALIASES: Record<string, string[]> = {
 
 function kanaPool(sequence: number, content?: GameContent): readonly KanaPrompt[] {
   const selection = content?.kana ?? autoSelection(sequence);
-  return kanaInScope(KANA_PROMPTS, selection.mode === 'auto' ? autoSelection(sequence) : selection);
+  const base = content?.pack?.sprint ?? KANA_PROMPTS;
+  return kanaInScope(base, selection.mode === 'auto' ? autoSelection(sequence) : selection);
 }
+
+/** The Russian stressed form written with a capital vowel, for the verdict line. */
+function capitalStress(reading: string): string {
+  const chars = [...reading.normalize('NFD')];
+  let out = '';
+  chars.forEach((ch, i) => {
+    if (ch === '\u0301') return;
+    out += chars[i + 1] === '\u0301' ? ch.toUpperCase() : ch;
+  });
+  return out;
+}
+
+/** Item keys for the bundled tables — each equals the `jp` its round carries, which is what seenProgress counts. */
+const KEY = {
+  sentence: (s: GradedSentence) => s.jp,
+  cloze: (c: ClozePrompt) => fillBlank(c.prompt, c.answer),
+  reading: (k: KanjiReadingPrompt) => k.word,
+  particle: (p: ParticlePrompt) => fillBlank(p.prompt, p.answer),
+  counter: (c: CounterPrompt) => c.jp,
+  kana: (k: KanaPrompt) => k.kana,
+  vocab: (v: VocabItem) => v.word,
+  mined: (c: ClozeItem) => c.sentence,
+};
 
 export function buildGameRound(
   gameId: Exclude<GameId, 'mirror-writing'>,
@@ -364,91 +537,96 @@ export function buildGameRound(
   sourceLang: SourceLang,
   sequence: number,
   content?: GameContent,
+  ctx?: PickContext,
 ): GameRound {
-  if (
-    gameId === 'star-invaders' ||
-    gameId === 'comet-courier' ||
-    gameId === 'capsule-sorter' ||
-    gameId === 'signal-simon'
-  ) {
+  if (GAME_DEFINITIONS.some((game) => game.id === gameId && game.mode === 'arcade')) {
     throw new Error(`Arcade game ${gameId} does not use language rounds.`);
   }
 
-  const seed = sequence + level * 31 + gameId.length * 13;
+  const studyLang: StudyLang = content?.studyLang ?? 'ja';
+  const pack = content?.pack ?? GAME_PACKS[studyLang];
+  const sl = studyLang;
+  const seed = mixSeed(sequence, level, hashText(gameId), ctx?.salt ?? 0);
+  const base = { gameId, level, sourceLang, studyLang } as const;
+  const id = (key: string) => `${gameId}-${ctx?.salt ?? 0}-${sequence}-${key}`;
 
-  // The player's own material always wins; the bundled tables below are the
+  // The player's own material always wins; the bundled pack below is the
   // fallback for an empty or too-thin deck.
-  const mined = fromPool(content?.cloze, seed);
+  const mined = choose(content?.cloze ?? [], seed, KEY.mined, ctx);
   if (mined && (gameId === 'cloze-blitz' || gameId === 'listening-flash')) {
     const speak = gameId === 'listening-flash';
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-mined`,
-      gameId,
-      level,
-      sourceLang,
+      id: id('mined'),
       // Audio-first: showing the sentence would make listening unnecessary.
       prompt: speak ? '' : mined.masked,
-      promptLang: 'ja',
+      promptLang: sl,
       jp: mined.sentence,
       reading: mined.reading,
       mineMeaning: mined.hint,
       answer: mined.answer,
       acceptable: [mined.answer, mined.reading].filter(Boolean),
-      inputLang: 'ja',
+      inputLang: sl,
       hint: mined.hint,
       speak,
     };
   }
 
-  const word = fromPool(content?.vocab, seed);
-  if (word && gameId === 'kanji-reading' && word.reading) {
-    return {
-      kind: 'type',
-      id: `${gameId}-${sequence}-${word.word}`,
-      gameId,
-      level,
-      sourceLang,
-      prompt: word.word,
-      promptLang: 'ja',
-      jp: word.word,
-      reading: word.reading,
-      mineMeaning: word.meaning,
-      answer: word.reading,
-      acceptable: [word.reading],
-      inputLang: 'ja',
-      hint: word.meaning,
-    };
+  const ownVocab = content?.vocab ?? [];
+  if (gameId === 'kanji-reading') {
+    // Only words whose reading this language's game can check.
+    const readable = ownVocab.filter((v) =>
+      sl === 'ru' ? v.reading.normalize('NFD').includes('\u0301') : !!v.reading,
+    );
+    const word = choose(readable, seed, KEY.vocab, ctx);
+    if (word) {
+      return {
+        ...base,
+        kind: 'type',
+        id: id(word.word),
+        prompt: word.word,
+        promptLang: sl,
+        jp: word.word,
+        word: word.word,
+        reading: word.reading,
+        mineMeaning: word.meaning,
+        answer: sl === 'ru' ? capitalStress(word.reading) : word.reading,
+        acceptable: [word.reading],
+        inputLang: sl === 'ja' ? 'ja' : sl === 'zh' ? 'en' : 'ru',
+        answerMode: sl === 'zh' ? 'pinyin' : sl === 'ru' ? 'stress' : undefined,
+        hint: word.meaning,
+      };
+    }
   }
-  if (word && gameId === 'reverse-recall') {
-    return {
-      kind: 'type',
-      id: `${gameId}-${sequence}-${word.word}`,
-      gameId,
-      level,
-      sourceLang,
-      prompt: word.word,
-      promptLang: 'ja',
-      jp: word.word,
-      reading: word.reading,
-      mineMeaning: word.meaning,
-      answer: word.meaning,
-      acceptable: [word.meaning],
-      inputLang: sourceLang,
-    };
+  if (gameId === 'reverse-recall') {
+    const word = choose(ownVocab, seed, KEY.vocab, ctx);
+    if (word) {
+      return {
+        ...base,
+        kind: 'type',
+        id: id(word.word),
+        prompt: word.word,
+        promptLang: sl,
+        jp: word.word,
+        word: word.word,
+        reading: word.reading,
+        mineMeaning: word.meaning,
+        answer: word.meaning,
+        acceptable: [word.meaning],
+        inputLang: sourceLang,
+      };
+    }
   }
-  const minedVocab = content?.vocab ?? [];
-  if (gameId === 'word-match' && minedVocab.length >= 4) {
-    const pairs = shuffled(minedVocab, seed)
+  if (gameId === 'word-match' && ownVocab.length >= 4) {
+    const pairs = shuffled(ownVocab, seed)
       .slice(0, 4)
       .map((v) => ({ jp: v.word, reading: v.reading, meaning: v.meaning }));
     return {
+      ...base,
       kind: 'match',
-      id: `${gameId}-${sequence}-mined`,
-      gameId,
-      level,
-      sourceLang,
-      prompt: 'Match each Japanese word to its meaning.',
+      id: id('mined'),
+      prompt: 'Match each word to its meaning.',
       promptLang: 'en',
       promptKey: 'games.match.instruction',
       jp: pairs.map((p) => p.jp).join(' / '),
@@ -460,194 +638,198 @@ export function buildGameRound(
   }
 
   if (gameId === 'sentence-builder') {
-    const sentence = sentenceFor(level, sourceLang, seed);
+    const sentence = pickByLevel(pack.sentences, level, seed, KEY.sentence, ctx);
     return {
+      ...base,
       kind: 'builder',
-      id: `${gameId}-${sequence}-${sentence.id}`,
-      gameId,
-      level,
-      sourceLang,
-      prompt: sourceText(sentence, sourceLang),
+      id: id(sentence.id),
+      prompt: gloss(sentence.translations, sourceLang, sl),
       promptLang: sourceLang,
       jp: sentence.jp,
-      reading: sentence.reading,
-      mineMeaning: sourceText(sentence, sourceLang),
+      reading: sentence.reading || undefined,
+      mineMeaning: gloss(sentence.translations, sourceLang, sl),
       tokens: shuffledDifferent(sentence.tokens, seed),
       answerTokens: sentence.tokens,
     };
   }
 
   if (gameId === 'speed-type') {
-    const sentence = sentenceFor(level, sourceLang, seed);
+    const sentence = pickByLevel(pack.sentences, level, seed, KEY.sentence, ctx);
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-${sentence.id}`,
-      gameId,
-      level,
-      sourceLang,
-      prompt: sourceText(sentence, sourceLang),
+      id: id(sentence.id),
+      prompt: gloss(sentence.translations, sourceLang, sl),
       promptLang: sourceLang,
       jp: sentence.jp,
-      reading: sentence.reading,
-      mineMeaning: sourceText(sentence, sourceLang),
+      reading: sentence.reading || undefined,
+      mineMeaning: gloss(sentence.translations, sourceLang, sl),
       answer: sentence.jp,
-      acceptable: [sentence.jp, sentence.reading],
-      inputLang: 'ja',
+      acceptable: [sentence.jp, sentence.reading].filter(Boolean),
+      inputLang: sl,
     };
   }
 
   if (gameId === 'word-match') {
-    const pairs = shuffled(VOCAB_PROMPTS, seed)
-      .filter((v) => Math.abs(v.level - level) <= 2)
+    const near = pack.vocab.filter((v) => Math.abs(v.level - level) <= 2);
+    const pool = near.length >= 4 ? near : pack.vocab;
+    const pairs = shuffled(pool, seed)
       .slice(0, 4)
-      .map((v) => ({ jp: v.jp, reading: v.reading, meaning: v.meanings[sourceLang] || v.meanings.en }));
-    const safePairs = pairs.length >= 3 ? pairs : VOCAB_PROMPTS.slice(0, 4).map((v) => ({
-      jp: v.jp,
-      reading: v.reading,
-      meaning: v.meanings[sourceLang] || v.meanings.en,
-    }));
+      .map((v) => ({ jp: v.jp, reading: v.reading, meaning: gloss(v.meanings, sourceLang, sl) }));
     return {
+      ...base,
       kind: 'match',
-      id: `${gameId}-${sequence}`,
-      gameId,
-      level,
-      sourceLang,
-      prompt: 'Match each Japanese word to its meaning.',
+      id: id('pack'),
+      prompt: 'Match each word to its meaning.',
       promptLang: 'en',
       promptKey: 'games.match.instruction',
-      jp: safePairs.map((p) => p.jp).join(' / '),
-      reading: safePairs.map((p) => p.reading).join(' / '),
-      mineMeaning: safePairs.map((p) => p.meaning).join(' / '),
-      pairs: safePairs,
-      rightChoices: shuffled(safePairs.map((p) => p.meaning), seed + 5),
+      jp: pairs.map((p) => p.jp).join(' / '),
+      reading: pairs.map((p) => p.reading).join(' / '),
+      mineMeaning: pairs.map((p) => p.meaning).join(' / '),
+      pairs,
+      rightChoices: shuffled(pairs.map((p) => p.meaning), seed + 5),
     };
   }
 
   if (gameId === 'kana-sprint') {
-    const pool = kanaPool(sequence, content);
-    const kana = pool[Math.abs(seed) % pool.length];
+    const pool = sl === 'ja' ? kanaPool(sequence, content) : pack.sprint;
+    const kana = choose(pool, seed, KEY.kana, ctx) ?? pool[0];
+    const aliases = [...(ROMAJI_ALIASES[kana.romaji] ?? []), ...(kana.aliases ?? [])];
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-${kana.kana}`,
-      gameId,
-      level,
-      sourceLang,
+      id: id(kana.kana),
       prompt: kana.kana,
-      promptLang: 'ja',
+      promptLang: sl,
       jp: kana.kana,
       mineMeaning: kana.romaji,
       answer: kana.romaji,
-      acceptable: [kana.romaji, ...(ROMAJI_ALIASES[kana.romaji] ?? [])],
+      acceptable: [kana.romaji, ...aliases],
       inputLang: 'en',
+      answerMode: sl === 'zh' ? 'pinyin-tone' : undefined,
     };
   }
 
   if (gameId === 'kanji-reading') {
-    const item = kanjiFor(level, seed);
+    const item = pickByLevel(pack.reading, level, seed, KEY.reading, ctx);
+    const meaning = gloss(item.meaning, sourceLang, sl);
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-${item.id}`,
-      gameId,
-      level,
-      sourceLang,
+      id: id(item.id),
       prompt: item.word,
-      promptLang: 'ja',
+      promptLang: sl,
       jp: item.word,
+      word: item.word,
       reading: item.reading,
-      mineMeaning: item.meaning[sourceLang] || item.meaning.en,
-      answer: item.reading,
+      mineMeaning: meaning,
+      answer: sl === 'ru' ? capitalStress(item.reading) : item.reading,
       acceptable: [item.reading],
-      inputLang: 'ja',
-      hint: item.meaning[sourceLang] || item.meaning.en,
+      inputLang: sl === 'ja' ? 'ja' : sl === 'zh' ? 'en' : 'ru',
+      answerMode: sl === 'zh' ? 'pinyin' : sl === 'ru' ? 'stress' : undefined,
+      hint: meaning,
     };
   }
 
   if (gameId === 'cloze-blitz' || gameId === 'listening-flash') {
-    const item = clozeFor(level, seed);
+    const item = pickByLevel(pack.cloze, level, seed, KEY.cloze, ctx);
     const speak = gameId === 'listening-flash';
-    const full = item.prompt.replace('___', item.answer);
+    const meaning = gloss(item.translations, sourceLang, sl);
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-${item.id}`,
-      gameId,
-      level,
-      sourceLang,
+      id: id(item.id),
       // The bundled cloze already carries its own blank; swap it for the same
       // blank the mined path uses so both look identical to the player.
       prompt: speak ? '' : item.prompt.replace('___', CLOZE_BLANK),
-      promptLang: 'ja',
-      jp: full,
-      mineMeaning: item.translations[sourceLang] || item.translations.en,
+      promptLang: sl,
+      jp: fillBlank(item.prompt, item.answer),
+      mineMeaning: meaning,
       answer: item.answer,
-      acceptable: [item.answer],
-      inputLang: 'ja',
-      hint: item.translations[sourceLang] || item.translations.en,
+      acceptable: [item.answer, ...(item.alternatives ?? [])],
+      inputLang: sl,
+      hint: meaning,
       speak,
     };
   }
 
   if (gameId === 'particle-panic') {
-    const item = particleFor(level, seed);
+    const item = pickByLevel(pack.particles, level, seed, KEY.particle, ctx);
+    const hint = gloss(item.hint, sourceLang, sl);
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-${item.id}`,
-      gameId,
-      level,
-      sourceLang,
+      id: id(item.id),
       prompt: item.prompt.replace('___', CLOZE_BLANK),
-      promptLang: 'ja',
-      jp: item.prompt.replace('___', item.answer),
-      mineMeaning: item.hint[sourceLang] || item.hint.en,
+      promptLang: sl,
+      jp: fillBlank(item.prompt, item.answer),
+      mineMeaning: hint,
       answer: item.answer,
-      acceptable: [item.answer],
-      inputLang: 'ja',
-      hint: item.hint[sourceLang] || item.hint.en,
+      acceptable: [item.answer, ...(item.alternatives ?? [])],
+      inputLang: sl,
+      hint,
     };
   }
 
   if (gameId === 'counter-quiz') {
-    const item = counterFor(level, seed);
-    const object = item.object[sourceLang] || item.object.en;
+    const item = pickByLevel(pack.counters, level, seed, KEY.counter, ctx);
+    const object = gloss(item.object, sourceLang, sl);
+    // Russian: "5 книг" with digits is the same recall as "пять книг".
+    const digits = sl === 'ru' ? [`${item.number} ${item.answer.split(' ').pop() ?? ''}`.trim()] : [];
     return {
+      ...base,
       kind: 'type',
-      id: `${gameId}-${sequence}-${item.id}`,
-      gameId,
-      level,
-      sourceLang,
+      id: id(item.id),
       prompt: `${item.number} ${object}`,
       promptLang: sourceLang,
       jp: item.jp,
-      reading: item.reading,
+      reading: item.reading || undefined,
       mineMeaning: `${item.number} ${object}`,
       answer: item.answer,
       // 三冊 or さんさつ — the kanji form and its reading are the same recall.
-      acceptable: [item.answer, item.reading].filter(Boolean),
-      inputLang: 'ja',
+      acceptable: [item.answer, item.reading, ...digits].filter(Boolean),
+      inputLang: sl,
     };
   }
 
-  const sentence = sentenceFor(level, sourceLang, seed);
+  const sentence = pickByLevel(pack.sentences, level, seed, KEY.sentence, ctx);
+  const meaning = gloss(sentence.translations, sourceLang, sl);
   return {
-    kind: 'type',
-    id: `${gameId}-${sequence}-${sentence.id}`,
+    ...base,
     gameId: 'reverse-recall',
-    level,
-    sourceLang,
+    kind: 'type',
+    id: id(sentence.id),
     prompt: sentence.jp,
-    promptLang: 'ja',
+    promptLang: sl,
     jp: sentence.jp,
-    reading: sentence.reading,
-    mineMeaning: sourceText(sentence, sourceLang),
-    answer: sourceText(sentence, sourceLang),
-    acceptable: [sourceText(sentence, sourceLang)],
+    reading: sentence.reading || undefined,
+    mineMeaning: meaning,
+    answer: meaning,
+    acceptable: [meaning],
     inputLang: sourceLang,
   };
+}
+
+/**
+ * All the rounds of one session. Rounds are built in order against a shared
+ * `used` set, so an item is not dealt twice while unused ones remain.
+ */
+export function buildSessionRounds(
+  gameId: Exclude<GameId, 'mirror-writing'>,
+  level: LevelTier,
+  sourceLang: SourceLang,
+  count: number,
+  content?: GameContent,
+  ctx: PickContext = {},
+): GameRound[] {
+  const shared: PickContext = { ...ctx, used: ctx.used ?? new Set() };
+  return Array.from({ length: count }, (_, i) => buildGameRound(gameId, level, sourceLang, i, content, shared));
 }
 
 export function evaluateRound(round: GameRound, answer: string | string[] | Record<string, string>): RoundOutcome {
   if (round.kind === 'type') {
     const value = String(answer);
-    const correct = fuzzyIncludes(value, round.acceptable, round.inputLang);
+    const correct = fuzzyIncludes(value, round.acceptable, round.inputLang, round.answerMode);
     return correct ? { correct } : { correct, mistake: makeMistake(round, value) };
   }
 
@@ -656,7 +838,7 @@ export function evaluateRound(round: GameRound, answer: string | string[] | Reco
     const expected = normalizeJapanese(round.answerTokens.join(''));
     const given = normalizeJapanese(tokens.join(''));
     const correct = given === expected;
-    return correct ? { correct } : { correct, mistake: makeMistake(round, tokens.join('')) };
+    return correct ? { correct } : { correct, mistake: makeMistake(round, tokens.join(round.studyLang === 'ru' ? ' ' : '')) };
   }
 
   const mapping = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
@@ -736,39 +918,42 @@ export function gamePoolSize(
   level: LevelTier,
   content?: GameContent,
 ): number {
+  const lang = content?.studyLang ?? 'ja';
+  const pack = content?.pack ?? GAME_PACKS[lang];
   switch (gameId) {
     case 'kana-sprint': {
+      if (lang !== 'ja') return pack.sprint.length;
       // Automatic mode widens as the session runs, so its pool is everything
       // it will eventually reach — not the narrow scope it starts on.
       const selection = content?.kana;
       const effective =
         !selection || selection.mode === 'auto' ? autoSelection(Number.MAX_SAFE_INTEGER) : selection;
-      return kanaInScope(KANA_PROMPTS, effective).length;
+      return kanaInScope(pack.sprint, effective).length;
     }
     case 'kanji-reading': {
       const own = (content?.vocab ?? []).filter((v) => v.reading).length;
-      return own || nearLevel(KANJI_READING_PROMPTS, level);
+      return own || nearLevel(pack.reading, level);
     }
     case 'reverse-recall': {
       const own = (content?.vocab ?? []).length;
-      return own || nearLevel(GRADED_SENTENCES, level);
+      return own || nearLevel(pack.sentences, level);
     }
     case 'word-match': {
       const own = (content?.vocab ?? []).length;
-      return own >= 4 ? own : nearLevel(VOCAB_PROMPTS, level);
+      return own >= 4 ? own : nearLevel(pack.vocab, level);
     }
     case 'cloze-blitz':
     case 'listening-flash': {
       const own = (content?.cloze ?? []).length;
-      return own || nearLevel(CLOZE_PROMPTS, level);
+      return own || nearLevel(pack.cloze, level);
     }
     case 'particle-panic':
-      return nearLevel(PARTICLE_PROMPTS, level);
+      return nearLevel(pack.particles, level);
     case 'counter-quiz':
-      return nearLevel(COUNTER_PROMPTS, level);
+      return nearLevel(pack.counters, level);
     case 'sentence-builder':
     case 'speed-type':
-      return nearLevel(GRADED_SENTENCES, level);
+      return nearLevel(pack.sentences, level);
     default:
       return 0;
   }

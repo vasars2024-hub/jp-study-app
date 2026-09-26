@@ -37,7 +37,14 @@ export const BUILT_IN_UNIFIED_SEARCH_PROVIDERS: readonly UnifiedSearchProvider[]
   builtIn('local-library', 'Local library', 'local-library', 0),
   builtIn('catalogues', 'MyAnimeList · AniList', 'metadata', 1),
   builtIn('torrent-indexes', 'Torrent indexes', 'site', 2),
+  // Dramas and films were missing: the catalogues above are anime/manga only.
+  builtIn('tv-film', 'TVmaze · TMDB', 'metadata', 3),
+  // "Does this have subtitles?" answered before anything is downloaded.
+  builtIn('subtitle-availability', 'Subtitle availability', 'connector', 4),
 ]);
+
+/** Built-ins added after the first release; appended once to existing documents. */
+export const LATER_BUILT_IN_IDS: readonly string[] = ['tv-film', 'subtitle-availability'];
 
 function builtIn(
   id: string,
@@ -103,6 +110,79 @@ export function createCatalogueExecutor(
       throw new Error(`No catalogue answered (${answer.provenance.failures.join(', ')}).`);
     }
     return answer.candidates.map((candidate) => candidateResult(step.providerId, candidate));
+  };
+}
+
+// ------------------------------------------------------- dramas and films ---
+
+export interface TvFilmHit {
+  provider: 'tvmaze' | 'tmdb';
+  id: string;
+  title: string;
+  nativeTitle?: string;
+  year?: number;
+  posterUrl?: string;
+  kind: 'tv' | 'movie';
+  genres: string[];
+  rating?: number;
+  network?: string;
+  country?: string;
+}
+
+export function createTvFilmExecutor(search: (query: string) => Promise<TvFilmHit[]>): UnifiedSearchProviderExecutor {
+  return async ({ query, step }) => {
+    const hits = await search(query);
+    return hits.map((hit): UnifiedSearchResult => ({
+      id: `${step.providerId}:${hit.id}`,
+      providerId: step.providerId,
+      providerResultId: hit.id,
+      title: hit.title,
+      alternativeTitles: [],
+      japaneseTitle: hit.nativeTitle ?? null,
+      romajiTitle: null,
+      authorsOrStudios: hit.network ? [hit.network] : [],
+      coverUrl: hit.posterUrl ?? null,
+      language: null,
+      availability: 'unknown',
+      metadataQuality: typeof hit.rating === 'number' ? Math.round(hit.rating * 10) : null,
+      episodeCount: null,
+      trackingStatus: 'unknown',
+      mediaType: hit.kind === 'movie' ? 'movie' : 'tv',
+      year: hit.year ?? null,
+      season: null,
+      genres: hit.genres,
+    }));
+  };
+}
+
+// ------------------------------------------------------ subtitle presence ---
+
+export function createSubtitleAvailabilityExecutor(
+  search: (query: string) => Promise<Array<{ language: string; releases: number; sample: string[] }> | null>,
+): UnifiedSearchProviderExecutor {
+  return async ({ query, step }) => {
+    const rows = await search(query);
+    if (rows === null) throw new Error('Add an OpenSubtitles key in Settings › Subtitles to check availability.');
+    return rows.map((row): UnifiedSearchResult => ({
+      id: `${step.providerId}:${row.language}:${query}`,
+      providerId: step.providerId,
+      providerResultId: `subtitles:${row.language}:${query.toLowerCase()}`,
+      title: row.sample[0] ?? query,
+      alternativeTitles: row.sample.slice(1),
+      japaneseTitle: null,
+      romajiTitle: null,
+      authorsOrStudios: [],
+      coverUrl: null,
+      language: row.language,
+      availability: row.releases > 0 ? 'available' : 'unavailable',
+      metadataQuality: null,
+      episodeCount: row.releases,
+      trackingStatus: 'unknown',
+      mediaType: 'other',
+      year: null,
+      season: null,
+      genres: [],
+    }));
   };
 }
 

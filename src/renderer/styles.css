@@ -8881,10 +8881,11 @@ mark.lookup-mark,
 /* ---- Catalogue refresh controls ---- */
 .res-controls-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   flex: 1 1 260px;
-  max-width: 460px;
+  max-width: 680px;
   justify-content: flex-end;
 }
 .res-refresh {
@@ -9320,6 +9321,23 @@ mark.lookup-mark,
 .mytool-note-edit button:hover {
   border-color: var(--accent-2);
 }
+
+/* ---- Your own resources (added or imported on this machine) ---- */
+.own-resource-card .res-cost { margin-left: auto; }
+.own-resource-group,
+.own-resource-lang {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-2) 12%, transparent);
+  color: var(--text);
+  font-size: 11px;
+}
+.own-resource-dialog { width: min(520px, 92vw); }
+.own-resource-form { display: flex; flex-direction: column; gap: 12px; }
+.own-resource-intro { margin: 0; }
+.own-resource-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
+.own-resource-langs { display: flex; flex-wrap: wrap; gap: 6px; }
+.heatmap-you-note { font-size: 11px; }
 
 /* ---------------------------------- Settings ---------------------------------- */
 .settings-view {
@@ -10300,6 +10318,42 @@ mark.lookup-mark,
 .gram-more-status {
   margin: 12px 0 0;
   font-size: 13px;
+}
+/* "More examples" and "Add your own examples" side by side. */
+.gram-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.gram-more-actions .gram-more-btn {
+  flex: 1 1 180px;
+  width: auto;
+}
+.gram-examples-own {
+  margin-top: 8px;
+}
+.gram-ex-own-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+}
+.gram-ex-own-tag {
+  color: var(--accent-text);
+}
+.gram-ex-own-remove {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.gram-ex-own-remove:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
 }
 .gram-examples-extra {
   margin-top: 12px;
@@ -25885,6 +25939,77 @@ html.lockscreen-widget-root #root {
 
 /* GrammarX Practice / Test / Notebook / Translation History */
 .gx-practice { display: flex; flex-direction: column; gap: 10px; min-height: 0; height: 100%; }
+/* "Import your own" dialog, shared by every importer. Flat sections, no inner boxes. */
+.content-import { width: min(760px, 92vw); }
+.content-import .content-import-desc { margin: 0 0 12px; }
+.content-import-template-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 600; font-size: 12px; }
+.content-import-seg { display: inline-flex; gap: 2px; margin-left: auto; }
+.content-import-sample { margin: 8px 0 4px; padding: 8px 10px; max-height: 140px; overflow: auto; font-size: 12px; line-height: 1.5; background: var(--hover, rgba(127,127,127,0.08)); border-radius: 8px; white-space: pre; }
+.content-import-note { font-size: 11px; margin: 0 0 12px; }
+.content-import-source { display: flex; align-items: center; gap: 10px; margin: 10px 0 6px; }
+.content-import-file { position: relative; overflow: hidden; cursor: pointer; }
+.content-import-file input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.content-import-paste { width: 100%; box-sizing: border-box; resize: vertical; font: 12px/1.5 var(--font-mono, ui-monospace, monospace); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: inherit; }
+.content-import-paste:focus { outline: none; border-color: var(--accent); }
+.content-import-name { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 12px; }
+.content-import-name .ui-input { flex: 1; }
+.content-import-preview { margin-top: 10px; max-height: 240px; overflow: auto; }
+.content-import-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.content-import-table th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.content-import-table td { padding: 4px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Game Arena: what a session draws from. */
+.game-material { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.game-material > span { color: var(--muted); }
+.game-material-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Difficulty at a glance: a title's level and known share (Gum cards, title page). */
+.media-level-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); white-space: nowrap; }
+.media-level-badge--title { margin-top: 6px; font-size: 12px; }
+.media-level-breakdown { display: grid; gap: 4px; margin-top: 10px; font-size: 12px; }
+.media-level-breakdown-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--border) 60%, transparent); }
+.media-level-breakdown-bar i { display: block; min-width: 2px; background: var(--accent); }
+.media-level-breakdown-bar i.lv-1 { opacity: 0.85; } .media-level-breakdown-bar i.lv-2 { opacity: 0.7; } .media-level-breakdown-bar i.lv-3 { opacity: 0.55; } .media-level-breakdown-bar i.lv-4 { opacity: 0.42; } .media-level-breakdown-bar i.lv-5 { opacity: 0.3; }
+.media-level-breakdown-bar i.is-unknown { background: var(--muted); opacity: 0.35; }
+.media-level-breakdown-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); }
+.media-study-deck-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 6px 0 10px; font-size: 12px; }
+.media-study-deck-name { display: inline-flex; align-items: center; gap: 6px; }
+.media-study-deck-name .ui-input { min-width: 180px; }
+/* Player: words the learner has not met, and words they are still learning. */
+.study-cue-text .wk-new { text-decoration: underline dotted color-mix(in srgb, var(--accent) 85%, white); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.study-cue-text .wk-learning { text-decoration: underline dotted rgba(255, 255, 255, 0.45); text-underline-offset: 4px; }
+.study-cue-level { display: inline-block; margin-right: 8px; padding: 0 6px; border-radius: 6px; font-size: 0.45em; font-weight: 700; vertical-align: middle; letter-spacing: 0.02em; color: #fff; background: rgba(0, 0, 0, 0.45); user-select: none; pointer-events: none; }
+.study-subtitle-import { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.study-subtitle-import input[type='file'] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* Settings › Media providers: the real metadata sources and whether they answer. */
+.media-provider-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.media-provider-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.media-provider-row:last-child { border-bottom: 0; }
+.media-provider-name { display: flex; flex-direction: column; gap: 2px; }
+.media-provider-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.media-provider-state.is-ok { color: var(--success, #3a9a5b); }
+.media-provider-state.is-down { color: var(--danger, #c0392b); }
+.media-provider-state.is-needs-key, .media-provider-state.is-checking { color: var(--muted); }
+/* Subtitle tracks: grade, stars, preferred group. */
+.subtitle-grade { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #fff; background: var(--muted); }
+.subtitle-grade--A { background: #2f8f55; } .subtitle-grade--B { background: #5c8f2f; } .subtitle-grade--C { background: #b08421; } .subtitle-grade--D { background: #b0412f; }
+.subtitle-quality { display: inline-flex; align-items: center; gap: 8px; }
+.subtitle-stars { display: inline-flex; }
+.subtitle-stars button { border: 0; background: none; padding: 0 1px; font-size: 13px; line-height: 1; cursor: pointer; color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.subtitle-stars button.is-on { color: var(--accent); }
+.subtitle-prefer { border: 0; background: none; padding: 2px 6px; border-radius: 6px; font-size: 11px; color: var(--accent); cursor: pointer; }
+.subtitle-prefer:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.subtitle-prefer:disabled { color: var(--muted); cursor: default; }
+/* Grammar review (spaced review of due points). One card, no nested panels. */
+.gx-review { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px; max-width: 760px; outline: none; }
+.gx-review-summary { font-size: 12px; }
+.gx-review-card { display: flex; flex-direction: column; gap: 10px; }
+.gx-review-head { display: flex; align-items: baseline; gap: 10px; }
+.gx-review-head h2 { margin: 0; font-size: 28px; font-weight: 600; }
+.gx-review-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.gx-review-rate { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.gx-review-rate .ui-btn { display: inline-flex; flex-direction: column; align-items: center; min-width: 88px; gap: 2px; }
+.gx-review-interval { font-size: 11px; opacity: 0.75; }
+.gx-review-empty { display: flex; flex-direction: column; gap: 8px; }
+.gx-review-empty p { margin: 0; }
 .gx-practice-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .gx-practice-status { margin-left: auto; font-size: 12px; }
 .gx-practice-layout { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: 12px; min-height: 0; flex: 1; }

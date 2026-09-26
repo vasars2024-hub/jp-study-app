@@ -6,7 +6,14 @@ import {
 } from './unifiedSearchController';
 import { loadDeck } from './flashcardDeck';
 import { createOfflineLocalLibraryExecutor } from './unifiedSearchLocalLibrary';
-import { createCatalogueExecutor, createTorrentIndexExecutor } from './unifiedSearchBackends';
+import {
+  createCatalogueExecutor,
+  createSubtitleAvailabilityExecutor,
+  createTorrentIndexExecutor,
+  createTvFilmExecutor,
+} from './unifiedSearchBackends';
+import { getStudyLang } from './studyEnvironment';
+import { addLaterBuiltInsOnce } from './unifiedSearchStore';
 import { getActiveScraperSettings } from './scraperSettingsStore';
 import type { UnifiedSearchSession, UnifiedSearchSessionState } from './unifiedSearchSession';
 
@@ -32,6 +39,7 @@ export function useUnifiedSearchSession(
   // own lifecycle and must not be rebuilt as the parent re-renders.
   const sessionRef = useRef<UnifiedSearchSession | null>(null);
   if (sessionRef.current === null) {
+    addLaterBuiltInsOnce();
     // Bind the offline deck-backed local-library connector by default; callers can
     // still override `localLibrary` (or the whole registry) through `options`.
     sessionRef.current = createRendererUnifiedSearchSession({
@@ -47,6 +55,11 @@ export function useUnifiedSearchSession(
         (input) => window.api.scraperSearchTorrents(input),
         () => getActiveScraperSettings(),
       ),
+      byId: {
+        'tv-film': createTvFilmExecutor((query) => window.api.searchTvFilm(query)),
+        'subtitle-availability': createSubtitleAvailabilityExecutor((query) =>
+          window.api.searchSubtitleAvailability(query, [getStudyLang(), 'en'])),
+      },
       ...options,
     });
   }

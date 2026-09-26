@@ -17,6 +17,7 @@ import MediaStudyPanel from './MediaStudyPanel';
 import MediaStatusPill from './MediaStatusPill';
 import MediaMatchDialog from './MediaMatchDialog';
 import NyaaSubtitleDialog from './NyaaSubtitleDialog';
+import OpenSubtitlesDialog from './OpenSubtitlesDialog';
 import { useMediaJobs } from './useMediaJobs';
 import { openFilesAppForMedia } from '../../filesapp/filesAppScope';
 import {
@@ -38,6 +39,7 @@ import {
   type FusionTrackMeta,
 } from '../../../../shared/subtitleFusionMeta';
 import type { MediaItem } from '../../../../shared/types';
+import SubtitleTrackQuality, { SubtitleTrackGradeChip } from './SubtitleTrackQuality';
 
 export interface MediaDetailPanelProps {
   entry: LibraryEntry | null;
@@ -89,6 +91,7 @@ export default function MediaDetailPanel({
   const [matching, setMatching] = useState(false);
   const [searching, setSearching] = useState(false);
   const [nyaaOpen, setNyaaOpen] = useState(false);
+  const [osOpen, setOsOpen] = useState(false);
   const [cardOptions, setCardOptions] = useTranscriptionCardOptions();
   /** Which track has been armed for removal, and which one is in flight. */
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
@@ -430,6 +433,9 @@ export default function MediaDetailPanel({
               <Button size="sm" onClick={() => setNyaaOpen(true)}>
                 {t('media.subtitles.nyaa.open')}
               </Button>
+              <Button size="sm" onClick={() => setOsOpen(true)}>
+                {t('media.subtitles.os.open')}
+              </Button>
               <Button
                 size="sm"
                 disabled={transcribing.has(entry.primary.id)}
@@ -463,6 +469,16 @@ export default function MediaDetailPanel({
             </div>
             {!englishTrack && (
               <p className="muted">{t('media.subtitles.fuse.needsEnglish')}</p>
+            )}
+            {osOpen && (
+              <OpenSubtitlesDialog
+                mediaId={entry.primary.id}
+                onCancel={() => setOsOpen(false)}
+                onAttached={(attachedLang) => {
+                  setOsOpen(false);
+                  showToast({ message: t('media.subtitles.nyaa.attached', { lang: attachedLang }), kind: 'success' });
+                }}
+              />
             )}
             {nyaaOpen && (
               <NyaaSubtitleDialog
@@ -552,6 +568,7 @@ export default function MediaDetailPanel({
                   const body = (
                     <>
                       <span className="medialib-track__lang">{track.lang}</span>
+                      <SubtitleTrackGradeChip track={track} />
                       <span className="medialib-track__text">
                         <span className="medialib-track__label" title={label}>{label}</span>
                         <span className="muted">{detail}</span>
@@ -584,6 +601,7 @@ export default function MediaDetailPanel({
                       ) : (
                         <div className="medialib-track">{body}</div>
                       )}
+                      <SubtitleTrackQuality mediaId={entry.primary.id} track={track} />
                       {/* The reverse of every add above it. Two clicks rather
                           than one: this deletes the cue file the app wrote, and
                           a corrected transcript is user work with no undo. */}

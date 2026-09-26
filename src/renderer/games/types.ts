@@ -1,4 +1,4 @@
-import type { LevelTier } from '../../shared/levelScale';
+import type { LevelTier, StudyLang } from '../../shared/levelScale';
 
 export type SourceLang = 'en' | 'ru' | 'zh';
 
@@ -17,6 +17,10 @@ export type GameId =
   | 'comet-courier'
   | 'capsule-sorter'
   | 'signal-simon'
+  | 'aero-breakout'
+  | 'aero-blocks'
+  | 'aero-pong'
+  | 'aero-snake'
   | 'mirror-writing';
 
 export interface GameDefinition {
@@ -37,6 +41,10 @@ export interface ArenaMistake {
   meaning?: string;
   level: LevelTier;
   sourceLang: SourceLang;
+  /** The language studied in that round. Absent on mistakes saved before other languages existed. */
+  studyLang?: StudyLang;
+  /** The single word the round tested, when it tested one. */
+  word?: string;
   createdAt: number;
 }
 

@@ -1802,6 +1802,36 @@ export function findLexiconFrequency(db: SqliteDb, query: FrequencyQuery): Lexic
  */
 const FREQUENCY_BATCH_TERMS = 400;
 
+/** A character's exam levels from KANJIDIC2 (JLPT) and the Chinese character data (HSK). */
+export interface CharacterLevels {
+  /** KANJIDIC2's pre-2010 JLPT level, `1`–`4` (4 easiest), as stored. */
+  jlpt?: string;
+  hsk?: string;
+}
+
+/**
+ * Exam levels for many characters at once, for a media difficulty estimate
+ * when the learner has not uploaded level lists: without this every analysis
+ * read "Unrated" although the dictionary already knew the JLPT level of every
+ * common kanji. One `IN` query per chunk; characters with no level are absent.
+ */
+export function findCharacterLevels(db: SqliteDb, chars: readonly string[]): Record<string, CharacterLevels> {
+  const unique = [...new Set(chars.filter((c) => [...c].length === 1))];
+  const out: Record<string, CharacterLevels> = {};
+  for (let i = 0; i < unique.length; i += 400) {
+    const chunk = unique.slice(i, i + 400);
+    const rows = db
+      .prepare(`select char, jlpt, hsk from chars where char in (${chunk.map(() => '?').join(',')}) and (jlpt is not null or hsk is not null)`)
+      .all(...chunk) as Array<{ char: string; jlpt: string | null; hsk: string | null }>;
+    for (const row of rows) {
+      const entry = (out[row.char] ??= {});
+      if (row.jlpt && !entry.jlpt) entry.jlpt = String(row.jlpt);
+      if (row.hsk && !entry.hsk) entry.hsk = String(row.hsk);
+    }
+  }
+  return out;
+}
+
 /**
  * The best rank each of many words has, in one pass.
  *

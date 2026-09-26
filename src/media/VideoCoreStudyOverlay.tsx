@@ -120,7 +120,8 @@ import VideoCoreTranscriptPanel from './VideoCoreTranscriptPanel';
 import { useCueAnalysis } from './useCueAnalysis';
 import {
   loadStudyTrackChoice,
-  loadSubtitleDelay,
+  loadSubtitleDelayFor,
+  saveSeriesSubtitleDelay,
   rememberStudyTrackChoice,
   saveSubtitleDelay,
   studySubtitleSource,
@@ -153,6 +154,13 @@ import {
 import { setVolumeNormalization } from './volumeNormalization';
 import { registerLivePlayerProbe } from './livePlayerProbe';
 import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../renderer/subtitlesExport';
+import { useLineLevel } from '../renderer/lineLevel';
+import { recordStudyTime } from '../renderer/stats';
+
+/** Dictation or shadowing: the player is being used to practise, not to watch. */
+function practiceModeActive(prefs: { dictationMode?: boolean; shadowingMode?: boolean }): boolean {
+  return prefs.dictationMode === true || prefs.shadowingMode === true;
+}
 
 /** This surface's name on `playerPreferencesStore` writes, so it ignores its own echo. */
 const VIDEO_CORE_PREFS_SOURCE = 'video-core';
@@ -642,6 +650,72 @@ export default function VideoCoreStudyOverlay({
     useCueAnalysis for why analyzing every cue as it goes past is not an option.
   */
   const studyLang = getStudyLang();
+
+  /**
+   * A subtitle file chosen from inside the player becomes the study track at
+   * once — the same mount the automatic sidecar uses, without leaving the video
+   * to find the library's subtitle picker.
+   */
+  const importSubtitleFile = React.useCallback(async (file: File) => {
+    if (!manager) return;
+    const split = parseStudySubtitles(await file.text());
+    if (!split.cues.length) {
+      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.importSubtitleEmpty'), kind: 'error' } }));
+      return;
+    }
+    const trackNumber = nextVideoCoreWhisperTrackNumber(manager.getTracks().map((track) => track.number));
+    const events = whisperCuesToVideoCoreEvents(split.cues, trackNumber) as MKVParser_SubtitleEvent[];
+    const track: MKVParser_TrackInfo = {
+      number: trackNumber,
+      uid: trackNumber,
+      type: 'subtitle',
+      codecID: 'S_TEXT/ASS',
+      // The file's own name: provenance the learner can read in the track picker.
+      name: file.name,
+      language: studyLang,
+      languageIETF: studyLang,
+      default: false,
+      forced: false,
+      enabled: true,
+    };
+    try {
+      await manager.addEventTrack(track);
+      await manager.onSubtitleEvents(events);
+      await manager.selectTrack(trackNumber);
+      setTracks(manager.getTracks());
+      setSelectedTrack(manager.getSelectedTrackNumberOrNull());
+      setAllCues(stableCueList(manager.getCues()));
+      setActiveCues(manager.getActiveCues());
+      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.importSubtitleDone', { name: file.name, count: split.cues.length }), kind: 'ok' } }));
+    } catch {
+      window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.importSubtitleEmpty'), kind: 'error' } }));
+    }
+  }, [manager, studyLang, t]);
+
+  /*
+   * Studied time, apart from watched time: seconds spent paused on a line with
+   * the dictionary or grammar open, or in dictation / shadowing. Watching keeps
+   * its own counter; this one goes to the day's study seconds in Statistics.
+   */
+  const studyingNow = practiceModeActive(preferences) || (playerPaused && (!!popup || preferences.grammarHighlight));
+  const studiedPending = React.useRef(0);
+  React.useEffect(() => {
+    if (!studyingNow) return undefined;
+    const id = window.setInterval(() => {
+      studiedPending.current += 5;
+      if (studiedPending.current >= 30) {
+        recordStudyTime(studiedPending.current);
+        studiedPending.current = 0;
+      }
+    }, 5_000);
+    return () => {
+      window.clearInterval(id);
+      if (studiedPending.current > 0) recordStudyTime(studiedPending.current);
+      studiedPending.current = 0;
+    };
+  }, [studyingNow]);
+  // The line's level (hardest word, by the learner's lists or the dictionary).
+  const cueLevel = useLineLevel(plainText, studyLang, preferences.lineLevel);
   const cueAnalysis = useCueAnalysis({
     text: plainText,
     lang: studyLang,
@@ -1855,10 +1929,11 @@ export default function VideoCoreStudyOverlay({
     one file to the next, because the overlay stays mounted across opens.
   */
   React.useEffect(() => {
-    const stored = loadSubtitleDelay(delayKey);
+    const stored = loadSubtitleDelayFor(delayKey, subtitleSource);
     subtitleDelayRef.current = stored;
     setSubtitleDelaySec(stored);
     void manager?.setSubtitleDelay(stored);
+    // `subtitleSource` is what `delayKey` is derived from; the key is the change signal.
   }, [delayKey, manager]);
 
   /**
@@ -3024,6 +3099,8 @@ export default function VideoCoreStudyOverlay({
             onSelectAnnotation={setSelectedAnnotation}
             furigana={preferences.furigana}
             lang={studyLang}
+            knownHighlight={preferences.knownHighlight}
+            levelBadge={cueLevel}
             onMouseDown={(event) => {
               popupOpenOnDownRef.current = !!popup;
               noteLookupPointerDown(event);
@@ -3269,6 +3346,7 @@ export default function VideoCoreStudyOverlay({
         hasCues={allCues.length > 0}
         hasActiveCue={!!activeCue}
         subtitleLoading={externalSubtitlePending}
+        onImportSubtitleFile={(file) => void importSubtitleFile(file)}
         onPrevCue={() => jumpCue(-1)}
         onReplayCue={() => replayCue(activeCue)}
         onNextCue={() => jumpCue(1)}
@@ -3278,6 +3356,11 @@ export default function VideoCoreStudyOverlay({
         subtitleDelaySec={subtitleDelaySec}
         onChangeSubtitleDelay={changeSubtitleDelay}
         onResetSubtitleDelay={resetSubtitleDelay}
+        onApplyDelayToSeries={subtitleSource.mediaId != null ? () => {
+          if (saveSeriesSubtitleDelay(subtitleSource, subtitleDelaySec)) {
+            window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('mediaWorkspace.study.delayAppliedToSeries'), kind: 'ok' } }));
+          }
+        } : undefined}
         onResetSubtitleAppearance={() => setPreferences(resetSubtitleAppearance)}
         onExportSubtitles={allCues.length > 0 ? exportSubtitles : undefined}
         shortcutKeysFor={shortcutKeysFor}

@@ -1024,6 +1024,7 @@ function DiscoveryPosterArt({
   score: number;
   level: string;
 }) {
+  const { t } = useT();
   const [failed, setFailed] = useState(false);
   let hash = 0;
   for (const char of title) hash = (Math.imul(hash, 31) + (char.codePointAt(0) ?? 0)) >>> 0;
@@ -1051,7 +1052,8 @@ function DiscoveryPosterArt({
         </span>
       )}
       <em>{Math.round(score)}%</em>
-      <i>{level}</i>
+      {/* A guess from genre and audience, not an analysis of the dialogue — say so. */}
+      <i title={t('mediaLevel.genreEstimateHint')}>{t('mediaLevel.estimated', { level })}</i>
     </span>
   );
 }

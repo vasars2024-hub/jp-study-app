@@ -264,6 +264,9 @@ export const GRAMMAR_TAXONOMY_JA: Catalog = {
   'grammar.practice.empty.hint': '絞り込みを減らすか、「検証済みタグのみ」をオフにしてください。',
   // —— familiarity (learner state) ——
   'grammar.familiarity.legend': '習熟度',
+  'grammar.lists.legend': 'マイリスト',
+  'grammar.lists.favorites': 'お気に入り',
+  'grammar.lists.queue': '学習キュー',
   'grammar.familiarity.new': '未学習',
   'grammar.familiarity.learning': '学習中',
   'grammar.familiarity.familiar': 'なじみ',

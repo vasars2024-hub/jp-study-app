@@ -30,30 +30,27 @@ network. `subtitleStore.ts` is the sole layer touching `localStorage` and `Date.
 
 | §8 roadmap piece | Status | Where / note |
 | --- | --- | --- |
-| Provider record: name, languages, search method, matching rules, format support, reliability score | **Finished** | `SubtitleProvider` + `normalizeSubtitleProvidersDocument` |
-| Format support: SRT / ASS / SSA / VTT / Embedded | **Finished** | `SUBTITLE_FORMATS`, `isSidecarSubtitleFormat`, `subtitleFormatSupportsStyling` |
-| Subtitle matching by title, episode, season, year, release group, duration, language | **Finished** | `matchSubtitleTracks`; per-provider rules, discriminating vs advisory signals |
-| Search subtitles separately | **Partial** | `planSubtitleProviders` routes and `matchSubtitleTracks` searches the *local* catalogue; provider-side search execution is out of scope |
-| Select preferred languages | **Finished** | `SubtitlePreferences.primaryLanguage` / `secondaryLanguage` |
-| Select subtitle priority | **Finished** | `languagePriority` + `resolveSubtitleLanguagePriority` |
-| Preferred style: full / signs-and-songs / forced | **Finished** | `SubtitleStyle`, honoured in ranking and matching |
-| Download subtitle files | **Not started** | Deliberately excluded — no downloads in this phase |
-| Replace subtitles | **Finished** | `selectSubtitleVersion` / `clearSubtitleVersionSelection` (pin per identity+language) |
-| Manage subtitle versions | **Finished** | `listSubtitleVersions`, `pickSubtitleVersion`, `planSubtitleSlots` |
-| Language support: ja / zh / ko / en / es / fr / de + custom | **Finished** | `BUILT_IN_SUBTITLE_LANGUAGES`, `customLanguages`, `listSupportedSubtitleLanguages` |
-| Display available subtitles ("English ✓ Japanese ✓") | **Partial** | `summarizeAvailableSubtitles` produces the data; no UI surface yet |
-| Quality system: accuracy, sync, translation, completeness, user rating | **Finished** | `scoreSubtitleQuality`; unrated scores `null`, never a misleading 0 |
-| Display a quality score | **Partial** | Score + grade computed; rendering not started |
-| Shift subtitles ±ms | **Finished** | `shiftSubtitleOffset` (relative to the inherited effective offset) |
-| Auto-detect offset | **Finished** | `detectSubtitleOffset` — median over caller-supplied timing anchors, with spread + confidence. Offline: it reads no files |
-| Save adjustments per series | **Finished** | Series → season → episode scope resolution (`resolveSubtitleOffset`) |
-| Multiple subtitle versions | **Finished** | Ranked version list per shelf |
-| Compare subtitles | **Partial** | `compareSubtitleVersions` diffs *release metadata*; cue-text diff needs file reading, which this phase does not do |
-| Preferred translator / group | **Finished** | `preferredTranslators`, ranked ahead of quality |
-| Persistence + clock injection | **Finished** | `subtitleStore.ts`, two keys, newer-version refusal, garbage fallback |
-| Settings UI panel + i18n (en/ja/zh/ru) | **Not started** | Next milestone — mirror `MediaProviderPanel` / `UnifiedSearchPanel` |
-| Provider execution / networking / auth / scraping | **Not started** | Out of scope by instruction and by §8's own boundary |
-| §9 external-player handoff (pass subtitle file to VLC/mpv) | **Not started** | §9's job; §8 only decides *which* release |
+| Provider record: name, languages, search method, matching rules, format support, reliability score | **Finished** (reliability unused) | `SubtitleProvider`; discovery builds one per run (`main/subtitleDiscovery.ts`) with `reliabilityScore: null` |
+| Format support: SRT / ASS / SSA / VTT / Embedded | **Finished** | `SUBTITLE_FORMATS`, `isSidecarSubtitleFormat` |
+| Subtitle matching by title, episode, season, year, release group, duration, language | **Finished** | `matchSubtitleTracks`, used by discovery's `scoreCandidates` |
+| Search subtitles separately | **Finished** | Automatic: `runSubtitleDiscovery` (embedded, sidecar, Jimaku, OpenSubtitles). Manual: Nyaa dialog and the OpenSubtitles dialog (`listOpenSubtitles` / `acceptOpenSubtitles`) in the media detail panel; unified search has a subtitle-availability source |
+| Select preferred languages | **Finished** | Study language = the study line (Settings › Study); `helperLanguage` = the second line; `autoDownloadLanguages`. The old `primaryLanguage` / `secondaryLanguage` preferences were never read and are no longer offered |
+| Select subtitle priority | **Partial** | `languagePriority` exists in `subtitleManagement`, not read by discovery |
+| Preferred style: full / signs-and-songs / forced | **Finished** | `SubtitleDiscoverySettings.style`, passed to the matcher by `scoreCandidates`; a track's style is read from its release name (`styleOfRelease`) |
+| Hearing-impaired tracks | **Finished** | `SubtitleDiscoverySettings.allowHearingImpaired` filters candidates in `scoreCandidates` |
+| Download subtitle files | **Finished** | Discovery downloads and aligns (`alignToAudio`) |
+| Replace subtitles / manage versions | **Partial** | Records per media item; `preferredSubtitleId` pins one. `selectSubtitleVersion` / `listSubtitleVersions` are not used |
+| Language support: ja / zh / ru / en / … + custom | **Finished** | `listSupportedSubtitleLanguages`; chips show localized names |
+| Display available subtitles | **Finished** | Media detail track list; unified search subtitle-availability source |
+| Quality system: match, sync, user rating | **Finished** | `shared/subtitleTrackGrade.ts`: match score + sync grade (`syncGradeFromEstimate`) + the user's 1–5 rating (`rateSubtitleRecord`) |
+| Display a quality score | **Finished** | Grade chip (A–D) and stars on each track row (`SubtitleTrackQuality.tsx`) |
+| Shift subtitles ±ms | **Finished** | Player ±0.1 s, remembered per file (`studySubtitleMemory.ts`) |
+| Auto-detect offset | **Finished** | `shared/subtitleSync.ts` `estimateOffset` at download time |
+| Save adjustments per series | **Finished** | "Apply to series" in the player saves via `saveSubtitleOffsetEntry`; a file without its own delay inherits it through `resolveSubtitleOffset` (`loadSubtitleDelayFor`) |
+| Compare subtitles | **Not started** | `compareSubtitleVersions` exists with no caller |
+| Preferred translator / group | **Finished** | `SubtitleDiscoverySettings.preferredGroups` ranks discovery, the OpenSubtitles list and Nyaa; "Prefer this group" on a track adds to it |
+| Settings UI panel + i18n (en/ja/zh/ru) | **Finished** | `SubtitleProviderPanel.tsx` |
+| §9 external-player handoff | **Not started** | §9's job |
 
 ## Design decisions worth remembering
 

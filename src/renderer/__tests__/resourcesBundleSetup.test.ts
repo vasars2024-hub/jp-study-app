@@ -17,6 +17,10 @@ const UI_KEYS = new Set([
   'bundleDetail.resourceLinks',
   'bundleDetail.linkCount',
   'bundleDetail.savedToolNote',
+  // The cost tag is a fixed Free / Freemium / Paid vocabulary, i.e. chrome.
+  'resources.cost.free',
+  'resources.cost.freemium',
+  'resources.cost.paid',
 ]);
 
 vi.mock('../i18n', () => ({

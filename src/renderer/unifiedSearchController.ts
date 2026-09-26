@@ -8,6 +8,7 @@ import type {
 } from '../shared/unifiedSearchExecution';
 import { createUnifiedSearchSession, type UnifiedSearchSession } from './unifiedSearchSession';
 import { loadUnifiedSearchDocument } from './unifiedSearchStore';
+import { LATER_BUILT_IN_IDS } from './unifiedSearchBackends';
 
 /**
  * Renderer-side wiring between the local Unified Search document and the search
@@ -35,6 +36,8 @@ export interface UnifiedSearchRegistryExecutors {
   metadata?: UnifiedSearchProviderExecutor;
   /** Connector for `kind: 'site'` and `kind: 'connector'` providers — the torrent indexes. */
   sites?: UnifiedSearchProviderExecutor;
+  /** Executors bound to specific provider ids, ahead of the kind binding. */
+  byId?: Record<string, UnifiedSearchProviderExecutor>;
 }
 
 function executorForKind(
@@ -62,7 +65,12 @@ export function createUnifiedSearchRegistry(
 ): UnifiedSearchProviderRegistry {
   const registry: Record<string, UnifiedSearchProviderExecutor> = {};
   for (const provider of selectEnabledUnifiedSearchProviders(document)) {
-    registry[provider.id] = executorForKind(provider.kind, executors);
+    // A built-in with a backend of its own (dramas/films, subtitle presence) is
+    // bound by id; everything else by kind, as before.
+    // Those built-ins never borrow another kind's backend: a TV search sent to the
+    // anime catalogues would answer a different question.
+    registry[provider.id] = executors.byId?.[provider.id]
+      ?? (LATER_BUILT_IN_IDS.includes(provider.id) ? inertExecutor : executorForKind(provider.kind, executors));
   }
   return Object.freeze(registry);
 }
@@ -89,6 +97,8 @@ export interface RendererUnifiedSearchSessionOptions {
   metadata?: UnifiedSearchProviderExecutor;
   /** Index executor bound to `site` and `connector` providers by the default registry. */
   sites?: UnifiedSearchProviderExecutor;
+  /** Executors for specific provider ids, taking precedence over the kind binding. */
+  byId?: Record<string, UnifiedSearchProviderExecutor>;
   concurrency?: number;
 }
 
@@ -107,6 +117,7 @@ export function createRendererUnifiedSearchSession(
         localLibrary: options.localLibrary,
         metadata: options.metadata,
         sites: options.sites,
+        byId: options.byId,
       }));
   // The coordinator calls `getDocument` then `getRegistry` within one search;
   // caching the plan's document keeps the registry aligned to the very providers

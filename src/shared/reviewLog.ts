@@ -14,7 +14,7 @@ import type { LocalSrsRating } from './localSrs';
  * day's study like any practice answer, and are summarised on their own so the
  * flashcard practice line keeps meaning flashcards.
  */
-export type ReviewLogMode = 'review' | 'learn' | 'test' | 'write' | 'grammar';
+export type ReviewLogMode = 'review' | 'learn' | 'test' | 'write' | 'grammar' | 'game';
 
 export interface ReviewLogEntry {
   id: string;
@@ -39,7 +39,7 @@ export interface ReviewLogEntry {
 /** Bound on stored rows: roughly a year of heavy daily review. */
 export const REVIEW_LOG_LIMIT = 50_000;
 
-const MODES: readonly ReviewLogMode[] = ['review', 'learn', 'test', 'write', 'grammar'];
+const MODES: readonly ReviewLogMode[] = ['review', 'learn', 'test', 'write', 'grammar', 'game'];
 const RATINGS: readonly LocalSrsRating[] = ['again', 'hard', 'good', 'easy'];
 
 function finite(value: unknown): number | undefined {
@@ -117,6 +117,9 @@ export interface ReviewLogSummary {
   /** Grammar practice answers inside the window (not in `practiceAnswers`). */
   grammarAnswers: number;
   grammarCorrect: number;
+  /** Game Arena answers inside the window (in neither of the above). */
+  gameAnswers: number;
+  gameCorrect: number;
 }
 
 function localDayKey(ms: number): string {
@@ -150,6 +153,8 @@ export function summarizeReviewLog(
   let practiceCorrect = 0;
   let grammarAnswers = 0;
   let grammarCorrect = 0;
+  let gameAnswers = 0;
+  let gameCorrect = 0;
   for (const entry of entries) {
     const bucket = index.get(localDayKey(entry.at));
     if (!bucket) continue;
@@ -164,6 +169,9 @@ export function summarizeReviewLog(
     } else if (entry.mode === 'grammar') {
       grammarAnswers += 1;
       if (entry.correct) grammarCorrect += 1;
+    } else if (entry.mode === 'game') {
+      gameAnswers += 1;
+      if (entry.correct) gameCorrect += 1;
     } else {
       practiceAnswers += 1;
       if (entry.correct) practiceCorrect += 1;
@@ -179,5 +187,7 @@ export function summarizeReviewLog(
     practiceCorrect,
     grammarAnswers,
     grammarCorrect,
+    gameAnswers,
+    gameCorrect,
   };
 }

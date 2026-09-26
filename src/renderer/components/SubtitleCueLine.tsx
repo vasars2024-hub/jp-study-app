@@ -7,6 +7,21 @@ import type { StudySegment } from '../../shared/studySegmentation';
 import type { StudyLang } from '../../shared/studyLang';
 import { useReadingAid } from '../readingAid';
 import { useStudyLanguage } from '../useStudyLanguage';
+import { getLevel, onKnowledgeChanged } from '../knownWords';
+import { studyWordKey } from '../../shared/studySegmentation';
+
+/**
+ * The learner's knowledge of a word as a class: New words are marked, words
+ * being learned are marked lightly, familiar and known words are left plain.
+ * `null` when highlighting is off.
+ */
+function knownClass(key: string, on: boolean, surface?: string): string {
+  if (!on || !key) return '';
+  // Known words are stored under the form the learner marked; check the plain
+  // spelling as well as the language's lemma/stem key.
+  const level = Math.max(getLevel(key), surface ? getLevel(surface) : 0);
+  return level === 0 ? ' wk-new' : level === 1 ? ' wk-learning' : '';
+}
 
 interface Props {
   text: string;
@@ -34,6 +49,10 @@ interface Props {
   onSelectAnnotation?: (index: number) => void;
   onMouseDown?: (e: React.MouseEvent) => void;
   onMouseUp?: (e: React.MouseEvent) => void;
+  /** Mark words the learner does not know yet (New) and is still learning. */
+  knownHighlight?: boolean;
+  /** The line's exam level (JLPT / HSK / CEFR), shown as a small tag. */
+  levelBadge?: string | null;
 }
 
 /** One rendered run: a plain stretch, or an annotated span carrying its index. */
@@ -49,17 +68,19 @@ function katakanaToHiragana(s: string): string {
   );
 }
 
-function TokenSpan({ token, furigana }: { token: JpToken; furigana: boolean }) {
+function TokenSpan({ token, furigana, known }: { token: JpToken; furigana: boolean; known: boolean }) {
   const reading = token.reading ? katakanaToHiragana(token.reading) : '';
+  // Only content words carry a knowledge state; particles are never "unknown".
+  const cls = `media-sub-morpheme${token.content && !token.proper ? knownClass(token.lemma || token.surface, known, token.surface) : ''}`;
   if (furigana && reading && hasKanji(token.surface) && reading !== token.surface) {
     return (
       <ruby className="media-sub-ruby">
-        <span className="media-sub-morpheme">{token.surface}</span>
+        <span className={cls}>{token.surface}</span>
         <rt>{reading}</rt>
       </ruby>
     );
   }
-  return <span className="media-sub-morpheme">{token.surface}</span>;
+  return <span className={cls}>{token.surface}</span>;
 }
 
 /**
@@ -72,16 +93,19 @@ function StudyWord({
   lang,
   aid,
   readings,
+  known = false,
 }: {
   word: string;
   lang: StudyLang;
   aid: boolean;
   readings: ReadingAidResult;
+  known?: boolean;
 }) {
   const reading = aid ? readings[word] : undefined;
+  const cls = `media-sub-morpheme wk${knownClass(studyWordKey(word, lang), known, word.toLowerCase())}`;
   if (lang === 'zh' && reading?.some(Boolean)) {
     return (
-      <span className="media-sub-morpheme wk" data-surface={word}>
+      <span className={cls} data-surface={word}>
         <ruby className="media-sub-ruby">
           {pinyinRubyPairs(word, reading).map((pair, i) => (
             <Fragment key={i}>{pair.base}<rt>{pair.rt}</rt></Fragment>
@@ -91,7 +115,7 @@ function StudyWord({
     );
   }
   const shown = lang === 'ru' && reading ? stressedRussian(word, reading) : word;
-  return <span className="media-sub-morpheme wk" data-surface={word}>{shown}</span>;
+  return <span className={cls} data-surface={word}>{shown}</span>;
 }
 
 function StudySegments({
@@ -99,16 +123,18 @@ function StudySegments({
   lang,
   aid,
   readings,
+  known = false,
 }: {
   parts: readonly StudySegment[];
   lang: StudyLang;
   aid: boolean;
   readings: ReadingAidResult;
+  known?: boolean;
 }) {
   return (
     <>
       {parts.map((part, i) => (part.wordLike
-        ? <StudyWord key={`${i}-${part.text}`} word={part.text} lang={lang} aid={aid} readings={readings} />
+        ? <StudyWord key={`${i}-${part.text}`} word={part.text} lang={lang} aid={aid} readings={readings} known={known} />
         : <Fragment key={`${i}-${part.text}`}>{part.text}</Fragment>))}
     </>
   );
@@ -133,7 +159,15 @@ export default function SubtitleCueLine({
   onSelectAnnotation,
   onMouseDown,
   onMouseUp,
+  knownHighlight = false,
+  levelBadge,
 }: Props) {
+  // Re-colour when a word's level changes (a lookup, a review, a manual mark).
+  const [, setKnowledgeNonce] = useState(0);
+  useEffect(
+    () => (knownHighlight ? onKnowledgeChanged(() => setKnowledgeNonce((n) => n + 1)) : undefined),
+    [knownHighlight],
+  );
   const runs = useMemo<CueRun[]>(() => {
     if (!annotations || annotations.length === 0) return [{ text }];
     return sentencePieces(text, annotations).map((piece) =>
@@ -189,14 +223,19 @@ export default function SubtitleCueLine({
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
     >
+      {levelBadge && (
+        <span className="study-cue-level" aria-label={levelBadge}>
+          {levelBadge}
+        </span>
+      )}
       {runs.map((run, runIndex) => {
         const tokens = tokenRuns?.[runIndex];
         const parts = aid.segments[runIndex];
         const content = !japanese && parts?.length
-          ? <StudySegments parts={parts} lang={lineLang} aid={furigana} readings={aid.readings} />
+          ? <StudySegments parts={parts} lang={lineLang} aid={furigana} readings={aid.readings} known={knownHighlight} />
           : tokens && tokens.length > 0
             ? tokens.map((tok, i) => (
-              <TokenSpan key={`${i}-${tok.surface}`} token={tok} furigana={furigana} />
+              <TokenSpan key={`${i}-${tok.surface}`} token={tok} furigana={furigana} known={knownHighlight} />
             ))
             : run.text;
 

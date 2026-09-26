@@ -114,7 +114,7 @@ const COLLAPSED_KEY = 'jp-media-collapsed';
 const PLAYER_PREFERENCES_KEY = 'jp-media-player-preferences-v1';
 /** This surface's name on `playerPreferencesStore` writes, so it ignores its own echo. */
 const MEDIA_CENTER_PREFS_SOURCE = 'media-center';
-export const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+export const RATE_PRESETS = [0.5, 0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
 
 function loadPlayerPreferences() {
   try {

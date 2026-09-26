@@ -63,6 +63,7 @@ export function emptyRankDrops(): NyaaRankDrops {
   return { titleMatched: 0, seeders: 0, title: 0, muxed: 0, shape: 0, language: 0 };
 }
 import { VIDEO_EXT } from '../shared/mediaKind';
+import { loadDiscoverySettings } from './subtitleDiscovery';
 
 export type { NyaaAcquisitionConfig };
 import { searchTorrents } from './scraper/torrents';
@@ -366,7 +367,8 @@ export async function nyaaSearchDetailed(
 
   const { candidates: ranked, dropped } = rankSubtitleCandidatesDetailed(rows, {
     languages: input.languages,
-    preferredGroups: input.config.torrents.preferredReleaseGroups,
+    // The torrent profile's groups and the subtitle settings' "prefer this group" list.
+    preferredGroups: [...new Set([...input.config.torrents.preferredReleaseGroups, ...loadDiscoverySettings().preferredGroups])],
     minSeeders: input.config.torrents.minSeeders,
     // The index matched this query, not this title. Without the title here the
     // listing offers releases of other shows entirely.

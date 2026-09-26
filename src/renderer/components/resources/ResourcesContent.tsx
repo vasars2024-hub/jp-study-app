@@ -13,6 +13,9 @@ import { RESOURCES, type Resource, type ResourceCategory } from '../../data/reso
 import { CATALOG_FALLBACK } from '../../data/catalogFallback';
 import BundleCard from './BundleCard';
 import BundleDetail from './BundleDetail';
+import { costLabel } from './costLabel';
+
+export { costLabel };
 import type {
   Bundle,
   BundleDownload,
@@ -22,8 +25,18 @@ import type {
 import type { CollectedTool } from '../../../shared/collectedTools';
 import { isResourcesCatalog } from '../../../shared/resourcesCatalog';
 import { useT } from '../../i18n';
-import { showToast } from '../ui';
+import { confirmDialog, showToast } from '../ui';
 import { confirmRemoveCollectedTool } from '../../collectedToolsActions';
+import { useStudyLanguage } from '../../useStudyLanguage';
+import {
+  OWN_RESOURCES_CATEGORY_ID,
+  isNewInCatalogue,
+  loadOwnResources,
+  onOwnResourcesChanged,
+  orderForStudyLang,
+  removeOwnResource,
+  type OwnResource,
+} from '../../ownResources';
 
 export type Filter = 'All' | string;
 export type RefreshState = 'idle' | 'refreshing' | 'updated' | 'cached' | 'builtin' | 'offline';
@@ -46,7 +59,7 @@ export function openLink(url: string): void {
 }
 
 function matchesResource(r: Resource, q: string): boolean {
-  return `${r.name} ${r.description}`.toLowerCase().includes(q);
+  return `${r.name} ${r.description} ${(r as Partial<OwnResource>).group ?? ''}`.toLowerCase().includes(q);
 }
 
 const CHECKLIST_PREFIX = 'resources.checklist.';
@@ -67,12 +80,6 @@ function saveChecklist(bundleId: string, ids: string[]): void {
   } catch {
     /* quota — non-fatal */
   }
-}
-
-function isNew(addedAt: string): boolean {
-  const t = Date.parse(addedAt);
-  if (Number.isNaN(t)) return false;
-  return Date.now() - t < 30 * 24 * 60 * 60 * 1000;
 }
 
 /** Remote categories are shaped like the static ones; normalize for rendering. */
@@ -121,6 +128,7 @@ export async function saveAndOpenBundleLink(
 
 export function useResources() {
   const { t } = useT();
+  const { lang: studyLang } = useStudyLanguage();
   const [filter, setFilter] = useState<Filter>('All');
   const [query, setQuery] = useState('');
 
@@ -135,6 +143,24 @@ export function useResources() {
   const [tools, setTools] = useState<CollectedTool[]>([]);
   const [editingTool, setEditingTool] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
+
+  // Resources the learner added or imported, kept on this machine.
+  const [own, setOwn] = useState<OwnResource[]>(loadOwnResources);
+  useEffect(() => onOwnResourcesChanged(() => setOwn(loadOwnResources())), []);
+  const removeOwn = useCallback(
+    async (id: string) => {
+      const item = own.find((r) => r.id === id);
+      if (!item) return;
+      const ok = await confirmDialog({
+        title: t('resources.own.removeTitle'),
+        message: t('resources.own.removeBody', { name: item.name }),
+        confirmLabel: t('resources.myTools.remove'),
+        danger: true,
+      });
+      if (ok) removeOwnResource(id);
+    },
+    [own, t],
+  );
 
   const reloadTools = useCallback(async () => {
     try {
@@ -254,8 +280,20 @@ export function useResources() {
     });
   }, []);
 
-  // Static categories + any remote extras, filtered by category + search query.
-  const allCategories = useMemo(() => [...RESOURCES, ...catalogCategories(catalog)], [catalog]);
+  // The learner's own resources first, then the categories for their study
+  // language, then any-language ones, then the rest; remote extras included.
+  const allCategories = useMemo(() => {
+    const listed = orderForStudyLang([...RESOURCES, ...catalogCategories(catalog)], studyLang);
+    if (own.length === 0) return listed;
+    const mine: ResourceCategory = {
+      id: OWN_RESOURCES_CATEGORY_ID,
+      icon: 'bookmark',
+      title: t('resources.own.title'),
+      blurb: t('resources.own.blurb'),
+      items: own,
+    };
+    return [mine, ...listed];
+  }, [catalog, own, studyLang, t]);
 
   const groups: ResourceCategory[] = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -274,10 +312,17 @@ export function useResources() {
     filter === 'All' ? null : allCategories.find((cat) => cat.id === filter) ?? null;
 
   const bundles = catalog.bundles;
-  const newEntries: NewEntry[] = useMemo(
-    () => [...catalog.newSection].sort((a, b) => Date.parse(b.addedAt) - Date.parse(a.addedAt)),
-    [catalog.newSection],
-  );
+  // Entries for the learner's study language first, newest first within that.
+  const newEntries: NewEntry[] = useMemo(() => {
+    const fits = (e: NewEntry) => (!e.lang || e.lang.length === 0 || e.lang.includes(studyLang) ? 0 : 1);
+    return [...catalog.newSection].sort(
+      (a, b) => fits(a) - fits(b) || Date.parse(b.addedAt) - Date.parse(a.addedAt),
+    );
+  }, [catalog.newSection, studyLang]);
+  const catalogueDate = catalog.updatedAt;
+  // The catalogue repo is unpublished: once main says there is only the
+  // built-in copy, Refresh has nothing to fetch and says so instead of spinning.
+  const canRefresh = refreshState !== 'builtin' && refreshState !== 'refreshing';
 
   // Bundles / New section only show on the unfiltered, unsearched landing view.
   const showLanding = filter === 'All' && !query.trim();
@@ -322,7 +367,11 @@ export function useResources() {
     activeCategory,
     bundles,
     newEntries,
+    catalogueDate,
+    canRefresh,
     showLanding,
+    own,
+    removeOwn,
   };
 }
 
@@ -363,9 +412,11 @@ export function ResourceNewSection({ state }: { state: ResourcesState }) {
             <span className="res-card-top">
               <span className="res-name">
                 {r.name}
-                {isNew(r.addedAt) ? <span className="new-badge">NEW</span> : null}
+                {isNewInCatalogue(r.addedAt, state.catalogueDate) ? (
+                  <span className="new-badge">{t('resources.new.badge')}</span>
+                ) : null}
               </span>
-              <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
+              <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{costLabel(t, r.cost)}</span>
             </span>
             <span className="res-desc">{r.description}</span>
             <span className="res-host">
@@ -466,6 +517,44 @@ export function ResourceMyTools({ state }: { state: ResourcesState }) {
   );
 }
 
+/**
+ * The learner's own resources as cards with a remove control (a card that is
+ * itself a button cannot hold one, so these are laid out like "My tools").
+ */
+export function ResourceOwnCards({ state, items }: { state: ResourcesState; items: readonly Resource[] }) {
+  const { t } = useT();
+  return (
+    <div className="res-grid">
+      {(items as OwnResource[]).map((r) => (
+        <div key={r.id} className="res-card mytool-card own-resource-card">
+          <span className="res-card-top">
+            <button className="res-name mytool-name" onClick={() => openLink(r.url)} title={r.url}>
+              {r.name}
+            </button>
+            <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{costLabel(t, r.cost)}</span>
+            <button
+              className="mytool-remove"
+              title={t('resources.own.remove', { name: r.name })}
+              aria-label={t('resources.own.remove', { name: r.name })}
+              onClick={() => void state.removeOwn(r.id)}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </span>
+          {r.description ? <span className="res-desc">{r.description}</span> : null}
+          <span className="res-host">
+            {hostOf(r.url)}
+            {r.group ? <span className="own-resource-group">{r.group}</span> : null}
+            {r.lang.length ? (
+              <span className="own-resource-lang">{r.lang.map((l) => t(`resources.own.lang.${l}`)).join(' · ')}</span>
+            ) : null}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The category → cards listing used by the standard Study OS shell and Blanc. */
 export function ResourceGroups({ state }: { state: ResourcesState }) {
   const { t } = useT();
@@ -481,12 +570,15 @@ export function ResourceGroups({ state }: { state: ResourcesState }) {
             <p className="muted">{cat.blurb}</p>
           </div>
 
+          {cat.id === OWN_RESOURCES_CATEGORY_ID ? (
+            <ResourceOwnCards state={state} items={cat.items} />
+          ) : (
           <div className="res-grid">
             {cat.items.map((r) => (
               <button key={r.url} className="res-card" onClick={() => openLink(r.url)}>
                 <span className="res-card-top">
                   <span className="res-name">{r.name}</span>
-                  <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
+                  <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{costLabel(t, r.cost)}</span>
                 </span>
                 <span className="res-desc">{r.description}</span>
                 <span className="res-host">
@@ -498,6 +590,7 @@ export function ResourceGroups({ state }: { state: ResourcesState }) {
               </button>
             ))}
           </div>
+          )}
         </section>
       ))}
     </>

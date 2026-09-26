@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GRAMMAR, importUserGrammar, type NormalizedGrammarPoint } from '../../data/grammar';
-import { parseGrammarImport } from '../../data/grammar/userImport';
+import { GRAMMAR_TEMPLATE_CSV, GRAMMAR_TEMPLATE_JSON, parseGrammarImport } from '../../data/grammar/userImport';
+import type { GrammarPoint } from '../../data/grammar/types';
+import ContentImportDialog from '../ContentImportDialog';
 import { contentLangOf, getStudyLang } from '../../studyEnvironment';
 import { dedupeGrammarByTitle } from '../../data/grammar/practiceFilters';
 import {
@@ -62,18 +64,21 @@ export default function GrammarCurationPanel() {
   /**
    * A grammar list of the learner's own — any study language — joins the
    * corpus as imported content awaiting review, which is this queue's job.
+   * The shared import dialog shows the template and a preview first, so a
+   * wrong column is seen before anything joins the corpus.
    */
-  const importFile = useCallback(async (file: File | undefined) => {
-    if (!file) return;
-    const { points, skipped } = parseGrammarImport(await file.text(), file.name, getStudyLang());
-    if (!points.length) {
-      setImportNote(t('grammar.curation.importNothing', { file: file.name }));
-      return;
-    }
+  const [importOpen, setImportOpen] = useState(false);
+  const parseImport = useCallback((text: string, fileName: string) => {
+    const { points, skipped } = parseGrammarImport(text, fileName, getStudyLang());
+    return { rows: points, skipped };
+  }, []);
+  const commitImport = useCallback((points: GrammarPoint[]) => {
     importUserGrammar(points);
     setCorpusVersion((n) => n + 1);
     setIssue('imported-unreviewed');
-    setImportNote(t('grammar.curation.imported', { count: points.length, skipped }));
+    const note = t('grammar.curation.imported', { count: points.length, skipped: 0 });
+    setImportNote(note);
+    return note;
   }, [t]);
   const counts = useMemo(() => issueCounts(corpus, state), [corpus, state]);
   const queue = useMemo(() => curationQueue(corpus, state, issue), [corpus, state, issue]);
@@ -213,19 +218,26 @@ export default function GrammarCurationPanel() {
         <Button size="sm" disabled={history.length === 0} onClick={undo}>
           {t('grammar.curation.undo')}
         </Button>
-        <label className="btn small gram-cur-import" title={t('grammar.curation.importHint')}>
+        <Button size="sm" className="gram-cur-import" title={t('grammar.curation.importHint')} onClick={() => setImportOpen(true)}>
           {t('grammar.curation.import')}
-          <input
-            type="file"
-            accept=".csv,.tsv,.txt,.json"
-            hidden
-            onChange={(event) => {
-              void importFile(event.currentTarget.files?.[0]);
-              event.currentTarget.value = '';
-            }}
-          />
-        </label>
+        </Button>
       </div>
+      <ContentImportDialog<GrammarPoint>
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title={t('grammar.curation.importTitle')}
+        description={t('grammar.curation.importHint')}
+        templates={{ csv: GRAMMAR_TEMPLATE_CSV, json: GRAMMAR_TEMPLATE_JSON }}
+        templateName="grammar-list"
+        parse={parseImport}
+        columns={[
+          { label: t('grammar.curation.col.pattern'), value: (p) => p.title, lang: (p) => contentLangOf(p.lang) },
+          { label: t('grammar.curation.col.meaning'), value: (p) => p.meaning },
+          { label: t('grammar.curation.col.level'), value: (p) => p.level },
+          { label: t('grammar.curation.col.example'), value: (p) => p.examples[0]?.jp ?? '', lang: (p) => contentLangOf(p.lang) },
+        ]}
+        onCommit={commitImport}
+      />
       {importNote && <p className="gram-cur-summary" role="status">{importNote}</p>}
 
       {queue.length === 0 ? (

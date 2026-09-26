@@ -54,6 +54,13 @@ interface DayEntry {
   /** Learn / Test / Write answers that day. */
   practice?: number;
   practiceCorrect?: number;
+  /**
+   * Seconds of active study that is neither reading nor watching: Game Arena
+   * sessions, and study-mode time in the player. Kept apart from both so a
+   * game session never inflates "time read" and study time never hides in
+   * "time watched".
+   */
+  studySeconds?: number;
 }
 interface BookEntry {
   title: string;
@@ -147,6 +154,7 @@ export function onStatsChanged(refresh: () => void): () => void {
     READING_RECORDED_EVENT,
     WATCH_RECORDED_EVENT,
     REVIEW_RECORDED_EVENT,
+    STUDY_RECORDED_EVENT,
     STATS_RESET_EVENT,
     STUDY_LANG_EVENT,
   ];
@@ -194,6 +202,8 @@ export interface DayStat {
   /** Flashcard reviews graded that day. */
   reviews: number;
   reviewsPassed: number;
+  /** Active study seconds (games, player study mode). */
+  studySeconds: number;
 }
 export interface BookStat {
   id: string;
@@ -222,6 +232,9 @@ export interface StatsSummary {
   /** Music listened to today / across every recorded day. Its own channel, like watching. */
   todayListenSeconds?: number;
   totalListenSeconds?: number;
+  /** Active study seconds (games, player study mode), today and in total. */
+  todayStudySeconds: number;
+  totalStudySeconds: number;
   /** Flashcard reviews graded today, and across every recorded day. */
   todayReviews: number;
   totalReviews: number;
@@ -499,6 +512,28 @@ export function recordListening(trackId: string, title: string, seconds: number)
   }
 }
 
+export const STUDY_RECORDED_EVENT = 'jp-study-time-recorded';
+
+/**
+ * Add active study time to today's totals — a Game Arena session, or time in
+ * the player's study mode. Its own channel, so it counts toward the streak and
+ * Statistics without being passed off as reading or watching.
+ */
+export function recordStudyTime(seconds: number, at = Date.now()): void {
+  if (!(seconds > 0)) return;
+  const data = load();
+  const key = dayKey(new Date(at));
+  const day = data.days[key] ?? { seconds: 0, chars: 0 };
+  day.studySeconds = (day.studySeconds ?? 0) + Math.round(seconds);
+  data.days[key] = day;
+  save(data);
+  try {
+    window.dispatchEvent(new CustomEvent(STUDY_RECORDED_EVENT, { detail: { seconds } }));
+  } catch {
+    /* non-browser context (tests) — ignore */
+  }
+}
+
 /**
  * Count flashcard reviews (or practice answers) toward today's totals.
  *
@@ -539,6 +574,7 @@ function dayIsActive(entry: DayEntry | undefined): boolean {
     || (entry.watchSeconds ?? 0) > 0
     || (entry.reviews ?? 0) > 0
     || (entry.practice ?? 0) > 0
+    || (entry.studySeconds ?? 0) > 0
   );
 }
 
@@ -569,7 +605,9 @@ export function getSummary(): StatsSummary {
   let totalListenSeconds = 0;
   let totalReviews = 0;
   let totalReviewsPassed = 0;
+  let totalStudySeconds = 0;
   for (const k of dayKeys) {
+    totalStudySeconds += data.days[k].studySeconds ?? 0;
     totalSeconds += data.days[k].seconds;
     totalChars += data.days[k].chars;
     totalWatchSeconds += data.days[k].watchSeconds ?? 0;
@@ -594,6 +632,7 @@ export function getSummary(): StatsSummary {
       watchSeconds: e.watchSeconds ?? 0,
       reviews: e.reviews ?? 0,
       reviewsPassed: e.reviewsPassed ?? 0,
+      studySeconds: e.studySeconds ?? 0,
     });
   }
 
@@ -616,6 +655,8 @@ export function getSummary(): StatsSummary {
     todayWatchSeconds: today.watchSeconds ?? 0,
     todayListenSeconds: today.listenSeconds ?? 0,
     totalListenSeconds,
+    todayStudySeconds: today.studySeconds ?? 0,
+    totalStudySeconds,
     todayReviews: today.reviews ?? 0,
     totalReviews,
     totalReviewsPassed,

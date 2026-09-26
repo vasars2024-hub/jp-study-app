@@ -26,6 +26,8 @@ import {
   type VideoCoreResumeSource,
   type VideoCoreTrackChoice,
 } from '../shared/videoCoreStudy';
+import { loadSubtitleManagementDocument, saveSubtitleOffsetEntry } from '../renderer/subtitleStore';
+import { resolveSubtitleOffset, type SubtitleAdjustmentTarget } from '../shared/subtitleManagement';
 
 function readStoredList<T>(key: string, normalize: (value: unknown) => T[]): T[] {
   try {
@@ -63,6 +65,37 @@ export function studySubtitleSource(
 /** Keyed exactly like the resume position, so both describe the same file. */
 export function subtitleDelayKey(source: VideoCoreResumeSource): string {
   return videoCoreResumeKey(source);
+}
+
+/**
+ * The series a file belongs to, for timing corrections that hold across it.
+ * A release group's whole batch is usually off by the same amount, so a delay
+ * fixed once for a series should not have to be fixed again every episode.
+ */
+export function seriesOffsetTarget(source: VideoCoreResumeSource): SubtitleAdjustmentTarget | null {
+  if (source.mediaId == null) return null;
+  return { identityId: `media-${source.mediaId}`, season: null, episode: null };
+}
+
+/**
+ * The file's own delay when one is saved; otherwise the series' delay. The
+ * per-file value is stored as a number (0 when never set), so a series value
+ * applies only while this file has none of its own.
+ */
+export function loadSubtitleDelayFor(key: string, source: VideoCoreResumeSource): number {
+  const own = loadSubtitleDelay(key);
+  if (own !== 0) return own;
+  const target = seriesOffsetTarget(source);
+  if (!target) return 0;
+  return resolveSubtitleOffset(loadSubtitleManagementDocument(), target).offsetMs / 1000;
+}
+
+/** "Apply to series": the current delay becomes the series' default. */
+export function saveSeriesSubtitleDelay(source: VideoCoreResumeSource, delaySec: number): boolean {
+  const target = seriesOffsetTarget(source);
+  if (!target) return false;
+  saveSubtitleOffsetEntry(target, Math.round(delaySec * 1000));
+  return true;
 }
 
 export function loadSubtitleDelay(key: string): number {

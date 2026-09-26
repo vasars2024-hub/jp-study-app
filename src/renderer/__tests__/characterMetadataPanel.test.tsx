@@ -14,7 +14,8 @@ import CharacterMetadataPanel from '../components/lexicon/CharacterMetadataPanel
 
 let root: Root | null = null;
 const recognizeImage = vi.fn<(dataUrl: string) => Promise<string>>();
-const clearRect = vi.fn();
+// Clearing repaints the white paper (a transparent canvas reads as black to the recognizer).
+const fillRect = vi.fn();
 
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -22,14 +23,14 @@ beforeAll(() => {
 
 beforeEach(() => {
   recognizeImage.mockReset();
-  clearRect.mockReset();
+  fillRect.mockReset();
   Object.defineProperty(window, 'api', {
     configurable: true,
     // The panel reads a drawn glyph through the language-aware recognizer.
     value: { ocrRecognizeGlyph: (dataUrl: string) => recognizeImage(dataUrl) },
   });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    beginPath: vi.fn(), clearRect, lineTo: vi.fn(), moveTo: vi.fn(), stroke: vi.fn(),
+    beginPath: vi.fn(), fillRect, save: vi.fn(), restore: vi.fn(), lineTo: vi.fn(), moveTo: vi.fn(), stroke: vi.fn(),
   } as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,practice');
 });
@@ -109,7 +110,7 @@ describe('CharacterMetadataPanel', () => {
     await act(async () => recognize?.click());
     expect(host.querySelector('output')?.textContent).toBe('manga.hw.failed');
     await act(async () => clear?.click());
-    expect(clearRect).toHaveBeenCalledWith(0, 0, 180, 180);
+    expect(fillRect).toHaveBeenLastCalledWith(0, 0, 180, 180);
     expect(host.querySelector('output')).toBeNull();
   });
 

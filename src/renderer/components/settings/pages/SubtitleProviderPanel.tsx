@@ -16,7 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../../i18n';
 import SettingsCard from '../SettingsCard';
 import { listSupportedSubtitleLanguages, type SubtitlePreferences } from '../../../../shared/subtitleManagement';
-import { loadSubtitleManagementDocument, updateSubtitlePreferences } from '../../../subtitleStore';
+import { loadSubtitleManagementDocument } from '../../../subtitleStore';
 import {
   DEFAULT_SUBTITLE_DISCOVERY_SETTINGS,
   SUBTITLE_TRANSLATION_ENGINE_PREFERENCES,
@@ -41,7 +41,7 @@ const KEY_URLS: Partial<Record<SubtitleProviderExecutionId, string>> = {
 export default function SubtitleProviderPanel() {
   const { t, lang } = useT();
   const studyLang = useStudyLanguage().lang;
-  const [management, setManagement] = useState(loadSubtitleManagementDocument);
+  const [management] = useState(loadSubtitleManagementDocument);
   const [settings, setSettings] = useState<SubtitleDiscoverySettings>(DEFAULT_SUBTITLE_DISCOVERY_SETTINGS);
   const [credentials, setCredentials] = useState<SubtitleProviderCredentialState[]>([]);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
@@ -51,8 +51,15 @@ export default function SubtitleProviderPanel() {
 
   const preferences = management.preferences;
   const languages = listSupportedSubtitleLanguages(preferences);
-  const updatePreferences = (patch: Partial<SubtitlePreferences>): void =>
-    setManagement(updateSubtitlePreferences(patch));
+  const [groupsDraft, setGroupsDraft] = useState('');
+  // Languages by name in the interface language — the chips used to show raw codes (`ja`, `zh-hant`).
+  const langName = useCallback((code: string): string => {
+    try {
+      return new Intl.DisplayNames([LANG_TAGS[lang] ?? 'en'], { type: 'language' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  }, [lang]);
 
   useEffect(() => {
     void window.api.getSubtitleDiscoverySettings().then(setSettings).catch(() => undefined);
@@ -249,7 +256,7 @@ export default function SubtitleProviderPanel() {
                 aria-pressed={settings.autoDownloadLanguages.includes(lang)}
                 onClick={() => toggleAutoLanguage(lang)}
               >
-                {lang}
+                {langName(lang)}
               </button>
             ))}
           </div>
@@ -297,7 +304,7 @@ export default function SubtitleProviderPanel() {
               // Any language but the one studied: the helper line explains the study line.
               .filter((lang) => !subtitleLangMatches(lang, studyLang))
               .map((language) => (
-              <option key={language} value={language}>{language}</option>
+              <option key={language} value={language}>{langName(language)}</option>
             ))}
           </select>
         </div>
@@ -358,39 +365,19 @@ export default function SubtitleProviderPanel() {
         </div>
       </fieldset>
 
+      {/* The study line's language is the study language (Settings › Study) and the
+          second line is the helper language above, so neither is repeated here. Style and
+          hearing-impaired tracks are ranking preferences the discovery engine reads; they
+          used to be stored where nothing read them. */}
       <fieldset className="unified-search-controls">
         <legend>{t('subtitle.preferences')}</legend>
-        <div className="field-row">
-          <label htmlFor="subtitle-primary">{t('subtitle.primary')}</label>
-          <select
-            id="subtitle-primary"
-            className="media-model-select"
-            value={preferences.primaryLanguage ?? ''}
-            onChange={(e) => updatePreferences({ primaryLanguage: e.currentTarget.value || null })}
-          >
-            <option value="">{t('subtitle.none')}</option>
-            {languages.map((language) => <option key={language} value={language}>{language}</option>)}
-          </select>
-        </div>
-        <div className="field-row">
-          <label htmlFor="subtitle-secondary">{t('subtitle.secondary')}</label>
-          <select
-            id="subtitle-secondary"
-            className="media-model-select"
-            value={preferences.secondaryLanguage ?? ''}
-            onChange={(e) => updatePreferences({ secondaryLanguage: e.currentTarget.value || null })}
-          >
-            <option value="">{t('subtitle.none')}</option>
-            {languages.map((language) => <option key={language} value={language}>{language}</option>)}
-          </select>
-        </div>
         <div className="field-row">
           <label htmlFor="subtitle-style">{t('subtitle.style')}</label>
           <select
             id="subtitle-style"
             className="media-model-select"
-            value={preferences.style}
-            onChange={(e) => updatePreferences({ style: e.currentTarget.value as SubtitlePreferences['style'] })}
+            value={settings.style}
+            onChange={(e) => persist({ ...settings, style: e.currentTarget.value as SubtitleDiscoverySettings['style'] })}
           >
             {STYLES.map((style) => <option key={style} value={style}>{t(`subtitle.style.${style}`)}</option>)}
           </select>
@@ -402,10 +389,26 @@ export default function SubtitleProviderPanel() {
           </span>
           <input
             type="checkbox"
-            checked={preferences.allowHearingImpaired}
-            onChange={(e) => updatePreferences({ allowHearingImpaired: e.currentTarget.checked })}
+            checked={settings.allowHearingImpaired}
+            onChange={(e) => persist({ ...settings, allowHearingImpaired: e.currentTarget.checked })}
           />
         </label>
+        <div className="field-row">
+          <label htmlFor="subtitle-groups">{t('subtitle.preferredGroups')}</label>
+          <input
+            id="subtitle-groups"
+            className="ui-input"
+            value={groupsDraft || settings.preferredGroups.join(', ')}
+            placeholder={t('subtitle.preferredGroupsPlaceholder')}
+            onChange={(e) => setGroupsDraft(e.currentTarget.value)}
+            onBlur={() => {
+              if (!groupsDraft) return;
+              persist({ ...settings, preferredGroups: groupsDraft.split(',').map((g) => g.trim()).filter(Boolean) });
+              setGroupsDraft('');
+            }}
+          />
+        </div>
+        <small className="muted">{t('subtitle.preferredGroupsDesc')}</small>
       </fieldset>
     </SettingsCard>
   );

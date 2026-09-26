@@ -306,6 +306,16 @@ export interface ExampleResult {
   runtimeMin?: number;
   /** Broadcaster or streaming service (TVmaze network / web channel). */
   network?: string;
+  /** Leading cast (TMDB credits / TVmaze cast). */
+  cast?: string[];
+  /** Director (film) or creator (series). */
+  director?: string;
+  /** Age rating as the rating board words it, with the country when not the US. */
+  ageRating?: string;
+  /** ISO 3166 country of origin (JP, KR, CN). */
+  country?: string;
+  /** When a running show airs, as the provider states it. */
+  schedule?: string;
   /**
    * The series' full episode run from the provider, including episodes the
    * library lacks. Same list on every file of the series; capped at

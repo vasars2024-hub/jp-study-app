@@ -16,8 +16,10 @@ import { formatNumber } from '../../stats';
 // still renders offline. The large SVG path table is loaded only when this
 // component mounts so it does not bloat the initial desktop bundle.
 //
-// When the user has opted in, we also merge a best-effort local country guess
-// so the map isn't empty before a Cloudflare Worker is configured / synced.
+// When the user has opted in, their own best-effort country guess (from the
+// time zone) is outlined on the map. It is NOT added to the counts: a guess is
+// not a learner the server counted, and adding it made "1 country, 1 learner"
+// out of nothing on a fresh install and inflated a real count by one.
 
 type WorldMapData = typeof import('../../data/worldMapPaths');
 
@@ -95,14 +97,8 @@ export default function WorldHeatMap({
     };
   }, [refreshToken]);
 
-  const displayCounts = useMemo(() => {
-    const base: CountryCounts = { ...(counts ?? {}) };
-    if (consented) {
-      const local = guessCountryCode();
-      if (local) base[local] = Math.max(base[local] ?? 0, 1);
-    }
-    return base;
-  }, [counts, consented]);
+  const displayCounts = useMemo<CountryCounts>(() => ({ ...(counts ?? {}) }), [counts]);
+  const localGuess = useMemo(() => (consented ? guessCountryCode() : null), [consented]);
 
   const { total, countryCount, max, ranked } = useMemo(() => {
     const entries = Object.entries(displayCounts);
@@ -117,7 +113,7 @@ export default function WorldHeatMap({
 
   // Nothing to show yet (no worker / no consent / no local guess). These
   // returns stay below every hook so a load-state change cannot reorder hooks.
-  if (loaded && countryCount === 0) {
+  if (loaded && countryCount === 0 && !localGuess) {
     if (!compact) return null;
     const emptyKey = statsConfigured()
       ? 'resources.heatmap.empty'
@@ -157,6 +153,11 @@ export default function WorldHeatMap({
   return (
     <section className={sectionClass} aria-label={t('resources.heatmap.aria')}>
       <div className="heatmap-caption">{caption}</div>
+      {localGuess ? (
+        <div className="heatmap-caption heatmap-you-note muted">
+          {t('resources.heatmap.you', { country: displayCountry(localGuess) })}
+        </div>
+      ) : null}
 
       {mapData?.hasWorldMapPaths() ? (
         <div className="heatmap-svg-wrap">
@@ -168,8 +169,9 @@ export default function WorldHeatMap({
                   key={iso}
                   d={d}
                   fill={colorFor(count, max)}
-                  stroke="var(--border)"
-                  strokeWidth={0.4}
+                  stroke={iso === localGuess ? 'var(--accent)' : 'var(--border)'}
+                  strokeWidth={iso === localGuess ? 1.2 : 0.4}
+                  className={iso === localGuess ? 'heatmap-you' : undefined}
                   style={{ transition: 'none' }}
                   onMouseEnter={() => setHover({ iso, count })}
                   onMouseLeave={() => setHover(null)}

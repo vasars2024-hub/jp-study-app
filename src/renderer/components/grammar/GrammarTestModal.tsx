@@ -20,6 +20,12 @@ import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { appendReviewLog } from '../../reviewLog';
+import {
+  loadGrammarSrs,
+  ratingForTestAnswer,
+  reviewGrammarPoint,
+  saveGrammarSrs,
+} from '../../grammarSrs';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import {
@@ -180,6 +186,9 @@ export default function GrammarTestModal({
       // One review-log row per answer, so grammar study counts toward the day
       // and Statistics can count grammar answers next to flashcard reviews.
       appendReviewLog({ mode: 'grammar', grammarId: question.id, word: point?.title, correct: wasCorrect });
+      // And one schedule step, so a tested point comes back on the Review tab
+      // when the flashcard scheduler says it should.
+      saveGrammarSrs(reviewGrammarPoint(loadGrammarSrs(), question.id, ratingForTestAnswer(grade)));
 
       const nextCorrect = correctCount + (wasCorrect ? 1 : 0);
       const nextMissed =

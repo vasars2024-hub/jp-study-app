@@ -144,6 +144,7 @@ export default function NyaaSubtitleDialog({
         {(candidates ?? []).map((candidate) => {
           const size = formatSize(candidate.sizeBytes, lang);
           const detail = [
+            candidate.releaseGroup ? t('media.subtitles.group', { group: candidate.releaseGroup }) : null,
             t(`media.subtitles.nyaa.route.${candidate.route}`),
             size,
             t('media.subtitles.nyaa.seeders', { count: candidate.seeders }),

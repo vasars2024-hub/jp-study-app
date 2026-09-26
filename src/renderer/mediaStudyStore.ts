@@ -40,8 +40,24 @@ export function saveMediaStudyDatabase(value: unknown): MediaStudyDatabase {
   return database;
 }
 
+/**
+ * Save a profile, and put its headline numbers on the media item too, so every
+ * surface that reads the library (tiles, search, filters) sees the same level
+ * the profile holds — the item's `jlptLevel` used to be written only by an
+ * agent tool. A profile for something that is not a library item (a season
+ * harvest, a visual novel) simply has no item to update.
+ */
 export function saveMediaLanguageProfile(profile: MediaLanguageProfile): MediaStudyDatabase {
-  return saveMediaStudyDatabase(upsertMediaLanguageProfile(loadMediaStudyDatabase(), profile));
+  const database = saveMediaStudyDatabase(upsertMediaLanguageProfile(loadMediaStudyDatabase(), profile));
+  const update = typeof window === 'undefined' ? undefined : window.api?.updateMediaMetadata;
+  if (update && !profile.mediaId.includes(':')) {
+    void update(profile.mediaId, {
+      ...(profile.difficulty.jlptLevel ? { jlptLevel: profile.difficulty.jlptLevel } : {}),
+      vocabularyCount: profile.vocabulary.uniqueWords,
+      kanjiCount: profile.kanji.uniqueKanji,
+    }).catch(() => undefined);
+  }
+  return database;
 }
 
 export function startMediaStudySession(

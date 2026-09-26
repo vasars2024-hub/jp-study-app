@@ -7,7 +7,8 @@ import {
   type UnifiedSearchMutationResult,
   type UnifiedSearchValidationResult,
 } from '../shared/unifiedSearch';
-import { BUILT_IN_UNIFIED_SEARCH_PROVIDERS } from './unifiedSearchBackends';
+import { BUILT_IN_UNIFIED_SEARCH_PROVIDERS, LATER_BUILT_IN_IDS } from './unifiedSearchBackends';
+import { writeLocalStorageJson } from './localStorageWrite';
 
 export const UNIFIED_SEARCH_STORAGE_KEY = 'jp-unified-search-v1';
 export const LEGACY_UNIFIED_SEARCH_STORAGE_KEYS = ['jp-unified-search', 'jp-multi-source-search'] as const;
@@ -85,6 +86,34 @@ export function loadUnifiedSearchDocument(): UnifiedSearchDocument {
 function withBuiltInProviders(document: UnifiedSearchDocument): UnifiedSearchDocument {
   if (document.providers.length) return document;
   return { ...document, providers: BUILT_IN_UNIFIED_SEARCH_PROVIDERS.map((provider) => ({ ...provider })) };
+}
+
+const LATER_BUILT_INS_KEY = 'jp-unified-search-later-builtins-v1';
+
+/**
+ * Sources added after a learner already had a list (dramas/films, subtitle
+ * presence) are appended once, at the end, when the search opens; removing
+ * them afterwards sticks, because the append is remembered and never repeated.
+ * Not done on load, so a stored document always reads back exactly as saved.
+ */
+export function addLaterBuiltInsOnce(): UnifiedSearchDocument {
+  const current = loadUnifiedSearchDocument();
+  const next = withLaterBuiltIns(current);
+  return next === current ? current : saveUnifiedSearchDocument(next).value;
+}
+
+function withLaterBuiltIns(document: UnifiedSearchDocument): UnifiedSearchDocument {
+  let seen: string[] = [];
+  try {
+    seen = JSON.parse(localStorage.getItem(LATER_BUILT_INS_KEY) ?? '[]') as string[];
+  } catch {
+    seen = [];
+  }
+  const missing = LATER_BUILT_IN_IDS.filter((id) => !seen.includes(id) && !document.providers.some((p) => p.id === id));
+  if (!missing.length) return document;
+  writeLocalStorageJson(LATER_BUILT_INS_KEY, [...new Set([...seen, ...LATER_BUILT_IN_IDS])]);
+  const added = BUILT_IN_UNIFIED_SEARCH_PROVIDERS.filter((p) => missing.includes(p.id)).map((p) => ({ ...p }));
+  return { ...document, providers: [...document.providers, ...added] };
 }
 
 export function saveUnifiedSearchDocument(input: unknown): UnifiedSearchValidationResult {

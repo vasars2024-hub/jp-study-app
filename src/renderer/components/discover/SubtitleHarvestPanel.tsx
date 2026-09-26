@@ -39,9 +39,11 @@ import {
   SEASON_STUDY_LIMITS,
   addMediaStudyFlashcards,
   analyzeMediaStudyCues,
+  createMediaLanguageProfile,
   mineableVocabulary,
   type MediaStudyAnalysis,
 } from '../../mediaStudyWorkflow';
+import { saveMediaLanguageProfile } from '../../mediaStudyStore';
 import { getLevel } from '../../knownWords';
 import { showToast } from '../ui/Toast';
 import { acquisitionConfigFrom } from '../../../shared/subtitleNyaa';
@@ -313,8 +315,17 @@ export default function SubtitleHarvestPanel({
     // dialogue is wrong rather than short.
     const value = await analyzeMediaStudyCues(combined.cues as Cue[], SEASON_STUDY_LIMITS);
     setAnalysis(value);
+    // A season analysis is a profile like any episode's, so the title's level
+    // badge and profile card read it; it used to be thrown away with the panel.
+    const numbers = combined.segments.map((segment) => segment.episode);
+    saveMediaLanguageProfile(
+      createMediaLanguageProfile({ id: `series:${sourceId}`, title }, value, Date.now(), {
+        kind: 'series',
+        ...(numbers.length ? { label: `${Math.min(...numbers)}–${Math.max(...numbers)}` } : {}),
+      }),
+    );
     setPhase('done');
-  }, [t]);
+  }, [t, sourceId, title]);
 
   const harvest = useCallback(async () => {
     if (!plan?.picks.length) return;

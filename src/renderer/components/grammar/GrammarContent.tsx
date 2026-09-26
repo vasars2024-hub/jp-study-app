@@ -8,8 +8,9 @@
  * presentations — nothing in this file may import `AppChrome`/`MenuBar`/
  * `StatusBar`, because Blanc composes it directly.
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  GRAMMAR,
   GUIDES,
   GUIDE_CATEGORIES,
   type GrammarFunctionId,
@@ -19,6 +20,7 @@ import {
   type GuideCategory,
 } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
+import { explanationCopiesMeaning, structureCopiesTitle } from '../../data/grammar/hollow';
 import type { ExampleSentence } from '../../../shared/types';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import {
@@ -29,6 +31,17 @@ import {
 import { useT } from '../../i18n';
 import { contentLangOf } from '../../studyEnvironment';
 import { normalizeStudyLang } from '../../../shared/studyLang';
+import ContentImportDialog from '../ContentImportDialog';
+import {
+  EXAMPLE_TEMPLATE_CSV,
+  EXAMPLE_TEMPLATE_JSON,
+  addUserExamples,
+  assignExampleRows,
+  parseExampleImport,
+  removeUserExample,
+  useUserExamples,
+  type ExampleImportRow,
+} from '../../data/grammar/userExamples';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 type CatFilter = 'All' | GuideCategory;
@@ -74,6 +87,30 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
   const [examples, setExamples] = useState<ExampleSentence[]>([]);
   const [exError, setExError] = useState('');
   const { t } = useT();
+  // Sentences the learner imported or kept for this point.
+  const ownExamples = useUserExamples(point.id);
+  const [importOpen, setImportOpen] = useState(false);
+  const [keptNote, setKeptNote] = useState('');
+  const commitExamples = useCallback(
+    (rows: ExampleImportRow[]) => {
+      const { byPoint, unmatched } = assignExampleRows(rows, point, GRAMMAR);
+      let added = 0;
+      for (const [id, list] of byPoint) {
+        added += addUserExamples(id, list, id === point.id ? point.examples : []);
+      }
+      const others = [...byPoint.keys()].filter((id) => id !== point.id).length;
+      return t('grammar.examples.own.imported', { added, others, unmatched });
+    },
+    [point, t],
+  );
+  const keepFound = () => {
+    const added = addUserExamples(
+      point.id,
+      examples.map((ex) => ({ jp: ex.jp, en: ex.en, fromTatoeba: true })),
+      point.examples,
+    );
+    setKeptNote(t('grammar.examples.own.kept', { count: added }));
+  };
 
   async function loadExamples() {
     setExState('loading');
@@ -100,7 +137,11 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
    * clamps it, so nothing here needs a second length rule.
    */
   const askAgent = (): void => {
-    const summary = [point.meaning, point.structure, point.explanation]
+    const summary = [
+      point.meaning,
+      structureCopiesTitle(point) ? '' : point.structure,
+      explanationCopiesMeaning(point) ? '' : point.explanation,
+    ]
       .map((part) => (part ?? '').trim())
       .filter(Boolean)
       .join(' — ');
@@ -124,41 +165,101 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
       </header>
       <p className="gram-gloss">{point.meaning}</p>
 
-      <div className="gram-block">
-        <h3>{t('grammar.structure')}</h3>
-        <p className="gram-structure" lang={contentLangOf(point.lang)}>
-          {point.structure}
-        </p>
-      </div>
+      {/* A block that only repeats the title or the gloss says nothing; hide it
+          rather than print the same words twice under a heading. */}
+      {!structureCopiesTitle(point) && (
+        <div className="gram-block">
+          <h3>{t('grammar.structure')}</h3>
+          <p className="gram-structure" lang={contentLangOf(point.lang)}>
+            {point.structure}
+          </p>
+        </div>
+      )}
 
-      <div className="gram-block">
-        <h3>{t('grammar.howToUse')}</h3>
-        <p>{point.explanation}</p>
-      </div>
+      {!explanationCopiesMeaning(point) && (
+        <div className="gram-block">
+          <h3>{t('grammar.howToUse')}</h3>
+          <p>{point.explanation}</p>
+        </div>
+      )}
 
       <div className="gram-block">
         <h3>{t('grammar.examples')}</h3>
-        <ul className="gram-examples">
-          {point.examples.map((ex, i) => (
-            <li key={i}>
-              <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
-                {ex.jp}
-              </span>
-              {ex.reading && (
-                <span className="gram-ex-reading" lang={point.lang === 'zh' ? 'zh-Latn-pinyin' : contentLangOf(point.lang)}>
-                  {ex.reading}
+        {point.examples.length === 0 && ownExamples.length === 0 ? (
+          <p className="gram-more-status muted">{t('grammar.noExamplesYet')}</p>
+        ) : point.examples.length === 0 ? null : (
+          <ul className="gram-examples">
+            {point.examples.map((ex, i) => (
+              <li key={i}>
+                <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                  {ex.jp}
                 </span>
-              )}
-              <span className="gram-ex-en">{ex.en}</span>
-            </li>
-          ))}
-        </ul>
-
-        {exState === 'idle' && (
-          <button className="gram-more-btn" onClick={loadExamples}>
-            {t('grammar.moreExamples')}
-          </button>
+                {ex.reading && (
+                  <span className="gram-ex-reading" lang={point.lang === 'zh' ? 'zh-Latn-pinyin' : contentLangOf(point.lang)}>
+                    {ex.reading}
+                  </span>
+                )}
+                <span className="gram-ex-en">{ex.en}</span>
+              </li>
+            ))}
+          </ul>
         )}
+
+        {ownExamples.length > 0 && (
+          <ul className="gram-examples gram-examples-own" aria-label={t('grammar.examples.own.label')}>
+            {ownExamples.map((ex) => (
+              <li key={ex.jp}>
+                <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                  {ex.jp}
+                </span>
+                {ex.reading && (
+                  <span className="gram-ex-reading" lang={point.lang === 'zh' ? 'zh-Latn-pinyin' : contentLangOf(point.lang)}>
+                    {ex.reading}
+                  </span>
+                )}
+                {ex.en && <span className="gram-ex-en">{ex.en}</span>}
+                <span className="gram-ex-own-row">
+                  <span className="gram-ex-own-tag">{t('grammar.examples.own.tag')}</span>
+                  <button
+                    type="button"
+                    className="gram-ex-own-remove"
+                    onClick={() => removeUserExample(point.id, ex.jp)}
+                    aria-label={t('grammar.examples.own.remove')}
+                    title={t('grammar.examples.own.remove')}
+                  >
+                    {t('grammar.examples.own.removeShort')}
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="gram-more-actions">
+          {exState === 'idle' && (
+            <button className="gram-more-btn" onClick={loadExamples}>
+              {t('grammar.moreExamples')}
+            </button>
+          )}
+          <button className="gram-more-btn" onClick={() => setImportOpen(true)}>
+            {t('grammar.examples.own.add')}
+          </button>
+        </div>
+        <ContentImportDialog<ExampleImportRow>
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          title={t('grammar.examples.own.importTitle', { pattern: point.title })}
+          description={t('grammar.examples.own.importDesc')}
+          templates={{ csv: EXAMPLE_TEMPLATE_CSV, json: EXAMPLE_TEMPLATE_JSON }}
+          templateName="grammar-examples"
+          parse={parseExampleImport}
+          columns={[
+            { label: t('grammar.curation.col.example'), value: (r) => r.jp, lang: () => contentLangOf(point.lang) },
+            { label: t('grammar.examples.own.colTranslation'), value: (r) => r.en },
+            { label: t('grammar.curation.col.pattern'), value: (r) => r.pattern ?? point.title, lang: () => contentLangOf(point.lang) },
+          ]}
+          onCommit={commitExamples}
+        />
         {exState === 'loading' && (
           <p className="gram-more-status muted">{t('grammar.searchingTatoeba')}</p>
         )}
@@ -169,18 +270,27 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
           </p>
         )}
         {exState === 'done' && examples.length > 0 && (
-          <ul className="gram-examples gram-examples-extra">
-            {examples.map((ex, i) => (
-              <li key={i}>
-                <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
-                  {ex.jp}
-                </span>
-                <span className="gram-ex-en">{ex.en}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="gram-examples gram-examples-extra">
+              {examples.map((ex, i) => (
+                <li key={i}>
+                  <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                    {ex.jp}
+                  </span>
+                  <span className="gram-ex-en">{ex.en}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="gram-more-actions">
+              <button className="gram-more-btn" onClick={keepFound}>
+                {t('grammar.examples.own.keep')}
+              </button>
+              {keptNote && <span className="gram-more-status muted" role="status">{keptNote}</span>}
+            </div>
+          </>
         )}
         {(point.examples.some((ex) => ex.source === 'tatoeba') ||
+          ownExamples.some((ex) => ex.source === 'tatoeba') ||
           (exState === 'done' && examples.length > 0)) && (
           <p className="gram-ex-credit muted">
             <a href="https://tatoeba.org" target="_blank" rel="noreferrer">

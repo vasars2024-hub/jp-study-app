@@ -793,7 +793,7 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
               </span>
               <em>{Math.round(entry.matchScore)}</em>
             </span>
-            <span className="disc-cell-level"><span className="disc-badge">{entry.estimatedLevel}</span></span>
+            <span className="disc-cell-level"><span className="disc-badge" title={t('mediaLevel.genreEstimateHint')}>{t('mediaLevel.estimated', { level: entry.estimatedLevel })}</span></span>
             <span className="disc-cell-dim">{entry.candidate.format ?? '—'}</span>
             <span className="disc-cell-dim">
               {mediaType === 'manga'

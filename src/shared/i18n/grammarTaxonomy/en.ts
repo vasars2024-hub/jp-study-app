@@ -290,6 +290,9 @@ export const GRAMMAR_TAXONOMY_EN: Catalog = {
   'grammar.practice.empty.hint': 'Try removing a filter, or turn off "Verified tags only".',
   // —— familiarity (learner state) ——
   'grammar.familiarity.legend': 'Familiarity',
+  'grammar.lists.legend': 'My lists',
+  'grammar.lists.favorites': 'Favourites',
+  'grammar.lists.queue': 'Study queue',
   'grammar.familiarity.new': 'New',
   'grammar.familiarity.learning': 'Learning',
   'grammar.familiarity.familiar': 'Familiar',

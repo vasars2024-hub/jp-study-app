@@ -36,6 +36,8 @@ import { STUDY_LANG_NATIVE_NAME, type StudyLang } from '../../../../shared/study
 import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
 import { getStudyLang } from '../../../studyEnvironment';
 import { useStudyLanguage } from '../../../useStudyLanguage';
+import MediaLevelBadge from '../MediaLevelBadge';
+import MediaCreditsFacts from '../MediaCreditsFacts';
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -739,6 +741,7 @@ export default function GumTitlePage({
           </div>
           <div>
             <h1 className="gum-title__name">{title.title}</h1>
+            <MediaLevelBadge className="media-level-badge--title" ids={[title.id, ...title.items.map((item) => item.id)]} fallbackLevel={title.items.find((item) => item.jlptLevel)?.jlptLevel} />
             {title.originalTitle && title.originalTitle !== title.title && (
               <div className="gum-title__native" lang="ja">{title.originalTitle}</div>
             )}
@@ -880,6 +883,7 @@ export default function GumTitlePage({
                 </div>
               )}
               {facts.studio && <div><dt>{t('gum.facts.studio')}</dt><dd>{facts.studio}</dd></div>}
+              <MediaCreditsFacts items={title.items} />
               {facts.network && <div><dt>{t('gum.facts.network')}</dt><dd>{facts.network}</dd></div>}
               {title.score !== undefined && <div><dt>{t('gum.facts.myRating')}</dt><dd>{formatScore(title, ratingDisplay, lang)}</dd></div>}
               {title.providerScore && <div><dt>{t('gum.facts.providerRating')}</dt><dd>{formatDecimal(title.providerScore, lang)}</dd></div>}

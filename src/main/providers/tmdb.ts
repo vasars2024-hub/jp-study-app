@@ -122,6 +122,46 @@ export interface TmdbMovie {
   status?: string | null;
   production_countries?: Array<{ iso_3166_1?: string | null }> | null;
   origin_country?: string[] | null;
+  /** From append_to_response=credits. */
+  credits?: TmdbCredits | null;
+  /** From append_to_response=release_dates: certifications per country. */
+  release_dates?: { results?: Array<{ iso_3166_1?: string | null; release_dates?: Array<{ certification?: string | null }> | null }> | null } | null;
+}
+
+export interface TmdbCredits {
+  cast?: Array<{ name?: string | null; order?: number | null }> | null;
+  crew?: Array<{ name?: string | null; job?: string | null }> | null;
+}
+
+/** Top-billed cast from TMDB credits. */
+export function tmdbCast(credits: TmdbCredits | null | undefined, limit = 8): string[] | undefined {
+  const cast = [...(credits?.cast ?? [])]
+    .sort((a, b) => (a?.order ?? 999) - (b?.order ?? 999))
+    .map((c) => text(c?.name))
+    .filter((n): n is string => Boolean(n));
+  return cast.length ? [...new Set(cast)].slice(0, limit) : undefined;
+}
+
+/** The director, or for a series its first listed series director / creator. */
+export function tmdbDirector(credits: TmdbCredits | null | undefined): string | undefined {
+  const crew = credits?.crew ?? [];
+  return text(crew.find((c) => c?.job === 'Director')?.name)
+    ?? text(crew.find((c) => c?.job === 'Series Director' || c?.job === 'Creator')?.name);
+}
+
+/**
+ * An age rating from TMDB's per-country list: the country of origin first
+ * (a Japanese film's Eirin rating), then the US, then any country that has one.
+ */
+export function tmdbAgeRating(
+  entries: ReadonlyArray<{ country: string; rating: string }>,
+  origin?: string,
+): string | undefined {
+  const rated = entries.filter((e) => e.rating);
+  const pick = (code: string | undefined) => (code ? rated.find((e) => e.country === code.toUpperCase()) : undefined);
+  const chosen = pick(origin) ?? pick('US') ?? rated[0];
+  if (!chosen) return undefined;
+  return chosen.country && chosen.country !== 'US' ? `${chosen.rating} (${chosen.country})` : chosen.rating;
 }
 
 export interface TmdbTv {
@@ -138,6 +178,11 @@ export interface TmdbTv {
   vote_average?: number | null;
   vote_count?: number | null;
   origin_country?: string[] | null;
+  /** Details only (append_to_response). */
+  credits?: TmdbCredits | null;
+  content_ratings?: { results?: Array<{ iso_3166_1?: string | null; rating?: string | null }> | null } | null;
+  created_by?: Array<{ name?: string | null }> | null;
+  networks?: Array<{ name?: string | null }> | null;
 }
 
 /**
@@ -189,6 +234,15 @@ export function tmdbMovieToWork(movie: TmdbMovie): ProviderWork {
     country: text(movie.production_countries?.[0]?.iso_3166_1)?.toUpperCase()
       ?? text(movie.origin_country?.[0])?.toUpperCase(),
     animation: isAnimation(movie.genre_ids, movie.genres),
+    cast: tmdbCast(movie.credits),
+    director: tmdbDirector(movie.credits),
+    ageRating: tmdbAgeRating(
+      (movie.release_dates?.results ?? []).map((r) => ({
+        country: text(r?.iso_3166_1)?.toUpperCase() ?? '',
+        rating: (r?.release_dates ?? []).map((d) => text(d?.certification)).find(Boolean) ?? '',
+      })),
+      text(movie.production_countries?.[0]?.iso_3166_1) ?? text(movie.origin_country?.[0]),
+    ),
   };
 }
 
@@ -216,6 +270,13 @@ export function tmdbTvToWork(show: TmdbTv): ProviderWork {
     language,
     country: text(show.origin_country?.[0])?.toUpperCase(),
     animation: isAnimation(show.genre_ids),
+    cast: tmdbCast(show.credits),
+    director: text(show.created_by?.[0]?.name) ?? tmdbDirector(show.credits),
+    ageRating: tmdbAgeRating(
+      (show.content_ratings?.results ?? []).map((r) => ({ country: text(r?.iso_3166_1)?.toUpperCase() ?? '', rating: text(r?.rating) ?? '' })),
+      text(show.origin_country?.[0]),
+    ),
+    network: text(show.networks?.[0]?.name),
   };
 }
 
@@ -275,10 +336,23 @@ export async function tmdbMovieById(id: number): Promise<ProviderWork | null> {
   const key = `tmdb:movie:${id}`;
   const cached = readCache<TmdbMovie>(key);
   if (cached && num(cached.id) !== undefined) return tmdbMovieToWork(cached);
-  const { data } = await get<TmdbMovie>(`/movie/${id}?language=en-US`, auth);
+  const { data } = await get<TmdbMovie>(`/movie/${id}?language=en-US&append_to_response=credits,release_dates`, auth);
   if (!data || num(data.id) === undefined) return null;
   writeCache(key, data);
   return tmdbMovieToWork(data);
+}
+
+/** Full TV details with credits and content ratings, for the Details panel. */
+export async function tmdbTvById(id: number): Promise<ProviderWork | null> {
+  const auth = currentAuth();
+  if (!auth || !Number.isInteger(id) || id <= 0) return null;
+  const key = `tmdb:tv:${id}`;
+  const cached = readCache<TmdbTv>(key);
+  if (cached && num(cached.id) !== undefined) return tmdbTvToWork(cached);
+  const { data } = await get<TmdbTv>(`/tv/${id}?language=en-US&append_to_response=credits,content_ratings`, auth);
+  if (!data || num(data.id) === undefined) return null;
+  writeCache(key, data);
+  return tmdbTvToWork(data);
 }
 
 export interface TmdbFindResult {

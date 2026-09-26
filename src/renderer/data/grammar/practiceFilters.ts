@@ -21,6 +21,7 @@ import {
   type NormalizedGrammarPoint,
 } from './normalize';
 import { resolveCategories } from './taxonomy';
+import { isHollowGrammarPoint } from './hollow';
 import { LEGACY_HSK_LEVELS } from './types';
 import { getStudyLang } from '../../studyEnvironment';
 import type { GrammarLang, GrammarLevel, GrammarRegister } from './types';
@@ -46,7 +47,21 @@ function migrateLevels(levels: unknown): GrammarLevel[] {
  * caller that offers the familiarity filter must feed decorated points, or the
  * whole corpus looks New — the two Explorer/Practice screens both decorate.
  */
-export type FilterablePoint = NormalizedGrammarPoint & Partial<WithFamiliarity>;
+export type FilterablePoint = NormalizedGrammarPoint & Partial<WithFamiliarity> & Partial<WithCollections>;
+
+/**
+ * The learner's own lists. Favourite and "add to study queue" used to write ids
+ * nothing ever read back; they are filter axes now, so a list is somewhere to
+ * go, and "Practice queue" is a query over it rather than a separate store.
+ */
+export type GrammarListId = 'favorites' | 'queue';
+export const GRAMMAR_LIST_IDS: GrammarListId[] = ['favorites', 'queue'];
+
+/** Collection membership, applied over the corpus like familiarity. */
+export interface WithCollections {
+  favorite: boolean;
+  queued: boolean;
+}
 
 export type GrammarSort = 'level' | 'alphabetical' | 'completeness' | 'random';
 
@@ -74,6 +89,8 @@ export interface PracticeFilters {
   requireExamples: boolean;
   /** Learner-state bands (New/Learning/Familiar/Known) to keep; empty = all. */
   familiarity: GxLevel[];
+  /** The learner's own lists (favourites, study queue); OR within, empty = all. */
+  lists: GrammarListId[];
   query: string;
   sort: GrammarSort;
 }
@@ -93,6 +110,7 @@ export const DEFAULT_PRACTICE_FILTERS: PracticeFilters = {
   studyReadyOnly: false,
   requireExamples: false,
   familiarity: [],
+  lists: [],
   query: '',
   sort: 'level',
 };
@@ -144,6 +162,9 @@ function coerce(parsed: Partial<PracticeFilters>): PracticeFilters {
     // No key-version bump is needed — only a changed field meaning warrants one.
     familiarity: Array.isArray(parsed.familiarity)
       ? (parsed.familiarity.filter((n) => n === 0 || n === 1 || n === 2 || n === 3) as GxLevel[])
+      : [],
+    lists: Array.isArray(parsed.lists)
+      ? parsed.lists.filter((l): l is GrammarListId => GRAMMAR_LIST_IDS.includes(l as GrammarListId))
       : [],
     query: typeof parsed.query === 'string' ? parsed.query : '',
   };
@@ -210,6 +231,7 @@ export function hasActiveFilters(f: PracticeFilters): boolean {
     f.studyReadyOnly ||
     f.requireExamples ||
     f.familiarity.length > 0 ||
+    f.lists.length > 0 ||
     f.query.trim().length > 0
   );
 }
@@ -236,6 +258,13 @@ export function matchesFilters(point: FilterablePoint, filters: PracticeFilters)
 
   if (filters.familiarity.length && !filters.familiarity.includes(point.familiarity ?? 0)) {
     return false;
+  }
+
+  if (filters.lists.length) {
+    const inList =
+      (filters.lists.includes('favorites') && point.favorite === true) ||
+      (filters.lists.includes('queue') && point.queued === true);
+    if (!inList) return false;
   }
 
   if (filters.categories.length) {
@@ -316,6 +345,21 @@ function seededSort(list: NormalizedGrammarPoint[], seed: number): NormalizedGra
   });
 }
 
+/**
+ * 1 for a record that says nothing beyond its title and gloss, else 0. A hollow
+ * record sorts below the written ones at the same level: the list should lead
+ * with what a learner can study, not with a pattern name and a shrug.
+ */
+const hollowCache = new WeakMap<object, number>();
+function hollowRank(p: NormalizedGrammarPoint): number {
+  let rank = hollowCache.get(p);
+  if (rank === undefined) {
+    rank = isHollowGrammarPoint(p) ? 1 : 0;
+    hollowCache.set(p, rank);
+  }
+  return rank;
+}
+
 export function sortGrammarPoints<T extends NormalizedGrammarPoint>(
   points: T[],
   sort: GrammarSort,
@@ -323,7 +367,9 @@ export function sortGrammarPoints<T extends NormalizedGrammarPoint>(
 ): T[] {
   switch (sort) {
     case 'alphabetical':
-      return [...points].sort((a, b) => a.title.localeCompare(b.title));
+      return [...points].sort(
+        (a, b) => hollowRank(a) - hollowRank(b) || a.title.localeCompare(b.title),
+      );
     case 'completeness':
       return [...points].sort(
         (a, b) => completenessScore(b) - completenessScore(a) || a.title.localeCompare(b.title),
@@ -335,6 +381,7 @@ export function sortGrammarPoints<T extends NormalizedGrammarPoint>(
       return [...points].sort(
         (a, b) =>
           (LEVEL_ORDER[a.level] ?? 99) - (LEVEL_ORDER[b.level] ?? 99) ||
+          hollowRank(a) - hollowRank(b) ||
           a.title.localeCompare(b.title),
       );
   }
@@ -420,6 +467,21 @@ export function familiarityFilterCounts(
   for (const p of points) {
     if (!matchesFilters(p, base)) continue;
     out[p.familiarity ?? 0] += 1;
+  }
+  return out;
+}
+
+/** Per-list result counts, against every other active filter (same recipe as above). */
+export function listFilterCounts(
+  points: readonly FilterablePoint[],
+  filters: PracticeFilters,
+): Record<GrammarListId, number> {
+  const base: PracticeFilters = { ...filters, lists: [] };
+  const out: Record<GrammarListId, number> = { favorites: 0, queue: 0 };
+  for (const p of points) {
+    if (!matchesFilters(p, base)) continue;
+    if (p.favorite) out.favorites += 1;
+    if (p.queued) out.queue += 1;
   }
   return out;
 }

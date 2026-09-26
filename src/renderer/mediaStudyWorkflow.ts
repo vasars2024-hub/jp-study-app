@@ -10,6 +10,7 @@ import {
 import {
   difficultyBandFromJlpt,
   type MediaLanguageProfile,
+  type MediaProfileScope,
 } from '../shared/mediaStudyDatabase';
 import { locateInSeason, type CombinedSeasonSegment } from '../shared/subtitleHarvest';
 import type { MediaItem } from '../shared/types';
@@ -28,12 +29,54 @@ import { getSlotList } from './levelLists';
 import type { Cue } from './subtitles';
 import { getTokenizer, tokenizeSync } from './tokenizer';
 import { getStudyLang } from './studyEnvironment';
+import type { StudyLang } from '../shared/levelScale';
+import { hskLabel, jlptFromKanjidic, levelCovering, levelFromRank } from '../shared/levelFallback';
 import { studyTokens } from './studyTokens';
 
 export interface MediaStudyAnalysis extends MediaStudyCorpus {
   level: BookLevelEstimate | null;
   comprehensibility: ComprehensibilityScore;
   grammar: GrammarMatchHit[];
+  /**
+   * Levels read from the offline dictionary (KANJIDIC2 JLPT, HSK, frequency
+   * ranks) when the learner has uploaded no level lists — so an analysis is an
+   * estimate rather than "Unrated". Word → label, character → label.
+   */
+  dictionaryLevels?: { words: Record<string, string>; chars: Record<string, string> };
+}
+
+/**
+ * Word and character levels from the dictionary, for when no lists exist.
+ * Best effort: a missing or un-migrated dictionary yields empty maps.
+ */
+export async function dictionaryLevelsFor(
+  corpus: Pick<MediaStudyCorpus, 'vocabulary' | 'kanji'>,
+  lang: StudyLang,
+): Promise<{ words: Record<string, string>; chars: Record<string, string> }> {
+  const api = typeof window === 'undefined' ? undefined : window.api;
+  const words: Record<string, string> = {};
+  const chars: Record<string, string> = {};
+  try {
+    const terms = corpus.vocabulary.slice(0, 2000).map((v) => v.word);
+    const ranks = terms.length && api?.dictFrequencyRanks ? await api.dictFrequencyRanks(terms, { sourceLangs: [lang] }) : {};
+    for (const term of terms) {
+      const label = levelFromRank(ranks[term], lang);
+      if (label) words[term] = label;
+    }
+    if (lang !== 'ru' && api?.dictCharLevels) {
+      const charList = lang === 'ja'
+        ? corpus.kanji.map((k) => k.character)
+        : [...new Set(corpus.vocabulary.flatMap((v) => [...v.word]))];
+      const levels = charList.length ? await api.dictCharLevels(charList.slice(0, 5000)) : {};
+      for (const [ch, level] of Object.entries(levels)) {
+        const label = lang === 'ja' ? jlptFromKanjidic(level.jlpt) : hskLabel(level.hsk);
+        if (label) chars[ch] = label;
+      }
+    }
+  } catch {
+    /* no dictionary: the profile stays unrated, which the card says */
+  }
+  return { words, chars };
 }
 
 const MAX_GRAMMAR_SENTENCES = 80;
@@ -80,14 +123,16 @@ export async function analyzeMediaStudyCues(
   if (lang === 'ja') await getTokenizer();
   const tokenize = lang === 'ja' ? tokenizeSync : (text: string) => studyTokens(text, lang);
   const corpus = buildMediaStudyCorpus(cues, tokenize, { ...options, lang });
-  const [level, comprehensibility] = await Promise.all([
+  const [level, comprehensibility, dictionaryLevels] = await Promise.all([
     estimateLevelFromText(corpus.text, lang),
     scoreTextComprehensibility(corpus.text, undefined, lang),
+    configuredJlptSets().length ? Promise.resolve(undefined) : dictionaryLevelsFor(corpus, lang),
   ]);
   return {
     ...corpus,
     level,
     comprehensibility,
+    ...(dictionaryLevels ? { dictionaryLevels } : {}),
     // The pattern matcher is Japanese grammar; other languages report none rather than false hits.
     grammar: lang === 'ja' ? rankGrammar(corpus.sentences) : [],
   };
@@ -152,16 +197,18 @@ function recommendation(knownRatio: number, level: string | null): string {
 }
 
 export function createMediaLanguageProfile(
-  item: MediaItem,
+  item: Pick<MediaItem, 'id' | 'title'>,
   analysis: MediaStudyAnalysis,
   now = Date.now(),
+  scope?: MediaProfileScope,
 ): MediaLanguageProfile {
   const levels = configuredJlptSets();
+  const fallback = analysis.dictionaryLevels;
   const vocabularyDistribution: Record<string, number> = {};
   const kanjiDistribution: Record<string, number> = {};
   const grammarDistribution: Record<string, number> = {};
   const vocabulary = analysis.vocabulary.map((entry) => {
-    const jlptLevel = levelFor(entry.word, levels);
+    const jlptLevel = levelFor(entry.word, levels) ?? fallback?.words[entry.word] ?? null;
     increment(vocabularyDistribution, jlptLevel);
     return {
       word: entry.word,
@@ -173,7 +220,7 @@ export function createMediaLanguageProfile(
     };
   });
   const kanji = analysis.kanji.map((entry) => {
-    const jlptLevel = levelFor(entry.character, levels);
+    const jlptLevel = levelFor(entry.character, levels) ?? fallback?.chars[entry.character] ?? null;
     increment(kanjiDistribution, jlptLevel);
     return { ...entry, jlptLevel };
   });
@@ -185,12 +232,21 @@ export function createMediaLanguageProfile(
     ? analysis.comprehensibility.uniqueKnown / analysis.comprehensibility.uniqueTotal
     : 0;
   const unknownRatio = 1 - knownRatio;
-  const jlptLevel = analysis.level?.label ?? null;
+  // With no uploaded lists, the level that covers 90% of the dialogue's words
+  // (or, failing that, its kanji / hanzi) by the dictionary's data — an estimate.
+  const lang = getStudyLang();
+  const estimated = analysis.level?.label
+    ? null
+    : levelCovering(vocabulary.map((v) => ({ level: v.jlptLevel, weight: v.occurrences })), lang) ??
+      levelCovering(kanji.map((k) => ({ level: k.jlptLevel, weight: k.occurrences })), lang);
+  const jlptLevel = analysis.level?.label ?? estimated;
+  const levelSource: 'lists' | 'dictionary' | undefined = analysis.level?.label ? 'lists' : estimated ? 'dictionary' : undefined;
 
   return {
     mediaId: item.id,
     title: item.title,
     updatedAt: now,
+    ...(scope ? { scope } : {}),
     analyzedCharacters: analysis.text.length,
     truncated: analysis.truncated,
     difficulty: {
@@ -202,7 +258,8 @@ export function createMediaLanguageProfile(
             : knownRatio >= 0.55 ? 'advanced'
               : 'native',
       jlptLevel,
-      confidence: analysis.level?.confidence ?? 0,
+      ...(levelSource ? { levelSource } : {}),
+      confidence: analysis.level?.confidence ?? (estimated ? 0.4 : 0),
       knownRatio,
       unknownRatio,
       recommendation: recommendation(knownRatio, jlptLevel),
@@ -329,10 +386,22 @@ export interface VisualNovelStudyCardAddResult {
   counts: Record<VisualNovelStudyCardKind, number>;
 }
 
+/**
+ * Options for mining every card kind from an analysis. Anime and drama used to
+ * get vocabulary cards only; the same builder the visual novel uses makes
+ * kanji, sentence and grammar cards too, into a deck folder of the learner's
+ * choosing (a named series deck, say) rather than the catch-all "Media".
+ */
+export interface StudyCardKindsOptions {
+  folder?: string;
+  kinds?: readonly VisualNovelStudyCardKind[];
+}
+
 export function addVisualNovelStudyFlashcards(
-  item: MediaItem,
+  item: Pick<MediaItem, 'id' | 'title'>,
   analysis: MediaStudyAnalysis,
   sceneReferences: ReadonlyMap<number, string> = new Map(),
+  options: StudyCardKindsOptions = {},
 ): VisualNovelStudyCardAddResult {
   const existing = new Set<string>();
   for (const card of loadDeck().filter((candidate) => candidate.bookId === item.id)) {
@@ -347,7 +416,10 @@ export function addVisualNovelStudyFlashcards(
     ...analysis,
     vocabulary: mineableVocabulary(analysis.vocabulary),
   };
-  const drafts = buildVisualNovelStudyCardDrafts(miningAnalysis, sceneReferences, existing);
+  const kinds = options.kinds ? new Set(options.kinds) : null;
+  const drafts = buildVisualNovelStudyCardDrafts(miningAnalysis, sceneReferences, existing).filter(
+    (draft) => !kinds || kinds.has(draft.studyKind),
+  );
   const levels = configuredJlptSets();
   for (const draft of drafts) {
     if (!draft.jlptLevel && (draft.studyKind === 'vocabulary' || draft.studyKind === 'kanji')) {
@@ -367,7 +439,7 @@ export function addVisualNovelStudyFlashcards(
       source: 'media' as const,
       bookId: item.id,
       bookTitle: item.title,
-      folder: 'Media',
+      folder: options.folder?.trim() || 'Media',
     }))));
   }
   return { total: drafts.length, counts };

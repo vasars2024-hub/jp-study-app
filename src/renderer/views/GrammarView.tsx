@@ -10,6 +10,7 @@ import {
 } from '../components/ui';
 import GrammarPracticePanel from '../components/grammar/GrammarPracticePanel';
 import GrammarCurationPanel from '../components/grammar/GrammarCurationPanel';
+import GrammarReviewPanel from '../components/grammar/GrammarReviewPanel';
 import GrammarExplorer from '../components/grammar/GrammarExplorer';
 import {
   GrammarDetail,
@@ -23,7 +24,12 @@ import {
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { clearHandoff, takeHandoffJson } from '../pendingHandoff';
 
-type Mode = 'grammar' | 'practice' | 'guides' | 'review';
+/*
+ * `review` is spaced review of due points. The corpus curation tool that used to
+ * sit under the "Review" label is `curate` now: it is data upkeep, not study,
+ * and a learner looking for their reviews was landing in a triage queue.
+ */
+type Mode = 'grammar' | 'practice' | 'review' | 'guides' | 'curate';
 
 /**
  * The four modes, in their rendered order, with the i18n key of each label.
@@ -39,8 +45,9 @@ type Mode = 'grammar' | 'practice' | 'guides' | 'review';
 const MODES: ReadonlyArray<{ mode: Mode; labelKey: string }> = [
   { mode: 'grammar', labelKey: 'grammar.mode.points' },
   { mode: 'practice', labelKey: 'grammar.mode.practice' },
-  { mode: 'guides', labelKey: 'grammar.mode.guides' },
   { mode: 'review', labelKey: 'grammar.mode.review' },
+  { mode: 'guides', labelKey: 'grammar.mode.guides' },
+  { mode: 'curate', labelKey: 'grammar.mode.curate' },
 ];
 const MODE_PANEL_ID = 'gram-mode-panel';
 const modeTabId = (mode: Mode) => `gram-mode-tab-${mode}`;
@@ -119,14 +126,7 @@ export default function GrammarView() {
     });
   };
 
-  const modeLabel =
-    mode === 'grammar'
-      ? t('grammar.mode.points')
-      : mode === 'practice'
-        ? t('grammar.mode.practice')
-        : mode === 'review'
-          ? t('grammar.mode.review')
-          : t('grammar.mode.guides');
+  const modeLabel = t(MODES.find((m) => m.mode === mode)?.labelKey ?? 'grammar.mode.points');
 
   const classicStatus = (
     <>
@@ -222,6 +222,8 @@ export default function GrammarView() {
         ) : mode === 'practice' ? (
           <GrammarPracticePanel initialFilters={practiceSeed} />
         ) : mode === 'review' ? (
+          <GrammarReviewPanel />
+        ) : mode === 'curate' ? (
           <GrammarCurationPanel />
         ) : (
           <GuidesBrowser />

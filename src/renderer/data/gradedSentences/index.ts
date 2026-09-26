@@ -1,13 +1,20 @@
 import type { LevelTier } from '../../../shared/levelScale';
 import type { SourceLang } from '../../games/types';
 
+/**
+ * A gloss in the player's own languages. English is required; the others are
+ * optional because a pack for Chinese study has no use for a Chinese gloss
+ * (and one for Russian none for Russian) — the engine falls back to English.
+ */
+export type Glosses = { en: string } & Partial<Record<SourceLang, string>>;
+
 export interface GradedSentence {
   id: string;
   level: LevelTier;
   jp: string;
   reading: string;
   tokens: string[];
-  translations: Record<SourceLang, string>;
+  translations: Glosses;
 }
 
 export interface VocabPrompt {
@@ -15,7 +22,7 @@ export interface VocabPrompt {
   level: LevelTier;
   jp: string;
   reading: string;
-  meanings: Record<SourceLang, string>;
+  meanings: Glosses;
 }
 
 export interface ClozePrompt {
@@ -23,13 +30,18 @@ export interface ClozePrompt {
   level: LevelTier;
   prompt: string;
   answer: string;
-  choices: string[];
-  translations: Record<SourceLang, string>;
+  /** Other answers that are also right in this sentence. */
+  alternatives?: string[];
+  /** Unused since the games became typed recall; kept for the older records. */
+  choices?: string[];
+  translations: Glosses;
 }
 
 export interface KanaPrompt {
   kana: string;
   romaji: string;
+  /** Other accepted spellings (e.g. Russian й → y / j / i). */
+  aliases?: string[];
 }
 
 export interface KanjiReadingPrompt {
@@ -37,8 +49,9 @@ export interface KanjiReadingPrompt {
   level: LevelTier;
   word: string;
   reading: string;
-  choices: string[];
-  meaning: Record<SourceLang, string>;
+  /** Unused since the games became typed recall; kept for the older records. */
+  choices?: string[];
+  meaning: Glosses;
 }
 
 export interface ParticlePrompt {
@@ -46,19 +59,23 @@ export interface ParticlePrompt {
   level: LevelTier;
   prompt: string;
   answer: string;
-  choices: string[];
-  hint: Record<SourceLang, string>;
+  /** Other answers that are also right in this sentence. */
+  alternatives?: string[];
+  /** Unused since the games became typed recall; kept for the older records. */
+  choices?: string[];
+  hint: Glosses;
 }
 
 export interface CounterPrompt {
   id: string;
   level: LevelTier;
-  object: Record<SourceLang, string>;
+  object: Glosses;
   number: number;
   answer: string;
   /** Kana reading of `answer` — Counter Quiz is typed, and the reading is accepted. */
   reading: string;
-  choices: string[];
+  /** Unused since the games became typed recall; kept for the older records. */
+  choices?: string[];
   jp: string;
 }
 

@@ -432,6 +432,8 @@ declare global {
         texts: string[],
         options?: { sourceLangs?: string[] },
       ): Promise<Record<string, number>>;
+      /** KANJIDIC2 JLPT / HSK levels for many characters; a character with none is absent. */
+      dictCharLevels(chars: string[]): Promise<Record<string, { jlpt?: string; hsk?: string }>>;
       dictEnrichTerms(
         terms: string[],
       ): Promise<Record<string, import('../shared/ankiEnrich').EnrichEntry[]>>;
@@ -958,7 +960,7 @@ declare global {
         source: string;
         target: string;
         senseHints?: import('../shared/translateCore').TranslateSenseHint[];
-      }): Promise<{ ok: boolean; text?: string; error?: string }>;
+      }): Promise<{ ok: boolean; text?: string; error?: string; errorKey?: string }>;
       translateRunBatch(req: {
         items: Array<{ id: string; text: string; source: string; target: string }>;
       }): Promise<{
@@ -1005,6 +1007,10 @@ declare global {
       ): () => void;
       listMedia(): Promise<MediaItem[]>;
       scanMediaStorage(paths: string[]): Promise<{ totalBytes: number; files: Array<{ path: string; size: number; modifiedAt: number }> }>;
+      /** Whether each metadata source (Jikan, AniList, TVmaze, TMDB) answers right now. */
+      searchTvFilm(query: string): Promise<Array<{ provider: 'tvmaze' | 'tmdb'; id: string; title: string; nativeTitle?: string; year?: number; posterUrl?: string; kind: 'tv' | 'movie'; genres: string[]; rating?: number; network?: string; country?: string }>>;
+      searchSubtitleAvailability(query: string, languages: string[]): Promise<Array<{ language: string; releases: number; sample: string[] }> | null>;
+      mediaProviderStatus(): Promise<Array<{ id: 'jikan' | 'anilist' | 'tvmaze' | 'tmdb'; state: 'ok' | 'down' | 'needs-key'; latencyMs?: number }>>;
       updateMediaMetadata(id: string, metadata: Partial<Pick<MediaItem, 'title' | 'artist' | 'genres' | 'actors' | 'year' | 'lang' | 'category' | 'jlptLevel' | 'vocabularyCount' | 'kanjiCount' | 'metadataSource'>>): Promise<MediaItem | null>;
       previewMediaOrganization(id: string, root: string): Promise<import('../shared/mediaHub').MediaOrganizationPreview | null>;
       organizeMedia(preview: import('../shared/mediaHub').MediaOrganizationPreview, choice?: import('../shared/mediaHub').MediaDuplicateChoice): Promise<{ ok: boolean; path?: string; error?: string }>;
@@ -1161,6 +1167,9 @@ declare global {
       attachSubtitleFile(
         filePath: string,
       ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+      listOpenSubtitles(mediaId: string, languages?: string[]): Promise<import('../shared/subtitleDiscoveryIpc').OpenSubtitlesListResult>;
+      acceptOpenSubtitles(mediaId: string, candidateId: string): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+      rateSubtitleRecord(mediaId: string, recordId: string, rating: number): Promise<boolean>;
       detachSubtitleRecord(
         mediaId: string,
         recordId: string,
