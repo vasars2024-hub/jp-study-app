@@ -456,10 +456,12 @@ export default function DeckWorkbenchApply({
               <ul className="deck-workbench-facts wb-apply-failures">
                 {commit.failures.map((failure) => (
                   <li key={`${failure.kind}-${failure.id}`}>
-                    {t(`ankiWorkbench.apply.live.failed.${failure.kind}`, {
-                      id: failure.id,
-                      reason: failure.reason,
-                    })}
+                    {failure.code === 'preset-not-applied'
+                      ? t('ankiWorkbench.apply.live.failed.preset', { id: failure.id, deck: failure.deck ?? '' })
+                      : t(`ankiWorkbench.apply.live.failed.${failure.kind}`, {
+                        id: failure.id,
+                        reason: failure.reason,
+                      })}
                   </li>
                 ))}
               </ul>

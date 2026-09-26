@@ -11697,6 +11697,7 @@ export const en: Catalog = {
     'Verified: the collection was read back from Anki and every change was found in it.',
   'ankiWorkbench.apply.live.failed.note': 'Note {id} was not written — {reason}',
   'ankiWorkbench.apply.live.failed.card': 'Card {id} did not move — {reason}',
+  'ankiWorkbench.apply.live.failed.preset': 'Card {id} was not moved to {deck} — its options preset could not be applied, so the card kept its current deck and review limits.',
   'ankiWorkbench.apply.liveError.nothing-to-commit':
     'The session adds up to no changes, so nothing was sent to Anki.',
   'ankiWorkbench.apply.liveError.no-source':

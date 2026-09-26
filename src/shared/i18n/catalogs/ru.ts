@@ -12143,6 +12143,7 @@ export const ru: Catalog = {
     'Проверено: коллекция перечитана из Anki, и каждое изменение в ней найдено.',
   'ankiWorkbench.apply.live.failed.note': 'Заметка {id} не записана — {reason}',
   'ankiWorkbench.apply.live.failed.card': 'Карточка {id} не перемещена — {reason}',
+  'ankiWorkbench.apply.live.failed.preset': 'Карточка {id} не перемещена в {deck} — не удалось применить набор параметров, поэтому она осталась в прежней колоде с прежними лимитами.',
   'ankiWorkbench.apply.liveError.nothing-to-commit':
     'Итоговых изменений в сессии нет, поэтому в Anki ничего не отправлено.',
   'ankiWorkbench.apply.liveError.no-source':

@@ -152,6 +152,14 @@ export interface ConnectCommitFailure {
   id: string;
   /** AnkiConnect's own words. A partial commit names each one, never a total. */
   reason: string;
+  /**
+   * Set when the renderer can say it in the UI language. `preset-not-applied`:
+   * a split deck was created but its options preset would not apply, so the
+   * card was NOT moved into it (it keeps its current deck and limits).
+   */
+  code?: 'preset-not-applied';
+  /** The deck a `preset-not-applied` card was meant for. */
+  deck?: string;
 }
 
 export interface ConnectCommitResult {

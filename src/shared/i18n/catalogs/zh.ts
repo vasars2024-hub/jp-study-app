@@ -11048,6 +11048,7 @@ export const zh: Catalog = {
   'ankiWorkbench.apply.live.ok.verified': '已验证：从 Anki 重新读取集合，每一处更改都已找到。',
   'ankiWorkbench.apply.live.failed.note': '笔记 {id} 未写入 — {reason}',
   'ankiWorkbench.apply.live.failed.card': '卡片 {id} 未移动 — {reason}',
+  'ankiWorkbench.apply.live.failed.preset': '卡片 {id} 未移动到 {deck} — 无法应用其选项预设，因此该卡片保留了当前的牌组和复习上限。',
   'ankiWorkbench.apply.liveError.nothing-to-commit': '本次会话的净更改为空，因此没有向 Anki 发送任何内容。',
   'ankiWorkbench.apply.liveError.no-source':
     '本次会话已无法确定当初读取了集合的哪一部分，因此什么也没有写入。请在第 1 步重新读取集合。',

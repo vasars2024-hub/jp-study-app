@@ -11110,6 +11110,7 @@ export const ja: Catalog = {
     '検証済み：Anki からコレクションを読み直し、すべての変更を確認しました。',
   'ankiWorkbench.apply.live.failed.note': 'ノート {id} は書き込まれませんでした — {reason}',
   'ankiWorkbench.apply.live.failed.card': 'カード {id} は移動しませんでした — {reason}',
+  'ankiWorkbench.apply.live.failed.preset': 'カード {id} は {deck} に移動しませんでした — オプションプリセットを適用できなかったため、現在のデッキと復習上限のままです。',
   'ankiWorkbench.apply.liveError.nothing-to-commit':
     'このセッションの net 変更は空のため、Anki には何も送信していません。',
   'ankiWorkbench.apply.liveError.no-source':
