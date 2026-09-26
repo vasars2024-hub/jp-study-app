@@ -31,6 +31,7 @@ import { BLANC_UI_EN } from '../blancUi/en';
 import { READER_UI_EN } from '../readerUi/en';
 import { STUDY_UI_EN } from '../studyUi/en';
 import { SYSTEM_UI_EN } from '../systemUi/en';
+import { CAPTIONS_UI_EN } from '../captionsUi/en';
 
 export const en: Catalog = {
   // Common actions
@@ -807,6 +808,7 @@ export const en: Catalog = {
   ...READER_UI_EN,
   ...STUDY_UI_EN,
   ...SYSTEM_UI_EN,
+  ...CAPTIONS_UI_EN,
 
   // Settings navigation
   'settings.appTitle': 'Settings',

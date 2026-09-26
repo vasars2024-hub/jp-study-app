@@ -15,6 +15,7 @@ import { loadToolboxSettings } from './toolboxSettings';
 import { resumeMostRecentWatched } from './continueWatchingStore';
 import { reachMediaWorkspace } from './mediaWorkspaceBridge';
 import { t } from './i18n';
+import { CAPTIONS_GLOBAL_COMMANDS } from '../shared/captionsOverlay';
 
 export type CommandCategory =
   | 'Navigation'
@@ -691,6 +692,51 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: '',
     note: 'Sends the line playing right now to Anki, with whatever the mining panel has armed.',
   },
+  // System audio and live captions (main/systemAudioCapture.ts). System-wide on
+  // purpose: the audio being mined plays in another app — a browser, a game, a
+  // stream — so these have to fire while Gum is in the background. Pushed to
+  // main by `syncCaptionsGlobalShortcuts` below; Ctrl+Alt+Shift+letter is the
+  // band the other system-wide rows use, and none of these letters is taken.
+  {
+    id: 'captions.mineRecent',
+    label: 'Mine the last seconds of system audio',
+    category: 'Immersion',
+    defaultKeys: 'Ctrl+Alt+Shift+M',
+    global: true,
+    note: 'System-wide. Cuts the last few seconds from system-audio capture, transcribes them, and shows the card to check before it is added. Capture must be on.',
+  },
+  {
+    id: 'captions.toggleRecording',
+    label: 'Start / stop a system-audio recording',
+    category: 'Immersion',
+    defaultKeys: 'Ctrl+Alt+Shift+K',
+    global: true,
+    note: 'System-wide. Records up to 60 seconds of system audio into a card. If capture was off it is on only for the recording.',
+  },
+  {
+    id: 'captions.toggleOverlay',
+    label: 'Show / hide the live captions bar',
+    category: 'Immersion',
+    defaultKeys: 'Ctrl+Alt+Shift+C',
+    global: true,
+    note: 'System-wide. An always-on-top caption bar: click a word to look it up, mine a line with its audio.',
+  },
+  {
+    id: 'captions.mineLine',
+    label: 'Mine the current caption line',
+    category: 'Immersion',
+    defaultKeys: 'Ctrl+Alt+Shift+L',
+    global: true,
+    note: 'System-wide. Adds the newest caption line as a sentence card, with its audio when capture is on.',
+  },
+  {
+    id: 'captions.toggleCapture',
+    label: 'Turn system-audio capture on / off',
+    category: 'Immersion',
+    defaultKeys: '',
+    global: true,
+    note: 'System-wide. Unbound by default so capture is never switched on by a stray key; bind it here if you want one.',
+  },
   {
     id: 'video.seekBack',
     label: 'Rewind',
@@ -981,6 +1027,7 @@ let store: ShortcutStore = loadStore();
 let lastSyncedToolboxOpenKeys: string | null = null;
 let lastSyncedAppToggleKeys: string | null = null;
 let lastSyncedAppRestartKeys: string | null = null;
+let lastSyncedCaptionsKeys: string | null = null;
 let lastSyncedOsHotkeyPayload: string | null = null;
 let osHotkeyInstalledCache: boolean | null = null;
 
@@ -1094,6 +1141,40 @@ function syncAppRestartGlobalShortcut(): void {
   }
 }
 
+/**
+ * The captions / system-audio rows are system-wide: push their chords to main
+ * (`main/captionsGlobalCommands.ts`) on boot and on every rebind, and say once
+ * which of them another application already owns.
+ */
+export function collectCaptionsGlobalChords(): Record<string, string> {
+  const chords: Record<string, string> = {};
+  for (const id of CAPTIONS_GLOBAL_COMMANDS) chords[id] = effectiveKeys(id);
+  return chords;
+}
+
+function syncCaptionsGlobalShortcuts(): void {
+  try {
+    if (!window.api?.captionsSetGlobalShortcuts) return;
+    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
+    const chords = collectCaptionsGlobalChords();
+    const serialized = JSON.stringify(chords);
+    if (serialized === lastSyncedCaptionsKeys) return;
+    lastSyncedCaptionsKeys = serialized;
+    void window.api.captionsSetGlobalShortcuts(chords).then((result) => {
+      const first = result && !result.ok ? Object.values(result.errors ?? {})[0] : undefined;
+      if (first) {
+        window.dispatchEvent(
+          new CustomEvent('os:toast', {
+            detail: { message: t('shortcut.toast.captionsGlobal', { error: first }), kind: 'muted' },
+          }),
+        );
+      }
+    });
+  } catch {
+    /* Non-Electron harness */
+  }
+}
+
 /** Push current Shortcuts chords into the Startup helper (when installed). */
 export function syncOsHotkeyHelperFromShortcuts(force = false): void {
   try {
@@ -1142,6 +1223,7 @@ function persist(): void {
   syncToolboxGlobalShortcut();
   syncAppToggleGlobalShortcut();
   syncAppRestartGlobalShortcut();
+  syncCaptionsGlobalShortcuts();
   syncOsHotkeyHelperFromShortcuts();
 }
 
@@ -1157,6 +1239,7 @@ if (typeof window !== 'undefined') {
     syncToolboxGlobalShortcut();
     syncAppToggleGlobalShortcut();
     syncAppRestartGlobalShortcut();
+    syncCaptionsGlobalShortcuts();
     syncOsHotkeyHelperFromShortcuts(true);
   }, 0);
 }

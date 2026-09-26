@@ -31,6 +31,7 @@ import { BLANC_UI_RU } from '../blancUi/ru';
 import { READER_UI_RU } from '../readerUi/ru';
 import { STUDY_UI_RU } from '../studyUi/ru';
 import { SYSTEM_UI_RU } from '../systemUi/ru';
+import { CAPTIONS_UI_RU } from '../captionsUi/ru';
 
 export const ru: Catalog = {
   'common.download': 'Скачать',
@@ -829,6 +830,7 @@ export const ru: Catalog = {
   ...READER_UI_RU,
   ...STUDY_UI_RU,
   ...SYSTEM_UI_RU,
+  ...CAPTIONS_UI_RU,
 
   'settings.appTitle': 'Настройки',
   'settings.group.personalization': 'Персонализация',

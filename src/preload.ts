@@ -3391,6 +3391,108 @@ const api = {
     ipcRenderer.on('liveCaptions:changed', handler);
     return () => ipcRenderer.removeListener('liveCaptions:changed', handler);
   },
+  /**
+   * System-audio capture and the live-captions overlay (main/systemAudioCapture.ts).
+   * Capture is off until the user turns it on; the audio stays in the hidden
+   * capture window's memory until a mine.
+   */
+  captionsGetState: (): Promise<import('./shared/captionsOverlay').CaptionsState> =>
+    ipcRenderer.invoke('captions:getState'),
+  captionsSetSettings: (
+    patch: Partial<import('./shared/captionsOverlay').CaptionsSettings>,
+  ): Promise<import('./shared/captionsOverlay').CaptionsState> => ipcRenderer.invoke('captions:setSettings', patch),
+  captionsSetCapture: (on: boolean): Promise<import('./shared/captionsOverlay').CaptionsState> =>
+    ipcRenderer.invoke('captions:setCapture', on),
+  captionsMineRecent: (seconds?: number): Promise<{ ok: boolean; draftId?: string; errorKey?: string }> =>
+    ipcRenderer.invoke('captions:mineRecent', seconds),
+  captionsToggleRecording: (): Promise<{ ok: boolean; recording: boolean; draftId?: string; errorKey?: string }> =>
+    ipcRenderer.invoke('captions:toggleRecording'),
+  captionsToggleOverlay: (open?: boolean): Promise<import('./shared/captionsOverlay').CaptionsState> =>
+    ipcRenderer.invoke('captions:toggleOverlay', open),
+  captionsMineLine: (
+    lineId: string,
+    extra?: { word?: string; reading?: string; meaning?: string; text?: string },
+  ): Promise<{ ok: boolean; created?: boolean; cardId?: string; error?: string; errorKey?: string }> =>
+    ipcRenderer.invoke('captions:mineLine', lineId, extra),
+  captionsMineCurrentLine: (): Promise<unknown> => ipcRenderer.invoke('captions:mineCurrentLine'),
+  captionsGetLines: (): Promise<import('./shared/captionsOverlay').CaptionOverlayLine[]> =>
+    ipcRenderer.invoke('captions:getLines'),
+  captionsUpdateDraft: (id: string, patch: { text?: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('captions:updateDraft', id, patch),
+  captionsConfirmDraft: (
+    id: string,
+    edits?: { text?: string },
+  ): Promise<{ ok: boolean; created?: boolean; cardId?: string; error?: string; errorKey?: string }> =>
+    ipcRenderer.invoke('captions:confirmDraft', id, edits),
+  captionsDiscardDraft: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('captions:discardDraft', id),
+  captionsStartWindowsLiveCaptions: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('captions:startWindowsLiveCaptions'),
+  captionsOpenSettings: (page?: 'transcription' | 'shortcuts'): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('captions:openSettings', page),
+  captionsSetGlobalShortcuts: (
+    chords: Record<string, string>,
+  ): Promise<{ ok: boolean; errors: Record<string, string> }> => ipcRenderer.invoke('captions:setGlobalShortcuts', chords),
+  captionsOverlaySetIgnoreMouse: (ignore: boolean): void => ipcRenderer.send('captions:overlaySetIgnoreMouse', ignore),
+  captionsOverlayGetBounds: (): Promise<import('./shared/captionsOverlay').OverlayBounds> =>
+    ipcRenderer.invoke('captions:overlayGetBounds'),
+  captionsOverlaySetBounds: (
+    bounds: import('./shared/captionsOverlay').OverlayBounds,
+  ): Promise<import('./shared/captionsOverlay').OverlayBounds | null> =>
+    ipcRenderer.invoke('captions:overlaySetBounds', bounds),
+  onCaptionsState: (cb: (state: import('./shared/captionsOverlay').CaptionsState) => void): (() => void) => {
+    const handler = (_e: unknown, state: import('./shared/captionsOverlay').CaptionsState): void => cb(state);
+    ipcRenderer.on('captions:state', handler);
+    return () => ipcRenderer.removeListener('captions:state', handler);
+  },
+  onCaptionsLines: (cb: (lines: import('./shared/captionsOverlay').CaptionOverlayLine[]) => void): (() => void) => {
+    const handler = (_e: unknown, lines: import('./shared/captionsOverlay').CaptionOverlayLine[]): void => cb(lines);
+    ipcRenderer.on('captions:lines', handler);
+    return () => ipcRenderer.removeListener('captions:lines', handler);
+  },
+  onCaptionsDrafts: (
+    cb: (payload: {
+      drafts: import('./shared/captionsOverlay').CaptionDraft[];
+      notices: import('./shared/captionsOverlay').CaptionNotice[];
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: {
+        drafts: import('./shared/captionsOverlay').CaptionDraft[];
+        notices: import('./shared/captionsOverlay').CaptionNotice[];
+      },
+    ): void => cb(payload);
+    ipcRenderer.on('captions:drafts', handler);
+    return () => ipcRenderer.removeListener('captions:drafts', handler);
+  },
+  /** Main window: a caption card to put in the deck (answered with captionsMineReply). */
+  onCaptionsMineRequest: (cb: (payload: import('./shared/captionsOverlay').CaptionMinePayload) => void): (() => void) => {
+    const handler = (_e: unknown, payload: import('./shared/captionsOverlay').CaptionMinePayload): void => cb(payload);
+    ipcRenderer.on('captions:mine-request', handler);
+    return () => ipcRenderer.removeListener('captions:mine-request', handler);
+  },
+  captionsMineReply: (reply: import('./shared/captionsOverlay').CaptionMineReply): void =>
+    ipcRenderer.send('captions:mine-reply', reply),
+  onCaptionsOpenSettings: (cb: (payload: { page: 'transcription' | 'shortcuts' }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { page: 'transcription' | 'shortcuts' }): void => cb(payload);
+    ipcRenderer.on('captions:open-settings', handler);
+    return () => ipcRenderer.removeListener('captions:open-settings', handler);
+  },
+  /** Hidden capture window only. */
+  onCaptionsHostCommand: (cb: (command: { id: string; type: string } & Record<string, unknown>) => void): (() => void) => {
+    const handler = (_e: unknown, command: { id: string; type: string } & Record<string, unknown>): void => cb(command);
+    ipcRenderer.on('captions:host-command', handler);
+    return () => ipcRenderer.removeListener('captions:host-command', handler);
+  },
+  captionsHostReply: (reply: { id: string } & Record<string, unknown>): void =>
+    ipcRenderer.send('captions:host-reply', reply),
+  captionsHostStatus: (status: { bufferedMs?: number; gumModelMissing?: boolean }): void =>
+    ipcRenderer.send('captions:host-status', status),
+  captionsHostUtterance: (utterance: { text: string; startMs: number; endMs: number }): void =>
+    ipcRenderer.send('captions:host-utterance', utterance),
+  /** Only answered when the app runs with --gum-captions-test (the end-to-end check). */
+  captionsInjectSnapshot: (lines: string[], windowTitle?: string): Promise<unknown> =>
+    ipcRenderer.invoke('liveCaptions:injectSnapshot', lines, windowTitle),
 
   cancelTranscription: (mediaId?: string): Promise<void> =>
     ipcRenderer.invoke('transcription:cancel', mediaId),

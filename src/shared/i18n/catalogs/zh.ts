@@ -31,6 +31,7 @@ import { BLANC_UI_ZH } from '../blancUi/zh';
 import { READER_UI_ZH } from '../readerUi/zh';
 import { STUDY_UI_ZH } from '../studyUi/zh';
 import { SYSTEM_UI_ZH } from '../systemUi/zh';
+import { CAPTIONS_UI_ZH } from '../captionsUi/zh';
 
 export const zh: Catalog = {
   'common.download': '下载',
@@ -704,6 +705,7 @@ export const zh: Catalog = {
   ...READER_UI_ZH,
   ...STUDY_UI_ZH,
   ...SYSTEM_UI_ZH,
+  ...CAPTIONS_UI_ZH,
 
   'settings.appTitle': '设置',
   'settings.group.personalization': '个性化',

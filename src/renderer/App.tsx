@@ -374,6 +374,21 @@ export default function App() {
     });
   }, []);
 
+  // System-audio / live-captions mining (main/systemAudioCapture.ts): the
+  // overlay and the global shortcuts ask main, main forwards the card here,
+  // where `mineToStudy` owns the deck — same shape as extension:mined above.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let dead = false;
+    void import('./captions/captionsMining').then(({ installCaptionsMining }) => {
+      if (!dead) off = installCaptionsMining();
+    });
+    return () => {
+      dead = true;
+      off?.();
+    };
+  }, []);
+
   // Pending-Anki queue: drains when Anki's link comes up; also reports a deck
   // the localStorage cache could not hold.
   useEffect(() => {
