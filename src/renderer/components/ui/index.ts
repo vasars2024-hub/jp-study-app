@@ -17,6 +17,10 @@ export * from './Checkbox';
 export * from './Toggle';
 export * from './Slider';
 export * from './SearchBox';
+// Round 3 — grouping without frames, and the launcher tile
+export * from './Group';
+export * from './Tile';
+export * from './SwitchRow';
 // Layout / navigation
 export * from './Toolbar';
 export * from './Tabs';

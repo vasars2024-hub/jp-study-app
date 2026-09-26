@@ -13,6 +13,7 @@ import PlaylistEditor from '../../PlaylistEditor';
 import { resolveWall } from '../../../environment';
 import { seedWallpaperLabelKey } from '../../../environment/types';
 import { useT } from '../../../i18n';
+import { Toggle } from '../../ui';
 
 export default function WallpaperRotationCard() {
   const { t } = useT();
@@ -26,16 +27,14 @@ export default function WallpaperRotationCard() {
       description={t('settings.atmosphere.rotation.desc')}
       highlight={focusSettingId === 'rotation'}
       trailing={
-        <label className="os-toggle os-toggle-compact">
-          <input
-            type="checkbox"
-            checked={env.rotationEnabled}
-            disabled={!env.enabled}
-            onChange={(e) => patchEnv({ rotationEnabled: e.target.checked })}
-            aria-label={t('settings.atmosphere.enableRotation')}
-          />
-          <span>{env.rotationEnabled ? t('common.on') : t('common.off')}</span>
-        </label>
+        <Toggle
+          className="os-toggle os-toggle-compact"
+          checked={env.rotationEnabled}
+          disabled={!env.enabled}
+          onChange={(e) => patchEnv({ rotationEnabled: e.target.checked })}
+          aria-label={t('settings.atmosphere.enableRotation')}
+          label={env.rotationEnabled ? t('common.on') : t('common.off')}
+        />
       }
     >
       {!env.enabled && (
@@ -64,15 +63,13 @@ export default function WallpaperRotationCard() {
           {resolved.reason}
         </p>
       )}
-      <label className="os-toggle">
-        <input
-          type="checkbox"
-          checked={env.calendarWallsEnabled}
-          disabled={!env.enabled || !env.rotationEnabled}
-          onChange={(e) => patchEnv({ calendarWallsEnabled: e.target.checked })}
-        />
-        <span>{t('settings.atmosphere.calendarWalls')}</span>
-      </label>
+      <Toggle
+        className="os-toggle"
+        checked={env.calendarWallsEnabled}
+        disabled={!env.enabled || !env.rotationEnabled}
+        onChange={(e) => patchEnv({ calendarWallsEnabled: e.target.checked })}
+        label={t('settings.atmosphere.calendarWalls')}
+      />
       <PlaylistEditor env={env} disabled={!env.enabled || !env.rotationEnabled} onChange={patchEnv} />
     </SettingsCard>
   );

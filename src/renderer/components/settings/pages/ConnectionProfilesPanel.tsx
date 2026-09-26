@@ -48,6 +48,7 @@ import {
   onConnectionProfilesChanged,
   saveConnectionProfilesDocument,
 } from '../../../connectionProfilesStore';
+import { SwitchRow } from '../../ui';
 
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -239,6 +240,7 @@ export default function ConnectionProfilesPanel() {
             onChange={(event) => setCloneName(event.currentTarget.value)}
           />
           <button
+            className="btn"
             type="button"
             onClick={() => guard(() => {
               const next = cloneConnectionProfile(document, active.id, {
@@ -253,6 +255,7 @@ export default function ConnectionProfilesPanel() {
             {t('connection.clone')}
           </button>
           <button
+            className="btn"
             type="button"
             onClick={() => guard(() => {
               const next = cloneConnectionProfile(document, active.id, {
@@ -419,6 +422,7 @@ export default function ConnectionProfilesPanel() {
             onChange={(event) => setSiteInput(event.currentTarget.value)}
           />
           <button
+            className="btn"
             type="button"
             onClick={() => guard(() => {
               const next = assignSiteProfile(document, siteInput, active.id);
@@ -440,7 +444,7 @@ export default function ConnectionProfilesPanel() {
                 <strong>{site}</strong>
                 <small className="muted">{profile ? profileName(profile) : profileId}</small>
               </span>
-              <button type="button" onClick={() => guard(() => clearSiteProfile(document, site))}>
+              <button className="btn" type="button" onClick={() => guard(() => clearSiteProfile(document, site))}>
                 {t('connection.removeSite')}
               </button>
             </div>
@@ -458,17 +462,12 @@ export default function ConnectionProfilesPanel() {
           </span>
         )}
       >
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('connection.pauseQueue')}</strong>
-            <small className="muted">{t('connection.pauseQueueDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={document.queue.paused}
-            onChange={(event) => commit(setConnectionQueuePaused(document, event.currentTarget.checked))}
-          />
-        </label>
+        <SwitchRow
+          title={t('connection.pauseQueue')}
+          description={t('connection.pauseQueueDesc')}
+          checked={document.queue.paused}
+          onChange={(event) => commit(setConnectionQueuePaused(document, event.currentTarget.checked))}
+        />
         <div className="field-row">
           <label htmlFor="connection-concurrency">{t('connection.concurrency')}</label>
           <input
@@ -493,6 +492,7 @@ export default function ConnectionProfilesPanel() {
             onChange={(event) => setJobSite(event.currentTarget.value)}
           />
           <button
+            className="btn"
             type="button"
             disabled={!jobSite.trim()}
             onClick={() => guard(() => {
@@ -518,12 +518,13 @@ export default function ConnectionProfilesPanel() {
               </small>
             </span>
             <button
+              className="btn"
               type="button"
               onClick={() => guard(() => setConnectionJobPriority(document, item.id, item.priority + 1))}
             >
               {t('connection.raisePriority')}
             </button>
-            <button type="button" onClick={() => guard(() => cancelConnectionJob(document, item.id, nowIso()))}>
+            <button className="btn" type="button" onClick={() => guard(() => cancelConnectionJob(document, item.id, nowIso()))}>
               {t('connection.cancelJob')}
             </button>
           </div>
@@ -540,17 +541,12 @@ export default function ConnectionProfilesPanel() {
         title={t('connection.logs')}
         description={t('connection.logsDesc')}
       >
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('connection.debugMode')}</strong>
-            <small className="muted">{t('connection.debugModeDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={document.debugMode}
-            onChange={(event) => commit(setConnectionDebugMode(document, event.currentTarget.checked))}
-          />
-        </label>
+        <SwitchRow
+          title={t('connection.debugMode')}
+          description={t('connection.debugModeDesc')}
+          checked={document.debugMode}
+          onChange={(event) => commit(setConnectionDebugMode(document, event.currentTarget.checked))}
+        />
         <div className="field-row">
           <label htmlFor="connection-log-channel">{t('connection.logChannel')}</label>
           <select

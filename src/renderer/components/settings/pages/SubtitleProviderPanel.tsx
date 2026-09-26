@@ -29,6 +29,7 @@ import {
 import type { SubtitleAutoNotices } from '../../../../shared/subtitleDiscoveryStatus';
 import { subtitleLangMatches } from '../../../../shared/subtitleDiscoveryPick';
 import { useStudyLanguage } from '../../../useStudyLanguage';
+import { SwitchRow } from '../../ui';
 
 const STYLES: SubtitlePreferences['style'][] = ['full', 'signs-songs', 'forced'];
 
@@ -142,11 +143,11 @@ export default function SubtitleProviderPanel() {
               time: notices.quotaResetAt ? new Date(notices.quotaResetAt).toLocaleString(LANG_TAGS[lang]) : '',
             })}
           </span>
-          <button type="button" onClick={() => dismissNotice(id)}>{t('subtitle.notice.dismiss')}</button>
+          <button className="btn" type="button" onClick={() => dismissNotice(id)}>{t('subtitle.notice.dismiss')}</button>
         </div>
       ))}
-      <fieldset className="unified-search-controls">
-        <legend>{t('subtitle.providers')}</legend>
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('subtitle.providers')}</legend>
         <ol className="subtitle-provider-list">
           {ordered.map((provider, index) => {
             const credential = credentialFor(provider.id);
@@ -199,10 +200,11 @@ export default function SubtitleProviderPanel() {
                       value={keyDrafts[provider.id] ?? ''}
                       onChange={(e) => setKeyDrafts((prev) => ({ ...prev, [provider.id]: e.currentTarget.value }))}
                     />
-                    <button type="button" onClick={() => void saveKey(provider.id)}>
+                    <button className="btn" type="button" onClick={() => void saveKey(provider.id)}>
                       {(keyDrafts[provider.id] ?? '').trim() ? t('subtitle.keySave') : t('subtitle.keyClear')}
                     </button>
                     <button
+                      className="btn"
                       type="button"
                       disabled={testing === provider.id || !credential?.hasKey}
                       onClick={() => void testProvider(provider.id)}
@@ -231,21 +233,16 @@ export default function SubtitleProviderPanel() {
         </ol>
       </fieldset>
 
-      <fieldset className="unified-search-controls">
-        <legend>{t('subtitle.discovery')}</legend>
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('subtitle.autoDiscover')}</strong>
-            <small className="muted">{t('subtitle.autoDiscoverDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.autoDiscover}
-            onChange={(e) => persist({ ...settings, autoDiscover: e.currentTarget.checked })}
-          />
-        </label>
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('subtitle.discovery')}</legend>
+        <SwitchRow
+          title={t('subtitle.autoDiscover')}
+          description={t('subtitle.autoDiscoverDesc')}
+          checked={settings.autoDiscover}
+          onChange={(e) => persist({ ...settings, autoDiscover: e.currentTarget.checked })}
+        />
 
-        <div className="field-row">
+        <div className="ui-control-row">
           <span>{t('subtitle.autoDownload')}</span>
           <div className="subtitle-language-chips">
             {languages.map((lang) => (
@@ -263,7 +260,7 @@ export default function SubtitleProviderPanel() {
         </div>
         <small className="muted">{t('subtitle.autoDownloadDesc')}</small>
 
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="subtitle-confidence">
             {t('subtitle.minConfidence', { percent: settings.minConfidence })}
           </label>
@@ -279,19 +276,14 @@ export default function SubtitleProviderPanel() {
         </div>
         <small className="muted">{t('subtitle.minConfidenceDesc')}</small>
 
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('subtitle.autoTranscribe')}</strong>
-            <small className="muted">{t('subtitle.autoTranscribeDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.autoTranscribe}
-            onChange={(e) => persist({ ...settings, autoTranscribe: e.currentTarget.checked })}
-          />
-        </label>
+        <SwitchRow
+          title={t('subtitle.autoTranscribe')}
+          description={t('subtitle.autoTranscribeDesc')}
+          checked={settings.autoTranscribe}
+          onChange={(e) => persist({ ...settings, autoTranscribe: e.currentTarget.checked })}
+        />
 
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="subtitle-helper-language">{t('subtitle.helperLanguage')}</label>
           <select
             id="subtitle-helper-language"
@@ -310,19 +302,14 @@ export default function SubtitleProviderPanel() {
         </div>
         <small className="muted">{t('subtitle.helperLanguageDesc')}</small>
 
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('subtitle.autoTranslate')}</strong>
-            <small className="muted">{t('subtitle.autoTranslateDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.autoTranslate}
-            onChange={(e) => persist({ ...settings, autoTranslate: e.currentTarget.checked })}
-          />
-        </label>
+        <SwitchRow
+          title={t('subtitle.autoTranslate')}
+          description={t('subtitle.autoTranslateDesc')}
+          checked={settings.autoTranslate}
+          onChange={(e) => persist({ ...settings, autoTranslate: e.currentTarget.checked })}
+        />
 
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="subtitle-translation-engine">{t('subtitle.translationEngine')}</label>
           <select
             id="subtitle-translation-engine"
@@ -340,19 +327,14 @@ export default function SubtitleProviderPanel() {
           </select>
         </div>
 
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('subtitle.autoStudyTrack')}</strong>
-            <small className="muted">{t('subtitle.autoStudyTrackDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.autoStudyTrack}
-            onChange={(e) => persist({ ...settings, autoStudyTrack: e.currentTarget.checked })}
-          />
-        </label>
+        <SwitchRow
+          title={t('subtitle.autoStudyTrack')}
+          description={t('subtitle.autoStudyTrackDesc')}
+          checked={settings.autoStudyTrack}
+          onChange={(e) => persist({ ...settings, autoStudyTrack: e.currentTarget.checked })}
+        />
 
-        <div className="field-row">
+        <div className="ui-control-row">
           <label htmlFor="subtitle-retry">{t('subtitle.retryAfter')}</label>
           <input
             id="subtitle-retry"
@@ -369,9 +351,9 @@ export default function SubtitleProviderPanel() {
           second line is the helper language above, so neither is repeated here. Style and
           hearing-impaired tracks are ranking preferences the discovery engine reads; they
           used to be stored where nothing read them. */}
-      <fieldset className="unified-search-controls">
-        <legend>{t('subtitle.preferences')}</legend>
-        <div className="field-row">
+      <fieldset className="ui-group">
+        <legend className="ui-group__title">{t('subtitle.preferences')}</legend>
+        <div className="ui-control-row">
           <label htmlFor="subtitle-style">{t('subtitle.style')}</label>
           <select
             id="subtitle-style"
@@ -382,18 +364,13 @@ export default function SubtitleProviderPanel() {
             {STYLES.map((style) => <option key={style} value={style}>{t(`subtitle.style.${style}`)}</option>)}
           </select>
         </div>
-        <label className="os-set-toggle-row">
-          <span>
-            <strong>{t('subtitle.hearingImpaired')}</strong>
-            <small className="muted">{t('subtitle.hearingImpairedDesc')}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.allowHearingImpaired}
-            onChange={(e) => persist({ ...settings, allowHearingImpaired: e.currentTarget.checked })}
-          />
-        </label>
-        <div className="field-row">
+        <SwitchRow
+          title={t('subtitle.hearingImpaired')}
+          description={t('subtitle.hearingImpairedDesc')}
+          checked={settings.allowHearingImpaired}
+          onChange={(e) => persist({ ...settings, allowHearingImpaired: e.currentTarget.checked })}
+        />
+        <div className="ui-control-row">
           <label htmlFor="subtitle-groups">{t('subtitle.preferredGroups')}</label>
           <input
             id="subtitle-groups"

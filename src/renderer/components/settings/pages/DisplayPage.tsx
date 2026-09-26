@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import MonitorsPage from './MonitorsPage';
-import { confirmDialog } from '../../ui';
+import { confirmDialog, Toggle } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from '../../../appZoom';
 import {
@@ -145,10 +145,12 @@ export default function DisplayPage() {
           />
           <span className="muted">{d.baseFontPx}px</span>
         </div>
-        <label className="os-toggle">
-          <input type="checkbox" checked={d.boldText} onChange={(e) => patch({ boldText: e.target.checked })} />
-          <span>{t('settings.display.boldText')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={d.boldText}
+          onChange={(e) => patch({ boldText: e.target.checked })}
+          label={t('settings.display.boldText')}
+        />
       </SettingsCard>
 
       <SettingsCard
@@ -190,14 +192,12 @@ export default function DisplayPage() {
             </button>
           ))}
         </div>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={d.underlineLinks}
-            onChange={(e) => patch({ underlineLinks: e.target.checked })}
-          />
-          <span>{t('settings.display.underlineLinks')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={d.underlineLinks}
+          onChange={(e) => patch({ underlineLinks: e.target.checked })}
+          label={t('settings.display.underlineLinks')}
+        />
       </SettingsCard>
 
       <SettingsCard
@@ -361,14 +361,12 @@ export default function DisplayPage() {
             </button>
           ))}
         </div>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={d.smoothScroll}
-            onChange={(e) => patch({ smoothScroll: e.target.checked })}
-          />
-          <span>{t('settings.display.smoothScroll')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={d.smoothScroll}
+          onChange={(e) => patch({ smoothScroll: e.target.checked })}
+          label={t('settings.display.smoothScroll')}
+        />
       </SettingsCard>
 
       <SettingsCard
@@ -420,14 +418,12 @@ export default function DisplayPage() {
             </button>
           ))}
         </div>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={d.reduceFlashes}
-            onChange={(e) => patch({ reduceFlashes: e.target.checked })}
-          />
-          <span>{t('settings.display.reduceFlashes')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={d.reduceFlashes}
+          onChange={(e) => patch({ reduceFlashes: e.target.checked })}
+          label={t('settings.display.reduceFlashes')}
+        />
         <p className="muted os-set-hint">{t('settings.display.motionHint')}</p>
       </SettingsCard>
 

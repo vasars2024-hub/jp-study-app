@@ -777,7 +777,7 @@ export default function SubtitleHarvestPanel({
                 })}
           </p>
           {source.nyaa.available && !nyaaCandidates.length ? (
-            <button type="button" className="scr-btn" onClick={findNyaa} disabled={busy}>
+            <button type="button" className="btn" onClick={findNyaa} disabled={busy}>
               {phase === 'listing' ? t('subHarvest.nyaa.searching') : t('subHarvest.nyaa.search')}
             </button>
           ) : null}
@@ -814,7 +814,7 @@ export default function SubtitleHarvestPanel({
                 </span>
                 <button
                   type="button"
-                  className="scr-btn"
+                  className="btn"
                   onClick={() => { void takeNyaa(candidate.id); }}
                   disabled={busy}
                 >

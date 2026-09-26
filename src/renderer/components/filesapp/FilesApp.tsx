@@ -193,6 +193,7 @@ import {
 import { getStudyLang } from '../../studyEnvironment';
 import { STUDY_LANG_NAME_KEY } from '../../../shared/studyLang';
 import './filesApp.css';
+import { SearchBox, Select } from '../ui';
 
 /**
  * Gate 8's two panels, loaded on demand — and the `lazy` is load-bearing, not
@@ -1890,16 +1891,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <>
           <label className="fa-search">
             <span className="fa-visually-hidden">{t('filesApp.search.label')}</span>
-            <input
-              type="search"
+            <SearchBox
               value={query}
               placeholder={t('filesApp.search.placeholder')}
+              title={t('filesApp.search.placeholder')}
               onChange={(e) => setQuery(e.target.value)}
             />
           </label>
           <label className="fa-sort">
             <span className="fa-visually-hidden">{t('filesApp.sort.label')}</span>
-            <select
+            <Select
               value={sortColumn}
               onChange={(e) => applyView({ sortColumn: e.target.value as FilesSortColumn })}
             >
@@ -1908,7 +1909,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                   {t(`filesApp.column.${column}`)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <button
             type="button"
@@ -1946,7 +1947,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             <div className="fa-columns">
               <button
                 type="button"
-                className="fa-columns-toggle"
+                className="btn small"
                 aria-expanded={columnsOpen}
                 onClick={() => setColumnsOpen((open) => !open)}
               >
@@ -2197,7 +2198,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <div className="fa-state fa-state-error">
           <p>{t('filesApp.state.error')}</p>
           <p className="fa-state-detail">{state.error}</p>
-          <button type="button" onClick={refresh}>
+          <button className="btn" type="button" onClick={refresh}>
             {t('filesApp.action.retry')}
           </button>
         </div>
@@ -2941,7 +2942,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       })}
       <button
         type="button"
-        className="fa-watch-dismiss"
+        className="btn small"
         onClick={watch.clearArrivals}
         title={t('filesApp.watch.dismiss')}
       >

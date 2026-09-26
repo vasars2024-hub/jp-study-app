@@ -8,7 +8,10 @@ import type { SettingsController } from '../components/settings/types';
 import { loadDisplayPrefs, saveDisplayPrefs } from '../displayPrefs';
 import { getRecentPages, pushRecentPage } from '../components/settings/settingsRecent';
 
-vi.mock('../components/ui', () => ({ confirmDialog: vi.fn(async () => true) }));
+vi.mock('../components/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../components/ui')>()),
+  confirmDialog: vi.fn(async () => true),
+}));
 
 let host: HTMLDivElement;
 let root: Root;

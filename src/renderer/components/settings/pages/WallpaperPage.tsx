@@ -6,6 +6,7 @@ import { useT } from '../../../i18n';
 // Atmosphere and Mini View, so every wallpaper surface is on one page.
 import WallpaperRotationCard from './WallpaperRotationCard';
 import MiniWallpaperCard from './MiniWallpaperCard';
+import { Toggle } from '../../ui';
 
 export default function WallpaperPage() {
   const { t } = useT();
@@ -179,14 +180,12 @@ export default function WallpaperPage() {
               ))}
             </select>
           </div>
-          <label className="os-toggle">
-            <input
-              type="checkbox"
-              checked={!!wall.shuffle}
-              onChange={(e) => s.onWallSlideshowOptions?.({ shuffle: e.target.checked })}
-            />
-            <span>{t('settings.wallpaper.shuffleOrder')}</span>
-          </label>
+          <Toggle
+            className="os-toggle"
+            checked={!!wall.shuffle}
+            onChange={(e) => s.onWallSlideshowOptions?.({ shuffle: e.target.checked })}
+            label={t('settings.wallpaper.shuffleOrder')}
+          />
           <div className="os-set-btns">
             <button type="button" className="btn small" onClick={() => s.onWallSlideshowPrev?.()}>
               {t('settings.wallpaper.previous')}

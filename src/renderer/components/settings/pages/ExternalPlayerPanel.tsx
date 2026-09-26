@@ -13,6 +13,7 @@ import {
   loadExternalPlayerPreferences,
   onExternalPlayerPreferencesChanged,
 } from '../../../externalPlayerStore';
+import { Select, SwitchRow } from '../../ui';
 
 const blank = (): ExternalPlayerProfile => ({
   id: `player-${Date.now()}`,
@@ -104,7 +105,7 @@ export default function ExternalPlayerPanel() {
   const contentLabel = (type: ExternalPlayerContentType): string => t(`externalPlayer.contentType.${type}`);
 
   return <SettingsCard id="external-players" title={t('externalPlayer.title')} description={t('externalPlayer.desc')}>
-    <div className="field-row">
+    <div className="ui-control-row">
       <label htmlFor="external-default">{t('externalPlayer.default')}</label>
       <select
         id="external-default"
@@ -118,7 +119,7 @@ export default function ExternalPlayerPanel() {
         {preferences.profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
     </div>
-    {preferences.profiles.map((profile) => <div className="field-row" key={profile.id}>
+    {preferences.profiles.map((profile) => <div className="ui-control-row" key={profile.id}>
       <span>
         <strong>{profile.name}</strong>
         <small className="muted">
@@ -126,45 +127,49 @@ export default function ExternalPlayerPanel() {
           {preferences.lastUsedProfileId === profile.id ? ` · ${t('externalPlayer.lastUsed')}` : ''}
         </small>
       </span>
-      <button type="button" onClick={() => edit(profile)}>{t('externalPlayer.edit')}</button>
-      <button type="button" onClick={() => remove(profile.id)}>{t('externalPlayer.remove')}</button>
+      <button className="btn" type="button" onClick={() => edit(profile)}>{t('externalPlayer.edit')}</button>
+      <button className="btn" type="button" onClick={() => remove(profile.id)}>{t('externalPlayer.remove')}</button>
     </div>)}
-    {draft && <fieldset className="unified-search-controls">
-      <legend>{preferences.profiles.some((p) => p.id === draft.id) ? t('externalPlayer.editTitle') : t('externalPlayer.addTitle')}</legend>
-      <div className="field-row">
+    {draft && <fieldset className="ui-group">
+      <legend className="ui-group__title">{preferences.profiles.some((p) => p.id === draft.id) ? t('externalPlayer.editTitle') : t('externalPlayer.addTitle')}</legend>
+      <div className="ui-control-row">
         <label htmlFor="external-name">{t('externalPlayer.name')}</label>
         <input id="external-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.currentTarget.value })} />
       </div>
-      <div className="field-row">
+      <div className="ui-control-row">
         <label htmlFor="external-path">{t('externalPlayer.path')}</label>
         <input
           id="external-path"
           value={draft.executablePath}
           onChange={(e) => setPath(e.currentTarget.value)}
         />
-        <button type="button" onClick={() => void browse()}>{t('externalPlayer.browse')}</button>
+        <button className="btn" type="button" onClick={() => void browse()}>{t('externalPlayer.browse')}</button>
       </div>
-      <div className="field-row">
+      <div className="ui-control-row">
         <label htmlFor="external-type">{t('externalPlayer.contentType')}</label>
-        <select id="external-type" value={draft.contentType} onChange={(e) => setDraft({ ...draft, contentType: e.currentTarget.value as ExternalPlayerContentType })}>
+        <Select id="external-type" value={draft.contentType} onChange={(e) => setDraft({ ...draft, contentType: e.currentTarget.value as ExternalPlayerContentType })}>
           <option value="video">{contentLabel('video')}</option>
           <option value="audio">{contentLabel('audio')}</option>
           <option value="any">{contentLabel('any')}</option>
-        </select>
+        </Select>
       </div>
-      <div className="field-row">
+      <div className="ui-control-row">
         <label htmlFor="external-args">{t('externalPlayer.arguments')}</label>
         <textarea id="external-args" value={draft.arguments.join('\n')} onChange={(e) => setDraft({ ...draft, arguments: e.currentTarget.value.split(/\r?\n/) })} />
       </div>
       <small className="muted">{t('externalPlayer.argumentsHint', PLACEHOLDERS)}</small>
-      <label className="os-set-toggle-row">
-        <span><strong>{t('externalPlayer.subtitles')}</strong><small className="muted">{t('externalPlayer.subtitlesHint', PLACEHOLDERS)}</small></span>
-        <input type="checkbox" checked={draft.supportsSubtitles} onChange={(e) => setDraft({ ...draft, supportsSubtitles: e.currentTarget.checked })} />
-      </label>
-      <label className="os-set-toggle-row">
-        <span><strong>{t('externalPlayer.resume')}</strong><small className="muted">{t('externalPlayer.resumeHint', PLACEHOLDERS)}</small></span>
-        <input type="checkbox" checked={draft.supportsResume} onChange={(e) => setDraft({ ...draft, supportsResume: e.currentTarget.checked })} />
-      </label>
+      <SwitchRow
+        title={t('externalPlayer.subtitles')}
+        description={t('externalPlayer.subtitlesHint', PLACEHOLDERS)}
+        checked={draft.supportsSubtitles}
+        onChange={(e) => setDraft({ ...draft, supportsSubtitles: e.currentTarget.checked })}
+      />
+      <SwitchRow
+        title={t('externalPlayer.resume')}
+        description={t('externalPlayer.resumeHint', PLACEHOLDERS)}
+        checked={draft.supportsResume}
+        onChange={(e) => setDraft({ ...draft, supportsResume: e.currentTarget.checked })}
+      />
       <button type="button" className="btn primary" onClick={() => void saveDraft()} disabled={!draft.name.trim() || !draft.executablePath.trim()}>{t('externalPlayer.save')}</button>
       {' '}
       <button type="button" className="btn" onClick={() => setDraft(null)}>{t('externalPlayer.cancel')}</button>

@@ -12,6 +12,7 @@ import {
 import type { MiningCandidate, TraditionalMiningConfig, ValueSource } from '../../shared/mining';
 import { useT } from '../i18n';
 import type { TVars } from '../../shared/i18n/core';
+import { Select } from './ui';
 
 type Props = {
   candidates: MiningCandidate[];
@@ -198,7 +199,7 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
       <div className="mining-form-grid mining-form-grid-wide">
         <label>
           {t('epub.test.term')}
-          <select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)}>
+          <Select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)}>
             {pickerOptions.map((c) => {
               const key = candidateLookupKey(c.expression, c.reading);
               return (
@@ -208,7 +209,7 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
                 </option>
               );
             })}
-          </select>
+          </Select>
         </label>
         <div className="actions">
           <button

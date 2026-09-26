@@ -11,6 +11,7 @@ import { useT } from '../../../i18n';
 import { ENVIRONMENT_PRESETS, getEnvironmentPreset, presetPatch } from '../../../environment/environmentPresets';
 import { emitCompanionEvent } from '../../../environment/companionEvents';
 import type { WeatherMode } from '../../../environment/types';
+import { Toggle } from '../../ui';
 
 export default function AtmospherePage() {
   const { t } = useT();
@@ -38,15 +39,13 @@ export default function AtmospherePage() {
         description={t('settings.atmosphere.livingLayer.desc')}
         highlight={focusSettingId === 'living-layer'}
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={env.enabled}
-              onChange={(e) => patchEnv({ enabled: e.target.checked })}
-              aria-label={t('settings.atmosphere.enableLivingLayer')}
-            />
-            <span>{env.enabled ? t('common.on') : t('common.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={env.enabled}
+            onChange={(e) => patchEnv({ enabled: e.target.checked })}
+            aria-label={t('settings.atmosphere.enableLivingLayer')}
+            label={env.enabled ? t('common.on') : t('common.off')}
+          />
         }
       >
         <div className="os-viz-row">
@@ -120,16 +119,14 @@ export default function AtmospherePage() {
         description={t('settings.atmosphere.lighting.desc')}
         highlight={focusSettingId === 'lighting'}
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={env.dayCycleLighting}
-              disabled={!env.enabled}
-              onChange={(e) => patchEnv({ dayCycleLighting: e.target.checked })}
-              aria-label={t('settings.atmosphere.enableLighting')}
-            />
-            <span>{env.dayCycleLighting ? t('common.on') : t('common.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={env.dayCycleLighting}
+            disabled={!env.enabled}
+            onChange={(e) => patchEnv({ dayCycleLighting: e.target.checked })}
+            aria-label={t('settings.atmosphere.enableLighting')}
+            label={env.dayCycleLighting ? t('common.on') : t('common.off')}
+          />
         }
       >
         <div className="os-viz-row">
@@ -158,27 +155,23 @@ export default function AtmospherePage() {
           focusSettingId === 'snow-accumulation'
         }
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={env.particlesEnabled}
-              disabled={!env.enabled}
-              onChange={(e) => patchEnv({ particlesEnabled: e.target.checked })}
-              aria-label={t('settings.atmosphere.enableParticles')}
-            />
-            <span>{env.particlesEnabled ? t('common.on') : t('common.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={env.particlesEnabled}
+            disabled={!env.enabled}
+            onChange={(e) => patchEnv({ particlesEnabled: e.target.checked })}
+            aria-label={t('settings.atmosphere.enableParticles')}
+            label={env.particlesEnabled ? t('common.on') : t('common.off')}
+          />
         }
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={env.matchParticleSuggestions}
-            disabled={!env.enabled || !env.particlesEnabled}
-            onChange={(e) => patchEnv({ matchParticleSuggestions: e.target.checked })}
-          />
-          <span>{t('settings.atmosphere.matchWallpaper')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={env.matchParticleSuggestions}
+          disabled={!env.enabled || !env.particlesEnabled}
+          onChange={(e) => patchEnv({ matchParticleSuggestions: e.target.checked })}
+          label={t('settings.atmosphere.matchWallpaper')}
+        />
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
           <span className="os-viz-label muted">{t('settings.atmosphere.presets')}</span>
           {PARTICLE_PRESETS.map((p) => {
@@ -246,15 +239,14 @@ export default function AtmospherePage() {
           />
           <span className="muted">{Math.round((env.particleSize ?? 0.55) * 100)}%</span>
         </div>
-        <label className="os-toggle" data-setting-id="snow-accumulation">
-          <input
-            type="checkbox"
-            checked={env.snowAccumulation !== false}
-            disabled={!env.enabled || !env.particlesEnabled}
-            onChange={(e) => patchEnv({ snowAccumulation: e.target.checked })}
-          />
-          <span>{t('settings.atmosphere.snowAccumulation')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          data-setting-id="snow-accumulation"
+          checked={env.snowAccumulation !== false}
+          disabled={!env.enabled || !env.particlesEnabled}
+          onChange={(e) => patchEnv({ snowAccumulation: e.target.checked })}
+          label={t('settings.atmosphere.snowAccumulation')}
+        />
       </SettingsCard>
 
       <SettingsCard
@@ -306,16 +298,14 @@ export default function AtmospherePage() {
         description={t('settings.atmosphere.ambientAudio.desc')}
         highlight={focusSettingId === 'ambient-audio'}
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={env.ambientAudio?.enabled ?? false}
-              disabled={!env.enabled}
-              onChange={(e) => patchEnv({ ambientAudio: { enabled: e.target.checked, volume: env.ambientAudio?.volume ?? 0.5 } })}
-              aria-label={t('settings.atmosphere.enableAmbientAudio')}
-            />
-            <span>{env.ambientAudio?.enabled ? t('common.on') : t('common.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={env.ambientAudio?.enabled ?? false}
+            disabled={!env.enabled}
+            onChange={(e) => patchEnv({ ambientAudio: { enabled: e.target.checked, volume: env.ambientAudio?.volume ?? 0.5 } })}
+            aria-label={t('settings.atmosphere.enableAmbientAudio')}
+            label={env.ambientAudio?.enabled ? t('common.on') : t('common.off')}
+          />
         }
       >
         <div className="os-viz-row">
@@ -341,15 +331,13 @@ export default function AtmospherePage() {
         description={t('settings.atmosphere.achievements.desc')}
         highlight={focusSettingId === 'achievements'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={env.achievementCelebrations}
-            disabled={!env.enabled}
-            onChange={(e) => patchEnv({ achievementCelebrations: e.target.checked })}
-          />
-          <span>{t('settings.atmosphere.celebrateStreaks')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={env.achievementCelebrations}
+          disabled={!env.enabled}
+          onChange={(e) => patchEnv({ achievementCelebrations: e.target.checked })}
+          label={t('settings.atmosphere.celebrateStreaks')}
+        />
       </SettingsCard>
     </>
   );

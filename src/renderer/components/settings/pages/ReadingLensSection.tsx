@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
-import { confirmDialog } from '../../ui';
+import { confirmDialog, Select, Toggle } from '../../ui';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
 import type { ReadingLensSource } from '../../../../shared/readingLens';
@@ -191,7 +191,7 @@ function LensCaptureHistory() {
         <span className="muted">{t('settings.lens.history.title')}</span>
         <input
           type="search"
-          className="os-input"
+          className="ui-input"
           style={{ flex: 1, minWidth: 120 }}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -209,8 +209,8 @@ function LensCaptureHistory() {
       </div>
 
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 6 }}>
-        <select
-          className="os-input"
+        <Select
+
           value={source}
           onChange={(e) => setSource(e.target.value as ReadingLensSource | 'all')}
           aria-label={t('settings.lens.history.filter.source')}
@@ -219,7 +219,7 @@ function LensCaptureHistory() {
           {(Object.keys(SOURCE_LABEL_KEYS) as ReadingLensSource[]).map((id) => (
             <option key={id} value={id}>{t(SOURCE_LABEL_KEYS[id])}</option>
           ))}
-        </select>
+        </Select>
         <button
           type="button"
           className="btn small"
@@ -232,8 +232,8 @@ function LensCaptureHistory() {
 
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 6 }}>
         <span className="muted">{t('settings.lens.history.retention.label')}</span>
-        <select
-          className="os-input"
+        <Select
+
           value={retention}
           onChange={(e) => void changeRetention(Number(e.target.value))}
           aria-label={t('settings.lens.history.retention.label')}
@@ -245,7 +245,7 @@ function LensCaptureHistory() {
                 : t('settings.lens.history.retention.days', { count: days })}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       {retentionRemoved !== null && (
         <p className="muted os-set-hint">
@@ -357,8 +357,8 @@ function LensRecognition({
       </div>
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 6 }}>
         <span className="muted">{t('settings.lens.ocr.defaultEngine')}</span>
-        <select
-          className="os-input"
+        <Select
+
           value={engine}
           onChange={(e) => onEngine(normalizeReadingLensEngine(e.target.value))}
           aria-label={t('settings.lens.ocr.defaultEngine')}
@@ -366,7 +366,7 @@ function LensRecognition({
           {READING_LENS_ENGINE_CHOICES.map((id) => (
             <option key={id} value={id}>{t(ENGINE_LABEL_KEYS[id])}</option>
           ))}
-        </select>
+        </Select>
       </div>
       <p className="muted os-set-hint">{t('settings.lens.ocr.engineHint')}</p>
 
@@ -455,15 +455,13 @@ export default function ReadingLensSection() {
 
   return (
     <>
-      <label className="os-toggle os-toggle-compact">
-        <input
-          type="checkbox"
-          checked={status.enabled}
-          onChange={(e) => void toggle(e.target.checked)}
-          aria-label={t('settings.lens.enable')}
-        />
-        <span>{status.enabled ? t('common.on') : t('common.off')}</span>
-      </label>
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={status.enabled}
+        onChange={(e) => void toggle(e.target.checked)}
+        aria-label={t('settings.lens.enable')}
+        label={status.enabled ? t('common.on') : t('common.off')}
+      />
 
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 8 }}>
         <span className="muted">{t('settings.lens.hotkeyLabel')}</span>

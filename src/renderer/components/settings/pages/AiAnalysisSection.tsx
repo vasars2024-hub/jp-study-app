@@ -12,6 +12,7 @@ import {
   type SentenceAnalysisPrefs,
   type TranslationLang,
 } from '../../../../shared/sentenceAnalysisPrefs';
+import { Toggle } from '../../ui';
 
 /**
  * Study → AI analysis. Controls what an "AI OCR" read actually returns, and
@@ -176,7 +177,7 @@ export default function AiAnalysisSection() {
         <span className="muted">{t('settings.analysis.learnerLevel')}</span>
         <input
           type="text"
-          className="os-input"
+          className="ui-input"
           style={{ maxWidth: 140 }}
           value={prefs.learnerLevel}
           placeholder={t('settings.analysis.learnerLevel.placeholder')}
@@ -188,7 +189,7 @@ export default function AiAnalysisSection() {
       <div className="os-set-field">
         <span className="os-set-field-label">{t('settings.analysis.custom')}</span>
         <textarea
-          className="os-input"
+          className="ui-textarea"
           rows={3}
           maxLength={MAX_CUSTOM_INSTRUCTIONS}
           value={prefs.customInstructions}
@@ -205,7 +206,7 @@ export default function AiAnalysisSection() {
         <span className="muted">{t('settings.analysis.anki.deck')}</span>
         <input
           type="text"
-          className="os-input"
+          className="ui-input"
           style={{ maxWidth: 240 }}
           value={prefs.anki.deck}
           placeholder={t('settings.analysis.anki.deck.placeholder')}
@@ -233,37 +234,31 @@ export default function AiAnalysisSection() {
         </div>
       </div>
 
-      <label className="os-toggle os-toggle-compact" style={{ marginTop: 8 }}>
-        <input
-          type="checkbox"
-          checked={prefs.anki.includeExplanation}
-          onChange={(e) => patch({ anki: { ...prefs.anki, includeExplanation: e.target.checked } })}
-        />
-        <span>{t('settings.analysis.anki.includeExplanation')}</span>
-      </label>
-      <label className="os-toggle os-toggle-compact">
-        <input
-          type="checkbox"
-          checked={prefs.anki.includeTranslation}
-          onChange={(e) => patch({ anki: { ...prefs.anki, includeTranslation: e.target.checked } })}
-        />
-        <span>{t('settings.analysis.anki.includeTranslation')}</span>
-      </label>
-      <label className="os-toggle os-toggle-compact">
-        <input
-          type="checkbox"
-          checked={prefs.anki.auto}
-          onChange={(e) => patch({ anki: { ...prefs.anki, auto: e.target.checked } })}
-        />
-        <span>{t('settings.analysis.anki.auto')}</span>
-      </label>
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={prefs.anki.includeExplanation}
+        onChange={(e) => patch({ anki: { ...prefs.anki, includeExplanation: e.target.checked } })}
+        label={t('settings.analysis.anki.includeExplanation')}
+      />
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={prefs.anki.includeTranslation}
+        onChange={(e) => patch({ anki: { ...prefs.anki, includeTranslation: e.target.checked } })}
+        label={t('settings.analysis.anki.includeTranslation')}
+      />
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={prefs.anki.auto}
+        onChange={(e) => patch({ anki: { ...prefs.anki, auto: e.target.checked } })}
+        label={t('settings.analysis.anki.auto')}
+      />
       <p className="muted os-set-hint">{t('settings.analysis.anki.auto.hint')}</p>
 
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 8 }}>
         <span className="muted">{t('settings.analysis.anki.tags')}</span>
         <input
           type="text"
-          className="os-input"
+          className="ui-input"
           style={{ maxWidth: 240 }}
           value={prefs.anki.extraTags.join(' ')}
           placeholder={t('settings.analysis.anki.tags.placeholder')}
@@ -277,20 +272,18 @@ export default function AiAnalysisSection() {
       <h4 className="sa-prefs-subhead">{t('settings.analysis.snapshot')}</h4>
       <p className="muted os-set-hint">{t('settings.analysis.snapshot.hint')}</p>
 
-      <label className="os-toggle os-toggle-compact">
-        <input
-          type="checkbox"
-          checked={prefs.snapshot.auto}
-          onChange={(e) => patch({ snapshot: { ...prefs.snapshot, auto: e.target.checked } })}
-        />
-        <span>{t('settings.analysis.snapshot.auto')}</span>
-      </label>
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={prefs.snapshot.auto}
+        onChange={(e) => patch({ snapshot: { ...prefs.snapshot, auto: e.target.checked } })}
+        label={t('settings.analysis.snapshot.auto')}
+      />
 
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 8 }}>
         <span className="muted">{t('settings.analysis.snapshot.folder')}</span>
         <input
           type="text"
-          className="os-input"
+          className="ui-input"
           // The `<span>` beside it is not a `<label>` and the field has no
           // placeholder, so this read as an unnamed text box. The other rows on
           // this page are named by their placeholder; this one has none.

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../../i18n';
+import { Toggle } from '../../ui';
 
 interface Status {
   enabled: boolean;
@@ -80,15 +81,13 @@ export default function SystemDictionarySection() {
 
   return (
     <>
-      <label className="os-toggle os-toggle-compact">
-        <input
-          type="checkbox"
-          checked={status.enabled}
-          onChange={(e) => void toggle(e.target.checked)}
-          aria-label={t('settings.sysDict.enable')}
-        />
-        <span>{status.enabled ? t('common.on') : t('common.off')}</span>
-      </label>
+      <Toggle
+        className="os-toggle os-toggle-compact"
+        checked={status.enabled}
+        onChange={(e) => void toggle(e.target.checked)}
+        aria-label={t('settings.sysDict.enable')}
+        label={status.enabled ? t('common.on') : t('common.off')}
+      />
 
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 8 }}>
         <span className="muted">{t('settings.sysDict.hotkeyLabel')}</span>

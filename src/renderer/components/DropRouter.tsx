@@ -314,12 +314,12 @@ export default function DropRouter({
               ))}
             </div>
             <div className="dropr-sheet-actions">
-              <button type="button" className="os-btn" onClick={() => setTriage(null)} disabled={busy}>
+              <button type="button" className="btn" onClick={() => setTriage(null)} disabled={busy}>
                 {t('common.cancel')}
               </button>
               <button
                 type="button"
-                className="os-btn os-btn-primary"
+                className="btn primary"
                 disabled={busy}
                 onClick={() => {
                   const plans = triage;

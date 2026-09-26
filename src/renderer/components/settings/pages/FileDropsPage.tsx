@@ -17,6 +17,7 @@ import {
   saveFileDropPrefs,
   type FileDropPrefs,
 } from '../../../fileDropPrefs';
+import { Toggle } from '../../ui';
 
 /**
  * The extensions worth an override. Each is a real ambiguity in the app, not a
@@ -50,22 +51,18 @@ export default function FileDropsPage() {
         description={t('settings.fileDrops.auto.desc')}
         highlight={focusSettingId === 'filedrop-auto'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={prefs.autoRoute}
-            onChange={(e) => patch({ autoRoute: e.target.checked })}
-          />
-          <span>{t('settings.fileDrops.auto.toggle')}</span>
-        </label>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={prefs.alwaysTriage}
-            onChange={(e) => patch({ alwaysTriage: e.target.checked })}
-          />
-          <span>{t('settings.fileDrops.alwaysAsk')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={prefs.autoRoute}
+          onChange={(e) => patch({ autoRoute: e.target.checked })}
+          label={t('settings.fileDrops.auto.toggle')}
+        />
+        <Toggle
+          className="os-toggle"
+          checked={prefs.alwaysTriage}
+          onChange={(e) => patch({ alwaysTriage: e.target.checked })}
+          label={t('settings.fileDrops.alwaysAsk')}
+        />
         <p className="muted os-set-hint">{t('settings.fileDrops.auto.hint')}</p>
       </SettingsCard>
 
@@ -128,7 +125,7 @@ export default function FileDropsPage() {
         description={t('settings.fileDrops.reset.desc')}
         highlight={focusSettingId === 'filedrop-reset'}
       >
-        <button type="button" className="os-btn" onClick={() => setPrefs(resetFileDropPrefs())}>
+        <button type="button" className="btn" onClick={() => setPrefs(resetFileDropPrefs())}>
           {t('settings.fileDrops.reset.action')}
         </button>
       </SettingsCard>

@@ -37,6 +37,7 @@ import {
   onCleanupSettingsChanged,
 } from '../../filesCleanupSettingsStore';
 import { announceFilesIndexChanged } from '../../filesIndexBus';
+import { Select } from '../ui';
 
 export interface CleanupSheetProps {
   onClose: () => void;
@@ -203,7 +204,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
     >
       <div className="fa-sheet-head">
         <h2>{t('filesApp.cleanup.title')}</h2>
-        <button type="button" className="fa-btn" onClick={onClose}>
+        <button type="button" className="btn" onClick={onClose}>
           {t('filesApp.cleanup.close')}
         </button>
       </div>
@@ -211,8 +212,8 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
       <p className="fa-sheet-note">{t('filesApp.cleanup.intro')}</p>
 
       <section className="fa-cleanup-settings">
-        <fieldset>
-          <legend>{t('filesApp.cleanup.classes.legend')}</legend>
+        <fieldset className="ui-group">
+          <legend className="ui-group__title">{t('filesApp.cleanup.classes.legend')}</legend>
           {FILES_CLEANUP_CLASS_IDS.map((classId) => (
             <label key={classId} className="fa-check">
               <input
@@ -231,7 +232,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
 
         <label className="fa-field">
           <span>{t('filesApp.cleanup.policy.legend')}</span>
-          <select
+          <Select
             value={settings.brokenLinkPolicy}
             onChange={(event) => {
               const commit = commitBrokenLinkPolicy(event.target.value as FilesBrokenLinkPolicy);
@@ -244,7 +245,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
                 {t(POLICY_LABEL_KEY[policy])}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       </section>
 
@@ -328,7 +329,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
                     {row.relocatable ? (
                       <button
                         type="button"
-                        className="fa-btn"
+                        className="btn"
                         onClick={() => {
                           setRelocateFor(row.itemId);
                           setRelocatePath('');
@@ -348,6 +349,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
               <label className="fa-field">
                 <span>{t('filesApp.cleanup.relocate.label')}</span>
                 <input
+                  className="ui-input"
                   type="text"
                   value={relocatePath}
                   spellCheck={false}
@@ -355,22 +357,22 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
                   placeholder={t('filesApp.cleanup.relocate.placeholder')}
                 />
               </label>
-              <button type="button" className="fa-btn" disabled={busy} onClick={() => void relocate()}>
+              <button type="button" className="btn" disabled={busy} onClick={() => void relocate()}>
                 {t('filesApp.cleanup.relocate.confirm')}
               </button>
-              <button type="button" className="fa-btn" onClick={() => setRelocateFor(null)}>
+              <button type="button" className="btn" onClick={() => setRelocateFor(null)}>
                 {t('filesApp.cleanup.relocate.cancel')}
               </button>
             </section>
           ) : null}
 
           <div className="fa-sheet-actions">
-            <button type="button" className="fa-btn" disabled={busy} onClick={() => void plan()}>
+            <button type="button" className="btn" disabled={busy} onClick={() => void plan()}>
               {t('filesApp.cleanup.replan')}
             </button>
             <button
               type="button"
-              className="fa-btn fa-btn-danger"
+              className="btn danger"
               disabled={busy || ticked.size === 0}
               onClick={() => void run()}
             >
@@ -405,7 +407,7 @@ export function CleanupSheet({ onClose, onChanged }: CleanupSheetProps) {
                 {entry.undoToken ? (
                   <button
                     type="button"
-                    className="fa-btn"
+                    className="btn"
                     onClick={() => {
                       void window.api
                         .filesCleanupUndo(entry.undoToken as string)

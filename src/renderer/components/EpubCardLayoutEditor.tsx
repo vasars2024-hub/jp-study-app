@@ -9,6 +9,7 @@ import {
 import type { EpubCardLayoutPreset } from '../../shared/miningTypes';
 import { useT } from '../i18n';
 import EpubVariablePalette from './EpubVariablePalette';
+import { Select } from './ui';
 
 type Side = 'front' | 'back';
 
@@ -90,14 +91,14 @@ export default function EpubCardLayoutEditor({
     <div className="epub-card-layout-editor">
       <label className="epub-layout-preset">
         {t('epub.layout.preset')}
-        <select value={preset} onChange={(e) => applyPreset(e.target.value as EpubCardLayoutPreset)}>
+        <Select value={preset} onChange={(e) => applyPreset(e.target.value as EpubCardLayoutPreset)}>
           {presetOptions.map((item) => (
             <option key={item.id} value={item.id}>
               {item.label}
             </option>
           ))}
           <option value="custom">{t('epub.layout.custom')}</option>
-        </select>
+        </Select>
       </label>
 
       <div className="fm-rows">

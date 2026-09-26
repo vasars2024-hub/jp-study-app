@@ -93,14 +93,15 @@ describe('Flashcards overview', () => {
       'Take a test',
     ]);
     for (const tile of tiles) {
-      expect(tile.querySelector('.flash-practice__icon svg'), 'an icon').toBeTruthy();
-      expect(tile.querySelector('.flash-practice__name')?.textContent).toBeTruthy();
+      expect(tile.classList.contains('ui-tile'), 'the shared Tile primitive').toBe(true);
+      expect(tile.querySelector('.ui-tile__icon svg'), 'an icon').toBeTruthy();
+      expect(tile.querySelector('.ui-tile__title')?.textContent).toBeTruthy();
       const about = document.getElementById(tile.getAttribute('aria-describedby') ?? '');
       expect(about, 'its description is attached').toBeTruthy();
       expect(tile.contains(about)).toBe(true);
       expect(tile.disabled).toBe(false);
     }
-    expect(tiles.map((b) => b.querySelector('.flash-practice__name')?.textContent)).toEqual([
+    expect(tiles.map((b) => b.querySelector('.ui-tile__title')?.textContent)).toEqual([
       'Learn',
       'Write',
       'Match',

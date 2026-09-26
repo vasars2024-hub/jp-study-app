@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
-import { confirmDialog } from '../../ui';
+import { confirmDialog, Toggle } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import {
   COMPANION_DEFS,
@@ -317,24 +317,22 @@ export default function CompanionsPage() {
         description={t('settings.companions.desc')}
         highlight={focusSettingId === 'companions' || focusSettingId === 'companion-activeness'}
         trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={env.companionsEnabled}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  patchEnv({
-                    enabled: true,
-                    companionsEnabled: true,
-                  });
-                } else {
-                  forceCompanionsOff();
-                }
-              }}
-              aria-label={t('settings.companions.showInApp')}
-            />
-            <span>{env.companionsEnabled ? t('common.on') : t('common.off')}</span>
-          </label>
+          <Toggle
+            className="os-toggle os-toggle-compact"
+            checked={env.companionsEnabled}
+            onChange={(e) => {
+              if (e.target.checked) {
+                patchEnv({
+                  enabled: true,
+                  companionsEnabled: true,
+                });
+              } else {
+                forceCompanionsOff();
+              }
+            }}
+            aria-label={t('settings.companions.showInApp')}
+            label={env.companionsEnabled ? t('common.on') : t('common.off')}
+          />
         }
       >
         {!aeroDiscovered && (
@@ -411,24 +409,20 @@ export default function CompanionsPage() {
         <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>
           {t('settings.companions.activeness.hint')}
         </p>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={env.companionCelebrate}
-            disabled={!env.enabled || !env.companionsEnabled}
-            onChange={(e) => patchEnv({ companionCelebrate: e.target.checked })}
-          />
-          <span>{t('settings.companions.celebrateProgress')}</span>
-        </label>
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={env.companionPauseWhenStudying}
-            disabled={!env.enabled || !env.companionsEnabled}
-            onChange={(e) => patchEnv({ companionPauseWhenStudying: e.target.checked })}
-          />
-          <span>{t('settings.companions.calmerMovement')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={env.companionCelebrate}
+          disabled={!env.enabled || !env.companionsEnabled}
+          onChange={(e) => patchEnv({ companionCelebrate: e.target.checked })}
+          label={t('settings.companions.celebrateProgress')}
+        />
+        <Toggle
+          className="os-toggle"
+          checked={env.companionPauseWhenStudying}
+          disabled={!env.enabled || !env.companionsEnabled}
+          onChange={(e) => patchEnv({ companionPauseWhenStudying: e.target.checked })}
+          label={t('settings.companions.calmerMovement')}
+        />
       </SettingsCard>
 
       <SettingsCard
@@ -757,15 +751,13 @@ export default function CompanionsPage() {
         description={t('settings.companions.osPets.desc')}
         highlight={focusSettingId === 'os-pets'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={env.companionsOnOsDesktop}
-            disabled={!env.enabled || !env.companionsEnabled}
-            onChange={(e) => patchEnv({ companionsOnOsDesktop: e.target.checked })}
-          />
-          <span>{t('settings.companions.showOnDesktop')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={env.companionsOnOsDesktop}
+          disabled={!env.enabled || !env.companionsEnabled}
+          onChange={(e) => patchEnv({ companionsOnOsDesktop: e.target.checked })}
+          label={t('settings.companions.showOnDesktop')}
+        />
         <div className="os-viz-row">
           <span className="os-viz-label muted">{t('settings.companions.monitors')}</span>
           <button
@@ -919,6 +911,7 @@ function StepFields({
             <option value="celebrate">{t('settings.companions.mood.celebrate')}</option>
           </select>
           <input
+            className="ui-input"
             disabled={disabled}
             value={step.status ?? ''}
             placeholder={t('settings.companions.statusPlaceholder')}
@@ -929,6 +922,7 @@ function StepFields({
     case 'wait':
       return (
         <input
+          className="ui-input"
           type="number"
           min={0}
           max={10000}
@@ -941,12 +935,14 @@ function StepFields({
       return (
         <>
           <input
+            className="ui-input"
             disabled={disabled}
             value={step.title}
             placeholder={t('settings.companions.titlePlaceholder')}
             onChange={(e) => onChange({ type: 'notify', title: e.target.value, body: step.body })}
           />
           <input
+            className="ui-input"
             disabled={disabled}
             value={step.body ?? ''}
             placeholder={t('settings.companions.bodyPlaceholder')}
@@ -975,6 +971,7 @@ function StepFields({
     case 'speak':
       return (
         <input
+          className="ui-input"
           disabled={disabled}
           value={step.text}
           onChange={(e) => onChange({ type: 'speak', text: e.target.value })}
@@ -984,12 +981,14 @@ function StepFields({
       return (
         <>
           <input
+            className="ui-input"
             disabled={disabled}
             value={step.event}
             placeholder={t('settings.companions.eventNamePlaceholder')}
             onChange={(e) => onChange({ type: 'dispatch', event: e.target.value, detail: step.detail })}
           />
           <input
+            className="ui-input"
             disabled={disabled}
             value={step.detail ?? ''}
             placeholder={t('settings.companions.detailPlaceholder')}

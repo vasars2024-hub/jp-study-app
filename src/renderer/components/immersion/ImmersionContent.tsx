@@ -88,6 +88,7 @@ import { onKnowledgeChanged } from '../../knownWords';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
 import { removeImmersionSiteWithConfirm } from './immersionSiteActions';
+import { Select } from '../ui';
 
 export { IMMERSION_MODE_CYCLE, IMMERSION_STARTERS, WK_HIGHLIGHT_CSS };
 export type { ImmersionMode };
@@ -1726,6 +1727,7 @@ function ImmersionBookmarkList({ state }: { state: ImmersionState }) {
             }}
           >
             <input
+              className="ui-input"
               autoFocus
               value={newFolder}
               aria-label={t('immersion.folders.name')}
@@ -1800,7 +1802,7 @@ function ImmersionBookmarkList({ state }: { state: ImmersionState }) {
               >
                 <label>
                   <span>{t('immersion.bookmark.folder')}</span>
-                  <select
+                  <Select
                     value={b.folderId ?? ''}
                     onChange={(e) => void state.updateBookmark(b, { folderId: e.target.value || null })}
                   >
@@ -1810,11 +1812,11 @@ function ImmersionBookmarkList({ state }: { state: ImmersionState }) {
                         {f.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   <span>{t('immersion.bookmark.tags')}</span>
-                  <input value={tagsDraft} onChange={(e) => setTagsDraft(e.target.value)} />
+                  <input className="ui-input" value={tagsDraft} onChange={(e) => setTagsDraft(e.target.value)} />
                 </label>
                 <button type="submit" className="btn small">{t('immersion.bookmark.save')}</button>
               </form>

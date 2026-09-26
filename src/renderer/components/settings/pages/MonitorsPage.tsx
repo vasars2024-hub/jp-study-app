@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
-import { confirmDialog } from '../../ui';
+import { confirmDialog, Toggle } from '../../ui';
 import type { DisplaySummary } from '../../../../main/displays';
 import type { DisplayAssignment, TaskbarMode } from '../../../../shared/desktop';
 import { getAssignments, onDesktopChanged } from '../../../desktopState';
@@ -108,19 +108,15 @@ export default function MonitorsPage() {
                     })}
                   </div>
 
-                  <label className="os-toggle">
-                    <input
-                      type="checkbox"
-                      checked={enabled}
-                      disabled={display.primary}
-                      onChange={(e) => patch(display.key, { enabled: e.target.checked })}
-                    />
-                    <span>
-                      {display.primary
-                        ? t('settings.monitors.enable.primary')
-                        : t('settings.monitors.enable')}
-                    </span>
-                  </label>
+                  <Toggle
+                    className="os-toggle"
+                    checked={enabled}
+                    disabled={display.primary}
+                    onChange={(e) => patch(display.key, { enabled: e.target.checked })}
+                    label={display.primary
+                      ? t('settings.monitors.enable.primary')
+                      : t('settings.monitors.enable')}
+                  />
 
                   {/* No "Hosts desktop" picker: the app has one desktop per screen today, so it
                       only offered a choice with nothing behind it. Assignments are still kept
@@ -147,23 +143,19 @@ export default function MonitorsPage() {
                     </div>
                   </div>
 
-                  <label className="os-toggle">
-                    <input
-                      type="checkbox"
-                      checked={assignment?.showAllWindows === true}
-                      onChange={(e) => patch(display.key, { showAllWindows: e.target.checked })}
-                    />
-                    <span>{t('settings.monitors.showAllWindows')}</span>
-                  </label>
+                  <Toggle
+                    className="os-toggle"
+                    checked={assignment?.showAllWindows === true}
+                    onChange={(e) => patch(display.key, { showAllWindows: e.target.checked })}
+                    label={t('settings.monitors.showAllWindows')}
+                  />
 
-                  <label className="os-toggle">
-                    <input
-                      type="checkbox"
-                      checked={assignment?.aero !== false}
-                      onChange={(e) => patch(display.key, { aero: e.target.checked })}
-                    />
-                    <span>{t('settings.monitors.aero')}</span>
-                  </label>
+                  <Toggle
+                    className="os-toggle"
+                    checked={assignment?.aero !== false}
+                    onChange={(e) => patch(display.key, { aero: e.target.checked })}
+                    label={t('settings.monitors.aero')}
+                  />
                 </div>
               </div>
             );
@@ -177,14 +169,12 @@ export default function MonitorsPage() {
         description={t('settings.monitors.remap.desc')}
         highlight={focusSettingId === 'monitors-layout-remap'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={prefs.remapLayoutProportionally}
-            onChange={(e) => setPrefs(saveDisplayPrefs({ remapLayoutProportionally: e.target.checked }))}
-          />
-          <span>{t('settings.monitors.remap.toggle')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={prefs.remapLayoutProportionally}
+          onChange={(e) => setPrefs(saveDisplayPrefs({ remapLayoutProportionally: e.target.checked }))}
+          label={t('settings.monitors.remap.toggle')}
+        />
         <p className="muted os-set-hint">{t('settings.monitors.remap.hint')}</p>
       </SettingsCard>
 
@@ -222,7 +212,7 @@ export default function MonitorsPage() {
       >
         <button
           type="button"
-          className="os-btn"
+          className="btn"
           onClick={() => {
             // Throws away every desktop→monitor assignment the user has made, for every
             // display, in one click — and there is no undo. It sat next to two harmless

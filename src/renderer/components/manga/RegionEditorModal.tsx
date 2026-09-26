@@ -233,6 +233,7 @@ export default function RegionEditorModal({
             </div>
             <input
               type="range"
+              className="ui-slider"
               min={10}
               max={90}
               value={Math.round(splitFraction * 100)}

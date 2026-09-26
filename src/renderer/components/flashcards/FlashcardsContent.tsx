@@ -120,7 +120,7 @@ import {
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
-import { SearchBox, Select, Tabs, useWiredMaterials } from '../ui';
+import { SearchBox, Select, Tabs, Tile, TileList, useWiredMaterials } from '../ui';
 import type { LibraryItem } from '../../../shared/types';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { JitenStore } from '../../../shared/jiten';
@@ -2102,30 +2102,21 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               </Select>
             </label>
           </div>
-          <ul className="flash-practice__modes">
+          <TileList className="flash-practice__modes">
             {PRACTICE_MODES.map((entry) => (
               <li key={entry.id}>
-                <button
-                  type="button"
+                <Tile
                   className="flash-practice__tile"
                   disabled={practiceDeckSize === 0}
                   aria-label={t(entry.startKey)}
-                  aria-describedby={`flash-practice-about-${entry.id}`}
+                  icon={<Icon name={entry.icon} size={18} />}
+                  title={t(entry.titleKey)}
+                  description={t(entry.aboutKey)}
                   onClick={() => setPractice(entry.id)}
-                >
-                  <span className="flash-practice__icon" aria-hidden="true">
-                    <Icon name={entry.icon} size={18} />
-                  </span>
-                  <span className="flash-practice__text">
-                    <span className="flash-practice__name">{t(entry.titleKey)}</span>
-                    <span id={`flash-practice-about-${entry.id}`} className="flash-practice__about">
-                      {t(entry.aboutKey)}
-                    </span>
-                  </span>
-                </button>
+                />
               </li>
             ))}
-          </ul>
+          </TileList>
           {practiceDeckSize === 0 && (
             <p className="flash-practice__empty muted" role="status">{t('flash.practice.emptyDeck')}</p>
           )}

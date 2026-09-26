@@ -341,6 +341,7 @@ export default function MediaStudyMode({
           <h3>{request.title}</h3>
         </div>
         <button
+          className="btn"
           type="button"
           onClick={() => {
             if (activeSessionId) endMediaStudySession(activeSessionId, positionSec);
@@ -377,7 +378,7 @@ export default function MediaStudyMode({
       {needsAnalysis && current?.id === item.id && cues.length === 0 && (
         <div className="media-study-empty">
           <p className="muted">{t('media.study.subtitlesNeeded')}</p>
-          <button type="button" onClick={() => void onLoadSubtitles()}>{t('media.study.loadSubtitles')}</button>
+          <button className="btn" type="button" onClick={() => void onLoadSubtitles()}>{t('media.study.loadSubtitles')}</button>
         </div>
       )}
       {needsAnalysis && current?.id === item.id && cues.length > 0 && (
@@ -403,7 +404,7 @@ export default function MediaStudyMode({
         <div className="media-study-results">
           <div className="media-study-result-head">
             <strong>{t('media.study.vocabularyCandidates', { count: analysis.vocabulary.length })}</strong>
-            <button type="button" onClick={createFlashcards}>{t('media.study.createCards')}</button>
+            <button className="btn" type="button" onClick={createFlashcards}>{t('media.study.createCards')}</button>
           </div>
           {/* Which cards, into which deck: anime used to get vocabulary cards in "Media" only. */}
           <div className="media-study-deck-options">

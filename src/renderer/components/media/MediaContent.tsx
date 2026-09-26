@@ -106,6 +106,7 @@ import type { StudyListeningAvailability } from '../../../shared/studyListeningF
 import { inspectStudyListeningAudio } from '../../studyListeningAudio';
 import { STUDY_LANG_NATIVE_NAME } from '../../../shared/studyLang';
 import { formatNumber } from '../../stats';
+import { Select } from '../ui';
 
 const CARD_MIN_WIDTH = 230;
 const CARD_GAP = 12;
@@ -2216,9 +2217,9 @@ export function MediaCategoryFilter({ state }: { state: MediaState }) {
     if (category === 'in-progress') return t('media.category.inProgress');
     return category[0].toUpperCase() + category.slice(1);
   };
-  return <select aria-label={t('media.category.filterLabel')} value={state.categoryFilter} onChange={(event) => state.setCategoryFilter(event.target.value as MediaCategoryFilterValue)}>
+  return <Select aria-label={t('media.category.filterLabel')} value={state.categoryFilter} onChange={(event) => state.setCategoryFilter(event.target.value as MediaCategoryFilterValue)}>
     {categories.map((category) => <option key={category} value={category}>{label(category)}</option>)}
-  </select>;
+  </Select>;
 }
 
 /** Small dashboard shelves shared by the full Media Hub and library entry points. */
@@ -2323,6 +2324,7 @@ export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpe
           {diagnostics.missing.length > 0 && <span>{t('mediaHub.diagnostics.missing', { count: diagnostics.missing.length })}</span>}
           {diagnostics.missing.length > 0 && (
             <button
+              className="btn"
               type="button"
               onClick={() => { void confirmAndPruneMissingMedia(t, diagnostics.missing.length); }}
             >
@@ -2421,12 +2423,12 @@ export function MediaHubStoragePanel({ items }: { items: MediaItem[] }) {
       >
         <div className="media-hub-storage-grid">
           <label>{t('media.storage.item')}
-            <select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setPreview(null); }}>
+            <Select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setPreview(null); }}>
               {items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-            </select>
+            </Select>
           </label>
           <label>{t('media.storage.organizationRoot')}
-            <input value={root} onChange={(event) => setRoot(event.target.value)} placeholder="C:\\Media" />
+            <input className="ui-input" value={root} onChange={(event) => setRoot(event.target.value)} placeholder="C:\\Media" />
           </label>
           <button type="button" className="btn primary" disabled={!selected || !root.trim()} onClick={() => void previewOrganization()}>
             {t('media.storage.previewOrganization')}
@@ -2437,12 +2439,12 @@ export function MediaHubStoragePanel({ items }: { items: MediaItem[] }) {
             <strong>{preview.action === 'conflict' ? t('media.storage.conflictDetected') : t('media.storage.organizationPreview')}</strong>
             <span>{preview.sourcePath} → {preview.targetPath}</span>
             {preview.action === 'conflict' && (
-              <select aria-label={t('media.storage.duplicateChoice')} value={choice} onChange={(event) => setChoice(event.target.value as MediaDuplicateChoice)}>
+              <Select aria-label={t('media.storage.duplicateChoice')} value={choice} onChange={(event) => setChoice(event.target.value as MediaDuplicateChoice)}>
                 <option value="keep-existing">{t('media.storage.keepExisting')}</option>
                 <option value="keep-incoming">{t('media.storage.keepIncoming')}</option>
                 <option value="keep-both">{t('media.storage.keepBoth')}</option>
                 <option value="skip">{t('media.storage.skip')}</option>
-              </select>
+              </Select>
             )}
             <button type="button" className="btn" onClick={() => void applyOrganization()} disabled={preview.action === 'noop'}>
               {t('media.storage.applyChoice')}
@@ -2458,13 +2460,13 @@ export function MediaHubStoragePanel({ items }: { items: MediaItem[] }) {
       {selected && (
         <MediaCollapsibleSection id="relationships" className="media-hub-relationships" title={t('media.relationships.title')}>
           <div>
-            <select aria-label={t('media.relationships.target')} value={targetId} onChange={(event) => setTargetId(event.target.value)}>
+            <Select aria-label={t('media.relationships.target')} value={targetId} onChange={(event) => setTargetId(event.target.value)}>
               <option value="">{t('media.relationships.chooseTarget')}</option>
               {items.filter((item) => item.id !== selected.id).map((item) => (
                 <option key={item.id} value={item.id}>{item.title}</option>
               ))}
-            </select>
-            <select
+            </Select>
+            <Select
               aria-label={t('media.relationships.type')}
               value={relationshipType}
               onChange={(event) => setRelationshipType(event.target.value as MediaRelationship['type'])}
@@ -2474,7 +2476,7 @@ export function MediaHubStoragePanel({ items }: { items: MediaItem[] }) {
               <option value="lyrics">{t('media.relationships.lyrics')}</option>
               <option value="note">{t('media.relationships.note')}</option>
               <option value="flashcard">{t('media.relationships.flashcard')}</option>
-            </select>
+            </Select>
             <button type="button" className="btn" disabled={!targetId} onClick={() => void addRelationship()}>
               {t('media.relationships.add')}
             </button>

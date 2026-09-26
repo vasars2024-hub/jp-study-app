@@ -1,6 +1,6 @@
 import SettingsCard from '../SettingsCard';
 import ThemeStudioPanel from './ThemeStudioPanel';
-import { confirmDialog } from '../../ui';
+import { confirmDialog, Toggle } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { THEMES } from '../../../theme';
 import {
@@ -156,22 +156,20 @@ export default function AppearancePage() {
         description={t('settings.appearance.blanc.description')}
         highlight={focusSettingId === 'blanc-mode'}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={blancMode.enabled}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setBlancMsg(t(next ? 'settings.appearance.blanc.opening' : 'settings.appearance.blanc.closing'));
-              void setBlancModeEnabled(next)
-                .then(setBlancMode)
-                .catch((error) => {
-                  setBlancMsg(error instanceof Error ? error.message : t('settings.appearance.blanc.openError'));
-                });
-            }}
-          />
-          <span>{t('special.useBlancMode')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={blancMode.enabled}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setBlancMsg(t(next ? 'settings.appearance.blanc.opening' : 'settings.appearance.blanc.closing'));
+            void setBlancModeEnabled(next)
+              .then(setBlancMode)
+              .catch((error) => {
+                setBlancMsg(error instanceof Error ? error.message : t('settings.appearance.blanc.openError'));
+              });
+          }}
+          label={t('special.useBlancMode')}
+        />
         <p className="muted os-set-hint">{t('settings.appearance.blanc.hint')}</p>
         {blancMsg && <p className="muted os-set-hint">{blancMsg}</p>}
       </SettingsCard>
@@ -199,14 +197,12 @@ export default function AppearancePage() {
             </button>
           </div>
         )}
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={look.autoTheme}
-            onChange={(e) => patchLook({ autoTheme: e.target.checked })}
-          />
-          <span>{t('settings.appearance.autoTheme')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={look.autoTheme}
+          onChange={(e) => patchLook({ autoTheme: e.target.checked })}
+          label={t('settings.appearance.autoTheme')}
+        />
         <div className="os-theme-grid">
           {THEMES.map((th) => (
             <button
@@ -547,18 +543,16 @@ export default function AppearancePage() {
         }
         advancedLabel={t('settings.appearance.css.editor')}
       >
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={look.customCssEnabled !== false}
-            onChange={(e) => {
-              patchLook({ customCssEnabled: e.target.checked });
-              if (!e.target.checked) document.getElementById('jp-user-css')?.remove();
-              else void saveCustomCss(userCss);
-            }}
-          />
-          <span>{t('settings.appearance.css.enable')}</span>
-        </label>
+        <Toggle
+          className="os-toggle"
+          checked={look.customCssEnabled !== false}
+          onChange={(e) => {
+            patchLook({ customCssEnabled: e.target.checked });
+            if (!e.target.checked) document.getElementById('jp-user-css')?.remove();
+            else void saveCustomCss(userCss);
+          }}
+          label={t('settings.appearance.css.enable')}
+        />
       </SettingsCard>
 
       {/* v1.0 audit §2.3. The playground owns a draft; persistence stays here, so
