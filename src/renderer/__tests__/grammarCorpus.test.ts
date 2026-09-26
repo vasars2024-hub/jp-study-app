@@ -10,6 +10,7 @@ import { N1_SUPPLEMENT } from '../data/grammar/n1-supplement';
 import { N2_SUPPLEMENT } from '../data/grammar/n2-supplement';
 import { N3_SUPPLEMENT } from '../data/grammar/n3-supplement';
 import { N4_SUPPLEMENT } from '../data/grammar/n4-supplement';
+import { dedupeGrammarByTitle } from '../data/grammar/practiceFilters';
 
 const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
 const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7-9', 'HSK10'];
@@ -41,6 +42,16 @@ describe('GrammarX corpus', () => {
     }
   });
 
+  it('shows the authored Chinese point, not its hollow imported twin', () => {
+    const shown = dedupeGrammarByTitle(GRAMMAR.filter((p) => p.lang === 'zh'));
+    for (const title of ['或者', '既然…就…', '要不是', '除非…才…', '否则', '怎么样']) {
+      const hits = shown.filter((p) => p.title === title);
+      expect(hits.length, title).toBe(1);
+      expect(hits[0].provenance.source, title).toBe('authored:hsk-starter');
+      expect(hits[0].examples.length, title).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it('has study-ready Russian A1–B1 grammar on the CEFR scale', () => {
     const russian = GRAMMAR.filter((p) => p.lang === 'ru');
     for (const level of ['A1', 'A2', 'B1']) {
@@ -50,6 +61,14 @@ describe('GrammarX corpus', () => {
     expect(russian.every((p) => p.examples.length >= 2 && p.explanation.trim().length > 0)).toBe(true);
     expect(russian.every((p) => p.examples.every((ex) => /\p{Script=Cyrillic}/u.test(ex.jp) && ex.en.trim()))).toBe(true);
     expect(russian.every((p) => frameworkForLevel(p.level) === 'cefr')).toBe(true);
+  });
+
+  it('has Russian beyond B1 and no two Russian points with the same title', () => {
+    const russian = GRAMMAR.filter((p) => p.lang === 'ru');
+    expect(russian.length).toBeGreaterThanOrEqual(90);
+    expect(russian.filter((p) => p.level === 'B2').length).toBeGreaterThanOrEqual(4);
+    const titles = russian.map((p) => p.title);
+    expect(new Set(titles).size).toBe(titles.length);
   });
 
   /*

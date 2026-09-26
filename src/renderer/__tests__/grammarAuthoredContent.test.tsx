@@ -16,9 +16,10 @@ import {
   authoringProgress,
   grammarAuthoringQueue,
   isHollowGrammarPoint,
+  shadowedSupplementIds,
   type GrammarPoint,
 } from '../data/grammar';
-import { sortGrammarPoints } from '../data/grammar/practiceFilters';
+import { grammarTitleKey, sortGrammarPoints } from '../data/grammar/practiceFilters';
 import { GrammarDetail } from '../components/grammar/GrammarContent';
 
 const SUPPLEMENTS: GrammarPoint[] = [
@@ -34,7 +35,7 @@ const byId = new Map(GRAMMAR.map((p) => [p.id, p]));
  * Ratchet: hollow records per level may only go down. When a pass authors
  * more, lower these numbers to the new counts the failure message prints.
  */
-const MAX_HOLLOW: Record<string, number> = { N4: 332, N3: 627, N2: 437, N1: 324 };
+const MAX_HOLLOW: Record<string, number> = { N4: 74, N3: 112, N2: 187, N1: 324 };
 
 describe('authored content for hollow supplement records', () => {
   const entries = Object.entries(AUTHORED_CONTENT);
@@ -70,6 +71,22 @@ describe('authored content for hollow supplement records', () => {
       expect(p.examples[0].jp).toBe(c.examples[0].jp);
       expect(p.provenance.source).toBe('authored:content-pass');
       expect(p.provenance.verification).not.toBe('missing');
+    }
+  });
+
+  it('keeps the corpus sentences an authored record had, after the authored examples', () => {
+    // てみたらどう: three Tatoeba hits before it was authored.
+    const p = byId.get('n4m-g-0376f5')!;
+    const authored = AUTHORED_CONTENT['n4m-g-0376f5'].examples.length;
+    expect(p.examples.slice(0, authored).every((e) => e.source !== 'tatoeba')).toBe(true);
+    expect(p.examples.slice(authored).some((e) => e.source === 'tatoeba')).toBe(true);
+  });
+
+  it('replaces the Vietnamese labels some dump records carried as titles', () => {
+    for (const [id, c] of entries) {
+      const shown = byId.get(id)!.title;
+      if (c.title) expect(shown, id).toBe(c.title);
+      expect(shown, id).not.toMatch(/[Ạ-ỹ]|từ/);
     }
   });
 
@@ -113,6 +130,37 @@ describe('authoring queue', () => {
     }));
     const q = grammarAuthoringQueue(recs, { shadowed: new Set(['a']), corpusHits: { c: 3 } });
     expect(q.map((x) => x.id)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('shadows supplement records that dedupe hides behind a core point or an earlier twin', () => {
+    const core = ['n5', 'n4', 'n3', 'n2', 'n2-extra', 'n1', 'n1-extra'].flatMap((m) => GRAMMAR_MODULES[m]);
+    const shadowed = shadowedSupplementIds(core, SUPPLEMENTS, grammarTitleKey);
+    const coreKeys = new Set(core.map((p) => grammarTitleKey('ja', p.title)));
+    const keyOf = (p: GrammarPoint) => grammarTitleKey('ja', AUTHORED_CONTENT[p.id]?.title ?? p.title);
+    // Every core collision is shadowed; an authored record without one never is.
+    for (const p of SUPPLEMENTS) {
+      const collides = coreKeys.has(keyOf(p));
+      if (collides) expect(shadowed.has(p.id), p.id).toBe(true);
+      else if (AUTHORED_CONTENT[p.id]) expect(shadowed.has(p.id), p.id).toBe(false);
+    }
+    // Exactly one visible record per remaining title key.
+    const visible = new Map<string, string>();
+    for (const p of SUPPLEMENTS) {
+      if (shadowed.has(p.id)) continue;
+      const key = keyOf(p);
+      expect(visible.has(key), `${p.id} twins ${visible.get(key)}`).toBe(false);
+      visible.set(key, p.id);
+    }
+    // The queue puts them after every open record of the same level.
+    const n4 = grammarAuthoringQueue(SUPPLEMENTS, { shadowed })
+      .filter((q) => q.level === 'N4')
+      .map((q) => shadowed.has(q.id));
+    expect(n4.indexOf(true)).toBeGreaterThan(n4.lastIndexOf(false));
+    // N4 and N3 are complete: every hollow record left there is one dedupe hides.
+    expect(n4.filter((s) => !s)).toEqual([]);
+    const openN3 = grammarAuthoringQueue(SUPPLEMENTS, { shadowed })
+      .filter((q) => q.level === 'N3' && !shadowed.has(q.id));
+    expect(openN3.map((q) => q.id)).toEqual([]);
   });
 });
 
