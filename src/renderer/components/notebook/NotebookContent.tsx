@@ -20,7 +20,7 @@ import {
   loadNotebookSources,
   type NotebookSources,
 } from '../../notebook/aggregate';
-import type { NotebookStream } from '../../notebookTimeline';
+import { onNotebookTimelineChanged, type NotebookStream } from '../../notebookTimeline';
 import {
   ALL_NOTEBOOK_STREAMS,
   NOTEBOOK_VIEWS,
@@ -81,9 +81,10 @@ export function useNotebook(): NotebookState {
   }, [tick]);
 
   // Live updates. The localStorage streams (deck, lookups, clipboard, known
-  // levels) used to be read once, and the IPC stores only on a manual refresh,
-  // so a card mined in another window never showed up here. Any change bumps
-  // `tick`, which re-reads the IPC stores and re-aggregates; bursts coalesce.
+  // levels, the timeline) used to be read once, and the IPC stores only on a
+  // manual refresh, so a card mined in another window never showed up here.
+  // Any change bumps `tick`, which re-reads the IPC stores and re-aggregates;
+  // bursts coalesce.
   useEffect(() => {
     let timer = 0;
     const bump = (): void => {
@@ -96,6 +97,9 @@ export function useNotebook(): NotebookState {
     const offs = [
       onDeckChanged(bump),
       onClipboardHistoryChanged(bump),
+      // The timeline itself: a note deleted from the Files app, or an event
+      // appended by another surface in this window.
+      onNotebookTimelineChanged(bump),
       window.api?.onLibraryChanged?.(() => bump()) ?? (() => undefined),
     ];
     window.addEventListener('storage', bump);

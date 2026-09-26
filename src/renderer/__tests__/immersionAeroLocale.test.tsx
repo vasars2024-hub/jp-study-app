@@ -84,7 +84,6 @@ describe('the Aero shell only asks for keys the catalogs answer', () => {
     'immersion.aero.status.ready',
     'immersion.aero.status.sitesCount',
     'immersion.aero.newPage',
-    'immersion.aero.pinned',
   ];
   const REUSED_KEYS = [
     'immersion.openInSystemBrowser',
@@ -101,11 +100,11 @@ describe('the Aero shell only asks for keys the catalogs answer', () => {
     'immersion.mode.focus',
   ];
 
-  it.each(LANGS)('%s answers all 26', async (lang) => {
+  it.each(LANGS)('%s answers all 25', async (lang) => {
     await ensureCatalog(lang);
     const catalog = catalogFor(lang);
     const keys = [...NEW_KEYS, ...REUSED_KEYS];
-    expect(keys.length).toBe(26);
+    expect(keys.length).toBe(25);
     for (const key of keys) {
       const value = catalog[key];
       // Plural entries are objects; everything else is a string.

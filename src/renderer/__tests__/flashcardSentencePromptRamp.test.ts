@@ -46,7 +46,7 @@ describe('flashcards: the comprehension prompt does not use the single-word type
       "className={`flash-word${current.promptKind === 'comprehension' ? ' flash-sentence-prompt' : ''}`}",
     );
     // The flipped-side word keeps the word ramp: it really is one word.
-    expect(TSX).toContain('<span className="flash-word" lang="ja">{current.word}</span>');
+    expect(TSX).toContain('<span className="flash-word" lang={cardContentLang(current)}>{current.word}</span>');
     // Exactly one place applies the sentence ramp; a second would mean a word got it too.
     expect(TSX.match(/flash-sentence-prompt/g)).toHaveLength(1);
   });

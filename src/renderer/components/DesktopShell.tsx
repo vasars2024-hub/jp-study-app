@@ -309,18 +309,13 @@ const START_HINT_KEYS: Partial<Record<WinSection, string>> = {
 };
 
 /**
- * `nameKey`/`hintKey`/`readyKey`, where present, are the translated display
- * strings (audit r2 #15); the English beside them is the fallback.
+ * A module's WIRED caption: English flavour text, or — for a module whose
+ * caption is translated (audit r2 #15) — the catalog keys alone. Not both: an
+ * English copy beside the key is a second source that drifts from the catalog.
  */
-type WiredModuleMeta = {
-  code: string;
-  name: string;
-  hint: string;
-  ready: string;
-  nameKey?: string;
-  hintKey?: string;
-  readyKey?: string;
-};
+type WiredModuleMeta =
+  | { code: string; name: string; hint: string; ready: string }
+  | { code: string; nameKey: string; hintKey: string; readyKey: string };
 
 const WIRED_MODULES: Partial<Record<WinSection, WiredModuleMeta>> = {
   player: { code: 'SIG-LIB', name: 'Signal Library', hint: 'Local media catalog', ready: 'LIB READY' },
@@ -331,9 +326,6 @@ const WIRED_MODULES: Partial<Record<WinSection, WiredModuleMeta>> = {
   dictionary: { code: 'LEX', name: 'Lexeme Analyzer', hint: 'Corpus index / probe terminal', ready: 'INDEX READY' },
   immersion: {
     code: 'FEED',
-    name: 'Immersion Feed',
-    hint: 'Remote node monitor',
-    ready: 'FEED DEGRADED',
     nameKey: 'desktop.wired.immersion.name',
     hintKey: 'desktop.wired.immersion.hint',
     readyKey: 'desktop.wired.immersion.ready',
@@ -359,11 +351,12 @@ const WIRED_MODULES: Partial<Record<WinSection, WiredModuleMeta>> = {
 function wiredModule(section: WinSection): { code: string; name: string; hint: string; ready: string } {
   const meta = WIRED_MODULES[section];
   if (!meta) return { code: section.toUpperCase(), name: section, hint: 'Module route', ready: 'READY' };
+  if (!('nameKey' in meta)) return meta;
   return {
     code: meta.code,
-    name: meta.nameKey ? translate(meta.nameKey) : meta.name,
-    hint: meta.hintKey ? translate(meta.hintKey) : meta.hint,
-    ready: meta.readyKey ? translate(meta.readyKey) : meta.ready,
+    name: translate(meta.nameKey),
+    hint: translate(meta.hintKey),
+    ready: translate(meta.readyKey),
   };
 }
 

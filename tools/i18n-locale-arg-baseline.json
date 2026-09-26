@@ -1,7 +1,6 @@
 {
-  "src/renderer/components/scraper/pages/DataPages.tsx": 5,
+  "src/renderer/components/scraper/pages/DataPages.tsx": 1,
   "src/renderer/components/scraper/pages/ManagementPages.tsx": 2,
-  "src/renderer/components/scraper/pages/NewScrapePage.tsx": 1,
-  "src/renderer/components/scraper/result/ResultPanels.tsx": 7,
+  "src/renderer/components/scraper/result/ResultPanels.tsx": 3,
   "src/renderer/components/scraper/strings.ts": 7
 }

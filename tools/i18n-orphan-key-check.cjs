@@ -45,6 +45,12 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
+/**
+ * The adopted Seanime player UI is bundled into the renderer and asks for the
+ * app's own keys (`playerUi.control.*` in its control bar), so it is a consumer
+ * like `src/` — without it all 15 player-button names read as orphans.
+ */
+const VENDOR_CONSUMERS = [path.join(ROOT, 'vendor', 'seanime-web')];
 const I18N_DIR = path.join(SRC, 'shared', 'i18n');
 const BASELINE_PATH = path.join(__dirname, 'i18n-orphan-key-baseline.json');
 
@@ -68,11 +74,72 @@ const EXEMPT_DIRS = ['node_modules', 'dist', '.vite', 'out', '__devharness__', '
  * Blanked length-preservingly so nothing downstream shifts. Strings are
  * deliberately left intact: a key IS a string literal, so masking them would
  * blind the check entirely.
+ *
+ * A scanner, not two regexes, because a comment opener inside a string is not
+ * a comment: `accept="image/*"` in the Blanc image converter opened a "block
+ * comment" that ran to the next `*\/` and blanked 32 live `blanc.tb.*` keys.
+ * Strings, template literals and regex literals are stepped over; `'` and `"`
+ * strings end at a newline so one mis-read quote cannot swallow the file.
  */
+const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'in', 'of', 'delete', 'void', 'throw', 'new', 'else', 'do', 'yield', 'await']);
+
 function maskComments(text) {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:\w])\/\/[^\n]*/g, (m, lead) => lead + ' '.repeat(m.length - lead.length));
+  const out = text.split('');
+  const n = text.length;
+  const blank = (from, to) => {
+    for (let k = from; k < to; k += 1) if (out[k] !== '\n') out[k] = ' ';
+  };
+  // Can a `/` at this point start a regex literal (rather than divide)?
+  const regexCanStart = (at) => {
+    let j = at - 1;
+    while (j >= 0 && /\s/.test(text[j])) j -= 1;
+    if (j < 0) return true;
+    const c = text[j];
+    if ('(,=:[!&|?{};+-*%<>~^'.includes(c)) return true;
+    if (!/[\w$]/.test(c)) return false;
+    let s = j;
+    while (s > 0 && /[\w$]/.test(text[s - 1])) s -= 1;
+    return REGEX_AFTER_WORD.has(text.slice(s, j + 1));
+  };
+  let i = 0;
+  while (i < n) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (c === '/' && next === '/') {
+      const end = text.indexOf('\n', i);
+      const stop = end < 0 ? n : end;
+      blank(i, stop);
+      i = stop;
+    } else if (c === '/' && next === '*') {
+      const end = text.indexOf('*/', i + 2);
+      const stop = end < 0 ? n : end + 2;
+      blank(i, stop);
+      i = stop;
+    } else if (c === '\'' || c === '"') {
+      i += 1;
+      while (i < n && text[i] !== c && text[i] !== '\n') i += text[i] === '\\' ? 2 : 1;
+      i += 1;
+    } else if (c === '`') {
+      i += 1;
+      while (i < n && text[i] !== '`') i += text[i] === '\\' ? 2 : 1;
+      i += 1;
+    } else if (c === '/' && regexCanStart(i)) {
+      let inClass = false;
+      i += 1;
+      while (i < n && text[i] !== '\n') {
+        const r = text[i];
+        if (r === '\\') { i += 2; continue; }
+        if (r === '[') inClass = true;
+        else if (r === ']') inClass = false;
+        else if (r === '/' && !inClass) break;
+        i += 1;
+      }
+      i += 1;
+    } else {
+      i += 1;
+    }
+  }
+  return out.join('');
 }
 
 /** A path under here declares keys; it never consumes them. */
@@ -141,6 +208,18 @@ function collectDynamicPrefixes(text, into) {
   }
 }
 
+/**
+ * Every suffix appended to a composed key: `` t(`${labelKeyOf(id)}.desc`) ``.
+ * The key before the suffix is itself a literal somewhere (a table of
+ * `id -> 'blanc.tool.x'`), so `<that literal><suffix>` is credited — and only
+ * that, not everything under a prefix.
+ */
+function collectDynamicSuffixes(text, into) {
+  const re = /\$\{[^`{}]*\}(\.[\w.]+)`/g;
+  let m;
+  while ((m = re.exec(text))) into.add(m[1]);
+}
+
 /** The namespace a key is reported under — its first two segments, or its first. */
 function namespaceOf(key) {
   const parts = key.split('.');
@@ -159,12 +238,15 @@ function main() {
   // One pass over every consuming file: collect the literal text and the set of
   // interpolated prefixes. Concatenating the sources is deliberate — a key is
   // used if ANY file asks for it, and which file does not change the verdict.
-  const consumers = walk(SRC).filter((f) => !isCatalogSource(f) && !isTestFile(f));
+  const roots = [SRC, ...VENDOR_CONSUMERS.filter((dir) => fs.existsSync(dir))];
+  const consumers = roots.flatMap((dir) => walk(dir)).filter((f) => !isCatalogSource(f) && !isTestFile(f));
   const dynamicPrefixes = new Set();
+  const dynamicSuffixes = new Set();
   const haystack = [];
   for (const file of consumers) {
     const text = maskComments(fs.readFileSync(file, 'utf8'));
     collectDynamicPrefixes(text, dynamicPrefixes);
+    collectDynamicSuffixes(text, dynamicSuffixes);
     haystack.push(text);
   }
   const blob = haystack.join('\n');
@@ -181,6 +263,9 @@ function main() {
   for (const [key, declaredIn] of declared) {
     if (literal.has(key)) continue;
     let dynamic = false;
+    for (const suffix of dynamicSuffixes) {
+      if (key.endsWith(suffix) && literal.has(key.slice(0, -suffix.length))) { dynamic = true; break; }
+    }
     for (const prefix of dynamicPrefixes) {
       if (prefix && key.startsWith(prefix)) { dynamic = true; break; }
     }

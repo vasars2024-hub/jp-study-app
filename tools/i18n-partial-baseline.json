@@ -1,14 +1,9 @@
 {
-  "renderer/components/scraper/result/ResultPanels.tsx": 34,
-  "renderer/components/DesktopShell.tsx": 28,
-  "renderer/components/scraper/pages/DataPages.tsx": 18,
+  "renderer/components/DesktopShell.tsx": 27,
   "renderer/components/flashcards/AutoReadingPreferences.tsx": 6,
-  "renderer/components/scraper/pages/SourceManagerPage.tsx": 5,
   "renderer/components/flashcards/AutoAudioPreferences.tsx": 4,
-  "renderer/components/scraper/pages/DashboardPage.tsx": 4,
   "renderer/views/MediaCenterView.tsx": 4,
   "renderer/components/Lockscreen.tsx": 3,
-  "renderer/widgets/more.tsx": 3,
   "renderer/components/EpubCardLayoutEditor.tsx": 2,
   "renderer/components/EpubMiningPanel.tsx": 2,
   "renderer/components/flashcards/SchedulingPreferences.tsx": 2,
@@ -20,15 +15,10 @@
   "renderer/components/immersion/VisualNovelMetadataEditor.tsx": 1,
   "renderer/components/media/MediaContent.tsx": 1,
   "renderer/components/reading/ReadingListPastePreview.tsx": 1,
-  "renderer/components/scraper/pages/NewScrapePage.tsx": 1,
-  "renderer/components/scraper/ScraperSearch.tsx": 1,
+  "renderer/components/scraper/result/ResultPanels.tsx": 1,
   "renderer/components/scraper/settings/ScraperSettingsDrawer.tsx": 1,
   "renderer/components/SeanimeDevPanel.tsx": 1,
   "renderer/components/settings/pages/VerifiedSitesManager.tsx": 1,
   "renderer/components/visualizer/VisualizerContent.tsx": 1,
-  "renderer/views/AnkiView.tsx": 1,
-  "renderer/views/GrammarView.tsx": 1,
-  "renderer/views/StatisticsView.tsx": 1,
-  "renderer/views/TranslateView.tsx": 1,
-  "renderer/views/YouTubePlaylistsView.tsx": 1
+  "renderer/views/AnkiView.tsx": 1
 }
