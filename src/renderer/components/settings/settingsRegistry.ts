@@ -128,7 +128,9 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'caption',
     group: 'Study',
     descKey: 'settings.nav.transcription.desc',
-    advanced: true,
+    // Not advanced: it holds live captions and system-audio capture, a study
+    // feature. Behind Advanced it was missing from the rail AND from Settings
+    // search — "live captions" and "system audio" found nothing.
   },
   {
     id: 'scraper',
@@ -1176,7 +1178,25 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     id: 'study-language',
     titleKey: 'settings.study.lang.title',
     descKey: 'settings.study.lang.desc',
-    keywords: ['study', 'language', 'japanese', 'chinese', 'environment', 'dictionary', 'zh', 'ja'],
+    // Russian and the per-language reading aid (furigana / pinyin / stress marks)
+    // live on this card too; searching for them found nothing, or the UI-language card.
+    keywords: [
+      'study',
+      'language',
+      'japanese',
+      'chinese',
+      'russian',
+      'environment',
+      'dictionary',
+      'zh',
+      'ja',
+      'ru',
+      'reading aid',
+      'furigana',
+      'pinyin',
+      'stress marks',
+      'accent marks',
+    ],
     pageId: 'study',
     group: 'Study',
   },
