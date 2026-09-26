@@ -156,7 +156,7 @@
     "message": "（$1）"
   },
   "save_cardCreated": {
-    "message": "Anki にカードを作成しました$1$2 · Gum にも保存"
+    "message": "Anki にカードを作成しました$1 · Gum にも保存"
   },
   "save_savedWord": {
     "message": "単語$1を Gum に保存しました"

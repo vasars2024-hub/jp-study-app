@@ -656,7 +656,9 @@ function formatSaveResultMessage(res) {
   const anki = res.anki || (res.destinations && res.destinations.anki) || null;
   if (anki && anki.ok) {
     const deck = [res.profileName, res.deckName].filter(Boolean).join(' / ');
-    return jpMsg('save_cardCreated', [term, deck ? jpMsg('save_deckSuffix', deck) : '']);
+    // One substitution: Chrome reads "$1$2" as a named placeholder "$1$" and
+    // refuses to load the extension, so term and deck travel together.
+    return jpMsg('save_cardCreated', term + (deck ? jpMsg('save_deckSuffix', deck) : ''));
   }
 
   const parts = [jpMsg(res.mode === 'sentence' ? 'save_savedSentence' : 'save_savedWord', term)];

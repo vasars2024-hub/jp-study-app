@@ -156,7 +156,7 @@
     "message": "（$1）"
   },
   "save_cardCreated": {
-    "message": "已在 Anki 中制卡$1$2 · 已保存到 Gum"
+    "message": "已在 Anki 中制卡$1 · 已保存到 Gum"
   },
   "save_savedWord": {
     "message": "单词$1已保存到 Gum"
@@ -1737,7 +1737,7 @@
     "message": "（$1 项已排队 — 打开 Gum 后会同步）"
   },
   "tabs_done": {
-    "message": "完成 — 已保存 $1/$2$3。"
+    "message": "完成 — 已保存 $1/$2 项$3。"
   },
   "tabs_finished": {
     "message": "已结束 — $1/$2 成功，$3 失败$4。"

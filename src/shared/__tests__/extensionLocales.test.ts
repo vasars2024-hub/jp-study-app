@@ -101,6 +101,48 @@ describe('extension _locales', () => {
     }
   });
 
+  it('loads in Chrome: no message reads as an undefined named placeholder', () => {
+    // Chrome's own load-time pass (MessageBundle::ReplaceVariables): from each
+    // '$', the text up to the next '$' is a placeholder name when it is only
+    // [A-Za-z0-9_@] — so "$1$2" or "$2$3" asks for a placeholder named "1" or
+    // "2", and Chrome refuses the WHOLE extension ("Variable $1$ used but not
+    // defined."). Measured: Extensions.loadUnpacked failed exactly so.
+    const loadError = (message: string, placeholders: Record<string, string>): string | null => {
+      let msg = message;
+      let beg = 0;
+      for (;;) {
+        beg = msg.indexOf('$', beg);
+        if (beg < 0) return null;
+        beg += 1;
+        if (beg >= msg.length) return null;
+        const end = msg.indexOf('$', beg);
+        if (end < 0) return null;
+        const name = msg.slice(beg, end);
+        if (!/^[A-Za-z0-9_@]+$/.test(name)) continue;
+        const value = placeholders[name.toLowerCase()];
+        if (value === undefined) return `Variable $${name}$ used but not defined.`;
+        msg = msg.slice(0, beg - 1) + value + msg.slice(end + 1);
+      }
+    };
+    const errors: string[] = [];
+    for (const lang of LANGS) {
+      for (const [key, entry] of Object.entries(catalogues[lang])) {
+        const raw = (entry as { placeholders?: Record<string, { content: string }> }).placeholders ?? {};
+        const placeholders = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k.toLowerCase(), v.content]));
+        const error = loadError(entry.message, placeholders);
+        if (error) errors.push(`${lang}.${key}: ${error} (${entry.message})`);
+      }
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it('formats a created card with its term and deck', () => {
+    const card = loadExtensionSandbox({ files: ['shared.js'] }).jpStudyShared as unknown as Record<string, (...args: unknown[]) => string>;
+    expect(card.formatSaveResultMessage({ ok: true, term: '猫', anki: { ok: true }, profileName: 'Japanese', deckName: 'Mining' })).toBe(
+      'Card created in Anki “猫” (Japanese / Mining) · saved in Gum',
+    );
+  });
+
   it('has every key the scripts, pages and manifest use, in every language', () => {
     const counted = countedKeys();
     const plain = new Set([...literalKeys(), ...pageKeys(), ...manifestKeys(), ...dynamicKeys()]);
