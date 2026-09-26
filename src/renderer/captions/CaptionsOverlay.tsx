@@ -289,6 +289,15 @@ export default function CaptionsOverlay() {
     let alive = true;
     void window.api.captionsGetState().then((s) => alive && s && setState(s));
     void window.api.captionsGetLines().then((l) => alive && Array.isArray(l) && setLines(l));
+    // What was pushed before this component subscribed — the first mined clip
+    // creates the window, and its draft arrives while the bar is still loading.
+    void window.api.captionsGetDrafts?.()
+      .then((p) => {
+        if (!alive || !p) return;
+        setDrafts(Array.isArray(p.drafts) ? p.drafts : []);
+        setNotices(Array.isArray(p.notices) ? p.notices : []);
+      })
+      .catch(() => undefined);
     const offs = [
       window.api.onCaptionsState((s) => setState(s)),
       window.api.onCaptionsLines((l) => setLines(l)),

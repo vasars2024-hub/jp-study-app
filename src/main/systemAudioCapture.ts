@@ -1053,6 +1053,9 @@ export function registerSystemAudioCaptureIpc(): void {
     mineLine(String(lineId ?? ''), extra && typeof extra === 'object' ? (extra as Record<string, string>) : {}));
   ipcMain.handle(CH.mineCurrentLine, () => mineCurrentLine());
   ipcMain.handle(CH.getLines, () => lines);
+  // The bar loads lazily: a draft or notice pushed while it was still loading
+  // (the first "mine the last seconds" creates the window) is pulled here.
+  ipcMain.handle(CH.getDrafts, () => ({ drafts, notices }));
   ipcMain.handle(CH.updateDraft, (_e, id: unknown, patch: unknown) => {
     const p = (patch && typeof patch === 'object' ? patch : {}) as { text?: unknown };
     if (typeof p.text === 'string') patchDraft(String(id), { text: p.text.slice(0, 2000) });

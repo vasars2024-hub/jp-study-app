@@ -3509,6 +3509,11 @@ const api = {
   captionsMineCurrentLine: (): Promise<unknown> => ipcRenderer.invoke('captions:mineCurrentLine'),
   captionsGetLines: (): Promise<import('./shared/captionsOverlay').CaptionOverlayLine[]> =>
     ipcRenderer.invoke('captions:getLines'),
+  /** The drafts and notices already waiting, for a bar that loads after they were pushed. */
+  captionsGetDrafts: (): Promise<{
+    drafts: import('./shared/captionsOverlay').CaptionDraft[];
+    notices: import('./shared/captionsOverlay').CaptionNotice[];
+  }> => ipcRenderer.invoke('captions:getDrafts'),
   captionsUpdateDraft: (id: string, patch: { text?: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('captions:updateDraft', id, patch),
   captionsConfirmDraft: (

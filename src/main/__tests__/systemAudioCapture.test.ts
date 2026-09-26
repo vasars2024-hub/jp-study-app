@@ -270,6 +270,14 @@ describe('system-audio capture in main', () => {
     expect(Buffer.from(card.audioBase64!, 'base64').length).toBe(4096);
     // The draft is gone once added.
     expect(lastSent<{ drafts: CaptionDraft[] }>(overlay, 'captions:drafts')!.drafts).toEqual([]);
+    expect(((await invoke('captions:getDrafts')) as { drafts: CaptionDraft[] }).drafts).toEqual([]);
+  });
+
+  it('a draft pushed before the bar loaded can be pulled by it', async () => {
+    const r = (await invoke('captions:mineRecent')) as { ok: boolean; draftId: string };
+    const pulled = (await invoke('captions:getDrafts')) as { drafts: CaptionDraft[]; notices: unknown[] };
+    expect(pulled.drafts.map((d) => d.id)).toContain(r.draftId);
+    await invoke('captions:discardDraft', r.draftId);
   });
 
   it('a caption line mines with the audio cut by its own timestamps', async () => {
