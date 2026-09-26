@@ -35,7 +35,7 @@ const byId = new Map(GRAMMAR.map((p) => [p.id, p]));
  * Ratchet: hollow records per level may only go down. When a pass authors
  * more, lower these numbers to the new counts the failure message prints.
  */
-const MAX_HOLLOW: Record<string, number> = { N4: 132, N3: 627, N2: 437, N1: 324 };
+const MAX_HOLLOW: Record<string, number> = { N4: 74, N3: 627, N2: 437, N1: 324 };
 
 describe('authored content for hollow supplement records', () => {
   const entries = Object.entries(AUTHORED_CONTENT);
@@ -148,6 +148,8 @@ describe('authoring queue', () => {
       .filter((q) => q.level === 'N4')
       .map((q) => shadowed.has(q.id));
     expect(n4.indexOf(true)).toBeGreaterThan(n4.lastIndexOf(false));
+    // N4 is complete: every hollow N4 record left is one dedupe hides.
+    expect(n4.filter((s) => !s)).toEqual([]);
   });
 });
 
