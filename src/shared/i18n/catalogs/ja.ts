@@ -6372,6 +6372,8 @@ export const ja: Catalog = {
   'music.loadLrcFile': '.lrcファイルを読み込む…',
   'music.lyricsSource.lrclib': 'LRCLIB の歌詞',
   'music.lyricsSource.file': 'ローカルファイルの歌詞',
+  'music.lyricsSource.sidecar': '曲と同じフォルダーの .lrc ファイルの歌詞',
+  'music.lyricsSource.embedded': '音声ファイルに埋め込まれた歌詞',
   'music.lyricsCorrect': '別のファイルを使う',
   'music.notSynced': '歌詞は時間同期されていません — テキストとして表示しています。',
   'music.lyricsClickHint': 'クリックまたは単語を選択して調べる',

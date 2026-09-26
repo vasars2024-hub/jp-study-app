@@ -1457,7 +1457,7 @@ const api = {
     return () => ipcRenderer.removeListener('player:command', handler);
   },
   /** Leader -> other windows: one throttled analyser frame (see renderer/vizFrames.ts). */
-  playerSendVizFrame: (frame: import('./renderer/vizFrames').VizFrame): void => {
+  playerSendVizFrame: (frame: import('./shared/vizFrame').VizFrame): void => {
     ipcRenderer.send('player:vizFrame', frame);
   },
   onPlayerVizFrame: (cb: (frame: unknown) => void): (() => void) => {

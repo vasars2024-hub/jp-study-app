@@ -24,7 +24,7 @@ import {
   saveGrammarSrs,
   seedMissed,
 } from '../../grammarSrs';
-import { loadCollections, onCollectionsChanged } from '../../grammarCollections';
+import { loadCollections, onGrammarCollectionsChanged } from '../../grammarCollections';
 import { loadSessionHistory, recentlyMissed } from '../../grammarSessionHistory';
 import { applyGrade, loadFamiliarity, saveFamiliarity, type AnswerGrade } from '../../grammarFamiliarity';
 import { appendReviewLog } from '../../reviewLog';
@@ -60,7 +60,7 @@ export default function GrammarReviewPanel() {
   }, [known]);
 
   useEffect(() => onGrammarSrsChanged(() => setSrs(loadGrammarSrs())), []);
-  useEffect(() => onCollectionsChanged(() => setCollections(loadCollections())), []);
+  useEffect(() => onGrammarCollectionsChanged(() => setCollections(loadCollections())), []);
   // A relearn step is minutes, not days: re-check what is due once a minute.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 60_000);

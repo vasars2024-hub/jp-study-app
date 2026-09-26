@@ -29,6 +29,7 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   root?.unmount();
   root = null;
   document.body.replaceChildren();
@@ -37,6 +38,9 @@ afterEach(() => {
 
 describe('wallpaper fit reaches the rotating wallpaper', () => {
   it('a rotating preset layer is sized by the user\'s fit, not a fixed cover', async () => {
+    // The default playlist follows the time of day, and the night wall is an animated
+    // layer this test leaves out; pin midday so the result does not depend on the clock.
+    vi.useFakeTimers({ now: new Date(2026, 8, 25, 12).getTime(), toFake: ['Date'] });
     saveEnvironment({ enabled: true, rotationEnabled: true });
     applyWallpaperFit('contain');
     expect(document.documentElement.style.getPropertyValue('--wall-background-fit')).toBe('contain');

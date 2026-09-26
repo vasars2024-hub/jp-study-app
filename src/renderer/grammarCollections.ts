@@ -62,7 +62,7 @@ export function withListMembership(
   return { ...current, [list]: next };
 }
 
-export function onCollectionsChanged(callback: () => void): () => void {
+export function onGrammarCollectionsChanged(callback: () => void): () => void {
   window.addEventListener(CHANGED_EVENT, callback);
   const onStorage = (event: StorageEvent): void => {
     if (event.key === FAVORITES_KEY || event.key === STUDY_QUEUE_KEY) callback();

@@ -16,7 +16,7 @@ import {
   onFamiliarityChanged,
   type FamiliarityState,
 } from '../../grammarFamiliarity';
-import { applyCollections, loadCollections, onCollectionsChanged } from '../../grammarCollections';
+import { applyCollections, loadCollections, onGrammarCollectionsChanged } from '../../grammarCollections';
 import { useT } from '../../i18n';
 import VirtualList from '../VirtualList';
 import GrammarFilterPanel from './GrammarFilterPanel';
@@ -49,7 +49,7 @@ export default function GrammarPracticePanel({
   // Finishing a test session writes familiarity; re-read so a "Learning only"
   // filter reflects what the session just changed.
   useEffect(() => onFamiliarityChanged(() => setFamiliarityState(loadFamiliarity())), []);
-  useEffect(() => onCollectionsChanged(() => setCollections(loadCollections())), []);
+  useEffect(() => onGrammarCollectionsChanged(() => setCollections(loadCollections())), []);
 
   // Decorated so the shared familiarity filter and its counts are correct here
   // too; dedupe stays static, decoration re-runs when learner state changes.

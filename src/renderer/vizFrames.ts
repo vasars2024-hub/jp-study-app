@@ -37,12 +37,9 @@ export const VIZ_WANT_TTL_MS = 3000;
 /** A follower treats the stream as stopped when no frame arrived for this long. */
 export const VIZ_FRAME_STALE_MS = 400;
 
-export interface VizFrame {
-  /** Spectrum, 0–255 per bin, bass first. */
-  freq: Uint8Array;
-  /** Time-domain waveform, 128 = silence. */
-  wave: Uint8Array;
-}
+import type { VizFrame } from '../shared/vizFrame';
+
+export type { VizFrame };
 
 /**
  * Max-pool `src[0..srcLen)` into `bins` buckets. Max, not mean: a bar that averaged a

@@ -45,12 +45,16 @@ function deck(n: number): DeckFlashcard[] {
 }
 
 beforeEach(() => {
+  // The fixture's due dates are relative to NOW, and reviewSessionCards reads the
+  // clock itself: pin it, or the comparison drifts as the real day moves on.
+  vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
   localStorage.clear();
   resetDeckMemoryForTests();
   localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, JSON.stringify({ folders: [], cards: deck(500), savedAt: 5 }));
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 

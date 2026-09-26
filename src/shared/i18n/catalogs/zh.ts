@@ -6334,6 +6334,8 @@ export const zh: Catalog = {
   'music.loadLrcFile': '加载 .lrc 文件…',
   'music.lyricsSource.lrclib': '歌词来自 LRCLIB',
   'music.lyricsSource.file': '歌词来自本地文件',
+  'music.lyricsSource.sidecar': '歌词来自歌曲旁的 .lrc 文件',
+  'music.lyricsSource.embedded': '歌词嵌入在音频文件中',
   'music.lyricsCorrect': '换一个文件',
   'music.notSynced': '歌词未按时间同步 — 以文本形式显示。',
   'music.lyricsClickHint': '点击或选中单词进行查询',

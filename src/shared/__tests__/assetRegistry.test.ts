@@ -351,6 +351,6 @@ describe('sha256 pin coverage (audit T6)', () => {
     // If this fails because someone pinned an asset: good — raise
     // PINNED_BASELINE to the new number and update the comment above.
     const { pinned, total } = assetPinCoverage();
-    expect({ pinned, total }).toEqual({ pinned: 18, total: 39 });
+    expect({ pinned, total }).toEqual({ pinned: 18, total: 38 });
   });
 });

@@ -6964,6 +6964,8 @@ export const ru: Catalog = {
   'music.loadLrcFile': 'Загрузить файл .lrc…',
   'music.lyricsSource.lrclib': 'Текст из LRCLIB',
   'music.lyricsSource.file': 'Текст из локального файла',
+  'music.lyricsSource.sidecar': 'Текст из файла .lrc рядом с песней',
+  'music.lyricsSource.embedded': 'Текст, встроенный в аудиофайл',
   'music.lyricsCorrect': 'Выбрать другой файл',
   'music.notSynced': 'Текст не синхронизирован по времени — показан как обычный текст.',
   'music.lyricsClickHint': 'Нажмите или выделите слово, чтобы посмотреть его значение',

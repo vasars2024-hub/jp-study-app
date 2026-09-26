@@ -6407,6 +6407,8 @@ export const en: Catalog = {
   'music.loadLrcFile': 'Load .lrc file…',
   'music.lyricsSource.lrclib': 'Lyrics from LRCLIB',
   'music.lyricsSource.file': 'Lyrics from a local file',
+  'music.lyricsSource.sidecar': 'Lyrics from a .lrc file next to the song',
+  'music.lyricsSource.embedded': 'Lyrics embedded in the audio file',
   'music.lyricsCorrect': 'Use a different file',
   'music.notSynced': "Lyrics aren't time-synced — showing them as text.",
   'music.lyricsClickHint': 'Click or highlight a word to look it up',

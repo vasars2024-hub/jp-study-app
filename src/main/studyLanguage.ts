@@ -102,7 +102,6 @@ export function registerStudyLanguageIpc(): void {
   ipcMain.handle('study:setLanguage', (_e, value: unknown) => {
     setMainStudyLanguage(value);
   });
-  ipcMain.handle('study:getLanguage', () => ({ ...load() }));
 }
 
 /** Tests only. */

@@ -776,6 +776,7 @@ export const BLANC_UI_JA: Catalog = {
   'blanc.tb.status.existing': '組み込み',
   'blanc.tb.modcat.automation': '自動化',
   'blanc.tb.modcat.capture': 'キャプチャ',
+  'blanc.tb.modcat.desktop': 'デスクトップ',
   'blanc.tb.modcat.files': 'ファイル',
   'blanc.tb.modcat.game': 'ゲーム',
   'blanc.tb.modcat.media': 'メディア',

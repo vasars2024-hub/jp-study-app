@@ -791,6 +791,7 @@ export const BLANC_UI_RU: Catalog = {
   'blanc.tb.status.existing': 'встроено',
   'blanc.tb.modcat.automation': 'Автоматизация',
   'blanc.tb.modcat.capture': 'Захват',
+  'blanc.tb.modcat.desktop': 'Рабочий стол',
   'blanc.tb.modcat.files': 'Файлы',
   'blanc.tb.modcat.game': 'Игра',
   'blanc.tb.modcat.media': 'Медиа',

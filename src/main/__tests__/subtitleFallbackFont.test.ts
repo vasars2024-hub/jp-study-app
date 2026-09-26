@@ -100,10 +100,12 @@ describe('pickSubtitleFallbackFont', () => {
 });
 
 describe('the candidate list itself', () => {
-  it('names no Latin-only face on either list', () => {
+  it('names no Latin-only face on either CJK list', () => {
     // The whole defect is a face with no CJK coverage being treated as good enough.
+    // Russian is exempt: Segoe UI, Arial and Tahoma all carry Cyrillic, which is the
+    // coverage that list is about.
     const latinOnly = /roboto|arial|tahoma|segoe|liberation|helvetica|verdana|calibri/i;
-    for (const candidates of Object.values(SUBTITLE_FALLBACK_FONT_CANDIDATES)) {
+    for (const candidates of [SUBTITLE_FALLBACK_FONT_CANDIDATES.ja, SUBTITLE_FALLBACK_FONT_CANDIDATES.zh]) {
       for (const candidate of candidates) {
         expect(candidate.family).not.toMatch(latinOnly);
         expect(candidate.path).not.toMatch(latinOnly);

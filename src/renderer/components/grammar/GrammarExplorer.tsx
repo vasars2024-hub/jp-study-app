@@ -37,7 +37,7 @@ import {
 import {
   applyCollections,
   loadCollections,
-  onCollectionsChanged,
+  onGrammarCollectionsChanged,
   saveCollections,
   withListMembership,
   type GrammarCollections,
@@ -141,7 +141,7 @@ export default function GrammarExplorer({
     if (!active || !sameFilters(active.filters, filters)) setActivePresetId('');
   }, [filters, presets, activePresetId]);
   // Lists are shared with Practice and Review; follow edits made there.
-  useEffect(() => onCollectionsChanged(() => setCollections(loadCollections())), []);
+  useEffect(() => onGrammarCollectionsChanged(() => setCollections(loadCollections())), []);
 
   // A practice session grading a card, or another window, writes familiarity;
   // re-read so the badges and band controls here never show a stale level.

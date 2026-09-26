@@ -776,6 +776,7 @@ export const BLANC_UI_ZH: Catalog = {
   'blanc.tb.status.existing': '内置',
   'blanc.tb.modcat.automation': '自动化',
   'blanc.tb.modcat.capture': '捕获',
+  'blanc.tb.modcat.desktop': '桌面',
   'blanc.tb.modcat.files': '文件',
   'blanc.tb.modcat.game': '游戏',
   'blanc.tb.modcat.media': '媒体',

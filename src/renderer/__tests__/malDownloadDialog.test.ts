@@ -262,11 +262,14 @@ describe('MalDownloadDialog — anime', () => {
 
   it('asks the backend for that entry by id, not by its title', async () => {
     await open(anime);
-    expect(api().scraperMalUnits).toHaveBeenCalledWith({
+    // `known` rides along so a busy catalogue can still list episodes from the
+    // count the caller already has; the lookup key is still the id.
+    expect(api().scraperMalUnits).toHaveBeenCalledWith(expect.objectContaining({
       contentType: 'anime',
       provider: 'jikan',
       id: 52_991,
-    });
+      known: expect.any(Object),
+    }));
   });
 
   it('narrows to the newest units when the amount is Latest', async () => {
