@@ -542,8 +542,9 @@ const api = {
   dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
     ipcRenderer.invoke('dict:pitch', term, reading),
   /** Offline-only Yomitan glossary lookup (no Jisho). */
-  lookupTermOffline: (query: string): Promise<DictResult> =>
-    ipcRenderer.invoke('dict:lookupTermOffline', query),
+  /** `lang` pins the dictionary language; without it the query's script decides (Han → Japanese). */
+  lookupTermOffline: (query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult> =>
+    ipcRenderer.invoke('dict:lookupTermOffline', query, lang),
   /** Offline segmentation and grounded glossary rows for the Lexicon Workbench. */
   lookupOfflineInterlinear: (
     text: string,

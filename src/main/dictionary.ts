@@ -1081,7 +1081,8 @@ export function registerDictionaryIpc(): void {
     await initYomitanMeta().catch(() => undefined);
     return getPitchData(term, reading);
   });
-  ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
+  ipcMain.handle('dict:lookupTermOffline', (_e, query: string, lang?: unknown) =>
+    lookupTermOffline(query, lang === 'ja' || lang === 'zh' || lang === 'ru' ? lang : undefined));
   ipcMain.handle(
     'dict:lookupOfflineInterlinear',
     (_e, text: unknown, options?: unknown): Promise<LexiconInterlinearResult> => {

@@ -369,7 +369,7 @@ declare global {
       lookupWord(query: string): Promise<DictResult>;
       /** `limit` is the page size, defaulting to eight and clamped in main. */
       lookupTerm(query: string, limit?: number): Promise<DictResult>;
-      lookupTermOffline(query: string): Promise<DictResult>;
+      lookupTermOffline(query: string, lang?: 'ja' | 'zh' | 'ru'): Promise<DictResult>;
       lookupOfflineInterlinear(
         text: string,
         options?: import('../shared/lexiconInterlinear').LexiconInterlinearOptions,
