@@ -64,13 +64,16 @@ describe('packaged Content-Security-Policy', () => {
     // `cdn.jiten.moe` serves Jiten deck covers for Reading discovery results
     // that have no locally cached art yet. `artworks.thetvdb.com` serves the media
     // workspace's episode thumbnails (blocked in packaged builds until 2026-09-23).
-    // `i.ytimg.com` serves YouTube playlist and Discover thumbnails (blocked until 2026-09-26).
+    // `i.ytimg.com` serves YouTube playlist and Discover thumbnails (blocked until 2026-09-26);
+    // `static.tvmaze.com` and `image.tmdb.org` drama and film posters (same date).
     expect(remote).toEqual([
       'https://cdn.myanimelist.net',
       'https://*.anilist.co',
       'https://cdn.jiten.moe',
       'https://artworks.thetvdb.com',
       'https://i.ytimg.com',
+      'https://static.tvmaze.com',
+      'https://image.tmdb.org',
     ]);
     // Every entry is still a concrete host. A bare `https:` here would silently
     // undo the whole directive, and reads almost identically in a diff.

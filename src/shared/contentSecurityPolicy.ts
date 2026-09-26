@@ -55,7 +55,13 @@ export const CONTENT_SECURITY_POLICY_DIRECTIVES: readonly string[] = [
   // last of yt-dlp's `thumbnails`, which is on the same host), and a packaged build blocked
   // every one: the round-4 console sweep logged `img-src` violations and broken images for all
   // three rows of a seeded playlist (2026-09-26). One named host, same rule as above.
-  "img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co https://cdn.jiten.moe https://artworks.thetvdb.com https://i.ytimg.com",
+  //
+  // `static.tvmaze.com` and `image.tmdb.org` are the drama and film posters: Settings >
+  // Scraper's unified search paints the TV/film source's `posterUrl` directly, and a packaged
+  // build blocked every one (round-4 probe, "Hanzawa Naoki": 2 broken covers, 8 img-src
+  // violations). They are the same two hosts main already downloads library artwork from
+  // (`mediaProviderClients.ts` ART_HOSTS), so this names no provider the app did not trust.
+  "img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co https://cdn.jiten.moe https://artworks.thetvdb.com https://i.ytimg.com https://static.tvmaze.com https://image.tmdb.org",
   // The sidecar origin appears here as well as in `connect-src`, and the two are
   // NOT interchangeable: `connect-src` governs the `fetch()` that prepares the
   // stream, `media-src` governs the `<video>` element that then loads it from
