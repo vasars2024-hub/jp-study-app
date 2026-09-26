@@ -1467,7 +1467,7 @@ export const zh: Catalog = {
   'settings.home.quick.theme': '自定义主题',
   'settings.home.quick.language': '更改语言',
   'settings.home.quick.extension': 'Chrome 扩展',
-  'settings.home.quick.blancMode': 'Blanc Mode',
+  'settings.home.quick.blancMode': 'Blanc 模式',
   'settings.home.quick.companions': '伙伴设置',
   'settings.home.quick.atmosphere': '粒子效果与氛围',
   'settings.home.quick.memory': '内存与存储',
@@ -3684,7 +3684,7 @@ export const zh: Catalog = {
   'aero.found.meter.streak': {
     other: '连续 {count} 天',
   },
-  'search.blancMode': 'Blanc Mode',
+  'search.blancMode': 'Blanc 模式',
   'search.blancMode.desc': '专注学习与实用工具的简洁工具箱外壳',
   'search.wallpaper': '壁纸',
   'search.wallpaper.desc': '预设、图片、视频或文件夹幻灯片',

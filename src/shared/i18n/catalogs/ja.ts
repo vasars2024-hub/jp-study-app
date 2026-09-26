@@ -1472,7 +1472,7 @@ export const ja: Catalog = {
   'settings.home.quick.theme': 'テーマをカスタマイズ',
   'settings.home.quick.language': '言語を変更',
   'settings.home.quick.extension': 'Chrome 拡張機能',
-  'settings.home.quick.blancMode': 'Blanc Mode',
+  'settings.home.quick.blancMode': 'Blancモード',
   'settings.home.quick.companions': 'コンパニオン設定',
   'settings.home.quick.atmosphere': 'パーティクルと雰囲気',
   'settings.home.quick.memory': 'メモリとストレージ',
@@ -3700,7 +3700,7 @@ export const ja: Catalog = {
   'aero.found.meter.streak': {
     other: '{count}日連続',
   },
-  'search.blancMode': 'Blanc Mode',
+  'search.blancMode': 'Blancモード',
   'search.blancMode.desc': '学習と実用ツールに集中したシンプルなツールボックスシェル',
   'search.wallpaper': '壁紙',
   'search.wallpaper.desc': 'プリセット・画像・動画・フォルダスライドショー',
