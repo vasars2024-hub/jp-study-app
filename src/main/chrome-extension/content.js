@@ -3211,7 +3211,7 @@
       setFabBusy('');
       if (res?.invalidated) return;
       if (res?.selecting) return;
-      if (!res?.ok) toast(res?.error || uiMsg('content_ocrFailed'), 'err');
+      if (!res?.ok) toast(ocrErrorText(res), 'err');
       showOcrResult(res);
     });
   }
@@ -3353,12 +3353,7 @@
     const hint = el.querySelector('.jp-ocr-hint');
     if (!res?.ok) {
       body.value = '';
-      // The app's `error` is English; the two states the extension can name
-      // (models missing, models still downloading) are said in the UI language.
-      hint.textContent =
-        res?.available === false
-          ? uiMsg(res?.downloading ? 'content_ocrDownloading' : 'content_ocrNoModels')
-          : res?.error || uiMsg('content_ocrFailed');
+      hint.textContent = ocrErrorText(res);
       el.classList.add('open');
       return;
     }
@@ -3376,6 +3371,16 @@
       el.classList.remove('open');
       void runSentenceAnalysis(body.value, { anchorY: 80, context: document.title || '' });
     }
+  }
+
+  /**
+   * Why an OCR failed. The app's `error` is English; the two states the
+   * extension can name (models missing, models still downloading) are said in
+   * the UI language — in the toast and in the OCR box alike.
+   */
+  function ocrErrorText(res) {
+    if (res?.available === false) return uiMsg(res?.downloading ? 'content_ocrDownloading' : 'content_ocrNoModels');
+    return res?.error || uiMsg('content_ocrFailed');
   }
 
   /** Which engine and language actually read the capture — confirms auto-detection. */
