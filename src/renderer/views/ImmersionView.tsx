@@ -126,7 +126,7 @@ export default function ImmersionView() {
       items: [
         ...IMMERSION_STARTERS.map((starter) => ({
           id: starter.url,
-          label: starter.label,
+          label: starter.labelKey ? t(starter.labelKey) : starter.label,
           /* Keep the mode the user chose - see ImmersionContent's starterButton. */
           onSelect: () => state.navigate(starter.url),
         })),

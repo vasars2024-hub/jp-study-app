@@ -114,13 +114,17 @@ export interface ImmersionMetricsDelta {
   pagesExported?: number;
 }
 
-/** Curated starter immersion destinations (no emoji). */
-export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; url: string; lang: ImmersionLang }> = [
-  { label: 'NHK Easy', url: 'https://news.web.nhk/news/easy/', lang: 'ja' },
-  { label: 'Wikipedia JP', url: 'https://ja.wikipedia.org/wiki/メインページ', lang: 'ja' },
+/**
+ * Curated starter immersion destinations (no emoji). `label` is the English
+ * name; `labelKey`, when present, is what the UI shows ("Wikipedia JP" used to
+ * print as-is in every language). A proper name with no translation has none.
+ */
+export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; labelKey?: string; url: string; lang: ImmersionLang }> = [
+  { label: 'NHK Easy', labelKey: 'immersion.starter.nhkEasy', url: 'https://news.web.nhk/news/easy/', lang: 'ja' },
+  { label: 'Japanese Wikipedia', labelKey: 'immersion.starter.wikipediaJa', url: 'https://ja.wikipedia.org/wiki/メインページ', lang: 'ja' },
   { label: 'Hacker News', url: 'https://news.ycombinator.com/', lang: 'auto' },
-  { label: 'Chinese Wikipedia', url: 'https://zh.wikipedia.org/wiki/Wikipedia:首页', lang: 'zh' },
-  { label: 'Russian Wikipedia', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница', lang: 'ru' },
+  { label: 'Chinese Wikipedia', labelKey: 'immersion.starter.wikipediaZh', url: 'https://zh.wikipedia.org/wiki/Wikipedia:首页', lang: 'zh' },
+  { label: 'Russian Wikipedia', labelKey: 'immersion.starter.wikipediaRu', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница', lang: 'ru' },
 ];
 
 /**

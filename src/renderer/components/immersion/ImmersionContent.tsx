@@ -1121,7 +1121,7 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
          away an explicit Live or Focus choice for everyone else. */
       onClick={() => state.navigate(s.url)}
     >
-      {s.label}
+      {s.labelKey ? t(s.labelKey) : s.label}
     </button>
   );
   return (
@@ -1386,7 +1386,7 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
                   /* Same as the empty state's starters: keep the mode the user chose. */
                   onClick={() => state.navigate(s.url)}
                 >
-                  <span className="immersion-rail-destination-label">{s.label}</span>
+                  <span className="immersion-rail-destination-label">{s.labelKey ? t(s.labelKey) : s.label}</span>
                   {s.lang !== 'auto' && (
                     <span className="immersion-rail-destination-lang muted">{s.lang.toUpperCase()}</span>
                   )}
