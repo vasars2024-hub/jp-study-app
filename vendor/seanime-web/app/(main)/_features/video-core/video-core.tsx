@@ -94,6 +94,7 @@ import { VideoCoreSettingsMenu } from "@/app/(main)/_features/video-core/video-c
 import { VideoCoreStatsForNerds } from "@/app/(main)/_features/video-core/video-core-stats"
 import { VideoCoreSubtitleMenu, type VideoCoreSubtitleSelection } from "@/app/(main)/_features/video-core/video-core-subtitle-menu"
 import { VideoCoreSubtitleManager } from "@/app/(main)/_features/video-core/video-core-subtitles"
+import { releaseVideoCoreManagers } from "@/app/(main)/_features/video-core/video-core-teardown"
 import { vc_timeRangeElement, VideoCoreTimeRange } from "@/app/(main)/_features/video-core/video-core-time-range"
 import { VideoCoreTopPlaybackInfo, VideoCoreTopSection } from "@/app/(main)/_features/video-core/video-core-top-section"
 import { VideoCoreWatchPartyChat } from "@/app/(main)/_features/video-core/video-core-watch-party-chat"
@@ -958,6 +959,9 @@ export function VideoCore(props: VideoCoreProps) {
     }, [watchHistory])
 
     const hasSoughtRef = React.useRef(false)
+    // Gum: `vc_mediaCaptionsManager` is the one manager atom not scoped to VideoCoreProvider,
+    // so another player can have replaced it by the time this one unmounts.
+    const ownMediaCaptionsManagerRef = React.useRef<MediaCaptionsManager | null>(null)
 
     // Lifecycle
     useUpdateEffect(() => {
@@ -978,16 +982,12 @@ export function VideoCore(props: VideoCoreProps) {
                 videoRef.current = null
             }
             setVideoElement(null)
-            subtitleManager?.destroy?.()
+            releaseVideoCoreManagers({ subtitleManager, mediaCaptionsManager, previewManager, anime4kManager, pipManager })
             setSubtitleManager(null)
-            mediaCaptionsManager?.destroy?.()
             setMediaCaptionsManager(null)
-            previewManager?.cleanup?.()
             setPreviewManager(null)
             setAudioManager(null)
-            anime4kManager?.destroy?.()
             setAnime4kManager(null)
-            pipManager?.destroy?.()
             setPipManager(null)
             setPipElement(null)
             // Keep the fullscreenManager alive during buffering or transitions to next episodes (when state.active is true).
@@ -1122,7 +1122,8 @@ export function VideoCore(props: VideoCoreProps) {
             })
             setMediaCaptionsManager(p => {
                 if (p) p.destroy()
-                return new MediaCaptionsManager({
+                // Gum: remembered so this player releases only its own manager on unmount.
+                return ownMediaCaptionsManagerRef.current = new MediaCaptionsManager({
                     videoElement: v!,
                     tracks: nonLibassSubtitleTracks,
                     translateTargetLang: serverStatus?.settings?.mediaPlayer?.vcTranslate
@@ -1655,6 +1656,27 @@ export function VideoCore(props: VideoCoreProps) {
             })
         }
     }, [])
+
+    // Gum: the other managers too. The "playback info is null" branch above only runs while
+    // this component is mounted; closing the video window unmounts it with a stream loaded,
+    // and the PiP, media-session and preview managers kept the whole player alive through
+    // `document` and `navigator.mediaSession` (see video-core-teardown.ts); the shared
+    // captions atom kept the last one reachable from the app store. `useUnmount` calls the
+    // latest render's closure, so these are the live managers. Under StrictMode's mount-time
+    // double invoke they are all still null.
+    useUnmount(() => {
+        const ownCaptions = mediaCaptionsManager && mediaCaptionsManager === ownMediaCaptionsManagerRef.current ? mediaCaptionsManager : null
+        releaseVideoCoreManagers({ subtitleManager, mediaCaptionsManager: ownCaptions, previewManager, anime4kManager, pipManager, mediaSessionManager })
+        ownMediaCaptionsManagerRef.current = null
+        setSubtitleManager(null)
+        if (ownCaptions) setMediaCaptionsManager(null)
+        setPreviewManager(null)
+        setAudioManager(null)
+        setAnime4kManager(null)
+        setPipManager(null)
+        setPipElement(null)
+        setMediaSessionManager(null)
+    })
 
     const chapterCues = useMemo(() => {
             if (!duration || duration <= 1) return []
