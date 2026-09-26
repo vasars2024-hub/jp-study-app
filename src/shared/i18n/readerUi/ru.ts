@@ -6,6 +6,8 @@ export const READER_UI_RU: Catalog = {
   'readerUi.dictPopup.aria': 'Словарь: {query}',
   'readerUi.dictPopup.levels': 'Насколько хорошо вы знаете это слово',
   'readerUi.dictPopup.mine': 'Собрать',
+  'reader.pdf.page': 'Страница {page}',
+  'reader.pdf.blankPage': '(На странице {page} нет текста)',
   'readerUi.dictPopup.mineTitle': 'Сохранить слово и предложение в коллекцию читалки',
   'readerUi.lookup.noSelection': 'Выделите слово или наведите указатель на слово в тексте и нажмите сочетание клавиш ещё раз.',
   'readerUi.gloss.langs': 'Языки значений',

@@ -6,6 +6,8 @@ export const READER_UI_ZH: Catalog = {
   'readerUi.dictPopup.aria': '词典：{query}',
   'readerUi.dictPopup.levels': '你对这个词的掌握程度',
   'readerUi.dictPopup.mine': '收集',
+  'reader.pdf.page': '第 {page} 页',
+  'reader.pdf.blankPage': '（第 {page} 页没有文字）',
   'readerUi.dictPopup.mineTitle': '将这个词及其例句保存到阅读器收藏',
   'readerUi.lookup.noSelection': '先选中一个词，或将指针指向正文中的词，再按一次快捷键即可查询。',
   'readerUi.gloss.langs': '释义语言',
