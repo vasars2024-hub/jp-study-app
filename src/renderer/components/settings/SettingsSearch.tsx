@@ -19,6 +19,9 @@ import { loadThemeId, onThemeChanged } from '../../theme/engine';
 import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../aeroDiscovery';
 import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../../wiredDiscovery';
 
+/** How recent a Tab keydown must be for the focus that follows it to count as the user's. */
+const TAB_INTENT_MS = 1000;
+
 const SettingsSearch = forwardRef<
   HTMLInputElement,
   {
@@ -53,6 +56,18 @@ const SettingsSearch = forwardRef<
   // dismissal is remembered until focus genuinely leaves the widget or the query changes,
   // rather than inferred from `relatedTarget`, which focus-in does not reliably carry.
   const dismissed = useRef(false);
+  // What tells a user's focus from the shell's programmatic one: see `onFocusIn`.
+  const pointerIntent = useRef(false);
+  const lastTabAt = useRef(Number.NEGATIVE_INFINITY);
+  useEffect(() => {
+    // Capture on the window: the Tab keydown fires on the element focus is LEAVING, which
+    // is outside this widget, so a listener on the widget never sees it.
+    const onKey = (ev: globalThis.KeyboardEvent) => {
+      if (ev.key === 'Tab') lastTabAt.current = performance.now();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const results = useMemo(
     () =>
       searchSettings(query, t, {
@@ -137,9 +152,18 @@ const SettingsSearch = forwardRef<
   // `document.body` — measured live: a real Tab walk of Settings stopped after 7 stops.
   // The pointer path never saw it because every item carries `onMouseDown preventDefault`,
   // so a click never blurs the input at all. `relatedTarget` is what tells the two apart.
+  //
+  // Opening on focus is for a USER arriving at the field: a pointer press on it, or a Tab
+  // onto it. The shell hands every newly opened window's focus to its first control (K7),
+  // and this input is Settings' first, so an unconditional open dropped the suggestion
+  // panel over the page every time Settings opened, hiding the breadcrumb, the page head
+  // and half the navigation until the user clicked somewhere else. A focus nobody asked
+  // for now leaves the panel shut; typing, ArrowDown or a click opens it.
   const onFocusIn = () => {
     cancelClose();
-    if (dismissed.current) return;
+    const byUser = pointerIntent.current || performance.now() - lastTabAt.current < TAB_INTENT_MS;
+    pointerIntent.current = false;
+    if (dismissed.current || !byUser) return;
     setOpen(true);
   };
   const onFocusOut = (ev: FocusEvent<HTMLDivElement>) => {
@@ -163,6 +187,9 @@ const SettingsSearch = forwardRef<
       onFocus={onFocusIn}
       onBlur={onFocusOut}
       onKeyDown={onKeyDown}
+      onPointerDown={() => {
+        pointerIntent.current = true;
+      }}
     >
       <Icon name="search" size={15} className="os-set-search-icon" />
       <input
@@ -176,6 +203,13 @@ const SettingsSearch = forwardRef<
         aria-expanded={open && (results.length > 0 || recent.length > 0 || !query.trim())}
         aria-autocomplete="list"
         autoComplete="off"
+        // A click on a field that already holds focus fires no focus event, and the shell's
+        // hand-off leaves it focused with the panel shut, so the click opens it itself.
+        onClick={() => {
+          if (open) return;
+          dismissed.current = false;
+          setOpen(true);
+        }}
         onChange={(e) => {
           setQuery(e.target.value);
           dismissed.current = false;
