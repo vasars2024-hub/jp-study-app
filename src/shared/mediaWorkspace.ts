@@ -8,6 +8,12 @@ import type { AcquisitionPlayback } from './acquisition';
  * the adopted VideoCore owns playback.
  */
 export const MEDIA_WORKSPACE_OPEN_EVENT = 'seanime:media-workspace-open';
+/**
+ * Ask the host to close the full-screen player. For a flow that starts in the player and
+ * continues in a desktop window (the sentence deck's "Listen now"): the player is an opaque
+ * full-screen view, so a window opened while it is up is behind it — present and invisible.
+ */
+export const MEDIA_WORKSPACE_CLOSE_EVENT = 'seanime:media-workspace-close';
 
 /**
  * How many `MediaWorkspaceHost`s are mounted in this window — i.e. whether anything

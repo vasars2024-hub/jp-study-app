@@ -20,6 +20,7 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { seanimeFailureKey, type SeanimeStatus } from '../shared/seanime';
 import {
+  MEDIA_WORKSPACE_CLOSE_EVENT,
   MEDIA_WORKSPACE_OPEN_EVENT,
   normalizeMediaWorkspaceOpenRequest,
   registerMediaWorkspaceHost,
@@ -89,10 +90,16 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
       requestMediaCenter({ tab: 'review', focus: detail });
     };
     window.addEventListener(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen);
+    const onWorkspaceClose = (): void => {
+      setOpen(false);
+      setPlaybackRequest(null);
+    };
+    window.addEventListener(MEDIA_WORKSPACE_CLOSE_EVENT, onWorkspaceClose);
     window.addEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
     return () => {
       releaseHost();
       window.removeEventListener(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen);
+      window.removeEventListener(MEDIA_WORKSPACE_CLOSE_EVENT, onWorkspaceClose);
       window.removeEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
     };
   }, []);

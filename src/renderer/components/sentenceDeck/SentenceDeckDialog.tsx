@@ -33,6 +33,7 @@ import { loadDeck, type FlashcardTextProvenance } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import { getStudyLang, studyContentLang } from '../../studyEnvironment';
 import { requestFlashcardsFocus } from '../../openIntents';
+import { MEDIA_WORKSPACE_CLOSE_EVENT, mediaWorkspaceIsOpen } from '../../../shared/mediaWorkspace';
 import {
   buildSentenceDeck,
   undoSentenceDeck,
@@ -313,6 +314,8 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
   }
 
   function listenNow(result: SentenceDeckDone): void {
+    // From the player: close it first, or Flashcards opens behind the full-screen view.
+    if (mediaWorkspaceIsOpen()) window.dispatchEvent(new CustomEvent(MEDIA_WORKSPACE_CLOSE_EVENT));
     requestFlashcardsFocus({ folder: result.folder, cardId: null, review: 'listening' });
     onClose();
   }

@@ -28,3 +28,13 @@ describe('sentence-deck dialog layering', () => {
     expect(token('z-view-overlay')).toBeLessThan(token('z-shell-overlay'));
   });
 });
+
+describe('"Listen now" from the player', () => {
+  it('closes the full-screen player before focusing Flashcards', () => {
+    const TSX = read('components/sentenceDeck/SentenceDeckDialog.tsx');
+    const fn = TSX.slice(TSX.indexOf('function listenNow('));
+    const body = fn.slice(0, fn.indexOf('\n  }\n'));
+    expect(body.indexOf('MEDIA_WORKSPACE_CLOSE_EVENT')).toBeGreaterThan(-1);
+    expect(body.indexOf('MEDIA_WORKSPACE_CLOSE_EVENT')).toBeLessThan(body.indexOf('requestFlashcardsFocus'));
+  });
+});
