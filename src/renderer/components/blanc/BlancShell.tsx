@@ -2849,6 +2849,8 @@ function ImageConverterPanel() {
 }
 
 function AutomationBuilderPanel() {
+  const { t } = useT();
+  const developerTools = useBlancDeveloperTools();
   const [copied, setCopied] = useState(false);
   const [launchMsg, setLaunchMsg] = useState('');
   // Resolved from this install rather than a baked-in constant. That constant
@@ -2880,10 +2882,12 @@ function AutomationBuilderPanel() {
     const result = await window.api.launchAutomationBuilder();
     setLaunchMsg(
       result.ok
-        ? `Launched${result.pid ? `, pid ${result.pid}` : ''}. Stop session recording with ${AUTOMATION_BUILDER.stopKey}.`
-        : result.error ?? 'Automation Builder could not be launched.',
+        ? result.pid
+          ? t('blanc.tb.ab.launchedPid', { pid: result.pid, key: AUTOMATION_BUILDER.stopKey })
+          : t('blanc.tb.ab.launched', { key: AUTOMATION_BUILDER.stopKey })
+        : result.error ?? t('blanc.tb.ab.launchFailed'),
     );
-  }, []);
+  }, [t]);
 
   useEffect(() => registerCommandHandler('automation.runSelected', () => {
     void launchBuilder();
@@ -2893,58 +2897,60 @@ function AutomationBuilderPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>{AUTOMATION_BUILDER.name}</legend>
-        <p className="blanc-note">
-          Existing Windows automation builder detected as a PowerShell side tool. It records cursor movement, clicks, keys, waits, and session configs without adding AI to Blanc.
-        </p>
+        <legend>{t('blanc.tool.automationBuilder')}</legend>
+        <p className="blanc-note">{t('blanc.tb.ab.intro')}</p>
         <div className="blanc-command-row">
           <input
             readOnly
-            value={command ?? 'automation-builder.ps1 was not found in this install.'}
-            aria-label="Automation Builder launch command"
+            value={command ?? t('blanc.tb.ab.notFound')}
+            aria-label={t('blanc.tb.ab.commandAria')}
           />
           <button type="button" onClick={() => void launchBuilder()}>
-            Launch
+            {t('blanc.tb.ab.launch')}
           </button>
           <button type="button" onClick={() => void copyCommand()} disabled={!command}>
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('blanc.tb.ab.copied') : t('blanc.tb.ab.copy')}
           </button>
         </div>
         {launchMsg && <p className="blanc-note">{launchMsg}</p>}
       </fieldset>
       <div className="blanc-grid two">
         <fieldset>
-          <legend>Capabilities</legend>
+          <legend>{t('blanc.tb.ab.capabilities')}</legend>
           <table>
             <tbody>
-              {AUTOMATION_BUILDER.capabilities.map((item) => (
+              {AUTOMATION_BUILDER.capabilities.map((item, index) => (
                 <tr key={item}>
-                  <td>{item}</td>
-                  <td>Available</td>
+                  <td>{t(`blanc.tb.ab.cap.${index}`)}</td>
+                  <td>{t('blanc.tb.ab.available')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </fieldset>
         <fieldset>
-          <legend>Safety</legend>
+          <legend>{t('blanc.tb.ab.safety')}</legend>
           <ul className="blanc-plain-list">
-            {AUTOMATION_BUILDER.safetyNotes.map((note) => (
-              <li key={note}>{note}</li>
+            {AUTOMATION_BUILDER.safetyNotes.map((note, index) => (
+              <li key={note}>
+                {t(`blanc.tb.ab.safe.${index}`, { key: AUTOMATION_BUILDER.stopKey, folder: AUTOMATION_BUILDER.configDir })}
+              </li>
             ))}
           </ul>
         </fieldset>
       </div>
       <fieldset>
-        <legend>Migration</legend>
-        <p className="blanc-note">
-          Config folder: <code>{AUTOMATION_BUILDER.configDir}</code>. This is separate from Blanc memory and from the main Gum settings.
-        </p>
-        <ul className="blanc-plain-list">
-          {AUTOMATION_BUILDER.migrationNotes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
+        <legend>{t('blanc.tb.ab.configs')}</legend>
+        <p className="blanc-note">{t('blanc.tb.ab.configFolder', { folder: AUTOMATION_BUILDER.configDir })}</p>
+        {/* The migration notes are the adapter roadmap — developer reading, so they
+            show only with Blanc's developer tools on. */}
+        {developerTools && (
+          <ul className="blanc-plain-list">
+            {AUTOMATION_BUILDER.migrationNotes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        )}
       </fieldset>
     </div>
   );

@@ -1274,14 +1274,11 @@ export function BlancAudioMinePanel() {
   return (
     <div className="blanc-tool-detail blanc-audio-mine">
       <fieldset>
-        <legend>Source</legend>
-        <p className="blanc-note">
-          Pick a local audio or video file. It is transcribed on this machine with Whisper —
-          nothing is uploaded. Then click any word in a line to look it up and mine it to your deck.
-        </p>
+        <legend>{t('blanc.native.audio.legend.source')}</legend>
+        <p className="blanc-note">{t('blanc.native.audio.intro')}</p>
         <div className="blanc-command-row">
           <button type="button" onClick={pickFile} disabled={busy}>
-            {fileName ? 'Change file' : 'Choose file…'}
+            {fileName ? t('blanc.native.audio.changeFile') : t('blanc.native.audio.chooseFile')}
           </button>
           {fileName && (
             <span className="blanc-audio-file" lang="ja" title={fileName}>
@@ -1291,7 +1288,7 @@ export function BlancAudioMinePanel() {
         </div>
         {pickError && <p className="blanc-warning">{pickError}</p>}
         <div className="blanc-status-row">
-          <span>Language</span>
+          <span>{t('blanc.native.audio.language')}</span>
           {(['ja', 'zh'] as const).map((l) => (
             <button
               key={l}
@@ -1301,48 +1298,47 @@ export function BlancAudioMinePanel() {
               disabled={busy}
               onClick={() => setLang(l)}
             >
-              {l === 'ja' ? 'Japanese' : 'Chinese'}
+              {t(`blanc.native.audio.lang.${l}`)}
             </button>
           ))}
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Model</legend>
+        <legend>{t('blanc.native.audio.legend.model')}</legend>
         <p className="blanc-note">
-          {WHISPER_TIER_LABELS[tier]} ({formatBytes(spec.sizeBytes)}) on{' '}
-          {device === 'cpu' ? 'CPU' : 'auto — GPU when available'}. Model and device follow your
-          Transcription settings.
+          {t('blanc.native.audio.modelLine', {
+            model: WHISPER_TIER_LABELS[tier],
+            size: formatBytes(spec.sizeBytes),
+            device: device === 'cpu' ? t('blanc.native.audio.deviceCpu') : t('blanc.native.audio.deviceAuto'),
+          })}
         </p>
         {modelReady ? (
-          <p className="blanc-note">Downloaded — runs fully offline.</p>
+          <p className="blanc-note">{t('blanc.native.audio.downloaded')}</p>
         ) : (
-          <p className="blanc-warning">
-            Not downloaded yet. The first run streams about {formatBytes(spec.sizeBytes)} — keep this
-            window open until it finishes. You can pre-download it in Settings → Transcription.
-          </p>
+          <p className="blanc-warning">{t('blanc.native.audio.notDownloaded', { size: formatBytes(spec.sizeBytes) })}</p>
         )}
       </fieldset>
 
       <fieldset>
-        <legend>Transcript</legend>
+        <legend>{t('blanc.native.audio.legend.transcript')}</legend>
         <div className="blanc-command-row">
           <button type="button" onClick={transcribe} disabled={!fileUrl || busy}>
-            Transcribe
+            {t('blanc.native.audio.transcribe')}
           </button>
           {busy && (
             <button type="button" onClick={transcription.cancel}>
-              Stop
+              {t('blanc.native.audio.stop')}
             </button>
           )}
           {!busy && (cues.length > 0 || state === 'done' || state === 'error') && (
             <button type="button" onClick={transcription.reset}>
-              Clear
+              {t('blanc.native.audio.clear')}
             </button>
           )}
           <label className="blanc-checkbox">
             <input type="checkbox" checked={furigana} onChange={(e) => setFurigana(e.target.checked)} />
-            Furigana
+            {t('blanc.native.audio.furigana')}
           </label>
         </div>
 
@@ -1365,19 +1361,14 @@ export function BlancAudioMinePanel() {
               ))}
             </ol>
             {state === 'done' && (
-              <p className="blanc-note">
-                {cues.length} lines. Click a word to look it up, then mine it from the popup — mined
-                cards appear in the developer console.
-              </p>
+              <p className="blanc-note">{t('blanc.native.audio.doneNote', { count: cues.length })}</p>
             )}
           </>
         ) : (
           !busy &&
           state !== 'error' && (
             <p className="blanc-note">
-              {fileUrl
-                ? 'Press Transcribe to generate lines from this file.'
-                : 'Choose a file to get started.'}
+              {fileUrl ? t('blanc.native.audio.pressTranscribe') : t('blanc.native.audio.chooseToStart')}
             </p>
           )
         )}

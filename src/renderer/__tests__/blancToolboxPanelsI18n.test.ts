@@ -53,3 +53,28 @@ describe('Blanc window size', () => {
     expect(mode).toMatch(/rememberWindowBounds \? undefined : \{ width: 560, height: 460 \}/);
   });
 });
+
+describe('Blanc audio mining, Automation Builder and Notebook', () => {
+  const native = readFileSync(path.join(__dirname, '..', 'components', 'blanc', 'BlancStudyNativePanels.tsx'), 'utf8');
+  const notebook = readFileSync(path.join(__dirname, '..', 'components', 'notebook', 'NotebookContent.tsx'), 'utf8');
+
+  it('the audio-mining panel reads the catalogue', () => {
+    for (const literal of ["'Japanese' : 'Chinese'", '<legend>Model</legend>', 'Choose a file to get started.']) {
+      expect(native, literal).not.toContain(literal);
+    }
+  });
+
+  it('the Automation Builder shows its roadmap notes to developers only', () => {
+    expect(shell).not.toContain('<legend>Migration</legend>');
+    expect(shell).toMatch(/\{developerTools && \(\s*<ul className="blanc-plain-list">\s*\{AUTOMATION_BUILDER\.migrationNotes/);
+  });
+
+  it('the Notebook refreshes on changes and names its own folders in the UI language', () => {
+    expect(notebook).toContain('onDeckChanged(bump)');
+    expect(notebook).toContain('[sources, tick]');
+    expect(notebook).toContain('notebookFolderLabel(f.label, t)');
+    for (const lang of ['en', 'ja', 'zh', 'ru'] as const) {
+      expect(typeof (CATALOGS[lang] as Record<string, unknown>)['notebook.folder.planToRead'], lang).toBe('string');
+    }
+  });
+});
