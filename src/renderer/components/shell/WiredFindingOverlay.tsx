@@ -16,10 +16,18 @@ import {
   onWiredArchiveSettingsChanged,
   type WiredFindingFeature,
 } from '../../terminalModeSettings';
-import wiredFaceUrl from '../../assets/wired-lain-reference.jpg';
+import guidePortraitUrl from '../../assets/companions/guide-portrait.png';
+import { privateImageUrl } from '../../privateAssets';
 import WiredLyricStream from './WiredLyricStream';
 import WiredLyricPreview from './WiredLyricPreview';
 import { SYSTEM_METADATA } from '../../lyricTransmission';
+
+/**
+ * The guide's face: the owner's private reference image when their build has
+ * one (private-assets/images, git-ignored), otherwise Gum's own original
+ * signal-guide portrait.
+ */
+const wiredFaceUrl = privateImageUrl('wired-guide-reference.jpg') ?? guidePortraitUrl;
 
 function cleanLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();

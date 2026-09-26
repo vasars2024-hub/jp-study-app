@@ -131,7 +131,11 @@ const config: ForgeConfig = {
     // Each entry lands in the resources root under its basename, so `build/seanime`
     // becomes `<resourcesPath>/seanime` — the slot `exePath.ts` resolves. Populated by
     // SeanimeSidecarStagingPlugin's prePackage hook; the directory always exists by then.
-    extraResource: ['public', SIDECAR_STAGING_DIR],
+    //
+    // `private-assets/` is the owner's git-ignored third-party art (see .gitignore). It is
+    // shipped only when the folder exists, so a public clone packages exactly as before;
+    // main.ts serves its `public/` after ours (`<resourcesPath>/private-assets/public`).
+    extraResource: ['public', SIDECAR_STAGING_DIR, ...(fs.existsSync('private-assets') ? ['private-assets'] : [])],
     // Ship Vite output + production node_modules; public ships once via extraResource.
     ignore: (file) => {
       if (!file) return false;
