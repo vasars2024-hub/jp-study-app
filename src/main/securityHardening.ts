@@ -243,6 +243,27 @@ export type SessionKind = 'app' | 'immersion' | 'other';
 const APP_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'media', 'local-fonts', 'notifications']);
 const IMMERSION_PERMISSIONS = new Set(['fullscreen', 'clipboard-sanitized-write']);
 
+/**
+ * WebContents allowed to ask for a display-media stream: the hidden system-audio
+ * capture window (`main/systemAudioCapture.ts`) and nothing else. Chromium asks
+ * for `media` with a video type on `getDisplayMedia`, which the rule below
+ * refuses for every other app window; the stream it then gets is decided by the
+ * session's display-media handler, which also checks the requesting frame. The
+ * screen video that comes with the loopback audio is stopped on arrival.
+ */
+const displayCaptureContents = new Set<number>();
+
+export function allowDisplayCapture(webContentsId: number): () => void {
+  displayCaptureContents.add(webContentsId);
+  return () => displayCaptureContents.delete(webContentsId);
+}
+
+export function displayCaptureAllowed(webContentsId: number | undefined, permission: string, mediaTypes?: readonly string[]): boolean {
+  if (webContentsId === undefined || !displayCaptureContents.has(webContentsId)) return false;
+  if (permission === 'display-capture') return true;
+  return permission === 'media' && !!mediaTypes && mediaTypes.every((t) => t === 'audio' || t === 'video');
+}
+
 export function permissionAllowed(
   kind: SessionKind,
   permission: string,
@@ -270,13 +291,17 @@ export function installPermissionPolicy(
   ses.setPermissionRequestHandler((wc, permission, callback, details) => {
     const origin = urlOrigin((details as { requestingUrl?: string }).requestingUrl) ?? urlOrigin(wc?.getURL());
     const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes;
-    const ok = permissionAllowed(kind, permission, origin, policy, mediaTypes);
+    const ok =
+      permissionAllowed(kind, permission, origin, policy, mediaTypes)
+      || (kind === 'app' && policy.isAppOrigin(origin) && displayCaptureAllowed(wc?.id, permission, mediaTypes));
     if (!ok) onDenied?.(permission, origin);
     callback(ok);
   });
-  ses.setPermissionCheckHandler((_wc, permission, requestingOrigin, details) => {
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
     const mediaType = (details as { mediaType?: string }).mediaType;
     const origin = urlOrigin(requestingOrigin) ?? requestingOrigin;
-    return permissionAllowed(kind, permission, origin, policy, mediaType ? [mediaType] : permission === 'media' ? [] : undefined);
+    const types = mediaType ? [mediaType] : permission === 'media' ? [] : undefined;
+    return permissionAllowed(kind, permission, origin, policy, types)
+      || (kind === 'app' && policy.isAppOrigin(origin) && displayCaptureAllowed(wc?.id, permission, mediaType ? [mediaType] : undefined));
   });
 }
