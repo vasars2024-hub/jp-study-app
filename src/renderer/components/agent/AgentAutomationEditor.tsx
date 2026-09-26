@@ -20,6 +20,7 @@ import {
 import { loadLocalAgentSettings, onLocalAgentSettingsChanged } from '../../localAgentSettingsStore';
 import { loadLocalAgentProfiles, onLocalAgentProfilesChanged } from '../../localAgentProfilesStore';
 import { agentPermissionLabelKey } from '../blanc/AgentProfileOperations';
+import { Select } from '../ui';
 
 const AGENT_WEEKDAY_KEYS = [
   'common.weekday.sun',
@@ -145,27 +146,27 @@ export function AgentAutomationEditor({ variant = 'settings' }: { variant?: keyo
     <div className="agent-automation-editor" data-variant={variant}>
       <p className={cls.note}>{t('blanc.agent.scheduleNote')}</p>
       <div className={cls.grid}>
-        <label>{t('blanc.agent.field.name')}<input value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} /></label>
-        <label>{t('blanc.agent.field.time')}<input type="time" value={time} onChange={(event) => setTime(event.currentTarget.value)} /></label>
+        <label>{t('blanc.agent.field.name')}<input className="ui-input" value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} /></label>
+        <label>{t('blanc.agent.field.time')}<input className="ui-input" type="time" value={time} onChange={(event) => setTime(event.currentTarget.value)} /></label>
         <label>
           {t('blanc.agent.field.frequency')}
-          <select value={frequency} onChange={(event) => setFrequency(event.currentTarget.value as AgentAutomation['frequency'])}>
+          <Select value={frequency} onChange={(event) => setFrequency(event.currentTarget.value as AgentAutomation['frequency'])}>
             <option value="daily">{t('blanc.agent.frequency.daily')}</option>
             <option value="weekly">{t('blanc.agent.frequency.weekly')}</option>
-          </select>
+          </Select>
         </label>
         {frequency === 'weekly' && (
           <label>
             {t('blanc.agent.field.day')}
-            <select value={weekday} onChange={(event) => setWeekday(Number(event.currentTarget.value))}>
+            <Select value={weekday} onChange={(event) => setWeekday(Number(event.currentTarget.value))}>
               {[1, 2, 3, 4, 5, 6, 0].map((day) => <option key={day} value={day}>{t(AGENT_WEEKDAY_KEYS[day])}</option>)}
-            </select>
+            </Select>
           </label>
         )}
       </div>
       <label>
         {t('blanc.agent.field.scheduledRequest')}
-        <textarea rows={2} maxLength={500} value={objective} placeholder={t('blanc.agent.placeholder.scheduledRequest')} onChange={(event) => setObjective(event.currentTarget.value)} />
+        <textarea className="ui-textarea" rows={2} maxLength={500} value={objective} placeholder={t('blanc.agent.placeholder.scheduledRequest')} onChange={(event) => setObjective(event.currentTarget.value)} />
       </label>
       <div className={cls.actions}>
         <button type="button" className="btn" onClick={add} disabled={!settings.enabled}>{t('blanc.agent.action.addSchedule')}</button>

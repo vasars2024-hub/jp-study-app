@@ -224,3 +224,38 @@
     white-space: normal;
   }
 }
+
+/* ------------------------------------------------ round 3: no boxes in boxes ---
+   The Arena drew a framed game list and a framed stage inside the Arena's own
+   panel, framed XP / streak / badges / level chips, a framed "Round options" bar
+   and a framed prompt card inside the stage. In the default themes the list is a
+   rail beside a hairline, the stage keeps its work tint without a frame, the chips
+   and the prompt keep their tint, and the options disclosure is a row between two
+   hairlines. Borders go transparent where the geometry matters, so nothing moves. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .game-list:where(:not(.blanc-root *)) {
+  border-color: transparent;
+  border-right-color: var(--game-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .game-stage:where(:not(.blanc-root *)) {
+  border-color: transparent;
+  box-shadow: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :is(.game-arena-progress span, .game-stage-meta span, .game-round-hud span, .game-prompt):where(:not(.blanc-root *)) {
+  border-color: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .game-ready-options:where(:not(.blanc-root *)) {
+  border-width: 1px 0;
+  border-radius: 0;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .game-ready-options:where(:not(.blanc-root *)) > summary {
+  padding-left: 0;
+  padding-right: 0;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .game-ready-options-body:where(:not(.blanc-root *)) {
+  padding-left: 0;
+  padding-right: 0;
+}
