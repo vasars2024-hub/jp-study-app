@@ -75,13 +75,13 @@ describe('Mini pinned routines', () => {
   });
 
   it('round-trips a pinned list through save and load', () => {
-    saveMiniMode({ routines: ['br-miko-climb', 'br-miko-cheer'] });
-    expect(loadMiniMode().routines).toEqual(['br-miko-climb', 'br-miko-cheer']);
+    saveMiniMode({ routines: ['br-aero-climb', 'br-aero-cheer'] });
+    expect(loadMiniMode().routines).toEqual(['br-aero-climb', 'br-aero-cheer']);
   });
 
   it('leaves the pinned list alone when an unrelated field is patched', () => {
-    saveMiniMode({ routines: ['br-miko-climb'] });
+    saveMiniMode({ routines: ['br-aero-climb'] });
     saveMiniMode({ tint: 'ocean' });
-    expect(loadMiniMode().routines).toEqual(['br-miko-climb']);
+    expect(loadMiniMode().routines).toEqual(['br-aero-climb']);
   });
 });

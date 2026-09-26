@@ -8,7 +8,7 @@ export type CompanionTypeId =
   | 'study-buddy'
   | 'critter'
   | 'timekeeper'
-  | 'miko-shimeji'
+  | 'aero-assistant'
   | 'wired-navi';
 export type CompanionMood = 'calm' | 'happy' | 'sleepy' | 'curious' | 'celebrate';
 export type CompanionReactivity = 'quiet' | 'normal' | 'playful';
@@ -41,7 +41,7 @@ const ALL_COMPANION_DEFS: CompanionDef[] = [
     color: '#ff6b81',
     accent: '#ffd0d7',
     variant: 'shimeji',
-    spritePack: 'tamamo',
+    spritePack: 'beni',
     voice: { baseHz: 520, wave: 'square', stepPerMora: 38 },
   },
   {
@@ -51,7 +51,7 @@ const ALL_COMPANION_DEFS: CompanionDef[] = [
     color: '#6b8cff',
     accent: '#c9d6ff',
     variant: 'shimeji',
-    spritePack: 'ene',
+    spritePack: 'yuzu',
     voice: { baseHz: 640, wave: 'triangle', stepPerMora: 48 },
   },
   {
@@ -61,39 +61,45 @@ const ALL_COMPANION_DEFS: CompanionDef[] = [
     color: '#e6c35c',
     accent: '#ffe9a8',
     variant: 'shimeji',
-    spritePack: 'maka',
+    spritePack: 'tock',
     voice: { baseHz: 440, wave: 'sine', stepPerMora: 28 },
   },
   {
-    id: 'miko-shimeji',
-    label: 'Remilia',
-    blurb: 'Aero discovery shimeji. Walks, falls, and climbs the desktop frame.',
+    id: 'aero-assistant',
+    label: 'Aero assistant',
+    blurb: 'A friendly retro desktop helper from the Aero theme. Walks, climbs and chats.',
     color: '#4bd6cf',
     accent: '#d4fff8',
     variant: 'shimeji',
-    spritePack: 'remilia',
+    spritePack: 'orbi',
     voice: { baseHz: 700, wave: 'square', stepPerMora: 55 },
     secret: true,
     secretMode: 'aero',
   },
   {
     id: 'wired-navi',
-    label: 'Fateburn',
+    label: 'Signal guide',
     blurb: 'Wired discovery signal-guide shimeji.',
     color: '#4bc7ff',
     accent: '#dff8ff',
     variant: 'wired-navi',
-    spritePack: 'fateburn',
+    spritePack: 'ping',
     voice: { baseHz: 300, wave: 'sawtooth', stepPerMora: 18 },
     secret: true,
     secretMode: 'wired',
   },
 ];
 
+/** The companion type whose built-in character is `packId`, if any. */
+export function companionTypeForDefaultPack(packId: ShimejiPackId | undefined): CompanionTypeId | undefined {
+  if (!packId) return undefined;
+  return ALL_COMPANION_DEFS.find((d) => d.spritePack === packId)?.id;
+}
+
 /**
  * A def with its name and blurb in the UI language. Keys are derived from the id
- * (`settings.companions.type.<id>.name` / `.blurb`); a key that is not in the catalog —
- * the secret companions' names, which are proper names — keeps the def's own text.
+ * (`settings.companions.type.<id>.name` / `.blurb`); a key that is not in the catalog
+ * keeps the def's own text.
  */
 export function localizedCompanionDef(def: CompanionDef, t: (key: string) => string): CompanionDef {
   const resolve = (key: string, fallback: string): string => {
@@ -179,8 +185,8 @@ export function defaultCompanions(w = 900, h = 500): CompanionInstance[] {
       status: 'Watching the clock',
     },
     {
-      id: 'c-bonzi',
-      typeId: 'miko-shimeji',
+      id: 'c-aero',
+      typeId: 'aero-assistant',
       x: Math.max(40, w * 0.72),
       y: Math.max(80, h - 112),
       facing: -1,
@@ -190,7 +196,7 @@ export function defaultCompanions(w = 900, h = 500): CompanionInstance[] {
       motionTargetX: Math.max(40, w * 0.22),
     },
     {
-      id: 'c-fateburn',
+      id: 'c-signal',
       typeId: 'wired-navi',
       x: Math.max(40, w * 0.86),
       y: Math.max(80, h - 118),

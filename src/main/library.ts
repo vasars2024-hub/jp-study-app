@@ -17,6 +17,7 @@ import { broadcastReadingLists } from './readingListsIpc';
 import { getReadingListsStore } from './readingListsStore';
 import { readJsonDetailedSync, readJsonSync, registerJsonFlusher, writeJsonAtomicSync } from './atomicJson';
 import { logDiagnostic } from './errorLog';
+import { resolveCompanionPackFrameFile } from './companionPacks';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -74,8 +75,11 @@ function tokenFromLocalFileRequest(requestUrl: string): string | null {
 export function registerLocalFileProtocol(): void {
   protocol.handle('localfile', (request) => {
     try {
-      const token = tokenFromLocalFileRequest(request.url);
-      const file = token ? localFileTokens.get(token) : undefined;
+      // Imported companion sprite packs: localfile://pet/<packId>/<frame>, resolved
+      // inside <userData>/companion-packs only (companionPacks.ts validates both parts).
+      const petFrame = request.url.startsWith('localfile://pet/') ? resolveCompanionPackFrameFile(request.url) : null;
+      const token = petFrame ? null : tokenFromLocalFileRequest(request.url);
+      const file = petFrame ?? (token ? localFileTokens.get(token) : undefined);
       if (!file || !fs.existsSync(file)) {
         console.warn('[localfile] not found', request.url, token);
         return new Response('Not found', { status: 404 });

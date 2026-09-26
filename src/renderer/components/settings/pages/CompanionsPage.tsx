@@ -41,6 +41,7 @@ import { requestWiredArchiveShutdown } from '../../../wiredArchiveLifecycle';
 import { TRINKETS, loadTrinketState, isTrinketUnlocked } from '../../../environment/companionTrinkets';
 import { READING_RECORDED_EVENT } from '../../../stats';
 import Icon from '../../Icons';
+import CompanionPacksCard from './CompanionPacksCard';
 
 function blankStep(type: BuddyStep['type']): BuddyStep {
   switch (type) {
@@ -93,7 +94,6 @@ export default function CompanionsPage() {
   }, []);
   // Names and blurbs resolve through i18n at render (CLAUDE.md i18n rule 7): the
   // catalog is module-level data and used to reach every language in English.
-  // `localizedCompanionDef` keeps a proper name (Remilia, Fateburn) as it is.
   const companionDefs = useMemo(
     () => COMPANION_DEFS().map((def) => localizedCompanionDef(def, t)),
     [aeroDiscovered, wiredDiscovered, lang],
@@ -424,6 +424,8 @@ export default function CompanionsPage() {
           label={t('settings.companions.calmerMovement')}
         />
       </SettingsCard>
+
+      <CompanionPacksCard />
 
       <SettingsCard
         id="buddy-programmer"

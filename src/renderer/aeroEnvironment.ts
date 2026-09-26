@@ -6,6 +6,7 @@ import { loadEnvironment, onEnvironmentChanged, saveEnvironment } from './enviro
 import { presetPatch } from './environment/environmentPresets';
 import type { EnvironmentSettings, WallpaperPlaylist } from './environment/types';
 import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
+import { migrateLegacyCompanionStorage } from './environment/companionLegacyIds';
 import { AERO_THEME_ID } from './theme/frutiger-aero';
 import { DEFAULT_THEME_ID, loadThemeId, onThemeChanged } from './theme/engine';
 import {
@@ -52,7 +53,7 @@ export function secretAeroEnvironmentPatch(): Partial<EnvironmentSettings> {
     enabled: true,
     ...(presetPatch('floating-islands') ?? {}),
     companionsEnabled: true,
-    companionTypes: ['miko-shimeji'],
+    companionTypes: ['aero-assistant'],
     companionReactivity: 'playful',
     companions: [],
     rotationEnabled: true,
@@ -64,6 +65,7 @@ export function secretAeroEnvironmentPatch(): Partial<EnvironmentSettings> {
 }
 
 function readJson<T>(key: string): T | null {
+  migrateLegacyCompanionStorage();
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;

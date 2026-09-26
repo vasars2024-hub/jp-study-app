@@ -7,6 +7,7 @@ import type { DesktopWinSection } from '../shared/desktop';
 import { DESKTOP_STUDY } from '../shared/desktop';
 import { getDesktopLayout, onDesktopChanged } from './desktopState';
 import { WALL_PRESETS } from './environment/wallCatalog';
+import { migrateLegacyCompanionStorage } from './environment/companionLegacyIds';
 
 /** Apps that can be pinned in Mini (must be pop-out capable). */
 export type MiniAppId =
@@ -290,6 +291,7 @@ export function moveMiniApp(apps: MiniAppId[], id: MiniAppId, dir: -1 | 1): Mini
 }
 
 export function loadMiniMode(): MiniModeSettings {
+  migrateLegacyCompanionStorage();
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULTS, apps: [...DEFAULT_APPS], routines: [] };

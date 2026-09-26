@@ -4,8 +4,8 @@ import type { CompanionInstance } from './companionCatalog';
 
 const pet = (over: Partial<CompanionInstance> = {}): CompanionInstance =>
   ({
-    id: 'c-bonzi',
-    typeId: 'bonzi',
+    id: 'c-aero',
+    typeId: 'aero',
     x: 10,
     y: 20,
     facing: 1,

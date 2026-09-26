@@ -8,6 +8,7 @@ import {
 } from './types';
 import { mergeBuddyRoutines } from './buddyRoutines';
 import { writeLocalStorageJson } from '../localStorageWrite';
+import { migrateLegacyCompanionStorage } from './companionLegacyIds';
 
 const KEY = 'jp-os-environment-v1';
 const EVENT = 'jp-os-environment-changed';
@@ -15,7 +16,7 @@ const CURRENT_COMPANION_TYPES = new Set([
   'study-buddy',
   'critter',
   'timekeeper',
-  'miko-shimeji',
+  'aero-assistant',
   'wired-navi',
 ]);
 
@@ -189,6 +190,7 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
 }
 
 export function loadEnvironment(): EnvironmentSettings {
+  migrateLegacyCompanionStorage();
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) return normalize(JSON.parse(raw) as Partial<EnvironmentSettings>);
