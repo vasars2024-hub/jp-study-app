@@ -5,7 +5,6 @@
   "src/renderer/components/media/gum/GumIcons.tsx": 15,
   "src/renderer/components/PerfOverlay.tsx": 8,
   "src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx": 19,
-  "src/renderer/components/translate-analysis/DeclensionDrawer.tsx": 9,
   "src/renderer/components/ui/MenuBar.tsx": 10,
   "src/renderer/components/ui/SplitPane.tsx": 7,
   "src/renderer/main.tsx": 6,
