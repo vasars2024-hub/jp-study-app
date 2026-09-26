@@ -27,6 +27,11 @@ export interface DictionaryImportProgress {
   lines: number;
   /** A bounded human-readable phase; consumers must not treat it as terminal. */
   phase: 'reading' | 'importing' | 'committing';
+  /**
+   * Whole-job completion, 0-100, when the importer can know it (the legacy
+   * migration measures the bytes it has read of every store). Absent otherwise.
+   */
+  percent?: number;
 }
 
 export interface DictionaryImportJobSnapshot {
@@ -82,6 +87,10 @@ export function normalizeDictionaryImportJobSnapshot(value: unknown): Dictionary
       || !Number.isSafeInteger(progress.lines) || (progress.lines as number) < 0
       || !PHASES.has(progress.phase as DictionaryImportProgress['phase'])) return null;
     snapshot.progress = { jobId: snapshot.jobId, kind: snapshot.kind, lines: progress.lines as number, phase: progress.phase as DictionaryImportProgress['phase'] };
+    const percent = progress.percent;
+    if (typeof percent === 'number' && Number.isFinite(percent) && percent >= 0 && percent <= 100) {
+      snapshot.progress.percent = Math.floor(percent);
+    }
   }
   if (snapshot.status === 'running') return snapshot;
   if (!raw.terminal || typeof raw.terminal !== 'object') return null;

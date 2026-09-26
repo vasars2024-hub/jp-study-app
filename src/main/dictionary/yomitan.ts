@@ -118,8 +118,9 @@ let initPromise: Promise<void> | null = null;
  * for the life of the process — and on an installation whose stores have been
  * migrated into SQLite nothing on the lookup path reads them: the database
  * answers exact, reading, de-inflected and prefix lookups for the same data. So
- * boot loads only the metadata (`initYomitanMeta`), and the glossaries load the
- * first time a caller that still reads them directly awaits `initYomitan()`.
+ * boot loads only the metadata (`initYomitanMeta`), and the main process never
+ * loads the glossaries at all (see `initYomitan`); only tests do, through
+ * `ensureYomitanTerms`.
  */
 let termsLoaded = false;
 
@@ -1195,23 +1196,21 @@ export function removeYomitanDict(id: string): { ok: boolean; error?: string } {
 }
 
 /**
- * The metadata, and the term glossaries only while they can answer something
- * the database cannot: resolves `true` when a caller may read the term index
- * (`lookupOfflineDeinflected`, `lookupGlossary`, `lookupTermMerged`), `false`
- * when SQLite owns every term store and the caller should not.
+ * The metadata, and whether a caller may read the in-memory term index
+ * (`lookupOfflineDeinflected`, `lookupGlossary`, `lookupTermMerged`).
  *
- * This is the single gate on the ~260 MB parse. Every caller that reads the
- * glossaries asks it first, so on a migrated installation no feature — the
- * extension, the gloss batch, mining, the pop-up's miss path — can load them.
- * They load only as the documented migration fallback, for a store still
- * waiting for its database import, and `releaseYomitanTermsIfMigrated` drops
- * them again once that import lands.
+ * The main process never parses the legacy term glossaries any more. It used
+ * to, as the migration fallback: while a store waited for its SQLite import, the
+ * first lookup of every boot parsed ~151 MB of JSON here and froze the whole
+ * app for 7.5-10.4 s — every boot, for the ~13 minutes the first import takes.
+ * Now a lookup during the import is answered by the stores already in SQLite
+ * and the online fallback, and says the dictionary is still being prepared
+ * (`legacyMigrationProgress`). So this resolves `true` only when a test has
+ * loaded the glossaries itself (`ensureYomitanTerms`).
  */
 export async function initYomitan(): Promise<boolean> {
   await initYomitanMeta();
-  if (!legacyTermsPending()) return false;
-  ensureYomitanTerms();
-  return true;
+  return termsLoaded;
 }
 
 /**
@@ -1258,6 +1257,28 @@ export function legacyTermsPending(): boolean {
   }
 }
 
+const storesReadyListeners = new Set<(provisionedId: string | null) => void>();
+
+/**
+ * Told when legacy stores are ready to be imported into the database: once with
+ * `null` when the stores already on disk are known, then with each bundled store's
+ * id as it is provisioned. The boot wiring starts (or queues) the import from it.
+ */
+export function onYomitanStoresReady(listener: (provisionedId: string | null) => void): () => void {
+  storesReadyListeners.add(listener);
+  return () => storesReadyListeners.delete(listener);
+}
+
+function emitStoresReady(provisionedId: string | null): void {
+  for (const listener of storesReadyListeners) {
+    try {
+      listener(provisionedId);
+    } catch (error) {
+      console.warn('[yomitan] stores-ready listener failed:', error);
+    }
+  }
+}
+
 /**
  * Boot-time init: seed and provision the bundled stores, load the registry and
  * the metadata indices (pitch, IPA, frequency). Safe to call repeatedly.
@@ -1273,9 +1294,16 @@ export function initYomitanMeta(): Promise<void> {
       initDictionaryService();
       await ensureBundledPitch();
       loadAllIndices();
+      // The stores already on disk can start their database import now, before
+      // any first-run download below: the import is what a new user's first
+      // lookup waits on, so it is not held behind the network.
+      emitStoresReady(null);
       let changed = false;
       for (const spec of BUNDLED_TERM_DICTS) {
-        if (await ensureBundledTermDict(spec)) changed = true;
+        if (await ensureBundledTermDict(spec)) {
+          changed = true;
+          emitStoresReady(spec.id);
+        }
       }
       // Reload in place when a bundled dictionary was just provisioned. There is no
       // renderer notification: every consumer awaits initYomitan() before looking a

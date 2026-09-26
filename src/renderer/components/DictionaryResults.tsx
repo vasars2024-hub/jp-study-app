@@ -989,8 +989,19 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     <div className={`dict-results ${variant}`}>
       {copyError && <div role="alert" className="dict-empty">{copyError}</div>}
       {query.trim() && !result && <div className="dict-loading">{t('dict.results.lookingUp')}</div>}
-      {result?.error && <div className="dict-empty">{result.error}</div>}
-      {result && !result.error && entries.length === 0 && (
+      {result?.preparing && entries.length === 0 && (
+        <div className="dict-empty" role="status">
+          {result.preparing.percent == null
+            ? t('dict.results.preparing')
+            : t('dict.results.preparingPercent', { percent: result.preparing.percent })}
+        </div>
+      )}
+      {result?.error && (
+        <div className="dict-empty">
+          {result.errorCode ? t(`dict.lookup.${result.errorCode}`) : result.error}
+        </div>
+      )}
+      {result && !result.error && !result.preparing && entries.length === 0 && (
         <div className="dict-empty">{t('dict.results.noMatch', { query })}</div>
       )}
 

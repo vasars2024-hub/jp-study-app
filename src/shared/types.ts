@@ -138,6 +138,18 @@ export interface DictResult {
   truncated?: true;
   /** Set when the lookup itself failed (e.g. offline). */
   error?: string;
+  /**
+   * Why the online fallback failed, for a translated message: `offline` (no
+   * connection) or `unavailable` (the service refused or failed, e.g. HTTP 403).
+   * Surfaces show this instead of the raw `error` text.
+   */
+  errorCode?: 'offline' | 'unavailable';
+  /**
+   * The offline dictionary is still being imported (first launch): this lookup
+   * could only use what has landed so far. `percent` is the import's progress,
+   * null until it has reported one.
+   */
+  preparing?: { percent: number | null };
 }
 
 // ----- Example sentences (Tatoeba) ---------------------------------------

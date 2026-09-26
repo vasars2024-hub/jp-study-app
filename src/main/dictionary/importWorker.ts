@@ -78,7 +78,7 @@ function numericCounts(source: Record<string, unknown>): Record<string, number> 
 
 export interface RunImportDeps {
   /** Reports progress. The caller decides whether that reaches the main process. */
-  onProgress: (lines: number, phase: 'reading' | 'importing' | 'committing') => void;
+  onProgress: (lines: number, phase: 'reading' | 'importing' | 'committing', percent?: number) => void;
   /** Polled on the importers' own cadence; true rolls the transaction back. */
   shouldCancel: () => boolean;
   openDb: (dir: string) => SqliteDb;
@@ -219,7 +219,7 @@ export function runDictionaryImport(
     const result = migrateLegacyYomitanStores(
       db,
       legacyRoot,
-      (progress) => deps.onProgress(progress.current, 'importing'),
+      (progress) => deps.onProgress(progress.current, 'importing', progress.percent),
       deps.shouldCancel,
       // A `dictId` on a legacy request scopes it to that one store — the job a
       // fresh Yomitan import queues for itself.
@@ -240,6 +240,44 @@ export function runDictionaryImport(
   } finally {
     db.close();
   }
+}
+
+/** How often the importers' cancel poll really touches the file system. */
+export const CANCEL_CHECK_MS = 250;
+
+/**
+ * The importers poll `shouldCancel` once per row — over a million times for the
+ * bundled stores — and each poll was an `fs.existsSync` on the cancel marker.
+ * Checking the clock instead, and the disk at most every `CANCEL_CHECK_MS`,
+ * keeps cancel responsive while taking the syscalls out of the hot loop.
+ */
+export function throttledCancelCheck(check: () => boolean, intervalMs = CANCEL_CHECK_MS, now = Date.now): () => boolean {
+  let last = -Infinity;
+  let cancelled = false;
+  return () => {
+    if (cancelled) return true;
+    const t = now();
+    if (t - last < intervalMs) return false;
+    last = t;
+    cancelled = check();
+    return cancelled;
+  };
+}
+
+/**
+ * Connection settings for a bulk import. The import is one long transaction per
+ * store that writes several FTS5 indexes; a larger page cache keeps their b-trees
+ * in memory instead of re-reading pages, and temporary structures stay in RAM.
+ * Durability is unchanged: the commit is still WAL + synchronous=NORMAL.
+ */
+export function tuneForImport(db: SqliteDb): SqliteDb {
+  try {
+    db.pragma('cache_size = -65536'); // 64 MB
+    db.pragma('temp_store = MEMORY');
+  } catch {
+    /* a read-only or exotic handle: import at default settings */
+  }
+  return db;
 }
 
 /**
@@ -270,9 +308,12 @@ export function attachDictionaryImportWorker(port: ParentPort): void {
     let terminal: DictionaryImportTerminal;
     try {
       terminal = runDictionaryImport(request, dbDir, legacyRoot, {
-        onProgress: (lines, phase) => send({ type: 'progress', progress: { jobId, kind, lines, phase } }),
-        shouldCancel: () => cancelRequested || fs.existsSync(cancelPath),
-        openDb: (dir) => openDictionaryDb({ dir }),
+        onProgress: (lines, phase, percent) => send({
+          type: 'progress',
+          progress: { jobId, kind, lines, phase, ...(percent === undefined ? {} : { percent }) },
+        }),
+        shouldCancel: throttledCancelCheck(() => cancelRequested || fs.existsSync(cancelPath)),
+        openDb: (dir) => tuneForImport(openDictionaryDb({ dir })),
       });
     } catch (error) {
       terminal = { state: 'failed', error: error instanceof Error ? error.message : String(error) };

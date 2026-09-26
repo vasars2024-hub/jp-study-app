@@ -21,7 +21,9 @@ import {
   importYomitanZip,
   initYomitan,
   initYomitanMeta,
+  legacyTermsPending,
   listYomitanDicts,
+  onYomitanStoresReady,
   getPitchData,
   lookupOfflineDeinflected,
   lookupTermMerged,
@@ -156,6 +158,8 @@ import {
   onDictionaryImportSettled,
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
+  legacyMigrationProgress,
+  dictionaryImportJobs,
   queueYomitanStoreImport,
   startSourceLangRelabel,
 } from './dictionary/importIpc';
@@ -247,10 +251,14 @@ export async function lookupWord(query: string): Promise<DictResult> {
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     const offline = /abort|fetch failed|ENOTFOUND|ECONNREFUSED|network/i.test(detail);
+    // The raw detail ("Jisho returned 403") is for the log, not the pop-up:
+    // surfaces translate `errorCode`, and `error` is a plain sentence.
+    console.warn('[dict] online fallback failed:', detail);
     return {
       query: q,
       entries: [],
-      error: offline ? 'No internet connection for the dictionary.' : detail,
+      errorCode: offline ? 'offline' : 'unavailable',
+      error: offline ? mt('dict.lookup.offline') : mt('dict.lookup.unavailable'),
     };
   }
 }
@@ -295,8 +303,7 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   // them for every miss is what kept ~260 MB of them resident after one popup,
   // so `initYomitan()` loads them only then; otherwise the legacy leg below
   // reads empty maps and goes straight to Jisho.
-  await initYomitan();
-  const merged = await lookupTermMerged(q, lookupWord);
+  const merged = withPreparing(await lookupTermMerged(q, lookupWord));
   if (merged.entries.length || merged.error) return merged;
 
   // Nothing matched exactly in either store. Before reporting "no match", ask the
@@ -312,6 +319,23 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
     // A database read must never take the established dictionary fallback down.
   }
   return merged;
+}
+
+/**
+ * Mark an empty answer given while the first-boot import is still running, so
+ * the pop-up says "being prepared (x%)" instead of "no match". The legacy term
+ * glossaries are not parsed on this process meanwhile (see `initYomitan`).
+ */
+function withPreparing(result: DictResult): DictResult {
+  if (result.entries.length) return result;
+  let pending = false;
+  try {
+    pending = legacyTermsPending();
+  } catch {
+    pending = false;
+  }
+  if (!pending) return result;
+  return { ...result, preparing: legacyMigrationProgress() ?? { percent: null } };
 }
 
 /** Legacy pitch, frequency and IPA on a database result, as the legacy index attached them. */
@@ -1552,6 +1576,18 @@ export function registerDictionaryIpc(): void {
   // Provisioning is already asynchronous. Once it has named every bundled
   // legacy store, migrate only the stores SQLite does not yet own. The job stays
   // observable/cancellable through the same Settings card as a manual rebuild.
+  //
+  // Started as early as each store exists (`onYomitanStoresReady`), not after
+  // every first-run download: until a term store is imported, a new user's
+  // lookups can only say the dictionary is being prepared.
+  onYomitanStoresReady((provisionedId) => {
+    try {
+      if (provisionedId && dictionaryImportJobs().running()) queueYomitanStoreImport(provisionedId);
+      else startPendingLegacyDictionaryMigration();
+    } catch (error) {
+      console.warn('[dictionary] could not start the bundled-source migration yet:', error);
+    }
+  });
   void initYomitanMeta().then(startPendingLegacyDictionaryMigration).catch((error: unknown) => {
     console.warn('[dictionary] automatic bundled-source migration did not start:', error);
   });
