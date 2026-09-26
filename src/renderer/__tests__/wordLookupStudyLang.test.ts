@@ -28,3 +28,23 @@ describe('lookup spans per study language', () => {
     expect(hit?.query.startsWith('图书')).toBe(true);
   });
 });
+
+describe('Japanese click spans', () => {
+  // The tokens kuromoji (IPADIC) really gives for these lines.
+  const tok = (surface: string, pos: string, posDetail: string, content: boolean) => ({
+    surface, lemma: surface, pos, posDetail, content, proper: false,
+  });
+
+  it('looks up おはよう, not the merged "おはようござい", in おはようございます', () => {
+    const tokens = [tok('おはよう', '感動詞', '*', false), tok('ござい', '助動詞', '*', false), tok('ます', '助動詞', '*', false)];
+    expect(resolveWordSpanInText('おはようございます', 1, tokens, 'ja')?.query).toBe('おはよう');
+    const thanks = [tok('ありがとう', '感動詞', '*', false), tok('ござい', '助動詞', '*', false), tok('まし', '助動詞', '*', false), tok('た', '助動詞', '*', false)];
+    expect(resolveWordSpanInText('ありがとうございました', 2, thanks, 'ja')?.query).toBe('ありがとう');
+  });
+
+  it('still glues a kana word kuromoji splits (う + がい in うがいをする)', () => {
+    const tokens = [tok('う', '感動詞', '*', false), tok('がい', '名詞', '非自立', false), tok('を', '助詞', '格助詞', false), tok('する', '動詞', '自立', true)];
+    expect(resolveWordSpanInText('うがいをする', 0, tokens, 'ja')?.query).toBe('うがい');
+    expect(resolveWordSpanInText('うがいをする', 1, tokens, 'ja')?.query).toBe('うがい');
+  });
+});
