@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
   userData: '',
   onSend: null as null | ((wc: unknown, channel: string, payload: unknown) => void),
   displayHandler: null as null | ((request: unknown, callback: (streams: unknown) => void) => void),
+  failRecordStart: false,
 }));
 
 vi.mock('electron', async () => {
@@ -191,6 +192,8 @@ beforeAll(() => {
           durationMs: 8000,
           silent: false,
         };
+      } else if (cmd.type === 'record-start' && h.failRecordStart) {
+        reply = { ok: false, error: 'not-capturing' };
       } else if (cmd.type === 'transcribe') {
         reply = { ok: true, text: '今天天气很好' };
       }
@@ -348,6 +351,30 @@ describe('system-audio capture in main', () => {
     expect(getCaptionsState().capture).toBe('off');
     expect(getCaptionsState().captureErrorKey).toBeUndefined();
     expect(captureWindows()).toHaveLength(0);
+  });
+
+  it('Record pressed twice while capture is still starting is start-then-stop: nothing keeps recording', async () => {
+    expect(getCaptionsState().capture).toBe('off');
+    const first = invoke('captions:toggleRecording') as Promise<{ ok: boolean; recording: boolean }>;
+    const second = invoke('captions:toggleRecording') as Promise<{ ok: boolean; recording: boolean }>;
+    const [a, b] = await Promise.all([first, second]);
+    expect(b).toEqual({ ok: true, recording: false });
+    expect(a.recording).toBe(false);
+    expect(getCaptionsState().recordingSince).toBeNull();
+    // Capture was turned on only for that recording: it goes off again.
+    await until(() => getCaptionsState().capture === 'off');
+    expect(hostCommands.filter((c) => c.type === 'record-start').length).toBeLessThanOrEqual(1);
+  });
+
+  it('a recording that cannot start leaves capture as it found it (off)', async () => {
+    h.failRecordStart = true;
+    try {
+      const r = (await invoke('captions:toggleRecording')) as { ok: boolean; errorKey?: string };
+      expect(r).toMatchObject({ ok: false, errorKey: 'captions.notice.cutFailed' });
+      expect(getCaptionsState().capture).toBe('off');
+    } finally {
+      h.failRecordStart = false;
+    }
   });
 
   it('settings are clamped and persisted without any audio', async () => {

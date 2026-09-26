@@ -575,8 +575,22 @@ export async function mineRecent(seconds?: number): Promise<{ ok: boolean; draft
 }
 
 let recordingTimer: NodeJS.Timeout | null = null;
+/** A Record press is still bringing capture up (a second or two from off). */
+let recordingStarting = false;
+/** Record was pressed again during that start: the user meant stop. */
+let stopWhenStarted = false;
 
-export async function toggleRecording(): Promise<{ ok: boolean; recording: boolean; draftId?: string; errorKey?: string }> {
+type RecordingReply = { ok: boolean; recording: boolean; draftId?: string; errorKey?: string };
+
+export async function toggleRecording(): Promise<RecordingReply> {
+  if (recordingStarting) {
+    // Pressed again before the first press had started anything (capture was
+    // still coming up). It used to start a second recording on top — or, in the
+    // app, wait 15 s for a host that was not listening yet — and the recording
+    // the user had just stopped ran on to its limit.
+    stopWhenStarted = true;
+    return { ok: true, recording: false };
+  }
   if (recordingSince !== null) {
     if (recordingTimer) clearTimeout(recordingTimer);
     recordingTimer = null;
@@ -601,6 +615,24 @@ export async function toggleRecording(): Promise<{ ok: boolean; recording: boole
     }
     return { ...result, recording: false };
   }
+  recordingStarting = true;
+  stopWhenStarted = false;
+  let started: RecordingReply;
+  try {
+    started = await startRecording();
+  } finally {
+    recordingStarting = false;
+  }
+  if (stopWhenStarted) {
+    stopWhenStarted = false;
+    if (started.recording) await abandonRecording();
+    return { ok: true, recording: false };
+  }
+  if (started.recording) notice('captions.notice.recording', 'info', { seconds: MANUAL_RECORDING_MAX_SECONDS }, 3000);
+  return started;
+}
+
+async function startRecording(): Promise<RecordingReply> {
   if (capture !== 'on') {
     recordingOwnsCapture = true;
     const started = await startCapture();
@@ -610,15 +642,28 @@ export async function toggleRecording(): Promise<{ ok: boolean; recording: boole
     }
   }
   const ok = await hostRequest<{ ok: boolean }>({ type: 'record-start' });
-  if (!ok?.ok) return { ok: false, recording: false, errorKey: 'captions.notice.cutFailed' };
+  if (!ok?.ok) {
+    // Capture turned on only for this recording goes off again, red dot and all.
+    if (recordingOwnsCapture) stopCapture();
+    return { ok: false, recording: false, errorKey: 'captions.notice.cutFailed' };
+  }
   recordingSince = Date.now();
   recordingTimer = setTimeout(() => {
     recordingTimer = null;
     if (recordingSince !== null) void toggleRecording();
   }, MANUAL_RECORDING_MAX_SECONDS * 1000 + 250);
   broadcastStateNow();
-  notice('captions.notice.recording', 'info', { seconds: MANUAL_RECORDING_MAX_SECONDS }, 3000);
   return { ok: true, recording: true };
+}
+
+/** A recording stopped before it had begun: nothing to keep, and capture it owned goes off. */
+async function abandonRecording(): Promise<void> {
+  if (recordingTimer) clearTimeout(recordingTimer);
+  recordingTimer = null;
+  await hostRequest({ type: 'record-stop' });
+  recordingSince = null;
+  if (recordingOwnsCapture) stopCapture();
+  else broadcastStateNow();
 }
 
 /**
