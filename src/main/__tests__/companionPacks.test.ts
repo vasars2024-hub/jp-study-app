@@ -41,7 +41,7 @@ vi.mock('../errorLog', () => ({ logDiagnostic: () => undefined }));
 import {
   COMPANION_PACK_CHANNELS,
   importCompanionPacks,
-  listCompanionPacks,
+  listImportedCompanionPacks,
   registerCompanionPacksIpc,
   removeCompanionPack,
   renameCompanionPack,
@@ -157,10 +157,10 @@ describe('list / rename / delete', () => {
     const res = importCompanionPacks(shimejiZip('a.zip'), root);
     if (!res.ok) throw new Error('import failed');
     const id = res.packs[0].id;
-    expect(listCompanionPacks(root).map((p) => p.id)).toEqual([id]);
+    expect(listImportedCompanionPacks(root).map((p) => p.id)).toEqual([id]);
 
     expect(renameCompanionPack(id, '  Fox friend  ', root)).toBe(true);
-    expect(listCompanionPacks(root)[0].name).toBe('Fox friend');
+    expect(listImportedCompanionPacks(root)[0].name).toBe('Fox friend');
     expect(renameCompanionPack('../x', 'y', root)).toBe(false);
 
     expect(resolveCompanionPackFrameFile(`localfile://pet/${id}/shime1.png`, root)).toBe(path.join(root, id, 'shime1.png'));
@@ -169,14 +169,14 @@ describe('list / rename / delete', () => {
 
     expect(removeCompanionPack('..', root)).toBe(false);
     expect(removeCompanionPack(id, root)).toBe(true);
-    expect(listCompanionPacks(root)).toEqual([]);
+    expect(listImportedCompanionPacks(root)).toEqual([]);
     expect(fs.readdirSync(root)).toEqual([]);
   });
 
   it('sweeps a staging folder left by a crash and ignores hand-made junk', () => {
     fs.mkdirSync(path.join(root, '.staging-half-1234abcd'), { recursive: true });
     fs.mkdirSync(path.join(root, 'not-a-pack-dir'), { recursive: true });
-    expect(listCompanionPacks(root)).toEqual([]);
+    expect(listImportedCompanionPacks(root)).toEqual([]);
     expect(fs.existsSync(path.join(root, '.staging-half-1234abcd'))).toBe(false);
   });
 });

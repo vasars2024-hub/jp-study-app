@@ -198,7 +198,7 @@ function sweepLeftovers(root: string): void {
   }
 }
 
-export function listCompanionPacks(root = companionPacksRoot()): CompanionPackManifest[] {
+export function listImportedCompanionPacks(root = companionPacksRoot()): CompanionPackManifest[] {
   sweepLeftovers(root);
   let names: string[] = [];
   try {
@@ -345,7 +345,7 @@ function broadcastChanged(): void {
 }
 
 export function registerCompanionPacksIpc(): void {
-  ipcMain.handle(COMPANION_PACK_CHANNELS.list, () => listCompanionPacks());
+  ipcMain.handle(COMPANION_PACK_CHANNELS.list, () => listImportedCompanionPacks());
 
   ipcMain.handle(
     COMPANION_PACK_CHANNELS.import,

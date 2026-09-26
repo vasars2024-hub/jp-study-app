@@ -456,6 +456,25 @@
   -webkit-backdrop-filter: none;
 }
 
+/* =============================================================================
+   captions/captionsOverlay.css — 4 rules. The live-captions window floats over OTHER
+   APPS, whose content is unknown, so these take the OPAQUE TINT treatment: the bar's
+   own surface colour at alpha 1, nothing blurred behind it.
+   ============================================================================= */
+
+:root[data-lq-flat] .cap-bar,
+:root[data-lq-flat] .cap-history,
+:root[data-lq-flat] .cap-notice {
+  background: rgb(22, 20, 24);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .cap-draft {
+  background: rgb(26, 24, 28);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* SCRIM — the reading-source picker's dimmer. */
 :root[data-lq-flat] .reading-source-backdrop {
   backdrop-filter: none;

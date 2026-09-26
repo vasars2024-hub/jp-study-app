@@ -100,7 +100,7 @@ describe('packaging fills the slot this module resolves', () => {
   });
 
   it('ships that staging directory as a resource', () => {
-    expect(forgeConfig).toMatch(/extraResource:\s*\['public',\s*SIDECAR_STAGING_DIR\]/);
+    expect(forgeConfig).toMatch(/extraResource:\s*\['public',\s*SIDECAR_STAGING_DIR[,\]]/);
   });
 
   it('fails the build rather than packaging a dead media surface', () => {
