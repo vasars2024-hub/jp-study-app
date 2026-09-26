@@ -13,7 +13,7 @@ import type { MediaItem } from '../../../../shared/types';
 import { WATCH_STATUSES, type WatchStatus, type WatchTitlePatch } from '../../../../shared/watchLibrary';
 import type { MediaEpisodeGuideEntry } from '../../../../shared/mediaMetadataIpc';
 import { buildLibraryEntries, isWatched, providerEpisodeTitle, watchedFraction } from '../../../../shared/mediaLibraryEntries';
-import { confirmDialog, promptDialog, showToast } from '../../ui';
+import { confirmDialog, promptDialog, Select, showToast } from '../../ui';
 import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { useT } from '../../../i18n';
 import type { LibraryEntry } from '../../../../shared/mediaLibraryEntries';
@@ -524,7 +524,7 @@ export function GumStatusSelect({ title, busy, onCommit }: { title: GumTitle; bu
     ? t('gum.title.derivedStatus', { status: t(`watchLibrary.status.${title.status}`) })
     : t('gum.title.notTracked');
   return (
-    <select
+    <Select
       value={draft}
       aria-busy={busy || undefined}
       onKeyDown={(event) => {
@@ -558,7 +558,7 @@ export function GumStatusSelect({ title, busy, onCommit }: { title: GumTitle; bu
     >
       {!title.tracked && <option value="">{untrackedLabel}</option>}
       {WATCH_STATUSES.map((status) => <option key={status} value={status}>{t(`watchLibrary.status.${status}`)}</option>)}
-    </select>
+    </Select>
   );
 }
 
