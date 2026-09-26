@@ -66,6 +66,7 @@ import {
   whenSubtitleSweepIdle,
   writeSubtitleFile,
 } from './subtitleDiscovery';
+import { subtitleRecordName } from './subtitleRecordName';
 import { hasSubtitleProviderKey } from './subtitleProviderClients';
 import { activeSubtitleNotices, onSubtitleNoticesChanged, raiseSubtitleNotice } from './subtitleDiscoveryNotices';
 import { resolveSubtitleTranslationEngine, translateSubtitleTrack } from './subtitleDiscoveryTranslate';
@@ -625,7 +626,7 @@ export function secondarySubtitleForItem(item: MediaItem): SecondarySubtitlePick
   const text = readSubtitleRecord(secondary);
   if (!text) return null;
   return {
-    name: secondary.label ?? `${secondary.lang} (${secondary.source})`,
+    name: subtitleRecordName(secondary),
     text,
     lang: secondary.lang,
     recordId: secondary.id,

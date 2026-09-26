@@ -39,6 +39,7 @@ import {
   type FusionTrackMeta,
 } from '../../../../shared/subtitleFusionMeta';
 import type { MediaItem } from '../../../../shared/types';
+import { subtitleRecordLabel } from '../../../../shared/subtitleRecord';
 import SubtitleTrackQuality, { SubtitleTrackGradeChip } from './SubtitleTrackQuality';
 
 export interface MediaDetailPanelProps {
@@ -498,7 +499,8 @@ export default function MediaDetailPanel({
             ) : (
               <ul className="medialib-tracks">
                 {tracks.map((track) => {
-                  const label = track.label ?? track.path;
+                  // An untitled container stream in the UI language, as the player names it.
+                  const label = subtitleRecordLabel(track, t) ?? track.path;
                   // Two ways to be the active track, because there are two players.
                   // `activeSubtitleName` is the inline player's live state; the stored
                   // id is the choice itself, and it is the only one the media workspace
@@ -605,7 +607,7 @@ export default function MediaDetailPanel({
                           size="sm"
                           variant="danger"
                           disabled={removing === track.id}
-                          onClick={() => { void removeTrack(entry.primary.id, track); }}
+                          onClick={() => { void removeTrack(entry.primary.id, { ...track, label: subtitleRecordLabel(track, t) }); }}
                         >
                           {removing === track.id
                             ? t('media.subtitles.removing')

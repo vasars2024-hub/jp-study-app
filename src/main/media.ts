@@ -58,6 +58,7 @@ import {
   registerSubtitleDiscoveryIpc,
   runSubtitleDiscovery,
 } from './subtitleDiscovery';
+import { subtitleRecordName } from './subtitleRecordName';
 import { registerSubtitleHarvestIpc } from './subtitleHarvest';
 import { getMainStudyLangTag } from './studyLanguage';
 import {
@@ -1623,7 +1624,7 @@ export function registerMediaIpc(): void {
     );
     if (record) {
       const text = readSubtitleRecord(record);
-      if (text) subtitle = { name: record.label ?? `${record.lang} (${record.source})`, text };
+      if (text) subtitle = { name: subtitleRecordName(record), text };
     }
     // Fall back to a file sitting beside the video, which is what this handler
     // effectively did before discovery existed.
@@ -1683,7 +1684,7 @@ export function registerMediaIpc(): void {
             lang,
           );
           const text = record ? readSubtitleRecord(record) : null;
-          if (record && text) return { name: record.label ?? `${record.lang} (${record.source})`, text };
+          if (record && text) return { name: subtitleRecordName(record), text };
         }
         return pickSidecarSubtitleForLanguage(filePath, lang);
       }
@@ -1706,7 +1707,7 @@ export function registerMediaIpc(): void {
         if (record) {
           const text = readSubtitleRecord(record);
           if (text) {
-            return { name: record.label ?? `${record.lang} (${record.source})`, text };
+            return { name: subtitleRecordName(record), text };
           }
         }
       }

@@ -16,7 +16,7 @@ import type { MediaItem } from '../shared/types';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { SUBTITLE_EXT, VIDEO_EXT, extOf } from '../shared/mediaKind';
 import { pickSubtitlePair, subtitleLangMatches } from '../shared/subtitleDiscoveryPick';
-import { isMachineTranslatedSubtitle, type SubtitleRecord } from '../shared/subtitleRecord';
+import { isMachineTranslatedSubtitle, untitledStreamNumber, type SubtitleRecord } from '../shared/subtitleRecord';
 import {
   studyAudioStreamIndex,
   type SentenceDeckCue,
@@ -133,9 +133,11 @@ export async function listSentenceDeckSources(
     return found ? found.subtitleIndex + 1 : undefined;
   };
   for (const record of records) {
-    // Discovery names an untitled stream "Stream <n>" in English; the dialog names it in the UI language.
-    const untitledStream = record.source === 'embedded' && (!record.label || /^Stream \d+$/.test(record.label));
-    const number = untitledStream ? streamNumber(record.streamIndex) : undefined;
+    // An untitled stream is named by the dialog in the UI language ("Subtitle stream 2").
+    const untitled = untitledStreamNumber(record);
+    const number = untitled !== undefined
+      ? record.subtitleNumber ?? streamNumber(record.streamIndex) ?? untitled
+      : undefined;
     tracks.push({
       id: `record:${record.id}`,
       label: number ? '' : record.label ?? `${record.lang} (${record.source})`,
