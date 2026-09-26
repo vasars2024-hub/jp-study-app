@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import DictionaryResults, { type DictLang } from './DictionaryResults';
 import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../knownWords';
+import { KNOWLEDGE_LEVEL_KEYS, KNOWLEDGE_LEVEL_SHORT_KEYS } from './lexicon/WordKnowledge';
 import { lemmaOf } from '../tokenizer';
 import { gradeKeyFor } from '../studyTokens';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../tts';
@@ -211,17 +212,17 @@ export default function DictionaryPopup({
         </button>
       </div>
       <div className="wk-grade" role="group" aria-label={t('readerUi.dictPopup.levels')}>
-        {WK_LEVELS.map((label, i) => (
+        {WK_LEVELS.map((id, i) => (
           <button
-            key={label}
+            key={id}
             type="button"
             className={`wk-grade-btn wk-g-${i} ${level === i ? 'active' : ''}`}
-            title={label}
-            aria-label={label}
+            title={t(KNOWLEDGE_LEVEL_KEYS[i])}
+            aria-label={t(KNOWLEDGE_LEVEL_KEYS[i])}
             aria-pressed={level === i}
             onClick={() => grade(i as WkLevel)}
           >
-            {label[0]}
+            {t(KNOWLEDGE_LEVEL_SHORT_KEYS[i])}
           </button>
         ))}
       </div>
