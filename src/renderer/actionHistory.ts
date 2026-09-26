@@ -32,7 +32,14 @@ function newId(): string {
   return `undo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** Push a reversible action. Label is shown in the undo command feedback. */
+/**
+ * Push a reversible action. Label is shown in the undo command feedback.
+ *
+ * The entry outlives whatever pushed it (up to MAX entries), and a closure keeps its whole
+ * enclosing scope alive. Build `undo` at module scope from plain values, never inside a
+ * component: one created in DesktopShell's render pinned an unmounted desktop per book
+ * read (see `pushWindowReopenUndo`).
+ */
 export function pushUndo(label: string, undo: () => void | Promise<void>, kind: UndoKind = 'generic'): void {
   stack.push({ id: newId(), label, kind, undo, createdAt: Date.now() });
   if (stack.length > MAX) stack = stack.slice(stack.length - MAX);

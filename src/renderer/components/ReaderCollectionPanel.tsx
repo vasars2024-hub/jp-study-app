@@ -101,6 +101,31 @@ function savePrefs(prefs: CollectionPrefs): void {
   }
 }
 
+/**
+ * Undo for an Anki export: delete the note it created and mark the card unexported.
+ *
+ * Built at module scope on purpose. The undo stack (`actionHistory.ts`, 40 entries) outlives
+ * this panel, and a closure created inside the component keeps that render's whole scope,
+ * with the panel's DOM, alive for as long as the entry stays on the stack (the same retention
+ * that pinned a whole unmounted desktop per book read, see `pushWindowReopenUndo` in
+ * DesktopShell). The panel needs no `setCards` here: `updateDeckCard` announces the change
+ * and the panel's `onDeckChanged` subscription re-reads the deck while it is mounted.
+ */
+function pushAnkiNoteUndo(term: string, noteId: number, cardId: string): void {
+  pushUndo(
+    `Anki note “${term.slice(0, 40)}”`,
+    async () => {
+      await window.api.ankiDeleteNotes([noteId]);
+      updateDeckCard(cardId, {
+        ankiExported: false,
+        ankiNoteId: undefined,
+        ankiExportError: undefined,
+      });
+    },
+    'anki',
+  );
+}
+
 interface EditDraft {
   id: string;
   front: string;
@@ -293,24 +318,7 @@ export default function ReaderCollectionPanel({
               ankiDeck: deck,
             });
             // Undo can delete the note we just created (AnkiConnect deleteNotes).
-            if (res.noteId && res.ok) {
-              const noteId = res.noteId;
-              const cardId = c.id;
-              const term = c.word;
-              pushUndo(
-                `Anki note “${term.slice(0, 40)}”`,
-                async () => {
-                  await window.api.ankiDeleteNotes([noteId]);
-                  updateDeckCard(cardId, {
-                    ankiExported: false,
-                    ankiNoteId: undefined,
-                    ankiExportError: undefined,
-                  });
-                  setCards(loadDeck());
-                },
-                'anki',
-              );
-            }
+            if (res.noteId && res.ok) pushAnkiNoteUndo(c.word, res.noteId, c.id);
           } else {
             updateDeckCard(c.id, {
               ankiExported: false,

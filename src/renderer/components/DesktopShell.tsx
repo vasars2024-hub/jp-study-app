@@ -365,6 +365,29 @@ function wiredModuleLabel(section: WinSection): string {
   return `${meta.code} / ${meta.name}`;
 }
 
+/**
+ * Let Ctrl+Shift+Z (nav.undo) reopen a closed window.
+ *
+ * This lives at module scope on purpose. The undo stack is module state and outlives
+ * the shell: opening a book unmounts the whole desktop and the Library button mounts a
+ * new one. A closure created inside `DesktopShell` keeps that render's entire scope
+ * (V8 closures share their enclosing context), and the entry used to be created in
+ * `removeWin` — so every stack entry pinned an unmounted shell, its `deskRef` and every
+ * window it had open, for up to 40 entries. Measured on the packaged build, 2026-09-26:
+ * +3,947 detached DOM nodes and +707 listeners per book opened, retainer path
+ * `actionHistory stack -> undo closure -> DesktopShell context -> winOpeners.current
+ * (Map) -> detached .os-start-btn -> the old desktop`. It also did nothing: it called
+ * the dead shell's `open`. Reopening through `os:open` reaches whichever shell is
+ * mounted when the user presses the key.
+ */
+function pushWindowReopenUndo(label: string, section: WinSection): void {
+  void import('../actionHistory').then(({ pushUndo }) => {
+    pushUndo(label, () => {
+      window.dispatchEvent(new CustomEvent('os:open', { detail: section }));
+    }, 'window');
+  });
+}
+
 // Selection set, not the resolution set — v1.0 audit §1.1 cut the Aero scenery
 // walls from the picker while leaving them resolvable (see wallCatalog.ts).
 const WALLPAPERS = SELECTABLE_WALL_PRESETS;
@@ -1803,12 +1826,7 @@ export default function DesktopShell({
     if (closing && closing.section && closing.section !== 'note') {
       const section = closing.section;
       const meta = APPS.find((a) => a.id === section);
-      const label = t('shell.window.reopen', { name: meta ? t(meta.labelKey) : section });
-      void import('../actionHistory').then(({ pushUndo }) => {
-        pushUndo(label, () => {
-          openRef.current(section);
-        }, 'window');
-      });
+      pushWindowReopenUndo(t('shell.window.reopen', { name: meta ? t(meta.labelKey) : section }), section);
     }
   };
   const minimize = (id: string) => {
