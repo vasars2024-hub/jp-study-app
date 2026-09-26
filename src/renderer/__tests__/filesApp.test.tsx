@@ -641,8 +641,9 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
    * entirely below 720px, and this app's dock was a status bar with no routes,
    * so under 720px the folder tree had NO home -- not collapsed, not behind a
    * menu, absent. jsdom reports width 0, which the scaffold reads as `wide`, so
-   * these stub the rect rather than mock ResizeObserver: the hook measures once
-   * from `getBoundingClientRect()` on mount, which is the path that runs here.
+   * these stub the size rather than mock ResizeObserver: the scaffold measures once
+   * on mount from `clientWidth` (its layout width, the number the observer reports),
+   * and other hooks still read `getBoundingClientRect()`, so both are stubbed.
    */
   /*
    * An inspector that opens can be closed. `setSelectedId(null)` was called from
@@ -737,9 +738,11 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
       Element.prototype.getBoundingClientRect = function stub(this: Element) {
         return { ...rect.call(this), width: px } as DOMRect;
       };
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => px });
     };
     afterEach(() => {
       if (rect) Element.prototype.getBoundingClientRect = rect;
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
     });
 
     const dockRoutes = () =>

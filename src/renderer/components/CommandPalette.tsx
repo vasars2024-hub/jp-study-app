@@ -28,6 +28,7 @@ import {
 import { MEDIA_WORKSPACE_OPEN_EVENT } from '../../shared/mediaWorkspace';
 import { loadSaved } from '../savedWords';
 import { loadDeck } from '../flashcardDeck';
+import { listPlaylists, requestPlaylistPlay } from '../musicPlaylists';
 import { loadSettingsAdvanced } from '../settingsAdvanced';
 import { loadThemeId } from '../theme/engine';
 import { hasDiscoveredAero } from '../aeroDiscovery';
@@ -329,6 +330,23 @@ export default function CommandPalette() {
             ? { terms: `${s.terms ?? ''} ${s.termsKey ? t(s.termsKey) : ''}` }
             : {}),
           run: () => openSection(s.id),
+        });
+      }
+      // User playlists: type part of a name and press Enter to hear it. Opening Music and
+      // asking in the same tick is safe: the request waits for the Music window to claim it.
+      const playlistGroup = t('musicUi.playlists.paletteGroup');
+      for (const p of listPlaylists()) {
+        out.push({
+          key: `pl-${p.id}`,
+          label: p.name,
+          sub: t('musicUi.playlists.paletteSub', { count: p.trackIds.length }),
+          group: playlistGroup,
+          glyph: 'music',
+          typedOnly: mode === 'commands',
+          run: () => {
+            openSection('music');
+            requestPlaylistPlay(p.id);
+          },
         });
       }
       for (const w of WIDGETS) {

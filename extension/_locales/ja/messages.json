@@ -386,6 +386,543 @@
   "content_snapshotFailed": {
     "message": "スナップショットに失敗しました"
   },
+  "content_extReloaded": {
+    "message": "拡張機能が再読み込みされました — このタブを更新してください"
+  },
+  "content_extError": {
+    "message": "拡張機能のエラー"
+  },
+  "content_close": {
+    "message": "閉じる"
+  },
+  "content_popupLabel": {
+    "message": "Gum 辞書検索"
+  },
+  "content_rpBack": {
+    "message": "戻る"
+  },
+  "content_rpBackTitle": {
+    "message": "前の検索に戻る"
+  },
+  "content_rpPronounce": {
+    "message": "発音を再生"
+  },
+  "content_rpPin": {
+    "message": "ポップアップを固定"
+  },
+  "content_rpPinTitle": {
+    "message": "ポップアップを固定 (P)"
+  },
+  "content_rpCloseTitle": {
+    "message": "閉じる (Esc)"
+  },
+  "content_rpKnownGroup": {
+    "message": "この単語をどのくらい知っていますか？"
+  },
+  "content_rpKnownLabel": {
+    "message": "習熟度:"
+  },
+  "content_rpLevel0": {
+    "message": "新規"
+  },
+  "content_rpLevel1": {
+    "message": "学習中"
+  },
+  "content_rpLevel2": {
+    "message": "なじみあり"
+  },
+  "content_rpLevel3": {
+    "message": "既知"
+  },
+  "content_rpTab_meaning": {
+    "message": "意味"
+  },
+  "content_rpTab_grammar": {
+    "message": "文法"
+  },
+  "content_rpTab_sentence": {
+    "message": "文"
+  },
+  "content_rpTab_kanji": {
+    "message": "漢字"
+  },
+  "content_rpTab_examples": {
+    "message": "例文"
+  },
+  "content_rpTab_more": {
+    "message": "その他"
+  },
+  "content_rpSaveWord": {
+    "message": "単語を保存"
+  },
+  "content_rpSaveSentence": {
+    "message": "文を保存"
+  },
+  "content_rpCreateCard": {
+    "message": "カードを作成"
+  },
+  "content_rpMoreActions": {
+    "message": "その他の操作"
+  },
+  "content_rpAddClip": {
+    "message": "クリップボード履歴に追加"
+  },
+  "content_rpTranslateSentence": {
+    "message": "文を翻訳"
+  },
+  "content_rpCopySentence": {
+    "message": "文をコピー"
+  },
+  "content_rpOpenGum": {
+    "message": "Gum を開く"
+  },
+  "content_rpBase": {
+    "message": "基本形:"
+  },
+  "content_rpDeinfTitle": {
+    "message": "活用の解析経路"
+  },
+  "content_rpCommon": {
+    "message": "常用"
+  },
+  "content_rpJlptTitle": {
+    "message": "JLPT レベルは推定です"
+  },
+  "content_rpFreqTitle": {
+    "message": "頻度順位"
+  },
+  "content_rpDictOffline": {
+    "message": "Gum が起動していません — 辞書はアプリ内にあります。Gum を開いてもう一度お試しください。"
+  },
+  "content_rpNoEntries": {
+    "message": "辞書の項目が見つかりませんでした。"
+  },
+  "content_rpNoGloss": {
+    "message": "（語義なし）"
+  },
+  "content_rpPitch": {
+    "message": "アクセント"
+  },
+  "content_rpDictSource": {
+    "message": "辞書の出典"
+  },
+  "content_rpMoreEntries_other": {
+    "message": "ほかに $1 件 —「その他」タブを参照してください。"
+  },
+  "content_rpNoSentence": {
+    "message": "この単語を含む文が見つかりませんでした。"
+  },
+  "content_rpMatchingGrammar": {
+    "message": "文法パターンを照合中…"
+  },
+  "content_rpGrammarOffline": {
+    "message": "Gum が起動していません — 文法の照合にはアプリが必要です。"
+  },
+  "content_rpGrammarFailed": {
+    "message": "文法の照合に失敗しました。"
+  },
+  "content_rpRetry": {
+    "message": "再試行"
+  },
+  "content_rpNoGrammar": {
+    "message": "この文に一致する既知の文法パターンはありませんでした。"
+  },
+  "content_rpInSentence": {
+    "message": "文中にあり"
+  },
+  "content_rpInSentenceTitle": {
+    "message": "この形が文中にそのまま現れています"
+  },
+  "content_rpPatternMatch": {
+    "message": "パターン一致"
+  },
+  "content_rpPatternMatchTitle": {
+    "message": "パターン規則で一致 — 正確な位置は特定できませんでした"
+  },
+  "content_rpGrammarNote": {
+    "message": "一致は Gum のパターン規則でこの文のテキストから見つけています。複数が重なる場合の判断はあなたに任されます — 詳しい解説は文法練習を開いてください。"
+  },
+  "content_rpOpenGrammar": {
+    "message": "文法練習を開く"
+  },
+  "content_rpNoSentenceAround": {
+    "message": "この単語の周りに文が見つかりませんでした。"
+  },
+  "content_rpExtendPrev": {
+    "message": "‹ 広げる"
+  },
+  "content_rpExtendPrevTitle": {
+    "message": "前の文を含める"
+  },
+  "content_rpExtendNext": {
+    "message": "広げる ›"
+  },
+  "content_rpExtendNextTitle": {
+    "message": "次の文を含める"
+  },
+  "content_rpReset": {
+    "message": "リセット"
+  },
+  "content_rpEdit": {
+    "message": "編集"
+  },
+  "content_rpAnalyzing": {
+    "message": "分析中…"
+  },
+  "content_rpCopy": {
+    "message": "コピー"
+  },
+  "content_rpDifficulty": {
+    "message": "難易度"
+  },
+  "content_rpEstimate": {
+    "message": "（推定）"
+  },
+  "content_rpKnownWords": {
+    "message": "既知語"
+  },
+  "content_rpChars_other": {
+    "message": "$1 文字"
+  },
+  "content_rpStatsOffline": {
+    "message": "Gum オフライン — 統計を表示できません"
+  },
+  "content_rpNoKanji": {
+    "message": "この表現に漢字はありません。"
+  },
+  "content_rpLoadingKanji": {
+    "message": "漢字を読み込み中…"
+  },
+  "content_rpKanjiOffline": {
+    "message": "Gum が起動していません — 漢字データにはアプリが必要です。"
+  },
+  "content_rpLookUpChar": {
+    "message": "$1 を調べる"
+  },
+  "content_rpNoKanjiEntry": {
+    "message": "辞書に項目がありません"
+  },
+  "content_rpSearchingExamples": {
+    "message": "例文を検索中…"
+  },
+  "content_rpNoExamples": {
+    "message": "例文が見つかりませんでした。"
+  },
+  "content_rpPlayExample": {
+    "message": "再生"
+  },
+  "content_rpTatoeba": {
+    "message": "例文は Tatoeba より（CC-BY 2.0 FR ライセンス）"
+  },
+  "content_rpPitchAccent": {
+    "message": "ピッチアクセント"
+  },
+  "content_rpDeconjugation": {
+    "message": "活用の解析"
+  },
+  "content_rpEntries": {
+    "message": "項目"
+  },
+  "content_rpEntriesFrom": {
+    "message": "$1 件（$2）"
+  },
+  "content_rpYourDicts": {
+    "message": "あなたの辞書"
+  },
+  "content_rpSourcePage": {
+    "message": "出典ページ"
+  },
+  "content_rpBridgeNote": {
+    "message": "辞書・文法・難易度のデータはすべて、ローカル接続を通じて Gum デスクトップアプリから取得しています。"
+  },
+  "content_rpTranslation": {
+    "message": "翻訳"
+  },
+  "content_rpEmpty": {
+    "message": "（空）"
+  },
+  "content_rpTranslateFailed": {
+    "message": "翻訳に失敗しました — Gum にモデルはインストールされていますか？"
+  },
+  "content_cpKind": {
+    "message": "カードの種類"
+  },
+  "content_cpWord": {
+    "message": "単語カード"
+  },
+  "content_cpSentence": {
+    "message": "文カード"
+  },
+  "content_cpText": {
+    "message": "カードのテキスト"
+  },
+  "content_cpNote": {
+    "message": "Gum は辞書と Anki のフィールド対応に基づいて、カードの項目（読み・意味・音声）を埋めます。"
+  },
+  "content_cpDestBoth": {
+    "message": "保存先: <b>Anki</b>（Anki が閉じていれば Gum）· Gum にも控えを保存"
+  },
+  "content_cpDestGum": {
+    "message": "保存先: <b>Gum の単語カード</b> — カードを求めたので Anki も試します"
+  },
+  "content_wheelLabel": {
+    "message": "Gum の操作"
+  },
+  "content_wheelUnavailable": {
+    "message": "$1 — このページでは使えません"
+  },
+  "content_fabLevelTitle": {
+    "message": "ページの推定難易度（Gum の設定の基準）"
+  },
+  "content_fabCompTitle": {
+    "message": "抽出した単語のうち既に知っている割合"
+  },
+  "content_fabExpand": {
+    "message": "ページツールを展開"
+  },
+  "content_fabHighlight": {
+    "message": "ハイライト"
+  },
+  "content_fabHighlightOn": {
+    "message": "ハイライト: オン"
+  },
+  "content_fabKnownTint": {
+    "message": "既知語の色分け"
+  },
+  "content_fabKnownTintOn": {
+    "message": "既知語の色分け: オン"
+  },
+  "content_fabOcr": {
+    "message": "OCR"
+  },
+  "content_fabHide": {
+    "message": "ここでは隠す"
+  },
+  "content_fabHideTitle": {
+    "message": "このサイトではこのパネルを隠す"
+  },
+  "content_levelOffline": {
+    "message": "難易度を推定できません — Gum が起動していません"
+  },
+  "content_levelNoText": {
+    "message": "このページで学習言語のテキストは見つかりませんでした"
+  },
+  "content_levelTitle": {
+    "message": "ページの推定難易度: $1（語彙レベルからの推定で、公式の評価ではありません）"
+  },
+  "content_ocrLabel": {
+    "message": "OCR の結果"
+  },
+  "content_ocrText": {
+    "message": "認識したテキスト — 保存前に編集できます"
+  },
+  "content_ocrHint": {
+    "message": "単語をダブルクリックで検索できます。認識漏れがあればテキストを編集してください。"
+  },
+  "content_ocrAnalyze": {
+    "message": "AI 分析"
+  },
+  "content_ocrLookUp": {
+    "message": "調べる"
+  },
+  "content_ocrSave": {
+    "message": "Gum に保存"
+  },
+  "content_ocrReselect": {
+    "message": "選択し直す"
+  },
+  "content_ocrNoModels": {
+    "message": "OCR モデルがインストールされていません。Gum → 設定 → モデルと辞書 を開いてください。"
+  },
+  "content_ocrReadHint": {
+    "message": "$1 · 単語をダブルクリックで検索できます。"
+  },
+  "content_ocrNothing": {
+    "message": "その範囲ではテキストを認識できませんでした — もう少し狭く囲んでください。"
+  },
+  "content_ocrEngineManga": {
+    "message": "マンガ OCR で読み取り"
+  },
+  "content_ocrEngineLang": {
+    "message": "$1 として読み取り"
+  },
+  "content_ocrEngineWeb": {
+    "message": "Web OCR で読み取り"
+  },
+  "content_langName_ja": {
+    "message": "日本語"
+  },
+  "content_langName_zh": {
+    "message": "中国語"
+  },
+  "content_langName_ru": {
+    "message": "ロシア語"
+  },
+  "content_aiLabel": {
+    "message": "AI による文の分析"
+  },
+  "content_aiTitle": {
+    "message": "AI OCR · 文の分析"
+  },
+  "content_aiReanalyze": {
+    "message": "再分析 (R)"
+  },
+  "content_aiCapturedFrom": {
+    "message": "$1 から取り込み"
+  },
+  "content_aiNeedsKey": {
+    "message": "AI 分析には API キーが必要です。Gum → 単語カード → AI カードスタジオ で追加してください。"
+  },
+  "content_aiNeedsLocal": {
+    "message": "AI 分析にはローカルの Qwen モデルが必要です。Gum → 翻訳 から Qwen3-1.7B をインストールするか、単語カード → AI カードスタジオ でクラウドに切り替えてください。"
+  },
+  "content_aiOutdated": {
+    "message": "Gum が古いか、起動が完了していません — アプリを再起動してから拡張機能を再読み込みしてください。"
+  },
+  "content_aiFailed": {
+    "message": "分析に失敗しました。"
+  },
+  "content_aiAnalyzing": {
+    "message": "文を分析中…"
+  },
+  "content_aiTryAgain": {
+    "message": "もう一度"
+  },
+  "content_aiRecognized": {
+    "message": "認識した文"
+  },
+  "content_aiHint": {
+    "message": "ハイライト部分をクリックすると文法と語彙の説明を表示します。"
+  },
+  "content_aiFormality": {
+    "message": "丁寧さ"
+  },
+  "content_aiStructure": {
+    "message": "構造"
+  },
+  "content_aiNuance": {
+    "message": "ニュアンス"
+  },
+  "content_aiWatchOut": {
+    "message": "注意点"
+  },
+  "content_aiShowTranslations": {
+    "message": "すべての訳を表示"
+  },
+  "content_aiHideTranslations": {
+    "message": "訳を隠す"
+  },
+  "content_aiSimplified": {
+    "message": "簡約"
+  },
+  "content_aiLiteral": {
+    "message": "直訳"
+  },
+  "content_aiPoint": {
+    "message": "$1のポイント"
+  },
+  "content_aiLevel": {
+    "message": "レベル"
+  },
+  "content_aiMeaning": {
+    "message": "意味・働き"
+  },
+  "content_aiOpenDict": {
+    "message": "辞書で開く"
+  },
+  "content_aiInDepth": {
+    "message": "詳しい解説"
+  },
+  "content_aiVocabNotes": {
+    "message": "語彙メモ"
+  },
+  "content_aiCopy": {
+    "message": "コピー"
+  },
+  "content_aiListen": {
+    "message": "聞く"
+  },
+  "content_aiSaveSentence": {
+    "message": "文全体を保存"
+  },
+  "content_aiShortcuts": {
+    "message": "ショートカット"
+  },
+  "content_aiKey_pick": {
+    "message": "選ぶ"
+  },
+  "content_aiKey_move": {
+    "message": "移動"
+  },
+  "content_aiKey_copy": {
+    "message": "コピー"
+  },
+  "content_aiKey_card": {
+    "message": "カード"
+  },
+  "content_aiKey_sentence": {
+    "message": "文"
+  },
+  "content_aiKey_snapshot": {
+    "message": "スナップショット"
+  },
+  "content_aiKey_listen": {
+    "message": "聞く"
+  },
+  "content_aiKey_dictionary": {
+    "message": "辞書"
+  },
+  "content_aiKey_translations": {
+    "message": "訳"
+  },
+  "content_aiKey_reanalyze": {
+    "message": "再分析"
+  },
+  "content_aiKey_close": {
+    "message": "閉じる"
+  },
+  "content_aiCat_grammar": {
+    "message": "文法"
+  },
+  "content_aiCat_vocabulary": {
+    "message": "語彙"
+  },
+  "content_aiCat_particle": {
+    "message": "助詞"
+  },
+  "content_aiCat_expression": {
+    "message": "表現"
+  },
+  "content_aiCat_idiom": {
+    "message": "慣用句"
+  },
+  "content_aiCat_name": {
+    "message": "固有名詞"
+  },
+  "content_aiMine_idle": {
+    "message": "単語カードに追加"
+  },
+  "content_aiMine_busy": {
+    "message": "追加中…"
+  },
+  "content_aiMine_done": {
+    "message": "追加済み"
+  },
+  "content_aiMine_error": {
+    "message": "追加を再試行"
+  },
+  "content_aiSnap_idle": {
+    "message": "スナップショット"
+  },
+  "content_aiSnap_busy": {
+    "message": "保存中…"
+  },
+  "content_aiSnap_done": {
+    "message": "ノートに保存済み"
+  },
+  "content_aiSnap_error": {
+    "message": "スナップショットを再試行"
+  },
   "popup_statusApp": {
     "message": "Gum アプリ"
   },

@@ -1832,8 +1832,9 @@ h1 {
 }
 
 .field-hint-btn {
-  width: 18px;
-  height: 18px;
+  /* WCAG 2.5.8 target floor: 24px (was 18x18). */
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -13204,6 +13205,81 @@ mark.lookup-mark,
 .music-row.active {
   background: rgba(255, 46, 77, 0.16);
 }
+/* User playlists: the picker row above the list, and a playlist row's move/remove
+   buttons beside its song button (a button may not hold buttons). */
+.music-playlists {
+  display: grid;
+  gap: 6px;
+  padding: 0 9px 8px;
+}
+.music-playlists__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.music-playlists__pick {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+}
+.music-playlists__pick select,
+.music-playlists__row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  font: inherit;
+}
+.music-playlists__note:empty {
+  display: none;
+}
+.music-playlists__note {
+  margin: 0;
+  font-size: 12px;
+}
+.music-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.music-playlist-row {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+.music-playlist-row > .music-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.music-playlist-row__actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+.music-playlist-row__actions button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.music-playlist-row__actions button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+.music-playlist-row__actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 .music-row-folder {
   color: rgba(255, 255, 255, 0.72);
   font-size: 12.5px;
@@ -14346,11 +14422,12 @@ html.os-interacting .os-companion {
   overflow: hidden;
 }
 .os-companion-menu-btn {
+  /* WCAG 2.5.8 target floor: 24px (was 20x18). */
   position: absolute;
   top: -6px;
   right: -8px;
-  width: 20px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -15238,11 +15315,12 @@ html[data-icon-label='hover'] .os-desk-icon:hover .os-desk-icon-label {
 html[data-icon-size='small'] .os-desk-icon-img { width: 36px; height: 36px; }
 html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
 .os-desk-icon-x {
+  /* WCAG 2.5.8 target floor: 24px (was 16x16). */
   position: absolute;
   top: 2px;
   right: 4px;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   display: none;
   align-items: center;
   justify-content: center;
@@ -15323,8 +15401,9 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   flex-shrink: 0;
 }
 .fwin-b {
+  /* WCAG 2.5.8 target floor: 24px (was 26x22). */
   width: 26px;
-  height: 22px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15718,11 +15797,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .os-start-tile-pin {
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
   position: absolute;
   top: 4px;
   right: 4px;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -17130,11 +17210,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
   opacity: 0.7;
 }
 .widget-b {
+  /* WCAG 2.5.8 target floor: 24px (was 24x22). */
   border: none;
   background: transparent;
   color: var(--muted);
   width: 24px;
-  height: 22px;
+  height: 24px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
@@ -17732,8 +17813,9 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--muted);
 }
 .wgt-todo-list .wgt-btn-icon {
-  width: 22px;
-  height: 22px;
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
+  width: 24px;
+  height: 24px;
   font-size: 13px;
   background: transparent;
 }
@@ -17957,8 +18039,9 @@ html[data-taskbar-size='large'] .os-tray-btn {
 
 /* ---- Phase 2 widgets ---- */
 .wgt-btn-icon.sm {
-  width: 20px;
-  height: 20px;
+  /* WCAG 2.5.8 target floor: 24px (was 20x20). */
+  width: 24px;
+  height: 24px;
   font-size: 12px;
   background: transparent;
 }
@@ -18990,6 +19073,8 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .immersion-toolbar .icon-btn {
   padding: 4px 6px;
   min-width: 28px;
+  /* WCAG 2.5.8: the 14px glyph + 4px padding came to 23.75px tall. */
+  min-height: 24px;
 }
 
 /* ---- Phase 2 system widgets ---- */
@@ -21177,12 +21262,13 @@ html[data-taskbar-size='large'] .os-tray-btn {
   gap: 2px;
 }
 .mini-ico-btn {
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
   appearance: none;
   border: none;
   background: transparent;
   color: var(--mini-caption);
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
   display: grid;
   place-items: center;
@@ -28413,11 +28499,12 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
   text-transform: uppercase;
 }
 .lib-drawer .aero-library-drawer-close {
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
   display: grid;
   place-items: center;
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;

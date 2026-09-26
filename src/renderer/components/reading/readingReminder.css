@@ -109,11 +109,12 @@
 }
 
 .rl-reminder-close {
+  /* WCAG 2.5.8 target floor: 24px (was 22x22). */
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   border: 0;

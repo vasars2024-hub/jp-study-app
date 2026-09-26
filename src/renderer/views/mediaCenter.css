@@ -1953,6 +1953,10 @@
   font-size: var(--mc-fs-meta, 12px);
 }
 
+.mc-music-sort[hidden] {
+  display: none;
+}
+
 .mc-music-sort select {
   min-width: 0;
   flex: 1;

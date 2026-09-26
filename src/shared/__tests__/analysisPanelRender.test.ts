@@ -22,6 +22,7 @@ import {
   type UnalignedAnnotation,
 } from '../sentenceAnalysisCore';
 import { analysisCommandForKey, type AnalysisCommand } from '../analysisShortcuts';
+import { createI18nStub } from './extensionHarness';
 
 interface PanelState {
   text: string;
@@ -55,10 +56,14 @@ interface ExtensionShared {
   aiPanelHtml: (state: PanelState) => string;
 }
 
-function loadExtensionShared(): ExtensionShared {
+/** shared.js reads its UI text through chrome.i18n, as it does in the browser. */
+function loadExtensionShared(locale = 'en'): ExtensionShared {
   const filePath = path.join(__dirname, '..', '..', '..', 'extension', 'shared.js');
   const code = readFileSync(filePath, 'utf8');
-  const sandbox: { globalThis?: unknown; jpStudyShared?: ExtensionShared; URL: typeof URL } = { URL };
+  const sandbox: { globalThis?: unknown; jpStudyShared?: ExtensionShared; URL: typeof URL; chrome: unknown } = {
+    URL,
+    chrome: { i18n: createI18nStub(locale) },
+  };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: filePath });

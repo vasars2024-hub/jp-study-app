@@ -1074,8 +1074,13 @@ export function registerDictionaryIpc(): void {
     return scoped ? moveDictionarySourceInPair(id, dir, scoped) : moveDictionarySource(id, dir);
   });
   ipcMain.handle('dict:removeSource', (_e, id: string) => removeDictionarySource(id));
-  // Read-only structured pitch data for the Blanc pitch panel.
-  ipcMain.handle('dict:pitch', (_e, term: string, reading?: string) => getPitchData(term, reading));
+  // Read-only structured pitch data for the Blanc pitch panel and the flashcard answer side.
+  // The metadata indices load at boot; a card shown before they finish must wait for them
+  // rather than read an empty index as 'no pitch dictionary installed'.
+  ipcMain.handle('dict:pitch', async (_e, term: string, reading?: string) => {
+    await initYomitanMeta().catch(() => undefined);
+    return getPitchData(term, reading);
+  });
   ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
   ipcMain.handle(
     'dict:lookupOfflineInterlinear',

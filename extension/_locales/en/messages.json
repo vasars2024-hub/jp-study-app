@@ -386,6 +386,549 @@
   "content_snapshotFailed": {
     "message": "Snapshot failed"
   },
+  "content_extReloaded": {
+    "message": "Extension reloaded — refresh this tab"
+  },
+  "content_extError": {
+    "message": "Extension error"
+  },
+  "content_close": {
+    "message": "Close"
+  },
+  "content_popupLabel": {
+    "message": "Gum lookup"
+  },
+  "content_rpBack": {
+    "message": "Back"
+  },
+  "content_rpBackTitle": {
+    "message": "Back to previous lookup"
+  },
+  "content_rpPronounce": {
+    "message": "Play pronunciation"
+  },
+  "content_rpPin": {
+    "message": "Pin popup"
+  },
+  "content_rpPinTitle": {
+    "message": "Pin popup (P)"
+  },
+  "content_rpCloseTitle": {
+    "message": "Close (Esc)"
+  },
+  "content_rpKnownGroup": {
+    "message": "How well do you know this word?"
+  },
+  "content_rpKnownLabel": {
+    "message": "Known:"
+  },
+  "content_rpLevel0": {
+    "message": "New"
+  },
+  "content_rpLevel1": {
+    "message": "Learning"
+  },
+  "content_rpLevel2": {
+    "message": "Familiar"
+  },
+  "content_rpLevel3": {
+    "message": "Known"
+  },
+  "content_rpTab_meaning": {
+    "message": "Meaning"
+  },
+  "content_rpTab_grammar": {
+    "message": "Grammar"
+  },
+  "content_rpTab_sentence": {
+    "message": "Sentence"
+  },
+  "content_rpTab_kanji": {
+    "message": "Kanji"
+  },
+  "content_rpTab_examples": {
+    "message": "Examples"
+  },
+  "content_rpTab_more": {
+    "message": "More"
+  },
+  "content_rpSaveWord": {
+    "message": "Save word"
+  },
+  "content_rpSaveSentence": {
+    "message": "Save sentence"
+  },
+  "content_rpCreateCard": {
+    "message": "Create card"
+  },
+  "content_rpMoreActions": {
+    "message": "More actions"
+  },
+  "content_rpAddClip": {
+    "message": "Add to clipboard history"
+  },
+  "content_rpTranslateSentence": {
+    "message": "Translate sentence"
+  },
+  "content_rpCopySentence": {
+    "message": "Copy sentence"
+  },
+  "content_rpOpenGum": {
+    "message": "Open Gum"
+  },
+  "content_rpBase": {
+    "message": "Base:"
+  },
+  "content_rpDeinfTitle": {
+    "message": "Deconjugation path"
+  },
+  "content_rpCommon": {
+    "message": "common"
+  },
+  "content_rpJlptTitle": {
+    "message": "JLPT level is an estimate"
+  },
+  "content_rpFreqTitle": {
+    "message": "Frequency rank"
+  },
+  "content_rpDictOffline": {
+    "message": "Gum is not running — dictionaries live in the app. Open Gum and try again."
+  },
+  "content_rpNoEntries": {
+    "message": "No dictionary entries found."
+  },
+  "content_rpNoGloss": {
+    "message": "(no gloss)"
+  },
+  "content_rpPitch": {
+    "message": "Pitch"
+  },
+  "content_rpDictSource": {
+    "message": "Dictionary source"
+  },
+  "content_rpMoreEntries_one": {
+    "message": "$1 more entry — see the More tab."
+  },
+  "content_rpMoreEntries_other": {
+    "message": "$1 more entries — see the More tab."
+  },
+  "content_rpNoSentence": {
+    "message": "No surrounding sentence was detected for this word."
+  },
+  "content_rpMatchingGrammar": {
+    "message": "Matching grammar patterns…"
+  },
+  "content_rpGrammarOffline": {
+    "message": "Gum is not running — grammar matching needs the app."
+  },
+  "content_rpGrammarFailed": {
+    "message": "Grammar matching failed."
+  },
+  "content_rpRetry": {
+    "message": "Retry"
+  },
+  "content_rpNoGrammar": {
+    "message": "No known grammar patterns matched this sentence."
+  },
+  "content_rpInSentence": {
+    "message": "in sentence"
+  },
+  "content_rpInSentenceTitle": {
+    "message": "This form appears literally in the sentence"
+  },
+  "content_rpPatternMatch": {
+    "message": "pattern match"
+  },
+  "content_rpPatternMatchTitle": {
+    "message": "Matched by pattern rules — the exact span could not be located"
+  },
+  "content_rpGrammarNote": {
+    "message": "Matches are found by Gum’s pattern rules on this sentence’s text. When several overlap, judgement is yours — open grammar practice for full explanations."
+  },
+  "content_rpOpenGrammar": {
+    "message": "Open grammar practice"
+  },
+  "content_rpNoSentenceAround": {
+    "message": "No sentence detected around this word."
+  },
+  "content_rpExtendPrev": {
+    "message": "‹ extend"
+  },
+  "content_rpExtendPrevTitle": {
+    "message": "Include the previous sentence"
+  },
+  "content_rpExtendNext": {
+    "message": "extend ›"
+  },
+  "content_rpExtendNextTitle": {
+    "message": "Include the next sentence"
+  },
+  "content_rpReset": {
+    "message": "Reset"
+  },
+  "content_rpEdit": {
+    "message": "Edit"
+  },
+  "content_rpAnalyzing": {
+    "message": "Analyzing…"
+  },
+  "content_rpCopy": {
+    "message": "Copy"
+  },
+  "content_rpDifficulty": {
+    "message": "Difficulty"
+  },
+  "content_rpEstimate": {
+    "message": "(estimate)"
+  },
+  "content_rpKnownWords": {
+    "message": "Known words"
+  },
+  "content_rpChars_one": {
+    "message": "$1 character"
+  },
+  "content_rpChars_other": {
+    "message": "$1 characters"
+  },
+  "content_rpStatsOffline": {
+    "message": "Gum offline — stats unavailable"
+  },
+  "content_rpNoKanji": {
+    "message": "No kanji in this expression."
+  },
+  "content_rpLoadingKanji": {
+    "message": "Loading kanji…"
+  },
+  "content_rpKanjiOffline": {
+    "message": "Gum is not running — kanji data needs the app."
+  },
+  "content_rpLookUpChar": {
+    "message": "Look up $1"
+  },
+  "content_rpNoKanjiEntry": {
+    "message": "No entry in your dictionaries"
+  },
+  "content_rpSearchingExamples": {
+    "message": "Searching examples…"
+  },
+  "content_rpNoExamples": {
+    "message": "No example sentences found."
+  },
+  "content_rpPlayExample": {
+    "message": "Play"
+  },
+  "content_rpTatoeba": {
+    "message": "Example sentences from Tatoeba, licensed CC-BY 2.0 FR"
+  },
+  "content_rpPitchAccent": {
+    "message": "Pitch accent"
+  },
+  "content_rpDeconjugation": {
+    "message": "Deconjugation"
+  },
+  "content_rpEntries": {
+    "message": "Entries"
+  },
+  "content_rpEntriesFrom": {
+    "message": "$1 from $2"
+  },
+  "content_rpYourDicts": {
+    "message": "your dictionaries"
+  },
+  "content_rpSourcePage": {
+    "message": "Source page"
+  },
+  "content_rpBridgeNote": {
+    "message": "All dictionary, grammar, and difficulty data comes from your Gum desktop app over the local bridge."
+  },
+  "content_rpTranslation": {
+    "message": "Translation"
+  },
+  "content_rpEmpty": {
+    "message": "(empty)"
+  },
+  "content_rpTranslateFailed": {
+    "message": "Translation failed — is the model installed in Gum?"
+  },
+  "content_cpKind": {
+    "message": "Card type"
+  },
+  "content_cpWord": {
+    "message": "Word card"
+  },
+  "content_cpSentence": {
+    "message": "Sentence card"
+  },
+  "content_cpText": {
+    "message": "Card text"
+  },
+  "content_cpNote": {
+    "message": "Gum fills the card fields (reading, definition, audio) from its dictionaries and your Anki field mapping."
+  },
+  "content_cpDestBoth": {
+    "message": "Destination: <b>Anki</b> (falls back to Gum if Anki is closed) · copy kept in Gum"
+  },
+  "content_cpDestGum": {
+    "message": "Destination: <b>Gum flashcards</b> — Anki is attempted because you asked for a card"
+  },
+  "content_wheelLabel": {
+    "message": "Gum actions"
+  },
+  "content_wheelUnavailable": {
+    "message": "$1 — not available on this page"
+  },
+  "content_fabLevelTitle": {
+    "message": "Estimated page difficulty (bands from your Gum settings)"
+  },
+  "content_fabCompTitle": {
+    "message": "Share of sampled words you already know"
+  },
+  "content_fabExpand": {
+    "message": "Expand page tools"
+  },
+  "content_fabHighlight": {
+    "message": "Highlight"
+  },
+  "content_fabHighlightOn": {
+    "message": "Highlight: on"
+  },
+  "content_fabKnownTint": {
+    "message": "Known tint"
+  },
+  "content_fabKnownTintOn": {
+    "message": "Known tint: on"
+  },
+  "content_fabOcr": {
+    "message": "OCR"
+  },
+  "content_fabHide": {
+    "message": "Hide here"
+  },
+  "content_fabHideTitle": {
+    "message": "Hide this panel on this site"
+  },
+  "content_levelOffline": {
+    "message": "Difficulty estimate unavailable — Gum is not running"
+  },
+  "content_levelNoText": {
+    "message": "No text in a study language was detected on this page"
+  },
+  "content_levelTitle": {
+    "message": "Estimated page difficulty: $1 (vocabulary-band estimate, not an official rating)"
+  },
+  "content_ocrLabel": {
+    "message": "OCR result"
+  },
+  "content_ocrText": {
+    "message": "Recognized text — edit before saving"
+  },
+  "content_ocrHint": {
+    "message": "Double-click a word to look it up. Edit the text if the recognition missed characters."
+  },
+  "content_ocrAnalyze": {
+    "message": "AI analysis"
+  },
+  "content_ocrLookUp": {
+    "message": "Look up"
+  },
+  "content_ocrSave": {
+    "message": "Save to Gum"
+  },
+  "content_ocrReselect": {
+    "message": "Re-select"
+  },
+  "content_ocrNoModels": {
+    "message": "OCR models are not installed. Open Gum → Settings → Models & dictionaries."
+  },
+  "content_ocrReadHint": {
+    "message": "$1 · Double-click a word to look it up."
+  },
+  "content_ocrNothing": {
+    "message": "No text was recognized in that area — try a tighter box."
+  },
+  "content_ocrEngineManga": {
+    "message": "Read with manga OCR"
+  },
+  "content_ocrEngineLang": {
+    "message": "Read as $1"
+  },
+  "content_ocrEngineWeb": {
+    "message": "Read with web OCR"
+  },
+  "content_langName_ja": {
+    "message": "Japanese"
+  },
+  "content_langName_zh": {
+    "message": "Chinese"
+  },
+  "content_langName_ru": {
+    "message": "Russian"
+  },
+  "content_aiLabel": {
+    "message": "AI sentence analysis"
+  },
+  "content_aiTitle": {
+    "message": "AI OCR · Sentence analysis"
+  },
+  "content_aiReanalyze": {
+    "message": "Re-analyze (R)"
+  },
+  "content_aiCapturedFrom": {
+    "message": "Captured from $1"
+  },
+  "content_aiNeedsKey": {
+    "message": "AI analysis needs an API key. Add one in Gum → Flashcards → AI Card Studio."
+  },
+  "content_aiNeedsLocal": {
+    "message": "AI analysis needs the local Qwen model. Install Qwen3-1.7B via Gum → Translate, or switch to Cloud in Flashcards → AI Card Studio."
+  },
+  "content_aiOutdated": {
+    "message": "Gum is outdated or not fully started — restart the app, then reload this extension."
+  },
+  "content_aiFailed": {
+    "message": "The analysis failed."
+  },
+  "content_aiAnalyzing": {
+    "message": "Analyzing the sentence…"
+  },
+  "content_aiTryAgain": {
+    "message": "Try again"
+  },
+  "content_aiRecognized": {
+    "message": "Recognized sentence"
+  },
+  "content_aiHint": {
+    "message": "Click any highlighted part to see grammar and vocabulary explained."
+  },
+  "content_aiFormality": {
+    "message": "Formality"
+  },
+  "content_aiStructure": {
+    "message": "Structure"
+  },
+  "content_aiNuance": {
+    "message": "Nuance"
+  },
+  "content_aiWatchOut": {
+    "message": "Watch out"
+  },
+  "content_aiShowTranslations": {
+    "message": "Show all translations"
+  },
+  "content_aiHideTranslations": {
+    "message": "Hide translations"
+  },
+  "content_aiSimplified": {
+    "message": "simplified"
+  },
+  "content_aiLiteral": {
+    "message": "Literal"
+  },
+  "content_aiPoint": {
+    "message": "$1 point"
+  },
+  "content_aiLevel": {
+    "message": "Level"
+  },
+  "content_aiMeaning": {
+    "message": "Meaning / function"
+  },
+  "content_aiOpenDict": {
+    "message": "Open in dictionary"
+  },
+  "content_aiInDepth": {
+    "message": "In-depth explanation"
+  },
+  "content_aiVocabNotes": {
+    "message": "Vocabulary notes"
+  },
+  "content_aiCopy": {
+    "message": "Copy"
+  },
+  "content_aiListen": {
+    "message": "Listen"
+  },
+  "content_aiSaveSentence": {
+    "message": "Save whole sentence"
+  },
+  "content_aiShortcuts": {
+    "message": "Shortcuts"
+  },
+  "content_aiKey_pick": {
+    "message": "pick"
+  },
+  "content_aiKey_move": {
+    "message": "move"
+  },
+  "content_aiKey_copy": {
+    "message": "copy"
+  },
+  "content_aiKey_card": {
+    "message": "card"
+  },
+  "content_aiKey_sentence": {
+    "message": "sentence"
+  },
+  "content_aiKey_snapshot": {
+    "message": "snapshot"
+  },
+  "content_aiKey_listen": {
+    "message": "listen"
+  },
+  "content_aiKey_dictionary": {
+    "message": "dictionary"
+  },
+  "content_aiKey_translations": {
+    "message": "translations"
+  },
+  "content_aiKey_reanalyze": {
+    "message": "re-analyze"
+  },
+  "content_aiKey_close": {
+    "message": "close"
+  },
+  "content_aiCat_grammar": {
+    "message": "Grammar"
+  },
+  "content_aiCat_vocabulary": {
+    "message": "Vocabulary"
+  },
+  "content_aiCat_particle": {
+    "message": "Particle"
+  },
+  "content_aiCat_expression": {
+    "message": "Expression"
+  },
+  "content_aiCat_idiom": {
+    "message": "Idiom"
+  },
+  "content_aiCat_name": {
+    "message": "Name"
+  },
+  "content_aiMine_idle": {
+    "message": "Add to flashcards"
+  },
+  "content_aiMine_busy": {
+    "message": "Adding…"
+  },
+  "content_aiMine_done": {
+    "message": "Added"
+  },
+  "content_aiMine_error": {
+    "message": "Retry add"
+  },
+  "content_aiSnap_idle": {
+    "message": "Snapshot"
+  },
+  "content_aiSnap_busy": {
+    "message": "Saving…"
+  },
+  "content_aiSnap_done": {
+    "message": "In notebook"
+  },
+  "content_aiSnap_error": {
+    "message": "Retry snapshot"
+  },
   "popup_statusApp": {
     "message": "Gum app"
   },

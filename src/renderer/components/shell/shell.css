@@ -1547,10 +1547,12 @@ html.os-frameless .focus-bar .focus-music-bar {
   position: absolute;
   top: 50%;
   /* 12px button padding + 1px border, less the slot's -4px margin. */
-  right: 9px;
-  width: 16px;
-  height: 16px;
-  margin-top: -8px;
+  /* WCAG 2.5.8 target floor: a 24px box (was 16x16) centred on the same 16px slot, so
+     the glyph stays put and the tab keeps its width. */
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
   padding: 0;
   border: 0;
   display: inline-flex;

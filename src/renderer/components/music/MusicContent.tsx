@@ -25,6 +25,23 @@ import * as player from '../../playerBus';
 import { coverFor } from '../../albumArt';
 import { isLiked, onLikedChanged, toggleLiked } from '../../likedSongs';
 import {
+  addTracksToPlaylist,
+  createPlaylist,
+  deletePlaylist,
+  getPlaylist,
+  listPlaylists,
+  moveTrackInPlaylist,
+  onPlaylistPlayRequested,
+  onPlaylistsChanged,
+  PLAYLIST_NAME_MAX,
+  removeTrackFromPlaylist,
+  renamePlaylist,
+  resolvePlaylistTracks,
+  takePendingPlaylistPlay,
+  type MusicPlaylist,
+} from '../../musicPlaylists';
+import { ContextMenu, type MenuItem } from '../ui/ContextMenu';
+import {
   loadLyricsSettings,
   onLyricsSettingsChanged,
   toggleUseAlbumInSearch,
@@ -85,6 +102,16 @@ export interface MusicState {
   setLikedOnly: (fn: (v: boolean) => boolean) => void;
   likedTick: number;
   bumpLikedTick: () => void;
+  /** The user's playlists, and the one the list is showing (null: the whole library). */
+  playlists: MusicPlaylist[];
+  playlistId: string | null;
+  activePlaylist: MusicPlaylist | undefined;
+  setPlaylistId: (id: string | null) => void;
+  /** Show a playlist and play it from its first track. */
+  playPlaylist: (id: string) => void;
+  /** The last playlist action, for a polite status line. */
+  playlistNote: string;
+  setPlaylistNote: (note: string) => void;
   query: string;
   setQuery: (q: string) => void;
   searchActive: boolean;
@@ -133,6 +160,11 @@ export function useMusic(): MusicState {
   );
   const [likedOnly, setLikedOnly] = useState(false);
   const [likedTick, setLikedTick] = useState(0);
+  const [playlists, setPlaylists] = useState(listPlaylists);
+  const [playlistId, setPlaylistId] = useState<string | null>(null);
+  const [playlistNote, setPlaylistNote] = useState('');
+  const [itemsLoaded, setItemsLoaded] = useState(false);
+  const activePlaylist = getPlaylistFrom(playlists, playlistId);
   const [art, setArt] = useState<string | null>(null);
   const [ytUrl, setYtUrl] = useState('');
   const [yt, setYt] = useState<{ stage: string; percent: number } | null>(null);
@@ -145,6 +177,11 @@ export function useMusic(): MusicState {
 
   useEffect(() => player.subscribe(setPs), []);
   useEffect(() => onLikedChanged(() => setLikedTick((n) => n + 1)), []);
+  useEffect(() => onPlaylistsChanged(() => setPlaylists(listPlaylists())), []);
+  // A deleted playlist (here or in another window) drops the view back to the library.
+  useEffect(() => {
+    if (playlistId && !activePlaylist) setPlaylistId(null);
+  }, [playlistId, activePlaylist]);
   useEffect(() => onLyricsSettingsChanged((s) => setUseAlbumInSearch(s.useAlbumInSearch)), []);
   useEffect(() => setPopup(null), [ps.current?.id]);
   useEffect(() => {
@@ -153,12 +190,14 @@ export function useMusic(): MusicState {
 
   // Filter to audio + the liked-only toggle. Recomputes on likedTick so
   // hearting a song updates the list immediately when likedOnly is active.
+  // A playlist narrows the library to its tracks, in the playlist's own order.
   const baseSongs = useMemo(() => {
     void likedTick;
     let list = items.filter((it) => AUDIO_EXT.test(it.fileName));
+    if (activePlaylist) list = resolvePlaylistTracks(activePlaylist, list);
     if (likedOnly) list = list.filter((it) => isLiked(it.id));
     return list;
-  }, [items, likedOnly, likedTick]);
+  }, [items, likedOnly, likedTick, activePlaylist]);
 
   // Cached once per song-list change — NOT on every keystroke or scroll tick.
   const metaMap = useMemo(() => {
@@ -180,12 +219,14 @@ export function useMusic(): MusicState {
 
   const flatSorted = useMemo(() => {
     const list = baseSongs.slice();
+    // A playlist's order is the user's; the library sorts do not apply to it.
+    if (activePlaylist) return list;
     if (sortBy === 'title') list.sort(titleCompare);
     else if (sortBy === 'artist') list.sort(compareBy((s) => metaMap.get(s.id)?.artist ?? ''));
     else if (sortBy !== 'folder')
       list.sort((a, b) => (b.lastPlayedAt ?? b.addedAt) - (a.lastPlayedAt ?? a.addedAt));
     return list;
-  }, [baseSongs, sortBy, compareBy, metaMap, titleCompare]);
+  }, [baseSongs, sortBy, compareBy, metaMap, titleCompare, activePlaylist]);
 
   const tree = useMemo(() => buildMusicTree(baseSongs), [baseSongs]);
 
@@ -219,25 +260,28 @@ export function useMusic(): MusicState {
     if (searchActive) {
       return searchResults.map((s) => ({ kind: 'song', key: s.id, song: s, depth: 0 }) as const);
     }
-    if (sortBy === 'folder') return flattenMusicTree(tree, collapsed, titleCompare);
+    if (sortBy === 'folder' && !activePlaylist) return flattenMusicTree(tree, collapsed, titleCompare);
     return flatSorted.map((s) => ({ kind: 'song', key: s.id, song: s, depth: 0 }) as const);
-  }, [searchActive, searchResults, sortBy, tree, collapsed, titleCompare, flatSorted]);
+  }, [searchActive, searchResults, sortBy, tree, collapsed, titleCompare, flatSorted, activePlaylist]);
 
   // The play queue tracks the full browsable order (ignoring which folders
   // happen to be collapsed right now), so next/prev/shuffle stay stable while
   // the user folds and unfolds the tree.
   const queueSongs = useMemo(() => {
     if (searchActive) return searchResults;
-    if (sortBy === 'folder') {
+    if (sortBy === 'folder' && !activePlaylist) {
       return flattenMusicTree(tree, EMPTY_SET, titleCompare)
         .filter((r): r is Extract<MusicRow, { kind: 'song' }> => r.kind === 'song')
         .map((r) => r.song);
     }
     return flatSorted;
-  }, [searchActive, searchResults, sortBy, tree, titleCompare, flatSorted]);
+  }, [searchActive, searchResults, sortBy, tree, titleCompare, flatSorted, activePlaylist]);
 
   useEffect(() => {
-    window.api.listMedia().then(setItems);
+    window.api.listMedia().then((next) => {
+      setItems(next);
+      setItemsLoaded(true);
+    });
     return window.api.onMediaChanged(setItems);
   }, []);
 
@@ -282,6 +326,38 @@ export function useMusic(): MusicState {
     if (err) setError(err);
   }, []);
 
+  // Show the playlist and start it from the top. The queue is set here rather than left to
+  // the queue effect, so the first track plays against the playlist's order immediately.
+  const playPlaylist = useCallback(
+    (id: string) => {
+      const playlist = getPlaylist(id);
+      if (!playlist) return;
+      setPlaylistId(id);
+      setQuery('');
+      const tracks = resolvePlaylistTracks(playlist, items.filter((it) => AUDIO_EXT.test(it.fileName)));
+      if (tracks.length === 0) {
+        setPlaylistNote(t('musicUi.playlists.nothingToPlay'));
+        return;
+      }
+      player.setQueue(tracks);
+      void play(tracks[0]);
+    },
+    [items, play, t],
+  );
+
+  // "Play playlist" from the palette: claimed once, after the library has loaded.
+  const playPlaylistRef = useRef(playPlaylist);
+  playPlaylistRef.current = playPlaylist;
+  useEffect(() => {
+    if (!itemsLoaded) return undefined;
+    const claim = (): void => {
+      const id = takePendingPlaylistPlay();
+      if (id) playPlaylistRef.current(id);
+    };
+    claim();
+    return onPlaylistPlayRequested(claim);
+  }, [itemsLoaded]);
+
   const downloadYt = useCallback(async () => {
     const u = ytUrl.trim();
     if (!u) return;
@@ -318,7 +394,9 @@ export function useMusic(): MusicState {
 
   const emptyMessage = searchActive
     ? t('music.empty.noMatch', { query: debouncedQuery })
-    : likedOnly
+    : activePlaylist
+      ? t('musicUi.playlists.empty')
+      : likedOnly
       ? t('music.empty.noLiked')
       : t('music.empty.noAudio');
 
@@ -335,6 +413,13 @@ export function useMusic(): MusicState {
     setLikedOnly,
     likedTick,
     bumpLikedTick: () => setLikedTick((n) => n + 1),
+    playlists,
+    playlistId: activePlaylist ? playlistId : null,
+    activePlaylist,
+    setPlaylistId,
+    playPlaylist,
+    playlistNote,
+    setPlaylistNote,
     query,
     setQuery,
     searchActive,
@@ -366,10 +451,88 @@ export function useMusic(): MusicState {
   };
 }
 
+function getPlaylistFrom(list: MusicPlaylist[], id: string | null): MusicPlaylist | undefined {
+  return id ? list.find((p) => p.id === id) : undefined;
+}
+
+/**
+ * The song menu: "Add to <playlist>" for each playlist and "New playlist with this song"
+ * in the library; move and remove inside a playlist. Built from `state` so both shells
+ * that host the list get the same menu.
+ */
+function songMenuItems(
+  state: MusicState,
+  song: MediaItem,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): MenuItem[] {
+  const playlist = state.activePlaylist;
+  if (playlist) {
+    const at = playlist.trackIds.indexOf(song.id);
+    return [
+      {
+        id: 'up',
+        label: t('musicUi.playlists.moveUp'),
+        disabled: at <= 0,
+        onSelect: () => moveTrackInPlaylist(playlist.id, song.id, at - 1),
+      },
+      {
+        id: 'down',
+        label: t('musicUi.playlists.moveDown'),
+        disabled: at < 0 || at >= playlist.trackIds.length - 1,
+        onSelect: () => moveTrackInPlaylist(playlist.id, song.id, at + 1),
+      },
+      { separator: true },
+      {
+        id: 'remove',
+        label: t('musicUi.playlists.remove'),
+        danger: true,
+        onSelect: () => removeTrackFromPlaylist(playlist.id, song.id),
+      },
+    ];
+  }
+  const items: MenuItem[] = state.playlists.map((p) => {
+    const has = p.trackIds.includes(song.id);
+    return {
+      id: `add-${p.id}`,
+      label: has ? t('musicUi.playlists.alreadyIn', { name: p.name }) : t('musicUi.playlists.addTo', { name: p.name }),
+      disabled: has,
+      onSelect: () => {
+        if (addTracksToPlaylist(p.id, [song.id]) > 0) state.setPlaylistNote(t('musicUi.playlists.added', { name: p.name }));
+      },
+    };
+  });
+  if (items.length) items.push({ separator: true });
+  items.push({
+    id: 'new',
+    label: t('musicUi.playlists.newWithSong'),
+    onSelect: () => {
+      const created = createPlaylist(
+        '',
+        t('musicUi.playlists.defaultName', { n: state.playlists.length + 1 }),
+        [song.id],
+      );
+      state.setPlaylistNote(t('musicUi.playlists.added', { name: created.name }));
+    },
+  });
+  return items;
+}
+
 /** The virtualized song list. Identical in both shells. */
 export function MusicSongList({ state }: { state: MusicState }) {
   const { t } = useT();
-  const { ps, metaMap, likedTick, toggleFolder, play } = state;
+  const { ps, metaMap, likedTick, toggleFolder, play, activePlaylist } = state;
+  const [menu, setMenu] = useState<{ x: number; y: number; song: MediaItem } | null>(null);
+
+  const openMenu = useCallback((song: MediaItem, x: number, y: number) => setMenu({ song, x, y }), []);
+  const onMenuKey = useCallback(
+    (song: MediaItem) => (e: React.KeyboardEvent<HTMLElement>) => {
+      if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      openMenu(song, r.left + 16, r.bottom);
+    },
+    [openMenu],
+  );
 
   const renderRow = useCallback(
     (row: MusicRow) => {
@@ -397,11 +560,16 @@ export function MusicSongList({ state }: { state: MusicState }) {
       }
       const s = row.song;
       const meta = metaMap.get(s.id) ?? guessSongMeta(s);
-      return (
+      const songButton = (
         <button
           className={`music-row music-song ${ps.current?.id === s.id ? 'active' : ''}`}
           style={{ paddingLeft: 10 + row.depth * 14 }}
           onClick={() => void play(s)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            openMenu(s, e.clientX, e.clientY);
+          }}
+          onKeyDown={onMenuKey(s)}
           title={s.fileName}
         >
           {isLiked(s.id) && <Icon name="heart" size={11} fill style={{ flexShrink: 0 }} />}
@@ -409,28 +577,195 @@ export function MusicSongList({ state }: { state: MusicState }) {
           {meta.artist && <span className="music-song-artist muted">{meta.artist}</span>}
         </button>
       );
+      if (!activePlaylist) return songButton;
+      // Inside a playlist the order is the user's, so moving and removing sit on the row
+      // itself (the same commands are on the row's menu for the keyboard).
+      const at = activePlaylist.trackIds.indexOf(s.id);
+      return (
+        <div className="music-playlist-row">
+          {songButton}
+          <span className="music-playlist-row__actions lq-hit-scope">
+            <button
+              type="button"
+              aria-label={t('musicUi.playlists.moveUp')}
+              title={t('musicUi.playlists.moveUp')}
+              disabled={at <= 0}
+              onClick={() => moveTrackInPlaylist(activePlaylist.id, s.id, at - 1)}
+            >
+              <Icon name="chevron" size={12} style={{ transform: 'rotate(-90deg)' }} />
+            </button>
+            <button
+              type="button"
+              aria-label={t('musicUi.playlists.moveDown')}
+              title={t('musicUi.playlists.moveDown')}
+              disabled={at < 0 || at >= activePlaylist.trackIds.length - 1}
+              onClick={() => moveTrackInPlaylist(activePlaylist.id, s.id, at + 1)}
+            >
+              <Icon name="chevron" size={12} style={{ transform: 'rotate(90deg)' }} />
+            </button>
+            <button
+              type="button"
+              aria-label={t('musicUi.playlists.remove')}
+              title={t('musicUi.playlists.remove')}
+              onClick={() => removeTrackFromPlaylist(activePlaylist.id, s.id)}
+            >
+              <Icon name="close" size={12} />
+            </button>
+          </span>
+        </div>
+      );
       // `likedTick` is a deliberate dependency: hearting a song must re-render
       // its row even though the row data itself did not change.
     },
-    [ps.current?.id, metaMap, toggleFolder, play, likedTick, t],
+    [ps.current?.id, metaMap, toggleFolder, play, likedTick, t, activePlaylist, openMenu, onMenuKey],
   );
 
   return (
-    <VirtualList
-      items={state.rows}
-      itemHeight={ROW_HEIGHT}
-      getKey={(row) => row.key}
-      renderItem={renderRow}
-      className="music-vlist"
-      listRole="list"
-      itemRole="listitem"
-      emptyState={
-        <div className="music-empty">
-          <p className="muted">{state.emptyMessage}</p>
-          {!state.searchActive && !state.likedOnly ? <MusicAddFolderButton onItems={state.setItems} /> : null}
-        </div>
-      }
-    />
+    <>
+      <VirtualList
+        items={state.rows}
+        itemHeight={ROW_HEIGHT}
+        getKey={(row) => row.key}
+        renderItem={renderRow}
+        className="music-vlist"
+        listRole="list"
+        itemRole="listitem"
+        emptyState={
+          <div className="music-empty">
+            <p className="muted">{state.emptyMessage}</p>
+            {!state.searchActive && !state.likedOnly && !activePlaylist ? (
+              <MusicAddFolderButton onItems={state.setItems} />
+            ) : null}
+          </div>
+        }
+      />
+      {menu ? (
+        <ContextMenu
+          open
+          x={menu.x}
+          y={menu.y}
+          items={songMenuItems(state, menu.song, t)}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * The playlist picker and its actions, above the song list: pick "All songs" or a
+ * playlist, play it, create, rename or delete one. Names are edited inline (Electron has
+ * no `prompt()`), and delete asks once in place, the way the scheduling reset does.
+ */
+export function MusicPlaylistBar({ state }: { state: MusicState }) {
+  const { t } = useT();
+  const { playlists, activePlaylist } = state;
+  const [editing, setEditing] = useState<'new' | 'rename' | null>(null);
+  const [name, setName] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => setConfirmDelete(false), [activePlaylist?.id]);
+
+  const startEdit = (mode: 'new' | 'rename'): void => {
+    setEditing(mode);
+    setName(mode === 'rename' ? activePlaylist?.name ?? '' : '');
+    setConfirmDelete(false);
+  };
+  const submit = (): void => {
+    if (editing === 'new') {
+      const created = createPlaylist(name, t('musicUi.playlists.defaultName', { n: playlists.length + 1 }));
+      state.setPlaylistId(created.id);
+    } else if (editing === 'rename' && activePlaylist) {
+      renamePlaylist(activePlaylist.id, name);
+    }
+    setEditing(null);
+  };
+  const remove = (): void => {
+    if (!activePlaylist) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    deletePlaylist(activePlaylist.id);
+    state.setPlaylistId(null);
+    setConfirmDelete(false);
+  };
+
+  return (
+    <div className="music-playlists" role="group" aria-label={t('musicUi.playlists.label')}>
+      <div className="music-playlists__row">
+        <label className="music-playlists__pick">
+          <span className="music-visually-hidden">{t('musicUi.playlists.label')}</span>
+          <select
+            value={activePlaylist?.id ?? ''}
+            onChange={(e) => {
+              state.setPlaylistId(e.target.value || null);
+              setEditing(null);
+            }}
+          >
+            <option value="">{t('musicUi.playlists.allSongs')}</option>
+            {playlists.map((p) => (
+              <option key={p.id} value={p.id}>
+                {t('musicUi.playlists.option', { name: p.name, count: p.trackIds.length })}
+              </option>
+            ))}
+          </select>
+        </label>
+        {activePlaylist ? (
+          <>
+            <button type="button" className="btn small primary" onClick={() => state.playPlaylist(activePlaylist.id)}>
+              {t('musicUi.playlists.play')}
+            </button>
+            <button type="button" className="btn small" onClick={() => startEdit('rename')}>
+              {t('musicUi.playlists.rename')}
+            </button>
+            <button type="button" className="btn small" onClick={remove}>
+              {confirmDelete
+                ? t('musicUi.playlists.deleteConfirm', { name: activePlaylist.name })
+                : t('musicUi.playlists.delete')}
+            </button>
+          </>
+        ) : null}
+        <button type="button" className="btn small" onClick={() => startEdit('new')}>
+          <Icon name="plus" size={12} /> {t('musicUi.playlists.new')}
+        </button>
+      </div>
+      {editing ? (
+        <form
+          className="music-playlists__row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <input
+            autoFocus
+            value={name}
+            maxLength={PLAYLIST_NAME_MAX}
+            aria-label={t('musicUi.playlists.nameLabel')}
+            placeholder={
+              editing === 'new' ? t('musicUi.playlists.defaultName', { n: playlists.length + 1 }) : undefined
+            }
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                setEditing(null);
+              }
+            }}
+          />
+          <button type="submit" className="btn small primary" disabled={editing === 'rename' && !name.trim()}>
+            {t('musicUi.playlists.save')}
+          </button>
+          <button type="button" className="btn small" onClick={() => setEditing(null)}>
+            {t('musicUi.playlists.cancel')}
+          </button>
+        </form>
+      ) : null}
+      <p className="music-playlists__note muted" role="status">
+        {state.playlistNote}
+      </p>
+    </div>
   );
 }
 

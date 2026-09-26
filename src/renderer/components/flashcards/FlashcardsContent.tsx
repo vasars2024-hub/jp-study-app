@@ -109,6 +109,7 @@ import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPrac
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { normalizeStudyLang } from '../../../shared/studyLang';
 import { cardContentLang, studyContentLang } from '../../studyEnvironment';
+import PitchAccentContour from '../lexicon/PitchAccentContour';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, loadSavedCards, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -1589,6 +1590,14 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
                   {current.reading}
                 </span>
               )}
+              {/* Japanese pitch accent from the installed pitch dictionary; nothing for zh/ru
+                  (tones and stress are in the reading) or when the word has no entry. */}
+              <PitchAccentContour
+                className="flash-pitch"
+                word={current.word}
+                reading={current.reading}
+                lang={normalizeStudyLang(current.studyLang)}
+              />
               {current.sentence && current.sentence !== current.word && (
                 <span className="flash-sentence" lang={cardContentLang(current)}>{current.sentence}</span>
               )}

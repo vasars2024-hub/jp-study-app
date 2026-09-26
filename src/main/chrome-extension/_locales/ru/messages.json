@@ -386,6 +386,561 @@
   "content_snapshotFailed": {
     "message": "Не удалось сохранить снимок"
   },
+  "content_extReloaded": {
+    "message": "Расширение перезагружено — обновите вкладку"
+  },
+  "content_extError": {
+    "message": "Ошибка расширения"
+  },
+  "content_close": {
+    "message": "Закрыть"
+  },
+  "content_popupLabel": {
+    "message": "Поиск в Gum"
+  },
+  "content_rpBack": {
+    "message": "Назад"
+  },
+  "content_rpBackTitle": {
+    "message": "Вернуться к предыдущему поиску"
+  },
+  "content_rpPronounce": {
+    "message": "Прослушать произношение"
+  },
+  "content_rpPin": {
+    "message": "Закрепить окно"
+  },
+  "content_rpPinTitle": {
+    "message": "Закрепить окно (P)"
+  },
+  "content_rpCloseTitle": {
+    "message": "Закрыть (Esc)"
+  },
+  "content_rpKnownGroup": {
+    "message": "Насколько хорошо вы знаете это слово?"
+  },
+  "content_rpKnownLabel": {
+    "message": "Знание:"
+  },
+  "content_rpLevel0": {
+    "message": "Новое"
+  },
+  "content_rpLevel1": {
+    "message": "Изучаю"
+  },
+  "content_rpLevel2": {
+    "message": "Знакомое"
+  },
+  "content_rpLevel3": {
+    "message": "Знаю"
+  },
+  "content_rpTab_meaning": {
+    "message": "Значение"
+  },
+  "content_rpTab_grammar": {
+    "message": "Грамматика"
+  },
+  "content_rpTab_sentence": {
+    "message": "Предложение"
+  },
+  "content_rpTab_kanji": {
+    "message": "Иероглифы"
+  },
+  "content_rpTab_examples": {
+    "message": "Примеры"
+  },
+  "content_rpTab_more": {
+    "message": "Ещё"
+  },
+  "content_rpSaveWord": {
+    "message": "Сохранить слово"
+  },
+  "content_rpSaveSentence": {
+    "message": "Сохранить предложение"
+  },
+  "content_rpCreateCard": {
+    "message": "Создать карточку"
+  },
+  "content_rpMoreActions": {
+    "message": "Другие действия"
+  },
+  "content_rpAddClip": {
+    "message": "Добавить в историю буфера обмена"
+  },
+  "content_rpTranslateSentence": {
+    "message": "Перевести предложение"
+  },
+  "content_rpCopySentence": {
+    "message": "Копировать предложение"
+  },
+  "content_rpOpenGum": {
+    "message": "Открыть Gum"
+  },
+  "content_rpBase": {
+    "message": "Начальная форма:"
+  },
+  "content_rpDeinfTitle": {
+    "message": "Цепочка снятия спряжения"
+  },
+  "content_rpCommon": {
+    "message": "частое"
+  },
+  "content_rpJlptTitle": {
+    "message": "Уровень JLPT — оценка"
+  },
+  "content_rpFreqTitle": {
+    "message": "Ранг частотности"
+  },
+  "content_rpDictOffline": {
+    "message": "Gum не запущен — словари находятся в приложении. Откройте Gum и попробуйте снова."
+  },
+  "content_rpNoEntries": {
+    "message": "Словарных статей не найдено."
+  },
+  "content_rpNoGloss": {
+    "message": "(нет толкования)"
+  },
+  "content_rpPitch": {
+    "message": "Ударение"
+  },
+  "content_rpDictSource": {
+    "message": "Источник словаря"
+  },
+  "content_rpMoreEntries_one": {
+    "message": "Ещё $1 статья — см. вкладку «Ещё»."
+  },
+  "content_rpMoreEntries_few": {
+    "message": "Ещё $1 статьи — см. вкладку «Ещё»."
+  },
+  "content_rpMoreEntries_many": {
+    "message": "Ещё $1 статей — см. вкладку «Ещё»."
+  },
+  "content_rpMoreEntries_other": {
+    "message": "Ещё $1 статьи — см. вкладку «Ещё»."
+  },
+  "content_rpNoSentence": {
+    "message": "Не удалось найти предложение вокруг этого слова."
+  },
+  "content_rpMatchingGrammar": {
+    "message": "Подбираю грамматические конструкции…"
+  },
+  "content_rpGrammarOffline": {
+    "message": "Gum не запущен — для поиска грамматики нужно приложение."
+  },
+  "content_rpGrammarFailed": {
+    "message": "Не удалось подобрать грамматику."
+  },
+  "content_rpRetry": {
+    "message": "Повторить"
+  },
+  "content_rpNoGrammar": {
+    "message": "Известные грамматические конструкции в этом предложении не найдены."
+  },
+  "content_rpInSentence": {
+    "message": "в предложении"
+  },
+  "content_rpInSentenceTitle": {
+    "message": "Эта форма дословно встречается в предложении"
+  },
+  "content_rpPatternMatch": {
+    "message": "по шаблону"
+  },
+  "content_rpPatternMatchTitle": {
+    "message": "Найдено по правилам шаблонов — точное место не определено"
+  },
+  "content_rpGrammarNote": {
+    "message": "Совпадения находят правила шаблонов Gum по тексту предложения. Если несколько перекрываются, решать вам — полные объяснения в практике грамматики."
+  },
+  "content_rpOpenGrammar": {
+    "message": "Открыть практику грамматики"
+  },
+  "content_rpNoSentenceAround": {
+    "message": "Вокруг этого слова не найдено предложение."
+  },
+  "content_rpExtendPrev": {
+    "message": "‹ расширить"
+  },
+  "content_rpExtendPrevTitle": {
+    "message": "Добавить предыдущее предложение"
+  },
+  "content_rpExtendNext": {
+    "message": "расширить ›"
+  },
+  "content_rpExtendNextTitle": {
+    "message": "Добавить следующее предложение"
+  },
+  "content_rpReset": {
+    "message": "Сбросить"
+  },
+  "content_rpEdit": {
+    "message": "Изменить"
+  },
+  "content_rpAnalyzing": {
+    "message": "Анализирую…"
+  },
+  "content_rpCopy": {
+    "message": "Копировать"
+  },
+  "content_rpDifficulty": {
+    "message": "Сложность"
+  },
+  "content_rpEstimate": {
+    "message": "(оценка)"
+  },
+  "content_rpKnownWords": {
+    "message": "Знакомые слова"
+  },
+  "content_rpChars_one": {
+    "message": "$1 символ"
+  },
+  "content_rpChars_few": {
+    "message": "$1 символа"
+  },
+  "content_rpChars_many": {
+    "message": "$1 символов"
+  },
+  "content_rpChars_other": {
+    "message": "$1 символа"
+  },
+  "content_rpStatsOffline": {
+    "message": "Gum не в сети — статистика недоступна"
+  },
+  "content_rpNoKanji": {
+    "message": "В этом выражении нет иероглифов."
+  },
+  "content_rpLoadingKanji": {
+    "message": "Загружаю иероглифы…"
+  },
+  "content_rpKanjiOffline": {
+    "message": "Gum не запущен — для данных об иероглифах нужно приложение."
+  },
+  "content_rpLookUpChar": {
+    "message": "Найти $1"
+  },
+  "content_rpNoKanjiEntry": {
+    "message": "В ваших словарях нет статьи"
+  },
+  "content_rpSearchingExamples": {
+    "message": "Ищу примеры…"
+  },
+  "content_rpNoExamples": {
+    "message": "Примеры предложений не найдены."
+  },
+  "content_rpPlayExample": {
+    "message": "Слушать"
+  },
+  "content_rpTatoeba": {
+    "message": "Примеры из Tatoeba, лицензия CC-BY 2.0 FR"
+  },
+  "content_rpPitchAccent": {
+    "message": "Тональное ударение"
+  },
+  "content_rpDeconjugation": {
+    "message": "Снятие спряжения"
+  },
+  "content_rpEntries": {
+    "message": "Статьи"
+  },
+  "content_rpEntriesFrom": {
+    "message": "$1 из: $2"
+  },
+  "content_rpYourDicts": {
+    "message": "ваших словарей"
+  },
+  "content_rpSourcePage": {
+    "message": "Исходная страница"
+  },
+  "content_rpBridgeNote": {
+    "message": "Все данные словарей, грамматики и сложности приходят из приложения Gum через локальное соединение."
+  },
+  "content_rpTranslation": {
+    "message": "Перевод"
+  },
+  "content_rpEmpty": {
+    "message": "(пусто)"
+  },
+  "content_rpTranslateFailed": {
+    "message": "Перевод не удался — установлена ли модель в Gum?"
+  },
+  "content_cpKind": {
+    "message": "Тип карточки"
+  },
+  "content_cpWord": {
+    "message": "Карточка слова"
+  },
+  "content_cpSentence": {
+    "message": "Карточка предложения"
+  },
+  "content_cpText": {
+    "message": "Текст карточки"
+  },
+  "content_cpNote": {
+    "message": "Gum заполнит поля карточки (чтение, значение, аудио) по своим словарям и вашим полям Anki."
+  },
+  "content_cpDestBoth": {
+    "message": "Куда: <b>Anki</b> (если Anki закрыт — в Gum) · копия остаётся в Gum"
+  },
+  "content_cpDestGum": {
+    "message": "Куда: <b>карточки Gum</b> — раз вы просили карточку, попробую и Anki"
+  },
+  "content_wheelLabel": {
+    "message": "Действия Gum"
+  },
+  "content_wheelUnavailable": {
+    "message": "$1 — недоступно на этой странице"
+  },
+  "content_fabLevelTitle": {
+    "message": "Оценка сложности страницы (уровни из настроек Gum)"
+  },
+  "content_fabCompTitle": {
+    "message": "Доля знакомых слов в выборке"
+  },
+  "content_fabExpand": {
+    "message": "Показать инструменты страницы"
+  },
+  "content_fabHighlight": {
+    "message": "Выделение"
+  },
+  "content_fabHighlightOn": {
+    "message": "Выделение: вкл."
+  },
+  "content_fabKnownTint": {
+    "message": "Подсветка знакомых"
+  },
+  "content_fabKnownTintOn": {
+    "message": "Подсветка знакомых: вкл."
+  },
+  "content_fabOcr": {
+    "message": "Распознать"
+  },
+  "content_fabHide": {
+    "message": "Скрыть здесь"
+  },
+  "content_fabHideTitle": {
+    "message": "Скрыть эту панель на этом сайте"
+  },
+  "content_levelOffline": {
+    "message": "Оценка сложности недоступна — Gum не запущен"
+  },
+  "content_levelNoText": {
+    "message": "На этой странице не найден текст на изучаемом языке"
+  },
+  "content_levelTitle": {
+    "message": "Оценка сложности страницы: $1 (по уровням лексики, не официальная)"
+  },
+  "content_ocrLabel": {
+    "message": "Результат распознавания"
+  },
+  "content_ocrText": {
+    "message": "Распознанный текст — можно исправить перед сохранением"
+  },
+  "content_ocrHint": {
+    "message": "Дважды щёлкните по слову, чтобы найти его. Если символы распознаны не все, исправьте текст."
+  },
+  "content_ocrAnalyze": {
+    "message": "Разбор ИИ"
+  },
+  "content_ocrLookUp": {
+    "message": "Найти"
+  },
+  "content_ocrSave": {
+    "message": "Сохранить в Gum"
+  },
+  "content_ocrReselect": {
+    "message": "Выделить заново"
+  },
+  "content_ocrNoModels": {
+    "message": "Модели распознавания не установлены. Откройте Gum → Настройки → Модели и словари."
+  },
+  "content_ocrReadHint": {
+    "message": "$1 · Дважды щёлкните по слову, чтобы найти его."
+  },
+  "content_ocrNothing": {
+    "message": "В этой области текст не распознан — выделите плотнее."
+  },
+  "content_ocrEngineManga": {
+    "message": "Распознано манга-OCR"
+  },
+  "content_ocrEngineLang": {
+    "message": "Распознано как $1"
+  },
+  "content_ocrEngineWeb": {
+    "message": "Распознано веб-OCR"
+  },
+  "content_langName_ja": {
+    "message": "японский"
+  },
+  "content_langName_zh": {
+    "message": "китайский"
+  },
+  "content_langName_ru": {
+    "message": "русский"
+  },
+  "content_aiLabel": {
+    "message": "Разбор предложения ИИ"
+  },
+  "content_aiTitle": {
+    "message": "AI OCR · Разбор предложения"
+  },
+  "content_aiReanalyze": {
+    "message": "Разобрать заново (R)"
+  },
+  "content_aiCapturedFrom": {
+    "message": "Взято с: $1"
+  },
+  "content_aiNeedsKey": {
+    "message": "Для разбора ИИ нужен ключ API. Добавьте его в Gum → Карточки → Студия карточек ИИ."
+  },
+  "content_aiNeedsLocal": {
+    "message": "Для разбора ИИ нужна локальная модель Qwen. Установите Qwen3-1.7B в Gum → Перевод или переключитесь на облако в Карточки → Студия карточек ИИ."
+  },
+  "content_aiOutdated": {
+    "message": "Gum устарел или ещё не запустился — перезапустите приложение, затем перезагрузите расширение."
+  },
+  "content_aiFailed": {
+    "message": "Разбор не удался."
+  },
+  "content_aiAnalyzing": {
+    "message": "Разбираю предложение…"
+  },
+  "content_aiTryAgain": {
+    "message": "Попробовать снова"
+  },
+  "content_aiRecognized": {
+    "message": "Распознанное предложение"
+  },
+  "content_aiHint": {
+    "message": "Щёлкните по выделенной части, чтобы увидеть объяснение грамматики и лексики."
+  },
+  "content_aiFormality": {
+    "message": "Стиль речи"
+  },
+  "content_aiStructure": {
+    "message": "Строение"
+  },
+  "content_aiNuance": {
+    "message": "Оттенки"
+  },
+  "content_aiWatchOut": {
+    "message": "Осторожно"
+  },
+  "content_aiShowTranslations": {
+    "message": "Показать все переводы"
+  },
+  "content_aiHideTranslations": {
+    "message": "Скрыть переводы"
+  },
+  "content_aiSimplified": {
+    "message": "упрощённо"
+  },
+  "content_aiLiteral": {
+    "message": "Дословно"
+  },
+  "content_aiPoint": {
+    "message": "$1: разбор"
+  },
+  "content_aiLevel": {
+    "message": "Уровень"
+  },
+  "content_aiMeaning": {
+    "message": "Значение / функция"
+  },
+  "content_aiOpenDict": {
+    "message": "Открыть в словаре"
+  },
+  "content_aiInDepth": {
+    "message": "Подробное объяснение"
+  },
+  "content_aiVocabNotes": {
+    "message": "Заметки о лексике"
+  },
+  "content_aiCopy": {
+    "message": "Копировать"
+  },
+  "content_aiListen": {
+    "message": "Слушать"
+  },
+  "content_aiSaveSentence": {
+    "message": "Сохранить всё предложение"
+  },
+  "content_aiShortcuts": {
+    "message": "Клавиши"
+  },
+  "content_aiKey_pick": {
+    "message": "выбрать"
+  },
+  "content_aiKey_move": {
+    "message": "перейти"
+  },
+  "content_aiKey_copy": {
+    "message": "копировать"
+  },
+  "content_aiKey_card": {
+    "message": "карточка"
+  },
+  "content_aiKey_sentence": {
+    "message": "предложение"
+  },
+  "content_aiKey_snapshot": {
+    "message": "снимок"
+  },
+  "content_aiKey_listen": {
+    "message": "слушать"
+  },
+  "content_aiKey_dictionary": {
+    "message": "словарь"
+  },
+  "content_aiKey_translations": {
+    "message": "переводы"
+  },
+  "content_aiKey_reanalyze": {
+    "message": "заново"
+  },
+  "content_aiKey_close": {
+    "message": "закрыть"
+  },
+  "content_aiCat_grammar": {
+    "message": "Грамматика"
+  },
+  "content_aiCat_vocabulary": {
+    "message": "Лексика"
+  },
+  "content_aiCat_particle": {
+    "message": "Частица"
+  },
+  "content_aiCat_expression": {
+    "message": "Выражение"
+  },
+  "content_aiCat_idiom": {
+    "message": "Идиома"
+  },
+  "content_aiCat_name": {
+    "message": "Имя собственное"
+  },
+  "content_aiMine_idle": {
+    "message": "В карточки"
+  },
+  "content_aiMine_busy": {
+    "message": "Добавляю…"
+  },
+  "content_aiMine_done": {
+    "message": "Добавлено"
+  },
+  "content_aiMine_error": {
+    "message": "Добавить снова"
+  },
+  "content_aiSnap_idle": {
+    "message": "Снимок"
+  },
+  "content_aiSnap_busy": {
+    "message": "Сохраняю…"
+  },
+  "content_aiSnap_done": {
+    "message": "В блокноте"
+  },
+  "content_aiSnap_error": {
+    "message": "Повторить снимок"
+  },
   "popup_statusApp": {
     "message": "Приложение Gum"
   },

@@ -24,6 +24,27 @@
   color: var(--text);
 }
 
+/* The Liquid flip is presentation only. `.lq-contextual` in a Liquid window paints an 8px
+   inset and a 1px edge; the header and the stage's own rows had neither conventionally, so
+   switching to Liquid pushed the description, the list and the stage down and re-flowed the
+   stage (V12 layout jumps, Game Arena CLS 0.08). They carry the same inset and a transparent
+   edge in both presentations, so the flip changes tint and edge colour and nothing moves.
+   `.game-list` already had exactly this geometry and is left alone. */
+.game-arena > .game-arena-top.lq-contextual,
+.game-stage .lq-contextual {
+  padding: var(--lq-space-3);
+  border: 1px solid transparent;
+}
+
+.game-arena > .game-arena-top.lq-contextual {
+  border-bottom-color: var(--game-border);
+}
+
+/* ...and in a Liquid window the edge takes the material's colour, as `.lq-contextual` gives it. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .game-arena .lq-contextual {
+  border-color: var(--lq-liquid-border);
+}
+
 /* Gameplay, answers, and review feedback are dense work. Keep that primary
    canvas on the opaque semantic material in every presentation. */
 .game-stage {
