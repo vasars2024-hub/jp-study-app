@@ -22,6 +22,7 @@ import {
   useStats,
 } from '../components/stats/StatsContent';
 import { useT } from '../i18n';
+import DailyGoalPanel from '../components/DailyGoalPanel';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import '../components/stats/statsLiquid.css';
 
@@ -118,7 +119,7 @@ export default function StatisticsView() {
                     </div>
                     <div>
                       <dt>{t('stats.card.showsWatched')}</dt>
-                      <dd>{s.shows.length}</dd>
+                      <dd>{state.shows.length}</dd>
                     </div>
                   </>
                 )}
@@ -156,7 +157,7 @@ export default function StatisticsView() {
                   <div className="aero-stats-empty">{t('stats.noBookTotals')}</div>
                 )}
               </section>
-              {s.shows.length > 0 && (
+              {state.shows.length > 0 && (
                 <section className="aero-stats-panel stats-by-show">
                   <header>{t('stats.byShow')}</header>
                   <StatsShows state={state} />
@@ -165,6 +166,10 @@ export default function StatisticsView() {
             </main>
 
             <aside className="aero-stats-knowledge">
+              <section className="stats-section stats-daily-goal" aria-label={t('dailyGoal.title')}>
+                <h2>{t('dailyGoal.title')}</h2>
+                <DailyGoalPanel />
+              </section>
               <WordKnowledge />
               <StatsReviews />
               <StatsGrammar />
@@ -177,7 +182,7 @@ export default function StatisticsView() {
 
   const classicStatus = (
     <>
-      <StatusBarField>TEL / METRICS LIVE</StatusBarField>
+      <StatusBarField>{t('stats.status.live')}</StatusBarField>
       <StatusBarField>{formatDuration(s.totalSeconds)}</StatusBarField>
       <StatusBarField>{formatNumber(s.totalChars)}</StatusBarField>
       <StatusBarSpacer />
@@ -220,6 +225,11 @@ export default function StatisticsView() {
         )}
       </ContextualSurface>
 
+      <section className="stats-section stats-daily-goal" aria-label={t('dailyGoal.title')}>
+        <h2>{t('dailyGoal.title')}</h2>
+        <DailyGoalPanel />
+      </section>
+
       <WordKnowledge />
 
       <StatsReviews />
@@ -250,7 +260,7 @@ export default function StatisticsView() {
             </section>
           )}
 
-          {s.shows.length > 0 && (
+          {state.shows.length > 0 && (
             <section className="stats-section stats-by-show">
               <h2>{t('stats.byShow')}</h2>
               <StatsShows state={state} />

@@ -253,9 +253,9 @@ export default function VisualNovelCommunityPanel({
         <label className="is-wide">{t('vnCommunity.languageReport')}<textarea value={draft.languageNotes} onChange={(event) => field('languageNotes', event.target.value)} placeholder={t('vnCommunity.languagePlaceholder')} /></label>
       </div>
       <div className="visual-novel-community-actions">
-        <button type="button" disabled={!!saveReportWhy} title={saveReportWhy ? t(saveReportWhy) : undefined} onClick={() => void saveReport()}>{t('vnCommunity.saveReport')}</button>
-        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void exportBundle()}>{t('vnCommunity.exportBundle')}</button>
-        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void chooseBundle()}>{t('vnCommunity.importBundle')}</button>
+        <button className="btn small" type="button" disabled={!!saveReportWhy} title={saveReportWhy ? t(saveReportWhy) : undefined} onClick={() => void saveReport()}>{t('vnCommunity.saveReport')}</button>
+        <button className="btn small" type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void exportBundle()}>{t('vnCommunity.exportBundle')}</button>
+        <button className="btn small" type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void chooseBundle()}>{t('vnCommunity.importBundle')}</button>
       </div>
       {preview && (
         <article className="visual-novel-community-preview">
@@ -272,8 +272,8 @@ export default function VisualNovelCommunityPanel({
           </p>
           {!identityMatches && <p className="media-error">{t('vnCommunity.mismatch')}</p>}
           <div>
-            <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => setPreview(null)}>{t('common.cancel')}</button>
-            <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void applyBundle()}>
+            <button className="btn small" type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => setPreview(null)}>{t('common.cancel')}</button>
+            <button className="btn small" type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void applyBundle()}>
               {!identityMatches && !mismatchConfirmed ? t('vnCommunity.reviewMismatch') : t('vnCommunity.applyBundle')}
             </button>
           </div>

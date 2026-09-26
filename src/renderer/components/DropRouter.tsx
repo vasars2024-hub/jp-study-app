@@ -24,6 +24,7 @@ import { announceFilesIndexChanged } from '../filesIndexBus';
 import { showOsToast } from './ToastHost';
 import Icon from './Icons';
 import { executeImport, undoImports, type ImportReceipt } from '../fileImportExecute';
+import { requestMediaCenterPlay } from '../mediaCenterIntent';
 
 /**
  * One routed file, ready to reverse.
@@ -81,9 +82,11 @@ export default function DropRouter({
   });
 
   const execute = useCallback(
-    async (plan: DropPlan, target: DropTargetId): Promise<UndoEntry | null> => {
+    async (plan: DropPlan, target: DropTargetId, single = false): Promise<UndoEntry | null> => {
       const receipt = await executeImport(plan, target, {
         onOpenSection,
+        // One video dropped: open it in the player, as the "→ Media player" toast says.
+        onPlayMedia: single ? requestMediaCenterPlay : undefined,
         // The refusals this component always showed, now named by the importer
         // rather than decided twice. `emptyFolder` is new and was previously a
         // silent `null` — a folder drop that imported nothing and said nothing.
@@ -120,7 +123,7 @@ export default function DropRouter({
         for (const plan of plans) {
           const override = explicit?.[plan.path] ?? prefs.overrides[extOf(plan.name)];
           const target = override ?? plan.candidates[0]?.target ?? 'unknown';
-          const entry = await execute(plan, target);
+          const entry = await execute(plan, target, plans.length === 1);
           if (entry) done.push(entry);
         }
       } finally {

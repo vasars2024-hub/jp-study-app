@@ -1,5 +1,10 @@
 /* global chrome */
 
+// Strings come from _locales via shared.js (loaded first by tabs.html).
+const t = (key, subs) => globalThis.jpStudyShared.msg(key, subs);
+const tn = (key, count, subs) => globalThis.jpStudyShared.msgCount(key, count, subs);
+globalThis.jpStudyShared.applyI18n(document);
+
 const listEl = document.getElementById('tab-list');
 const countEl = document.getElementById('count');
 const statusEl = document.getElementById('status');
@@ -25,18 +30,18 @@ function send(msg) {
         resolve({ ok: false, error: chrome.runtime.lastError.message });
         return;
       }
-      resolve(res || { ok: false, error: 'No response' });
+      resolve(res || { ok: false, error: t('common_noResponse') });
     });
   });
 }
 
 const CATEGORY_LABELS = {
-  news: 'News',
-  novel: 'Novel',
-  manga: 'Manga',
-  youtube: 'Video',
-  article: 'Article',
-  other: 'Webpage',
+  news: 'tabs_catNews',
+  novel: 'tabs_catNovel',
+  manga: 'category_manga',
+  youtube: 'category_video',
+  article: 'category_article',
+  other: 'category_webpage',
 };
 
 function categoryOf(tab) {
@@ -48,7 +53,7 @@ function categoryOf(tab) {
 
 function categoryLabel(tab) {
   if (tab?.categoryLabel) return tab.categoryLabel;
-  return CATEGORY_LABELS[categoryOf(tab)] || 'Webpage';
+  return t(CATEGORY_LABELS[categoryOf(tab)] || 'category_webpage');
 }
 
 function isYt(kind) {
@@ -57,7 +62,7 @@ function isYt(kind) {
 
 function updateChrome() {
   const n = selected.size;
-  countEl.textContent = `${n} selected`;
+  countEl.textContent = tn('tabs_selected', n);
   captureBtn.disabled = busy || n === 0;
   const ytSelected = [...selected].some((id) => {
     const t = tabs.find((x) => x.id === id);
@@ -86,7 +91,7 @@ function renderList() {
   if (!tabs.length) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'No tabs found in this scope.';
+    empty.textContent = t('tabs_empty');
     listEl.appendChild(empty);
     updateChrome();
     return;
@@ -122,7 +127,7 @@ function renderList() {
     meta.className = 'tab-meta';
     const title = document.createElement('div');
     title.className = 'title';
-    title.textContent = tab.title || tab.url || `Tab ${tab.id}`;
+    title.textContent = tab.title || tab.url || t('tabs_untitled', tab.id);
     title.title = tab.title || '';
     const url = document.createElement('div');
     url.className = 'url';
@@ -134,7 +139,7 @@ function renderList() {
     const badge = document.createElement('span');
     badge.className = 'cat-badge cat-' + cat;
     badge.textContent = categoryLabel(tab);
-    badge.title = 'Detected source type (URL and title heuristics)';
+    badge.title = t('tabs_badgeTitle');
 
     row.appendChild(cb);
     row.appendChild(fav);
@@ -149,10 +154,10 @@ function renderList() {
 }
 
 async function refreshTabs() {
-  setStatus('Loading tabs…');
+  setStatus(t('tabs_loading'));
   const res = await send({ type: 'list-tabs', allWindows: allWindowsEl.checked });
   if (!res?.ok) {
-    setStatus(res?.error || 'Could not list tabs.', 'err');
+    setStatus(res?.error || t('tabs_listFailed'), 'err');
     tabs = [];
     selected.clear();
     renderList();
@@ -164,7 +169,7 @@ async function refreshTabs() {
     if (!valid.has(id)) selected.delete(id);
   }
   renderList();
-  setStatus(`${tabs.length} tab(s) · ${valid.size} can be saved`);
+  setStatus(t('tabs_summary', [tn('tabs_count', tabs.length), tn('tabs_saveable', valid.size)]));
 }
 
 function sleep(ms) {
@@ -181,20 +186,21 @@ async function runBulk(action) {
     });
   }
   if (!ids.length) {
-    setStatus(action === 'download' ? 'No YouTube tabs selected.' : 'Select at least one tab.', 'err');
+    setStatus(action === 'download' ? t('tabs_noYoutube') : t('tabs_selectOne'), 'err');
     return;
   }
 
   busy = true;
   updateChrome();
-  const labels = { capture: 'Saving', download: 'Queueing downloads' };
+  const labels = { capture: 'tabs_progressSaving', download: 'tabs_progressDownloading' };
   let done = 0;
   let failures = 0;
   let queued = 0;
   const total = ids.length;
 
   for (const tabId of ids) {
-    setStatus(`${labels[action] || 'Working'}… ${done + 1}/${total}` + (failures ? ` · ${failures} failed` : ''));
+    const progress = t(labels[action] || 'tabs_progressWorking', [done + 1, total]);
+    setStatus(failures ? t('tabs_progressWithFailures', [progress, failures]) : progress);
     const res = await send({ type: 'tab-action', action, tabId });
     done += 1;
     if (!res?.ok && !res?.queued) failures += 1;
@@ -204,11 +210,11 @@ async function runBulk(action) {
 
   busy = false;
   updateChrome();
-  const queuedNote = queued ? ` (${queued} queued — will sync when Gum is open)` : '';
+  const queuedNote = queued ? tn('tabs_queuedNote', queued) : '';
   if (failures === 0) {
-    setStatus(`Done — ${done}/${total} saved${queuedNote}.`, 'ok');
+    setStatus(t('tabs_done', [done, total, queuedNote]), 'ok');
   } else {
-    setStatus(`Finished — ${done - failures}/${total} ok, ${failures} failed${queuedNote}.`, 'err');
+    setStatus(t('tabs_finished', [done - failures, total, failures, queuedNote]), 'err');
   }
 }
 

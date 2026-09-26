@@ -36,6 +36,7 @@ export const GUM_LIBRARY_JA: Catalog = {
   // Meta lines
   'gum.runtime.hm': '{h}時間{m}分',
   'gum.runtime.m': '{m}分',
+  'gum.runtime.s': '{s} 秒',
   'gum.meta.season': 'シーズン{n}',
   'gum.meta.seasons': { other: '全{count}シーズン' },
   'gum.meta.episodes': { other: '全{count}話' },
@@ -54,6 +55,7 @@ export const GUM_LIBRARY_JA: Catalog = {
   'gum.card.score': 'あなたの評価：10点中{score}点',
   'gum.card.minutesLeft': '残り{m}分',
   'gum.card.hoursLeft': '残り{h}時間{m}分',
+  'gum.card.secondsLeft': '残り {s} 秒',
   'gum.badge.newEpisode': '新着話',
   'gum.badge.new': '新着',
   'gum.badge.film': '映画',
@@ -143,6 +145,10 @@ export const GUM_LIBRARY_JA: Catalog = {
   'gum.library.badges': 'ポスターに表示するもの',
   'gum.library.resultCount': { other: '{count}作品' },
   'gum.library.noMatch': 'この条件に合う作品はありません',
+  'gum.library.matchesInAll': {
+    other: '「すべて」に {count} 件あります',
+  },
+  'gum.library.showInAll': '「すべて」で表示',
   'gum.library.emptyTab.all': 'まだ何もありません',
   'gum.library.emptyTab.watching': '視聴中の作品はありません。観始めるとここに表示されます。',
   'gum.library.emptyTab.plan': '観たいリストは空です',
@@ -260,6 +266,7 @@ export const GUM_LIBRARY_JA: Catalog = {
   // Title page
   'gum.title.status': 'ステータス',
   'gum.title.notTracked': '未記録',
+  'gum.title.derivedStatus': '{status}（ファイルから判断）',
   'gum.title.myRating': '自分の評価',
   'gum.title.ratingValue': '10点中{n}点',
   'gum.title.unrated': '未評価',

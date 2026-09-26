@@ -125,7 +125,8 @@ describe('the review session registers a handler for each of them', () => {
 
   it('replay is NOT gated on the card being flipped — audio-only review needs it first', () => {
     const source = readFileSync(FLASHCARDS, 'utf8');
-    const block = /registerCommandHandler\('flashcards\.replayAudio', \(\) => \{([\s\S]*?)\n {6}\}\)/
+    // Handlers close with `})`, or `}, scoped)` since they are scoped to the review surface.
+    const block = /registerCommandHandler\('flashcards\.replayAudio', \(\) => \{([\s\S]*?)\n {6}\}(?:, scoped)?\)/
       .exec(source);
     expect(block, 'replayAudio handler not found').toBeTruthy();
     expect(block?.[1]).not.toMatch(/flipped/);
@@ -133,7 +134,7 @@ describe('the review session registers a handler for each of them', () => {
 
     // The control: the ratings in the same block ARE gated, so "no `flipped`" is a
     // property of this handler and not of the regex.
-    const hard = /registerCommandHandler\('flashcards\.hard', \(\) => \{([\s\S]*?)\n {6}\}\)/
+    const hard = /registerCommandHandler\('flashcards\.hard', \(\) => \{([\s\S]*?)\n {6}\}(?:, scoped)?\)/
       .exec(source);
     expect(hard?.[1]).toMatch(/flipped/);
   });

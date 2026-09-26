@@ -38,6 +38,7 @@ export const GUM_LIBRARY_EN: Catalog = {
   // Meta lines
   'gum.runtime.hm': '{h} h {m}',
   'gum.runtime.m': '{m} min',
+  'gum.runtime.s': '{s} s',
   'gum.meta.season': 'Season {n}',
   'gum.meta.seasons': { one: '{count} season', other: '{count} seasons' },
   'gum.meta.episodes': { one: '{count} episode', other: '{count} episodes' },
@@ -56,6 +57,7 @@ export const GUM_LIBRARY_EN: Catalog = {
   'gum.card.score': 'Your rating: {score} out of 10',
   'gum.card.minutesLeft': '{m} min left',
   'gum.card.hoursLeft': '{h} h {m} min left',
+  'gum.card.secondsLeft': '{s} s left',
   'gum.badge.newEpisode': 'New ep',
   'gum.badge.new': 'New',
   'gum.badge.film': 'Film',
@@ -145,6 +147,11 @@ export const GUM_LIBRARY_EN: Catalog = {
   'gum.library.badges': 'Show on posters',
   'gum.library.resultCount': { one: '{count} title', other: '{count} titles' },
   'gum.library.noMatch': 'Nothing matches these filters',
+  'gum.library.matchesInAll': {
+    one: '{count} match is under All',
+    other: '{count} matches are under All',
+  },
+  'gum.library.showInAll': 'Show in All',
   'gum.library.emptyTab.all': 'Nothing here yet',
   'gum.library.emptyTab.watching': 'Nothing in progress. Start something and it appears here.',
   'gum.library.emptyTab.plan': 'Your watchlist is empty',
@@ -262,6 +269,7 @@ export const GUM_LIBRARY_EN: Catalog = {
   // Title page
   'gum.title.status': 'Status',
   'gum.title.notTracked': 'Not tracked',
+  'gum.title.derivedStatus': '{status} (from your files)',
   'gum.title.myRating': 'My rating',
   'gum.title.ratingValue': '{n} out of 10',
   'gum.title.unrated': 'Not rated',

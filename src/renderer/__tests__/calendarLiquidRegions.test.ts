@@ -12,14 +12,13 @@ const CSS = readFileSync(
 );
 
 describe('Calendar Liquid regions', () => {
-  it('treats only the header and the transport as Liquid-eligible', () => {
-    expect(VIEW).toContain(
-      "import { ContextualSurface } from '../components/liquid/LiquidSurface'",
-    );
-    expect(VIEW).toContain(
-      '<ContextualSurface as="header" className="view-head calendar-context-head">',
-    );
+  it('treats only the transport row as Liquid-eligible, with New event at its end', () => {
+    // The header strip that held only "New event" is gone (an empty band across the
+    // top of the window, V12); the action is passed into the transport row instead.
+    expect(VIEW).not.toContain('calendar-context-head');
+    expect(VIEW).toMatch(/<CalendarNav\s+state=\{state\}\s+actions=\{/);
     expect(CONTENT).toContain('<ContextualSurface className="cal-toolbar cal-context-toolbar">');
+    expect(CONTENT).toContain('<div className="cal-toolbar-actions">{actions}</div>');
   });
 
   it('leaves the grids, the agenda and the event form on the work surface', () => {

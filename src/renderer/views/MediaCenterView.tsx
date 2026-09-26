@@ -27,7 +27,7 @@ import {
 } from '../components/media/MediaContent';
 import SeanimeStudyLibraryPanel from '../components/reading/SeanimeStudyLibraryPanel';
 import SeanimeWatchLoopPanel from '../components/reading/SeanimeWatchLoopPanel';
-import { onMediaCenterIntent, takeMediaCenterIntent } from '../mediaCenterIntent';
+import { onMediaCenterIntent, onMediaCenterPlay, takeMediaCenterIntent, takeMediaCenterPlay } from '../mediaCenterIntent';
 import { useStudyReadiness } from '../useStudyReadiness';
 import MediaLibraryShell from '../components/media/library/MediaLibraryShell';
 import MediaArtwork from '../components/media/library/MediaArtwork';
@@ -56,6 +56,7 @@ import {
   useWatchLibrary,
 } from '../components/media/gum/gumBackend';
 import { useHomeLayout, useLibraryPrefs, useSavedViews } from '../components/media/gum/useGumPrefs';
+import { useGumRoutePersistence } from '../components/media/gum/gumRoute';
 import { fitTopNav } from '../components/media/gum/gumTopNav';
 import '../components/media/gum/gum.css';
 import MalDownloadDialog from '../components/discover/MalDownloadDialog';
@@ -855,11 +856,20 @@ function VideoPanel({
 function MusicPanel({ state }: { state: MusicState }) {
   const { t } = useT();
   const { ps } = state;
-  const queue = (ps.queue.length > 0 ? ps.queue : state.baseSongs).slice(0, 8);
+  // Up next is what will actually play: the current track, then the leader's play order
+  // after it (`ps.upNext`, shuffle included). It used to be the first eight rows of the
+  // queue, whatever was playing — track 40 playing still listed tracks 1-8.
+  const pool = ps.queue.length > 0 ? ps.queue : state.baseSongs;
+  const byId = new Map(pool.map((item) => [item.id, item]));
+  const currentIndex = ps.current ? pool.findIndex((item) => item.id === ps.current?.id) : -1;
+  const upcoming = ps.upNext.length
+    ? ps.upNext.map((id) => byId.get(id)).filter((item): item is MediaItem => !!item)
+    : pool.slice(currentIndex + 1);
+  const queue = (ps.current && currentIndex >= 0 ? [pool[currentIndex], ...upcoming] : pool).slice(0, 8);
   return (
     <div className="mc-page mc-music-page">
       <div className="mc-music-head">
-        <div><span className="mc-eyebrow">{t('mediaCenter.music.eyebrow')}</span><h1>{state.currentMeta?.title ?? t('mediaCenter.nav.music')}</h1><p>{state.currentMeta?.artist ?? t('mediaCenter.music.libraryCount', { count: state.baseSongs.length })}</p></div>
+        <div><span className="mc-eyebrow">{t('mediaCenter.music.eyebrow')}</span><h1>{state.currentMeta?.title ?? t('mediaCenter.music.chooseTrack')}</h1><p>{state.currentMeta?.artist ?? t('mediaCenter.music.libraryCount', { count: state.baseSongs.length })}</p></div>
         <div className="mc-music-window-actions lq-hit-scope">
           <button type="button" className="mc-button" onClick={() => void window.api.popOut('music')}>
             <Icon name="window" size={13} /> {t('mediaCenter.music.detachPlayer')}
@@ -1848,6 +1858,17 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     setTab('video');
   });
 
+  // A single video dropped on the window (`DropRouter`) plays, rather than only landing in
+  // the library. Taken on mount too: the drop may be what opened this window.
+  useEffect(() => {
+    const apply = (): void => {
+      const item = takeMediaCenterPlay();
+      if (item) playItem(item);
+    };
+    apply();
+    return onMediaCenterPlay(apply);
+  }, [playItem]);
+
   /** A file's resume position from the shared resume store (the workspace writes it). */
   const resumeAt = useStableCallback((item: MediaItem): number | undefined => {
     const row = continueRows.find((candidate) => candidate.item?.id === item.id);
@@ -1900,6 +1921,15 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     if (owner) openTitle(owner);
     else playItem(item, resumeAt(item));
   }, [pendingMediaId, media.items, titles, playItem, openTitle, resumeAt]);
+
+  // A restart comes back to the title page that was open (and playing), not the grid.
+  useGumRoutePersistence({
+    enabled: initialTab === 'library' || initialTab === 'home',
+    tab,
+    titleId,
+    titles,
+    restore: openTitle,
+  });
 
   const browse = useStableCallback((request: GumBrowseRequest) => {
     setLibraryPrefs((current) => {
@@ -2212,7 +2242,8 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
           <ContextualSurface as="header" className="gum-topnav" ref={topnavRef}>
             <div className="gum-brand" data-topnav-fixed="">
               <span className="gum-brand__mark" aria-hidden="true"><Icon name="player" size={13} /></span>
-              <span className="gum-brand__name">{t('mediaCenter.nav.label')}</span>
+              {/* One name: the window, Start and the taskbar call this app Watch. */}
+              <span className="gum-brand__name">{t('palette.section.watch')}</span>
             </div>
             {/* Both are icon-only and disabled on a fresh trail, so the title carries the
                 REASON while disabled and the label while enabled; `aria-label` holds the
@@ -2237,7 +2268,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 <Icon name="chevron" size={12} />
               </button>
             </div>
-            <nav className="gum-nav" aria-label={t('mediaCenter.nav.label')}>
+            <nav className="gum-nav" aria-label={t('palette.section.watch')}>
               {shownPrimary.map((item) => navLink(item))}
               <GumPopover
                 className="gum-nav-more"

@@ -1044,6 +1044,44 @@ export default function ReadingGarden({
       <div className="reading-garden-grade" aria-hidden="true" />
       <MooncapSkyDevConsole />
 
+      {/* Progress used to be visible only inside the dossier, which opens from
+          the mushroom — nothing on screen said the garden tracks reading at all.
+          This stays in the corner and opens the same dossier. */}
+      {!isInfoOpen && (
+        <button
+          type="button"
+          className="reading-garden-hud"
+          onClick={() => {
+            mooncapMusicPlayer.unlockFromGesture();
+            setIsInfoOpen(true);
+          }}
+          aria-controls="reading-garden-info"
+          aria-expanded={false}
+          aria-label={t("mooncap.hud.open", {
+            phase: phasePad,
+            max: READING_GARDEN_MAX_STAGE,
+            status: phaseStatus,
+          })}
+        >
+          <span className="reading-garden-hud-phase">
+            {t("mooncap.hud.phase", { phase: phasePad, max: READING_GARDEN_MAX_STAGE })}
+          </span>
+          <span className="reading-garden-hud-status">
+            {mature
+              ? t("mooncap.info.mature")
+              : t("mooncap.info.bankedProgress", {
+                  current: pagesTowardNext,
+                  target: READING_GARDEN_PAGES_PER_PHASE,
+                })}
+          </span>
+          {!mature && (
+            <span className="reading-garden-hud-track" aria-hidden="true">
+              <i style={{ width: `${(pagesTowardNext / READING_GARDEN_PAGES_PER_PHASE) * 100}%` }} />
+            </span>
+          )}
+        </button>
+      )}
+
       {isInfoOpen && (
         <div className="reading-garden-info-chrome">
           {/*

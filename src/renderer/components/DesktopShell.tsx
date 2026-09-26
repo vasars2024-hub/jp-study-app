@@ -79,6 +79,10 @@ import AeroBootOverlay from './shell/AeroBootOverlay';
 import WiredArchiveBootOverlay from './shell/WiredArchiveBootOverlay';
 import WiredBreachOverlay from './shell/WiredBreachOverlay';
 import DesktopLayerHost from './shell/DesktopLayerHost';
+import StartPanel from './shell/StartPanel';
+import StartHereCard from './shell/StartHereCard';
+import { resetWidgetLayoutWithUndo } from './shell/widgetLayoutReset';
+import { captureFocus, firstMeaningfulControl, focusIsLostOrInside, restoreFocus } from './shell/focusReturn';
 import { ContextMenu, confirmDialog, alertDialog, useAppMaterialSet } from './ui';
 import {
   commitLayout,
@@ -87,7 +91,7 @@ import {
   getAssignments,
   getDesktopCount,
   getDesktopLayout,
-  getDesktopName,
+  displayDesktopName,
   focusOrOpenDesktop,
   onDesktopChanged,
   switchDesktop as switchDesktopState,
@@ -212,6 +216,8 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
   { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
+  // The visualizer had a window but no way in except through the Music widget.
+  { id: 'visualizer', labelKey: 'palette.section.visualizer', glyph: 'chart-bar' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
   { id: 'visualnovels', labelKey: 'palette.section.visualnovels', glyph: 'visual-novel' },
@@ -391,6 +397,8 @@ const WIN_SNAP = 26;
 // than a regex over this file.
 /** HTML5 DnD payload for pinning a Start-menu app onto the desktop. */
 const START_APP_DND = 'text/x-study-os-app';
+/** The Start panel's id, for the button's `aria-controls`. */
+const START_PANEL_ID = 'os-start-panel';
 
 type AppMeta = { id: WinSection; labelKey: string; glyph: IconName };
 
@@ -845,6 +853,24 @@ export default function DesktopShell({
   const [slidePaths, setSlidePaths] = useState<string[]>([]);
   const [slideIndex, setSlideIndex] = useState(0);
   const [startOpen, setStartOpen] = useState(false);
+  /** The Start button, so the panel can hand focus back to it (round-2 audit K6). */
+  const startBtnRef = useRef<HTMLButtonElement | null>(null);
+  /** Right-click / Shift+F10 menu on a Start tile: where the pin command lives now. */
+  const [startTileCtx, setStartTileCtx] = useState<{ x: number; y: number; app: AppMeta } | null>(null);
+  /**
+   * Window focus hand-off (round-2 audit K7). Measured: 19 of 20 apps opened from
+   * Start left focus where it was, and closing or minimising a window dropped it to
+   * <body>. `open`/`openNote` and `removeWin`/`minimize` record what should happen
+   * here, and the effect after the next `wins` commit — when the window's DOM exists,
+   * or is gone — carries it out.
+   */
+  const pendingWinFocus = useRef<
+    | { kind: 'open'; id: string }
+    | { kind: 'leave'; closedId: string; container: HTMLElement | null; opener: HTMLElement | null; fromTaskbar: boolean }
+    | null
+  >(null);
+  /** What had focus when each window was opened, if it will outlive the opening. */
+  const winOpeners = useRef<Map<string, HTMLElement>>(new Map());
   /** Section id while dragging an app tile from Start onto the desktop. */
   const [startAppDragging, setStartAppDragging] = useState<WinSection | null>(null);
   const [deskPrefs, setDeskPrefs] = useState<DesktopPrefs>(loadDesktopPrefs);
@@ -1490,7 +1516,7 @@ export default function DesktopShell({
         activeDesktop,
         desktopCount: getDesktopCount(),
         windowsOn: (index) => getDesktopLayout(index).windows,
-        nameOf: getDesktopName,
+        nameOf: displayDesktopName,
       }),
     [myAssignment?.showAllWindows, activeDesktop, deskPrefs, layoutRevision],
   );
@@ -1739,8 +1765,35 @@ export default function DesktopShell({
       await close(id);
     }
   };
+  /** The `.fwin` element of a window, or `null` (it is not mounted, or already gone). */
+  const winElement = (id: string): HTMLElement | null => {
+    const nodes = deskRef.current?.querySelectorAll<HTMLElement>('.fwin') ?? [];
+    for (const node of Array.from(nodes)) if (node.dataset.winId === id) return node;
+    return null;
+  };
+  /**
+   * A window is about to leave the screen (closed or minimised). If it — or its own
+   * taskbar entry — held focus, queue the hand-back for after the commit; if focus was
+   * somewhere else entirely, leave it there.
+   */
+  const queueFocusLeave = (id: string) => {
+    const container = winElement(id);
+    const active = document.activeElement as HTMLElement | null;
+    const fromTaskbar = !!active?.closest(`[data-task-win="${id}"]`);
+    if (!fromTaskbar && !focusIsLostOrInside(container)) return;
+    pendingWinFocus.current = {
+      kind: 'leave',
+      closedId: id,
+      container,
+      // Closed from the taskbar: the hand-back stays in the taskbar, not the opener.
+      opener: fromTaskbar ? null : winOpeners.current.get(id) ?? null,
+      fromTaskbar,
+    };
+  };
   const removeWin = (id: string, opts?: { silent?: boolean }) => {
     const closing = winsRef.current.find((w) => w.id === id);
+    queueFocusLeave(id);
+    winOpeners.current.delete(id);
     if (!opts?.silent) window.dispatchEvent(new CustomEvent('shell:windowClose'));
     if (wired && closing && closing.section !== 'note') {
       notify({ message: `MODULE ${wiredModule(closing.section).code} UNMOUNTED`, source: 'SHELL', silent: true });
@@ -1756,12 +1809,8 @@ export default function DesktopShell({
     // Allow Ctrl+Shift+Z (nav.undo) to reopen the window.
     if (closing && closing.section && closing.section !== 'note') {
       const section = closing.section;
-      const label =
-        section === 'music'
-          ? 'Reopen Music'
-          : section === 'player'
-            ? 'Reopen Player'
-            : `Reopen ${section}`;
+      const meta = APPS.find((a) => a.id === section);
+      const label = t('shell.window.reopen', { name: meta ? t(meta.labelKey) : section });
       void import('../actionHistory').then(({ pushUndo }) => {
         pushUndo(label, () => {
           openRef.current(section);
@@ -1774,12 +1823,50 @@ export default function DesktopShell({
     if (delay > 0) {
       if (winAnim[id] === 'minimizing') return;
       window.dispatchEvent(new CustomEvent('shell:windowMinimize'));
-      beginWinAnim(id, 'minimizing', delay, () => patch(id, { min: true }));
+      beginWinAnim(id, 'minimizing', delay, () => {
+        queueFocusLeave(id);
+        patch(id, { min: true });
+      });
       return;
     }
     window.dispatchEvent(new CustomEvent('shell:windowMinimize'));
+    queueFocusLeave(id);
     patch(id, { min: true });
   };
+
+  // K7: carry out the focus hand-off queued above, once the commit that shows or
+  // removes the window has landed.
+  useEffect(() => {
+    const pending = pendingWinFocus.current;
+    if (!pending) return;
+    pendingWinFocus.current = null;
+    if (pending.kind === 'open') {
+      const el = winElement(pending.id);
+      if (!el || el.style.display === 'none') return;
+      // An app that focused its own field on mount (child effects run first) keeps it.
+      if (el.contains(document.activeElement)) return;
+      const body = el.querySelector('.fwin-body');
+      const target = (body && firstMeaningfulControl(body)) || el;
+      target.focus({ preventScroll: true });
+      return;
+    }
+    const topWindow = (): HTMLElement | null => {
+      const next = winsRef.current
+        .filter((w) => !w.min && w.id !== pending.closedId)
+        .sort((a, b) => (b.pin ? PIN_Z_BASE : 0) + b.z - ((a.pin ? PIN_Z_BASE : 0) + a.z))[0];
+      return next ? winElement(next.id) : null;
+    };
+    const neighbourTaskButton = (): HTMLElement | null =>
+      taskbarRef.current?.querySelector<HTMLElement>('.os-task-wins .os-task-win') ?? null;
+    restoreFocus(pending.opener, {
+      container: pending.container,
+      // Closed from its own taskbar entry: stay in the taskbar. Otherwise: the window
+      // now on top, and with none left, the Start button.
+      fallbacks: pending.fromTaskbar
+        ? [neighbourTaskButton, () => startBtnRef.current]
+        : [topWindow, () => startBtnRef.current],
+    });
+  }, [wins]);
 
   // ----- Home Workspace widgets -----
   const newWidgetId = () => `wgt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -1823,6 +1910,7 @@ export default function DesktopShell({
     setNotes((prev) => ({ ...prev, [id]: { text: '', color: NOTE_COLORS[count % NOTE_COLORS.length] } }));
     const n = winsRef.current.length % 5;
     setWins((ws) => [...ws, { id, section: 'note', x: 260 + n * 30, y: 60 + n * 28, w: 260, h: 220, z: ++zTop.current }]);
+    pendingWinFocus.current = { kind: 'open', id };
     const openMs = winPhaseMs(true);
     if (openMs > 0) beginWinAnim(id, 'opening', openMs);
     setStartOpen(false);
@@ -1838,6 +1926,19 @@ export default function DesktopShell({
       void window.api.popOut(section);
       return;
     }
+    // K7: the window takes focus once it is on screen. Its opener is remembered only
+    // when it will still exist at close time — a Start tile is unmounted by this very
+    // call, and focus then goes to the next window or the Start button instead.
+    const targetId = winsRef.current.find((w) => w.section === section)?.id ?? section;
+    const opener = captureFocus();
+    if (
+      opener
+      && !opener.closest('.os-start')
+      && opener.closest<HTMLElement>('.fwin')?.dataset.winId !== targetId
+    ) {
+      winOpeners.current.set(targetId, opener);
+    }
+    pendingWinFocus.current = { kind: 'open', id: targetId };
     // New window (not a re-focus): run the §2 "module powers on" phase.
     if (!winsRef.current.some((w) => w.section === section)) {
       const openMs = winPhaseMs(true);
@@ -2773,6 +2874,20 @@ export default function DesktopShell({
     (app) => !START_PRIMARY_SECTIONS.includes(app.id) && !START_HIDDEN_SECTIONS.has(app.id),
   );
 
+  /** Right-click, Shift+F10 or the Menu key on a Start tile opens its pin menu. */
+  const openStartTileMenu = (e: RMouseEvent<HTMLElement>, app: AppMeta) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // A keyboard-raised contextmenu carries no pointer position; anchor to the tile.
+    const keyboard = e.clientX === 0 && e.clientY === 0;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setStartTileCtx({
+      x: keyboard ? rect.left + rect.width / 2 : e.clientX,
+      y: keyboard ? rect.top + rect.height / 2 : e.clientY,
+      app,
+    });
+  };
+
   const renderAeroStartApp = (app: AppMeta, tone: 'program' | 'place') => {
     const pinned = isAppPinned(app.id);
     const wiredMeta = wired ? wiredModule(app.id) : null;
@@ -2789,6 +2904,7 @@ export default function DesktopShell({
           onDragStart={(e) => beginStartAppDrag(app, e)}
           onDragEnd={endStartAppDrag}
           onClick={() => open(app.id)}
+          onContextMenu={(e) => openStartTileMenu(e, app)}
         >
           <span className={`os-start-aero-ic app-${app.id}`}>
             <Icon name={app.glyph} size={tone === 'program' ? 22 : 18} />
@@ -2807,6 +2923,9 @@ export default function DesktopShell({
           className={`os-start-aero-pin${pinned ? ' on' : ''}`}
           title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
           aria-label={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+          // Out of the tab order: the context menu of the tile carries this command (K6).
+          tabIndex={-1}
+          data-start-secondary
           draggable={false}
           onClick={() => togglePinApp(app)}
         >
@@ -3037,7 +3156,6 @@ export default function DesktopShell({
         }}
       />
       <BuddyToast />
-      <NotificationCenter />
 
       {viz.enabled && (viz.mode === 'wallpaper' || viz.mode === 'both') && musicPlaying && (
         <VisualizerCanvas className="os-wall-visualizer" settings={viz} />
@@ -3129,11 +3247,30 @@ export default function DesktopShell({
       {galleryOpen && (
         <WidgetGallery
           onAdd={addWidget}
-          onResetLayout={() => { setWidgets([]); setGalleryOpen(false); }}
+          onResetLayout={() => {
+            // Asks first, then offers Undo — it used to wipe every widget on one click.
+            void resetWidgetLayoutWithUndo({
+              current: widgets,
+              confirm: confirmDialog,
+              apply: setWidgets,
+              toast: showOsToast,
+              t,
+            }).then((reset) => {
+              if (reset) setGalleryOpen(false);
+            });
+          }}
           hiddenWidgets={hiddenWidgets}
           onRestore={restoreWidget}
           onClose={() => setGalleryOpen(false)}
           installedTypes={widgets.map((w) => w.type)}
+        />
+      )}
+
+      {/* J11: an empty desktop after the tour offers three first actions. */}
+      {!secondary && (
+        <StartHereCard
+          desktopEmpty={wins.length === 0 && visibleWidgets.length === 0 && !startOpen && !galleryOpen}
+          onOpen={(section) => open(section)}
         />
       )}
 
@@ -3152,8 +3289,12 @@ export default function DesktopShell({
             onDrop={(e) => dropStartAppOnDesktop(e)}
           />
           {!secretStartMenu && (
-            <div
+            <StartPanel
               className="os-start os-start-legacy"
+              id={START_PANEL_ID}
+              label={t('desktop.start')}
+              onClose={() => setStartOpen(false)}
+              returnFocusTo={() => startBtnRef.current}
               onDragOver={(e) => {
                 // Keep drops on the panel itself from landing on the desktop.
                 e.preventDefault();
@@ -3204,6 +3345,7 @@ export default function DesktopShell({
                               onDragStart={(e) => beginStartAppDrag(a, e)}
                               onDragEnd={endStartAppDrag}
                               onClick={() => open(a.id)}
+                              onContextMenu={(e) => openStartTileMenu(e, a)}
                             >
                               <span className={`os-start-app-ic app-${a.id}`}>
                                 <Icon name={a.glyph} size={24} />
@@ -3214,6 +3356,10 @@ export default function DesktopShell({
                               type="button"
                               className={`os-start-tile-pin${pinned ? ' on' : ''}`}
                               title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+                              aria-label={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+                              // Out of the tab order: the context menu of the tile carries this command.
+                              tabIndex={-1}
+                              data-start-secondary
                               draggable={false}
                               onClick={() => togglePinApp(a)}
                             >
@@ -3295,11 +3441,15 @@ export default function DesktopShell({
                   </svg>
                 </button>
               </div>
-            </div>
+            </StartPanel>
           )}
           {secretStartMenu && (
-            <div
+            <StartPanel
               className="os-start os-start-aero-menu"
+              id={START_PANEL_ID}
+              label={t('desktop.start')}
+              onClose={() => setStartOpen(false)}
+              returnFocusTo={() => startBtnRef.current}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -3430,10 +3580,29 @@ export default function DesktopShell({
                   </button>
                 </div>
               </div>
-            </div>
+            </StartPanel>
           )}
         </>
       )}
+      {/* The pin command, reachable from the keyboard without a second tab stop per
+          tile: right-click, Shift+F10 or the Menu key on a Start tile (K6). */}
+      <ContextMenu
+        open={!!startTileCtx}
+        x={startTileCtx?.x ?? 0}
+        y={startTileCtx?.y ?? 0}
+        onClose={() => setStartTileCtx(null)}
+        items={
+          startTileCtx
+            ? [{
+                id: 'toggle-pin',
+                label: isAppPinned(startTileCtx.app.id)
+                  ? t('desktop.removeFromDesktop')
+                  : t('desktop.addToDesktop'),
+                onSelect: () => togglePinApp(startTileCtx.app),
+              }]
+            : []
+        }
+      />
 
       {/* Per-display taskbar mode. 'none' hides it entirely; 'windows-only'
           drops the Start button and desktop switcher and keeps the window
@@ -3463,12 +3632,16 @@ export default function DesktopShell({
                 genuinely owns the open state — a stale expanded state is worse than none,
                 and the four dispatch-only tray buttons keep their panels' state in the
                 panels themselves. */}
+            {/* `dialog`, not `menu` (K6): the panel is a labelled dialog with a
+                search entry, headed groups and a roving list — see `shell/StartPanel`. */}
             <button
+              ref={startBtnRef}
               className={`os-start-btn ${startOpen ? 'active' : ''}`}
               data-primary
               title={wired ? 'NODE ROUTER' : t('desktop.start')}
-              aria-haspopup="menu"
+              aria-haspopup="dialog"
               aria-expanded={startOpen}
+              aria-controls={startOpen ? START_PANEL_ID : undefined}
               onClick={() => setStartOpen((o) => !o)}
             >
               <Icon name="logo" size={22} />
@@ -3528,81 +3701,84 @@ export default function DesktopShell({
               w.section === 'note' ? 'note'
                 : w.section === 'visualizer' || w.section === 'musicwidget' ? 'music'
                   : app?.glyph ?? 'app';
+            const isActive = w.z === topZ && !w.min;
+            /*
+              K12: the close affordance used to be a `role="button"` span INSIDE this
+              button — an interactive element nested in another, which assistive tech
+              flattens or drops. They are siblings in one wrapper now; the wrapper
+              positions the close over the slot the button reserves for it, so the
+              pill looks exactly as before. `aria-current` states which window is the
+              active one, which was carried only by the `active` class.
+            */
             return (
-              <button
-                key={w.id}
-                className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''} ${winAnim[w.id] ? `anim-${winAnim[w.id]}` : ''}`}
-                title={wired ? wiredModuleLabel(w.section) : taskName}
-                aria-label={wired ? wiredModuleLabel(w.section) : taskName}
-                // Drag a taskbar button up and off the bar to give that app a
-                // desktop of its own. Pointer events rather than HTML5 drag:
-                // the shell already drives every other drag this way, and HTML5
-                // drag images do not survive a frameless window.
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return;
-                  // The close affordance is a child of this button.
-                  if ((e.target as HTMLElement).closest('.os-task-close')) return;
-                  taskDrag.current = { id: w.id, x: e.clientX, y: e.clientY, fired: false };
-                }}
-                onPointerMove={(e) => {
-                  const d = taskDrag.current;
-                  if (!d || d.id !== w.id || d.fired) return;
-                  // The taskbar sits at the bottom, so a tear-off travels up.
-                  if (d.y - e.clientY < TEAR_OFF_PX) return;
-                  d.fired = true;
-                  suppressTaskClick.current = true;
-                  void tearOffToNewDesktop(w);
-                }}
-                onPointerUp={() => {
-                  taskDrag.current = null;
-                }}
-                onPointerCancel={() => {
-                  taskDrag.current = null;
-                }}
-                onClick={() => {
-                  // A completed tear-off still ends in a click on this button.
-                  if (suppressTaskClick.current) {
-                    suppressTaskClick.current = false;
-                    return;
-                  }
-                  taskClick(w);
-                }}
-                // Middle-click closes, as it does on a real taskbar / browser tab.
-                onAuxClick={(e) => {
-                  if (e.button !== 1) return;
-                  e.preventDefault();
-                  close(w.id);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setTaskCtx({ x: e.clientX, y: e.clientY, win: w });
-                }}
-              >
-                <Icon name={glyph} size={18} />
-                {label ? <span>{label}</span> : null}
-                {/* A nested <button> would be invalid inside this button, so the
-                    close affordance is a span with button semantics. */}
-                <span
-                  className="os-task-close"
-                  role="button"
-                  tabIndex={-1}
-                  aria-label={t('desktop.task.close', { name: taskName })}
-                  title={t('desktop.task.close', { name: taskName })}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    close(w.id);
+              <div key={w.id} className="os-task-item" data-task-win={w.id}>
+                <button
+                  type="button"
+                  className={`os-task-win app-${w.section} ${isActive ? 'active' : ''} ${w.min ? 'min' : ''} ${winAnim[w.id] ? `anim-${winAnim[w.id]}` : ''}`}
+                  title={wired ? wiredModuleLabel(w.section) : taskName}
+                  aria-label={wired ? wiredModuleLabel(w.section) : taskName}
+                  aria-current={isActive ? 'true' : undefined}
+                  // Drag a taskbar button up and off the bar to give that app a
+                  // desktop of its own. Pointer events rather than HTML5 drag:
+                  // the shell already drives every other drag this way, and HTML5
+                  // drag images do not survive a frameless window.
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    taskDrag.current = { id: w.id, x: e.clientX, y: e.clientY, fired: false };
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Enter' && e.key !== ' ') return;
-                    e.stopPropagation();
+                  onPointerMove={(e) => {
+                    const d = taskDrag.current;
+                    if (!d || d.id !== w.id || d.fired) return;
+                    // The taskbar sits at the bottom, so a tear-off travels up.
+                    if (d.y - e.clientY < TEAR_OFF_PX) return;
+                    d.fired = true;
+                    suppressTaskClick.current = true;
+                    void tearOffToNewDesktop(w);
+                  }}
+                  onPointerUp={() => {
+                    taskDrag.current = null;
+                  }}
+                  onPointerCancel={() => {
+                    taskDrag.current = null;
+                  }}
+                  onClick={() => {
+                    // A completed tear-off still ends in a click on this button.
+                    if (suppressTaskClick.current) {
+                      suppressTaskClick.current = false;
+                      return;
+                    }
+                    taskClick(w);
+                  }}
+                  // Middle-click closes, as it does on a real taskbar / browser tab.
+                  onAuxClick={(e) => {
+                    if (e.button !== 1) return;
                     e.preventDefault();
                     close(w.id);
                   }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTaskCtx({ x: e.clientX, y: e.clientY, win: w });
+                  }}
+                >
+                  <Icon name={glyph} size={18} />
+                  {label ? <span>{label}</span> : null}
+                  {/* Keeps the room the close button sits over, so the label never runs under it. */}
+                  <span className="os-task-close-slot" aria-hidden="true" />
+                </button>
+                {/* Out of the tab order, as before: from the keyboard, the entry's own
+                    context menu (Shift+F10 / Menu key) carries Close. */}
+                <button
+                  type="button"
+                  className="os-task-close"
+                  tabIndex={-1}
+                  aria-label={t('desktop.task.close', { name: taskName })}
+                  title={t('desktop.task.close', { name: taskName })}
+                  onClick={() => close(w.id)}
                 >
                   ×
-                </span>
-              </button>
+                </button>
+              </div>
             );
           })}
           {/* Windows on other monitors. Badged with the desktop they live on;
@@ -3671,6 +3847,7 @@ export default function DesktopShell({
             title={t('quickSettings.title')}
             aria-label={t('quickSettings.title')}
             aria-haspopup="dialog"
+            data-shell-opener="quick-settings"
             onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'))}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -4041,6 +4218,7 @@ const FloatingWindow = memo(function FloatingWindow({
   // unnamed to assistive tech while every other window is named by its own bar. The label is
   // supplied only where the visible one is empty, so no titled window gains a second name and
   // no already-scored surface moves. Existing keys; no new string.
+  const titleId = `fwin-title-${win.id}`;
   const untitledName = isVisualizer
     ? t('settings.nav.visualizer')
     : isMusicWidget
@@ -4217,7 +4395,15 @@ const FloatingWindow = memo(function FloatingWindow({
       data-section={win.section}
       data-presentation={liquid ? 'liquid' : 'standard'}
       data-maximizable={canMaximize ? 'true' : 'false'}
-      aria-label={title ? undefined : untitledName || undefined}
+      data-win-id={win.id}
+      // A named region (round-2 audit K12): the scan found every window with no role
+      // and no name. Titled windows are named by their own title text; the three
+      // untitled trinkets keep the label above. `tabIndex={-1}` lets the shell focus
+      // the window itself when its body has nothing focusable yet (K7).
+      role="region"
+      aria-labelledby={title && !isGarden ? titleId : undefined}
+      aria-label={title && !isGarden ? undefined : untitledName || title || undefined}
+      tabIndex={-1}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
     >
@@ -4230,7 +4416,7 @@ const FloatingWindow = memo(function FloatingWindow({
         >
           <span className="fwin-title" style={noteInk}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            <span className="fwin-title-text">{title}</span>
+            <span className="fwin-title-text" id={titleId}>{title}</span>
           </span>
           <span className="fwin-btns">
             {/* `title` alone does not name these: a button's own text content

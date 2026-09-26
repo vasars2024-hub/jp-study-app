@@ -61,10 +61,15 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
-/** Default label for a desktop the user has not renamed. */
+/**
+ * Default label for a desktop the user has not renamed. The second desktop was
+ * "City", a name from an old build that no switcher button uses — the buttons
+ * say "Desktop 2" — so a toast or badge naming "City" pointed at nothing. The
+ * renderer shows every default through its own translated "Desktop N"
+ * (desktopState.displayDesktopName), including layouts saved as "City".
+ */
 function defaultDesktopName(desktopIndex: DesktopIndex): string {
   if (desktopIndex === DESKTOP_STUDY) return 'Study';
-  if (desktopIndex === DESKTOP_CITY) return 'City';
   return `Desktop ${desktopIndex + 1}`;
 }
 

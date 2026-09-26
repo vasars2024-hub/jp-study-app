@@ -86,6 +86,7 @@ import {
   getSeanimeAcquisitionSnapshot,
   runSeanimeAcquisitionAction,
 } from './seanimeAcquisition';
+import { SCRAPER_LOG_MESSAGE } from '../../shared/scraperLogMessages';
 
 /**
  * Methods with a real implementation behind them. Anything absent falls back to
@@ -404,5 +405,6 @@ export function registerScraperIpc(): void {
   });
   startScheduler(emit, emitSchedulerState);
 
-  scraperLog('info', 'system', 'Scraper backend ready.');
+  // The renderer translates this exact sentence (see shared/scraperLogMessages.ts).
+  scraperLog('info', 'system', SCRAPER_LOG_MESSAGE.backendReady);
 }

@@ -54,10 +54,21 @@ async function mount(): Promise<void> {
 }
 
 describe('Settings > Help — keyboard shortcuts', () => {
+  it('K12: lists the video player’s own keys in a Player group', async () => {
+    await mount();
+    const group = host.querySelector('[data-group="player"]');
+    expect(group).toBeTruthy();
+    const seek = group?.querySelector('[data-player-action="seekForward"]');
+    expect(seek?.querySelector('kbd')?.textContent).toBe('D');
+    expect(seek?.querySelector('dt')?.textContent).toBe('Skip forward 30 s');
+    expect(group?.querySelector('[data-player-action="playPause"] kbd')?.textContent).toBe('Space · Enter');
+  });
+
   it('lists every bound command with its current keys, and nothing unbound', async () => {
     await mount();
     const bound = getBindings().filter((row) => row.keys);
-    const rows = host.querySelectorAll('.help-shortcuts-row');
+    // The player's own keys are a separate group (K12), counted by their own test below.
+    const rows = host.querySelectorAll('.help-shortcuts-row:not([data-player-action])');
     expect(rows.length).toBe(bound.length);
     const palette = bound.find((row) => row.id === 'nav.search');
     expect(host.textContent).toContain(formatKeysDisplay(palette?.keys ?? ''));

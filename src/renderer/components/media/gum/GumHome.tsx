@@ -31,7 +31,7 @@ import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { LiquidLoading } from '../../liquid/LiquidLoading';
 import type { ContinueWatchingRow } from '../ContinueWatchingShelf';
 import GumIcon from './GumIcons';
-import { GumArt, GumEpisodeCard, GumPosterCard, formatRuntime, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
+import { GumArt, GumEpisodeCard, GumPosterCard, formatRuntime, formatTimeLeft, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
 import {
   GUM_DENSITIES,
   arrangeSections,
@@ -146,7 +146,7 @@ function GumHero({
   const percent = pick.row?.entry.percent ?? null;
   const duration = pick.row?.entry.durationSec ?? item?.durationSec;
   const position = pick.row?.entry.positionSec ?? item?.positionSec ?? 0;
-  const left = duration && position > 0 ? Math.max(1, Math.round((duration - position) / 60)) : null;
+  const left = position > 0 ? formatTimeLeft(t, duration, position) : null;
   const meta = [
     title ? t(typeLabelKey(title)) : null,
     title?.year ? String(title.year) : null,
@@ -200,7 +200,7 @@ function GumHero({
               </span>
             )}
             <small>
-              {[left !== null ? t('gum.card.minutesLeft', { m: left }) : null, subs ? t('gum.hero.subsReady', { langs: subs }) : null]
+              {[left, subs ? t('gum.hero.subsReady', { langs: subs }) : null]
                 .filter(Boolean).join(' · ')}
             </small>
           </div>

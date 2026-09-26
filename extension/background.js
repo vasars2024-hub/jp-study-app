@@ -18,6 +18,8 @@ import './shared.js';
 import './settings.js';
 
 const S = globalThis.jpStudyShared || {};
+/** A catalogue string (see shared.js jpMsg); the key if shared.js did not load. */
+const t = (key, subs) => (S.msg ? S.msg(key, subs) : key);
 if (!S.resolveCommandId) {
   console.error('[Gum] shared.js did not publish jpStudyShared in the service worker.');
 }
@@ -25,7 +27,7 @@ if (!S.resolveCommandId) {
 /** Throw a diagnosable error instead of a bare TypeError when shared.js is missing. */
 function assertSharedLoaded() {
   if (S.resolveCommandId) return;
-  throw new Error('Extension scripts failed to load — reload Gum in chrome://extensions');
+  throw new Error(t('bg_scriptsFailed'));
 }
 const SETTINGS = globalThis.jpStudySettings || null;
 const DEFAULT_PORT = S.DEFAULT_PORT || 18765;
@@ -65,12 +67,16 @@ async function getSettings() {
  */
 const APP_UPDATE_PATHS = /^\/v1\/sentence-analysis(?:[/?]|$)/;
 
-const APP_OUTDATED_MSG =
-  'Gum is outdated or not fully started — restart the app, then reload this extension.';
+const APP_OUTDATED_MSG = t('bg_appOutdated');
 
-/** A reachable app that rejects our token. Waiting never fixes it; re-pairing does. */
-const AUTH_FAILED_MSG =
-  'Gum rejected this extension — re-pair it from the app\'s Companions settings.';
+/**
+ * A reachable app that rejects our token. Waiting never fixes it; re-pairing
+ * does, and the message names where: the token lives in Gum under Settings ->
+ * Profile & dictionary -> Chrome extension (settings/pages/StudyPage.tsx mounts
+ * ExtensionBridgeSection), and the extension takes it in its own options page
+ * under Connection. It used to send people to "Companions", the desktop-pet page.
+ */
+const AUTH_FAILED_MSG = t('bg_authFailed');
 
 async function apiFetch(path, opts = {}) {
   const { token, port } = await getConfig();
@@ -84,7 +90,7 @@ async function apiFetch(path, opts = {}) {
       body: opts.body,
     });
   } catch (err) {
-    const offline = new Error('Gum is not running — open the app, then retry.');
+    const offline = new Error(t('bg_offline'));
     offline.status = 0;
     offline.offline = true;
     offline.cause = err;
@@ -173,9 +179,7 @@ async function enqueue(kind, payload) {
   try {
     await chrome.storage.local.set({ [QUEUE_KEY]: queue });
   } catch (err) {
-    const quota = new Error(
-      'Local storage is full — open Gum to sync the queued items, then retry.',
-    );
+    const quota = new Error(t('bg_storageFull'));
     quota.quota = true;
     quota.cause = err;
     throw quota;
@@ -347,7 +351,7 @@ async function downloadCurrent(tab) {
   if (!tab?.url) throw new Error('No active tab');
   const kind = S.detectPageKind(tab.url);
   if (kind !== 'youtube-video' && kind !== 'youtube-playlist') {
-    throw new Error('Open a YouTube video or playlist tab first');
+    throw new Error(t('bg_needYoutubeTab'));
   }
   const settings = await getSettings();
   const payload = {
@@ -378,7 +382,7 @@ async function transcribeCurrent(tab) {
   if (!tab?.url) throw new Error('No active tab');
   const kind = S.detectPageKind(tab.url);
   if (kind !== 'youtube-video') {
-    throw new Error('Open a YouTube video tab first');
+    throw new Error(t('bg_needYoutubeVideo'));
   }
   const out = await apiFetch('/v1/transcribe', {
     method: 'POST',
@@ -425,7 +429,7 @@ function saveQueuedResponse(payload, mode, text) {
  */
 async function saveText(tab, text, mode, opts = {}) {
   const trimmed = String(text || '').trim();
-  if (!trimmed) throw new Error('Nothing selected to save');
+  if (!trimmed) throw new Error(t('bg_nothingSelected'));
   const settings = await getSettings();
   const resolved = mode === 'auto' || !mode ? S.classifyMineSelection(trimmed) : mode;
   const forceAnki = opts.forceAnki === true;
@@ -474,7 +478,7 @@ async function selectionFromTab(tab) {
   }
   const page = await capturePage(tab.id);
   const text = (page.selection || '').trim();
-  if (!text) throw new Error('Select a word or sentence on the page first');
+  if (!text) throw new Error(t('bg_selectFirst'));
   return { text, mode: 'auto' };
 }
 
@@ -504,7 +508,7 @@ async function saveAudioClipboard(tab) {
   await ensureContentScript(tab.id);
   const stash = await chrome.tabs.sendMessage(tab.id, { type: 'jp-get-audio-clipboard' });
   const dataUrl = stash?.dataUrl || '';
-  if (!dataUrl) throw new Error('No recording yet — use Record audio first, then stop');
+  if (!dataUrl) throw new Error(t('bg_noRecording'));
   const payload = {
     dataUrl,
     mimeType: stash.mimeType || 'audio/webm',
@@ -744,8 +748,8 @@ async function scanLongStrip(tab) {
       };
     },
   });
-  if (!result) throw new Error('Could not scan this page');
-  if (!result.images.length) throw new Error('No panel images found on this page');
+  if (!result) throw new Error(t('bg_scanFailed'));
+  if (!result.images.length) throw new Error(t('bg_noPanels'));
   const payload = { title: result.title, url: result.url, images: result.images };
   try {
     const out = await apiFetch('/v1/manga-import', { method: 'POST', body: JSON.stringify(payload) });
@@ -783,7 +787,7 @@ async function cropDataUrlToRegion(dataUrl, region) {
   const vw = Number(region?.viewportWidth) || 0;
   const vh = Number(region?.viewportHeight) || 0;
   if (width < 20 || height < 20 || vw < 1 || vh < 1) {
-    throw new Error('Drag a larger area');
+    throw new Error(t('common_dragLarger'));
   }
   const res = await fetch(dataUrl);
   const blob = await res.blob();
@@ -816,7 +820,7 @@ async function cropDataUrlToRegion(dataUrl, region) {
     sy = Math.max(0, Math.min(bitmap.height - 1, sy));
     sw = Math.max(1, Math.min(bitmap.width - sx, sw));
     sh = Math.max(1, Math.min(bitmap.height - sy, sh));
-    if (sw < 20 || sh < 20) throw new Error('Drag a larger area');
+    if (sw < 20 || sh < 20) throw new Error(t('common_dragLarger'));
     const canvas = new OffscreenCanvas(sw, sh);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
@@ -994,7 +998,7 @@ async function openTabPicker() {
 async function runTabAction(tabId, action) {
   const tab = await chrome.tabs.get(tabId);
   if (!tab?.id) throw new Error('Tab not found');
-  if (!isScriptableUrl(tab.url || '')) throw new Error('Cannot access this tab');
+  if (!isScriptableUrl(tab.url || '')) throw new Error(t('bg_tabRestricted'));
   if (action === 'capture' || action === 'save') return saveCurrent(tab);
   if (action === 'download') return downloadCurrent(tab);
   throw new Error('Unknown tab action');
@@ -1106,15 +1110,15 @@ async function runCommand(commandId, tab, opts = {}) {
 /* ------------------------------ context menus ------------------------------ */
 
 const CONTEXT_MENU_ITEMS = [
-  { id: 'lookup.selection', title: 'Look up selection', contexts: ['selection'] },
-  { id: 'analyze.selection', title: 'AI analysis of selection', contexts: ['selection'] },
-  { id: 'save.word', title: 'Save word', contexts: ['selection'] },
-  { id: 'save.sentence', title: 'Save sentence', contexts: ['selection'] },
-  { id: 'card.create', title: 'Create flashcard', contexts: ['selection'] },
+  { id: 'lookup.selection', title: t('menu_lookup'), contexts: ['selection'] },
+  { id: 'analyze.selection', title: t('menu_analyze'), contexts: ['selection'] },
+  { id: 'save.word', title: t('menu_saveWord'), contexts: ['selection'] },
+  { id: 'save.sentence', title: t('menu_saveSentence'), contexts: ['selection'] },
+  { id: 'card.create', title: t('menu_createCard'), contexts: ['selection'] },
   { id: 'sep-1', type: 'separator', contexts: ['page', 'selection'] },
-  { id: 'capture.page', title: 'Save page to Gum', contexts: ['page'] },
-  { id: 'capture.ocr', title: 'OCR capture (drag a box)', contexts: ['page', 'image'] },
-  { id: 'app.open', title: 'Open Gum', contexts: ['page'] },
+  { id: 'capture.page', title: t('menu_savePage'), contexts: ['page'] },
+  { id: 'capture.ocr', title: t('menu_ocr'), contexts: ['page', 'image'] },
+  { id: 'app.open', title: t('menu_openApp'), contexts: ['page'] },
 ];
 
 function rebuildContextMenus() {
@@ -1173,7 +1177,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('[Gum extension]', err);
-    await toastOnTab(tab, msg || 'Action failed', 'err');
+    await toastOnTab(tab, msg || t('bg_actionFailed'), 'err');
   }
 });
 
@@ -1209,7 +1213,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('[Gum extension]', err);
-    await toastOnTab(tab, msg || 'Command failed', 'err');
+    await toastOnTab(tab, msg || t('bg_commandFailed'), 'err');
   }
 });
 
@@ -1231,14 +1235,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             running: true,
             paired: auth ? false : undefined,
             status: res.status,
-            error: auth ? AUTH_FAILED_MSG : `Gum answered HTTP ${res.status}.`,
+            error: auth ? AUTH_FAILED_MSG : t('bg_httpStatus', res.status),
           });
           return;
         }
         sendResponse({ ok: true, running: true, paired: true, data: await res.json() });
       } catch {
         // Nothing answered on the port — this is the genuine not-running case.
-        sendResponse({ ok: false, running: false, error: 'Gum is not running.' });
+        sendResponse({ ok: false, running: false, error: t('common_gumNotRunning') });
       }
       return;
     }

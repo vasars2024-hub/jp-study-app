@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Gum — Reading list</title>
+    <title data-i18n="tabs_pageTitle">Gum — Reading list</title>
     <style>
       :root {
         --bg: #14161c;
@@ -179,32 +179,33 @@
   </head>
   <body>
     <header>
-      <strong>Reading list</strong>
-      <span id="count" class="chip">0 selected</span>
+      <strong data-i18n="tabs_heading">Reading list</strong>
+      <span id="count" class="chip"></span>
     </header>
 
     <div class="toolbar">
-      <label class="check"><input id="all-windows" type="checkbox" /> All windows</label>
+      <label class="check"><input id="all-windows" type="checkbox" /> <span data-i18n="tabs_allWindows">All windows</span></label>
       <span class="spacer"></span>
-      <button id="select-all" type="button">Select all</button>
-      <button id="select-none" type="button">None</button>
-      <button id="refresh" type="button">Refresh</button>
+      <button id="select-all" type="button" data-i18n="tabs_selectAll">Select all</button>
+      <button id="select-none" type="button" data-i18n="tabs_selectNone">None</button>
+      <button id="refresh" type="button" data-i18n="tabs_refresh">Refresh</button>
     </div>
 
     <div id="tab-list">
-      <div class="empty">Loading tabs…</div>
+      <div class="empty" data-i18n="tabs_loading">Loading tabs…</div>
     </div>
 
     <div class="actions">
-      <button id="capture" class="primary" type="button" disabled>Save pages to Gum</button>
-      <button id="download" type="button" disabled>Download videos</button>
+      <button id="capture" class="primary" type="button" disabled data-i18n="tabs_capture">Save pages to Gum</button>
+      <button id="download" type="button" disabled data-i18n="tabs_download">Download videos</button>
     </div>
-    <p class="hint">
+    <p class="hint" data-i18n="tabs_hint">
       Select tabs and save them in one go — articles go to your Gum inbox, videos and playlists
       to YouTube tracking. The colored edge shows the detected source type (News, Novel, Manga,
       Video, Article). Download only applies to YouTube tabs.
     </p>
     <div id="status"></div>
+    <script src="shared.js"></script>
     <script src="tabs.js"></script>
   </body>
 </html>

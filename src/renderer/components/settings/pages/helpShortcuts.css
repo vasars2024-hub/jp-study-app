@@ -10,6 +10,11 @@
   color: var(--muted);
 }
 
+.help-shortcuts-note {
+  margin: 0 0 var(--space-xs, 4px);
+  font-size: var(--font-size-xs, 12px);
+}
+
 .help-shortcuts-list {
   margin: 0;
   display: grid;

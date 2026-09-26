@@ -15,7 +15,7 @@
  *   machine could run a new job.
  */
 import { describe, expect, it } from 'vitest';
-import { bootBackground, readExtensionFile } from './extensionHarness';
+import { bootBackground, extensionMessage, readExtensionFile } from './extensionHarness';
 import {
   EXTENSION_TRANSCRIBE_REFUSALS,
   countTranscriptCues,
@@ -360,12 +360,19 @@ describe('gate 11 — the extension actually asks for the count', () => {
     expect(popup).toContain("res?.state === 'queued'");
     expect(popup).toContain('followTranscription(res.videoId, res.queuedAt)');
     expect(popup).toMatch(/type: 'transcribe-status', videoId/);
-    expect(popup).toMatch(/Transcribed — \$\{res\.cueCount\} cues/);
+    // The words live in _locales now (extensionLocales.test.ts); the popup
+    // names the message and hands it the count.
+    expect(popup).toContain("tn('popup_transcribedDone', res.cueCount)");
+    expect(extensionMessage('popup_transcribedDone_other', ['12'])).toBe(
+      'Transcribed — 12 cues. Mine it from Files or Mining.',
+    );
     // And the four endings stay distinct: a shared sentence is the defect the
     // named-refusal table exists to prevent.
-    expect(popup).toContain('The transcription ended without a transcript.');
+    expect(popup).toContain("t('popup_transcriptionEnded')");
+    expect(extensionMessage('popup_transcriptionEnded')).toContain('The transcription ended without a transcript.');
     expect(popup).toContain("res.state === 'notStarted'");
-    expect(popup).toContain('Nothing has been downloaded for this video yet');
+    expect(popup).toContain("t('popup_transcriptionNotStarted')");
+    expect(extensionMessage('popup_transcriptionNotStarted')).toContain('Nothing has been downloaded for this video yet');
   });
 
   it('the popup follows a job that was ALREADY running, on the job\'s own clock', () => {
@@ -376,17 +383,20 @@ describe('gate 11 — the extension actually asks for the count', () => {
     expect(popup).toContain('followTranscription(res.videoId, res.queuedAt)');
     // And the counter reads the queue's timestamp rather than the poll's.
     expect(popup).toContain('Number.isFinite(res.queuedAt)');
-    expect(popup).toContain('Already transcribing in Gum');
+    expect(popup).toContain("t('popup_alreadyTranscribing')");
+    expect(extensionMessage('popup_alreadyTranscribing')).toContain('Already transcribing in Gum');
   });
 
   it('control: notStarted and failed do not share a sentence in the popup', () => {
     const popup = readExtensionFile('popup.js');
-    const sentences = [
+    const keys = ['popup_transcriptionEnded', 'popup_transcriptionNotStarted'];
+    const sentences = keys.map((key) => extensionMessage(key));
+    expect(sentences).toEqual([
       'The transcription ended without a transcript. Retry from the Media library.',
       'Nothing has been downloaded for this video yet, so no transcription has run.',
-    ];
+    ]);
     expect(new Set(sentences).size).toBe(2);
-    for (const sentence of sentences) expect(popup).toContain(sentence);
+    for (const key of keys) expect(popup).toContain(`t('${key}')`);
   });
 
   /*
@@ -400,7 +410,7 @@ describe('gate 11 — the extension actually asks for the count', () => {
     expect(popup).toContain('showTranscriptionPill');
     // Wired into the page refresh, not only into the button handler.
     expect(popup).toMatch(/renderActions\(\);\s*\n\s*\/\/[^\n]*\n\s*void showTranscriptionPill\(\);/);
-    expect(popup).toMatch(/Transcribed · \$\{escapeHtml\(String\(res\.cueCount\)\)\} cues/);
+    expect(popup).toContain("escapeHtml(tn('popup_transcribedCues', res.cueCount))");
   });
 
   it('notStarted is SILENT on page load — that is what it is for', () => {
@@ -409,7 +419,8 @@ describe('gate 11 — the extension actually asks for the count', () => {
     const popup = readExtensionFile('popup.js');
     expect(popup).toContain("if (!res || res.state === 'notStarted') return;");
     // And the failed pill still exists, or the silence would be a deletion.
-    expect(popup).toContain('Transcription left no text');
+    expect(popup).toContain("t('popup_transcriptionEmpty')");
+    expect(extensionMessage('popup_transcriptionEmpty')).toBe('Transcription left no text');
   });
 
   it('the id comes from the URL, since detect does not carry one', () => {

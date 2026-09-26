@@ -24,7 +24,7 @@ import {
   type CompanionTypeId,
 } from './companionCatalog';
 import ShimejiSprite from './ShimejiSprite';
-import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../aeroDiscovery';
+import { hasDiscoveredAero, onAeroDiscoveryChanged, setTreasureCompanionHidden } from '../aeroDiscovery';
 import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../wiredDiscovery';
 import { onCompanionEvent, type CompanionEventDetail } from './companionEvents';
 import { onPlayingChanged, isPlaying as musicIsPlaying } from '../audioBus';
@@ -63,6 +63,7 @@ import {
 } from './companionClickGesture';
 import { BUDDY_SPEECH_EVENT, speakBeepLine, voiceForType, type BuddySpeechDetail } from './beepSpeech';
 import { pickDialogueLine, type DialogueContext } from './dialoguePools';
+import { buddyText } from './buddyText';
 import { getUserLevel, onLevelChange } from '../levelService';
 import { useT } from '../i18n';
 
@@ -856,7 +857,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       window.setTimeout(() => setShakeId((id) => (id === c.id ? null : id)), 420);
       patchCompanion(c.id, { mood: 'curious', status: t('companion.treasure.seeking') });
       window.dispatchEvent(
-        new CustomEvent('os:toast', { detail: { message: t('companion.treasure.locked'), kind: 'warn' } }),
+        new CustomEvent('os:toast', {
+          detail: { message: `${t('companion.treasure.locked')} ${t('companion.treasure.hideHint')}`, kind: 'warn' },
+        }),
       );
     },
     [patchCompanion, lang],
@@ -1045,7 +1048,12 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     e.preventDefault();
     e.stopPropagation();
     if (isTreasureLockedBonzi(c)) {
-      rejectTreasureBonzi(c);
+      // Right-click is the way out: the locked pet refuses everything else, so
+      // without this it could never leave the desktop.
+      setTreasureCompanionHidden(true);
+      window.dispatchEvent(
+        new CustomEvent('os:toast', { detail: { message: t('companion.treasure.hidden'), kind: 'info' } }),
+      );
       return;
     }
     setMenuId((id) => (id === c.id ? null : c.id));
@@ -1159,7 +1167,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                       setMenuId(null);
                     }}
                   >
-                    {t('companion.menu.run', { name: r.name })}
+                    {t('companion.menu.run', { name: buddyText(r.name) })}
                   </button>
                 ))}
                 <div className="os-companion-menu-shortcuts">
@@ -1196,7 +1204,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                         )}
                         {bindableRoutines.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {r.name}
+                            {buddyText(r.name)}
                           </option>
                         ))}
                       </select>

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   capturesForVisualNovel,
   createEmptyVisualNovelDatabase,
+  VISUAL_NOVEL_ENGINE_NAMES,
+  type VisualNovelEngine,
   type VisualNovelDatabase,
   type VisualNovelEntry,
   type VisualNovelRoute,
@@ -236,6 +238,17 @@ function captureSceneKey(capture: Pick<VisualNovelTextCapture, 'chapter' | 'scen
 }
 
 /**
+ * The engine as chrome shows it. Product names are data and stay verbatim; `custom` and
+ * `unknown` are UI words. The summary and the library rows printed the raw union member, so
+ * a Japanese or Russian UI read the English word 'unknown' beside '不明' (V12).
+ */
+export function engineLabel(engine: VisualNovelEngine, t: (key: string, vars?: TVars) => string): string {
+  if (engine === 'unknown') return t('vnApp.engine.unknown');
+  if (engine === 'custom') return t('vnMeta.engineCustom');
+  return VISUAL_NOVEL_ENGINE_NAMES[engine] ?? engine;
+}
+
+/**
  * Playtime, in the interface language.
  *
  * `vnPanel.duration.{hm,m}` had been written and translated into all four
@@ -265,7 +278,7 @@ export default function VisualNovelPanel({
   /** Rendered as the Visual Novels app: the window title already names it. */
   standalone?: boolean;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [libraryOpen, setLibraryOpen] = useState(() => readPanelState().libraryOpen);
   const [database, setDatabase] = useState<VisualNovelDatabase>(createEmptyVisualNovelDatabase);
   const [studyProfiles, setStudyProfiles] = useState(() => loadMediaStudyDatabase().profiles);
@@ -296,9 +309,21 @@ export default function VisualNovelPanel({
   const [clockNow, setClockNow] = useState(Date.now());
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  // The add-a-novel disclosure is controlled so the head's 'Add to library' can open it.
+  const [addOpen, setAddOpen] = useState(false);
   const [popup, setPopup] = useState<{ query: string; x: number; y: number; context?: string } | null>(null);
 
   useEffect(() => writePanelState({ selectedId, tab, libraryOpen }), [selectedId, tab, libraryOpen]);
+
+  // The status line holds a sentence already resolved in the language that was active
+  // when the action finished (child panels report finished strings too), so after a
+  // language switch it went on reading 'Visual novel added to the local library.' in a
+  // Japanese UI. It is transient feedback about the last action; a switch clears it
+  // rather than leave a stale sentence in the wrong language.
+  useEffect(() => {
+    setStatus('');
+    setError('');
+  }, [lang]);
 
   const reportStatus = (message: string, isError = false): void => {
     if (isError) {
@@ -836,22 +861,28 @@ export default function VisualNovelPanel({
             which is most of why the default state scanned 36 controls against §10.4's bar of 12.
             Adding a novel is a once-per-title task and the list is the everyday one, so setup
             goes behind a disclosure and the list and its recommendations stay in the open. */}
-        <details className="visual-novel-add-disclosure">
+        <details
+          className="visual-novel-add-disclosure"
+          open={addOpen}
+          onToggle={(event) => setAddOpen(event.currentTarget.open)}
+        >
           <summary>{t('vnPanel.addToLibrary')}</summary>
           <div className="visual-novel-add">
             <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('vnPanel.titlePlaceholder')} aria-label={t('vnPanel.aria.title')} />
             <input value={japaneseTitle} onChange={(event) => setJapaneseTitle(event.target.value)} placeholder={t('vnPanel.japaneseTitlePlaceholder')} aria-label={t('vnPanel.aria.japaneseTitle')} />
             <div>
               <input value={executablePath} onChange={(event) => setExecutablePath(event.target.value)} placeholder={t('vnPanel.executablePlaceholder')} aria-label={t('vnPanel.aria.executable')} />
-              <button type="button" onClick={() => void chooseExecutable()}>{t('vnPanel.browse')}</button>
+              <button className="btn small" type="button" onClick={() => void chooseExecutable()}>{t('vnPanel.browse')}</button>
             </div>
+            {/* 'Add', not a third 'Add to library': the disclosure above already says it. */}
             <button
+              className="btn small primary"
               type="button"
               disabled={!title.trim()}
               title={!title.trim() ? t('vnPanel.reason.needTitle') : undefined}
               onClick={() => void addEntry()}
             >
-              {t('vnPanel.addToLibrary')}
+              {t('common.add')}
             </button>
           </div>
           <VisualNovelImportPanel
@@ -887,7 +918,7 @@ export default function VisualNovelPanel({
                 onClick={() => setSelectedId(entry.id)}
               >
                 <strong>{entry.title}</strong>
-                <span>{entry.engine} · {t(STATUS_KEYS[entry.status])} · {Math.round(entry.completionPct)}%</span>
+                <span>{engineLabel(entry.engine, t)} · {t(STATUS_KEYS[entry.status])} · {Math.round(entry.completionPct)}%</span>
               </button>
             </li>
           ))}
@@ -951,31 +982,43 @@ export default function VisualNovelPanel({
           </div>
         )}
         {/* One declared primary action in the head: Launch the selected novel, or with
-            nothing selected, the way to the first entry. It mirrors the summary's Launch. */}
-        <button
-          type="button"
-          className="btn primary visual-novel-panel-primary"
-          disabled={selected ? !!launchWhy : false}
-          title={selected && launchWhy ? t(launchWhy) : undefined}
-          onClick={() => {
-            if (selected) void launchVisualNovel();
-            else setLibraryOpen(true);
-          }}
-        >
-          {selected ? t('vnPanel.launch') : t('vnPanel.addToLibrary')}
-        </button>
+            nothing selected, the way to the first entry. It mirrors the summary's Launch.
+            With nothing selected it only shows while the library rail is CLOSED: with the
+            rail open, the rail's own 'Add to library' disclosure is on screen and a second
+            copy up here made three 'Add to library' controls in one window (V12). It now
+            opens the rail AND the add form, so it lands on the fields, not on a list. */}
+        {(selected || !libraryOpen) && (
+          <button
+            type="button"
+            className="btn primary visual-novel-panel-primary"
+            disabled={selected ? !!launchWhy : false}
+            title={selected && launchWhy ? t(launchWhy) : undefined}
+            onClick={() => {
+              if (selected) {
+                void launchVisualNovel();
+                return;
+              }
+              setLibraryOpen(true);
+              setAddOpen(true);
+            }}
+          >
+            {selected ? t('vnPanel.launch') : t('vnPanel.addToLibrary')}
+          </button>
+        )}
         <div className="visual-novel-panel-tools">
           <button
+            className="btn"
             type="button"
             aria-pressed={libraryOpen}
             onClick={() => setLibraryOpen((open) => !open)}
           >
             {libraryOpen ? t('immersion.hideLibrary') : t('immersion.showLibrary')}
           </button>
-          {onClose && <button type="button" onClick={onClose}>{t('vnPanel.backToBrowser')}</button>}
+          {onClose && <button className="btn small" type="button" onClick={onClose}>{t('vnPanel.backToBrowser')}</button>}
         </div>
       </ContextualSurface>
-      {(status || error) && <p className={error ? 'media-error' : 'muted'} role="status">{error || status}</p>}
+      {/* Always mounted: a live region has to exist before its text changes to be announced. */}
+      <p className={`visual-novel-status ${error ? 'media-error' : 'muted'}`} role="status">{error || status}</p>
       <ReadingCanvas
         className="visual-novel-layout"
         closeLabel={t('immersion.hideLibrary')}
@@ -1002,7 +1045,12 @@ export default function VisualNovelPanel({
                   <small className="visual-novel-difficulty">{difficultyLine}</small>
                 </div>
                 <span title={sessionTracking ? t(TRACKING_KEYS[sessionTracking]) : undefined}>
-                  {selected.engine} · {t(COMPAT_KEYS[selected.engineCompatibility])} · {formatDuration(
+                  {/* An undetected engine has, by definition, unknown compatibility: saying it
+                      twice ('Engine unknown · Unknown') is noise, so the pair collapses. */}
+                  {engineLabel(selected.engine, t)}
+                  {selected.engine === 'unknown' ? '' : ` · ${t(COMPAT_KEYS[selected.engineCompatibility])}`}
+                  {' · '}
+                  {formatDuration(
                     selected.totalPlaytimeSec
                     + (sessionStartedAt ? Math.max(0, (clockNow - sessionStartedAt) / 1000) : 0),
                     t,
@@ -1010,9 +1058,9 @@ export default function VisualNovelPanel({
                   {sessionStartedAt ? ` · ${t('vnPanel.timing')}` : ''}
                 </span>
                 <div className="visual-novel-summary-actions">
-                  <button type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>{t('vnPanel.launch')}</button>
-                  {sessionStartedAt && <button type="button" onClick={() => void stopReadingTimer()}>{t('vnPanel.stopTimer')}</button>}
-                  <button type="button" onClick={() => void removeEntry(selected.id, selected.title)}>{t('vnPanel.remove')}</button>
+                  <button className="btn small" type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>{t('vnPanel.launch')}</button>
+                  {sessionStartedAt && <button className="btn small" type="button" onClick={() => void stopReadingTimer()}>{t('vnPanel.stopTimer')}</button>}
+                  <button className="btn small" type="button" onClick={() => void removeEntry(selected.id, selected.title)}>{t('vnPanel.remove')}</button>
                 </div>
               </div>
               {/* Tabs rather than ten stacked disclosures. Every panel stays MOUNTED and is
@@ -1049,7 +1097,7 @@ export default function VisualNovelPanel({
                   hand and the hook-file relay are the fallbacks, so they stay compact here. */}
               <div className="visual-novel-capture">
                 <div className="visual-novel-capture-actions">
-                  <button type="button" onClick={() => void captureScreenText()}>{t('vnPanel.captureScreenText')}</button>
+                  <button className="btn small" type="button" onClick={() => void captureScreenText()}>{t('vnPanel.captureScreenText')}</button>
                   <details className="visual-novel-capture-manual">
                     {/* The hook relay keeps running while this is shut; the summary reports it. */}
                     <summary>
@@ -1068,8 +1116,8 @@ export default function VisualNovelPanel({
                       <textarea value={captureText} onChange={(event) => setCaptureText(event.target.value)} placeholder={t('vnPanel.capturePlaceholder')} />
                       <textarea value={captureTranslation} onChange={(event) => setCaptureTranslation(event.target.value)} placeholder={t('vnPanel.captureTranslationPlaceholder')} />
                       <div className="visual-novel-capture-manual-actions">
-                        <button type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>{t('vnPanel.addCapturedLine')}</button>
-                        <button type="button" className={hookState?.active ? 'is-active' : ''} onClick={() => void toggleHookRelay()}>
+                        <button className="btn small" type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>{t('vnPanel.addCapturedLine')}</button>
+                        <button type="button" className={`btn small${hookState?.active ? ' is-active' : ''}`} onClick={() => void toggleHookRelay()}>
                           {hookState?.active ? t('vnPanel.stopHook') : t('vnPanel.startHook')}
                         </button>
                         {hookState?.active && (
@@ -1119,9 +1167,9 @@ export default function VisualNovelPanel({
                   <option value="chapter" disabled={!progress.chapter.trim()}>{t('vnPanel.scope.chapter')}</option>
                   <option value="scenes" disabled={!sceneOptions.length}>{t('vnPanel.scope.scenes')}</option>
                 </select>
-                <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? t('vnPanel.analyzing') : t('vnPanel.analyzeScope', { scope: t(SCOPE_KEYS[miningScope]) })}</button>
-                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={() => void createCards()}>{t('vnPanel.createCards')}</button>
-                <button type="button" onClick={() => setCollectionOpen(true)}>{t('vnPanel.openDeck')}</button>
+                <button className="btn small" type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? t('vnPanel.analyzing') : t('vnPanel.analyzeScope', { scope: t(SCOPE_KEYS[miningScope]) })}</button>
+                <button className="btn small" type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={() => void createCards()}>{t('vnPanel.createCards')}</button>
+                <button className="btn small" type="button" onClick={() => setCollectionOpen(true)}>{t('vnPanel.openDeck')}</button>
               </div>
               {miningScope === 'scenes' && (
                 <details className="visual-novel-scene-picker" open>
@@ -1132,9 +1180,9 @@ export default function VisualNovelPanel({
                     })}
                   </summary>
                   <div className="visual-novel-scene-picker-actions">
-                    <button type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>{t('vnPanel.currentScene')}</button>
-                    <button type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>{t('vnPanel.allScenes')}</button>
-                    <button type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>{t('vnPanel.clear')}</button>
+                    <button className="btn small" type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>{t('vnPanel.currentScene')}</button>
+                    <button className="btn small" type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>{t('vnPanel.allScenes')}</button>
+                    <button className="btn small" type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>{t('vnPanel.clear')}</button>
                   </div>
                   <div className="visual-novel-scene-options">
                     {sceneOptions.map((option) => (
@@ -1216,7 +1264,7 @@ export default function VisualNovelPanel({
                 <label>{t('vnPanel.chapter')}<input value={progress.chapter} onChange={(event) => setProgress((current) => ({ ...current, chapter: event.target.value }))} /></label>
                 <label>{t('vnPanel.scene')}<input value={progress.scene} onChange={(event) => setProgress((current) => ({ ...current, scene: event.target.value }))} /></label>
                 <label>{t('vnPanel.completion')}<input type="number" min="0" max="100" value={progress.completion} onChange={(event) => setProgress((current) => ({ ...current, completion: event.target.value }))} /></label>
-                <button type="button" onClick={() => void saveProgress()}>{t('vnPanel.saveProgress')}</button>
+                <button className="btn small" type="button" onClick={() => void saveProgress()}>{t('vnPanel.saveProgress')}</button>
               </div>
               </section>
               <section className="visual-novel-routes" aria-label={t('vnPanel.aria.routes')}>
@@ -1233,7 +1281,7 @@ export default function VisualNovelPanel({
                     <input value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder={t('vnPanel.routeNamePlaceholder')} aria-label={t('vnPanel.aria.routeName')} />
                     <input value={routeCharacter} onChange={(event) => setRouteCharacter(event.target.value)} placeholder={t('vnPanel.characterPlaceholder')} aria-label={t('vnPanel.aria.routeCharacter')} />
                     <input value={endingName} onChange={(event) => setEndingName(event.target.value)} placeholder={t('vnPanel.firstEndingPlaceholder')} aria-label={t('vnPanel.aria.endingName')} />
-                    <button type="button" disabled={!!addRouteWhy} title={addRouteWhy ? t(addRouteWhy) : undefined} onClick={() => void addRoute()}>{t('vnPanel.addRoute')}</button>
+                    <button className="btn small" type="button" disabled={!!addRouteWhy} title={addRouteWhy ? t(addRouteWhy) : undefined} onClick={() => void addRoute()}>{t('vnPanel.addRoute')}</button>
                   </div>
                 </details>
                 <div className="visual-novel-route-list">
@@ -1254,7 +1302,7 @@ export default function VisualNovelPanel({
                             <option key={value} value={value}>{t(ROUTE_STATUS_KEYS[value])}</option>
                           ))}
                         </select>
-                        <button type="button" onClick={() => {
+                        <button className="btn small" type="button" onClick={() => {
                           if (routePendingRemoveId !== route.id) {
                             setRoutePendingRemoveId(route.id);
                             return;
@@ -1312,7 +1360,7 @@ export default function VisualNovelPanel({
                               }
                             }}
                           />
-                          <button type="button" onClick={() => void updateRoute(route.id, (current) => ({
+                          <button className="btn small" type="button" onClick={() => void updateRoute(route.id, (current) => ({
                             ...current,
                             endings: current.endings.filter((candidate) => candidate.id !== ending.id),
                           }))}>{t('vnPanel.remove')}</button>
@@ -1328,7 +1376,7 @@ export default function VisualNovelPanel({
                           placeholder={t('vnPanel.addEndingPlaceholder')}
                           aria-label={t('vnPanel.aria.addEnding', { name: route.name })}
                         />
-                        <button type="button" {...endingReasonProps(endingDrafts[route.id])} onClick={() => void addEnding(route.id)}>{t('vnPanel.addEnding')}</button>
+                        <button className="btn small" type="button" {...endingReasonProps(endingDrafts[route.id])} onClick={() => void addEnding(route.id)}>{t('vnPanel.addEnding')}</button>
                       </div>
                     </article>
                   ))}

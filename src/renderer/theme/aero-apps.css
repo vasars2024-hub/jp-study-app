@@ -2580,6 +2580,9 @@
      actually reads, matching the pattern .os-set-nav-item.active already uses on the dark
      themes. #00697f scores 5.55:1 against this backdrop. */
   box-shadow: inset 2px 0 0 0 var(--state-indicator), inset 0 1px 0 var(--glass-highlight);
+  /* The base rule paints the active label white for the dark themes' accent fill;
+     on this pale selection that read 1.39:1. */
+  color: var(--text);
 }
 :root[data-materials='aero'] .os-set-nav-group { margin-top: 6px; }
 :root[data-materials='aero'] .os-set-nav-group-label {
@@ -2588,7 +2591,8 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
-  opacity: 0.7;
+  /* Was opacity 0.7 over --muted: 2.77:1. --muted alone is 5.7:1 here. */
+  color: var(--muted);
 }
 :root[data-materials='aero'] .os-set-nav-list { gap: 1px; }
 
@@ -4916,7 +4920,10 @@
   min-height: 27px;
   padding: 2px 6px;
   color: #f7fdff;
+  /* The deep scrim is what keeps white menu labels readable: over the bare sky
+     gradient they measured 2.79:1 (round-2 visual scan); with it about 5:1. */
   background:
+    linear-gradient(rgba(4, 44, 104, 0.5), rgba(4, 44, 104, 0.5)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(100, 194, 255, 0.2) 42%, rgba(19, 111, 209, 0.5)),
     linear-gradient(90deg, var(--vista-app-blue-3), var(--vista-app-blue-1) 46%, var(--vista-app-blue-3));
   border-bottom: 1px solid rgba(12, 91, 184, 0.72);
@@ -4927,7 +4934,8 @@
 }
 
 :root[data-materials='aero'] .ui-menubar__btn {
-  min-height: 21px;
+  /* WCAG 2.5.8: 21px menu items measured 19px at 80% zoom. */
+  min-height: 24px;
   padding: 2px 9px;
   color: inherit;
   border-radius: 2px;
@@ -5361,8 +5369,8 @@
 
 :root[data-materials='aero'] .dict-tts,
 :root[data-materials='aero'] .dict-x {
-  width: 22px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

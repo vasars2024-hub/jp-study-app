@@ -7,7 +7,7 @@
  * form. Both shells now compose these, so Blanc never mounts `CalendarView`.
  * Nothing here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Icon from '../Icons';
 import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
 import { confirmDialog } from '../ui/dialogService';
@@ -467,7 +467,11 @@ export function useCalendar() {
 }
 
 /** Mode switcher + prev/today/next + date jump. */
-export function CalendarNav({ state }: { state: CalendarState }) {
+/**
+ * `actions` sits at the row's far end. The main window puts "New event" here: on a
+ * header strip of its own it left an empty band across the top of the window.
+ */
+export function CalendarNav({ state, actions }: { state: CalendarState; actions?: ReactNode }) {
   const { t } = useT();
   const { mode, setMode, modeLabels, shift, goToday, headerLabel, jumpVal, setJumpVal, jump } = state;
   return (
@@ -511,6 +515,7 @@ export function CalendarNav({ state }: { state: CalendarState }) {
           </details>
         </AnchorSurface>
       )}
+      {actions ? <div className="cal-toolbar-actions">{actions}</div> : null}
     </ContextualSurface>
   );
 }

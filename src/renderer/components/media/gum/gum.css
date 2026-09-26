@@ -976,11 +976,24 @@
   margin-top: 2px;
 }
 
-/* A download glyph reads as an action, not a hover hint: always shown. */
+/*
+ * A download or "more" glyph reads as an action, not a hover hint, so it is always shown —
+ * and therefore sits in the corner, not the centre: centred and permanent, it covered the
+ * title of every poster drawn from type (a title with no artwork).
+ */
 .gum-ep-card__play[data-icon='download'],
-.gum-ep-card__play[data-icon='more'] {
+.gum-ep-card__play[data-icon='more'],
+.gum-ep-card__hit:hover .gum-ep-card__play[data-icon='download'],
+.gum-ep-card__hit:hover .gum-ep-card__play[data-icon='more'],
+.gum-ep-card__hit:focus-visible .gum-ep-card__play[data-icon='download'],
+.gum-ep-card__hit:focus-visible .gum-ep-card__play[data-icon='more'] {
+  left: 10px;
+  top: 10px;
+  width: 32px;
+  height: 32px;
+  margin: 0;
   opacity: 0.92;
-  transform: scale(0.92);
+  transform: none;
 }
 
 /* ------------------------------------------------------------- hero ---- */
@@ -2717,13 +2730,18 @@
   font-weight: 800;
 }
 
+/* Two lines before an ellipsis: a one-line cut read "Просмотре…" in Russian. The full
+   label is also the cell's tooltip. */
 .gum-stat span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.3;
   color: var(--mc-muted);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .gum-import-card__foot {

@@ -1,0 +1,78 @@
+/* Daily study goal (DailyGoalPanel): desktop widget + Statistics. */
+.daily-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+.daily-goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.daily-goal.is-compact .daily-goal-list {
+  gap: 7px;
+  overflow: auto;
+}
+.daily-goal-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.daily-goal-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.daily-goal-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.daily-goal-row.is-reached .daily-goal-count {
+  color: var(--accent);
+}
+.daily-goal-ctrls {
+  display: inline-flex;
+  gap: 4px;
+}
+.daily-goal-ctrls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.daily-goal-row.is-off .daily-goal-label {
+  color: var(--muted);
+}
+.daily-goal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: auto;
+}
+.daily-goal.is-met .daily-goal-foot .muted {
+  color: var(--accent);
+}
+.daily-goal-defaults {
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.daily-goal-defaults:hover {
+  text-decoration: underline;
+}
+.stats-daily-goal .daily-goal {
+  max-width: 520px;
+}

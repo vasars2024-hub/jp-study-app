@@ -127,10 +127,36 @@ export function preflightDiskSpace(sizeBytes: number, freeBytes: number): Prefli
   return { ok: shortfallBytes === 0, requiredBytes, freeBytes, shortfallBytes };
 }
 
+/**
+ * The locale a size is written in: a BCP-47 tag for the number and the five unit
+ * words B/KB/MB/GB/TB. Round-2 audit V12: a Russian UI read "1.7 GB" where it
+ * should read "1,7 ГБ" — `toFixed` always writes a dot and the units were
+ * hard-coded English.
+ */
+export interface ByteFormatLocale {
+  tag: string;
+  units: readonly string[];
+}
+
+const DEFAULT_BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+
+/**
+ * This module is shared with the main process, which has no UI language, so the
+ * renderer registers a provider for the current one (see
+ * `renderer/components/shell/localeFormat.ts`). Without a provider — main, tests —
+ * the output is the historical English form, byte for byte.
+ */
+let byteLocaleProvider: (() => ByteFormatLocale | null) | null = null;
+
+export function setByteFormatLocaleProvider(provider: (() => ByteFormatLocale | null) | null): void {
+  byteLocaleProvider = provider;
+}
+
 /** Human-readable size. Used by both the pre-flight warning and the Storage page. */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+export function formatBytes(bytes: number, locale?: ByteFormatLocale): string {
+  const loc = locale ?? byteLocaleProvider?.() ?? null;
+  const units = loc && loc.units.length === DEFAULT_BYTE_UNITS.length ? loc.units : DEFAULT_BYTE_UNITS;
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0 ${units[2]}`;
   let value = bytes;
   let unit = 0;
   while (value >= 1024 && unit < units.length - 1) {
@@ -138,7 +164,20 @@ export function formatBytes(bytes: number): string {
     unit += 1;
   }
   const digits = value < 10 && unit >= 2 ? 1 : 0;
-  return `${value.toFixed(digits)} ${units[unit]}`;
+  let text = value.toFixed(digits);
+  if (loc) {
+    try {
+      text = new Intl.NumberFormat(loc.tag, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+        // "1000 KB", never "1,000 KB": the value is always < 1024.
+        useGrouping: false,
+      }).format(value);
+    } catch {
+      // An unknown tag keeps the plain form rather than throwing inside a render.
+    }
+  }
+  return `${text} ${units[unit]}`;
 }
 
 // ----- state machine -----------------------------------------------------

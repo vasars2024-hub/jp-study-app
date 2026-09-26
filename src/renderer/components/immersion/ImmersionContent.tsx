@@ -82,6 +82,7 @@ import {
 } from '../../../shared/immersionGuestBridge';
 import { highlightEl, recolorEl, resetHighlightRoot, WK_HIGHLIGHT_CSS } from '../../wordHighlight';
 import { recordReading } from '../../stats';
+import { recordReadingCharsForGarden } from '../../readingGardenProgress';
 import { getTokenizer, tokenizerReady } from '../../tokenizer';
 import { onKnowledgeChanged } from '../../knownWords';
 import { registerCommandHandler } from '../../keyboardShortcuts';
@@ -290,6 +291,7 @@ export function useImmersion() {
     secondsAcc.current = 0;
     charsAcc.current = 0;
     recordReading(id, activeTitle.current, secs, chars);
+    if (chars > 0) recordReadingCharsForGarden({ sourceId: id, chars });
     if (currentUrl) {
       // `countVisit: false` — this is the 5-second stats flush, not an arrival. Without
       // it main incremented `visitCount` on every flush, so the rail's "N visits" was

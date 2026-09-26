@@ -34,6 +34,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { getToolboxModule, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
+import { isDeveloperOnlyTool } from './blancDeveloperTools';
 
 /**
  * Is this tool id governed by `TOOLBOX_MODULES`, and therefore by the user's
@@ -50,6 +51,11 @@ export interface ToolVisibilitySettings {
   enabledTools: readonly string[];
   hiddenTools: readonly string[];
   showHiddenToolsInSearch: boolean;
+  /**
+   * Blanc's developer flag (blancDeveloperTools.ts). Developer-only tools such
+   * as `coverage` are listed only when it is on; absent means off.
+   */
+  developerTools?: boolean;
 }
 
 /**
@@ -63,6 +69,7 @@ export function isToolLaunchable(
   settings: ToolVisibilitySettings,
   searching: boolean,
 ): boolean {
+  if (isDeveloperOnlyTool(id)) return settings.developerTools === true;
   if (!isRegistryGovernedTool(id)) return true;
   if (!settings.enabledTools.includes(id)) return false;
   if (settings.hiddenTools.includes(id) && !(searching && settings.showHiddenToolsInSearch)) {

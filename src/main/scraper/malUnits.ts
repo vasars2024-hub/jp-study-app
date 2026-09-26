@@ -22,6 +22,7 @@ import {
 import { scraperLog } from './logBus';
 import {
   episodeLabel,
+  MAL_UNITS_CATALOGUE_BUSY,
   type MalDownloadTarget,
   type MalDownloadUnit,
   type MalUnitsInput,
@@ -71,6 +72,37 @@ function placeholderUnits(count: number): MalDownloadUnit[] {
 /** Hard ceiling on a placeholder list, so a bad `episodeCount` cannot flood the UI. */
 const MAX_PLACEHOLDER_UNITS = 5_000;
 
+/**
+ * The catalogue did not answer. Offer `1..count` from what the caller already knows
+ * (the library's episode count), and say — as a code the renderer translates — that
+ * the service was busy, so trying again later can fill in titles and air dates.
+ */
+function catalogueBusy(input: MalUnitsInput): MalUnitsResult {
+  const known = input.known && typeof input.known === 'object' ? input.known : undefined;
+  const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+  const declared = Number(known?.episodeCount);
+  const count = Number.isFinite(declared) ? Math.min(Math.max(0, Math.trunc(declared)), MAX_PLACEHOLDER_UNITS) : 0;
+  scraperLog('warn', 'catalogue', `No record for ${input.provider} ${input.id}; offering ${count} placeholder episode(s).`, {
+    correlationId: `mal-units-${input.provider}-${input.id}`,
+  });
+  const title = text(known?.title);
+  return {
+    target: {
+      contentType: 'anime',
+      provider: input.provider,
+      id: input.id,
+      title,
+      nativeTitle: text(known?.nativeTitle),
+      romajiTitle: title,
+      posterUrl: text(known?.posterUrl),
+      totalUnits: count,
+    },
+    units: placeholderUnits(count),
+    servedBy: '',
+    note: MAL_UNITS_CATALOGUE_BUSY,
+  };
+}
+
 export async function listMalUnits(input: MalUnitsInput): Promise<MalUnitsResult> {
   const correlationId = `mal-units-${input.provider}-${input.id}`;
   if (input.contentType !== 'anime') {
@@ -80,8 +112,18 @@ export async function listMalUnits(input: MalUnitsInput): Promise<MalUnitsResult
   scraperLog('info', 'catalogue', `Listing units for ${input.provider} ${input.id}.`, {
     correlationId,
   });
-  const work = await catalogueWorkById(input.provider, input.id, correlationId);
-  if (!work) throw new Error(`The catalogue has no ${input.provider} entry ${input.id}.`);
+  let work: CatalogueWork | null = null;
+  try {
+    work = await catalogueWorkById(input.provider, input.id, correlationId);
+  } catch (error) {
+    scraperLog('warn', 'catalogue', `Id lookup failed: ${error instanceof Error ? error.message : String(error)}`, {
+      correlationId,
+    });
+  }
+  // No record is almost always the catalogue being busy (Jikan answers 429/5xx under load),
+  // not the id being wrong — the id came from that catalogue. This used to throw "The
+  // catalogue has no jikan entry 34798.", in English, and the dialog was a dead end.
+  if (!work) return catalogueBusy(input);
 
   const episodes = await catalogueEpisodes(work, correlationId);
   const target = targetFor(work, input);

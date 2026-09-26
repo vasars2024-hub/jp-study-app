@@ -186,15 +186,17 @@ function average(values: number[]): number | undefined {
 
 /** Minutes of one unit (film, or a typical episode), from provider data first, then durations. */
 function unitRuntime(kind: WatchKind, items: readonly MediaItem[], fallback?: number, episodeCount?: number): number | undefined {
-  const provider = items.map((item) => item.runtimeMin).find((value): value is number => typeof value === 'number' && value > 0);
-  if (provider) return provider;
+  // The files' real lengths win over the catalogue's: a provider's "24 min per episode" was
+  // shown for a 20-second clip. Under a minute the value keeps its seconds (as a fraction).
   const durations = items
     .map((item) => item.durationSec)
     .filter((value): value is number => typeof value === 'number' && value > 0);
   if (durations.length) {
     const value = kind === 'film' ? Math.max(...durations) / 60 : (average(durations) ?? 0) / 60;
-    return Math.round(value) || undefined;
+    return value < 1 ? Math.max(1, Math.round(value * 60)) / 60 : Math.round(value);
   }
+  const provider = items.map((item) => item.runtimeMin).find((value): value is number => typeof value === 'number' && value > 0);
+  if (provider) return provider;
   if (fallback && kind !== 'film' && episodeCount) return Math.round(fallback / episodeCount) || undefined;
   return fallback;
 }

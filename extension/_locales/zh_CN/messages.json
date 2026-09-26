@@ -1,0 +1,1394 @@
+{
+  "locale_code": {
+    "message": "zh-CN"
+  },
+  "ext_name": {
+    "message": "Gum — 阅读助手"
+  },
+  "ext_description": {
+    "message": "悬停查词、语法与句子分析、将单词和句子保存到 Gum、Anki 卡片、OCR 和网页保存。"
+  },
+  "ext_actionTitle": {
+    "message": "Gum"
+  },
+  "manifestCmd_savePage": {
+    "message": "将网页保存到 Gum"
+  },
+  "manifestCmd_lookup": {
+    "message": "查询所选内容 / 光标下的词"
+  },
+  "manifestCmd_saveSelection": {
+    "message": "保存所选内容（单词或句子）"
+  },
+  "manifestCmd_wheel": {
+    "message": "打开操作轮盘"
+  },
+  "manifestCmd_bulkTabs": {
+    "message": "打开阅读列表（如需要，可在浏览器中设置快捷键）"
+  },
+  "manifestCmd_analyze": {
+    "message": "AI 分析所选句子（如需要，可在浏览器中设置快捷键）"
+  },
+  "bg_scriptsFailed": {
+    "message": "扩展脚本加载失败 — 请在 chrome://extensions 中重新加载 Gum"
+  },
+  "bg_appOutdated": {
+    "message": "Gum 版本过旧或尚未完全启动 — 请重启应用，然后重新加载此扩展。"
+  },
+  "bg_authFailed": {
+    "message": "Gum 拒绝了此扩展 — 请在 Gum 中（设置 → 个人资料与词典 → Chrome 扩展）复制令牌，并粘贴到扩展选项的“连接”中。"
+  },
+  "bg_offline": {
+    "message": "Gum 未运行 — 请打开应用后重试。"
+  },
+  "bg_storageFull": {
+    "message": "本地存储已满 — 请打开 Gum 同步排队的项目，然后重试。"
+  },
+  "bg_needYoutubeTab": {
+    "message": "请先打开 YouTube 视频或播放列表标签页"
+  },
+  "bg_needYoutubeVideo": {
+    "message": "请先打开 YouTube 视频标签页"
+  },
+  "bg_nothingSelected": {
+    "message": "没有选中要保存的内容"
+  },
+  "bg_selectFirst": {
+    "message": "请先在页面上选中一个单词或句子"
+  },
+  "bg_noRecording": {
+    "message": "还没有录音 — 请先使用“录音”，然后停止"
+  },
+  "bg_scanFailed": {
+    "message": "无法扫描此页面"
+  },
+  "bg_noPanels": {
+    "message": "此页面上没有找到漫画分格图片"
+  },
+  "bg_tabRestricted": {
+    "message": "无法访问此标签页"
+  },
+  "bg_actionFailed": {
+    "message": "操作失败"
+  },
+  "bg_commandFailed": {
+    "message": "命令失败"
+  },
+  "bg_httpStatus": {
+    "message": "Gum 返回了 HTTP $1。"
+  },
+  "menu_lookup": {
+    "message": "查询所选内容"
+  },
+  "menu_analyze": {
+    "message": "AI 分析所选内容"
+  },
+  "menu_saveWord": {
+    "message": "保存单词"
+  },
+  "menu_saveSentence": {
+    "message": "保存句子"
+  },
+  "menu_createCard": {
+    "message": "制作抽认卡"
+  },
+  "menu_savePage": {
+    "message": "将网页保存到 Gum"
+  },
+  "menu_ocr": {
+    "message": "OCR 截取（拖出一个框）"
+  },
+  "menu_openApp": {
+    "message": "打开 Gum"
+  },
+  "common_gumNotRunning": {
+    "message": "Gum 未运行。"
+  },
+  "common_noResponse": {
+    "message": "无响应"
+  },
+  "common_readingListFailed": {
+    "message": "无法打开阅读列表"
+  },
+  "common_queuedWillSync": {
+    "message": "已加入队列 — 打开 Gum 后会同步"
+  },
+  "common_dragLarger": {
+    "message": "请拖出更大的区域"
+  },
+  "common_cancel": {
+    "message": "取消"
+  },
+  "category_news": {
+    "message": "新闻"
+  },
+  "category_novel": {
+    "message": "网络小说"
+  },
+  "category_manga": {
+    "message": "漫画"
+  },
+  "category_video": {
+    "message": "视频"
+  },
+  "category_article": {
+    "message": "文章"
+  },
+  "category_webpage": {
+    "message": "网页"
+  },
+  "save_working_card": {
+    "message": "正在制作卡片…"
+  },
+  "save_working_app": {
+    "message": "正在保存到 Gum…"
+  },
+  "save_failed": {
+    "message": "保存失败"
+  },
+  "save_termQuoted": {
+    "message": "“$1”"
+  },
+  "save_queued": {
+    "message": "已加入队列$1 — 打开 Gum 后会同步"
+  },
+  "save_deckSuffix": {
+    "message": "（$1）"
+  },
+  "save_cardCreated": {
+    "message": "已在 Anki 中制卡$1$2 · 已保存到 Gum"
+  },
+  "save_savedWord": {
+    "message": "单词$1已保存到 Gum"
+  },
+  "save_savedSentence": {
+    "message": "句子$1已保存到 Gum"
+  },
+  "save_ankiUnavailable": {
+    "message": "Anki 不可用：$1"
+  },
+  "clip_failed": {
+    "message": "无法添加到剪贴板历史"
+  },
+  "clip_added": {
+    "message": "已添加到 Gum 剪贴板历史"
+  },
+  "capture_failed": {
+    "message": "无法保存此网页"
+  },
+  "capture_queued": {
+    "message": "网页已加入队列 — 打开 Gum 后会同步"
+  },
+  "capture_playlistSaved": {
+    "message": "播放列表已保存到 Gum"
+  },
+  "capture_videoDuplicate": {
+    "message": "该视频已在 Gum 中"
+  },
+  "capture_videoSaved": {
+    "message": "视频已保存到 Gum"
+  },
+  "capture_pageSaved": {
+    "message": "网页已保存到 Gum 收件箱"
+  },
+  "content_wkNew": {
+    "message": "新词"
+  },
+  "content_wkLearning": {
+    "message": "学习中"
+  },
+  "content_wkFamiliar": {
+    "message": "熟悉"
+  },
+  "content_wkKnown": {
+    "message": "已掌握"
+  },
+  "content_knownSet": {
+    "message": "$1 · $2"
+  },
+  "content_saved": {
+    "message": "已保存"
+  },
+  "content_failed": {
+    "message": "失败"
+  },
+  "content_added": {
+    "message": "已添加"
+  },
+  "content_done": {
+    "message": "完成"
+  },
+  "content_copied": {
+    "message": "已复制"
+  },
+  "content_copyBlocked": {
+    "message": "无法复制 — 页面阻止了剪贴板访问"
+  },
+  "content_knownFailed": {
+    "message": "无法更新掌握状态 — Gum 是否正在运行？"
+  },
+  "content_nothingToSave": {
+    "message": "没有可保存的内容"
+  },
+  "content_addingClip": {
+    "message": "正在添加到剪贴板历史…"
+  },
+  "content_translating": {
+    "message": "正在翻译…"
+  },
+  "content_translated": {
+    "message": "已翻译"
+  },
+  "content_translationFailed": {
+    "message": "翻译失败"
+  },
+  "content_selectText": {
+    "message": "请先选中一些文字"
+  },
+  "content_highlighted": {
+    "message": "已高亮"
+  },
+  "content_selectWordOrSentence": {
+    "message": "请先选中一个单词或句子"
+  },
+  "content_cardEmpty": {
+    "message": "卡片文字为空"
+  },
+  "content_cardSource": {
+    "message": "来源：$1"
+  },
+  "content_notAvailable": {
+    "message": "此页面上无法使用“$1”"
+  },
+  "content_actionNotAvailable": {
+    "message": "此页面上无法使用该操作"
+  },
+  "content_selectOrHover": {
+    "message": "请先选中或悬停一个单词"
+  },
+  "content_selectToTranslate": {
+    "message": "请选中要翻译的文字"
+  },
+  "content_openInApp": {
+    "message": "在应用中打开"
+  },
+  "content_openInbox": {
+    "message": "打开收件箱"
+  },
+  "content_selectSentence": {
+    "message": "请先选中一个句子"
+  },
+  "content_savingPage": {
+    "message": "正在保存网页…"
+  },
+  "content_queueingDownload": {
+    "message": "正在将下载加入队列…"
+  },
+  "content_scanningManga": {
+    "message": "正在扫描漫画页面…"
+  },
+  "content_savingAudio": {
+    "message": "正在保存音频…"
+  },
+  "content_mangaImported": {
+    "message": "已导入 Gum 漫画的页数：$1"
+  },
+  "content_importFailed": {
+    "message": "导入失败"
+  },
+  "content_downloadQueued": {
+    "message": "已在 Gum 中加入下载队列"
+  },
+  "content_downloadFailed": {
+    "message": "下载失败"
+  },
+  "content_themeOn": {
+    "message": "阅读主题：$1"
+  },
+  "content_themeOff": {
+    "message": "阅读主题已关闭"
+  },
+  "content_themeButton": {
+    "message": "主题：$1"
+  },
+  "content_theme_off": {
+    "message": "关闭"
+  },
+  "content_theme_night": {
+    "message": "夜间"
+  },
+  "content_theme_sepia": {
+    "message": "棕褐"
+  },
+  "content_theme_paper": {
+    "message": "纸张"
+  },
+  "content_theme_gray": {
+    "message": "灰色"
+  },
+  "content_highlightOn": {
+    "message": "高亮模式已开启 — 选中文字即可标记"
+  },
+  "content_highlightOff": {
+    "message": "高亮模式已关闭"
+  },
+  "content_highlightModeOn": {
+    "message": "高亮模式：开"
+  },
+  "content_tintOn": {
+    "message": "已掌握词着色已开启"
+  },
+  "content_tintOff": {
+    "message": "已掌握词着色已关闭"
+  },
+  "content_tintModeOn": {
+    "message": "已掌握词着色：开"
+  },
+  "content_stopRecording": {
+    "message": "停止录音"
+  },
+  "content_panelHidden": {
+    "message": "已在此网站隐藏面板 — 可在 设置 → 页面面板 中恢复"
+  },
+  "content_micUnavailable": {
+    "message": "此处无法使用麦克风录音"
+  },
+  "content_recordingEmpty": {
+    "message": "录音为空"
+  },
+  "content_recordingReady": {
+    "message": "录音完成 — 使用“保存音频”将其发送到 Gum"
+  },
+  "content_recordingUnreadable": {
+    "message": "无法读取录音"
+  },
+  "content_recording": {
+    "message": "正在录音… 再次运行“录音”即可停止"
+  },
+  "content_micDenied": {
+    "message": "麦克风权限被拒绝"
+  },
+  "content_ocrCancelled": {
+    "message": "已取消 OCR 选区"
+  },
+  "content_runningOcr": {
+    "message": "正在进行 OCR…"
+  },
+  "content_ocrFailed": {
+    "message": "OCR 失败"
+  },
+  "content_speechUnavailable": {
+    "message": "此处无法使用朗读"
+  },
+  "content_cardAddFailed": {
+    "message": "无法添加卡片"
+  },
+  "content_snapshotFailed": {
+    "message": "快照失败"
+  },
+  "popup_statusApp": {
+    "message": "Gum 应用"
+  },
+  "popup_statusPairing": {
+    "message": "配对"
+  },
+  "popup_statusAnki": {
+    "message": "Anki 配置文件"
+  },
+  "popup_statusPending": {
+    "message": "等待同步"
+  },
+  "popup_openConnection": {
+    "message": "打开连接设置"
+  },
+  "popup_modeHighlight": {
+    "message": "高亮"
+  },
+  "popup_modeHighlightAria": {
+    "message": "高亮时打开的内容"
+  },
+  "popup_modeDictionary": {
+    "message": "词典 AI"
+  },
+  "popup_modeAi": {
+    "message": "AI OCR"
+  },
+  "popup_modeOcr": {
+    "message": "截图 OCR"
+  },
+  "popup_modeOcrAria": {
+    "message": "OCR 时打开的内容"
+  },
+  "popup_recent": {
+    "message": "最近"
+  },
+  "popup_retryNow": {
+    "message": "立即重试"
+  },
+  "popup_navTabs": {
+    "message": "阅读列表"
+  },
+  "popup_navApp": {
+    "message": "打开 Gum"
+  },
+  "popup_navSettings": {
+    "message": "设置"
+  },
+  "popup_chipConnected": {
+    "message": "已连接"
+  },
+  "popup_chipConnectedQueued_other": {
+    "message": "已连接 · 队列中 $1 项"
+  },
+  "popup_chipPairingNeeded": {
+    "message": "需要配对"
+  },
+  "popup_chipAppNotRunning": {
+    "message": "应用未运行"
+  },
+  "popup_appRunning": {
+    "message": "正在运行"
+  },
+  "popup_appNotRunning": {
+    "message": "未运行"
+  },
+  "popup_pairTokenNeeded": {
+    "message": "需要令牌"
+  },
+  "popup_pairOk": {
+    "message": "正常"
+  },
+  "popup_pendingItems_other": {
+    "message": "$1 项等待同步"
+  },
+  "popup_pageRestricted": {
+    "message": "此页面受浏览器限制"
+  },
+  "popup_pageRestrictedHint": {
+    "message": "浏览器内部页面无法使用查词和保存。"
+  },
+  "popup_currentPage": {
+    "message": "当前页面"
+  },
+  "popup_difficultyTitle": {
+    "message": "基于词汇等级的估计，并非官方评级"
+  },
+  "popup_difficulty": {
+    "message": "难度 $1"
+  },
+  "popup_difficultyCached": {
+    "message": "难度 $1（缓存）"
+  },
+  "popup_knownWords": {
+    "message": "已掌握词 $1%"
+  },
+  "popup_noJapanese": {
+    "message": "此页面上没有找到你所学语言的文字"
+  },
+  "popup_noJapaneseHint": {
+    "message": "在所学语言的文字上按住查词键即可使用悬停查词。"
+  },
+  "popup_transcribedTitle": {
+    "message": "已在 Gum 目录中 — 无需回到这里即可收集"
+  },
+  "popup_transcribedCues_other": {
+    "message": "已转写 · $1 条字幕"
+  },
+  "popup_transcribing": {
+    "message": "正在转写"
+  },
+  "popup_transcribingFor": {
+    "message": "正在转写 · $1 秒"
+  },
+  "popup_transcriptionEmptyTitle": {
+    "message": "请从媒体库重试"
+  },
+  "popup_transcriptionEmpty": {
+    "message": "转写没有产生文字"
+  },
+  "popup_savePlaylist": {
+    "message": "保存播放列表"
+  },
+  "popup_saveVideo": {
+    "message": "保存视频"
+  },
+  "popup_downloadVideo": {
+    "message": "下载视频"
+  },
+  "popup_transcribeAudio": {
+    "message": "转写音频"
+  },
+  "popup_lookupSelection": {
+    "message": "查询所选内容"
+  },
+  "popup_saveSelection": {
+    "message": "保存所选内容"
+  },
+  "popup_ocrCapture": {
+    "message": "OCR 截取"
+  },
+  "popup_importManga": {
+    "message": "导入漫画页面"
+  },
+  "popup_savePage": {
+    "message": "保存网页"
+  },
+  "popup_lookupFailed": {
+    "message": "无法打开查词弹窗"
+  },
+  "popup_savingSelection": {
+    "message": "正在保存所选内容…"
+  },
+  "popup_savingPage": {
+    "message": "正在保存网页…"
+  },
+  "popup_queueingDownload": {
+    "message": "正在将下载加入队列…"
+  },
+  "popup_downloadQueued": {
+    "message": "已在 Gum 中加入下载队列。"
+  },
+  "popup_downloadFailed": {
+    "message": "下载失败"
+  },
+  "popup_askingTranscribe": {
+    "message": "正在请求 Gum 转写…"
+  },
+  "popup_ocrFailed": {
+    "message": "无法开始 OCR 选区"
+  },
+  "popup_scanningManga": {
+    "message": "正在扫描漫画页面… 页面会自动滚动"
+  },
+  "popup_mangaImported_other": {
+    "message": "已将 $1 页导入 Gum 漫画。"
+  },
+  "popup_importFailed": {
+    "message": "导入失败"
+  },
+  "popup_refuseNotAVideoPage": {
+    "message": "请先打开视频页面 — 此页面没有音频。"
+  },
+  "popup_refuseNoVideoId": {
+    "message": "该 YouTube 网址中没有视频。"
+  },
+  "popup_refuseNotDownloaded": {
+    "message": "请先下载此视频 — Whisper 读取的是文件，而不是网页。"
+  },
+  "popup_refuseAudioMissing": {
+    "message": "Gum 中有此视频的记录，但文件已丢失。"
+  },
+  "popup_refuseTranscriberOffline": {
+    "message": "Gum 正在运行，但转写功能尚未就绪。"
+  },
+  "popup_refuseItemNotFound": {
+    "message": "Gum 的媒体库中已没有此视频。"
+  },
+  "popup_transcribedDone_other": {
+    "message": "转写完成 — $1 条字幕。可在“文件”或“收集”中收集。"
+  },
+  "popup_transcriptionEnded": {
+    "message": "转写已结束，但没有生成文字稿。请从媒体库重试。"
+  },
+  "popup_transcriptionNotStarted": {
+    "message": "此视频尚未下载，因此没有进行转写。"
+  },
+  "popup_transcribingElapsed": {
+    "message": "正在 Gum 中转写… $1 秒"
+  },
+  "popup_stillTranscribing": {
+    "message": "Gum 仍在转写 — 完成后会出现在目录中。"
+  },
+  "popup_transcriptionFailed": {
+    "message": "转写失败"
+  },
+  "popup_alreadyTranscribed_other": {
+    "message": "已转写 — $1 条字幕。可在“文件”或“收集”中收集。"
+  },
+  "popup_transcribeQueued": {
+    "message": "正在 Gum 中转写 — 完成后会出现在目录中。"
+  },
+  "popup_alreadyTranscribing": {
+    "message": "Gum 已在转写 — 没有新加入队列。"
+  },
+  "popup_alreadyTranscribingFor": {
+    "message": "Gum 已转写 $1 秒 — 没有新加入队列。"
+  },
+  "popup_transcriptionRefused": {
+    "message": "转写被拒绝"
+  },
+  "popup_cardCreated": {
+    "message": "已在 Anki 中制卡 · 已保存到 Gum。"
+  },
+  "popup_savedToGum": {
+    "message": "已保存到 Gum。"
+  },
+  "popup_recentWord": {
+    "message": "已保存单词"
+  },
+  "popup_recentSentence": {
+    "message": "已保存句子"
+  },
+  "popup_recentCard": {
+    "message": "已制卡"
+  },
+  "popup_recentPage": {
+    "message": "已保存网页"
+  },
+  "popup_recentDownload": {
+    "message": "已加入下载队列"
+  },
+  "popup_recentOcr": {
+    "message": "已 OCR 截取"
+  },
+  "popup_recentManga": {
+    "message": "已导入漫画"
+  },
+  "popup_recentQueued": {
+    "message": "已排队"
+  },
+  "popup_recentSaved": {
+    "message": "已保存"
+  },
+  "popup_gumNotRunningStart": {
+    "message": "Gum 未运行 — 请启动桌面应用。"
+  },
+  "popup_retrying": {
+    "message": "正在重试队列中的项目…"
+  },
+  "popup_retryDropped_other": {
+    "message": "$1 项无法保存，已丢弃 — 请查看最近的记录。"
+  },
+  "popup_retrySent_other": {
+    "message": "已发送队列中的 $1 项。"
+  },
+  "popup_retryStillPending_other": {
+    "message": "仍有 $1 项待处理。"
+  },
+  "popup_retryUnreachable_other": {
+    "message": "仍无法连接应用 — 队列中有 $1 项。"
+  },
+  "popup_retryNothing": {
+    "message": "没有需要重试的项目。"
+  },
+  "opt_pageTitle": {
+    "message": "Gum — 扩展设置"
+  },
+  "opt_searchAria": {
+    "message": "搜索设置"
+  },
+  "opt_searchPlaceholder": {
+    "message": "搜索设置…"
+  },
+  "opt_searchEmpty": {
+    "message": "没有匹配的设置。"
+  },
+  "opt_navLookup": {
+    "message": "悬停查词"
+  },
+  "opt_navAi": {
+    "message": "AI OCR"
+  },
+  "opt_navPopup": {
+    "message": "阅读弹窗"
+  },
+  "opt_navSaving": {
+    "message": "保存与卡片"
+  },
+  "opt_navWheel": {
+    "message": "环形轮盘"
+  },
+  "opt_navPanel": {
+    "message": "页面面板"
+  },
+  "opt_navMedia": {
+    "message": "视频与媒体"
+  },
+  "opt_navConnection": {
+    "message": "连接"
+  },
+  "opt_navShortcuts": {
+    "message": "快捷键"
+  },
+  "opt_navAdvanced": {
+    "message": "高级"
+  },
+  "opt_lookupLead": {
+    "message": "按住按键并指向所学语言的文字，即可打开阅读弹窗。"
+  },
+  "opt_hoverEnable": {
+    "message": "启用悬停查词"
+  },
+  "opt_hoverEnableSub": {
+    "message": "按住激活键，将光标移到单词上。"
+  },
+  "opt_hoverKey": {
+    "message": "激活键"
+  },
+  "opt_hoverKeyDesc": {
+    "message": "悬停时按住；点击和选中查词时也会用到。"
+  },
+  "opt_hoverDelay": {
+    "message": "悬停延迟"
+  },
+  "opt_hoverDelayDesc": {
+    "message": "光标在单词上停留多久后打开弹窗。"
+  },
+  "opt_scanLength": {
+    "message": "扫描长度"
+  },
+  "opt_scanLengthDesc": {
+    "message": "匹配时考虑的最大字符数。越长越能识别长复合词，越短越快。"
+  },
+  "opt_closeOnRelease": {
+    "message": "松开按键时关闭弹窗"
+  },
+  "opt_closeOnReleaseSub": {
+    "message": "关闭时：弹窗会一直显示，直到你点击别处或按 Esc。固定的弹窗始终保留。"
+  },
+  "opt_clickLookup": {
+    "message": "按键 + 点击 / 按键 + 选中 也可查词"
+  },
+  "opt_clickLookupSub": {
+    "message": "普通点击始终会传递给页面。"
+  },
+  "opt_lookupEditable": {
+    "message": "允许在文本框中查词"
+  },
+  "opt_lookupEditableSub": {
+    "message": "默认关闭，以免打断输入。"
+  },
+  "opt_aiTitle": {
+    "message": "AI OCR / 词典 AI"
+  },
+  "opt_aiLead": {
+    "message": "分别选择高亮和 OCR 各自打开什么。AI OCR 会为整句加注释（语法、词汇、等级、正式程度与语气），并可制卡或存为笔记快照。词典 AI 保留即时的离线查词。两种操作分开设置。"
+  },
+  "opt_aiOnHighlight": {
+    "message": "高亮文字时使用 AI OCR"
+  },
+  "opt_aiOnHighlightSub": {
+    "message": "关闭时：高亮会像以前一样打开词典弹窗。"
+  },
+  "opt_aiOnOcr": {
+    "message": "截图 OCR 后使用 AI OCR"
+  },
+  "opt_aiOnOcrSub": {
+    "message": "关闭时：OCR 结果会带着“AI 分析”按钮打开。"
+  },
+  "opt_aiMinChars": {
+    "message": "最少选中字数"
+  },
+  "opt_aiMinCharsDesc": {
+    "message": "较短的选中内容仍使用离线词典 — 为一个词调用云端更慢，而且要为词典已有的答案付费。"
+  },
+  "opt_aiWhere": {
+    "message": "分析内容、卡片发送到哪个卡组以及自动笔记快照，在 Gum → 设置 → 个人资料与词典 → AI 分析 中设置。需要 API 密钥（抽认卡 → AI 制卡工作室）。"
+  },
+  "opt_popupLead": {
+    "message": "页面内词典，包含释义、语法、句子、汉字和例句标签页。"
+  },
+  "opt_popupWidth": {
+    "message": "宽度"
+  },
+  "opt_popupFont": {
+    "message": "字号"
+  },
+  "opt_popupCompact": {
+    "message": "紧凑模式"
+  },
+  "opt_popupCompactSub": {
+    "message": "每个词条显示更少的释义 — 长时间阅读更轻松。"
+  },
+  "opt_popupPin": {
+    "message": "按键 + 点击时固定弹窗"
+  },
+  "opt_popupPinSub": {
+    "message": "固定的弹窗可以拖动标题栏，阅读时会一直保持打开。"
+  },
+  "opt_popupKeysHtml": {
+    "message": "弹窗内：<kbd>←</kbd><kbd>→</kbd> 切换标签页 · <kbd>S</kbd> 保存单词 · <kbd>Shift+S</kbd> 保存句子 · <kbd>C</kbd> 制卡 · <kbd>P</kbd> 固定 · <kbd>A</kbd> 音频 · <kbd>Esc</kbd> 关闭。"
+  },
+  "opt_savingLead": {
+    "message": "保存的单词、句子和抽认卡去往何处。（以前称为“收集”。）"
+  },
+  "opt_destLabel": {
+    "message": "保存单词或句子时"
+  },
+  "opt_destBoth": {
+    "message": "Gum + Anki 卡片"
+  },
+  "opt_destBothSub": {
+    "message": "Anki 运行时会制作 Anki 卡片；Gum 书库中始终保留一份副本。"
+  },
+  "opt_destApp": {
+    "message": "仅 Gum"
+  },
+  "opt_destAppSub": {
+    "message": "保存到 Gum 书库。“制卡”仍会明确发送到 Anki。"
+  },
+  "opt_confirmCard": {
+    "message": "制卡前预览"
+  },
+  "opt_confirmCardSub": {
+    "message": "发送前显示文字、卡片类型和目标。卡片字段由 Gum 根据其词典和你的 Anki 字段映射填写。"
+  },
+  "opt_folderLabel": {
+    "message": "书库文件夹名称"
+  },
+  "opt_folderLabelDesc": {
+    "message": "从扩展保存的内容会出现在 Gum 抽认卡的此文件夹下。"
+  },
+  "opt_savingHintHtml": {
+    "message": "卡组、笔记类型和字段映射在 Gum 应用中设置 — 直达链接见<b>连接</b>。"
+  },
+  "opt_wheelLeadHtml": {
+    "message": "用 <kbd>Alt+Shift+W</kbd> 打开的快捷操作环。每个位置放一个命令；中心始终为取消。"
+  },
+  "opt_wheelEnable": {
+    "message": "启用环形轮盘"
+  },
+  "opt_wheelEnableSub": {
+    "message": "禁用后，快捷键会改为打开紧凑的操作列表。"
+  },
+  "opt_wheelHintHtml": {
+    "message": "每个命令只能分配一次 — 选择已放置的命令会交换两个位置。不适用于当前页面的命令（例如在 YouTube 以外“下载视频”）在轮盘上显示为禁用。键盘：<kbd>1</kbd>–<kbd>6</kbd> 执行对应位置，方向键移动高亮，<kbd>Esc</kbd> 取消。"
+  },
+  "opt_panelLead": {
+    "message": "显示难度估计和页面工具的角落小面板。"
+  },
+  "opt_fabVisible": {
+    "message": "显示页面面板"
+  },
+  "opt_fabCollapsed": {
+    "message": "初始时折叠"
+  },
+  "opt_fabCorner": {
+    "message": "位置"
+  },
+  "opt_cornerBottomRight": {
+    "message": "右下"
+  },
+  "opt_cornerBottomRightMid": {
+    "message": "右下（偏上）"
+  },
+  "opt_cornerTopRight": {
+    "message": "右上"
+  },
+  "opt_badgesHeading": {
+    "message": "徽章与按钮"
+  },
+  "opt_fabLevel": {
+    "message": "难度估计"
+  },
+  "opt_fabComp": {
+    "message": "已掌握词比例"
+  },
+  "opt_fabTheme": {
+    "message": "阅读主题按钮"
+  },
+  "opt_fabHl": {
+    "message": "高亮模式按钮"
+  },
+  "opt_fabLearn": {
+    "message": "已掌握词着色按钮"
+  },
+  "opt_fabOcr": {
+    "message": "OCR 按钮"
+  },
+  "opt_fabClearHidden": {
+    "message": "在所有网站上重新显示面板"
+  },
+  "opt_fabHint": {
+    "message": "面板上的“在此隐藏”会按网站隐藏它；此操作会清空该列表。"
+  },
+  "opt_mediaLead": {
+    "message": "YouTube 上“保存网页”的作用，以及媒体选项。"
+  },
+  "opt_ytMode": {
+    "message": "保存 YouTube 页面"
+  },
+  "opt_ytModeDownload": {
+    "message": "将媒体下载到 Gum"
+  },
+  "opt_ytModeMetadata": {
+    "message": "仅保存元数据（跟踪视频/播放列表）"
+  },
+  "opt_ytAudio": {
+    "message": "下载时仅音频"
+  },
+  "opt_ytAudioSub": {
+    "message": "文件更小 — 适合听力练习。"
+  },
+  "opt_mediaHint": {
+    "message": "在 YouTube 页面上，始终可以从弹窗、轮盘和“更多”菜单中明确使用“下载视频”。"
+  },
+  "opt_connLead": {
+    "message": "与 Gum 桌面应用配对。其他内容（Anki 映射、收集规则、剪贴板历史）都在应用中。"
+  },
+  "opt_pairingHeading": {
+    "message": "配对"
+  },
+  "opt_connUnknown": {
+    "message": "未知"
+  },
+  "opt_token": {
+    "message": "配对令牌"
+  },
+  "opt_tokenDesc": {
+    "message": "在 Gum 中打开 设置 → 个人资料与词典 → Chrome 扩展。复制令牌并粘贴到这里；或者先在那里点击“立即配对”，再在这里点击“从应用获取令牌”。"
+  },
+  "opt_port": {
+    "message": "桥接端口"
+  },
+  "opt_savePair": {
+    "message": "保存配对"
+  },
+  "opt_test": {
+    "message": "测试连接"
+  },
+  "opt_pull": {
+    "message": "从应用获取令牌"
+  },
+  "opt_openInApp": {
+    "message": "在 Gum 应用中打开"
+  },
+  "opt_openAnki": {
+    "message": "Anki 与字段映射"
+  },
+  "opt_openRules": {
+    "message": "保存规则（配置文件）"
+  },
+  "opt_openClipboard": {
+    "message": "剪贴板历史"
+  },
+  "opt_openFlashcards": {
+    "message": "抽认卡"
+  },
+  "opt_openInbox": {
+    "message": "收件箱"
+  },
+  "opt_shortcutsLead": {
+    "message": "浏览器级快捷键由 Chrome 管理；页面内按键在阅读弹窗或轮盘打开时可用。"
+  },
+  "opt_browserShortcuts": {
+    "message": "浏览器快捷键"
+  },
+  "opt_openShortcuts": {
+    "message": "在 Chrome 快捷键设置中更改"
+  },
+  "opt_inPageKeys": {
+    "message": "页面内按键"
+  },
+  "opt_inPageKeysHtml": {
+    "message": "阅读弹窗：<kbd>←</kbd><kbd>→</kbd> 标签页 · <kbd>S</kbd> 保存单词 · <kbd>Shift+S</kbd> 保存句子 · <kbd>C</kbd> 制卡 · <kbd>P</kbd> 固定 · <kbd>A</kbd> 音频 · <kbd>Backspace</kbd> 返回 · <kbd>Esc</kbd> 关闭。<br /> 轮盘：<kbd>1</kbd>–<kbd>6</kbd> 执行 · 方向键高亮 · <kbd>Enter</kbd> 执行 · <kbd>Esc</kbd> 取消。<br /> OCR 选区：拖出一个框 · <kbd>Esc</kbd> 取消。"
+  },
+  "opt_advancedLead": {
+    "message": "数据、迁移，以及所有不需要默认开启的内容。"
+  },
+  "opt_logImmersion": {
+    "message": "将阅读时间记录到 Gum"
+  },
+  "opt_logImmersionSub": {
+    "message": "将在所学语言页面上的活跃时间计入沉浸统计。"
+  },
+  "opt_notes": {
+    "message": "备注"
+  },
+  "opt_notesPlaceholder": {
+    "message": "给自己的备注（可选）"
+  },
+  "opt_settingsData": {
+    "message": "设置数据"
+  },
+  "opt_export": {
+    "message": "导出设置"
+  },
+  "opt_import": {
+    "message": "导入设置"
+  },
+  "opt_reset": {
+    "message": "恢复默认"
+  },
+  "opt_resetHint": {
+    "message": "重置会保留配对令牌和端口。旧版本的设置（包括“收集时优先 Anki”和旧的轮盘位置）会自动迁移 — “收集”现在直接称为“保存”。"
+  },
+  "opt_unitMs": {
+    "message": "$1 毫秒"
+  },
+  "opt_unitPx": {
+    "message": "$1 像素"
+  },
+  "opt_unitChars_other": {
+    "message": "$1 个字符"
+  },
+  "opt_posTop": {
+    "message": "上"
+  },
+  "opt_posUpperRight": {
+    "message": "右上"
+  },
+  "opt_posLowerRight": {
+    "message": "右下"
+  },
+  "opt_posBottom": {
+    "message": "下"
+  },
+  "opt_posLowerLeft": {
+    "message": "左下"
+  },
+  "opt_posUpperLeft": {
+    "message": "左上"
+  },
+  "opt_posAria": {
+    "message": "“$1”位置的命令"
+  },
+  "opt_shortcutsFailed": {
+    "message": "无法读取浏览器快捷键。"
+  },
+  "opt_scSavePage": {
+    "message": "将网页保存到 Gum"
+  },
+  "opt_scLookup": {
+    "message": "查询所选内容 / 光标下的词"
+  },
+  "opt_scSaveSelection": {
+    "message": "保存所选内容（单词或句子）"
+  },
+  "opt_scWheel": {
+    "message": "打开操作轮盘"
+  },
+  "opt_scBulkTabs": {
+    "message": "打开阅读列表"
+  },
+  "opt_scToolbarPopup": {
+    "message": "打开工具栏弹窗"
+  },
+  "opt_scNotSet": {
+    "message": "未设置"
+  },
+  "opt_connReachable": {
+    "message": "应用可连接"
+  },
+  "opt_connNotRunning": {
+    "message": "应用未运行"
+  },
+  "opt_statusReachable": {
+    "message": "Gum 可以连接。"
+  },
+  "opt_statusNotRunning": {
+    "message": "Gum 未运行，或端口不正确。"
+  },
+  "opt_statusPairSaved": {
+    "message": "配对已保存。"
+  },
+  "opt_statusPullNeedsPairNow": {
+    "message": "Gum 尚未接受获取 — 请在 Gum 中点击“立即配对”（设置 → 个人资料与词典 → Chrome 扩展），然后在两分钟内再次获取。也可以在那里复制令牌并粘贴到这里。"
+  },
+  "opt_statusPulled": {
+    "message": "已从应用获取配对。"
+  },
+  "opt_statusPullNoToken": {
+    "message": "应用有响应，但没有发送令牌 — 请从设置中手动复制。"
+  },
+  "opt_statusPullFailed": {
+    "message": "无法获取 — 请打开 Gum 并手动粘贴令牌。"
+  },
+  "opt_statusOpened": {
+    "message": "已在 Gum 中打开。"
+  },
+  "opt_statusExported": {
+    "message": "设置已导出（不含令牌）。"
+  },
+  "opt_statusImported": {
+    "message": "设置已导入。"
+  },
+  "opt_statusImportFailed": {
+    "message": "无法导入 — 该文件不是有效的设置导出文件。"
+  },
+  "opt_statusReset": {
+    "message": "设置已恢复默认（保留配对）。"
+  },
+  "opt_statusPanelRestored": {
+    "message": "面板将在所有网站上重新显示。"
+  },
+  "opt_statusSaved": {
+    "message": "已保存。"
+  },
+  "tabs_pageTitle": {
+    "message": "Gum — 阅读列表"
+  },
+  "tabs_heading": {
+    "message": "阅读列表"
+  },
+  "tabs_allWindows": {
+    "message": "所有窗口"
+  },
+  "tabs_selectAll": {
+    "message": "全选"
+  },
+  "tabs_selectNone": {
+    "message": "全不选"
+  },
+  "tabs_refresh": {
+    "message": "刷新"
+  },
+  "tabs_loading": {
+    "message": "正在加载标签页…"
+  },
+  "tabs_capture": {
+    "message": "将网页保存到 Gum"
+  },
+  "tabs_download": {
+    "message": "下载视频"
+  },
+  "tabs_hint": {
+    "message": "选择标签页后一次性保存 — 文章进入 Gum 收件箱，视频和播放列表进入 YouTube 跟踪。彩色边缘表示检测到的来源类型（新闻、小说、漫画、视频、文章）。下载仅适用于 YouTube 标签页。"
+  },
+  "tabs_catNews": {
+    "message": "新闻"
+  },
+  "tabs_catNovel": {
+    "message": "小说"
+  },
+  "tabs_selected_other": {
+    "message": "已选 $1 项"
+  },
+  "tabs_empty": {
+    "message": "此范围内没有标签页。"
+  },
+  "tabs_untitled": {
+    "message": "标签页 $1"
+  },
+  "tabs_badgeTitle": {
+    "message": "检测到的来源类型（根据网址和标题推断）"
+  },
+  "tabs_listFailed": {
+    "message": "无法列出标签页。"
+  },
+  "tabs_summary": {
+    "message": "$1 · $2"
+  },
+  "tabs_count_other": {
+    "message": "$1 个标签页"
+  },
+  "tabs_saveable_other": {
+    "message": "$1 个可保存"
+  },
+  "tabs_noYoutube": {
+    "message": "没有选中 YouTube 标签页。"
+  },
+  "tabs_selectOne": {
+    "message": "请至少选择一个标签页。"
+  },
+  "tabs_progressSaving": {
+    "message": "正在保存… $1/$2"
+  },
+  "tabs_progressDownloading": {
+    "message": "正在将下载加入队列… $1/$2"
+  },
+  "tabs_progressWorking": {
+    "message": "正在处理… $1/$2"
+  },
+  "tabs_progressWithFailures": {
+    "message": "$1 · $2 项失败"
+  },
+  "tabs_queuedNote_other": {
+    "message": "（$1 项已排队 — 打开 Gum 后会同步）"
+  },
+  "tabs_done": {
+    "message": "完成 — 已保存 $1/$2$3。"
+  },
+  "tabs_finished": {
+    "message": "已结束 — $1/$2 成功，$3 失败$4。"
+  },
+  "cmd_lookup_selection_label": {
+    "message": "查词"
+  },
+  "cmd_lookup_selection_short": {
+    "message": "查词"
+  },
+  "cmd_lookup_selection_desc": {
+    "message": "为所选或最后悬停的文字打开阅读弹窗。"
+  },
+  "cmd_save_word_label": {
+    "message": "保存单词"
+  },
+  "cmd_save_word_short": {
+    "message": "单词"
+  },
+  "cmd_save_word_desc": {
+    "message": "将所选单词保存到 Gum 书库。"
+  },
+  "cmd_save_sentence_label": {
+    "message": "保存句子"
+  },
+  "cmd_save_sentence_short": {
+    "message": "句子"
+  },
+  "cmd_save_sentence_desc": {
+    "message": "将所选或检测到的句子保存到 Gum 书库。"
+  },
+  "cmd_card_create_label": {
+    "message": "制卡"
+  },
+  "cmd_card_create_short": {
+    "message": "卡片"
+  },
+  "cmd_card_create_desc": {
+    "message": "用所选内容制作抽认卡（可用时发送到 Anki；Gum 中始终保留副本）。"
+  },
+  "cmd_capture_page_label": {
+    "message": "保存网页"
+  },
+  "cmd_capture_page_short": {
+    "message": "网页"
+  },
+  "cmd_capture_page_desc": {
+    "message": "将此页面（文章、视频或播放列表）保存到 Gum。"
+  },
+  "cmd_capture_ocr_label": {
+    "message": "OCR 截取"
+  },
+  "cmd_capture_ocr_short": {
+    "message": "OCR"
+  },
+  "cmd_capture_ocr_desc": {
+    "message": "在图片上拖出一个框来识别其中的文字。"
+  },
+  "cmd_capture_audio_record_label": {
+    "message": "录音"
+  },
+  "cmd_capture_audio_record_short": {
+    "message": "录音"
+  },
+  "cmd_capture_audio_record_desc": {
+    "message": "录制麦克风音频，供下一次“保存音频”使用。"
+  },
+  "cmd_capture_audio_save_label": {
+    "message": "保存音频"
+  },
+  "cmd_capture_audio_save_short": {
+    "message": "音频"
+  },
+  "cmd_capture_audio_save_desc": {
+    "message": "将最后一次录音保存到 Gum。"
+  },
+  "cmd_capture_manga_label": {
+    "message": "导入漫画页面"
+  },
+  "cmd_capture_manga_short": {
+    "message": "漫画"
+  },
+  "cmd_capture_manga_desc": {
+    "message": "扫描长条 / 条漫页面，并将画格导入 Gum。"
+  },
+  "cmd_media_download_label": {
+    "message": "下载视频"
+  },
+  "cmd_media_download_short": {
+    "message": "下载"
+  },
+  "cmd_media_download_desc": {
+    "message": "将当前 YouTube 视频或播放列表下载到 Gum。"
+  },
+  "cmd_media_transcribe_label": {
+    "message": "转写音频"
+  },
+  "cmd_media_transcribe_short": {
+    "message": "转写"
+  },
+  "cmd_media_transcribe_desc": {
+    "message": "用 Whisper 转写当前视频的音频，并添加到目录。"
+  },
+  "cmd_clipboard_send_label": {
+    "message": "发送到剪贴板历史"
+  },
+  "cmd_clipboard_send_short": {
+    "message": "剪贴"
+  },
+  "cmd_clipboard_send_desc": {
+    "message": "将所选内容添加到 Gum 剪贴板历史。"
+  },
+  "cmd_translate_selection_label": {
+    "message": "翻译"
+  },
+  "cmd_translate_selection_short": {
+    "message": "翻译"
+  },
+  "cmd_translate_selection_desc": {
+    "message": "使用 Gum 的翻译模型翻译所选内容。"
+  },
+  "cmd_grammar_match_label": {
+    "message": "匹配语法"
+  },
+  "cmd_grammar_match_short": {
+    "message": "语法"
+  },
+  "cmd_grammar_match_desc": {
+    "message": "在所选句子中查找语法句型。"
+  },
+  "cmd_reader_theme_label": {
+    "message": "阅读主题"
+  },
+  "cmd_reader_theme_short": {
+    "message": "主题"
+  },
+  "cmd_reader_theme_desc": {
+    "message": "循环切换页面阅读主题（夜间、棕褐、纸张、灰色）。"
+  },
+  "cmd_reader_highlight_label": {
+    "message": "高亮模式"
+  },
+  "cmd_reader_highlight_short": {
+    "message": "高亮"
+  },
+  "cmd_reader_highlight_desc": {
+    "message": "在此页面上切换“选中即高亮”。"
+  },
+  "cmd_reader_knownTint_label": {
+    "message": "已掌握词着色"
+  },
+  "cmd_reader_knownTint_short": {
+    "message": "着色"
+  },
+  "cmd_reader_knownTint_desc": {
+    "message": "按掌握程度为页面上的词着色。"
+  },
+  "cmd_tabs_picker_label": {
+    "message": "阅读列表"
+  },
+  "cmd_tabs_picker_short": {
+    "message": "标签页"
+  },
+  "cmd_tabs_picker_desc": {
+    "message": "打开标签页列表，一次保存多个网页。"
+  },
+  "cmd_app_open_label": {
+    "message": "打开 Gum"
+  },
+  "cmd_app_open_short": {
+    "message": "应用"
+  },
+  "cmd_app_open_desc": {
+    "message": "将 Gum 桌面应用切换到前台。"
+  },
+  "cmd_settings_special_label": {
+    "message": "特殊模块"
+  },
+  "cmd_settings_special_short": {
+    "message": "特殊"
+  },
+  "cmd_settings_special_desc": {
+    "message": "打开 Gum 中隐藏的“特殊模块”设置页。"
+  },
+  "cmd_wheel_more_label": {
+    "message": "更多…"
+  },
+  "cmd_wheel_more_short": {
+    "message": "更多"
+  },
+  "cmd_wheel_more_desc": {
+    "message": "打开次级操作列表（OCR、媒体、页面工具）。"
+  }
+}

@@ -126,7 +126,7 @@ describe('StatsChart renders its axis in the interface language', () => {
       books: [],
       shows: [],
     } satisfies StatsSummary;
-    return { summary, peak: 60, hasData: true, refresh: noop, resetAllStats: noop };
+    return { summary, shows: [], peak: 60, hasData: true, refresh: noop, resetAllStats: noop };
   }
 
   async function labels(): Promise<string[]> {
@@ -243,7 +243,7 @@ describe('StatsChart names each day for a reader who is not using a mouse', () =
       books: [],
       shows: [],
     } satisfies StatsSummary;
-    return { summary, peak: 600, hasData: true, refresh: noop, resetAllStats: noop };
+    return { summary, shows: [], peak: 600, hasData: true, refresh: noop, resetAllStats: noop };
   }
 
   async function columns(watch = false): Promise<HTMLElement[]> {

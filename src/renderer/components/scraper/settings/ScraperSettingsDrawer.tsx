@@ -26,6 +26,7 @@ import {
 import { useScraper } from '../ScraperContext';
 import { SCRAPER_SETTINGS_DRAWER_ID } from '../drawerId';
 import { sx, sxs } from '../strings';
+import { profileDescription, profileName } from '../localize';
 import { useScraperPort } from '../data/scraperPort';
 import { useT } from '../../../i18n';
 import {
@@ -368,7 +369,7 @@ export default function ScraperSettingsDrawer() {
                   <span>{t('scraperDrawer.special.activeProfile')}</span>
                   <select className="scr-input" value={doc.activeProfileId} onChange={(event) => selectProfile(event.target.value)}>
                     {doc.profiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>{profile.name}</option>
+                      <option key={profile.id} value={profile.id}>{profileName(profile)}</option>
                     ))}
                   </select>
                   <small>{t('scraperDrawer.special.activeProfileHint')}</small>
@@ -381,7 +382,7 @@ export default function ScraperSettingsDrawer() {
                       className={profile.id === doc.activeProfileId ? 'is-active' : ''}
                       onClick={() => selectProfile(profile.id)}
                     >
-                      <span><b>{profile.name}</b><small>{profile.description}</small></span>
+                      <span><b>{profileName(profile)}</b><small>{profileDescription(profile)}</small></span>
                       <span>{t('scraperDrawer.special.revisionCount', { count: profile.history.length })}</span>
                     </button>
                   ))}

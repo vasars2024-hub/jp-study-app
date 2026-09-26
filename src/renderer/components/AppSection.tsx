@@ -7,6 +7,7 @@ import MusicWidget from './MusicWidget';
 import { useVisualizer, VizStage } from './visualizer/VisualizerContent';
 import { WALL_PRESETS } from '../environment/wallCatalog';
 import { SectionErrorBoundary } from './SectionErrorBoundary';
+import SectionHeading from './shell/SectionHeading';
 const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 
 const AgentWorkspaceShell = lazy(() => import('./agent/AgentWorkspaceShell'));
@@ -170,6 +171,8 @@ export default function AppSection({
   // taking the whole desktop to the top-level boundary.
   return (
     <SectionErrorBoundary section={section}>
+      {/* Screen-reader-only name for the apps that render no heading (K12). */}
+      <SectionHeading section={section} />
       <Suspense fallback={<div className="app-section-loading muted">{t('common.loading')}</div>}>{view}</Suspense>
     </SectionErrorBoundary>
   );

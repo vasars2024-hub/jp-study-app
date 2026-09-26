@@ -16,6 +16,12 @@ import {
 import { SCRAPER_NAV } from './scraperPages';
 import { useScraper } from './ScraperContext';
 import { sx } from './strings';
+import {
+  effectiveKeys,
+  formatKeysDisplay,
+  onShortcutsChanged,
+  registerCommandHandler,
+} from '../../keyboardShortcuts';
 
 const QUICK_PAGE_IDS = ['dashboard', 'new-scrape', 'results', 'downloads'] as const;
 
@@ -55,18 +61,26 @@ export default function ScraperSearch() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  useEffect(() => {
-    const focusSearch = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLocaleLowerCase() !== 'k') return;
-      event.preventDefault();
-      setRecentQueries(getRecentScraperQueries());
-      setOpen(true);
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    };
-    window.addEventListener('keydown', focusSearch);
-    return () => window.removeEventListener('keydown', focusSearch);
-  }, []);
+  // The app's palette chord (Ctrl+K by default) searches the Scraper while the keyboard is
+  // in the Scraper window, and opens the app palette everywhere else. This used to be a raw
+  // window listener for Ctrl+K, which fired from ANY window as long as the Scraper was
+  // mounted, and would now also fire alongside the palette that moved to Ctrl+K.
+  useEffect(
+    () =>
+      registerCommandHandler(
+        'nav.palette',
+        () => {
+          setRecentQueries(getRecentScraperQueries());
+          setOpen(true);
+          inputRef.current?.focus();
+          inputRef.current?.select();
+        },
+        { scope: () => boxRef.current },
+      ),
+    [],
+  );
+  const [searchChord, setSearchChord] = useState(() => formatKeysDisplay(effectiveKeys('nav.palette')));
+  useEffect(() => onShortcutsChanged(() => setSearchChord(formatKeysDisplay(effectiveKeys('nav.palette')))), []);
 
   const choose = (index: number) => {
     const hit = results[index];
@@ -137,7 +151,9 @@ export default function ScraperSearch() {
           }
         }}
       />
-      <kbd className="scr-search-shortcut" aria-label={sx('app.searchShortcut')}>Ctrl K</kbd>
+      {searchChord && (
+        <kbd className="scr-search-shortcut" aria-label={sx('app.searchShortcut')}>{searchChord}</kbd>
+      )}
       {open && (
         <div
           className="scr-search-pop"

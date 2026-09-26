@@ -307,6 +307,7 @@ export default function ApiKeysPage() {
                 />
                 <button
                   type="button"
+                  className="btn small primary"
                   disabled={isBusy || !(drafts[key] ?? '').trim()}
                   onClick={() => void save(spec, field)}
                 >
@@ -321,6 +322,7 @@ export default function ApiKeysPage() {
           {spec.testable && (
             <button
               type="button"
+              className="btn small"
               disabled={isBusy || !status.configured}
               onClick={() => void runTest(spec)}
             >
@@ -330,6 +332,7 @@ export default function ApiKeysPage() {
           {spec.kind !== 'oauth' && (
             <button
               type="button"
+              className="btn small danger"
               disabled={isBusy || !status.configured || status.fromEnv}
               onClick={() => void remove(spec)}
             >
@@ -339,6 +342,7 @@ export default function ApiKeysPage() {
           {spec.managedOnPage && (
             <button
               type="button"
+              className="btn small"
               onClick={() =>
                 // `guided` because the page this lands on may be advanced-only.
                 // Without it `SettingsApp`'s guard bounces straight back Home and
@@ -352,7 +356,7 @@ export default function ApiKeysPage() {
               {t('credential.manage')}
             </button>
           )}
-          <button type="button" onClick={() => window.api.openExternal(spec.signupUrl)}>
+          <button type="button" className="btn small" onClick={() => window.api.openExternal(spec.signupUrl)}>
             {t('credential.getKey')}
           </button>
         </div>

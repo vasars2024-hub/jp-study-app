@@ -17,10 +17,14 @@ export type PracticeModeId = Exclude<PracticeMode, 'none'>;
 
 export interface PracticeModeEntry {
   id: PracticeModeId;
-  /** i18n key for the button that opens it. */
+  /** i18n key for the action that opens it (the tile's accessible name). */
   startKey: string;
+  /** i18n key for the short name printed on the launcher tile. */
+  titleKey: string;
   /** i18n key for the one-line description of what it drills. */
   aboutKey: string;
+  /** The tile's glyph: a name from the renderer's icon set (`components/Icons.tsx`). */
+  icon: 'flashcards' | 'keyboard' | 'shuffle' | 'check';
 }
 
 /**
@@ -30,10 +34,10 @@ export interface PracticeModeEntry {
  * down the list gets the sequence.
  */
 export const PRACTICE_MODES: readonly PracticeModeEntry[] = [
-  { id: 'learn', startKey: 'flash.learn.start', aboutKey: 'flash.learn.about' },
-  { id: 'write', startKey: 'flash.write.start', aboutKey: 'flash.write.about' },
-  { id: 'match', startKey: 'flash.match.start', aboutKey: 'flash.match.about' },
-  { id: 'test', startKey: 'flash.test.start', aboutKey: 'flash.test.about' },
+  { id: 'learn', startKey: 'flash.learn.start', titleKey: 'flash.practice.mode.learn', aboutKey: 'flash.learn.about', icon: 'flashcards' },
+  { id: 'write', startKey: 'flash.write.start', titleKey: 'flash.practice.mode.write', aboutKey: 'flash.write.about', icon: 'keyboard' },
+  { id: 'match', startKey: 'flash.match.start', titleKey: 'flash.practice.mode.match', aboutKey: 'flash.match.about', icon: 'shuffle' },
+  { id: 'test', startKey: 'flash.test.start', titleKey: 'flash.practice.mode.test', aboutKey: 'flash.test.about', icon: 'check' },
 ];
 
 export function isPracticeMode(value: string): value is PracticeModeId {

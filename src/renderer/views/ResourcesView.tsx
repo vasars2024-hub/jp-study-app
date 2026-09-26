@@ -287,7 +287,9 @@ export default function ResourcesView() {
           </div>
         </div>
 
-        {refreshLabel ? <div className="res-refresh-hint muted">{refreshLabel}</div> : null}
+        {/* Always mounted, with a one-line floor in CSS: it used to mount a frame after the
+            window (idle -> refreshing) and push the whole landing down one line (V12). */}
+        <div className="res-refresh-hint muted">{refreshLabel}</div>
       </ContextualSurface>
 
       {showLanding ? <WorldHeatMap /> : null}

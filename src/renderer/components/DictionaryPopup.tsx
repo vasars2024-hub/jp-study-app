@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import DictionaryResults, { type DictLang } from './DictionaryResults';
 import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../knownWords';
 import { lemmaOf } from '../tokenizer';
@@ -10,6 +10,7 @@ import { getStudyLang, studyContentLang } from '../studyEnvironment';
 import { dictionaryAgentContext, handOffToAgent, routeAgentContext } from '../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
 import { useT } from '../i18n';
+import { usePopupFocus } from '../popupFocus';
 import Icon from './Icons';
 
 interface Props {
@@ -28,6 +29,21 @@ interface Props {
    * the transcript the reader is using to follow along.
    */
   rightInsetPx?: number;
+  /**
+   * Top edge, in the same coordinates as `y`, of the line the word sits on.
+   *
+   * `y` is the word's *bottom*, which is all the popup needs to open below it. To
+   * open *above* it — the player's subtitles sit at the bottom of the picture, so
+   * that is where it usually goes there — it also needs the top, or it lands on
+   * the very line being read (measured: an 18px overlap on a 36px subtitle).
+   */
+  anchorTop?: number;
+  /**
+   * Save the word and its sentence to the host's own collection. When given, the
+   * popup carries a visible "Mine" action, so mining is on the surface where the
+   * word was found rather than two menus away.
+   */
+  onMine?: () => void;
   onClose: () => void;
 }
 
@@ -39,9 +55,15 @@ export default function DictionaryPopup({
   y,
   context,
   rightInsetPx = 0,
+  anchorTop,
+  onMine,
   onClose,
 }: Props) {
   const { t } = useT();
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  usePopupFocus(rootRef);
+
   const style: CSSProperties = useMemo(() => {
     // App zoom is on #root (see appZoom.ts). Selection / client coords are
     // visual; fixed layout uses pre-zoom CSS pixels — divide by zoom factor.
@@ -57,16 +79,20 @@ export default function DictionaryPopup({
     const left = Math.max(8, Math.min(lx, rightLimit));
     const margin = 8;
     const spaceBelow = vh - ly - 18 - margin;
-    const spaceAbove = ly - 18 - margin;
     // Prefer opening below the click; only flip above when there's genuinely
     // more room up there, and always cap height to whatever room actually
     // exists in the chosen direction so the popup can't run off-screen.
+    // With the line's top known, "above" means above the whole line, not 18px up
+    // from the word's baseline — which is inside a subtitle-sized line.
+    const lineTop = anchorTop !== undefined ? Math.min(anchorTop / z, ly) : undefined;
+    const aboveEdge = lineTop !== undefined ? lineTop - 6 : ly - 18;
+    const spaceAbove = aboveEdge - margin;
     const placeAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
     const maxHeight = Math.max(120, Math.min(placeAbove ? spaceAbove : spaceBelow, 0.7 * vh));
     return placeAbove
-      ? { left, bottom: Math.max(margin, vh - ly + 18), width: POPUP_W, maxHeight }
+      ? { left, bottom: Math.max(margin, vh - aboveEdge), width: POPUP_W, maxHeight }
       : { left, top: Math.min(ly + 12, vh - 120), width: POPUP_W, maxHeight };
-  }, [x, y, rightInsetPx]);
+  }, [x, y, anchorTop, rightInsetPx]);
 
   const lang = getStudyLang() as DictLang;
 
@@ -127,7 +153,23 @@ export default function DictionaryPopup({
   }, [query, lang]);
 
   return (
-    <div className="dict-popup" style={style} onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      ref={rootRef}
+      className="dict-popup"
+      style={style}
+      role="dialog"
+      aria-label={t('readerUi.dictPopup.aria', { query })}
+      tabIndex={-1}
+      onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        // Escape closes this popup and nothing else: the reader and the player
+        // both close themselves on Escape from a window listener.
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
+      }}
+    >
       <div className="dict-head">
         <span className="dict-q" lang={studyContentLang(lang)}>
           {query}
@@ -154,17 +196,29 @@ export default function DictionaryPopup({
         >
           <Icon name="sparkle" size={14} />
         </button>
-        <button className="dict-x" onClick={onClose} aria-label={t('common.close')}>
+        {onMine && (
+          <button
+            type="button"
+            className="btn small dict-mine"
+            title={t('readerUi.dictPopup.mineTitle')}
+            onClick={onMine}
+          >
+            {t('readerUi.dictPopup.mine')}
+          </button>
+        )}
+        <button type="button" className="dict-x" onClick={onClose} aria-label={t('common.close')}>
           ×
         </button>
       </div>
-      <div className="wk-grade">
+      <div className="wk-grade" role="group" aria-label={t('readerUi.dictPopup.levels')}>
         {WK_LEVELS.map((label, i) => (
           <button
             key={label}
+            type="button"
             className={`wk-grade-btn wk-g-${i} ${level === i ? 'active' : ''}`}
             title={label}
             aria-label={label}
+            aria-pressed={level === i}
             onClick={() => grade(i as WkLevel)}
           >
             {label[0]}

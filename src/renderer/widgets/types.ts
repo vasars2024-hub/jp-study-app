@@ -24,6 +24,12 @@ export interface WidgetProps {
   setSettings: (patch: Record<string, unknown>) => void;
   /** Current content size in px, so widgets can adapt their layout. */
   size: { w: number; h: number };
+  /**
+   * The widget instance's stable id (`WidgetSnapshot.id`). State that must
+   * outlive the body — a running timer, which a collapse would otherwise reset —
+   * is kept in a module store under this key. Absent in previews.
+   */
+  instanceId?: string;
 }
 
 export interface WidgetDef {

@@ -2,6 +2,9 @@
 
 const SH = jpStudyShared;
 const SET = jpStudySettings;
+const t = (key, subs) => SH.msg(key, subs);
+const tn = (key, count, subs) => SH.msgCount(key, count, subs);
+SH.applyI18n(document);
 
 const statusEl = document.getElementById('status');
 let statusTimer = null;
@@ -11,6 +14,14 @@ function showStatus(text, cls) {
   statusEl.className = 'show ' + (cls || '');
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => statusEl.classList.remove('show'), 2600);
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function bg(msg) {
@@ -91,11 +102,11 @@ document.getElementById('search').addEventListener('input', (e) => {
 const $ = (id) => document.getElementById(id);
 
 const RANGES = [
-  ['hover-delay', 'hover-delay-val', (v) => `${v} ms`],
-  ['scan-length', 'scan-length-val', (v) => `${v} chars`],
-  ['ai-min-chars', 'ai-min-chars-val', (v) => `${v} chars`],
-  ['popup-width', 'popup-width-val', (v) => `${v} px`],
-  ['popup-font', 'popup-font-val', (v) => `${v} px`],
+  ['hover-delay', 'hover-delay-val', (v) => t('opt_unitMs', v)],
+  ['scan-length', 'scan-length-val', (v) => tn('opt_unitChars', Number(v))],
+  ['ai-min-chars', 'ai-min-chars-val', (v) => tn('opt_unitChars', Number(v))],
+  ['popup-width', 'popup-width-val', (v) => t('opt_unitPx', v)],
+  ['popup-font', 'popup-font-val', (v) => t('opt_unitPx', v)],
 ];
 for (const [id, valId, fmt] of RANGES) {
   $(id).addEventListener('input', () => {
@@ -202,12 +213,12 @@ document.getElementById('dest-group').addEventListener('change', () => {
 /* ------------------------------- wheel editor ------------------------------- */
 
 const POSITION_LABELS = {
-  top: 'Top',
-  'upper-right': 'Upper right',
-  'lower-right': 'Lower right',
-  bottom: 'Bottom',
-  'lower-left': 'Lower left',
-  'upper-left': 'Upper left',
+  top: 'opt_posTop',
+  'upper-right': 'opt_posUpperRight',
+  'lower-right': 'opt_posLowerRight',
+  bottom: 'opt_posBottom',
+  'lower-left': 'opt_posLowerLeft',
+  'upper-left': 'opt_posUpperLeft',
 };
 
 function renderWheelEditor() {
@@ -218,10 +229,11 @@ function renderWheelEditor() {
     const row = document.createElement('div');
     row.className = 'wheel-pos';
     const lab = document.createElement('span');
-    lab.textContent = POSITION_LABELS[pos] || pos;
+    const posLabel = POSITION_LABELS[pos] ? t(POSITION_LABELS[pos]) : pos;
+    lab.textContent = posLabel;
     const sel = document.createElement('select');
     sel.dataset.index = String(i);
-    sel.setAttribute('aria-label', `Command for the ${POSITION_LABELS[pos] || pos} position`);
+    sel.setAttribute('aria-label', t('opt_posAria', posLabel));
     for (const c of commands) {
       const opt = document.createElement('option');
       opt.value = c.id;
@@ -250,7 +262,11 @@ function renderWheelEditor() {
 
 function renderWheelPreview() {
   const pv = $('wheel-preview');
-  pv.innerHTML = '<div class="pv-center">Cancel</div>';
+  pv.innerHTML = '';
+  const center = document.createElement('div');
+  center.className = 'pv-center';
+  center.textContent = t('common_cancel');
+  pv.appendChild(center);
   const n = 6;
   const slice = 360 / n;
   currentWheelSlots.slice(0, 6).forEach((id, i) => {
@@ -272,23 +288,26 @@ async function renderShortcuts() {
   const res = await bg({ type: 'get-commands' });
   const table = $('shortcut-table');
   if (!res?.ok || !Array.isArray(res.commands)) {
-    table.innerHTML = '<tr><td>Could not read browser shortcuts.</td></tr>';
+    table.innerHTML = `<tr><td>${escapeHtml(t('opt_shortcutsFailed'))}</td></tr>`;
     return;
   }
+  // Chrome hands back each command's manifest description already resolved
+  // from _locales, so a named row only needs its own short title.
   const NAMES = {
-    'save-page': 'Save page to Gum',
-    'dictionary-popup': 'Look up selection / word under cursor',
-    'mine-selection': 'Save selection (word or sentence)',
-    'action-wheel': 'Open the action wheel',
-    'bulk-tabs': 'Open the reading list',
-    _execute_action: 'Open the toolbar popup',
+    'save-page': 'opt_scSavePage',
+    'dictionary-popup': 'opt_scLookup',
+    'mine-selection': 'opt_scSaveSelection',
+    'action-wheel': 'opt_scWheel',
+    'bulk-tabs': 'opt_scBulkTabs',
+    _execute_action: 'opt_scToolbarPopup',
   };
   table.innerHTML = res.commands
     .map((c) => {
-      const name = NAMES[c.name] || c.description || c.name;
+      const name = NAMES[c.name] ? t(NAMES[c.name]) : c.description || c.name;
+      const desc = c.description && name !== c.description ? c.description : '';
       return `<tr>
-        <td><div>${name}</div><div class="cmd-desc">${c.description && NAMES[c.name] !== c.description ? c.description : ''}</div></td>
-        <td>${c.shortcut ? `<kbd>${c.shortcut}</kbd>` : '<span class="cmd-desc">not set</span>'}</td>
+        <td><div>${escapeHtml(name)}</div><div class="cmd-desc">${escapeHtml(desc)}</div></td>
+        <td>${c.shortcut ? `<kbd>${escapeHtml(c.shortcut)}</kbd>` : `<span class="cmd-desc">${escapeHtml(t('opt_scNotSet'))}</span>`}</td>
       </tr>`;
     })
     .join('');
@@ -306,14 +325,14 @@ async function testConnection(silent) {
   try {
     const res = await fetch(`http://127.0.0.1:${f.port}/v1/health`);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    state.textContent = 'app reachable';
+    state.textContent = t('opt_connReachable');
     state.className = 'conn-state ok';
-    if (!silent) showStatus('Gum is reachable.', 'ok');
+    if (!silent) showStatus(t('opt_statusReachable'), 'ok');
     return true;
   } catch {
-    state.textContent = 'app not running';
+    state.textContent = t('opt_connNotRunning');
     state.className = 'conn-state err';
-    if (!silent) showStatus('Gum is not running or the port is wrong.', 'err');
+    if (!silent) showStatus(t('opt_statusNotRunning'), 'err');
     return false;
   }
 }
@@ -321,7 +340,7 @@ async function testConnection(silent) {
 document.getElementById('save-pair').addEventListener('click', async () => {
   const f = readForm();
   await SET.save({ token: f.token, port: f.port });
-  showStatus('Pairing saved.', 'ok');
+  showStatus(t('opt_statusPairSaved'), 'ok');
   void testConnection(true);
 });
 
@@ -338,7 +357,7 @@ document.getElementById('pull-app').addEventListener('click', async () => {
       headers: f.token ? { Authorization: `Bearer ${f.token}` } : {},
     });
     if (res.status === 401) {
-      showStatus('Need a valid token first — copy it from the app, save, then pull again.', 'err');
+      showStatus(t('opt_statusPullNeedsPairNow'), 'err');
       return;
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -347,13 +366,13 @@ document.getElementById('pull-app').addEventListener('click', async () => {
       $('token').value = data.token;
       if (data.port) $('port').value = String(data.port);
       await SET.save({ token: data.token, port: Number(data.port) || f.port });
-      showStatus('Pulled pairing from the app.', 'ok');
+      showStatus(t('opt_statusPulled'), 'ok');
       void testConnection(true);
     } else {
-      showStatus('App responded but sent no token — copy it manually from Settings.', 'err');
+      showStatus(t('opt_statusPullNoToken'), 'err');
     }
   } catch {
-    showStatus('Could not pull — open Gum and paste the token manually.', 'err');
+    showStatus(t('opt_statusPullFailed'), 'err');
   }
 });
 
@@ -362,13 +381,20 @@ document.querySelectorAll('button[data-open]').forEach((btn) => {
     const target = btn.dataset.open;
     const res = await bg({ type: 'ui-open', target });
     showStatus(
-      res?.ok ? 'Opened in Gum.' : res?.error || 'Gum is not running.',
+      res?.ok ? t('opt_statusOpened') : res?.error || t('common_gumNotRunning'),
       res?.ok ? 'ok' : 'err',
     );
   });
 });
 
 /* ------------------------------ import / export ----------------------------- */
+
+/**
+ * The export's file name. It said `grammarx-…` (the app's old name) until
+ * 3.2.x; import reads the JSON and never looks at the name, so files exported
+ * under the old name still import.
+ */
+const EXPORT_FILENAME = 'gum-extension-settings.json';
 
 document.getElementById('export-settings').addEventListener('click', async () => {
   const s = await SET.load();
@@ -378,10 +404,10 @@ document.getElementById('export-settings').addEventListener('click', async () =>
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'grammarx-extension-settings.json';
+  a.download = EXPORT_FILENAME;
   a.click();
   URL.revokeObjectURL(url);
-  showStatus('Settings exported (token excluded).', 'ok');
+  showStatus(t('opt_statusExported'), 'ok');
 });
 
 document.getElementById('import-settings').addEventListener('click', () => {
@@ -398,9 +424,9 @@ $('import-file').addEventListener('change', async (e) => {
     const cur = await SET.load();
     const next = await SET.save({ ...raw, token: cur.token, port: raw.port || cur.port });
     fillForm(next);
-    showStatus('Settings imported.', 'ok');
+    showStatus(t('opt_statusImported'), 'ok');
   } catch {
-    showStatus('Could not import — the file is not a valid settings export.', 'err');
+    showStatus(t('opt_statusImportFailed'), 'err');
   } finally {
     e.target.value = '';
   }
@@ -416,12 +442,12 @@ document.getElementById('reset-settings').addEventListener('click', async () => 
     fabHiddenOrigins: [],
   });
   fillForm(next);
-  showStatus('Settings reset to defaults (pairing kept).', 'ok');
+  showStatus(t('opt_statusReset'), 'ok');
 });
 
 document.getElementById('fab-clear-hidden').addEventListener('click', async () => {
   await SET.save({ fabHiddenOrigins: [] });
-  showStatus('The panel will show on all sites again.', 'ok');
+  showStatus(t('opt_statusPanelRestored'), 'ok');
 });
 
 /* -------------------------------- auto-save --------------------------------- */
@@ -431,7 +457,7 @@ async function autoSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     await SET.save(readForm());
-    showStatus('Saved.', 'ok');
+    showStatus(t('opt_statusSaved'), 'ok');
   }, 250);
 }
 

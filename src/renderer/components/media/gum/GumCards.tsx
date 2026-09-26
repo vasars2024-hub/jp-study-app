@@ -19,6 +19,9 @@ type Translate = (key: string, vars?: Record<string, string | number>) => string
 
 export function formatRuntime(t: Translate, minutes: number | undefined): string | null {
   if (!minutes || minutes <= 0) return null;
+  // A clip under a minute says its seconds: a 20 s file read "24 min" (the catalogue's
+  // episode length) or "0 min".
+  if (minutes < 1) return t('gum.runtime.s', { s: Math.max(1, Math.round(minutes * 60)) });
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes % 60);
   return h > 0 ? t('gum.runtime.hm', { h, m: String(m).padStart(2, '0') }) : t('gum.runtime.m', { m });
@@ -293,10 +296,25 @@ export const GumPosterCard = memo(function GumPosterCard({ title, badges, layout
 });
 
 function timeLeft(t: Translate, item: MediaItem | undefined, positionSec: number, durationSec: number | undefined): string | null {
-  const duration = durationSec ?? item?.durationSec;
-  if (!duration || duration <= 0) return null;
-  const left = Math.max(0, Math.round((duration - positionSec) / 60));
+  return formatTimeLeft(t, durationSec ?? item?.durationSec, positionSec);
+}
+
+/**
+ * "12 min left" from the file's real duration. Under a minute it counts seconds — "1 min
+ * left" on a 20-second clip that had 16 seconds to go read as a wrong duration.
+ */
+export function formatTimeLeft(t: Translate, durationSec: number | undefined, positionSec: number): string | null {
+  if (!durationSec || durationSec <= 0) return null;
+  const leftSec = Math.max(0, durationSec - positionSec);
+  if (leftSec < 60) return t('gum.card.secondsLeft', { s: Math.max(1, Math.round(leftSec)) });
+  const left = Math.round(leftSec / 60);
   return left >= 60 ? t('gum.card.hoursLeft', { h: Math.floor(left / 60), m: String(left % 60).padStart(2, '0') }) : t('gum.card.minutesLeft', { m: Math.max(1, left) });
+}
+
+/** A per-episode length ("~24 min"), in seconds for a clip under a minute. */
+export function formatPerEpisode(t: Translate, minutes: number | undefined): string | null {
+  if (!minutes || minutes <= 0) return null;
+  return minutes < 1 ? t('gum.runtime.s', { s: Math.max(1, Math.round(minutes * 60)) }) : t('gum.meta.perEpisode', { m: Math.round(minutes) });
 }
 
 export interface GumEpisodeCardProps {

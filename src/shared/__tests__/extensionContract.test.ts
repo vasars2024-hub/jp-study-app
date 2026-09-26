@@ -36,6 +36,7 @@ import {
   EXTENSION_CONTRACT_VERSION,
   EXTENSION_QUEUE_KINDS,
   EXTENSION_QUEUE_ROUTES,
+  EXTENSION_SERVER_ONLY_ROUTES,
   extensionCommand,
   extensionCommandsByCategory,
   extensionContractManifest,
@@ -207,6 +208,21 @@ describe('extension contract — routes match the bridge server', () => {
     for (const route of EXTENSION_BRIDGE_ROUTES) {
       expect(SERVER_SOURCE.includes(`pathname === '${route}'`), route).toBe(true);
     }
+  });
+
+  it('lists exactly the routes the shipped extension never calls as server-only', () => {
+    const extensionSource = ['background.js', 'shared.js', 'content.js', 'popup.js', 'options.js', 'tabs.js', 'settings.js']
+      .map(readExtensionFile)
+      .join('\n');
+    // A route counts as called when it appears as a string literal start
+    // (quoted or templated), optionally followed by a query string.
+    const called = (route: string): boolean =>
+      // Either a literal path, or appended to a base URL template (`${base}/v1/…`).
+      ["'", '"', '`', '}'].some((before) =>
+        ["'", '"', '`', '?', '${'].some((after) => extensionSource.includes(`${before}${route}${after}`)),
+      );
+    const unused = EXTENSION_BRIDGE_ROUTES.filter((route) => !called(route)).sort();
+    expect(unused).toEqual([...EXTENSION_SERVER_ONLY_ROUTES].sort());
   });
 });
 

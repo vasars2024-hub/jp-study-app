@@ -118,7 +118,7 @@ export default function VisualNovelSourcePanel({
       <summary>{t('vnSource.head')}</summary>
       <div className="visual-novel-source-search">
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('vnSource.searchPlaceholder')} />
-        <button type="button" disabled={busy || query.trim().length < 2} onClick={() => void search()}>
+        <button className="btn small" type="button" disabled={busy || query.trim().length < 2} onClick={() => void search()}>
           {busy ? t('vnSource.searching') : t('vnSource.search')}
         </button>
       </div>
@@ -139,8 +139,8 @@ export default function VisualNovelSourcePanel({
               <p>{result.synopsis.slice(0, 220)}</p>
             </div>
             <div>
-              <button type="button" onClick={() => void window.api.openExternal(result.sourceUrl)}>{t('vnSource.view')}</button>
-              <button type="button" disabled={busy} onClick={() => void apply(result)}>{t('vnSource.apply')}</button>
+              <button className="btn small" type="button" onClick={() => void window.api.openExternal(result.sourceUrl)}>{t('vnSource.view')}</button>
+              <button className="btn small" type="button" disabled={busy} onClick={() => void apply(result)}>{t('vnSource.apply')}</button>
             </div>
           </article>
         ))}

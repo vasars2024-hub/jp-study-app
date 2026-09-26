@@ -424,8 +424,49 @@ export function MusicSongList({ state }: { state: MusicState }) {
       className="music-vlist"
       listRole="list"
       itemRole="listitem"
-      emptyState={<p className="muted music-empty">{state.emptyMessage}</p>}
+      emptyState={
+        <div className="music-empty">
+          <p className="muted">{state.emptyMessage}</p>
+          {!state.searchActive && !state.likedOnly ? <MusicAddFolderButton onItems={state.setItems} /> : null}
+        </div>
+      }
     />
+  );
+}
+
+/**
+ * The empty library offers the import itself instead of only describing where
+ * files could go: one folder dialog, and the songs show up in the list.
+ */
+function MusicAddFolderButton({ onItems }: { onItems: (items: MediaItem[]) => void }) {
+  const { t } = useT();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const add = async () => {
+    setBusy(true);
+    setNote('');
+    try {
+      const r = await window.api.addMediaFolder();
+      onItems(r.items);
+      if (r.added === 0) setNote(t('musicUi.empty.noneAdded'));
+    } catch {
+      setNote(t('musicUi.empty.addFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button type="button" className="btn primary small" disabled={busy} onClick={() => void add()}>
+        <Icon name="folder" size={13} />
+        {t('musicUi.empty.addFolder')}
+      </button>
+      {note ? (
+        <p className="muted" role="status">
+          {note}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -503,7 +544,11 @@ export function MusicYoutubeRow({ state }: { state: MusicState }) {
         onClick={() => void state.downloadYt()}
       >
         <Icon name="download" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-        {yt ? `${yt.stage} ${Math.round(yt.percent)}%` : t('music.yt.getAudio')}
+        {yt
+          ? yt.stage === 'merging'
+            ? t('media.yt.merging')
+            : t('media.yt.downloading', { percent: Math.round(yt.percent) })
+          : t('music.yt.getAudio')}
       </button>
       {ytError && <div className="lib-import-err music-yt-err">{ytError}</div>}
     </AnchorSurface>

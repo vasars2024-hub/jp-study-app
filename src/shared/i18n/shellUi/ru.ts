@@ -1,0 +1,60 @@
+// Desktop shell chrome: Start menu, taskbar, windows, quick settings, toasts, calendar and theme editor (round-2 a11y/visual pass). — Russian. See ./en.ts for scope.
+
+import type { Catalog } from '../core';
+
+export const SHELL_UI_RU: Catalog = {
+  'shell.undo': 'Отменить',
+  'shell.window.reopen': 'Снова открыть: {name}',
+
+  'shell.widgets.reset.title': 'Сбросить расположение виджетов?',
+  'shell.widgets.reset.message': {
+    one: 'С рабочего стола будет удалён {count} виджет. Сразу после этого можно отменить.',
+    few: 'С рабочего стола будут удалены все {count} виджета. Сразу после этого можно отменить.',
+    many: 'С рабочего стола будут удалены все {count} виджетов. Сразу после этого можно отменить.',
+    other: 'С рабочего стола будут удалены все {count} виджета. Сразу после этого можно отменить.',
+  },
+  'shell.widgets.reset.confirm': 'Сбросить',
+  'shell.widgets.reset.done': 'Расположение виджетов сброшено',
+  'shell.widgets.reset.restored': 'Расположение виджетов восстановлено',
+
+  'shell.startHere.title': 'С чего начать',
+  'shell.startHere.lead': 'Выберите что-нибудь одно.',
+  'shell.startHere.videos': 'Добавить видео',
+  'shell.startHere.videosHint': 'Смотрите с субтитрами и сохраняйте новые слова',
+  'shell.startHere.deck': 'Импортировать колоду',
+  'shell.startHere.deckHint': 'Колода Anki или CSV',
+  'shell.startHere.book': 'Открыть книгу',
+  'shell.startHere.bookHint': 'Читайте EPUB с мгновенным поиском слов',
+  'shell.startHere.dismiss': 'Скрыть',
+
+  'shell.unit.byte': 'Б',
+  'shell.unit.kb': 'КБ',
+  'shell.unit.mb': 'МБ',
+  'shell.unit.gb': 'ГБ',
+  'shell.unit.tb': 'ТБ',
+
+  'shell.themeToken.accent-weak': 'Акцент (мягкий)',
+  'shell.themeToken.bg': 'Фон',
+  'shell.themeToken.panel': 'Панель',
+  'shell.themeToken.panel-2': 'Панель (верхний слой)',
+  'shell.themeToken.sidebar': 'Боковая панель',
+  'shell.themeToken.text': 'Текст',
+  'shell.themeToken.muted': 'Второстепенный текст',
+  'shell.themeToken.border': 'Рамка',
+  'shell.themeToken.glass-tint': 'Оттенок стекла',
+  'shell.themeToken.glass-border': 'Край стекла',
+  'shell.themeToken.font-display': 'Шрифт заголовков',
+  'shell.themeToken.font-mono': 'Моноширинный шрифт',
+  'shell.themeToken.font-size-2xs': 'Размер текста: наименьший',
+  'shell.themeToken.font-size-xs': 'Размер текста: очень мелкий',
+  'shell.themeToken.font-size-sm': 'Размер текста: мелкий',
+  'shell.themeToken.font-size-md': 'Размер текста: средний',
+  'shell.themeToken.font-size-lg': 'Размер текста: крупный',
+  'shell.themeToken.line-height-normal': 'Межстрочный интервал',
+  'shell.themeToken.control-radius': 'Скругление элементов',
+  'shell.themeToken.glass-blur': 'Размытие стекла',
+  'shell.themeToken.motion-duration': 'Длительность анимации',
+  'shell.themeToken.dur-fast': 'Быстрый переход',
+  'shell.themeToken.dur-normal': 'Обычный переход',
+  'shell.themeToken.scrollbar-size': 'Ширина полосы прокрутки',
+};

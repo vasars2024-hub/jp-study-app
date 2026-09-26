@@ -10,6 +10,8 @@ import { runCommand } from '../keyboardShortcuts';
 import { next as musicNext, prev as musicPrev, toggle as musicToggle } from '../playerBus';
 import { speakBeepLine, voiceForType } from './beepSpeech';
 import { defFor } from './companionCatalog';
+import { buddyText } from './buddyText';
+import { t } from '../i18n';
 import {
   sanitizeTrigger,
   timeScheduleFromRoutines,
@@ -442,22 +444,22 @@ async function runStep(step: BuddyStep, ctx: BuddyRunContext, depth: number): Pr
       applyToggleEnv(step.key, step.value ?? 'toggle');
       return;
     case 'setMood':
-      ctx.patchCompanion({ mood: step.mood, status: step.status });
+      ctx.patchCompanion({ mood: step.mood, status: buddyText(step.status) });
       return;
     case 'speak':
       if (ctx.speak) {
-        ctx.speak(step.text);
+        ctx.speak(buddyText(step.text));
       } else {
         const profile = defFor(ctx.typeId).voice ?? voiceForType(ctx.typeId);
-        await speakBeepLine(ctx.companionId, step.text, profile);
+        await speakBeepLine(ctx.companionId, buddyText(step.text), profile);
       }
       return;
     case 'wait':
       await new Promise((r) => setTimeout(r, step.ms));
       return;
     case 'notify':
-      toast(step.title, step.body);
-      if (step.body) ctx.patchCompanion({ status: step.body.slice(0, 40) });
+      toast(buddyText(step.title), buddyText(step.body));
+      if (step.body) ctx.patchCompanion({ status: buddyText(step.body).slice(0, 40) });
       return;
     case 'music':
       if (step.action === 'playPause') musicToggle();
@@ -486,28 +488,28 @@ export async function runBuddyRoutine(
   depth = 0,
 ): Promise<{ ok: boolean; error?: string }> {
   if (depth > MAX_ROUTINE_DEPTH) {
-    return { ok: false, error: 'Routine nesting too deep.' };
+    return { ok: false, error: t('companion.routine.error.depth') };
   }
   const debounceKey = `${ctx.companionId}:${routineId}`;
   const now = Date.now();
   if ((lastRunAt.get(debounceKey) ?? 0) + 400 > now && depth === 0) {
-    return { ok: false, error: 'Too fast.' };
+    return { ok: false, error: t('companion.routine.error.tooFast') };
   }
   lastRunAt.set(debounceKey, now);
 
   const env = loadEnvironment();
   if (!env.enabled || !env.companionsEnabled) {
-    return { ok: false, error: 'Companions are off.' };
+    return { ok: false, error: t('companion.routine.error.off') };
   }
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const routine = routines.find((r) => r.id === routineId);
-  if (!routine) return { ok: false, error: 'Routine not found.' };
+  if (!routine) return { ok: false, error: t('companion.routine.error.notFound') };
   if (routine.forType && routine.forType !== '*' && routine.forType !== ctx.typeId) {
-    return { ok: false, error: 'Routine not for this buddy.' };
+    return { ok: false, error: t('companion.routine.error.wrongBuddy') };
   }
 
   try {
-    if (depth === 0) toast(routine.name);
+    if (depth === 0) toast(buddyText(routine.name));
     const steps = routine.steps.slice(0, MAX_STEPS);
     for (const step of steps) {
       await runStep(step, ctx, depth);
@@ -515,7 +517,7 @@ export async function runBuddyRoutine(
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    toast('Buddy routine failed', message);
+    toast(t('companion.routine.error.failed'), message);
     return { ok: false, error: message };
   }
 }

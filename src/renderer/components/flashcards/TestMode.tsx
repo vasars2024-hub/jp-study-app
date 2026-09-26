@@ -107,7 +107,7 @@ export default function TestMode({ onExit, deck = 'all' }: {
       <fieldset className="auto-reading-options">
         <legend>{t('flash.test.title')}</legend>
         <p className="auto-reading-options__report">{t('flash.test.noUsableCards')}</p>
-        {onExit && <button type="button" onClick={onExit}>{t('flash.test.exit')}</button>}
+        {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.test.exit')}</button>}
       </fieldset>
     );
   }
@@ -144,8 +144,8 @@ export default function TestMode({ onExit, deck = 'all' }: {
           ))}
         </ul>
         <div className="flash-match-actions">
-          <button type="button" onClick={begin}>{t('flash.test.again')}</button>
-          {onExit && <button type="button" onClick={onExit}>{t('flash.test.exit')}</button>}
+          <button className="btn primary" type="button" onClick={begin}>{t('flash.test.again')}</button>
+          {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.test.exit')}</button>}
         </div>
       </fieldset>
     );
@@ -240,20 +240,21 @@ export default function TestMode({ onExit, deck = 'all' }: {
       )}
 
       <div className="flash-match-actions">
-        <button type="button" disabled={at === 0} onClick={() => setAt((i) => i - 1)}>
+        <button className="btn" type="button" disabled={at === 0} onClick={() => setAt((i) => i - 1)}>
           {t('flash.test.back')}
         </button>
         <button
+          className="btn"
           type="button"
           disabled={at >= paper.questions.length - 1}
           onClick={() => setAt((i) => i + 1)}
         >
           {t('flash.test.next')}
         </button>
-        <button type="button" onClick={handIn}>
+        <button className="btn primary" type="button" onClick={handIn}>
           {confirming ? t('flash.test.handInAnyway') : t('flash.test.handIn')}
         </button>
-        {onExit && <button type="button" onClick={onExit}>{t('flash.test.exit')}</button>}
+        {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.test.exit')}</button>}
       </div>
     </fieldset>
   );

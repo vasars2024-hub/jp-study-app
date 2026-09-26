@@ -36,6 +36,7 @@ export const GUM_LIBRARY_ZH: Catalog = {
   // Meta lines
   'gum.runtime.hm': '{h} 小时 {m} 分',
   'gum.runtime.m': '{m} 分钟',
+  'gum.runtime.s': '{s} 秒',
   'gum.meta.season': '第 {n} 季',
   'gum.meta.seasons': { other: '共 {count} 季' },
   'gum.meta.episodes': { other: '共 {count} 集' },
@@ -54,6 +55,7 @@ export const GUM_LIBRARY_ZH: Catalog = {
   'gum.card.score': '我的评分：{score} / 10',
   'gum.card.minutesLeft': '剩余 {m} 分钟',
   'gum.card.hoursLeft': '剩余 {h} 小时 {m} 分钟',
+  'gum.card.secondsLeft': '剩余 {s} 秒',
   'gum.badge.newEpisode': '新一集',
   'gum.badge.new': '新',
   'gum.badge.film': '电影',
@@ -143,6 +145,10 @@ export const GUM_LIBRARY_ZH: Catalog = {
   'gum.library.badges': '海报上显示',
   'gum.library.resultCount': { other: '{count} 部作品' },
   'gum.library.noMatch': '没有符合这些条件的作品',
+  'gum.library.matchesInAll': {
+    other: '“全部”中有 {count} 个匹配项',
+  },
+  'gum.library.showInAll': '在“全部”中显示',
   'gum.library.emptyTab.all': '这里还什么都没有',
   'gum.library.emptyTab.watching': '没有正在看的作品。开始看后会出现在这里。',
   'gum.library.emptyTab.plan': '想看清单是空的',
@@ -260,6 +266,7 @@ export const GUM_LIBRARY_ZH: Catalog = {
   // Title page
   'gum.title.status': '状态',
   'gum.title.notTracked': '未记录',
+  'gum.title.derivedStatus': '{status}（根据你的文件）',
   'gum.title.myRating': '我的评分',
   'gum.title.ratingValue': '{n} / 10 分',
   'gum.title.unrated': '未评分',

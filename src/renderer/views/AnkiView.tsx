@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import CollapsibleSection from '../components/CollapsibleSection';
 import {
@@ -15,10 +16,23 @@ import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { stripTrailingTerminator } from '../../shared/sentenceJoin';
 import { useT } from '../i18n';
 
+/** How long the first connection check may take before the offline sections mount anyway. */
+export const ANKI_FIRST_CHECK_GRACE_MS = 1500;
+
 export default function AnkiView() {
   const { t } = useT();
   const state = useAnkiConfig();
   const { status, loading, active, model, connLabel } = state;
+  // The Deck Workbench and the profile section need no Anki, so a first check that hangs
+  // (AnkiConnect half-up) must not hold them back for long: after the grace period they
+  // mount anyway and accept the one shift.
+  const [firstCheckSlow, setFirstCheckSlow] = useState(false);
+  useEffect(() => {
+    if (status) return;
+    const id = window.setTimeout(() => setFirstCheckSlow(true), ANKI_FIRST_CHECK_GRACE_MS);
+    return () => window.clearTimeout(id);
+  }, [status]);
+  const showOfflineSections = !!status || firstCheckSlow;
 
   const ankiMenus: MenuBarMenu[] = [
     {
@@ -61,9 +75,22 @@ export default function AnkiView() {
         </div>
       </ContextualSurface>
 
-      {loading && <div className="banner">{t('anki.checkingConnection')}</div>}
+      {/* LAYOUT JUMP (V12). The first check used to paint a one-line banner with the
+          Deck Workbench and the profile section right under it, then swap the banner for
+          the ~380px connection card — shoving both sections down ~280px a third of a
+          second after the window opened (CLS 0.04-0.08 in the visual sweep). Until the
+          FIRST answer arrives the body is one placeholder card and nothing is
+          mounted below it, so the real content arrives in place instead of pushing
+          anything. A later Recheck keeps the current content on screen (the head button
+          already says "Checking…"), instead of collapsing the whole window and rebuilding
+          it — the same jump, user-triggered. */}
+      {!status && (
+        <div className="anki-card anki-first-check" role="status" aria-busy="true">
+          {t('anki.checkingConnection')}
+        </div>
+      )}
 
-      {!loading && status && !status.connected && (
+      {status && !status.connected && (
         <>
           <div className="anki-card">
             <AnkiDisconnected state={state} />
@@ -87,7 +114,7 @@ export default function AnkiView() {
         </>
       )}
 
-      {!loading && status?.connected && (
+      {status?.connected && (
         <div className="anki-workspace">
           <div className="anki-workspace-main">
             <div className="status-banner ok">
@@ -156,13 +183,17 @@ export default function AnkiView() {
         text export, and this app's own local deck — need no Anki running at all, so gating
         it on AnkiConnect would hide working functionality.
       */}
-      <div className="anki-card anki-card-flush">
-        <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
-          <DeckWorkbench />
-        </CollapsibleSection>
-      </div>
+      {showOfflineSections && (
+        <>
+          <div className="anki-card anki-card-flush">
+            <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
+              <DeckWorkbench />
+            </CollapsibleSection>
+          </div>
 
-      <ProfileSettingsSection />
+          <ProfileSettingsSection />
+        </>
+      )}
     </div>
     </AppChrome>
   );

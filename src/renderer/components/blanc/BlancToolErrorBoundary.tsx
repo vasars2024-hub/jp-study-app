@@ -34,6 +34,7 @@
  */
 
 import React from 'react';
+import { useT } from '../../i18n';
 
 interface Props {
   /** The tool this boundary guards. Used for the message and for the reset key. */
@@ -45,6 +46,24 @@ interface Props {
 
 interface State {
   error: Error | null;
+}
+
+/**
+ * The fallback is a function component so it can subscribe to the UI language
+ * with `useT()` — a class render calling the bare `t` would not re-render on a
+ * language switch.
+ */
+function BlancToolCrashFallback({ label, onRetry }: { label: string; onRetry: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="blanc-tool-crash" role="alert">
+      <p className="blanc-tool-crash-title">{t('blanc.errorBoundary.title', { label })}</p>
+      <p className="blanc-tool-crash-body">{t('blanc.errorBoundary.body')}</p>
+      <button type="button" className="blanc-tool-crash-retry" onClick={onRetry}>
+        {t('common.tryAgain')}
+      </button>
+    </div>
+  );
 }
 
 export class BlancToolErrorBoundary extends React.Component<Props, State> {
@@ -80,19 +99,7 @@ export class BlancToolErrorBoundary extends React.Component<Props, State> {
     // not fire — nothing observable changed — so it was removed instead of left
     // as a comment claiming a property no test could see.
     if (!this.state.error) return this.props.children;
-    return (
-      <div className="blanc-tool-crash" role="alert">
-        <p className="blanc-tool-crash-title">{`${this.props.label} could not be displayed.`}</p>
-        <p className="blanc-tool-crash-body">
-          This tool ran into an unexpected error. The rest of Blanc is unaffected — the
-          other tools, your tabs and anything you had open are still there. The error
-          was written to the diagnostic log.
-        </p>
-        <button type="button" className="blanc-tool-crash-retry" onClick={this.retry}>
-          Try again
-        </button>
-      </div>
-    );
+    return <BlancToolCrashFallback label={this.props.label} onRetry={this.retry} />;
   }
 }
 

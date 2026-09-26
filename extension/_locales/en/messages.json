@@ -1,0 +1,1439 @@
+{
+  "locale_code": {
+    "message": "en"
+  },
+  "ext_name": {
+    "message": "Gum — Reader Companion"
+  },
+  "ext_description": {
+    "message": "Hover lookup, grammar and sentence analysis, saving words and sentences to Gum, Anki cards, OCR and page capture."
+  },
+  "ext_actionTitle": {
+    "message": "Gum"
+  },
+  "manifestCmd_savePage": {
+    "message": "Save page to Gum"
+  },
+  "manifestCmd_lookup": {
+    "message": "Look up selection / word under cursor"
+  },
+  "manifestCmd_saveSelection": {
+    "message": "Save selection (word or sentence)"
+  },
+  "manifestCmd_wheel": {
+    "message": "Open the action wheel"
+  },
+  "manifestCmd_bulkTabs": {
+    "message": "Open the reading list (assign a shortcut in the browser if desired)"
+  },
+  "manifestCmd_analyze": {
+    "message": "AI analysis of the selected sentence (assign a shortcut in the browser if desired)"
+  },
+  "bg_scriptsFailed": {
+    "message": "Extension scripts failed to load — reload Gum in chrome://extensions"
+  },
+  "bg_appOutdated": {
+    "message": "Gum is outdated or not fully started — restart the app, then reload this extension."
+  },
+  "bg_authFailed": {
+    "message": "Gum rejected this extension — copy the token from Gum (Settings → Profile & dictionary → Chrome extension) and paste it in the extension options under Connection."
+  },
+  "bg_offline": {
+    "message": "Gum is not running — open the app, then retry."
+  },
+  "bg_storageFull": {
+    "message": "Local storage is full — open Gum to sync the queued items, then retry."
+  },
+  "bg_needYoutubeTab": {
+    "message": "Open a YouTube video or playlist tab first"
+  },
+  "bg_needYoutubeVideo": {
+    "message": "Open a YouTube video tab first"
+  },
+  "bg_nothingSelected": {
+    "message": "Nothing selected to save"
+  },
+  "bg_selectFirst": {
+    "message": "Select a word or sentence on the page first"
+  },
+  "bg_noRecording": {
+    "message": "No recording yet — use Record audio first, then stop"
+  },
+  "bg_scanFailed": {
+    "message": "Could not scan this page"
+  },
+  "bg_noPanels": {
+    "message": "No panel images found on this page"
+  },
+  "bg_tabRestricted": {
+    "message": "Cannot access this tab"
+  },
+  "bg_actionFailed": {
+    "message": "Action failed"
+  },
+  "bg_commandFailed": {
+    "message": "Command failed"
+  },
+  "bg_httpStatus": {
+    "message": "Gum answered HTTP $1."
+  },
+  "menu_lookup": {
+    "message": "Look up selection"
+  },
+  "menu_analyze": {
+    "message": "AI analysis of selection"
+  },
+  "menu_saveWord": {
+    "message": "Save word"
+  },
+  "menu_saveSentence": {
+    "message": "Save sentence"
+  },
+  "menu_createCard": {
+    "message": "Create flashcard"
+  },
+  "menu_savePage": {
+    "message": "Save page to Gum"
+  },
+  "menu_ocr": {
+    "message": "OCR capture (drag a box)"
+  },
+  "menu_openApp": {
+    "message": "Open Gum"
+  },
+  "common_gumNotRunning": {
+    "message": "Gum is not running."
+  },
+  "common_noResponse": {
+    "message": "No response"
+  },
+  "common_readingListFailed": {
+    "message": "Could not open the reading list"
+  },
+  "common_queuedWillSync": {
+    "message": "Queued — will sync when Gum is open"
+  },
+  "common_dragLarger": {
+    "message": "Drag a larger area"
+  },
+  "common_cancel": {
+    "message": "Cancel"
+  },
+  "category_news": {
+    "message": "News"
+  },
+  "category_novel": {
+    "message": "Web novel"
+  },
+  "category_manga": {
+    "message": "Manga"
+  },
+  "category_video": {
+    "message": "Video"
+  },
+  "category_article": {
+    "message": "Article"
+  },
+  "category_webpage": {
+    "message": "Webpage"
+  },
+  "save_working_card": {
+    "message": "Creating card…"
+  },
+  "save_working_app": {
+    "message": "Saving to Gum…"
+  },
+  "save_failed": {
+    "message": "Save failed"
+  },
+  "save_termQuoted": {
+    "message": " “$1”"
+  },
+  "save_queued": {
+    "message": "Queued$1 — will sync when Gum is open"
+  },
+  "save_deckSuffix": {
+    "message": " ($1)"
+  },
+  "save_cardCreated": {
+    "message": "Card created in Anki$1$2 · saved in Gum"
+  },
+  "save_savedWord": {
+    "message": "Word saved$1 to Gum"
+  },
+  "save_savedSentence": {
+    "message": "Sentence saved$1 to Gum"
+  },
+  "save_ankiUnavailable": {
+    "message": "Anki unavailable: $1"
+  },
+  "clip_failed": {
+    "message": "Could not add to clipboard history"
+  },
+  "clip_added": {
+    "message": "Added to Gum clipboard history"
+  },
+  "capture_failed": {
+    "message": "Could not save this page"
+  },
+  "capture_queued": {
+    "message": "Page queued — will sync when Gum is open"
+  },
+  "capture_playlistSaved": {
+    "message": "Playlist saved to Gum"
+  },
+  "capture_videoDuplicate": {
+    "message": "Video is already in Gum"
+  },
+  "capture_videoSaved": {
+    "message": "Video saved to Gum"
+  },
+  "capture_pageSaved": {
+    "message": "Page saved to your Gum inbox"
+  },
+  "content_wkNew": {
+    "message": "New"
+  },
+  "content_wkLearning": {
+    "message": "Learning"
+  },
+  "content_wkFamiliar": {
+    "message": "Familiar"
+  },
+  "content_wkKnown": {
+    "message": "Known"
+  },
+  "content_knownSet": {
+    "message": "$1 · $2"
+  },
+  "content_saved": {
+    "message": "Saved"
+  },
+  "content_failed": {
+    "message": "Failed"
+  },
+  "content_added": {
+    "message": "Added"
+  },
+  "content_done": {
+    "message": "Done"
+  },
+  "content_copied": {
+    "message": "Copied"
+  },
+  "content_copyBlocked": {
+    "message": "Could not copy — page blocked clipboard access"
+  },
+  "content_knownFailed": {
+    "message": "Could not update known status — is Gum running?"
+  },
+  "content_nothingToSave": {
+    "message": "Nothing to save"
+  },
+  "content_addingClip": {
+    "message": "Adding to clipboard history…"
+  },
+  "content_translating": {
+    "message": "Translating…"
+  },
+  "content_translated": {
+    "message": "Translated"
+  },
+  "content_translationFailed": {
+    "message": "Translation failed"
+  },
+  "content_selectText": {
+    "message": "Select some text first"
+  },
+  "content_highlighted": {
+    "message": "Highlighted"
+  },
+  "content_selectWordOrSentence": {
+    "message": "Select a word or sentence first"
+  },
+  "content_cardEmpty": {
+    "message": "Card text is empty"
+  },
+  "content_cardSource": {
+    "message": "Source: $1"
+  },
+  "content_notAvailable": {
+    "message": "$1 is not available on this page"
+  },
+  "content_actionNotAvailable": {
+    "message": "That action is not available on this page"
+  },
+  "content_selectOrHover": {
+    "message": "Select or hover a word first"
+  },
+  "content_selectToTranslate": {
+    "message": "Select text to translate"
+  },
+  "content_openInApp": {
+    "message": "Open in app"
+  },
+  "content_openInbox": {
+    "message": "Open inbox"
+  },
+  "content_selectSentence": {
+    "message": "Select a sentence first"
+  },
+  "content_savingPage": {
+    "message": "Saving page…"
+  },
+  "content_queueingDownload": {
+    "message": "Queueing download…"
+  },
+  "content_scanningManga": {
+    "message": "Scanning manga pages…"
+  },
+  "content_savingAudio": {
+    "message": "Saving audio…"
+  },
+  "content_mangaImported": {
+    "message": "Pages imported into Gum Manga: $1"
+  },
+  "content_importFailed": {
+    "message": "Import failed"
+  },
+  "content_downloadQueued": {
+    "message": "Download queued in Gum"
+  },
+  "content_downloadFailed": {
+    "message": "Download failed"
+  },
+  "content_themeOn": {
+    "message": "Reading theme: $1"
+  },
+  "content_themeOff": {
+    "message": "Reading theme off"
+  },
+  "content_themeButton": {
+    "message": "Theme: $1"
+  },
+  "content_theme_off": {
+    "message": "off"
+  },
+  "content_theme_night": {
+    "message": "night"
+  },
+  "content_theme_sepia": {
+    "message": "sepia"
+  },
+  "content_theme_paper": {
+    "message": "paper"
+  },
+  "content_theme_gray": {
+    "message": "gray"
+  },
+  "content_highlightOn": {
+    "message": "Highlight mode on — select text to mark it"
+  },
+  "content_highlightOff": {
+    "message": "Highlight mode off"
+  },
+  "content_highlightModeOn": {
+    "message": "Highlight mode: on"
+  },
+  "content_tintOn": {
+    "message": "Known-word tint on"
+  },
+  "content_tintOff": {
+    "message": "Known-word tint off"
+  },
+  "content_tintModeOn": {
+    "message": "Known-word tint: on"
+  },
+  "content_stopRecording": {
+    "message": "Stop recording"
+  },
+  "content_panelHidden": {
+    "message": "Panel hidden on this site — restore it in Settings → Page panel"
+  },
+  "content_micUnavailable": {
+    "message": "Microphone recording is not available here"
+  },
+  "content_recordingEmpty": {
+    "message": "Recording was empty"
+  },
+  "content_recordingReady": {
+    "message": "Recording ready — use Save audio to send it to Gum"
+  },
+  "content_recordingUnreadable": {
+    "message": "Could not read the recording"
+  },
+  "content_recording": {
+    "message": "Recording… run Record audio again to stop"
+  },
+  "content_micDenied": {
+    "message": "Microphone permission denied"
+  },
+  "content_ocrCancelled": {
+    "message": "OCR selection cancelled"
+  },
+  "content_runningOcr": {
+    "message": "Running OCR…"
+  },
+  "content_ocrFailed": {
+    "message": "OCR failed"
+  },
+  "content_speechUnavailable": {
+    "message": "Speech is unavailable here"
+  },
+  "content_cardAddFailed": {
+    "message": "Could not add the card"
+  },
+  "content_snapshotFailed": {
+    "message": "Snapshot failed"
+  },
+  "popup_statusApp": {
+    "message": "Gum app"
+  },
+  "popup_statusPairing": {
+    "message": "Pairing"
+  },
+  "popup_statusAnki": {
+    "message": "Anki profile"
+  },
+  "popup_statusPending": {
+    "message": "Waiting to sync"
+  },
+  "popup_openConnection": {
+    "message": "Open connection settings"
+  },
+  "popup_modeHighlight": {
+    "message": "Highlight"
+  },
+  "popup_modeHighlightAria": {
+    "message": "What a highlight opens"
+  },
+  "popup_modeDictionary": {
+    "message": "Dictionary AI"
+  },
+  "popup_modeAi": {
+    "message": "AI OCR"
+  },
+  "popup_modeOcr": {
+    "message": "Screenshot OCR"
+  },
+  "popup_modeOcrAria": {
+    "message": "What an OCR opens"
+  },
+  "popup_recent": {
+    "message": "Recent"
+  },
+  "popup_retryNow": {
+    "message": "Retry now"
+  },
+  "popup_navTabs": {
+    "message": "Reading list"
+  },
+  "popup_navApp": {
+    "message": "Open Gum"
+  },
+  "popup_navSettings": {
+    "message": "Settings"
+  },
+  "popup_chipConnected": {
+    "message": "Connected"
+  },
+  "popup_chipConnectedQueued_one": {
+    "message": "Connected · $1 queued"
+  },
+  "popup_chipConnectedQueued_other": {
+    "message": "Connected · $1 queued"
+  },
+  "popup_chipPairingNeeded": {
+    "message": "Pairing needed"
+  },
+  "popup_chipAppNotRunning": {
+    "message": "App not running"
+  },
+  "popup_appRunning": {
+    "message": "Running"
+  },
+  "popup_appNotRunning": {
+    "message": "Not running"
+  },
+  "popup_pairTokenNeeded": {
+    "message": "Token needed"
+  },
+  "popup_pairOk": {
+    "message": "OK"
+  },
+  "popup_pendingItems_one": {
+    "message": "$1 item waiting to sync"
+  },
+  "popup_pendingItems_other": {
+    "message": "$1 items waiting to sync"
+  },
+  "popup_pageRestricted": {
+    "message": "This page is browser-restricted"
+  },
+  "popup_pageRestrictedHint": {
+    "message": "Lookup and capture are unavailable on internal browser pages."
+  },
+  "popup_currentPage": {
+    "message": "Current page"
+  },
+  "popup_difficultyTitle": {
+    "message": "Vocabulary-band estimate, not an official rating"
+  },
+  "popup_difficulty": {
+    "message": "Difficulty $1"
+  },
+  "popup_difficultyCached": {
+    "message": "Difficulty $1 (cached)"
+  },
+  "popup_knownWords": {
+    "message": "Known words $1%"
+  },
+  "popup_noJapanese": {
+    "message": "No text in your study languages found on this page"
+  },
+  "popup_noJapaneseHint": {
+    "message": "Hover lookup works when you hold the lookup key over text in a language you study."
+  },
+  "popup_transcribedTitle": {
+    "message": "Already in the Gum catalogue — mine it without returning here"
+  },
+  "popup_transcribedCues_one": {
+    "message": "Transcribed · $1 cue"
+  },
+  "popup_transcribedCues_other": {
+    "message": "Transcribed · $1 cues"
+  },
+  "popup_transcribing": {
+    "message": "Transcribing"
+  },
+  "popup_transcribingFor": {
+    "message": "Transcribing · $1s"
+  },
+  "popup_transcriptionEmptyTitle": {
+    "message": "Retry from the Media library"
+  },
+  "popup_transcriptionEmpty": {
+    "message": "Transcription left no text"
+  },
+  "popup_savePlaylist": {
+    "message": "Save playlist"
+  },
+  "popup_saveVideo": {
+    "message": "Save video"
+  },
+  "popup_downloadVideo": {
+    "message": "Download video"
+  },
+  "popup_transcribeAudio": {
+    "message": "Transcribe audio"
+  },
+  "popup_lookupSelection": {
+    "message": "Look up selection"
+  },
+  "popup_saveSelection": {
+    "message": "Save selection"
+  },
+  "popup_ocrCapture": {
+    "message": "OCR capture"
+  },
+  "popup_importManga": {
+    "message": "Import manga pages"
+  },
+  "popup_savePage": {
+    "message": "Save page"
+  },
+  "popup_lookupFailed": {
+    "message": "Could not open the lookup popup"
+  },
+  "popup_savingSelection": {
+    "message": "Saving selection…"
+  },
+  "popup_savingPage": {
+    "message": "Saving page…"
+  },
+  "popup_queueingDownload": {
+    "message": "Queueing download…"
+  },
+  "popup_downloadQueued": {
+    "message": "Download queued in Gum."
+  },
+  "popup_downloadFailed": {
+    "message": "Download failed"
+  },
+  "popup_askingTranscribe": {
+    "message": "Asking Gum to transcribe…"
+  },
+  "popup_ocrFailed": {
+    "message": "Could not start OCR selection"
+  },
+  "popup_scanningManga": {
+    "message": "Scanning manga pages… this scrolls the page"
+  },
+  "popup_mangaImported_one": {
+    "message": "Imported $1 page into Gum Manga."
+  },
+  "popup_mangaImported_other": {
+    "message": "Imported $1 pages into Gum Manga."
+  },
+  "popup_importFailed": {
+    "message": "Import failed"
+  },
+  "popup_refuseNotAVideoPage": {
+    "message": "Open a video page first — there is no audio on this one."
+  },
+  "popup_refuseNoVideoId": {
+    "message": "This YouTube URL has no video in it."
+  },
+  "popup_refuseNotDownloaded": {
+    "message": "Download this video first — Whisper reads the file, not the page."
+  },
+  "popup_refuseAudioMissing": {
+    "message": "Gum has a record of this video but its file is gone."
+  },
+  "popup_refuseTranscriberOffline": {
+    "message": "Gum is running but its transcriber is not ready yet."
+  },
+  "popup_refuseItemNotFound": {
+    "message": "Gum no longer has this video in its media library."
+  },
+  "popup_transcribedDone_one": {
+    "message": "Transcribed — $1 cue. Mine it from Files or Mining."
+  },
+  "popup_transcribedDone_other": {
+    "message": "Transcribed — $1 cues. Mine it from Files or Mining."
+  },
+  "popup_transcriptionEnded": {
+    "message": "The transcription ended without a transcript. Retry from the Media library."
+  },
+  "popup_transcriptionNotStarted": {
+    "message": "Nothing has been downloaded for this video yet, so no transcription has run."
+  },
+  "popup_transcribingElapsed": {
+    "message": "Transcribing in Gum… $1s"
+  },
+  "popup_stillTranscribing": {
+    "message": "Still transcribing in Gum — it will appear in the catalogue."
+  },
+  "popup_transcriptionFailed": {
+    "message": "Transcription failed"
+  },
+  "popup_alreadyTranscribed_one": {
+    "message": "Already transcribed — $1 cue. Mine it from Files or Mining."
+  },
+  "popup_alreadyTranscribed_other": {
+    "message": "Already transcribed — $1 cues. Mine it from Files or Mining."
+  },
+  "popup_transcribeQueued": {
+    "message": "Transcribing in Gum — it will appear in the catalogue."
+  },
+  "popup_alreadyTranscribing": {
+    "message": "Already transcribing in Gum — nothing new was queued."
+  },
+  "popup_alreadyTranscribingFor": {
+    "message": "Already transcribing in Gum for $1s — nothing new was queued."
+  },
+  "popup_transcriptionRefused": {
+    "message": "Transcription refused"
+  },
+  "popup_cardCreated": {
+    "message": "Card created in Anki · saved in Gum."
+  },
+  "popup_savedToGum": {
+    "message": "Saved to Gum."
+  },
+  "popup_recentWord": {
+    "message": "Word saved"
+  },
+  "popup_recentSentence": {
+    "message": "Sentence saved"
+  },
+  "popup_recentCard": {
+    "message": "Card created"
+  },
+  "popup_recentPage": {
+    "message": "Page saved"
+  },
+  "popup_recentDownload": {
+    "message": "Download queued"
+  },
+  "popup_recentOcr": {
+    "message": "OCR captured"
+  },
+  "popup_recentManga": {
+    "message": "Manga imported"
+  },
+  "popup_recentQueued": {
+    "message": "Queued"
+  },
+  "popup_recentSaved": {
+    "message": "Saved"
+  },
+  "popup_gumNotRunningStart": {
+    "message": "Gum is not running — start the desktop app."
+  },
+  "popup_retrying": {
+    "message": "Retrying queued items…"
+  },
+  "popup_retryDropped_one": {
+    "message": "$1 item could not be saved and was discarded — see recent activity."
+  },
+  "popup_retryDropped_other": {
+    "message": "$1 items could not be saved and were discarded — see recent activity."
+  },
+  "popup_retrySent_one": {
+    "message": "Sent $1 queued item."
+  },
+  "popup_retrySent_other": {
+    "message": "Sent $1 queued items."
+  },
+  "popup_retryStillPending_one": {
+    "message": "$1 still pending."
+  },
+  "popup_retryStillPending_other": {
+    "message": "$1 still pending."
+  },
+  "popup_retryUnreachable_one": {
+    "message": "App still unreachable — $1 item queued."
+  },
+  "popup_retryUnreachable_other": {
+    "message": "App still unreachable — $1 items queued."
+  },
+  "popup_retryNothing": {
+    "message": "Nothing to retry."
+  },
+  "opt_pageTitle": {
+    "message": "Gum — Extension settings"
+  },
+  "opt_searchAria": {
+    "message": "Search settings"
+  },
+  "opt_searchPlaceholder": {
+    "message": "Search settings…"
+  },
+  "opt_searchEmpty": {
+    "message": "No settings match."
+  },
+  "opt_navLookup": {
+    "message": "Hover lookup"
+  },
+  "opt_navAi": {
+    "message": "AI OCR"
+  },
+  "opt_navPopup": {
+    "message": "Reader popup"
+  },
+  "opt_navSaving": {
+    "message": "Saving & cards"
+  },
+  "opt_navWheel": {
+    "message": "Radial wheel"
+  },
+  "opt_navPanel": {
+    "message": "Page panel"
+  },
+  "opt_navMedia": {
+    "message": "Video & media"
+  },
+  "opt_navConnection": {
+    "message": "Connection"
+  },
+  "opt_navShortcuts": {
+    "message": "Shortcuts"
+  },
+  "opt_navAdvanced": {
+    "message": "Advanced"
+  },
+  "opt_lookupLead": {
+    "message": "Hold a key and point at text in a language you study to open the reader popup."
+  },
+  "opt_hoverEnable": {
+    "message": "Enable hover lookup"
+  },
+  "opt_hoverEnableSub": {
+    "message": "Hold the activation key and move the cursor over a word."
+  },
+  "opt_hoverKey": {
+    "message": "Activation key"
+  },
+  "opt_hoverKeyDesc": {
+    "message": "Held while hovering; also used with click and select lookups."
+  },
+  "opt_hoverDelay": {
+    "message": "Hover delay"
+  },
+  "opt_hoverDelayDesc": {
+    "message": "How long the cursor rests on a word before the popup opens."
+  },
+  "opt_scanLength": {
+    "message": "Scan length"
+  },
+  "opt_scanLengthDesc": {
+    "message": "Maximum characters considered for a match. Longer catches long compounds; shorter is faster."
+  },
+  "opt_closeOnRelease": {
+    "message": "Close the popup when the key is released"
+  },
+  "opt_closeOnReleaseSub": {
+    "message": "Off: the popup stays until you click elsewhere or press Esc. Pinned popups always stay."
+  },
+  "opt_clickLookup": {
+    "message": "Key + click / key + select also look up"
+  },
+  "opt_clickLookupSub": {
+    "message": "Plain clicks always pass through to the page."
+  },
+  "opt_lookupEditable": {
+    "message": "Allow lookup inside text fields"
+  },
+  "opt_lookupEditableSub": {
+    "message": "Off by default so typing is never interrupted."
+  },
+  "opt_aiTitle": {
+    "message": "AI OCR / Dictionary AI"
+  },
+  "opt_aiLead": {
+    "message": "Choose what a highlight and an OCR each resolve to. AI OCR annotates the whole sentence — grammar, vocabulary, level, formality and nuance — and lets you card it or snapshot it into the notebook. Dictionary AI keeps the instant offline lookup. The two gestures are set separately."
+  },
+  "opt_aiOnHighlight": {
+    "message": "AI OCR when I highlight text"
+  },
+  "opt_aiOnHighlightSub": {
+    "message": "Off: highlighting opens the dictionary popup as before."
+  },
+  "opt_aiOnOcr": {
+    "message": "AI OCR after a screenshot OCR"
+  },
+  "opt_aiOnOcrSub": {
+    "message": "Off: the OCR result opens with an “AI analysis” button instead."
+  },
+  "opt_aiMinChars": {
+    "message": "Minimum selection"
+  },
+  "opt_aiMinCharsDesc": {
+    "message": "Shorter selections stay on the offline dictionary — a one-word cloud call is slower and costs money for an answer the dictionary already has."
+  },
+  "opt_aiWhere": {
+    "message": "What the analysis contains, which deck cards go to, and automatic notebook snapshots are set in Gum → Settings → Profile & dictionary → AI analysis. An API key is required (Flashcards → AI Card Studio)."
+  },
+  "opt_popupLead": {
+    "message": "The in-page dictionary with Meaning, Grammar, Sentence, Kanji, and Examples tabs."
+  },
+  "opt_popupWidth": {
+    "message": "Width"
+  },
+  "opt_popupFont": {
+    "message": "Font size"
+  },
+  "opt_popupCompact": {
+    "message": "Compact mode"
+  },
+  "opt_popupCompactSub": {
+    "message": "Fewer definitions per entry — lighter for long reading sessions."
+  },
+  "opt_popupPin": {
+    "message": "Pin the popup on key + click"
+  },
+  "opt_popupPinSub": {
+    "message": "Pinned popups can be dragged by their header and stay open while you read."
+  },
+  "opt_popupKeysHtml": {
+    "message": "Inside the popup: <kbd>←</kbd><kbd>→</kbd> switch tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Esc</kbd> close."
+  },
+  "opt_savingLead": {
+    "message": "Where saved words, sentences, and flashcards go. (Previously called “mining”.)"
+  },
+  "opt_destLabel": {
+    "message": "When I save a word or sentence"
+  },
+  "opt_destBoth": {
+    "message": "Gum + Anki card"
+  },
+  "opt_destBothSub": {
+    "message": "Creates an Anki card when Anki is running; a copy is always kept in your Gum library."
+  },
+  "opt_destApp": {
+    "message": "Gum only"
+  },
+  "opt_destAppSub": {
+    "message": "Saves to your Gum library. “Create card” still sends to Anki explicitly."
+  },
+  "opt_confirmCard": {
+    "message": "Preview before creating a card"
+  },
+  "opt_confirmCardSub": {
+    "message": "Shows the text, card type, and destination before sending. Card fields are filled by Gum from its dictionaries and your Anki field mapping."
+  },
+  "opt_folderLabel": {
+    "message": "Library folder label"
+  },
+  "opt_folderLabelDesc": {
+    "message": "Saves from the extension appear under this folder in Gum flashcards."
+  },
+  "opt_savingHintHtml": {
+    "message": "Deck, note type, and field mapping live in the Gum app — see <b>Connection</b> for direct links."
+  },
+  "opt_wheelLeadHtml": {
+    "message": "A quick action ring opened with <kbd>Alt+Shift+W</kbd>. One command per position; the center always cancels."
+  },
+  "opt_wheelEnable": {
+    "message": "Enable the radial wheel"
+  },
+  "opt_wheelEnableSub": {
+    "message": "When disabled, the shortcut opens a compact action list instead."
+  },
+  "opt_wheelHintHtml": {
+    "message": "Each command can be assigned once — picking a command that is already placed swaps the two positions. Commands that don't apply to the current page (like Download video outside YouTube) appear disabled on the wheel. Keyboard: <kbd>1</kbd>–<kbd>6</kbd> run a position, arrows move the highlight, <kbd>Esc</kbd> cancels."
+  },
+  "opt_panelLead": {
+    "message": "The small corner panel with the difficulty estimate and page tools."
+  },
+  "opt_fabVisible": {
+    "message": "Show the page panel"
+  },
+  "opt_fabCollapsed": {
+    "message": "Start collapsed"
+  },
+  "opt_fabCorner": {
+    "message": "Position"
+  },
+  "opt_cornerBottomRight": {
+    "message": "Bottom right"
+  },
+  "opt_cornerBottomRightMid": {
+    "message": "Bottom right (higher)"
+  },
+  "opt_cornerTopRight": {
+    "message": "Top right"
+  },
+  "opt_badgesHeading": {
+    "message": "Badges & buttons"
+  },
+  "opt_fabLevel": {
+    "message": "Difficulty estimate"
+  },
+  "opt_fabComp": {
+    "message": "Known-word percentage"
+  },
+  "opt_fabTheme": {
+    "message": "Reading theme button"
+  },
+  "opt_fabHl": {
+    "message": "Highlight mode button"
+  },
+  "opt_fabLearn": {
+    "message": "Known-word tint button"
+  },
+  "opt_fabOcr": {
+    "message": "OCR button"
+  },
+  "opt_fabClearHidden": {
+    "message": "Show panel on all sites again"
+  },
+  "opt_fabHint": {
+    "message": "“Hide here” on the panel suppresses it per-site; this clears that list."
+  },
+  "opt_mediaLead": {
+    "message": "What “Save page” does on YouTube, and media options."
+  },
+  "opt_ytMode": {
+    "message": "Saving a YouTube page"
+  },
+  "opt_ytModeDownload": {
+    "message": "Download the media into Gum"
+  },
+  "opt_ytModeMetadata": {
+    "message": "Save metadata only (track the video/playlist)"
+  },
+  "opt_ytAudio": {
+    "message": "Audio only when downloading"
+  },
+  "opt_ytAudioSub": {
+    "message": "Smaller files — useful for listening practice."
+  },
+  "opt_mediaHint": {
+    "message": "“Download video” is always available explicitly on YouTube pages from the popup, wheel, and More menu."
+  },
+  "opt_connLead": {
+    "message": "Pairing with the Gum desktop app. Everything else — Anki mapping, mining rules, clipboard history — lives in the app itself."
+  },
+  "opt_pairingHeading": {
+    "message": "Pairing"
+  },
+  "opt_connUnknown": {
+    "message": "unknown"
+  },
+  "opt_token": {
+    "message": "Pairing token"
+  },
+  "opt_tokenDesc": {
+    "message": "In Gum, open Settings → Profile & dictionary → Chrome extension. Copy the token and paste it here, or press Pair now there and then Pull token from app here."
+  },
+  "opt_port": {
+    "message": "Bridge port"
+  },
+  "opt_savePair": {
+    "message": "Save pairing"
+  },
+  "opt_test": {
+    "message": "Test connection"
+  },
+  "opt_pull": {
+    "message": "Pull token from app"
+  },
+  "opt_openInApp": {
+    "message": "Open in the Gum app"
+  },
+  "opt_openAnki": {
+    "message": "Anki & field mapping"
+  },
+  "opt_openRules": {
+    "message": "Saving rules (profiles)"
+  },
+  "opt_openClipboard": {
+    "message": "Clipboard history"
+  },
+  "opt_openFlashcards": {
+    "message": "Flashcards"
+  },
+  "opt_openInbox": {
+    "message": "Inbox"
+  },
+  "opt_shortcutsLead": {
+    "message": "Browser-level shortcuts are managed by Chrome; in-page keys work whenever the reader popup or wheel is open."
+  },
+  "opt_browserShortcuts": {
+    "message": "Browser shortcuts"
+  },
+  "opt_openShortcuts": {
+    "message": "Change in Chrome shortcut settings"
+  },
+  "opt_inPageKeys": {
+    "message": "In-page keys"
+  },
+  "opt_inPageKeysHtml": {
+    "message": "Reader popup: <kbd>←</kbd><kbd>→</kbd> tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Backspace</kbd> back · <kbd>Esc</kbd> close.<br /> Wheel: <kbd>1</kbd>–<kbd>6</kbd> run · arrows highlight · <kbd>Enter</kbd> run · <kbd>Esc</kbd> cancel.<br /> OCR selection: drag a box · <kbd>Esc</kbd> cancel."
+  },
+  "opt_advancedLead": {
+    "message": "Data, migration, and everything that doesn't need to be on by default."
+  },
+  "opt_logImmersion": {
+    "message": "Log reading time to Gum"
+  },
+  "opt_logImmersionSub": {
+    "message": "Counts active time on pages in a language you study toward your immersion statistics."
+  },
+  "opt_notes": {
+    "message": "Notes"
+  },
+  "opt_notesPlaceholder": {
+    "message": "Optional notes for yourself"
+  },
+  "opt_settingsData": {
+    "message": "Settings data"
+  },
+  "opt_export": {
+    "message": "Export settings"
+  },
+  "opt_import": {
+    "message": "Import settings"
+  },
+  "opt_reset": {
+    "message": "Reset to defaults"
+  },
+  "opt_resetHint": {
+    "message": "Reset keeps your pairing token and port. Settings from older versions (including “Prefer Anki for mines” and the old wheel slots) are migrated automatically — “mine” is simply called “save” now."
+  },
+  "opt_unitMs": {
+    "message": "$1 ms"
+  },
+  "opt_unitPx": {
+    "message": "$1 px"
+  },
+  "opt_unitChars_one": {
+    "message": "$1 char"
+  },
+  "opt_unitChars_other": {
+    "message": "$1 chars"
+  },
+  "opt_posTop": {
+    "message": "Top"
+  },
+  "opt_posUpperRight": {
+    "message": "Upper right"
+  },
+  "opt_posLowerRight": {
+    "message": "Lower right"
+  },
+  "opt_posBottom": {
+    "message": "Bottom"
+  },
+  "opt_posLowerLeft": {
+    "message": "Lower left"
+  },
+  "opt_posUpperLeft": {
+    "message": "Upper left"
+  },
+  "opt_posAria": {
+    "message": "Command for the position: $1"
+  },
+  "opt_shortcutsFailed": {
+    "message": "Could not read browser shortcuts."
+  },
+  "opt_scSavePage": {
+    "message": "Save page to Gum"
+  },
+  "opt_scLookup": {
+    "message": "Look up selection / word under cursor"
+  },
+  "opt_scSaveSelection": {
+    "message": "Save selection (word or sentence)"
+  },
+  "opt_scWheel": {
+    "message": "Open the action wheel"
+  },
+  "opt_scBulkTabs": {
+    "message": "Open the reading list"
+  },
+  "opt_scToolbarPopup": {
+    "message": "Open the toolbar popup"
+  },
+  "opt_scNotSet": {
+    "message": "not set"
+  },
+  "opt_connReachable": {
+    "message": "app reachable"
+  },
+  "opt_connNotRunning": {
+    "message": "app not running"
+  },
+  "opt_statusReachable": {
+    "message": "Gum is reachable."
+  },
+  "opt_statusNotRunning": {
+    "message": "Gum is not running or the port is wrong."
+  },
+  "opt_statusPairSaved": {
+    "message": "Pairing saved."
+  },
+  "opt_statusPullNeedsPairNow": {
+    "message": "Gum is not accepting a pull yet — press Pair now in Gum (Settings → Profile & dictionary → Chrome extension), then pull again within two minutes. Or copy the token there and paste it here."
+  },
+  "opt_statusPulled": {
+    "message": "Pulled pairing from the app."
+  },
+  "opt_statusPullNoToken": {
+    "message": "App responded but sent no token — copy it manually from Settings."
+  },
+  "opt_statusPullFailed": {
+    "message": "Could not pull — open Gum and paste the token manually."
+  },
+  "opt_statusOpened": {
+    "message": "Opened in Gum."
+  },
+  "opt_statusExported": {
+    "message": "Settings exported (token excluded)."
+  },
+  "opt_statusImported": {
+    "message": "Settings imported."
+  },
+  "opt_statusImportFailed": {
+    "message": "Could not import — the file is not a valid settings export."
+  },
+  "opt_statusReset": {
+    "message": "Settings reset to defaults (pairing kept)."
+  },
+  "opt_statusPanelRestored": {
+    "message": "The panel will show on all sites again."
+  },
+  "opt_statusSaved": {
+    "message": "Saved."
+  },
+  "tabs_pageTitle": {
+    "message": "Gum — Reading list"
+  },
+  "tabs_heading": {
+    "message": "Reading list"
+  },
+  "tabs_allWindows": {
+    "message": "All windows"
+  },
+  "tabs_selectAll": {
+    "message": "Select all"
+  },
+  "tabs_selectNone": {
+    "message": "None"
+  },
+  "tabs_refresh": {
+    "message": "Refresh"
+  },
+  "tabs_loading": {
+    "message": "Loading tabs…"
+  },
+  "tabs_capture": {
+    "message": "Save pages to Gum"
+  },
+  "tabs_download": {
+    "message": "Download videos"
+  },
+  "tabs_hint": {
+    "message": "Select tabs and save them in one go — articles go to your Gum inbox, videos and playlists to YouTube tracking. The colored edge shows the detected source type (News, Novel, Manga, Video, Article). Download only applies to YouTube tabs."
+  },
+  "tabs_catNews": {
+    "message": "News"
+  },
+  "tabs_catNovel": {
+    "message": "Novel"
+  },
+  "tabs_selected_one": {
+    "message": "$1 selected"
+  },
+  "tabs_selected_other": {
+    "message": "$1 selected"
+  },
+  "tabs_empty": {
+    "message": "No tabs found in this scope."
+  },
+  "tabs_untitled": {
+    "message": "Tab $1"
+  },
+  "tabs_badgeTitle": {
+    "message": "Detected source type (URL and title heuristics)"
+  },
+  "tabs_listFailed": {
+    "message": "Could not list tabs."
+  },
+  "tabs_summary": {
+    "message": "$1 · $2"
+  },
+  "tabs_count_one": {
+    "message": "$1 tab"
+  },
+  "tabs_count_other": {
+    "message": "$1 tabs"
+  },
+  "tabs_saveable_one": {
+    "message": "$1 can be saved"
+  },
+  "tabs_saveable_other": {
+    "message": "$1 can be saved"
+  },
+  "tabs_noYoutube": {
+    "message": "No YouTube tabs selected."
+  },
+  "tabs_selectOne": {
+    "message": "Select at least one tab."
+  },
+  "tabs_progressSaving": {
+    "message": "Saving… $1/$2"
+  },
+  "tabs_progressDownloading": {
+    "message": "Queueing downloads… $1/$2"
+  },
+  "tabs_progressWorking": {
+    "message": "Working… $1/$2"
+  },
+  "tabs_progressWithFailures": {
+    "message": "$1 · $2 failed"
+  },
+  "tabs_queuedNote_one": {
+    "message": " ($1 queued — will sync when Gum is open)"
+  },
+  "tabs_queuedNote_other": {
+    "message": " ($1 queued — will sync when Gum is open)"
+  },
+  "tabs_done": {
+    "message": "Done — $1/$2 saved$3."
+  },
+  "tabs_finished": {
+    "message": "Finished — $1/$2 ok, $3 failed$4."
+  },
+  "cmd_lookup_selection_label": {
+    "message": "Look up"
+  },
+  "cmd_lookup_selection_short": {
+    "message": "Look up"
+  },
+  "cmd_lookup_selection_desc": {
+    "message": "Open the reader popup for the selected or last-hovered text."
+  },
+  "cmd_save_word_label": {
+    "message": "Save word"
+  },
+  "cmd_save_word_short": {
+    "message": "Word"
+  },
+  "cmd_save_word_desc": {
+    "message": "Save the selected word to your Gum library."
+  },
+  "cmd_save_sentence_label": {
+    "message": "Save sentence"
+  },
+  "cmd_save_sentence_short": {
+    "message": "Sentence"
+  },
+  "cmd_save_sentence_desc": {
+    "message": "Save the selected or detected sentence to your Gum library."
+  },
+  "cmd_card_create_label": {
+    "message": "Create card"
+  },
+  "cmd_card_create_short": {
+    "message": "Card"
+  },
+  "cmd_card_create_desc": {
+    "message": "Create a flashcard from the selection (Anki when available; a copy always stays in Gum)."
+  },
+  "cmd_capture_page_label": {
+    "message": "Save page"
+  },
+  "cmd_capture_page_short": {
+    "message": "Page"
+  },
+  "cmd_capture_page_desc": {
+    "message": "Save this page (article, video, or playlist) into Gum."
+  },
+  "cmd_capture_ocr_label": {
+    "message": "OCR capture"
+  },
+  "cmd_capture_ocr_short": {
+    "message": "OCR"
+  },
+  "cmd_capture_ocr_desc": {
+    "message": "Drag a box over an image to recognize its text."
+  },
+  "cmd_capture_audio_record_label": {
+    "message": "Record audio"
+  },
+  "cmd_capture_audio_record_short": {
+    "message": "Record"
+  },
+  "cmd_capture_audio_record_desc": {
+    "message": "Record microphone audio for the next Save audio."
+  },
+  "cmd_capture_audio_save_label": {
+    "message": "Save audio"
+  },
+  "cmd_capture_audio_save_short": {
+    "message": "Audio"
+  },
+  "cmd_capture_audio_save_desc": {
+    "message": "Save the last recording into Gum."
+  },
+  "cmd_capture_manga_label": {
+    "message": "Import manga pages"
+  },
+  "cmd_capture_manga_short": {
+    "message": "Manga"
+  },
+  "cmd_capture_manga_desc": {
+    "message": "Scan a long-strip / webtoon page and import the panels into Gum."
+  },
+  "cmd_media_download_label": {
+    "message": "Download video"
+  },
+  "cmd_media_download_short": {
+    "message": "Download"
+  },
+  "cmd_media_download_desc": {
+    "message": "Download the current YouTube video or playlist into Gum."
+  },
+  "cmd_media_transcribe_label": {
+    "message": "Transcribe audio"
+  },
+  "cmd_media_transcribe_short": {
+    "message": "Transcribe"
+  },
+  "cmd_media_transcribe_desc": {
+    "message": "Transcribe the current video’s audio with Whisper and add it to the catalogue."
+  },
+  "cmd_clipboard_send_label": {
+    "message": "Send to clipboard history"
+  },
+  "cmd_clipboard_send_short": {
+    "message": "Clip"
+  },
+  "cmd_clipboard_send_desc": {
+    "message": "Add the selection to the Gum clipboard history."
+  },
+  "cmd_translate_selection_label": {
+    "message": "Translate"
+  },
+  "cmd_translate_selection_short": {
+    "message": "Translate"
+  },
+  "cmd_translate_selection_desc": {
+    "message": "Translate the selection with the Gum translation model."
+  },
+  "cmd_grammar_match_label": {
+    "message": "Match grammar"
+  },
+  "cmd_grammar_match_short": {
+    "message": "Grammar"
+  },
+  "cmd_grammar_match_desc": {
+    "message": "Find grammar patterns in the selected sentence."
+  },
+  "cmd_reader_theme_label": {
+    "message": "Reading theme"
+  },
+  "cmd_reader_theme_short": {
+    "message": "Theme"
+  },
+  "cmd_reader_theme_desc": {
+    "message": "Cycle the page reading theme (night, sepia, paper, gray)."
+  },
+  "cmd_reader_highlight_label": {
+    "message": "Highlight mode"
+  },
+  "cmd_reader_highlight_short": {
+    "message": "Highlight"
+  },
+  "cmd_reader_highlight_desc": {
+    "message": "Toggle select-to-highlight on this page."
+  },
+  "cmd_reader_knownTint_label": {
+    "message": "Known-word tint"
+  },
+  "cmd_reader_knownTint_short": {
+    "message": "Tint"
+  },
+  "cmd_reader_knownTint_desc": {
+    "message": "Tint words on the page by how well you know them."
+  },
+  "cmd_tabs_picker_label": {
+    "message": "Reading list"
+  },
+  "cmd_tabs_picker_short": {
+    "message": "Tabs"
+  },
+  "cmd_tabs_picker_desc": {
+    "message": "Open the tab list to save several pages at once."
+  },
+  "cmd_app_open_label": {
+    "message": "Open Gum"
+  },
+  "cmd_app_open_short": {
+    "message": "App"
+  },
+  "cmd_app_open_desc": {
+    "message": "Bring the Gum desktop app to the front."
+  },
+  "cmd_settings_special_label": {
+    "message": "Special modules"
+  },
+  "cmd_settings_special_short": {
+    "message": "Special"
+  },
+  "cmd_settings_special_desc": {
+    "message": "Open the hidden Special modules settings page in Gum."
+  },
+  "cmd_wheel_more_label": {
+    "message": "More…"
+  },
+  "cmd_wheel_more_short": {
+    "message": "More"
+  },
+  "cmd_wheel_more_desc": {
+    "message": "Open the secondary action list (OCR, media, page tools)."
+  }
+}

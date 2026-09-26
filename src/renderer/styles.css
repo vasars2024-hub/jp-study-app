@@ -889,16 +889,12 @@ html {
    and uses --accent / panel colors so themes and accent presets recolor it.
    ========================================================================== */
 
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-*:hover,
-*:focus,
-*:focus-within {
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-}
+/* No `scrollbar-width` / `scrollbar-color` on `*` (round-2 audit V6). Chromium honours
+   those standard properties since 121 and, where either is set, IGNORES every
+   `::-webkit-scrollbar` rule below: the themed thin thumb became the native bar with
+   arrow buttons, and `transparent` hid it outright until hover. The app runs only in
+   Chromium, so the webkit rules are the whole implementation. Containers that hide
+   their bar on purpose still set `scrollbar-width: none` themselves. */
 
 /* Chromium / Electron / Safari */
 *::-webkit-scrollbar {
@@ -5218,6 +5214,8 @@ details.lib-filter-bar[open] .lib-filter-summary::after {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  min-width: 24px;
+  min-height: 24px;
 }
 .dict-x:hover {
   color: var(--text);
@@ -5569,6 +5567,8 @@ mark.lookup-mark,
 }
 .wk-grade-btn {
   flex: 1;
+  /* WCAG 2.5.8: 11px text + 4px padding came to 23px. */
+  min-height: 24px;
   padding: 4px 2px;
   font-size: 11px;
   border: 1px solid var(--border);
@@ -5924,6 +5924,20 @@ mark.lookup-mark,
   line-height: 1;
   cursor: pointer;
   padding: 0 2px;
+  /* Same 14px glyph, a 24px target (WCAG 2.5.8): measured 14x16 before. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: var(--radius-sm);
+}
+/* Definition-language chips: which bundled dictionaries' glosses are on screen. */
+.dict-gloss-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
 }
 .dict-star:hover {
   color: var(--accent);
@@ -6036,6 +6050,12 @@ mark.lookup-mark,
   padding: var(--space-xl);
   margin-bottom: 18px;
   box-shadow: var(--shadow-card);
+}
+/* Anki's first connection check: one placeholder card roughly the height of the
+   "not connected" card it is replaced by (AnkiView mounts nothing below it). */
+.anki-first-check {
+  min-height: 320px;
+  color: var(--muted);
 }
 /* ============================================================================
    IR-2 — `.anki-card` containment cues (closes the request Phase 3A filed).
@@ -13030,6 +13050,14 @@ mark.lookup-mark,
   font-size: 13px;
   line-height: 1.5;
 }
+.music-empty p {
+  margin: 0 0 8px;
+}
+.music-empty .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .music-search {
   display: flex;
   align-items: center;
@@ -13633,7 +13661,9 @@ mark.lookup-mark,
   max-width: 220px;
 }
 .os-viz-label {
-  width: 62px;
+  /* A floor, not a width (round-2 audit V8): "Чувствительность" does not fit 62px. */
+  min-width: 62px;
+  flex: none;
   font-size: 12.5px;
 }
 .os-viz-select {
@@ -15510,33 +15540,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .os-task-win.min {
   opacity: 0.6;
 }
-/* Close affordance. Space is reserved permanently and only the opacity
-   animates, so revealing it on hover never re-flows the taskbar. */
-.os-task-win .os-task-close {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin-right: -4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--muted);
-  opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
-}
-.os-task-win:hover .os-task-close,
-.os-task-win.active .os-task-close,
-.os-task-win .os-task-close:focus-visible {
-  opacity: 1;
-}
-.os-task-win .os-task-close:hover {
-  background: var(--red-deep);
-  color: #fff;
-  opacity: 1;
-}
+/* The close affordance is a sibling of this button now: see `.os-task-item` in shell/shell.css. */
 .os-tray {
   display: flex;
   align-items: center;
@@ -15912,6 +15916,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .os-check-row input {
   accent-color: var(--accent);
+}
+.os-check-row-desc {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 .os-set-top {
   flex-shrink: 0;
@@ -16758,6 +16767,8 @@ html[data-taskbar-size='large'] .os-tray-btn {
 
 .os-accent-row {
   display: flex;
+  /* The swatches wrap in a narrow Settings window instead of running off its edge (V8). */
+  flex-wrap: wrap;
   gap: 10px;
 }
 .os-accent {
@@ -18355,6 +18366,8 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border: 1px solid var(--border);
 }
 .immersion-mode-btn {
+  /* WCAG 2.5.8 target floor (was 23px tall). */
+  min-height: 24px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -18914,6 +18927,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  /* 24px target around the 14px glyph (was 19x19). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
 }
 .dict-tts:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* "Ask the Agent" sits beside pronunciation and shares its quiet head-button look. */
@@ -18924,6 +18943,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
 }
 .dict-agent:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .reader-anno-swatches { display: flex; gap: 4px; align-items: center; margin-left: 4px; }
@@ -20352,7 +20376,17 @@ html[data-taskbar-size='large'] .os-tray-btn {
   gap: 3px;
 }
 .cal-month-cell.out {
-  opacity: 0.45;
+  /* Days of the next/previous month stay readable (opacity 0.45 put the day
+     numbers at 1.9:1 in the light themes); they are told apart by a quieter
+     number and a flatter cell instead. */
+  background: transparent;
+}
+.cal-month-cell.out .cal-month-daynum {
+  color: var(--muted);
+  font-weight: 400;
+}
+.cal-month-cell.out > :not(.cal-month-daynum) {
+  opacity: 0.7;
 }
 .cal-month-cell.today {
   border-color: var(--accent);
@@ -20861,6 +20895,9 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .focus-music-row {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  left: 0;
   gap: 1px;
   width: 100%;
   text-align: left;
@@ -20897,11 +20934,26 @@ html[data-taskbar-size='large'] .os-tray-btn {
   line-height: 1.4;
 }
 .focus-music-error {
+  /* Under the bar, so it is seen whether or not the song list is open. */
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 6;
+  max-width: 320px;
   margin: 0;
   padding: 6px 10px;
   font-size: 0.75rem;
   color: var(--accent-2, #ff6b7a);
-  border-top: 1px solid var(--border);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.focus-music-error--inline {
+  position: static;
+  max-width: none;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 /* ---- Mini View: locked crafting-table window ---- */
@@ -23204,6 +23256,11 @@ html.lockscreen-widget-root #root {
   justify-content: center;
   margin-bottom: 10px;
 }
+/* UI-language picker at the top of the first-launch card (reuses .sp-seg). */
+.consent-lang {
+  width: fit-content;
+  margin: -8px auto 18px;
+}
 .consent-card h1 {
   margin: 0 0 10px;
   font-size: 20px;
@@ -23253,8 +23310,13 @@ html.lockscreen-widget-root #root {
   border: 1px solid var(--border);
 }
 .consent-yes {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
+  /* The deep accent red, not --accent-2: --accent-2 is the accent mixed 28% toward white
+     (a highlight recipe), which painted the first CTA a new user sees salmon pink, off-brand,
+     at ~2.7:1 under white text. --red-deep is the same live accent 22% toward black
+     (osPersonalization writes it inline, so it follows the user's accent preset) and holds
+     ~5.2:1 under white text on the default accent. */
+  background: var(--red-deep);
+  border-color: var(--red-deep);
   color: #fff;
   font-weight: 600;
 }
@@ -28074,6 +28136,8 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
 .credential-field { display: grid; gap: 4px; margin: 10px 0 0; }
 .credential-field label { font-size: 12px; color: var(--muted); }
 .credential-field input { width: 100%; }
+/* The Save .btn sits in the field's grid; without this it stretches to the full row width. */
+.credential-field .btn { justify-self: start; }
 .credential-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
 /* A store that cannot encrypt is a security statement, not a hint: it reads as a
    warning rather than as muted body text. */

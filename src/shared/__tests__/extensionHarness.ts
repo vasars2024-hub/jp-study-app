@@ -29,6 +29,35 @@ export function readExtensionFile(name: string): string {
 
 /* ------------------------------ chrome stubs ------------------------------ */
 
+export interface I18nStub {
+  getMessage(key: string, substitutions?: string | string[]): string;
+  getUILanguage(): string;
+}
+
+/**
+ * chrome.i18n over the shipped _locales/<locale>/messages.json, faithful on
+ * what the extension relies on: an unknown key returns "", and $1…$9 in a
+ * message are filled from the substitutions ($$ is a literal dollar).
+ */
+export function createI18nStub(locale = 'en'): I18nStub {
+  const file = path.join(EXTENSION_DIR, '_locales', locale, 'messages.json');
+  const catalogue = JSON.parse(readFileSync(file, 'utf8')) as Record<string, { message: string }>;
+  return {
+    getMessage(key, substitutions) {
+      const entry = catalogue[key];
+      if (!entry) return '';
+      const subs = substitutions == null ? [] : ([] as string[]).concat(substitutions);
+      return entry.message.replace(/\$(\$|[1-9])/g, (_m, d: string) => (d === '$' ? '$' : (subs[Number(d) - 1] ?? '')));
+    },
+    getUILanguage: () => locale.replace('_', '-'),
+  };
+}
+
+/** One catalogue message as the extension would show it ("" if the key is missing). */
+export function extensionMessage(key: string, substitutions?: string[], locale = 'en'): string {
+  return createI18nStub(locale).getMessage(key, substitutions);
+}
+
 type StorageQuery = string | string[] | Record<string, unknown> | null | undefined;
 
 export interface StorageAreaStub {
@@ -115,6 +144,7 @@ export interface ChromeStub {
   alarms: Record<string, unknown>;
   contextMenus: Record<string, unknown>;
   commands: Record<string, unknown>;
+  i18n: I18nStub;
 }
 
 /**
@@ -189,6 +219,7 @@ export function createChromeStub(seed: Record<string, unknown> = {}): ChromeStub
           listeners.onContextMenuClicked.push(fn),
       },
     },
+    i18n: createI18nStub(),
     commands: {
       getAll: record('commands.getAll', [] as unknown[]),
       onCommand: { addListener: (fn: (c: string) => unknown) => listeners.onCommand.push(fn) },
@@ -328,7 +359,9 @@ export function loadExtensionSandbox(options: LoadOptions = {}): ExtensionSandbo
     ...(options.globals ?? {}),
   };
   sandbox.globalThis = sandbox;
-  if (options.chrome) sandbox.chrome = options.chrome;
+  // Without a full stub the pages still get chrome.i18n, as every extension
+  // context does, so shared.js resolves its strings to the English catalogue.
+  sandbox.chrome = options.chrome ?? { i18n: createI18nStub() };
   vm.createContext(sandbox);
   for (const file of files) {
     const filePath = path.join(EXTENSION_DIR, file);

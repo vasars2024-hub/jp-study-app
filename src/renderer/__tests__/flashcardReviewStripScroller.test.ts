@@ -68,8 +68,11 @@ describe('flashcards: the review strip stays a scroller, not a 96,806px wall', (
     expect(block).toContain('overflow: hidden');
     // A clamp is only honest if the full string has another route. The chip's own `title` is it,
     // and it must carry the SAME field the label renders (`card.word`), not a summary of it.
-    expect(TSX).toContain("title={card.promptKind === 'listening' ? t('flash.prompt.listening') : card.word}");
-    expect(TSX).toContain('{card.promptKind === \'listening\' ? t(\'flash.audioCardShort\') : card.word}');
+    // Since J10 a chip does not show its word before its card is revealed: a hidden chip's
+    // title and label both name its position; a revealed chip's title and label are both the word.
+    expect(TSX).toContain("title={t('flash.review.hiddenCardTitle', { position: i + 1 })}");
+    expect(TSX).toContain("t('flash.review.hiddenCard', { position: i + 1 })");
+    expect(TSX).toMatch(/title=\{card\.word\}\s*>\s*<span className="flash-strip-word"[^>]*>\s*\{card\.word\}/);
   });
 
   it('leaves the preview strips reflowing, which is what that rule was for', () => {

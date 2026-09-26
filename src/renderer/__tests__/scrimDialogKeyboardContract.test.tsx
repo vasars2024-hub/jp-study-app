@@ -183,7 +183,9 @@ describe('the command palette honours the same contract', () => {
   it('does not let Shift+Tab out onto "Show desktop (minimize all)"', () => {
     const el = openPalette();
     const inside = focusables(el);
-    expect(inside.length, 'nothing to trap').toBeGreaterThan(1);
+    // The palette is a combobox (K10): the input is its one Tab stop and the rows are
+    // options reached with the arrow keys, so one focusable is the pattern, not a gap.
+    expect(inside.length, 'nothing to trap').toBeGreaterThanOrEqual(1);
     press('Tab', true);
     expect(el.contains(document.activeElement)).toBe(true);
     expect(document.activeElement).not.toBe(pOutside);

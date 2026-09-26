@@ -6,20 +6,37 @@ import { getSummary, formatDuration } from '../stats';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import WorldHeatMap from '../components/resources/WorldHeatMap';
+import DailyGoalPanel from '../components/DailyGoalPanel';
+import './widgets.css';
 import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 import { sendTelemetryPingIfNeeded } from '../telemetryPing';
 
 // ---------- World clock (multiple time zones) ----------
 interface Zone {
   id: string;
+  /** What the user typed; empty for the built-in zones, whose names are translated. */
   label: string;
   tz: string;
 }
-const DEFAULT_ZONES: Zone[] = [
-  { id: 'z1', label: 'Tokyo', tz: 'Asia/Tokyo' },
-  { id: 'z2', label: 'London', tz: 'Europe/London' },
-  { id: 'z3', label: 'New York', tz: 'America/New_York' },
-];
+/**
+ * The built-in zones' city names are UI text, so they are resolved from a key at
+ * render time. A layout saved before that stored the English name as `label`;
+ * that exact name on the same built-in id and zone is treated as "not renamed".
+ */
+const BUILTIN_ZONE_CITY: Record<string, { tz: string; key: string; legacyLabel: string }> = {
+  z1: { tz: 'Asia/Tokyo', key: 'widgets.worldClock.city.tokyo', legacyLabel: 'Tokyo' },
+  z2: { tz: 'Europe/London', key: 'widgets.worldClock.city.london', legacyLabel: 'London' },
+  z3: { tz: 'America/New_York', key: 'widgets.worldClock.city.newYork', legacyLabel: 'New York' },
+};
+const DEFAULT_ZONES: Zone[] = Object.entries(BUILTIN_ZONE_CITY).map(([id, z]) => ({ id, label: '', tz: z.tz }));
+
+export function worldClockZoneLabel(zone: Zone, t: (key: string) => string): string {
+  const builtin = BUILTIN_ZONE_CITY[zone.id];
+  if (builtin && builtin.tz === zone.tz && (!zone.label || zone.label === builtin.legacyLabel)) return t(builtin.key);
+  if (zone.label && zone.label !== zone.tz) return zone.label;
+  // No name typed: the city part of the IANA id ("America/Sao_Paulo" -> "Sao Paulo").
+  return zone.tz.split('/').pop()?.replace(/_/g, ' ') || zone.tz;
+}
 export function WorldClock({ settings, setSettings }: WidgetProps) {
   const { t, lang } = useT();
   const now = useNow(1000);
@@ -28,7 +45,7 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
   const [label, setLabel] = useState('');
   const add = () => {
     if (!tz.trim()) return;
-    setSettings({ zones: [...zones, { id: `z${Date.now()}`, label: label.trim() || tz, tz: tz.trim() }] });
+    setSettings({ zones: [...zones, { id: `z${Date.now()}`, label: label.trim(), tz: tz.trim() }] });
     setTz('');
     setLabel('');
   };
@@ -44,7 +61,7 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
           }
           return (
             <li key={z.id}>
-              <span className="wgt-world-label">{z.label}</span>
+              <span className="wgt-world-label">{worldClockZoneLabel(z, t)}</span>
               <span className="wgt-world-time">{time}</span>
               <button className="wgt-btn-icon sm" title={t('common.remove')} aria-label={t('common.remove')} onClick={() => setSettings({ zones: zones.filter((x) => x.id !== z.id) })}>×</button>
             </li>
@@ -60,50 +77,50 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
   );
 }
 
-// ---------- Daily goals ----------
-interface Goal {
+// ---------- Daily goal ----------
+// The study goal (reviews, new cards, minutes) counted from the real review log
+// and study statistics; see components/DailyGoalPanel.tsx. It replaced a list of
+// free-text goals whose counters never reset and whose target could only go up.
+// Goals a user had written there are kept as a small daily checklist (ticks
+// clear at local midnight) so nothing they typed disappears; new ones are not
+// offered — the To-do and Habit widgets cover that.
+interface LegacyGoal {
   id: string;
   text: string;
-  target: number;
-  done: number;
+  /** Local day (YYYY-MM-DD) the goal was ticked; any other day reads unticked. */
+  doneDay?: string;
 }
-export function DailyGoals({ settings, setSettings }: WidgetProps) {
+function localDay(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+export function DailyGoals({ settings, setSettings, size }: WidgetProps) {
   const { t } = useT();
-  const goals = readSetting<Goal[]>(settings, 'goals', []);
-  const [draft, setDraft] = useState('');
-  const write = (next: Goal[]) => setSettings({ goals: next });
-  const add = () => {
-    const text = draft.trim();
-    if (!text) return;
-    write([...goals, { id: `g${Date.now()}`, text, target: 1, done: 0 }]);
-    setDraft('');
-  };
-  const bump = (id: string, d: number) =>
-    write(goals.map((g) => (g.id === id ? { ...g, done: Math.max(0, Math.min(g.target, g.done + d)) } : g)));
+  const legacy = readSetting<LegacyGoal[]>(settings, 'goals', []).filter((g) => g && typeof g.text === 'string');
+  const today = localDay(useNow(60_000));
+  const write = (next: LegacyGoal[]) => setSettings({ goals: next });
   return (
     <div className="wgt wgt-goals">
-      <div className="wgt-todo-add">
-        <input value={draft} placeholder={t('widgets.dailyGoals.addPlaceholder')} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-        <button className="wgt-btn-icon" onClick={add} title={t('common.add')} aria-label={t('common.add')}>+</button>
-      </div>
-      <ul className="wgt-goals-list">
-        {goals.length === 0 && <li className="wgt-empty">{t('widgets.dailyGoals.emptyHint')}</li>}
-        {goals.map((g) => (
-          <li key={g.id} className={g.done >= g.target ? 'reached' : ''}>
-            <div className="wgt-goal-top">
-              <span className="wgt-goal-text">{g.text}</span>
-              <span className="wgt-goal-count">{g.done}/{g.target}</span>
-            </div>
-            <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${(g.done / g.target) * 100}%` }} /></div>
-            <div className="wgt-goal-ctrls">
-              <button className="wgt-btn-icon sm" aria-label={t('widgets.dailyGoals.decrement')} onClick={() => bump(g.id, -1)}>−</button>
-              <button className="wgt-btn-icon sm" aria-label={t('widgets.dailyGoals.increment')} onClick={() => bump(g.id, 1)}>+</button>
-              <button className="wgt-btn-icon sm" title={t('widgets.dailyGoals.raiseTarget')} onClick={() => write(goals.map((x) => (x.id === g.id ? { ...x, target: x.target + 1 } : x)))}>+T</button>
-              <button className="wgt-btn-icon sm" title={t('common.remove')} aria-label={t('common.remove')} onClick={() => write(goals.filter((x) => x.id !== g.id))}>×</button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <DailyGoalPanel compact={size.h < 200 || legacy.length > 0} />
+      {legacy.length > 0 && (
+        <ul className="wgt-goals-list wgt-goals-own" aria-label={t('dailyGoal.ownGoals')}>
+          {legacy.map((g) => {
+            const done = g.doneDay === today;
+            return (
+              <li key={g.id} className={done ? 'reached' : ''}>
+                <label className="wgt-goal-top">
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    onChange={() => write(legacy.map((x) => (x.id === g.id ? { ...x, doneDay: done ? undefined : today } : x)))}
+                  />
+                  <span className="wgt-goal-text">{g.text}</span>
+                </label>
+                <button className="wgt-btn-icon sm" title={t('common.remove')} aria-label={t('common.remove')} onClick={() => write(legacy.filter((x) => x.id !== g.id))}>×</button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

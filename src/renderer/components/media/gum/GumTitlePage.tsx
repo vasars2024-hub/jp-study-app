@@ -8,7 +8,7 @@
  * a second banner, title, Play button, synopsis and four tabs of its own inside
  * this page's tab. The per-file tools stay one click away in All files.
  */
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { MediaItem } from '../../../../shared/types';
 import { WATCH_STATUSES, type WatchStatus, type WatchTitlePatch } from '../../../../shared/watchLibrary';
 import type { MediaEpisodeGuideEntry } from '../../../../shared/mediaMetadataIpc';
@@ -19,7 +19,7 @@ import { useT } from '../../../i18n';
 import type { LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import MediaArtwork from '../library/MediaArtwork';
 import GumIcon from './GumIcons';
-import { GumArt, formatRuntime, formatScore, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
+import { GumArt, formatPerEpisode, formatRuntime, formatScore, formatTimeLeft, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
 import {
   externalPlayerProfile,
   openInExternalPlayer,
@@ -346,7 +346,9 @@ function EpisodeCard({
   const watched = item ? isWatched(item) : row.trackedWatched;
   const inProgress = item ? !watched && (item.positionSec ?? 0) > 0 : false;
   const name = (item ? providerEpisodeTitle(item) : null) ?? row.guide?.title ?? (item && row.number === null ? item.title : null);
-  const runtime = row.guide?.runtimeMin ?? item?.runtimeMin ?? (item?.durationSec ? Math.round(item.durationSec / 60) : undefined);
+  // The file's own length first: the guide's and provider's are the catalogue's typical
+  // episode, which put "24 min" on a 20-second file.
+  const runtime = (item?.durationSec ? item.durationSec / 60 : undefined) ?? row.guide?.runtimeMin ?? item?.runtimeMin;
   const study = useStudyLanguage().lang;
   const subs = item ? langNames(t, item, status, study) : '';
   let note: string;
@@ -359,8 +361,7 @@ function EpisodeCard({
     note = when ? t('gum.episode.watchedOn', { date: when }) : t('gum.episode.watched');
     tone = 'watched';
   } else if (inProgress && item.durationSec) {
-    const left = Math.max(1, Math.round((item.durationSec - (item.positionSec ?? 0)) / 60));
-    note = [t('gum.card.minutesLeft', { m: left }), subs ? subsNote(t, subs, status) : null].filter(Boolean).join(' · ');
+    note = [formatTimeLeft(t, item.durationSec, item.positionSec ?? 0), subs ? subsNote(t, subs, status) : null].filter(Boolean).join(' · ');
     tone = 'progress';
   } else {
     note = [t('gum.episode.onDisk'), subs ? subsNote(t, subs, status) : t('gum.episode.noSubs')].join(' · ');
@@ -372,14 +373,14 @@ function EpisodeCard({
       <div className="gum-episode__still">
         {item ? (
           <MediaArtwork id={item.id} title={name ?? label} variant="still" ratio="16 / 9" decorative>
-            {runtime ? <span className="gum-badge gum-badge--runtime">{t('gum.runtime.m', { m: runtime })}</span> : null}
+            {runtime ? <span className="gum-badge gum-badge--runtime">{formatRuntime(t, runtime)}</span> : null}
             {fraction !== null && fraction > 0 && fraction < 1 && (
               <span className="gum-progress gum-progress--flush" role="presentation"><i style={{ width: `${Math.round(fraction * 100)}%` }} /></span>
             )}
           </MediaArtwork>
         ) : (
           <div className="gum-episode__blank" aria-hidden="true">
-            {runtime ? <span className="gum-badge gum-badge--runtime">{t('gum.runtime.m', { m: runtime })}</span> : null}
+            {runtime ? <span className="gum-badge gum-badge--runtime">{formatRuntime(t, runtime)}</span> : null}
           </div>
         )}
       </div>
@@ -484,6 +485,81 @@ function Rating({ value, onChange, label }: { value: number | undefined; onChang
   );
 }
 
+/** Keys that change a closed native `<select>` without opening it. */
+const SELECT_BROWSE_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown']);
+
+/**
+ * The title's watch status.
+ *
+ * A closed native select changes its value on every arrow key, and saving on `change` meant
+ * arrowing past "Completed" on the way to "On hold" marked the show completed (and set its
+ * progress to the last episode). A keyboard change is now a draft, saved on Enter or when
+ * focus leaves; Escape puts the saved value back. A pick from the open list (mouse, or
+ * Enter in the list) saves at once. The select is never disabled while saving — disabling
+ * it threw focus to the page after every change.
+ *
+ * An untracked title shows the status its files suggest ("Watching (from your files)"),
+ * the same status the library counts it under; it said "Not tracked" while the Watching
+ * tab counted it.
+ */
+export function GumStatusSelect({ title, busy, onCommit }: { title: GumTitle; busy: boolean; onCommit: (status: WatchStatus) => void }) {
+  const { t } = useT();
+  const saved = title.tracked ? title.status ?? '' : '';
+  const [draft, setDraft] = useState<string>(saved);
+  const browsing = useRef(false);
+  /** The value last sent, so the blur after a pick does not save it a second time. */
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    setDraft(saved);
+    sent.current = null;
+  }, [saved, title.id]);
+  const commit = (value: string): void => {
+    if (!value || value === saved || value === sent.current || busy) return;
+    sent.current = value;
+    onCommit(value as WatchStatus);
+  };
+  const untrackedLabel = !title.tracked && title.status
+    ? t('gum.title.derivedStatus', { status: t(`watchLibrary.status.${title.status}`) })
+    : t('gum.title.notTracked');
+  return (
+    <select
+      value={draft}
+      aria-busy={busy || undefined}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commit(draft);
+          return;
+        }
+        if (event.key === 'Escape' && draft !== saved) {
+          event.preventDefault();
+          event.stopPropagation();
+          setDraft(saved);
+          return;
+        }
+        const printable = event.key.length === 1 && !event.ctrlKey && !event.metaKey;
+        if ((SELECT_BROWSE_KEYS.has(event.key) && !event.altKey) || printable) {
+          browsing.current = true;
+          // The `change` a browse key causes fires within this key press; after it, a
+          // change is a pick from the open list again.
+          window.setTimeout(() => {
+            browsing.current = false;
+          }, 0);
+        }
+      }}
+      onChange={(event) => {
+        const value = event.target.value;
+        setDraft(value);
+        if (!browsing.current) commit(value);
+      }}
+      onBlur={() => commit(draft)}
+    >
+      {!title.tracked && <option value="">{untrackedLabel}</option>}
+      {WATCH_STATUSES.map((status) => <option key={status} value={status}>{t(`watchLibrary.status.${status}`)}</option>)}
+    </select>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -579,7 +655,7 @@ export default function GumTitlePage({
     title.genres.slice(0, 3).join(', ') || null,
     title.kind !== 'film' && seasons.length > 1 ? t('gum.meta.seasons', { count: seasons.length }) : null,
     title.kind !== 'film' && title.episodeCount ? t('gum.meta.episodes', { count: title.episodeCount }) : null,
-    title.runtimeMin ? (title.kind === 'film' ? formatRuntime(t, title.runtimeMin) : t('gum.meta.perEpisode', { m: title.runtimeMin })) : null,
+    title.runtimeMin ? (title.kind === 'film' ? formatRuntime(t, title.runtimeMin) : formatPerEpisode(t, title.runtimeMin)) : null,
     title.providerScore ? t('gum.meta.providerScore', { score: Math.round(title.providerScore * 10) / 10 }) : null,
   ].filter(Boolean) as string[];
   const chips = [t(typeLabelKey(title)), title.language === 'ja' ? t('gum.filter.language.ja') : null, title.format && title.format !== 'TV' ? title.format : null]
@@ -694,19 +770,7 @@ export default function GumTitlePage({
             )}
             <label className="gum-field">
               <span>{t('gum.title.status')}</span>
-              <select
-                // An untracked title's status is only what its files suggest; the select
-                // says "Not tracked" until the viewer picks one, which starts tracking it.
-                value={title.tracked ? title.status ?? '' : ''}
-                disabled={busy}
-                onChange={(event) => {
-                  const value = event.target.value as WatchStatus;
-                  if (value) void edit({ status: value });
-                }}
-              >
-                {!title.tracked && <option value="">{t('gum.title.notTracked')}</option>}
-                {WATCH_STATUSES.map((status) => <option key={status} value={status}>{t(`watchLibrary.status.${status}`)}</option>)}
-              </select>
+              <GumStatusSelect title={title} busy={busy} onCommit={(status) => void edit({ status })} />
             </label>
             <div className="gum-field">
               <Rating
@@ -722,11 +786,11 @@ export default function GumTitlePage({
             ) : (
               <div className="gum-field gum-stepper" role="group" aria-label={t('gum.title.progress')}>
                 <span>{t('gum.title.progress')}</span>
-                <button type="button" className="gum-icon-btn" disabled={busy || title.progress <= 0} onClick={() => void edit({ progress: Math.max(0, title.progress - 1) })} aria-label={t('gum.title.progressDown')}>
+                <button type="button" className="gum-icon-btn" disabled={title.progress <= 0} aria-busy={busy || undefined} onClick={() => { if (!busy) void edit({ progress: Math.max(0, title.progress - 1) }); }} aria-label={t('gum.title.progressDown')}>
                   <GumIcon name="minus" size={12} />
                 </button>
                 <strong aria-live="polite">{title.episodeCount ? `${title.progress} / ${title.episodeCount}` : title.progress}</strong>
-                <button type="button" className="gum-icon-btn" disabled={busy || (title.episodeCount !== undefined && title.progress >= title.episodeCount)} onClick={() => void edit({ progress: title.progress + 1 })} aria-label={t('gum.title.progressUp')}>
+                <button type="button" className="gum-icon-btn" disabled={title.episodeCount !== undefined && title.progress >= title.episodeCount} aria-busy={busy || undefined} onClick={() => { if (!busy) void edit({ progress: title.progress + 1 }); }} aria-label={t('gum.title.progressUp')}>
                   <GumIcon name="plus" size={12} />
                 </button>
               </div>
@@ -812,7 +876,7 @@ export default function GumTitlePage({
               {title.runtimeMin && (
                 <div>
                   <dt>{t('gum.facts.runtime')}</dt>
-                  <dd>{title.kind === 'film' ? formatRuntime(t, title.runtimeMin) : t('gum.meta.perEpisode', { m: title.runtimeMin })}</dd>
+                  <dd>{title.kind === 'film' ? formatRuntime(t, title.runtimeMin) : formatPerEpisode(t, title.runtimeMin)}</dd>
                 </div>
               )}
               {facts.studio && <div><dt>{t('gum.facts.studio')}</dt><dd>{facts.studio}</dd></div>}

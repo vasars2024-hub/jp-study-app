@@ -37,6 +37,7 @@ import {
   shouldRunTour,
 } from '../../onboardingStore';
 import { useT } from '../../i18n';
+import { layoutViewport, toLayoutRect } from '../../zoomCoords';
 import { TELEMETRY_CONSENT_DECIDED_EVENT, telemetryConsentPending } from '../../../shared/stats';
 import './onboarding.css';
 
@@ -54,7 +55,11 @@ function measure(selector: string | null): Rect | null {
   if (!selector) return null;
   const element = document.querySelector(selector);
   if (!element) return null;
-  const box = element.getBoundingClientRect();
+  // The overlay renders inside #root, whose CSS zoom scales every `top/left` it
+  // sets, while getBoundingClientRect reports viewport pixels. Convert once here:
+  // at the 80% default zoom the raw rect put the ring and bubble a fifth of the
+  // way short of their anchor.
+  const box = toLayoutRect(element.getBoundingClientRect());
   // A zero-area element is present in the DOM but not on screen (collapsed rail,
   // hidden taskbar). Treat it as absent so the step centres instead of drawing a
   // spotlight the user cannot see.
@@ -308,12 +313,14 @@ function bubblePosition(rect: Rect): { top: number; left: number } {
   const BUBBLE_W = 340;
   const BUBBLE_H = 210;
   const GAP = 14;
+  // Layout pixels, like `rect`: the window's own size divided by the #root zoom.
+  const viewport = layoutViewport();
   const below = rect.top + rect.height + GAP;
-  const fitsBelow = below + BUBBLE_H < window.innerHeight;
+  const fitsBelow = below + BUBBLE_H < viewport.height;
   const top = fitsBelow ? below : Math.max(GAP, rect.top - BUBBLE_H - GAP);
   const left = Math.min(
     Math.max(GAP, rect.left + rect.width / 2 - BUBBLE_W / 2),
-    Math.max(GAP, window.innerWidth - BUBBLE_W - GAP),
+    Math.max(GAP, viewport.width - BUBBLE_W - GAP),
   );
   return { top, left };
 }

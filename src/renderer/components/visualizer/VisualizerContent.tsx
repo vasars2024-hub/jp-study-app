@@ -20,6 +20,7 @@ import {
   loadVizSettings,
   onVizSettingsChanged,
   saveVizSettings,
+  vizShowsIn,
   type VizSettings,
 } from '../../visualizerSettings';
 import './visualizerWidgetLiquid.css';
@@ -73,6 +74,56 @@ export function VizStage({
 }) {
   const { t } = useT();
   const settingsLabel = `${t('settings.nav.visualizer')} — ${t('settings.visualizer.options')}`;
+  /* The "Where" setting (Wallpaper / Widget / Both) and the on/off switch are honoured
+     here too. This stage is the "Widget" surface; it used to draw regardless, so
+     choosing "Wallpaper" changed nothing in it. When the settings keep it off this
+     surface, the stage says so and offers the one step that brings it back. */
+  const shown = vizShowsIn(settings, 'widget');
+  if (!shown) {
+    const turnOn = (): void => {
+      const latest = loadVizSettings();
+      saveVizSettings({
+        ...latest,
+        enabled: true,
+        mode: latest.mode === 'wallpaper' && latest.enabled ? 'both' : latest.mode,
+      });
+    };
+    return (
+      <div className={classes.root} data-viz-hidden={settings.enabled ? 'wallpaper' : 'off'}>
+        <button
+          type="button"
+          className={`${classes.hint} viz-widget-empty viz-widget-hint-action lq-hit-placed`}
+          data-primary
+          onClick={turnOn}
+        >
+          <span className="viz-widget-hint-state">
+            {settings.enabled ? t('musicUi.viz.wallpaperOnly') : t('musicUi.viz.off')}
+          </span>
+          <span className="viz-widget-hint-route">
+            {settings.enabled ? t('musicUi.viz.showHereToo') : t('musicUi.viz.turnOn')}
+          </span>
+        </button>
+        {onOpenSettings && (
+          <ContextualSurface
+            className="viz-widget-dock"
+            role="toolbar"
+            aria-label={t('settings.nav.visualizer')}
+          >
+            <button
+              type="button"
+              className="viz-widget-action lq-hit"
+              data-viz-action="settings"
+              title={settingsLabel}
+              aria-label={settingsLabel}
+              onClick={onOpenSettings}
+            >
+              <Icon name="settings" size={14} />
+            </button>
+          </ContextualSurface>
+        )}
+      </div>
+    );
+  }
   /* Two runs, one control. The route alone ("Open Music") is a label, not a state: a blank
      stage never said WHY it is blank, so category 8 found no observable state on this surface
      at all and could not score it. The condition is named first and the route stays exactly

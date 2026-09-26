@@ -19,6 +19,12 @@ import { displayKeysFor, primaryDisplayKey, resolveDisplayKey } from '../shared/
 export interface DisplaySummary {
   id: number;
   key: string;
+  /**
+   * The monitor's name as the OS reports it (e.g. "DELL U2419H"), or '' when it
+   * reports none — callers show a translated "Display N" by position then. Never
+   * the synthetic `display-<id>` the key fingerprint falls back to: that is an
+   * opaque OS handle, and Settings showed it verbatim ("display-193337900").
+   */
   label: string;
   bounds: Electron.Rectangle;
   workArea: Electron.Rectangle;
@@ -30,6 +36,20 @@ export interface DisplaySummary {
 /** Synthetic displays injected by simulated-display mode. Empty in normal use. */
 let virtualDisplays: DisplayLike[] = [];
 
+/** Label fallback that keeps the key fingerprint unique; not a name to show anyone. */
+function syntheticLabel(id: number): string {
+  return `display-${id}`;
+}
+
+/** The label a person can read, or '' when the only label is the synthetic fallback. */
+export function friendlyDisplayLabel(d: Pick<DisplayLike, 'id' | 'label' | 'virtual'>): string {
+  // Simulated displays are named "Simulated <n>" in English for their key prefix;
+  // the Monitors page already tags them, and "Display N" is their translated name.
+  if (d.virtual === true) return '';
+  const label = (d.label ?? '').trim();
+  return label && label !== syntheticLabel(d.id) ? label : '';
+}
+
 type ChangeListener = () => void;
 const changeListeners = new Set<ChangeListener>();
 let screenHooksInstalled = false;
@@ -40,7 +60,7 @@ function toDisplayLike(d: Electron.Display, primaryId: number): DisplayLike {
     // `label` is '' on some Windows driver/adapter combinations. Falling back to
     // the id keeps the fingerprint unique per panel instead of collapsing every
     // unlabelled monitor onto one key.
-    label: d.label || `display-${d.id}`,
+    label: d.label || syntheticLabel(d.id),
     bounds: d.bounds,
     workArea: d.workArea,
     scaleFactor: d.scaleFactor,
@@ -62,7 +82,7 @@ export function listDisplays(): DisplaySummary[] {
   return all.map((d, i) => ({
     id: d.id,
     key: keys[i],
-    label: d.label ?? `display-${d.id}`,
+    label: friendlyDisplayLabel(d),
     bounds: d.bounds,
     workArea: d.workArea,
     primary: d.primary === true,

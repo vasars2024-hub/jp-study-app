@@ -12,7 +12,7 @@ import DayCycleLighting from './DayCycleLightingLayer';
 import WeatherLayer from './WeatherLayer';
 import { pulseCalendarCompanions } from './schedules';
 import { onCalendarChanged } from '../calendar';
-import { hasDiscoveredAero } from '../aeroDiscovery';
+import { onAeroDiscoveryChanged, showsTreasureCompanion } from '../aeroDiscovery';
 
 const TREASURE_BONZI_ENV = (base: EnvironmentSettings): EnvironmentSettings => ({
   ...base,
@@ -33,6 +33,9 @@ export default function EnvironmentStack({
   const [env, setEnv] = useState<EnvironmentSettings>(loadEnvironment);
 
   useEffect(() => onEnvironmentChanged(setEnv), []);
+  // Discovery and "hide the locked companion" both change what shows here.
+  const [treasure, setTreasure] = useState(showsTreasureCompanion);
+  useEffect(() => onAeroDiscoveryChanged(() => setTreasure(showsTreasureCompanion())), []);
 
   // Calendar changes can swap walls / ping companions (also re-tick wallpaper rules)
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function EnvironmentStack({
   }, [env.enabled, env.rotationEnabled, suppressWallpaper, onRotationActive]);
 
   if (!env.enabled) {
-    if (hasDiscoveredAero()) return null;
+    if (!treasure) return null;
     return (
       <div className="os-env-stack os-env-stack-treasure" aria-hidden={false} data-companions="1">
         <CompanionLayer env={TREASURE_BONZI_ENV(env)} />
@@ -77,7 +80,7 @@ export default function EnvironmentStack({
     );
   }
 
-  const showTreasureBonzi = !hasDiscoveredAero() && !env.companionsEnabled;
+  const showTreasureBonzi = treasure && !env.companionsEnabled;
   const showLivingWallpaper = env.rotationEnabled && !suppressWallpaper;
 
   return (

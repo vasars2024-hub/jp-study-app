@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
+import { formatDecimal } from '../../shell/localeFormat';
 import {
   effectiveVelocity,
   loadMotionPrefs,
@@ -29,7 +30,7 @@ import { loadAeroSafeMode, onAeroSafeModeChanged, setAeroSafeMode } from '../../
 import { inspectAeroRecoveryHealth, onAeroRecoveryHealthChanged } from '../../../aeroRecoveryHealth';
 
 export default function MotionPage() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { seg, focusSettingId } = useSettings();
   const [m, setM] = useState<MotionPrefs>(loadMotionPrefs);
   // Preview state so the sliders are verifiable by eye, not just by trust.
@@ -47,7 +48,7 @@ export default function MotionPage() {
   const velocityLabel =
     m.velocity === 0
       ? t('settings.motion.velocity.instant')
-      : `${m.velocity.toFixed(2)}×`;
+      : `${formatDecimal(m.velocity, 2, lang)}×`;
 
   return (
     <>

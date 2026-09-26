@@ -90,7 +90,7 @@ describe('every toast has an exit that is not a timeout', () => {
     expect(close).not.toBeNull();
     expect(close?.getAttribute('aria-label')?.length).toBeGreaterThan(0);
     act(() => close?.click());
-    expect(host.querySelector('.os-toast-host')).toBeNull();
+    expect(host.querySelector('.os-toast-host .os-toast')).toBeNull();
   });
 
   it('still expires on its own when nobody dismisses it', () => {
@@ -100,7 +100,7 @@ describe('every toast has an exit that is not a timeout', () => {
     advance(2000);
     expect(toast()).not.toBeNull();
     advance(1200);
-    expect(host.querySelector('.os-toast-host')).toBeNull();
+    expect(host.querySelector('.os-toast-host .os-toast')).toBeNull();
   });
 });
 
@@ -136,7 +136,7 @@ describe('the undo window waits for the user', () => {
     advance(400);
     expect(toast(), 'still owed roughly 600 ms').not.toBeNull();
     advance(900);
-    expect(host.querySelector('.os-toast-host')).toBeNull();
+    expect(host.querySelector('.os-toast-host .os-toast')).toBeNull();
   });
 
   it('holds while focus is inside the host, for the keyboard path', () => {

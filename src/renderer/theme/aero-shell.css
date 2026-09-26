@@ -3616,11 +3616,19 @@
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-title {
   font-size: 12px;
   font-weight: 600;
+  /* Vista titles are dark ink with a white glow. White text on this pale sky
+     glass measured 2.57:1 (round-2 visual scan, every aero window). */
+  color: #0d2c47;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.95), 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
 :root[data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) .fwin-b {
   width: 24px;
   height: 20px;
+  /* The UA button padding (1px 6px) left 12px for the glyph, and ⧉ / ◇ are
+     wider than that: they overflowed the 24px cap (scrollWidth 27). */
+  padding: 0;
+  line-height: 1;
   border-radius: 0 0 3px 3px;
   color: #f8fdff;
   border: 1px solid rgba(42, 119, 190, 0.64);

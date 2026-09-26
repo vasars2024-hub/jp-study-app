@@ -8,6 +8,8 @@ import {
 import { AUTOMATION_BUILDER } from '../../../shared/automationBuilder';
 import { getToolboxModule, listBlancToolboxModules, listToolboxModules, type ToolboxModuleId } from '../../../shared/toolboxRegistry';
 import { isRegistryGovernedTool, isToolLaunchable, mergeFavoriteTools } from './blancToolVisibility';
+import { isDeveloperOnlyTool, useBlancDeveloperTools } from './blancDeveloperTools';
+import { blancToolLabel, blancToolLabelKey } from './blancToolLabels';
 import { markSectionOpenHandled } from '../../sectionSurface';
 import { BlancToolErrorBoundary } from './BlancToolErrorBoundary';
 import {
@@ -50,6 +52,7 @@ import {
   type BlancModeSettings,
 } from '../../blancMode';
 import { getUiLang, setUiLang, useT } from '../../i18n';
+import { commandLabel, commandNote } from '../../commandI18n';
 import {
   exportCurrentToolboxSettings,
   importCurrentToolboxSettings,
@@ -225,16 +228,18 @@ const BlancAudioMinePanel = lazy(() =>
 // Pillar 3 — App Drawer. Supersedes workspace-launcher (retired below).
 const BlancAppDrawerPanel = lazy(() => import('./BlancAppDrawerPanel'));
 
-const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
-  read: { label: 'Read', icon: 'library' },
-  mine: { label: 'Mine', icon: 'scan' },
-  deck: { label: 'Deck', icon: 'anki' },
-  flashcards: { label: 'Cards', icon: 'flashcards' },
-  media: { label: 'Media', icon: 'player' },
-  stats: { label: 'Stats', icon: 'stats' },
-  tools: { label: 'Toolbox', icon: 'wrench' },
-  blocks: { label: 'Blocks', icon: 'app' },
-  settings: { label: 'Settings', icon: 'settings' },
+// Labels are catalog KEYS, resolved with t() at render (module-level tables
+// cannot call useT()).
+const TAB_META: Record<BlancTabId, { labelKey: string; icon: IconName }> = {
+  read: { labelKey: 'blanc.shell.tab.read', icon: 'library' },
+  mine: { labelKey: 'blanc.shell.tab.mine', icon: 'scan' },
+  deck: { labelKey: 'blanc.shell.tab.deck', icon: 'anki' },
+  flashcards: { labelKey: 'blanc.shell.tab.cards', icon: 'flashcards' },
+  media: { labelKey: 'blanc.shell.tab.media', icon: 'player' },
+  stats: { labelKey: 'blanc.shell.tab.stats', icon: 'stats' },
+  tools: { labelKey: 'blanc.shell.tab.toolbox', icon: 'wrench' },
+  blocks: { labelKey: 'blanc.shell.tab.blocks', icon: 'app' },
+  settings: { labelKey: 'blanc.shell.tab.settings', icon: 'settings' },
 };
 
 function useMinuteClock(): Date {
@@ -254,6 +259,7 @@ export default function BlancShell({
   onInitialBookConsumed: () => void;
 }) {
   const { t, lang } = useT();
+  const blancTools = useBlancTools();
   const [settings, setSettings] = useState<BlancModeSettings>(() => loadBlancMode());
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [workspaceFull, setWorkspaceFull] = useState(false);
@@ -444,15 +450,7 @@ export default function BlancShell({
     });
   };
 
-  const patchDark = (on: boolean): void => {
-    setSettings(setBlancDarkMode(on));
-  };
-
-  const patchAdvanced = (on: boolean): void => {
-    setSettings(setBlancAdvanced(on));
-  };
-
-  const title = book ? 'Reader' : TAB_META[tab].label;
+  const title = book ? t('blanc.shell.reader') : t(TAB_META[tab].labelKey);
   const canExpandWorkspace = book || tab === 'mine' || tab === 'flashcards' || tab === 'media' || tab === 'stats' || tab === 'tools';
 
   return (
@@ -460,20 +458,18 @@ export default function BlancShell({
       <aside
         className="blanc-taskbar lq-liquid"
         data-lq-role="liquid"
-        aria-label="Blanc Mode sections"
+        aria-label={t('blanc.shell.sections')}
       >
-        <div className="blanc-brand">
-          <span className="blanc-brand-mark" aria-hidden />
-          <span>Blanc</span>
-        </div>
+        {/* No in-window "Blanc" brand: the window title already names the window,
+            and repeating it here only cost the taskbar a row (design brief). */}
         <button
           type="button"
           className="blanc-nav-btn blanc-taskbar-toggle"
           onClick={() => setTaskbarHidden(true)}
-          title="Hide taskbar"
+          title={t('blanc.shell.hideTaskbar')}
         >
           <Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }} />
-          <span>Hide</span>
+          <span>{t('blanc.shell.hide')}</span>
         </button>
         <nav className="blanc-nav">
           {BLANC_TABS.map((id) => (
@@ -488,10 +484,10 @@ export default function BlancShell({
               // for a navigation landmark, which this <nav> is.
               aria-current={!book && tab === id ? 'page' : undefined}
               onClick={() => chooseNavTab(id)}
-              title={TAB_META[id].label}
+              title={t(TAB_META[id].labelKey)}
             >
               <Icon name={TAB_META[id].icon} size={16} />
-              <span>{TAB_META[id].label}</span>
+              <span>{t(TAB_META[id].labelKey)}</span>
             </button>
           ))}
         </nav>
@@ -500,7 +496,7 @@ export default function BlancShell({
           className="blanc-exit"
           onClick={() => void setBlancModeEnabled(false)}
         >
-          Exit Blanc
+          {t('blanc.shell.exit')}
         </button>
       </aside>
 
@@ -509,7 +505,7 @@ export default function BlancShell({
           <div className="blanc-title">
             {book && (
               <button type="button" className="blanc-small-btn" onClick={() => setBook(null)}>
-                Back
+                {t('blanc.shell.back')}
               </button>
             )}
             <span>{title}</span>
@@ -518,7 +514,7 @@ export default function BlancShell({
               time is the one thing in the top bar that is read rather than operated. A <time>
               is not a control, so keeping it visible costs the default view nothing. */}
           <time className="blanc-clock">
-            {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {clock.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' })}
           </time>
           {/* Blanc's one cross-tool capability (6b488974) and its dominant way in, so it stays
               in the bar rather than one click inside the drawer: a Ctrl+F affordance that has
@@ -528,8 +524,8 @@ export default function BlancShell({
           <button
             type="button"
             className="blanc-icon-btn primary blanc-top-search"
-            title="Search Blanc (Ctrl+F)"
-            aria-label="Search Blanc"
+            title={t('blanc.shell.searchTitle')}
+            aria-label={t('blanc.shell.search')}
             onClick={() => setMasterSearchOpen(true)}
           >
             <Icon name="search" size={15} />
@@ -541,7 +537,7 @@ export default function BlancShell({
             aria-controls="blanc-top-context"
             onClick={() => setCompactToolsOpen((open) => !open)}
           >
-            Context tools
+            {t('blanc.shell.contextTools')}
           </button>
           <div
             id="blanc-top-context"
@@ -553,35 +549,23 @@ export default function BlancShell({
               <button
                 type="button"
                 className="blanc-icon-btn"
-                title={workspaceFull ? 'Exit fullscreen workspace' : 'Fullscreen workspace'}
+                title={workspaceFull ? t('blanc.shell.exitFullscreenWorkspace') : t('blanc.shell.fullscreenWorkspace')}
+                aria-label={workspaceFull ? t('blanc.shell.exitFullscreenWorkspace') : t('blanc.shell.fullscreenWorkspace')}
                 onClick={() => setWorkspaceFull((current) => !current)}
               >
                 <Icon name={workspaceFull ? 'app' : 'monitor'} size={15} />
               </button>
             )}
             <LanguageSelect />
-            <label className="blanc-check">
-              <input
-                type="checkbox"
-                checked={settings.advanced}
-                onChange={(event) => patchAdvanced(event.target.checked)}
-              />
-              <span>Advanced</span>
-            </label>
-            <label className="blanc-check">
-              <input
-                type="checkbox"
-                checked={settings.darkMode}
-                onChange={(event) => patchDark(event.target.checked)}
-              />
-              <span>Dark</span>
-            </label>
+            {/* Advanced and Dark used to sit here as well as in Settings > Interface:
+                the same two checkboxes in two places, one of them a step behind
+                the other. They live in Settings only. */}
             </div>
           </div>
         </header>
 
         <section className={`blanc-content${book ? ' is-reader' : ''}`}>
-          <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
+          <Suspense fallback={<div className="blanc-loading">{t('blanc.shell.loading')}</div>}>
           {book?.kind === 'manga' ? (
             <MangaReader item={book} onClose={() => setBook(null)} />
           ) : book ? (
@@ -616,19 +600,19 @@ export default function BlancShell({
         <button
           type="button"
           className="blanc-fullscreen-exit"
-          title="Exit fullscreen workspace"
+          title={t('blanc.shell.exitFullscreenWorkspace')}
           onClick={() => setWorkspaceFull(false)}
         >
           <Icon name="app" size={15} />
-          <span>Exit Fullscreen</span>
+          <span>{t('blanc.shell.exitFullscreen')}</span>
         </button>
       )}
       {taskbarHidden && !workspaceFull && (
         <button
           type="button"
           className="blanc-taskbar-reveal"
-          title="Show taskbar"
-          aria-label="Show Blanc taskbar"
+          title={t('blanc.shell.showTaskbar')}
+          aria-label={t('blanc.shell.showTaskbarAria')}
           onClick={() => setTaskbarHidden(false)}
         >
           <Icon name="chevron" size={15} />
@@ -636,7 +620,7 @@ export default function BlancShell({
       )}
       <BlancMasterSearch
         open={masterSearchOpen}
-        tools={BLANC_TOOLS}
+        tools={blancTools}
         content={masterContent}
         commands={TOOLBOX_SHORTCUT_COMMANDS.map((command) => ({
           ...command,
@@ -728,10 +712,11 @@ export default function BlancShell({
 }
 
 function LanguageSelect() {
+  const { t } = useT();
   const [lang, setLang] = useState<UiLang>(() => getUiLang());
   return (
     <label className="blanc-lang">
-      <span>Language</span>
+      <span>{t('blanc.shell.language')}</span>
       <select
         value={lang}
         onChange={(event) => {
@@ -751,6 +736,7 @@ function LanguageSelect() {
 }
 
 function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
+  const { t } = useT();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [activeFolder, setActiveFolder] = useState('all');
@@ -806,16 +792,16 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
   return (
     <div className="blanc-panel blanc-read">
       <fieldset>
-        <legend>Library</legend>
+        <legend>{t('blanc.shell.read.library')}</legend>
         <div className="blanc-toolbar">
           <button type="button" disabled={busy} onClick={() => void runBusy(async () => setItems(await window.api.importFiles()))}>
-            Upload file
+            {t('blanc.shell.read.uploadFile')}
           </button>
           <button type="button" disabled={busy} onClick={() => void runBusy(async () => setItems(await window.api.importFolder()))}>
-            Upload folder
+            {t('blanc.shell.read.uploadFolder')}
           </button>
           <button type="button" disabled={busy} onClick={() => void runBusy(refresh)}>
-            Refresh
+            {t('blanc.shell.refresh')}
           </button>
           <button
             type="button"
@@ -828,23 +814,23 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
               })
             }
           >
-            {watchFolder ? 'Change watch folder' : 'Set watch folder'}
+            {watchFolder ? t('blanc.shell.read.changeWatchFolder') : t('blanc.shell.read.setWatchFolder')}
           </button>
         </div>
         {watchFolder && (
           <p className="blanc-note">
-            Auto-import folder: <code>{watchFolder}</code>
+            {t('blanc.shell.read.autoImportFolder')} <code>{watchFolder}</code>
           </p>
         )}
         {status && <p className="blanc-error">{status}</p>}
       </fieldset>
 
       <fieldset>
-        <legend>Folders</legend>
+        <legend>{t('blanc.shell.read.folders')}</legend>
         <div className="blanc-folder-row">
           <select value={activeFolder} onChange={(event) => setActiveFolder(event.target.value)}>
-            <option value="all">All ({items.length})</option>
-            <option value="unfiled">Unfiled</option>
+            <option value="all">{t('blanc.shell.read.allCount', { count: items.length })}</option>
+            <option value="unfiled">{t('blanc.shell.read.unfiled')}</option>
             {folders.map((folder) => (
               <option key={folder} value={folder}>
                 {folder}
@@ -854,14 +840,15 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
           <input
             type="text"
             value={newFolder}
-            placeholder="New folder"
+            placeholder={t('blanc.shell.read.newFolder')}
+            aria-label={t('blanc.shell.read.newFolder')}
             onChange={(event) => setNewFolder(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') void createFolder();
             }}
           />
           <button type="button" onClick={() => void createFolder()}>
-            Add
+            {t('blanc.shell.read.add')}
           </button>
         </div>
       </fieldset>
@@ -870,10 +857,10 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
         <table className="blanc-table">
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Type</th>
-              <th>Progress</th>
-              <th>Folder</th>
+              <th>{t('blanc.shell.col.title')}</th>
+              <th>{t('blanc.shell.col.type')}</th>
+              <th>{t('blanc.shell.col.progress')}</th>
+              <th>{t('blanc.shell.col.folder')}</th>
               <th />
             </tr>
           </thead>
@@ -887,8 +874,8 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
                       {item.title}
                     </button>
                   </td>
-                  <td>{item.kind === 'manga' ? 'Manga' : item.epubFile?.endsWith('.pdf') ? 'PDF' : 'EPUB'}</td>
-                  <td>{pct}%</td>
+                  <td>{item.kind === 'manga' ? t('blanc.shell.read.kindManga') : item.epubFile?.endsWith('.pdf') ? 'PDF' : 'EPUB'}</td>
+                  <td>{new Intl.NumberFormat(LANG_TAGS[getUiLang()], { style: 'percent', maximumFractionDigits: 0 }).format(pct / 100)}</td>
                   <td>
                     <select
                       value={item.folder && folders.includes(item.folder) ? item.folder : ''}
@@ -896,7 +883,7 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
                         void window.api.setItemFolder(item.id, event.target.value || null).then(setItems)
                       }
                     >
-                      <option value="">Unfiled</option>
+                      <option value="">{t('blanc.shell.read.unfiled')}</option>
                       {folders.map((folder) => (
                         <option key={folder} value={folder}>
                           {folder}
@@ -906,7 +893,7 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
                   </td>
                   <td>
                     <button type="button" onClick={() => onOpenBook(item)}>
-                      Open
+                      {t('blanc.shell.open')}
                     </button>
                   </td>
                 </tr>
@@ -914,7 +901,7 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
             })}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={5}>No readable items in this folder.</td>
+                <td colSpan={5}>{t('blanc.shell.read.empty')}</td>
               </tr>
             )}
           </tbody>
@@ -933,6 +920,7 @@ function BlancMinePanel({ advanced }: { advanced: boolean }) {
 }
 
 function BlancDeckPanel({ advanced }: { advanced: boolean }) {
+  const { t } = useT();
   const [cards, setCards] = useState<DeckFlashcard[]>(() => loadDeck());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState('');
@@ -982,7 +970,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
         ankiExported: ok,
         ankiExportedAt: ok ? Date.now() : undefined,
         ankiNoteId: result.noteId,
-        ankiExportError: ok ? undefined : result.error ?? 'Export failed',
+        ankiExportError: ok ? undefined : result.error ?? t('blanc.shell.deck.exportFailed'),
         ankiDeck: deck || undefined,
       });
       setCards(loadDeck());
@@ -993,15 +981,15 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
   const exportSelected = async (): Promise<void> => {
     const targets = cards.filter((card) => selected.has(card.id));
     if (!targets.length) {
-      setStatus('Select cards first.');
+      setStatus(t('blanc.shell.deck.selectFirst'));
       return;
     }
-    setStatus(`Exporting ${targets.length} cards...`);
+    setStatus(t('blanc.shell.deck.exporting', { count: targets.length }));
     let ok = 0;
     for (const card of targets) {
       if (await sendCard(card)) ok += 1;
     }
-    setStatus(`Exported ${ok}/${targets.length}.`);
+    setStatus(t('blanc.shell.deck.exported', { ok, total: targets.length }));
   };
 
   const addManual = async (): Promise<void> => {
@@ -1026,9 +1014,9 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
     setSentence('');
     if (connected && created) {
       const ok = await sendCard(created);
-      setStatus(ok ? 'Card saved and exported.' : 'Card saved locally; Anki export failed.');
+      setStatus(ok ? t('blanc.shell.deck.savedExported') : t('blanc.shell.deck.savedExportFailed'));
     } else {
-      setStatus('Card saved locally.');
+      setStatus(t('blanc.shell.deck.savedLocal'));
     }
   };
 
@@ -1039,10 +1027,10 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
         <legend>Anki</legend>
         <div className="blanc-toolbar">
           <span className={`blanc-status-dot${connected ? ' ok' : ''}`} />
-          <span>{connected ? 'Connected' : 'Not connected'}</span>
-          <select value={deck} onChange={(event) => setDeck(event.target.value)}>
+          <span>{connected ? t('blanc.shell.deck.connected') : t('blanc.shell.deck.notConnected')}</span>
+          <select value={deck} aria-label={t('blanc.shell.deck.deck')} onChange={(event) => setDeck(event.target.value)}>
             {deck && !decks.includes(deck) && <option value={deck}>{deck}</option>}
-            <option value="">Profile default</option>
+            <option value="">{t('blanc.shell.deck.profileDefault')}</option>
             {decks.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -1050,34 +1038,34 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
             ))}
           </select>
           <button type="button" onClick={() => void exportSelected()}>
-            Export selected
+            {t('blanc.shell.deck.exportSelected')}
           </button>
         </div>
         {status && <p className="blanc-note">{status}</p>}
       </fieldset>
 
       <fieldset>
-        <legend>Manual card</legend>
+        <legend>{t('blanc.shell.deck.manualCard')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Word
+            {t('blanc.shell.deck.word')}
             <input value={term} lang="ja" onChange={(event) => setTerm(event.target.value)} />
           </label>
           <label>
-            Reading
+            {t('blanc.shell.deck.reading')}
             <input value={reading} lang="ja" onChange={(event) => setReading(event.target.value)} />
           </label>
           <label>
-            Meaning
+            {t('blanc.shell.deck.meaning')}
             <input value={meaning} onChange={(event) => setMeaning(event.target.value)} />
           </label>
           <label>
-            Sentence
+            {t('blanc.shell.deck.sentence')}
             <input value={sentence} lang="ja" onChange={(event) => setSentence(event.target.value)} />
           </label>
         </div>
         <button type="button" onClick={() => void addManual()} disabled={!term.trim()}>
-          Add card
+          {t('blanc.shell.deck.addCard')}
         </button>
       </fieldset>
 
@@ -1086,9 +1074,9 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
           <thead>
             <tr>
               <th />
-              <th>Word</th>
-              <th>Meaning</th>
-              <th>Source</th>
+              <th>{t('blanc.shell.deck.word')}</th>
+              <th>{t('blanc.shell.deck.meaning')}</th>
+              <th>{t('blanc.shell.deck.source')}</th>
               <th>Anki</th>
               <th />
             </tr>
@@ -1097,25 +1085,30 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
             {cards.map((card) => (
               <tr key={card.id}>
                 <td>
-                  <input type="checkbox" checked={selected.has(card.id)} onChange={() => toggle(card.id)} />
+                  <input
+                    type="checkbox"
+                    checked={selected.has(card.id)}
+                    aria-label={t('blanc.shell.deck.selectCard', { word: card.word })}
+                    onChange={() => toggle(card.id)}
+                  />
                 </td>
                 <td lang="ja">{card.word}</td>
                 <td>{card.meaning || card.back}</td>
                 <td>{card.bookTitle || card.source}</td>
-                <td>{card.ankiExported ? 'Exported' : card.ankiExportError ? 'Failed' : 'Local'}</td>
+                <td>{card.ankiExported ? t('blanc.shell.deck.stateExported') : card.ankiExportError ? t('blanc.shell.deck.stateFailed') : t('blanc.shell.deck.stateLocal')}</td>
                 <td>
                   <button type="button" onClick={() => {
                     removeDeckCard(card.id);
                     setCards(loadDeck());
                   }}>
-                    Remove
+                    {t('blanc.shell.remove')}
                   </button>
                 </td>
               </tr>
             ))}
             {cards.length === 0 && (
               <tr>
-                <td colSpan={6}>No cards yet. Mine from the reader or add one manually.</td>
+                <td colSpan={6}>{t('blanc.shell.deck.empty')}</td>
               </tr>
             )}
           </tbody>
@@ -1295,86 +1288,95 @@ interface BlancToolEntry {
   shortcut?: string;
 }
 
-const TOOL_CATEGORY_LABELS: Record<BlancToolCategory, string> = {
-  quick: 'Quick Tools',
-  productivity: 'Productivity',
-  system: 'System',
-  language: 'Language',
+const TOOL_CATEGORY_LABEL_KEYS: Record<BlancToolCategory, string> = {
+  quick: 'blanc.shell.category.quick',
+  productivity: 'blanc.shell.category.productivity',
+  system: 'blanc.shell.category.system',
+  language: 'blanc.shell.category.language',
 };
 
 const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'system', 'language'];
 
-const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; description: string; shortcut?: string }> = {
-  furigana: { category: 'language', description: 'Paste Japanese text and get ruby, Anki bracket furigana, or kana — offline.' },
-  'counter-reader': { category: 'language', description: 'Numbers, counters, dates, and clock times to kana — 3本 → さんぼん, with audio.' },
-  'dev-console': { category: 'system', description: 'Append-only event log — mining, deck writes, toasts, and errors, with copy-for-report.' },
-  'pitch-accent': { category: 'language', description: 'Pitch-accent contour for a word, with the pattern named and spoken aloud.' },
-  'audio-mine': { category: 'language', description: 'Transcribe a local audio or video file with Whisper, then click any word to look it up and mine it.' },
-  'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
-  'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
-  coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
-  agent: { category: 'system', description: 'Aim a request at local Qwen or a named cloud provider, bound its input and output, and see what it charged against the monthly ceiling.' },
-  files: { category: 'system', description: 'Everything the app stores, filed by what it is — books, decks, transcripts, dictionaries — with the real location of each.' },
-  notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
-  translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
-  music: { category: 'language', description: 'Song library, karaoke lyrics, and click-to-look-up — shares the app-wide player.' },
-  novels: { category: 'language', description: 'Search Jiten and the local catalogue, plan to read, and import or mine EPUBs.' },
-  discover: { category: 'language', description: 'What to watch next at your level, ranked against your library, with the reasons spelled out.' },
-  games: { category: 'language', description: 'The full Game Arena — sentence builder, cloze, match, kana sprint, and more; XP and mistakes sync app-wide.' },
-  immersion: { category: 'language', description: 'The full immersion browser — live guest, Reader Mode, sites rail, and click-to-look-up; feeds reading stats.' },
-  visualizer: { category: 'productivity', description: 'Live music visualizer with style, colour, and sensitivity controls — shared with the desktop wallpaper.' },
-  'local-agent': { category: 'system', description: 'Offline local assistant with reviewed plans, permissions, confirmations, and task progress.' },
-  calculator: { category: 'quick', description: 'Offline arithmetic with a compact result display.', shortcut: 'Alt+1' },
-  'unit-converter': { category: 'quick', description: 'Static length, weight, temperature, and data conversions.', shortcut: 'Alt+2' },
-  'hash-checker': { category: 'quick', description: 'Generate SHA-256 and compare downloaded files.', shortcut: 'Alt+3' },
-  'image-converter': { category: 'quick', description: 'Convert PNG, JPEG, and WebP without leaving Blanc.', shortcut: 'Alt+4' },
-  'batch-converter': { category: 'quick', description: 'Queue many images through the same canvas conversion.' },
-  'focus-timer': { category: 'productivity', description: 'Countdown, stopwatch, presets, and session rhythm.', shortcut: 'Alt+5' },
-  'quick-notes': { category: 'productivity', description: 'Local scratch notes that stay inside Blanc.', shortcut: 'Alt+6' },
-  clipboard: { category: 'productivity', description: 'Clipboard history and Japanese capture handoff.', shortcut: 'Alt+7' },
-  calendar: { category: 'productivity', description: 'Study calendar and local scheduling tools.' },
-  'system-monitor': { category: 'system', description: 'CPU, RAM, storage, uptime, and battery at a glance.', shortcut: 'Alt+8' },
-  'file-search': { category: 'system', description: 'Capped local filename search with open/copy actions.', shortcut: 'Alt+9' },
-  'automation-builder': { category: 'system', description: 'Launch the existing Windows automation builder.' },
-  'app-drawer': { category: 'system', description: 'Folders of apps, files, links, and Blanc tools — launch a whole folder in one click.' },
-  dictionary: { category: 'language', description: 'Lookup, dictionaries, examples, and study actions.' },
-  grammar: { category: 'language', description: 'Deterministic Japanese grammar reference.' },
-  'reading-finder': { category: 'language', description: 'Find and import readable Japanese sources.' },
-  resources: { category: 'language', description: 'Curated study resources and collected tools.' },
-  'notification-center': { category: 'system', description: 'Persistent notification history with dismiss and clear actions.' },
-  'difficulty-analyzer': { category: 'language', description: 'Paste text to estimate exam level and comprehension.' },
-  'immersion-tracker': { category: 'language', description: 'Read-only immersion site totals, streaks, and character counts.' },
-  'frequency-explorer': { category: 'language', description: 'Lookup corpus frequency ranks from installed dictionaries.' },
-  'subtitle-importer': { category: 'language', description: 'Parse subtitle files and send lines to the flashcard deck.' },
-  'context-search': { category: 'language', description: 'Search commands, saved words, deck cards, and grammar.' },
-  'kanji-inspector': { category: 'language', description: 'Inspect one kanji against radicals and dictionary senses.' },
-  'youtube-library': { category: 'language', description: 'Compact playlist manager with download and plan-to-watch toggles.' },
+/**
+ * Category and default shortcut per tool. The name and description are catalog
+ * keys (`blanc.tool.<id>` / `blanc.tool.<id>.desc`, see blancToolLabels.ts),
+ * resolved at render by `useBlancTools()`.
+ */
+const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; shortcut?: string }> = {
+  furigana: { category: 'language' },
+  'counter-reader': { category: 'language' },
+  'dev-console': { category: 'system' },
+  'pitch-accent': { category: 'language' },
+  'audio-mine': { category: 'language' },
+  'review-forecast': { category: 'language' },
+  'conjugation-drill': { category: 'language' },
+  coverage: { category: 'system' },
+  agent: { category: 'system' },
+  files: { category: 'system' },
+  notebook: { category: 'language' },
+  translate: { category: 'language' },
+  music: { category: 'language' },
+  novels: { category: 'language' },
+  discover: { category: 'language' },
+  games: { category: 'language' },
+  immersion: { category: 'language' },
+  visualizer: { category: 'productivity' },
+  'local-agent': { category: 'system' },
+  calculator: { category: 'quick', shortcut: 'Alt+1' },
+  'unit-converter': { category: 'quick', shortcut: 'Alt+2' },
+  'hash-checker': { category: 'quick', shortcut: 'Alt+3' },
+  'image-converter': { category: 'quick', shortcut: 'Alt+4' },
+  'batch-converter': { category: 'quick' },
+  'focus-timer': { category: 'productivity', shortcut: 'Alt+5' },
+  'quick-notes': { category: 'productivity', shortcut: 'Alt+6' },
+  clipboard: { category: 'productivity', shortcut: 'Alt+7' },
+  calendar: { category: 'productivity' },
+  'system-monitor': { category: 'system', shortcut: 'Alt+8' },
+  'file-search': { category: 'system', shortcut: 'Alt+9' },
+  'automation-builder': { category: 'system' },
+  'app-drawer': { category: 'system' },
+  dictionary: { category: 'language' },
+  grammar: { category: 'language' },
+  'reading-finder': { category: 'language' },
+  resources: { category: 'language' },
+  'notification-center': { category: 'system' },
+  'difficulty-analyzer': { category: 'language' },
+  'immersion-tracker': { category: 'language' },
+  'frequency-explorer': { category: 'language' },
+  'subtitle-importer': { category: 'language' },
+  'context-search': { category: 'language' },
+  'kanji-inspector': { category: 'language' },
+  'youtube-library': { category: 'language' },
 };
 
-/** Labels for the Blanc-only ids, which have no `TOOLBOX_MODULES` entry to read. */
-const BLANC_ONLY_LABELS: Record<BlancOnlyToolId, string> = {
-  coverage: 'Coverage',
-  agent: 'Agent',
-  files: 'Files',
-  notebook: 'Notebook',
-  translate: 'Translate',
-  music: 'Music',
-  novels: 'Novels',
-  discover: 'Discover',
-  games: 'Games',
-  immersion: 'Immersion',
-  visualizer: 'Visualizer',
-  'local-agent': 'Local AI Agent',
-};
+interface BlancToolDef {
+  id: BlancToolId;
+  icon: IconName;
+  category: BlancToolCategory;
+  shortcut?: string;
+}
 
-const BLANC_TOOLS: BlancToolEntry[] = BLANC_TOOL_IDS.map((id) => ({
+const BLANC_TOOL_DEFS: BlancToolDef[] = BLANC_TOOL_IDS.map((id) => ({
   id,
-  label: BLANC_ONLY_LABELS[id as BlancOnlyToolId] ?? getToolboxModule(id)?.label ?? id,
   icon: BLANC_TOOL_ICONS[id],
   category: TOOL_DESCRIPTIONS[id].category,
-  description: TOOL_DESCRIPTIONS[id].description,
   shortcut: TOOL_DESCRIPTIONS[id].shortcut,
 }));
+
+/** Blanc's tools with their name and description in the active UI language. */
+function useBlancTools(): BlancToolEntry[] {
+  const { t, lang } = useT();
+  const developerTools = useBlancDeveloperTools();
+  return useMemo(
+    () =>
+      BLANC_TOOL_DEFS.filter((def) => developerTools || !isDeveloperOnlyTool(def.id)).map((def) => ({
+        ...def,
+        label: blancToolLabel(t, def.id),
+        description: t(`${blancToolLabelKey(def.id) ?? def.id}.desc`),
+      })),
+    [lang, developerTools],
+  );
+}
 
 const BLANC_LAST_TOOL_KEY = 'jp-study.blanc.toolbox.lastTool';
 const BLANC_FAVORITE_TOOLS_KEY = 'jp-study.blanc.toolbox.favoriteTools';
@@ -1479,6 +1481,8 @@ function BlancToolsPanel({
   grammarRequest: { id: string; key: number } | null;
   toolRequest: { id: BlancToolId; key: number } | null;
 }) {
+  const { t } = useT();
+  const blancTools = useBlancTools();
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(() => loadToolboxSettings().sidebarExpanded);
@@ -1516,8 +1520,8 @@ function BlancToolsPanel({
     toolboxSettings.fuzzySearch
       ? fuzzyIncludes(haystack.toLowerCase(), normalizedQuery)
       : haystack.toLowerCase().includes(normalizedQuery);
-  const activeTool = BLANC_TOOLS.find((item) => item.id === tool) ?? BLANC_TOOLS[0];
-  const matchingTools = BLANC_TOOLS.filter((item) => {
+  const activeTool = blancTools.find((item) => item.id === tool) ?? blancTools[0];
+  const matchingTools = blancTools.filter((item) => {
     // The enabled/hidden lists are `ToolboxModuleId[]` and are re-sanitised
     // against TOOLBOX_MODULES on every load, so a Blanc-only id can never be a
     // member of one. Gating on them by name hid all nine Pillar 2 ports; see
@@ -1527,7 +1531,7 @@ function BlancToolsPanel({
     const haystack = [
       toolboxSettings.searchToolsByTitle ? item.label : '',
       toolboxSettings.searchToolDescriptions ? item.description : '',
-      TOOL_CATEGORY_LABELS[item.category],
+      t(TOOL_CATEGORY_LABEL_KEYS[item.category]),
     ].join(' ');
     return matches(haystack);
   });
@@ -1682,9 +1686,9 @@ function BlancToolsPanel({
   // The tab strip is workspace chrome, never content: it must live OUTSIDE
   // .blanc-embedded-view, whose `> *` children stretch to full height.
   const tabStrip = (
-    <div className="blanc-tool-tabs" role="tablist" aria-label="Open toolbox tools">
+    <div className="blanc-tool-tabs" role="tablist" aria-label={t('blanc.tb.openTools')}>
       {openTabs.map((id) => {
-        const item = BLANC_TOOLS.find((candidate) => candidate.id === id);
+        const item = blancTools.find((candidate) => candidate.id === id);
         if (!item) return null;
         return (
           <button
@@ -1693,7 +1697,7 @@ function BlancToolsPanel({
             role="tab"
             aria-selected={tool === id}
             className={tool === id ? 'active' : ''}
-            title={tip(`Switch to ${item.label}`)}
+            title={tip(t('blanc.tb.switchTo', { name: item.label }))}
             onClick={() => chooseTool(id)}
           >
             {toolboxSettings.showTabIcons && <Icon name={item.icon} size={13} />}
@@ -1702,8 +1706,8 @@ function BlancToolsPanel({
               role="button"
               tabIndex={0}
               className="blanc-tab-close"
-              title={tip(`Close ${item.label} tab`)}
-              aria-label={`Close ${item.label} tab`}
+              title={tip(t('blanc.tb.closeTab', { name: item.label }))}
+              aria-label={t('blanc.tb.closeTab', { name: item.label })}
               onClick={(event) => {
                 event.stopPropagation();
                 closeToolTab(id);
@@ -1727,17 +1731,17 @@ function BlancToolsPanel({
     return (
       <div className="blanc-panel blanc-tools-panel">
         <fieldset>
-          <legend>Toolbox</legend>
-          <p className="blanc-note">The Toolbox is disabled in Toolbox settings. Tools stay installed; only this launcher is off.</p>
+          <legend>{t('blanc.tb.disabledTitle')}</legend>
+          <p className="blanc-note">{t('blanc.tb.disabledNote')}</p>
           <div className="blanc-row-actions">
             <button type="button" onClick={() => saveToolboxSettings({ enabled: true })}>
-              Enable Toolbox
+              {t('blanc.tb.enable')}
             </button>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('blanc:select-tab', { detail: 'settings' }))}
             >
-              Open Settings
+              {t('blanc.tb.openSettings')}
             </button>
           </div>
         </fieldset>
@@ -1758,14 +1762,14 @@ function BlancToolsPanel({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search tools"
-            aria-label="Search toolbox tools"
+            placeholder={t('blanc.tb.searchPlaceholder')}
+            aria-label={t('blanc.tb.searchAria')}
           />
         </label>
         <button
           type="button"
           className="blanc-icon-btn"
-          title={tip(sidebarOpen ? 'Collapse tool launcher' : 'Expand tool launcher')}
+          title={tip(sidebarOpen ? t('blanc.tb.collapseLauncher') : t('blanc.tb.expandLauncher'))}
           onClick={() => setSidebar(!sidebarOpen)}
         >
           <Icon name="settings" size={15} />
@@ -1773,18 +1777,18 @@ function BlancToolsPanel({
       </header>
 
       <div className="blanc-workbench">
-        <aside className="blanc-tool-launcher" aria-label="Tool launcher">
+        <aside className="blanc-tool-launcher" aria-label={t('blanc.tb.launcher')}>
           {toolboxSettings.showFavoritesSection && favorites.length > 0 && (
-            <div className="blanc-tool-strip" aria-label="Favorite tools">
+            <div className="blanc-tool-strip" aria-label={t('blanc.tb.favorites')}>
               {favorites.map((id) => {
-                const item = BLANC_TOOLS.find((candidate) => candidate.id === id);
+                const item = blancTools.find((candidate) => candidate.id === id);
                 if (!item) return null;
                 return (
                   <button
                     key={id}
                     type="button"
                     className={tool === id ? 'active' : ''}
-                    title={tip(`Favorite: ${item.label}`)}
+                    title={tip(t('blanc.tb.favorite', { name: item.label }))}
                     onClick={() => chooseTool(id)}
                   >
                     <Icon name={item.icon} size={15} />
@@ -1796,9 +1800,9 @@ function BlancToolsPanel({
 
           {toolboxSettings.showRecentToolsSection && recent.length > 0 && (
             <div className="blanc-tool-recent">
-              <span>Recent</span>
+              <span>{t('blanc.tb.recent')}</span>
               {recent.map((id) => {
-                const item = BLANC_TOOLS.find((candidate) => candidate.id === id);
+                const item = blancTools.find((candidate) => candidate.id === id);
                 if (!item) return null;
                 return (
                   <button
@@ -1821,7 +1825,7 @@ function BlancToolsPanel({
             if (!tools.length) return null;
             return (
               <section key={category} className="blanc-tool-section">
-                {toolboxSettings.showCategoryHeaders && <h3>{TOOL_CATEGORY_LABELS[category]}</h3>}
+                {toolboxSettings.showCategoryHeaders && <h3>{t(TOOL_CATEGORY_LABEL_KEYS[category])}</h3>}
                 {tools.map((item) => (
                   <button
                     key={item.id}
@@ -1843,20 +1847,20 @@ function BlancToolsPanel({
           })}
 
           {commandResults.length > 0 && (
-            <section className="blanc-tool-section" aria-label="Matching commands">
-              {toolboxSettings.showCategoryHeaders && <h3>Commands</h3>}
+            <section className="blanc-tool-section" aria-label={t('blanc.tb.matchingCommands')}>
+              {toolboxSettings.showCategoryHeaders && <h3>{t('blanc.tb.commands')}</h3>}
               {commandResults.map((command) => (
                 <button
                   key={command.id}
                   type="button"
                   className="blanc-tool-launch blanc-command-result"
-                  title={tip(command.description)}
+                  title={tip(commandNote(command.id, command.description, t) ?? command.description)}
                   onClick={() => runCommand(command.id)}
                 >
                   <Icon name="wrench" size={16} />
                   <span>
-                    <strong>{command.name}</strong>
-                    {toolboxSettings.showCommandDescriptions && <small>{command.description}</small>}
+                    <strong>{commandLabel(command.id, command.name, t)}</strong>
+                    {toolboxSettings.showCommandDescriptions && <small>{commandNote(command.id, command.description, t) ?? command.description}</small>}
                   </span>
                   {toolboxSettings.showCommandShortcutLabels && commandBindings.get(command.id) && (
                     <kbd>{formatKeysDisplay(commandBindings.get(command.id) ?? '')}</kbd>
@@ -1867,14 +1871,14 @@ function BlancToolsPanel({
           )}
 
           {normalizedQuery && visibleTools.length === 0 && commandResults.length === 0 && (
-            <p className="blanc-note">No tools or commands match "{query.trim()}".</p>
+            <p className="blanc-note">{t('blanc.tb.noMatch', { query: query.trim() })}</p>
           )}
         </aside>
 
         <section className="blanc-tool-workspace" aria-label={activeTool.label}>
           <header className="blanc-active-tool-head">
             <div>
-              <span className="blanc-tool-kicker">{TOOL_CATEGORY_LABELS[activeTool.category]}</span>
+              <span className="blanc-tool-kicker">{t(TOOL_CATEGORY_LABEL_KEYS[activeTool.category])}</span>
               <h2>{activeTool.label}</h2>
             {toolboxSettings.showToolDescriptions && <p>{activeTool.description}</p>}
             </div>
@@ -1882,7 +1886,7 @@ function BlancToolsPanel({
               <button
                 type="button"
                 className={`blanc-icon-btn${favorites.includes(activeTool.id) ? ' active' : ''}`}
-                title={tip(favorites.includes(activeTool.id) ? `Unpin ${activeTool.label}` : `Pin ${activeTool.label}`)}
+                title={tip(t(favorites.includes(activeTool.id) ? 'blanc.tb.unpin' : 'blanc.tb.pin', { name: activeTool.label }))}
                 onClick={() => toggleFavorite(activeTool.id)}
               >
                 <Icon name="bookmark" size={15} />
@@ -1901,7 +1905,7 @@ function BlancToolsPanel({
               nested under the fallback would never see it.
             */}
             <BlancToolErrorBoundary key={tool} toolId={tool} label={activeTool.label}>
-              <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
+              <Suspense fallback={<div className="blanc-loading">{t('blanc.tb.loading')}</div>}>
                 {renderBlancTool(tool, onOpenBook, grammarRequest)}
               </Suspense>
             </BlancToolErrorBoundary>
@@ -1974,34 +1978,87 @@ function ToolboxCoveragePanel() {
 }
 
 function CalculatorPanel() {
+  const { t } = useT();
   const [expression, setExpression] = useState('2 + 2');
   const result = useMemo(() => calculateToolboxExpression(expression), [expression]);
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Calculator</legend>
+        <legend>{t('blanc.tb.calculator')}</legend>
         <label>
-          Expression
+          {t('blanc.tb.expression')}
           <input
             value={expression}
             onChange={(event) => setExpression(event.target.value)}
-            placeholder="Example: (12.5 + 4) / 3"
+            placeholder={t('blanc.tb.expressionExample')}
           />
         </label>
         <div className="blanc-result-box">
           {result.ok && typeof result.value === 'number'
             ? formatToolboxNumber(result.value)
-            : result.error}
+            : toolboxErrorText(result.error, t)}
         </div>
-        <p className="blanc-note">Offline basic arithmetic only: +, -, *, /, %, parentheses, and ^ for exponent.</p>
+        <p className="blanc-note">{t('blanc.tb.calcNote')}</p>
       </fieldset>
     </div>
   );
 }
 
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+/**
+ * The shared Toolbox helpers (toolboxUtilities / toolboxSettings) return their
+ * errors in English; these are the ones the panels below show, in the UI
+ * language. An unknown message passes through unchanged.
+ */
+const TOOLBOX_ERROR_KEYS: Record<string, string> = {
+  'Enter an expression.': 'blanc.tb.err.enterExpression',
+  'Only numbers and basic operators are supported.': 'blanc.tb.err.onlyBasic',
+  'Invalid exponent operator.': 'blanc.tb.err.exponent',
+  'Expression did not produce a finite number.': 'blanc.tb.err.notFinite',
+  'Invalid expression.': 'blanc.tb.err.invalid',
+  'Enter a finite value.': 'blanc.tb.err.finiteValue',
+  'Choose units from the same category.': 'blanc.tb.err.sameCategory',
+  'Not a Toolbox settings export.': 'blanc.tb.err.settingsExport',
+};
+
+function toolboxErrorText(message: string | undefined, t: TFn): string {
+  if (!message) return '';
+  const key = TOOLBOX_ERROR_KEYS[message];
+  return key ? t(key) : message;
+}
+
+/** A unit's name in the UI language (the registry label is English). */
+function unitLabel(id: string, fallback: string, t: TFn): string {
+  const key = `blanc.unit.${id}`;
+  const out = t(key);
+  return out === key ? fallback : out;
+}
+
+/** A Toolbox setting's name, from the same keys its checkbox uses; the id if it has none. */
+function settingLabel(id: string, t: TFn): string {
+  const key = `blanc.settings.toggle.${id}`;
+  const out = t(key);
+  return out === key ? id : out;
+}
+
+const MODULE_STATUS_KEYS: Record<string, string> = {
+  ready: 'blanc.tb.status.ready',
+  existing: 'blanc.tb.status.existing',
+  planned: 'blanc.tb.status.planned',
+  'adapter-needed': 'blanc.tb.status.adapterNeeded',
+  experimental: 'blanc.tb.status.experimental',
+};
+
+function moduleStatusLabel(status: string, t: TFn): string {
+  const key = MODULE_STATUS_KEYS[status];
+  return key ? t(key) : status;
+}
+
 const UNIT_OPTIONS = Object.entries(TOOLBOX_UNITS) as Array<[ToolboxUnit, (typeof TOOLBOX_UNITS)[ToolboxUnit]]>;
 
 function UnitConverterPanel() {
+  const { t } = useT();
   const [value, setValue] = useState('1');
   const [from, setFrom] = useState<ToolboxUnit>('m');
   const [to, setTo] = useState<ToolboxUnit>('cm');
@@ -2010,25 +2067,25 @@ function UnitConverterPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Unit Converter</legend>
+        <legend>{t('blanc.tb.unitConverter')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Value
+            {t('blanc.tb.value')}
             <input value={value} onChange={(event) => setValue(event.target.value)} inputMode="decimal" />
           </label>
           <label>
-            From
+            {t('blanc.tb.from')}
             <select value={from} onChange={(event) => setFrom(event.target.value as ToolboxUnit)}>
               {UNIT_OPTIONS.map(([id, unit]) => (
-                <option key={id} value={id}>{unit.label}</option>
+                <option key={id} value={id}>{unitLabel(id, unit.label, t)}</option>
               ))}
             </select>
           </label>
           <label>
-            To
+            {t('blanc.tb.to')}
             <select value={to} onChange={(event) => setTo(event.target.value as ToolboxUnit)}>
               {UNIT_OPTIONS.map(([id, unit]) => (
-                <option key={id} value={id}>{unit.label}</option>
+                <option key={id} value={id}>{unitLabel(id, unit.label, t)}</option>
               ))}
             </select>
           </label>
@@ -2036,9 +2093,9 @@ function UnitConverterPanel() {
         <div className="blanc-result-box">
           {result.ok && typeof result.value === 'number'
             ? `${formatToolboxNumber(result.value)} ${to}`
-            : result.error}
+            : toolboxErrorText(result.error, t)}
         </div>
-        <p className="blanc-note">Static offline units only. Currency is intentionally not included here because rates need dated online data.</p>
+        <p className="blanc-note">{t('blanc.tb.unitNote')}</p>
       </fieldset>
     </div>
   );
@@ -2052,6 +2109,7 @@ function formatTimerSeconds(total: number): string {
 }
 
 function FocusTimerPanel() {
+  const { t } = useT();
   const [mode, setMode] = useState<'countdown' | 'stopwatch'>('countdown');
   const [minutes, setMinutes] = useState(25);
   const [seconds, setSeconds] = useState(25 * 60);
@@ -2068,7 +2126,7 @@ function FocusTimerPanel() {
           setRunning(false);
           if (soundOn) {
             try {
-              window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: 'Focus timer finished.', kind: 'ok' } }));
+              window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('blanc.tb.timerDone'), kind: 'ok' } }));
             } catch {
               /* ignore */
             }
@@ -2123,34 +2181,34 @@ function FocusTimerPanel() {
   return (
     <div className="blanc-focus-workspace">
       <section className="blanc-focus-main">
-        <div className="blanc-segmented" role="group" aria-label="Timer mode">
-          <button type="button" className={mode === 'countdown' ? 'active' : ''} onClick={() => switchMode('countdown')} title="Countdown mode">Countdown</button>
-          <button type="button" className={mode === 'stopwatch' ? 'active' : ''} onClick={() => switchMode('stopwatch')} title="Stopwatch mode">Stopwatch</button>
+        <div className="blanc-segmented" role="group" aria-label={t('blanc.tb.timerMode')}>
+          <button type="button" className={mode === 'countdown' ? 'active' : ''} onClick={() => switchMode('countdown')} title={t('blanc.tb.countdown')}>{t('blanc.tb.countdown')}</button>
+          <button type="button" className={mode === 'stopwatch' ? 'active' : ''} onClick={() => switchMode('stopwatch')} title={t('blanc.tb.stopwatch')}>{t('blanc.tb.stopwatch')}</button>
         </div>
         <div className="blanc-timer-display">{formatTimerSeconds(seconds)}</div>
         <div className="blanc-focus-actions">
-          <button type="button" className="blanc-primary-action" onClick={() => setRunning((current) => !current)} title={running ? 'Pause timer' : 'Start timer'}>
-            {running ? 'Pause' : 'Start'}
+          <button type="button" className="blanc-primary-action" onClick={() => setRunning((current) => !current)} title={running ? t('blanc.tb.pauseTimer') : t('blanc.tb.startTimer')}>
+            {running ? t('blanc.tb.pause') : t('blanc.tb.start')}
           </button>
-          <button type="button" onClick={reset} title="Reset timer">Reset</button>
-          <button type="button" onClick={recordLap} title="Record current time">Lap</button>
+          <button type="button" onClick={reset} title={t('blanc.tb.resetTimer')}>{t('blanc.tb.reset')}</button>
+          <button type="button" onClick={recordLap} title={t('blanc.tb.recordLap')}>{t('blanc.tb.lap')}</button>
         </div>
-        <p className="blanc-note">Shortcuts: Ctrl+Shift+Space start/pause, Ctrl+Shift+Backspace reset. Controls remain fully reachable by keyboard focus.</p>
+        <p className="blanc-note">{t('blanc.tb.timerKeys', { startPause: 'Ctrl+Shift+Space', reset: 'Ctrl+Shift+Backspace' })}</p>
       </section>
 
       <aside className="blanc-focus-side">
         <section>
-          <h3>Presets</h3>
+          <h3>{t('blanc.tb.presets')}</h3>
           <div className="blanc-preset-grid">
             {[5, 15, 25, 45].map((preset) => (
-              <button key={preset} type="button" className={minutes === preset && mode === 'countdown' ? 'active' : ''} onClick={() => setPreset(preset)} title={`${preset} minute preset`}>
-                {preset}m
+              <button key={preset} type="button" className={minutes === preset && mode === 'countdown' ? 'active' : ''} onClick={() => setPreset(preset)} title={t('blanc.tb.presetTitle', { count: preset })}>
+                {t('blanc.tb.presetLabel', { count: preset })}
               </button>
             ))}
           </div>
           {mode === 'countdown' && (
             <label className="blanc-focus-custom">
-              Custom minutes
+              {t('blanc.tb.customMinutes')}
               <input
                 type="number"
                 min={1}
@@ -2166,14 +2224,14 @@ function FocusTimerPanel() {
           )}
         </section>
         <section>
-          <h3>Options</h3>
+          <h3>{t('blanc.tb.options')}</h3>
           <label className="blanc-check">
             <input type="checkbox" checked={soundOn} onChange={(event) => setSoundOn(event.target.checked)} />
-            <span>Completion notice</span>
+            <span>{t('blanc.tb.completionNotice')}</span>
           </label>
         </section>
         <section>
-          <h3>Laps</h3>
+          <h3>{t('blanc.tb.laps')}</h3>
           {laps.length ? (
             <ol className="blanc-lap-list">
               {laps.map((lap, index) => (
@@ -2181,7 +2239,7 @@ function FocusTimerPanel() {
               ))}
             </ol>
           ) : (
-            <p className="blanc-note">No laps recorded.</p>
+            <p className="blanc-note">{t('blanc.tb.noLaps')}</p>
           )}
         </section>
       </aside>
@@ -2242,18 +2300,19 @@ function BlancMeter({
 }
 
 function SystemMonitorPanel() {
+  const { t } = useT();
   const [metrics, setMetrics] = useState<BlancSystemMetrics | null>(null);
   const [storage, setStorage] = useState<BlancStorageEstimate | null>(null);
-  const [status, setStatus] = useState('Loading system metrics...');
+  const [status, setStatus] = useState(() => t('blanc.tb.metricsLoading'));
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const next = await window.api.systemGetMetrics();
       setMetrics(next);
-      setStatus('Live metrics refreshed.');
+      setStatus(t('blanc.tb.metricsRefreshed'));
     } catch {
       setMetrics(null);
-      setStatus('System metrics are unavailable.');
+      setStatus(t('blanc.tb.metricsUnavailable'));
     }
     try {
       const estimate = await navigator.storage?.estimate?.();
@@ -2273,39 +2332,69 @@ function SystemMonitorPanel() {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
+  const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
+  useEffect(() => {
+    type BatteryLike = EventTarget & { level: number; charging: boolean; chargingTime: number };
+    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryLike> };
+    let alive = true;
+    let manager: BatteryLike | null = null;
+    const read = (): void => {
+      if (!alive || !manager) return;
+      // Chromium reports a computer with no battery as full, charging and done
+      // charging (chargingTime 0) — that is "no battery", not a 100% meter.
+      const none = manager.charging && manager.level === 1 && manager.chargingTime === 0;
+      setBattery(none ? null : { level: manager.level, charging: manager.charging });
+    };
+    void nav.getBattery?.()
+      .then((result) => {
+        manager = result;
+        read();
+        result.addEventListener('levelchange', read);
+        result.addEventListener('chargingchange', read);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      manager?.removeEventListener('levelchange', read);
+      manager?.removeEventListener('chargingchange', read);
+    };
+  }, []);
+
   const ramUsed = metrics ? Math.max(0, metrics.totalmem - metrics.freemem) : 0;
   const ramPct = metrics && metrics.totalmem > 0 ? (ramUsed / metrics.totalmem) * 100 : 0;
   const cpuPct = metrics ? metrics.cpuLoad * 100 : 0;
   const storagePct = storage && storage.quota > 0 ? (storage.usage / storage.quota) * 100 : 0;
-  const batteryPct = metrics?.battery != null ? metrics.battery * 100 : null;
+  // Main cannot read a battery level (Electron exposes only on/off battery), so
+  // the level comes from the renderer's Battery API when main has none.
+  const batteryPct =
+    metrics?.battery != null ? metrics.battery * 100 : battery ? battery.level * 100 : null;
+  const batteryOnPower = metrics?.battery != null ? !metrics.onBattery : (battery?.charging ?? true);
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>System Monitor</legend>
-        <p className="blanc-note">
-          Local CPU, RAM, uptime, battery, and browser storage. GPU/process details stay planned until a native adapter is added.
-        </p>
+        <legend>{t('blanc.tb.systemMonitor')}</legend>
+        <p className="blanc-note">{t('blanc.tb.systemNote')}</p>
         {metrics ? (
           <div className="blanc-monitor-grid">
-            <BlancMeter label="CPU" value={cpuPct} detail="Current sampled load" />
+            <BlancMeter label={t('blanc.tb.cpu')} value={cpuPct} detail={t('blanc.tb.cpuDetail')} />
             <BlancMeter
-              label="RAM"
+              label={t('blanc.tb.ram')}
               value={ramPct}
-              detail={`${formatBytes(ramUsed)} used of ${formatBytes(metrics.totalmem)}`}
+              detail={t('blanc.tb.usedOf', { used: formatBytes(ramUsed), total: formatBytes(metrics.totalmem) })}
             />
             {storage && (
               <BlancMeter
-                label="Storage"
+                label={t('blanc.tb.storage')}
                 value={storagePct}
-                detail={`${formatBytes(storage.usage)} used of ${formatBytes(storage.quota)} browser quota`}
+                detail={t('blanc.tb.storageDetail', { used: formatBytes(storage.usage), total: formatBytes(storage.quota) })}
               />
             )}
             {batteryPct != null && (
               <BlancMeter
-                label="Battery"
+                label={t('blanc.tb.battery')}
                 value={batteryPct}
-                detail={metrics.onBattery ? 'On battery power' : 'Plugged in'}
+                detail={batteryOnPower ? t('blanc.tb.pluggedIn') : t('blanc.tb.onBattery')}
               />
             )}
           </div>
@@ -2313,12 +2402,12 @@ function SystemMonitorPanel() {
           <p className="blanc-error">{status}</p>
         )}
         <div className="blanc-status-row">
-          {metrics && <span>Platform: {metrics.platform}</span>}
-          {metrics && <span>Uptime: {formatUptime(metrics.uptime)}</span>}
+          {metrics && <span>{t('blanc.tb.platform', { name: metrics.platform })}</span>}
+          {metrics && <span>{t('blanc.tb.uptime', { time: formatUptime(metrics.uptime) })}</span>}
           <span>{status}</span>
         </div>
         <div className="blanc-row-actions">
-          <button type="button" onClick={() => void refresh()}>Refresh</button>
+          <button type="button" onClick={() => void refresh()}>{t('blanc.tb.refresh')}</button>
         </div>
       </fieldset>
     </div>
@@ -2328,6 +2417,7 @@ function SystemMonitorPanel() {
 const BLANC_QUICK_NOTES_KEY = 'jp-study.blanc.quickNotes';
 
 function QuickNotesPanel() {
+  const { t } = useT();
   const [notes, setNotes] = useState(() => {
     try {
       return window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '';
@@ -2355,17 +2445,17 @@ function QuickNotesPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Quick Notes</legend>
-        <p className="blanc-warning">Blanc quick notes are local to Blanc. They do not transfer to the main app memory/settings yet.</p>
+        <legend>{t('blanc.tb.quickNotes')}</legend>
+        <p className="blanc-warning">{t('blanc.tb.quickNotesWarning')}</p>
         <textarea
           rows={12}
           value={notes}
-          placeholder="Plain toolbox notes, source links, capture ideas, small checklists..."
+          placeholder={t('blanc.tb.quickNotesPlaceholder')}
           onChange={(event) => save(event.target.value)}
         />
         <div className="blanc-row-actions">
-          <button type="button" onClick={() => save('')}>Clear</button>
-          <span className="blanc-note">{saved ? 'Saved' : `${notes.length} characters`}</span>
+          <button type="button" onClick={() => save('')}>{t('blanc.tb.clear')}</button>
+          <span className="blanc-note">{saved ? t('blanc.tb.saved') : t('blanc.tb.characters', { count: notes.length })}</span>
         </div>
       </fieldset>
     </div>
@@ -2374,7 +2464,7 @@ function QuickNotesPanel() {
 
 function formatDateTime(ms: number): string {
   if (!Number.isFinite(ms)) return '-';
-  return new Date(ms).toLocaleString([], {
+  return new Date(ms).toLocaleString(LANG_TAGS[getUiLang()], {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -2397,6 +2487,7 @@ const FILE_SEARCH_ROW_HEIGHT = 38;
 const FILE_SEARCH_LIST_MAX_HEIGHT = 420;
 
 function FileSearchPanel() {
+  const { t } = useT();
   const [root, setRoot] = useState('');
   const [query, setQuery] = useState('');
   const [extensions, setExtensions] = useState('');
@@ -2404,18 +2495,18 @@ function FileSearchPanel() {
   const [scanned, setScanned] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Choose a folder and enter a filename search.');
+  const [status, setStatus] = useState(() => t('blanc.tb.fileSearchIdle'));
 
   const chooseFolder = async (): Promise<void> => {
     const picked = await window.api.toolboxPickSearchFolder();
     if (!picked) return;
     setRoot(picked);
-    setStatus('Folder selected.');
+    setStatus(t('blanc.tb.folderSelected'));
   };
 
   const search = async (): Promise<void> => {
     setBusy(true);
-    setStatus('Searching...');
+    setStatus(t('blanc.tb.searching'));
     setResults([]);
     try {
       const response = await window.api.toolboxFileSearch({
@@ -2426,17 +2517,16 @@ function FileSearchPanel() {
         maxScanned: 30_000,
       });
       if (!response.ok) {
-        setStatus(response.error ?? 'Search failed.');
+        setStatus(response.error ?? t('blanc.tb.searchFailed'));
         return;
       }
       setResults(response.results ?? []);
       setScanned(response.scanned ?? 0);
       setTruncated(response.truncated === true);
-      setStatus(
-        `${response.results?.length ?? 0} result(s), ${response.scanned ?? 0} files scanned${response.truncated ? ', capped' : ''}.`,
-      );
+      const summary = t('blanc.tb.searchSummary', { count: response.results?.length ?? 0, scanned: response.scanned ?? 0 });
+      setStatus(t(response.truncated ? 'blanc.tb.searchCapped' : 'blanc.tb.searchDone', { summary }));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Search failed.');
+      setStatus(error instanceof Error ? error.message : t('blanc.tb.searchFailed'));
     } finally {
       setBusy(false);
     }
@@ -2444,46 +2534,44 @@ function FileSearchPanel() {
 
   const copyPath = async (filePath: string): Promise<void> => {
     await navigator.clipboard.writeText(filePath);
-    setStatus('Path copied.');
+    setStatus(t('blanc.tb.pathCopied'));
   };
 
   const openPath = async (filePath: string): Promise<void> => {
     const error = await window.api.launchTarget(filePath);
-    setStatus(error ?? 'Opened.');
+    setStatus(error ?? t('blanc.tb.opened'));
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>File Search</legend>
-        <p className="blanc-note">
-          Capped local filename search. This does not index file contents yet, so it stays fast and predictable inside Blanc.
-        </p>
+        <legend>{t('blanc.tb.fileSearch')}</legend>
+        <p className="blanc-note">{t('blanc.tb.fileSearchNote')}</p>
         <div className="blanc-form-grid">
           <label>
-            Folder
-            <input value={root} onChange={(event) => setRoot(event.target.value)} placeholder="Choose or paste a folder path" />
+            {t('blanc.tb.folder')}
+            <input value={root} onChange={(event) => setRoot(event.target.value)} placeholder={t('blanc.tb.folderPlaceholder')} />
           </label>
           <label>
-            Name contains
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="anki, book, .srt..." />
+            {t('blanc.tb.nameContains')}
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('blanc.tb.namePlaceholder')} />
           </label>
           <label>
-            Extensions
-            <input value={extensions} onChange={(event) => setExtensions(event.target.value)} placeholder="Optional: epub, srt, mp3" />
+            {t('blanc.tb.extensions')}
+            <input value={extensions} onChange={(event) => setExtensions(event.target.value)} placeholder={t('blanc.tb.extensionsPlaceholder')} />
           </label>
         </div>
         <div className="blanc-row-actions">
-          <button type="button" onClick={() => void chooseFolder()}>Choose folder</button>
+          <button type="button" onClick={() => void chooseFolder()}>{t('blanc.tb.chooseFolder')}</button>
           <button type="button" disabled={busy || !root.trim() || !query.trim()} onClick={() => void search()}>
-            {busy ? 'Searching...' : 'Search'}
+            {busy ? t('blanc.tb.searching') : t('blanc.tb.search')}
           </button>
           <span className="blanc-note">{status}</span>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Results</legend>
+        <legend>{t('blanc.tb.results')}</legend>
         {results.length > 0 ? (
           // A plain <table> here would put up to 500 raw <tr> rows in the DOM
           // at once (toolboxFileSearch's cap) — VirtualList only keeps the
@@ -2491,11 +2579,11 @@ function FileSearchPanel() {
           // CSS-grid row list instead of an HTML table.
           <div className="blanc-file-search-results">
             <div className="blanc-file-search-row blanc-file-search-header">
-              <span>Name</span>
-              <span>Type</span>
-              <span>Size</span>
-              <span>Modified</span>
-              <span>Actions</span>
+              <span>{t('blanc.tb.colName')}</span>
+              <span>{t('blanc.tb.colType')}</span>
+              <span>{t('blanc.tb.colSize')}</span>
+              <span>{t('blanc.tb.colModified')}</span>
+              <span>{t('blanc.tb.colActions')}</span>
             </div>
             <VirtualList
               items={results}
@@ -2509,22 +2597,22 @@ function FileSearchPanel() {
               renderItem={(result) => (
                 <div className="blanc-file-search-row">
                   <span className="blanc-file-search-name" title={result.path}>{result.name}</span>
-                  <span>{result.isDirectory ? 'Folder' : result.ext || 'file'}</span>
+                  <span>{result.isDirectory ? t('blanc.tb.typeFolder') : result.ext || t('blanc.tb.typeFile')}</span>
                   <span>{result.isDirectory ? '-' : formatBytes(result.size)}</span>
                   <span>{formatDateTime(result.modifiedMs)}</span>
                   <span className="blanc-row-actions">
-                    <button type="button" onClick={() => void openPath(result.path)}>Open</button>
-                    <button type="button" onClick={() => void copyPath(result.path)}>Copy path</button>
+                    <button type="button" onClick={() => void openPath(result.path)}>{t('blanc.tb.open')}</button>
+                    <button type="button" onClick={() => void copyPath(result.path)}>{t('blanc.tb.copyPath')}</button>
                   </span>
                 </div>
               )}
             />
           </div>
         ) : (
-          <p className="blanc-note">No results yet.</p>
+          <p className="blanc-note">{t('blanc.tb.noResults')}</p>
         )}
         <p className="blanc-note">
-          Scanned {scanned} file(s). {truncated ? 'Search stopped at the safety cap; narrow the folder or query.' : 'Results are within the safety cap.'}
+          {t('blanc.tb.scanned', { count: scanned })} {truncated ? t('blanc.tb.capHit') : t('blanc.tb.capOk')}
         </p>
       </fieldset>
     </div>
@@ -2543,6 +2631,7 @@ function normalizeHash(value: string): string {
 }
 
 function HashCheckerPanel() {
+  const { t } = useT();
   const [fileName, setFileName] = useState('');
   const [hash, setHash] = useState('');
   const [expected, setExpected] = useState('');
@@ -2555,48 +2644,46 @@ function HashCheckerPanel() {
     if (!file) return;
     setFileName(file.name);
     setHash('');
-    setStatus('Hashing...');
+    setStatus(t('blanc.tb.hashing'));
     try {
       setHash(await sha256File(file));
-      setStatus('SHA-256 ready.');
+      setStatus(t('blanc.tb.hashReady'));
     } catch {
-      setStatus('Could not hash this file.');
+      setStatus(t('blanc.tb.hashFailed'));
     }
   };
 
   const copyHash = async (): Promise<void> => {
     if (!hash) return;
     await navigator.clipboard.writeText(hash);
-    setStatus('Hash copied.');
+    setStatus(t('blanc.tb.hashCopied'));
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Hash Checker</legend>
-        <p className="blanc-note">
-          Generate SHA-256 for a local file and compare it with an expected hash. A match verifies identity against that supplied value, not general safety.
-        </p>
+        <legend>{t('blanc.tb.hashChecker')}</legend>
+        <p className="blanc-note">{t('blanc.tb.hashNote')}</p>
         <label>
-          File
+          {t('blanc.tb.file')}
           <input type="file" onChange={(event) => void pickFile(event.target.files?.[0])} />
         </label>
-        {fileName && <p className="blanc-note">Selected: {fileName}</p>}
+        {fileName && <p className="blanc-note">{t('blanc.tb.selected', { name: fileName })}</p>}
         <label>
-          Expected SHA-256
+          {t('blanc.tb.expectedHash')}
           <input
             value={expected}
             onChange={(event) => setExpected(event.target.value)}
-            placeholder="Paste expected hash"
+            placeholder={t('blanc.tb.expectedHashPlaceholder')}
           />
         </label>
         <div className="blanc-result-box is-wrap">
-          {hash || status || 'No file hashed yet.'}
+          {hash || status || t('blanc.tb.noHash')}
         </div>
         <div className="blanc-row-actions">
-          <button type="button" disabled={!hash} onClick={() => void copyHash()}>Copy hash</button>
-          {hashMatches && <span className="blanc-status ready">Match</span>}
-          {hashMismatch && <span className="blanc-status adapter-needed">Mismatch</span>}
+          <button type="button" disabled={!hash} onClick={() => void copyHash()}>{t('blanc.tb.copyHash')}</button>
+          {hashMatches && <span className="blanc-status ready">{t('blanc.tb.match')}</span>}
+          {hashMismatch && <span className="blanc-status adapter-needed">{t('blanc.tb.mismatch')}</span>}
           <span className="blanc-note">{status}</span>
         </div>
       </fieldset>
@@ -2624,6 +2711,7 @@ function formatBytes(bytes: number): string {
 }
 
 function ImageConverterPanel() {
+  const { t } = useT();
   const [sourceName, setSourceName] = useState('');
   const [sourceSize, setSourceSize] = useState(0);
   const [sourceUrl, setSourceUrl] = useState('');
@@ -2631,7 +2719,7 @@ function ImageConverterPanel() {
   const [outputSize, setOutputSize] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>('image/webp');
   const [quality, setQuality] = useState(0.86);
-  const [status, setStatus] = useState('Choose an image.');
+  const [status, setStatus] = useState(() => t('blanc.tb.chooseImage'));
 
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -2641,7 +2729,7 @@ function ImageConverterPanel() {
   const chooseFile = (file: File | undefined): void => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setStatus('Choose an image file.');
+      setStatus(t('blanc.tb.chooseImageFile'));
       return;
     }
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -2651,15 +2739,15 @@ function ImageConverterPanel() {
     setSourceUrl(URL.createObjectURL(file));
     setOutputUrl('');
     setOutputSize(0);
-    setStatus('Ready to convert.');
+    setStatus(t('blanc.tb.readyToConvert'));
   };
 
   const convert = async (): Promise<void> => {
     if (!sourceUrl) {
-      setStatus('Choose an image first.');
+      setStatus(t('blanc.tb.chooseImageFirst'));
       return;
     }
-    setStatus('Converting...');
+    setStatus(t('blanc.tb.converting'));
     try {
       const image = new Image();
       image.decoding = 'async';
@@ -2682,24 +2770,24 @@ function ImageConverterPanel() {
       if (outputUrl) URL.revokeObjectURL(outputUrl);
       setOutputUrl(URL.createObjectURL(blob));
       setOutputSize(blob.size);
-      setStatus('Converted.');
+      setStatus(t('blanc.tb.converted'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not convert this image.');
+      setStatus(error instanceof Error ? error.message : t('blanc.tb.convertFailed'));
     }
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Image Converter</legend>
-        <p className="blanc-note">Local image conversion through browser canvas. PNG, JPEG, and WebP are supported here; heavier batch formats can use OSS adapters later.</p>
+        <legend>{t('blanc.tb.imageConverter')}</legend>
+        <p className="blanc-note">{t('blanc.tb.imageNote')}</p>
         <label>
-          Image
+          {t('blanc.tb.image')}
           <input type="file" accept="image/*" onChange={(event) => chooseFile(event.target.files?.[0])} />
         </label>
         <div className="blanc-form-grid">
           <label>
-            Output
+            {t('blanc.tb.output')}
             <select value={format} onChange={(event) => setFormat(event.target.value as ImageOutputFormat)}>
               <option value="image/webp">WebP</option>
               <option value="image/png">PNG</option>
@@ -2707,7 +2795,7 @@ function ImageConverterPanel() {
             </select>
           </label>
           <label>
-            Quality
+            {t('blanc.tb.quality')}
             <input
               type="range"
               min={0.4}
@@ -2720,10 +2808,10 @@ function ImageConverterPanel() {
           </label>
         </div>
         <div className="blanc-row-actions">
-          <button type="button" disabled={!sourceUrl} onClick={() => void convert()}>Convert</button>
+          <button type="button" disabled={!sourceUrl} onClick={() => void convert()}>{t('blanc.tb.convert')}</button>
           {outputUrl && (
             <a className="blanc-file-link" href={outputUrl} download={imageOutputName(sourceName, format)}>
-              Save {imageOutputName(sourceName, format)}
+              {t('blanc.tb.saveFile', { name: imageOutputName(sourceName, format) })}
             </a>
           )}
           <span className="blanc-note">{status}</span>
@@ -2731,13 +2819,13 @@ function ImageConverterPanel() {
       </fieldset>
       {sourceUrl && (
         <fieldset>
-          <legend>Preview</legend>
+          <legend>{t('blanc.tb.preview')}</legend>
           <div className="blanc-image-preview">
             <img src={sourceUrl} alt={sourceName} />
           </div>
           <p className="blanc-note">
-            Source: {sourceName} ({formatBytes(sourceSize)})
-            {outputSize ? ` | Output: ${formatBytes(outputSize)}` : ''}
+            {t('blanc.tb.sourceSize', { name: sourceName, size: formatBytes(sourceSize) })}
+            {outputSize ? t('blanc.tb.outputSize', { size: formatBytes(outputSize) }) : ''}
           </p>
         </fieldset>
       )}
@@ -2746,6 +2834,8 @@ function ImageConverterPanel() {
 }
 
 function AutomationBuilderPanel() {
+  const { t } = useT();
+  const developerTools = useBlancDeveloperTools();
   const [copied, setCopied] = useState(false);
   const [launchMsg, setLaunchMsg] = useState('');
   // Resolved from this install rather than a baked-in constant. That constant
@@ -2777,10 +2867,12 @@ function AutomationBuilderPanel() {
     const result = await window.api.launchAutomationBuilder();
     setLaunchMsg(
       result.ok
-        ? `Launched${result.pid ? `, pid ${result.pid}` : ''}. Stop session recording with ${AUTOMATION_BUILDER.stopKey}.`
-        : result.error ?? 'Automation Builder could not be launched.',
+        ? result.pid
+          ? t('blanc.tb.ab.launchedPid', { pid: result.pid, key: AUTOMATION_BUILDER.stopKey })
+          : t('blanc.tb.ab.launched', { key: AUTOMATION_BUILDER.stopKey })
+        : result.error ?? t('blanc.tb.ab.launchFailed'),
     );
-  }, []);
+  }, [t]);
 
   useEffect(() => registerCommandHandler('automation.runSelected', () => {
     void launchBuilder();
@@ -2790,58 +2882,60 @@ function AutomationBuilderPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>{AUTOMATION_BUILDER.name}</legend>
-        <p className="blanc-note">
-          Existing Windows automation builder detected as a PowerShell side tool. It records cursor movement, clicks, keys, waits, and session configs without adding AI to Blanc.
-        </p>
+        <legend>{t('blanc.tool.automationBuilder')}</legend>
+        <p className="blanc-note">{t('blanc.tb.ab.intro')}</p>
         <div className="blanc-command-row">
           <input
             readOnly
-            value={command ?? 'automation-builder.ps1 was not found in this install.'}
-            aria-label="Automation Builder launch command"
+            value={command ?? t('blanc.tb.ab.notFound')}
+            aria-label={t('blanc.tb.ab.commandAria')}
           />
           <button type="button" onClick={() => void launchBuilder()}>
-            Launch
+            {t('blanc.tb.ab.launch')}
           </button>
           <button type="button" onClick={() => void copyCommand()} disabled={!command}>
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('blanc.tb.ab.copied') : t('blanc.tb.ab.copy')}
           </button>
         </div>
         {launchMsg && <p className="blanc-note">{launchMsg}</p>}
       </fieldset>
       <div className="blanc-grid two">
         <fieldset>
-          <legend>Capabilities</legend>
+          <legend>{t('blanc.tb.ab.capabilities')}</legend>
           <table>
             <tbody>
-              {AUTOMATION_BUILDER.capabilities.map((item) => (
+              {AUTOMATION_BUILDER.capabilities.map((item, index) => (
                 <tr key={item}>
-                  <td>{item}</td>
-                  <td>Available</td>
+                  <td>{t(`blanc.tb.ab.cap.${index}`)}</td>
+                  <td>{t('blanc.tb.ab.available')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </fieldset>
         <fieldset>
-          <legend>Safety</legend>
+          <legend>{t('blanc.tb.ab.safety')}</legend>
           <ul className="blanc-plain-list">
-            {AUTOMATION_BUILDER.safetyNotes.map((note) => (
-              <li key={note}>{note}</li>
+            {AUTOMATION_BUILDER.safetyNotes.map((note, index) => (
+              <li key={note}>
+                {t(`blanc.tb.ab.safe.${index}`, { key: AUTOMATION_BUILDER.stopKey, folder: AUTOMATION_BUILDER.configDir })}
+              </li>
             ))}
           </ul>
         </fieldset>
       </div>
       <fieldset>
-        <legend>Migration</legend>
-        <p className="blanc-note">
-          Config folder: <code>{AUTOMATION_BUILDER.configDir}</code>. This is separate from Blanc memory and from the main Gum settings.
-        </p>
-        <ul className="blanc-plain-list">
-          {AUTOMATION_BUILDER.migrationNotes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
+        <legend>{t('blanc.tb.ab.configs')}</legend>
+        <p className="blanc-note">{t('blanc.tb.ab.configFolder', { folder: AUTOMATION_BUILDER.configDir })}</p>
+        {/* The migration notes are the adapter roadmap — developer reading, so they
+            show only with Blanc's developer tools on. */}
+        {developerTools && (
+          <ul className="blanc-plain-list">
+            {AUTOMATION_BUILDER.migrationNotes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        )}
       </fieldset>
     </div>
   );
@@ -2873,6 +2967,7 @@ function BlancSettingsPanel({
   onPatch: (settings: BlancModeSettings) => void;
 }) {
   const { t } = useT();
+  const blancTools = useBlancTools();
   const [pin, setPin] = useState('');
   const [pinMsg, setPinMsg] = useState('');
   const [lockOn, setLockOn] = useState(() => loadLockscreen().enabled);
@@ -2953,7 +3048,7 @@ function BlancSettingsPanel({
   // Blanc setting you cannot change without a mouse. Drag is worth adding on
   // top later; it is not worth having instead.
   const orderableTools = orderToolIds(
-    BLANC_TOOLS.map((item) => item.id).filter((id): id is ToolboxModuleId =>
+    blancTools.map((item) => item.id).filter((id): id is ToolboxModuleId =>
       id !== 'coverage' && toolboxSettings.enabledTools.includes(id as ToolboxModuleId),
     ),
     toolboxSettings.toolOrder,
@@ -2979,7 +3074,7 @@ function BlancSettingsPanel({
     // Plain string, not a t() key: adding one would mean editing all four
     // catalog files, which a parallel session is currently writing to. Blanc
     // chrome is outside the i18n sweep by policy anyway (plan, Pillar 8).
-    setSettingsMsg('Launcher order reset to the default.');
+    setSettingsMsg(t('blanc.tb.launcherOrderReset'));
   };
 
   const resetToolboxCategory = (category: ToolboxSettingsCategory): void => {
@@ -3152,7 +3247,7 @@ function BlancSettingsPanel({
                 setSettingsImport('');
                 setSettingsMsg(t('blanc.settings.imported'));
               } else {
-                setSettingsMsg(result.error);
+                setSettingsMsg(toolboxErrorText(result.error, t));
               }
             }}
             disabled={!settingsImport.trim()}
@@ -3194,7 +3289,7 @@ function BlancSettingsPanel({
             >
               {listBlancToolboxModules().map((module) => (
                 <option key={module.id} value={module.id}>
-                  {module.label}
+                  {blancToolLabel(t, module.id)}
                 </option>
               ))}
             </select>
@@ -3288,15 +3383,15 @@ function BlancSettingsPanel({
               <thead>
                 <tr>
                   <th>{t('blanc.settings.col.setting')}</th>
-                  <th>Category</th>
+                  <th>{t('blanc.tb.colCategory')}</th>
                   <th>{t('blanc.settings.col.description')}</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleDefinitions.map((definition) => (
                   <tr key={definition.id}>
-                    <td>{definition.id}</td>
-                    <td>{definition.category}</td>
+                    <td>{settingLabel(definition.id, t)}</td>
+                    <td>{t(`blanc.settings.category.${definition.category}`)}</td>
                     <td>{definition.description}</td>
                   </tr>
                 ))}
@@ -3307,7 +3402,7 @@ function BlancSettingsPanel({
       </fieldset>
 
       <fieldset data-blanc-setting="theme" tabIndex={-1}>
-        <legend>Theme</legend>
+        <legend>{t('blanc.tb.theme')}</legend>
         <div className="blanc-segmented">
           {BLANC_THEME_PRESETS.map((preset) => (
             <button
@@ -3322,7 +3417,7 @@ function BlancSettingsPanel({
           ))}
         </div>
         <p className="blanc-note">
-          {presetById(toolboxSettings.themePreset)?.description ?? 'Custom palette.'}
+          {presetById(toolboxSettings.themePreset)?.description ?? t('blanc.tb.customPalette')}
         </p>
 
         <div className="blanc-theme-grid">
@@ -3345,12 +3440,12 @@ function BlancSettingsPanel({
                 />
                 <span className="blanc-theme-label">{token.label}</span>
                 {overridden ? (
-                  <button type="button" onClick={() => clearThemeToken(token.id)} title="Reset this colour" aria-label="Reset this colour">
+                  <button type="button" onClick={() => clearThemeToken(token.id)} title={t('blanc.tb.resetColour')} aria-label={t('blanc.tb.resetColour')}>
                     ×
                   </button>
                 ) : (
                   <span className="blanc-theme-inherit">
-                    {activePresetOverrides[token.id] ? 'preset' : 'default'}
+                    {activePresetOverrides[token.id] ? t('blanc.tb.inheritPreset') : t('blanc.tb.inheritDefault')}
                   </span>
                 )}
               </label>
@@ -3360,14 +3455,14 @@ function BlancSettingsPanel({
 
         <div className="blanc-status-row">
           <span>
-            {Object.keys(toolboxSettings.themeOverrides).length} of {BLANC_THEME_TOKENS.length} customised
+            {t('blanc.tb.customisedCount', { count: Object.keys(toolboxSettings.themeOverrides).length, total: BLANC_THEME_TOKENS.length })}
           </span>
           <button
             type="button"
             disabled={!Object.keys(toolboxSettings.themeOverrides).length}
             onClick={() => patchToolbox({ themeOverrides: {} })}
           >
-            Clear customisations
+            {t('blanc.tb.clearCustom')}
           </button>
           <button
             type="button"
@@ -3378,10 +3473,10 @@ function BlancSettingsPanel({
               const next = saveToolboxSettings({ themePreset: previous.preset, themeOverrides: previous.overrides });
               setToolboxSettings(next);
               setThemeHistoryCount(loadBlancThemeHistory().length);
-              setSettingsMsg('Previous theme restored.');
+              setSettingsMsg(t('blanc.tb.themeRestored'));
             }}
           >
-            Undo theme change
+            {t('blanc.tb.undoTheme')}
           </button>
           <button
             type="button"
@@ -3392,10 +3487,10 @@ function BlancSettingsPanel({
                 2,
               );
               void navigator.clipboard.writeText(json);
-              setSettingsMsg('Theme copied to the clipboard as JSON.');
+              setSettingsMsg(t('blanc.tb.themeCopied'));
             }}
           >
-            Copy theme
+            {t('blanc.tb.copyTheme')}
           </button>
           <button
             type="button"
@@ -3403,22 +3498,18 @@ function BlancSettingsPanel({
               void navigator.clipboard.readText().then((text) => {
                 const parsed = parseThemeExport(text);
                 if (!parsed) {
-                  setSettingsMsg('Clipboard does not contain a Blanc theme.');
+                  setSettingsMsg(t('blanc.tb.noThemeInClipboard'));
                   return;
                 }
                 patchToolbox({ themePreset: parsed.preset, themeOverrides: parsed.overrides });
-                setSettingsMsg('Theme applied from the clipboard.');
+                setSettingsMsg(t('blanc.tb.themePasted'));
               });
             }}
           >
-            Paste theme
+            {t('blanc.tb.pasteTheme')}
           </button>
         </div>
-        <p className="blanc-note">
-          Colours are validated before they reach the stylesheet — only hex, rgb(), hsl(), and a few
-          keywords are accepted, so a pasted theme cannot inject CSS or hide Blanc&rsquo;s own
-          controls.
-        </p>
+        <p className="blanc-note">{t('blanc.tb.themeSafety')}</p>
       </fieldset>
 
       <fieldset data-blanc-setting="custom-css" tabIndex={-1}>
@@ -3463,15 +3554,11 @@ function BlancSettingsPanel({
       </fieldset>
 
       <fieldset data-blanc-setting="launcher-order" tabIndex={-1}>
-        <legend>Launcher order</legend>
-        <p className="blanc-note">
-          The order tools appear in the launcher. Only enabled tools are listed; search results are
-          left in relevance order. Tools you never move keep their default position, so anything
-          added to Blanc later still shows up.
-        </p>
+        <legend>{t('blanc.tb.launcherOrder')}</legend>
+        <p className="blanc-note">{t('blanc.tb.launcherOrderNote')}</p>
         <ol className="blanc-order-list">
           {orderableTools.map((id, index) => {
-            const entry = BLANC_TOOLS.find((item) => item.id === id);
+            const entry = blancTools.find((item) => item.id === id);
             return (
               <li key={id}>
                 <span className="blanc-order-index">{index + 1}</span>
@@ -3479,7 +3566,7 @@ function BlancSettingsPanel({
                 <button
                   type="button"
                   disabled={index === 0}
-                  aria-label={`Move ${entry?.label ?? id} up`}
+                  aria-label={t('blanc.tb.moveUp', { name: entry?.label ?? id })}
                   onClick={() => moveTool(id, -1)}
                 >
                   ↑
@@ -3487,7 +3574,7 @@ function BlancSettingsPanel({
                 <button
                   type="button"
                   disabled={index === orderableTools.length - 1}
-                  aria-label={`Move ${entry?.label ?? id} down`}
+                  aria-label={t('blanc.tb.moveDown', { name: entry?.label ?? id })}
                   onClick={() => moveTool(id, 1)}
                 >
                   ↓
@@ -3497,22 +3584,22 @@ function BlancSettingsPanel({
           })}
         </ol>
         <div className="blanc-status-row">
-          <span>{orderableTools.length} tools</span>
+          <span>{t('blanc.tb.toolCount', { count: orderableTools.length })}</span>
           <button type="button" disabled={!toolboxSettings.toolOrder.length} onClick={resetToolOrder}>
-            Reset to default order
+            {t('blanc.tb.resetOrder')}
           </button>
         </div>
 
-        <p className="blanc-note">Category sections, in the order they appear:</p>
+        <p className="blanc-note">{t('blanc.tb.sectionOrderNote')}</p>
         <ol className="blanc-order-list">
           {orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder).map((category, index, list) => (
             <li key={category}>
               <span className="blanc-order-index">{index + 1}</span>
-              <span className="blanc-order-label">{TOOL_CATEGORY_LABELS[category]}</span>
+              <span className="blanc-order-label">{t(TOOL_CATEGORY_LABEL_KEYS[category])}</span>
               <button
                 type="button"
                 disabled={index === 0}
-                aria-label={`Move the ${TOOL_CATEGORY_LABELS[category]} section up`}
+                aria-label={t('blanc.tb.moveSectionUp', { name: t(TOOL_CATEGORY_LABEL_KEYS[category]) })}
                 onClick={() => moveCategory(category, -1)}
               >
                 ↑
@@ -3520,7 +3607,7 @@ function BlancSettingsPanel({
               <button
                 type="button"
                 disabled={index === list.length - 1}
-                aria-label={`Move the ${TOOL_CATEGORY_LABELS[category]} section down`}
+                aria-label={t('blanc.tb.moveSectionDown', { name: t(TOOL_CATEGORY_LABEL_KEYS[category]) })}
                 onClick={() => moveCategory(category, 1)}
               >
                 ↓
@@ -3534,10 +3621,10 @@ function BlancSettingsPanel({
             disabled={!toolboxSettings.categoryOrder.length}
             onClick={() => {
               patchToolbox({ categoryOrder: [] });
-              setSettingsMsg('Category order reset to the default.');
+              setSettingsMsg(t('blanc.tb.sectionOrderReset'));
             }}
           >
-            Reset section order
+            {t('blanc.tb.resetSectionOrder')}
           </button>
         </div>
       </fieldset>
@@ -3548,13 +3635,17 @@ function BlancSettingsPanel({
           {listBlancToolboxModules().map((module) => (
             <div key={module.id} className="blanc-tool-management-row">
               <div>
-                <strong>{module.label}</strong>
-                <span>{module.category} / {module.status}</span>
+                <strong>{blancToolLabel(t, module.id)}</strong>
+                <span>{t(`blanc.tb.modcat.${module.category}`)} · {moduleStatusLabel(module.status, t)}</span>
               </div>
               <label className="blanc-check">
                 <input
                   type="checkbox"
                   checked={toolboxSettings.enabledTools.includes(module.id)}
+                  // The calculator cannot be switched off (the Toolbox would be empty);
+                  // it used to look switchable and simply stayed checked.
+                  disabled={module.id === 'calculator'}
+                  title={module.id === 'calculator' ? t('blanc.settings.calculatorLocked') : undefined}
                   onChange={(event) => toggleTool(module.id, event.target.checked)}
                 />
                 <span>{t('blanc.settings.toolEnabled')}</span>
@@ -3752,6 +3843,7 @@ function ToolboxShortcutSettingsPanel() {
 }
 
 export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
+  const { t } = useT();
   const [digits, setDigits] = useState('');
   const [error, setError] = useState('');
   const now = useMinuteClock();
@@ -3760,7 +3852,7 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
     if (pin.length !== 4) return;
     if (!verifyLockscreenPin(pin)) {
       setDigits('');
-      setError('Wrong PIN');
+      setError(t('blanc.tb.wrongPin'));
       return;
     }
     onUnlocked();
@@ -3784,15 +3876,15 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   return (
     <div className="blanc-lock">
-      <section className="blanc-lock-box" role="dialog" aria-modal="true" aria-label="Blanc lockscreen">
+      <section className="blanc-lock-box" role="dialog" aria-modal="true" aria-label={t('blanc.tb.lockscreen')}>
         <time className="blanc-lock-time">
-          {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {now.toLocaleTimeString(LANG_TAGS[getUiLang()], { hour: '2-digit', minute: '2-digit' })}
         </time>
         <div className="blanc-lock-date">
-          {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+          {now.toLocaleDateString(LANG_TAGS[getUiLang()], { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
         <label>
-          PIN
+          {t('blanc.tb.pinLabel')}
           <input
             autoFocus
             type="password"
@@ -3905,6 +3997,7 @@ function initialMono(): MonoState {
 }
 
 function MonoBlocks() {
+  const { t } = useT();
   const [state, setState] = useState<MonoState>(() => initialMono());
   const keys = useRef(new Set<string>());
   const rotateLatch = useRef(false);
@@ -4016,23 +4109,23 @@ function MonoBlocks() {
   return (
     <div className="blanc-panel mono-blocks">
       <fieldset>
-        <legend>Mono Blocks</legend>
+        <legend>{t('blanc.tb.monoBlocks')}</legend>
         <div className="mono-hud">
-          <span>Score {state.score}</span>
-          <span>Lines {state.lines}</span>
-          <span>Level {state.level}</span>
+          <span>{t('blanc.tb.score', { count: state.score })}</span>
+          <span>{t('blanc.tb.lines', { count: state.lines })}</span>
+          <span>{t('blanc.tb.level', { count: state.level })}</span>
           <button type="button" onClick={() => setState(initialMono())}>
-            Restart
+            {t('blanc.tb.restart')}
           </button>
         </div>
       </fieldset>
-      <div className="mono-board" aria-label="Mono Blocks board">
+      <div className="mono-board" aria-label={t('blanc.tb.blocksBoard')}>
         {cells.map((filled, index) => (
           <span key={index} className={filled ? 'filled' : ''} />
         ))}
       </div>
-      <p className="blanc-note">Move: arrow keys. Rotate: Up, W, X. Reverse rotate: Z. Space hard-drops.</p>
-      {state.over && <p className="blanc-error">Game over. Press Restart.</p>}
+      <p className="blanc-note">{t('blanc.tb.blocksKeys')}</p>
+      {state.over && <p className="blanc-error">{t('blanc.tb.gameOver')}</p>}
     </div>
   );
 }

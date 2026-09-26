@@ -35,6 +35,7 @@ import {
 import type { ScrapeJobSummary, SourceStatus } from '../../../../shared/scraperResults';
 import { sx, sx2, sxn, sxNumber, sxs } from '../strings';
 import { SCRAPER_POSTER, scraperArtwork } from '../artwork';
+import { sourceKindText, tr, unitMs } from '../localize';
 
 const HEALTH_LABEL: Record<SourceStatus['health'], 'health.ok' | 'health.degraded' | 'health.blocked' | 'health.offline' | 'health.unknown'> = {
   ok: 'health.ok',
@@ -236,10 +237,12 @@ export default function DashboardPage() {
             <span><b>{sxNumber(snap.episodes.japanese)}</b> {sx('dash.hero.japaneseTracks')}</span>
           </div>
         </div>
-        <div className="scr-dashboard-hero-art" aria-label="Recent anime artwork">
-          <img className="is-poster" src={SCRAPER_POSTER} alt="Grand Line Archives placeholder poster" />
-          <img src={scraperArtwork(1)} alt="The Swordsman placeholder thumbnail" />
-          <img src={scraperArtwork(3)} alt="Moonlit Harbor placeholder thumbnail" />
+        {/* Decorative placeholder art: it names nothing a reader could act on,
+            so it is hidden from assistive tech rather than described in English. */}
+        <div className="scr-dashboard-hero-art" aria-hidden>
+          <img className="is-poster" src={SCRAPER_POSTER} alt="" />
+          <img src={scraperArtwork(1)} alt="" />
+          <img src={scraperArtwork(3)} alt="" />
         </div>
       </section>
 
@@ -455,12 +458,12 @@ export default function DashboardPage() {
                       <span className="scr-health-label">{source.label}</span>
                       <span className="scr-health-host">{source.host}</span>
                     </span>
-                    <span className="scr-pill scr-pill--quiet">{source.kind}</span>
+                    <span className="scr-pill scr-pill--quiet">{sourceKindText(source.kind)}</span>
                     <span className="scr-health-state">{sx(HEALTH_LABEL[source.health])}</span>
                     <span className="scr-health-latency">
-                      {source.latencyMs ? `${source.latencyMs} ms` : '—'}
+                      {source.latencyMs ? unitMs(source.latencyMs) : '—'}
                     </span>
-                    <Sparkline values={source.history} label={`${source.label} success rate`} />
+                    <Sparkline values={source.history} label={tr('scrApp.r2.dash.successRate', { name: source.label })} />
                     <span className="scr-health-rate">{Math.round(last * 100)}%</span>
                     <Icon name="chevron" size={12} />
                   </button>
@@ -476,14 +479,20 @@ export default function DashboardPage() {
             reports those instead of inventing a split. */}
         <ScrCard id="runtime" title={sx('dash.runtime')} statusId="set.performance">
           <div className="scr-mini-stats">
-            <div>
-              <span className="scr-mini-value">{`${ctl.systemStats.memoryMb}`}</span>
-              <span className="scr-mini-label">{sx('dash.runtime.memory')}</span>
-            </div>
-            <div>
-              <span className="scr-mini-value">{`${ctl.systemStats.cpuPercent}%`}</span>
-              <span className="scr-mini-label">{sx('dash.runtime.cpu')}</span>
-            </div>
+            {/* Memory and CPU are the developer readout — behind "Advanced /
+                developer tools", like the rail's copy of them. */}
+            {ctl.advancedMode && (
+              <>
+                <div>
+                  <span className="scr-mini-value">{`${ctl.systemStats.memoryMb}`}</span>
+                  <span className="scr-mini-label">{sx('dash.runtime.memory')}</span>
+                </div>
+                <div>
+                  <span className="scr-mini-value">{`${ctl.systemStats.cpuPercent}%`}</span>
+                  <span className="scr-mini-label">{sx('dash.runtime.cpu')}</span>
+                </div>
+              </>
+            )}
             <div>
               <span className="scr-mini-value">{String(ctl.systemStats.activeJobs)}</span>
               <span className="scr-mini-label">{sx('dash.runtime.jobs')}</span>

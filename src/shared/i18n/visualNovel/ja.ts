@@ -6,6 +6,7 @@ export const VISUAL_NOVEL_JA: Catalog = {
   'vnApp.aria.tabs': 'ビジュアルノベルのセクション',
   'vnApp.tab.read': '読む',
   'vnApp.tab.study': '学習',
+  'vnApp.engine.unknown': 'エンジン不明',
   'vnApp.tab.routes': 'ルート',
   'vnApp.tab.details': '詳細',
   'vnApp.tab.setup': 'テキスト取得の設定',

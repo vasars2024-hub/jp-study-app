@@ -932,20 +932,64 @@ function snapshotProfile(
   }].slice(-SCRAPER_PROFILE_HISTORY_LIMIT);
 }
 
+/**
+ * The built-in profiles' stored name and description, with the i18n keys the
+ * renderer shows in their place.
+ *
+ * The document keeps the English text: it is exported as portable JSON and read
+ * by main, so it must not change with the UI language, and a user may rename a
+ * profile. The renderer (`scraper/localize.ts`) translates a built-in profile's
+ * name or description only while it still equals the value below, so a stored
+ * default renders in the UI language and a user's own text renders as typed.
+ */
+export const SCRAPER_BUILTIN_PROFILE_TEXT = {
+  fast: {
+    name: 'Fast',
+    nameKey: 'scraperMgmt.preset.fast',
+    description: 'Lower waits and higher concurrency for reliable sources.',
+    descriptionKey: 'scrApp.r2.profile.desc.fast',
+  },
+  balanced: {
+    name: 'Balanced',
+    nameKey: 'scraperMgmt.preset.balanced',
+    description: 'Safe defaults for everyday scraping.',
+    descriptionKey: 'scrApp.r2.profile.desc.balanced',
+  },
+  thorough: {
+    name: 'Thorough',
+    nameKey: 'scraperMgmt.preset.thorough',
+    description: 'Longer waits and conservative concurrency for complex pages.',
+    descriptionKey: 'scrApp.r2.profile.desc.thorough',
+  },
+} as const satisfies Record<Exclude<ScraperPresetId, 'custom'>, {
+  name: string;
+  nameKey: string;
+  description: string;
+  descriptionKey: string;
+}>;
+
+/**
+ * The revision-log reasons this module writes. Stored in English for the same
+ * reason as the profile names; the renderer recognises these and translates them.
+ */
+export const SCRAPER_PROFILE_REASON = {
+  updated: 'Settings updated',
+  fallback: 'Profile update',
+  preset: (preset: string) => `Applied ${preset} preset`,
+  presetPattern: /^Applied (fast|balanced|thorough|custom) preset$/,
+  rollback: (versionId: string) => `Rolled back to ${versionId}`,
+  rollbackPattern: /^Rolled back to (.+)$/,
+} as const;
+
 function makeProfile(
   preset: Exclude<ScraperPresetId, 'custom'>,
   now: string,
 ): ScraperSettingsProfile {
-  const names = { fast: 'Fast', balanced: 'Balanced', thorough: 'Thorough' } as const;
-  const descriptions = {
-    fast: 'Lower waits and higher concurrency for reliable sources.',
-    balanced: 'Safe defaults for everyday scraping.',
-    thorough: 'Longer waits and conservative concurrency for complex pages.',
-  } as const;
+  const text = SCRAPER_BUILTIN_PROFILE_TEXT[preset];
   return {
     id: preset,
-    name: names[preset],
-    description: descriptions[preset],
+    name: text.name,
+    description: text.description,
     preset,
     createdAt: now,
     updatedAt: now,
@@ -989,7 +1033,7 @@ function normalizeProfile(
       history.push({
         id: safeId(rawVersion.id, profileVersionId(now, historyIndex)),
         createdAt: safeDate(rawVersion.createdAt, now),
-        reason: stringValue(rawVersion.reason, 'Profile update', 160, `profiles.${index}.history.${historyIndex}.reason`, issues),
+        reason: stringValue(rawVersion.reason, SCRAPER_PROFILE_REASON.fallback, 160, `profiles.${index}.history.${historyIndex}.reason`, issues),
         preset: presetId(rawVersion.preset),
         settings: versionSettings.value,
       });
@@ -1128,7 +1172,7 @@ export function patchScraperProfile(
         preset: 'custom',
         updatedAt: now,
         settings: next,
-        history: snapshotProfile(profile, 'Settings updated', now),
+        history: snapshotProfile(profile, SCRAPER_PROFILE_REASON.updated, now),
       };
     }),
   };
@@ -1149,7 +1193,7 @@ export function applyScraperPreset(
             preset,
             updatedAt: now,
             settings: getScraperPreset(preset),
-            history: snapshotProfile(profile, `Applied ${preset} preset`, now),
+            history: snapshotProfile(profile, SCRAPER_PROFILE_REASON.preset(preset), now),
           }
         : profile,
     ),
@@ -1280,7 +1324,7 @@ export function rollbackScraperProfile(
         preset: version.preset,
         updatedAt: now,
         settings: cloneSettings(version.settings),
-        history: snapshotProfile(profile, `Rolled back to ${versionId}`, now),
+        history: snapshotProfile(profile, SCRAPER_PROFILE_REASON.rollback(versionId), now),
       };
     }),
   };

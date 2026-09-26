@@ -16,6 +16,11 @@ export interface PlayerSnapshot {
   shuffle: boolean;
   repeat: RepeatMode;
   mediaUrl: string;
+  /**
+   * Ids of the tracks that play next, in the leader's play order. Optional because a
+   * snapshot from an older build (or a released one) carries none.
+   */
+  upNext?: string[];
 }
 
 /**
@@ -97,4 +102,9 @@ export type PlayerCommand =
   | { type: 'setVolume'; volume: number }
   | { type: 'toggleShuffle' }
   | { type: 'cycleRepeat' }
-  | { type: 'stop' };
+  | { type: 'stop' }
+  /**
+   * A window without the audio has a visualizer on screen and asks the leader for
+   * analyser frames (see `renderer/vizFrames.ts`). Carries nothing; repeated each second.
+   */
+  | { type: 'vizWant' };

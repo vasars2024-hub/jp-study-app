@@ -6,6 +6,18 @@
 /* The tabbed workspace is one column: the primary column carries the summary and
    the tab bar, and the setup column only appears for the tabs that live in it. */
 .visual-novel-workspace.is-tabbed { grid-template-columns: minmax(0, 1fr); }
+
+/* V12: the panel is a three-row grid (head, status, canvas: `auto auto minmax(..., 1fr)`),
+   but the status line only rendered while it had text, so the canvas fell into the SECOND
+   (auto) row and the 1fr row stayed empty: the library rail was cut off at the height of
+   the empty-state prompt, with a blank band under it down to the window's bottom edge.
+   The status line is always mounted now, and the canvas is pinned to the last row
+   regardless, so a missing row can never again hand it an `auto` track. */
+.visual-novel-panel > .visual-novel-layout { grid-row: 3; }
+.visual-novel-status { margin: 0; }
+/* With nothing selected and the library open, the head's primary is not rendered, so the
+   tools group is the head's first child and has to take the right edge itself. */
+.visual-novel-panel-tools:first-child { margin-left: auto; }
 .visual-novel-column[hidden],
 .visual-novel-tabpanel[hidden] { display: none; }
 .visual-novel-tabpanel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 12px; min-width: 0; }

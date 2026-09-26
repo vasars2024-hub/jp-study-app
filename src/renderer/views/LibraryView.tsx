@@ -190,6 +190,8 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
     }
   };
   const { t, lang } = useT();
+  /** The Inbox folder is stored by its English name; show it in the UI language. */
+  const folderName = (f: string): string => (f === INBOX_FOLDER ? t('library.toolbar.inbox') : f);
   const aero = useAeroMaterials();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
@@ -965,7 +967,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
         },
         ...folders.map((f) => ({
           id: `view-folder-${f}`,
-          label: t('library.menu.viewFolder', { name: f, count: counts.byFolder.get(f) ?? 0 }),
+          label: t('library.menu.viewFolder', { name: folderName(f), count: counts.byFolder.get(f) ?? 0 }),
           disabled: active === f,
           onSelect: () => setActive(f),
         })),
@@ -1190,7 +1192,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 {...chipDropProps(f, true)}
               >
                 <Icon name="folder" size={15} />
-                <span>{f}</span>
+                <span>{folderName(f)}</span>
                 <strong>{counts.byFolder.get(f) ?? 0}</strong>
               </button>
             ))}
@@ -1534,7 +1536,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
           <span
             key={f}
             className={`lib-folder-chip lib-folder-chip-group ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
-            title={t('library.chip.folderTitle', { name: f })}
+            title={t('library.chip.folderTitle', { name: folderName(f) })}
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData('app/lib-folder', f);
@@ -1549,7 +1551,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
               onClick={() => setActive(f)}
             >
               <Icon name="folder" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-              {f} <span className="lib-chip-count">{counts.byFolder.get(f) ?? 0}</span>
+              {folderName(f)} <span className="lib-chip-count">{counts.byFolder.get(f) ?? 0}</span>
             </button>
             {active === f && (
               <button
@@ -1929,7 +1931,7 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                           onClick={(e) => fileInto(e, it.id, f)}
                         >
                           <Icon name="folder" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                          {f}
+                          {folderName(f)}
                         </button>
                       ))}
                       {it.folder && (

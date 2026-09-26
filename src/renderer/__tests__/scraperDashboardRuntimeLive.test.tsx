@@ -33,7 +33,7 @@ const PORT_ONE_SHOT: SystemStats = { memoryMb: 152, cpuPercent: 2, activeJobs: 1
 
 let root: Root | null = null;
 
-function controller(systemStats: SystemStats): ScraperController {
+function controller(systemStats: SystemStats, advancedMode = true): ScraperController {
   return {
     shell: DEFAULT_SCRAPER_SHELL_STATE,
     page: 'dashboard',
@@ -44,7 +44,8 @@ function controller(systemStats: SystemStats): ScraperController {
     toggleRail: vi.fn(),
     compact: false,
     setCompact: vi.fn(),
-    advancedMode: false,
+    // Memory and CPU are the developer readout, shown with "Advanced / developer tools".
+    advancedMode,
     setAdvancedMode: vi.fn(),
     drawerOpen: false,
     drawerCategory: 'network',
@@ -81,7 +82,7 @@ function controller(systemStats: SystemStats): ScraperController {
   } as unknown as ScraperController;
 }
 
-async function render(systemStats: SystemStats) {
+async function render(systemStats: SystemStats, advancedMode = true) {
   const host = document.getElementById('host');
   if (!host) throw new Error('Missing test host');
   const created = root ?? createRoot(host);
@@ -90,7 +91,7 @@ async function render(systemStats: SystemStats) {
     created.render(createElement(
       ScraperPortProvider,
       { value: createMockScraperPort() },
-      createElement(ScraperProvider, { value: controller(systemStats) },
+      createElement(ScraperProvider, { value: controller(systemStats, advancedMode) },
         createElement(DashboardPage)),
     ));
   });
@@ -133,6 +134,11 @@ describe('Scraper Dashboard — the Runtime card reports the shell\'s live sampl
     expect(runtimeValues(host)).toEqual(['845', '6%', '0']);
     await render({ memoryMb: 431, cpuPercent: 41, activeJobs: 2 });
     expect(runtimeValues(host)).toEqual(['431', '41%', '2']);
+  });
+
+  it('shows only the job count until developer tools are on (J11)', async () => {
+    const host = await render({ memoryMb: 845, cpuPercent: 6, activeJobs: 3 }, false);
+    expect(runtimeValues(host)).toEqual(['3']);
   });
 
   it('keeps the volatile reading out of the once-per-mount snapshot entirely', () => {

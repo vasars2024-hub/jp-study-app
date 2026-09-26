@@ -1,8 +1,10 @@
 /**
  * Personality-seeded dialogue pools + context hooks for companion beep speech.
- * Study content is never translated here — these are chrome lines.
+ * Study content is never translated here — these are chrome lines, shown in
+ * the UI language through buddyText.ts (the English below is the source).
  */
 import type { CompanionTypeId } from './companionCatalog';
+import { buddyText } from './buddyText';
 
 export type DialogueContext =
   | 'idle'
@@ -95,8 +97,9 @@ export function pickDialogueLine(
   const pool = POOLS[typeId];
   const primary = pool?.[ctx];
   const line = pick(primary, `${typeId}:${ctx}:${seedExtra}:${Math.floor(Date.now() / 60_000)}`);
-  if (line) return line;
-  return pick(pool?.idle, `${typeId}:idle:${seedExtra}`);
+  if (line) return buddyText(line);
+  const idle = pick(pool?.idle, `${typeId}:idle:${seedExtra}`);
+  return idle == null ? null : buddyText(idle);
 }
 
 export function dialogueContextFromHour(h?: number): DialogueContext {

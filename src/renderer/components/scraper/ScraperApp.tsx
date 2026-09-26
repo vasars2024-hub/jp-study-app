@@ -16,6 +16,7 @@ import { SCRAPER_NAV } from './scraperPages';
 import type { ScraperController } from './types';
 import {
   loadScraperShellState,
+  migrateLegacyScraperAdvancedMode,
   onScraperShellChanged,
   patchScraperShellState,
   navigateScraperShell,
@@ -68,24 +69,7 @@ const DiscoverPage = lazy(() => import('./pages/DiscoverPage'));
 // actually opened.
 const ScraperSettingsDrawer = lazy(() => import('./settings/ScraperSettingsDrawer'));
 
-const ADVANCED_MODE_KEY = 'jp-scraper-advanced-v1';
 const FOCUS_CLEAR_MS = 2200;
-
-function readAdvancedMode(): boolean {
-  try {
-    return localStorage.getItem(ADVANCED_MODE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeAdvancedMode(on: boolean): void {
-  try {
-    localStorage.setItem(ADVANCED_MODE_KEY, on ? '1' : '0');
-  } catch {
-    /* storage unavailable — the mode simply won't persist */
-  }
-}
 
 export default function ScraperApp() {
   const aero = useAeroMaterials();
@@ -100,9 +84,15 @@ export default function ScraperApp() {
   // and resolve at render (`scraperPages.ts:3`). Any memo added later that does
   // cache text must take `lang` as a dependency, per CLAUDE.md's i18n rule.
   useT();
-  const [shell, setShell] = useState(() => loadScraperShellState());
+  const [shell, setShell] = useState(() => {
+    migrateLegacyScraperAdvancedMode();
+    return loadScraperShellState();
+  });
   useEffect(() => onScraperShellChanged(setShell), []);
-  const [advancedMode, setAdvancedModeState] = useState(readAdvancedMode);
+  // "Advanced / developer tools" — persisted in the shell document with the rest
+  // of the window's shape, off by default. It gates the expert settings fields,
+  // the Tools pages (`advanced: true` in scraperPages.ts) and the memory readout.
+  const advancedMode = shell.advanced;
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);
   const [targetUrl, setTargetUrl] = useState('');
   const [resultSeriesId, setResultSeriesId] = useState<string | null>(null);
@@ -244,10 +234,7 @@ export default function ScraperApp() {
     return () => window.removeEventListener('scraper:navigate', handle);
   }, [navigate]);
 
-  const setAdvancedMode = useCallback((on: boolean) => {
-    writeAdvancedMode(on);
-    setAdvancedModeState(on);
-  }, []);
+  const setAdvancedMode = useCallback((on: boolean) => patch({ advanced: on }), [patch]);
 
   const openResultSeries = useCallback((seriesId: string) => {
     setResultSeriesId(seriesId);

@@ -221,27 +221,27 @@ export default function VisualNovelSentenceAssist({
         </figure>
       )}
       <div className="visual-novel-sentence-actions">
-        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void persist()}>{t('vnAssist.saveDetails')}</button>
-        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void translate()}>{busy ? t('vnAssist.working') : t('vnAssist.translate')}</button>
-        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void analyze()}>{t('vnAssist.analyze')}</button>
-        <button type="button" onClick={onSaveCard}>{t('vnAssist.saveCard')}</button>
+        <button className="btn small" type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void persist()}>{t('vnAssist.saveDetails')}</button>
+        <button className="btn small" type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void translate()}>{busy ? t('vnAssist.working') : t('vnAssist.translate')}</button>
+        <button className="btn small" type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void analyze()}>{t('vnAssist.analyze')}</button>
+        <button className="btn small" type="button" onClick={onSaveCard}>{t('vnAssist.saveCard')}</button>
         <VisualNovelAgentHandoffButton capture={capture} screenshotDataUrl={screenshotDataUrl} />
         {capture.audioPath ? (
           <>
-            <button type="button" disabled={audioBusy} onClick={() => void playAudio()}>
+            <button className="btn small" type="button" disabled={audioBusy} onClick={() => void playAudio()}>
               {audioBusy ? t('vnAssist.loadingAudio') : t('vnAssist.playClip')}
             </button>
-            <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>{t('vnAssist.replaceClip')}</button>
-            <button type="button" className={confirmRemoveAudio ? 'is-confirming' : ''} disabled={audioBusy} onClick={() => void removeAudio()}>
+            <button className="btn small" type="button" disabled={audioBusy} onClick={() => void attachAudio()}>{t('vnAssist.replaceClip')}</button>
+            <button type="button" className={`btn small${confirmRemoveAudio ? ' is-confirming' : ''}`} disabled={audioBusy} onClick={() => void removeAudio()}>
               {confirmRemoveAudio ? t('vnAssist.confirmRemove') : t('vnAssist.removeClip')}
             </button>
           </>
         ) : (
-          <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>
+          <button className="btn small" type="button" disabled={audioBusy} onClick={() => void attachAudio()}>
             {audioBusy ? t('vnAssist.attaching') : t('vnAssist.attachClip')}
           </button>
         )}
-        <button type="button" className={confirmDelete ? 'is-confirming' : ''} onClick={() => void remove()}>
+        <button type="button" className={`btn small${confirmDelete ? ' is-confirming' : ''}`} onClick={() => void remove()}>
           {confirmDelete ? t('vnAssist.confirmRemove') : t('vnAssist.removeSentence')}
         </button>
       </div>
@@ -265,7 +265,7 @@ export default function VisualNovelSentenceAssist({
           )}
           {analysis.grammar.length > 0 && (
             <div>
-              <button type="button" onClick={openGrammarApp}>{t('vnAssist.practiceGrammar')}</button>
+              <button className="btn small" type="button" onClick={openGrammarApp}>{t('vnAssist.practiceGrammar')}</button>
               {analysis.grammar.map((grammar) => (
                 <article key={grammar.id}>
                   <strong>{grammar.title}</strong>

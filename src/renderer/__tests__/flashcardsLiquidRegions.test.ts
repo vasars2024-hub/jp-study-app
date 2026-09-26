@@ -26,7 +26,8 @@ describe('Flashcards Liquid regions', () => {
   it('uses the shared contextual primitive for mode launchers and navigation', () => {
     expect(SOURCE).toContain("import { ContextualSurface } from '../liquid/LiquidSurface';");
     expect(SOURCE.match(/<ContextualSurface className="view-head">/g)).toHaveLength(4);
-    expect(SOURCE).toContain('<ContextualSurface className="flash-tabs">');
+    // The collection tabs + search bar (round-2 redesign: the design system's Tabs inside it).
+    expect(SOURCE).toContain('<ContextualSurface className="flash-collections">');
     expect(SOURCE).toContain(
       '<ContextualSurface className="flash-tabs epub-mining-mode-tabs">',
     );

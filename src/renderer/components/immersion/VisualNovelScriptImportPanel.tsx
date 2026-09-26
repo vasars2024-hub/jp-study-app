@@ -57,15 +57,15 @@ export default function VisualNovelScriptImportPanel({
     <details className="visual-novel-script-import">
       <summary>{t('vnScript.head')}</summary>
       <div className="visual-novel-script-actions">
-        <button type="button" disabled={busy} onClick={() => void chooseScripts()}>
+        <button className="btn small" type="button" disabled={busy} onClick={() => void chooseScripts()}>
           {busy ? t('vnScript.working') : t('vnScript.chooseScripts')}
         </button>
         {lines.length > 0 && (
           <>
-            <button type="button" disabled={busy || !selectedLines.length} onClick={() => void importLines()}>
+            <button className="btn small" type="button" disabled={busy || !selectedLines.length} onClick={() => void importLines()}>
               {t('vnScript.importSelected', { count: selectedLines.length })}
             </button>
-            <button type="button" disabled={busy} onClick={() => {
+            <button className="btn small" type="button" disabled={busy} onClick={() => {
               setLines([]);
               setSelected(new Set());
             }}>{t('vnScript.clearPreview')}</button>

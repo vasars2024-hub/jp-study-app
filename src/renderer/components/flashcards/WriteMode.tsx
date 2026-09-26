@@ -99,7 +99,7 @@ export default function WriteMode({ onExit, deck = 'all' }: {
       <fieldset className="auto-reading-options">
         <legend>{t('flash.write.title')}</legend>
         <p className="auto-reading-options__report">{t('flash.write.noUsableCards')}</p>
-        {onExit && <button type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
+        {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
       </fieldset>
     );
   }
@@ -119,8 +119,8 @@ export default function WriteMode({ onExit, deck = 'all' }: {
           {score.overridden > 0 && ` ${t('flash.write.summaryOverrides', { count: score.overridden })}`}
         </p>
         <div className="flash-match-actions">
-          <button type="button" onClick={deal}>{t('flash.write.again')}</button>
-          {onExit && <button type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
+          <button className="btn primary" type="button" onClick={deal}>{t('flash.write.again')}</button>
+          {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
         </div>
       </fieldset>
     );
@@ -166,7 +166,7 @@ export default function WriteMode({ onExit, deck = 'all' }: {
           onChange={(event) => setTyped(event.target.value)}
         />
         {(!grade || grade.verdict === 'empty') && (
-          <button type="submit">{t('flash.write.check')}</button>
+          <button className="btn primary" type="submit">{t('flash.write.check')}</button>
         )}
       </form>
 
@@ -182,9 +182,9 @@ export default function WriteMode({ onExit, deck = 'all' }: {
 
       {grade?.verdict === 'close' && (
         <div className="flash-match-actions">
-          <button type="button" onClick={retry}>{t('flash.write.retype')}</button>
-          <button type="button" onClick={() => setRevealed(true)}>{t('flash.write.reveal')}</button>
-          <button type="button" onClick={override}>{t('flash.write.override')}</button>
+          <button className="btn" type="button" onClick={retry}>{t('flash.write.retype')}</button>
+          <button className="btn" type="button" onClick={() => setRevealed(true)}>{t('flash.write.reveal')}</button>
+          <button className="btn" type="button" onClick={override}>{t('flash.write.override')}</button>
         </div>
       )}
       {grade?.verdict === 'close' && revealed && (
@@ -195,15 +195,15 @@ export default function WriteMode({ onExit, deck = 'all' }: {
 
       {(grade?.verdict === 'correct' || grade?.verdict === 'wrong') && (
         <div className="flash-match-actions">
-          <button type="button" onClick={advance} autoFocus>{t('flash.write.next')}</button>
-          {onExit && <button type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
+          <button className="btn primary" type="button" onClick={advance} autoFocus>{t('flash.write.next')}</button>
+          {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
         </div>
       )}
 
       {(!grade || grade.verdict === 'empty' || grade.verdict === 'close') && (
         <div className="flash-match-actions">
-          <button type="button" onClick={advance}>{t('flash.write.skip')}</button>
-          {onExit && <button type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
+          <button className="btn" type="button" onClick={advance}>{t('flash.write.skip')}</button>
+          {onExit && <button className="btn" type="button" onClick={onExit}>{t('flash.write.exit')}</button>}
         </div>
       )}
     </fieldset>

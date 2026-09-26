@@ -21,7 +21,6 @@ import {
 } from '../components/calendar/CalendarContent';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
-import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import '../components/calendar/calendarLiquid.css';
 
 /**
@@ -99,12 +98,9 @@ export default function CalendarView() {
     <AppChrome menus={calMenus} status={calStatus} className="aero-calendar-chrome">
     <div className={`calendar-view${aero ? ' aero-calendar' : ''}`}>
       {/* No in-window "Calendar" heading: the window title and taskbar button
-          already say which app this is (CLAUDE.md window minimalism). */}
-      <ContextualSurface as="header" className="view-head calendar-context-head">
-        <button type="button" className="btn primary" onClick={() => openNew(toKey(cursor))}>
-          <Icon name="plus" size={14} /> {t('calendar.newEvent')}
-        </button>
-      </ContextualSurface>
+          already say which app this is (CLAUDE.md window minimalism). "New event"
+          rides at the end of the transport row below; a header strip holding only
+          that one button was an empty band across the top of the window. */}
 
       {aero && (
         <aside className="aero-cal-sidebar" aria-label={t('calendar.aero.nav')}>
@@ -143,7 +139,14 @@ export default function CalendarView() {
         </aside>
       )}
 
-      <CalendarNav state={state} />
+      <CalendarNav
+        state={state}
+        actions={
+          <button type="button" className="btn primary" onClick={() => openNew(toKey(cursor))}>
+            <Icon name="plus" size={14} /> {t('calendar.newEvent')}
+          </button>
+        }
+      />
 
       <CalendarBody state={state} />
 

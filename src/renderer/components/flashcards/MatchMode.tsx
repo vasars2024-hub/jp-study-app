@@ -76,7 +76,7 @@ export default function MatchMode({ onExit, deck = 'all' }: {
             : t('flash.match.noUsablePairs')}
         </p>
         {onExit && (
-          <button type="button" onClick={onExit}>{t('flash.match.exit')}</button>
+          <button className="btn" type="button" onClick={onExit}>{t('flash.match.exit')}</button>
         )}
       </fieldset>
     );
@@ -142,9 +142,9 @@ export default function MatchMode({ onExit, deck = 'all' }: {
       </p>
 
       <div className="flash-match-actions">
-        <button type="button" onClick={deal}>{t('flash.match.again')}</button>
+        <button className="btn primary" type="button" onClick={deal}>{t('flash.match.again')}</button>
         {onExit && (
-          <button type="button" onClick={onExit}>{t('flash.match.exit')}</button>
+          <button className="btn" type="button" onClick={onExit}>{t('flash.match.exit')}</button>
         )}
       </div>
     </fieldset>

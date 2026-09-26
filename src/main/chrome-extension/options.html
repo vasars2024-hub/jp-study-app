@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Gum — Extension settings</title>
+    <title data-i18n="opt_pageTitle">Gum — Extension settings</title>
     <style>
       :root {
         --bg: #13151b;
@@ -230,31 +230,31 @@
     <div class="layout">
       <nav class="side" id="nav">
         <div class="brand">Gum</div>
-        <input id="search" type="search" placeholder="Search settings…" aria-label="Search settings" />
-        <div class="search-empty" id="search-empty">No settings match.</div>
-        <button data-pane="lookup" data-keywords="hover shift key delay scan dictionary popup activation hold editable click">Hover lookup</button>
-        <button data-pane="ai" data-keywords="ai ocr dictionary ai analysis annotate grammar explanation formality translation snapshot notebook flashcard highlight sentence">AI OCR</button>
-        <button data-pane="popup" data-keywords="reader popup width font compact pin size appearance">Reader popup</button>
-        <button data-pane="saving" data-keywords="save mine card anki flashcard destination preview folder library confirm">Saving &amp; cards</button>
-        <button data-pane="wheel" data-keywords="wheel radial slot actions gesture positions">Radial wheel</button>
-        <button data-pane="panel" data-keywords="panel fab badge level comprehensibility corner theme highlight tint hide site">Page panel</button>
-        <button data-pane="media" data-keywords="youtube yt video download audio playlist media subtitle">Video &amp; media</button>
-        <button data-pane="connection" data-keywords="connection pairing token port bridge app anki mapping rules clipboard history flashcards test pull">Connection</button>
-        <button data-pane="shortcuts" data-keywords="shortcut keyboard keys binding commands chrome">Shortcuts</button>
-        <button data-pane="advanced" data-keywords="advanced export import reset immersion notes legacy mine terminology data">Advanced</button>
+        <input id="search" type="search" placeholder="Search settings…" aria-label="Search settings" data-i18n-placeholder="opt_searchPlaceholder" data-i18n-aria-label="opt_searchAria" />
+        <div class="search-empty" id="search-empty" data-i18n="opt_searchEmpty">No settings match.</div>
+        <button data-pane="lookup" data-keywords="hover shift key delay scan dictionary popup activation hold editable click" data-i18n="opt_navLookup">Hover lookup</button>
+        <button data-pane="ai" data-keywords="ai ocr dictionary ai analysis annotate grammar explanation formality translation snapshot notebook flashcard highlight sentence" data-i18n="opt_navAi">AI OCR</button>
+        <button data-pane="popup" data-keywords="reader popup width font compact pin size appearance" data-i18n="opt_navPopup">Reader popup</button>
+        <button data-pane="saving" data-keywords="save mine card anki flashcard destination preview folder library confirm" data-i18n="opt_navSaving">Saving &amp; cards</button>
+        <button data-pane="wheel" data-keywords="wheel radial slot actions gesture positions" data-i18n="opt_navWheel">Radial wheel</button>
+        <button data-pane="panel" data-keywords="panel fab badge level comprehensibility corner theme highlight tint hide site" data-i18n="opt_navPanel">Page panel</button>
+        <button data-pane="media" data-keywords="youtube yt video download audio playlist media subtitle" data-i18n="opt_navMedia">Video &amp; media</button>
+        <button data-pane="connection" data-keywords="connection pairing token port bridge app anki mapping rules clipboard history flashcards test pull" data-i18n="opt_navConnection">Connection</button>
+        <button data-pane="shortcuts" data-keywords="shortcut keyboard keys binding commands chrome" data-i18n="opt_navShortcuts">Shortcuts</button>
+        <button data-pane="advanced" data-keywords="advanced export import reset immersion notes legacy mine terminology data" data-i18n="opt_navAdvanced">Advanced</button>
       </nav>
 
       <main>
         <!-- Hover lookup -->
         <section class="pane" id="pane-lookup">
-          <h1>Hover lookup</h1>
-          <p class="lead">Hold a key and point at Japanese text to open the reader popup.</p>
+          <h1 data-i18n="opt_navLookup">Hover lookup</h1>
+          <p class="lead" data-i18n="opt_lookupLead">Hold a key and point at text in a language you study to open the reader popup.</p>
           <div class="group">
             <label class="check"><input type="checkbox" id="hover-enabled" />
-              <span>Enable hover lookup<span class="sub">Hold the activation key and move the cursor over a word.</span></span></label>
+              <span><span data-i18n="opt_hoverEnable">Enable hover lookup</span><span class="sub" data-i18n="opt_hoverEnableSub">Hold the activation key and move the cursor over a word.</span></span></label>
             <div class="field">
-              <label class="name" for="hover-key">Activation key</label>
-              <p class="desc">Held while hovering; also used with click and select lookups.</p>
+              <label class="name" for="hover-key" data-i18n="opt_hoverKey">Activation key</label>
+              <p class="desc" data-i18n="opt_hoverKeyDesc">Held while hovering; also used with click and select lookups.</p>
               <select id="hover-key">
                 <option value="shift">Shift</option>
                 <option value="alt">Alt</option>
@@ -262,207 +262,207 @@
               </select>
             </div>
             <div class="field">
-              <label class="name" for="hover-delay">Hover delay</label>
-              <p class="desc">How long the cursor rests on a word before the popup opens.</p>
+              <label class="name" for="hover-delay" data-i18n="opt_hoverDelay">Hover delay</label>
+              <p class="desc" data-i18n="opt_hoverDelayDesc">How long the cursor rests on a word before the popup opens.</p>
               <input type="range" id="hover-delay" min="0" max="600" step="20" />
               <span class="range-val" id="hover-delay-val"></span>
             </div>
             <div class="field">
-              <label class="name" for="scan-length">Scan length</label>
-              <p class="desc">Maximum characters considered for a match. Longer catches long compounds; shorter is faster.</p>
+              <label class="name" for="scan-length" data-i18n="opt_scanLength">Scan length</label>
+              <p class="desc" data-i18n="opt_scanLengthDesc">Maximum characters considered for a match. Longer catches long compounds; shorter is faster.</p>
               <input type="range" id="scan-length" min="4" max="24" step="1" />
               <span class="range-val" id="scan-length-val"></span>
             </div>
             <label class="check"><input type="checkbox" id="close-on-release" />
-              <span>Close the popup when the key is released<span class="sub">Off: the popup stays until you click elsewhere or press Esc. Pinned popups always stay.</span></span></label>
+              <span><span data-i18n="opt_closeOnRelease">Close the popup when the key is released</span><span class="sub" data-i18n="opt_closeOnReleaseSub">Off: the popup stays until you click elsewhere or press Esc. Pinned popups always stay.</span></span></label>
             <label class="check"><input type="checkbox" id="click-lookup" />
-              <span>Key + click / key + select also look up<span class="sub">Plain clicks always pass through to the page.</span></span></label>
+              <span><span data-i18n="opt_clickLookup">Key + click / key + select also look up</span><span class="sub" data-i18n="opt_clickLookupSub">Plain clicks always pass through to the page.</span></span></label>
             <label class="check"><input type="checkbox" id="lookup-editable" />
-              <span>Allow lookup inside text fields<span class="sub">Off by default so typing is never interrupted.</span></span></label>
+              <span><span data-i18n="opt_lookupEditable">Allow lookup inside text fields</span><span class="sub" data-i18n="opt_lookupEditableSub">Off by default so typing is never interrupted.</span></span></label>
           </div>
         </section>
 
         <!-- AI OCR / Dictionary AI -->
         <section class="pane" id="pane-ai">
-          <h1>AI OCR / Dictionary AI</h1>
-          <p class="lead">Choose what a highlight and an OCR each resolve to. AI OCR annotates the
+          <h1 data-i18n="opt_aiTitle">AI OCR / Dictionary AI</h1>
+          <p class="lead" data-i18n="opt_aiLead">Choose what a highlight and an OCR each resolve to. AI OCR annotates the
             whole sentence &mdash; grammar, vocabulary, level, formality and nuance &mdash; and lets
             you card it or snapshot it into the notebook. Dictionary AI keeps the instant offline
             lookup. The two gestures are set separately.</p>
           <div class="group">
             <label class="check"><input type="checkbox" id="ai-on-highlight" />
-              <span>AI OCR when I highlight text<span class="sub">Off: highlighting opens the dictionary popup as before.</span></span></label>
+              <span><span data-i18n="opt_aiOnHighlight">AI OCR when I highlight text</span><span class="sub" data-i18n="opt_aiOnHighlightSub">Off: highlighting opens the dictionary popup as before.</span></span></label>
             <label class="check"><input type="checkbox" id="ai-on-ocr" />
-              <span>AI OCR after a screenshot OCR<span class="sub">Off: the OCR result opens with an &ldquo;AI analysis&rdquo; button instead.</span></span></label>
+              <span><span data-i18n="opt_aiOnOcr">AI OCR after a screenshot OCR</span><span class="sub" data-i18n="opt_aiOnOcrSub">Off: the OCR result opens with an &ldquo;AI analysis&rdquo; button instead.</span></span></label>
             <div class="field">
-              <label class="name" for="ai-min-chars">Minimum selection</label>
-              <p class="desc">Shorter selections stay on the offline dictionary &mdash; a one-word cloud call is slower and costs money for an answer the dictionary already has.</p>
+              <label class="name" for="ai-min-chars" data-i18n="opt_aiMinChars">Minimum selection</label>
+              <p class="desc" data-i18n="opt_aiMinCharsDesc">Shorter selections stay on the offline dictionary &mdash; a one-word cloud call is slower and costs money for an answer the dictionary already has.</p>
               <input type="range" id="ai-min-chars" min="2" max="60" step="1" />
               <span class="range-val" id="ai-min-chars-val"></span>
             </div>
-            <p class="desc">What the analysis contains, which deck cards go to, and automatic
-              notebook snapshots are set in Gum &rarr; Settings &rarr; Study &rarr; AI analysis.
+            <p class="desc" data-i18n="opt_aiWhere">What the analysis contains, which deck cards go to, and automatic
+              notebook snapshots are set in Gum &rarr; Settings &rarr; Profile &amp; dictionary &rarr; AI analysis.
               An API key is required (Flashcards &rarr; AI Card Studio).</p>
           </div>
         </section>
 
         <!-- Reader popup -->
         <section class="pane" id="pane-popup">
-          <h1>Reader popup</h1>
-          <p class="lead">The in-page dictionary with Meaning, Grammar, Sentence, Kanji, and Examples tabs.</p>
+          <h1 data-i18n="opt_navPopup">Reader popup</h1>
+          <p class="lead" data-i18n="opt_popupLead">The in-page dictionary with Meaning, Grammar, Sentence, Kanji, and Examples tabs.</p>
           <div class="group">
             <div class="field">
-              <label class="name" for="popup-width">Width</label>
+              <label class="name" for="popup-width" data-i18n="opt_popupWidth">Width</label>
               <input type="range" id="popup-width" min="280" max="560" step="10" />
               <span class="range-val" id="popup-width-val"></span>
             </div>
             <div class="field">
-              <label class="name" for="popup-font">Font size</label>
+              <label class="name" for="popup-font" data-i18n="opt_popupFont">Font size</label>
               <input type="range" id="popup-font" min="12" max="18" step="1" />
               <span class="range-val" id="popup-font-val"></span>
             </div>
             <label class="check"><input type="checkbox" id="popup-compact" />
-              <span>Compact mode<span class="sub">Fewer definitions per entry — lighter for long reading sessions.</span></span></label>
+              <span><span data-i18n="opt_popupCompact">Compact mode</span><span class="sub" data-i18n="opt_popupCompactSub">Fewer definitions per entry — lighter for long reading sessions.</span></span></label>
             <label class="check"><input type="checkbox" id="popup-pin-click" />
-              <span>Pin the popup on key + click<span class="sub">Pinned popups can be dragged by their header and stay open while you read.</span></span></label>
-            <p class="hint">Inside the popup: <kbd>←</kbd><kbd>→</kbd> switch tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Esc</kbd> close.</p>
+              <span><span data-i18n="opt_popupPin">Pin the popup on key + click</span><span class="sub" data-i18n="opt_popupPinSub">Pinned popups can be dragged by their header and stay open while you read.</span></span></label>
+            <p class="hint" data-i18n-html="opt_popupKeysHtml">Inside the popup: <kbd>←</kbd><kbd>→</kbd> switch tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Esc</kbd> close.</p>
           </div>
         </section>
 
         <!-- Saving & cards -->
         <section class="pane" id="pane-saving">
-          <h1>Saving &amp; cards</h1>
-          <p class="lead">Where saved words, sentences, and flashcards go. (Previously called “mining”.)</p>
+          <h1 data-i18n="opt_navSaving">Saving &amp; cards</h1>
+          <p class="lead" data-i18n="opt_savingLead">Where saved words, sentences, and flashcards go. (Previously called “mining”.)</p>
           <div class="group">
             <div class="field">
-              <label class="name">When I save a word or sentence</label>
+              <label class="name" data-i18n="opt_destLabel">When I save a word or sentence</label>
               <div class="radio-group" id="dest-group">
                 <label class="radio-card"><input type="radio" name="dest" value="both" />
-                  <span><b>Gum + Anki card</b><span class="sub">Creates an Anki card when Anki is running; a copy is always kept in your Gum library.</span></span></label>
+                  <span><b data-i18n="opt_destBoth">Gum + Anki card</b><span class="sub" data-i18n="opt_destBothSub">Creates an Anki card when Anki is running; a copy is always kept in your Gum library.</span></span></label>
                 <label class="radio-card"><input type="radio" name="dest" value="app" />
-                  <span><b>Gum only</b><span class="sub">Saves to your Gum library. “Create card” still sends to Anki explicitly.</span></span></label>
+                  <span><b data-i18n="opt_destApp">Gum only</b><span class="sub" data-i18n="opt_destAppSub">Saves to your Gum library. “Create card” still sends to Anki explicitly.</span></span></label>
               </div>
             </div>
             <label class="check"><input type="checkbox" id="confirm-card" />
-              <span>Preview before creating a card<span class="sub">Shows the text, card type, and destination before sending. Card fields are filled by Gum from its dictionaries and your Anki field mapping.</span></span></label>
+              <span><span data-i18n="opt_confirmCard">Preview before creating a card</span><span class="sub" data-i18n="opt_confirmCardSub">Shows the text, card type, and destination before sending. Card fields are filled by Gum from its dictionaries and your Anki field mapping.</span></span></label>
             <div class="field">
-              <label class="name" for="folder-label">Library folder label</label>
-              <p class="desc">Saves from the extension appear under this folder in Gum flashcards.</p>
+              <label class="name" for="folder-label" data-i18n="opt_folderLabel">Library folder label</label>
+              <p class="desc" data-i18n="opt_folderLabelDesc">Saves from the extension appear under this folder in Gum flashcards.</p>
               <input id="folder-label" type="text" maxlength="40" />
             </div>
-            <p class="hint">Deck, note type, and field mapping live in the Gum app — see <b>Connection</b> for direct links.</p>
+            <p class="hint" data-i18n-html="opt_savingHintHtml">Deck, note type, and field mapping live in the Gum app — see <b>Connection</b> for direct links.</p>
           </div>
         </section>
 
         <!-- Radial wheel -->
         <section class="pane" id="pane-wheel">
-          <h1>Radial wheel</h1>
-          <p class="lead">A quick action ring opened with <kbd>Alt+Shift+W</kbd>. One command per position; the center always cancels.</p>
+          <h1 data-i18n="opt_navWheel">Radial wheel</h1>
+          <p class="lead" data-i18n-html="opt_wheelLeadHtml">A quick action ring opened with <kbd>Alt+Shift+W</kbd>. One command per position; the center always cancels.</p>
           <div class="group">
             <label class="check"><input type="checkbox" id="wheel-enabled" />
-              <span>Enable the radial wheel<span class="sub">When disabled, the shortcut opens a compact action list instead.</span></span></label>
+              <span><span data-i18n="opt_wheelEnable">Enable the radial wheel</span><span class="sub" data-i18n="opt_wheelEnableSub">When disabled, the shortcut opens a compact action list instead.</span></span></label>
             <div class="wheel-editor">
               <div class="wheel-positions" id="wheel-positions"></div>
               <div id="wheel-preview" aria-hidden="true"></div>
             </div>
-            <p class="hint">Each command can be assigned once — picking a command that is already placed swaps the two positions. Commands that don't apply to the current page (like Download video outside YouTube) appear disabled on the wheel. Keyboard: <kbd>1</kbd>–<kbd>6</kbd> run a position, arrows move the highlight, <kbd>Esc</kbd> cancels.</p>
+            <p class="hint" data-i18n-html="opt_wheelHintHtml">Each command can be assigned once — picking a command that is already placed swaps the two positions. Commands that don't apply to the current page (like Download video outside YouTube) appear disabled on the wheel. Keyboard: <kbd>1</kbd>–<kbd>6</kbd> run a position, arrows move the highlight, <kbd>Esc</kbd> cancels.</p>
           </div>
         </section>
 
         <!-- Page panel -->
         <section class="pane" id="pane-panel">
-          <h1>Page panel</h1>
-          <p class="lead">The small corner panel with the difficulty estimate and page tools.</p>
+          <h1 data-i18n="opt_navPanel">Page panel</h1>
+          <p class="lead" data-i18n="opt_panelLead">The small corner panel with the difficulty estimate and page tools.</p>
           <div class="group">
-            <label class="check"><input type="checkbox" id="fab-visible" /><span>Show the page panel</span></label>
-            <label class="check"><input type="checkbox" id="fab-collapsed" /><span>Start collapsed</span></label>
+            <label class="check"><input type="checkbox" id="fab-visible" /><span data-i18n="opt_fabVisible">Show the page panel</span></label>
+            <label class="check"><input type="checkbox" id="fab-collapsed" /><span data-i18n="opt_fabCollapsed">Start collapsed</span></label>
             <div class="field">
-              <label class="name" for="fab-corner">Position</label>
+              <label class="name" for="fab-corner" data-i18n="opt_fabCorner">Position</label>
               <select id="fab-corner">
-                <option value="bottom-right">Bottom right</option>
-                <option value="bottom-right-mid">Bottom right (higher)</option>
-                <option value="top-right">Top right</option>
+                <option value="bottom-right" data-i18n="opt_cornerBottomRight">Bottom right</option>
+                <option value="bottom-right-mid" data-i18n="opt_cornerBottomRightMid">Bottom right (higher)</option>
+                <option value="top-right" data-i18n="opt_cornerTopRight">Top right</option>
               </select>
             </div>
-            <h3 style="margin-top:16px">Badges &amp; buttons</h3>
-            <label class="check"><input type="checkbox" id="fab-level" /><span>Difficulty estimate</span></label>
-            <label class="check"><input type="checkbox" id="fab-comp" /><span>Known-word percentage</span></label>
-            <label class="check"><input type="checkbox" id="fab-theme" /><span>Reading theme button</span></label>
-            <label class="check"><input type="checkbox" id="fab-hl" /><span>Highlight mode button</span></label>
-            <label class="check"><input type="checkbox" id="fab-learn" /><span>Known-word tint button</span></label>
-            <label class="check"><input type="checkbox" id="fab-ocr" /><span>OCR button</span></label>
+            <h3 style="margin-top:16px" data-i18n="opt_badgesHeading">Badges &amp; buttons</h3>
+            <label class="check"><input type="checkbox" id="fab-level" /><span data-i18n="opt_fabLevel">Difficulty estimate</span></label>
+            <label class="check"><input type="checkbox" id="fab-comp" /><span data-i18n="opt_fabComp">Known-word percentage</span></label>
+            <label class="check"><input type="checkbox" id="fab-theme" /><span data-i18n="opt_fabTheme">Reading theme button</span></label>
+            <label class="check"><input type="checkbox" id="fab-hl" /><span data-i18n="opt_fabHl">Highlight mode button</span></label>
+            <label class="check"><input type="checkbox" id="fab-learn" /><span data-i18n="opt_fabLearn">Known-word tint button</span></label>
+            <label class="check"><input type="checkbox" id="fab-ocr" /><span data-i18n="opt_fabOcr">OCR button</span></label>
             <div class="row">
-              <button type="button" class="btn" id="fab-clear-hidden">Show panel on all sites again</button>
+              <button type="button" class="btn" id="fab-clear-hidden" data-i18n="opt_fabClearHidden">Show panel on all sites again</button>
             </div>
-            <p class="hint">“Hide here” on the panel suppresses it per-site; this clears that list.</p>
+            <p class="hint" data-i18n="opt_fabHint">“Hide here” on the panel suppresses it per-site; this clears that list.</p>
           </div>
         </section>
 
         <!-- Video & media -->
         <section class="pane" id="pane-media">
-          <h1>Video &amp; media</h1>
-          <p class="lead">What “Save page” does on YouTube, and media options.</p>
+          <h1 data-i18n="opt_navMedia">Video &amp; media</h1>
+          <p class="lead" data-i18n="opt_mediaLead">What “Save page” does on YouTube, and media options.</p>
           <div class="group">
             <div class="field">
-              <label class="name" for="yt-mode">Saving a YouTube page</label>
+              <label class="name" for="yt-mode" data-i18n="opt_ytMode">Saving a YouTube page</label>
               <select id="yt-mode">
-                <option value="download">Download the media into Gum</option>
-                <option value="metadata">Save metadata only (track the video/playlist)</option>
+                <option value="download" data-i18n="opt_ytModeDownload">Download the media into Gum</option>
+                <option value="metadata" data-i18n="opt_ytModeMetadata">Save metadata only (track the video/playlist)</option>
               </select>
             </div>
             <label class="check"><input type="checkbox" id="yt-audio" />
-              <span>Audio only when downloading<span class="sub">Smaller files — useful for listening practice.</span></span></label>
-            <p class="hint">“Download video” is always available explicitly on YouTube pages from the popup, wheel, and More menu.</p>
+              <span><span data-i18n="opt_ytAudio">Audio only when downloading</span><span class="sub" data-i18n="opt_ytAudioSub">Smaller files — useful for listening practice.</span></span></label>
+            <p class="hint" data-i18n="opt_mediaHint">“Download video” is always available explicitly on YouTube pages from the popup, wheel, and More menu.</p>
           </div>
         </section>
 
         <!-- Connection -->
         <section class="pane" id="pane-connection">
-          <h1>Connection</h1>
-          <p class="lead">Pairing with the Gum desktop app. Everything else — Anki mapping, mining rules, clipboard history — lives in the app itself.</p>
+          <h1 data-i18n="opt_navConnection">Connection</h1>
+          <p class="lead" data-i18n="opt_connLead">Pairing with the Gum desktop app. Everything else — Anki mapping, mining rules, clipboard history — lives in the app itself.</p>
           <div class="group">
-            <h3>Pairing <span class="conn-state" id="conn-state" style="margin-left:10px">unknown</span></h3>
+            <h3><span data-i18n="opt_pairingHeading">Pairing</span> <span class="conn-state" id="conn-state" style="margin-left:10px" data-i18n="opt_connUnknown">unknown</span></h3>
             <div class="field">
-              <label class="name" for="token">Pairing token</label>
-              <p class="desc">Copy it from Gum → Settings → Study → Chrome extension, or pull it automatically while the app is open.</p>
+              <label class="name" for="token" data-i18n="opt_token">Pairing token</label>
+              <p class="desc" data-i18n="opt_tokenDesc">In Gum, open Settings → Profile &amp; dictionary → Chrome extension. Copy the token and paste it here, or press Pair now there and then Pull token from app here.</p>
               <input id="token" type="password" autocomplete="off" />
             </div>
             <div class="field">
-              <label class="name" for="port">Bridge port</label>
+              <label class="name" for="port" data-i18n="opt_port">Bridge port</label>
               <input id="port" type="number" value="18765" min="1" max="65535" />
             </div>
             <div class="row">
-              <button type="button" class="btn primary" id="save-pair">Save pairing</button>
-              <button type="button" class="btn" id="test">Test connection</button>
-              <button type="button" class="btn" id="pull-app">Pull token from app</button>
+              <button type="button" class="btn primary" id="save-pair" data-i18n="opt_savePair">Save pairing</button>
+              <button type="button" class="btn" id="test" data-i18n="opt_test">Test connection</button>
+              <button type="button" class="btn" id="pull-app" data-i18n="opt_pull">Pull token from app</button>
             </div>
           </div>
           <div class="group">
-            <h3>Open in the Gum app</h3>
+            <h3 data-i18n="opt_openInApp">Open in the Gum app</h3>
             <div class="row">
-              <button type="button" class="btn" data-open="anki">Anki &amp; field mapping</button>
-              <button type="button" class="btn" data-open="profile-rules">Saving rules (profiles)</button>
-              <button type="button" class="btn" data-open="clipboard">Clipboard history</button>
-              <button type="button" class="btn" data-open="flashcards">Flashcards</button>
-              <button type="button" class="btn" data-open="inbox">Inbox</button>
+              <button type="button" class="btn" data-open="anki" data-i18n="opt_openAnki">Anki &amp; field mapping</button>
+              <button type="button" class="btn" data-open="profile-rules" data-i18n="opt_openRules">Saving rules (profiles)</button>
+              <button type="button" class="btn" data-open="clipboard" data-i18n="opt_openClipboard">Clipboard history</button>
+              <button type="button" class="btn" data-open="flashcards" data-i18n="opt_openFlashcards">Flashcards</button>
+              <button type="button" class="btn" data-open="inbox" data-i18n="opt_openInbox">Inbox</button>
             </div>
           </div>
         </section>
 
         <!-- Shortcuts -->
         <section class="pane" id="pane-shortcuts">
-          <h1>Shortcuts</h1>
-          <p class="lead">Browser-level shortcuts are managed by Chrome; in-page keys work whenever the reader popup or wheel is open.</p>
+          <h1 data-i18n="opt_navShortcuts">Shortcuts</h1>
+          <p class="lead" data-i18n="opt_shortcutsLead">Browser-level shortcuts are managed by Chrome; in-page keys work whenever the reader popup or wheel is open.</p>
           <div class="group">
-            <h3>Browser shortcuts</h3>
+            <h3 data-i18n="opt_browserShortcuts">Browser shortcuts</h3>
             <table class="shortcuts" id="shortcut-table"></table>
             <div class="row">
-              <button type="button" class="btn" id="open-shortcuts">Change in Chrome shortcut settings</button>
+              <button type="button" class="btn" id="open-shortcuts" data-i18n="opt_openShortcuts">Change in Chrome shortcut settings</button>
             </div>
           </div>
           <div class="group">
-            <h3>In-page keys</h3>
-            <p class="hint" style="margin-top:0">
+            <h3 data-i18n="opt_inPageKeys">In-page keys</h3>
+            <p class="hint" style="margin-top:0" data-i18n-html="opt_inPageKeysHtml">
               Reader popup: <kbd>←</kbd><kbd>→</kbd> tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Backspace</kbd> back · <kbd>Esc</kbd> close.<br />
               Wheel: <kbd>1</kbd>–<kbd>6</kbd> run · arrows highlight · <kbd>Enter</kbd> run · <kbd>Esc</kbd> cancel.<br />
               OCR selection: drag a box · <kbd>Esc</kbd> cancel.
@@ -472,25 +472,25 @@
 
         <!-- Advanced -->
         <section class="pane" id="pane-advanced">
-          <h1>Advanced</h1>
-          <p class="lead">Data, migration, and everything that doesn't need to be on by default.</p>
+          <h1 data-i18n="opt_navAdvanced">Advanced</h1>
+          <p class="lead" data-i18n="opt_advancedLead">Data, migration, and everything that doesn't need to be on by default.</p>
           <div class="group">
             <label class="check"><input type="checkbox" id="log-immersion" />
-              <span>Log reading time to Gum<span class="sub">Counts active time on pages with Japanese text toward your immersion statistics.</span></span></label>
+              <span><span data-i18n="opt_logImmersion">Log reading time to Gum</span><span class="sub" data-i18n="opt_logImmersionSub">Counts active time on pages in a language you study toward your immersion statistics.</span></span></label>
             <div class="field">
-              <label class="name" for="notes">Notes</label>
-              <textarea id="notes" placeholder="Optional notes for yourself"></textarea>
+              <label class="name" for="notes" data-i18n="opt_notes">Notes</label>
+              <textarea id="notes" placeholder="Optional notes for yourself" data-i18n-placeholder="opt_notesPlaceholder"></textarea>
             </div>
           </div>
           <div class="group">
-            <h3>Settings data</h3>
+            <h3 data-i18n="opt_settingsData">Settings data</h3>
             <div class="row">
-              <button type="button" class="btn" id="export-settings">Export settings</button>
-              <button type="button" class="btn" id="import-settings">Import settings</button>
+              <button type="button" class="btn" id="export-settings" data-i18n="opt_export">Export settings</button>
+              <button type="button" class="btn" id="import-settings" data-i18n="opt_import">Import settings</button>
               <input type="file" id="import-file" accept="application/json" hidden />
-              <button type="button" class="btn danger" id="reset-settings">Reset to defaults</button>
+              <button type="button" class="btn danger" id="reset-settings" data-i18n="opt_reset">Reset to defaults</button>
             </div>
-            <p class="hint">Reset keeps your pairing token and port. Settings from older versions (including “Prefer Anki for mines” and the old wheel slots) are migrated automatically — “mine” is simply called “save” now.</p>
+            <p class="hint" data-i18n="opt_resetHint">Reset keeps your pairing token and port. Settings from older versions (including “Prefer Anki for mines” and the old wheel slots) are migrated automatically — “mine” is simply called “save” now.</p>
           </div>
         </section>
       </main>

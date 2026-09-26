@@ -3,6 +3,12 @@ export const READING_GARDEN_PROGRESS_EVENT = 'jp-reading-garden-progress';
 export const READING_GARDEN_MAX_STAGE = 50;
 export const READING_GARDEN_PAGES_PER_PHASE = 50;
 export const READING_GARDEN_EVOLUTION_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+/**
+ * Reading that has no pages of its own (PDF text, visual novels, the
+ * Immersion browser) grows the garden by characters: this many count as one
+ * page, roughly a paperback page of Japanese or Chinese.
+ */
+export const READING_GARDEN_CHARS_PER_PAGE = 400;
 
 export interface ReadingGardenProgress {
   version: 2;
@@ -15,6 +21,8 @@ export interface ReadingGardenProgress {
   lastEvolutionAt: number | null;
   lastReadAt: number | null;
   lastBookId: string | null;
+  /** Characters read outside paged readers, not yet a whole page. */
+  pendingChars?: number;
 }
 
 export interface EpubPageRead {
@@ -122,6 +130,9 @@ function normalizeV2(parsed: Partial<ReadingGardenProgress>): ReadingGardenProgr
     lastEvolutionAt: finiteTimestamp(parsed.lastEvolutionAt),
     lastReadAt: finiteTimestamp(parsed.lastReadAt),
     lastBookId: typeof parsed.lastBookId === 'string' ? parsed.lastBookId : null,
+    ...(finitePageCount(parsed.pendingChars) > 0
+      ? { pendingChars: Math.min(READING_GARDEN_CHARS_PER_PAGE - 1, finitePageCount(parsed.pendingChars)) }
+      : {}),
   };
 }
 
@@ -194,5 +205,46 @@ export function recordEpubPageRead(
       }),
     );
   }
+  return next;
+}
+
+function saveAndAnnounce(next: ReadingGardenProgress, storage: GardenStorage): void {
+  storage.setItem(READING_GARDEN_STORAGE_KEY, JSON.stringify(next));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent<ReadingGardenProgress>(READING_GARDEN_PROGRESS_EVENT, { detail: next }),
+    );
+  }
+}
+
+/**
+ * Characters read somewhere without pages — a PDF, a visual novel, a web page
+ * in the Immersion browser. The garden used to count EPUB and manga pages only,
+ * so a learner who read everything else never saw it grow.
+ */
+export function recordReadingCharsForGarden(
+  input: { sourceId: string; chars: number },
+  storage: GardenStorage = localStorage,
+  now = Date.now(),
+): ReadingGardenProgress {
+  const chars = finitePageCount(input.chars);
+  const current = loadReadingGardenProgress(storage, now);
+  if (chars <= 0) return current;
+  const total = (current.pendingChars ?? 0) + chars;
+  const pages = Math.floor(total / READING_GARDEN_CHARS_PER_PAGE);
+  const rest = total - pages * READING_GARDEN_CHARS_PER_PAGE;
+  const { pendingChars: _drop, ...base } = current;
+  void _drop;
+  const withChars: ReadingGardenProgress = {
+    ...base,
+    ...(rest > 0 ? { pendingChars: rest } : {}),
+    pagesRead: current.pagesRead + pages,
+    bankedPages:
+      current.stage >= READING_GARDEN_MAX_STAGE ? current.bankedPages : current.bankedPages + pages,
+    lastReadAt: now,
+    lastBookId: input.sourceId,
+  };
+  const next = settleReadingGardenEvolution(withChars, now);
+  saveAndAnnounce(next, storage);
   return next;
 }

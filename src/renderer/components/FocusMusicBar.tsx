@@ -7,6 +7,8 @@ import type { MediaItem } from '../../shared/types';
 import Icon from './Icons';
 import * as player from '../playerBus';
 import { guessSongMeta } from '../lyrics';
+import { useT } from '../i18n';
+import { songListWindow, SONG_ROW_HEIGHT } from './focusMusicWindow';
 
 const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i;
 
@@ -26,6 +28,7 @@ function labelOf(item: MediaItem): { title: string; artist: string } {
 }
 
 export default function FocusMusicBar() {
+  const { t } = useT();
   const [s, setS] = useState(player.getState);
   const [library, setLibrary] = useState<MediaItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -34,6 +37,9 @@ export default function FocusMusicBar() {
   const [error, setError] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewHeight, setViewHeight] = useState(320);
 
   useEffect(() => player.subscribe(setS), []);
 
@@ -79,7 +85,7 @@ export default function FocusMusicBar() {
 
   useEffect(() => {
     if (!pickerOpen) return;
-    const t = window.setTimeout(() => searchRef.current?.focus(), 40);
+    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 40);
     const onDoc = (e: MouseEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setPickerOpen(false);
     };
@@ -89,7 +95,7 @@ export default function FocusMusicBar() {
     document.addEventListener('mousedown', onDoc);
     window.addEventListener('keydown', onKey);
     return () => {
-      window.clearTimeout(t);
+      window.clearTimeout(focusTimer);
       document.removeEventListener('mousedown', onDoc);
       window.removeEventListener('keydown', onKey);
     };
@@ -112,9 +118,10 @@ export default function FocusMusicBar() {
   const title = s.current
     ? labelOf(s.current).title
     : library.length
-      ? 'Choose a song'
-      : 'No songs in library';
+      ? t('focusMusic.chooseSong')
+      : t('focusMusic.noSongs');
   const artist = s.current ? labelOf(s.current).artist : '';
+  const win = songListWindow(songs.length, scrollTop, viewHeight);
 
   return (
     <div className="focus-music-bar" ref={rootRef}>
@@ -123,7 +130,7 @@ export default function FocusMusicBar() {
         className="btn small focus-music-btn"
         disabled={(!s.queue.length && !s.current) || busy}
         onClick={() => player.prev()}
-        aria-label="Previous track"
+        aria-label={t('focusMusic.prev')}
       >
         <Icon name="skip-back" size={14} />
       </button>
@@ -135,7 +142,7 @@ export default function FocusMusicBar() {
           if (!s.current && library[0]) void playSong(library[0]);
           else player.toggle();
         }}
-        aria-label={s.playing ? 'Pause' : 'Play'}
+        aria-label={s.playing ? t('focusMusic.pause') : t('focusMusic.play')}
       >
         <Icon name={s.playing ? 'pause' : 'player'} size={14} />
       </button>
@@ -144,7 +151,7 @@ export default function FocusMusicBar() {
         className="btn small focus-music-btn"
         disabled={(!s.queue.length && !s.current) || busy}
         onClick={() => player.next()}
-        aria-label="Next track"
+        aria-label={t('focusMusic.next')}
       >
         <Icon name="skip-forward" size={14} />
       </button>
@@ -154,8 +161,8 @@ export default function FocusMusicBar() {
         disabled={(!s.queue.length && !s.current) || busy}
         onClick={() => player.toggleShuffle()}
         aria-pressed={s.shuffle}
-        aria-label={s.shuffle ? 'Mix on' : 'Mix off'}
-        title={s.shuffle ? 'Mix on' : 'Mix off'}
+        aria-label={s.shuffle ? t('focusMusic.mixOn') : t('focusMusic.mixOff')}
+        title={s.shuffle ? t('focusMusic.mixOn') : t('focusMusic.mixOff')}
       >
         <Icon name="shuffle" size={14} />
       </button>
@@ -167,7 +174,7 @@ export default function FocusMusicBar() {
           setPickerOpen((o) => !o);
           void loadLibrary();
         }}
-        title={s.current ? `${title}${artist ? ` — ${artist}` : ''}` : 'Select a song'}
+        title={s.current ? `${title}${artist ? ` — ${artist}` : ''}` : t('focusMusic.selectSong')}
         aria-expanded={pickerOpen}
         aria-haspopup="listbox"
       >
@@ -179,7 +186,7 @@ export default function FocusMusicBar() {
           </span>
         ) : (
           <span className="focus-music-artist muted">
-            {library.length ? `${library.length} tracks · click to pick` : 'Import audio in Music app'}
+            {library.length ? t('focusMusic.trackCount', { count: library.length }) : t('focusMusic.importHint')}
           </span>
         )}
       </button>
@@ -193,62 +200,93 @@ export default function FocusMusicBar() {
           step={0.02}
           value={s.volume}
           onChange={(e) => player.setVolume(Number(e.target.value))}
-          aria-label="Volume"
+          aria-label={t('focusMusic.volume')}
         />
         <span className="focus-music-vol-value">{Math.round(s.volume * 100)}</span>
       </label>
 
       {pickerOpen && (
-        <div className="focus-music-picker" role="listbox" aria-label="Song list">
+        <div className="focus-music-picker">
           <div className="focus-music-picker-head">
             <input
               ref={searchRef}
               type="search"
               className="focus-music-search"
-              placeholder="Search songs…"
+              placeholder={t('focusMusic.searchPlaceholder')}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search songs"
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setScrollTop(0);
+                if (listRef.current) listRef.current.scrollTop = 0;
+              }}
+              aria-label={t('focusMusic.searchAria')}
             />
             <button
               type="button"
               className="btn small"
               onClick={() => setPickerOpen(false)}
-              aria-label="Close song list"
+              aria-label={t('focusMusic.closeList')}
             >
               <Icon name="close" size={12} />
             </button>
           </div>
-          <div className="focus-music-list">
+          {/* Only the rows in view are mounted: a library of thousands of songs
+              used to render every one of them each time the list opened. */}
+          <div
+            className="focus-music-list"
+            role="listbox"
+            aria-label={t('focusMusic.songList')}
+            ref={(el) => {
+              listRef.current = el;
+              if (el && el.clientHeight && el.clientHeight !== viewHeight) setViewHeight(el.clientHeight);
+            }}
+            onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+          >
             {!songs.length && (
               <p className="focus-music-empty muted">
-                {library.length
-                  ? 'No matches.'
-                  : 'No audio in the media library yet. Open the Music app from the desktop (exit focus) and import files or a folder.'}
+                {library.length ? t('focusMusic.noMatches') : t('focusMusic.emptyLibrary')}
               </p>
             )}
-            {songs.map((item) => {
-              const { title: t, artist: a } = labelOf(item);
-              const active = s.current?.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  className={`focus-music-row${active ? ' active' : ''}`}
-                  disabled={busy}
-                  onClick={() => void playSong(item)}
-                >
-                  <span className="focus-music-row-title">{t}</span>
-                  {a ? <span className="focus-music-row-artist muted">{a}</span> : null}
-                </button>
-              );
-            })}
+            {songs.length > 0 && (
+              <div style={{ height: songs.length * SONG_ROW_HEIGHT, position: 'relative' }}>
+                {songs.slice(win.start, win.end).map((item, i) => {
+                  const { title: rowTitle, artist: rowArtist } = labelOf(item);
+                  const active = s.current?.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      aria-setsize={songs.length}
+                      aria-posinset={win.start + i + 1}
+                      className={`focus-music-row${active ? ' active' : ''}`}
+                      style={{ position: 'absolute', top: (win.start + i) * SONG_ROW_HEIGHT, height: SONG_ROW_HEIGHT }}
+                      disabled={busy}
+                      onClick={() => void playSong(item)}
+                    >
+                      <span className="focus-music-row-title">{rowTitle}</span>
+                      {rowArtist ? <span className="focus-music-row-artist muted">{rowArtist}</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {error ? <p className="focus-music-error">{error}</p> : null}
+          {error ? (
+            <p className="focus-music-error focus-music-error--inline" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
       )}
+      {/* Errors show whether or not the list is open (Play with the list closed
+          used to fail silently). */}
+      {error && !pickerOpen ? (
+        <p className="focus-music-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

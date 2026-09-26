@@ -12,6 +12,7 @@
  */
 import React from 'react';
 import { useT } from '../renderer/i18n';
+import { useFocusReturn } from '../renderer/components/shell/focusReturn';
 
 export default function StudyToolSheet({
   id,
@@ -26,6 +27,17 @@ export default function StudyToolSheet({
 }): React.ReactElement {
   const { t } = useT();
   const ref = React.useRef<HTMLDivElement | null>(null);
+
+  // The header promised this and nothing did it (round-2 audit K7): closing a sheet
+  // with Escape or its × left focus on <body>. The opener is captured before the
+  // effect below moves focus in, and gets it back on close — unless the close came
+  // from the user clicking somewhere else, which keeps that focus. When the opener
+  // is gone, the sheet's own category button in the bar takes it.
+  useFocusReturn(true, ref, () =>
+    document.querySelector<HTMLElement>(
+      `[data-study-sheet-toggle="${id.replace(/^study-sheet-/, '')}"]`,
+    ),
+  );
 
   React.useEffect(() => {
     const node = ref.current;

@@ -2534,6 +2534,87 @@
   }
 }
 
+/* ------------------------------------------- indexer results, card rows --- */
+
+/* The tier above still pays ~450px of fixed tracks, so at the default window
+   (a ~600px card) the NAME column was measured at 49px and every release read
+   "[ASW] Ts…". Below TORRENT_CARD_BREAKPOINT (ResultPanels.tsx) the table adds
+   `.is-cards` — from a ResizeObserver on the table itself, because the row height
+   is a number VirtualList has to be told — and each row becomes a two-line card:
+   the full-width name block on top, the numbers on one line beneath it. The
+   header stays in the accessibility tree (visually hidden), so each cell still
+   announces its column. */
+.scr-t-cardlabel {
+  display: none;
+}
+
+/* Collapsed to zero height rather than taken out of flow: the header must keep
+   the grid's `auto` row, or the body would fall into it and lose the `1fr` row
+   whose height is what VirtualList windows against. */
+.scr-table--torrents.is-cards .scr-thead {
+  height: 0;
+  overflow: hidden;
+  border-bottom: 0;
+  clip-path: inset(50%);
+}
+
+.scr-table--torrents.is-cards .scr-row {
+  grid-template-columns: auto auto auto minmax(0, 1fr);
+  grid-template-areas:
+    'name name name name'
+    'resolution seeders leechers size';
+  align-content: center;
+  column-gap: var(--space-md);
+  row-gap: var(--space-2xs);
+  padding-block: var(--space-xs);
+}
+
+.scr-table--torrents.is-cards.is-selectable .scr-row {
+  grid-template-columns: 34px auto auto auto minmax(0, 1fr);
+  grid-template-areas:
+    'select name name name name'
+    'select resolution seeders leechers size';
+}
+
+.scr-table--torrents.is-cards [data-col='select'] { grid-area: select; }
+.scr-table--torrents.is-cards [data-col='name'] { grid-area: name; }
+.scr-table--torrents.is-cards [data-col='resolution'] { grid-area: resolution; }
+.scr-table--torrents.is-cards [data-col='seeders'] { grid-area: seeders; }
+.scr-table--torrents.is-cards [data-col='leechers'] { grid-area: leechers; }
+.scr-table--torrents.is-cards [data-col='size'] { grid-area: size; justify-self: end; }
+
+.scr-table--torrents.is-cards [data-col='group'],
+.scr-table--torrents.is-cards [data-col='age'],
+.scr-table--torrents.is-cards [data-col='subs'],
+.scr-table--torrents.is-cards [data-col='tracker'] {
+  display: none;
+}
+
+.scr-table--torrents.is-cards .scr-t-fold {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two lines of the release name instead of one ellipsis; the rest is in the
+   name's tooltip. */
+.scr-table--torrents.is-cards .scr-t-en {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.scr-table--torrents.is-cards .scr-t-cardlabel {
+  display: inline;
+  margin-inline-end: var(--space-2xs);
+  color: var(--muted);
+  font-size: var(--font-size-2xs);
+}
+
 /* ---------------------------------------- qBittorrent mirror, responsive --- */
 
 /* Fifteen columns, a 1582px min-content, and the same 606px card: this is the
@@ -4835,7 +4916,10 @@
   padding: var(--space-xs) var(--space-sm);
   border: 1px solid color-mix(in srgb, var(--status-success) 45%, var(--border));
   border-radius: var(--radius-pill);
-  color: var(--status-success);
+  /* Its own ground and a text-strength green: the raw status green read 2.71:1
+     in Classic Light and 1.75:1 on aero glass. */
+  background: color-mix(in srgb, var(--status-success) 10%, var(--panel));
+  color: color-mix(in srgb, var(--status-success) 55%, var(--text));
   font-size: var(--font-size-xs);
 }
 

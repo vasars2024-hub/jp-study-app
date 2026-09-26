@@ -368,7 +368,9 @@ describe('VisualNovelPanel renders in the interface language', () => {
     // `partial`, not `supported`: script import reads only unpacked `.ks`, and a
     // shipped KiriKiri game keeps its scripts inside `.xp3` archives.
     expect(text).toContain(catalog['vnPanel.compat.partial'] as string);
-    expect(text, 'the engine name is data and must survive').toContain('kirikiri');
+    // Shown by its product name (VISUAL_NOVEL_ENGINE_NAMES), never translated; only the
+    // UI words `unknown` / `custom` are.
+    expect(text, 'the engine name is data and must survive').toContain('KiriKiri');
     // `reading` also appears inside `Reading overlay`, so anchor on the token
     // in its own separator context rather than on the bare word.
     expect(text).not.toContain('· partial ·');

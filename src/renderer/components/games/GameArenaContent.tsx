@@ -381,7 +381,9 @@ export function GameArena() {
               }}
             >
               <Icon name={game.mode === 'writing' ? 'edit' : game.mode === 'arcade' ? 'sparkle' : 'dice'} size={16} />
-              <span>
+              {/* Names and blurbs are cut with an ellipsis in the narrow list (Russian
+                  names run long), so the full text is the tooltip. */}
+              <span title={`${t(gameTitleKey(game.id))} — ${t(gameDescKey(game.id))}`}>
                 <b>{t(gameTitleKey(game.id))}</b>
                 <small>{t(gameDescKey(game.id))}</small>
               </span>

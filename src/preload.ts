@@ -1453,6 +1453,18 @@ const api = {
     ipcRenderer.on('player:command', handler);
     return () => ipcRenderer.removeListener('player:command', handler);
   },
+  /** Leader -> other windows: one throttled analyser frame (see renderer/vizFrames.ts). */
+  playerSendVizFrame: (frame: import('./renderer/vizFrames').VizFrame): void => {
+    ipcRenderer.send('player:vizFrame', frame);
+  },
+  onPlayerVizFrame: (cb: (frame: unknown) => void): (() => void) => {
+    const handler = (_e: unknown, frame: unknown): void => cb(frame);
+    ipcRenderer.on('player:vizFrame', handler);
+    return () => ipcRenderer.removeListener('player:vizFrame', handler);
+  },
+  /** Lyrics stored with a library audio file: a sidecar .lrc, else embedded tags. */
+  musicLocalLyrics: (id: string): Promise<import('./shared/musicLocalLyrics').LocalLyrics | null> =>
+    ipcRenderer.invoke('music:localLyrics', id),
 
   /** Open an http/https link in the system browser. */
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),

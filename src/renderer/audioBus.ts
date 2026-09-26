@@ -2,6 +2,18 @@
 // here, and any number of visualizer canvases (wallpaper layer, widgets) read
 // live frequency/waveform data from the shared analyser. Also does simple
 // beat (transient) detection on the bass band.
+//
+// A window that does not own the audio (the player's "leader" is another window)
+// has no analyser; it reads the leader's relayed frames from `vizFrames` instead,
+// so a detached Visualizer or mini player draws the music rather than a flat line.
+
+import {
+  ensureRelay,
+  isRemoteLive,
+  onRemoteLiveChanged,
+  readRemoteFrequency,
+  readRemoteWaveform,
+} from './vizFrames';
 
 let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
@@ -14,12 +26,26 @@ let playing = false;
 const playListeners = new Set<(playing: boolean) => void>();
 const beatListeners = new Set<(strength: number) => void>();
 
+/** What listeners last heard: local audio OR a live relayed stream. */
+let announced = false;
+
+function emitIfChanged(): void {
+  const next = playing || isRemoteLive();
+  if (announced === next) return;
+  announced = next;
+  for (const l of playListeners) l(next);
+  if (next) startBeatLoop();
+}
+
 function notify(next: boolean): void {
   if (playing === next) return;
   playing = next;
-  for (const l of playListeners) l(playing);
-  if (playing) startBeatLoop();
+  // A follower may be waiting for frames from this window the moment it starts.
+  if (playing) ensureRelay();
+  emitIfChanged();
 }
+
+onRemoteLiveChanged(() => emitIfChanged());
 
 /** Elements whose play/pause listeners are already installed. */
 const listened = new WeakSet<HTMLMediaElement>();
@@ -91,8 +117,27 @@ export function attachAudio(el: HTMLMediaElement): void {
   if (!el.paused) route();
 }
 
+/** True while music is audible anywhere: this window's audio, or the leader's relayed frames. */
 export function isPlaying(): boolean {
+  return playing || isRemoteLive();
+}
+
+/** True only while THIS window's own element is playing (the relay's sender needs it). */
+export function isLocallyPlaying(): boolean {
   return playing;
+}
+
+/** Read this window's own analyser, for the relay. Null when there is none. */
+export function readLocalAnalyser(
+  freq: Uint8Array,
+  wave: Uint8Array,
+): { freqLen: number; waveLen: number } | null {
+  if (!analyser) return null;
+  const freqLen = Math.min(analyser.frequencyBinCount, freq.length);
+  const waveLen = Math.min(analyser.fftSize, wave.length);
+  analyser.getByteFrequencyData(freq.subarray(0, freqLen));
+  analyser.getByteTimeDomainData(wave.subarray(0, waveLen));
+  return { freqLen, waveLen };
 }
 
 /** Change frequency resolution (256–4096; more = finer bars, slower reaction). */
@@ -100,8 +145,17 @@ export function setFftSize(n: number): void {
   if (analyser && [256, 512, 1024, 2048, 4096].includes(n)) analyser.fftSize = n;
 }
 
-/** Fill `out` with current frequency bins (0-255). Returns false when idle. */
+/**
+ * Fill `out` with current frequency bins (0-255). Returns false when idle.
+ * This window's own analyser wins while its audio plays; otherwise the leader's
+ * relayed frame, stretched over `binCount()` bins.
+ */
 export function getFrequencyData(out: Uint8Array): boolean {
+  if (analyser && playing) {
+    analyser.getByteFrequencyData(out);
+    return true;
+  }
+  if (readRemoteFrequency(out, Math.min(out.length, binCount()))) return true;
   if (!analyser) return false;
   analyser.getByteFrequencyData(out);
   return true;
@@ -109,6 +163,11 @@ export function getFrequencyData(out: Uint8Array): boolean {
 
 /** Fill `out` with the current time-domain waveform (128 = silence line). */
 export function getWaveform(out: Uint8Array): boolean {
+  if (analyser && playing) {
+    analyser.getByteTimeDomainData(out);
+    return true;
+  }
+  if (readRemoteWaveform(out, Math.min(out.length, binCount() * 2))) return true;
   if (!analyser) return false;
   analyser.getByteTimeDomainData(out);
   return true;
@@ -122,9 +181,8 @@ const bassScratch = new Uint8Array(4096);
 
 /** Average level (0..1) of the bass band (bottom ~8% of the spectrum). */
 export function getBassLevel(): number {
-  if (!analyser) return 0;
-  const n = analyser.frequencyBinCount;
-  analyser.getByteFrequencyData(bassScratch.subarray(0, n));
+  const n = Math.min(binCount(), bassScratch.length);
+  if (!getFrequencyData(bassScratch.subarray(0, n))) return 0;
   const bassBins = Math.max(4, Math.floor(n * 0.08));
   let sum = 0;
   for (let i = 0; i < bassBins; i++) sum += bassScratch[i];
@@ -138,7 +196,7 @@ let rollingAvg = 0;
 let lastBeatAt = 0;
 
 function beatFrame(): void {
-  if (!playing) {
+  if (!isPlaying()) {
     beatRaf = 0;
     rollingAvg = 0;
     return;
@@ -162,7 +220,7 @@ function startBeatLoop(): void {
 /** Subscribe to detected beats (strength 0..1). Returns an unsubscribe fn. */
 export function onBeat(cb: (strength: number) => void): () => void {
   beatListeners.add(cb);
-  if (playing) startBeatLoop();
+  if (isPlaying()) startBeatLoop();
   return () => {
     beatListeners.delete(cb);
   };

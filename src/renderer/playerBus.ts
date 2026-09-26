@@ -5,7 +5,20 @@
 
 import type { MediaItem } from '../shared/types';
 import type { PlayerCommand, PlayerSnapshot, RepeatMode } from '../shared/playerSync';
-import { attachAudio } from './audioBus';
+import { attachAudio, isLocallyPlaying, readLocalAnalyser } from './audioBus';
+import { noteFramesWanted, receiveRemoteFrame, setVizTransport } from './vizFrames';
+import {
+  EMPTY_PLAY_ORDER,
+  linearOrder,
+  pickInOrder,
+  reconcileOrder,
+  shuffledOrder,
+  stepOrder,
+  upcomingIds,
+  type PlayOrder,
+} from '../shared/musicPlayOrder';
+import { createListenTracker } from './musicListening';
+import { t } from './i18n';
 
 export type { RepeatMode };
 
@@ -18,7 +31,16 @@ export interface PlayerState {
   volume: number;
   shuffle: boolean;
   repeat: RepeatMode;
+  /**
+   * Ids of the tracks that play after the current one, in play order (shuffled when
+   * shuffle is on). Computed by the leader and mirrored to followers, so every
+   * window's "Up next" shows what will actually play.
+   */
+  upNext: string[];
 }
+
+/** How many upcoming ids the leader computes and publishes. */
+export const UP_NEXT_LIMIT = 50;
 
 const PREFS_KEY = 'jp-music-player';
 
@@ -46,7 +68,24 @@ const state: PlayerState = {
   volume: prefs.volume,
   shuffle: prefs.shuffle,
   repeat: prefs.repeat,
+  upNext: [],
 };
+
+/** The leader's play order -- see `shared/musicPlayOrder.ts`. */
+let order: PlayOrder = EMPTY_PLAY_ORDER;
+
+function queueIds(): string[] {
+  return state.queue.map((s) => s.id);
+}
+
+/** Re-align the play order with the queue and the current track (never reshuffles). */
+function syncOrder(): void {
+  order = reconcileOrder(order, queueIds(), state.shuffle, state.current?.id ?? null);
+}
+
+function refreshUpNext(): void {
+  state.upNext = upcomingIds(order, UP_NEXT_LIMIT, state.repeat === 'all');
+}
 
 const listeners = new Set<(s: PlayerState) => void>();
 let lastTimeNotify = 0;
@@ -84,6 +123,7 @@ function toSnapshot(): PlayerSnapshot {
     shuffle: state.shuffle,
     repeat: state.repeat,
     mediaUrl: audio.src || '',
+    upNext: state.upNext,
   };
 }
 
@@ -102,6 +142,7 @@ function notify(throttleTime = false, republish = true): void {
     if (now - lastTimeNotify < 240) return;
     lastTimeNotify = now;
   }
+  if (isLeader()) refreshUpNext();
   const snap = { ...state, queue: state.queue };
   for (const l of listeners) l(snap);
   if (republish && isLeader()) publishSnapshot(!throttleTime);
@@ -121,6 +162,7 @@ function applySnapshot(snap: PlayerSnapshot): void {
   state.volume = snap.volume;
   state.shuffle = snap.shuffle;
   state.repeat = snap.repeat;
+  state.upNext = Array.isArray(snap.upNext) ? snap.upNext : [];
   audio.volume = snap.volume;
 
   // Followers mirror UI only — the leader keeps the sole <audio> element.
@@ -188,6 +230,9 @@ function runCommand(cmd: PlayerCommand): void {
     case 'stop':
       stopLocal();
       break;
+    case 'vizWant':
+      noteFramesWanted();
+      break;
   }
 }
 
@@ -206,17 +251,30 @@ audio.addEventListener('loadedmetadata', () => {
   void audio.play().catch(() => undefined);
   notify(false, true);
 });
+/**
+ * Listening time for the study statistics. Only the window that owns the audio records
+ * it, so a song playing is counted once however many windows mirror it.
+ */
+const listening = createListenTracker();
+const sampleListening = (): void => {
+  listening.sample(state.current, audio.currentTime, !audio.paused && !switchingTrack);
+};
+
 audio.addEventListener('timeupdate', () => {
+  sampleListening();
   if (switchingTrack) return;
   state.time = audio.currentTime;
   notify(true);
 });
 audio.addEventListener('play', () => {
+  sampleListening();
   if (switchingTrack) return;
   state.playing = true;
   notify();
 });
 audio.addEventListener('pause', () => {
+  sampleListening();
+  listening.flush();
   if (switchingTrack) return;
   state.playing = false;
   if (state.current && audio.currentTime > 3) {
@@ -225,6 +283,8 @@ audio.addEventListener('pause', () => {
   notify();
 });
 audio.addEventListener('ended', () => {
+  sampleListening();
+  listening.flush();
   state.playing = false;
   if (state.repeat === 'one') {
     audio.currentTime = 0;
@@ -237,20 +297,35 @@ audio.addEventListener('ended', () => {
 attachAudio(audio);
 
 void (async () => {
+  // No preload bridge outside Electron: component tests reach this module through
+  // keyboardShortcuts without stubbing window.api, and must not crash on import.
+  if (!window.api) return;
   myWindowId = await window.api.playerWindowId();
   const snap = await window.api.playerGetSnapshot();
   if (snap) applySnapshot(snap);
 })();
 
-window.api.onPlayerSync(applySnapshot);
-window.api.onPlayerCommand((cmd) => {
+window.api?.onPlayerSync(applySnapshot);
+window.api?.onPlayerCommand((cmd) => {
   if (isLeader()) runCommand(cmd);
 });
+
+// Visualizer frames for windows that do not own the audio -- see `vizFrames.ts`.
+setVizTransport({
+  sendFrame: (frame) => window.api.playerSendVizFrame?.(frame),
+  sendWant: () => window.api.playerSendCommand({ type: 'vizWant' }),
+  localPlaying: isLocallyPlaying,
+  readLocal: readLocalAnalyser,
+});
+window.api?.onPlayerVizFrame?.(receiveRemoteFrame);
+// A closing window must not lose the last few seconds it listened to.
+window.addEventListener('beforeunload', () => listening.flush());
 
 // ----- queue / playback -----------------------------------------------------
 
 export function setQueue(items: MediaItem[]): void {
   state.queue = items;
+  syncOrder();
   notify(false, false);
 }
 
@@ -264,6 +339,12 @@ async function playItemById(id: string, itemHint?: MediaItem): Promise<string | 
     return null;
   }
 
+  // The chosen track becomes the current step of the play order (see `pickInOrder`).
+  syncOrder();
+  order = pickInOrder(order, id);
+  // Credit the outgoing track before the element is repointed.
+  listening.flush();
+
   switchingTrack = true;
   trackToken++;
   audio.pause();
@@ -274,7 +355,7 @@ async function playItemById(id: string, itemHint?: MediaItem): Promise<string | 
   const opened = await window.api.openMedia(id);
   if (!opened) {
     switchingTrack = false;
-    return 'That file could not be opened — has it moved?';
+    return t('musicUi.error.fileMissing');
   }
 
   state.current = opened.item ?? itemHint ?? null;
@@ -288,21 +369,16 @@ async function playItemById(id: string, itemHint?: MediaItem): Promise<string | 
 function advance(dir: 1 | -1, fromEnded = false): void {
   const q = state.queue;
   if (!state.current || q.length === 0) return;
-  const i = q.findIndex((s) => s.id === state.current!.id);
-  let next: MediaItem | undefined;
-  if (state.shuffle && q.length > 1) {
-    let j = i;
-    while (j === i) j = Math.floor(Math.random() * q.length);
-    next = q[j];
-  } else {
-    const j = i + dir;
-    if (j < 0 || j >= q.length) {
-      if (fromEnded && state.repeat !== 'all') return;
-      next = q[(j + q.length) % q.length];
-    } else {
-      next = q[j];
-    }
+  syncOrder();
+  const step = stepOrder(order, dir, { repeat: state.repeat, fromEnded });
+  if (!step.nextId) {
+    // Previous at the start of a shuffled cycle has no earlier track to return to, so
+    // it restarts the current one.
+    if (dir === -1 && audio.src) seekLocal(0);
+    return;
   }
+  order = step.order;
+  const next = q.find((s) => s.id === step.nextId);
   if (next) void playItem(next);
 }
 
@@ -322,14 +398,14 @@ export function toggle(): void {
   if (!isLeader()) return delegate({ type: 'toggle' });
   togglePlayback();
 }
-function seekLocal(t: number): void {
-  audio.currentTime = t;
-  state.time = t;
+function seekLocal(sec: number): void {
+  audio.currentTime = sec;
+  state.time = sec;
   notify();
 }
-export function seek(t: number): void {
-  if (!isLeader()) return delegate({ type: 'seek', time: t });
-  seekLocal(t);
+export function seek(sec: number): void {
+  if (!isLeader()) return delegate({ type: 'seek', time: sec });
+  seekLocal(sec);
 }
 
 /**
@@ -359,6 +435,9 @@ export function setVolume(v: number): void {
 }
 function toggleShuffleLocal(): void {
   state.shuffle = !state.shuffle;
+  // A fresh cycle starting at the current track, or back to the queue's own order.
+  const current = state.current?.id ?? null;
+  order = state.shuffle ? shuffledOrder(queueIds(), current) : linearOrder(queueIds(), current);
   savePrefs();
   notify();
 }
@@ -380,7 +459,13 @@ export function getState(): PlayerState {
   return { ...state };
 }
 
+/** Test-only: the leader's current play order. */
+export function __getPlayOrderForTests(): PlayOrder {
+  return order;
+}
+
 function stopLocal(): void {
+  listening.flush();
   switchingTrack = false;
   trackToken++;
   audio.pause();

@@ -2,6 +2,76 @@
 
 const DEFAULT_PORT = 18765;
 
+/* ----------------------------------------------------------------------------
+ * Interface language
+ *
+ * Every user-visible string lives in _locales/<lang>/messages.json (en, ja,
+ * zh_CN, ru) and is read through chrome.i18n, which picks the catalogue that
+ * matches the browser's UI language and falls back to English. Keys use
+ * underscores because Chrome allows nothing else in a message name.
+ * src/shared/__tests__/extensionLocales.test.ts fails for a key used here that
+ * is missing from any catalogue.
+ * -------------------------------------------------------------------------- */
+
+/** The message for `key`, with $1…$9 filled from `subs`; the key itself if missing. */
+function jpMsg(key, subs) {
+  try {
+    const i18n = typeof chrome !== 'undefined' && chrome ? chrome.i18n : null;
+    if (!i18n || typeof i18n.getMessage !== 'function') return key;
+    const list = subs == null ? undefined : [].concat(subs).map((s) => String(s == null ? '' : s));
+    return i18n.getMessage(key, list) || key;
+  } catch {
+    return key;
+  }
+}
+
+/**
+ * The language of the catalogue chrome.i18n actually chose — not the raw
+ * browser language, which may be one the extension has no strings for. Used
+ * for <html lang> and plural rules.
+ */
+function jpUiLocale() {
+  const code = jpMsg('locale_code');
+  return code && code !== 'locale_code' ? code : 'en';
+}
+
+/**
+ * A counted message. Each catalogue carries `<key>_one` / `_few` / `_many` /
+ * `_other` as its language needs (CLDR categories); `$1` is the count.
+ */
+function jpMsgCount(key, count, subs) {
+  const n = Number(count) || 0;
+  let category = 'other';
+  try {
+    category = new Intl.PluralRules(jpUiLocale()).select(n);
+  } catch {
+    category = n === 1 ? 'one' : 'other';
+  }
+  const list = [String(n)].concat(subs == null ? [] : subs);
+  const exact = jpMsg(`${key}_${category}`, list);
+  return exact !== `${key}_${category}` ? exact : jpMsg(`${key}_other`, list);
+}
+
+/**
+ * Translate an extension page in place: `data-i18n` sets text,
+ * `data-i18n-html` sets markup (catalogue strings only, never page data), and
+ * `data-i18n-title` / `-aria-label` / `-placeholder` set those attributes.
+ */
+function jpApplyI18n(root) {
+  const doc = root && root.ownerDocument ? root.ownerDocument : root;
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+  if (doc && doc.documentElement) doc.documentElement.lang = jpUiLocale();
+  for (const el of root.querySelectorAll('[data-i18n]')) el.textContent = jpMsg(el.dataset.i18n);
+  for (const el of root.querySelectorAll('[data-i18n-html]')) el.innerHTML = jpMsg(el.dataset.i18nHtml);
+  for (const [attr, prop] of [
+    ['title', 'i18nTitle'],
+    ['aria-label', 'i18nAriaLabel'],
+    ['placeholder', 'i18nPlaceholder'],
+  ]) {
+    for (const el of root.querySelectorAll(`[data-i18n-${attr}]`)) el.setAttribute(attr, jpMsg(el.dataset[prop]));
+  }
+}
+
 /** Heuristic host lists — keep in sync with src/shared/extensionCapture.ts */
 const NEWS_HOST_SUFFIXES = [
   'nhk.or.jp',
@@ -222,17 +292,17 @@ function detectContentCategory(url, opts) {
 function contentCategoryLabel(category) {
   switch (category) {
     case 'news':
-      return 'News';
+      return jpMsg('category_news');
     case 'novel':
-      return 'Web novel';
+      return jpMsg('category_novel');
     case 'manga':
-      return 'Manga';
+      return jpMsg('category_manga');
     case 'youtube':
-      return 'Video';
+      return jpMsg('category_video');
     case 'article':
-      return 'Article';
+      return jpMsg('category_article');
     default:
-      return 'Webpage';
+      return jpMsg('category_webpage');
   }
 }
 
@@ -485,6 +555,15 @@ const COMMANDS = [
   },
 ];
 
+// The English above names each command for code readers; what a user sees
+// comes from the catalogue (cmd_<id with dots as underscores>_label/_short/_desc).
+for (const cmd of COMMANDS) {
+  const base = `cmd_${cmd.id.replace(/\./g, '_')}`;
+  cmd.label = jpMsg(`${base}_label`);
+  cmd.shortLabel = jpMsg(`${base}_short`);
+  cmd.description = jpMsg(`${base}_desc`);
+}
+
 /** Old action / wheel-slot ids → current command ids. */
 const COMMAND_ALIASES = {
   mine: 'save.word',
@@ -557,29 +636,30 @@ function savePrimaryDestination(destination, forceAnki) {
 
 function saveWorkingMessage(destination, forceAnki) {
   return savePrimaryDestination(destination, forceAnki) === 'anki'
-    ? 'Creating card…'
-    : 'Saving to Gum…';
+    ? jpMsg('save_working_card')
+    : jpMsg('save_working_app');
 }
 
 /** Human-readable save / card result for toasts and popup status. */
 function formatSaveResultMessage(res) {
-  if (!res) return 'Save failed';
-  if (!res.ok && !res.queued) return res.error || 'Save failed';
+  if (!res) return jpMsg('save_failed');
+  if (!res.ok && !res.queued) return res.error || jpMsg('save_failed');
 
-  const kind = res.mode === 'sentence' ? 'Sentence' : 'Word';
-  const term = res.term ? ` “${String(res.term).slice(0, 40)}”` : '';
+  // The quoted term is spliced in whole ($1 is either empty or ` “猫”`), so
+  // each language places it where its grammar wants the object.
+  const term = res.term ? jpMsg('save_termQuoted', String(res.term).slice(0, 40)) : '';
 
   if (res.queued) {
-    return `Queued${term} — will sync when Gum is open`;
+    return jpMsg('save_queued', term);
   }
 
   const anki = res.anki || (res.destinations && res.destinations.anki) || null;
   if (anki && anki.ok) {
     const deck = [res.profileName, res.deckName].filter(Boolean).join(' / ');
-    return `Card created in Anki${term}${deck ? ` (${deck})` : ''} · saved in Gum`;
+    return jpMsg('save_cardCreated', [term, deck ? jpMsg('save_deckSuffix', deck) : '']);
   }
 
-  const parts = [`${kind} saved${term} to Gum`];
+  const parts = [jpMsg(res.mode === 'sentence' ? 'save_savedSentence' : 'save_savedWord', term)];
   const ankiAttempted =
     res.ankiAttempted === true ||
     (res.ankiAttempted !== false &&
@@ -587,23 +667,23 @@ function formatSaveResultMessage(res) {
       anki != null &&
       anki.error !== 'skipped');
   if (ankiAttempted && anki && !anki.ok && anki.error && anki.error !== 'skipped') {
-    parts.push(`Anki unavailable: ${anki.error}`);
+    parts.push(jpMsg('save_ankiUnavailable', anki.error));
   }
   return parts.join(' · ');
 }
 
 function formatClipboardResultMessage(res) {
-  if (!res?.ok && !res?.queued) return res?.error || 'Could not add to clipboard history';
-  if (res.queued) return 'Queued — will sync when Gum is open';
-  return 'Added to Gum clipboard history';
+  if (!res?.ok && !res?.queued) return res?.error || jpMsg('clip_failed');
+  if (res.queued) return jpMsg('common_queuedWillSync');
+  return jpMsg('clip_added');
 }
 
 function formatCaptureResultMessage(res) {
-  if (!res?.ok && !res?.queued) return res?.error || 'Could not save this page';
-  if (res.queued) return 'Page queued — will sync when Gum is open';
-  if (res.action === 'playlist') return 'Playlist saved to Gum';
-  if (res.action === 'video') return res.duplicate ? 'Video is already in Gum' : 'Video saved to Gum';
-  return 'Page saved to your Gum inbox';
+  if (!res?.ok && !res?.queued) return res?.error || jpMsg('capture_failed');
+  if (res.queued) return jpMsg('capture_queued');
+  if (res.action === 'playlist') return jpMsg('capture_playlistSaved');
+  if (res.action === 'video') return res.duplicate ? jpMsg('capture_videoDuplicate') : jpMsg('capture_videoSaved');
+  return jpMsg('capture_pageSaved');
 }
 
 /* ---------------------------------------------------------------------------- */
@@ -1076,6 +1156,10 @@ function aiPanelHtml(state) {
 if (typeof globalThis !== 'undefined') {
   globalThis.jpStudyShared = {
     DEFAULT_PORT,
+    msg: jpMsg,
+    msgCount: jpMsgCount,
+    uiLocale: jpUiLocale,
+    applyI18n: jpApplyI18n,
     NEWS_HOST_SUFFIXES,
     NOVEL_HOST_SUFFIXES,
     MANGA_HOST_SUFFIXES,

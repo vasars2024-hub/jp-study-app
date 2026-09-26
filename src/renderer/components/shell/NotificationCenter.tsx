@@ -20,6 +20,7 @@ import { openExtensionSettings } from '../../extensionBridgeUi';
 import { openSectionSurface } from '../../sectionSurface';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { useFocusReturn } from './focusReturn';
 
 const TOGGLE_EVENT = 'shell:toggleNotifications';
 
@@ -106,6 +107,12 @@ export default function NotificationCenter() {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [open]);
+
+  // Same hand-back as Quick Settings (round-2 audit K7): Escape used to leave focus
+  // on <body>. Back to the opener, or to the bell when the opener is gone.
+  useFocusReturn(open, panelRef, () =>
+    document.querySelector<HTMLElement>('[data-shell-opener="notifications"]'),
+  );
 
   if (!open) return null;
   const items = getNotifications();

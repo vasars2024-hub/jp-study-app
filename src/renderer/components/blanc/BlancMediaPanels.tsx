@@ -70,29 +70,31 @@ export function BlancMediaPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Source</legend>
+        <legend>{t('blanc.media.source')}</legend>
         <div className="blanc-command-row">
           <button type="button" onClick={() => void state.openFile()}>
-            Add files…
+            {t('blanc.media.addFiles')}
           </button>
           <button type="button" onClick={() => void state.openFolder()}>
-            Add folder…
+            {t('blanc.media.addFolder')}
           </button>
           <button type="button" onClick={() => void state.openSubs()} disabled={!src}>
-            {subName && genState !== 'done' ? `Subs: ${subName}` : 'Load subtitles…'}
+            {subName && genState !== 'done'
+              ? t('media.subs.loaded', { name: subName })
+              : t('blanc.media.loadSubs')}
           </button>
           <button
             type="button"
             onClick={() => src && void state.runGeneration(src)}
             disabled={!src || generating}
           >
-            Generate subtitles
+            {t('media.generateSubs')}
           </button>
         </div>
         <div className="blanc-status-row">
-          <span>{items.length} items</span>
-          <span>{current ? current.title : 'Nothing loaded'}</span>
-          {cues.length > 0 && <span>{cues.length} subtitle lines</span>}
+          <span>{t('blanc.media.items', { count: items.length })}</span>
+          <span>{current ? current.title : t('blanc.media.nothingLoaded')}</span>
+          {cues.length > 0 && <span>{t('blanc.media.subtitleLines', { count: cues.length })}</span>}
         </div>
         <MediaWatchFolder state={state} />
       </fieldset>
@@ -120,7 +122,7 @@ export function BlancMediaPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>From YouTube</legend>
+        <legend>{t('blanc.media.fromYoutube')}</legend>
         <MediaYoutubeBar state={state} />
       </fieldset>
 
@@ -135,13 +137,13 @@ export function BlancMediaPanel() {
       */}
       {src && current && (
         <fieldset>
-          <legend>Player</legend>
+          <legend>{t('blanc.media.player')}</legend>
           <BlancStudyPlayer item={current} />
         </fieldset>
       )}
 
       <fieldset>
-        <legend>Library</legend>
+        <legend>{t('blanc.media.library')}</legend>
         {items.length === 0 ? (
           <MediaEmptyLibrary />
         ) : (
@@ -156,12 +158,13 @@ export function BlancMediaPanel() {
             </div>
             <div className="blanc-status-row">
               <span>
-                {state.displayedItems.length} shown
-                {state.displayedItems.length !== items.length ? ` of ${items.length}` : ''}
+                {state.displayedItems.length !== items.length
+                  ? t('blanc.media.shownOf', { count: state.displayedItems.length, total: items.length })
+                  : t('blanc.media.shown', { count: state.displayedItems.length })}
               </span>
               {state.selectedFolder && (
                 <button type="button" onClick={() => state.setSelectedFolder(null)}>
-                  Clear folder filter
+                  {t('blanc.media.clearFolderFilter')}
                 </button>
               )}
             </div>

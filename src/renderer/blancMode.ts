@@ -77,16 +77,21 @@ export function applyBlancModeClass(settings = loadBlancMode()): void {
   }
 }
 
+/**
+ * The size to open the Blanc window at: none when "Remember window size" is on,
+ * so main restores the last saved bounds, else the default. Every opener uses
+ * this; the boot-time opener in App.tsx used to pass 560x460 unconditionally,
+ * so the remembered size never came back after a restart.
+ */
+export function blancOpenSize(): { width: number; height: number } | undefined {
+  return loadToolboxSettings().rememberWindowBounds ? undefined : { width: 560, height: 460 };
+}
+
 export async function setBlancModeEnabled(on: boolean): Promise<BlancModeSettings> {
   const next = saveBlancMode({ enabled: on });
   try {
     if (on) {
-      // With rememberWindowBounds on, omit the size so main restores the last
-      // saved Blanc window bounds; otherwise force the default size.
-      const size = loadToolboxSettings().rememberWindowBounds
-        ? undefined
-        : { width: 560, height: 460 };
-      await window.api?.blancOpen?.(size);
+      await window.api?.blancOpen?.(blancOpenSize());
     } else {
       await window.api?.blancClose?.();
     }

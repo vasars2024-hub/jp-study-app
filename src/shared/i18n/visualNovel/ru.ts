@@ -6,6 +6,7 @@ export const VISUAL_NOVEL_RU: Catalog = {
   'vnApp.aria.tabs': 'Разделы визуальной новеллы',
   'vnApp.tab.read': 'Чтение',
   'vnApp.tab.study': 'Учёба',
+  'vnApp.engine.unknown': 'Движок неизвестен',
   'vnApp.tab.routes': 'Руты',
   'vnApp.tab.details': 'Сведения',
   'vnApp.tab.setup': 'Захват текста',

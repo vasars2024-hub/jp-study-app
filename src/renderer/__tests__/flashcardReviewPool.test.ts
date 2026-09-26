@@ -136,11 +136,12 @@ describe('the picker call site', () => {
   // Comments stripped: the block carries a JSX comment that names the very
   // identifiers the ban below looks for, and prose about a defect is not the
   // defect. A raw-text guard that reads its own explanation is a false red.
-  // The <select> renders `reviewSourceOptions`, built once per deck/filter change
-  // (so typing in the find box does not rebuild it); both halves are the picker.
+  // The picker is the design-system <Select> since the Flashcards redesign; it renders
+  // `reviewSourceOptions`, built once per deck/filter change (so typing in the find box
+  // does not rebuild it); both halves are the picker.
   const PICKER = (
     SOURCE.slice(SOURCE.indexOf('const reviewSourceOptions = useMemo('), SOURCE.indexOf('[epubReviewBooks, reviewSourceCount, lang]'))
-    + SOURCE.slice(SOURCE.indexOf("<select value={reviewBookKey}"), SOURCE.indexOf("{t('flash.dueOnly')}"))
+    + SOURCE.slice(SOURCE.indexOf("<Select value={reviewBookKey}"), SOURCE.indexOf("{t('flash.dueOnly')}"))
   ).replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 
   it('labels every option through the session predicate', () => {

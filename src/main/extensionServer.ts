@@ -2014,8 +2014,8 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     return;
   }
 
-  // The extension reads (never writes) the analysis preferences, so its popup
-  // can show the current mode and section list. Settings stay app-owned.
+  // Read-only view of the app-owned analysis preferences. The shipped extension
+  // does not call it (see EXTENSION_SERVER_ONLY_ROUTES in extensionContract.ts).
   if (req.method === 'GET' && pathname === '/v1/sentence-analysis/prefs') {
     if (!requireAuth(req, res)) return;
     try {

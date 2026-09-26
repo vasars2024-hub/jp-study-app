@@ -10,7 +10,8 @@ import VirtualList from '../../VirtualList';
 import Icon from '../../Icons';
 import { scraperArtwork } from '../artwork';
 import { Pill, SubtitleBadge } from './Pill';
-import { gridTemplate, type ScraperColumn } from './columns';
+import { columnLabel, gridTemplate, type ScraperColumn } from './columns';
+import { episodeKindText, episodeStatusText, tr } from '../localize';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
 import type { EpisodeRow } from '../../../../shared/scraperResults';
@@ -32,7 +33,7 @@ function cellContent(
         <input
           type="checkbox"
           checked={selected}
-          aria-label={`Select ${row.titleEn}`}
+          aria-label={tr('scrApp.r2.common.selectItem', { name: row.titleEn })}
           onChange={() => onToggle(row.id)}
         />
       );
@@ -45,13 +46,13 @@ function cellContent(
             <img src={row.thumbnailUrl || scraperArtwork(row.number - 1)} alt="" loading="lazy" />
           </span>
           <span className="scr-t-titles">
-            <span className="scr-t-en">{row.titleEn}</span>
-            <span className="scr-t-ja">{row.titleJa}</span>
+            <span className="scr-t-en" title={row.titleEn}>{row.titleEn}</span>
+            <span className="scr-t-ja" title={row.titleJa}>{row.titleJa}</span>
           </span>
         </span>
       );
     case 'type':
-      return <Pill>{row.kind}</Pill>;
+      return <Pill>{episodeKindText(row.kind)}</Pill>;
     case 'language':
       return <Pill tone="accent">{row.audio}</Pill>;
     case 'subtitles':
@@ -74,7 +75,7 @@ function cellContent(
           tone={row.status === 'ok' ? 'good' : row.status === 'warning' ? 'warn' : 'bad'}
           title={row.statusNote || undefined}
         >
-          {row.status}
+          {episodeStatusText(row.status)}
         </Pill>
       );
     case 'link':
@@ -82,7 +83,7 @@ function cellContent(
         <button
           type="button"
           className="scr-t-play"
-          aria-label={`Open ${row.titleEn}`}
+          aria-label={tr('scrApp.r2.common.openItem', { name: row.titleEn })}
           onClick={() => onOpen?.(row)}
         >
           <Icon name="player" size={13} />
@@ -138,7 +139,7 @@ export default function EpisodeTable({
             >
               {column.sortable ? (
                 <button type="button" className="scr-th-btn" onClick={() => onSort(column.id)}>
-                  {column.label}
+                  {columnLabel(column)}
                   {active && (
                     <span className={`scr-th-caret${sortDir === 'desc' ? ' is-desc' : ''}`} aria-hidden>
                       <Icon name="chevron" size={10} />
@@ -146,7 +147,7 @@ export default function EpisodeTable({
                   )}
                 </button>
               ) : (
-                column.label
+                columnLabel(column)
               )}
             </div>
           );

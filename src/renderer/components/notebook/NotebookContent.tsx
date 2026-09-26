@@ -29,7 +29,8 @@ import {
 } from '../../notebook/views';
 import { buildLineageIndex, lineageForEntry } from '../../notebook/lineage';
 import { collectAllAnnotationsMap } from '../../annotations';
-import { loadDeck } from '../../flashcardDeck';
+import { loadDeck, onDeckChanged } from '../../flashcardDeck';
+import { onClipboardHistoryChanged } from '../../clipboardHistory';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import './notebookLiquid.css';
 
@@ -79,7 +80,39 @@ export function useNotebook(): NotebookState {
     };
   }, [tick]);
 
-  const data = useMemo(() => aggregateNotebook(sources), [sources]);
+  // Live updates. The localStorage streams (deck, lookups, clipboard, known
+  // levels) used to be read once, and the IPC stores only on a manual refresh,
+  // so a card mined in another window never showed up here. Any change bumps
+  // `tick`, which re-reads the IPC stores and re-aggregates; bursts coalesce.
+  useEffect(() => {
+    let timer = 0;
+    const bump = (): void => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setTick((n) => n + 1), 250);
+    };
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') bump();
+    };
+    const offs = [
+      onDeckChanged(bump),
+      onClipboardHistoryChanged(bump),
+      window.api?.onLibraryChanged?.(() => bump()) ?? (() => undefined),
+    ];
+    window.addEventListener('storage', bump);
+    window.addEventListener('focus', bump);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      for (const off of offs) off();
+      window.removeEventListener('storage', bump);
+      window.removeEventListener('focus', bump);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  // `tick` is a dependency on purpose: the localStorage streams are read inside
+  // aggregateNotebook, so a tick with unchanged IPC sources must still recompute.
+  const data = useMemo(() => aggregateNotebook(sources), [sources, tick]);
 
   // Built once per refresh rather than per row: resolving a chain inline would
   // re-scan the whole deck for each of up to 400 rendered entries.
@@ -210,6 +243,26 @@ export function NotebookStreamCounts({ state }: { state: NotebookState }) {
   );
 }
 
+/** The notebook's own folders carry English names; a user's library folders do not match. */
+const NOTEBOOK_FOLDER_KEYS: Record<string, string> = {
+  Clipboard: 'notebook.folder.clipboard',
+  Extension: 'notebook.folder.extension',
+  Inbox: 'notebook.folder.inbox',
+  Known: 'notebook.folder.known',
+  'Live captions': 'notebook.folder.liveCaptions',
+  Lookups: 'notebook.folder.lookups',
+  Mined: 'notebook.folder.mined',
+  OCR: 'notebook.folder.ocr',
+  'Plan to read': 'notebook.folder.planToRead',
+  Translations: 'notebook.folder.translations',
+  Other: 'notebook.folder.other',
+};
+
+export function notebookFolderLabel(name: string, t: (key: string) => string): string {
+  const key = NOTEBOOK_FOLDER_KEYS[name];
+  return key ? t(key) : name;
+}
+
 export function NotebookFolders({ state }: { state: NotebookState }) {
   const { t } = useT();
   return (
@@ -228,7 +281,7 @@ export function NotebookFolders({ state }: { state: NotebookState }) {
           className={`gx-notebook-folder ${state.folder === f.id ? 'active' : ''}`}
           onClick={() => state.setFolder(f.id)}
         >
-          {f.label} ({f.count})
+          {notebookFolderLabel(f.label, t)} ({f.count})
         </button>
       ))}
     </>
@@ -266,7 +319,7 @@ export function NotebookTimeline({
               </div>
               {e.detail ? <p className="muted gx-notebook-item-detail">{e.detail}</p> : null}
               <div className="gx-notebook-item-meta muted">
-                {e.folder ? <span>{e.folder}</span> : null}
+                {e.folder ? <span>{notebookFolderLabel(e.folder, t)}</span> : null}
                 <span>{new Date(e.ts).toLocaleString(LANG_TAGS[lang])}</span>
               </div>
             </button>

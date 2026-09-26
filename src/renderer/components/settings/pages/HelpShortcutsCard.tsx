@@ -5,18 +5,33 @@
  * that was not on the page. This is it: every command that has a key, grouped by
  * the Shortcuts page's categories, read LIVE from `getBindings()` so a rebind
  * shows here at once, with one click through to change them.
+ *
+ * The video player's own keys follow in a separate "Player" group (round-2
+ * K12). The player handles those itself — they are not app commands and are
+ * rebound in the player's Preferences, not on the Shortcuts page — so they
+ * are read from `playerKeymap`, and the group says where they apply.
  */
 import { useEffect, useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useT } from '../../../i18n';
 import { commandCategory, commandLabel } from '../../../commandI18n';
 import { formatKeysDisplay, getBindings, onShortcutsChanged, type BindingRow } from '../../../keyboardShortcuts';
+import { PLAYER_KEYBINDINGS_STORAGE_KEY, readPlayerKeymap, type PlayerKeyRow } from '../../../playerKeymap';
 import './helpShortcuts.css';
 
 export default function HelpShortcutsCard() {
   const { t, lang } = useT();
   const [rows, setRows] = useState<BindingRow[]>(() => safeBindings());
   useEffect(() => onShortcutsChanged(() => setRows(safeBindings())), []);
+  const [playerKeys, setPlayerKeys] = useState<PlayerKeyRow[]>(readPlayerKeymap);
+  // A rebind in the player's Preferences in another window arrives as `storage`.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key === PLAYER_KEYBINDINGS_STORAGE_KEY) setPlayerKeys(readPlayerKeymap());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const groups = useMemo(() => {
     const out = new Map<string, { label: string; items: { id: string; label: string; keys: string }[] }>();
@@ -55,6 +70,20 @@ export default function HelpShortcutsCard() {
           </section>
         ))
       )}
+      <section className="help-shortcuts-group" data-group="player">
+        <h3 className="help-shortcuts-heading">{t('helpKeys.player.group')}</h3>
+        <p className="muted help-shortcuts-note">{t('helpKeys.player.note')}</p>
+        <dl className="help-shortcuts-list">
+          {playerKeys.map((row) => (
+            <div key={row.action} className="help-shortcuts-row" data-player-action={row.action}>
+              <dt>{t(row.labelKey, row.params)}</dt>
+              <dd>
+                <kbd>{row.keys}</kbd>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
       <div className="fm-actions">
         <button
           type="button"

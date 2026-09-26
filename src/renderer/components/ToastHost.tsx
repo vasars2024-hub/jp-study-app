@@ -3,6 +3,9 @@ import { ToastViewport } from './ui/Toast';
 import ReadingReminderHost from './reading/ReadingReminderHost';
 import CalendarReminderHost from './calendar/CalendarReminderHost';
 import { useT } from '../i18n';
+// Side effect: registers the UI-language byte-size format with `formatBytes`.
+// Here because every renderer shell mounts this host exactly once.
+import './shell/localeFormat';
 
 /**
  * Renders transient `os:toast` messages. Extracted from App.tsx when Blanc got
@@ -128,60 +131,63 @@ export default function ToastHost() {
   // own until a `ui:toast` arrives.
   return (
     <>
-      {toasts.length > 0 && (
-        <div className="os-toast-host" aria-live="polite" onFocus={hold} onBlur={release}>
-          {toasts.map((toast) => {
-            const urgent = isUrgent(toast.kind);
-            return (
-              <div
-                key={toast.id}
-                // `has-action` is what opts the box back into hit-testing: the
-                // host is `pointer-events: none` so a purely informational
-                // toast never swallows a desktop click, and only the one
-                // carrying a decision needs the pointer to be able to rest on
-                // it. The dismiss button opts itself in either way.
-                className={`os-toast ${toast.kind}${toast.action ? ' has-action' : ''}`}
-                // A nested live region wins over the polite ancestor for its
-                // own subtree, so a failure interrupts instead of queueing
-                // behind whatever the screen reader was already saying.
-                role={urgent ? 'alert' : undefined}
-                aria-live={urgent ? 'assertive' : undefined}
-                onMouseEnter={hold}
-                onMouseLeave={release}
-              >
-                <span className="os-toast-text">{toast.message}</span>
-                {toast.action && (
-                  <button
-                    type="button"
-                    className="os-toast-action"
-                    onClick={() => {
-                      toast.action?.run();
-                      dismiss(toast.id);
-                    }}
-                  >
-                    {toast.action.label}
-                  </button>
-                )}
+      {/* The live region is ALWAYS in the DOM (round-2 audit K9). It used to mount
+          together with its first toast, and a screen reader only announces changes
+          to a region it already knew about — so the first message of a session,
+          often the one that matters (a failed drop, a refused switch), was read
+          late or not at all. Empty, it draws nothing and takes no pointer. */}
+      <div className="os-toast-host" role="status" aria-live="polite" onFocus={hold} onBlur={release}>
+        {toasts.map((toast) => {
+          const urgent = isUrgent(toast.kind);
+          return (
+            <div
+              key={toast.id}
+              // `has-action` is what opts the box back into hit-testing: the
+              // host is `pointer-events: none` so a purely informational
+              // toast never swallows a desktop click, and only the one
+              // carrying a decision needs the pointer to be able to rest on
+              // it. The dismiss button opts itself in either way.
+              className={`os-toast ${toast.kind}${toast.action ? ' has-action' : ''}`}
+              // A nested live region wins over the polite ancestor for its
+              // own subtree, so a failure interrupts instead of queueing
+              // behind whatever the screen reader was already saying.
+              role={urgent ? 'alert' : undefined}
+              aria-live={urgent ? 'assertive' : undefined}
+              onMouseEnter={hold}
+              onMouseLeave={release}
+            >
+              <span className="os-toast-text">{toast.message}</span>
+              {toast.action && (
                 <button
                   type="button"
-                  className="os-toast-close"
-                  // Several toasts stack at once — three were on screen while
-                  // this was measured — and every one of their ✕ buttons
-                  // announced the bare word "Dismiss" (D152). The visible
-                  // sentence is the toast's only identity, so it is its name.
-                  // `title` stays the short word: it is a hover tooltip on a
-                  // control whose own message is already two lines above it.
-                  title={t('notifications.dismiss')}
-                  aria-label={t('notifications.dismissNamed', { title: toast.message })}
-                  onClick={() => dismiss(toast.id)}
+                  className="os-toast-action"
+                  onClick={() => {
+                    toast.action?.run();
+                    dismiss(toast.id);
+                  }}
                 >
-                  ×
+                  {toast.action.label}
                 </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              )}
+              <button
+                type="button"
+                className="os-toast-close"
+                // Several toasts stack at once — three were on screen while
+                // this was measured — and every one of their ✕ buttons
+                // announced the bare word "Dismiss" (D152). The visible
+                // sentence is the toast's only identity, so it is its name.
+                // `title` stays the short word: it is a hover tooltip on a
+                // control whose own message is already two lines above it.
+                title={t('notifications.dismiss')}
+                aria-label={t('notifications.dismissNamed', { title: toast.message })}
+                onClick={() => dismiss(toast.id)}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
       <ToastViewport />
       {/*
         Reading Lists §11.3's reminder card. Mounted here for the reason this

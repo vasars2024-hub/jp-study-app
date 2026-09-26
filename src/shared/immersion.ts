@@ -158,13 +158,15 @@ export interface ImmersionMetricsDelta {
 }
 
 /**
+/**
  * Curated starter immersion destinations (no emoji). `labelKey` is resolved with
- * `t()` at render time (CLAUDE.md i18n rule 7); `label` is the English fallback
- * for a caller outside React.
+ * `t()` at render time (CLAUDE.md i18n rule 7) — "Wikipedia JP" used to print
+ * as-is in every language; `label` is the English fallback for a caller
+ * outside React.
  */
 export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; labelKey: string; url: string; lang: ImmersionLang }> = [
   { label: 'NHK Easy', labelKey: 'immersion.starter.nhkEasy', url: 'https://news.web.nhk/news/easy/', lang: 'ja' },
-  { label: 'Wikipedia JP', labelKey: 'immersion.starter.wikipediaJa', url: 'https://ja.wikipedia.org/wiki/メインページ', lang: 'ja' },
+  { label: 'Japanese Wikipedia', labelKey: 'immersion.starter.wikipediaJa', url: 'https://ja.wikipedia.org/wiki/メインページ', lang: 'ja' },
   { label: 'Hacker News', labelKey: 'immersion.starter.hackerNews', url: 'https://news.ycombinator.com/', lang: 'auto' },
   { label: 'Chinese Wikipedia', labelKey: 'immersion.starter.wikipediaZh', url: 'https://zh.wikipedia.org/wiki/Wikipedia:首页', lang: 'zh' },
   { label: 'Russian Wikipedia', labelKey: 'immersion.starter.wikipediaRu', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница', lang: 'ru' },
