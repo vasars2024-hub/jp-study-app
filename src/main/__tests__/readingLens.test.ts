@@ -46,6 +46,9 @@ const h = vi.hoisted(() => {
     ] as Array<{ id: number; bounds: Electron.Rectangle; scaleFactor: number }>,
     // Electron's cross-scale-factor placement: the next placement lands this many times too small.
     shrinkNextPlacement: 0,
+    clipText: '',
+    clipImage: { isEmpty: () => true } as { isEmpty: () => boolean },
+    clipOcr: { ok: false, text: '', engine: 'none', lang: 'ja' } as Record<string, unknown>,
   };
   const sent: Array<{ channel: string; payload: unknown }> = [];
 
@@ -115,6 +118,7 @@ vi.mock('electron', () => {
   return {
     app: { getPath: () => h.env.userData },
     BrowserWindow,
+    clipboard: { readText: () => h.env.clipText, readImage: () => h.env.clipImage },
     globalShortcut: {
       register: (acc: string, cb: () => void) => {
         h.shortcut.registerCalls.push(acc);
@@ -146,6 +150,7 @@ vi.mock('electron', () => {
 
 const ocrCalls: unknown[][] = [];
 vi.mock('../screenOcr', () => ({
+  ocrClipboardImage: async () => h.env.clipOcr,
   ocrRegion: async (...args: unknown[]) => {
     ocrCalls.push(args);
     return { ok: true, engine: 'web', lines: [], text: '', available: true, hash: 'x' };
@@ -700,6 +705,19 @@ describe('repeat region', () => {
     await h.ipc.handlers.get('lens:open')!({}, 'select');
     await h.ipc.handlers.get('lens:ocr')!({}, region);
   };
+
+  it('the programmatic clipboard open reads a copied picture, keeping it as the capture image', async () => {
+    await booted();
+    h.env.clipText = '';
+    h.env.clipImage = { isEmpty: () => false };
+    h.env.clipOcr = { ok: true, text: '猫が好き', engine: 'web', lang: 'ja', screenshotDataUrl: 'data:image/png;base64,AAAA' };
+    await h.ipc.handlers.get('lens:open')!({}, 'clipboard');
+    const opened = init() as { mode: string; capture?: { text: string; screenshotDataUrl?: string } };
+    expect(opened.mode).toBe('clipboard');
+    expect(opened.capture).toMatchObject({ text: '猫が好き', screenshotDataUrl: 'data:image/png;base64,AAAA' });
+    h.env.clipImage = { isEmpty: () => true };
+    h.env.clipOcr = { ok: false, text: '', engine: 'none', lang: 'ja' };
+  });
 
   it('remembers the rectangle the OCR handler was actually given', async () => {
     await booted();

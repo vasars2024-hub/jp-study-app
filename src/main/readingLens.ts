@@ -637,10 +637,12 @@ export function registerReadingLensIpc(): void {
   });
 
   // Programmatic open (Settings button / testing) mirrors the hotkey path.
-  ipcMain.handle('lens:open', (_e, mode: unknown): void => {
-    openLens(
-      mode === 'auto' || mode === 'clipboard' || mode === 'repeat' || mode === 'cursor' ? mode : 'select',
-    );
+  ipcMain.handle('lens:open', async (_e, mode: unknown): Promise<void> => {
+    // Clipboard goes through the hotkey's own reader, so a copied picture is
+    // OCR'd here too (openLens alone only reads clipboard text). No source
+    // window: the caller is Gum's own UI, not the app the text came from.
+    if (mode === 'clipboard') return openClipboard(null);
+    openLens(mode === 'auto' || mode === 'repeat' || mode === 'cursor' ? mode : 'select');
   });
 
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);
