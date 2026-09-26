@@ -131,6 +131,8 @@ export class MediaCaptionsManager extends EventTarget {
     private translatedTracks = new Map<number, { translating: boolean }>()
     // Gum: one in-flight load per track, shared by selectTrack() and loadTrackContent().
     private trackLoads = new Map<LoadedTrack, Promise<void>>()
+    // Gum: bumped by every selectTrack/setNoTrack; only the newest selection may finish.
+    private selectGeneration = 0
 
     constructor(options: MediaCaptionsManagerOptions) {
         super()
@@ -240,6 +242,7 @@ export class MediaCaptionsManager extends EventTarget {
             return
         }
 
+        const generation = ++this.selectGeneration
         this.currentTrackIndex = index
         log.info(`Selected track: ${this.tracks[index].label}`)
 
@@ -247,6 +250,11 @@ export class MediaCaptionsManager extends EventTarget {
 
         if (this.renderer) {
             await this._ensureTrackLoaded(track)
+            // Gum: a track still loading when the user picks another one must not finish
+            // after it — it would put its cues on screen and announce itself as selected,
+            // and the study overlay would follow the track the user had just left. The same
+            // rule VideoCoreSubtitleManager.selectTrack follows (subtitle audit 6h / 7).
+            if (generation !== this.selectGeneration) return
             this.renderer.changeTrack({
                 cues: track.cues,
                 regions: track.regions,
@@ -314,6 +322,7 @@ export class MediaCaptionsManager extends EventTarget {
     }
 
     public setNoTrack() {
+        this.selectGeneration += 1
         this.currentTrackIndex = NO_TRACK_IDX
         if (this.renderer) {
             this.renderer.reset()

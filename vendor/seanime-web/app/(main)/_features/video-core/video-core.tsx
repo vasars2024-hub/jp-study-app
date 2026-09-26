@@ -10,8 +10,9 @@ import { type NormalizedSkipData } from "@/app/(main)/_features/video-core/_lib/
 import { vc_anime4kOption, VideoCoreAnime4K } from "@/app/(main)/_features/video-core/video-core-anime-4k"
 import { Anime4KOption, VideoCoreAnime4KManager } from "@/app/(main)/_features/video-core/video-core-anime-4k-manager"
 import { vc_menuOpen } from "@/app/(main)/_features/video-core/video-core-atoms"
-// jp-study-app: the pinned sidecar cannot detect SRT; see video-core-srt.ts
-import { srtToWebVtt } from "@/app/(main)/_features/video-core/video-core-srt"
+// jp-study-app: the pinned sidecar cannot detect SRT, and overlapping conversions must each
+// settle; see video-core-srt.ts
+import { subtitleConverter } from "@/app/(main)/_features/video-core/video-core-srt"
 import { vc_menuSectionOpen } from "@/app/(main)/_features/video-core/video-core-atoms"
 import { vc_hoveringControlBar } from "@/app/(main)/_features/video-core/video-core-atoms"
 import { vc_activePlayerId } from "@/app/(main)/_features/video-core/video-core-atoms"
@@ -758,7 +759,7 @@ export function VideoCore(props: VideoCoreProps) {
 
     const { mutate: cancelDiscordActivity } = useCancelDiscordActivity()
 
-    const { mutate: convertSubs } = useDirectstreamConvertSubs()
+    const convertSubsMutation = useDirectstreamConvertSubs()
 
     const isFirstError = React.useRef(true)
     const shouldDispatchTerminatedOnUnmount = React.useRef(false)
@@ -1128,14 +1129,8 @@ export function VideoCore(props: VideoCoreProps) {
                         ? serverStatus?.settings?.mediaPlayer?.vcTranslateTargetLanguage
                         : null,
                     settings: settings,
-                    fetchAndConvertToVTT: (url?: string, content?: string) => {
-                        return new Promise((resolve, reject) => {
-                            convertSubs({ url: url ?? "", content: srtToWebVtt(content) ?? "", to: "vtt" }, {
-                                onSuccess: (data) => resolve(data),
-                                onError: (error) => reject(error),
-                            })
-                        })
-                    },
+                    // jp-study-app: each call's own promise; see subtitleConverter in video-core-srt.ts
+                    fetchAndConvertToVTT: subtitleConverter(convertSubsMutation, "vtt"),
                     sendTranslateRequest: (text?: string, track?: VideoCore_VideoSubtitleTrack) => {
                         if (text) {
                             dispatchTranslateTextEvent(text)
@@ -1162,14 +1157,8 @@ export function VideoCore(props: VideoCoreProps) {
                         ? serverStatus?.settings?.mediaPlayer?.vcTranslateTargetLanguage
                         : null,
                     settings: settings,
-                    fetchAndConvertToASS: (url?: string, content?: string) => {
-                        return new Promise((resolve, reject) => {
-                            convertSubs({ url: url ?? "", content: srtToWebVtt(content) ?? "", to: "ass" }, {
-                                onSuccess: (data) => resolve(data),
-                                onError: (error) => reject(error),
-                            })
-                        })
-                    },
+                    // jp-study-app: each call's own promise; see subtitleConverter in video-core-srt.ts
+                    fetchAndConvertToASS: subtitleConverter(convertSubsMutation, "ass"),
                     sendTranslateRequest: (text?: string, track?: VideoCore_VideoSubtitleTrack) => {
                         if (text) {
                             dispatchTranslateTextEvent(text)
