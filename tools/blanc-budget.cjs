@@ -111,9 +111,24 @@ function main() {
     return;
   }
 
+  // blanc-budget.json is a machine-local report (.gitignore), so a fresh clone
+  // or CI never has one. Failing there made the whole gate unrunnable — including
+  // its structural half, which needs no recorded number at all. Without a budget
+  // the byte check is skipped (and says so); the forbidden-subsystem check still
+  // decides the exit code.
   if (!fs.existsSync(BUDGET_PATH)) {
-    console.log('No blanc-budget.json yet. Run: node tools/blanc-budget.cjs --update');
-    process.exitCode = 1;
+    const mbNow = (report.blanc.bytes / 1024 / 1024).toFixed(2);
+    console.log(
+      `Blanc boot payload: ${mbNow} MB. No blanc-budget.json on this machine, so the byte budget ` +
+        'is not checked; record one with --update.',
+    );
+    if (report.violations.length) {
+      console.log(`PILLAR 1 VIOLATIONS — Study OS subsystems in Blanc's boot path (${report.violations.length}):`);
+      for (const v of report.violations) console.log(`    ${v}`);
+    } else {
+      console.log('Blanc boots none of the Study OS desktop subsystems.');
+    }
+    process.exitCode = report.violations.length ? 1 : 0;
     return;
   }
   const budget = JSON.parse(fs.readFileSync(BUDGET_PATH, 'utf8'));

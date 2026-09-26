@@ -86,7 +86,7 @@ import { bootAeroEnvironmentIfNeeded, installAeroEnvironmentBridge } from './aer
 import MainWindowChrome from './components/shell/MainWindowChrome';
 import { useWindowChromeMode } from './windowChrome';
 import { requestWiredArchiveEntryBoot } from './wiredArchiveLifecycle';
-import { isBlancWindow, loadBlancMode, onBlancModeChanged, type BlancModeSettings } from './blancMode';
+import { blancOpenSize, isBlancWindow, loadBlancMode, onBlancModeChanged, type BlancModeSettings } from './blancMode';
 import AeroViewport from './components/AeroViewport';
 
 const STUDY_OS_REBOOT_EVENT = 'shell:studyOsReboot';
@@ -255,7 +255,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!blanc.enabled || popout || isBlancWindow()) return;
-    void window.api.blancOpen({ width: 560, height: 460 });
+    void window.api.blancOpen(blancOpenSize());
   }, [blanc.enabled, popout]);
   useEffect(() => {
     if (locked) return;

@@ -52,6 +52,7 @@ import {
   type BlancModeSettings,
 } from '../../blancMode';
 import { getUiLang, setUiLang, useT } from '../../i18n';
+import { commandLabel, commandNote } from '../../commandI18n';
 import {
   exportCurrentToolboxSettings,
   importCurrentToolboxSettings,
@@ -1700,7 +1701,7 @@ function BlancToolsPanel({
   // The tab strip is workspace chrome, never content: it must live OUTSIDE
   // .blanc-embedded-view, whose `> *` children stretch to full height.
   const tabStrip = (
-    <div className="blanc-tool-tabs" role="tablist" aria-label="Open toolbox tools">
+    <div className="blanc-tool-tabs" role="tablist" aria-label={t('blanc.tb.openTools')}>
       {openTabs.map((id) => {
         const item = blancTools.find((candidate) => candidate.id === id);
         if (!item) return null;
@@ -1711,7 +1712,7 @@ function BlancToolsPanel({
             role="tab"
             aria-selected={tool === id}
             className={tool === id ? 'active' : ''}
-            title={tip(`Switch to ${item.label}`)}
+            title={tip(t('blanc.tb.switchTo', { name: item.label }))}
             onClick={() => chooseTool(id)}
           >
             {toolboxSettings.showTabIcons && <Icon name={item.icon} size={13} />}
@@ -1720,8 +1721,8 @@ function BlancToolsPanel({
               role="button"
               tabIndex={0}
               className="blanc-tab-close"
-              title={tip(`Close ${item.label} tab`)}
-              aria-label={`Close ${item.label} tab`}
+              title={tip(t('blanc.tb.closeTab', { name: item.label }))}
+              aria-label={t('blanc.tb.closeTab', { name: item.label })}
               onClick={(event) => {
                 event.stopPropagation();
                 closeToolTab(id);
@@ -1745,17 +1746,17 @@ function BlancToolsPanel({
     return (
       <div className="blanc-panel blanc-tools-panel">
         <fieldset>
-          <legend>Toolbox</legend>
-          <p className="blanc-note">The Toolbox is disabled in Toolbox settings. Tools stay installed; only this launcher is off.</p>
+          <legend>{t('blanc.tb.disabledTitle')}</legend>
+          <p className="blanc-note">{t('blanc.tb.disabledNote')}</p>
           <div className="blanc-row-actions">
             <button type="button" onClick={() => saveToolboxSettings({ enabled: true })}>
-              Enable Toolbox
+              {t('blanc.tb.enable')}
             </button>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('blanc:select-tab', { detail: 'settings' }))}
             >
-              Open Settings
+              {t('blanc.tb.openSettings')}
             </button>
           </div>
         </fieldset>
@@ -1776,14 +1777,14 @@ function BlancToolsPanel({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search tools"
-            aria-label="Search toolbox tools"
+            placeholder={t('blanc.tb.searchPlaceholder')}
+            aria-label={t('blanc.tb.searchAria')}
           />
         </label>
         <button
           type="button"
           className="blanc-icon-btn"
-          title={tip(sidebarOpen ? 'Collapse tool launcher' : 'Expand tool launcher')}
+          title={tip(sidebarOpen ? t('blanc.tb.collapseLauncher') : t('blanc.tb.expandLauncher'))}
           onClick={() => setSidebar(!sidebarOpen)}
         >
           <Icon name="settings" size={15} />
@@ -1791,9 +1792,9 @@ function BlancToolsPanel({
       </header>
 
       <div className="blanc-workbench">
-        <aside className="blanc-tool-launcher" aria-label="Tool launcher">
+        <aside className="blanc-tool-launcher" aria-label={t('blanc.tb.launcher')}>
           {toolboxSettings.showFavoritesSection && favorites.length > 0 && (
-            <div className="blanc-tool-strip" aria-label="Favorite tools">
+            <div className="blanc-tool-strip" aria-label={t('blanc.tb.favorites')}>
               {favorites.map((id) => {
                 const item = blancTools.find((candidate) => candidate.id === id);
                 if (!item) return null;
@@ -1802,7 +1803,7 @@ function BlancToolsPanel({
                     key={id}
                     type="button"
                     className={tool === id ? 'active' : ''}
-                    title={tip(`Favorite: ${item.label}`)}
+                    title={tip(t('blanc.tb.favorite', { name: item.label }))}
                     onClick={() => chooseTool(id)}
                   >
                     <Icon name={item.icon} size={15} />
@@ -1814,7 +1815,7 @@ function BlancToolsPanel({
 
           {toolboxSettings.showRecentToolsSection && recent.length > 0 && (
             <div className="blanc-tool-recent">
-              <span>Recent</span>
+              <span>{t('blanc.tb.recent')}</span>
               {recent.map((id) => {
                 const item = blancTools.find((candidate) => candidate.id === id);
                 if (!item) return null;
@@ -1861,20 +1862,20 @@ function BlancToolsPanel({
           })}
 
           {commandResults.length > 0 && (
-            <section className="blanc-tool-section" aria-label="Matching commands">
-              {toolboxSettings.showCategoryHeaders && <h3>Commands</h3>}
+            <section className="blanc-tool-section" aria-label={t('blanc.tb.matchingCommands')}>
+              {toolboxSettings.showCategoryHeaders && <h3>{t('blanc.tb.commands')}</h3>}
               {commandResults.map((command) => (
                 <button
                   key={command.id}
                   type="button"
                   className="blanc-tool-launch blanc-command-result"
-                  title={tip(command.description)}
+                  title={tip(commandNote(command.id, command.description, t) ?? command.description)}
                   onClick={() => runCommand(command.id)}
                 >
                   <Icon name="wrench" size={16} />
                   <span>
-                    <strong>{command.name}</strong>
-                    {toolboxSettings.showCommandDescriptions && <small>{command.description}</small>}
+                    <strong>{commandLabel(command.id, command.name, t)}</strong>
+                    {toolboxSettings.showCommandDescriptions && <small>{commandNote(command.id, command.description, t) ?? command.description}</small>}
                   </span>
                   {toolboxSettings.showCommandShortcutLabels && commandBindings.get(command.id) && (
                     <kbd>{formatKeysDisplay(commandBindings.get(command.id) ?? '')}</kbd>
@@ -1885,7 +1886,7 @@ function BlancToolsPanel({
           )}
 
           {normalizedQuery && visibleTools.length === 0 && commandResults.length === 0 && (
-            <p className="blanc-note">No tools or commands match "{query.trim()}".</p>
+            <p className="blanc-note">{t('blanc.tb.noMatch', { query: query.trim() })}</p>
           )}
         </aside>
 
@@ -1900,7 +1901,7 @@ function BlancToolsPanel({
               <button
                 type="button"
                 className={`blanc-icon-btn${favorites.includes(activeTool.id) ? ' active' : ''}`}
-                title={tip(favorites.includes(activeTool.id) ? `Unpin ${activeTool.label}` : `Pin ${activeTool.label}`)}
+                title={tip(t(favorites.includes(activeTool.id) ? 'blanc.tb.unpin' : 'blanc.tb.pin', { name: activeTool.label }))}
                 onClick={() => toggleFavorite(activeTool.id)}
               >
                 <Icon name="bookmark" size={15} />
@@ -1919,7 +1920,7 @@ function BlancToolsPanel({
               nested under the fallback would never see it.
             */}
             <BlancToolErrorBoundary key={tool} toolId={tool} label={activeTool.label}>
-              <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
+              <Suspense fallback={<div className="blanc-loading">{t('blanc.tb.loading')}</div>}>
                 {renderBlancTool(tool, onOpenBook, grammarRequest)}
               </Suspense>
             </BlancToolErrorBoundary>
@@ -1992,34 +1993,87 @@ function ToolboxCoveragePanel() {
 }
 
 function CalculatorPanel() {
+  const { t } = useT();
   const [expression, setExpression] = useState('2 + 2');
   const result = useMemo(() => calculateToolboxExpression(expression), [expression]);
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Calculator</legend>
+        <legend>{t('blanc.tb.calculator')}</legend>
         <label>
-          Expression
+          {t('blanc.tb.expression')}
           <input
             value={expression}
             onChange={(event) => setExpression(event.target.value)}
-            placeholder="Example: (12.5 + 4) / 3"
+            placeholder={t('blanc.tb.expressionExample')}
           />
         </label>
         <div className="blanc-result-box">
           {result.ok && typeof result.value === 'number'
             ? formatToolboxNumber(result.value)
-            : result.error}
+            : toolboxErrorText(result.error, t)}
         </div>
-        <p className="blanc-note">Offline basic arithmetic only: +, -, *, /, %, parentheses, and ^ for exponent.</p>
+        <p className="blanc-note">{t('blanc.tb.calcNote')}</p>
       </fieldset>
     </div>
   );
 }
 
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+/**
+ * The shared Toolbox helpers (toolboxUtilities / toolboxSettings) return their
+ * errors in English; these are the ones the panels below show, in the UI
+ * language. An unknown message passes through unchanged.
+ */
+const TOOLBOX_ERROR_KEYS: Record<string, string> = {
+  'Enter an expression.': 'blanc.tb.err.enterExpression',
+  'Only numbers and basic operators are supported.': 'blanc.tb.err.onlyBasic',
+  'Invalid exponent operator.': 'blanc.tb.err.exponent',
+  'Expression did not produce a finite number.': 'blanc.tb.err.notFinite',
+  'Invalid expression.': 'blanc.tb.err.invalid',
+  'Enter a finite value.': 'blanc.tb.err.finiteValue',
+  'Choose units from the same category.': 'blanc.tb.err.sameCategory',
+  'Not a Toolbox settings export.': 'blanc.tb.err.settingsExport',
+};
+
+function toolboxErrorText(message: string | undefined, t: TFn): string {
+  if (!message) return '';
+  const key = TOOLBOX_ERROR_KEYS[message];
+  return key ? t(key) : message;
+}
+
+/** A unit's name in the UI language (the registry label is English). */
+function unitLabel(id: string, fallback: string, t: TFn): string {
+  const key = `blanc.unit.${id}`;
+  const out = t(key);
+  return out === key ? fallback : out;
+}
+
+/** A Toolbox setting's name, from the same keys its checkbox uses; the id if it has none. */
+function settingLabel(id: string, t: TFn): string {
+  const key = `blanc.settings.toggle.${id}`;
+  const out = t(key);
+  return out === key ? id : out;
+}
+
+const MODULE_STATUS_KEYS: Record<string, string> = {
+  ready: 'blanc.tb.status.ready',
+  existing: 'blanc.tb.status.existing',
+  planned: 'blanc.tb.status.planned',
+  'adapter-needed': 'blanc.tb.status.adapterNeeded',
+  experimental: 'blanc.tb.status.experimental',
+};
+
+function moduleStatusLabel(status: string, t: TFn): string {
+  const key = MODULE_STATUS_KEYS[status];
+  return key ? t(key) : status;
+}
+
 const UNIT_OPTIONS = Object.entries(TOOLBOX_UNITS) as Array<[ToolboxUnit, (typeof TOOLBOX_UNITS)[ToolboxUnit]]>;
 
 function UnitConverterPanel() {
+  const { t } = useT();
   const [value, setValue] = useState('1');
   const [from, setFrom] = useState<ToolboxUnit>('m');
   const [to, setTo] = useState<ToolboxUnit>('cm');
@@ -2028,25 +2082,25 @@ function UnitConverterPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Unit Converter</legend>
+        <legend>{t('blanc.tb.unitConverter')}</legend>
         <div className="blanc-form-grid">
           <label>
-            Value
+            {t('blanc.tb.value')}
             <input value={value} onChange={(event) => setValue(event.target.value)} inputMode="decimal" />
           </label>
           <label>
-            From
+            {t('blanc.tb.from')}
             <select value={from} onChange={(event) => setFrom(event.target.value as ToolboxUnit)}>
               {UNIT_OPTIONS.map(([id, unit]) => (
-                <option key={id} value={id}>{unit.label}</option>
+                <option key={id} value={id}>{unitLabel(id, unit.label, t)}</option>
               ))}
             </select>
           </label>
           <label>
-            To
+            {t('blanc.tb.to')}
             <select value={to} onChange={(event) => setTo(event.target.value as ToolboxUnit)}>
               {UNIT_OPTIONS.map(([id, unit]) => (
-                <option key={id} value={id}>{unit.label}</option>
+                <option key={id} value={id}>{unitLabel(id, unit.label, t)}</option>
               ))}
             </select>
           </label>
@@ -2054,9 +2108,9 @@ function UnitConverterPanel() {
         <div className="blanc-result-box">
           {result.ok && typeof result.value === 'number'
             ? `${formatToolboxNumber(result.value)} ${to}`
-            : result.error}
+            : toolboxErrorText(result.error, t)}
         </div>
-        <p className="blanc-note">Static offline units only. Currency is intentionally not included here because rates need dated online data.</p>
+        <p className="blanc-note">{t('blanc.tb.unitNote')}</p>
       </fieldset>
     </div>
   );
@@ -2070,6 +2124,7 @@ function formatTimerSeconds(total: number): string {
 }
 
 function FocusTimerPanel() {
+  const { t } = useT();
   const [mode, setMode] = useState<'countdown' | 'stopwatch'>('countdown');
   const [minutes, setMinutes] = useState(25);
   const [seconds, setSeconds] = useState(25 * 60);
@@ -2086,7 +2141,7 @@ function FocusTimerPanel() {
           setRunning(false);
           if (soundOn) {
             try {
-              window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: 'Focus timer finished.', kind: 'ok' } }));
+              window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: t('blanc.tb.timerDone'), kind: 'ok' } }));
             } catch {
               /* ignore */
             }
@@ -2141,34 +2196,34 @@ function FocusTimerPanel() {
   return (
     <div className="blanc-focus-workspace">
       <section className="blanc-focus-main">
-        <div className="blanc-segmented" role="group" aria-label="Timer mode">
-          <button type="button" className={mode === 'countdown' ? 'active' : ''} onClick={() => switchMode('countdown')} title="Countdown mode">Countdown</button>
-          <button type="button" className={mode === 'stopwatch' ? 'active' : ''} onClick={() => switchMode('stopwatch')} title="Stopwatch mode">Stopwatch</button>
+        <div className="blanc-segmented" role="group" aria-label={t('blanc.tb.timerMode')}>
+          <button type="button" className={mode === 'countdown' ? 'active' : ''} onClick={() => switchMode('countdown')} title={t('blanc.tb.countdown')}>{t('blanc.tb.countdown')}</button>
+          <button type="button" className={mode === 'stopwatch' ? 'active' : ''} onClick={() => switchMode('stopwatch')} title={t('blanc.tb.stopwatch')}>{t('blanc.tb.stopwatch')}</button>
         </div>
         <div className="blanc-timer-display">{formatTimerSeconds(seconds)}</div>
         <div className="blanc-focus-actions">
-          <button type="button" className="blanc-primary-action" onClick={() => setRunning((current) => !current)} title={running ? 'Pause timer' : 'Start timer'}>
-            {running ? 'Pause' : 'Start'}
+          <button type="button" className="blanc-primary-action" onClick={() => setRunning((current) => !current)} title={running ? t('blanc.tb.pauseTimer') : t('blanc.tb.startTimer')}>
+            {running ? t('blanc.tb.pause') : t('blanc.tb.start')}
           </button>
-          <button type="button" onClick={reset} title="Reset timer">Reset</button>
-          <button type="button" onClick={recordLap} title="Record current time">Lap</button>
+          <button type="button" onClick={reset} title={t('blanc.tb.resetTimer')}>{t('blanc.tb.reset')}</button>
+          <button type="button" onClick={recordLap} title={t('blanc.tb.recordLap')}>{t('blanc.tb.lap')}</button>
         </div>
-        <p className="blanc-note">Shortcuts: Ctrl+Shift+Space start/pause, Ctrl+Shift+Backspace reset. Controls remain fully reachable by keyboard focus.</p>
+        <p className="blanc-note">{t('blanc.tb.timerKeys', { startPause: 'Ctrl+Shift+Space', reset: 'Ctrl+Shift+Backspace' })}</p>
       </section>
 
       <aside className="blanc-focus-side">
         <section>
-          <h3>Presets</h3>
+          <h3>{t('blanc.tb.presets')}</h3>
           <div className="blanc-preset-grid">
             {[5, 15, 25, 45].map((preset) => (
-              <button key={preset} type="button" className={minutes === preset && mode === 'countdown' ? 'active' : ''} onClick={() => setPreset(preset)} title={`${preset} minute preset`}>
-                {preset}m
+              <button key={preset} type="button" className={minutes === preset && mode === 'countdown' ? 'active' : ''} onClick={() => setPreset(preset)} title={t('blanc.tb.presetTitle', { count: preset })}>
+                {t('blanc.tb.presetLabel', { count: preset })}
               </button>
             ))}
           </div>
           {mode === 'countdown' && (
             <label className="blanc-focus-custom">
-              Custom minutes
+              {t('blanc.tb.customMinutes')}
               <input
                 type="number"
                 min={1}
@@ -2184,14 +2239,14 @@ function FocusTimerPanel() {
           )}
         </section>
         <section>
-          <h3>Options</h3>
+          <h3>{t('blanc.tb.options')}</h3>
           <label className="blanc-check">
             <input type="checkbox" checked={soundOn} onChange={(event) => setSoundOn(event.target.checked)} />
-            <span>Completion notice</span>
+            <span>{t('blanc.tb.completionNotice')}</span>
           </label>
         </section>
         <section>
-          <h3>Laps</h3>
+          <h3>{t('blanc.tb.laps')}</h3>
           {laps.length ? (
             <ol className="blanc-lap-list">
               {laps.map((lap, index) => (
@@ -2199,7 +2254,7 @@ function FocusTimerPanel() {
               ))}
             </ol>
           ) : (
-            <p className="blanc-note">No laps recorded.</p>
+            <p className="blanc-note">{t('blanc.tb.noLaps')}</p>
           )}
         </section>
       </aside>
@@ -2260,18 +2315,19 @@ function BlancMeter({
 }
 
 function SystemMonitorPanel() {
+  const { t } = useT();
   const [metrics, setMetrics] = useState<BlancSystemMetrics | null>(null);
   const [storage, setStorage] = useState<BlancStorageEstimate | null>(null);
-  const [status, setStatus] = useState('Loading system metrics...');
+  const [status, setStatus] = useState(() => t('blanc.tb.metricsLoading'));
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const next = await window.api.systemGetMetrics();
       setMetrics(next);
-      setStatus('Live metrics refreshed.');
+      setStatus(t('blanc.tb.metricsRefreshed'));
     } catch {
       setMetrics(null);
-      setStatus('System metrics are unavailable.');
+      setStatus(t('blanc.tb.metricsUnavailable'));
     }
     try {
       const estimate = await navigator.storage?.estimate?.();
@@ -2291,39 +2347,69 @@ function SystemMonitorPanel() {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
+  const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
+  useEffect(() => {
+    type BatteryLike = EventTarget & { level: number; charging: boolean; chargingTime: number };
+    const nav = navigator as Navigator & { getBattery?: () => Promise<BatteryLike> };
+    let alive = true;
+    let manager: BatteryLike | null = null;
+    const read = (): void => {
+      if (!alive || !manager) return;
+      // Chromium reports a computer with no battery as full, charging and done
+      // charging (chargingTime 0) — that is "no battery", not a 100% meter.
+      const none = manager.charging && manager.level === 1 && manager.chargingTime === 0;
+      setBattery(none ? null : { level: manager.level, charging: manager.charging });
+    };
+    void nav.getBattery?.()
+      .then((result) => {
+        manager = result;
+        read();
+        result.addEventListener('levelchange', read);
+        result.addEventListener('chargingchange', read);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      manager?.removeEventListener('levelchange', read);
+      manager?.removeEventListener('chargingchange', read);
+    };
+  }, []);
+
   const ramUsed = metrics ? Math.max(0, metrics.totalmem - metrics.freemem) : 0;
   const ramPct = metrics && metrics.totalmem > 0 ? (ramUsed / metrics.totalmem) * 100 : 0;
   const cpuPct = metrics ? metrics.cpuLoad * 100 : 0;
   const storagePct = storage && storage.quota > 0 ? (storage.usage / storage.quota) * 100 : 0;
-  const batteryPct = metrics?.battery != null ? metrics.battery * 100 : null;
+  // Main cannot read a battery level (Electron exposes only on/off battery), so
+  // the level comes from the renderer's Battery API when main has none.
+  const batteryPct =
+    metrics?.battery != null ? metrics.battery * 100 : battery ? battery.level * 100 : null;
+  const batteryOnPower = metrics?.battery != null ? !metrics.onBattery : (battery?.charging ?? true);
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>System Monitor</legend>
-        <p className="blanc-note">
-          Local CPU, RAM, uptime, battery, and browser storage. GPU/process details stay planned until a native adapter is added.
-        </p>
+        <legend>{t('blanc.tb.systemMonitor')}</legend>
+        <p className="blanc-note">{t('blanc.tb.systemNote')}</p>
         {metrics ? (
           <div className="blanc-monitor-grid">
-            <BlancMeter label="CPU" value={cpuPct} detail="Current sampled load" />
+            <BlancMeter label={t('blanc.tb.cpu')} value={cpuPct} detail={t('blanc.tb.cpuDetail')} />
             <BlancMeter
-              label="RAM"
+              label={t('blanc.tb.ram')}
               value={ramPct}
-              detail={`${formatBytes(ramUsed)} used of ${formatBytes(metrics.totalmem)}`}
+              detail={t('blanc.tb.usedOf', { used: formatBytes(ramUsed), total: formatBytes(metrics.totalmem) })}
             />
             {storage && (
               <BlancMeter
-                label="Storage"
+                label={t('blanc.tb.storage')}
                 value={storagePct}
-                detail={`${formatBytes(storage.usage)} used of ${formatBytes(storage.quota)} browser quota`}
+                detail={t('blanc.tb.storageDetail', { used: formatBytes(storage.usage), total: formatBytes(storage.quota) })}
               />
             )}
             {batteryPct != null && (
               <BlancMeter
-                label="Battery"
+                label={t('blanc.tb.battery')}
                 value={batteryPct}
-                detail={metrics.onBattery ? 'On battery power' : 'Plugged in'}
+                detail={batteryOnPower ? t('blanc.tb.pluggedIn') : t('blanc.tb.onBattery')}
               />
             )}
           </div>
@@ -2331,12 +2417,12 @@ function SystemMonitorPanel() {
           <p className="blanc-error">{status}</p>
         )}
         <div className="blanc-status-row">
-          {metrics && <span>Platform: {metrics.platform}</span>}
-          {metrics && <span>Uptime: {formatUptime(metrics.uptime)}</span>}
+          {metrics && <span>{t('blanc.tb.platform', { name: metrics.platform })}</span>}
+          {metrics && <span>{t('blanc.tb.uptime', { time: formatUptime(metrics.uptime) })}</span>}
           <span>{status}</span>
         </div>
         <div className="blanc-row-actions">
-          <button type="button" onClick={() => void refresh()}>Refresh</button>
+          <button type="button" onClick={() => void refresh()}>{t('blanc.tb.refresh')}</button>
         </div>
       </fieldset>
     </div>
@@ -2346,6 +2432,7 @@ function SystemMonitorPanel() {
 const BLANC_QUICK_NOTES_KEY = 'jp-study.blanc.quickNotes';
 
 function QuickNotesPanel() {
+  const { t } = useT();
   const [notes, setNotes] = useState(() => {
     try {
       return window.localStorage.getItem(BLANC_QUICK_NOTES_KEY) ?? '';
@@ -2373,17 +2460,17 @@ function QuickNotesPanel() {
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Quick Notes</legend>
-        <p className="blanc-warning">Blanc quick notes are local to Blanc. They do not transfer to the main app memory/settings yet.</p>
+        <legend>{t('blanc.tb.quickNotes')}</legend>
+        <p className="blanc-warning">{t('blanc.tb.quickNotesWarning')}</p>
         <textarea
           rows={12}
           value={notes}
-          placeholder="Plain toolbox notes, source links, capture ideas, small checklists..."
+          placeholder={t('blanc.tb.quickNotesPlaceholder')}
           onChange={(event) => save(event.target.value)}
         />
         <div className="blanc-row-actions">
-          <button type="button" onClick={() => save('')}>Clear</button>
-          <span className="blanc-note">{saved ? 'Saved' : `${notes.length} characters`}</span>
+          <button type="button" onClick={() => save('')}>{t('blanc.tb.clear')}</button>
+          <span className="blanc-note">{saved ? t('blanc.tb.saved') : t('blanc.tb.characters', { count: notes.length })}</span>
         </div>
       </fieldset>
     </div>
@@ -2392,7 +2479,7 @@ function QuickNotesPanel() {
 
 function formatDateTime(ms: number): string {
   if (!Number.isFinite(ms)) return '-';
-  return new Date(ms).toLocaleString([], {
+  return new Date(ms).toLocaleString(LANG_TAGS[getUiLang()], {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -2415,6 +2502,7 @@ const FILE_SEARCH_ROW_HEIGHT = 38;
 const FILE_SEARCH_LIST_MAX_HEIGHT = 420;
 
 function FileSearchPanel() {
+  const { t } = useT();
   const [root, setRoot] = useState('');
   const [query, setQuery] = useState('');
   const [extensions, setExtensions] = useState('');
@@ -2422,18 +2510,18 @@ function FileSearchPanel() {
   const [scanned, setScanned] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Choose a folder and enter a filename search.');
+  const [status, setStatus] = useState(() => t('blanc.tb.fileSearchIdle'));
 
   const chooseFolder = async (): Promise<void> => {
     const picked = await window.api.toolboxPickSearchFolder();
     if (!picked) return;
     setRoot(picked);
-    setStatus('Folder selected.');
+    setStatus(t('blanc.tb.folderSelected'));
   };
 
   const search = async (): Promise<void> => {
     setBusy(true);
-    setStatus('Searching...');
+    setStatus(t('blanc.tb.searching'));
     setResults([]);
     try {
       const response = await window.api.toolboxFileSearch({
@@ -2444,17 +2532,16 @@ function FileSearchPanel() {
         maxScanned: 30_000,
       });
       if (!response.ok) {
-        setStatus(response.error ?? 'Search failed.');
+        setStatus(response.error ?? t('blanc.tb.searchFailed'));
         return;
       }
       setResults(response.results ?? []);
       setScanned(response.scanned ?? 0);
       setTruncated(response.truncated === true);
-      setStatus(
-        `${response.results?.length ?? 0} result(s), ${response.scanned ?? 0} files scanned${response.truncated ? ', capped' : ''}.`,
-      );
+      const summary = t('blanc.tb.searchSummary', { count: response.results?.length ?? 0, scanned: response.scanned ?? 0 });
+      setStatus(t(response.truncated ? 'blanc.tb.searchCapped' : 'blanc.tb.searchDone', { summary }));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Search failed.');
+      setStatus(error instanceof Error ? error.message : t('blanc.tb.searchFailed'));
     } finally {
       setBusy(false);
     }
@@ -2462,46 +2549,44 @@ function FileSearchPanel() {
 
   const copyPath = async (filePath: string): Promise<void> => {
     await navigator.clipboard.writeText(filePath);
-    setStatus('Path copied.');
+    setStatus(t('blanc.tb.pathCopied'));
   };
 
   const openPath = async (filePath: string): Promise<void> => {
     const error = await window.api.launchTarget(filePath);
-    setStatus(error ?? 'Opened.');
+    setStatus(error ?? t('blanc.tb.opened'));
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>File Search</legend>
-        <p className="blanc-note">
-          Capped local filename search. This does not index file contents yet, so it stays fast and predictable inside Blanc.
-        </p>
+        <legend>{t('blanc.tb.fileSearch')}</legend>
+        <p className="blanc-note">{t('blanc.tb.fileSearchNote')}</p>
         <div className="blanc-form-grid">
           <label>
-            Folder
-            <input value={root} onChange={(event) => setRoot(event.target.value)} placeholder="Choose or paste a folder path" />
+            {t('blanc.tb.folder')}
+            <input value={root} onChange={(event) => setRoot(event.target.value)} placeholder={t('blanc.tb.folderPlaceholder')} />
           </label>
           <label>
-            Name contains
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="anki, book, .srt..." />
+            {t('blanc.tb.nameContains')}
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('blanc.tb.namePlaceholder')} />
           </label>
           <label>
-            Extensions
-            <input value={extensions} onChange={(event) => setExtensions(event.target.value)} placeholder="Optional: epub, srt, mp3" />
+            {t('blanc.tb.extensions')}
+            <input value={extensions} onChange={(event) => setExtensions(event.target.value)} placeholder={t('blanc.tb.extensionsPlaceholder')} />
           </label>
         </div>
         <div className="blanc-row-actions">
-          <button type="button" onClick={() => void chooseFolder()}>Choose folder</button>
+          <button type="button" onClick={() => void chooseFolder()}>{t('blanc.tb.chooseFolder')}</button>
           <button type="button" disabled={busy || !root.trim() || !query.trim()} onClick={() => void search()}>
-            {busy ? 'Searching...' : 'Search'}
+            {busy ? t('blanc.tb.searching') : t('blanc.tb.search')}
           </button>
           <span className="blanc-note">{status}</span>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Results</legend>
+        <legend>{t('blanc.tb.results')}</legend>
         {results.length > 0 ? (
           // A plain <table> here would put up to 500 raw <tr> rows in the DOM
           // at once (toolboxFileSearch's cap) — VirtualList only keeps the
@@ -2509,11 +2594,11 @@ function FileSearchPanel() {
           // CSS-grid row list instead of an HTML table.
           <div className="blanc-file-search-results">
             <div className="blanc-file-search-row blanc-file-search-header">
-              <span>Name</span>
-              <span>Type</span>
-              <span>Size</span>
-              <span>Modified</span>
-              <span>Actions</span>
+              <span>{t('blanc.tb.colName')}</span>
+              <span>{t('blanc.tb.colType')}</span>
+              <span>{t('blanc.tb.colSize')}</span>
+              <span>{t('blanc.tb.colModified')}</span>
+              <span>{t('blanc.tb.colActions')}</span>
             </div>
             <VirtualList
               items={results}
@@ -2527,22 +2612,22 @@ function FileSearchPanel() {
               renderItem={(result) => (
                 <div className="blanc-file-search-row">
                   <span className="blanc-file-search-name" title={result.path}>{result.name}</span>
-                  <span>{result.isDirectory ? 'Folder' : result.ext || 'file'}</span>
+                  <span>{result.isDirectory ? t('blanc.tb.typeFolder') : result.ext || t('blanc.tb.typeFile')}</span>
                   <span>{result.isDirectory ? '-' : formatBytes(result.size)}</span>
                   <span>{formatDateTime(result.modifiedMs)}</span>
                   <span className="blanc-row-actions">
-                    <button type="button" onClick={() => void openPath(result.path)}>Open</button>
-                    <button type="button" onClick={() => void copyPath(result.path)}>Copy path</button>
+                    <button type="button" onClick={() => void openPath(result.path)}>{t('blanc.tb.open')}</button>
+                    <button type="button" onClick={() => void copyPath(result.path)}>{t('blanc.tb.copyPath')}</button>
                   </span>
                 </div>
               )}
             />
           </div>
         ) : (
-          <p className="blanc-note">No results yet.</p>
+          <p className="blanc-note">{t('blanc.tb.noResults')}</p>
         )}
         <p className="blanc-note">
-          Scanned {scanned} file(s). {truncated ? 'Search stopped at the safety cap; narrow the folder or query.' : 'Results are within the safety cap.'}
+          {t('blanc.tb.scanned', { count: scanned })} {truncated ? t('blanc.tb.capHit') : t('blanc.tb.capOk')}
         </p>
       </fieldset>
     </div>
@@ -2561,6 +2646,7 @@ function normalizeHash(value: string): string {
 }
 
 function HashCheckerPanel() {
+  const { t } = useT();
   const [fileName, setFileName] = useState('');
   const [hash, setHash] = useState('');
   const [expected, setExpected] = useState('');
@@ -2573,48 +2659,46 @@ function HashCheckerPanel() {
     if (!file) return;
     setFileName(file.name);
     setHash('');
-    setStatus('Hashing...');
+    setStatus(t('blanc.tb.hashing'));
     try {
       setHash(await sha256File(file));
-      setStatus('SHA-256 ready.');
+      setStatus(t('blanc.tb.hashReady'));
     } catch {
-      setStatus('Could not hash this file.');
+      setStatus(t('blanc.tb.hashFailed'));
     }
   };
 
   const copyHash = async (): Promise<void> => {
     if (!hash) return;
     await navigator.clipboard.writeText(hash);
-    setStatus('Hash copied.');
+    setStatus(t('blanc.tb.hashCopied'));
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Hash Checker</legend>
-        <p className="blanc-note">
-          Generate SHA-256 for a local file and compare it with an expected hash. A match verifies identity against that supplied value, not general safety.
-        </p>
+        <legend>{t('blanc.tb.hashChecker')}</legend>
+        <p className="blanc-note">{t('blanc.tb.hashNote')}</p>
         <label>
-          File
+          {t('blanc.tb.file')}
           <input type="file" onChange={(event) => void pickFile(event.target.files?.[0])} />
         </label>
-        {fileName && <p className="blanc-note">Selected: {fileName}</p>}
+        {fileName && <p className="blanc-note">{t('blanc.tb.selected', { name: fileName })}</p>}
         <label>
-          Expected SHA-256
+          {t('blanc.tb.expectedHash')}
           <input
             value={expected}
             onChange={(event) => setExpected(event.target.value)}
-            placeholder="Paste expected hash"
+            placeholder={t('blanc.tb.expectedHashPlaceholder')}
           />
         </label>
         <div className="blanc-result-box is-wrap">
-          {hash || status || 'No file hashed yet.'}
+          {hash || status || t('blanc.tb.noHash')}
         </div>
         <div className="blanc-row-actions">
-          <button type="button" disabled={!hash} onClick={() => void copyHash()}>Copy hash</button>
-          {hashMatches && <span className="blanc-status ready">Match</span>}
-          {hashMismatch && <span className="blanc-status adapter-needed">Mismatch</span>}
+          <button type="button" disabled={!hash} onClick={() => void copyHash()}>{t('blanc.tb.copyHash')}</button>
+          {hashMatches && <span className="blanc-status ready">{t('blanc.tb.match')}</span>}
+          {hashMismatch && <span className="blanc-status adapter-needed">{t('blanc.tb.mismatch')}</span>}
           <span className="blanc-note">{status}</span>
         </div>
       </fieldset>
@@ -2642,6 +2726,7 @@ function formatBytes(bytes: number): string {
 }
 
 function ImageConverterPanel() {
+  const { t } = useT();
   const [sourceName, setSourceName] = useState('');
   const [sourceSize, setSourceSize] = useState(0);
   const [sourceUrl, setSourceUrl] = useState('');
@@ -2649,7 +2734,7 @@ function ImageConverterPanel() {
   const [outputSize, setOutputSize] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>('image/webp');
   const [quality, setQuality] = useState(0.86);
-  const [status, setStatus] = useState('Choose an image.');
+  const [status, setStatus] = useState(() => t('blanc.tb.chooseImage'));
 
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -2659,7 +2744,7 @@ function ImageConverterPanel() {
   const chooseFile = (file: File | undefined): void => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setStatus('Choose an image file.');
+      setStatus(t('blanc.tb.chooseImageFile'));
       return;
     }
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -2669,15 +2754,15 @@ function ImageConverterPanel() {
     setSourceUrl(URL.createObjectURL(file));
     setOutputUrl('');
     setOutputSize(0);
-    setStatus('Ready to convert.');
+    setStatus(t('blanc.tb.readyToConvert'));
   };
 
   const convert = async (): Promise<void> => {
     if (!sourceUrl) {
-      setStatus('Choose an image first.');
+      setStatus(t('blanc.tb.chooseImageFirst'));
       return;
     }
-    setStatus('Converting...');
+    setStatus(t('blanc.tb.converting'));
     try {
       const image = new Image();
       image.decoding = 'async';
@@ -2700,24 +2785,24 @@ function ImageConverterPanel() {
       if (outputUrl) URL.revokeObjectURL(outputUrl);
       setOutputUrl(URL.createObjectURL(blob));
       setOutputSize(blob.size);
-      setStatus('Converted.');
+      setStatus(t('blanc.tb.converted'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not convert this image.');
+      setStatus(error instanceof Error ? error.message : t('blanc.tb.convertFailed'));
     }
   };
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Image Converter</legend>
-        <p className="blanc-note">Local image conversion through browser canvas. PNG, JPEG, and WebP are supported here; heavier batch formats can use OSS adapters later.</p>
+        <legend>{t('blanc.tb.imageConverter')}</legend>
+        <p className="blanc-note">{t('blanc.tb.imageNote')}</p>
         <label>
-          Image
+          {t('blanc.tb.image')}
           <input type="file" accept="image/*" onChange={(event) => chooseFile(event.target.files?.[0])} />
         </label>
         <div className="blanc-form-grid">
           <label>
-            Output
+            {t('blanc.tb.output')}
             <select value={format} onChange={(event) => setFormat(event.target.value as ImageOutputFormat)}>
               <option value="image/webp">WebP</option>
               <option value="image/png">PNG</option>
@@ -2725,7 +2810,7 @@ function ImageConverterPanel() {
             </select>
           </label>
           <label>
-            Quality
+            {t('blanc.tb.quality')}
             <input
               type="range"
               min={0.4}
@@ -2738,10 +2823,10 @@ function ImageConverterPanel() {
           </label>
         </div>
         <div className="blanc-row-actions">
-          <button type="button" disabled={!sourceUrl} onClick={() => void convert()}>Convert</button>
+          <button type="button" disabled={!sourceUrl} onClick={() => void convert()}>{t('blanc.tb.convert')}</button>
           {outputUrl && (
             <a className="blanc-file-link" href={outputUrl} download={imageOutputName(sourceName, format)}>
-              Save {imageOutputName(sourceName, format)}
+              {t('blanc.tb.saveFile', { name: imageOutputName(sourceName, format) })}
             </a>
           )}
           <span className="blanc-note">{status}</span>
@@ -2749,13 +2834,13 @@ function ImageConverterPanel() {
       </fieldset>
       {sourceUrl && (
         <fieldset>
-          <legend>Preview</legend>
+          <legend>{t('blanc.tb.preview')}</legend>
           <div className="blanc-image-preview">
             <img src={sourceUrl} alt={sourceName} />
           </div>
           <p className="blanc-note">
-            Source: {sourceName} ({formatBytes(sourceSize)})
-            {outputSize ? ` | Output: ${formatBytes(outputSize)}` : ''}
+            {t('blanc.tb.sourceSize', { name: sourceName, size: formatBytes(sourceSize) })}
+            {outputSize ? t('blanc.tb.outputSize', { size: formatBytes(outputSize) }) : ''}
           </p>
         </fieldset>
       )}
@@ -2998,7 +3083,7 @@ function BlancSettingsPanel({
     // Plain string, not a t() key: adding one would mean editing all four
     // catalog files, which a parallel session is currently writing to. Blanc
     // chrome is outside the i18n sweep by policy anyway (plan, Pillar 8).
-    setSettingsMsg('Launcher order reset to the default.');
+    setSettingsMsg(t('blanc.tb.launcherOrderReset'));
   };
 
   const resetToolboxCategory = (category: ToolboxSettingsCategory): void => {
@@ -3171,7 +3256,7 @@ function BlancSettingsPanel({
                 setSettingsImport('');
                 setSettingsMsg(t('blanc.settings.imported'));
               } else {
-                setSettingsMsg(result.error);
+                setSettingsMsg(toolboxErrorText(result.error, t));
               }
             }}
             disabled={!settingsImport.trim()}
@@ -3213,7 +3298,7 @@ function BlancSettingsPanel({
             >
               {listBlancToolboxModules().map((module) => (
                 <option key={module.id} value={module.id}>
-                  {module.label}
+                  {blancToolLabel(t, module.id)}
                 </option>
               ))}
             </select>
@@ -3307,15 +3392,15 @@ function BlancSettingsPanel({
               <thead>
                 <tr>
                   <th>{t('blanc.settings.col.setting')}</th>
-                  <th>Category</th>
+                  <th>{t('blanc.tb.colCategory')}</th>
                   <th>{t('blanc.settings.col.description')}</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleDefinitions.map((definition) => (
                   <tr key={definition.id}>
-                    <td>{definition.id}</td>
-                    <td>{definition.category}</td>
+                    <td>{settingLabel(definition.id, t)}</td>
+                    <td>{t(`blanc.settings.category.${definition.category}`)}</td>
                     <td>{definition.description}</td>
                   </tr>
                 ))}
@@ -3326,7 +3411,7 @@ function BlancSettingsPanel({
       </fieldset>
 
       <fieldset data-blanc-setting="theme" tabIndex={-1}>
-        <legend>Theme</legend>
+        <legend>{t('blanc.tb.theme')}</legend>
         <div className="blanc-segmented">
           {BLANC_THEME_PRESETS.map((preset) => (
             <button
@@ -3341,7 +3426,7 @@ function BlancSettingsPanel({
           ))}
         </div>
         <p className="blanc-note">
-          {presetById(toolboxSettings.themePreset)?.description ?? 'Custom palette.'}
+          {presetById(toolboxSettings.themePreset)?.description ?? t('blanc.tb.customPalette')}
         </p>
 
         <div className="blanc-theme-grid">
@@ -3364,12 +3449,12 @@ function BlancSettingsPanel({
                 />
                 <span className="blanc-theme-label">{token.label}</span>
                 {overridden ? (
-                  <button type="button" onClick={() => clearThemeToken(token.id)} title="Reset this colour" aria-label="Reset this colour">
+                  <button type="button" onClick={() => clearThemeToken(token.id)} title={t('blanc.tb.resetColour')} aria-label={t('blanc.tb.resetColour')}>
                     ×
                   </button>
                 ) : (
                   <span className="blanc-theme-inherit">
-                    {activePresetOverrides[token.id] ? 'preset' : 'default'}
+                    {activePresetOverrides[token.id] ? t('blanc.tb.inheritPreset') : t('blanc.tb.inheritDefault')}
                   </span>
                 )}
               </label>
@@ -3379,14 +3464,14 @@ function BlancSettingsPanel({
 
         <div className="blanc-status-row">
           <span>
-            {Object.keys(toolboxSettings.themeOverrides).length} of {BLANC_THEME_TOKENS.length} customised
+            {t('blanc.tb.customisedCount', { count: Object.keys(toolboxSettings.themeOverrides).length, total: BLANC_THEME_TOKENS.length })}
           </span>
           <button
             type="button"
             disabled={!Object.keys(toolboxSettings.themeOverrides).length}
             onClick={() => patchToolbox({ themeOverrides: {} })}
           >
-            Clear customisations
+            {t('blanc.tb.clearCustom')}
           </button>
           <button
             type="button"
@@ -3397,10 +3482,10 @@ function BlancSettingsPanel({
               const next = saveToolboxSettings({ themePreset: previous.preset, themeOverrides: previous.overrides });
               setToolboxSettings(next);
               setThemeHistoryCount(loadBlancThemeHistory().length);
-              setSettingsMsg('Previous theme restored.');
+              setSettingsMsg(t('blanc.tb.themeRestored'));
             }}
           >
-            Undo theme change
+            {t('blanc.tb.undoTheme')}
           </button>
           <button
             type="button"
@@ -3411,10 +3496,10 @@ function BlancSettingsPanel({
                 2,
               );
               void navigator.clipboard.writeText(json);
-              setSettingsMsg('Theme copied to the clipboard as JSON.');
+              setSettingsMsg(t('blanc.tb.themeCopied'));
             }}
           >
-            Copy theme
+            {t('blanc.tb.copyTheme')}
           </button>
           <button
             type="button"
@@ -3422,22 +3507,18 @@ function BlancSettingsPanel({
               void navigator.clipboard.readText().then((text) => {
                 const parsed = parseThemeExport(text);
                 if (!parsed) {
-                  setSettingsMsg('Clipboard does not contain a Blanc theme.');
+                  setSettingsMsg(t('blanc.tb.noThemeInClipboard'));
                   return;
                 }
                 patchToolbox({ themePreset: parsed.preset, themeOverrides: parsed.overrides });
-                setSettingsMsg('Theme applied from the clipboard.');
+                setSettingsMsg(t('blanc.tb.themePasted'));
               });
             }}
           >
-            Paste theme
+            {t('blanc.tb.pasteTheme')}
           </button>
         </div>
-        <p className="blanc-note">
-          Colours are validated before they reach the stylesheet — only hex, rgb(), hsl(), and a few
-          keywords are accepted, so a pasted theme cannot inject CSS or hide Blanc&rsquo;s own
-          controls.
-        </p>
+        <p className="blanc-note">{t('blanc.tb.themeSafety')}</p>
       </fieldset>
 
       <fieldset data-blanc-setting="custom-css" tabIndex={-1}>
@@ -3482,12 +3563,8 @@ function BlancSettingsPanel({
       </fieldset>
 
       <fieldset data-blanc-setting="launcher-order" tabIndex={-1}>
-        <legend>Launcher order</legend>
-        <p className="blanc-note">
-          The order tools appear in the launcher. Only enabled tools are listed; search results are
-          left in relevance order. Tools you never move keep their default position, so anything
-          added to Blanc later still shows up.
-        </p>
+        <legend>{t('blanc.tb.launcherOrder')}</legend>
+        <p className="blanc-note">{t('blanc.tb.launcherOrderNote')}</p>
         <ol className="blanc-order-list">
           {orderableTools.map((id, index) => {
             const entry = blancTools.find((item) => item.id === id);
@@ -3498,7 +3575,7 @@ function BlancSettingsPanel({
                 <button
                   type="button"
                   disabled={index === 0}
-                  aria-label={`Move ${entry?.label ?? id} up`}
+                  aria-label={t('blanc.tb.moveUp', { name: entry?.label ?? id })}
                   onClick={() => moveTool(id, -1)}
                 >
                   ↑
@@ -3506,7 +3583,7 @@ function BlancSettingsPanel({
                 <button
                   type="button"
                   disabled={index === orderableTools.length - 1}
-                  aria-label={`Move ${entry?.label ?? id} down`}
+                  aria-label={t('blanc.tb.moveDown', { name: entry?.label ?? id })}
                   onClick={() => moveTool(id, 1)}
                 >
                   ↓
@@ -3516,13 +3593,13 @@ function BlancSettingsPanel({
           })}
         </ol>
         <div className="blanc-status-row">
-          <span>{orderableTools.length} tools</span>
+          <span>{t('blanc.tb.toolCount', { count: orderableTools.length })}</span>
           <button type="button" disabled={!toolboxSettings.toolOrder.length} onClick={resetToolOrder}>
-            Reset to default order
+            {t('blanc.tb.resetOrder')}
           </button>
         </div>
 
-        <p className="blanc-note">Category sections, in the order they appear:</p>
+        <p className="blanc-note">{t('blanc.tb.sectionOrderNote')}</p>
         <ol className="blanc-order-list">
           {orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder).map((category, index, list) => (
             <li key={category}>
@@ -3531,7 +3608,7 @@ function BlancSettingsPanel({
               <button
                 type="button"
                 disabled={index === 0}
-                aria-label={`Move the ${t(TOOL_CATEGORY_LABEL_KEYS[category])} section up`}
+                aria-label={t('blanc.tb.moveSectionUp', { name: t(TOOL_CATEGORY_LABEL_KEYS[category]) })}
                 onClick={() => moveCategory(category, -1)}
               >
                 ↑
@@ -3539,7 +3616,7 @@ function BlancSettingsPanel({
               <button
                 type="button"
                 disabled={index === list.length - 1}
-                aria-label={`Move the ${t(TOOL_CATEGORY_LABEL_KEYS[category])} section down`}
+                aria-label={t('blanc.tb.moveSectionDown', { name: t(TOOL_CATEGORY_LABEL_KEYS[category]) })}
                 onClick={() => moveCategory(category, 1)}
               >
                 ↓
@@ -3553,10 +3630,10 @@ function BlancSettingsPanel({
             disabled={!toolboxSettings.categoryOrder.length}
             onClick={() => {
               patchToolbox({ categoryOrder: [] });
-              setSettingsMsg('Category order reset to the default.');
+              setSettingsMsg(t('blanc.tb.sectionOrderReset'));
             }}
           >
-            Reset section order
+            {t('blanc.tb.resetSectionOrder')}
           </button>
         </div>
       </fieldset>
@@ -3567,8 +3644,8 @@ function BlancSettingsPanel({
           {listBlancToolboxModules().map((module) => (
             <div key={module.id} className="blanc-tool-management-row">
               <div>
-                <strong>{module.label}</strong>
-                <span>{module.category} / {module.status}</span>
+                <strong>{blancToolLabel(t, module.id)}</strong>
+                <span>{t(`blanc.tb.modcat.${module.category}`)} · {moduleStatusLabel(module.status, t)}</span>
               </div>
               <label className="blanc-check">
                 <input
@@ -3771,6 +3848,7 @@ function ToolboxShortcutSettingsPanel() {
 }
 
 export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
+  const { t } = useT();
   const [digits, setDigits] = useState('');
   const [error, setError] = useState('');
   const now = useMinuteClock();
@@ -3779,7 +3857,7 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
     if (pin.length !== 4) return;
     if (!verifyLockscreenPin(pin)) {
       setDigits('');
-      setError('Wrong PIN');
+      setError(t('blanc.tb.wrongPin'));
       return;
     }
     onUnlocked();
@@ -3803,15 +3881,15 @@ export function BlancLockscreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   return (
     <div className="blanc-lock">
-      <section className="blanc-lock-box" role="dialog" aria-modal="true" aria-label="Blanc lockscreen">
+      <section className="blanc-lock-box" role="dialog" aria-modal="true" aria-label={t('blanc.tb.lockscreen')}>
         <time className="blanc-lock-time">
-          {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {now.toLocaleTimeString(LANG_TAGS[getUiLang()], { hour: '2-digit', minute: '2-digit' })}
         </time>
         <div className="blanc-lock-date">
-          {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+          {now.toLocaleDateString(LANG_TAGS[getUiLang()], { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
         <label>
-          PIN
+          {t('blanc.tb.pinLabel')}
           <input
             autoFocus
             type="password"
@@ -3924,6 +4002,7 @@ function initialMono(): MonoState {
 }
 
 function MonoBlocks() {
+  const { t } = useT();
   const [state, setState] = useState<MonoState>(() => initialMono());
   const keys = useRef(new Set<string>());
   const rotateLatch = useRef(false);
@@ -4035,23 +4114,23 @@ function MonoBlocks() {
   return (
     <div className="blanc-panel mono-blocks">
       <fieldset>
-        <legend>Mono Blocks</legend>
+        <legend>{t('blanc.tb.monoBlocks')}</legend>
         <div className="mono-hud">
-          <span>Score {state.score}</span>
-          <span>Lines {state.lines}</span>
-          <span>Level {state.level}</span>
+          <span>{t('blanc.tb.score', { count: state.score })}</span>
+          <span>{t('blanc.tb.lines', { count: state.lines })}</span>
+          <span>{t('blanc.tb.level', { count: state.level })}</span>
           <button type="button" onClick={() => setState(initialMono())}>
-            Restart
+            {t('blanc.tb.restart')}
           </button>
         </div>
       </fieldset>
-      <div className="mono-board" aria-label="Mono Blocks board">
+      <div className="mono-board" aria-label={t('blanc.tb.blocksBoard')}>
         {cells.map((filled, index) => (
           <span key={index} className={filled ? 'filled' : ''} />
         ))}
       </div>
-      <p className="blanc-note">Move: arrow keys. Rotate: Up, W, X. Reverse rotate: Z. Space hard-drops.</p>
-      {state.over && <p className="blanc-error">Game over. Press Restart.</p>}
+      <p className="blanc-note">{t('blanc.tb.blocksKeys')}</p>
+      {state.over && <p className="blanc-error">{t('blanc.tb.gameOver')}</p>}
     </div>
   );
 }
