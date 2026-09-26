@@ -22,9 +22,15 @@ import {
 } from '../../../environment/buddyRoutines';
 import { speakBeepLine, voiceForType } from '../../../environment/beepSpeech';
 import { defFor, localizedCompanionDef } from '../../../environment/companionCatalog';
+import { buddyText } from '../../../environment/buddyText';
 import { COMMAND_CATALOG, SHORTCUT_OPEN_APPS } from '../../../keyboardShortcuts';
 import { useT } from '../../../i18n';
-import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
+import {
+  hasDiscoveredAero,
+  isTreasureCompanionHidden,
+  onAeroDiscoveryChanged,
+  setTreasureCompanionHidden,
+} from '../../../aeroDiscovery';
 import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../../../wiredDiscovery';
 import { forceCompanionsOff } from '../../../findingReadouts';
 import { exitSecretAero } from '../../../theme/SecretAeroTrigger';
@@ -69,6 +75,8 @@ export default function CompanionsPage() {
   const { t, lang } = useT();
   const { env, patchEnv, deskPrefs, patchDesk, seg, focusSettingId } = useSettings();
   const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
+  const [treasureHidden, setTreasureHidden] = useState(isTreasureCompanionHidden);
+  useEffect(() => onAeroDiscoveryChanged(() => setTreasureHidden(isTreasureCompanionHidden())), []);
   const [wiredDiscovered, setWiredDiscovered] = useState(hasDiscoveredWired);
   const [activeThemeId, setActiveThemeId] = useState(loadThemeId);
   const [trinketState, setTrinketState] = useState(loadTrinketState);
@@ -329,6 +337,19 @@ export default function CompanionsPage() {
           </label>
         }
       >
+        {!aeroDiscovered && (
+          <label className="os-check-row">
+            <input
+              type="checkbox"
+              checked={!treasureHidden}
+              onChange={(e) => setTreasureCompanionHidden(!e.target.checked)}
+            />
+            <span>
+              {t('companion.treasure.showLocked')}
+              <span className="muted os-check-row-desc">{t('companion.treasure.showLockedDesc')}</span>
+            </span>
+          </label>
+        )}
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
           <span className="os-viz-label muted">{t('settings.companions.who')}</span>
           {companionDefs.map((d) => {
@@ -440,7 +461,7 @@ export default function CompanionsPage() {
             >
               {typeRoutines.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {buddyText(r.name)}
                 </option>
               ))}
             </select>
@@ -454,7 +475,7 @@ export default function CompanionsPage() {
             >
               {typeRoutines.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {buddyText(r.name)}
                 </option>
               ))}
             </select>
@@ -469,7 +490,7 @@ export default function CompanionsPage() {
               <option value="">{t('settings.companions.holdOpensMenu')}</option>
               {typeRoutines.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {buddyText(r.name)}
                 </option>
               ))}
             </select>
@@ -486,7 +507,7 @@ export default function CompanionsPage() {
             >
               {routines.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.name}
+                  {buddyText(r.name)}
                   {r.builtin ? t('settings.companions.builtinSuffix') : ''}
                   {r.forType && r.forType !== '*' ? ` · ${routineTypeLabel(r)}` : ''}
                 </option>
@@ -527,7 +548,7 @@ export default function CompanionsPage() {
             <li key={r.id} className={`buddy-routine-row${editId === r.id ? ' is-active' : ''}`}>
               <button type="button" className="buddy-routine-select" onClick={() => setEditId(r.id)}>
                 <span className="buddy-routine-name">
-                  {r.name}
+                  {buddyText(r.name)}
                   {r.builtin ? t('settings.companions.builtinSuffix') : ''}
                 </span>
                 <span className="muted buddy-routine-meta">
@@ -1000,7 +1021,7 @@ function StepFields({
         >
           {routines.map((r) => (
             <option key={r.id} value={r.id}>
-              {r.name}
+              {buddyText(r.name)}
             </option>
           ))}
         </select>

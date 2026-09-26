@@ -15888,6 +15888,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .os-check-row input {
   accent-color: var(--accent);
 }
+.os-check-row-desc {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
 .os-set-top {
   flex-shrink: 0;
   padding: 0 0 12px;
