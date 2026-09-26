@@ -37,3 +37,13 @@ html.sysdict-window #root {
   top: 10px !important;
   left: 10px !important;
 }
+
+/* "Card preview" — below the popup (which caps itself at 70vh), never over it. */
+.sysdict-actions {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}

@@ -708,6 +708,33 @@ describe('repeat region', () => {
       .toEqual({ displayId: 7, x: 100, y: 200, width: 300, height: 80 });
   });
 
+  it('a word-under-the-cursor read does not replace the region "repeat" replays', async () => {
+    await booted();
+    await scan({ x: 100, y: 200, width: 300, height: 80 });
+    await h.ipc.handlers.get('lens:open')!({}, 'cursor');
+    const cursorInit = init() as { mode: string; region?: { width: number; height: number }; point?: unknown };
+    expect(cursorInit.mode).toBe('cursor');
+    expect(cursorInit.region).toMatchObject({ width: 420, height: 132 });
+    expect(cursorInit.point).toBeTruthy();
+    await h.ipc.handlers.get('lens:ocr')!({}, cursorInit.region);
+    expect((await status()).lastRegion)
+      .toEqual({ displayId: 7, x: 100, y: 200, width: 300, height: 80 });
+  });
+
+  it('centres the cursor box on the pointer and keeps it on the display', async () => {
+    const { __readingLensTestables: t } = await load();
+    const bounds = { x: 1920, y: 0, width: 1280, height: 720 };
+    expect(t.cursorRegion({ x: 2500, y: 300 }, bounds)).toEqual({
+      region: { x: 370, y: 234, width: 420, height: 132 },
+      point: { x: 210, y: 66 },
+    });
+    // Near the corner the box is pushed inside and the point moves within it.
+    expect(t.cursorRegion({ x: 1925, y: 5 }, bounds)).toEqual({
+      region: { x: 0, y: 0, width: 420, height: 132 },
+      point: { x: 5, y: 5 },
+    });
+  });
+
   it('records nothing when the OCR arrives with no open behind it', async () => {
     await booted();
     await h.ipc.handlers.get('lens:ocr')!({}, { x: 100, y: 200, width: 300, height: 80 });

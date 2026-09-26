@@ -4067,7 +4067,8 @@ export const ru: Catalog = {
   'lens.select.hint': 'Выделите японский текст',
   'lens.select.sub': 'или нажмите A, чтобы прочитать весь экран · Esc — отмена',
   'lens.select.clipboard': 'Прочитать буфер обмена',
-  'lens.clipboard.empty': 'В буфере обмена нет текста для чтения.',
+  'lens.clipboard.empty': 'В буфере обмена нет текста или картинки для чтения.',
+  'lens.clipboard.imageFailed': 'Не удалось прочитать скопированную картинку. Проверьте, установлены ли модели OCR для изучаемого языка.',
   'lens.scanning': 'Чтение…',
   'lens.empty.title': 'Здесь не найдено японского текста',
   'lens.empty.hint': 'Сузьте область или переключитесь в режим манги.',
@@ -4141,6 +4142,7 @@ export const ru: Catalog = {
   'lens.reader.mineSaved': 'В колоде',
   'lens.reader.mineQueued': 'Сохранено — в Anki позже',
   'lens.reader.mineRetry': 'Повторить',
+  'lens.reader.preview': 'Предпросмотр карточки…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': 'Что открывает скан',

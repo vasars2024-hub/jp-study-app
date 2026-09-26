@@ -133,6 +133,13 @@ import {
   stopReadingLens,
 } from './main/readingLens';
 import {
+  configureCompanion,
+  registerCompanionIpc,
+  startCompanion,
+  stopCompanion,
+} from './main/companion';
+import { stopCompanionContext } from './main/companionContext';
+import {
   isOsHotkeyHelperInstalled,
   registerOsHotkeyHelperIpc,
 } from './main/osHotkeyHelper';
@@ -1908,6 +1915,19 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerReadingLensIpc();
+  // The desktop companion: radial wheel, card preview and notices over any app,
+  // forwarding mines to this main window's renderer.
+  configureCompanion({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+    getMainWindow: () => mainWindow,
+    ensureMainWindow: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createWindow({ visible: false });
+    },
+  });
+  registerCompanionIpc();
   // The VN reader window beside a running game (Visual Novels ▸ Launch).
   configureVisualNovelReader({
     rendererUrl,
@@ -1930,6 +1950,8 @@ app.whenReady().then(async () => {
     startSystemDictionary();
     // Reading Lens: registers its own global hotkey (screen-region OCR reader).
     startReadingLens();
+    // Companion wheel, card preview, mine-last, Mini View: their chords go live now.
+    startCompanion();
     // Provision the offline dictionaries and load their metadata (pitch, IPA,
     // frequency) in the background. Its first step opens the dictionary database
     // synchronously, which is why it waits for the first frame. The term
@@ -1973,6 +1995,8 @@ app.on('will-quit', () => {
   stopExtensionServer();
   stopSystemDictionary();
   stopReadingLens();
+  stopCompanion();
+  stopCompanionContext();
   stopGlobalCommands();
   stopDebugBridge();
   // The local model runtime was the one subsystem here with no stop: contexts, weights and the

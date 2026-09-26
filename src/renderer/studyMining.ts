@@ -294,6 +294,8 @@ const ROUTE_SOURCE: Partial<Record<FlashcardSource, MineSource>> = {
   reader: 'reader',
   analysis: 'dictionary',
   lexicon: 'dictionary',
+  // The Windows counterpart of the extension: the same mining rules apply.
+  companion: 'extension',
 };
 
 /** A request for a pending card whose queued request was lost. */

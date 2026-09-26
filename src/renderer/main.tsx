@@ -118,6 +118,7 @@ import { startAiSetupSync } from './aiSetupClient';
 // Lazy: the reader pulls the tokenizer and the mining path, which no other
 // window should pay for at boot.
 const VisualNovelReaderOverlay = React.lazy(() => import('./components/immersion/VisualNovelReaderOverlay'));
+const CompanionOverlay = React.lazy(() => import('./components/companion/CompanionOverlay'));
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -178,6 +179,15 @@ const isVnReader =
   new URLSearchParams(window.location.search).get('vnReader') === '1';
 if (isVnReader) {
   document.documentElement.classList.add('vn-reader-window');
+}
+
+// The desktop companion's windows over other apps (main/companion.ts): the radial
+// wheel, the card preview and the notice. Same rule as the overlays above.
+const companionKind =
+  typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('companion') : null;
+const isCompanionSurface = companionKind === 'wheel' || companionKind === 'preview' || companionKind === 'notice';
+if (isCompanionSurface) {
+  document.documentElement.classList.add('companion-window');
 }
 
 function runWhenIdle(fn: () => void, timeout = 5000): void {
@@ -302,7 +312,7 @@ runWhenIdle(() => {
   installShellSounds();
 }, 3000);
 
-if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader) {
+if (!isCompanionHost && !isSysDictOverlay && !isReadingLens && !isVnReader && !isCompanionSurface) {
   bootCustomCss();
   // Theme Studio's active theme was painted only while Settings > Appearance was
   // open, so a restart dropped it until then. Paint it at boot like the sandbox.
@@ -377,6 +387,18 @@ if (container) {
         withStrictMode(
           <AppErrorBoundary>
             <SystemDictOverlay />
+          </AppErrorBoundary>,
+        ),
+      );
+    } else if (isCompanionSurface) {
+      // The card preview adds to the active profile's deck (through the main window).
+      initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+      createRoot(container).render(
+        withStrictMode(
+          <AppErrorBoundary>
+            <React.Suspense fallback={null}>
+              <CompanionOverlay kind={companionKind ?? ''} />
+            </React.Suspense>
           </AppErrorBoundary>,
         ),
       );

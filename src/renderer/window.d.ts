@@ -1989,6 +1989,38 @@ declare global {
         }) => void,
       ): () => void;
 
+      sysDictGetContext(): Promise<{ mode: 'auto' | 'translate'; sourceTitle?: string; sourceApp?: string }>;
+
+      // Desktop companion (main/companion.ts)
+      companionGetWheel(): Promise<import('../shared/companion').CompanionWheelInit | null>;
+      onCompanionWheel(cb: (init: import('../shared/companion').CompanionWheelInit | null) => void): () => void;
+      companionWheelRun(id: import('../shared/companion').CompanionWheelActionId): Promise<boolean>;
+      companionWheelClose(): Promise<void>;
+      companionGetPreview(): Promise<import('../shared/companion').CompanionDraft | null>;
+      onCompanionPreview(cb: (draft: import('../shared/companion').CompanionDraft | null) => void): () => void;
+      companionOpenPreview(draft: Partial<import('../shared/companion').CompanionDraft>): Promise<boolean>;
+      companionPreviewClose(): Promise<void>;
+      companionMine(request: import('../shared/companion').CompanionMineRequest): Promise<import('../shared/companion').CompanionMineOutcome>;
+      companionGetNotice(): Promise<{
+        messageKey: string;
+        vars?: Record<string, string | number>;
+        tone?: 'ok' | 'muted' | 'warn';
+      } | null>;
+      onCompanionNotice(
+        cb: (notice: {
+          messageKey: string;
+          vars?: Record<string, string | number>;
+          tone?: 'ok' | 'muted' | 'warn';
+        } | null) => void,
+      ): () => void;
+      companionReady(): Promise<void>;
+      onCompanionMine(
+        cb: (payload: { requestId: string; request: import('../shared/companion').CompanionMineRequest }) => void,
+      ): () => void;
+      companionMineResult(requestId: string, outcome: import('../shared/companion').CompanionMineOutcome): Promise<void>;
+      onCompanionRunInRenderer(cb: (command: string) => void): () => void;
+      onCompanionOpenShortcuts(cb: (category: string) => void): () => void;
+
       // Reading Lens — OS-wide screen-region OCR reader
       lensGetSettings(): Promise<ReadingLensStatus>;
       lensSetEnabled(enabled: boolean): Promise<ReadingLensStatus>;

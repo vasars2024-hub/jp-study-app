@@ -64,6 +64,8 @@ import {
   readerTarget,
   setReaderOpacity,
 } from './visualNovelReaderWindow';
+import { registerGlobalCommand } from '../globalCommands';
+import { showCompanionNotice } from '../companion';
 
 const MAX_SCAN_FILES = 3_000;
 const MAX_SCAN_DEPTH = 4;
@@ -510,6 +512,45 @@ function startCapture(id: string, test = false) {
     websocketUrl: settings.websocketUrl,
     test,
   });
+}
+
+/**
+ * The novel a capture hotkey means: the one the reader window is beside, else
+ * one being played now, else the one played most recently.
+ */
+function captureHotkeyTarget(): string {
+  const live = readerTarget() || [...activeReadingSessions.keys()][0];
+  if (live) return live;
+  const played = loadDatabase()
+    .entries.filter((entry) => entry.lastPlayedAt)
+    .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0));
+  return played[0]?.id ?? '';
+}
+
+/**
+ * `vn.toggleCapture` — start or stop texthooker capture without opening Gum,
+ * from inside the game. Says what it did in a companion notice, since the
+ * Visual Novels view that shows the capture state is usually not on screen.
+ */
+function toggleCaptureFromHotkey(): void {
+  const live = captureSession.state();
+  if (live.active && !live.test) {
+    captureSession.stop();
+    showCompanionNotice({ messageKey: 'companion.notice.vnCaptureStopped', tone: 'muted' });
+    return;
+  }
+  const id = captureHotkeyTarget();
+  if (!id) {
+    showCompanionNotice({ messageKey: 'companion.notice.vnNone', tone: 'warn' });
+    return;
+  }
+  try {
+    startCapture(id);
+    const title = loadDatabase().entries.find((entry) => entry.id === id)?.title ?? '';
+    showCompanionNotice({ messageKey: 'companion.notice.vnCaptureStarted', vars: { title }, tone: 'ok' });
+  } catch {
+    showCompanionNotice({ messageKey: 'companion.notice.vnCaptureFailed', tone: 'warn' });
+  }
 }
 
 function listProcessNames(): Promise<Set<string>> {
@@ -1273,6 +1314,8 @@ export function registerVisualNovelIpc(): void {
   });
 
   ipcMain.handle('visual-novel:captureStop', async () => captureSession.stop());
+  // Settings → Shortcuts → Companion: start / stop capture from inside the game.
+  registerGlobalCommand('vn.toggleCapture', () => toggleCaptureFromHotkey());
 
   ipcMain.handle('visual-novel:updateSettings', async (_event, patch: VisualNovelSettingsPatch) => {
     const database = saveDatabase(updateVisualNovelSettings(loadDatabase(), patch ?? {}));

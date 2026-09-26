@@ -24,7 +24,7 @@ import {
   onFocusModeChanged,
   toggleFocusMode,
 } from './focusMode';
-import { loadMiniMode, onMiniModeChanged, type MiniModeSettings } from './miniMode';
+import { isMiniMode, loadMiniMode, onMiniModeChanged, setMiniModeEnabled, type MiniModeSettings } from './miniMode';
 import { applySettingsAdvancedClass } from './settingsAdvanced';
 import MiniShell from './components/MiniShell';
 import Lockscreen from './components/Lockscreen';
@@ -69,6 +69,8 @@ import { getStudyLang } from './studyEnvironment';
 import { studyLangOfText } from '../shared/studyLang';
 import { compactLevelBadge, resolvePageLevelLang } from '../shared/pageLevelDetect';
 import { handleExtensionUiOpen } from './extensionBridgeUi';
+import { installCompanionMining } from './companionMine';
+import { revealShortcut } from './shortcutReveal';
 import { appendNotebookEvent } from './notebookTimeline';
 import { appendTranslationHistory } from './translationHistory';
 import { scoreTextComprehensibility, knownPercent } from './comprehensibility';
@@ -372,6 +374,22 @@ export default function App() {
         });
       })();
     });
+  }, []);
+
+  // Desktop companion (main/companion.ts): cards drafted over other apps are
+  // mined here, where the deck lives; main re-sends anything that arrived while
+  // this window was closed or loading. Mini View and "Companion shortcuts…"
+  // from the tray land here too.
+  useEffect(() => installCompanionMining(), []);
+  useEffect(() => {
+    const offRun = window.api.onCompanionRunInRenderer?.((command) => {
+      if (command === 'miniView.toggle') setMiniModeEnabled(!isMiniMode());
+    });
+    const offShortcuts = window.api.onCompanionOpenShortcuts?.(() => revealShortcut({ category: 'Companion' }));
+    return () => {
+      offRun?.();
+      offShortcuts?.();
+    };
   }, []);
 
   // Pending-Anki queue: drains when Anki's link comes up; also reports a deck

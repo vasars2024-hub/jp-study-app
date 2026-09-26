@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LensReaderPanel from './LensReaderPanel';
+import { pickLensWordAt } from './lensWordAt';
 import LensAnalysisPanel from './LensAnalysisPanel';
 import LensClipboardPassage from './LensClipboardPassage';
 import LensReadPanel from './LensReadPanel';
@@ -244,6 +245,13 @@ export default function ReadingLensOverlay() {
   const [dock, setDockState] = useState<LensDockPreference>(loadDock);
   /** The sentence the AI panel is currently explaining; null when it is closed. */
   const [analysisText, setAnalysisText] = useState<string | null>(null);
+  /** The app the lens was opened over, for a mined card's source (from main's init). */
+  const sourceRef = useRef<{ title?: string; app?: string }>({});
+  /**
+   * `cursor` opens ("look up the word under the cursor"): the pointer, relative
+   * to the region, whose word opens by itself once the read lands.
+   */
+  const cursorPointRef = useRef<{ x: number; y: number } | null>(null);
   const [editMode, setEditMode] = useState(false);
   /** The Read depth — the passage sheet, opened from the chrome, not automatic. */
   const [readOpen, setReadOpen] = useState(false);
@@ -378,10 +386,18 @@ export default function ReadingLensOverlay() {
     // instead of reaching `lens:ocr` as a string no engine answers to.
     defaultEngineRef.current = normalizeReadingLensEngine(init.defaultEngine);
     interactiveRef.current = true; // main re-enabled the mouse on open
+    sourceRef.current = { title: init.sourceTitle, app: init.sourceApp };
+    cursorPointRef.current = init.mode === 'cursor' && init.region && init.point ? init.point : null;
     if (init.mode === 'clipboard') {
       const capture = normalizeReadingLensCapture(init.capture);
       if (!capture) {
-        setState({ kind: 'error', region: null, message: t('lens.clipboard.empty'), canRetry: false });
+        setState({
+          kind: 'error',
+          region: null,
+          // A copied picture that OCR could not read is not an empty clipboard.
+          message: init.clipboardImageFailed ? t('lens.clipboard.imageFailed') : t('lens.clipboard.empty'),
+          canRetry: false,
+        });
         return;
       }
       void window.api.lensHistoryRecord(capture).catch(() => undefined);
@@ -399,10 +415,11 @@ export default function ReadingLensOverlay() {
         region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
         engine: defaultEngineRef.current,
       });
-    } else if (init.mode === 'repeat' && init.region) {
+    } else if ((init.mode === 'repeat' || init.mode === 'cursor') && init.region) {
       // Main only sends `repeat` when it has a region on a display that still
       // exists and still contains it, so there is no fallback to invent here —
       // an unreplayable repeat arrives as `select` and lands in the branch below.
+      // `cursor` is the small box main centred on the pointer.
       setState({ kind: 'scanning', region: init.region, engine: defaultEngineRef.current });
     } else {
       setState({ kind: 'selecting' });
@@ -540,6 +557,19 @@ export default function ReadingLensOverlay() {
               screenshotDataUrl: capture.screenshotDataUrl,
               alternate,
             });
+            // "Look up the word under the cursor": open the word the pointer was on.
+            const point = cursorPointRef.current;
+            cursorPointRef.current = null;
+            const hit = point ? pickLensWordAt(lines, point) : null;
+            if (point && hit) {
+              setPopup({
+                query: hit.token.surface,
+                context: hit.line.text,
+                tokens: hit.line.tokens,
+                x: region.x + point.x,
+                y: region.y + point.y,
+              });
+            }
           }
         })
         .catch(() => {
@@ -1372,6 +1402,11 @@ export default function ReadingLensOverlay() {
           query={popup.query}
           context={popup.context}
           tokens={popup.tokens}
+          screenshotDataUrl={
+            state.kind === 'reading' ? state.screenshotDataUrl : state.kind === 'passage' ? state.capture.screenshotDataUrl : undefined
+          }
+          sourceTitle={sourceRef.current.title}
+          sourceApp={sourceRef.current.app}
           x={popup.x}
           y={popup.y}
           onClose={() => setPopup(null)}

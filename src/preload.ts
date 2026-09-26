@@ -3176,6 +3176,66 @@ const api = {
     return () => ipcRenderer.removeListener('sysdict:settings-changed', handler);
   },
 
+  /** Presentation hints for the query just pushed (translate mode, source window). */
+  sysDictGetContext: (): Promise<{ mode: 'auto' | 'translate'; sourceTitle?: string; sourceApp?: string }> =>
+    ipcRenderer.invoke('sysdict:getContext'),
+
+  // Desktop companion (main/companion.ts): radial wheel, card preview, notices,
+  // and the main window's side of a forwarded mine.
+  companionGetWheel: (): Promise<import('./shared/companion').CompanionWheelInit | null> => ipcRenderer.invoke('companion:getWheel'),
+  onCompanionWheel: (cb: (init: import('./shared/companion').CompanionWheelInit | null) => void): (() => void) => {
+    const handler = (_e: unknown, init: import('./shared/companion').CompanionWheelInit | null): void => cb(init);
+    ipcRenderer.on('companion:wheel', handler);
+    return () => ipcRenderer.removeListener('companion:wheel', handler);
+  },
+  companionWheelRun: (id: import('./shared/companion').CompanionWheelActionId): Promise<boolean> =>
+    ipcRenderer.invoke('companion:wheelRun', id),
+  companionWheelClose: (): Promise<void> => ipcRenderer.invoke('companion:wheelClose'),
+  companionGetPreview: (): Promise<import('./shared/companion').CompanionDraft | null> => ipcRenderer.invoke('companion:getPreview'),
+  onCompanionPreview: (cb: (draft: import('./shared/companion').CompanionDraft | null) => void): (() => void) => {
+    const handler = (_e: unknown, draft: import('./shared/companion').CompanionDraft | null): void => cb(draft);
+    ipcRenderer.on('companion:preview', handler);
+    return () => ipcRenderer.removeListener('companion:preview', handler);
+  },
+  companionOpenPreview: (draft: Partial<import('./shared/companion').CompanionDraft>): Promise<boolean> =>
+    ipcRenderer.invoke('companion:openPreview', draft),
+  companionPreviewClose: (): Promise<void> => ipcRenderer.invoke('companion:previewClose'),
+  companionMine: (request: import('./shared/companion').CompanionMineRequest): Promise<import('./shared/companion').CompanionMineOutcome> =>
+    ipcRenderer.invoke('companion:mine', request),
+  companionGetNotice: (): Promise<{ messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null> =>
+    ipcRenderer.invoke('companion:getNotice'),
+  onCompanionNotice: (
+    cb: (notice: { messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      notice: { messageKey: string; vars?: Record<string, string | number>; tone?: 'ok' | 'muted' | 'warn' } | null,
+    ): void => cb(notice);
+    ipcRenderer.on('companion:notice', handler);
+    return () => ipcRenderer.removeListener('companion:notice', handler);
+  },
+  /** Main window: listening for forwarded mines; main re-sends anything unanswered. */
+  companionReady: (): Promise<void> => ipcRenderer.invoke('companion:ready'),
+  onCompanionMine: (
+    cb: (payload: { requestId: string; request: import('./shared/companion').CompanionMineRequest }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { requestId: string; request: import('./shared/companion').CompanionMineRequest }): void => cb(payload);
+    ipcRenderer.on('companion:mine', handler);
+    return () => ipcRenderer.removeListener('companion:mine', handler);
+  },
+  companionMineResult: (requestId: string, outcome: import('./shared/companion').CompanionMineOutcome): Promise<void> =>
+    ipcRenderer.invoke('companion:mineResult', requestId, outcome),
+  onCompanionRunInRenderer: (cb: (command: string) => void): (() => void) => {
+    const handler = (_e: unknown, command: string): void => cb(command);
+    ipcRenderer.on('companion:runInRenderer', handler);
+    return () => ipcRenderer.removeListener('companion:runInRenderer', handler);
+  },
+  onCompanionOpenShortcuts: (cb: (category: string) => void): (() => void) => {
+    const handler = (_e: unknown, category: string): void => cb(category);
+    ipcRenderer.on('companion:openShortcuts', handler);
+    return () => ipcRenderer.removeListener('companion:openShortcuts', handler);
+  },
+
   // Reading Lens — OS-wide screen-region OCR reader (global hotkey + overlay).
   lensGetSettings: (): Promise<ReadingLensStatus> => ipcRenderer.invoke('lens:getSettings'),
   lensSetEnabled: (enabled: boolean): Promise<ReadingLensStatus> =>

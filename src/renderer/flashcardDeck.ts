@@ -18,7 +18,9 @@ export type FlashcardSource =
   /** Reading Lens reader panel glance. */
   | 'reader'
   /** Lexicon workbench harvest row. */
-  | 'lexicon';
+  | 'lexicon'
+  /** Desktop companion: drafted over another Windows app (card preview, wheel, mine-last). */
+  | 'companion';
 
 /**
  * Where a card's Japanese TEXT came from, which is a different question from

@@ -3773,7 +3773,8 @@ export const zh: Catalog = {
   'lens.select.hint': '拖动框选日语文本',
   'lens.select.sub': '按 A 读取整个屏幕 · 按 Esc 取消',
   'lens.select.clipboard': '读取剪贴板',
-  'lens.clipboard.empty': '剪贴板中没有可读取的文本。',
+  'lens.clipboard.empty': '剪贴板中没有可读取的文本或图片。',
+  'lens.clipboard.imageFailed': '无法读取复制的图片。请确认已安装你学习语言的 OCR 模型。',
   'lens.scanning': '读取中…',
   'lens.empty.title': '这里没有找到日语',
   'lens.empty.hint': '请缩小框选范围，或切换到漫画模式。',
@@ -3842,6 +3843,7 @@ export const zh: Catalog = {
   'lens.reader.mineSaved': '已存入卡组',
   'lens.reader.mineQueued': '已保存 — 稍后加入 Anki',
   'lens.reader.mineRetry': '重试采集',
+  'lens.reader.preview': '卡片预览…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': '扫描后的操作',

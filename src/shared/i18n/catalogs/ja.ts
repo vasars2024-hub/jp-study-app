@@ -3790,7 +3790,8 @@ export const ja: Catalog = {
   'lens.select.hint': '日本語をドラッグして囲む',
   'lens.select.sub': 'A キーで画面全体を読み取り · Esc でキャンセル',
   'lens.select.clipboard': 'クリップボードを読む',
-  'lens.clipboard.empty': 'クリップボードに読み取れるテキストがありません。',
+  'lens.clipboard.empty': 'クリップボードに読み取れるテキストや画像がありません。',
+  'lens.clipboard.imageFailed': 'コピーした画像を読み取れませんでした。学習言語の OCR モデルがインストールされているか確認してください。',
   'lens.scanning': '読み取り中…',
   'lens.empty.title': 'ここに日本語が見つかりません',
   'lens.empty.hint': '範囲を狭めるか、マンガモードに切り替えてください。',
@@ -3859,6 +3860,7 @@ export const ja: Catalog = {
   'lens.reader.mineSaved': 'デッキに保存済み',
   'lens.reader.mineQueued': '保存済み — 後で Anki へ',
   'lens.reader.mineRetry': '再試行',
+  'lens.reader.preview': 'カードプレビュー…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': 'スキャン後の動作',

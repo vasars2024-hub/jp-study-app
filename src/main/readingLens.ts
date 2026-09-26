@@ -339,6 +339,8 @@ interface LensOpenExtras {
   /** A clipboard capture prepared off the open path (an OCR'd clipboard picture). */
   capture?: ReadingLensCapture | null;
   clipboardImageFailed?: boolean;
+  /** `cursor`: read around this screen point instead of the pointer (the wheel's centre). */
+  at?: { x: number; y: number };
 }
 
 function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): void {
@@ -365,7 +367,7 @@ function openLens(requestedMode: LensOpenMode, extras: LensOpenExtras = {}): voi
       }
     }
   }
-  const cursor = mode === 'cursor' ? cursorRegion(screen.getCursorScreenPoint(), bounds) : null;
+  const cursor = mode === 'cursor' ? cursorRegion(extras.at ?? screen.getCursorScreenPoint(), bounds) : null;
   pendingInit = {
     bounds,
     mode,
@@ -456,9 +458,13 @@ function closeLens(): void {
 // ---- Activation ---------------------------------------------------------
 
 /** Open from a hotkey: note the app in front first, so a mined card can name it. */
-async function openFromHotkey(mode: LensOpenMode, source?: ForegroundInfo | null): Promise<void> {
+async function openFromHotkey(
+  mode: LensOpenMode,
+  source?: ForegroundInfo | null,
+  at?: { x: number; y: number },
+): Promise<void> {
   const from = source === undefined ? await quickForegroundInfo() : source;
-  openLens(mode, { source: from });
+  openLens(mode, { source: from, ...(at ? { at } : {}) });
 }
 
 function trigger(source?: ForegroundInfo | null): Promise<void> {
@@ -506,10 +512,15 @@ async function openClipboard(source?: ForegroundInfo | null): Promise<void> {
 }
 
 /** Everything a companion surface can ask the Lens to do. */
-export function openReadingLens(mode: LensOpenMode, source?: ForegroundInfo | null): Promise<void> {
+export function openReadingLens(
+  mode: LensOpenMode,
+  source?: ForegroundInfo | null,
+  at?: { x: number; y: number },
+): Promise<void> {
+  if (!settings.enabled) return Promise.resolve();
   if (mode === 'clipboard') return openClipboard(source);
   if (mode === 'select') return trigger(source);
-  return openFromHotkey(mode, source);
+  return openFromHotkey(mode, source, at);
 }
 
 // ---- Global commands ----------------------------------------------------

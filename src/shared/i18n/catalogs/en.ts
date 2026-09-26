@@ -3698,7 +3698,8 @@ export const en: Catalog = {
   'lens.select.hint': 'Drag over Japanese text',
   'lens.select.sub': 'or press A to read this screen · Esc to cancel',
   'lens.select.clipboard': 'Read clipboard',
-  'lens.clipboard.empty': 'The clipboard has no text to read.',
+  'lens.clipboard.empty': 'The clipboard has no text or picture to read.',
+  'lens.clipboard.imageFailed': 'The copied picture could not be read. Check that the OCR models for your study language are installed.',
   'lens.scanning': 'Reading…',
   'lens.empty.title': 'No Japanese found here',
   'lens.empty.hint': 'Try a tighter region, or switch to Manga mode.',
@@ -3772,6 +3773,7 @@ export const en: Catalog = {
   'lens.reader.mineSaved': 'Saved to deck',
   'lens.reader.mineQueued': 'Saved — Anki later',
   'lens.reader.mineRetry': 'Retry mine',
+  'lens.reader.preview': 'Card preview…',
 
   // Reading Lens — AI OCR / Dictionary AI mode
   'lens.mode.label': 'What a scan opens',
