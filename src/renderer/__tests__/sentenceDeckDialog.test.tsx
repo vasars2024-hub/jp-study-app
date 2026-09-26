@@ -202,6 +202,21 @@ describe('SentenceDeckDialog', () => {
     expect(document.body.textContent).toContain('Transcription queued');
   });
 
+  it('says the Whisper model downloads first, with its size, only when it is not here yet', async () => {
+    sources = { ok: true, videoPath: VIDEO, title: 'x', tracks: [] };
+    await open();
+    expect(q('[data-sd-model-download]').textContent).toMatch(/downloads first.*\d+(\.\d)? MB/);
+    await act(async () => { root.unmount(); });
+    host.remove();
+    // The study language's default tier, downloaded for the backend in use.
+    const { loadWhisperModelTier } = await import('../whisperSettings');
+    const { markTierDownloaded } = await import('../whisperModelCache');
+    markTierDownloaded(loadWhisperModelTier('ja'), 'wasm', 'cpu');
+    localStorage.setItem('jp-study-whisper-device', 'cpu');
+    await open();
+    expect(document.querySelector('[data-sd-model-download]')).toBeNull();
+  });
+
   it('says why when there is no video to cut', async () => {
     sources = { ok: false, reasonKey: 'sentenceDeck.error.noVideoForSubtitle', tracks: [] };
     await open({ subtitlePath: 'E:/x/Lonely.ja.srt' });

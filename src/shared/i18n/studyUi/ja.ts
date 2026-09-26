@@ -155,6 +155,7 @@ export const STUDY_UI_JA: Catalog = {
   'sentenceDeck.undone.anki': 'Anki に送信済みのカードは Anki に残ります。',
   'sentenceDeck.noText.body': 'この動画にはまだ字幕も文字起こしもありません。',
   'sentenceDeck.noText.hint': 'Whisper でこのパソコン上で{language}の文字起こしができます。完了したら、もう一度開いてください。',
+  'sentenceDeck.noText.modelDownload': '最初に一度だけ Whisper のモデル（{size}）をダウンロードします。',
   'sentenceDeck.noText.transcribe': 'Whisper で文字起こし',
   'sentenceDeck.noText.transcribeQueued': '文字起こしを予約しました。進行状況はメディアライブラリに表示されます。',
   'sentenceDeck.noText.transcribeFailed': 'この動画の文字起こしを予約できませんでした。',

@@ -218,6 +218,7 @@ export const STUDY_UI_RU: Catalog = {
   'sentenceDeck.undone.anki': 'Карточки, уже отправленные в Anki, остаются в Anki.',
   'sentenceDeck.noText.body': 'У этого видео пока нет ни субтитров, ни расшифровки.',
   'sentenceDeck.noText.hint': 'Whisper может расшифровать его ({language}) прямо на этом компьютере. Откройте это окно снова, когда расшифровка будет готова.',
+  'sentenceDeck.noText.modelDownload': 'Сначала один раз загрузится модель Whisper ({size}).',
   'sentenceDeck.noText.transcribe': 'Расшифровать с Whisper',
   'sentenceDeck.noText.transcribeQueued': 'Расшифровка поставлена в очередь. Ход работы виден в медиатеке.',
   'sentenceDeck.noText.transcribeFailed': 'Не удалось поставить расшифровку этого видео в очередь.',

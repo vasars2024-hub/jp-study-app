@@ -155,6 +155,7 @@ export const STUDY_UI_ZH: Catalog = {
   'sentenceDeck.undone.anki': '已发送到 Anki 的卡片会保留在 Anki 中。',
   'sentenceDeck.noText.body': '此视频还没有字幕或转写文本。',
   'sentenceDeck.noText.hint': 'Whisper 可以在本机把它转写为{language}。转写完成后请再次打开。',
+  'sentenceDeck.noText.modelDownload': '首次使用时会先下载一次 Whisper 模型（{size}）。',
   'sentenceDeck.noText.transcribe': '用 Whisper 转写',
   'sentenceDeck.noText.transcribeQueued': '已加入转写队列，进度显示在媒体库中。',
   'sentenceDeck.noText.transcribeFailed': '无法为此视频加入转写队列。',

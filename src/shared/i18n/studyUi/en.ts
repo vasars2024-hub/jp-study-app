@@ -176,6 +176,7 @@ export const STUDY_UI_EN: Catalog = {
   'sentenceDeck.undone.anki': 'Cards already sent to Anki stay in Anki.',
   'sentenceDeck.noText.body': 'This video has no subtitles or transcript yet.',
   'sentenceDeck.noText.hint': 'Whisper can transcribe it in {language} on this computer. Open this again when the transcript is ready.',
+  'sentenceDeck.noText.modelDownload': 'The Whisper model downloads first, once ({size}).',
   'sentenceDeck.noText.transcribe': 'Transcribe with Whisper',
   'sentenceDeck.noText.transcribeQueued': 'Transcription queued. Its progress shows in the media library.',
   'sentenceDeck.noText.transcribeFailed': 'Could not queue a transcription for this video.',
