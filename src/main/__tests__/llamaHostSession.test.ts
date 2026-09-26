@@ -310,7 +310,7 @@ describe('llamaHost — a host that stops answering or dies', () => {
     await expect(session.prompt('x', { maxTokens: 8 })).rejects.toMatchObject({ name: 'LlamaSessionLostError' });
 
     // A fresh acquire forks a new child; the dead session's id was never posted to it.
-    const next = host.acquireLlamaSession('C:\models\qwen.gguf', 8192);
+    const next = host.acquireLlamaSession('C:\\models\\qwen.gguf', 8192);
     await Promise.resolve();
     const replacement = child(1);
     const request = lastRequest(replacement, 'acquire');
