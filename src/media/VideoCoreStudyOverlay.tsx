@@ -2659,6 +2659,8 @@ export default function VideoCoreStudyOverlay({
   const makeSentenceDeck = React.useCallback((): void => {
     if (!sentenceDeckPath) return;
     video?.pause();
+    // The dialog mounts on the page, which a fullscreen player element would cover.
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     const shift = (cue: VideoCoreActiveCue) => ({
       startMs: Math.max(0, Math.round(cue.startMs + subtitleDelaySec * 1000)),
       endMs: Math.max(0, Math.round(cue.endMs + subtitleDelaySec * 1000)),
