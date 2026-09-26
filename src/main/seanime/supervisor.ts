@@ -143,6 +143,7 @@ function emptyStatus(kind: SeanimeStatus['kind']): SeanimeStatus {
     version: null,
     simulatedUser: null,
     error: null,
+    errorCode: null,
     logTail: [],
   };
 }
@@ -256,7 +257,7 @@ function installExitHook(): void {
 export async function startSeanime(): Promise<SeanimeStatus> {
   if (!SEANIME_SIDECAR_ENABLED) {
     // The flag is on by default now, so the only way to be here is an explicit opt-out.
-    setStatus({ ...emptyStatus('disabled'), error: 'SEANIME_SIDECAR=0 disables the sidecar' });
+    setStatus({ ...emptyStatus('disabled'), error: 'SEANIME_SIDECAR=0 disables the sidecar', errorCode: 'disabled' });
     return status;
   }
   if (child && child.exitCode === null) return status;
@@ -264,7 +265,7 @@ export async function startSeanime(): Promise<SeanimeStatus> {
   const exe = currentExe();
   if (!exe.exists) {
     logTail = [];
-    setStatus({ ...emptyStatus('failed'), error: seanimeExeMissingMessage(exe) });
+    setStatus({ ...emptyStatus('failed'), error: seanimeExeMissingMessage(exe), errorCode: 'missing-exe' });
     return status;
   }
 
@@ -293,7 +294,7 @@ export async function startSeanime(): Promise<SeanimeStatus> {
   try {
     port = await reservePort();
   } catch (err) {
-    setStatus({ ...emptyStatus('failed'), error: `could not reserve a port: ${String(err)}` });
+    setStatus({ ...emptyStatus('failed'), error: `could not reserve a port: ${String(err)}`, errorCode: 'port' });
     return status;
   }
 
@@ -323,7 +324,7 @@ export async function startSeanime(): Promise<SeanimeStatus> {
     child = null;
     keepalive.stop();
     pushLog(`spawn error: ${err.message}`);
-    setStatus({ kind: 'failed', pid: null, error: `could not start the sidecar: ${err.message}` });
+    setStatus({ kind: 'failed', pid: null, error: `could not start the sidecar: ${err.message}`, errorCode: 'spawn-failed' });
   });
   child.on('exit', (code) => {
     child = null;
@@ -336,6 +337,7 @@ export async function startSeanime(): Promise<SeanimeStatus> {
         kind: 'offline',
         pid: null,
         error: `sidecar exited with code ${code ?? 'null'}`,
+        errorCode: 'crashed',
       });
     }
   });
@@ -347,12 +349,17 @@ export async function startSeanime(): Promise<SeanimeStatus> {
     // Before the status goes out, so the log line it writes rides the same update and
     // the dev panel shows the client being held rather than reporting it a poll later.
     keepalive.start({ baseUrl: `http://127.0.0.1:${port}`, token });
-    setStatus({ kind: 'ready', error: null });
-  } else {
+    setStatus({ kind: 'ready', error: null, errorCode: null });
+  } else if (status.kind === 'starting') {
+    // Only a start still in progress timed out; a spawn error or an early exit
+    // has already said what happened and must not be reworded as "unhealthy".
     setStatus({
       kind: 'failed',
       error: `sidecar did not become healthy within ${HEALTH_TIMEOUT_MS / 1000}s`,
+      errorCode: 'unhealthy',
     });
+    stopSeanime();
+  } else {
     stopSeanime();
   }
   return status;
