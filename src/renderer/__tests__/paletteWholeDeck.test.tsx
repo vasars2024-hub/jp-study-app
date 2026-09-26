@@ -68,4 +68,19 @@ describe('the palette and the deck', () => {
     const labels = [...document.querySelectorAll('.palette-row .palette-label')].map((el) => el.textContent);
     expect(labels).toContain('麒麟児');
   });
+
+  it('blurs its search box before it unmounts, so the closed palette is not retained', async () => {
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+    });
+    const input = document.querySelector<HTMLInputElement>('.palette-input');
+    input?.focus();
+    const blurred = { value: false };
+    input?.addEventListener('blur', () => { blurred.value = true; });
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(document.querySelector('.palette-input')).toBeNull();
+    expect(blurred.value).toBe(true);
+  });
 });

@@ -181,7 +181,7 @@ export default function CommandPalette() {
    */
   useModalKeyboard({
     panelRef,
-    onEscape: () => setOpen(false),
+    onEscape: () => close(),
     enabled: open,
     initialFocusRef: inputRef,
   });
@@ -272,7 +272,14 @@ export default function CommandPalette() {
     };
   }, [open, mode, settingsRows.length]);
 
-  const close = useCallback(() => setOpen(false), []);
+  // Blur first: unmounting with the search box focused leaves that detached
+  // input as React's tracked active element, and through its fiber the closed
+  // palette's state — every flashcard row included — until focus moves.
+  const close = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur();
+    setOpen(false);
+  }, []);
 
   const items = useMemo<Item[]>(() => {
     if (!open) return [];
