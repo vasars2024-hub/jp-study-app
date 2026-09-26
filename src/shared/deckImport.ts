@@ -56,7 +56,54 @@ const HEADER_HINTS: Array<[RegExp, DeckFieldKey]> = [
   [/^rear$/i, 'back'],
 ];
 
-export function guessColumnMapping(headers: string[]): DeckColumnMapping {
+/** A column of kana, pinyin (tone marks or digits) or a stress-marked word: a reading. */
+function looksLikeReadingColumn(values: string[]): boolean {
+  const cells = values.map((v) => v.trim()).filter(Boolean);
+  if (!cells.length) return false;
+  const reading = cells.filter(
+    (v) =>
+      /^[\p{Script=Hiragana}\p{Script=Katakana}ー・ 　]+$/u.test(v) ||
+      /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/i.test(v) ||
+      /^([a-zü]+[1-5] ?)+$/i.test(v) ||
+      /́/.test(v.normalize('NFD')),
+  ).length;
+  return reading / cells.length >= 0.6;
+}
+
+/**
+ * Columns by header name, then by position for the rest. `rows` (optional) lets
+ * a headerless table be read by content: a pasted "猫<TAB>cat" list used to map
+ * its second column to `reading` by position, so every card came out with
+ * "cat" as its reading and no meaning at all.
+ */
+export function guessColumnMapping(headers: string[], rows?: readonly (readonly string[])[]): DeckColumnMapping {
+  if (rows && rows.length) {
+    // Only when no header names a field: named headers always win over content.
+    const named = headers.some((h) => HEADER_HINTS.some(([re]) => re.test(h.trim())));
+    if (!named) {
+      const mapping: DeckColumnMapping = { 0: 'word' };
+      let reading = false;
+      let meaning = false;
+      for (let i = 1; i < headers.length; i++) {
+        const column = rows.map((row) => row[i] ?? '');
+        if (!reading && looksLikeReadingColumn(column)) {
+          mapping[i] = 'reading';
+          reading = true;
+        } else if (!meaning) {
+          mapping[i] = 'meaning';
+          meaning = true;
+        } else if (!reading) {
+          mapping[i] = 'reading';
+          reading = true;
+        } else mapping[i] = 'skip';
+      }
+      return mapping;
+    }
+  }
+  return guessColumnMappingByHeader(headers);
+}
+
+function guessColumnMappingByHeader(headers: string[]): DeckColumnMapping {
   const mapping: DeckColumnMapping = {};
   const used = new Set<DeckFieldKey>();
   headers.forEach((header, index) => {
