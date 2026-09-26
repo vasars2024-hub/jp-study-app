@@ -22,6 +22,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { confirmDialog } from '../ui';
+import { Button } from '../ui/Button';
 import {
   clearAgentSpend,
   loadAgentSpend,
@@ -238,14 +239,19 @@ export function AgentSpendPanel({ disabled = false }: { disabled?: boolean }): R
 
           <p className="agent-budget-note">{t('agent.spend.limitNote')}</p>
 
-          <button
-            type="button"
-            className="agent-action agent-action-danger"
+          {/* The design-system button, not `.agent-action`: this panel also renders in
+              Settings > AI and in Blanc, where agent.css (and the `--agent-*` vars it
+              scopes to `.agent-shell`) is not loaded, and there it was Chromium's grey
+              slab (round-3 sweep, every configuration). */}
+          <Button
+            size="sm"
+            variant="danger"
+            className="agent-spend-clear"
             onClick={() => void eraseRecord()}
             disabled={blocked || (totals?.requests ?? 0) + (totals?.unpricedRequests ?? 0) === 0}
           >
             {t('agent.spend.clear')}
-          </button>
+          </Button>
         </>
       )}
     </div>

@@ -159,6 +159,17 @@ describe('AgentSpendPanel', () => {
     expect(button.disabled).toBe(true);
   });
 
+  it('draws the erase control as a design-system button, which needs no agent.css', async () => {
+    // Settings > AI renders this panel without the Agent window's stylesheet; a class that
+    // only agent.css defines was Chromium's grey slab there (round-3 sweep).
+    installBridge(snapshot(10, [row({ spentUsd: 1, requests: 1, unpricedRequests: 0 })]));
+    await mount();
+    const button = host.querySelector('button') as HTMLButtonElement;
+    expect(button.classList.contains('ui-btn')).toBe(true);
+    expect(button.classList.contains('ui-btn--danger')).toBe(true);
+    expect(button.className).not.toMatch(/\bagent-action\b/);
+  });
+
   it('asks before erasing, and the question states the ceiling is untouched', async () => {
     installBridge(snapshot(10, [row({ spentUsd: 2.5, requests: 4, unpricedRequests: 1 })]));
     await mount();
