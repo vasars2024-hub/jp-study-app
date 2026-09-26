@@ -25,6 +25,7 @@ import { SHELL_UI_ZH } from '../shellUi/zh';
 import { COMMANDS_UI_ZH } from '../commandsUi/zh';
 import { MUSIC_UI_ZH } from '../musicUi/zh';
 import { RESOURCES_CATALOG_ZH } from '../resourcesCatalog/zh';
+import { RESOURCE_BUNDLES_ZH } from '../resourceBundles/zh';
 import { WIDGETS_UI_ZH } from '../widgetsUi/zh';
 import { BLANC_UI_ZH } from '../blancUi/zh';
 import { READER_UI_ZH } from '../readerUi/zh';
@@ -697,6 +698,7 @@ export const zh: Catalog = {
   ...COMMANDS_UI_ZH,
   ...MUSIC_UI_ZH,
   ...RESOURCES_CATALOG_ZH,
+  ...RESOURCE_BUNDLES_ZH,
   ...WIDGETS_UI_ZH,
   ...BLANC_UI_ZH,
   ...READER_UI_ZH,

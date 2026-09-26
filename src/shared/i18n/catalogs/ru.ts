@@ -25,6 +25,7 @@ import { SHELL_UI_RU } from '../shellUi/ru';
 import { COMMANDS_UI_RU } from '../commandsUi/ru';
 import { MUSIC_UI_RU } from '../musicUi/ru';
 import { RESOURCES_CATALOG_RU } from '../resourcesCatalog/ru';
+import { RESOURCE_BUNDLES_RU } from '../resourceBundles/ru';
 import { WIDGETS_UI_RU } from '../widgetsUi/ru';
 import { BLANC_UI_RU } from '../blancUi/ru';
 import { READER_UI_RU } from '../readerUi/ru';
@@ -822,6 +823,7 @@ export const ru: Catalog = {
   ...COMMANDS_UI_RU,
   ...MUSIC_UI_RU,
   ...RESOURCES_CATALOG_RU,
+  ...RESOURCE_BUNDLES_RU,
   ...WIDGETS_UI_RU,
   ...BLANC_UI_RU,
   ...READER_UI_RU,

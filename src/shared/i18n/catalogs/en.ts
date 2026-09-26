@@ -25,6 +25,7 @@ import { SHELL_UI_EN } from '../shellUi/en';
 import { COMMANDS_UI_EN } from '../commandsUi/en';
 import { MUSIC_UI_EN } from '../musicUi/en';
 import { RESOURCES_CATALOG_EN } from '../resourcesCatalog/en';
+import { RESOURCE_BUNDLES_EN } from '../resourceBundles/en';
 import { WIDGETS_UI_EN } from '../widgetsUi/en';
 import { BLANC_UI_EN } from '../blancUi/en';
 import { READER_UI_EN } from '../readerUi/en';
@@ -800,6 +801,7 @@ export const en: Catalog = {
   ...COMMANDS_UI_EN,
   ...MUSIC_UI_EN,
   ...RESOURCES_CATALOG_EN,
+  ...RESOURCE_BUNDLES_EN,
   ...WIDGETS_UI_EN,
   ...BLANC_UI_EN,
   ...READER_UI_EN,
