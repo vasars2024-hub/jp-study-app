@@ -5660,7 +5660,7 @@ export const en: Catalog = {
   'resources.heatmap.unconfigured': 'Community map backend isn’t connected yet. Your country still appears here after you opt in.',
 
   // Statistics view
-  'stats.intro': 'Your reading time and characters read, tracked locally as you read in the app.',
+  'stats.intro': 'Reading and watching time, characters read and your daily goal, kept on this computer.',
   'stats.reset': 'Reset',
   'stats.resetTitle': 'Reset statistics',
   'stats.resetConfirm': 'Reset all study statistics? This cannot be undone.',

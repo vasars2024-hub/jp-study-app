@@ -5612,7 +5612,7 @@ export const zh: Catalog = {
   'resources.heatmap.unconfigured': '社区地图后端尚未连接。选择加入后，你的国家仍会显示在这里。',
 
   // Statistics view
-  'stats.intro': '你在应用内阅读的时间和字数，全部保存在本地。',
+  'stats.intro': '阅读与观看时间、阅读字数和每日目标，都记录在这台电脑上。',
   'stats.reset': '重置',
   'stats.resetTitle': '重置统计',
   'stats.resetConfirm': '重置所有学习统计？此操作无法撤销。',

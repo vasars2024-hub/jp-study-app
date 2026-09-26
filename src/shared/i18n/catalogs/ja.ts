@@ -5645,7 +5645,7 @@ export const ja: Catalog = {
   'resources.heatmap.unconfigured': 'コミュニティマップのバックエンドはまだ接続されていません。オプトイン後もあなたの国はここに表示されます。',
 
   // Statistics view
-  'stats.intro': 'アプリ内で読んだ時間と文字数を、端末内で記録します。',
+  'stats.intro': '読書と視聴の時間、読んだ文字数、今日の目標を、このパソコン内に記録します。',
   'stats.reset': 'リセット',
   'stats.resetTitle': '統計をリセット',
   'stats.resetConfirm': 'すべての学習統計をリセットしますか？元に戻せません。',
