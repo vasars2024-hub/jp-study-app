@@ -329,6 +329,82 @@
   line-height: 1.5;
 }
 
+/* A sentence-deck card's scene and its way back to the video, under the answer. */
+.flash-view .flash-card-still {
+  display: block;
+  max-width: min(100%, 22rem);
+  max-height: 12rem;
+  margin: 6px auto 0;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+}
+
+.flash-view .flash-play-in-video {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Listen: the deck as a hands-free playlist. The line sits on the window surface
+   in the sentence size; the controls are one row of design-system buttons. */
+.flash-view .flash-listen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 44rem;
+}
+
+.flash-view .flash-listen__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 7.5rem;
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  text-align: center;
+}
+
+.flash-view .flash-listen__sentence {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  line-height: 1.5;
+}
+
+.flash-view .flash-listen__hidden {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flash-view .flash-listen__position {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.flash-view .flash-listen__options > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* "Mix decks": one row of deck toggles across the whole setup grid. */
+.flash-view .flash-review-setup-grid > .flash-mix {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.flash-view .flash-mix > p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
 .flash-view .flash-sentence {
   max-width: 48rem;
   font-size: 1rem;

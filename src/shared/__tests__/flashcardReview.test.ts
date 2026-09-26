@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { audioReviewPoolStatus, planFlashcardReview } from '../flashcardReview';
+import { audioReviewPoolStatus, orderReviewPlan, planFlashcardReview, planListenQueue } from '../flashcardReview';
 
 const zero = () => 0;
 const cards = [
@@ -60,5 +60,57 @@ describe('what audio-only review says it will do', () => {
       usable: plan.length,
       dropped: cards.length - plan.length,
     });
+  });
+});
+
+describe('ordering a sitting ("mix it up")', () => {
+  const decks = [
+    { id: 'a1', reviewGroup: 'ep1', sourceOrder: 3, audioPath: 'a1.mp3' },
+    { id: 'a2', reviewGroup: 'ep1', sourceOrder: 1, audioPath: 'a2.mp3' },
+    { id: 'a3', reviewGroup: 'ep1', sourceOrder: 2, audioPath: 'a3.mp3' },
+    { id: 'b1', reviewGroup: 'ep2', sourceOrder: 2, audioPath: 'b1.mp3' },
+    { id: 'b2', reviewGroup: 'ep2', sourceOrder: 1 },
+    { id: 'c1', reviewGroup: 'book', sourceOrder: 1 },
+  ];
+  let seed = 7;
+  const seeded = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+
+  it('interleaves decks when spreading, whatever the shuffle', () => {
+    for (let run = 0; run < 20; run += 1) {
+      const order = orderReviewPlan(decks, 'spread', seeded);
+      expect(order).toHaveLength(decks.length);
+      // Three ep1 cards among six: never two ep1 cards in a row while another deck has cards.
+      for (let i = 1; i < order.length - 1; i += 1) {
+        if (order[i].reviewGroup === order[i - 1].reviewGroup) {
+          const rest = order.slice(i);
+          expect(rest.every((card) => card.reviewGroup === order[i].reviewGroup)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('keeps each deck together when shuffling within decks', () => {
+    const order = orderReviewPlan(decks, 'by-deck', seeded);
+    const groups = order.map((card) => card.reviewGroup);
+    const runs = groups.filter((group, i) => i === 0 || group !== groups[i - 1]);
+    expect(runs.sort()).toEqual(['book', 'ep1', 'ep2']);
+  });
+
+  it('plays each deck in its own order in source order', () => {
+    const order = orderReviewPlan(decks, 'source', seeded).map((card) => card.id);
+    expect(order).toEqual(['a2', 'a3', 'a1', 'b2', 'b1', 'c1']);
+  });
+
+  it('passes the order through the planner', () => {
+    const plan = planFlashcardReview(decks, { mode: 'text', order: 'source', random: zero });
+    expect(plan.map((card) => card.id)).toEqual(['a2', 'a3', 'a1', 'b2', 'b1', 'c1']);
+  });
+
+  it('builds the listen playlist from the cards that have a clip', () => {
+    const queue = planListenQueue(decks, 'source');
+    expect(queue.map((card) => card.id)).toEqual(['a2', 'a3', 'a1', 'b1']);
   });
 });

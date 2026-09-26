@@ -56,6 +56,7 @@ import {
   deleteDeckFolder,
   filterDeckCards,
   filterDeckByBook,
+  filterDeckByBooks,
   groupDeckByBook,
   loadDeck,
   loadDeckFolders,
@@ -88,9 +89,11 @@ import { previewSchedule } from '../../../shared/flashcardScheduling';
 import { loadSchedulingConfig } from '../../flashcardScheduling';
 import {
   audioReviewPoolStatus,
+  orderReviewPlan,
   planFlashcardReview,
   type FlashcardPromptKind,
   type FlashcardReviewMode,
+  type ReviewOrder,
 } from '../../../shared/flashcardReview';
 import { flashcardAudioErrorKey } from '../../../shared/flashcardAudioMessages';
 import { cardAudio } from '../../cardAudioPlayback';
@@ -102,6 +105,7 @@ import DeckAudioExport from './DeckAudioExport';
 import SchedulingPreferencesPanel from './SchedulingPreferences';
 import AnkiQueueStatus from './AnkiQueueStatus';
 import LearnMode from './LearnMode';
+import ListenMode from './ListenMode';
 import MatchMode from './MatchMode';
 import TestMode from './TestMode';
 import WriteMode from './WriteMode';
@@ -136,6 +140,7 @@ import {
 } from '../../deckLevelEstimate';
 import { takeHandoffJson } from '../../pendingHandoff';
 import { FLASHCARDS_FOCUS_EVENT, onOpenIntent, takeFlashcardsFocus } from '../../openIntents';
+import { openMediaWorkspace, reachMediaWorkspace } from '../../mediaWorkspaceBridge';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
@@ -165,7 +170,19 @@ export interface ReviewCard {
   textProvenance?: DeckFlashcard['textProvenance'];
   /** The card's own study language (absent is Japanese, as stored); drives lang, TTS and pitch. */
   studyLang?: DeckFlashcard['studyLang'];
+  /** A whole sentence as the card's text: set in the sentence size, not the word size. */
+  studyKind?: DeckFlashcard['studyKind'];
+  /** The video the line came from and where in it, for "Play in video". */
+  sourceUrl?: string;
+  cueStartSec?: number;
+  /** A still of the scene (sentence decks), shown with the answer. */
+  imagePath?: string;
+  /** Position in its deck for in-order sittings. */
+  sourceOrder?: number;
 }
+
+/** The review source picker's "several decks at once" choice. */
+export const REVIEW_MIX_KEY = '__mix__';
 
 /** Chip label for a recorded text provenance. Absent means "not recorded". */
 const TEXT_PROVENANCE_KEYS: Record<
@@ -180,13 +197,18 @@ const TEXT_PROVENANCE_KEYS: Record<
 
 const reviewCardKey = (card: { id: string }): string => card.id;
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+/** The scene a sentence card was cut from, read from the managed store on demand. */
+function CardStill({ path }: { path: string }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => {
+    let alive = true;
+    setSrc('');
+    void window.api.flashcardReadAudio(path)
+      .then((read) => { if (alive && read.ok && read.dataUrl) setSrc(read.dataUrl); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [path]);
+  return src ? <img className="flash-card-still" src={src} alt="" /> : null;
 }
 
 /** Small cover-art tile for a book group, shared by every group-header layout. */
@@ -264,6 +286,15 @@ export interface FlashcardsState {
   setReviewDueOnly: (v: boolean) => void;
   reviewMode: FlashcardReviewMode;
   setReviewMode: (v: FlashcardReviewMode) => void;
+  /** How the sitting is ordered: decks interleaved, deck by deck, or in source order. */
+  reviewOrder: ReviewOrder;
+  setReviewOrder: (v: ReviewOrder) => void;
+  /** The decks a "mix" sitting draws from (`reviewBookKey === REVIEW_MIX_KEY`). */
+  reviewMixKeys: string[];
+  toggleReviewMixKey: (key: string) => void;
+  /** Why "Play in video" could not open the player, or ''. */
+  videoNote: string;
+  playCurrentInVideo: () => Promise<void>;
   audioBusy: boolean;
   audioCancelling: boolean;
   audioError: string;
@@ -388,6 +419,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewBookKey, setReviewBookKey] = useState<string>('all');
   const [reviewDueOnly, setReviewDueOnly] = useState(true);
   const [reviewMode, setReviewMode] = useState<FlashcardReviewMode>('mixed');
+  const [reviewOrder, setReviewOrder] = useState<ReviewOrder>('spread');
+  const [reviewMixKeys, setReviewMixKeys] = useState<string[]>([]);
+  const [videoNote, setVideoNote] = useState('');
+  /** When a "Listen now" hand-off asked for a listening sitting to start. */
+  const pendingListenRef = useRef(0);
   const [audioBusy, setAudioBusy] = useState(false);
   const [audioCancelling, setAudioCancelling] = useState(false);
   const [audioError, setAudioError] = useState('');
@@ -480,13 +516,20 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   );
   // Due now, with the profile's new-cards-per-day allowance applied.
   const epubDueCards = useMemo(() => dueDeckCards(epubReviewPool), [epubReviewPool]);
+  // A mix draws from the chosen decks; every other choice is one key.
+  const sessionBookKey = useMemo<string | readonly string[]>(
+    () => (reviewBookKey === REVIEW_MIX_KEY ? reviewMixKeys : reviewBookKey),
+    [reviewBookKey, reviewMixKeys],
+  );
   const epubReviewCandidates = useMemo(() => {
-    const pool = filterDeckByBook(epubReviewPool, reviewBookKey);
+    const pool = typeof sessionBookKey === 'string'
+      ? filterDeckByBook(epubReviewPool, sessionBookKey)
+      : filterDeckByBooks(epubReviewPool, sessionBookKey);
     return reviewDueOnly ? dueDeckCards(pool) : pool;
-  }, [epubReviewPool, reviewBookKey, reviewDueOnly]);
+  }, [epubReviewPool, sessionBookKey, reviewDueOnly]);
   const epubReviewSessionCandidates = useMemo(
-    () => reviewSessionCards(epubReviewPool, reviewBookKey, reviewDueOnly, reviewMode),
-    [epubReviewPool, reviewBookKey, reviewDueOnly, reviewMode],
+    () => reviewSessionCards(epubReviewPool, sessionBookKey, reviewDueOnly, reviewMode),
+    [epubReviewPool, sessionBookKey, reviewDueOnly, reviewMode],
   );
   /**
    * What the source picker labels each option with: the size of the session that
@@ -584,7 +627,16 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       timingFidelity: c.timingFidelity,
       textProvenance: c.textProvenance,
       studyLang: c.studyLang,
-    })), { mode: reviewMode });
+      studyKind: c.studyKind,
+      sourceUrl: c.sourceUrl,
+      cueStartSec: c.sourceRef?.cueStartSec,
+      imagePath: c.imagePath,
+      sourceOrder: c.sourceRef?.cueStartSec ?? c.addedAt / 1000,
+    })), { mode: reviewMode, order: reviewOrder });
+  }
+
+  function toggleReviewMixKey(key: string): void {
+    setReviewMixKeys((prev) => (prev.includes(key) ? prev.filter((entry) => entry !== key) : [...prev, key]));
   }
 
   function markRevealed(id: string): void {
@@ -605,8 +657,14 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     });
   }
 
+  /**
+   * Cards still to learn first, in the order the planner chose — shuffled with
+   * the decks interleaved, deck by deck, or in source order. Reshuffling here
+   * used to throw that order away, so a "mixed" sitting of two episodes could
+   * still play five lines of one in a row.
+   */
   function orderReviewCards(cards: ReviewCard[], initialMastered: Set<string>): ReviewCard[] {
-    const unknown = shuffle(cards.filter((c) => !initialMastered.has(c.id)));
+    const unknown = cards.filter((c) => !initialMastered.has(c.id));
     const known = cards.filter((c) => initialMastered.has(c.id));
     return [...unknown, ...known];
   }
@@ -657,7 +715,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       // The done-state action repeats this sitting's cards even though Good has
       // just moved them beyond the due filter. Starting from candidates here
       // made the button inert as soon as a scheduled session completed.
-      startReviewSession(sessionCards, 'epub');
+      startReviewSession(orderReviewPlan(sessionCards, reviewOrder), 'epub');
       return;
     }
     startReview();
@@ -687,7 +745,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   function shuffleReview(): void {
     if (sessionCards.length < 2) return;
-    const next = orderReviewCards(sessionCards, masteredIds);
+    // Shuffle means shuffle: an in-order sitting reshuffles with the decks interleaved.
+    const next = orderReviewCards(
+      orderReviewPlan(sessionCards, reviewOrder === 'source' ? 'spread' : reviewOrder),
+      masteredIds,
+    );
     setSessionCards(next);
     setReviewIndex(0);
     setFlipped(false);
@@ -853,6 +915,24 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     await cardAudio.play(dataUrl).catch(() => setAudioError(t('flash.audioPlaybackFailed')));
   }
 
+  /** Open the player on the moment this line was said, with a short run-up. */
+  async function playCurrentInVideo(): Promise<void> {
+    const card = sessionCards[reviewIndex];
+    if (!card?.sourceUrl || card.cueStartSec == null) return;
+    cardAudio.stop();
+    const reach = await reachMediaWorkspace();
+    if (reach === 'no-host') {
+      setVideoNote(t('media.study.noWorkspaceHere'));
+      return;
+    }
+    if (reach === 'unavailable') {
+      setVideoNote(t('media.study.playerUnavailable'));
+      return;
+    }
+    setVideoNote('');
+    openMediaWorkspace({ localFilePath: card.sourceUrl, startAtSec: Math.max(0, card.cueStartSec - 0.3) });
+  }
+
   async function addAudioToCurrent(): Promise<void> {
     const card = sessionCards[reviewIndex];
     if (!card || reviewSource !== 'epub' || audioBusy) return;
@@ -983,10 +1063,33 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       setSearch(card ? (card.word || card.front || '').trim() : '');
       setOverviewTab('epub');
       setMode('overview');
+      if (focus.review === 'listening') {
+        // "Listen now" after a sentence deck: the whole folder, audio first.
+        setReviewBookKey('all');
+        setReviewDueOnly(false);
+        setReviewMode('audio');
+        pendingListenRef.current = Date.now();
+      }
     }
     consumeFocus();
     return onOpenIntent(FLASHCARDS_FOCUS_EVENT, consumeFocus);
   }, []);
+
+  // Start that sitting once the pool reflects the folder and mode it asked for.
+  // Bounded in time, so a hand-off whose deck never arrives cannot start a
+  // sitting later out of nowhere.
+  useEffect(() => {
+    const askedAt = pendingListenRef.current;
+    if (!askedAt || mode !== 'overview') return;
+    if (Date.now() - askedAt > 15_000) {
+      pendingListenRef.current = 0;
+      return;
+    }
+    if (reviewMode !== 'audio' || reviewDueOnly || reviewBookKey !== 'all') return;
+    if (!epubReviewSessionCandidates.length) return;
+    pendingListenRef.current = 0;
+    startEpubReview();
+  }, [epubReviewSessionCandidates, mode, reviewMode, reviewDueOnly, reviewBookKey]);
 
   useEffect(() => {
     if (hideAiStudio && mode === 'ai-studio') setMode('overview');
@@ -1214,6 +1317,12 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewDueOnly,
     reviewMode,
     setReviewMode,
+    reviewOrder,
+    setReviewOrder,
+    reviewMixKeys,
+    toggleReviewMixKey,
+    videoNote,
+    playCurrentInVideo,
     audioBusy,
     audioCancelling,
     audioError,
@@ -1419,9 +1528,11 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   const nextHardInterval = nextIntervals ? nextIntervals.hard : null;
   const nextEasyInterval = nextIntervals ? nextIntervals.easy : null;
   const reviewTitle =
-    reviewSource === 'epub' && reviewBookKey !== 'all'
-      ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle
-      : null;
+    reviewSource === 'epub' && reviewBookKey === REVIEW_MIX_KEY
+      ? t('flash.mix.sessionTitle', { count: state.reviewMixKeys.length })
+      : reviewSource === 'epub' && reviewBookKey !== 'all'
+        ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle
+        : null;
 
   return (
     <div className="flash-view review" ref={state.reviewRootRef}>
@@ -1584,7 +1695,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               </span>
             </>
           ) : (
-            <span className="flash-word" lang={cardContentLang(current)}>{current.word}</span>
+            <span
+              className={`flash-word${current.studyKind === 'sentence' ? ' flash-sentence-prompt' : ''}`}
+              lang={cardContentLang(current)}
+            >
+              {current.word}
+            </span>
           )}
           {flipped ? (
             <div className="flash-answer">
@@ -1605,6 +1721,22 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
                 <span className="flash-sentence" lang={cardContentLang(current)}>{current.sentence}</span>
               )}
               <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
+              {current.imagePath && <CardStill path={current.imagePath} />}
+              {current.sourceUrl && current.cueStartSec != null && !/^https?:/i.test(current.sourceUrl) && (
+                <button
+                  type="button"
+                  className="btn small flash-play-in-video"
+                  data-flash-action="play-in-video"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void state.playCurrentInVideo();
+                  }}
+                >
+                  <Icon name="video" size={13} />
+                  {t('flash.playInVideo')}
+                </button>
+              )}
+              {state.videoNote && <span className="flash-audio-error" role="status">{state.videoNote}</span>}
             </div>
           ) : (
             <span className="flash-tap-hint">{t('flash.tapToReveal')}</span>
@@ -1903,6 +2035,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     reviewBookKey,
     reviewDueOnly,
     reviewMode,
+    reviewOrder,
+    reviewMixKeys,
     collapsedBooks,
     creatingFolder,
     newFolderName,
@@ -1927,6 +2061,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   const reviewSourceOptions = useMemo(
     () => [
       <option key="all" value="all">{t('flash.allInFolder', { count: reviewSourceCount('all') })}</option>,
+      <option key={REVIEW_MIX_KEY} value={REVIEW_MIX_KEY}>{t('flash.mix.option')}</option>,
       ...epubReviewBooks.map((group) => {
         const key = `${group.bookId}::${group.bookTitle}`;
         return (
@@ -2082,6 +2217,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       {practice === 'write' && <WriteMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {practice === 'learn' && <LearnMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {practice === 'test' && <TestMode deck={practiceDeck} onExit={() => setPractice('none')} />}
+      {practice === 'listen' && <ListenMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {/*
         The practice launcher: four mode tiles on the window surface, not a bordered
         fieldset inside the window's own panel. Every tile has the same shape (icon, name,
@@ -2215,6 +2351,39 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                     rather than the 0 it actually offers.
                   */}
                   {reviewSourceOptions}
+                </Select>
+              </label>
+              {reviewBookKey === REVIEW_MIX_KEY && (
+                <div className="flash-mix" role="group" aria-label={t('flash.mix.label')}>
+                  {/* Every deck, each a toggle: an episode's sentence deck, another
+                      episode's, a book — one shuffled sitting across all of them. */}
+                  {epubReviewBooks.map((group) => {
+                    const key = `${group.bookId}::${group.bookTitle}`;
+                    const on = reviewMixKeys.includes(key);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`lib-folder-chip${on ? ' active' : ''}`}
+                        aria-pressed={on}
+                        onClick={() => state.toggleReviewMixKey(key)}
+                      >
+                        {t('flash.mix.deck', { name: group.bookTitle, count: reviewSourceCount(key) })}
+                      </button>
+                    );
+                  })}
+                  {reviewMixKeys.length === 0 && <p className="muted">{t('flash.mix.empty')}</p>}
+                </div>
+              )}
+              <label>
+                {t('flash.reviewOrder')}
+                <Select
+                  value={reviewOrder}
+                  onChange={(event) => state.setReviewOrder(event.target.value as ReviewOrder)}
+                >
+                  <option value="spread">{t('flash.reviewOrder.spread')}</option>
+                  <option value="by-deck">{t('flash.reviewOrder.byDeck')}</option>
+                  <option value="source">{t('flash.reviewOrder.source')}</option>
                 </Select>
               </label>
               <label className="flash-review-setup-check">

@@ -10,7 +10,7 @@
  * control this repo keeps finding.
  */
 
-export type PracticeMode = 'none' | 'match' | 'write' | 'learn' | 'test';
+export type PracticeMode = 'none' | 'match' | 'write' | 'learn' | 'test' | 'listen';
 
 /** Everything except `none`, which is the launcher's own state. */
 export type PracticeModeId = Exclude<PracticeMode, 'none'>;
@@ -24,7 +24,7 @@ export interface PracticeModeEntry {
   /** i18n key for the one-line description of what it drills. */
   aboutKey: string;
   /** The tile's glyph: a name from the renderer's icon set (`components/Icons.tsx`). */
-  icon: 'flashcards' | 'keyboard' | 'shuffle' | 'check';
+  icon: 'flashcards' | 'keyboard' | 'shuffle' | 'check' | 'headphones';
 }
 
 /**
@@ -38,6 +38,9 @@ export const PRACTICE_MODES: readonly PracticeModeEntry[] = [
   { id: 'write', startKey: 'flash.write.start', titleKey: 'flash.practice.mode.write', aboutKey: 'flash.write.about', icon: 'keyboard' },
   { id: 'match', startKey: 'flash.match.start', titleKey: 'flash.practice.mode.match', aboutKey: 'flash.match.about', icon: 'shuffle' },
   { id: 'test', startKey: 'flash.test.start', titleKey: 'flash.practice.mode.test', aboutKey: 'flash.test.about', icon: 'check' },
+  // Not a drill: the deck's clips as a shuffled, hands-free playlist (a sentence
+  // deck from an episode, on a walk). Last because it grades nothing.
+  { id: 'listen', startKey: 'flash.listen.start', titleKey: 'flash.practice.mode.listen', aboutKey: 'flash.listen.about', icon: 'headphones' },
 ];
 
 export function isPracticeMode(value: string): value is PracticeModeId {
