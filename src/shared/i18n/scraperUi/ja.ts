@@ -862,6 +862,9 @@ export const SCRAPER_UI_JA: Catalog = {
   'scrApp.transfer.removedKept': 'qBittorrent から {value} を削除しました。ダウンロード済みのファイルは残っています。',
   'scrApp.transfer.removedDeleted': 'qBittorrent から {value} を削除し、ダウンロード済みのファイルも消去しました。',
   'scrApp.transfer.failed': 'qBittorrent で実行できませんでした: {value}',
+  'scrApp.qbitList.offline': 'qBittorrent に接続できないため、この一覧は最後に読み込めた時点のものです。Web UI を有効にして起動しているか確認してから更新してください。',
+  'scrApp.qbitList.auth': 'qBittorrent がログインを拒否したため、この一覧は最後に読み込めた時点のものです。設定でユーザー名、パスワード、または API キーを確認してください。',
+  'scrApp.qbitList.service': 'qBittorrent がエラーを返したため、この一覧は最後に読み込めた時点のものです。少し待ってから更新してください。',
   'scrApp.torrent.pieces': 'ピースの進捗',
   'scrApp.torrent.matches': { other: '{count} 件のリリースが一致' },
   'scrApp.torrent.alreadyInLibrary': {

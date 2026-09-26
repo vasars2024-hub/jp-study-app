@@ -21,7 +21,8 @@ import { sx, sxn, sxNumber, sxs, sxss, type ScraperTextKey } from '../strings';
 import { episodeStatusText, tr } from '../localize';
 import { firstReason } from '../disabledReason';
 import TransferRemoveConfirm from '../TransferRemoveConfirm';
-import { errorText, qbitActionNotice } from '../data/qbitActions';
+import { errorText, qbitActionNotice, qbitListFailureKey } from '../data/qbitActions';
+import { t } from '../../../i18n';
 import { loadExternalPlayerPreferences } from '../../../externalPlayerStore';
 import { selectExternalPlayerProfile, type PlaybackHandoff } from '../../../../shared/externalPlayer';
 import type {
@@ -446,7 +447,9 @@ export function DownloadsPage() {
     try {
       setRows(await port.listDownloads());
     } catch (error) {
-      setNotice({ text: sxs('downloads.loadFailed', errorText(error)), bad: true });
+      // Rows from the last good read are kept, not blanked into "no downloads".
+      const key = qbitListFailureKey(error);
+      setNotice({ text: key ? t(key) : sxs('downloads.loadFailed', errorText(error)), bad: true });
     }
   }, [port]);
 

@@ -28,6 +28,19 @@ export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * The i18n key for a transfer list that could not be read, from the
+ * `qbit-list-failed:<code>` main throws (it survives the IPC boundary inside
+ * the message). Null for any other error.
+ */
+export function qbitListFailureKey(error: unknown): string | null {
+  const match = /qbit-list-failed:([a-z-]+)/.exec(errorText(error));
+  if (!match) return null;
+  if (match[1] === 'auth') return 'scrApp.qbitList.auth';
+  if (match[1] === 'offline') return 'scrApp.qbitList.offline';
+  return 'scrApp.qbitList.service';
+}
+
 /** The line a screen shows after `port.qbitAction(...)` answered. */
 export function qbitActionNotice(
   action: ScraperQbitTorrentAction,
