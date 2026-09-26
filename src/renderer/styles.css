@@ -8861,10 +8861,11 @@ mark.lookup-mark,
 /* ---- Catalogue refresh controls ---- */
 .res-controls-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   flex: 1 1 260px;
-  max-width: 460px;
+  max-width: 680px;
   justify-content: flex-end;
 }
 .res-refresh {
@@ -9300,6 +9301,23 @@ mark.lookup-mark,
 .mytool-note-edit button:hover {
   border-color: var(--accent-2);
 }
+
+/* ---- Your own resources (added or imported on this machine) ---- */
+.own-resource-card .res-cost { margin-left: auto; }
+.own-resource-group,
+.own-resource-lang {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-2) 12%, transparent);
+  color: var(--text);
+  font-size: 11px;
+}
+.own-resource-dialog { width: min(520px, 92vw); }
+.own-resource-form { display: flex; flex-direction: column; gap: 12px; }
+.own-resource-intro { margin: 0; }
+.own-resource-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
+.own-resource-langs { display: flex; flex-wrap: wrap; gap: 6px; }
+.heatmap-you-note { font-size: 11px; }
 
 /* ---------------------------------- Settings ---------------------------------- */
 .settings-view {

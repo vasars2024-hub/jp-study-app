@@ -22,10 +22,14 @@ import {
   ResourceGroups,
   ResourceMyTools,
   ResourceNewSection,
+  ResourceOwnCards,
+  costLabel,
   hostOf,
   openLink,
   useResources,
 } from '../components/resources/ResourcesContent';
+import OwnResourceControls from '../components/resources/OwnResourceControls';
+import { OWN_RESOURCES_CATEGORY_ID } from '../ownResources';
 import { useT } from '../i18n';
 
 export default function ResourcesView() {
@@ -48,7 +52,12 @@ export default function ResourcesView() {
     activeCategory,
     bundles,
     showLanding,
+    canRefresh,
   } = state;
+
+  // With only the built-in catalogue there is nothing to refresh; the button
+  // stays visible but disabled, and its tooltip and the hint say why.
+  const refreshTitle = refreshState === 'builtin' ? t('resources.refreshUnavailable') : t('resources.aero.menu.refresh');
 
   // `resources.updated` is 'Updated {when}' and there is no {when} here. This
   // used to blank the slot, strip a leftover `{when}` and trim, then fall back
@@ -62,7 +71,7 @@ export default function ResourcesView() {
         : refreshState === 'cached'
           ? t('resources.cached')
         : refreshState === 'builtin'
-          ? t('resources.builtin')
+          ? t('resources.builtinExplained')
         : refreshState === 'updated'
           ? t('resources.updatedRecently')
           : '';
@@ -72,7 +81,7 @@ export default function ResourcesView() {
       id: 'file',
       label: t('resources.aero.menu.file'),
       items: [
-        { id: 'refresh', label: t('resources.aero.menu.refresh'), onSelect: () => void doRefresh() },
+        { id: 'refresh', label: t('resources.aero.menu.refresh'), disabled: !canRefresh, onSelect: () => void doRefresh() },
         { id: 'clear-search', label: t('resources.aero.menu.clearSearch'), disabled: !query, onSelect: () => setQuery('') },
         { id: 'all', label: t('resources.aero.menu.showAll'), onSelect: () => setFilter('All') },
       ],
@@ -128,7 +137,8 @@ export default function ResourcesView() {
               </button>
             ))}
             <ToolbarSpacer />
-            <button className="aero-resource-filter" onClick={() => void doRefresh()} disabled={refreshState === 'refreshing'} title={t('resources.aero.menu.refresh')}>
+            <OwnResourceControls compact />
+            <button className="aero-resource-filter" onClick={() => void doRefresh()} disabled={!canRefresh} title={refreshTitle}>
               <Icon name="refresh" size={12} /> {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
             </button>
             <input
@@ -178,6 +188,9 @@ export default function ResourcesView() {
                         <span>{cat.title}</span>
                         <small>{cat.blurb}</small>
                       </div>
+                      {cat.id === OWN_RESOURCES_CATEGORY_ID ? (
+                        <ResourceOwnCards state={state} items={cat.items} />
+                      ) : (
                       <div className="aero-resource-table" role="table" aria-label={cat.title}>
                         <div className="aero-resource-row aero-resource-row-head" role="row">
                           <span>{t('resources.aero.col.name')}</span>
@@ -188,12 +201,13 @@ export default function ResourcesView() {
                         {cat.items.map((r) => (
                           <button key={r.url} className="aero-resource-row" role="row" onClick={() => openLink(r.url)}>
                             <span className="aero-resource-name">{r.name}</span>
-                            <span className={`aero-resource-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
+                            <span className={`aero-resource-cost cost-${r.cost.toLowerCase()}`}>{costLabel(t, r.cost)}</span>
                             <span>{hostOf(r.url)}</span>
                             <span>{r.description}</span>
                           </button>
                         ))}
                       </div>
+                      )}
                     </section>
                   ))
                 )}
@@ -268,10 +282,12 @@ export default function ResourcesView() {
             ))}
           </div>
           <div className="res-controls-right">
+            <OwnResourceControls />
             <button
               className="gram-level-btn res-refresh"
               onClick={() => void doRefresh()}
-              disabled={refreshState === 'refreshing'}
+              disabled={!canRefresh}
+              title={refreshTitle}
             >
               <Icon name="refresh" size={12} />
               {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}

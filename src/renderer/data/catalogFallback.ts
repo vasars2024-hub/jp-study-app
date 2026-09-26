@@ -11,8 +11,16 @@ import type { ResourcesCatalog } from '../../shared/resourcesCatalog';
 
 export const CATALOG_FALLBACK: ResourcesCatalog = {
   schemaVersion: 1,
-  updatedAt: '2026-07-16',
+  updatedAt: '2026-09-25',
   newSection: [
+    { name: 'Hanzi Writer', url: 'https://github.com/chanind/hanzi-writer', description: 'Open-source stroke-order animations and a stroke-by-stroke writing quiz for thousands of Chinese characters.', cost: 'Free', addedAt: '2026-09-25', source: 'github', lang: ['zh'], tags: ['writing', 'characters'] },
+    { name: 'Make Me a Hanzi', url: 'https://github.com/skishore/makemeahanzi', description: 'Open stroke-order and decomposition data for 9,000+ characters. The data behind many free writing tools.', cost: 'Free', addedAt: '2026-09-25', source: 'github', lang: ['zh'], tags: ['writing', 'data'] },
+    { name: 'Mandarin Bean', url: 'https://mandarinbean.com', description: 'Free graded stories and articles by HSK level with pinyin, word lists and a translation toggle.', cost: 'Free', addedAt: '2026-09-25', source: 'web', lang: ['zh'], tags: ['reading'] },
+    { name: 'OpenRussian', url: 'https://en.openrussian.org', description: 'Open Russian dictionary with stress marks, every declension and conjugation, audio and example sentences.', cost: 'Free', addedAt: '2026-09-25', source: 'web', lang: ['ru'], tags: ['dictionary', 'stress'] },
+    { name: 'Russiangram', url: 'https://russiangram.com', description: 'Paste Russian text, get it back with stress marks on every word. A quick check before reading aloud.', cost: 'Free', addedAt: '2026-09-25', source: 'web', lang: ['ru'], tags: ['stress', 'reading'] },
+    { name: 'Russian National Corpus', url: 'https://ruscorpora.ru', description: 'See how a word or construction is really used across hundreds of millions of words of Russian.', cost: 'Free', addedAt: '2026-09-25', source: 'web', lang: ['ru'], tags: ['corpus', 'usage'] },
+    { name: 'YouGlish', url: 'https://youglish.com', description: 'Hear any word spoken in real YouTube videos, in Japanese, Chinese, Russian and many more.', cost: 'Free', addedAt: '2026-09-25', source: 'web', lang: ['ja', 'zh', 'ru'], tags: ['listening', 'pronunciation'] },
+    { name: 'Language Reactor', url: 'https://www.languagereactor.com', description: 'Dual subtitles and a pop-up dictionary on Netflix and YouTube, with saved words to mine later.', cost: 'Freemium', addedAt: '2026-09-25', source: 'web', lang: ['ja', 'zh', 'ru'], tags: ['listening', 'mining'] },
     { name: 'Yomitan', url: 'https://github.com/yomidevs/yomitan', description: 'Actively maintained pop-up dictionary (the Yomichan successor). Frequent releases and new dictionary support.', cost: 'Free', addedAt: '2026-07-12', source: 'github', lang: ['ja'], tags: ['dictionary', 'mining'] },
     { name: 'JL', url: 'https://github.com/rampaa/JL', description: 'Fast Windows pop-up dictionary for VNs, games, and clipboard text. Great free Textractor companion.', cost: 'Free', addedAt: '2026-07-10', source: 'github', lang: ['ja'], tags: ['dictionary', 'texthooker'] },
     { name: 'Jimaku', url: 'https://jimaku.cc', description: 'Community-run archive of Japanese subtitles for anime, drama, and film — feed them into asbplayer for mining.', cost: 'Free', addedAt: '2026-07-14', source: 'web', lang: ['ja'], tags: ['subtitles', 'immersion'] },

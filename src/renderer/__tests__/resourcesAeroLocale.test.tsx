@@ -156,7 +156,7 @@ describe('ResourcesView Aero shell renders in the interface language', () => {
     'Host',
     'Description',
     'Study directory',
-    'A living catalogue of Japanese study links, bundles, and tools.',
+    'A living catalogue of study links, bundles, and tools for Japanese, Chinese and Russian.',
     'Visible',
     'Bundles',
     'Mode',

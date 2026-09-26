@@ -1,6 +1,9 @@
-// A hand-curated directory of the best Japanese-learning resources on the web.
-// Everything here is a real, well-known site. Links open in the system browser
-// through the safe `window.api.openExternal` bridge.
+// A hand-curated directory of the best resources on the web for learning
+// Japanese, Chinese and Russian. Everything here is a real, well-known site.
+// Links open in the system browser through the safe `window.api.openExternal`
+// bridge. A category with `lang` is for learners of those languages and is
+// listed first for them; one without is for any language.
+import type { StudyLang } from '../../shared/levelScale';
 
 export type Cost = 'Free' | 'Freemium' | 'Paid';
 
@@ -17,11 +20,14 @@ export interface ResourceCategory {
   title: string;
   blurb: string;
   items: Resource[];
+  /** The study languages this category is for; absent = any language. */
+  lang?: StudyLang[];
 }
 
 export const RESOURCES: ResourceCategory[] = [
   {
     id: 'dictionaries',
+    lang: ['ja'],
     icon: 'book',
     title: 'Dictionaries & lookup',
     blurb: 'Look up words, kanji, and example sentences.',
@@ -72,6 +78,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'kanji-srs',
+    lang: ['ja'],
     icon: 'kanji',
     title: 'Kanji & vocab (SRS)',
     blurb: 'Spaced-repetition systems to make words stick.',
@@ -115,6 +122,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'grammar',
+    lang: ['ja'],
     icon: 'grammar',
     title: 'Grammar references',
     blurb: 'Deeper explanations when a point won’t click.',
@@ -165,6 +173,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'reading',
+    lang: ['ja'],
     icon: 'reading',
     title: 'Reading practice',
     blurb: 'Graded readers and native text to level up.',
@@ -208,6 +217,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'listening',
+    lang: ['ja'],
     icon: 'audio',
     title: 'Listening & video',
     blurb: 'Train your ear with comprehensible input.',
@@ -251,6 +261,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'tools',
+    lang: ['ja'],
     icon: 'tools',
     title: 'Immersion tools',
     blurb: 'Turn anything you watch or read into study material.',
@@ -294,6 +305,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'community',
+    lang: ['ja'],
     icon: 'speaking',
     title: 'Practice & community',
     blurb: 'Real people to talk to and learn alongside.',
@@ -324,6 +336,386 @@ export const RESOURCES: ResourceCategory[] = [
         url: 'https://www.reddit.com/r/LearnJapanese/',
         description:
           'A large, active community for questions, resource recommendations, and the long-running Daily Thread for quick help.',
+        cost: 'Free',
+      },
+    ],
+  },
+  {
+    id: 'zh-dictionaries',
+    lang: ['zh'],
+    icon: 'book',
+    title: 'Chinese: dictionaries & characters',
+    blurb: 'Look up words and characters, learn stroke order, and drill hanzi.',
+    items: [
+      {
+        name: 'Pleco',
+        url: 'https://www.pleco.com',
+        description:
+          'The standard Chinese dictionary app: handwriting input, camera OCR, a document reader and flashcards. The core is free; extra dictionaries are paid.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'MDBG',
+        url: 'https://www.mdbg.net/chinese/dictionary',
+        description:
+          'Fast free web dictionary built on CC-CEDICT, with character decomposition, stroke order and example words.',
+        cost: 'Free',
+      },
+      {
+        name: 'CC-CEDICT',
+        url: 'https://cc-cedict.org/wiki/',
+        description:
+          'The open, community-edited Chinese-English dictionary (CC BY-SA) behind most free Chinese tools. Download it for your own decks.',
+        cost: 'Free',
+      },
+      {
+        name: 'Zhongwen',
+        url: 'https://github.com/cschiller/zhongwen',
+        description:
+          'Hover-dictionary browser extension for Chinese, showing pinyin, tones and meanings over any web page.',
+        cost: 'Free',
+      },
+      {
+        name: 'Hanzi Writer',
+        url: 'https://hanziwriter.org',
+        description:
+          'Animated stroke order for thousands of simplified and traditional characters, with a quiz mode that checks each stroke you draw.',
+        cost: 'Free',
+      },
+      {
+        name: 'Dong Chinese',
+        url: 'https://www.dong-chinese.com',
+        description:
+          'Character etymology and component breakdowns with a structured course; explains why characters look the way they do.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Outlier Linguistics',
+        url: 'https://www.outlier-linguistics.com',
+        description:
+          'Scholarly character dictionary that separates meaning, sound and form components. Pairs well with Pleco.',
+        cost: 'Paid',
+      },
+      {
+        name: 'Skritter',
+        url: 'https://skritter.com',
+        description:
+          'Handwriting SRS for hanzi and kanji: write each character on screen and get graded stroke by stroke.',
+        cost: 'Paid',
+      },
+      {
+        name: 'Hack Chinese',
+        url: 'https://www.hackchinese.com',
+        description:
+          'Vocabulary SRS with HSK and textbook lists and frequency data, built around listening and typing reviews.',
+        cost: 'Paid',
+      },
+      {
+        name: 'HSK Academy',
+        url: 'https://hsk.academy',
+        description:
+          'Free HSK word lists by level with example sentences, stroke order and printable sheets.',
+        cost: 'Free',
+      },
+      {
+        name: 'Purple Culture',
+        url: 'https://www.purpleculture.net',
+        description:
+          'Pinyin converter, dictionary and HSK tools. Paste text to get pinyin with tone marks above each character.',
+        cost: 'Free',
+      },
+      {
+        name: 'Chinese Text Project',
+        url: 'https://ctext.org',
+        description:
+          'Classical and pre-modern Chinese texts with parallel translations and a linked dictionary. For advanced learners.',
+        cost: 'Free',
+      },
+    ],
+  },
+  {
+    id: 'zh-practice',
+    lang: ['zh'],
+    icon: 'reading',
+    title: 'Chinese: reading, listening & grammar',
+    blurb: 'Graded stories, grammar explained, and native video to listen to.',
+    items: [
+      {
+        name: 'Chinese Grammar Wiki',
+        url: 'https://resources.allsetlearning.com/chinese/grammar/',
+        description:
+          'The most complete free Mandarin grammar reference, sorted by CEFR level with many examples per pattern.',
+        cost: 'Free',
+      },
+      {
+        name: 'Du Chinese',
+        url: 'https://duchinese.net',
+        description:
+          'Graded reading app with audio, pinyin toggles and tap-to-look-up, from HSK 1 to advanced.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Mandarin Bean',
+        url: 'https://mandarinbean.com',
+        description:
+          'Free graded stories and articles by HSK level, each with pinyin, a word list and a translation toggle.',
+        cost: 'Free',
+      },
+      {
+        name: 'Maayot',
+        url: 'https://maayot.com',
+        description:
+          'A short daily story at your level, with a quick comprehension check and your own sentence to write.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'The Chairman’s Bao',
+        url: 'https://www.thechairmansbao.com',
+        description:
+          'News-based graded reader with HSK levels, audio and built-in flashcards.',
+        cost: 'Paid',
+      },
+      {
+        name: 'Mandarin Companion',
+        url: 'https://mandarincompanion.com',
+        description:
+          'Graded readers: well-known novels retold in Chinese with a small, controlled character count.',
+        cost: 'Paid',
+      },
+      {
+        name: 'Readibu',
+        url: 'https://readibu.com',
+        description:
+          'Read Chinese web novels with a pop-up dictionary, saved words and reading statistics.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'ChinesePod',
+        url: 'https://chinesepod.com',
+        description:
+          'A large archive of dialogue-based audio lessons from newbie to advanced, with transcripts and vocabulary.',
+        cost: 'Paid',
+      },
+      {
+        name: 'Bilibili',
+        url: 'https://www.bilibili.com',
+        description:
+          'China’s main video site for anime, vlogs and lectures. Most videos carry Chinese subtitles or on-screen text.',
+        cost: 'Free',
+      },
+      {
+        name: 'iQIYI',
+        url: 'https://www.iq.com',
+        description:
+          'Chinese dramas and variety shows with Chinese and English subtitles. Much of the catalogue is free with ads.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'r/ChineseLanguage',
+        url: 'https://www.reddit.com/r/ChineseLanguage/',
+        description:
+          'A large community for Mandarin and Cantonese questions, resource lists and study logs.',
+        cost: 'Free',
+      },
+    ],
+  },
+  {
+    id: 'ru-dictionaries',
+    lang: ['ru'],
+    icon: 'book',
+    title: 'Russian: dictionaries & stress',
+    blurb: 'Look up words with their stress, forms and real usage.',
+    items: [
+      {
+        name: 'OpenRussian',
+        url: 'https://en.openrussian.org',
+        description:
+          'Open Russian dictionary with stress marks, full declension and conjugation tables, audio and example sentences.',
+        cost: 'Free',
+      },
+      {
+        name: 'Russiangram',
+        url: 'https://russiangram.com',
+        description:
+          'Paste Russian text and get it back with stress marks on every word. Useful before reading aloud.',
+        cost: 'Free',
+      },
+      {
+        name: 'Wiktionary (Russian)',
+        url: 'https://ru.wiktionary.org',
+        description:
+          'The Russian-language Wiktionary: stress, every inflected form, etymology and usage notes for a huge word list.',
+        cost: 'Free',
+      },
+      {
+        name: 'Gramota.ru',
+        url: 'https://gramota.ru',
+        description:
+          'The reference portal for Russian spelling, stress and usage, with several academic dictionaries in one search.',
+        cost: 'Free',
+      },
+      {
+        name: 'Multitran',
+        url: 'https://www.multitran.com',
+        description:
+          'Huge bilingual dictionary with specialist vocabulary and phrase translations contributed by translators.',
+        cost: 'Free',
+      },
+      {
+        name: 'Russian National Corpus',
+        url: 'https://ruscorpora.ru',
+        description:
+          'Search hundreds of millions of words of real Russian to see how a word or construction is actually used.',
+        cost: 'Free',
+      },
+      {
+        name: 'Reverso Context',
+        url: 'https://context.reverso.net/translation/russian-english/',
+        description:
+          'Shows a word or phrase in many real bilingual sentence pairs, so you see it in context rather than as a gloss.',
+        cost: 'Free',
+      },
+    ],
+  },
+  {
+    id: 'ru-practice',
+    lang: ['ru'],
+    icon: 'reading',
+    title: 'Russian: reading, listening & grammar',
+    blurb: 'Grammar explained, texts to read, and Russian to listen to.',
+    items: [
+      {
+        name: 'Master Russian',
+        url: 'https://masterrussian.com',
+        description:
+          'Free grammar lessons, frequency lists and vocabulary articles, from the alphabet through participles.',
+        cost: 'Free',
+      },
+      {
+        name: 'Russian for Everyone',
+        url: 'https://www.russianforeveryone.com',
+        description:
+          'Structured beginner-to-intermediate grammar course with exercises and reading texts.',
+        cost: 'Free',
+      },
+      {
+        name: 'Real Russian Club',
+        url: 'https://realrussianclub.com',
+        description:
+          'Lessons, podcasts and videos on everyday Russian and grammar, many with transcripts.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Russian with Max',
+        url: 'https://www.russianwithmax.com',
+        description:
+          'Slow, clear podcasts and videos in Russian about culture and daily life, with transcripts.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Easy Russian',
+        url: 'https://www.youtube.com/@EasyRussian',
+        description:
+          'Street interviews with native speakers, subtitled in Russian and English. Real speech at natural speed.',
+        cost: 'Free',
+      },
+      {
+        name: 'RussianPod101',
+        url: 'https://www.russianpod101.com',
+        description:
+          'Audio and video lessons by level with dialogues, transcripts and vocabulary lists.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Arzamas',
+        url: 'https://arzamas.academy',
+        description:
+          'Free Russian-language courses and podcasts on literature, history and art. Great upper-intermediate listening.',
+        cost: 'Free',
+      },
+      {
+        name: 'Lib.ru',
+        url: 'http://lib.ru',
+        description:
+          'One of the oldest Russian online libraries, with classic literature and many public-domain texts.',
+        cost: 'Free',
+      },
+      {
+        name: 'Mosfilm Cinema',
+        url: 'https://cinema.mosfilm.ru',
+        description:
+          'The Mosfilm studio’s own site for watching its classic Soviet films online, free.',
+        cost: 'Free',
+      },
+      {
+        name: 'r/russian',
+        url: 'https://www.reddit.com/r/russian/',
+        description:
+          'A large, friendly community for Russian learners: grammar questions, resources and practice.',
+        cost: 'Free',
+      },
+    ],
+  },
+  {
+    id: 'any-language',
+    icon: 'globe',
+    title: 'Any language',
+    blurb: 'Tools that work for Japanese, Chinese and Russian alike.',
+    items: [
+      {
+        name: 'Tatoeba',
+        url: 'https://tatoeba.org',
+        description:
+          'An open (CC BY) collection of translated example sentences in hundreds of languages, many with audio.',
+        cost: 'Free',
+      },
+      {
+        name: 'YouGlish',
+        url: 'https://youglish.com',
+        description:
+          'Type a word and hear it said in real YouTube videos, jumping straight to the moment it is spoken.',
+        cost: 'Free',
+      },
+      {
+        name: 'Forvo',
+        url: 'https://forvo.com',
+        description:
+          'Native-speaker recordings of words and names in almost every language.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Language Reactor',
+        url: 'https://www.languagereactor.com',
+        description:
+          'Browser extension that shows two subtitle tracks on Netflix and YouTube, with a pop-up dictionary and saved words.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'LingQ',
+        url: 'https://www.lingq.com',
+        description:
+          'Import any text or video and read it with tap-to-look-up; it tracks which words you already know.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Readlang',
+        url: 'https://readlang.com',
+        description:
+          'Web reader that translates words as you click them and turns them into flashcards.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Clozemaster',
+        url: 'https://www.clozemaster.com',
+        description:
+          'Fill-in-the-blank sentence drills sorted by word frequency, for more than fifty languages.',
+        cost: 'Freemium',
+      },
+      {
+        name: 'Wiktionary',
+        url: 'https://www.wiktionary.org',
+        description:
+          'The free multilingual dictionary: pronunciation, forms, etymology and translations for millions of words.',
         cost: 'Free',
       },
     ],
