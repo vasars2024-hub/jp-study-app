@@ -156,6 +156,7 @@ import { registerLivePlayerProbe } from './livePlayerProbe';
 import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../renderer/subtitlesExport';
 import { useLineLevel } from '../renderer/lineLevel';
 import { recordStudyTime } from '../renderer/stats';
+import { openSentenceDeckDialog } from '../renderer/components/sentenceDeck/SentenceDeckDialog';
 
 /** Dictation or shadowing: the player is being used to practise, not to watch. */
 function practiceModeActive(prefs: { dictationMode?: boolean; shadowingMode?: boolean }): boolean {
@@ -2648,6 +2649,43 @@ export default function VideoCoreStudyOverlay({
     workspaceTrigger('mine');
   }, [workspaceTrigger]);
 
+  /**
+   * The whole episode as a sentence deck. The track on screen is handed over as
+   * it is shown — the user's delay applied — so the deck is cut from the lines
+   * the user has been reading; the dialog also offers every other track the file
+   * has. Only a local file can be cut, so a stream gets no button.
+   */
+  const sentenceDeckPath = localFilePath || playbackInfo?.localFile?.path || '';
+  const makeSentenceDeck = React.useCallback((): void => {
+    if (!sentenceDeckPath) return;
+    video?.pause();
+    const shift = (cue: VideoCoreActiveCue) => ({
+      startMs: Math.max(0, Math.round(cue.startMs + subtitleDelaySec * 1000)),
+      endMs: Math.max(0, Math.round(cue.endMs + subtitleDelaySec * 1000)),
+      text: cue.text,
+    });
+    const secondaryEntry = tracks.find((entry) => entry.number === secondaryTrack);
+    void openSentenceDeckDialog({
+      videoPath: sentenceDeckPath,
+      ...(allCues.length
+        ? {
+          playerTrack: {
+            label: selectedTrackLabel,
+            cues: allCues.map(shift),
+            ...(secondaryCues.length
+              ? {
+                secondary: {
+                  label: secondaryEntry ? trackLabel(secondaryEntry, t) : t('mediaWorkspace.study.secondarySubs'),
+                  cues: secondaryCues.map(shift),
+                },
+              }
+              : {}),
+          },
+        }
+        : {}),
+    });
+  }, [sentenceDeckPath, video, subtitleDelaySec, tracks, secondaryTrack, allCues, secondaryCues, selectedTrackLabel, t]);
+
   /* ------------------------------------------------------------------------------ *
    * Detached blocks
    *
@@ -3369,6 +3407,7 @@ export default function VideoCoreStudyOverlay({
         onTranslateLine={() => void translateCue()}
         translationBusy={translationBusy}
         onMineCurrentLine={mineCurrentLine}
+        onMakeSentenceDeck={sentenceDeckPath ? makeSentenceDeck : undefined}
         practiceMode={practiceMode}
         setPracticeMode={setPracticeMode}
         abStartSec={abStartSec}
