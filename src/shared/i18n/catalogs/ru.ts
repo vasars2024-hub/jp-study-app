@@ -24,6 +24,7 @@ import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 import { SHELL_UI_RU } from '../shellUi/ru';
 import { COMMANDS_UI_RU } from '../commandsUi/ru';
 import { MUSIC_UI_RU } from '../musicUi/ru';
+import { RESOURCES_CATALOG_RU } from '../resourcesCatalog/ru';
 import { WIDGETS_UI_RU } from '../widgetsUi/ru';
 import { BLANC_UI_RU } from '../blancUi/ru';
 import { READER_UI_RU } from '../readerUi/ru';
@@ -820,6 +821,7 @@ export const ru: Catalog = {
   ...SHELL_UI_RU,
   ...COMMANDS_UI_RU,
   ...MUSIC_UI_RU,
+  ...RESOURCES_CATALOG_RU,
   ...WIDGETS_UI_RU,
   ...BLANC_UI_RU,
   ...READER_UI_RU,
