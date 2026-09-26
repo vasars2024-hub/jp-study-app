@@ -784,6 +784,15 @@ declare global {
       appToggle(): Promise<{ ok: boolean }>;
       appSetToggleShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
       appSetRestartShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
+      globalCommandsSync(
+        chords: Record<string, string>,
+      ): Promise<import('../shared/globalCommands').GlobalCommandStatus[]>;
+      globalCommandsList(): Promise<import('../shared/globalCommands').GlobalCommandStatus[]>;
+      globalCommandsRun(id: string): Promise<boolean>;
+      globalCommandsLegacyChords(): Promise<Record<string, string>>;
+      onGlobalCommandsChanged(
+        cb: (list: import('../shared/globalCommands').GlobalCommandStatus[]) => void,
+      ): () => void;
       osHotkeyStatus(): Promise<{
         supported: boolean;
         installed: boolean;

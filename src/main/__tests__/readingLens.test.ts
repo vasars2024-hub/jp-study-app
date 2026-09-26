@@ -185,6 +185,9 @@ function clearState(): void {
   fs.rmSync(path.join(tmpRoot, STATE), { force: true });
   // A .bak without its primary counts as damage and would be reinstated.
   fs.rmSync(path.join(tmpRoot, `${STATE}.bak`), { force: true });
+  // The chords themselves live in the global-command registry's file now.
+  fs.rmSync(path.join(tmpRoot, 'global-commands.json'), { force: true });
+  fs.rmSync(path.join(tmpRoot, 'global-commands.json.bak'), { force: true });
 }
 function readState(): unknown {
   return JSON.parse(fs.readFileSync(path.join(tmpRoot, STATE), 'utf8'));
@@ -284,7 +287,8 @@ describe('startReadingLens', () => {
     writeState('}}}not json{{{');
     const m = await load();
     expect(() => m.startReadingLens()).not.toThrow();
-    expect(h.shortcut.registerCalls).toEqual(['Ctrl+Shift+Space']);
+    // Region select on its default chord (the word-under-cursor read holds its own).
+    expect(h.shortcut.registerCalls).toContain('Ctrl+Shift+Space');
   });
 
   it('registers nothing when the stored settings disable the Lens', async () => {
@@ -310,35 +314,8 @@ describe('startReadingLens', () => {
   });
 });
 
-// ---- accelerator mapping ------------------------------------------------
-
-describe('toAccelerator', () => {
-  it('passes a plain chord through unchanged', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Ctrl+Shift+Space')).toBe('Ctrl+Shift+Space');
-  });
-
-  it('maps Meta to Electron’s Super', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Meta+K')).toBe('Super+K');
-    expect(t.toAccelerator('Ctrl+Meta+Alt+J')).toBe('Ctrl+Super+Alt+J');
-  });
-
-  it('takes the first alternative of a pipe-separated chord', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Ctrl+K|Meta+K')).toBe('Ctrl+K');
-  });
-
-  it('trims surrounding whitespace', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('  Ctrl+K  |Meta+K')).toBe('Ctrl+K');
-  });
-
-  it('does not rewrite Meta inside a longer word', async () => {
-    const { __readingLensTestables: t } = await load();
-    expect(t.toAccelerator('Ctrl+Metal')).toBe('Ctrl+Metal');
-  });
-});
+// Chord → accelerator mapping moved to the shared registry and is covered by
+// src/shared/__tests__/globalCommands.test.ts.
 
 // ---- registration lifecycle --------------------------------------------
 
@@ -385,7 +362,7 @@ describe('hotkey registration', () => {
     expect(h.shortcut.unregisterCalls).toContain('Ctrl+Shift+Space');
     expect(h.shortcut.registered.has('Ctrl+Shift+Space')).toBe(false);
     expect(h.shortcut.registered.has('Ctrl+Alt+L')).toBe(true);
-    expect([...h.shortcut.registered.keys()]).toEqual(['Ctrl+Alt+L']);
+    expect([...h.shortcut.registered.keys()].filter((k) => k === 'Ctrl+Shift+Space')).toEqual([]);
   });
 
   it('reports a busy accelerator by name and holds nothing', async () => {
@@ -398,7 +375,8 @@ describe('hotkey registration', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toContain('Ctrl+Alt+L');
     expect(res.error).toMatch(/already in use/i);
-    expect(h.shortcut.registered.size).toBe(0);
+    expect(h.shortcut.registered.has('Ctrl+Alt+L')).toBe(false);
+    expect(h.shortcut.registered.has('Ctrl+Shift+Space')).toBe(false);
   });
 
   it('surfaces a register() exception as an error result', async () => {

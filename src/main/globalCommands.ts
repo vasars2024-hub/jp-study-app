@@ -45,6 +45,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import {
+  chordToAccelerator,
   GLOBAL_COMMAND_DEFAULTS,
   normalizeGlobalChord,
   planGlobalRegistrations,
@@ -74,6 +75,8 @@ interface Entry {
   /** Accelerator currently held with Windows. */
   held: string | null;
   error?: GlobalCommandError;
+  /** What `register` threw, for a `failed` error. */
+  errorDetail?: string;
   conflictWith?: string;
 }
 
@@ -209,6 +212,7 @@ function reconcile(): void {
   for (const step of plan) {
     const entry = entries.get(step.id)!;
     entry.error = step.error;
+    entry.errorDetail = undefined;
     entry.conflictWith = step.conflictWith;
     if (!step.accelerator || entry.held === step.accelerator) continue;
     try {
@@ -217,6 +221,7 @@ function reconcile(): void {
       else entry.error = 'in-use';
     } catch (err) {
       entry.error = 'failed';
+      entry.errorDetail = err instanceof Error ? err.message : String(err);
       console.warn(`[globalCommands] ${step.id}: register("${step.accelerator}") threw`, err);
     }
   }
@@ -335,6 +340,35 @@ export function applyGlobalCommandChords(chords: Record<string, unknown>): Globa
 export function setGlobalCommandChord(id: string, chord: string): GlobalCommandStatus {
   applyGlobalCommandChords({ [id]: chord });
   return statusOf(ensureEntry(id));
+}
+
+/**
+ * `{ ok, error }` in the shape the per-command channels always returned
+ * (`blanc:setGlobalShortcut`, `app:setToggleShortcut`, `lens:setHotkey` …).
+ * English on purpose: these strings only reach logs and older callers; the
+ * Settings UI translates the error code itself.
+ */
+export function legacyChordResult(status: GlobalCommandStatus | null): { ok: boolean; error?: string } {
+  const entry = status ? entries.get(status.id) : undefined;
+  switch (status?.error) {
+    case undefined:
+      return { ok: true };
+    case 'needs-modifier':
+      return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
+    case 'invalid':
+      return { ok: false, error: 'This shortcut cannot be registered system-wide.' };
+    case 'in-use':
+      return { ok: false, error: `"${acceleratorOf(status.chord)}" is already in use by another application.` };
+    case 'duplicate':
+      return { ok: false, error: `Already used by ${status.conflictWith ?? 'another Gum shortcut'}.` };
+    default:
+      return { ok: false, error: entry?.errorDetail || 'Could not register the global shortcut.' };
+  }
+}
+
+function acceleratorOf(chord: string): string {
+  const parsed = chordToAccelerator(chord);
+  return parsed.ok ? parsed.accelerator : chord;
 }
 
 /**

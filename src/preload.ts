@@ -1303,6 +1303,23 @@ const api = {
     ipcRenderer.invoke('app:setToggleShortcut', chord),
   appSetRestartShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('app:setRestartShortcut', chord),
+  /** The one OS-wide hotkey registry (main/globalCommands.ts): push, list, run. */
+  globalCommandsSync: (
+    chords: Record<string, string>,
+  ): Promise<import('./shared/globalCommands').GlobalCommandStatus[]> =>
+    ipcRenderer.invoke('globalCommands:sync', chords),
+  globalCommandsList: (): Promise<import('./shared/globalCommands').GlobalCommandStatus[]> =>
+    ipcRenderer.invoke('globalCommands:list'),
+  globalCommandsRun: (id: string): Promise<boolean> => ipcRenderer.invoke('globalCommands:run', id),
+  globalCommandsLegacyChords: (): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('globalCommands:legacyChords'),
+  onGlobalCommandsChanged: (
+    cb: (list: import('./shared/globalCommands').GlobalCommandStatus[]) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, list: import('./shared/globalCommands').GlobalCommandStatus[]): void => cb(list);
+    ipcRenderer.on('globalCommands:changed', handler);
+    return () => ipcRenderer.removeListener('globalCommands:changed', handler);
+  },
   osHotkeyStatus: (): Promise<{
     supported: boolean;
     installed: boolean;

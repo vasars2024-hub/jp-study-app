@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_ZH } from '../scraperDrawerUi/zh';
 import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 import { SHELL_UI_ZH } from '../shellUi/zh';
 import { COMMANDS_UI_ZH } from '../commandsUi/zh';
+import { COMPANION_UI_ZH } from '../companionUi/zh';
 import { MUSIC_UI_ZH } from '../musicUi/zh';
 import { RESOURCES_CATALOG_ZH } from '../resourcesCatalog/zh';
 import { RESOURCE_BUNDLES_ZH } from '../resourceBundles/zh';
@@ -696,6 +697,7 @@ export const zh: Catalog = {
   ...GRAMMAR_TAXONOMY_ZH,
   ...SHELL_UI_ZH,
   ...COMMANDS_UI_ZH,
+  ...COMPANION_UI_ZH,
   ...MUSIC_UI_ZH,
   ...RESOURCES_CATALOG_ZH,
   ...RESOURCE_BUNDLES_ZH,
@@ -3501,6 +3503,7 @@ export const zh: Catalog = {
   'commands.category.music': '音乐',
   'commands.category.video': '视频',
   'commands.category.toolbox': '工具箱',
+  'commands.category.companion': '伴侣',
   'commands.category.utility': '实用工具',
   'commands.category.custom': '自定义',
 

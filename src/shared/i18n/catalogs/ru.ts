@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_RU } from '../scraperDrawerUi/ru';
 import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 import { SHELL_UI_RU } from '../shellUi/ru';
 import { COMMANDS_UI_RU } from '../commandsUi/ru';
+import { COMPANION_UI_RU } from '../companionUi/ru';
 import { MUSIC_UI_RU } from '../musicUi/ru';
 import { RESOURCES_CATALOG_RU } from '../resourcesCatalog/ru';
 import { RESOURCE_BUNDLES_RU } from '../resourceBundles/ru';
@@ -821,6 +822,7 @@ export const ru: Catalog = {
   ...GRAMMAR_TAXONOMY_RU,
   ...SHELL_UI_RU,
   ...COMMANDS_UI_RU,
+  ...COMPANION_UI_RU,
   ...MUSIC_UI_RU,
   ...RESOURCES_CATALOG_RU,
   ...RESOURCE_BUNDLES_RU,
@@ -3789,6 +3791,7 @@ export const ru: Catalog = {
   'commands.category.music': 'Музыка',
   'commands.category.video': 'Видео',
   'commands.category.toolbox': 'Инструменты',
+  'commands.category.companion': 'Компаньон',
   'commands.category.utility': 'Утилиты',
   'commands.category.custom': 'Свои',
 

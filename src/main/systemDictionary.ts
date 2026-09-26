@@ -8,34 +8,62 @@
  * dictionary popup as a small always-on-top overlay window — even when the
  * Study OS window is minimized.
  *
- * How the selection is captured without a native module: on the hotkey we
- * synthesize Ctrl+C into the foreground window (PowerShell SendKeys), read the
- * clipboard, then restore the user's previous clipboard so the lookup is
- * non-destructive. If nothing new was copied we fall back to whatever is
- * already on the clipboard.
+ * How the selection is captured without a native module: see
+ * `companionContext.ts` — a kept-alive helper waits for the hotkey's modifiers
+ * to be released, sends Ctrl+C to the foreground window, and the user's
+ * previous clipboard is put back afterwards so the lookup is non-destructive.
  *
- * Everything here is opt-out: a Settings toggle, a tray checkbox, and the
- * hotkey itself. Disabling unregisters the global shortcut entirely.
+ * The hotkeys themselves (`companion.lookupSelection`,
+ * `companion.lookupClipboard`) belong to the one global-command registry and
+ * are rebound in Settings → Shortcuts; the chord set on this feature's old
+ * settings page is carried there once (`legacyKeys`).
+ *
+ * This module also owns the tray icon, whose menu lists every companion
+ * action with its current chord.
+ *
+ * Everything here is opt-out: a Settings toggle and a tray checkbox. Disabling
+ * releases the lookup chord entirely.
  */
 
 import {
   app,
   BrowserWindow,
   clipboard,
-  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
   screen,
   Tray,
+  type MenuItemConstructorOptions,
 } from 'electron';
-import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import {
+  captureSelection,
+  noteCompanionLookup,
+  warmCompanionContext,
+  type ForegroundInfo,
+} from './companionContext';
+import {
+  getGlobalCommandChord,
+  getGlobalCommandStatus,
+  legacyChordResult,
+  listGlobalCommands,
+  onGlobalCommandsChanged,
+  refreshGlobalCommands,
+  registerGlobalCommand,
+  runGlobalCommand,
+  setGlobalCommandChord,
+} from './globalCommands';
+import { chordToAccelerator, COMPANION_COMMAND_ORDER, GLOBAL_COMMAND_DEFAULTS } from '../shared/globalCommands';
+import { mt } from './i18n';
 
 export interface SystemDictionarySettings {
   enabled: boolean;
-  /** Accelerator in the app's chord format, e.g. "Ctrl+Shift+D". */
+  /**
+   * The chord this page used to own. Kept only so a chord chosen here before the
+   * Shortcuts registry existed is carried over; the live chord is the registry's.
+   */
   hotkey: string;
 }
 
@@ -46,12 +74,23 @@ export interface SystemDictionaryStatus extends SystemDictionarySettings {
   registered: boolean;
 }
 
+/** How the overlay should present a query. */
+export type SysDictMode = 'auto' | 'translate';
+
+export interface SysDictContext {
+  mode: SysDictMode;
+  sourceTitle?: string;
+  sourceApp?: string;
+}
+
 const STATE_FILE = 'system-dictionary.json';
+const LOOKUP_ID = 'companion.lookupSelection';
+const CLIPBOARD_ID = 'companion.lookupClipboard';
 // Ctrl+Alt+J is deliberately chosen to not collide with any in-app default
 // binding (a global accelerator shadows the in-app one even while focused).
 const DEFAULTS: SystemDictionarySettings = {
   enabled: true,
-  hotkey: 'Ctrl+Alt+J',
+  hotkey: GLOBAL_COMMAND_DEFAULTS[LOOKUP_ID] ?? 'Ctrl+Alt+J',
 };
 
 const OVERLAY_W = 372;
@@ -67,11 +106,15 @@ let attachNavGuards: NavGuardFn | null = null;
 let isDev = false;
 
 let settings: SystemDictionarySettings = { ...DEFAULTS };
-let currentAccelerator: string | null = null;
+let settingsLoaded = false;
+let started = false;
+let commandsRegistered = false;
 let overlay: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let offCommandsChanged: (() => void) | null = null;
 /** Last captured text, handed to the overlay renderer once it has loaded. */
 let pendingQuery = '';
+let pendingContext: SysDictContext = { mode: 'auto' };
 
 export function configureSystemDictionary(opts: {
   rendererUrl: RendererUrlFn;
@@ -108,66 +151,18 @@ function loadSettings(): SystemDictionarySettings {
   }
 }
 
+function ensureSettings(): void {
+  if (settingsLoaded) return;
+  settings = loadSettings();
+  settingsLoaded = true;
+}
+
 function saveSettings(): void {
   try {
     writeJsonAtomicSync(statePath(), settings);
   } catch (err) {
     console.error('[systemDictionary] failed to persist settings', err);
   }
-}
-
-// ---- Selection capture --------------------------------------------------
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Synthesize Ctrl+C into the currently focused (foreground) window. Windows only. */
-function sendCopyKeystroke(): Promise<void> {
-  if (process.platform !== 'win32') return Promise.resolve();
-  return new Promise((resolve) => {
-    try {
-      const child = spawn(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-STA',
-          '-Command',
-          "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^c')",
-        ],
-        { windowsHide: true, stdio: 'ignore' },
-      );
-      child.on('exit', () => resolve());
-      child.on('error', () => resolve());
-    } catch {
-      resolve();
-    }
-  });
-}
-
-/**
- * Grab the foreground selection: copy it, read it, then restore the user's
- * original clipboard so we never clobber it. Falls back to the existing
- * clipboard text when the copy produced nothing new.
- */
-async function captureSelection(): Promise<string> {
-  const before = clipboard.readText();
-  await sendCopyKeystroke();
-  await delay(160);
-  const after = clipboard.readText();
-  if (after && after !== before) {
-    // Restore shortly after so downstream paste actions still see the user's data.
-    setTimeout(() => {
-      try {
-        clipboard.writeText(before);
-      } catch {
-        /* ignore */
-      }
-    }, 350);
-    return after.trim();
-  }
-  return before.trim();
 }
 
 // ---- Overlay window -----------------------------------------------------
@@ -184,10 +179,31 @@ function placeAtCursor(): { x: number; y: number } {
   return { x: Math.round(x), y: Math.round(y) };
 }
 
-function showOverlay(text: string): void {
+function contextFor(source: ForegroundInfo | null | undefined, mode: SysDictMode): SysDictContext {
+  return {
+    mode,
+    ...(source?.title ? { sourceTitle: source.title } : {}),
+    ...(source?.process ? { sourceApp: source.process } : {}),
+  };
+}
+
+/**
+ * Float the popup dictionary (or, for a sentence or `mode: 'translate'`, the
+ * translator) on `text`, beside the cursor, over whatever app is in front.
+ */
+export function lookUpText(
+  text: string,
+  opts: { mode?: SysDictMode; source?: ForegroundInfo | null } = {},
+): boolean {
   const query = text.slice(0, 500);
-  if (!query.trim()) return;
+  if (!query.trim()) return false;
   pendingQuery = query;
+  pendingContext = contextFor(opts.source, opts.mode ?? 'auto');
+  noteCompanionLookup({
+    text: query,
+    ...(pendingContext.sourceTitle ? { sourceTitle: pendingContext.sourceTitle } : {}),
+    ...(pendingContext.sourceApp ? { sourceApp: pendingContext.sourceApp } : {}),
+  });
   const { x, y } = placeAtCursor();
 
   if (overlay && !overlay.isDestroyed()) {
@@ -195,7 +211,7 @@ function showOverlay(text: string): void {
     overlay.webContents.send('sysdict:query', query);
     overlay.show();
     overlay.focus();
-    return;
+    return true;
   }
 
   overlay = new BrowserWindow({
@@ -247,6 +263,7 @@ function showOverlay(text: string): void {
   });
 
   void win.loadURL(getRendererUrl('sysDict=1'));
+  return true;
 }
 
 function hideOverlay(): void {
@@ -255,66 +272,45 @@ function hideOverlay(): void {
 
 // ---- Triggers -----------------------------------------------------------
 
-async function triggerFromSelection(): Promise<void> {
-  const text = await captureSelection();
-  if (text) showOverlay(text);
+/**
+ * Copy the selection out of the app in front (or out of `target`, when the
+ * radial wheel is in front) and look it up.
+ */
+export async function lookUpSelection(
+  opts: { target?: ForegroundInfo | null; mode?: SysDictMode } = {},
+): Promise<boolean> {
+  const captured = await captureSelection(opts.target);
+  if (!captured.text) return false;
+  return lookUpText(captured.text, { mode: opts.mode, source: captured.source ?? opts.target });
 }
 
-function triggerFromClipboard(): void {
+export function lookUpClipboard(source?: ForegroundInfo | null): boolean {
   const text = clipboard.readText().trim();
-  if (text) showOverlay(text);
+  return text ? lookUpText(text, { source }) : false;
 }
 
-// ---- Global shortcut ----------------------------------------------------
+// ---- Global commands -----------------------------------------------------
 
-function toAccelerator(chord: string): string {
-  // Chord format is "Ctrl+Shift+D" (alternatives split by "|"); register the
-  // first alternative only. Electron uses "Super" where the app says "Meta".
-  return chord.split('|')[0]!.trim().replace(/\bMeta\b/g, 'Super');
-}
-
-function unregisterShortcut(): void {
-  if (currentAccelerator) {
-    try {
-      globalShortcut.unregister(currentAccelerator);
-    } catch {
-      /* already gone */
-    }
-    currentAccelerator = null;
-  }
-}
-
-function registerShortcut(): { ok: boolean; error?: string } {
-  unregisterShortcut();
-  const accelerator = toAccelerator(settings.hotkey);
-  if (!/^([\w]+\+)+[\w,.;'[\]/\\`=-]+$/.test(accelerator)) {
-    return { ok: false, error: 'This shortcut cannot be registered system-wide.' };
-  }
-  if (!/(Ctrl|Alt|Shift|Super|CmdOrCtrl)\+/i.test(accelerator)) {
-    return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
-  }
-  try {
-    const registered = globalShortcut.register(accelerator, () => {
-      void triggerFromSelection();
-    });
-    if (!registered) {
-      return { ok: false, error: `"${accelerator}" is already in use by another application.` };
-    }
-    currentAccelerator = accelerator;
-    return { ok: true };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : 'Could not register the global shortcut.',
-    };
-  }
+function ensureCommands(): void {
+  if (commandsRegistered) return;
+  commandsRegistered = true;
+  ensureSettings();
+  registerGlobalCommand(LOOKUP_ID, () => lookUpSelection().then(() => undefined), {
+    available: () => started && settings.enabled,
+    legacyKeys: () => settings.hotkey,
+  });
+  registerGlobalCommand(CLIPBOARD_ID, () => {
+    lookUpClipboard();
+  }, {
+    available: () => started,
+  });
 }
 
 function applyEnabledState(): { ok: boolean; error?: string } {
-  if (settings.enabled) return registerShortcut();
-  unregisterShortcut();
-  hideOverlay();
-  return { ok: true };
+  refreshGlobalCommands();
+  if (!settings.enabled) hideOverlay();
+  const status = getGlobalCommandStatus(LOOKUP_ID);
+  return settings.enabled ? legacyChordResult(status) : { ok: true };
 }
 
 // ---- Tray ---------------------------------------------------------------
@@ -338,6 +334,70 @@ function loadTrayIcon(): Electron.NativeImage {
   return nativeImage.createEmpty();
 }
 
+/** A command's label in the UI language (`commands.<id>`, then `cmd.<id>`). */
+function commandLabel(id: string): string {
+  for (const key of [`commands.${id}`, `cmd.${id}`]) {
+    const out = mt(key);
+    if (out !== key) return out;
+  }
+  return id;
+}
+
+/**
+ * One menu row per companion action (and per command another feature added,
+ * such as live captions), each showing the chord it is bound to right now.
+ * The chord is display-only here (`registerAccelerator: false`): the registry
+ * already holds it with Windows.
+ */
+export function companionMenuItems(): MenuItemConstructorOptions[] {
+  const statuses = listGlobalCommands();
+  const byId = new Map(statuses.map((s) => [s.id, s]));
+  const extra = statuses
+    .filter((s) => !COMPANION_COMMAND_ORDER.includes(s.id) && !(s.id in GLOBAL_COMMAND_DEFAULTS))
+    .map((s) => s.id);
+  return [...COMPANION_COMMAND_ORDER, ...extra]
+    .map((id) => byId.get(id))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s?.hasHandler))
+    .map((s) => {
+      const parsed = chordToAccelerator(s.chord);
+      const accelerator = parsed.ok ? parsed.accelerator : '';
+      return {
+        id: `companion:${s.id}`,
+        label: commandLabel(s.id),
+        enabled: s.available,
+        ...(accelerator ? { accelerator, registerAccelerator: false } : {}),
+        click: () => {
+          runGlobalCommand(s.id);
+        },
+      };
+    });
+}
+
+function refreshTrayMenu(): void {
+  if (!tray) return;
+  const chord = getGlobalCommandChord(LOOKUP_ID);
+  const menu = Menu.buildFromTemplate([
+    { label: mt('companion.tray.title'), submenu: companionMenuItems() },
+    { type: 'separator' },
+    {
+      label: mt('companion.tray.enableLookup'),
+      type: 'checkbox',
+      checked: settings.enabled,
+      click: () => setEnabled(!settings.enabled),
+    },
+    { label: mt('companion.tray.shortcuts'), click: () => openShortcutSettings() },
+    { type: 'separator' },
+    { label: mt('companion.tray.open'), click: () => runGlobalCommand('app.focus') || focusMainWindow() },
+    { label: mt('companion.tray.quit'), click: () => app.quit() },
+  ]);
+  tray.setContextMenu(menu);
+  tray.setToolTip(
+    settings.enabled && chord
+      ? mt('companion.tray.tooltipOn', { chord })
+      : mt('companion.tray.tooltipOff'),
+  );
+}
+
 function focusMainWindow(): void {
   const win = BrowserWindow.getAllWindows().find((w) => w !== overlay && !w.isDestroyed());
   if (!win) return;
@@ -346,41 +406,12 @@ function focusMainWindow(): void {
   win.focus();
 }
 
-function refreshTrayMenu(): void {
-  if (!tray) return;
-  const menu = Menu.buildFromTemplate([
-    {
-      label: settings.enabled ? 'Popup dictionary: on' : 'Popup dictionary: off',
-      enabled: false,
-    },
-    { type: 'separator' },
-    {
-      label: 'Enable system-wide lookup',
-      type: 'checkbox',
-      checked: settings.enabled,
-      click: () => setEnabled(!settings.enabled),
-    },
-    {
-      label: `Look up selection  (${settings.hotkey})`,
-      enabled: settings.enabled,
-      click: () => {
-        void triggerFromSelection();
-      },
-    },
-    {
-      label: 'Look up clipboard text',
-      click: () => triggerFromClipboard(),
-    },
-    { type: 'separator' },
-    { label: 'Open Gum', click: () => focusMainWindow() },
-    { label: 'Quit', click: () => app.quit() },
-  ]);
-  tray.setContextMenu(menu);
-  tray.setToolTip(
-    settings.enabled
-      ? `Popup dictionary — press ${settings.hotkey} anywhere`
-      : 'Popup dictionary (off)',
-  );
+/** Settings → Shortcuts, filtered to the companion group. */
+function openShortcutSettings(): void {
+  runGlobalCommand('app.focus') || focusMainWindow();
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w !== overlay && !w.isDestroyed()) w.webContents.send('companion:openShortcuts', 'Companion');
+  }
 }
 
 function ensureTray(): void {
@@ -392,11 +423,9 @@ function ensureTray(): void {
     tray = null;
     return;
   }
-  // Left-click grabs the current selection, same as the hotkey.
-  tray.on('click', () => {
-    if (settings.enabled) void triggerFromSelection();
-    else triggerFromClipboard();
-  });
+  // A left click used to send Ctrl+C — to the taskbar, which had focus by then.
+  // It opens the companion menu instead, which is where every action lives.
+  tray.on('click', () => tray?.popUpContextMenu());
   refreshTrayMenu();
 }
 
@@ -423,7 +452,7 @@ function setHotkey(hotkey: string): { ok: boolean; error?: string } {
   if (!next) return { ok: false, error: 'Enter a shortcut.' };
   settings.hotkey = next;
   saveSettings();
-  const res = applyEnabledState();
+  const res = legacyChordResult(setGlobalCommandChord(LOOKUP_ID, next));
   refreshTrayMenu();
   broadcastSettings();
   return res;
@@ -431,9 +460,10 @@ function setHotkey(hotkey: string): { ok: boolean; error?: string } {
 
 function getStatus(): SystemDictionaryStatus {
   return {
-    ...settings,
+    enabled: settings.enabled,
+    hotkey: getGlobalCommandChord(LOOKUP_ID),
     supported: process.platform === 'win32',
-    registered: currentAccelerator !== null,
+    registered: getGlobalCommandStatus(LOOKUP_ID)?.registered === true,
   };
 }
 
@@ -441,13 +471,22 @@ function getStatus(): SystemDictionaryStatus {
 
 export function startSystemDictionary(): void {
   settings = loadSettings();
+  settingsLoaded = true;
+  started = true;
+  ensureCommands();
   ensureTray();
   applyEnabledState();
+  offCommandsChanged ??= onGlobalCommandsChanged(() => refreshTrayMenu());
   refreshTrayMenu();
+  // The selection helper boots PowerShell once, off the hotkey's critical path.
+  warmCompanionContext();
 }
 
 export function stopSystemDictionary(): void {
-  unregisterShortcut();
+  started = false;
+  refreshGlobalCommands();
+  offCommandsChanged?.();
+  offCommandsChanged = null;
   if (overlay && !overlay.isDestroyed()) overlay.destroy();
   overlay = null;
   if (tray) {
@@ -457,6 +496,7 @@ export function stopSystemDictionary(): void {
 }
 
 export function registerSystemDictionaryIpc(): void {
+  ensureCommands();
   ipcMain.handle('sysdict:getSettings', (): SystemDictionaryStatus => getStatus());
   ipcMain.handle('sysdict:setEnabled', (_e, on: unknown): SystemDictionaryStatus => {
     setEnabled(on === true);
@@ -470,6 +510,9 @@ export function registerSystemDictionaryIpc(): void {
     },
   );
   ipcMain.handle('sysdict:getPending', (): string => pendingQuery);
+  ipcMain.handle('sysdict:getContext', (): SysDictContext => pendingContext);
   ipcMain.handle('sysdict:close', (): void => hideOverlay());
-  ipcMain.handle('sysdict:lookupClipboard', (): void => triggerFromClipboard());
+  ipcMain.handle('sysdict:lookupClipboard', (): void => {
+    lookUpClipboard();
+  });
 }

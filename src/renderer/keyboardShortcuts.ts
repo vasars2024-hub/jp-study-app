@@ -15,6 +15,7 @@ import { loadToolboxSettings } from './toolboxSettings';
 import { resumeMostRecentWatched } from './continueWatchingStore';
 import { reachMediaWorkspace } from './mediaWorkspaceBridge';
 import { t } from './i18n';
+import { GLOBAL_COMMAND_DEFAULTS, migrateLegacyGlobalChords, type GlobalCommandStatus } from '../shared/globalCommands';
 
 export type CommandCategory =
   | 'Navigation'
@@ -28,6 +29,7 @@ export type CommandCategory =
   | 'Video'
   | 'Utility'
   | 'Toolbox'
+  | 'Companion'
   | 'Custom';
 
 export interface AppCommand {
@@ -441,6 +443,38 @@ export const COMMAND_CATALOG: AppCommand[] = [
     note: 'Turns the Shift+click dictionary gesture on or off without opening settings.',
   },
 
+  // Companion — system-wide: these reach Gum from any app on the computer. Main's one
+  // registry (`main/globalCommands.ts`) holds each chord with Windows; the defaults live
+  // in `shared/globalCommands.ts` because main needs them before any window has pushed.
+  // The Lens and popup-dictionary chords used to be set on those features' own pages;
+  // `syncGlobalCommands` carries a chord set there into these rows once.
+  ...(
+    [
+      ['companion.wheel', 'Companion wheel at the cursor', 'Study actions around the pointer, over any app. Keys 1–8 pick one, Esc closes. The Chrome extension keeps Alt+Shift+W inside Chrome.'],
+      ['companion.lookupSelection', 'Look up the selected text', 'Copies what is selected in any app and opens the popup dictionary beside it. Your clipboard is put back afterwards.'],
+      ['lens.atCursor', 'Look up the word under the cursor', 'Reads a small box around the pointer with the Reading Lens and opens the word you are pointing at — works in games, video and images too.'],
+      ['companion.lookupClipboard', 'Look up the clipboard', 'Opens the popup dictionary on whatever text is on the clipboard.'],
+      ['companion.cardPreview', 'Card preview for the selection', 'Drafts a card from the selected text with the window title as its source; edit it, then Add.'],
+      ['companion.mineLast', 'Mine the last lookup', 'Adds the word you last looked up from another app to your deck, without opening anything.'],
+      ['lens.region', 'Reading Lens: select a region', 'Drag a box over any app to read it. Press twice quickly to read the whole screen.'],
+      ['lens.auto', 'Reading Lens: read the whole screen', 'Reads the display under the cursor without a drag.'],
+      ['lens.repeat', 'Reading Lens: repeat the last region', 'Reads the same box again — for visual novels and games that keep text in one place.'],
+      ['lens.clipboard', 'Reading Lens: read the clipboard', 'Reads copied text, or a copied picture (a snip, a manga panel) with OCR.'],
+      ['vn.toggleCapture', 'Start / stop visual novel text capture', 'Captures from the texthooker for the visual novel you are playing (or played last).'],
+      ['app.focus', 'Open / focus Gum', 'Brings the Gum window to the front, starting it again if it was closed.'],
+      ['app.toggleMiniView', 'Toggle Mini View', 'Switches Gum between the full desktop and the compact Mini View.'],
+    ] as const
+  ).map(
+    ([id, label, note]): AppCommand => ({
+      id,
+      label,
+      category: 'Companion',
+      defaultKeys: GLOBAL_COMMAND_DEFAULTS[id] ?? '',
+      note,
+      global: true,
+    }),
+  ),
+
   // Flashcards — review session
   {
     id: 'flashcards.flip',
@@ -816,6 +850,8 @@ interface ShortcutStore {
   customCommands: CustomCommandDef[];
   /** Which set of built-in defaults the profiles were last migrated to (see MOVED_DEFAULTS). */
   defaultsVersion?: number;
+  /** Chords from the old Lens / popup-dictionary pages were carried in (see syncGlobalCommands). */
+  globalMigrated?: boolean;
 }
 
 const KEY = 'jp-shortcuts-v1';
@@ -955,7 +991,13 @@ function loadStore(): ShortcutStore {
         const movedDefaults = fromVersion < DEFAULTS_VERSION;
         if (movedDefaults) migrateMovedDefaults(profiles, fromVersion);
         const migrated = migrateHighlightHKey(profiles) || movedDefaults;
-        const next: ShortcutStore = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION };
+        const next: ShortcutStore = {
+          active,
+          profiles,
+          customCommands,
+          defaultsVersion: DEFAULTS_VERSION,
+          ...(p.globalMigrated === true ? { globalMigrated: true } : {}),
+        };
         if (migrated) {
           try {
             localStorage.setItem(KEY, JSON.stringify(next));
@@ -974,13 +1016,10 @@ function loadStore(): ShortcutStore {
 
 let store: ShortcutStore = loadStore();
 
-// Keep the OS-level global shortcut for `toolbox.open` in sync with the user's
-// current binding (pushed to main on boot and on every rebind). If another
-// application owns the accelerator, main reports it and the in-app binding
-// keeps working — the failure is surfaced once as a quiet toast.
-let lastSyncedToolboxOpenKeys: string | null = null;
-let lastSyncedAppToggleKeys: string | null = null;
-let lastSyncedAppRestartKeys: string | null = null;
+// System-wide chords (`global: true` rows) are pushed to main's registry on boot and
+// on every rebind (`syncGlobalCommands`). If another application owns an accelerator,
+// main reports it per command and the in-app binding keeps working — the failure is
+// surfaced once as a quiet toast and stays visible on the row in Settings.
 let lastSyncedOsHotkeyPayload: string | null = null;
 let osHotkeyInstalledCache: boolean | null = null;
 
@@ -1029,68 +1068,143 @@ export function collectOsHotkeyBindings(): {
   return { toggle, restart, opens };
 }
 
-function syncToolboxGlobalShortcut(): void {
-  try {
-    if (!window.api?.blancSetGlobalShortcut) return;
-    // Only the main Study window owns the registration; the Blanc window doing
-    // it too would double-register and could race error toasts.
-    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
-    const keys = getBindings().find((row) => row.id === 'toolbox.open')?.keys ?? '';
-    if (keys === lastSyncedToolboxOpenKeys) return;
-    lastSyncedToolboxOpenKeys = keys;
-    void window.api.blancSetGlobalShortcut(keys).then((result) => {
-      if (result && !result.ok && result.error) {
-        window.dispatchEvent(
-          new CustomEvent('os:toast', {
-            detail: { message: t('shortcut.toast.toolboxGlobal', { error: result.error }), kind: 'muted' },
-          }),
-        );
-      }
-    });
-  } catch {
-    /* Non-Electron harness (tests, browser dev harness) — in-app binding only. */
+/**
+ * Windows where the main process should hear about chords: the main desktop only.
+ * Overlays and pop-outs share this store (same origin), and every one of them
+ * pushing would repeat each "Windows refused …" toast once per window.
+ */
+function ownsGlobalRegistration(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return ![
+    'blanc',
+    'sysDict',
+    'readingLens',
+    'companion',
+    'companionHost',
+    'vnReader',
+    'popout',
+    'desk',
+  ].some((flag) => params.has(flag));
+}
+
+/** Every `global: true` row (catalog and Toolbox) and its effective chord. */
+export function collectGlobalChords(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const cmd of COMMAND_CATALOG) {
+    if (cmd.global) out[cmd.id] = effectiveKeys(cmd.id);
+  }
+  return out;
+}
+
+/** What main said last, so Settings can show "Windows refused this chord" per row. */
+let globalStatuses: GlobalCommandStatus[] = [];
+const GLOBAL_STATUS_EVENT = 'global-commands-status';
+
+export function getGlobalCommandStatuses(): GlobalCommandStatus[] {
+  return globalStatuses;
+}
+
+export function onGlobalCommandStatus(cb: (list: GlobalCommandStatus[]) => void): () => void {
+  const h = (): void => cb(globalStatuses);
+  window.addEventListener(GLOBAL_STATUS_EVENT, h);
+  return () => window.removeEventListener(GLOBAL_STATUS_EVENT, h);
+}
+
+function setGlobalStatuses(list: unknown): void {
+  if (!Array.isArray(list)) return;
+  globalStatuses = list as GlobalCommandStatus[];
+  window.dispatchEvent(new CustomEvent(GLOBAL_STATUS_EVENT));
+}
+
+/** A registration error, in the live language. */
+export function globalCommandErrorText(status: Pick<GlobalCommandStatus, 'error' | 'conflictWith' | 'chord'>): string {
+  switch (status.error) {
+    case 'in-use':
+      return t('shortcut.global.error.inUse', { chord: status.chord });
+    case 'duplicate':
+      return t('shortcut.global.error.duplicate', {
+        name: status.conflictWith ? (builtinLabel(status.conflictWith) ?? status.conflictWith) : '',
+      });
+    case 'needs-modifier':
+      return t('shortcut.global.error.needsModifier');
+    case 'invalid':
+      return t('shortcut.global.error.invalid');
+    case 'failed':
+      return t('shortcut.global.error.failed');
+    default:
+      return '';
   }
 }
 
-function syncAppToggleGlobalShortcut(): void {
-  try {
-    if (!window.api?.appSetToggleShortcut) return;
-    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
-    const keys = getBindings().find((row) => row.id === 'app.toggle')?.keys ?? '';
-    if (keys === lastSyncedAppToggleKeys) return;
-    lastSyncedAppToggleKeys = keys;
-    void window.api.appSetToggleShortcut(keys).then((result) => {
-      if (result && !result.ok && result.error) {
-        window.dispatchEvent(
-          new CustomEvent('os:toast', {
-            detail: { message: t('shortcut.toast.appToggle', { error: result.error }), kind: 'muted' },
-          }),
-        );
-      }
-    });
-  } catch {
-    /* Non-Electron harness */
-  }
+let lastSyncedGlobalChords: string | null = null;
+let globalMigration: Promise<void> | null = null;
+/** Errors already toasted, keyed `id:error:chord`, so a re-push does not repeat them. */
+const toastedGlobalErrors = new Set<string>();
+
+/**
+ * Carry chords from the old per-feature pages (popup dictionary, Reading Lens) into
+ * the Shortcuts profiles, once per profile store. Main reports what those files
+ * held; the rows the user never touched here take them over.
+ */
+function migrateLegacyGlobalOnce(): Promise<void> {
+  if (store.globalMigrated) return Promise.resolve();
+  globalMigration ??= (async () => {
+    let legacy: Record<string, string> = {};
+    try {
+      legacy = (await window.api.globalCommandsLegacyChords?.()) ?? {};
+    } catch {
+      legacy = {};
+    }
+    migrateLegacyGlobalChords(store.profiles, legacy);
+    store.globalMigrated = true;
+    try {
+      localStorage.setItem(KEY, JSON.stringify(store));
+    } catch {
+      /* ignore */
+    }
+    window.dispatchEvent(new CustomEvent(EVENT));
+  })();
+  return globalMigration;
 }
 
-function syncAppRestartGlobalShortcut(): void {
+/**
+ * Push every system-wide chord to main's registry in one message. Replaces the three
+ * per-command channels (Toolbox, hide/show, restart) and the Lens and popup-dictionary
+ * pages' own hotkey fields: one list, one conflict check, one place that says when
+ * Windows refused a chord.
+ */
+export function syncGlobalCommands(force = false): Promise<void> {
   try {
-    if (!window.api?.appSetRestartShortcut) return;
-    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
-    const keys = getBindings().find((row) => row.id === 'app.restart')?.keys ?? '';
-    if (keys === lastSyncedAppRestartKeys) return;
-    lastSyncedAppRestartKeys = keys;
-    void window.api.appSetRestartShortcut(keys).then((result) => {
-      if (result && !result.ok && result.error) {
+    if (!window.api?.globalCommandsSync) return Promise.resolve();
+    if (!ownsGlobalRegistration()) return Promise.resolve();
+    return migrateLegacyGlobalOnce().then(async () => {
+      const chords = collectGlobalChords();
+      const serialized = JSON.stringify(chords);
+      if (!force && serialized === lastSyncedGlobalChords) return;
+      lastSyncedGlobalChords = serialized;
+      const list = await window.api.globalCommandsSync(chords);
+      setGlobalStatuses(list);
+      for (const status of list ?? []) {
+        if (!status.error || !(status.id in chords)) continue;
+        const key = `${status.id}:${status.error}:${status.chord}`;
+        if (toastedGlobalErrors.has(key)) continue;
+        toastedGlobalErrors.add(key);
         window.dispatchEvent(
           new CustomEvent('os:toast', {
-            detail: { message: t('shortcut.toast.appRestart', { error: result.error }), kind: 'muted' },
+            detail: {
+              message: t('shortcut.toast.global', {
+                name: builtinLabel(status.id) ?? status.id,
+                error: globalCommandErrorText(status),
+              }),
+              kind: 'muted',
+            },
           }),
         );
       }
-    });
+    }).catch(() => undefined);
   } catch {
-    /* Non-Electron harness */
+    /* Non-Electron harness (tests, browser dev harness) — in-app bindings only. */
+    return Promise.resolve();
   }
 }
 
@@ -1139,9 +1253,7 @@ function persist(): void {
     /* ignore */
   }
   window.dispatchEvent(new CustomEvent(EVENT));
-  syncToolboxGlobalShortcut();
-  syncAppToggleGlobalShortcut();
-  syncAppRestartGlobalShortcut();
+  void syncGlobalCommands();
   syncOsHotkeyHelperFromShortcuts();
 }
 
@@ -1154,10 +1266,13 @@ export function onShortcutsChanged(cb: () => void): () => void {
 // Initial registration once the module (and the preload bridge) are up.
 if (typeof window !== 'undefined') {
   window.setTimeout(() => {
-    syncToolboxGlobalShortcut();
-    syncAppToggleGlobalShortcut();
-    syncAppRestartGlobalShortcut();
+    void syncGlobalCommands(true);
     syncOsHotkeyHelperFromShortcuts(true);
+    try {
+      window.api?.onGlobalCommandsChanged?.((list) => setGlobalStatuses(list));
+    } catch {
+      /* Non-Electron harness */
+    }
   }, 0);
 }
 
@@ -1552,7 +1667,8 @@ export function importShortcuts(json: string): { ok: boolean; error?: string } {
       : store.customCommands;
     // An export from before a defaults move carries the old chords as they were then.
     migrateMovedDefaults(profiles, typeof p.defaultsVersion === 'number' ? p.defaultsVersion : 1);
-    store = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION };
+    // An import is a whole profile set of its own; the legacy pages were already carried in.
+    store = { active, profiles, customCommands, defaultsVersion: DEFAULTS_VERSION, globalMigrated: true };
     persist();
     return { ok: true };
   } catch (err) {
@@ -1896,6 +2012,25 @@ function builtinHandler(id: string): Handler | null {
     case 'app.restart':
       return () => {
         void window.api?.relaunchApp?.();
+      };
+    // The companion rows run in main (they act on other apps' windows). Pressed inside
+    // Gum — or picked from the palette, or when Windows refused the chord — they take
+    // the same path the OS hotkey would.
+    case 'companion.wheel':
+    case 'companion.lookupSelection':
+    case 'companion.lookupClipboard':
+    case 'companion.cardPreview':
+    case 'companion.mineLast':
+    case 'lens.atCursor':
+    case 'lens.region':
+    case 'lens.auto':
+    case 'lens.repeat':
+    case 'lens.clipboard':
+    case 'vn.toggleCapture':
+    case 'app.focus':
+    case 'app.toggleMiniView':
+      return () => {
+        void window.api?.globalCommandsRun?.(id);
       };
     case 'calendar.open':
       return () => void openApp('calendar');

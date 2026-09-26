@@ -1,0 +1,28 @@
+/*
+ * Desktop companion — the surfaces Gum puts over other apps (radial wheel, card
+ * preview, notice) and the "System-wide" marks in Settings → Shortcuts.
+ *
+ * The overlay windows are frameless and transparent (main/companion.ts), so
+ * html/body/#root are see-through and only the surface itself paints. A
+ * transparent Electron window cannot blur what is behind it, so the surfaces
+ * use a near-opaque tint rather than backdrop-filter glass.
+ */
+
+/* ---- Settings → Shortcuts ---- */
+
+.sc-global-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  vertical-align: 1px;
+  color: var(--accent-2, #e0707b);
+  background: color-mix(in srgb, var(--accent, #b23b47) 14%, transparent);
+}
+
+.global-chord-row {
+  margin-top: 8px;
+}

@@ -23,6 +23,7 @@ import { SCRAPER_DRAWER_EN } from '../scraperDrawerUi/en';
 import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 import { SHELL_UI_EN } from '../shellUi/en';
 import { COMMANDS_UI_EN } from '../commandsUi/en';
+import { COMPANION_UI_EN } from '../companionUi/en';
 import { MUSIC_UI_EN } from '../musicUi/en';
 import { RESOURCES_CATALOG_EN } from '../resourcesCatalog/en';
 import { RESOURCE_BUNDLES_EN } from '../resourceBundles/en';
@@ -799,6 +800,7 @@ export const en: Catalog = {
   ...GRAMMAR_TAXONOMY_EN,
   ...SHELL_UI_EN,
   ...COMMANDS_UI_EN,
+  ...COMPANION_UI_EN,
   ...MUSIC_UI_EN,
   ...RESOURCES_CATALOG_EN,
   ...RESOURCE_BUNDLES_EN,
@@ -3418,6 +3420,7 @@ export const en: Catalog = {
   'commands.category.music': 'Music',
   'commands.category.video': 'Video',
   'commands.category.toolbox': 'Toolbox',
+  'commands.category.companion': 'Companion',
   'commands.category.utility': 'Utility',
   'commands.category.custom': 'Custom',
 

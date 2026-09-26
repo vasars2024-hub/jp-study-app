@@ -16,8 +16,11 @@ import {
   exportShortcuts,
   formatKeysDisplay,
   getBindings,
+  getGlobalCommandStatuses,
+  globalCommandErrorText,
   importShortcuts,
   listShortcutProfiles,
+  onGlobalCommandStatus,
   onShortcutsChanged,
   removeCustomCommand,
   resetAllBindings,
@@ -29,6 +32,8 @@ import {
   type CommandCategory,
   type CustomAction,
 } from '../keyboardShortcuts';
+import { SHORTCUT_REVEAL_EVENT, takePendingShortcutReveal, type ShortcutRevealTarget } from '../shortcutReveal';
+import './companion/companion.css';
 
 // Ordered by purpose, roughly by how often a shortcut in that group gets used:
 // moving around the OS first, then arranging it, then the study surfaces
@@ -39,6 +44,9 @@ const CATEGORY_ORDER: CommandCategory[] = [
   'Reader',
   'Manga',
   'Dictionary',
+  // System-wide: reach Gum from any other app. Next to Dictionary because most of
+  // what it does is look something up.
+  'Companion',
   'Flashcards',
   'Immersion',
   'Music',
@@ -105,10 +113,40 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
    * property of the visit, and a stored set would re-open them weeks later.
    */
   const [openCats, setOpenCats] = useState<Set<CommandCategory>>(() => new Set());
+  /** Main's registration result per system-wide row ("Windows refused …"). */
+  const [globalStatus, setGlobalStatus] = useState(() => getGlobalCommandStatuses());
+  const [revealId, setRevealId] = useState<string | null>(null);
   const captureRef = useRef<string | null>(null);
   const modeRef = useRef<CaptureMode>('replace');
   captureRef.current = capturing;
   modeRef.current = captureMode;
+
+  useEffect(() => onGlobalCommandStatus(setGlobalStatus), []);
+
+  // "Change in Shortcuts" from the Lens / popup-dictionary pages, the tray or the
+  // companion wheel: open that group and bring the row into view.
+  useEffect(() => {
+    const apply = (target: ShortcutRevealTarget | null): void => {
+      if (!target) return;
+      const cat = target.category ?? COMMAND_CATALOG.find((c) => c.id === target.id)?.category;
+      if (cat) setOpenCats((prev) => new Set(prev).add(cat));
+      setQuery('');
+      setRevealId(target.id ?? null);
+    };
+    apply(takePendingShortcutReveal());
+    const onReveal = (ev: Event): void => {
+      takePendingShortcutReveal();
+      apply((ev as CustomEvent<ShortcutRevealTarget>).detail ?? null);
+    };
+    window.addEventListener(SHORTCUT_REVEAL_EVENT, onReveal);
+    return () => window.removeEventListener(SHORTCUT_REVEAL_EVENT, onReveal);
+  }, []);
+
+  useEffect(() => {
+    if (!revealId) return;
+    const el = document.querySelector(`[data-shortcut-id="${CSS.escape(revealId)}"]`);
+    el?.scrollIntoView({ block: 'center' });
+  }, [revealId, openCats]);
 
   useEffect(
     () =>
@@ -596,8 +634,16 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                 data-shortcut-keys={r.keys}
               >
                 <div className="sc-row-text">
-                  <span className="sc-label">{displayLabel(r, t)}</span>
+                  <span className="sc-label">
+                    {displayLabel(r, t)}
+                    {r.global && <span className="sc-global-tag">{t('shortcut.global.tag')}</span>}
+                  </span>
                   {r.note && <span className="sc-note muted">{displayNote(r, t)}</span>}
+                  {r.global && (() => {
+                    const status = globalStatus.find((g) => g.id === r.id);
+                    const text = status?.error ? globalCommandErrorText(status) : '';
+                    return text ? <span className="sc-conflict sc-global-error">{text}</span> : null;
+                  })()}
                   {r.conflictsWith.length > 0 && (
                     <span className="sc-conflict">
                       {t('settings.shortcuts.alsoBound', {
