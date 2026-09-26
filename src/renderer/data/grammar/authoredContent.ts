@@ -32,6 +32,11 @@ export interface AuthoredGrammarContent {
   explanation: string;
   /** At least two, each with a translation. */
   examples: GrammarExample[];
+  /**
+   * A replacement title, only where the dump's is not pattern notation at all:
+   * ten records arrived labelled in Vietnamese (`Trợ từ + なら` for 助詞＋なら).
+   */
+  title?: string;
   /** A corrected gloss, when the dump's gloss was wrong or unreadable. */
   meaning?: string;
   /** Corrected legacy function tags (the dump's were gloss-regex guesses). */
@@ -119,6 +124,7 @@ export function applyAuthoredContent(list: readonly GrammarPoint[]): GrammarPoin
     const functions = content.functions ?? corrected;
     return {
       ...p,
+      title: content.title ?? p.title,
       meaning: content.meaning ?? p.meaning,
       structure: content.structure,
       explanation: content.explanation,
@@ -189,13 +195,15 @@ export function shadowedSupplementIds(
   titleKey: (lang: GrammarLang, title: string) => string,
 ): Set<string> {
   const coreKeys = new Set(core.map((p) => titleKey(p.lang ?? 'ja', p.title)));
+  // The key dedupe will see: an authored title replaces the dump's.
+  const keyOf = (p: GrammarPoint) => titleKey(p.lang ?? 'ja', AUTHORED_CONTENT[p.id]?.title ?? p.title);
   const claimed = new Map<string, string>();
   for (const p of supplements) {
-    if (AUTHORED_CONTENT[p.id]) claimed.set(titleKey(p.lang ?? 'ja', p.title), p.id);
+    if (AUTHORED_CONTENT[p.id]) claimed.set(keyOf(p), p.id);
   }
   const shadowed = new Set<string>();
   for (const p of supplements) {
-    const key = titleKey(p.lang ?? 'ja', p.title);
+    const key = keyOf(p);
     const owner = claimed.get(key);
     if (coreKeys.has(key) || (owner && owner !== p.id)) {
       shadowed.add(p.id);
