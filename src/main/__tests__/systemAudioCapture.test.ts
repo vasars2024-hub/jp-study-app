@@ -321,6 +321,27 @@ describe('system-audio capture in main', () => {
     expect(mineRequests.at(-1)!.audioBase64).toBeUndefined();
   });
 
+  it('a quick on → off → on ends on with one capture window; on → off ends off, not "error"', async () => {
+    const captureWindows = (): FakeWin[] => (BrowserWindow.getAllWindows() as FakeWin[]).filter((w) => w.url.includes('audioCapture=1'));
+    const first = invoke('captions:setCapture', true);
+    const off = invoke('captions:setCapture', false);
+    const again = invoke('captions:setCapture', true);
+    await Promise.all([first, off, again]);
+    await until(() => getCaptionsState().capture !== 'starting');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getCaptionsState().capture).toBe('on');
+    expect(captureWindows()).toHaveLength(1);
+
+    await invoke('captions:setCapture', false);
+    const withdrawn = invoke('captions:setCapture', true);
+    await invoke('captions:setCapture', false);
+    await withdrawn;
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getCaptionsState().capture).toBe('off');
+    expect(getCaptionsState().captureErrorKey).toBeUndefined();
+    expect(captureWindows()).toHaveLength(0);
+  });
+
   it('settings are clamped and persisted without any audio', async () => {
     await invoke('captions:setSettings', { captureSeconds: 500, source: 'gum' });
     expect(getCaptionsState().settings).toMatchObject({ captureSeconds: 120, source: 'gum' });

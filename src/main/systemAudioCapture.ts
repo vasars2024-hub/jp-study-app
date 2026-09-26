@@ -316,6 +316,11 @@ function waitForLoad(win: BrowserWindow): Promise<boolean> {
       return;
     }
     const timer = setTimeout(() => resolve(false), 30_000);
+    // Turned off while loading: a destroyed window never finishes loading.
+    win.once('closed', () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
     win.webContents.once('did-finish-load', () => {
       clearTimeout(timer);
       resolve(true);
@@ -364,9 +369,19 @@ export async function startCapture(): Promise<{ ok: boolean; errorKey?: string }
   broadcastStateNow();
   const win = createCaptureWindow();
   captureWin = win;
+  // Turned off (or off and on again) while this start was still under way: the
+  // later action owns the state and the window. This start only makes sure its
+  // own window is gone — failing here would mark capture "error", and destroy
+  // the NEW window, after the user had simply changed their mind.
+  const superseded = (): { ok: boolean } => {
+    if (!win.isDestroyed()) win.destroy();
+    return { ok: capture === 'on' };
+  };
   const loaded = waitForLoad(win);
   void win.loadURL(deps ? deps.rendererUrl('audioCapture=1') : 'app://bundle/index.html?audioCapture=1');
-  if (!(await loaded) || !(await waitForHost(win))) return failCapture('captions.error.hostFailed');
+  const hostUp = (await loaded) && (await waitForHost(win));
+  if (captureWin !== win) return superseded();
+  if (!hostUp) return failCapture('captions.error.hostFailed');
   let result: { ok?: boolean; error?: string } | null = null;
   try {
     // `userGesture: true` — getDisplayMedia wants a user activation, and this
@@ -376,10 +391,11 @@ export async function startCapture(): Promise<{ ok: boolean; errorKey?: string }
       true,
     );
   } catch (err) {
+    if (captureWin !== win) return superseded();
     return failCapture('captions.error.streamFailed', err instanceof Error ? err.message : String(err));
   }
+  if (captureWin !== win) return superseded();
   if (!result?.ok) return failCapture('captions.error.streamFailed', result?.error);
-  if (captureWin !== win) return { ok: false, errorKey: 'captions.error.streamFailed' };
   capture = 'on';
   broadcastStateNow();
   return { ok: true };
