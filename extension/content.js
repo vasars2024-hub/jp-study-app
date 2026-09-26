@@ -470,20 +470,23 @@
   const LOOKUP_CACHE_MAX = 120;
 
   async function cachedLookup(query) {
-    if (lookupCache.has(query)) {
-      const hit = lookupCache.get(query);
-      lookupCache.delete(query);
-      lookupCache.set(query, hit); // LRU bump
+    // The page's language (kana → ja, Cyrillic → ru, Han → the page hint) so the
+    // app answers from that language's dictionary, not Japanese by default. The
+    // cache is per language: the same Han word is a different entry in each.
+    const lang = lookupLangFor(query);
+    const key = `${lang}:${query}`;
+    if (lookupCache.has(key)) {
+      const hit = lookupCache.get(key);
+      lookupCache.delete(key);
+      lookupCache.set(key, hit); // LRU bump
       return hit;
     }
-    // The page's language (kana → ja, Cyrillic → ru, Han → the page hint) so the
-    // app answers from that language's dictionary, not Japanese by default.
-    const res = await safeRuntimeSend({ type: 'lookup', query, lang: lookupLangFor(query) });
+    const res = await safeRuntimeSend({ type: 'lookup', query, lang });
     if (res?.invalidated) return res;
     // Cache only definitive answers (hits and true misses) — never offline
     // errors, so results recover as soon as the app starts.
     if (res && res.ok) {
-      lookupCache.set(query, res);
+      lookupCache.set(key, res);
       while (lookupCache.size > LOOKUP_CACHE_MAX) {
         lookupCache.delete(lookupCache.keys().next().value);
       }
@@ -1267,9 +1270,21 @@
     const s = String(text || '');
     if (/[぀-ヿ]/.test(s)) return 'ja';
     if (/[Ѐ-ӿ]/.test(s)) return 'ru';
-    const hint = currentLangHint();
+    const hint = hanLangHint();
     if (/[㐀-鿿]/.test(s)) return hint === 'zh' ? 'zh' : 'ja';
     return hint || '';
+  }
+
+  /**
+   * Which language Han-only text on this page is in. A page that declares
+   * itself ja or zh (<html lang>) is taken at its word before the level
+   * badge: the badge's language is inferred from sample text, and Han alone
+   * (or one quoted Japanese line) reads as the study language — so on a
+   * Chinese page the Chinese words were looked up in the Japanese dictionary.
+   */
+  function hanLangHint() {
+    const declared = S.langTagToOcrLang ? S.langTagToOcrLang((document.documentElement && document.documentElement.lang) || '') : '';
+    return declared === 'ja' || declared === 'zh' ? declared : currentLangHint();
   }
 
   /**
@@ -1360,7 +1375,7 @@
     const host = popup && popup.querySelector('.rp-more-translate');
     if (host) host.innerHTML = `<div class="rp-loading-inline">${uiHtml('content_translating')}</div>`;
     else toast(uiMsg('content_translating'), 'pending');
-    const res = await safeRuntimeSend({ type: 'translate', text, ...S.translateLangs(text, currentLangHint(), aiUiLang()) });
+    const res = await safeRuntimeSend({ type: 'translate', text, ...S.translateLangs(text, hanLangHint(), aiUiLang()) });
     if (res?.invalidated) return;
     const out = String(res?.text || '').trim();
     if (host && host.isConnected) {
@@ -2327,7 +2342,7 @@
         const res = await safeRuntimeSend({
           type: 'translate',
           text: payload.text,
-          ...S.translateLangs(payload.text, currentLangHint(), aiUiLang()),
+          ...S.translateLangs(payload.text, hanLangHint(), aiUiLang()),
         });
         if (res?.invalidated) return;
         if (res?.ok) toast(String(res.text || '').slice(0, 140) || uiMsg('content_translated'), 'ok', { label: uiMsg('content_openInApp'), openTarget: 'translate' });

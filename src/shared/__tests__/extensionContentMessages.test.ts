@@ -112,6 +112,21 @@ describe('content script — messages in the page and UI language', () => {
     expect(toast()).toBe(ja.getMessage('content_micUnavailable'));
   });
 
+  it('looks Chinese up in Chinese on a page that says zh, whatever the level badge inferred', async () => {
+    document.documentElement.lang = 'zh-CN';
+    // The badge's language comes from sample text; a quoted Japanese line made it 'ja'.
+    const badge = document.getElementById('jp-study-level-badge') ?? document.body.appendChild(Object.assign(document.createElement('span'), { id: 'jp-study-level-badge' }));
+    badge.dataset.lang = 'ja';
+    sent.length = 0;
+    reply = () => ({ ok: true, entries: [] });
+    deliver({ type: 'jp-lookup-selection', text: '学习' });
+    for (let i = 0; i < 20 && !sent.some((m) => m.type === 'lookup'); i++) await flush();
+    expect(sent.filter((m) => m.type === 'lookup').map((m) => m.lang)).toContain('zh');
+    expect(sent.filter((m) => m.type === 'lookup').map((m) => m.lang)).not.toContain('ja');
+    badge.dataset.lang = '';
+    document.documentElement.lang = '';
+  });
+
   it('marks Chinese and Russian study text with its own lang, not ja', async () => {
     document.documentElement.lang = 'zh-CN';
     reply = (msg) =>
