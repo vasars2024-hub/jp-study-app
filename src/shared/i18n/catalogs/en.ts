@@ -2777,6 +2777,7 @@ export const en: Catalog = {
   'palette.section.watch': 'Watch',
   'palette.section.watchTerms': 'video media player movie film anime drama episode',
   'palette.section.music': 'Music',
+  'palette.section.visualizer': 'Visualizer',
   'palette.section.dictionary': 'Dictionary',
   'palette.section.library': 'Library',
   'palette.section.novels': 'Novels',

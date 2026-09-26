@@ -13021,6 +13021,14 @@ mark.lookup-mark,
   font-size: 13px;
   line-height: 1.5;
 }
+.music-empty p {
+  margin: 0 0 8px;
+}
+.music-empty .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .music-search {
   display: flex;
   align-items: center;
@@ -20696,6 +20704,9 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .focus-music-row {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  left: 0;
   gap: 1px;
   width: 100%;
   text-align: left;
@@ -20732,11 +20743,26 @@ html[data-taskbar-size='large'] .os-tray-btn {
   line-height: 1.4;
 }
 .focus-music-error {
+  /* Under the bar, so it is seen whether or not the song list is open. */
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 6;
+  max-width: 320px;
   margin: 0;
   padding: 6px 10px;
   font-size: 0.75rem;
   color: var(--accent-2, #ff6b7a);
-  border-top: 1px solid var(--border);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.focus-music-error--inline {
+  position: static;
+  max-width: none;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 /* ---- Mini View: locked crafting-table window ---- */

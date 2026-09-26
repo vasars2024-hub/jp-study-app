@@ -9,4 +9,9 @@ export const MUSIC_UI_JA: Catalog = {
   'musicUi.viz.off': 'ビジュアライザーはオフです',
   'musicUi.viz.showHereToo': 'ここにも表示する',
   'musicUi.viz.turnOn': 'オンにする',
+  'musicUi.viz.fftOption': 'FFT サイズ {size}',
+  // The empty song list offers the import itself.
+  'musicUi.empty.addFolder': '音楽フォルダを追加…',
+  'musicUi.empty.noneAdded': 'そのフォルダに音声ファイルは見つかりませんでした。',
+  'musicUi.empty.addFailed': 'フォルダを追加できませんでした。もう一度試すか、ファイルをメディアの監視フォルダに入れてください。',
 };

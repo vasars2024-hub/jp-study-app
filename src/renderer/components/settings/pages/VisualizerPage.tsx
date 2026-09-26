@@ -132,7 +132,7 @@ export default function VisualizerPage() {
                 >
                   {FFT_SIZES.map((n) => (
                     <option key={n} value={n}>
-                      FFT {n}
+                      {t('musicUi.viz.fftOption', { size: n })}
                     </option>
                   ))}
                 </select>

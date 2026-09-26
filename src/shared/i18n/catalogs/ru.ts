@@ -2801,6 +2801,7 @@ export const ru: Catalog = {
   'palette.section.watch': 'Смотреть',
   'palette.section.watchTerms': 'видео медиа просмотр плеер фильм кино аниме сериал',
   'palette.section.music': 'Музыка',
+  'palette.section.visualizer': 'Визуализатор',
   'palette.section.dictionary': 'Словарь',
   'palette.section.library': 'Библиотека',
   'palette.section.novels': 'Новеллы',

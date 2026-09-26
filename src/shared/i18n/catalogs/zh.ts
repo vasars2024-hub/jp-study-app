@@ -2583,6 +2583,7 @@ export const zh: Catalog = {
   'palette.section.watch': '观看',
   'palette.section.watchTerms': '视频 媒体 看 播放 播放器 电影 动画 动漫 电视剧',
   'palette.section.music': '音乐',
+  'palette.section.visualizer': '音乐可视化',
   'palette.section.dictionary': '词典',
   'palette.section.library': '图书馆',
   'palette.section.novels': '小说',

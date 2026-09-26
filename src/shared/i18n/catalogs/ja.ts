@@ -2597,6 +2597,7 @@ export const ja: Catalog = {
   'palette.section.watch': '視聴',
   'palette.section.watchTerms': '動画 ビデオ メディア 見る 観る 再生 プレイヤー 映画 アニメ ドラマ',
   'palette.section.music': '音楽',
+  'palette.section.visualizer': 'ビジュアライザー',
   'palette.section.dictionary': '辞書',
   'palette.section.library': 'ライブラリ',
   'palette.section.novels': '小説',

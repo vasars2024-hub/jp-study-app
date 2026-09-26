@@ -9,4 +9,9 @@ export const MUSIC_UI_ZH: Catalog = {
   'musicUi.viz.off': '可视化效果已关闭',
   'musicUi.viz.showHereToo': '也在这里显示',
   'musicUi.viz.turnOn': '开启',
+  'musicUi.viz.fftOption': 'FFT 点数 {size}',
+  // The empty song list offers the import itself.
+  'musicUi.empty.addFolder': '添加音乐文件夹…',
+  'musicUi.empty.noneAdded': '该文件夹中没有找到音频文件。',
+  'musicUi.empty.addFailed': '无法添加该文件夹。请重试，或将文件放入媒体监视文件夹。',
 };

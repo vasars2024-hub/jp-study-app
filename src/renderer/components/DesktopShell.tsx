@@ -216,6 +216,8 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
   { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
+  // The visualizer had a window but no way in except through the Music widget.
+  { id: 'visualizer', labelKey: 'palette.section.visualizer', glyph: 'chart-bar' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
   { id: 'visualnovels', labelKey: 'palette.section.visualnovels', glyph: 'visual-novel' },
