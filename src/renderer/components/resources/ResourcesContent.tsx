@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
 import { RESOURCES, type Resource, type ResourceCategory } from '../../data/resources';
-import { localizeResourceCategory } from './resourceText';
+import { localizeBundle, localizeNewEntry, localizeResourceCategory } from './resourceText';
 import { CATALOG_FALLBACK } from '../../data/catalogFallback';
 import BundleCard from './BundleCard';
 import BundleDetail from './BundleDetail';
@@ -315,14 +315,24 @@ export function useResources() {
   const activeCategory =
     filter === 'All' ? null : allCategories.find((cat) => cat.id === filter) ?? null;
 
-  const bundles = catalog.bundles;
+  // Bundles and New entries show in the interface language while the catalogue still
+  // carries the bundled English; anything a fetched catalogue rewords or adds keeps the
+  // English it came with (resourceText.ts).
+  const bundles = useMemo(
+    () => catalog.bundles.map((bundle) => localizeBundle(bundle, t)),
+    [catalog.bundles, t, uiLang],
+  );
+  // The open bundle follows the list, so switching the interface language re-labels it.
+  const shownBundle = selectedBundle
+    ? bundles.find((b) => b.id === selectedBundle.id) ?? selectedBundle
+    : null;
   // Entries for the learner's study language first, newest first within that.
   const newEntries: NewEntry[] = useMemo(() => {
     const fits = (e: NewEntry) => (!e.lang || e.lang.length === 0 || e.lang.includes(studyLang) ? 0 : 1);
-    return [...catalog.newSection].sort(
-      (a, b) => fits(a) - fits(b) || Date.parse(b.addedAt) - Date.parse(a.addedAt),
-    );
-  }, [catalog.newSection, studyLang]);
+    return [...catalog.newSection]
+      .sort((a, b) => fits(a) - fits(b) || Date.parse(b.addedAt) - Date.parse(a.addedAt))
+      .map((entry) => localizeNewEntry(entry, t));
+  }, [catalog.newSection, studyLang, t, uiLang]);
   const catalogueDate = catalog.updatedAt;
   // The catalogue repo is unpublished: once main says there is only the
   // built-in copy, Refresh has nothing to fetch and says so instead of spinning.
@@ -351,7 +361,7 @@ export function useResources() {
     setQuery,
     refreshState,
     doRefresh,
-    selectedBundle,
+    selectedBundle: shownBundle,
     openBundle,
     closeBundle,
     checklists,
