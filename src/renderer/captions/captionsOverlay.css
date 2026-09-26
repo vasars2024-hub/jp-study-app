@@ -343,6 +343,8 @@ html.captions-overlay-window #root {
 .cap-link {
   border: 0;
   padding: 0;
+  /* It follows a sentence inline ("…type the sentence, or" + link): keep them apart. */
+  margin-inline-start: 0.3em;
   background: none;
   color: var(--accent-2, #ff8b9c);
   font: inherit;
