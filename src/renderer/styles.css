@@ -1234,6 +1234,14 @@ html[data-chrome='frosted'] .os-taskbar {
   --lv-n1-text: color-mix(in srgb, #c0304a 30%, var(--text));
   --gram-fam-1-text: color-mix(in srgb, #a86b00 30%, var(--text));
   --gram-fam-2-text: color-mix(in srgb, #a86b00 30%, var(--text));
+  /* The Liquid roles' secondary ink. Their defaults (liquid-tokens.css) are `--text` faded
+     to 58-66%, a recipe written for light-on-dark: over a light ground the fade moves the ink
+     TOWARD the ground and measured 2.75-4.4:1 across these six palettes (Files' modified
+     column and empty states, the rails' counts). Each palette's own `--muted` clears 4.5:1 on
+     its bg, panel and panel-2; `lightMutedTokens.test.ts` recomputes that. */
+  --lq-work-text-muted: var(--muted);
+  --lq-anchor-text-muted: var(--muted);
+  --lq-liquid-text-muted: var(--muted);
 }
 
 /* ---------- Study OS boot animation ---------- */
@@ -7901,11 +7909,17 @@ mark.lookup-mark,
 }
 /* Filters can be on while the panel is shut. The marker is a SHAPE, not a colour — a colour
    swap alone would say nothing to anyone who cannot see it, and the button also carries an
-   `aria-label` naming the state. Positioned rather than appended so it cannot reflow the row. */
+   `aria-label` naming the state. Positioned rather than appended so it cannot reflow the row.
+
+   `::before`, never `::after`: the row is a `.lq-hit-scope`, whose pointer floor is an
+   `::after` on every button in it (liquid-controls.css) at the same specificity and a later
+   sheet. On `::after` the dot kept this rule's colour and radius but took the floor's
+   `left: 50%`, `width: max(100%, 32px)` and centring transform — a pink ellipse laid over
+   the whole button, hiding its label (round-3 sweep, every locale). */
 .gram-x-filters-btn.is-on {
   position: relative;
 }
-.gram-x-filters-btn.is-on::after {
+.gram-x-filters-btn.is-on::before {
   content: '';
   position: absolute;
   top: 3px;
@@ -9424,6 +9438,9 @@ mark.lookup-mark,
 .set-row-desc {
   font-size: 13px;
   line-height: 1.55;
+  /* A dictionary's licence line ends in its source URL, which has no break opportunity and
+     ran 56px past the row in Settings > Profile & dictionary (round-3 sweep, Aero). */
+  overflow-wrap: anywhere;
 }
 .set-row-desc kbd {
   display: inline-block;
@@ -18966,6 +18983,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 .immersion-tab-button {
+  display: flex;
   flex: 1;
   min-width: 0;
   border: none;
@@ -18973,10 +18991,17 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--text);
   font-size: 12px;
   padding: 4px 8px;
-  white-space: nowrap;
+  cursor: pointer;
+}
+/* The ellipsis lives on the label, not the button: `overflow: hidden` on the button clipped
+   its own `.lq-hit-scope` pointer floor (a 32px `::after` on a 25px tab) back to the tab's box,
+   so the floor did nothing, and the clipped overhang read as a 3px vertical overflow in every
+   locale (round-3 sweep). */
+.immersion-tab-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
+  white-space: nowrap;
 }
 .immersion-tab-close,
 .immersion-tab-new {

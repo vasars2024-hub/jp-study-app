@@ -8,7 +8,7 @@ export const MAL_SYNC_JA: Catalog = {
   'malSync.setup': '初期設定',
   'malSync.clientIdDesc':
     'MyAnimeList で API アプリケーションを登録し、その Client ID をここに貼り付けてください。パスワードがこのアプリに渡ることはありません。',
-  'malSync.clientId': 'Client ID',
+  'malSync.clientId': 'クライアント ID',
   'malSync.clientIdStored': '保存済み — 新しい ID を貼り付けると置き換わります',
   'malSync.clientIdPlaceholder': 'MyAnimeList の Client ID を貼り付け',
   'malSync.clientIdSave': '保存',

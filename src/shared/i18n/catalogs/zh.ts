@@ -24,6 +24,7 @@ import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 import { SHELL_UI_ZH } from '../shellUi/zh';
 import { COMMANDS_UI_ZH } from '../commandsUi/zh';
 import { MUSIC_UI_ZH } from '../musicUi/zh';
+import { RESOURCES_CATALOG_ZH } from '../resourcesCatalog/zh';
 import { WIDGETS_UI_ZH } from '../widgetsUi/zh';
 import { BLANC_UI_ZH } from '../blancUi/zh';
 import { READER_UI_ZH } from '../readerUi/zh';
@@ -695,6 +696,7 @@ export const zh: Catalog = {
   ...SHELL_UI_ZH,
   ...COMMANDS_UI_ZH,
   ...MUSIC_UI_ZH,
+  ...RESOURCES_CATALOG_ZH,
   ...WIDGETS_UI_ZH,
   ...BLANC_UI_ZH,
   ...READER_UI_ZH,
@@ -793,6 +795,7 @@ export const zh: Catalog = {
   'unifiedSearch.noSources': '尚未配置来源。',
   'unifiedSearch.builtin.localLibrary': '本地资料库',
   'unifiedSearch.builtin.torrentIndexes': '种子索引',
+  'unifiedSearch.builtin.subtitleAvailability': '字幕可用性',
   'unifiedSearch.merged': '所有来源（合并）',
   'unifiedSearch.foundIn': '来自 {sources}',
   'unifiedSearch.sourceOrder': '{name} 的顺序',
@@ -854,6 +857,11 @@ export const zh: Catalog = {
   'theme.profiles': '主题配置',
   'theme.profilesDesc': '已保存的外观。内置主题可编辑和复制，自建主题可删除。',
   'theme.activeTheme': '当前主题',
+  'theme.builtin.default': '默认',
+  'theme.builtin.macosInspired': 'macOS 风格',
+  'theme.builtin.minimal': '极简',
+  'theme.builtin.japaneseStudy': '日语学习模式',
+  'theme.builtin.darkOled': '深色 OLED',
   'theme.newTheme': '基于当前外观新建主题',
   'theme.newThemePlaceholder': '主题名称',
   'theme.create': '创建',

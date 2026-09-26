@@ -24,6 +24,7 @@ import { ANIME_SCHEDULE_JA } from '../animeSchedule/ja';
 import { SHELL_UI_JA } from '../shellUi/ja';
 import { COMMANDS_UI_JA } from '../commandsUi/ja';
 import { MUSIC_UI_JA } from '../musicUi/ja';
+import { RESOURCES_CATALOG_JA } from '../resourcesCatalog/ja';
 import { WIDGETS_UI_JA } from '../widgetsUi/ja';
 import { BLANC_UI_JA } from '../blancUi/ja';
 import { READER_UI_JA } from '../readerUi/ja';
@@ -697,6 +698,7 @@ export const ja: Catalog = {
   ...SHELL_UI_JA,
   ...COMMANDS_UI_JA,
   ...MUSIC_UI_JA,
+  ...RESOURCES_CATALOG_JA,
   ...WIDGETS_UI_JA,
   ...BLANC_UI_JA,
   ...READER_UI_JA,
@@ -795,6 +797,7 @@ export const ja: Catalog = {
   'unifiedSearch.noSources': 'ソースが設定されていません。',
   'unifiedSearch.builtin.localLibrary': 'ローカルライブラリ',
   'unifiedSearch.builtin.torrentIndexes': 'トレントインデックス',
+  'unifiedSearch.builtin.subtitleAvailability': '字幕の有無',
   'unifiedSearch.merged': '全ソース（統合）',
   'unifiedSearch.foundIn': '{sources} で見つかりました',
   'unifiedSearch.sourceOrder': '{name}の順序',
@@ -856,6 +859,11 @@ export const ja: Catalog = {
   'theme.profiles': 'テーマプロファイル',
   'theme.profilesDesc': '保存した見た目です。組み込みテーマは編集と複製ができ、自作テーマは削除できます。',
   'theme.activeTheme': '使用中のテーマ',
+  'theme.builtin.default': '標準',
+  'theme.builtin.macosInspired': 'macOS 風',
+  'theme.builtin.minimal': 'ミニマル',
+  'theme.builtin.japaneseStudy': '日本語学習モード',
+  'theme.builtin.darkOled': 'ダーク OLED',
   'theme.newTheme': '現在の見た目から新規テーマ',
   'theme.newThemePlaceholder': 'テーマ名',
   'theme.create': '作成',

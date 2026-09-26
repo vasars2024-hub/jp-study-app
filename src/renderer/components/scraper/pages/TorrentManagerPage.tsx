@@ -482,7 +482,7 @@ export default function TorrentManagerPage() {
           <span>
             {sx('acq.sidecar')}{' '}
             <Pill tone={backend?.state === 'ready' ? 'good' : backend?.state === 'error' ? 'bad' : 'neutral'}>
-              {backend?.state ?? sx('acq.loading')}
+              {backend ? sx(`acq.state.${backend.state}`) : sx('acq.loading')}
             </Pill>
           </span>
           <span>

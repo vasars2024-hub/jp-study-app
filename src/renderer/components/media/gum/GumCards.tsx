@@ -78,6 +78,27 @@ export function typeLabelKey(title: Pick<GumTitle, 'kind' | 'anime'>): string {
   return `gum.type.${title.kind}`;
 }
 
+const FORMAT_KEY: Record<string, string> = {
+  special: 'gum.format.special',
+  movie: 'gum.format.movie',
+  tvshort: 'gum.format.tvShort',
+  music: 'gum.format.music',
+};
+
+/**
+ * A provider's release format in the interface language: AniList sends `SPECIAL`,
+ * `TV_SHORT`, `MUSIC`, MAL sends "Special", "Movie". It was printed raw, so the title
+ * page's chip read "SPECIAL" in every language. Plain TV says nothing the type chip does
+ * not (null); OVA and ONA are the same abbreviation everywhere, and an unknown value is
+ * shown as the provider wrote it.
+ */
+export function formatLabel(t: Translate, format: string | null | undefined): string | null {
+  const raw = (format ?? '').trim();
+  const key = raw.toLowerCase().replace(/[\s_-]+/g, '');
+  if (!key || key === 'tv') return null;
+  return FORMAT_KEY[key] ? t(FORMAT_KEY[key]) : raw;
+}
+
 /** The line under a poster: where you are, or what the title is. */
 export function metaLine(t: Translate, title: GumTitle): string {
   if (title.kind === 'film') {

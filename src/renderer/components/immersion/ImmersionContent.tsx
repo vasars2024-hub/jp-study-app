@@ -1190,7 +1190,7 @@ export function ImmersionTabStrip({ state }: { state: ImmersionState }) {
               title={tab.url || label}
               onClick={() => state.switchTab(tab.id)}
             >
-              {label}
+              <span className="immersion-tab-label">{label}</span>
             </button>
             <button
               type="button"

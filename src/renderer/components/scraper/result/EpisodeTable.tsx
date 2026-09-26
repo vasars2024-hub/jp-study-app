@@ -10,7 +10,7 @@ import VirtualList from '../../VirtualList';
 import Icon from '../../Icons';
 import { scraperArtwork } from '../artwork';
 import { Pill, SubtitleBadge } from './Pill';
-import { columnLabel, gridTemplate, type ScraperColumn } from './columns';
+import { columnLabel, gridTemplate, minTrackWidth, type ScraperColumn } from './columns';
 import { episodeKindText, episodeStatusText, tr } from '../localize';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
@@ -120,71 +120,88 @@ export default function EpisodeTable({
   onOpen?: (row: EpisodeRow) => void;
 }) {
   const template = useMemo(() => gridTemplate(columns), [columns]);
+  // The default ten columns floor at ~1050px and the result card is ~600-700px at the
+  // default window. The card clips (`overflow: hidden`) and nothing inside it scrolled
+  // sideways, so Resolution, Source and Size were cut off, header and values alike
+  // (round-3 sweep, every configuration). The table now takes its real floor and the
+  // wrapper scrolls horizontally; header and rows keep one width, so they cannot stagger.
+  const minWidth = useMemo(
+    () =>
+      `calc(${minTrackWidth(columns)}px + ${Math.max(0, columns.length - 1)} * var(--space-sm) + 2 * var(--space-md))`,
+    [columns],
+  );
 
   // `rows.length + 1`, and the header is row 1: `aria-rowcount` counts every row
   // the table has, header included, and it was short by one. It is also the only
   // place the real size can come from — the body is windowed, so what is in the
   // DOM is a couple of dozen rows out of however many there are.
   return (
-    <div className="scr-table" role="table" aria-rowcount={rows.length + 1}>
-      <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: template }}>
-        {columns.map((column) => {
-          const active = column.id === sortColumn;
-          return (
-            <div
-              key={column.id}
-              role="columnheader"
-              className={`scr-th scr-th--${column.align ?? 'start'}`}
-              aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
-            >
-              {column.sortable ? (
-                <button type="button" className="scr-th-btn" onClick={() => onSort(column.id)}>
-                  {columnLabel(column)}
-                  {active && (
-                    <span className={`scr-th-caret${sortDir === 'desc' ? ' is-desc' : ''}`} aria-hidden>
-                      <Icon name="chevron" size={10} />
-                    </span>
-                  )}
-                </button>
-              ) : (
-                columnLabel(column)
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="scr-tbody">
-        <VirtualList
-          items={rows}
-          itemHeight={ROW_HEIGHT[density]}
-          getKey={(row) => row.id}
-          gridRole="rowgroup"
-          emptyState={<p className="scr-table-empty">{emptyMessage}</p>}
-          renderItem={(row, index) => {
-            const isSelected = selected.has(row.id);
+    <div className="scr-table-hscroll">
+      <div
+        className="scr-table scr-table--episodes"
+        role="table"
+        aria-rowcount={rows.length + 1}
+        style={{ minWidth }}
+      >
+        <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: template }}>
+          {columns.map((column) => {
+            const active = column.id === sortColumn;
             return (
               <div
-                role="row"
-                aria-rowindex={index + 2}
-                className={`scr-row${isSelected ? ' is-selected' : ''}${
-                  row.status === 'failed' ? ' is-failed' : ''
-                }`}
-                style={{ gridTemplateColumns: template }}
+                key={column.id}
+                role="columnheader"
+                className={`scr-th scr-th--${column.align ?? 'start'}`}
+                aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
               >
-                {columns.map((column) => (
-                  <div
-                    key={column.id}
-                    role="gridcell"
-                    className={`scr-td scr-td--${column.align ?? 'start'}`}
-                  >
-                    {cellContent(column, row, languagePriority, isSelected, onToggle, onOpen)}
-                  </div>
-                ))}
+                {column.sortable ? (
+                  <button type="button" className="scr-th-btn" onClick={() => onSort(column.id)}>
+                    {columnLabel(column)}
+                    {active && (
+                      <span className={`scr-th-caret${sortDir === 'desc' ? ' is-desc' : ''}`} aria-hidden>
+                        <Icon name="chevron" size={10} />
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  columnLabel(column)
+                )}
               </div>
             );
-          }}
-        />
+          })}
+        </div>
+
+        <div className="scr-tbody">
+          <VirtualList
+            items={rows}
+            itemHeight={ROW_HEIGHT[density]}
+            getKey={(row) => row.id}
+            gridRole="rowgroup"
+            emptyState={<p className="scr-table-empty">{emptyMessage}</p>}
+            renderItem={(row, index) => {
+              const isSelected = selected.has(row.id);
+              return (
+                <div
+                  role="row"
+                  aria-rowindex={index + 2}
+                  className={`scr-row${isSelected ? ' is-selected' : ''}${
+                    row.status === 'failed' ? ' is-failed' : ''
+                  }`}
+                  style={{ gridTemplateColumns: template }}
+                >
+                  {columns.map((column) => (
+                    <div
+                      key={column.id}
+                      role="gridcell"
+                      className={`scr-td scr-td--${column.align ?? 'start'}`}
+                    >
+                      {cellContent(column, row, languagePriority, isSelected, onToggle, onOpen)}
+                    </div>
+                  ))}
+                </div>
+              );
+            }}
+          />
+        </div>
       </div>
     </div>
   );

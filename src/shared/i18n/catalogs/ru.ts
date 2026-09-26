@@ -24,6 +24,7 @@ import { ANIME_SCHEDULE_RU } from '../animeSchedule/ru';
 import { SHELL_UI_RU } from '../shellUi/ru';
 import { COMMANDS_UI_RU } from '../commandsUi/ru';
 import { MUSIC_UI_RU } from '../musicUi/ru';
+import { RESOURCES_CATALOG_RU } from '../resourcesCatalog/ru';
 import { WIDGETS_UI_RU } from '../widgetsUi/ru';
 import { BLANC_UI_RU } from '../blancUi/ru';
 import { READER_UI_RU } from '../readerUi/ru';
@@ -820,6 +821,7 @@ export const ru: Catalog = {
   ...SHELL_UI_RU,
   ...COMMANDS_UI_RU,
   ...MUSIC_UI_RU,
+  ...RESOURCES_CATALOG_RU,
   ...WIDGETS_UI_RU,
   ...BLANC_UI_RU,
   ...READER_UI_RU,
@@ -918,6 +920,7 @@ export const ru: Catalog = {
   'unifiedSearch.noSources': 'Источники не настроены.',
   'unifiedSearch.builtin.localLibrary': 'Локальная библиотека',
   'unifiedSearch.builtin.torrentIndexes': 'Торрент-индексы',
+  'unifiedSearch.builtin.subtitleAvailability': 'Наличие субтитров',
   'unifiedSearch.merged': 'Все источники вместе',
   'unifiedSearch.foundIn': 'Найдено в: {sources}',
   'unifiedSearch.sourceOrder': 'Порядок для {name}',
@@ -979,6 +982,11 @@ export const ru: Catalog = {
   'theme.profiles': 'Профили тем',
   'theme.profilesDesc': 'Сохранённые варианты оформления. Встроенные темы можно менять и копировать, свои — удалять.',
   'theme.activeTheme': 'Активная тема',
+  'theme.builtin.default': 'По умолчанию',
+  'theme.builtin.macosInspired': 'В стиле macOS',
+  'theme.builtin.minimal': 'Минимализм',
+  'theme.builtin.japaneseStudy': 'Режим изучения японского',
+  'theme.builtin.darkOled': 'Тёмная OLED',
   'theme.newTheme': 'Новая тема из текущего вида',
   'theme.newThemePlaceholder': 'Название темы',
   'theme.create': 'Создать',

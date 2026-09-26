@@ -303,7 +303,13 @@
 .ui-check input:checked + .ui-check__box { background: var(--accent); border-color: var(--accent); }
 .ui-check input:focus-visible + .ui-check__box { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 .ui-check input { position: absolute; opacity: 0; width: 0; height: 0; }
-.ui-check--disabled { opacity: var(--alpha-disabled); pointer-events: none; }
+.ui-check--disabled { pointer-events: none; cursor: default; }
+/* Disabled = the CONTROL fades and the sentence goes to `--muted`, never the whole label at
+   `--alpha-disabled`: 0.45 opacity put the label text at 2.7:1 on a light card and 3.9:1 on the
+   dark one (round-3 sweep, every locale), and a sentence explaining why something is off has
+   to stay readable. `--muted` clears 4.5:1 on every palette's card. */
+.ui-check--disabled .ui-check__box { opacity: var(--alpha-disabled); }
+.ui-check--disabled > span:not(.ui-check__box) { color: var(--muted); }
 
 /* Toggle switch */
 .ui-toggle { display: inline-flex; align-items: center; gap: var(--space-sm); cursor: pointer; user-select: none; }
@@ -327,7 +333,10 @@
 .ui-toggle input:checked + .ui-toggle__track .ui-toggle__thumb { transform: translateX(18px); }
 .ui-toggle input:focus-visible + .ui-toggle__track { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 .ui-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-.ui-toggle--disabled { opacity: var(--alpha-disabled); pointer-events: none; }
+.ui-toggle--disabled { pointer-events: none; cursor: default; }
+/* Same split as `.ui-check--disabled` above: the switch fades, its sentence stays legible. */
+.ui-toggle--disabled .ui-toggle__track { opacity: var(--alpha-disabled); }
+.ui-toggle--disabled > span:not(.ui-toggle__track) { color: var(--muted); }
 
 /* Slider */
 .ui-slider { width: 100%; height: 22px; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
@@ -371,7 +380,7 @@
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .ui-tab:hover { color: var(--text); }
-.ui-tab[aria-selected='true'] { color: var(--accent); border-bottom-color: var(--accent); }
+.ui-tab[aria-selected='true'] { color: var(--accent-text, var(--accent)); border-bottom-color: var(--accent); }
 .ui-tab:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: -2px; }
 
 /* ---------- Segmented control (P1.6, previously missing) -----------------
@@ -865,9 +874,23 @@
    Doubled class on purpose: a contextual rule such as `.settings-panel select`
    sets the `background` shorthand, which would wipe the chevron image while
    `appearance: none` had already removed the native arrow. At (0,2,0) the image
-   and the room for it survive; the context keeps its own background colour. */
+   and the room for it survive; the context keeps its own background colour.
+
+   The app's older select classes join it: `.set-select` (every Settings page),
+   `.media-model-select` (Theme Studio, connections, subtitles, transcription),
+   `.dict-lang-select` and the two bare selects in Files and File drops were still
+   the OS combobox, and on a white ground the sweep read them as browser-default
+   (round 3, default and Classic Light). `:is()` takes its heaviest argument, so the
+   whole list sits at (0,2,1) and still out-ranks each class's own shorthand. */
 :where(html:not([data-materials='aero']):not([data-materials='wired']))
-  .ui-select.ui-select:where(:not(.blanc-root *)):where(:not([multiple]):not([size])) {
+  :is(
+    .ui-select.ui-select,
+    .set-select.set-select,
+    .media-model-select.media-model-select,
+    .dict-lang-select.dict-lang-select,
+    .fa-folder-move select:not([class]),
+    .os-filedrop-override select:not([class])
+  ):where(:not(.blanc-root *)):where(:not([multiple]):not([size])) {
   appearance: none;
   padding-right: 30px;
   background-image:
@@ -879,7 +902,9 @@
   background-size: 5px 5px;
   background-repeat: no-repeat;
 }
-:where(html:not([data-materials='aero']):not([data-materials='wired'])) .ui-select:where(:not(.blanc-root *)) option {
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  :is(.ui-select, .set-select, .media-model-select, .dict-lang-select, .fa-folder-move select, .os-filedrop-override select):where(:not(.blanc-root *))
+  option {
   background: var(--panel-2);
   color: var(--text);
 }

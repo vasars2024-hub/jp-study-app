@@ -19,7 +19,7 @@ import { useT } from '../../../i18n';
 import type { LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import MediaArtwork from '../library/MediaArtwork';
 import GumIcon from './GumIcons';
-import { GumArt, formatPerEpisode, formatRuntime, formatScore, formatTimeLeft, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
+import { GumArt, formatLabel, formatPerEpisode, formatRuntime, formatScore, formatTimeLeft, gumPlayLabel, typeLabelKey, useHeroArt } from './GumCards';
 import {
   externalPlayerProfile,
   openInExternalPlayer,
@@ -661,7 +661,7 @@ export default function GumTitlePage({
     title.runtimeMin ? (title.kind === 'film' ? formatRuntime(t, title.runtimeMin) : formatPerEpisode(t, title.runtimeMin)) : null,
     title.providerScore ? t('gum.meta.providerScore', { score: Math.round(title.providerScore * 10) / 10 }) : null,
   ].filter(Boolean) as string[];
-  const chips = [t(typeLabelKey(title)), title.language === 'ja' ? t('gum.filter.language.ja') : null, title.format && title.format !== 'TV' ? title.format : null]
+  const chips = [t(typeLabelKey(title)), title.language === 'ja' ? t('gum.filter.language.ja') : null, formatLabel(t, title.format)]
     .filter(Boolean) as string[];
 
   const tabs: GumTitleTab[] = isSeries ? ['episodes', 'details', 'subtitles', 'history'] : ['details', 'subtitles', 'history'];
@@ -870,7 +870,7 @@ export default function GumTitlePage({
         {tab === 'details' && (
           <div className="gum-details">
             <dl className="gum-facts">
-              <div><dt>{t('gum.facts.type')}</dt><dd>{t(typeLabelKey(title))}{title.format ? ` · ${title.format}` : ''}</dd></div>
+              <div><dt>{t('gum.facts.type')}</dt><dd>{t(typeLabelKey(title))}{formatLabel(t, title.format) ? ` · ${formatLabel(t, title.format)}` : ''}</dd></div>
               {title.year && <div><dt>{t('gum.facts.year')}</dt><dd>{String(title.year)}</dd></div>}
               {facts.aired && <div><dt>{t('gum.facts.aired')}</dt><dd>{facts.aired}</dd></div>}
               {facts.airing && <div><dt>{t('gum.facts.airing')}</dt><dd>{facts.airing}</dd></div>}

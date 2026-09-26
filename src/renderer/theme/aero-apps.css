@@ -541,7 +541,7 @@
   padding: 4px 0;
 }
 
-:root[data-materials='aero'] .aero-flash-folder-edit input,
+:root[data-materials='aero'] .aero-flash-folder-edit input:where(:not([type='checkbox'], [type='radio'], [type='range'])),
 :root[data-materials='aero'] .aero-flash-panel select {
   min-width: 0;
   height: 25px;
@@ -553,7 +553,7 @@
   font-size: var(--font-size-xs);
 }
 
-:root[data-materials='aero'] .aero-flash-folder-edit input {
+:root[data-materials='aero'] .aero-flash-folder-edit input:where(:not([type='checkbox'], [type='radio'], [type='range'])) {
   flex: 1;
   padding: 0 6px;
 }
@@ -1351,7 +1351,7 @@
   font-size: var(--font-size-xs);
 }
 
-:root[data-materials='aero'] .aero-csv-chrome .csv-editor-field.compact input,
+:root[data-materials='aero'] .aero-csv-chrome .csv-editor-field.compact input:where(:not([type='checkbox'], [type='radio'], [type='range'])),
 :root[data-materials='aero'] .aero-csv-chrome .csv-editor-field.compact select,
 :root[data-materials='aero'] .aero-csv-chrome .csv-editor-filter-input,
 :root[data-materials='aero'] .aero-csv-chrome .csv-editor-map-row select {
@@ -2083,7 +2083,7 @@
 }
 
 :root[data-materials='aero'] .lib-import-text,
-:root[data-materials='aero'] .cal-field input,
+:root[data-materials='aero'] .cal-field input:where(:not([type='checkbox'], [type='radio'], [type='range'])),
 :root[data-materials='aero'] .cal-field select,
 :root[data-materials='aero'] .cal-field textarea,
 :root[data-materials='aero'] .focus-music-search {
@@ -2464,7 +2464,7 @@
     var(--aero-chrome-glass, var(--chrome));
 }
 
-:root[data-materials='aero'] .aero-dict-chrome .dict-search input {
+:root[data-materials='aero'] .aero-dict-chrome .dict-search input:where(:not([type='checkbox'], [type='radio'], [type='range'])) {
   min-height: 27px;
   border-radius: var(--radius-xs);
 }
@@ -4032,7 +4032,7 @@
 :root[data-materials='aero'] .set-select,
 :root[data-materials='aero'] .sc-search,
 :root[data-materials='aero'] .sc-manual-input,
-:root[data-materials='aero'] .sc-field input,
+:root[data-materials='aero'] .sc-field input:where(:not([type='checkbox'], [type='radio'], [type='range'])),
 :root[data-materials='aero'] .sc-field .set-select,
 :root[data-materials='aero'] .pl-field input[type='number'],
 :root[data-materials='aero'] .pl-field input:not([type]),
@@ -4529,7 +4529,7 @@
   color: var(--muted);
 }
 
-:root[data-materials='aero'] .aero-gram-search input {
+:root[data-materials='aero'] .aero-gram-search input:where(:not([type='checkbox'], [type='radio'], [type='range'])) {
   min-width: 0;
   flex: 1;
   border: 0;
@@ -5124,7 +5124,7 @@
 :root[data-materials='aero'] .ui-input,
 :root[data-materials='aero'] .ui-textarea,
 :root[data-materials='aero'] .ui-select,
-:root[data-materials='aero'] input,
+:root[data-materials='aero'] input:where(:not([type='checkbox'], [type='radio'], [type='range'])),
 :root[data-materials='aero'] textarea,
 :root[data-materials='aero'] select {
   /* WCAG 1.4.11 (3:1 for a control affordance). THIS is aero's input border — it sets
@@ -5143,6 +5143,147 @@
     #ffffff;
   color: #17425f;
   box-shadow: inset 0 1px 2px rgba(38, 101, 150, 0.2);
+}
+
+/* ---------- Native checkboxes, radios, selects and sliders on the Aero skin ----------
+   The app-wide control layer in ui.css (Fluent box, drawn chevron) is scoped
+   `html:not([data-materials='aero'])`, and nothing took its place here: the round-3 sweep
+   counted 149 OS checkboxes, 82 OS selects and 13 OS sliders across the Aero windows.
+   These are the same controls in the Vista/7 vocabulary the rest of this sheet speaks.
+
+   Zero specificity throughout, like ui.css, so a component that styled its own input (a
+   hidden input under a drawn box, `.ui-switch`, a player's volume slider) keeps it. That is
+   also why the field rules skip these three types (`input:where(:not([type='checkbox'], …))`,
+   zero weight): the white well and inset shade above, and the 24px min-height and padding
+   of the Anki, calendar, CSV and shortcut field rules, would out-rank every one of them and
+   turn a 13px box into a 24px text-field-shaped one. */
+:where(:root[data-materials='aero'])
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not([hidden])):where(:not(.blanc-root *)) {
+  appearance: none;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-content: center;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #4f7a9b;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #ffffff, #eef6fb);
+  box-shadow: inset 0 1px 2px rgba(38, 101, 150, 0.2);
+  vertical-align: -2px;
+  cursor: pointer;
+}
+:where(:root[data-materials='aero']) :where(input[type='radio']):where(:not([hidden])):where(:not(.blanc-root *)) {
+  border-radius: 50%;
+}
+:where(:root[data-materials='aero'])
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):where(:hover:not(:disabled)) {
+  border-color: #3a8fb8;
+  background: linear-gradient(180deg, #ffffff, #dff3fc);
+}
+:where(:root[data-materials='aero'])
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):where(:checked, :indeterminate) {
+  border-color: #3a8fb8;
+  background: linear-gradient(180deg, #f4fbff, #c9e9f9);
+}
+/* The glyph is the dark Aero ink on the pale well (8:1), not white on a mid-blue fill. */
+:where(:root[data-materials='aero']) :where(input[type='checkbox']:not([role='switch'])):where(:not(.blanc-root *)):where(:checked)::before {
+  content: '';
+  width: 7px;
+  height: 3px;
+  margin-top: -2px;
+  border-bottom: 2px solid #17425f;
+  border-left: 2px solid #17425f;
+  transform: rotate(-45deg);
+}
+:where(:root[data-materials='aero']) :where(input[type='checkbox']:not([role='switch'])):where(:not(.blanc-root *)):where(:indeterminate)::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background: linear-gradient(180deg, #5fb4de, #1f78b4);
+}
+:where(:root[data-materials='aero']) :where(input[type='radio']):where(:not(.blanc-root *)):where(:checked)::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #8fd3f5, #1f6fae);
+}
+:where(:root[data-materials='aero'])
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):where(:focus-visible) {
+  outline: 1px dotted #17425f;
+  outline-offset: 2px;
+}
+:where(:root[data-materials='aero'])
+  :where(input[type='checkbox']:not([role='switch']), input[type='radio']):where(:not(.blanc-root *)):where(:disabled) {
+  opacity: var(--alpha-disabled);
+  cursor: default;
+}
+
+/* The combobox: the OS arrow gives way to a drawn chevron in the Aero ink.
+   `:not(#\#)` is a specificity pin, not a filter: it matches every select and adds one id's
+   weight. A dozen contextual rules in this sheet (`.aero-flash-panel select`,
+   `.settings-panel select`, `.aero-anki-chrome .set-select` …) set the `background` and
+   `padding` shorthands at up to (0,4,1); any one of them would wipe the chevron while
+   `appearance: none` had already removed the native arrow, leaving a select with no
+   affordance at all. Only the IMAGE and the right padding are pinned; the contexts keep
+   their own background colour and the rest of their padding. */
+:root[data-materials='aero'] select:where(:not([multiple]):not([size])):where(:not(.blanc-root *)):not(#\#) {
+  appearance: none;
+  padding-right: 24px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #2f6690 50%),
+    linear-gradient(135deg, #2f6690 50%, transparent 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(238, 248, 253, 0.92));
+  background-position:
+    calc(100% - 13px) 55%,
+    calc(100% - 8px) 55%,
+    0 0;
+  background-size:
+    5px 5px,
+    5px 5px,
+    100% 100%;
+  background-repeat: no-repeat;
+}
+:where(:root[data-materials='aero']) select:where(:not(.blanc-root *)) option {
+  background: #ffffff;
+  color: #17425f;
+}
+
+/* Sliders: the quick-settings flyout's Vista track and thumb, for every range input. */
+:where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *)) {
+  appearance: none;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+:where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *))::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  border: 1px solid #7fa3b6;
+  background: linear-gradient(180deg, #d8e4ea, #eef4f7);
+  box-shadow: inset 0 1px 1px rgba(18, 49, 67, 0.16);
+}
+:where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *))::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 17px;
+  margin-top: -7px;
+  border-radius: 2px;
+  border: 1px solid #6a8fa0;
+  background: linear-gradient(180deg, #ffffff, #d9e8ee 58%, #b9ccd6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 1px 2px rgba(18, 49, 67, 0.18);
+}
+:where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *)):where(:focus-visible) {
+  outline: 1px dotted #17425f;
+  outline-offset: 2px;
+}
+:where(:root[data-materials='aero']) :where(input[type='range']):where(:not(.blanc-root *)):where(:disabled) {
+  opacity: var(--alpha-disabled);
 }
 
 :root[data-materials='aero'] .ui-btn,
@@ -5750,7 +5891,7 @@
   box-shadow: none;
 }
 
-:root[data-materials='aero'] .aero-anki-chrome input,
+:root[data-materials='aero'] .aero-anki-chrome input:where(:not([type='checkbox'], [type='radio'], [type='range'])),
 :root[data-materials='aero'] .aero-anki-chrome select,
 :root[data-materials='aero'] .aero-anki-chrome textarea,
 :root[data-materials='aero'] .aero-anki-chrome .fm-input,

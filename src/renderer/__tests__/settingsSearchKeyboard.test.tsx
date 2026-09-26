@@ -61,11 +61,68 @@ async function mount() {
   await act(async () => {
     root?.render(<SettingsSearch onNavigate={(page) => navigated.push(page)} />);
   });
-  // Opening is what the input's focus does; the panel only exists once open.
+  // Opening is what a USER's focus does (a press on the field, or a Tab onto it); the
+  // panel only exists once open.
   await act(async () => {
+    input()?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     focusIn(input() as Element);
   });
 }
+
+async function mountWithoutFocus() {
+  await act(async () => {
+    root?.render(<SettingsSearch onNavigate={() => undefined} />);
+  });
+}
+
+/**
+ * Round-3 visual sweep: the shell's K7 hand-off focuses a newly opened window's first
+ * control, which in Settings is this input, and the focus alone opened the suggestion
+ * panel. Every Settings page in all seven sweep configurations was captured with the
+ * panel lying over the breadcrumb, the page head and the navigation.
+ */
+describe('Settings search: only a user focus opens the suggestion panel', () => {
+  it('stays shut when focus arrives with no pointer press and no Tab', async () => {
+    await mountWithoutFocus();
+    await act(async () => {
+      focusIn(input() as Element);
+    });
+    expect(panel()).toBeNull();
+  });
+
+  it('opens when the focus follows a Tab keydown', async () => {
+    await mountWithoutFocus();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      focusIn(input() as Element);
+    });
+    expect(panel()).not.toBeNull();
+  });
+
+  it('opens on a click into a field that already held focus', async () => {
+    await mountWithoutFocus();
+    await act(async () => {
+      focusIn(input() as Element);
+    });
+    expect(panel()).toBeNull();
+    await act(async () => {
+      input()?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(panel()).not.toBeNull();
+  });
+
+  it('opens as soon as the user types', async () => {
+    await mountWithoutFocus();
+    const el = input() as HTMLInputElement;
+    await act(async () => {
+      focusIn(el);
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, 'theme');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(panel()).not.toBeNull();
+  });
+});
 
 describe('Settings search — keyboard reachability of the suggestion panel', () => {
   // Two cases, deliberately, because they pin different halves and one of them alone does

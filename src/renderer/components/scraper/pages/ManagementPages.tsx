@@ -195,7 +195,7 @@ export function ProfilesPage() {
               <div className="scr-profile-stats">
                 <span><b>{profile.settings.network.concurrentRequests}</b> {t('scraperMgmt.profiles.stat.requests')}</span>
                 <span><b>{Math.round(profile.settings.network.requestTimeoutMs / 1_000)}s</b> {t('scraperMgmt.profiles.stat.timeout')}</span>
-                <span><b>{profile.settings.sources.mode}</b> {t('scraperMgmt.profiles.stat.sources')}</span>
+                <span><b>{t(`scraperMgmt.profiles.stat.mode.${profile.settings.sources.mode}`)}</b> {t('scraperMgmt.profiles.stat.sources')}</span>
               </div>
               <div className="scr-page-actions">
                 <Button size="sm" variant={active ? 'primary' : 'default'} onClick={() => activate(profile.id)}>

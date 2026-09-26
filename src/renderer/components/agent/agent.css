@@ -1435,7 +1435,7 @@
   border-top: 1px dashed var(--agent-line);
 }
 
-.agent-spend-panel > .agent-action {
+.agent-spend-panel > .agent-spend-clear {
   margin-top: var(--space-sm, 8px);
 }
 

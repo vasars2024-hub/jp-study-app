@@ -28,6 +28,11 @@
      2.77:1 on the settings nav (round-2 visual scan). #3f5a66 is the same slate,
      deeper: 4.7:1 on that glass, 5.7:1 on the sidebar, 7:1 on the panel. */
   --muted: #3f5a66;
+  /* The Liquid roles fade `--text` to 58-66% for their secondary ink, a light-on-dark recipe:
+     here it measured 3.2-4.5:1 (Files' counts, detail labels, empty state). The same slate. */
+  --lq-work-text-muted: var(--muted);
+  --lq-anchor-text-muted: var(--muted);
+  --lq-liquid-text-muted: var(--muted);
   --border: #90afba;
   --grid-line: rgba(18, 49, 67, 0.14);
 

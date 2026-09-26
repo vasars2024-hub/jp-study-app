@@ -307,6 +307,26 @@ export const BUILT_IN_UI_THEMES: Array<{ id: string; name: string; tokens: UiTok
   },
 ];
 
+const BUILT_IN_UI_THEME_NAME_KEY: Record<string, string> = {
+  default: 'theme.builtin.default',
+  'macos-inspired': 'theme.builtin.macosInspired',
+  minimal: 'theme.builtin.minimal',
+  'japanese-study': 'theme.builtin.japaneseStudy',
+  'dark-oled': 'theme.builtin.darkOled',
+};
+
+/**
+ * The i18n key a profile's name is shown through, or null to show it as stored. A
+ * built-in keeps its English name in the document (which is exported as portable
+ * JSON), so it is translated at render, and only while it still reads as the
+ * built-in's own: a name the user gave a profile is theirs.
+ */
+export function builtInUiThemeNameKey(profile: { id: string; name: string }): string | null {
+  const key = BUILT_IN_UI_THEME_NAME_KEY[profile.id];
+  const builtIn = BUILT_IN_UI_THEMES.find((theme) => theme.id === profile.id);
+  return key && builtIn && builtIn.name === profile.name ? key : null;
+}
+
 // ---------------------------------------------------------------------------
 // Value validation
 // ---------------------------------------------------------------------------

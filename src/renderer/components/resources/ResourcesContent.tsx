@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
 import { RESOURCES, type Resource, type ResourceCategory } from '../../data/resources';
+import { localizeResourceCategory } from './resourceText';
 import { CATALOG_FALLBACK } from '../../data/catalogFallback';
 import BundleCard from './BundleCard';
 import BundleDetail from './BundleDetail';
@@ -127,7 +128,7 @@ export async function saveAndOpenBundleLink(
 }
 
 export function useResources() {
-  const { t } = useT();
+  const { t, lang: uiLang } = useT();
   const { lang: studyLang } = useStudyLanguage();
   const [filter, setFilter] = useState<Filter>('All');
   const [query, setQuery] = useState('');
@@ -283,7 +284,10 @@ export function useResources() {
   // The learner's own resources first, then the categories for their study
   // language, then any-language ones, then the rest; remote extras included.
   const allCategories = useMemo(() => {
-    const listed = orderForStudyLang([...RESOURCES, ...catalogCategories(catalog)], studyLang);
+    // The built-ins are shown in the interface language; remote categories carry no
+    // keys and keep the English they arrive with (resourceText.ts).
+    const builtIn = RESOURCES.map((category) => localizeResourceCategory(category, t));
+    const listed = orderForStudyLang([...builtIn, ...catalogCategories(catalog)], studyLang);
     if (own.length === 0) return listed;
     const mine: ResourceCategory = {
       id: OWN_RESOURCES_CATEGORY_ID,
@@ -293,7 +297,7 @@ export function useResources() {
       items: own,
     };
     return [mine, ...listed];
-  }, [catalog, own, studyLang, t]);
+  }, [catalog, own, studyLang, t, uiLang]);
 
   const groups: ResourceCategory[] = useMemo(() => {
     const q = query.trim().toLowerCase();

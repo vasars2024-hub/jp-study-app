@@ -24,6 +24,7 @@ import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 import { SHELL_UI_EN } from '../shellUi/en';
 import { COMMANDS_UI_EN } from '../commandsUi/en';
 import { MUSIC_UI_EN } from '../musicUi/en';
+import { RESOURCES_CATALOG_EN } from '../resourcesCatalog/en';
 import { WIDGETS_UI_EN } from '../widgetsUi/en';
 import { BLANC_UI_EN } from '../blancUi/en';
 import { READER_UI_EN } from '../readerUi/en';
@@ -798,6 +799,7 @@ export const en: Catalog = {
   ...SHELL_UI_EN,
   ...COMMANDS_UI_EN,
   ...MUSIC_UI_EN,
+  ...RESOURCES_CATALOG_EN,
   ...WIDGETS_UI_EN,
   ...BLANC_UI_EN,
   ...READER_UI_EN,
@@ -903,6 +905,7 @@ export const en: Catalog = {
   'unifiedSearch.noSources': 'No sources are configured.',
   'unifiedSearch.builtin.localLibrary': 'Local library',
   'unifiedSearch.builtin.torrentIndexes': 'Torrent indexes',
+  'unifiedSearch.builtin.subtitleAvailability': 'Subtitle availability',
   'unifiedSearch.merged': 'All sources, merged',
   'unifiedSearch.foundIn': 'Found in {sources}',
   'unifiedSearch.sourceOrder': 'Order for {name}',
@@ -964,6 +967,11 @@ export const en: Catalog = {
   'theme.profiles': 'Theme profiles',
   'theme.profilesDesc': 'Saved looks. Built-in themes can be edited and copied; your own can be deleted.',
   'theme.activeTheme': 'Active theme',
+  'theme.builtin.default': 'Default',
+  'theme.builtin.macosInspired': 'macOS inspired',
+  'theme.builtin.minimal': 'Minimal',
+  'theme.builtin.japaneseStudy': 'Japanese study mode',
+  'theme.builtin.darkOled': 'Dark OLED',
   'theme.newTheme': 'New theme from current look',
   'theme.newThemePlaceholder': 'Theme name',
   'theme.create': 'Create',

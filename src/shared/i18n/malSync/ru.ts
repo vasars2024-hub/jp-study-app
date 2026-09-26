@@ -11,7 +11,7 @@ export const MAL_SYNC_RU: Catalog = {
   'malSync.setup': 'Настройка',
   'malSync.clientIdDesc':
     'Зарегистрируйте приложение API на MyAnimeList и вставьте сюда его Client ID. Приложение никогда не видит ваш пароль от MyAnimeList.',
-  'malSync.clientId': 'Client ID',
+  'malSync.clientId': 'ID клиента',
   'malSync.clientIdStored': 'Сохранён — вставьте новый id, чтобы заменить',
   'malSync.clientIdPlaceholder': 'Вставьте ваш Client ID с MyAnimeList',
   'malSync.clientIdSave': 'Сохранить',

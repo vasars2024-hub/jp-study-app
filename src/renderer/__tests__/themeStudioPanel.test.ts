@@ -58,9 +58,17 @@ describe('theme studio settings wiring', () => {
     expect(html).not.toContain('data-setting-id="theme-studio-components"');
     expect(html).not.toContain('data-setting-id="theme-studio-css"');
     expect(html).not.toContain('id="theme-css"');
-    // Every §20 theme profile is offered, and Default is active.
-    for (const name of ['Default', 'macOS inspired', 'Minimal', 'Japanese study mode', 'Dark OLED']) {
-      expect(html).toContain(name);
+    // Every §20 theme profile is offered, and Default is active. A built-in's name is
+    // shown through its key (it stays English in the stored document), so under this
+    // file's key-echoing `t` the keys are what render.
+    for (const key of [
+      'theme.builtin.default',
+      'theme.builtin.macosInspired',
+      'theme.builtin.minimal',
+      'theme.builtin.japaneseStudy',
+      'theme.builtin.darkOled',
+    ]) {
+      expect(html).toContain(key);
     }
     // Where a theme's accent / density / corners go is said, not discovered.
     expect(html).toContain('theme.lookNote');

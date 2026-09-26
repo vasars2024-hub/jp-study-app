@@ -5,6 +5,7 @@ import {
   columnById,
   columnLabel,
   gridTemplate,
+  minTrackWidth,
   groupLabelFor,
   resolveColumns,
   rowMatches,
@@ -72,6 +73,20 @@ describe('table columns', () => {
     const template = gridTemplate(resolved);
     expect(template.split(' ').length).toBeGreaterThanOrEqual(resolved.length);
     expect(template).toContain('34px');
+  });
+
+  it('floors the table at its tracks, so a narrow card scrolls instead of clipping columns', () => {
+    const resolved = resolveColumns(['size'], [...SCRAPER_COLUMN_IDS]);
+    const floor = minTrackWidth(resolved);
+    // Every fixed track counts in full and a minmax track by its floor: never less than the
+    // fixed widths alone, and title's 220px floor is in it.
+    const fixed = resolved
+      .map((c) => /^(\d+)px$/.exec(c.track)?.[1])
+      .filter(Boolean)
+      .reduce((sum, n) => sum + Number(n), 0);
+    expect(floor).toBeGreaterThanOrEqual(fixed + 220);
+    expect(minTrackWidth([{ id: 'title', labelKey: '', track: '1fr' } as never])).toBe(0);
+    expect(minTrackWidth([{ id: 'title', labelKey: '', track: 'minmax(90px, 0.7fr)' } as never])).toBe(90);
   });
 
   it('resolves a column by id', () => {

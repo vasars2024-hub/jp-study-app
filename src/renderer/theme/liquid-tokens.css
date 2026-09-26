@@ -63,7 +63,9 @@
   --lq-liquid-border: var(--glass-border);
   --lq-liquid-highlight: var(--glass-highlight);
   --lq-liquid-text: var(--text);
-  --lq-liquid-text-muted: color-mix(in srgb, var(--text) 66%, transparent);
+  /* 74%, not 66: the glass lets the wallpaper through, and at 66% the Files view switch
+     measured 3.98:1 on the default wallpaper (round-3 sweep, ru). */
+  --lq-liquid-text-muted: color-mix(in srgb, var(--text) 74%, transparent);
   --lq-liquid-radius: var(--radius-xl);
   --lq-liquid-shadow: var(--elevation-3);
   --lq-liquid-blur: var(--glass-blur);
