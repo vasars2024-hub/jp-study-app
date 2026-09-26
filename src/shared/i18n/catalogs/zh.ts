@@ -669,6 +669,8 @@ export const zh: Catalog = {
   'vnPanel.duration.m': '{minutes} 分',
   'vnPanel.msg.addFailed': '无法添加该视觉小说。',
   'vnPanel.msg.launchFailed': '启动失败。',
+  'vnPanel.msg.launchMissing': '游戏的可执行文件已不在原位置。请在条目设置中重新选择后再启动。',
+  'vnPanel.msg.launchNoExecutable': '此游戏尚未设置可执行文件。请在条目设置中选择。',
   'vnPanel.msg.launched': '已启动视觉小说并开始计时。',
   'vnPanel.msg.captureFailed': '无法采集该行。',
   'vnPanel.msg.ocrPrompt': '请在 Reading Lens 中选择 {title} 的日文文本。',

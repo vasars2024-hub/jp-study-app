@@ -1827,7 +1827,7 @@ declare global {
       visualNovelReadCaptureAudio(
         filePath: string,
       ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }>;
-      visualNovelLaunch(id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }>;
+      visualNovelLaunch(id: string): Promise<{ ok: boolean; error?: string; errorCode?: 'no-executable' | 'missing-file' | 'launch-failed'; startedAt?: number }>;
       /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
       visualNovelArt(url: string): Promise<{ ok: boolean; url?: string; error?: string }>;
       visualNovelCaptureState(): Promise<import('../shared/visualNovelCapture').VisualNovelCaptureState>;

@@ -627,7 +627,12 @@ export default function VisualNovelPanel({
     if (!selected) return;
     const result = await window.api.visualNovelLaunch(selected.id);
     if (!result.ok) {
-      reportStatus(result.error ?? t('vnPanel.msg.launchFailed'), true);
+      // Typed: the raw spawn error (English, a path) is never the message.
+      reportStatus(t(
+        result.errorCode === 'missing-file'
+          ? 'vnPanel.msg.launchMissing'
+          : result.errorCode === 'no-executable' ? 'vnPanel.msg.launchNoExecutable' : 'vnPanel.msg.launchFailed',
+      ), true);
       return;
     }
     setSessionStartedAt(result.startedAt ?? Date.now());

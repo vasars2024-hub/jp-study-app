@@ -671,6 +671,8 @@ export const ja: Catalog = {
   'vnPanel.duration.m': '{minutes}分',
   'vnPanel.msg.addFailed': 'ビジュアルノベルを追加できませんでした。',
   'vnPanel.msg.launchFailed': '起動に失敗しました。',
+  'vnPanel.msg.launchMissing': 'ゲームの実行ファイルが元の場所にありません。項目の設定で選び直してから起動してください。',
+  'vnPanel.msg.launchNoExecutable': 'このゲームには実行ファイルがまだ設定されていません。項目の設定で選んでください。',
   'vnPanel.msg.launched': 'ビジュアルノベルを起動し、読書時間の計測を開始しました。',
   'vnPanel.msg.captureFailed': '行を取り込めませんでした。',
   'vnPanel.msg.ocrPrompt': 'Reading Lens で {title} の日本語テキストを選択してください。',

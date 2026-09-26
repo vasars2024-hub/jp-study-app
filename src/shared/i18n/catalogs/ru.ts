@@ -789,6 +789,8 @@ export const ru: Catalog = {
   'vnPanel.duration.m': '{minutes} мин',
   'vnPanel.msg.addFailed': 'Не удалось добавить визуальную новеллу.',
   'vnPanel.msg.launchFailed': 'Не удалось запустить.',
+  'vnPanel.msg.launchMissing': 'Исполняемый файл игры больше не на прежнем месте. Выберите его заново в настройках записи и запустите.',
+  'vnPanel.msg.launchNoExecutable': 'Для этой игры ещё не задан исполняемый файл. Выберите его в настройках записи.',
   'vnPanel.msg.launched': 'Визуальная новелла запущена, отсчёт времени чтения начат.',
   'vnPanel.msg.captureFailed': 'Не удалось захватить строку.',
   'vnPanel.msg.ocrPrompt': 'Выделите японский текст «{title}» в Reading Lens.',

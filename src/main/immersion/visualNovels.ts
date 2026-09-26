@@ -1477,8 +1477,10 @@ export function registerVisualNovelIpc(): void {
 
   ipcMain.handle('visual-novel:launch', async (_event, id: string) => {
     const entry = loadDatabase().entries.find((candidate) => candidate.id === id);
-    if (!entry?.executablePath) return { ok: false as const, error: 'No executable is configured.' };
-    if (!fs.existsSync(entry.executablePath)) return { ok: false as const, error: 'The executable could not be found.' };
+    if (!entry?.executablePath) return { ok: false as const, error: 'No executable is configured.', errorCode: 'no-executable' as const };
+    if (!fs.existsSync(entry.executablePath)) {
+      return { ok: false as const, error: 'The executable could not be found.', errorCode: 'missing-file' as const };
+    }
     const settings = visualNovelSettings(loadDatabase());
     if (!activeGames.has(id)) {
       const installPath = entry.installPath || path.dirname(entry.executablePath);
@@ -1494,16 +1496,28 @@ export function registerVisualNovelIpc(): void {
           // An executable whose manifest demands elevation cannot be spawned
           // directly; the shell starts it with a UAC prompt and it is then
           // followed by process name.
-          onSpawnError: () => {
-            void shell.openPath(entry.executablePath);
-          },
+          // `openPath` answers an error string, '' on success — read, not
+          // discarded, so a fallback that also fails is a failed launch.
+          onSpawnError: async () => (await shell.openPath(entry.executablePath)) === '',
         }, () => {
           activeGames.delete(id);
           stopReadingSession(id);
         });
         activeGames.set(id, game);
+        // Tracking, capture and "reading" start only once the game really
+        // started: a launch that failed used to be announced and timed anyway.
+        const outcome = await game.started;
+        if (!outcome.ok) {
+          activeGames.delete(id);
+          return {
+            ok: false as const,
+            error: outcome.error.message,
+            errorCode: (fs.existsSync(entry.executablePath) ? 'launch-failed' : 'missing-file') as 'launch-failed' | 'missing-file',
+          };
+        }
       } catch (error) {
-        return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+        activeGames.delete(id);
+        return { ok: false as const, error: error instanceof Error ? error.message : String(error), errorCode: 'launch-failed' as const };
       }
     }
     const startedAt = activeReadingSessions.get(id) ?? Date.now();

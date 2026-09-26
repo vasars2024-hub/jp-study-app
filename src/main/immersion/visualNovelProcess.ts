@@ -39,9 +39,16 @@ export interface GameTrackerDeps {
    * manifest demands elevation, which `spawn` refuses (EACCES / error 740) but
    * the shell can start with a UAC prompt. The caller opens it that way; the
    * tracker then follows it by process name.
+   *
+   * Answers whether that fallback really started something (`shell.openPath`
+   * resolves to an error string on failure). `false` fails the launch; a
+   * `void` answer is taken as started, for callers with no way to know.
    */
-  onSpawnError?: (error: Error) => void;
+  onSpawnError?: (error: Error) => void | boolean | Promise<boolean>;
 }
+
+/** Whether the game really started, settled once and only once. */
+export type GameLaunchOutcome = { ok: true } | { ok: false; error: Error };
 
 export interface GameLaunch {
   executablePath: string;
@@ -58,6 +65,12 @@ export interface TrackedGame {
   noteActivity: () => void;
   /** Stop watching (does NOT kill the game). */
   dispose: () => void;
+  /**
+   * Settles once the launch is confirmed (the child spawned, or the shell
+   * fallback opened it) or has failed. A failed launch has already stopped
+   * the tracker without reporting an exit — nothing was running.
+   */
+  started: Promise<GameLaunchOutcome>;
 }
 
 /** `LEProc.exe -run "<game>"` — Locale Emulator's documented command line. */
@@ -144,6 +157,23 @@ export function trackGame(
     }, PROCESS_POLL_MS);
   };
 
+  let settleStarted: (outcome: GameLaunchOutcome) => void = () => undefined;
+  const started = new Promise<GameLaunchOutcome>((resolve) => {
+    let settled = false;
+    settleStarted = (outcome) => {
+      if (settled) return;
+      settled = true;
+      resolve(outcome);
+    };
+  });
+  /** A launch that never started: stop quietly, there is no session to end. */
+  const abandon = (error: Error): void => {
+    finished = true;
+    if (timer) stopEvery(timer);
+    timer = null;
+    settleStarted({ ok: false, error });
+  };
+
   const child = deps.spawn(command, args, {
     cwd: path.dirname(launch.executablePath),
     detached: true,
@@ -152,10 +182,28 @@ export function trackGame(
   });
   // The game must outlive the app if the user closes the app first.
   child.unref?.();
+  // Node assigns `pid` only when the process was actually created; a spawn
+  // that failed (missing file, elevation required) has none and reports why
+  // through 'error' on the next tick.
+  if (typeof child.pid === 'number') settleStarted({ ok: true });
+  child.once('spawn', () => settleStarted({ ok: true }));
   child.once('error', (error) => {
     if (finished) return;
-    deps.onSpawnError?.(error);
-    watchNames();
+    if (!deps.onSpawnError) {
+      abandon(error);
+      return;
+    }
+    void Promise.resolve()
+      .then(() => deps.onSpawnError?.(error))
+      .then((opened) => {
+        if (finished) return;
+        if (opened === false) {
+          abandon(error);
+          return;
+        }
+        settleStarted({ ok: true });
+        watchNames();
+      }, () => abandon(error));
   });
   child.once('exit', () => {
     if (finished) return;
@@ -174,5 +222,6 @@ export function trackGame(
       if (timer) stopEvery(timer);
       timer = null;
     },
+    started,
   };
 }

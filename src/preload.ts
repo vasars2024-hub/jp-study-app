@@ -2916,7 +2916,7 @@ const api = {
     filePath: string,
   ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }> =>
     ipcRenderer.invoke('visual-novel:readCaptureAudio', filePath),
-  visualNovelLaunch: (id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }> =>
+  visualNovelLaunch: (id: string): Promise<{ ok: boolean; error?: string; errorCode?: 'no-executable' | 'missing-file' | 'launch-failed'; startedAt?: number }> =>
     ipcRenderer.invoke('visual-novel:launch', id),
   /** A VNDB image cached by main and served over media:// (the CSP blocks t.vndb.org). */
   visualNovelArt: (url: string): Promise<{ ok: boolean; url?: string; error?: string }> =>

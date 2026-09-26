@@ -769,6 +769,8 @@ export const en: Catalog = {
   'vnPanel.duration.m': '{minutes}m',
   'vnPanel.msg.addFailed': 'The visual novel could not be added.',
   'vnPanel.msg.launchFailed': 'Launch failed.',
+  'vnPanel.msg.launchMissing': 'The game\'s executable is no longer where it was. Choose it again in the entry\'s settings, then launch.',
+  'vnPanel.msg.launchNoExecutable': 'No executable is set for this game yet. Choose one in the entry\'s settings.',
   'vnPanel.msg.launched': 'Visual novel launched and reading time started.',
   'vnPanel.msg.captureFailed': 'The line could not be captured.',
   'vnPanel.msg.ocrPrompt': 'Select Japanese text for {title} in Reading Lens.',
