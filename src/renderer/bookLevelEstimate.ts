@@ -19,11 +19,12 @@ import { pageHasChinese, pageHasJapanese } from '../shared/pageLevelDetect';
 import { getSlotList, onLevelListsChanged } from './levelLists';
 import { getStudyLang, onStudyLangChanged, type StudyLang } from './studyEnvironment';
 import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
+import { bookProfileEntry, prefetchBookFileKeys } from './bookProfiles';
+import { knownKeyFor } from './studyTokens';
+import { profileLemmas } from '../shared/studyWordProfile';
 
 const CACHE_KEY = 'jp-book-level-cache-v1';
 const MAX_SAMPLE_CHARS = 40_000;
-/** Cap concurrent EPUB text samples so Library idle enrich stays light. */
-const SAMPLE_CONCURRENCY = 1;
 
 export interface CachedBookLevel {
   lang: StudyLang;
@@ -34,11 +35,18 @@ export interface CachedBookLevel {
 
 type CacheMap = Record<string, CachedBookLevel>;
 
+/** The last parse, by the text it came from: the Library reads a badge per book per render. */
+let parsedCache: { raw: string; map: CacheMap } | null = null;
+
 function loadCache(): CacheMap {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as CacheMap) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    if (!raw) return {};
+    if (parsedCache?.raw === raw) return parsedCache.map;
+    const parsed = JSON.parse(raw) as CacheMap;
+    const map = parsed && typeof parsed === 'object' ? parsed : {};
+    parsedCache = { raw, map };
+    return map;
   } catch {
     return {};
   }
@@ -142,7 +150,7 @@ export function setCachedBookLevel(
   estimate: BookLevelEstimate,
   lang: StudyLang = getStudyLang(),
 ): void {
-  const cache = loadCache();
+  const cache = { ...loadCache() };
   cache[bookId] = {
     lang,
     fingerprint: levelListsFingerprint(lang),
@@ -173,22 +181,6 @@ export async function estimateLevelFromText(
   return estimateBookLevel(lemmas, bands, lang);
 }
 
-async function sampleBookPlainText(item: LibraryItem): Promise<string> {
-  const inbox = item.inboxMeta?.textSample?.trim();
-  if (inbox) return inbox;
-
-  if (item.kind !== 'book') return '';
-  // PDFs have no cheap plain-text path here.
-  if (item.epubFile?.toLowerCase().endsWith('.pdf')) return '';
-
-  try {
-    const sample = await window.api.sampleBookText(item.id, MAX_SAMPLE_CHARS);
-    return (sample ?? '').trim();
-  } catch {
-    return '';
-  }
-}
-
 /**
  * Prefer script detected in the book text so Chinese EPUBs get HSK even when
  * the app study language is Japanese (and vice versa). Falls back to study lang.
@@ -207,25 +199,41 @@ export function resolveBookEstimateLang(
 /**
  * Compute (and cache) the exam-level badge for one library book.
  * Returns null when lists are empty, text is missing, or scoring fails.
+ *
+ * Reads the book's cached word profile (`bookProfiles.ts`): sampled and
+ * tokenized once per file, in a worker, instead of a 40k-character kuromoji
+ * pass on the UI thread every time the Library opened.
  */
 export async function estimateLibraryBookLevel(
   item: LibraryItem,
   studyLang: StudyLang = getStudyLang(),
 ): Promise<BookLevelEstimate | null> {
-  const text = await sampleBookPlainText(item);
-  if (!text) return null;
+  const first = await bookProfileEntry(item, studyLang);
+  if (!first) return null;
 
-  const lang = resolveBookEstimateLang(text, studyLang);
+  // Same rule as `resolveBookEstimateLang`, from what the sample showed.
+  const lang: StudyLang = first.script
+    ?? (first.detected === 'ja' || first.detected === 'zh' ? first.detected : studyLang);
   const cached = getCachedBookLevel(item.id, lang);
   if (cached) return cached;
 
   const bands = bandsFromSettings(lang);
   if (bands.length === 0) return null;
 
-  const lemmas = await lemmasFromText(text, lang);
-  const estimate = estimateBookLevel(lemmas, bands, lang);
+  const entry = lang === studyLang ? first : await bookProfileEntry(item, lang);
+  if (!entry) return null;
+  const estimate = estimateBookLevel(profileLemmas(entry.profile, bandKeyFor(lang, bands)), bands, lang);
   if (estimate) setCachedBookLevel(item.id, estimate, lang);
   return estimate;
+}
+
+/**
+ * Russian profile words are written forms; the band lists hold dictionary
+ * forms. Match a form to whichever of its likely lemmas a band lists.
+ */
+function bandKeyFor(lang: StudyLang, bands: readonly BookLevelBand[]): ((word: string) => string) | undefined {
+  if (lang !== 'ru') return undefined;
+  return (word) => knownKeyFor(word, 'ru', (key) => (bands.some((band) => band.words.has(key)) ? 1 : 0));
 }
 
 /**
@@ -240,8 +248,12 @@ export async function enrichBookLevelEstimates(
 ): Promise<Map<string, BookLevelEstimate>> {
   const studyLang = getStudyLang();
   const out = new Map<string, BookLevelEstimate>();
-  // Need at least one exam list configured (JA or ZH) or every sample is wasted.
-  if (bandsFromSettings('ja').length === 0 && bandsFromSettings('zh').length === 0) {
+  // Need at least one exam list configured or every sample is wasted.
+  if (
+    bandsFromSettings('ja').length === 0
+    && bandsFromSettings('zh').length === 0
+    && bandsFromSettings(studyLang).length === 0
+  ) {
     return out;
   }
 
@@ -250,31 +262,29 @@ export async function enrichBookLevelEstimates(
     if (it.epubFile?.toLowerCase().endsWith('.pdf')) return false;
     return true;
   });
+  // One read of the badge cache for the fast path, not one per book.
+  const cache = loadCache();
+  const fingerprint = levelListsFingerprint(studyLang);
+  const uncached: LibraryItem[] = [];
+  for (const it of pending) {
+    const entry = cache[it.id];
+    if (entry && entry.lang === studyLang && entry.fingerprint === fingerprint) {
+      out.set(it.id, entry.estimate);
+      onUpdate?.(it.id, entry.estimate);
+    } else {
+      uncached.push(it);
+    }
+  }
+  if (!uncached.length || signal?.cancelled) return out;
+  await prefetchBookFileKeys(uncached);
 
-  let i = 0;
-  while (i < pending.length) {
+  for (const it of uncached) {
     if (signal?.cancelled) break;
-    const batch = pending.slice(i, i + SAMPLE_CONCURRENCY);
-    i += SAMPLE_CONCURRENCY;
-    await Promise.all(
-      batch.map(async (it) => {
-        if (signal?.cancelled) return;
-        // Fast path: cached under study lang (common for monolingual libraries).
-        const quick = getCachedBookLevel(it.id, studyLang);
-        if (quick) {
-          out.set(it.id, quick);
-          onUpdate?.(it.id, quick);
-          return;
-        }
-        const est = await estimateLibraryBookLevel(it, studyLang);
-        if (est) {
-          out.set(it.id, est);
-          onUpdate?.(it.id, est);
-        }
-      }),
-    );
-    // Let the event loop breathe between books.
-    await new Promise((r) => setTimeout(r, 0));
+    const est = await estimateLibraryBookLevel(it, studyLang).catch(() => null);
+    if (est && !signal?.cancelled) {
+      out.set(it.id, est);
+      onUpdate?.(it.id, est);
+    }
   }
   return out;
 }

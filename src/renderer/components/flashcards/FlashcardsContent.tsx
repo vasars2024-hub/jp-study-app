@@ -39,6 +39,7 @@ import {
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import Icon from '../Icons';
+import WindowedStrip from './WindowedStrip';
 import VirtualList from '../VirtualList';
 import EpubMiningPanel from '../EpubMiningPanel';
 import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
@@ -63,6 +64,7 @@ import {
   removeBookGroup,
   renameBookGroup,
   reviewSessionCards,
+  reviewSessionCounts,
   dueDeckCards,
   undoLastReview,
   peekReviewUndo,
@@ -172,6 +174,8 @@ const TEXT_PROVENANCE_KEYS: Record<
   transcript: 'flash.provenance.transcript',
   'book-text': 'flash.provenance.bookText',
 };
+
+const reviewCardKey = (card: { id: string }): string => card.id;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -477,19 +481,28 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
    * uses. D310 — it used to read off `filteredDeck`, which the find box narrows
    * and the session ignores.
    */
-  const reviewSourceCount = useCallback(
-    (bookKey: string) => reviewSessionCards(epubReviewPool, bookKey, reviewDueOnly, reviewMode).length,
+  const reviewSourceCounts = useMemo(
+    () => reviewSessionCounts(epubReviewPool, reviewDueOnly, reviewMode),
     [epubReviewPool, reviewDueOnly, reviewMode],
+  );
+  const reviewSourceCount = useCallback(
+    (bookKey: string) => reviewSourceCounts.get(bookKey) ?? 0,
+    [reviewSourceCounts],
   );
   const audioCandidateCount = useMemo(
     () => epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath).length,
     [epubReviewCandidates],
   );
 
+  // A book's level is a property of its cards in the folder, not of whatever the
+  // find box narrows it to: keyed on the search-filtered groups, every keystroke
+  // changed every fingerprint and re-ran the estimate for each visible book.
+  const levelGroups = useMemo(() => groupDeckByBook(epubReviewPool), [epubReviewPool]);
+
   // Seed deck level badges from cache, then idle-enrich missing estimates.
   useEffect(() => {
     const seed: Record<string, BookLevelEstimate> = {};
-    for (const g of bookGroups) {
+    for (const g of levelGroups) {
       const id = deckGroupKey(g.bookId, g.bookTitle);
       const cached = getCachedDeckLevel(id, deckContentFingerprint(g.cards));
       if (cached) seed[id] = cached;
@@ -500,7 +513,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const signal = { cancelled: false };
     levelEnrichCancel.current = signal;
     void enrichDeckLevelEstimates(
-      bookGroups,
+      levelGroups,
       (deckId, estimate) => {
         if (signal.cancelled) return;
         setDeckLevels((prev) => (prev[deckId] === estimate ? prev : { ...prev, [deckId]: estimate }));
@@ -510,7 +523,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     return () => {
       signal.cancelled = true;
     };
-  }, [bookGroups]);
+  }, [levelGroups]);
 
   useEffect(() => {
     return onDeckLevelInputsChanged(() => {
@@ -1252,6 +1265,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
     if (current?.promptKind === 'listening') void state.playCurrentAudio();
   }, [current?.id, current?.promptKind]);
 
+  // Each strip chip looked its own index up with findIndex: O(n²) per render.
+  const sessionIndexById = useMemo(
+    () => new Map(sessionCards.map((card, index) => [card.id, index] as const)),
+    [sessionCards],
+  );
+
   /**
    * "Ask about how this session went" — a different gesture from asking about the
    * saved-word list, which is why it lives here rather than in the overview.
@@ -1279,7 +1298,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   };
 
   function reviewStripCard(card: ReviewCard, mastered: boolean): JSX.Element {
-    const i = sessionCards.findIndex((c) => c.id === card.id);
+    const i = sessionIndexById.get(card.id) ?? -1;
     const active = i === reviewIndex;
     return (
       <button
@@ -1381,9 +1400,13 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               <span className="flash-review-group-label">
                 {t('flash.dontKnowGroup', { count: unknownReviewCards.length })}
               </span>
-              <div className="flash-strip flash-review-strip" role="list">
-                {unknownReviewCards.map((card) => reviewStripCard(card, false))}
-              </div>
+              <WindowedStrip
+                className="flash-strip flash-review-strip"
+                items={unknownReviewCards}
+                itemKey={reviewCardKey}
+                activeKey={current?.id}
+                renderItem={(card) => reviewStripCard(card, false)}
+              />
             </div>
           )}
           {knownReviewCards.length > 0 && (
@@ -1391,9 +1414,13 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               <span className="flash-review-group-label">
                 {t('flash.knowGroup', { count: knownReviewCards.length })}
               </span>
-              <div className="flash-strip flash-review-strip" role="list">
-                {knownReviewCards.map((card) => reviewStripCard(card, true))}
-              </div>
+              <WindowedStrip
+                className="flash-strip flash-review-strip"
+                items={knownReviewCards}
+                itemKey={reviewCardKey}
+                activeKey={current?.id}
+                renderItem={(card) => reviewStripCard(card, true)}
+              />
             </div>
           )}
           {sessionCards.length > 1 && (
@@ -1825,6 +1852,24 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   // once and every one of them exits back to the same place.
   const [practice, setPractice] = useState<PracticeMode>('none');
 
+  // The source picker's options, built once per deck/folder/filter change: typing
+  // in the find box re-renders this view, and the picker does not depend on it.
+  const reviewSourceOptions = useMemo(
+    () => [
+      <option key="all" value="all">{t('flash.allInFolder', { count: reviewSourceCount('all') })}</option>,
+      ...epubReviewBooks.map((group) => {
+        const key = `${group.bookId}::${group.bookTitle}`;
+        return (
+          <option key={key} value={key}>
+            {group.bookTitle} ({reviewSourceCount(key)})
+          </option>
+        );
+      }),
+    ],
+    // `lang`, not `t`: t's identity is stable across a language switch.
+    [epubReviewBooks, reviewSourceCount, lang],
+  );
+
   /**
    * Which local deck a practice sitting draws from.
    *
@@ -2086,15 +2131,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                     it: a book with nothing in scope printed its whole-deck total
                     rather than the 0 it actually offers.
                   */}
-                  <option value="all">{t('flash.allInFolder', { count: reviewSourceCount('all') })}</option>
-                  {epubReviewBooks.map((group) => {
-                    const key = `${group.bookId}::${group.bookTitle}`;
-                    return (
-                      <option key={key} value={key}>
-                        {group.bookTitle} ({reviewSourceCount(key)})
-                      </option>
-                    );
-                  })}
+                  {reviewSourceOptions}
                 </select>
               </label>
               <label className="flash-review-setup-check">

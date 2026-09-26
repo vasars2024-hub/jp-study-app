@@ -333,6 +333,11 @@ const api = {
     patch: NonNullable<LibraryItem['levelMeta']>,
     opts?: { broadcast?: boolean },
   ): Promise<LibraryItem[]> => ipcRenderer.invoke('library:updateLevelMeta', id, patch, opts),
+  /** Many books' level stats in one library write (the Library's progressive scoring). */
+  updateLevelMetaMany: (
+    patches: Array<{ id: string; levelMeta: NonNullable<LibraryItem['levelMeta']> }>,
+    opts?: { broadcast?: boolean },
+  ): Promise<LibraryItem[]> => ipcRenderer.invoke('library:updateLevelMetaMany', patches, opts),
   addMediaPaths: (paths: string[]): Promise<MediaItem[]> =>
     ipcRenderer.invoke('media:addPaths', paths),
   /** Bring a finished download into the library — see `media:addAcquired`. */
@@ -493,6 +498,9 @@ const api = {
   /** Plain-text sample from an EPUB (capped) for JLPT/HSK cover level badges. */
   sampleBookText: (id: string, maxChars?: number): Promise<string | null> =>
     ipcRenderer.invoke('library:sampleBookText', id, maxChars),
+  /** Size + mtime of each book's file, so a score computed from a sample is cached per file. */
+  bookFileKeys: (ids: string[]): Promise<Record<string, string | null>> =>
+    ipcRenderer.invoke('library:bookFileKeys', ids),
 
   // Auto-import (watch) folder
   getWatchFolder: (): Promise<string | null> => ipcRenderer.invoke('config:getWatchFolder'),

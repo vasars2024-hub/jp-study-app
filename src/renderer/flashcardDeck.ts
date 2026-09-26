@@ -38,7 +38,6 @@ export type FlashcardTextProvenance =
   | 'book-text';
 
 import {
-  countIntroducedToday,
   filterLocalReviewsDue,
   limitNewCards,
   type LocalSrsAlgorithm,
@@ -154,8 +153,8 @@ import {
   type LocalDeckDraftResult,
 } from '../shared/ankiLocalDeck';
 import { stripFieldHtml } from '../shared/apkgParse';
-import { IDB_KEYS, mirrorToIdb } from './storage/storage';
-import { kvGet } from './storage/db';
+import { IDB_KEYS, flushPendingMirrors, mirrorToIdb } from './storage/storage';
+import * as kv from './storage/db';
 import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../shared/overEncodedJson';
 import { emitCompanionEvent } from './environment/companionEvents';
 import { logBlanc } from './blancConsole';
@@ -255,6 +254,212 @@ let pendingVerify: Promise<void> | null = null;
 /** The durable copy could not be read: keep guarding writes from this base. */
 let unverifiedBase: { baseText: string | null } | null = null;
 
+// ── Per-card durable writes for reviews ─────────────────────────────────────
+//
+// A grade changes one card, and used to rewrite the whole deck: JSON.stringify
+// and localStorage.setItem of 3.7 MB, plus a structured clone of all 10k cards
+// into IndexedDB — 0.35-0.63 s per grade. A grade is now written to IndexedDB
+// as that one card (`flashcard-deck-card:<id>`, stamped), committed at once,
+// and the cache catches up in one write once the grading pauses. The durable
+// deck is the whole-deck record plus every card record stamped after it
+// (`readDurableDeck`): boot reconciliation and the suspect-base merge read it
+// that way, and a backup holds both (every IndexedDB record is in a snapshot).
+
+/** IndexedDB key prefix of the per-card records a review writes. */
+export const FLASHCARD_DECK_CARD_PREFIX = 'flashcard-deck-card:';
+/**
+ * localStorage marker: the `savedAt` of graded cards that are in IndexedDB but
+ * not yet in the cache. Another window that sees it treats its cache read as a
+ * suspect base, so its next write merges over the durable deck first.
+ */
+export const FLASHCARD_DECK_JOURNAL_KEY = 'jp-flashcard-deck-journal';
+/** Write the cache this long after the last grade (and at least this often). */
+const HOT_SETTLE_MS = 1_500;
+const HOT_MAX_WAIT_MS = 10_000;
+
+interface DeckCardRecord {
+  card: DeckFlashcard;
+  /** The deck `savedAt` of the write that produced this card. */
+  at: number;
+}
+
+function isCardRecord(value: unknown): value is DeckCardRecord {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<DeckCardRecord>;
+  return typeof v.at === 'number' && !!v.card && typeof v.card === 'object' && typeof v.card.id === 'string';
+}
+
+/** This window's graded cards that the cache does not have yet. */
+let hot: { base: DeckFlashcard[]; store: FlashcardDeckStore; dirty: Map<string, DeckFlashcard> } | null = null;
+/** How many per-card records the last durable read found (retired after a reconcile). */
+let durableRecordsSeen = 0;
+/** The cards array of the cache store the last read was built on. */
+let lastCacheCards: DeckFlashcard[] | null = null;
+let hotTimer: ReturnType<typeof setTimeout> | null = null;
+let hotSince = 0;
+let hotWrites: Promise<void> = Promise.resolve();
+
+function readJournalMarker(): number | null {
+  try {
+    const raw = localStorage.getItem(FLASHCARD_DECK_JOURNAL_KEY);
+    if (!raw) return null;
+    const stamp = Number(raw);
+    return Number.isFinite(stamp) ? stamp : null;
+  } catch {
+    return null;
+  }
+}
+
+function setJournalMarker(stamp: number | null): void {
+  try {
+    if (stamp === null) localStorage.removeItem(FLASHCARD_DECK_JOURNAL_KEY);
+    else setCacheItem(FLASHCARD_DECK_JOURNAL_KEY, String(stamp));
+  } catch {
+    /* the marker is for other windows; the durable write stands without it */
+  }
+}
+
+/** Whether a review may take the per-card path (nothing is being reconciled). */
+function canWriteHot(): boolean {
+  return !restoring && !pendingVerify && !lastReadSuspect && !unverifiedBase && !overflowStore && lastCacheCards !== null;
+}
+
+/** Every per-card record (a platform or test without range reads has none). */
+async function readCardRecords(): Promise<DeckCardRecord[]> {
+  let entries: Array<[string, unknown]> = [];
+  try {
+    entries = await kv.kvScanPrefix(FLASHCARD_DECK_CARD_PREFIX);
+  } catch {
+    return [];
+  }
+  return entries.map(([, value]) => value).filter(isCardRecord);
+}
+
+/**
+ * The durable deck: the whole-deck record with every card record stamped after
+ * it applied on top. Throws when the whole-deck record cannot be read, exactly
+ * as reading it alone did.
+ */
+export async function readDurableDeck(
+  read: (key: string) => Promise<unknown> = kv.kvGet,
+): Promise<FlashcardDeckStore | null> {
+  const base = normalizeDurableDeck(await read(IDB_KEYS.flashcardDeck));
+  const records = await readCardRecords();
+  durableRecordsSeen = records.length;
+  const baseStamp = base?.savedAt ?? 0;
+  const newer = records.filter((record) => record.at > baseStamp).sort((a, b) => a.at - b.at);
+  if (!newer.length) return base;
+  const cards = base ? [...base.cards] : [];
+  const index = new Map(cards.map((card, i) => [card.id, i]));
+  const added: DeckFlashcard[] = [];
+  for (const { card } of newer) {
+    const at = index.get(card.id);
+    if (at !== undefined) {
+      cards[at] = card;
+    } else {
+      // A card the whole-deck record does not have yet (added, then graded,
+      // before the record caught up): newer than that record, so it is kept.
+      const addedAt = added.findIndex((c) => c.id === card.id);
+      if (addedAt >= 0) added[addedAt] = card;
+      else added.push(card);
+    }
+  }
+  return {
+    folders: base?.folders ?? [],
+    cards: [...added, ...cards],
+    savedAt: Math.max(baseStamp, newer[newer.length - 1].at),
+  };
+}
+
+/**
+ * Drop the card records a whole-deck record stamped `upTo` already contains,
+ * once that record has landed. Judged per record inside one transaction, so a
+ * record rewritten meanwhile (a newer grade) is kept.
+ */
+async function retireCardRecords(upTo: number): Promise<void> {
+  try {
+    await flushPendingMirrors();
+    await kv.kvDeleteWhere(FLASHCARD_DECK_CARD_PREFIX, (value) => isCardRecord(value) && value.at <= upTo);
+  } catch {
+    /* kept: older than the whole-deck record, so never applied over it */
+  }
+}
+
+/** A review's write: the changed cards to IndexedDB now, the cache later. */
+function writeStoreHot(store: FlashcardDeckStore, changed: readonly DeckFlashcard[]): void {
+  const previous = hot?.store.savedAt ?? 0;
+  store.savedAt = Math.max(Date.now(), previous + 1, (store.savedAt ?? 0) + 1);
+  if (!hot) {
+    hot = { base: lastCacheCards ?? store.cards, store, dirty: new Map() };
+    hotSince = Date.now();
+  }
+  hot.store = store;
+  for (const card of changed) hot.dirty.set(card.id, card);
+  setJournalMarker(store.savedAt);
+  const at = store.savedAt;
+  const records = changed.map((card) => ({
+    type: 'put' as const,
+    key: `${FLASHCARD_DECK_CARD_PREFIX}${card.id}`,
+    value: { card, at } satisfies DeckCardRecord,
+  }));
+  hotWrites = hotWrites
+    .then(() => kv.kvBatch(records))
+    .catch((error: unknown) => {
+      // Not durable yet: write the cache and the whole-deck record now instead.
+      console.error('[deck] per-card write failed; writing the whole deck', error);
+      settleHotDeck();
+    });
+  scheduleHotSettle();
+  window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
+}
+
+function scheduleHotSettle(): void {
+  if (hotTimer) clearTimeout(hotTimer);
+  const wait = Math.max(0, Math.min(HOT_SETTLE_MS, hotSince + HOT_MAX_WAIT_MS - Date.now()));
+  hotTimer = setTimeout(settleHotDeck, wait);
+}
+
+/**
+ * Bring the cache and the whole-deck record up to date with the graded cards,
+ * in one write, then retire the card records it now contains.
+ */
+export function settleHotDeck(): void {
+  if (hotTimer) clearTimeout(hotTimer);
+  hotTimer = null;
+  if (!hot) return;
+  const store = readStore();
+  hot = null;
+  commitStore(store);
+  setJournalMarker(null);
+  const upTo = store.savedAt ?? 0;
+  void hotWrites.then(() => retireCardRecords(upTo));
+}
+
+/** Test seam: wait for the per-card writes issued so far. */
+export async function settleHotWritesForTests(): Promise<void> {
+  await hotWrites;
+}
+
+if (typeof window !== 'undefined') {
+  // Leaving: the graded cards are durable already; put them in the cache too
+  // (synchronously), so the next start has nothing to reconcile.
+  window.addEventListener('pagehide', () => {
+    if (!hot) return;
+    const store = readStore();
+    if (writeCache(store)) {
+      hot = null;
+      setJournalMarker(null);
+    }
+  });
+  try {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') settleHotDeck();
+    });
+  } catch {
+    /* no document */
+  }
+}
+
 /** Emitted when a deck write could not reach localStorage (quota / blocked). */
 export const FLASHCARD_DECK_STORAGE_EVENT = 'flashcard-deck-storage';
 
@@ -286,7 +491,50 @@ function safeGetCache(): string | null {
   }
 }
 
+/**
+ * The last parse of the cache, by the exact text it came from. The deck is one
+ * 3.7 MB JSON string on a 10k-card profile and nearly every surface reads it —
+ * the Flashcards window parsed it ~43 times per render (every due count asked
+ * `loadDeck()` again). A read whose text is the text we last parsed or wrote
+ * returns that parse. Keyed on the text itself rather than on a stamp, so a
+ * write from any source (another window, a restore, a test) invalidates it
+ * with no extra bookkeeping; comparing the text is one pointer check when
+ * Blink hands back the same string, a memcmp otherwise — never a parse.
+ */
+let parsedCache: { raw: string; store: FlashcardDeckStore } | null = null;
+
+function rememberParse(raw: string, store: FlashcardDeckStore): void {
+  parsedCache = { raw, store: copyStore(store) };
+}
+
+/**
+ * The deck as this window must see it: the cache, plus this window's graded
+ * cards that are durable in IndexedDB but not yet in the cache (`hot`), and
+ * marked suspect when another window's grades are in that state.
+ */
 function readStore(): FlashcardDeckStore {
+  const base = readCacheStore();
+  lastCacheCards = base.cards;
+  if (!hot) {
+    const journal = readJournalMarker();
+    if (!lastReadSuspect && journal !== null && journal > (base.savedAt ?? 0)) {
+      // Another window graded cards the cache does not have yet: they are in
+      // IndexedDB, so a write from here merges over the durable deck first.
+      lastReadSuspect = { baseText: parsedCache?.raw ?? null };
+    }
+    return base;
+  }
+  if (hot.base !== base.cards) {
+    // Another window wrote the cache meanwhile: keep its deck, with our grades on top.
+    const dirty = hot.dirty;
+    const cards = base.cards.map((card) => dirty.get(card.id) ?? card);
+    hot.store = { ...base, cards, savedAt: Math.max(base.savedAt ?? 0, hot.store.savedAt ?? 0) };
+    hot.base = base.cards;
+  }
+  return copyStore(hot.store);
+}
+
+function readCacheStore(): FlashcardDeckStore {
   lastReadSuspect = null;
   const marker = readOverflowMarker();
   if (overflowStore) {
@@ -310,11 +558,17 @@ function readStore(): FlashcardDeckStore {
       lastReadSuspect = { baseText: null };
       return { folders: [], cards: [] };
     }
+    if (parsedCache && parsedCache.raw === raw) {
+      const store = copyStore(parsedCache.store);
+      if (marker !== null && marker > (store.savedAt ?? 0)) lastReadSuspect = { baseText: raw };
+      return store;
+    }
     // v1.0 audit 5.1 — this key accumulated one JSON layer per boot from an old
     // migration-runner bug. A single parse then yields a *string*, both checks
     // below fail, and a real deck reads as empty (measured: 3,221 cards gone,
     // 37.25 MB of text, 5.2 s of blocked main thread per read).
     const { store, layers } = parseFlashcardDeckStore(raw);
+    if (layers === 1) rememberParse(raw, store);
     if (layers === 0) {
       lastReadSuspect = { baseText: null };
     } else if (marker !== null && marker > (store.savedAt ?? 0)) {
@@ -355,6 +609,7 @@ function writeCache(store: FlashcardDeckStore, unverified = false): boolean {
   try {
     text = JSON.stringify(store);
     setCacheItem(FLASHCARD_DECK_STORAGE_KEY, text);
+    rememberParse(text, store);
     overflowStore = null;
     overflowText = null;
     setOverflowMarker(unverified ? DECK_UNVERIFIED : null);
@@ -463,7 +718,7 @@ async function verifyPendingWrite(read: (key: string) => Promise<unknown>): Prom
   let durable: FlashcardDeckStore | null = null;
   let readable = true;
   try {
-    durable = normalizeDurableDeck(await read(IDB_KEYS.flashcardDeck));
+    durable = await readDurableDeck(read);
   } catch {
     readable = false;
   }
@@ -488,6 +743,9 @@ async function verifyPendingWrite(read: (key: string) => Promise<unknown>): Prom
     });
   }
   commitStore(next);
+  // `durable` included every per-card record, so the merged deck supersedes them.
+  const upTo = next.savedAt ?? 0;
+  void hotWrites.then(() => retireCardRecords(upTo));
   window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
 }
 
@@ -499,6 +757,15 @@ export async function settleDeckWritesForTests(): Promise<void> {
 function writeStore(store: FlashcardDeckStore): void {
   const suspect = lastReadSuspect ?? unverifiedBase;
   lastReadSuspect = null;
+  // A whole-deck write carries any graded cards still waiting for the cache
+  // (`readStore` returned them), so it settles them too.
+  const wasHot = hot !== null;
+  if (wasHot) {
+    hot = null;
+    if (hotTimer) clearTimeout(hotTimer);
+    hotTimer = null;
+    setJournalMarker(null);
+  }
   const previous = overflowStore?.savedAt ?? 0;
   // Strictly increasing, so two writes in one millisecond still order.
   store.savedAt = Math.max(Date.now(), previous + 1, (store.savedAt ?? 0) + 1);
@@ -511,7 +778,7 @@ function writeStore(store: FlashcardDeckStore): void {
     if (!pendingVerify) pendingBase = suspect;
     if (!writeCache(store, true)) reportCacheFull(store);
     if (!pendingVerify) {
-      pendingVerify = verifyPendingWrite(kvGet).finally(() => {
+      pendingVerify = verifyPendingWrite(kv.kvGet).finally(() => {
         pendingVerify = null;
       });
     }
@@ -519,6 +786,10 @@ function writeStore(store: FlashcardDeckStore): void {
     return;
   }
   commitStore(store);
+  if (wasHot && !restoring) {
+    const upTo = store.savedAt ?? 0;
+    void hotWrites.then(() => retireCardRecords(upTo));
+  }
   window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
 }
 
@@ -544,7 +815,7 @@ export type DeckRestoreOutcome = 'durable' | 'local' | 'empty';
  * this window while the durable copy was being read are merged into the winner.
  */
 export async function restoreDeckFromIdb(
-  read: (key: string) => Promise<unknown> = kvGet,
+  read: (key: string) => Promise<unknown> = kv.kvGet,
 ): Promise<DeckRestoreOutcome> {
   if (restoring) return 'local';
   restoring = true;
@@ -553,7 +824,7 @@ export async function restoreDeckFromIdb(
   const localStamp = local.savedAt ?? 0;
   let durable: FlashcardDeckStore | null = null;
   try {
-    durable = normalizeDurableDeck(await read(IDB_KEYS.flashcardDeck));
+    durable = await readDurableDeck(read);
   } catch {
     durable = null;
   }
@@ -581,6 +852,12 @@ export async function restoreDeckFromIdb(
       // mirrored it.
       if (!durable || (current.savedAt ?? 0) > durableStamp) {
         mirrorToIdb(IDB_KEYS.flashcardDeck, current);
+        settleReconciledRecords(current);
+      } else if (durableRecordsSeen && (current.savedAt ?? 0) >= durableStamp) {
+        // The cache already holds what the card records say (a window wrote it
+        // on leaving): fold them into the whole-deck record.
+        mirrorToIdb(IDB_KEYS.flashcardDeck, current);
+        settleReconciledRecords(current);
       }
       return 'local';
     }
@@ -595,7 +872,12 @@ export async function restoreDeckFromIdb(
       savedAt: Math.max(durableStamp, current.savedAt ?? 0),
     };
     if (!writeCache(winner)) reportCacheFull(winner);
-    if (createdMeanwhile.length) mirrorToIdb(IDB_KEYS.flashcardDeck, winner);
+    if (createdMeanwhile.length || durableRecordsSeen) {
+      // Card records (grades from a window that closed before its cache write)
+      // are folded into the whole-deck record, then retired.
+      mirrorToIdb(IDB_KEYS.flashcardDeck, winner);
+      settleReconciledRecords(winner);
+    }
     logBlanc('info', 'deck', 'Restored the local deck from its durable copy', {
       cards: winner.cards.length,
       cachedCards: local.cards.length,
@@ -608,8 +890,24 @@ export async function restoreDeckFromIdb(
   }
 }
 
+/** After a reconcile wrote `store` everywhere: clear the marker and retire the records it holds. */
+function settleReconciledRecords(store: FlashcardDeckStore): void {
+  const upTo = store.savedAt ?? 0;
+  const journal = readJournalMarker();
+  if (journal !== null && journal <= upTo) setJournalMarker(null);
+  if (durableRecordsSeen) void retireCardRecords(upTo);
+}
+
 /** Test seam: forget the in-memory overflow copy. */
 export function resetDeckMemoryForTests(): void {
+  parsedCache = null;
+  hot = null;
+  lastCacheCards = null;
+  if (hotTimer) clearTimeout(hotTimer);
+  hotTimer = null;
+  hotWrites = Promise.resolve();
+  durableRecordsSeen = 0;
+  introducedMemo = null;
   overflowStore = null;
   overflowText = null;
   restoring = false;
@@ -899,7 +1197,9 @@ export function reviewDeckCard(
       : {}),
   };
   store.cards = store.cards.map((card, i) => (i === index ? next : card));
-  writeStore(store);
+  // One card changed: write that card durably now, the whole deck later.
+  if (canWriteHot()) writeStoreHot(store, [next]);
+  else writeStore(store);
   // A real review action ("Got it"), distinct from folder/import edits — the
   // one flashcard-deck event the city bridge's telemetry collector counts.
   emitCompanionEvent('flashcard');
@@ -942,19 +1242,22 @@ export function undoLastReview(): { undo: DeckReviewUndo; cards: DeckFlashcard[]
   const undo = reviewUndoStack.pop();
   if (!undo) return null;
   const store = readStore();
-  let restored = false;
+  let restored: DeckFlashcard | null = null;
   store.cards = store.cards.map((card) => {
     if (card.id !== undo.cardId) return card;
-    restored = true;
     // Only the fields the review wrote: an edit made since (a new meaning,
     // attached audio) must survive the undo.
     const next: DeckFlashcard = { ...card, known: undo.previous.known, srs: undo.previous.srs };
     if (undo.previous.introducedAt === undefined) delete next.introducedAt;
     if (next.known === undefined) delete next.known;
     if (next.srs === undefined) delete next.srs;
+    restored = next;
     return next;
   });
-  if (restored) writeStore(store);
+  if (restored) {
+    if (canWriteHot()) writeStoreHot(store, [restored]);
+    else writeStore(store);
+  }
   removeReviewLogEntry(undo.log);
   if (undo.knowledge) setInferredLevel(undo.knowledge.word, undo.knowledge.previous);
   return { undo, cards: store.cards };
@@ -1254,9 +1557,72 @@ export function dueDeckCards<T extends { srs?: unknown }>(
   cards: readonly T[],
   now = Date.now(),
   newPerDay: number | undefined = getActiveProfile().deckParams.newPerDay,
-  introducedToday: number = countIntroducedToday(loadDeck(), now),
+  introducedToday: number = introducedTodayCount(now),
 ): T[] {
   return limitNewCards(filterLocalReviewsDue(cards, now), newPerDay, introducedToday);
+}
+
+let introducedMemo: { cards: readonly DeckFlashcard[]; from: number; stamps: number[] } | null = null;
+
+/**
+ * Cards introduced today across the whole deck — the new-card budget already
+ * spent. Same answer as `countIntroducedToday(loadDeck(), now)`, but the scan is
+ * done once per deck version and day: it was a default parameter, so every due
+ * count parsed and scanned the whole deck again.
+ */
+export function introducedTodayCount(now = Date.now()): number {
+  const cards = loadDeck();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const from = start.getTime();
+  if (!introducedMemo || introducedMemo.cards !== cards || introducedMemo.from !== from) {
+    const stamps: number[] = [];
+    for (const card of cards) {
+      if (typeof card.introducedAt === 'number' && card.introducedAt >= from) stamps.push(card.introducedAt);
+    }
+    stamps.sort((a, b) => a - b);
+    introducedMemo = { cards, from, stamps };
+  }
+  // Introduced at or before `now` (binary search over today's stamps).
+  const { stamps } = introducedMemo;
+  let lo = 0;
+  let hi = stamps.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (stamps[mid] <= now) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * `reviewSessionCards(pool, key, dueOnly, mode).length` for every source the
+ * review picker offers — `'all'` and each `bookId::bookTitle` in `pool` — in
+ * one pass. The picker asked the predicate once per <option>, and each ask
+ * scanned the pool and parsed the whole deck.
+ */
+export function reviewSessionCounts(
+  pool: DeckFlashcard[],
+  dueOnly: boolean,
+  mode: FlashcardReviewMode,
+  now = Date.now(),
+): Map<string, number> {
+  const newPerDay = getActiveProfile().deckParams.newPerDay;
+  const introduced = introducedTodayCount(now);
+  const sessionSize = (cards: DeckFlashcard[]): number => {
+    const due = dueOnly ? dueDeckCards(cards, now, newPerDay, introduced) : cards;
+    return mode === 'audio' ? due.filter((card) => card.audioDataUrl || card.audioPath).length : due.length;
+  };
+  const byBook = new Map<string, DeckFlashcard[]>();
+  for (const card of pool) {
+    const key = `${card.bookId || 'unknown'}::${card.bookTitle || 'Unknown source'}`;
+    const list = byBook.get(key);
+    if (list) list.push(card);
+    else byBook.set(key, [card]);
+  }
+  const counts = new Map<string, number>([['all', sessionSize(pool)]]);
+  for (const [key, cards] of byBook) counts.set(key, sessionSize(cards));
+  return counts;
 }
 
 /**
@@ -1297,12 +1663,20 @@ export function groupDeckByBook(cards: DeckFlashcard[]): BookGroup[] {
   return [...map.values()].sort((a, b) => a.bookTitle.localeCompare(b.bookTitle));
 }
 
+/** Storage keys whose change (from another window) can change what `loadDeck` returns. */
+const DECK_STORAGE_KEYS = new Set<string | null>([FLASHCARD_DECK_STORAGE_KEY, FLASHCARD_DECK_OVERFLOW_KEY, null]);
+
 export function onDeckChanged(cb: () => void): () => void {
   const handler = (): void => cb();
+  // Any other key's `storage` event is someone else's data. Re-reading the deck
+  // for each of them (theme, known words, every setting) re-parsed 3.7 MB each.
+  const storageHandler = (e: StorageEvent): void => {
+    if (DECK_STORAGE_KEYS.has(e.key)) cb();
+  };
   window.addEventListener(FLASHCARD_DECK_EVENT, handler);
-  window.addEventListener('storage', handler);
+  window.addEventListener('storage', storageHandler);
   return () => {
     window.removeEventListener(FLASHCARD_DECK_EVENT, handler);
-    window.removeEventListener('storage', handler);
+    window.removeEventListener('storage', storageHandler);
   };
 }

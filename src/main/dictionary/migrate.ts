@@ -170,6 +170,8 @@ export interface MigrationProgress {
   total: number;
   dictId: string;
   title: string;
+  /** Bytes of every store's index.json read so far, over their total size: 0-100. */
+  percent: number;
 }
 
 export interface MigrationResult {
@@ -395,12 +397,14 @@ export function importLegacyIndexFile(
   file: string,
   info: YomitanDictInfo,
   shouldCancel?: () => boolean,
+  onBytes?: (bytesRead: number) => void,
 ): ImportedCounts {
   const sections = new Set<string>(LEGACY_ROW_SECTIONS);
   return importLegacyRows(db, info, (visit) => {
     scanLegacyIndexFile(file, {
       sections,
       onMember: (section, key, value) => visit(section as LegacyRowSection, key, value),
+      onBytes,
     });
   }, shouldCancel);
 }
@@ -657,18 +661,18 @@ export function migrateLegacyYomitanStores(
     .map((entry) => entry.name)
     .filter((name) => !only || only.has(name));
 
-  dirs.forEach((dirName, position) => {
-    // Cancellation is per store, not per row: each store is its own transaction,
-    // so the honest stopping point is a whole-dictionary boundary. The stores
-    // already imported stay — `result.imported` says exactly which.
-    if (result.cancelled || shouldCancel?.()) {
-      result.cancelled = true;
-      return;
-    }
+  // Read every store's `info` (the first chunk of its file) and size up front:
+  // the sizes make an honest whole-job percentage, and the infos let the term
+  // dictionaries go first — they are what a lookup needs, and until a term store
+  // lands a new user's pop-up can only say "being prepared". Metadata-only
+  // stores (pitch, frequency) keep answering from their JSON meanwhile.
+  interface Planned { dirName: string; file: string; info: YomitanDictInfo; bytes: number }
+  const planned: Planned[] = [];
+  for (const dirName of dirs) {
     const file = path.join(root, dirName, 'index.json');
     if (!fs.existsSync(file)) {
       result.skipped.push({ dictId: dirName, reason: 'no index.json' });
-      return;
+      continue;
     }
     // Only `info` is read here; the rows are streamed inside the import's own
     // transaction, so no store is ever held in memory whole.
@@ -677,16 +681,45 @@ export function migrateLegacyYomitanStores(
       info = (readLegacyIndexInfo(file) as YomitanDictInfo | undefined) ?? undefined;
     } catch (err) {
       result.skipped.push({ dictId: dirName, reason: `unreadable index.json: ${(err as Error).message}` });
-      return;
+      continue;
     }
     if (!info?.id) {
       result.skipped.push({ dictId: dirName, reason: 'index.json has no info.id' });
+      continue;
+    }
+    let bytes = 0;
+    try {
+      bytes = fs.statSync(file).size;
+    } catch {
+      /* counted as empty for progress */
+    }
+    planned.push({ dirName, file, info, bytes });
+  }
+  planned.sort((a, b) =>
+    Number(Boolean(b.info.hasTerms)) - Number(Boolean(a.info.hasTerms))
+    || (a.info.priority ?? 0) - (b.info.priority ?? 0));
+
+  const totalBytes = planned.reduce((sum, entry) => sum + entry.bytes, 0);
+  let doneBytes = 0;
+  let lastPercent = -1;
+
+  planned.forEach(({ file, info, bytes }, position) => {
+    // Cancellation is per store, not per row: each store is its own transaction,
+    // so the honest stopping point is a whole-dictionary boundary. The stores
+    // already imported stay — `result.imported` says exactly which.
+    if (result.cancelled || shouldCancel?.()) {
+      result.cancelled = true;
       return;
     }
-    onProgress?.({ current: position + 1, total: dirs.length, dictId: info.id, title: info.title });
+    const report = (storeBytes: number, force = false): void => {
+      const percent = totalBytes > 0 ? Math.min(100, Math.floor(((doneBytes + storeBytes) / totalBytes) * 100)) : 0;
+      if (!force && percent === lastPercent) return;
+      lastPercent = percent;
+      onProgress?.({ current: position + 1, total: planned.length, dictId: info.id, title: info.title, percent });
+    };
+    report(0, true);
     try {
-      const counts = importLegacyIndexFile(db, file, info, shouldCancel);
-      const bytes = fs.statSync(file).size;
+      const counts = importLegacyIndexFile(db, file, info, shouldCancel, (read) => report(Math.min(read, bytes)));
       db.prepare('update dictionaries set bytes = ? where id = ?').run(bytes, info.id);
       result.imported.push(counts);
     } catch (err) {
@@ -699,6 +732,8 @@ export function migrateLegacyYomitanStores(
       // transaction has rolled back, so nothing of it was written.
       const reason = err instanceof LegacyIndexReadError ? 'unreadable index.json' : 'import failed';
       result.skipped.push({ dictId: info.id, reason: `${reason}: ${(err as Error).message}` });
+    } finally {
+      doneBytes += bytes;
     }
   });
 

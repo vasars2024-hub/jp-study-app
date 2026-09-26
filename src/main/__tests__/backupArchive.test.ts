@@ -127,6 +127,36 @@ describe('round trip', () => {
     expect(fs.readFileSync(path.join(dest, 'library', 'book-1', 'book.epub')).equals(fs.readFileSync(path.join(source, 'library', 'book-1', 'book.epub')))).toBe(true);
   });
 
+  it('stores a renderer snapshot sent as text verbatim, and never holds the thread for a large entry', async () => {
+    // A 12 MB store and a 9 MB snapshot text: the sizes that froze main for seconds
+    // when they were stringified and deflated in one synchronous call each.
+    const big = JSON.stringify({ items: Array.from({ length: 60_000 }, (_, i) => ({ id: i, path: `C:/music/track-${i}.mp3`, title: `トラック ${i}` })) });
+    put(source, 'media.json', big);
+    const text = `{"app":"jp-study-app","kind":"renderer-snapshot","format":1,"createdAt":"2026-09-25T00:00:00.000Z","summary":{"localStorageKeys":1,"indexedDbDatabases":["jp-study-db"]},"localStorage":{"jp-flashcard-deck":${JSON.stringify('x'.repeat(9_000_000))}},"indexedDb":{"jp-study-db":{"version":1,"stores":{}}}}`;
+    const zip = path.join(root, 'out', 'text.zip');
+    let longest = 0;
+    let last = performance.now();
+    const ticker = setInterval(() => {
+      const now = performance.now();
+      longest = Math.max(longest, now - last);
+      last = now;
+    }, 1);
+    const created = await createBackupArchive({
+      userData: source, target: zip, includeBookFiles: false, trigger: 'auto', appVersion: '1.0.1', renderer: text,
+    });
+    clearInterval(ticker);
+    expect(created.manifest.renderer).toEqual({ localStorageKeys: 1, indexedDbDatabases: ['jp-study-db'] });
+    const staged = await stageArchive(zip, path.join(root, 'staging-text'));
+    expect(staged.ok).toBe(true);
+    if (!staged.ok) return;
+    expect(JSON.stringify(staged.staged.renderer)).toBe(text);
+    const result = commitStaged(staged.staged, dest, path.join(root, 'previous-text'));
+    expect(result.ok).toBe(true);
+    expect(get(dest, 'media.json')).toBe(big);
+    // Sliced deflate: no single synchronous stretch anywhere near the old seconds.
+    expect(longest).toBeLessThan(400);
+  });
+
   it('without book files, keeps the library JSON and says what was left out', async () => {
     const zip = path.join(root, 'nobooks.zip');
     const created = await createBackupArchive({ userData: source, target: zip, includeBookFiles: false, trigger: 'auto', appVersion: '1.0.1', renderer: null });

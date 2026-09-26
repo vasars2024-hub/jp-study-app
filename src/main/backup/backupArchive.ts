@@ -49,6 +49,7 @@ import zlib from 'node:zlib';
 import { once } from 'node:events';
 import { finished } from 'node:stream/promises';
 import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
+export { RENDERER_SNAPSHOT_TEXT_PREFIX, isRendererSnapshotText } from './snapshotText';
 
 export const BACKUP_APP = 'jp-study-app';
 export const BACKUP_KIND = 'gum-backup';
@@ -205,7 +206,11 @@ export interface CreateBackupOptions {
   trigger: 'manual' | 'auto';
   appVersion: string;
   origin?: string | null;
-  /** renderer.json contents (already validated by the caller). */
+  /**
+   * renderer.json contents (already validated by the caller): the snapshot
+   * object, or — what the app sends — its JSON text, serialized by the renderer
+   * in slices so neither process holds its thread for the whole of it.
+   */
   renderer: unknown | null;
 }
 
@@ -215,7 +220,32 @@ export interface CreateBackupResult {
   manifest: BackupManifest;
 }
 
+/**
+ * The summary a pre-serialized snapshot carries in its header
+ * (`renderer/storage/backupSnapshot.ts` writes it before the data), read
+ * without parsing the rest of the text.
+ */
+export function summaryFromSnapshotText(text: string): BackupManifest['renderer'] {
+  const at = text.indexOf('"summary":');
+  const end = text.indexOf('},"localStorage":', at);
+  if (at < 0 || end < 0 || at > 4096) return null;
+  try {
+    const summary = JSON.parse(text.slice(at + '"summary":'.length, end + 1)) as {
+      localStorageKeys?: unknown;
+      indexedDbDatabases?: unknown;
+    };
+    if (typeof summary.localStorageKeys !== 'number' || !Array.isArray(summary.indexedDbDatabases)) return null;
+    return {
+      localStorageKeys: summary.localStorageKeys,
+      indexedDbDatabases: summary.indexedDbDatabases.filter((name): name is string => typeof name === 'string'),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function rendererSummary(renderer: unknown): BackupManifest['renderer'] {
+  if (typeof renderer === 'string') return summaryFromSnapshotText(renderer);
   if (!renderer || typeof renderer !== 'object') return null;
   const r = renderer as { localStorage?: Record<string, unknown>; indexedDb?: Record<string, unknown> };
   return {
@@ -235,7 +265,12 @@ export class BackupTooLargeError extends Error {
 export async function createBackupArchive(options: CreateBackupOptions): Promise<CreateBackupResult> {
   const inv = inventoryUserData(options.userData);
   const library = options.includeBookFiles ? inv.library : inv.library.filter((s) => !s.bookFile);
-  const rendererText = options.renderer == null ? null : JSON.stringify(options.renderer);
+  // Text from the renderer is written as it came: stringifying the snapshot
+  // object here held the main process for the whole of it (3.4-5.6 s together
+  // with the synchronous reads and deflate below).
+  const rendererText = options.renderer == null
+    ? null
+    : typeof options.renderer === 'string' ? options.renderer : JSON.stringify(options.renderer);
   const total = inv.storeBytes + library.reduce((n, s) => n + s.bytes, 0) + (rendererText?.length ?? 0);
   if (total > ZIP32_LIMIT_BYTES) throw new BackupTooLargeError(total);
 
@@ -265,17 +300,17 @@ export async function createBackupArchive(options: CreateBackupOptions): Promise
   const writer = openZipWriter(out);
 
   try {
-    if (rendererText != null) writer.addData('renderer.json', Buffer.from(rendererText), true);
+    if (rendererText != null) await writer.addData('renderer.json', Buffer.from(rendererText), true);
     const writtenStores: BackupManifest['stores'] = [];
     for (const s of inv.stores) {
       let data: Buffer;
       try {
-        data = fs.readFileSync(s.abs);
+        data = await fs.promises.readFile(s.abs);
       } catch {
         manifest.excluded.push(`${s.rel} (vanished during backup)`);
         continue;
       }
-      writer.addData(`${USERDATA_PREFIX}${s.rel}`, data, true);
+      await writer.addData(`${USERDATA_PREFIX}${s.rel}`, data, true);
       writtenStores.push({ path: s.rel, bytes: data.length });
     }
     let libraryFiles = 0;
@@ -296,7 +331,7 @@ export async function createBackupArchive(options: CreateBackupOptions): Promise
     manifest.library.files = libraryFiles;
     manifest.library.bytes = libraryBytes;
     manifest.entries = writtenStores.length + libraryFiles;
-    writer.addData('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)), true);
+    await writer.addData('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)), true);
     await writer.end();
     fs.renameSync(tmp, options.target);
   } catch (err) {
@@ -345,8 +380,24 @@ export function zipEndRecords(count: number, cdSize: number, cdOffset: number): 
   return Buffer.concat([record, locator, end]);
 }
 
+/**
+ * Data is deflated in slices of this size with a turn of the event loop
+ * between them, so a large entry (renderer.json, the library database) is
+ * never one long synchronous deflate on the main process.
+ */
+export const ZIP_SLICE_BYTES = 256 * 1024;
+
+function nextTurn(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 export interface ZipWriter {
-  addData(name: string, data: Uint8Array, compress: boolean): void;
+  /**
+   * Add an entry. Entries are written in the order they are added; the returned
+   * promise settles when this one is fully written (awaiting it is optional —
+   * `end()` waits for every entry).
+   */
+  addData(name: string, data: Uint8Array, compress: boolean): Promise<void>;
   addFile(name: string, abs: string, compress: boolean): Promise<void>;
   /** Finish the archive and wait until `out` has flushed. */
   end(): Promise<void>;
@@ -357,6 +408,8 @@ export function openZipWriter(out: fs.WriteStream): ZipWriter {
   let zipError: Error | null = null;
   let written = 0;
   let count = 0;
+  /** Entries push their data strictly one after another. */
+  let queue: Promise<void> = Promise.resolve();
   const zip = new Zip((err, chunk, final) => {
     if (err) {
       zipError = err;
@@ -379,20 +432,39 @@ export function openZipWriter(out: fs.WriteStream): ZipWriter {
       const f = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
       zip.add(f);
       count += 1;
-      f.push(data, true);
+      if (data.byteLength <= ZIP_SLICE_BYTES) {
+        // Small entries (most of them) go straight through, in order.
+        queue = queue.then(() => f.push(data, true));
+        return queue;
+      }
+      queue = queue.then(async () => {
+        for (let at = 0; at < data.byteLength; at += ZIP_SLICE_BYTES) {
+          const end = Math.min(data.byteLength, at + ZIP_SLICE_BYTES);
+          f.push(data.subarray(at, end), end === data.byteLength);
+          if (out.writableNeedDrain) await once(out, 'drain');
+          else await nextTurn();
+        }
+      });
+      return queue;
     },
     async addFile(name, abs, compress) {
+      await queue;
       const f = compress ? new ZipDeflate(name, { level: 6 }) : new ZipPassThrough(name);
       zip.add(f);
       count += 1;
-      for await (const chunk of fs.createReadStream(abs, { highWaterMark: 1 << 20 })) {
-        const buf = chunk as Buffer;
-        f.push(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
-        if (out.writableNeedDrain) await once(out, 'drain');
-      }
-      f.push(new Uint8Array(0), true);
+      const run = (async () => {
+        for await (const chunk of fs.createReadStream(abs, { highWaterMark: ZIP_SLICE_BYTES })) {
+          const buf = chunk as Buffer;
+          f.push(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+          if (out.writableNeedDrain) await once(out, 'drain');
+        }
+        f.push(new Uint8Array(0), true);
+      })();
+      queue = run;
+      await run;
     },
     async end() {
+      await queue;
       zip.end();
       await finished(out);
       if (zipError) throw zipError;

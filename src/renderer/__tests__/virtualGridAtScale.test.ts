@@ -210,3 +210,27 @@ describe('VirtualGrid on a sparse shelf', () => {
     expect(firstRow(many)?.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
   });
 });
+
+describe('VirtualGrid layout containment', () => {
+  it('contains a scrolling grid strictly and places rows by transform, each contained', async () => {
+    installLayout(800, 600);
+    const el = await renderGrid(5_000);
+    const scroller = el.firstElementChild as HTMLElement;
+    // 600px tall against 1,667 rows of content: it scrolls, so a parent sizes it.
+    expect(scroller.style.contain).toBe('strict');
+    const row = firstRow(el);
+    expect(row?.style.contain).toBe('layout paint');
+    expect(row?.style.top).toBe('0px');
+    expect(row?.style.transform).toBe('translateY(0px)');
+    const rows = Array.from(scroller.firstElementChild?.children ?? []) as HTMLElement[];
+    expect(rows.map((r) => r.style.transform)).toContain('translateY(200px)');
+  });
+
+  it('never size-contains a grid that grows with its content', async () => {
+    // Taller than its content: size containment would collapse it to 0.
+    installLayout(800, 5_000);
+    const el = await renderGrid(6);
+    const scroller = el.firstElementChild as HTMLElement;
+    expect(scroller.style.contain).toBe('layout paint');
+  });
+});

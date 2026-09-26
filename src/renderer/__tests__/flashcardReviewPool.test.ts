@@ -136,9 +136,11 @@ describe('the picker call site', () => {
   // Comments stripped: the block carries a JSX comment that names the very
   // identifiers the ban below looks for, and prose about a defect is not the
   // defect. A raw-text guard that reads its own explanation is a false red.
-  const PICKER = SOURCE.slice(
-    SOURCE.indexOf("<select value={reviewBookKey}"),
-    SOURCE.indexOf("{t('flash.dueOnly')}"),
+  // The <select> renders `reviewSourceOptions`, built once per deck/filter change
+  // (so typing in the find box does not rebuild it); both halves are the picker.
+  const PICKER = (
+    SOURCE.slice(SOURCE.indexOf('const reviewSourceOptions = useMemo('), SOURCE.indexOf('[epubReviewBooks, reviewSourceCount, lang]'))
+    + SOURCE.slice(SOURCE.indexOf("<select value={reviewBookKey}"), SOURCE.indexOf("{t('flash.dueOnly')}"))
   ).replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 
   it('labels every option through the session predicate', () => {
@@ -155,6 +157,10 @@ describe('the picker call site', () => {
 
   it('builds the session pool from the same helper as the counts', () => {
     expect(SOURCE).toContain('reviewSessionCards(epubReviewPool, reviewBookKey, reviewDueOnly, reviewMode)');
-    expect(SOURCE).toContain('reviewSessionCards(epubReviewPool, bookKey, reviewDueOnly, reviewMode)');
+    // Per-option counts come from `reviewSessionCounts`, which is
+    // `reviewSessionCards(...).length` for every source in one pass
+    // (flashcardDeckReadCache.test.ts proves the equality).
+    expect(SOURCE).toContain('reviewSessionCounts(epubReviewPool, reviewDueOnly, reviewMode)');
+    expect(PICKER).toContain('{reviewSourceOptions}');
   });
 });

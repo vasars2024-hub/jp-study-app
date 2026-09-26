@@ -15,6 +15,7 @@ import { restoreBookmarksFromIdb } from '../bookmarks';
 import { restoreLevelListsFromIdb } from '../levelLists';
 import {
   applyStorageMigration,
+  storageMigrationNeeded,
   type StorageMigrationAdapter,
   type StorageMigrationPlan,
   type StorageMigrationSnapshot,
@@ -172,6 +173,19 @@ function createAdapter(): StorageMigrationAdapter {
 export async function runStorageMigrations(): Promise<void> {
   try {
     const current = (await kvGet<number>(VERSION_KEY)) ?? 0;
+    // Most boots have nothing to migrate: the stored version is current and no
+    // cache text is damaged. Reading and planning anyway copied every heavy
+    // store — the deck included — four or five times per boot, for a plan that
+    // changes nothing. Such a boot only rehydrates.
+    const localTexts = Object.values(LS_KEYS)
+      .map((key) => readLocal(key))
+      .filter((text): text is string => text != null);
+    if (!storageMigrationNeeded(current, localTexts)) {
+      await restoreAnnotationsFromIdb();
+      await restoreBookmarksFromIdb();
+      await restoreLevelListsFromIdb();
+      return;
+    }
     const plan = await applyStorageMigration(createAdapter(), current);
 
     if (plan.issues.length) {

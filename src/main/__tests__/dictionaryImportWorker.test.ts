@@ -324,3 +324,26 @@ describe('attachDictionaryImportWorker', () => {
     exit.mockRestore();
   });
 });
+
+describe('the cancel poll', () => {
+  it('touches the file system at most once per interval, and latches a cancel', async () => {
+    const { throttledCancelCheck } = await import('../dictionary/importWorker');
+    let now = 0;
+    let checks = 0;
+    let marker = false;
+    const poll = throttledCancelCheck(() => {
+      checks += 1;
+      return marker;
+    }, 250, () => now);
+    for (let i = 0; i < 100_000; i += 1) expect(poll()).toBe(false);
+    expect(checks).toBe(1);
+    marker = true;
+    now = 100;
+    expect(poll()).toBe(false);
+    now = 260;
+    expect(poll()).toBe(true);
+    marker = false;
+    expect(poll()).toBe(true);
+    expect(checks).toBe(2);
+  });
+});

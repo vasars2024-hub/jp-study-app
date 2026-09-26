@@ -22,6 +22,16 @@ vi.mock('../storage/db', () => ({
     if (next !== undefined) idb.set(key, JSON.parse(JSON.stringify(next)));
     return next ?? idb.get(key);
   },
+  kvDelete: async (key: string) => {
+    idb.delete(key);
+  },
+  kvBatch: async (ops: Array<{ type: 'put' | 'delete'; key: string; value?: unknown }>) => {
+    for (const op of ops) {
+      if (op.type === 'put') idb.set(op.key, JSON.parse(JSON.stringify(op.value)));
+      else idb.delete(op.key);
+    }
+  },
+  kvScanPrefix: async (prefix: string) => [...idb.entries()].filter(([key]) => key.startsWith(prefix)),
 }));
 
 import {
@@ -98,7 +108,8 @@ describe('a review is progress', () => {
     expect(log.map((row) => row.rating)).toEqual(['good', 'again']);
     expect(log[0]).toMatchObject({ mode: 'review', cardId: card.id, isNew: true, correct: true });
     await flushReviewLogWrites();
-    expect((idb.get('review-log-v1') as { entries: unknown[] }).entries).toHaveLength(2);
+    // Appended, one record per answer (the log is append-only).
+    expect([...idb.keys()].filter((key) => key.startsWith('review-log-row:'))).toHaveLength(2);
   });
 });
 

@@ -3,10 +3,14 @@
 // command palette) via the 'clipboard:open' CustomEvent, same pattern as
 // CommandPalette. Mounted once in App.tsx.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from './Icons';
+import VirtualList from './VirtualList';
 import {
+  CLIPBOARD_MAX_SIZE_MAX,
+  CLIPBOARD_MAX_SIZE_MIN,
   CLIPBOARD_TYPE_LABELS,
+  clampClipboardMaxSize,
   clearUnpinned,
   deleteEntries,
   deleteEntry,
@@ -41,6 +45,11 @@ function matchesFilter(e: ClipboardEntry, f: FilterKey): boolean {
 }
 
 const COLLAPSE_LEN = 220;
+/**
+ * Row pitch of the windowed list (card + gap). The card is laid out to this
+ * height; a long or expanded text scrolls inside it (see `.cbh-vlist`).
+ */
+export const CLIPBOARD_ROW_HEIGHT = 168;
 
 function EntryCard({
   entry,
@@ -63,7 +72,7 @@ function EntryCard({
   const copyPlain = () => void navigator.clipboard.writeText(entry.text.replace(/\s+/g, ' ').trim());
 
   return (
-    <li className={`cbh-card ${entry.pinned ? 'pinned' : ''}`}>
+    <div className={`cbh-card ${entry.pinned ? 'pinned' : ''}`}>
       <div className="cbh-card-top">
         <input
           type="checkbox"
@@ -162,7 +171,7 @@ function EntryCard({
           <Icon name="close" size={13} /> {t('clipboard.delete')}
         </button>
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -177,6 +186,25 @@ export default function ClipboardHistoryPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettingsState] = useState(loadClipboardSettings);
+  /** The size box's text while typing; committed (clamped) on blur or Enter. */
+  const [sizeDraft, setSizeDraft] = useState<string | null>(null);
+
+  /**
+   * Close, blurring first. Unmounting the panel with its search box focused left
+   * that detached input referenced from React's SelectEventPlugin (its tracked
+   * active element) — and through it the whole closed panel — until focus moved
+   * somewhere else; measured retained in the long-session heap snapshots.
+   */
+  const close = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur();
+    setOpen(false);
+  }, []);
+  const commitSize = (): void => {
+    if (sizeDraft === null) return;
+    setSettingsState(saveClipboardSettings({ maxSize: clampClipboardMaxSize(sizeDraft, settings.maxSize) }));
+    setSizeDraft(null);
+  };
 
   const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'all', label: t('clipboard.filter.all') },
@@ -199,11 +227,12 @@ export default function ClipboardHistoryPanel() {
   useEffect(() => {
     const onOpenEvt = () => {
       setEntries(loadClipboardHistory());
-      setOpen((o) => !o);
+      if (panelRef.current) close();
+      else setOpen(true);
     };
     window.addEventListener('clipboard:open', onOpenEvt);
     return () => window.removeEventListener('clipboard:open', onOpenEvt);
-  }, []);
+  }, [close]);
 
   // Also live-respond to the rebindable command while this panel is mounted
   // (it always is), so Ctrl+Shift+V works everywhere without a per-view hook.
@@ -223,7 +252,7 @@ export default function ClipboardHistoryPanel() {
    */
   useModalKeyboard({
     panelRef,
-    onEscape: () => setOpen(false),
+    onEscape: close,
     enabled: open,
     initialFocusRef: searchRef,
   });
@@ -260,7 +289,7 @@ export default function ClipboardHistoryPanel() {
 
   return (
     <>
-      <div className="cbh-backdrop" onMouseDown={() => setOpen(false)} />
+      <div className="cbh-backdrop" onMouseDown={close} />
       <div
         className="cbh-panel"
         role="dialog"
@@ -290,7 +319,7 @@ export default function ClipboardHistoryPanel() {
           <button type="button" className="cbh-icon-btn" title={t('clipboard.settings')} onClick={() => setSettingsOpen((v) => !v)}>
             <Icon name="settings" size={15} />
           </button>
-          <button type="button" className="cbh-icon-btn" title={t('common.close')} onClick={() => setOpen(false)}>
+          <button type="button" className="cbh-icon-btn" title={t('common.close')} onClick={close}>
             <Icon name="close" size={15} />
           </button>
         </div>
@@ -301,10 +330,14 @@ export default function ClipboardHistoryPanel() {
               <span>{t('clipboard.maxHistorySize')}</span>
               <input
                 type="number"
-                min={10}
-                max={2000}
-                value={settings.maxSize}
-                onChange={(e) => setSettingsState(saveClipboardSettings({ maxSize: Math.max(10, Number(e.target.value) || 200) }))}
+                min={CLIPBOARD_MAX_SIZE_MIN}
+                max={CLIPBOARD_MAX_SIZE_MAX}
+                value={sizeDraft ?? settings.maxSize}
+                onChange={(e) => setSizeDraft(e.target.value)}
+                onBlur={commitSize}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitSize();
+                }}
               />
             </label>
             <label className="cbh-setting-row">
@@ -371,15 +404,26 @@ export default function ClipboardHistoryPanel() {
           </div>
         )}
 
-        <ul className="cbh-list">
-          {filtered.length === 0 && (
-            <li className="cbh-empty muted">
+        {/*
+          Windowed: the history can hold 2,000 entries, each a card with six
+          buttons, and every one was mounted (and re-rendered per keystroke in
+          the search box). Only the rows in view exist now.
+        */}
+        <VirtualList
+          className="cbh-list cbh-vlist"
+          items={filtered}
+          itemHeight={CLIPBOARD_ROW_HEIGHT}
+          listRole="list"
+          itemRole="listitem"
+          resetScrollKey={`${filter}|${query}`}
+          getKey={(e) => e.id}
+          emptyState={
+            <div className="cbh-empty muted">
               {entries.length === 0 ? t('clipboard.emptyNothing') : t('clipboard.emptyNoMatch')}
-            </li>
-          )}
-          {filtered.map((e) => (
+            </div>
+          }
+          renderItem={(e) => (
             <EntryCard
-              key={e.id}
               entry={e}
               selected={selected.has(e.id)}
               onToggleSelect={() =>
@@ -392,8 +436,8 @@ export default function ClipboardHistoryPanel() {
               }
               onChanged={() => setEntries(loadClipboardHistory())}
             />
-          ))}
-        </ul>
+          )}
+        />
       </div>
     </>
   );

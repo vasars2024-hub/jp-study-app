@@ -216,8 +216,13 @@ const PARTICLE_LIKE = new Set([
   'くらい', 'ぐらい', 'など', 'よう', 'まし', 'たら', 'たい', 'せ', 'させ', 'られ', 'れ', 'ろ',
 ]);
 
+/**
+ * An auxiliary (ござい, まし, られ…) is grammar attached to a word, never a
+ * fragment of one: gluing it turned a click on おはよう in おはようございます
+ * into the lookup "おはようござい", a span no dictionary has.
+ */
 function isGluableKanaFragment(t: JpToken): boolean {
-  return t.surface.length > 0 && /^[ぁ-ゖー]+$/.test(t.surface) && !PARTICLE_LIKE.has(t.surface);
+  return t.surface.length > 0 && t.pos !== '助動詞' && /^[ぁ-ゖー]+$/.test(t.surface) && !PARTICLE_LIKE.has(t.surface);
 }
 
 function tokenSpanAt(block: Element, globalOffset: number): { start: number; end: number; query: string } | null {
@@ -305,7 +310,9 @@ export function resolveWordSpanInText(
       const tkEnd = pos + tk.surface.length;
       if (globalOffset >= pos && globalOffset < tkEnd) {
         let idx = i;
-        if (!tk.content) {
+        // An interjection (おはよう, ありがとう, はい) is the word the user
+        // clicked, not a particle hanging off its neighbour.
+        if (!tk.content && tk.pos !== '感動詞') {
           // Clicked a particle/auxiliary (を、が、した…) rather than the word
           // itself. Attach to whichever neighbor is the actual content word —
           // almost always the one right before it (particles trail their

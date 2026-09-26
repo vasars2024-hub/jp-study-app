@@ -198,22 +198,23 @@ describe('lookups in the study language', () => {
 });
 
 describe('legacy term index, a store waiting for its database import', () => {
-  it('is the fallback for that store, and is released once the import lands', async () => {
+  it('is not loaded on the main process even then; the database answers once the import lands', async () => {
     writeStore(PENDING);
     writeRegistry([EN, RU, PENDING]);
     // Reloads the registry without provisioning.
     yomitan.setYomitanLang(PENDING.info.id, '');
 
+    // The old fallback parsed every legacy glossary here, on Electron's main
+    // thread (7.5-10.4 s per boot during the first import). Now the store is
+    // simply not answerable offline until its import lands.
+    expect(yomitan.legacyTermsPending()).toBe(true);
     const kirin = await lookupTermOffline('麒麟');
-    expect(kirin.entries.map((e) => e.word)).toEqual(['麒麟']);
-    expect(yomitan.yomitanTermsLoaded()).toBe(true);
-    expect(yomitan.releaseYomitanTermsIfMigrated()).toBe(false);
+    expect(kirin.entries).toEqual([]);
+    expect(yomitan.yomitanTermsLoaded()).toBe(false);
 
     importLegacyIndex(dictionaryDb(), PENDING);
-    expect(yomitan.releaseYomitanTermsIfMigrated()).toBe(true);
-    expect(yomitan.yomitanTermsLoaded()).toBe(false);
-    expect(yomitan.lookupGlossary('麒麟')).toEqual([]);
-    // Still answered — by the database now.
+    expect(yomitan.legacyTermsPending()).toBe(false);
+    // Answered by the database.
     expect((await lookupTermOffline('麒麟')).entries[0].senses[0].definitions).toEqual(['giraffe']);
     expect(yomitan.yomitanTermsLoaded()).toBe(false);
   });

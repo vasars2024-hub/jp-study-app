@@ -31,6 +31,18 @@ vi.mock('../storage/db', () => ({
     if (next !== undefined) h.store.set(key, structuredClone(next));
     return next ?? h.store.get(key);
   },
+  kvDelete: async (key: string) => {
+    h.store.delete(key);
+  },
+  kvBatch: async (ops: Array<{ type: 'put' | 'delete'; key: string; value?: unknown }>) => {
+    for (const op of ops) {
+      if (op.type === 'put') h.store.set(op.key, structuredClone(op.value));
+      else h.store.delete(op.key);
+    }
+  },
+  kvScanPrefix: async (prefix: string) =>
+    [...h.store.entries()].filter(([key]) => key.startsWith(prefix)).sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => [key, structuredClone(value)]),
 }));
 vi.mock('../stats', () => ({ recordReviewActivity: () => undefined }));
 
@@ -43,7 +55,17 @@ function history(count: number) {
   };
 }
 
-const storedIds = (): string[] => ((h.store.get(KEY) as { entries: Array<{ id: string }> }).entries).map((e) => e.id);
+/**
+ * Every stored row in time order: the whole-log value older builds wrote plus
+ * the rows appended beside it (one record each — appends never rewrite the log).
+ */
+const storedIds = (): string[] => {
+  const legacy = (h.store.get(KEY) as { entries: Array<{ id: string; at: number }> } | undefined)?.entries ?? [];
+  const rows = [...h.store.entries()]
+    .filter(([key]) => key.startsWith('review-log-row:'))
+    .map(([, value]) => value as { id: string; at: number });
+  return [...legacy, ...rows].sort((a, b) => a.at - b.at).map((e) => e.id);
+};
 
 async function freshWindow() {
   vi.resetModules();
@@ -89,6 +111,26 @@ describe('review log writes', () => {
     log.removeReviewLogEntry(row);
     await log.flushReviewLogWrites();
     expect(storedIds()).toEqual(['old-0', 'old-1']);
+  });
+
+  it('an answer is one small write: the stored history is never read back or rewritten', async () => {
+    h.store.set(KEY, history(20_000));
+    const log = await freshWindow();
+    await log.loadReviewLog();
+    const before = h.store.get(KEY);
+    const row = log.appendReviewLog({ mode: 'review', correct: true, at: 9_000_000 });
+    await log.flushReviewLogWrites();
+    expect(h.store.get(KEY)).toBe(before);
+    expect(h.store.get(`review-log-row:${row.id}`)).toMatchObject({ id: row.id });
+  });
+
+  it('an undo of a row an older build stored takes it out of that value', async () => {
+    h.store.set(KEY, history(3));
+    const log = await freshWindow();
+    const rows = await log.loadReviewLog();
+    log.removeReviewLogEntry(rows[1]);
+    await log.flushReviewLogWrites();
+    expect(storedIds()).toEqual(['old-0', 'old-2']);
   });
 
   it('never writes over a stored value that is not a review log', async () => {

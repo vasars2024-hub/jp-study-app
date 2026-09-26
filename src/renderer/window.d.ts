@@ -245,6 +245,10 @@ declare global {
         patch: NonNullable<LibraryItem['levelMeta']>,
         opts?: { broadcast?: boolean },
       ): Promise<LibraryItem[]>;
+      updateLevelMetaMany(
+        patches: Array<{ id: string; levelMeta: NonNullable<LibraryItem['levelMeta']> }>,
+        opts?: { broadcast?: boolean },
+      ): Promise<LibraryItem[]>;
       addMediaPaths(paths: string[]): Promise<MediaItem[]>;
       /** Bring a finished download into the library — see `media:addAcquired`. */
       addAcquiredMedia(
@@ -356,6 +360,7 @@ declare global {
       ): () => void;
       readBook(id: string): Promise<ArrayBuffer | null>;
       sampleBookText(id: string, maxChars?: number): Promise<string | null>;
+      bookFileKeys(ids: string[]): Promise<Record<string, string | null>>;
       getWatchFolder(): Promise<string | null>;
       setWatchFolder(): Promise<{ folder: string | null; items: LibraryItem[] }>;
       clearWatchFolder(): Promise<null>;

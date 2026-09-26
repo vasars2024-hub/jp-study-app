@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../storage/backupSnapshot', () => ({
   applyRendererSnapshot: vi.fn(),
   collectRendererSnapshot: async () => ({ localStorage: {}, indexedDb: {} }),
+  collectRendererSnapshotText: async () => '{"app":"jp-study-app","kind":"renderer-snapshot","localStorage":{},"indexedDb":{}}',
   isLegacyBackup: () => false,
   isRendererSnapshot: () => true,
   legacyToSnapshot: vi.fn(),

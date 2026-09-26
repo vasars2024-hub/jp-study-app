@@ -15,7 +15,7 @@
  * format, which covers the renderer tiers and four host settings only.
  */
 
-import { kvDelete, kvEntries, kvGet, kvSet, setIdbWritesBlocked } from './db';
+import { kvDelete, kvDeleteWhere, kvEntries, kvGet, kvSet, setIdbWritesBlocked } from './db';
 import {
   collectLocalStorageSnapshot,
   domainById,
@@ -519,6 +519,13 @@ export async function clearSettingsDomain(domainId: string): Promise<string | nu
       } catch {
         /* ignore */
       }
+    }
+  }
+  for (const prefix of def.idbPrefixes ?? []) {
+    try {
+      await kvDeleteWhere(prefix, () => true);
+    } catch {
+      /* ignore */
     }
   }
 

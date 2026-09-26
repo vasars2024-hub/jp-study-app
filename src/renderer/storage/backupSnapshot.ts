@@ -174,6 +174,109 @@ export async function collectRendererSnapshot(options: { mirrorReading?: boolean
   };
 }
 
+// ── serialized in slices, for a backup ───────────────────────────────────────
+
+/** Serialize for at most this long before letting the page (input, paint) run. */
+const SLICE_MS = 8;
+
+function makeYielder(): () => Promise<void> {
+  let sliceStart = performance.now();
+  return async () => {
+    if (performance.now() - sliceStart < SLICE_MS) return;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    sliceStart = performance.now();
+  };
+}
+
+/** One database as the JSON text `JSON.stringify(dumpDatabase(name))` would give. */
+async function dumpDatabaseText(name: string, pause: () => Promise<void>): Promise<string | null> {
+  let db: IDBDatabase;
+  try {
+    db = name === DB_NAME ? await openAppDb() : await openExisting(name);
+  } catch {
+    return null;
+  }
+  try {
+    const storeNames = Array.from(db.objectStoreNames as unknown as Iterable<string>);
+    const stores: string[] = [];
+    if (storeNames.length) {
+      // Every read is issued in the one transaction before anything is awaited,
+      // so the snapshot is consistent across stores.
+      const tx = db.transaction(storeNames, 'readonly');
+      const reads = storeNames.map((storeName) => {
+        const store = tx.objectStore(storeName);
+        return Promise.all([req(store.getAllKeys()), req(store.getAll())]).then(([keys, values]) => ({
+          storeName,
+          keyPath: (store as { keyPath?: string | string[] | null }).keyPath ?? null,
+          autoIncrement: Boolean((store as { autoIncrement?: boolean }).autoIncrement),
+          keys,
+          values,
+        }));
+      });
+      for (const { storeName, keyPath, autoIncrement, keys, values } of await Promise.all(reads)) {
+        const entries: string[] = [];
+        for (let i = 0; i < keys.length; i++) {
+          entries.push(JSON.stringify([keys[i], await encodeIdbValue(values[i])]));
+          await pause();
+        }
+        stores.push(`${JSON.stringify(storeName)}:{"keyPath":${JSON.stringify(keyPath)},"autoIncrement":${JSON.stringify(autoIncrement)},"entries":[${entries.join(',')}]}`);
+      }
+    }
+    return `{"version":${JSON.stringify(db.version)},"stores":{${stores.join(',')}}}`;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Everything the renderer holds, as the JSON text of a `RendererSnapshot`
+ * (plus a small `summary` header the main process reads for the manifest).
+ *
+ * Built a record at a time with the page yielding every few milliseconds:
+ * collecting the snapshot as one object, then having IPC clone it and main
+ * stringify it, held the UI thread and then the main process for seconds on
+ * every automatic backup (3.4-5.6 s measured). The text is what renderer.json
+ * contains, byte for byte what `JSON.stringify(collectRendererSnapshot())`
+ * would give apart from the header.
+ */
+export async function collectRendererSnapshotText(options: { mirrorReading?: boolean } = {}): Promise<string> {
+  if (options.mirrorReading !== false) {
+    try {
+      const { collectAllAnnotationsMap } = await import('../annotations');
+      const { collectAllBookmarksMap } = await import('../bookmarks');
+      const { kvSet } = await import('./db');
+      const { IDB_KEYS } = await import('./storage');
+      await kvSet(IDB_KEYS.annotations, collectAllAnnotationsMap());
+      await kvSet(IDB_KEYS.bookmarks, collectAllBookmarksMap());
+    } catch {
+      /* the localStorage copies are in the snapshot regardless */
+    }
+  }
+  const pause = makeYielder();
+  const databases: string[] = [];
+  const dbTexts: string[] = [];
+  for (const name of await databaseNames()) {
+    const text = await dumpDatabaseText(name, pause);
+    if (text == null) continue;
+    databases.push(name);
+    dbTexts.push(`${JSON.stringify(name)}:${text}`);
+  }
+  const local = readLocalStorage();
+  const localEntries: string[] = [];
+  for (const [key, value] of Object.entries(local)) {
+    localEntries.push(`${JSON.stringify(key)}:${JSON.stringify(value)}`);
+    await pause();
+  }
+  const header = JSON.stringify({
+    app: 'jp-study-app',
+    kind: SNAPSHOT_KIND,
+    format: SNAPSHOT_FORMAT,
+    createdAt: new Date().toISOString(),
+    summary: { localStorageKeys: localEntries.length, indexedDbDatabases: databases },
+  });
+  return `${header.slice(0, -1)},"localStorage":{${localEntries.join(',')}},"indexedDb":{${dbTexts.join(',')}}}`;
+}
+
 // ── apply ────────────────────────────────────────────────────────────────────
 
 export interface ApplyFailure {

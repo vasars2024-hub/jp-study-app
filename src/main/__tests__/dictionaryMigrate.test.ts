@@ -442,14 +442,38 @@ describe('scanning userData/yomitan', () => {
     writeStore(path.join(root, 'moedict'), fixture({ info: { ...fixture().info, id: 'moedict', title: 'Moedict' } }));
 
     const seen: string[] = [];
+    const percents: number[] = [];
     const result = migrateLegacyYomitanStores(db, root, (progress) => {
-      seen.push(`${progress.current}/${progress.total} ${progress.dictId}`);
+      const label = `${progress.current}/${progress.total} ${progress.dictId}`;
+      if (seen[seen.length - 1] !== label) seen.push(label);
+      percents.push(progress.percent);
     });
 
     expect(result.imported.map((row) => row.dictId).sort()).toEqual(['jmdict-en', 'moedict']);
     expect(result.skipped).toEqual([]);
     expect(seen).toEqual(['1/2 jmdict-en', '2/2 moedict']);
+    // Whole-job progress by bytes read: starts at 0, never goes back, ends at 100.
+    expect(percents[0]).toBe(0);
+    expect(percents.every((p, i) => i === 0 || p >= percents[i - 1])).toBe(true);
+    expect(percents[percents.length - 1]).toBe(100);
     expect(db.prepare('select count(*) c from dictionaries').get()).toEqual({ c: 2 });
+  });
+
+  it('imports the term dictionaries first — they are what a lookup waits on', () => {
+    const root = path.join(tempRoot, 'yomitan');
+    writeStore(path.join(root, 'a-pitch'), {
+      version: 1,
+      info: { ...fixture().info, id: 'a-pitch', title: 'Pitch', hasTerms: false, hasPitch: true },
+      pitch: { [`食べる${LEGACY_KEY_SEP}たべる`]: { reading: 'たべる', positions: [2] } },
+    });
+    writeStore(path.join(root, 'b-late'), fixture({ info: { ...fixture().info, id: 'b-late', title: 'Late', priority: 5 } }));
+    writeStore(path.join(root, 'c-early'), fixture({ info: { ...fixture().info, id: 'c-early', title: 'Early', priority: 1 } }));
+
+    const order: string[] = [];
+    migrateLegacyYomitanStores(db, root, (progress) => {
+      if (order[order.length - 1] !== progress.dictId) order.push(progress.dictId);
+    });
+    expect(order).toEqual(['c-early', 'b-late', 'a-pitch']);
   });
 
   it('records the file size it read', () => {

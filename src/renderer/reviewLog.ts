@@ -4,27 +4,33 @@
 // the day's statistics (`stats.recordReviewActivity`), which is what makes a
 // day of reviewing keep the streak alive and gives Statistics its Reviews card.
 //
-// The log is loaded lazily. Rows appended before the load finishes are held
-// and merged afterwards, so the first write of a session can never replace a
-// year of history with the handful of rows this window has seen.
+// Append-only. Each row is its own IndexedDB record (`review-log-row:<id>`), so
+// recording an answer is one small put. It used to be a read-modify-write of the
+// whole log in one value — 19,721 rows read, merged, sorted and written back on
+// every grade, a large share of a grade's 0.35–0.63 s. The value that older
+// builds wrote (`review-log-v1`) stays as the frozen head of the history; rows
+// are only ever added beside it, and an undo deletes its own row.
 //
-// Writes never store this window's copy. They send only what this window
-// changed (rows added, rows undone) and merge it by id into whatever is stored,
-// in the same IndexedDB transaction that reads it (`kvUpdate`). Before, a read
-// that failed became [] and the next save replaced the history with it, and
-// two windows each saved their own cache over the other's rows. A stored value
-// that is not a review log at all is never written over.
+// The log is loaded lazily. Rows appended before the load finishes are held
+// and written as soon as possible, so the first write of a session can never
+// replace a year of history with the handful of rows this window has seen —
+// and nothing is ever written over the stored history at all, so a failed read
+// or two windows answering at once cannot lose rows either. A stored v1 value
+// that is not a review log is never written over.
 
-import { kvGet, kvUpdate } from './storage/db';
+import { kvBatch, kvGet, kvScanPrefix, kvUpdate } from './storage/db';
 import { recordReviewActivity } from './stats';
 import {
   normalizeReviewLog,
+  normalizeReviewLogEntry,
   REVIEW_LOG_LIMIT,
   type ReviewLogEntry,
 } from '../shared/reviewLog';
 
-/** IndexedDB key. Not in IDB_KEYS on purpose: the migration runner owns those. */
+/** The whole-log value older builds wrote. Not in IDB_KEYS on purpose: the migration runner owns those. */
 export const REVIEW_LOG_IDB_KEY = 'review-log-v1';
+/** One record per row, appended. */
+export const REVIEW_LOG_ROW_PREFIX = 'review-log-row:';
 export const REVIEW_LOG_EVENT = 'jp-review-log-changed';
 
 let cache: ReviewLogEntry[] | null = null;
@@ -33,6 +39,15 @@ let loading: Promise<ReviewLogEntry[]> | null = null;
 let heldAppends: ReviewLogEntry[] = [];
 /** Row ids this window undid that may still be stored. */
 let heldRemovals = new Set<string>();
+/**
+ * Every row this window added, and every row it undid, this session. The first
+ * load can race the first writes (a row stored between the load's read and its
+ * return), so what the window shows is always what it read plus these.
+ */
+let ownRows: ReviewLogEntry[] = [];
+let ownRemoved = new Set<string>();
+/** Row ids stored in the v1 value (an undo of one of those rewrites it). */
+let legacyIds = new Set<string>();
 let writeChain: Promise<void> = Promise.resolve();
 
 function newId(): string {
@@ -48,7 +63,7 @@ function emit(): void {
 }
 
 function withHeld(rows: readonly ReviewLogEntry[]): ReviewLogEntry[] {
-  return normalizeReviewLog([...rows, ...heldAppends]).filter((entry) => !heldRemovals.has(entry.id));
+  return normalizeReviewLog([...rows, ...ownRows]).filter((entry) => !ownRemoved.has(entry.id));
 }
 
 /** A stored value this module may merge into: nothing yet, or a review log. */
@@ -58,20 +73,32 @@ function isReviewLogValue(value: unknown): boolean {
   return typeof value === 'object' && Array.isArray((value as { entries?: unknown }).entries);
 }
 
+async function readStored(): Promise<ReviewLogEntry[]> {
+  const legacy = normalizeReviewLog(await kvGet<unknown>(REVIEW_LOG_IDB_KEY));
+  legacyIds = new Set(legacy.map((entry) => entry.id));
+  const rows: ReviewLogEntry[] = [];
+  for (const [, value] of await kvScanPrefix(REVIEW_LOG_ROW_PREFIX)) {
+    const entry = normalizeReviewLogEntry(value);
+    if (entry) rows.push(entry);
+  }
+  return normalizeReviewLog([...legacy, ...rows]);
+}
+
 export function loadReviewLog(): Promise<ReviewLogEntry[]> {
   if (cache) return Promise.resolve(cache);
   if (!loading) {
     loading = (async () => {
       let stored: ReviewLogEntry[] = [];
       try {
-        stored = normalizeReviewLog(await kvGet<unknown>(REVIEW_LOG_IDB_KEY));
+        stored = await readStored();
       } catch {
-        // Shown as what this window has; the history is untouched, because a
-        // write merges into what is stored instead of replacing it.
+        // Shown as what this window has; the history is untouched, because
+        // nothing is ever written over it.
         stored = [];
       }
       cache = withHeld(stored);
       if (heldAppends.length || heldRemovals.size) persist();
+      if (stored.length >= REVIEW_LOG_LIMIT) void pruneReviewLog().catch(() => undefined);
       return cache;
     })();
   }
@@ -84,26 +111,46 @@ function persist(): void {
       const appends = heldAppends.slice();
       const removals = new Set(heldRemovals);
       if (!appends.length && !removals.size) return;
-      let merged = null as ReviewLogEntry[] | null;
-      await kvUpdate(REVIEW_LOG_IDB_KEY, (current) => {
-        if (!isReviewLogValue(current)) return undefined;
-        merged = normalizeReviewLog([...normalizeReviewLog(current), ...appends])
-          .filter((entry) => !removals.has(entry.id));
-        return { version: 1, entries: merged };
-      });
-      if (!merged) {
-        console.warn('[review-log] stored log is unreadable; keeping new rows in memory instead of overwriting it');
-        return;
+      await kvBatch([
+        ...appends.map((entry) => ({ type: 'put' as const, key: `${REVIEW_LOG_ROW_PREFIX}${entry.id}`, value: entry })),
+        ...[...removals].map((id) => ({ type: 'delete' as const, key: `${REVIEW_LOG_ROW_PREFIX}${id}` })),
+      ]);
+      const legacyRemovals = [...removals].filter((id) => legacyIds.has(id));
+      if (legacyRemovals.length) {
+        // A row an older build stored in the whole-log value: take it out of
+        // that value, in one read-modify-write, never over an unreadable one.
+        await kvUpdate(REVIEW_LOG_IDB_KEY, (current) => {
+          if (!isReviewLogValue(current)) return undefined;
+          const drop = new Set(legacyRemovals);
+          return { version: 1, entries: normalizeReviewLog(current).filter((entry) => !drop.has(entry.id)) };
+        });
+        for (const id of legacyRemovals) legacyIds.delete(id);
       }
       heldAppends = heldAppends.filter((entry) => !appends.includes(entry));
       for (const id of removals) heldRemovals.delete(id);
-      // Rows other windows stored meanwhile are in `merged` too.
-      cache = withHeld(merged);
       emit();
     })
     .catch((error) => {
+      // The rows stay held and go with the next write.
       console.error('[review-log] IndexedDB write failed:', error);
     });
+}
+
+/**
+ * Drop the oldest stored rows beyond `REVIEW_LOG_LIMIT` (the whole-log value
+ * capped itself on every write). Run once in a while, not per answer.
+ */
+export async function pruneReviewLog(limit = REVIEW_LOG_LIMIT): Promise<number> {
+  const rows = await kvScanPrefix(REVIEW_LOG_ROW_PREFIX);
+  const legacyCount = normalizeReviewLog(await kvGet<unknown>(REVIEW_LOG_IDB_KEY)).length;
+  const excess = rows.length + legacyCount - limit;
+  if (excess <= 0) return 0;
+  const oldest = rows
+    .map(([key, value]) => ({ key, at: normalizeReviewLogEntry(value)?.at ?? 0 }))
+    .sort((a, b) => a.at - b.at)
+    .slice(0, excess);
+  await kvBatch(oldest.map(({ key }) => ({ type: 'delete' as const, key })));
+  return oldest.length;
 }
 
 /** Test seam: wait for queued writes. */
@@ -117,6 +164,9 @@ export function resetReviewLogForTests(): void {
   loading = null;
   heldAppends = [];
   heldRemovals = new Set();
+  ownRows = [];
+  ownRemoved = new Set();
+  legacyIds = new Set();
   writeChain = Promise.resolve();
 }
 
@@ -128,13 +178,15 @@ export function appendReviewLog(input: Omit<ReviewLogEntry, 'id' | 'at'> & { at?
   const entry: ReviewLogEntry = { ...input, id: newId(), at: input.at ?? Date.now() };
   recordReviewActivity(entry.mode === 'review' ? 'review' : 'practice', entry.correct, entry.at);
   heldAppends.push(entry);
+  ownRows.push(entry);
   if (cache) {
     cache.push(entry);
     if (cache.length > REVIEW_LOG_LIMIT) cache = cache.slice(cache.length - REVIEW_LOG_LIMIT);
-    persist();
   } else {
     void loadReviewLog();
   }
+  // Written now either way: an append needs nothing from the stored log.
+  persist();
   emit();
   return entry;
 }
@@ -143,13 +195,13 @@ export function appendReviewLog(input: Omit<ReviewLogEntry, 'id' | 'at'> & { at?
 export function removeReviewLogEntry(entry: ReviewLogEntry): void {
   recordReviewActivity(entry.mode === 'review' ? 'review' : 'practice', entry.correct, entry.at, true);
   heldAppends = heldAppends.filter((row) => row.id !== entry.id);
+  ownRows = ownRows.filter((row) => row.id !== entry.id);
+  ownRemoved.add(entry.id);
+  if (cache) cache = cache.filter((row) => row.id !== entry.id);
+  // Deleted even if it may not be stored yet: its put could be in flight, and
+  // the delete is queued after it.
   heldRemovals.add(entry.id);
-  if (cache) {
-    cache = cache.filter((row) => row.id !== entry.id);
-    persist();
-  } else {
-    void loadReviewLog();
-  }
+  persist();
   emit();
 }
 

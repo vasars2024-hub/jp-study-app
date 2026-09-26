@@ -1,7 +1,7 @@
 import { app, ipcMain, dialog, protocol, BrowserWindow } from 'electron';
 import { partialDownloadFiles, subtitleIsAutoCaption } from '../shared/youtubeDownloadFiles';
 import { readWatchLibrary } from './watchLibrary';
-import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
+import { readJsonSync, registerJsonFlusher, writeJsonAtomicSync } from './atomicJson';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -124,14 +124,69 @@ interface MediaDb {
 function dbPath(): string {
   return path.join(app.getPath('userData'), MEDIA_LIBRARY_STORE_FILE);
 }
+/**
+ * Item patches from the metadata sweep, not yet on disk. The sweep stamps one
+ * title at a time, and each stamp used to be a full read + write of media.json
+ * and a full broadcast — twice per title (the group patch and the per-file
+ * patch). With 2,001 tracks that is thousands of full rewrites of a multi-MB
+ * file. Patches now collect here, every read sees them at once, and they reach
+ * disk in one write (and one broadcast) per `PATCH_FLUSH_MS`.
+ */
+const pendingPatches = new Map<string, { patch: Partial<MediaItem>; seq: number }>();
+let patchSeq = 0;
+let patchTimer: NodeJS.Timeout | null = null;
+const PATCH_FLUSH_MS = 400;
+/** The patch sequence number a db object was read at (a write re-applies only later patches). */
+const readSeqOf = new WeakMap<MediaDb, number>();
+
+function applyPendingPatches(db: MediaDb, after = -1): void {
+  if (!pendingPatches.size) return;
+  for (const item of db.items) {
+    const entry = pendingPatches.get(item.id);
+    if (entry && entry.seq > after) Object.assign(item, entry.patch);
+  }
+}
+
 function readDb(): MediaDb {
-  const db = readJsonSync<MediaDb | null>(dbPath(), null, { validate: (v) => v !== null && typeof v === 'object' });
-  if (!db) return { items: [], relationships: [] };
-  return { items: mediaItemsFromStoredDocument(db), watchFolder: db.watchFolder, relationships: Array.isArray(db.relationships) ? db.relationships : [] };
+  const stored = readJsonSync<MediaDb | null>(dbPath(), null, { validate: (v) => v !== null && typeof v === 'object' });
+  const db: MediaDb = stored
+    ? { items: mediaItemsFromStoredDocument(stored), watchFolder: stored.watchFolder, relationships: Array.isArray(stored.relationships) ? stored.relationships : [] }
+    : { items: [], relationships: [] };
+  applyPendingPatches(db);
+  readSeqOf.set(db, patchSeq);
+  return db;
 }
 function writeDb(db: MediaDb): void {
+  // Patches queued after this db was read are not in it yet; the earlier ones
+  // were applied by readDb (and the caller may have changed those fields since).
+  applyPendingPatches(db, readSeqOf.get(db) ?? -1);
   writeJsonAtomicSync(dbPath(), db);
+  pendingPatches.clear();
+  if (patchTimer) clearTimeout(patchTimer);
+  patchTimer = null;
 }
+
+/** Queue patches for many items; every read sees them at once. */
+function queuePatches(entries: Iterable<readonly [string, Partial<MediaItem>]>): void {
+  let any = false;
+  for (const [id, patch] of entries) {
+    const prev = pendingPatches.get(id);
+    pendingPatches.set(id, { patch: prev ? { ...prev.patch, ...patch } : { ...patch }, seq: ++patchSeq });
+    any = true;
+  }
+  if (!any || patchTimer) return;
+  patchTimer = setTimeout(flushMediaPatches, PATCH_FLUSH_MS);
+}
+
+/** Write queued patches now: one write and one broadcast. */
+export function flushMediaPatches(): void {
+  if (patchTimer) clearTimeout(patchTimer);
+  patchTimer = null;
+  if (!pendingPatches.size) return;
+  writeDb(readDb());
+  broadcastMedia();
+}
+registerJsonFlusher(flushMediaPatches);
 
 // Turn "AnimePahe_Re_Zero_kara_Hajimeru_Isekai_Seikatsu__74_1080p.mp4" into a
 // readable title we can also feed to a MyAnimeList search.
@@ -192,47 +247,77 @@ function applyReleaseIdentity(item: MediaItem, fileName: string): boolean {
   return changed;
 }
 
+interface AddRequest {
+  absPath: string;
+  touch?: boolean;
+  extra?: { sourceUrl?: string; youtubeId?: string };
+}
+
+/**
+ * Add (or find) many files in one read and one write of media.json.
+ *
+ * Adding a music folder called `addOrGetItem` per file, and each call read the
+ * whole store, searched it linearly and wrote it back: O(n²), 44 s for 2,001
+ * tracks. The store is now read once, indexed by path and YouTube id, and
+ * written once; the caller broadcasts once.
+ */
+export function addOrGetItems(requests: readonly AddRequest[]): MediaItem[] {
+  if (!requests.length) return [];
+  const db = readDb();
+  const byPath = new Map<string, MediaItem>();
+  const byYoutube = new Map<string, MediaItem>();
+  for (const item of db.items) {
+    if (item.path && !byPath.has(item.path)) byPath.set(item.path, item);
+    if (item.youtubeId && !byYoutube.has(item.youtubeId)) byYoutube.set(item.youtubeId, item);
+  }
+  const added: MediaItem[] = [];
+  const out = requests.map(({ absPath, touch = true, extra }) => {
+    let item = byPath.get(absPath);
+    if (!item && extra?.youtubeId) item = byYoutube.get(extra.youtubeId);
+    if (!item) {
+      const fileName = path.basename(absPath);
+      item = {
+        id: crypto.randomUUID(),
+        title: cleanTitle(absPath),
+        path: absPath,
+        fileName,
+        addedAt: Date.now(),
+        kind: classifyMediaKind(fileName),
+        sourceUrl: extra?.sourceUrl,
+        youtubeId: extra?.youtubeId,
+      };
+      applyReleaseIdentity(item, fileName);
+      added.push(item);
+    } else {
+      if (!item.kind) item.kind = classifyMediaKind(item.fileName, item.durationSec);
+      if (extra?.sourceUrl) item.sourceUrl = extra.sourceUrl;
+      if (extra?.youtubeId) item.youtubeId = extra.youtubeId;
+      if (item.path !== absPath && fs.existsSync(absPath)) {
+        item.path = absPath;
+        item.fileName = path.basename(absPath);
+        item.title = cleanTitle(absPath);
+      }
+      if (item.seriesKey === undefined) applyReleaseIdentity(item, item.fileName);
+      else refreshReleaseIdentity(item);
+    }
+    byPath.set(item.path, item);
+    if (item.youtubeId) byYoutube.set(item.youtubeId, item);
+    if (touch) item.lastPlayedAt = Date.now();
+    return item;
+  });
+  // Newest first, exactly as one-at-a-time `unshift`s left them.
+  if (added.length) db.items.unshift(...added.reverse());
+  writeDb(db);
+  return out;
+}
+
 function addOrGetItem(
   absPath: string,
   touch = true,
   extra?: { sourceUrl?: string; youtubeId?: string },
 ): MediaItem {
-  const db = readDb();
-  let item = db.items.find((i) => i.path === absPath);
-  if (!item && extra?.youtubeId) {
-    item = db.items.find((i) => i.youtubeId === extra.youtubeId);
-  }
-  if (!item) {
-    const fileName = path.basename(absPath);
-    item = {
-      id: crypto.randomUUID(),
-      title: cleanTitle(absPath),
-      path: absPath,
-      fileName,
-      addedAt: Date.now(),
-      kind: classifyMediaKind(fileName),
-      sourceUrl: extra?.sourceUrl,
-      youtubeId: extra?.youtubeId,
-    };
-    applyReleaseIdentity(item, fileName);
-    db.items.unshift(item);
-  } else {
-    if (!item.kind) item.kind = classifyMediaKind(item.fileName, item.durationSec);
-    if (extra?.sourceUrl) item.sourceUrl = extra.sourceUrl;
-    if (extra?.youtubeId) item.youtubeId = extra.youtubeId;
-    if (item.path !== absPath && fs.existsSync(absPath)) {
-      item.path = absPath;
-      item.fileName = path.basename(absPath);
-      item.title = cleanTitle(absPath);
-    }
-    if (item.seriesKey === undefined) applyReleaseIdentity(item, item.fileName);
-    else refreshReleaseIdentity(item);
-  }
-  if (touch) item.lastPlayedAt = Date.now();
-  writeDb(db);
-  return item;
+  return addOrGetItems([{ absPath, touch, extra }])[0];
 }
-
 /** Extract YouTube video id from a watch / youtu.be URL when possible. */
 export function extractYoutubeVideoId(url: string): string | undefined {
   const raw = (url ?? '').trim();
@@ -1035,35 +1120,14 @@ function scheduleMetadataSweep(): void {
 
 function patchEachItem(entries: ReadonlyArray<readonly [string, Partial<MediaItem>]>): void {
   if (entries.length === 0) return;
-  const byId = new Map(entries);
-  const db = readDb();
-  let touched = false;
-  for (const item of db.items) {
-    const patch = byId.get(item.id);
-    if (!patch) continue;
-    Object.assign(item, patch);
-    touched = true;
-  }
-  if (!touched) return;
-  writeDb(db);
-  broadcastMedia();
+  // Queued, not written per call: see `pendingPatches`. Every read sees them now.
+  queuePatches(entries);
 }
 
 function patchItems(ids: readonly string[], patch: Partial<MediaItem>): void {
   if (ids.length === 0) return;
-  const wanted = new Set(ids);
-  const db = readDb();
-  let touched = false;
-  for (const item of db.items) {
-    if (!wanted.has(item.id)) continue;
-    Object.assign(item, patch);
-    touched = true;
-  }
-  if (!touched) return;
-  writeDb(db);
-  broadcastMedia();
+  queuePatches(ids.map((id) => [id, patch] as const));
 }
-
 /**
  * What an external player should get beyond the file: the library's study
  * subtitle (a file the player can load) and the saved resume point, when the
@@ -1396,12 +1460,10 @@ export function registerMediaIpc(): void {
       ],
     });
     if (res.canceled || !res.filePaths[0]) return null;
-    let first: MediaOpen | null = null;
-    for (const filePath of res.filePaths) {
-      if (!MEDIA_EXT.has(path.extname(filePath).toLowerCase())) continue;
-      const item = addOrGetItem(filePath, !first);
-      if (!first) first = { item, url: `playfile://${tokenFor(item.path)}` };
-    }
+    const files = res.filePaths.filter((filePath) => MEDIA_EXT.has(path.extname(filePath).toLowerCase()));
+    // The first file is the one opened (touched); the rest are only added.
+    const items = addOrGetItems(files.map((absPath, index) => ({ absPath, touch: index === 0 })));
+    const first: MediaOpen | null = items[0] ? { item: items[0], url: `playfile://${tokenFor(items[0].path)}` } : null;
     broadcastMedia();
     scheduleMetadataSweep();
     return first;
@@ -1418,11 +1480,9 @@ export function registerMediaIpc(): void {
       if (res.canceled || !res.filePaths[0]) return { items: readDb().items, added: 0 };
       const root = res.filePaths[0];
       const before = new Set(readDb().items.map((i) => i.path));
-      let added = 0;
-      for (const filePath of collectMediaFilesInDir(root)) {
-        addOrGetItem(filePath, false);
-        if (!before.has(filePath)) added += 1;
-      }
+      const files = collectMediaFilesInDir(root);
+      addOrGetItems(files.map((absPath) => ({ absPath, touch: false })));
+      const added = files.filter((filePath) => !before.has(filePath)).length;
       if (added > 0) {
         broadcastMedia();
         scheduleMetadataSweep();
@@ -1482,18 +1542,18 @@ export function registerMediaIpc(): void {
 
   // Add media files dropped onto the app window (no dialog).
   ipcMain.handle('media:addPaths', (_e, paths: string[]) => {
-    let added = false;
+    const files: string[] = [];
     for (const fp of Array.isArray(paths) ? paths : []) {
       if (typeof fp !== 'string') continue;
       try {
-        if (fs.existsSync(fp) && MEDIA_EXT.has(path.extname(fp).toLowerCase())) {
-          addOrGetItem(fp, false);
-          added = true;
-        }
+        if (fs.existsSync(fp) && MEDIA_EXT.has(path.extname(fp).toLowerCase())) files.push(fp);
       } catch {
         /* unreadable file — skip it */
       }
     }
+    // One read, one write and one broadcast for the whole drop.
+    addOrGetItems(files.map((absPath) => ({ absPath, touch: false })));
+    const added = files.length > 0;
     if (added) {
       broadcastMedia();
       scheduleMetadataSweep();

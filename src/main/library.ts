@@ -643,26 +643,43 @@ function findEpubZipEntry(zip: AdmZip, zipPath: string): ReturnType<AdmZip['getE
   return null;
 }
 
+/** One zip entry's text, inflated on libuv's pool rather than on this thread. */
+function zipEntryText(entry: AdmZip.IZipEntry): Promise<string> {
+  return new Promise((resolve, reject) => {
+    entry.getDataAsync((data, err) => {
+      if (err) reject(new Error(String(err)));
+      else resolve(data.toString('utf-8'));
+    });
+  });
+}
+
+/** Spine documents shorter than this are covers, title pages and colophons. */
+const SAMPLE_MIN_DOCUMENT_CHARS = 200;
+
 /**
- * Lightweight plain-text sample from an EPUB for JLPT/HSK cover badges.
- * Stops once `maxChars` is reached so large books stay off the UI thread.
+ * Lightweight plain-text sample from an EPUB for the Library's level scores.
+ * Stops once `maxChars` is reached so large books stay cheap.
+ *
+ * Asynchronous end to end: the file is read with `fs.promises` and each entry
+ * is inflated with zlib's async API, so sampling a 200-book shelf never holds
+ * the main process (it used to read and inflate every zip synchronously). Short
+ * front-matter documents are skipped while running text follows them, so a
+ * small sample is prose rather than a title page.
  */
-function sampleBookText(id: string, maxChars = 40_000): string | null {
+export async function sampleBookText(id: string, maxChars = 40_000): Promise<string | null> {
   const it = readDb().find((x) => x.id === id);
   if (!it || it.kind !== 'book') return null;
   const file = it.epubFile ?? 'original.epub';
   if (file.toLowerCase().endsWith('.pdf')) return null;
-  const full = path.join(itemDir(id), file);
-  if (!fs.existsSync(full)) return null;
 
   try {
-    const zip = new AdmZip(full);
+    const zip = new AdmZip(await fs.promises.readFile(path.join(itemDir(id), file)));
     const parsed = readEpubOpf(zip);
     const parts: string[] = [];
+    const skipped: string[] = [];
     let total = 0;
 
-    const pushText = (html: string): boolean => {
-      const text = stripHtmlToText(html);
+    const pushText = (text: string): boolean => {
       if (!text) return false;
       const room = maxChars - total;
       if (room <= 0) return true;
@@ -670,6 +687,15 @@ function sampleBookText(id: string, maxChars = 40_000): string | null {
       parts.push(slice);
       total += slice.length;
       return total >= maxChars;
+    };
+    const pushDocument = (html: string): boolean => {
+      const text = stripHtmlToText(html);
+      if (!text) return false;
+      if (!parts.length && text.length < SAMPLE_MIN_DOCUMENT_CHARS) {
+        skipped.push(text);
+        return false;
+      }
+      return pushText(text);
     };
 
     if (parsed) {
@@ -695,7 +721,7 @@ function sampleBookText(id: string, maxChars = 40_000): string | null {
             : path.posix.join(opfDir, cleaned);
         const entry = findEpubZipEntry(zip, zipPath);
         if (!entry) continue;
-        if (pushText(entry.getData().toString('utf-8'))) break;
+        if (pushDocument(await zipEntryText(entry))) break;
       }
     }
 
@@ -705,15 +731,45 @@ function sampleBookText(id: string, maxChars = 40_000): string | null {
         const name = entry.entryName.replace(/\\/g, '/').toLowerCase();
         if (!/\.(xhtml|html|htm)$/.test(name)) continue;
         if (/(^|\/)nav\.xhtml$/.test(name) || name.includes('toc')) continue;
-        if (pushText(entry.getData().toString('utf-8'))) break;
+        if (pushDocument(await zipEntryText(entry))) break;
       }
     }
 
+    // A book made only of short documents: its short text is still its text.
+    for (const text of skipped) {
+      if (total >= maxChars) break;
+      pushText(text);
+    }
     const out = parts.join('\n').trim();
     return out || null;
   } catch {
     return null;
   }
+}
+
+/**
+ * A cheap identity for each book's file — size and modification time — so the
+ * renderer can cache what it computed from a sample and never sample the same
+ * file twice. `null` for an item with no readable file, and for PDFs, which
+ * have no text sample.
+ */
+export async function bookFileKeys(ids: readonly string[]): Promise<Record<string, string | null>> {
+  const byId = new Map(readDb().map((item) => [item.id, item]));
+  const out: Record<string, string | null> = {};
+  await Promise.all(ids.map(async (id) => {
+    out[id] = null;
+    const it = byId.get(id);
+    if (!it || it.kind !== 'book') return;
+    const file = it.epubFile ?? 'original.epub';
+    if (file.toLowerCase().endsWith('.pdf')) return;
+    try {
+      const st = await fs.promises.stat(path.join(itemDir(id), file));
+      out[id] = `${st.size}:${Math.round(st.mtimeMs)}`;
+    } catch {
+      /* missing file: nothing to sample */
+    }
+  }));
+  return out;
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -1441,6 +1497,34 @@ export function updateLibraryLevelMeta(
   return items;
 }
 
+/**
+ * `updateLibraryLevelMeta` for many books in one read and one write of the
+ * library database. The Library scores books progressively and persists them
+ * in batches; a write per book rewrote the whole of library.json each time.
+ */
+export function updateLibraryLevelMetaMany(
+  patches: ReadonlyArray<{ id: string; levelMeta: NonNullable<LibraryItem['levelMeta']> }>,
+  opts?: { broadcast?: boolean },
+): LibraryItem[] {
+  const items = readDb();
+  const byId = new Map(items.map((item) => [item.id, item]));
+  let changed = false;
+  for (const { id, levelMeta } of patches) {
+    const it = byId.get(id);
+    if (!it || it.kind !== 'book' || !levelMeta || typeof levelMeta !== 'object') continue;
+    it.levelMeta = {
+      lang: levelMeta.lang,
+      knownRatio: typeof levelMeta.knownRatio === 'number' ? levelMeta.knownRatio : 0,
+      levelEstimate: levelMeta.levelEstimate ?? null,
+    };
+    changed = true;
+  }
+  if (!changed) return items;
+  writeDb(items);
+  if (opts?.broadcast !== false) broadcastLibrary(items);
+  return items;
+}
+
 /** Persist manga OCR/translate volume status for library cover badges. */
 export function updateLibraryOcrMeta(
   id: string,
@@ -1956,6 +2040,21 @@ export function registerLibraryIpc(): void {
   );
 
   ipcMain.handle(
+    'library:updateLevelMetaMany',
+    (
+      _e,
+      patches: Array<{ id: string; levelMeta: NonNullable<LibraryItem['levelMeta']> }>,
+      opts?: { broadcast?: boolean },
+    ) => {
+      if (!Array.isArray(patches)) return readDb();
+      return updateLibraryLevelMetaMany(
+        patches.filter((p) => p && typeof p.id === 'string' && p.levelMeta && typeof p.levelMeta === 'object'),
+        opts,
+      );
+    },
+  );
+
+  ipcMain.handle(
     'library:updateLevelMeta',
     (
       _e,
@@ -2040,6 +2139,9 @@ export function registerLibraryIpc(): void {
 
   ipcMain.handle('library:sampleBookText', (_e, id: string, maxChars?: number) =>
     sampleBookText(id, typeof maxChars === 'number' && maxChars > 0 ? maxChars : 40_000),
+  );
+  ipcMain.handle('library:bookFileKeys', (_e, ids: unknown) =>
+    bookFileKeys(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []),
   );
 
   ipcMain.handle('config:getWatchFolder', () => readConfig().watchFolder ?? null);

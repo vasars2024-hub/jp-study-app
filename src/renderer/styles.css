@@ -20142,6 +20142,24 @@ html[data-taskbar-size='large'] .os-tray-btn {
   text-align: center;
   font-size: 13px;
 }
+/* Windowed history (VirtualList): every row is one fixed pitch, so the card
+   fills its slot and a long or expanded text scrolls inside the card. */
+.cbh-list.cbh-vlist {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cbh-vlist .cbh-card {
+  box-sizing: border-box;
+  height: calc(100% - 8px);
+  overflow: hidden;
+}
+.cbh-vlist .cbh-text,
+.cbh-vlist .cbh-dict {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
 .cbh-card {
   border: 1px solid var(--border);
   background: var(--panel-2);

@@ -41,6 +41,7 @@ import {
   type BackupManifest,
   type StagedRestore,
 } from './backupArchive';
+import { isRendererSnapshotText } from './snapshotText';
 import { drainAtomicWrites, flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites, writeJsonAtomicSync } from '../atomicJson';
 import { logDiagnostic } from '../errorLog';
 import { mt } from '../i18n';
@@ -62,6 +63,10 @@ function parentWindow(event: IpcMainInvokeEvent): BrowserWindow | undefined {
 }
 
 function isRendererSnapshot(value: unknown): boolean {
+  // The renderer sends its snapshot as JSON text it serialized in slices, so
+  // this process neither deserializes a large object graph off IPC nor
+  // stringifies it again.
+  if (isRendererSnapshotText(value)) return true;
   if (!value || typeof value !== 'object') return false;
   const v = value as { localStorage?: unknown; indexedDb?: unknown };
   return typeof v.localStorage === 'object' && v.localStorage !== null && typeof v.indexedDb === 'object' && v.indexedDb !== null;

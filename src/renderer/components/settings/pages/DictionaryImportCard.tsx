@@ -11,6 +11,9 @@ const FILE_KINDS = ['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'sta
 export function dictionaryImportStatusKey(snapshot: DictionaryImportJobSnapshot | null): string {
   if (!snapshot) return 'storage.dictionaryImport.idle';
   if (snapshot.status === 'running') {
+    if (snapshot.progress?.phase === 'importing' && snapshot.progress.percent != null) {
+      return 'storage.dictionaryImport.phase.importingPercent';
+    }
     return `storage.dictionaryImport.phase.${snapshot.progress?.phase ?? 'reading'}`;
   }
   return `storage.dictionaryImport.status.${snapshot.status}`;
@@ -113,6 +116,7 @@ export default function DictionaryImportCard() {
         {t(dictionaryImportStatusKey(snapshot), {
           lines,
           count: counts ?? 0,
+          percent: snapshot?.progress?.percent ?? 0,
         })}
         {snapshot?.terminal?.state === 'failed' ? ` ${snapshot.terminal.error}` : ''}
       </div>

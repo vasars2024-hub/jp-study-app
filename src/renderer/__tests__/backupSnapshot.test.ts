@@ -9,6 +9,7 @@ import {
   SnapshotApplyError,
   applyRendererSnapshot,
   collectRendererSnapshot,
+  collectRendererSnapshotText,
   isLegacyBackup,
   legacyToSnapshot,
   type RendererSnapshot,
@@ -32,6 +33,44 @@ function seedOriginal(): void {
     'level-lists': { n5: ['食べる'] },
   });
 }
+
+describe('renderer snapshot text (what a backup sends)', () => {
+  it('is the snapshot JSON, with a summary header main reads without parsing the body', async () => {
+    seedOriginal();
+    const text = await collectRendererSnapshotText({ mirrorReading: false });
+    const { summaryFromSnapshotText, isRendererSnapshotText } = await import('../../main/backup/backupArchive');
+    expect(isRendererSnapshotText(text)).toBe(true);
+    expect(summaryFromSnapshotText(text)).toEqual({ localStorageKeys: 2, indexedDbDatabases: [DB_NAME] });
+    const parsed = JSON.parse(text) as RendererSnapshot & { summary?: unknown };
+    const object = JSON.parse(JSON.stringify(await collectRendererSnapshot({ mirrorReading: false }))) as RendererSnapshot;
+    expect(parsed.localStorage).toEqual(object.localStorage);
+    expect(parsed.indexedDb).toEqual(object.indexedDb);
+    // And it restores exactly like the object form.
+    fake = installFakeIndexedDb();
+    ls = new FakeLocalStorage();
+    vi.stubGlobal('localStorage', ls);
+    await applyRendererSnapshot(parsed);
+    expect((fake.rows(DB_NAME, KV_STORE)['flashcard-deck'] as { at: Date }).at).toBeInstanceOf(Date);
+  });
+
+  it('lets the page run while it serializes a large store', async () => {
+    fake.seed(DB_NAME, KV_STORE, Object.fromEntries(
+      Array.from({ length: 3_000 }, (_, i) => [`review-log-row:${i}`, { id: `r${i}`, at: i, text: 'x'.repeat(400) }]),
+    ));
+    let ticks = 0;
+    const timer = setInterval(() => { ticks += 1; }, 0);
+    const now = performance.now;
+    let fakeNow = 0;
+    // Each record "costs" 1 ms, so a slice (8 ms) holds eight of them.
+    vi.spyOn(performance, 'now').mockImplementation(() => (fakeNow += 1));
+    const text = await collectRendererSnapshotText({ mirrorReading: false });
+    clearInterval(timer);
+    performance.now = now;
+    vi.restoreAllMocks();
+    expect(JSON.parse(text).indexedDb[DB_NAME].stores[KV_STORE].entries).toHaveLength(3_000);
+    expect(ticks).toBeGreaterThan(50);
+  });
+});
 
 describe('renderer snapshot', () => {
   it('round-trips localStorage and IndexedDB, including non-JSON values, through JSON', async () => {

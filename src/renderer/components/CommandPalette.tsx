@@ -181,7 +181,7 @@ export default function CommandPalette() {
    */
   useModalKeyboard({
     panelRef,
-    onEscape: () => setOpen(false),
+    onEscape: () => close(),
     enabled: open,
     initialFocusRef: inputRef,
   });
@@ -272,7 +272,14 @@ export default function CommandPalette() {
     };
   }, [open, mode, settingsRows.length]);
 
-  const close = useCallback(() => setOpen(false), []);
+  // Blur first: unmounting with the search box focused leaves that detached
+  // input as React's tracked active element, and through its fiber the closed
+  // palette's state — every flashcard row included — until focus moves.
+  const close = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur();
+    setOpen(false);
+  }, []);
 
   const items = useMemo<Item[]>(() => {
     if (!open) return [];
@@ -355,14 +362,26 @@ export default function CommandPalette() {
           run: () => openSection('dictionary'),
         });
       }
-      for (const c of loadDeck().slice(0, 400)) {
+      // Every card, not the first 400: a word mined last year is as findable as
+      // one mined today. `loadDeck` is the cached parse now, and the labels are
+      // resolved once per book rather than once per card.
+      const flashGroup = t('palette.group.flashcards');
+      const plainCard = t('palette.flashcard');
+      const bookSubs = new Map<string, string>();
+      const openFlashcards = (): void => openSection('flashcards');
+      for (const c of loadDeck()) {
+        let sub = plainCard;
+        if (c.bookTitle) {
+          sub = bookSubs.get(c.bookTitle) ?? t('palette.flashcardBook', { book: c.bookTitle });
+          bookSubs.set(c.bookTitle, sub);
+        }
         out.push({
           key: `fc-${c.id}`,
           label: c.word,
-          sub: c.bookTitle ? t('palette.flashcardBook', { book: c.bookTitle }) : t('palette.flashcard'),
-          group: t('palette.group.flashcards'),
+          sub,
+          group: flashGroup,
           glyph: 'flashcards',
-          run: () => openSection('flashcards'),
+          run: openFlashcards,
         });
       }
       const grammarGroup = t('palette.group.grammar');

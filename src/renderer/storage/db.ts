@@ -501,6 +501,91 @@ export async function kvEntries(): Promise<Array<[string, unknown]>> {
   });
 }
 
+/** One write of a `kvBatch`. */
+export type KvBatchOp = { type: 'put'; key: string; value: unknown } | { type: 'delete'; key: string };
+
+/**
+ * Several puts and deletes in ONE readwrite transaction: all land or none do.
+ * What an append-only or per-record layout writes instead of re-writing one big
+ * value.
+ */
+export async function kvBatch(ops: readonly KvBatchOp[]): Promise<void> {
+  if (writesBlocked || !ops.length) return;
+  await withTransaction('readwrite', async (store) => {
+    await Promise.all(ops.map((op) => requestToPromise(
+      op.type === 'put' ? store.put(op.value, op.key) : store.delete(op.key),
+    )));
+  });
+}
+
+/** The key range of every key starting with `prefix`, when the platform has key ranges. */
+function prefixRange(prefix: string): IDBKeyRange | null {
+  try {
+    return typeof IDBKeyRange === 'undefined' ? null : IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Every entry whose key starts with `prefix`, in key order — one range read, not
+ * a scan of the whole store (a platform without `IDBKeyRange` filters instead).
+ */
+export async function kvScanPrefix(prefix: string): Promise<Array<[string, unknown]>> {
+  return withTransaction('readonly', async (store) => {
+    const range = prefixRange(prefix);
+    const [keys, values] = await Promise.all([
+      requestToPromise(range ? store.getAllKeys(range) : store.getAllKeys()),
+      requestToPromise(range ? store.getAll(range) : store.getAll()),
+    ]);
+    const out: Array<[string, unknown]> = [];
+    keys.forEach((key, i) => {
+      const k = String(key);
+      if (k.startsWith(prefix)) out.push([k, values[i]]);
+    });
+    return out;
+  });
+}
+
+/**
+ * Delete, in ONE readwrite transaction, every entry under `prefix` whose value
+ * `predicate` accepts. The read and the deletes cannot interleave with another
+ * write, so a record rewritten meanwhile is judged by its new value. Resolves
+ * with how many were deleted.
+ */
+export async function kvDeleteWhere(prefix: string, predicate: (value: unknown, key: string) => boolean): Promise<number> {
+  if (writesBlocked) return 0;
+  return withTransaction('readwrite', (store) => new Promise<number>((resolve, reject) => {
+    const range = prefixRange(prefix);
+    // The deletes are issued from the reads' success callbacks, inside the same
+    // transaction, as kvUpdate does: nothing can land between judging a record
+    // and deleting it.
+    const keysReq = range ? store.getAllKeys(range) : store.getAllKeys();
+    keysReq.onerror = () => reject(keysReq.error ?? new Error('IndexedDB request failed'));
+    keysReq.onsuccess = () => {
+      const keys = keysReq.result.map(String);
+      const valuesReq = range ? store.getAll(range) : store.getAll();
+      valuesReq.onerror = () => reject(valuesReq.error ?? new Error('IndexedDB request failed'));
+      valuesReq.onsuccess = () => {
+        const values = valuesReq.result;
+        let deleted = 0;
+        try {
+          keys.forEach((key, i) => {
+            if (key.startsWith(prefix) && predicate(values[i], key)) {
+              store.delete(key);
+              deleted += 1;
+            }
+          });
+        } catch (err) {
+          reject(err);
+          return;
+        }
+        resolve(deleted);
+      };
+    };
+  }));
+}
+
 /**
  * Replace the whole kv store in ONE transaction: either every entry lands and
  * the old ones are gone, or the transaction aborts and the store is exactly as

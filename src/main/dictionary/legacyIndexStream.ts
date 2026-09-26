@@ -44,6 +44,8 @@ export interface LegacyIndexScan {
   onMember?: (section: string, key: string, value: unknown) => void;
   /** A whole top-level value. Return `false` to stop reading the file there. */
   onValue?: (key: string, value: unknown) => boolean | void;
+  /** Bytes of the file read so far, once per chunk (for progress). */
+  onBytes?: (bytesRead: number) => void;
 }
 
 type Phase = 'key' | 'colon' | 'value' | 'primitive' | 'nested' | 'after';
@@ -147,6 +149,7 @@ function scanWith(fd: number, scan: LegacyIndexScan): void {
   for (;;) {
     const read = fs.readSync(fd, chunk, 0, CHUNK_BYTES, null);
     if (read === 0) break;
+    scan.onBytes?.(offset + read);
     startAt = 0;
     for (let i = 0; i < read; i += 1, offset += 1) {
       const byte = chunk[i];

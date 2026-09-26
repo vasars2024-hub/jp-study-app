@@ -24,6 +24,20 @@ describe('dictionary import job contract', () => {
     expect(states.every(isDictionaryImportTerminal)).toBe(true);
   });
 
+  it('carries a whole-job percentage when the worker knows one, and drops a bogus one', () => {
+    const ok = normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-p', kind: 'legacy', status: 'running',
+      progress: { jobId: 'job-p', kind: 'legacy', lines: 1, phase: 'importing', percent: 42.7 },
+    });
+    expect(ok?.progress?.percent).toBe(42);
+    const bogus = normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-q', kind: 'legacy', status: 'running',
+      progress: { jobId: 'job-q', kind: 'legacy', lines: 1, phase: 'importing', percent: 170 },
+    });
+    expect(bogus?.progress).toBeDefined();
+    expect(bogus?.progress?.percent).toBeUndefined();
+  });
+
   it('rejects mismatched progress and terminal payloads', () => {
     expect(normalizeDictionaryImportJobSnapshot({
       jobId: 'job-1', kind: 'cedict', status: 'running',

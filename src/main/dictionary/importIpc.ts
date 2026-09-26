@@ -163,6 +163,17 @@ export function startPendingLegacyDictionaryMigration(): void {
 }
 
 /**
+ * The first-boot migration's progress, for lookups made while it runs: null
+ * when no legacy import is running, else its whole-job percentage (null until
+ * the worker has reported one).
+ */
+export function legacyMigrationProgress(): { percent: number | null } | null {
+  const current = jobs?.current();
+  if (!current || current.status !== 'running' || current.kind !== 'legacy') return null;
+  return { percent: current.progress?.percent ?? null };
+}
+
+/**
  * Queues a source-language relabel and answers immediately.
  *
  * Lives here rather than in `service.ts` because the answer is a job, not a new

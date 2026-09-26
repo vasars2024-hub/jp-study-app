@@ -44,6 +44,25 @@ interface Tokenizer {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const BaseLoader = DictionaryLoader as any;
 
+/**
+ * Inflate a dictionary file without holding the UI thread. The browser's
+ * DecompressionStream inflates natively and hands back the bytes
+ * asynchronously; `fflate.gunzipSync` did the same work in JavaScript on the
+ * UI thread at boot (1.28 s for the IPADIC files, measured). The synchronous
+ * path stays as the fallback for a runtime without DecompressionStream.
+ */
+export async function gunzipOffThread(raw: Uint8Array): Promise<Uint8Array> {
+  if (typeof DecompressionStream === 'function' && typeof Blob === 'function' && typeof Response === 'function') {
+    try {
+      const stream = new Blob([raw as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch {
+      /* a platform whose stream refuses: inflate synchronously below */
+    }
+  }
+  return gunzipSync(raw);
+}
+
 class SniffingLoader extends BaseLoader {
   loadArrayBuffer(url: string, callback: (err: unknown, buf: ArrayBuffer | null) => void): void {
     // The dict is stored as "*.dat.bin" (gzip BYTES under a non-.gz name):
@@ -55,7 +74,7 @@ class SniffingLoader extends BaseLoader {
       .then(async (res) => {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
         const raw = new Uint8Array(await res.arrayBuffer());
-        const data = raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw;
+        const data = raw[0] === 0x1f && raw[1] === 0x8b ? await gunzipOffThread(raw) : raw;
         // Hand over an exact-size ArrayBuffer (a larger backing buffer breaks
         // kuromoji's typed-array views).
         return data.byteLength === data.buffer.byteLength
@@ -124,19 +143,47 @@ function isContent(t: IpadicFeatures): boolean {
  * same line never tokenizes differently, so it is done once. Bounded, oldest out first.
  */
 const TOKENIZE_CACHE_MAX = 4000;
-const tokenizeCache = new Map<string, JpToken[]>();
+/**
+ * The cache is for lines and paragraphs. A whole-chapter or book-sample text is
+ * tokenized once and never asked for again, and caching it kept hundreds of
+ * thousands of token objects resident (the Library's 40k-character samples held
+ * ~120 MB), so long texts are not cached and the total is capped by size too.
+ */
+export const TOKENIZE_CACHE_MAX_TEXT = 1_000;
+/** Estimated bytes the cache may hold (text + token objects). */
+export const TOKENIZE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+/** Rough heap cost of one token object with its strings. */
+const TOKEN_BYTES = 160;
+const tokenizeCache = new Map<string, { tokens: JpToken[]; bytes: number }>();
+let tokenizeCacheBytes = 0;
+
+function cacheCost(text: string, tokens: readonly JpToken[]): number {
+  return text.length * 2 + tokens.length * TOKEN_BYTES;
+}
 
 export function tokenizeSync(text: string): JpToken[] {
   if (!tok) return [];
   const cached = tokenizeCache.get(text);
-  if (cached) return cached;
+  if (cached) return cached.tokens;
   const tokens = tokenizeUncached(text);
-  if (tokenizeCache.size >= TOKENIZE_CACHE_MAX) {
+  if (text.length > TOKENIZE_CACHE_MAX_TEXT) return tokens;
+  const bytes = cacheCost(text, tokens);
+  while (
+    tokenizeCache.size && (tokenizeCache.size >= TOKENIZE_CACHE_MAX || tokenizeCacheBytes + bytes > TOKENIZE_CACHE_MAX_BYTES)
+  ) {
     const oldest = tokenizeCache.keys().next().value;
-    if (oldest !== undefined) tokenizeCache.delete(oldest);
+    if (oldest === undefined) break;
+    tokenizeCacheBytes -= tokenizeCache.get(oldest)?.bytes ?? 0;
+    tokenizeCache.delete(oldest);
   }
-  tokenizeCache.set(text, tokens);
+  tokenizeCache.set(text, { tokens, bytes });
+  tokenizeCacheBytes += bytes;
   return tokens;
+}
+
+/** What the tokenize cache holds now. For tests and diagnostics. */
+export function tokenizeCacheStats(): { entries: number; bytes: number } {
+  return { entries: tokenizeCache.size, bytes: tokenizeCacheBytes };
 }
 
 /**
