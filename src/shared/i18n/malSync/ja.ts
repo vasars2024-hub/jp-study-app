@@ -70,6 +70,7 @@ export const MAL_SYNC_JA: Catalog = {
   'malSync.pushPushing': '送信中…',
   'malSync.pushResult': '送信 {sent} 件、失敗 {failed} 件。',
   'malSync.pushRemaining': { other: '残り {count} 件は次回の送信で送られます。' },
+  'malSync.pushRetryAt': 'MyAnimeList から待機を求められました。{time} 以降に再試行してください。',
   'malSync.pushChangedOnMal': { other: '前回の取得後に MyAnimeList 側で変更された {count} 件は、上書きせずそのままにしました。もう一度リストを取得して比べてください：' },
   'malSync.pushAdded': 'MyAnimeList に新規追加',
   'malSync.pushField.status': 'ステータス',
@@ -95,5 +96,6 @@ export const MAL_SYNC_JA: Catalog = {
   'malSync.error.not-authenticated': 'MyAnimeList と未連携です。先にアカウントを連携してください。',
   'malSync.error.reauth-required': 'MyAnimeList で再度のサインインが必要です。もう一度連携してください。',
   'malSync.error.transient': 'MyAnimeList から応答がありませんでした。少し待って再試行してください。',
+  'malSync.error.rate-limited': 'MyAnimeList が現在リクエストを制限しています。サインインは維持されています。数分待ってから再試行してください。',
   'malSync.error.request-failed': 'MyAnimeList へのリクエストが失敗しました。',
 };

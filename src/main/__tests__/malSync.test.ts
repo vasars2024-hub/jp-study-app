@@ -368,6 +368,46 @@ describe('refresh failure', () => {
     expect(store.current?.refreshToken).toBe(FAKE_REFRESH);
   });
 
+  // Resilience audit #7: a 429 on refresh was read as a rejected grant and
+  // deleted the stored tokens, so waiting for MAL could never restore sync.
+  it('keeps the tokens on a rate-limited refresh, and says when to retry', async () => {
+    const store = memoryStore(connectedTokens({ expiresAt: 1 }));
+    const rec = recorder((request) =>
+      request.url === MAL_TOKEN_URL
+        ? { status: 429, body: '', retryAfter: '120' }
+        : { status: 200, body: JSON.stringify({ data: [], paging: {} }) });
+    const client = makeClient(rec.transport, store);
+
+    await expect(client.fetchAnimeList()).rejects.toMatchObject({
+      code: 'rate-limited',
+      retryAt: 1_700_000_000_000 + 120_000,
+    });
+    expect(store.current?.refreshToken).toBe(FAKE_REFRESH);
+    expect(client.status().connected).toBe(true);
+  });
+
+  it('keeps the tokens on any refresh status that is not a rejected grant', async () => {
+    const store = memoryStore(connectedTokens());
+    const rec = recorder((request) =>
+      request.url === MAL_TOKEN_URL ? { status: 403, body: '<html>blocked</html>' } : { status: 401, body: '' });
+    const client = makeClient(rec.transport, store);
+
+    await expect(client.fetchAnimeList()).rejects.toMatchObject({ code: 'transient' });
+    expect(store.current?.refreshToken).toBe(FAKE_REFRESH);
+  });
+
+  it('types a 429 on an API call as rate-limited, not request-failed', async () => {
+    const store = memoryStore(connectedTokens());
+    const rec = recorder(() => ({ status: 429, body: '' }));
+    const client = makeClient(rec.transport, store);
+
+    await expect(client.fetchAnimeList()).rejects.toMatchObject({
+      code: 'rate-limited',
+      retryAt: 1_700_000_000_000 + 60_000,
+    });
+    expect(store.current?.accessToken).toBe(FAKE_ACCESS);
+  });
+
   it('sends grant_type=refresh_token with the stored refresh token', async () => {
     const store = memoryStore(connectedTokens());
     const rec = recorder((request) =>

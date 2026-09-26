@@ -78,6 +78,7 @@ export const MAL_SYNC_RU: Catalog = {
   'malSync.pushPushing': 'Отправка…',
   'malSync.pushResult': 'Отправлено: {sent}, с ошибкой: {failed}.',
   'malSync.pushRemaining': { one: 'Ещё {count} ждёт следующей отправки.', few: 'Ещё {count} ждут следующей отправки.', many: 'Ещё {count} ждут следующей отправки.', other: 'Ещё {count} ждут следующей отправки.' },
+  'malSync.pushRetryAt': 'MyAnimeList просит подождать: повторите после {time}.',
   'malSync.pushChangedOnMal': { one: '{count} тайтл изменён на MyAnimeList после последней загрузки и оставлен как есть. Загрузите список снова, чтобы сравнить:', few: '{count} тайтла изменены на MyAnimeList после последней загрузки и оставлены как есть. Загрузите список снова, чтобы сравнить:', many: '{count} тайтлов изменены на MyAnimeList после последней загрузки и оставлены как есть. Загрузите список снова, чтобы сравнить:', other: '{count} тайтла изменены на MyAnimeList после последней загрузки и оставлены как есть. Загрузите список снова, чтобы сравнить:' },
   'malSync.pushAdded': 'новое в MyAnimeList',
   'malSync.pushField.status': 'статус',
@@ -103,5 +104,6 @@ export const MAL_SYNC_RU: Catalog = {
   'malSync.error.not-authenticated': 'Нет подключения к MyAnimeList. Сначала подключите аккаунт.',
   'malSync.error.reauth-required': 'MyAnimeList требует войти заново. Подключите аккаунт ещё раз.',
   'malSync.error.transient': 'MyAnimeList не ответил. Попробуйте ещё раз через минуту.',
+  'malSync.error.rate-limited': 'MyAnimeList сейчас ограничивает запросы. Вход в аккаунт сохранён — подождите несколько минут и повторите.',
   'malSync.error.request-failed': 'Запрос к MyAnimeList не удался.',
 };

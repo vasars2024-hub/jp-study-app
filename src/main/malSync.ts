@@ -60,6 +60,7 @@ import {
 } from './credentials/vault';
 import { readJsonSync, removeJsonStore, writeJsonAtomicSync } from './atomicJson';
 import { malPushPreview, pushWatchChangesToMal } from './malPush';
+import { parseRetryAfterMs } from '../shared/resilience';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -76,13 +77,26 @@ export type MalErrorCode =
   | 'not-authenticated'
   | 'reauth-required'
   | 'transient'
+  /**
+   * HTTP 429. Transient by definition: the credentials are fine and are kept,
+   * bulk work stops, and `retryAt` says when asking again is worth it.
+   */
+  | 'rate-limited'
   | 'request-failed';
 
 export class MalSyncError extends Error {
-  constructor(readonly code: MalErrorCode, message: string) {
+  constructor(readonly code: MalErrorCode, message: string, readonly retryAt?: number) {
     super(message);
     this.name = 'MalSyncError';
   }
+}
+
+/** Default back-off when MAL sends 429 without a usable Retry-After. */
+const MAL_RATE_LIMIT_BACKOFF_MS = 60_000;
+
+function malRateLimited(response: MalHttpResponse, now: number): MalSyncError {
+  const delay = parseRetryAfterMs(response.retryAfter ?? null, now) ?? MAL_RATE_LIMIT_BACKOFF_MS;
+  return new MalSyncError('rate-limited', 'MyAnimeList is limiting requests. Try again shortly.', now + delay);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +113,8 @@ export interface MalHttpRequest {
 export interface MalHttpResponse {
   status: number;
   body: string;
+  /** The `Retry-After` header, when the server sent one (429/503). */
+  retryAfter?: string | null;
 }
 
 export type MalTransport = (request: MalHttpRequest) => Promise<MalHttpResponse>;
@@ -148,14 +164,22 @@ export const netMalTransport: MalTransport = (request) =>
         if (chunks.reduce((n, c) => n + c.length, 0) < 8_000_000) chunks.push(chunk);
       });
       response.on('end', () => {
+        const header = response.headers?.['retry-after'];
         finish(() => resolve({
           status: response.statusCode ?? 0,
           body: Buffer.concat(chunks).toString('utf-8'),
+          retryAfter: Array.isArray(header) ? header[0] ?? null : header ?? null,
         }));
       });
-      response.on('error', (error: Error) => finish(() => reject(error)));
+      response.on('error', () => finish(() => reject(
+        new MalSyncError('transient', 'The connection to MyAnimeList dropped.'),
+      )));
     });
-    req.on('error', (error) => finish(() => reject(error)));
+    // A transport failure (offline, DNS, reset) is typed `transient` so every
+    // caller — the bulk push above all — stops instead of retrying each title.
+    req.on('error', () => finish(() => reject(
+      new MalSyncError('transient', 'MyAnimeList could not be reached.'),
+    )));
 
     if (request.body !== undefined) req.write(request.body, 'utf-8');
     req.end();
@@ -677,8 +701,17 @@ export class MalSyncClient {
       body: body.toString(),
     });
 
-    if (response.status >= 500 || response.status === 0) {
+    if (response.status >= 500 || response.status === 0 || response.status === 408) {
       throw new MalSyncError('transient', `MyAnimeList could not be reached to ${what}.`);
+    }
+    // A rate limit says nothing about the grant. Treating it as a rejection is
+    // what signed people out for asking during a busy minute.
+    if (response.status === 429) throw malRateLimited(response, this.now());
+    // On the refresh path only a definitive rejection of the grant (400
+    // invalid_grant, 401 invalid_client) may clear the stored tokens; any other
+    // status is MAL misbehaving, and the refresh token is kept for a retry.
+    if (phase === 'refresh' && response.status !== 200 && response.status !== 400 && response.status !== 401) {
+      throw new MalSyncError('transient', `MyAnimeList could not ${what} right now.`);
     }
     if (response.status !== 200) {
       // MAL-4: a *confidential* registration must send `client_secret`, and this
@@ -833,6 +866,7 @@ export class MalSyncClient {
 
   private assertOk(response: MalHttpResponse): MalHttpResponse {
     if (response.status >= 200 && response.status < 300) return response;
+    if (response.status === 429) throw malRateLimited(response, this.now());
     if (response.status >= 500 || response.status === 0) {
       throw new MalSyncError('transient', 'MyAnimeList is not responding. Try again shortly.');
     }
@@ -1084,6 +1118,8 @@ export interface MalIpcResult<T> {
   data?: T;
   errorCode?: MalErrorCode;
   message?: string;
+  /** Epoch ms; set with `rate-limited`. */
+  retryAt?: number;
 }
 
 async function guard<T>(run: () => Promise<T> | T): Promise<MalIpcResult<T>> {
@@ -1091,7 +1127,12 @@ async function guard<T>(run: () => Promise<T> | T): Promise<MalIpcResult<T>> {
     return { ok: true, data: await run() };
   } catch (error) {
     if (error instanceof MalSyncError) {
-      return { ok: false, errorCode: error.code, message: error.message };
+      return {
+        ok: false,
+        errorCode: error.code,
+        message: error.message,
+        ...(error.retryAt ? { retryAt: error.retryAt } : {}),
+      };
     }
     return {
       ok: false,
