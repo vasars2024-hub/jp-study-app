@@ -63,6 +63,14 @@ describe('GrammarX corpus', () => {
     expect(russian.every((p) => frameworkForLevel(p.level) === 'cefr')).toBe(true);
   });
 
+  it('has Russian beyond B1 and no two Russian points with the same title', () => {
+    const russian = GRAMMAR.filter((p) => p.lang === 'ru');
+    expect(russian.length).toBeGreaterThanOrEqual(90);
+    expect(russian.filter((p) => p.level === 'B2').length).toBeGreaterThanOrEqual(4);
+    const titles = russian.map((p) => p.title);
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
   /*
    * The previous version of this file asserted `functions.length > 0`, which the
    * regex tagger satisfied by emitting `['other']` for 44% of the corpus. It

@@ -1,7 +1,11 @@
 import type { GrammarPoint } from './types';
 
 /**
- * Russian grammar, CEFR A1–B1 (the TORFL elementary, basic and first levels).
+ * Russian grammar, CEFR A1–B2 (the TORFL elementary, basic, first and second
+ * levels). A second pass (the block at the end) fills case government the
+ * first left implicit (accusative object, dative, genitive and по/к/из-за
+ * prepositions), time expressions, свой/себя/друг друга, -то vs -нибудь,
+ * aspect in the imperative, and the B2 participles.
  *
  * Authored for this app (original explanations and example sentences, no
  * third-party text), so it carries the app's own licence. Levels follow the
@@ -879,6 +883,652 @@ export const RU_CEFR: GrammarPoint[] = [
     examples: [
       { jp: 'Мне холодно, закрой окно.', en: 'I am cold, close the window.' },
       { jp: 'Детям было весело.', en: 'The children were having fun.' },
+    ],
+  },
+  // —— Round 3: case uses, agreement, time, aspect and B2 participles ——
+  {
+    id: 'ru-a1-menya-zovut',
+    lang: 'ru',
+    level: 'A1',
+    title: 'Меня зовут …',
+    meaning: 'my name is …',
+    structure: 'accusative pronoun (меня / тебя / его / её) + зовут + name',
+    explanation:
+      'Literally "they call me …": the person named is in the accusative and зовут has no subject. The question is Как тебя зовут? (informal) or Как вас зовут? (formal). Past tense: Его звали Иван.',
+    categories: ['explanation.definition'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Как вас зовут? — Меня зовут Анна.', en: 'What is your name? — My name is Anna.' },
+      { jp: 'Моего брата зовут Павел.', en: 'My brother’s name is Pavel.' },
+    ],
+  },
+  {
+    id: 'ru-a1-accusative-object',
+    lang: 'ru',
+    level: 'A1',
+    title: 'Accusative: the direct object (вижу маму)',
+    meaning: 'marking what the action is done to',
+    structure: 'fem. -а/-я → -у/-ю; masc. animate → -а/-я; masc. inanimate and neuter unchanged',
+    explanation:
+      'The direct object of a transitive verb goes into the accusative. Feminine nouns in -а/-я change to -у/-ю (книгу, землю). Masculine nouns that name people or animals take the genitive-looking ending -а/-я (брата), while things stay unchanged (стол). Feminine nouns in -ь do not change.',
+    categories: ['voice.form'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я читаю книгу.', en: 'I am reading a book.' },
+      { jp: 'Ты знаешь моего брата?', en: 'Do you know my brother?' },
+      { jp: 'Мы смотрим фильм.', en: 'We are watching a film.' },
+    ],
+  },
+  {
+    id: 'ru-a1-o-prepositional',
+    lang: 'ru',
+    level: 'A1',
+    title: 'о / об + prepositional (about)',
+    meaning: 'about, concerning',
+    structure: 'говорить / думать / читать / рассказывать + о (об, обо) + prepositional',
+    explanation:
+      'The topic of speaking, thinking or writing takes о with the prepositional case: о работе, о брате. Before a vowel sound о becomes об (об этом, об Анне), and обо is used in a few fixed forms such as обо мне.',
+    categories: ['discourse.topic'],
+    register: 'neutral',
+    examples: [
+      { jp: 'О чём ты думаешь? — О работе.', en: 'What are you thinking about? — About work.' },
+      { jp: 'Расскажи мне об этом.', en: 'Tell me about it.' },
+    ],
+  },
+  {
+    id: 'ru-a1-moy',
+    lang: 'ru',
+    level: 'A1',
+    title: 'мой / моя / моё / мои (possessives)',
+    meaning: 'my, your, our (agreeing with the thing owned)',
+    structure: 'мой (m.) / моя (f.) / моё (n.) / мои (pl.); also твой, наш, ваш',
+    explanation:
+      'Possessives agree with the noun that is owned, not with the owner: моя сестра said by a man is still моя. его, её and их never change: его машина, его дом. Ваш is both plural "your" and the polite singular.',
+    categories: ['state.description'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Это моя сестра, а это мой брат.', en: 'This is my sister, and this is my brother.' },
+      { jp: 'Где ваши вещи? — Их вещи в машине.', en: 'Where are your things? — Their things are in the car.' },
+    ],
+  },
+  {
+    id: 'ru-a1-adjective-agreement',
+    lang: 'ru',
+    level: 'A1',
+    title: 'Adjective agreement (новый / новая / новое / новые)',
+    meaning: 'adjectives match the noun in gender, number and case',
+    structure: '-ый/-ой/-ий (m.), -ая/-яя (f.), -ое/-ее (n.), -ые/-ие (pl.)',
+    explanation:
+      'An adjective takes the gender, number and case of its noun: новый дом, новая машина, новое окно, новые дома. After г, к, х, ж, ш, щ and ч the spelling rule gives -ие in the plural (русские). Stressed endings use -ой: большой.',
+    categories: ['state.description'],
+    register: 'neutral',
+    examples: [
+      { jp: 'У меня новая квартира и новое окно.', en: 'I have a new flat and a new window.' },
+      { jp: 'Это очень интересные книги.', en: 'These are very interesting books.' },
+    ],
+  },
+  {
+    id: 'ru-a1-plural',
+    lang: 'ru',
+    level: 'A1',
+    title: 'Noun plurals (-ы / -и / -а)',
+    meaning: 'forming the nominative plural',
+    structure: 'masc./fem. → -ы (or -и after г, к, х, ж, ш, щ, ч, and for -ь, -я, -й); neut. -о → -а, -е → -я',
+    explanation:
+      'Most masculine and feminine nouns take -ы or -и: столы, книги, ночи. Neuter nouns take -а or -я: окна, моря. Some masculine nouns take a stressed -а (дома, города), and a few plurals are irregular: друг → друзья, человек → люди, ребёнок → дети.',
+    categories: ['quantity.amount'],
+    register: 'neutral',
+    examples: [
+      { jp: 'В классе новые столы и стулья.', en: 'There are new desks and chairs in the classroom.' },
+      { jp: 'Мои друзья живут в разных городах.', en: 'My friends live in different cities.' },
+    ],
+  },
+  {
+    id: 'ru-a1-adverb',
+    lang: 'ru',
+    level: 'A1',
+    title: 'хорошо vs хороший (adverb vs adjective)',
+    meaning: 'how something is done vs what something is like',
+    structure: 'adjective stem + -о (хорошо, быстро, плохо); по-русски for languages',
+    explanation:
+      'Adverbs describe a verb and are formed with -о: Он хорошо говорит. Adjectives describe a noun: Он хороший человек. Languages use по- + -ски: говорить по-русски. The same -о form also appears in impersonal sentences such as Здесь холодно.',
+    categories: ['state.description', 'method.means'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Она хорошо говорит по-русски.', en: 'She speaks Russian well.' },
+      { jp: 'Это хороший вопрос.', en: 'That is a good question.' },
+    ],
+  },
+  {
+    id: 'ru-a1-v-days',
+    lang: 'ru',
+    level: 'A1',
+    title: 'в + accusative for days (в понедельник)',
+    meaning: 'on (a day of the week)',
+    structure: 'в + day (accusative): в понедельник, в среду, в субботу',
+    explanation:
+      'To say "on Monday", use в with the accusative, so feminine days change: в среду, в пятницу. For a habit, use по + dative plural: по понедельникам "on Mondays". Parts of the day are adverbs: утром, днём, вечером, ночью.',
+    categories: ['time.point'],
+    register: 'neutral',
+    examples: [
+      { jp: 'В субботу мы едем на дачу.', en: 'On Saturday we are going to the dacha.' },
+      { jp: 'По средам у меня английский.', en: 'I have English on Wednesdays.' },
+    ],
+  },
+  {
+    id: 'ru-a1-kotoryi-chas',
+    lang: 'ru',
+    level: 'A1',
+    title: 'Который час? / в … часов (telling the time)',
+    meaning: 'what time is it? / at … o’clock',
+    structure: 'Сейчас + number + час / часа / часов; в + number + час(а/ов)',
+    explanation:
+      'The word час follows the number rule: 1 час, 2–4 часа, 5–20 часов. "At" a time is в + the same phrase: в два часа. Сколько сейчас времени? is a common alternative to Который час?.',
+    categories: ['time.point', 'quantity.amount'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Который час? — Сейчас три часа.', en: 'What time is it? — It is three o’clock.' },
+      { jp: 'Урок начинается в девять часов.', en: 'The lesson starts at nine o’clock.' },
+    ],
+  },
+  {
+    id: 'ru-a1-lyubit',
+    lang: 'ru',
+    level: 'A1',
+    title: 'любить + infinitive / accusative',
+    meaning: 'to like, to love (doing) something',
+    structure: 'люблю, любишь, любит … + infinitive or accusative noun',
+    explanation:
+      'любить expresses a lasting liking or love and takes an infinitive or an accusative object: люблю читать, люблю музыку. Note the л in the first person: люблю. For a single impression ("I like this film") Russians usually say мне нравится.',
+    categories: ['emotion.feeling', 'volition.desire'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я люблю готовить.', en: 'I love cooking.' },
+      { jp: 'Мой отец любит футбол.', en: 'My father loves football.' },
+    ],
+  },
+  // —— A2 ——
+  {
+    id: 'ru-a2-genitive-possession',
+    lang: 'ru',
+    level: 'A2',
+    title: 'Genitive of possession (машина брата)',
+    meaning: 'X’s Y; the Y of X',
+    structure: 'noun + noun in the genitive',
+    explanation:
+      'The owner follows the thing owned and goes into the genitive: машина брата "my brother’s car", центр города "the city centre". Feminine -а becomes -ы/-и, masculine and neuter take -а/-я.',
+    categories: ['state.description'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Это машина моего брата.', en: 'This is my brother’s car.' },
+      { jp: 'Мы живём в центре города.', en: 'We live in the city centre.' },
+    ],
+  },
+  {
+    id: 'ru-a2-genitive-prepositions',
+    lang: 'ru',
+    level: 'A2',
+    title: 'из / от / до / после / без + genitive',
+    meaning: 'from, from (a person), until / as far as, after, without',
+    structure: 'из (out of a place), от (from a person / away from), до, после, без + genitive',
+    explanation:
+      'Many common prepositions govern the genitive. из pairs with в (из Москвы ← в Москву), с pairs with на (с работы ← на работу), and от is used for people (от мамы). до means both "until" and "as far as".',
+    categories: ['space.direction', 'time.sequence'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я получил письмо от мамы из Москвы.', en: 'I got a letter from Mum from Moscow.' },
+      { jp: 'После работы я хожу в спортзал.', en: 'After work I go to the gym.' },
+      { jp: 'Кофе без сахара, пожалуйста.', en: 'Coffee without sugar, please.' },
+    ],
+  },
+  {
+    id: 'ru-a2-dative-object',
+    lang: 'ru',
+    level: 'A2',
+    title: 'Dative: the indirect object (дать брату)',
+    meaning: 'to / for someone',
+    structure: 'давать, дарить, звонить, писать, помогать, говорить + dative',
+    explanation:
+      'The person who receives something or is addressed goes into the dative: подарить маме, звонить другу. Note помогать and звонить take the dative, where English uses a direct object. Dative endings: -у/-ю (m., n.), -е/-и (f.).',
+    categories: ['voice.form', 'space.direction'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я подарил сестре цветы.', en: 'I gave my sister flowers.' },
+      { jp: 'Позвони мне завтра вечером.', en: 'Call me tomorrow evening.' },
+    ],
+  },
+  {
+    id: 'ru-a2-k-dative',
+    lang: 'ru',
+    level: 'A2',
+    title: 'к + dative (to someone’s place)',
+    meaning: 'to, towards (a person)',
+    structure: 'идти / ехать / приходить + к + dative (person)',
+    explanation:
+      'With people, destination uses к + dative, not в or на: иду к врачу, еду к бабушке. Coming back from a person is от + genitive: от врача. к can also mean "towards" or "by (a time)": к вечеру.',
+    categories: ['space.direction'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Завтра я иду к врачу.', en: 'Tomorrow I am going to the doctor.' },
+      { jp: 'Летом мы ездили к бабушке.', en: 'In the summer we went to visit Grandma.' },
+    ],
+  },
+  {
+    id: 'ru-a2-po-dative',
+    lang: 'ru',
+    level: 'A2',
+    title: 'по + dative (along, by, on)',
+    meaning: 'along; by (means of communication); on (a subject)',
+    structure: 'по + dative: по улице, по телефону, по радио, экзамен по истории',
+    explanation:
+      'по has several common dative uses: movement along or around a surface (гулять по парку), a channel of communication (по телефону), and a subject area (учебник по химии). With plural days it expresses repetition: по субботам.',
+    categories: ['method.means', 'space.range'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Мы долго гуляли по городу.', en: 'We walked around the city for a long time.' },
+      { jp: 'Мы говорили по телефону целый час.', en: 'We talked on the phone for a whole hour.' },
+    ],
+  },
+  {
+    id: 'ru-a2-zanimatsya',
+    lang: 'ru',
+    level: 'A2',
+    title: 'заниматься / интересоваться + instrumental',
+    meaning: 'to do / study; to be interested in',
+    structure: 'заниматься, интересоваться, увлекаться + instrumental',
+    explanation:
+      'These -ся verbs take the instrumental, not the accusative: заниматься спортом "do sport", интересоваться музыкой. заниматься alone can mean "to study, to do homework": Он сейчас занимается.',
+    categories: ['emotion.feeling', 'state.effort'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я занимаюсь плаванием три раза в неделю.', en: 'I go swimming three times a week.' },
+      { jp: 'Моя дочь интересуется историей.', en: 'My daughter is interested in history.' },
+    ],
+  },
+  {
+    id: 'ru-a2-perfective-future',
+    lang: 'ru',
+    level: 'A2',
+    title: 'Perfective future (прочитаю, сделаю)',
+    meaning: 'will (get something) done',
+    structure: 'perfective verb conjugated in the present-tense pattern',
+    explanation:
+      'A perfective verb has no present tense: its "present" endings give the future, focused on the result: Я прочитаю книгу "I will finish reading the book". For an ongoing or repeated future action use буду + imperfective infinitive. Never combine буду with a perfective.',
+    categories: ['time.completion', 'volition.will'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я сделаю это завтра.', en: 'I will get it done tomorrow.' },
+      { jp: 'Когда ты прочитаешь книгу, дай её мне.', en: 'When you finish the book, give it to me.' },
+    ],
+  },
+  {
+    id: 'ru-a2-short-adjectives',
+    lang: 'ru',
+    level: 'A2',
+    title: 'Short adjectives (рад, занят, болен, готов)',
+    meaning: 'glad, busy, ill, ready (as a temporary state)',
+    structure: 'рад / рада / рады; занят / занята / заняты … (predicate only)',
+    explanation:
+      'Some adjectives are used in a short form as the predicate, describing a current state: Я занят "I am busy". They agree in gender and number but not case, and cannot stand before a noun. рад has no long form at all.',
+    categories: ['state.description'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Очень рад вас видеть!', en: 'I am very glad to see you!' },
+      { jp: 'Извини, сегодня я занята.', en: 'Sorry, I am busy today.' },
+    ],
+  },
+  {
+    id: 'ru-a2-position-verbs',
+    lang: 'ru',
+    level: 'A2',
+    title: 'стоять / лежать / сидеть / висеть',
+    meaning: 'to be standing / lying / sitting / hanging (location of things)',
+    structure: 'object + стоит / лежит / сидит / висит + где? (prepositional)',
+    explanation:
+      'Where English says "is", Russian often names the position: upright objects стоят (bottles, furniture), flat ones лежат (books on a table, phones), things on a wall висят. Birds and people sit: сидят.',
+    categories: ['space.location', 'state.description'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Книга лежит на столе, а ваза стоит на полке.', en: 'The book is on the table and the vase is on the shelf.' },
+      { jp: 'На стене висит картина.', en: 'There is a picture hanging on the wall.' },
+    ],
+  },
+  {
+    id: 'ru-a2-cherez-nazad',
+    lang: 'ru',
+    level: 'A2',
+    title: 'через … / … назад',
+    meaning: 'in (… from now) / … ago',
+    structure: 'через + accusative time (future); time + назад (past)',
+    explanation:
+      'через comes before the period for "in, after" (через час "in an hour"), and назад follows it for "ago" (час назад). через also means "through, across": через парк. For duration within which something is completed, use за: за час.',
+    categories: ['time.point', 'time.duration'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Поезд отправляется через десять минут.', en: 'The train leaves in ten minutes.' },
+      { jp: 'Мы познакомились пять лет назад.', en: 'We met five years ago.' },
+    ],
+  },
+  {
+    id: 'ru-a2-kazhdyi-ves',
+    lang: 'ru',
+    level: 'A2',
+    title: 'каждый / весь',
+    meaning: 'every, each / all, the whole',
+    structure: 'каждый (день, неделю) ; весь / вся / всё / все',
+    explanation:
+      'каждый means "each, every" with singular nouns: каждый день. весь means "all, the whole" and agrees with the noun: весь день "all day", вся семья, всё время. Used alone, все means "everyone" and всё means "everything".',
+    categories: ['quantity.amount', 'quantity.frequency'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я каждое утро пью кофе.', en: 'I drink coffee every morning.' },
+      { jp: 'Всю неделю шёл дождь.', en: 'It rained all week.' },
+    ],
+  },
+  {
+    id: 'ru-a2-s-do',
+    lang: 'ru',
+    level: 'A2',
+    title: 'с … до … (from … to / until …)',
+    meaning: 'from (a time / place) to …',
+    structure: 'с + genitive … до + genitive',
+    explanation:
+      'Both prepositions take the genitive: с девяти до пяти "from nine to five", с утра до вечера. For places, от … до … is more usual: от дома до школы.',
+    categories: ['time.duration', 'space.range'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Магазин работает с девяти до девяти.', en: 'The shop is open from nine to nine.' },
+      { jp: 'От дома до работы двадцать минут пешком.', en: 'It is twenty minutes on foot from home to work.' },
+    ],
+  },
+  {
+    id: 'ru-a2-davai',
+    lang: 'ru',
+    level: 'A2',
+    title: 'давай(те) + verb (let’s …)',
+    meaning: 'let’s …',
+    structure: 'давай(те) + imperfective infinitive ／ давай(те) + perfective мы-form',
+    explanation:
+      'давай (informal) or давайте (plural / polite) invites the listener to do something together. With a perfective verb, use the мы-form without мы: Давай поговорим. With an imperfective, use the infinitive: Давайте начинать. Alone, Давай! means "Go on! / OK!".',
+    categories: ['request.invite'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Давай встретимся в семь.', en: 'Let’s meet at seven.' },
+      { jp: 'Давайте не будем спорить.', en: 'Let’s not argue.' },
+    ],
+  },
+  {
+    id: 'ru-a2-ya-by-hotel',
+    lang: 'ru',
+    level: 'A2',
+    title: 'Я бы хотел(а) … (polite wish)',
+    meaning: 'I would like …',
+    structure: 'subject + бы + past tense (хотел / хотела / хотели) + infinitive or noun',
+    explanation:
+      'бы with the past tense softens a wish or request: Я бы хотел кофе "I would like a coffee". It is the polite alternative to Я хочу. The past tense agrees with the speaker: a woman says Я бы хотела.',
+    categories: ['volition.desire', 'request.ask'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я бы хотела заказать столик на двоих.', en: 'I would like to book a table for two.' },
+      { jp: 'Мы бы хотели посмотреть квартиру.', en: 'We would like to see the flat.' },
+    ],
+  },
+  {
+    id: 'ru-a2-ne-bylo',
+    lang: 'ru',
+    level: 'A2',
+    title: 'не было / не будет + genitive',
+    meaning: 'there was not / there will not be',
+    structure: 'не было (past) / не будет (future) + genitive',
+    explanation:
+      'The past and future of нет + genitive use the neuter form of быть regardless of the noun: не было времени, не будет урока. Learners often make было agree (не была машины), which is wrong.',
+    categories: ['emphasis.negation', 'time.point'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Вчера у меня не было времени.', en: 'I had no time yesterday.' },
+      { jp: 'Завтра урока не будет.', en: 'There will be no lesson tomorrow.' },
+    ],
+  },
+  // —— B1 ——
+  {
+    id: 'ru-b1-svoi',
+    lang: 'ru',
+    level: 'B1',
+    title: 'свой (one’s own)',
+    meaning: 'his / her / their own (referring back to the subject)',
+    structure: 'свой / своя / своё / свои (agrees with the noun owned)',
+    explanation:
+      'When the owner is the subject of the same clause, Russian uses свой: Он любит свою работу "he loves his (own) job". Using его there would mean someone else’s job. With я, ты, мы and вы both are possible (мою / свою книгу), but with a third-person owner the choice changes the meaning.',
+    categories: ['state.description', 'discourse.connection'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Анна взяла свою сумку и ушла.', en: 'Anna took her bag and left.' },
+      { jp: 'Он позвонил своему другу, а не её другу.', en: 'He called his own friend, not hers.' },
+    ],
+  },
+  {
+    id: 'ru-b1-sebya',
+    lang: 'ru',
+    level: 'B1',
+    title: 'себя (oneself)',
+    meaning: 'myself, yourself, himself …',
+    structure: 'себя (acc./gen.), себе (dat./prep.), собой (instr.)',
+    explanation:
+      'себя refers back to the subject and has no nominative form. It is used in all persons: я купил себе, ты купил себе. Common phrases: чувствовать себя (feel), взять с собой (take along), у себя дома (at one’s place).',
+    categories: ['voice.form'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Как ты себя чувствуешь?', en: 'How are you feeling?' },
+      { jp: 'Возьми зонт с собой.', en: 'Take an umbrella with you.' },
+    ],
+  },
+  {
+    id: 'ru-b1-drug-druga',
+    lang: 'ru',
+    level: 'B1',
+    title: 'друг друга (each other)',
+    meaning: 'each other, one another',
+    structure: 'друг + (preposition) + друга in the case the verb needs',
+    explanation:
+      'The first друг never changes; the second takes the case required, and any preposition goes between them: друг другу, друг о друге, друг с другом. Some verbs express reciprocity with -ся instead: встречаться, целоваться.',
+    categories: ['voice.form'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Они давно знают друг друга.', en: 'They have known each other for a long time.' },
+      { jp: 'Мы часто думаем друг о друге.', en: 'We often think about each other.' },
+    ],
+  },
+  {
+    id: 'ru-b1-stavit-klast',
+    lang: 'ru',
+    level: 'B1',
+    title: 'ставить / класть / вешать (putting things)',
+    meaning: 'to put (upright / lying / hanging)',
+    structure: 'ставить–поставить, класть–положить, вешать–повесить + куда? (accusative)',
+    explanation:
+      'These are the "put" partners of стоять, лежать and висеть: you поставить a bottle upright, положить a book flat and повесить a coat. Their destination uses в / на + accusative (куда?), unlike the position verbs, which use the prepositional (где?).',
+    categories: ['space.direction'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Положи ключи на стол.', en: 'Put the keys on the table.' },
+      { jp: 'Я поставил цветы в вазу.', en: 'I put the flowers in a vase.' },
+    ],
+  },
+  {
+    id: 'ru-b1-nesti-nosit',
+    lang: 'ru',
+    level: 'B1',
+    title: 'нести / носить, вести / водить (carrying, leading)',
+    meaning: 'to carry / to lead (one-way vs multi-directional)',
+    structure: 'нести, вести (one direction, now) ↔ носить, водить (habitual, round trips)',
+    explanation:
+      'Like идти / ходить, these motion verbs come in pairs. нести / вести describe one trip in progress; носить / водить describe habits or round trips. носить also means "to wear" regularly: Она носит очки.',
+    categories: ['space.direction', 'time.repetition'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Я несу сумки домой.', en: 'I am carrying the bags home.' },
+      { jp: 'Каждое утро папа водит сына в школу.', en: 'Every morning Dad takes his son to school.' },
+    ],
+  },
+  {
+    id: 'ru-b1-nekogda',
+    lang: 'ru',
+    level: 'B1',
+    title: 'некогда / негде / нечего + infinitive',
+    meaning: 'there is no time / nowhere / nothing to …',
+    structure: '(dative) + некогда / негде / нечего / некуда + infinitive',
+    explanation:
+      'These stressed не- words build impersonal sentences: Мне некогда отдыхать "I have no time to rest". The person is in the dative and the verb in the infinitive. They differ from никогда / нигде / ничего, which need не with a finite verb.',
+    categories: ['emphasis.negation', 'possibility.ability'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Мне некогда, я очень занят.', en: 'I have no time, I am very busy.' },
+      { jp: 'Здесь нечего делать.', en: 'There is nothing to do here.' },
+    ],
+  },
+  {
+    id: 'ru-b1-to-nibud',
+    lang: 'ru',
+    level: 'B1',
+    title: '-то vs -нибудь (кто-то / кто-нибудь)',
+    meaning: 'someone (specific but unknown) vs anyone / someone (unspecified)',
+    structure: 'question word + -то / -нибудь: кто-то, что-то, где-то; кто-нибудь, что-нибудь',
+    explanation:
+      '-то refers to a particular person or thing the speaker cannot or does not name: Кто-то звонил "someone called". -нибудь means "any, some or other" and is used in questions, requests, the future and with habits: Позвони кому-нибудь.',
+    categories: ['discourse.vagueness'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Тебе кто-то звонил, пока тебя не было.', en: 'Someone called you while you were out.' },
+      { jp: 'Ты что-нибудь хочешь съесть?', en: 'Do you want something to eat?' },
+    ],
+  },
+  {
+    id: 'ru-b1-pust',
+    lang: 'ru',
+    level: 'B1',
+    title: 'пусть + 3rd person (let him / her …)',
+    meaning: 'let (someone else) do …',
+    structure: 'пусть + subject + present / perfective future (3rd person)',
+    explanation:
+      'пусть expresses permission, a wish or indifference about a third person’s action: Пусть он позвонит завтра "let him call tomorrow". Colloquial пускай is a synonym. For "let’s" (including the speaker), use давай.',
+    categories: ['possibility.permission', 'volition.command'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Пусть дети поиграют ещё полчаса.', en: 'Let the children play for another half hour.' },
+      { jp: 'Если он хочет, пусть приходит.', en: 'If he wants to, let him come.' },
+    ],
+  },
+  {
+    id: 'ru-b1-iz-za-blagodarya',
+    lang: 'ru',
+    level: 'B1',
+    title: 'из-за + genitive / благодаря + dative',
+    meaning: 'because of (bad cause) / thanks to (good cause)',
+    structure: 'из-за + genitive ; благодаря + dative',
+    explanation:
+      'Both give the cause of a result, but из-за is used for negative outcomes (из-за дождя) and благодаря for positive ones (благодаря тебе). Mixing them sounds ironic. Note the different cases.',
+    categories: ['cause.reason'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Из-за снега поезд опоздал на час.', en: 'Because of the snow, the train was an hour late.' },
+      { jp: 'Благодаря вашей помощи мы всё успели.', en: 'Thanks to your help we got everything done.' },
+    ],
+  },
+  {
+    id: 'ru-b1-comparative-genitive',
+    lang: 'ru',
+    level: 'B1',
+    title: 'Comparative + genitive (старше брата)',
+    meaning: 'X is more … than Y (without чем)',
+    structure: 'short comparative + genitive noun or pronoun',
+    explanation:
+      'With a simple comparative, the thing compared can go into the genitive instead of using чем: Он старше брата = Он старше, чем брат. The genitive is neater with nouns and pronouns; чем is needed before whole clauses and with более.',
+    categories: ['comparison.compare'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Моя сестра на три года старше меня.', en: 'My sister is three years older than me.' },
+      { jp: 'Москва больше Петербурга.', en: 'Moscow is bigger than St Petersburg.' },
+    ],
+  },
+  {
+    id: 'ru-b1-imperative-aspect',
+    lang: 'ru',
+    level: 'B1',
+    title: 'Aspect in the imperative (скажи / не говори)',
+    meaning: 'which aspect to use in commands and prohibitions',
+    structure: 'perfective imperative for a one-off request; imperfective for invitations, general advice and prohibitions',
+    explanation:
+      'A specific request normally uses the perfective: Закройте окно. Polite invitations and encouragement use the imperfective: Садитесь! Проходите! In the negative, prohibitions use the imperfective (Не опаздывайте), while a negative perfective warns against an accident (Не упади!).',
+    categories: ['request.ask', 'obligation.prohibition'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Проходите, садитесь, пожалуйста.', en: 'Come in, please have a seat.' },
+      { jp: 'Не забудь позвонить маме!', en: 'Don’t forget to call Mum!' },
+    ],
+  },
+  // —— B2 ——
+  {
+    id: 'ru-b2-present-active-participle',
+    lang: 'ru',
+    level: 'B2',
+    title: 'Present active participle (читающий)',
+    meaning: 'who is doing … (…-ing, as an adjective)',
+    structure: 'present stem + -ущий / -ющий (1st conj.) or -ащий / -ящий (2nd conj.)',
+    explanation:
+      'Formed from imperfective verbs, it works like an adjective meaning "who / which is doing": человек, читающий газету. It agrees with its noun in gender, number and case. It belongs to written and formal Russian; speech uses который + present tense.',
+    categories: ['voice.form', 'discourse.connection'],
+    register: 'literary',
+    examples: [
+      { jp: 'Студенты, изучающие русский язык, часто читают эти тексты.', en: 'Students studying Russian often read these texts.' },
+      { jp: 'Я смотрел на детей, играющих во дворе.', en: 'I watched the children playing in the yard.' },
+    ],
+  },
+  {
+    id: 'ru-b2-past-active-participle',
+    lang: 'ru',
+    level: 'B2',
+    title: 'Past active participle (читавший, прочитавший)',
+    meaning: 'who did / had done …',
+    structure: 'past stem + -вший (after a vowel) / -ший (after a consonant)',
+    explanation:
+      'It describes someone who did something in the past: студент, сдавший экзамен "the student who passed the exam". It can be made from both aspects. It is written style; in speech use который + past tense.',
+    categories: ['voice.form', 'time.completion'],
+    register: 'literary',
+    examples: [
+      { jp: 'Студенты, сдавшие экзамен, могут идти домой.', en: 'Students who have passed the exam may go home.' },
+      { jp: 'Человек, написавший эту книгу, жил в Сибири.', en: 'The man who wrote this book lived in Siberia.' },
+    ],
+  },
+  {
+    id: 'ru-b2-past-passive-participle',
+    lang: 'ru',
+    level: 'B2',
+    title: 'Long past passive participle (прочитанный, открытый)',
+    meaning: '(which was) …-ed',
+    structure: 'perfective stem + -нный / -енный / -тый',
+    explanation:
+      'The long form describes a noun that has undergone an action: прочитанная книга "a book that has been read". It agrees like an adjective. The short form (книга прочитана) is the predicate passive; the long form is attributive.',
+    categories: ['voice.passive', 'state.result'],
+    register: 'neutral',
+    examples: [
+      { jp: 'На столе лежало открытое письмо.', en: 'An opened letter lay on the table.' },
+      { jp: 'Это дом, построенный в прошлом веке.', en: 'This is a house built in the last century.' },
+    ],
+  },
+  {
+    id: 'ru-b2-tot-kto',
+    lang: 'ru',
+    level: 'B2',
+    title: 'тот, кто … / то, что …',
+    meaning: 'the one who … / what (the thing that) …',
+    structure: 'тот / та / те (case as needed), кто … ; то (case as needed), что …',
+    explanation:
+      'Russian needs a demonstrative before кто and что when they start a relative clause: Тот, кто рано встаёт… "he who gets up early…". The demonstrative takes the case of the main clause, and кто / что the case of its own clause: Я думаю о том, что ты сказал.',
+    categories: ['discourse.connection'],
+    register: 'neutral',
+    examples: [
+      { jp: 'Тот, кто много читает, много знает.', en: 'Whoever reads a lot knows a lot.' },
+      { jp: 'Я не согласен с тем, что он сказал.', en: 'I do not agree with what he said.' },
     ],
   },
 ];
