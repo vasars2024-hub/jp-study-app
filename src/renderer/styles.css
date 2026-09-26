@@ -18983,6 +18983,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 .immersion-tab-button {
+  display: flex;
   flex: 1;
   min-width: 0;
   border: none;
@@ -18990,10 +18991,17 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--text);
   font-size: 12px;
   padding: 4px 8px;
-  white-space: nowrap;
+  cursor: pointer;
+}
+/* The ellipsis lives on the label, not the button: `overflow: hidden` on the button clipped
+   its own `.lq-hit-scope` pointer floor (a 32px `::after` on a 25px tab) back to the tab's box,
+   so the floor did nothing, and the clipped overhang read as a 3px vertical overflow in every
+   locale (round-3 sweep). */
+.immersion-tab-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
+  white-space: nowrap;
 }
 .immersion-tab-close,
 .immersion-tab-new {

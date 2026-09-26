@@ -2451,6 +2451,20 @@
   min-width: 0;
 }
 
+/* The episode table's own sideways scroller. It takes the table's place in the result
+   card's grid; the table inside carries its column floor as `min-width` (EpisodeTable),
+   so a card narrower than the columns scrolls here instead of clipping them. Vertical
+   scrolling stays with the virtual list. */
+.scr-table-hscroll {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 /* Header and rows are separate grids sharing one track list. They must also
    share a WIDTH, or `1fr`/`minmax` tracks resolve differently per row and the
    columns visibly stagger — which is exactly what `min-width: max-content`
@@ -3253,7 +3267,8 @@
   overflow: hidden;
 }
 
-.scr-result-workspace > .scr-table {
+.scr-result-workspace > .scr-table,
+.scr-result-workspace > .scr-table-hscroll {
   min-height: 260px;
 }
 
@@ -4361,6 +4376,11 @@ button.scr-pill:focus-visible {
   border-left: 1px solid var(--border);
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
+  /* A profile name is one word in some locales: "Сбалансированный" ran 25px past its
+     column in Russian (round-3 sweep). `hyphens` needs the element's lang, so the
+     unconditional break is the backstop. */
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .scr-profile-compare-row > span:first-child {

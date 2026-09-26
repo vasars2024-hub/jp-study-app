@@ -71,6 +71,22 @@ export function gridTemplate(columns: ScraperColumn[]): string {
   return columns.map((c) => c.track).join(' ');
 }
 
+/**
+ * The narrowest the track list can be laid out, in px, before any gap or padding:
+ * a fixed track counts its width, a `minmax(Npx, …)` its floor, a bare `fr` nothing.
+ * The table is given this as a floor so that, in a card narrower than its columns, it
+ * scrolls sideways inside its own box instead of pushing columns out of a clipped one.
+ */
+export function minTrackWidth(columns: ScraperColumn[]): number {
+  let total = 0;
+  for (const { track } of columns) {
+    const fixed = /^(\d+(?:\.\d+)?)px$/.exec(track.trim());
+    const floor = /^minmax\(\s*(\d+(?:\.\d+)?)px\s*,/.exec(track.trim());
+    total += Number((fixed ?? floor)?.[1] ?? 0);
+  }
+  return total;
+}
+
 /** Fields a free-text filter searches. */
 export function rowMatches(row: EpisodeRow, query: string): boolean {
   const q = query.trim().toLowerCase();
