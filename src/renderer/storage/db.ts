@@ -501,6 +501,52 @@ export async function kvEntries(): Promise<Array<[string, unknown]>> {
   });
 }
 
+/** One write of a `kvBatch`. */
+export type KvBatchOp = { type: 'put'; key: string; value: unknown } | { type: 'delete'; key: string };
+
+/**
+ * Several puts and deletes in ONE readwrite transaction: all land or none do.
+ * What an append-only or per-record layout writes instead of re-writing one big
+ * value.
+ */
+export async function kvBatch(ops: readonly KvBatchOp[]): Promise<void> {
+  if (writesBlocked || !ops.length) return;
+  await withTransaction('readwrite', async (store) => {
+    await Promise.all(ops.map((op) => requestToPromise(
+      op.type === 'put' ? store.put(op.value, op.key) : store.delete(op.key),
+    )));
+  });
+}
+
+/** The key range of every key starting with `prefix`, when the platform has key ranges. */
+function prefixRange(prefix: string): IDBKeyRange | null {
+  try {
+    return typeof IDBKeyRange === 'undefined' ? null : IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Every entry whose key starts with `prefix`, in key order — one range read, not
+ * a scan of the whole store (a platform without `IDBKeyRange` filters instead).
+ */
+export async function kvScanPrefix(prefix: string): Promise<Array<[string, unknown]>> {
+  return withTransaction('readonly', async (store) => {
+    const range = prefixRange(prefix);
+    const [keys, values] = await Promise.all([
+      requestToPromise(range ? store.getAllKeys(range) : store.getAllKeys()),
+      requestToPromise(range ? store.getAll(range) : store.getAll()),
+    ]);
+    const out: Array<[string, unknown]> = [];
+    keys.forEach((key, i) => {
+      const k = String(key);
+      if (k.startsWith(prefix)) out.push([k, values[i]]);
+    });
+    return out;
+  });
+}
+
 /**
  * Replace the whole kv store in ONE transaction: either every entry lands and
  * the old ones are gone, or the transaction aborts and the store is exactly as
