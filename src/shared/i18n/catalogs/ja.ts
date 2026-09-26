@@ -9901,10 +9901,10 @@ export const ja: Catalog = {
     other: '蓄積フェーズ {count} · 日次進化は休止中。',
   },
   'mooncap.info.untilNext': {
-    other: 'フェーズ {phase} まで EPUB {count} ページ。',
+    other: 'フェーズ {phase} まであと {count} ページ。',
   },
   'mooncap.info.evolvedToday': '本日の進化は完了済み',
-  'mooncap.info.nothingRead': 'まだ何も読んでいません。どの本でもページを読み終えると、ムーンキャップが育ち始めます。',
+  'mooncap.info.nothingRead': 'まだ何も読んでいません。本・マンガ・PDF・ビジュアルノベル・Web ページのどれかを読むと、ムーンキャップが育ち始めます。',
   'mooncap.info.ariaGarden': 'ムーンキャップ読書庭園。キノコ段階 {stage} / {max}。',
   'mooncap.info.musicLabel': '庭園の音楽',
   'mooncap.info.musicOn': 'オン',

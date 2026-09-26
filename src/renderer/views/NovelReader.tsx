@@ -99,7 +99,7 @@ import {
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
 import { useT } from '../i18n';
 import { KNOWN_LANGS } from '../../shared/langs';
-import { recordEpubPageRead } from '../readingGardenProgress';
+import { recordEpubPageRead, recordReadingCharsForGarden } from '../readingGardenProgress';
 // §11.1 row 8. A read-only cross-reference — §10.2 keeps list LOGIC out of this
 // file, so the reader hands it an item id and renders whatever comes back.
 import ReadingListMembership from '../components/reading/ReadingListMembership';
@@ -1618,6 +1618,8 @@ export default function NovelReader({ item, onClose }: Props) {
       const chars = pendingCharsRef.current;
       pendingCharsRef.current = 0;
       if (secs > 0 || chars > 0) recordReading(item.id, titleRef.current, secs, chars);
+      // A PDF has no EPUB pages for the garden to count, so its text grows it instead.
+      if (sourceIsPdfRef.current && chars > 0) recordReadingCharsForGarden({ sourceId: item.id, chars });
     };
     const setActive = (on: boolean) => {
       if (on) {

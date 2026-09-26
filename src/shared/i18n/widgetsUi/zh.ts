@@ -149,4 +149,7 @@ export const WIDGETS_UI_ZH: Catalog = {
   'companion.routine.error.notFound': '找不到该例程。',
   'companion.routine.error.wrongBuddy': '该例程不适用于这个伙伴。',
   'companion.routine.error.failed': '伙伴例程执行失败',
+  // Mooncap garden: the always-visible progress chip.
+  'mooncap.hud.phase': '阶段 {phase} / {max}',
+  'mooncap.hud.open': '月菇阶段 {phase} / {max}。{status} 显示详情。',
 };

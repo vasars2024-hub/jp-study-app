@@ -11,6 +11,7 @@ import {
   SEED_CITY_ICONS,
   SEED_WALLPAPER,
 } from '../shared/desktop';
+import { t } from './i18n';
 
 function seedLayout(desktopIndex: DesktopIndex): DesktopLayout {
   return {
@@ -66,6 +67,20 @@ export function getDesktopCount(): number {
 
 export function getDesktopName(index: DesktopIndex): string {
   return snapshot.viewports.find((layout) => layout.desktopIndex === index)?.name ?? `Desktop ${index + 1}`;
+}
+
+/** Names main gives a desktop nobody renamed ('City' is the old name of desktop 2). */
+export function isDefaultDesktopName(index: DesktopIndex, name: string): boolean {
+  return name === `Desktop ${index + 1}` || (index === 0 && name === 'Study') || (index === 1 && name === 'City');
+}
+
+/**
+ * The name to show for a desktop: what the user called it, or the same
+ * translated "Desktop N" the switcher buttons use.
+ */
+export function displayDesktopName(index: DesktopIndex): string {
+  const name = getDesktopName(index);
+  return isDefaultDesktopName(index, name) ? t('desktop.desktopN', { n: index + 1 }) : name;
 }
 
 export function getAssignments(): DisplayAssignment[] {

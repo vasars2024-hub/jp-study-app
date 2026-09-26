@@ -149,4 +149,7 @@ export const WIDGETS_UI_RU: Catalog = {
   'companion.routine.error.notFound': 'Действие не найдено.',
   'companion.routine.error.wrongBuddy': 'Это действие не для этого компаньона.',
   'companion.routine.error.failed': 'Действие компаньона не выполнено',
+  // Mooncap garden: the always-visible progress chip.
+  'mooncap.hud.phase': 'Фаза {phase} из {max}',
+  'mooncap.hud.open': 'Лунная шляпка, фаза {phase} из {max}. {status} Показать подробности.',
 };

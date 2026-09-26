@@ -9850,10 +9850,10 @@ export const zh: Catalog = {
     other: '已积蓄 {count} 个阶段 · 每日进化正在休整。',
   },
   'mooncap.info.untilNext': {
-    other: '距阶段 {phase} 还需 {count} 页 EPUB。',
+    other: '距阶段 {phase} 还需 {count} 页。',
   },
   'mooncap.info.evolvedToday': '今日进化已完成',
-  'mooncap.info.nothingRead': '尚未阅读任何内容。在任意书籍中读完页面后，月菇便会开始生长。',
+  'mooncap.info.nothingRead': '尚未阅读任何内容。阅读书籍、漫画、PDF、视觉小说或网页后，月菇便会开始生长。',
   'mooncap.info.ariaGarden': '月菇阅读花园。蘑菇阶段 {stage} / {max}。',
   'mooncap.info.musicLabel': '花园音乐',
   'mooncap.info.musicOn': '开',

@@ -149,4 +149,7 @@ export const WIDGETS_UI_JA: Catalog = {
   'companion.routine.error.notFound': 'ルーチンが見つかりません。',
   'companion.routine.error.wrongBuddy': 'このコンパニオン用のルーチンではありません。',
   'companion.routine.error.failed': 'コンパニオンのルーチンに失敗しました',
+  // Mooncap garden: the always-visible progress chip.
+  'mooncap.hud.phase': 'フェーズ {phase} / {max}',
+  'mooncap.hud.open': 'ムーンキャップ フェーズ {phase} / {max}。{status} 詳細を表示。',
 };

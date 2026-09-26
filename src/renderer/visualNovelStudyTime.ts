@@ -9,6 +9,7 @@
  * atomic in main, so two open windows never record the same session twice.
  */
 import { recordReading } from './stats';
+import { recordReadingCharsForGarden } from './readingGardenProgress';
 
 let installed = false;
 
@@ -18,6 +19,7 @@ async function drain(): Promise<void> {
   const sessions = await api.visualNovelDrainStudyTime().catch(() => []);
   for (const session of sessions) {
     recordReading(`vn:${session.visualNovelId}`, session.title, session.seconds, session.chars);
+    recordReadingCharsForGarden({ sourceId: `vn:${session.visualNovelId}`, chars: session.chars });
   }
 }
 

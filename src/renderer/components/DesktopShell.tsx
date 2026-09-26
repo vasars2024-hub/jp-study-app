@@ -91,7 +91,7 @@ import {
   getAssignments,
   getDesktopCount,
   getDesktopLayout,
-  getDesktopName,
+  displayDesktopName,
   focusOrOpenDesktop,
   onDesktopChanged,
   switchDesktop as switchDesktopState,
@@ -1487,7 +1487,7 @@ export default function DesktopShell({
         activeDesktop,
         desktopCount: getDesktopCount(),
         windowsOn: (index) => getDesktopLayout(index).windows,
-        nameOf: getDesktopName,
+        nameOf: displayDesktopName,
       }),
     [myAssignment?.showAllWindows, activeDesktop, deskPrefs, layoutRevision],
   );

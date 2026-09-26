@@ -149,4 +149,7 @@ export const WIDGETS_UI_EN: Catalog = {
   'companion.routine.error.notFound': 'Routine not found.',
   'companion.routine.error.wrongBuddy': 'Routine not for this buddy.',
   'companion.routine.error.failed': 'Buddy routine failed',
+  // Mooncap garden: the always-visible progress chip.
+  'mooncap.hud.phase': 'Phase {phase} of {max}',
+  'mooncap.hud.open': 'Mooncap phase {phase} of {max}. {status} Show details.',
 };
