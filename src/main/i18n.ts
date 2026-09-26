@@ -13,6 +13,7 @@ import { DEFAULT_LANG, isUiLang, translate, type TVars, type UiLang } from '../s
 // two implementations.
 
 let currentLang: UiLang = DEFAULT_LANG;
+const langListeners = new Set<(lang: UiLang) => void>();
 
 export function setMainLang(lang: UiLang): void {
   currentLang = lang;
@@ -20,7 +21,22 @@ export function setMainLang(lang: UiLang): void {
   // can return anything but English. Fire-and-forget: the renderer pushes the
   // language at boot, well before any native dialog needs a title, and mt()
   // falls back to English in the gap rather than blocking startup.
-  void ensureCatalog(lang);
+  void Promise.resolve(ensureCatalog(lang)).then(() => {
+    // Native surfaces built once (the tray menu) rebuild in the new language.
+    for (const cb of langListeners) {
+      try {
+        cb(lang);
+      } catch {
+        /* a listener's failure is its own */
+      }
+    }
+  });
+}
+
+/** Called after a language switch has loaded its catalog. */
+export function onMainLangChanged(cb: (lang: UiLang) => void): () => void {
+  langListeners.add(cb);
+  return () => langListeners.delete(cb);
 }
 
 export function getMainLang(): UiLang {

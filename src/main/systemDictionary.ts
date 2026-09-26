@@ -56,7 +56,7 @@ import {
   setGlobalCommandChord,
 } from './globalCommands';
 import { chordToAccelerator, COMPANION_COMMAND_ORDER, GLOBAL_COMMAND_DEFAULTS } from '../shared/globalCommands';
-import { mt } from './i18n';
+import { mt, onMainLangChanged } from './i18n';
 
 export interface SystemDictionarySettings {
   enabled: boolean;
@@ -112,6 +112,7 @@ let commandsRegistered = false;
 let overlay: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let offCommandsChanged: (() => void) | null = null;
+let offLangChanged: (() => void) | null = null;
 /** Last captured text, handed to the overlay renderer once it has loaded. */
 let pendingQuery = '';
 let pendingContext: SysDictContext = { mode: 'auto' };
@@ -477,6 +478,7 @@ export function startSystemDictionary(): void {
   ensureTray();
   applyEnabledState();
   offCommandsChanged ??= onGlobalCommandsChanged(() => refreshTrayMenu());
+  offLangChanged ??= onMainLangChanged(() => refreshTrayMenu());
   refreshTrayMenu();
   // The selection helper boots PowerShell once, off the hotkey's critical path.
   warmCompanionContext();
@@ -487,6 +489,8 @@ export function stopSystemDictionary(): void {
   refreshGlobalCommands();
   offCommandsChanged?.();
   offCommandsChanged = null;
+  offLangChanged?.();
+  offLangChanged = null;
   if (overlay && !overlay.isDestroyed()) overlay.destroy();
   overlay = null;
   if (tray) {
