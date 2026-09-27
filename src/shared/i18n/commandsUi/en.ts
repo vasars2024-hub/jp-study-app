@@ -155,7 +155,7 @@ export const COMMANDS_UI_EN: Catalog = {
   'cmd.note.window.zoomIn': 'Scales the whole interface. Plain Ctrl+= is the reader font size, which is scoped to a book.',
   'cmd.note.window.zoomOut': 'Scales the whole interface. Plain Ctrl+- is the reader font size, which is scoped to a book.',
   'cmd.note.window.zoomReset': 'Returns the interface scale to 100%. A reader keeps its own font size.',
-  'cmd.note.reader.highlightWord': 'Personal color mark (annotations) — independent of New/Learning/Known vocabulary levels.',
+  'cmd.note.reader.highlightWord': 'Personal color mark (annotations) — independent of New/Learning/Familiar/Known vocabulary levels.',
   'cmd.note.reader.toggleWordHighlight': 'LingQ-style New/Learning/Familiar/Known colors.',
   'cmd.note.reader.toggleTranslation': 'Toggles original-only vs bilingual/translation overlay in EPUB and manga readers. Ctrl+Shift+T belongs to the Toolbox (Reopen Last Tool).',
   'cmd.note.reader.selectSentence': 'Hold the chord and click a word to select the full sentence (ends at 。！？ etc., not commas). Does not open the dictionary popup. Rebind freely — mouse buttons and modifiers supported.',

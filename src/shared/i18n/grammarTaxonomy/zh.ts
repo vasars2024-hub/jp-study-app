@@ -266,7 +266,7 @@ export const GRAMMAR_TAXONOMY_ZH: Catalog = {
   'grammar.lists.legend': '我的列表',
   'grammar.lists.favorites': '收藏',
   'grammar.lists.queue': '学习队列',
-  'grammar.familiarity.new': '未学',
+  'grammar.familiarity.new': '未学习',
   'grammar.familiarity.learning': '学习中',
   'grammar.familiarity.familiar': '熟悉',
   'grammar.familiarity.known': '已掌握',

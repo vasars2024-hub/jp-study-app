@@ -270,7 +270,7 @@ export const GRAMMAR_TAXONOMY_RU: Catalog = {
   'grammar.familiarity.new': 'Новое',
   'grammar.familiarity.learning': 'Изучается',
   'grammar.familiarity.familiar': 'Знакомо',
-  'grammar.familiarity.known': 'Усвоено',
+  'grammar.familiarity.known': 'Выучено',
   'grammar.familiarity.hint': 'Насколько вы знаете каждый пункт — по итогам практики или вручную.',
   'grammar.familiarity.setLabel': 'Знание',
   'grammar.familiarity.manual': 'задано вручную',
