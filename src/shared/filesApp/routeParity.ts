@@ -201,6 +201,18 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
     note: 'downloads/ is written by main/media.ts and browsed from the Media Center.',
   },
   {
+    capability: 'sidecars',
+    status: 'new',
+    section: null,
+    module: '',
+    symbol: '',
+    note:
+      'Subtitle files beside a library video that discovery had not attached (not reached yet, or '
+      + 'a language it was not asked for) had no row anywhere, so "Make a sentence deck" from a '
+      + 'subtitle file could not reach them. Files is the first reader; attached files keep their '
+      + 'record row through the path dedupe in buildFilesIndex.',
+  },
+  {
     capability: 'decks',
     status: 'preserved',
     section: 'anki',

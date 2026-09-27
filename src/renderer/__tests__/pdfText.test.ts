@@ -10,7 +10,7 @@
  * words together across line breaks.
  */
 import { describe, expect, it } from 'vitest';
-import { cleanPdfText, linesToParagraphs } from '../pdfText';
+import { cleanPdfText, pdfLinesToParagraphs } from '../pdfText';
 
 describe('cleanPdfText', () => {
   it('folds Kangxi radicals to the ideograph the page shows', () => {
@@ -25,23 +25,23 @@ describe('cleanPdfText', () => {
   });
 });
 
-describe('linesToParagraphs', () => {
+describe('pdfLinesToParagraphs', () => {
   it('joins Japanese and Chinese lines without a space', () => {
-    expect(linesToParagraphs(['朝、ねこは窓の', 'そばで眠りました。'])).toEqual(['朝、ねこは窓のそばで眠りました。']);
-    expect(linesToParagraphs(['早上，小猫在窗', '边晒太阳。'])).toEqual(['早上，小猫在窗边晒太阳。']);
+    expect(pdfLinesToParagraphs(['朝、ねこは窓の', 'そばで眠りました。'])).toEqual(['朝、ねこは窓のそばで眠りました。']);
+    expect(pdfLinesToParagraphs(['早上，小猫在窗', '边晒太阳。'])).toEqual(['早上，小猫在窗边晒太阳。']);
   });
 
   it('joins Russian and English lines with the space the break stood for', () => {
-    expect(linesToParagraphs(['Утром кошка грелась', 'на солнце у окна.'])).toEqual(['Утром кошка грелась на солнце у окна.']);
-    expect(linesToParagraphs(['The cat slept', 'by the window.'])).toEqual(['The cat slept by the window.']);
+    expect(pdfLinesToParagraphs(['Утром кошка грелась', 'на солнце у окна.'])).toEqual(['Утром кошка грелась на солнце у окна.']);
+    expect(pdfLinesToParagraphs(['The cat slept', 'by the window.'])).toEqual(['The cat slept by the window.']);
   });
 
   it('rejoins a word hyphenated across the break', () => {
-    expect(linesToParagraphs(['Кошка смотрела в ок-', 'но весь день.'])).toEqual(['Кошка смотрела в окно весь день.']);
+    expect(pdfLinesToParagraphs(['Кошка смотрела в ок-', 'но весь день.'])).toEqual(['Кошка смотрела в окно весь день.']);
   });
 
   it('still starts a new paragraph after sentence-ending punctuation', () => {
-    expect(linesToParagraphs(['一文目。', '二文目。'])).toEqual(['一文目。', '二文目。']);
-    expect(linesToParagraphs(['«Да», — сказала она.', 'Потом ушла.'])).toEqual(['«Да», — сказала она.', 'Потом ушла.']);
+    expect(pdfLinesToParagraphs(['一文目。', '二文目。'])).toEqual(['一文目。', '二文目。']);
+    expect(pdfLinesToParagraphs(['«Да», — сказала она.', 'Потом ушла.'])).toEqual(['«Да», — сказала она.', 'Потом ушла.']);
   });
 });

@@ -27,7 +27,7 @@ const SPACED_START = /^[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\d(«
 // and Chinese lines are joined without spaces (there are none between words);
 // Russian and other spaced scripts get the space the line break stood for —
 // "слово" + "слово" used to become one word.
-export function linesToParagraphs(lines: string[]): string[] {
+export function pdfLinesToParagraphs(lines: string[]): string[] {
   const paras: string[] = [];
   let buf = '';
   for (const raw of lines) {

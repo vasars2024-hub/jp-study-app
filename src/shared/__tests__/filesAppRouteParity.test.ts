@@ -82,10 +82,10 @@ describe('files app route parity (gate 6)', () => {
       ...scanSources('src/main/filesApp/enumerators.ts'),
       ...scanSources('src/renderer/components/filesapp/rendererEnumerators.ts'),
     ];
-    // 17 main + 8 renderer. Gate 1 closed at 17 + 3; gate 7 added five renderer
-    // stores the Notebook aggregated. Asserted as a number so a regex that
+    // 18 main + 8 renderer. Gate 1 closed at 17 + 3; gate 7 added five renderer
+    // stores the Notebook aggregated; the round-4 audit added unattached sidecar subtitles. Asserted as a number so a regex that
     // silently stops matching cannot pass by comparing two empty lists.
-    expect(sources).toHaveLength(25);
+    expect(sources).toHaveLength(26);
     const declared = FILES_ROUTE_PARITY.map((r) => r.capability).filter(isEnumeratorCapability);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...new Set(sources)].sort()).toEqual([...declared].sort());
@@ -96,7 +96,7 @@ describe('files app route parity (gate 6)', () => {
     // returning true for everything the equality would fail — but if it started
     // returning FALSE for everything, `declared` would be empty and `sources`
     // would have to be empty too for the test to pass. Pin both directions.
-    expect(declared.length).toBe(25);
+    expect(declared.length).toBe(26);
     expect(FILES_ROUTE_PARITY.filter((r) => !isEnumeratorCapability(r.capability)).length)
       .toBeGreaterThan(0);
     expect(isEnumeratorCapability('panel:system/memory')).toBe(false);

@@ -9,7 +9,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { LoadedEpub, EpubChapter, EpubTocEntry } from './epubLoader';
 import { t } from './i18n';
-import { cleanPdfText, linesToParagraphs } from './pdfText';
+import { cleanPdfText, pdfLinesToParagraphs } from './pdfText';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -60,7 +60,7 @@ export async function loadPdf(
         }
       }
       if (cur) lines.push(cur);
-      const paras = linesToParagraphs(lines);
+      const paras = pdfLinesToParagraphs(lines);
       html = paras.map((t) => `<p>${esc(t)}</p>`).join('');
       chars = paras.join('').replace(/\s+/g, '').length;
       page.cleanup();

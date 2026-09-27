@@ -328,7 +328,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Highlight current word',
     category: 'Reader',
     defaultKeys: 'H',
-    note: 'Personal color mark (annotations) — independent of New/Learning/Known vocabulary levels.',
+    note: 'Personal color mark (annotations) — independent of New/Learning/Familiar/Known vocabulary levels.',
   },
   {
     id: 'reader.toggleWordHighlight',
