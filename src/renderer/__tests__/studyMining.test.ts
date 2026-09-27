@@ -24,8 +24,10 @@ import { loadDeck } from '../flashcardDeck';
 import {
   ANKI_MINE_QUEUE_KEY,
   ANKI_QUEUE_MAX_ATTEMPTS,
+  ANKI_QUEUE_RETRY_MS,
   flushAnkiMineQueue,
   gaveUpAnkiCards,
+  installStudyMining,
   markAnkiSeen,
   mineToStudy,
   pendingAnkiCards,
@@ -291,6 +293,37 @@ describe('mineToStudy', () => {
 });
 
 describe('the pending-Anki queue', () => {
+  it('drains a note queued while the link never looked down (J04: Anki back inside the probe gap)', async () => {
+    markAnkiSeen();
+    // Main's heartbeat still says connected: Anki closed and reopened between probes,
+    // so no reconnect event will ever arrive.
+    linkState = 'connected';
+    let ankiUp = false;
+    const api = (window as unknown as { api: { ankiMineNote: (req: MineNoteRequest) => Promise<MineNoteResult> } }).api;
+    api.ankiMineNote = async (req) => {
+      mined.push(req);
+      return ankiUp ? { ok: true, noteId: 9 } : { ok: false, error: ANKI_UNREACHABLE_MSG };
+    };
+    await mineCat();
+    expect(pendingAnkiCards().map((c) => c.word)).toEqual(['猫']);
+
+    vi.useFakeTimers();
+    try {
+      const off = installStudyMining();
+      await flushAnkiMineQueue(); // the drain on install, while Anki is still away
+      expect(pendingAnkiCards()).toHaveLength(1);
+      ankiUp = true;
+      await vi.advanceTimersByTimeAsync(ANKI_QUEUE_RETRY_MS);
+      await flushAnkiMineQueue();
+      // Before: it stayed pending until the app was restarted.
+      expect(pendingAnkiCards()).toHaveLength(0);
+      expect(loadDeck().find((c) => c.word === '猫')?.ankiNoteId).toBe(9);
+      off();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a note that keeps timing out no longer blocks the rest, and is given up after the limit', async () => {
     markAnkiSeen();
     await mineCat({ anki: { ...request, term: '犬' }, word: '犬' });

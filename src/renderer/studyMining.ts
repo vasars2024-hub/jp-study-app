@@ -216,6 +216,8 @@ interface QueueEntry {
 
 /** A note that times out this many times while Anki answers otherwise is given up on. */
 export const ANKI_QUEUE_MAX_ATTEMPTS = 5;
+/** How often a waiting queue is retried while the Anki link looks unchanged. */
+export const ANKI_QUEUE_RETRY_MS = 20_000;
 
 type QueueStore = Record<string, QueueEntry>;
 
@@ -820,6 +822,14 @@ export function installStudyMining(): () => void {
     }));
   }
   if (pendingAnkiCards().length) void flushAnkiMineQueue().then(announceDrain);
+  // The link event fires on a reconnect edge only. Anki closed and reopened
+  // inside main's 30 s connected-probe gap never looked disconnected, so a note
+  // queued in that gap waited for the next restart (J04). While anything waits,
+  // try again now and then; the drain asks whether Anki is up before sending.
+  const retry = window.setInterval(() => {
+    if (pendingAnkiCards().length) void flushAnkiMineQueue().then(announceDrain);
+  }, ANKI_QUEUE_RETRY_MS);
+  offs.push(() => window.clearInterval(retry));
 
   let warnedFull = false;
   const onStorage = (): void => {
