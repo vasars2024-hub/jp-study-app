@@ -16,6 +16,7 @@ import { resumeMostRecentWatched } from './continueWatchingStore';
 import { reachMediaWorkspace } from './mediaWorkspaceBridge';
 import { t } from './i18n';
 import { GLOBAL_COMMAND_DEFAULTS, migrateLegacyGlobalChords, type GlobalCommandStatus } from '../shared/globalCommands';
+import { reportGlobalShortcutFailures } from './globalShortcutNotice';
 
 export type CommandCategory =
   | 'Navigation'
@@ -1063,8 +1064,8 @@ let store: ShortcutStore = loadStore();
 
 // System-wide chords (`global: true` rows) are pushed to main's registry on boot and
 // on every rebind (`syncGlobalCommands`). If another application owns an accelerator,
-// main reports it per command and the in-app binding keeps working — the failure is
-// surfaced once as a quiet toast and stays visible on the row in Settings.
+// main reports it per command and the in-app binding keeps working — the failures are
+// surfaced as one notice (globalShortcutNotice.ts) and stay visible on the rows in Settings.
 let lastSyncedOsHotkeyPayload: string | null = null;
 let osHotkeyInstalledCache: boolean | null = null;
 
@@ -1183,8 +1184,6 @@ export function globalCommandErrorText(status: Pick<GlobalCommandStatus, 'error'
 
 let lastSyncedGlobalChords: string | null = null;
 let globalMigration: Promise<void> | null = null;
-/** Errors already toasted, keyed `id:error:chord`, so a re-push does not repeat them. */
-const toastedGlobalErrors = new Set<string>();
 
 /**
  * Carry chords from the old per-feature pages (popup dictionary, Reading Lens) into
@@ -1229,23 +1228,8 @@ export function syncGlobalCommands(force = false): Promise<void> {
       lastSyncedGlobalChords = serialized;
       const list = await window.api.globalCommandsSync(chords);
       setGlobalStatuses(list);
-      for (const status of list ?? []) {
-        if (!status.error || !(status.id in chords)) continue;
-        const key = `${status.id}:${status.error}:${status.chord}`;
-        if (toastedGlobalErrors.has(key)) continue;
-        toastedGlobalErrors.add(key);
-        window.dispatchEvent(
-          new CustomEvent('os:toast', {
-            detail: {
-              message: t('shortcut.toast.global', {
-                name: builtinLabel(status.id) ?? status.id,
-                error: globalCommandErrorText(status),
-              }),
-              kind: 'muted',
-            },
-          }),
-        );
-      }
+      // One notice per sync, however many chords Windows refused (globalShortcutNotice.ts).
+      await reportGlobalShortcutFailures(list, chords);
     }).catch(() => undefined);
   } catch {
     /* Non-Electron harness (tests, browser dev harness) — in-app bindings only. */

@@ -5,7 +5,9 @@ import type { Catalog } from '../core';
 export const COMMANDS_UI_ZH: Catalog = {
   // ---- shortcut manager: toasts, custom-shortcut descriptions, undo ----
   'shortcut.toast.startupHelper': '启动助手：{error}',
-  'shortcut.toast.global': '{name}：{error}',
+  'shortcut.notice.refused.inUse': '有 {count} 个快捷键无法注册：其他应用正在使用。',
+  'shortcut.notice.refused.mixed': '有 {count} 个快捷键无法注册。打开“快捷键”查看原因。',
+  'shortcut.notice.refused.open': '打开快捷键',
   'shortcut.global.tag': '全局',
   'shortcut.global.changeInShortcuts': '在快捷键中更改',
   'shortcut.global.error.inUse': 'Windows 拒绝了 {chord}：另一个应用正在使用它。请换一个组合键。',

@@ -5,7 +5,19 @@ import type { Catalog } from '../core';
 export const COMMANDS_UI_RU: Catalog = {
   // ---- shortcut manager: toasts, custom-shortcut descriptions, undo ----
   'shortcut.toast.startupHelper': 'Помощник автозапуска: {error}',
-  'shortcut.toast.global': '«{name}»: {error}',
+  'shortcut.notice.refused.inUse': {
+    one: 'Не удалось зарегистрировать {count} сочетание клавиш — его использует другое приложение.',
+    few: 'Не удалось зарегистрировать {count} сочетания клавиш — их использует другое приложение.',
+    many: 'Не удалось зарегистрировать {count} сочетаний клавиш — их использует другое приложение.',
+    other: 'Не удалось зарегистрировать {count} сочетания клавиш — их использует другое приложение.',
+  },
+  'shortcut.notice.refused.mixed': {
+    one: 'Не удалось зарегистрировать {count} сочетание клавиш. Причина — в разделе «Горячие клавиши».',
+    few: 'Не удалось зарегистрировать {count} сочетания клавиш. Причины — в разделе «Горячие клавиши».',
+    many: 'Не удалось зарегистрировать {count} сочетаний клавиш. Причины — в разделе «Горячие клавиши».',
+    other: 'Не удалось зарегистрировать {count} сочетания клавиш. Причины — в разделе «Горячие клавиши».',
+  },
+  'shortcut.notice.refused.open': 'Открыть горячие клавиши',
   'shortcut.global.tag': 'Во всей системе',
   'shortcut.global.changeInShortcuts': 'Изменить в «Сочетаниях клавиш»',
   'shortcut.global.error.inUse': 'Windows отклонила {chord}: его занимает другое приложение. Выберите другое сочетание.',

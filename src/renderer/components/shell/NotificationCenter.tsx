@@ -16,7 +16,7 @@ import {
   setDnd,
   type NotificationKind,
 } from '../../notificationStore';
-import { openExtensionSettings } from '../../extensionBridgeUi';
+import { openExtensionSettings, openShortcutSettings } from '../../extensionBridgeUi';
 import { openSectionSurface } from '../../sectionSurface';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
@@ -142,10 +142,15 @@ export default function NotificationCenter() {
           {items.length === 0 ? (
             <div className="os-notif-empty type-body">{wired ? 'BULLETIN CHANNEL EMPTY / NO DISPATCHES' : t('notifications.empty')}</div>
           ) : (
-            items.map((n) => (
+            items.map((n) => {
+              // A notice posted with catalog keys follows the live language; the
+              // stored text is only the fallback for entries without them.
+              const title = n.i18n?.title ? t(n.i18n.title, n.i18n.vars) : n.title;
+              const message = n.i18n ? t(n.i18n.message, n.i18n.vars) : n.message;
+              return (
               <div key={n.id} className={closingIds.has(n.id) ? 'wired-notif-closing' : undefined}>
               <Notification
-                title={n.title}
+                title={title}
                 kind={uiKind(n.kind)}
                 // Named by what it dismisses. Every row's ✕ announced the bare
                 // word "Dismiss", so a screen reader walking a list of five
@@ -160,8 +165,8 @@ export default function NotificationCenter() {
                 // undefined (`i18n/core.ts:83`). The message is the row's real
                 // identity; the bare word is the last resort, not the first.
                 dismissLabel={
-                  n.title || n.message
-                    ? t('notifications.dismissNamed', { title: n.title || n.message })
+                  title || message
+                    ? t('notifications.dismissNamed', { title: title || message })
                     : t('notifications.dismiss')
                 }
                 onClose={() => dismissEntry(n.id)}
@@ -180,7 +185,7 @@ export default function NotificationCenter() {
                     </span>
                   </div>
                 )}
-                <span>{n.message}</span>
+                <span>{message}</span>
                 <div className="os-notif-time type-status">{wired ? new Date(n.ts).toLocaleTimeString(LANG_TAGS[lang]) : timeAgo(n.ts)}</div>
                 {n.actionUrl || n.clientAction ? (
                   <div className="os-notif-actions" style={{ marginTop: 8 }}>
@@ -198,6 +203,11 @@ export default function NotificationCenter() {
                           setOpen(false);
                           return;
                         }
+                        if (n.clientAction === 'open-shortcuts') {
+                          openShortcutSettings();
+                          setOpen(false);
+                          return;
+                        }
                         if (n.actionUrl) void window.api.openExternal(n.actionUrl);
                       }}
                     >
@@ -205,13 +215,16 @@ export default function NotificationCenter() {
                         ? t('notifications.openExtensionSettings')
                         : n.clientAction === 'open-calendar'
                           ? t('calendar.reminder.open')
-                          : t('notifications.openLink')}
+                          : n.clientAction === 'open-shortcuts'
+                            ? t('shortcut.notice.refused.open')
+                            : t('notifications.openLink')}
                     </button>
                   </div>
                 ) : null}
               </Notification>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </aside>

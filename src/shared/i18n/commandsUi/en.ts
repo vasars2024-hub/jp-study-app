@@ -5,7 +5,15 @@ import type { Catalog } from '../core';
 export const COMMANDS_UI_EN: Catalog = {
   // ---- shortcut manager: toasts, custom-shortcut descriptions, undo ----
   'shortcut.toast.startupHelper': 'Startup helper: {error}',
-  'shortcut.toast.global': '{name}: {error}',
+  'shortcut.notice.refused.inUse': {
+    one: "{count} shortcut couldn't be registered — another app is using it.",
+    other: "{count} shortcuts couldn't be registered — another app is using them.",
+  },
+  'shortcut.notice.refused.mixed': {
+    one: "{count} shortcut couldn't be registered. Open Shortcuts to see why.",
+    other: "{count} shortcuts couldn't be registered. Open Shortcuts to see why.",
+  },
+  'shortcut.notice.refused.open': 'Open Shortcuts',
   'shortcut.global.tag': 'System-wide',
   'shortcut.global.changeInShortcuts': 'Change in Shortcuts',
   'shortcut.global.error.inUse': 'Windows refused {chord}: another app is using it. Pick another chord.',

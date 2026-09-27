@@ -23,9 +23,22 @@ export interface ShellNotification {
   /** Optional deep-link / release page opened from the notification center. */
   actionUrl?: string;
   /** In-app action when the notice is not an external URL. */
-  clientAction?: 'extension-settings' | 'open-calendar';
+  clientAction?: NotificationClientAction;
   /** Stable client key used to replace an earlier notice for the same event. */
   clientId?: string;
+  /**
+   * Catalog keys the center renders in the live language. `title`/`message`
+   * stay as the text composed at post time (older builds, logs, search).
+   */
+  i18n?: NotificationI18n;
+}
+
+export type NotificationClientAction = 'extension-settings' | 'open-calendar' | 'open-shortcuts';
+
+export interface NotificationI18n {
+  title?: string;
+  message: string;
+  vars?: Record<string, string | number>;
 }
 
 const LS_KEY = 'jp-os-notifications-v1';
@@ -87,7 +100,8 @@ export interface NotifyInput {
   source?: string;
   priority?: NotificationPriority;
   actionUrl?: string;
-  clientAction?: 'extension-settings' | 'open-calendar';
+  clientAction?: NotificationClientAction;
+  i18n?: NotificationI18n;
   /**
    * When set, replaces any existing unread/read notice with the same clientId
    * so repeated release checks do not spam the center.
@@ -168,7 +182,9 @@ export function installNotificationCapture(): void {
   if (installed) return;
   installed = true;
   window.addEventListener('os:toast', (e: Event) => {
-    const d = (e as CustomEvent<{ message?: string; kind?: string }>).detail;
+    const d = (e as CustomEvent<{ message?: string; kind?: string; record?: boolean }>).detail;
+    // `record: false` — the sender already put a translatable entry in the center.
+    if (d?.record === false) return;
     if (d?.message && typeof d.message === 'string') {
       notify({ message: d.message, kind: normalizeKind(d.kind) });
     }

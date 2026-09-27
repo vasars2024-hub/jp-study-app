@@ -5,7 +5,9 @@ import type { Catalog } from '../core';
 export const COMMANDS_UI_JA: Catalog = {
   // ---- shortcut manager: toasts, custom-shortcut descriptions, undo ----
   'shortcut.toast.startupHelper': 'スタートアップヘルパー: {error}',
-  'shortcut.toast.global': '{name}：{error}',
+  'shortcut.notice.refused.inUse': '{count} 件のショートカットを登録できませんでした。別のアプリが使用しています。',
+  'shortcut.notice.refused.mixed': '{count} 件のショートカットを登録できませんでした。理由は「ショートカット」で確認できます。',
+  'shortcut.notice.refused.open': 'ショートカットを開く',
   'shortcut.global.tag': 'システム全体',
   'shortcut.global.changeInShortcuts': 'ショートカットで変更',
   'shortcut.global.error.inUse': 'Windows が {chord} を拒否しました。別のアプリが使用中です。別のキーを選んでください。',
