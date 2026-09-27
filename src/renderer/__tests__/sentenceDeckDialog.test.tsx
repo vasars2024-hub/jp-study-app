@@ -184,7 +184,8 @@ describe('SentenceDeckDialog', () => {
     await flush();
     const why = q('.sd-failed .sd-detail');
     expect(why.textContent).toBe('No sound at this point of the video — the line may be past its end.');
-    expect(why.getAttribute('title')).toBe('nothing to hear in this range');
+    // ffmpeg's own English stays out of the UI, tooltip included.
+    expect(why.getAttribute('title')).toBeNull();
   });
 
   it('undoes the whole batch', async () => {

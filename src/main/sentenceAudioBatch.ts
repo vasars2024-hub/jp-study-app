@@ -91,7 +91,7 @@ export interface SentenceAudioBatchHooks {
   onProgress?: (done: number, total: number, result: SentenceAudioClipResult) => void;
 }
 
-interface RunOutcome {
+export interface RunOutcome {
   ok: boolean;
   bytes?: Buffer;
   error?: string;
@@ -158,6 +158,17 @@ function runToBuffer(args: string[], signal?: AbortSignal): Promise<RunOutcome> 
   });
 }
 
+/**
+ * A failure worth one more try: the encoder did not start or finish (Windows can
+ * refuse a process start under load, 0xC0000142), not an answer about the file.
+ * A missing audio stream, silence, an oversized clip and a cancel are answers.
+ */
+export function isTransientClipFailure(outcome: Pick<RunOutcome, 'ok' | 'failure' | 'stderr'>): boolean {
+  if (outcome.ok) return false;
+  if (outcome.failure !== 'ffmpeg' && outcome.failure !== 'timeout') return false;
+  return !/matches no streams/i.test(outcome.stderr ?? '');
+}
+
 /** Cut, store and describe one sentence. Never throws. */
 export async function extractSentenceClip(
   request: Omit<SentenceAudioBatchRequest, 'clips'>,
@@ -166,10 +177,11 @@ export async function extractSentenceClip(
   signal?: AbortSignal,
 ): Promise<SentenceAudioClipResult> {
   const bounds = sentenceClipBounds(clip.startMs, clip.endMs, request.padMs ?? SENTENCE_CLIP_PAD_MS);
-  const audio = await runToBuffer(
-    sentenceAudioFfmpegArgs({ filePath: request.filePath, bounds, audioStream: request.audioStream }),
-    signal,
-  );
+  const audioArgs = sentenceAudioFfmpegArgs({ filePath: request.filePath, bounds, audioStream: request.audioStream });
+  let audio = await runToBuffer(audioArgs, signal);
+  // One retry, so a clip the machine was too busy to cut once does not become a
+  // card without sound.
+  if (isTransientClipFailure(audio) && !signal?.aborted) audio = await runToBuffer(audioArgs, signal);
   if (!audio.ok || !audio.bytes) {
     return {
       id: clip.id,

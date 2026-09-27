@@ -633,7 +633,7 @@ export function SentenceDeckDialog({ request, onClose }: { request: SentenceDeck
               {result.failedClips.slice(0, 20).map((clip) => (
                 <li key={clip.index}>
                   <span lang={contentLang}>{clip.text}</span>
-                  <span className="sd-muted sd-detail" title={clip.error}>{t(clip.reasonKey)}</span>
+                  <span className="sd-muted sd-detail">{t(clip.reasonKey)}</span>
                 </li>
               ))}
             </ul>

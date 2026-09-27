@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { extractSentenceAudioBatch } from '../sentenceAudioBatch';
+import { extractSentenceAudioBatch, isTransientClipFailure } from '../sentenceAudioBatch';
 
 /** A hook after each real store write, so a cancel can land between a clip and its still. */
 const writes = vi.hoisted(() => ({ after: null as null | (() => void) }));
@@ -264,4 +264,20 @@ describe.skipIf(!fs.existsSync(TEST_EPISODE) || !fs.existsSync(TEST_SUBTITLE))('
       expect(Math.abs(seconds - expected)).toBeLessThan(0.3);
     }
   }, 120_000);
+});
+
+describe('isTransientClipFailure: which failed cut is tried once more', () => {
+  it('retries an encoder that did not start or finish', () => {
+    // 0xC0000142: Windows refused the process start under load (seen in a zh run).
+    expect(isTransientClipFailure({ ok: false, failure: 'ffmpeg', stderr: '' })).toBe(true);
+    expect(isTransientClipFailure({ ok: false, failure: 'timeout' })).toBe(true);
+  });
+
+  it('does not retry an answer about the file, a cancel, or a success', () => {
+    expect(isTransientClipFailure({ ok: false, failure: 'ffmpeg', stderr: 'Stream map 0:a:0 matches no streams.' })).toBe(false);
+    for (const failure of ['silent', 'too-large', 'cancelled', 'store'] as const) {
+      expect(isTransientClipFailure({ ok: false, failure })).toBe(false);
+    }
+    expect(isTransientClipFailure({ ok: true })).toBe(false);
+  });
 });
