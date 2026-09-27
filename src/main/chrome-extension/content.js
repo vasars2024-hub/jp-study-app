@@ -3102,6 +3102,10 @@
           armOcrRegionSelect();
         });
       });
+      // Chrome stops animation frames in a window another one covers, which left
+      // the box unarmed until the page was looked at again. A timer arms it anyway;
+      // arming twice is harmless.
+      ocrSelectArmTimer = setTimeout(armOcrRegionSelect, 120);
     };
 
     ocrSelectArmCleanup = cleanup;
