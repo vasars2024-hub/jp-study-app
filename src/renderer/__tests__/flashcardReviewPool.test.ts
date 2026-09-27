@@ -159,7 +159,10 @@ describe('the picker call site', () => {
   it('builds the session pool from the same helper as the counts', () => {
     // `sessionBookKey` is `reviewBookKey` itself for every single-source choice;
     // only "Mix several decks" turns it into the chosen set.
-    expect(SOURCE).toContain('reviewSessionCards(epubReviewPool, sessionBookKey, reviewDueOnly, reviewMode)');
+    expect(SOURCE).toContain('reviewSessionCards(sessionPool, sessionBookKey, reviewDueOnly, reviewMode)');
+    // A mix spans folders (one per episode deck), so it draws from the whole deck.
+    expect(SOURCE).toContain('const sessionPool = reviewBookKey === REVIEW_MIX_KEY ? epubCards : epubReviewPool;');
+    expect(SOURCE).toContain('reviewSessionCounts(epubCards, reviewDueOnly, reviewMode)');
     expect(SOURCE).toContain('reviewBookKey === REVIEW_MIX_KEY ? reviewMixKeys : reviewBookKey');
     // Per-option counts come from `reviewSessionCounts`, which is
     // `reviewSessionCards(...).length` for every source in one pass

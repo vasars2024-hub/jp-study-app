@@ -321,6 +321,8 @@ export interface FlashcardsState {
   epubReviewSessionCandidates: DeckFlashcard[];
   /** Size of the session a given source option would start. See D310. */
   reviewSourceCount: (bookKey: string) => number;
+  /** Per-deck session sizes for the mix chips, over the whole deck (a mix spans folders). */
+  reviewMixCounts: ReadonlyMap<string, number>;
   filteredSaved: SavedWord[];
   unknownReviewCards: ReviewCard[];
   knownReviewCards: ReviewCard[];
@@ -521,15 +523,19 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     () => (reviewBookKey === REVIEW_MIX_KEY ? reviewMixKeys : reviewBookKey),
     [reviewBookKey, reviewMixKeys],
   );
+  // A mix spans decks, and each episode's sentence deck is its own folder: drawing
+  // it from the folder-scoped pool left every other episode at (0) after "Listen
+  // now" had narrowed the view to one of them. A mix draws from the whole deck.
+  const sessionPool = reviewBookKey === REVIEW_MIX_KEY ? epubCards : epubReviewPool;
   const epubReviewCandidates = useMemo(() => {
     const pool = typeof sessionBookKey === 'string'
-      ? filterDeckByBook(epubReviewPool, sessionBookKey)
-      : filterDeckByBooks(epubReviewPool, sessionBookKey);
+      ? filterDeckByBook(sessionPool, sessionBookKey)
+      : filterDeckByBooks(sessionPool, sessionBookKey);
     return reviewDueOnly ? dueDeckCards(pool) : pool;
-  }, [epubReviewPool, sessionBookKey, reviewDueOnly]);
+  }, [sessionPool, sessionBookKey, reviewDueOnly]);
   const epubReviewSessionCandidates = useMemo(
-    () => reviewSessionCards(epubReviewPool, sessionBookKey, reviewDueOnly, reviewMode),
-    [epubReviewPool, sessionBookKey, reviewDueOnly, reviewMode],
+    () => reviewSessionCards(sessionPool, sessionBookKey, reviewDueOnly, reviewMode),
+    [sessionPool, sessionBookKey, reviewDueOnly, reviewMode],
   );
   /**
    * What the source picker labels each option with: the size of the session that
@@ -544,6 +550,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const reviewSourceCount = useCallback(
     (bookKey: string) => reviewSourceCounts.get(bookKey) ?? 0,
     [reviewSourceCounts],
+  );
+  // The mix chips count what the mix would draw: the whole deck, not the folder.
+  const reviewMixCounts = useMemo(
+    () => reviewSessionCounts(epubCards, reviewDueOnly, reviewMode),
+    [epubCards, reviewDueOnly, reviewMode],
   );
   const audioCandidateCount = useMemo(
     () => epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath).length,
@@ -1346,6 +1357,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     epubReviewCandidates,
     epubReviewSessionCandidates,
     reviewSourceCount,
+    reviewMixCounts,
     filteredSaved,
     unknownReviewCards,
     knownReviewCards,
@@ -2032,6 +2044,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     epubReviewBooks,
     epubReviewSessionCandidates,
     reviewSourceCount,
+    reviewMixCounts,
     recentStrip,
     reviewBookKey,
     reviewDueOnly,
@@ -2369,7 +2382,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                         aria-pressed={on}
                         onClick={() => state.toggleReviewMixKey(key)}
                       >
-                        {t('flash.mix.deck', { name: group.bookTitle, count: reviewSourceCount(key) })}
+                        {t('flash.mix.deck', { name: group.bookTitle, count: reviewMixCounts.get(key) ?? 0 })}
                       </button>
                     );
                   })}
