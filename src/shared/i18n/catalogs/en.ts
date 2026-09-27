@@ -2576,7 +2576,7 @@ export const en: Catalog = {
   'settings.reader.toggle.prettyWrap': 'Pretty wrap',
   'settings.reader.toggle.prioritizeStyles': 'Prioritize my styles',
   'settings.reader.toggle.hideFurigana': 'Hide furigana',
-  'settings.reader.toggle.wordHighlight': 'Vocabulary colors (New / Learning / Known)',
+  'settings.reader.toggle.wordHighlight': 'Vocabulary colors (New / Learning / Familiar / Known)',
   'settings.reader.toggle.hyperlinks': 'Hyperlinks (Wikipedia → import as EPUB)',
   'settings.reader.hint': 'Hold Ctrl and scroll to resize. Settings save automatically.',
   // Settings clipboard/a11y + AnkiSetup + mining/dict results (en)
@@ -6209,7 +6209,7 @@ export const en: Catalog = {
   'stats.wk.learning': 'learning',
   'stats.wk.trackedTotal': 'tracked total',
   'stats.wk.note':
-    'Grade words from any dictionary popup, or pull your progress from Anki (card intervals → familiar / known). Turn on "Highlight new words" in the reader to see them tinted.',
+    'Grade words from any dictionary popup, or pull your progress from Anki (card intervals → familiar / known). Turn on "Vocabulary colors" in the reader to see them tinted.',
   'stats.level.title': 'Estimated level',
   'level.tier.beginner': 'Beginner',
   'level.tier.advanced': 'Advanced',

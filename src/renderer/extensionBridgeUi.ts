@@ -61,6 +61,14 @@ export function openExtensionSettings(): void {
   }, 80);
 }
 
+/** Settings → Shortcuts (the global-shortcut notice's "Open Shortcuts"). */
+export function openShortcutSettings(): void {
+  openAppSection('settings');
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('settings:navigate', { detail: { page: 'shortcuts' } }));
+  }, 80);
+}
+
 /** Open full clipboard history panel (same as Ctrl+Shift+V / taskbar). */
 export function openClipboardHistory(): void {
   window.dispatchEvent(new CustomEvent('clipboard:open'));

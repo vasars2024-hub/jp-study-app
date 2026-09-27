@@ -5,7 +5,9 @@ import type { Catalog } from '../core';
 export const COMMANDS_UI_ZH: Catalog = {
   // ---- shortcut manager: toasts, custom-shortcut descriptions, undo ----
   'shortcut.toast.startupHelper': '启动助手：{error}',
-  'shortcut.toast.global': '{name}：{error}',
+  'shortcut.notice.refused.inUse': '有 {count} 个快捷键无法注册：其他应用正在使用。',
+  'shortcut.notice.refused.mixed': '有 {count} 个快捷键无法注册。打开“快捷键”查看原因。',
+  'shortcut.notice.refused.open': '打开快捷键',
   'shortcut.global.tag': '全局',
   'shortcut.global.changeInShortcuts': '在快捷键中更改',
   'shortcut.global.error.inUse': 'Windows 拒绝了 {chord}：另一个应用正在使用它。请换一个组合键。',
@@ -147,8 +149,8 @@ export const COMMANDS_UI_ZH: Catalog = {
   'cmd.note.window.zoomIn': '缩放整个界面。单独的 Ctrl+= 是阅读器字号，仅作用于当前书籍。',
   'cmd.note.window.zoomOut': '缩放整个界面。单独的 Ctrl+- 是阅读器字号，仅作用于当前书籍。',
   'cmd.note.window.zoomReset': '将界面缩放恢复为 100%。阅读器保留自己的字号。',
-  'cmd.note.reader.highlightWord': '个人颜色标记（注释），与 新词/学习中/已掌握 的词汇等级无关。',
-  'cmd.note.reader.toggleWordHighlight': 'LingQ 风格的 新词/学习中/熟悉/已掌握 颜色。',
+  'cmd.note.reader.highlightWord': '个人颜色标记（注释），与 未学习/学习中/熟悉/已掌握 的词汇等级无关。',
+  'cmd.note.reader.toggleWordHighlight': 'LingQ 风格的 未学习/学习中/熟悉/已掌握 颜色。',
   'cmd.note.reader.toggleTranslation': '在 EPUB 和漫画阅读器中切换仅原文与双语/译文叠加。Ctrl+Shift+T 属于工具箱（重新打开上一个工具）。',
   'cmd.note.reader.selectSentence': '按住组合键并点击一个词即可选中整句（以 。！？ 等结束，不以逗号结束）。不会打开词典弹窗。可自由重新绑定——支持鼠标按键和修饰键。',
   'cmd.note.reader.pageNext': '在小说/EPUB 阅读器中可用。空格键保留给抽认卡翻面。',

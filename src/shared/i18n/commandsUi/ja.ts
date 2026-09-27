@@ -5,7 +5,9 @@ import type { Catalog } from '../core';
 export const COMMANDS_UI_JA: Catalog = {
   // ---- shortcut manager: toasts, custom-shortcut descriptions, undo ----
   'shortcut.toast.startupHelper': 'スタートアップヘルパー: {error}',
-  'shortcut.toast.global': '{name}：{error}',
+  'shortcut.notice.refused.inUse': '{count} 件のショートカットを登録できませんでした。別のアプリが使用しています。',
+  'shortcut.notice.refused.mixed': '{count} 件のショートカットを登録できませんでした。理由は「ショートカット」で確認できます。',
+  'shortcut.notice.refused.open': 'ショートカットを開く',
   'shortcut.global.tag': 'システム全体',
   'shortcut.global.changeInShortcuts': 'ショートカットで変更',
   'shortcut.global.error.inUse': 'Windows が {chord} を拒否しました。別のアプリが使用中です。別のキーを選んでください。',
@@ -147,8 +149,8 @@ export const COMMANDS_UI_JA: Catalog = {
   'cmd.note.window.zoomIn': '画面全体を拡大します。単独の Ctrl+= はリーダーの文字サイズで、本ごとに設定されます。',
   'cmd.note.window.zoomOut': '画面全体を縮小します。単独の Ctrl+- はリーダーの文字サイズで、本ごとに設定されます。',
   'cmd.note.window.zoomReset': '画面の拡大率を 100% に戻します。リーダーは独自の文字サイズを保ちます。',
-  'cmd.note.reader.highlightWord': '自分用の色マーク（注釈）です。未学習・学習中・既知の語彙レベルとは別です。',
-  'cmd.note.reader.toggleWordHighlight': 'LingQ 風の 未学習・学習中・なじみあり・既知 の色分けです。',
+  'cmd.note.reader.highlightWord': '自分用の色マーク（注釈）です。未学習・学習中・見覚えあり・習得済みの語彙レベルとは別です。',
+  'cmd.note.reader.toggleWordHighlight': 'LingQ 風の 未学習・学習中・見覚えあり・習得済み の色分けです。',
   'cmd.note.reader.toggleTranslation': 'EPUB とマンガのリーダーで、原文のみと対訳・翻訳の重ね表示を切り替えます。Ctrl+Shift+T はツールボックス（最後のツールを開き直す）用です。',
   'cmd.note.reader.selectSentence': 'コードを押しながら単語をクリックすると、文全体（。！？などで終わり、読点では終わらない）を選択します。辞書ポップアップは開きません。自由に割り当て直せます — マウスボタンや修飾キーも使えます。',
   'cmd.note.reader.pageNext': '小説・EPUB リーダーで使えます。Space はフラッシュカードの裏返し用です。',

@@ -269,7 +269,7 @@ export const GRAMMAR_TAXONOMY_JA: Catalog = {
   'grammar.lists.queue': '学習キュー',
   'grammar.familiarity.new': '未学習',
   'grammar.familiarity.learning': '学習中',
-  'grammar.familiarity.familiar': 'なじみ',
+  'grammar.familiarity.familiar': '見覚えあり',
   'grammar.familiarity.known': '習得済み',
   'grammar.familiarity.hint': '各項目の習熟度。練習セッションの結果、または手動で設定されます。',
   'grammar.familiarity.setLabel': '習熟度',

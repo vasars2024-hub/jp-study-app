@@ -30,6 +30,7 @@ export type IconName =
   | 'skip-forward'
   | 'repeat'
   | 'shuffle'
+  | 'swap'
   | 'search'
   | 'folder'
   | 'chevron'
@@ -126,6 +127,8 @@ export const BASE_PATHS: Record<IconName, string> = {
   'skip-forward': 'M13 5l9 7-9 7z M3 5l9 7-9 7z',
   repeat: 'M4 7h11a4 4 0 0 1 4 4v1 M7 4 4 7l3 3 M20 17H9a4 4 0 0 1-4-4v-1 M17 20l3-3-3-3',
   shuffle: 'M3 6h4l12 12h2 M3 18h4l4-5 M15 6h4 M15 6l4-2 M15 6l4 2 M15 18l4 2 M15 18l4-2',
+  // Two opposed arrows: exchange the two sides (Translate's source/target).
+  swap: 'M4 8h15 M15 4l4 4-4 4 M20 16H5 M9 12l-4 4 4 4',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-4.5-4.5',
   folder: 'M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z',
   chevron: 'M9 5l7 7-7 7',

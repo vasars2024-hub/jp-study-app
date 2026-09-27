@@ -264,7 +264,7 @@ export default function TranslateView() {
                   aria-label={t('translate.menu.swap')}
                   title={t('translate.menu.swap')}
                 >
-                  <Icon name="globe" size={13} />
+                  <Icon name="swap" size={13} />
                 </button>
                 <label>
                   {t('translate.lang.to')}
@@ -431,7 +431,7 @@ export default function TranslateView() {
                 aria-label={t('translate.menu.swap')}
                 title={t('translate.menu.swap')}
               >
-                <Icon name="globe" size={14} />
+                <Icon name="swap" size={14} />
               </button>
               <div
                 className="dict-lang-toggle"
@@ -515,7 +515,7 @@ export default function TranslateView() {
                   t('translate.working')
                 ) : (
                   <>
-                    <Icon name="globe" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+                    <Icon name="translate" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
                     {t('translate.menu.translate')}
                   </>
                 )}

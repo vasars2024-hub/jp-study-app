@@ -289,7 +289,7 @@ export const BLANC_UI_ZH: Catalog = {
   'blanc.native.forecast.legend.knowledge': '掌握分布',
   'blanc.native.forecast.words': { other: '{count} 个词' },
   'blanc.native.forecast.noWords': '尚无跟踪的单词。',
-  'blanc.native.forecast.level.new': '新词',
+  'blanc.native.forecast.level.new': '未学习',
   'blanc.native.forecast.level.learning': '学习中',
   'blanc.native.forecast.level.familiar': '熟悉',
   'blanc.native.forecast.level.known': '已掌握',
