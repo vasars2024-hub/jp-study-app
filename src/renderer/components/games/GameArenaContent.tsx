@@ -17,6 +17,7 @@ import { getUserLevel, onLevelChange } from '../../levelService';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import Icon from '../Icons';
+import { GAME_ICONS } from '../../games/gameIcons';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import { addDeckCards, loadDeckFolders, onDeckChanged } from '../../flashcardDeck';
 import { onLevelListsChanged } from '../../levelLists';
@@ -478,7 +479,7 @@ export function GameArena() {
                 setSession(null);
               }}
             >
-              <Icon name={game.mode === 'writing' ? 'edit' : game.mode === 'arcade' ? 'sparkle' : 'dice'} size={16} />
+              <Icon name={GAME_ICONS[game.id]} size={16} />
               {/* Names and blurbs are cut with an ellipsis in the narrow list (Russian
                   names run long), so the full text is the tooltip. */}
               <span title={`${t(gameTitleKey(game.id, studyLang))} — ${t(gameDescKey(game.id, studyLang))}`}>
