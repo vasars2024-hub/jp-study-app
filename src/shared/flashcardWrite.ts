@@ -81,7 +81,7 @@ function normalize(text: string): string {
   return text
     .normalize('NFKC')
     .toLowerCase()
-    .replace(/[.,!?;:"'`‘’“”()[\]{}・…、。]/g, '')
+    .replace(/[.,!?;:"'`‘’“”()[\]{}・…、。〜~]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -118,6 +118,16 @@ function glossSenses(meaning: string): string[] {
   }
   senses.push(meaning.slice(start).trim());
   return senses.filter(Boolean);
+}
+
+/** "to eat (food)" -> "to eat": a clarification in brackets is not part of the word. */
+function withoutParentheticals(sense: string): string {
+  let out = sense;
+  for (let previous = ''; previous !== out; ) {
+    previous = out;
+    out = out.replace(/[(（][^()（）]*[)）]/g, ' ');
+  }
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 function levenshtein(a: string, b: string, cap: number): number {
@@ -195,7 +205,9 @@ export function buildWriteQuestion(
     direction,
     prompt: japanese,
     answer: meaning,
-    accepted: [meaning, ...glossSenses(meaning)],
+    accepted: [
+      ...new Set([meaning, ...glossSenses(meaning), ...glossSenses(meaning).map(withoutParentheticals)]),
+    ].filter(Boolean),
     hint: reading && reading !== japanese ? reading : '',
     answerLength: meaning.length,
   };

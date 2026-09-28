@@ -111,6 +111,17 @@ describe('gradeWrittenAnswer', () => {
     expect(gradeWrittenAnswer('see', q).verdict).toBe('correct');
   });
 
+  it('accepts a gloss typed without its bracketed clarification', () => {
+    const q = question('jp-to-meaning', card({ id: 'p', word: '食べる', reading: 'たべる', meaning: 'to eat (food)' }));
+    expect(gradeWrittenAnswer('eat', q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('food', q).verdict).toBe('wrong');
+  });
+
+  it('ignores a leading tilde on a bound form', () => {
+    const q = question('meaning-to-jp', card({ id: 't', word: '〜たい', reading: '〜たい', meaning: 'want to' }));
+    expect(gradeWrittenAnswer('たい', q).verdict).toBe('correct');
+  });
+
   it.each([['(', ')'], ['（', '）']])('keeps nested %s%s examples together while splitting outer senses', (open, close) => {
     const sense = `to watch ${open}movies, programs ${open}TV${close}${close}`;
     const many = card({ id: 'm', word: '見る', reading: 'みる', meaning: `${sense}/to see` });
