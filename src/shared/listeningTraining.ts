@@ -35,10 +35,14 @@ export function evaluateJapaneseDictation(
   answerValue: string,
   expectedValue: string,
 ): DictationEvaluation {
-  const answer = normalizeJapaneseDictation(answerValue).slice(0, 500);
-  const expected = normalizeJapaneseDictation(expectedValue).slice(0, 500);
-  const longest = Math.max(answer.length, expected.length);
-  const distance = editDistance([...answer], [...expected]);
+  // Use the same character units for the limit, distance, and score: kanji
+  // such as 𠮷 occupy two UTF-16 code units but count as one answer character.
+  const answerChars = [...normalizeJapaneseDictation(answerValue)].slice(0, 500);
+  const expectedChars = [...normalizeJapaneseDictation(expectedValue)].slice(0, 500);
+  const answer = answerChars.join('');
+  const expected = expectedChars.join('');
+  const longest = Math.max(answerChars.length, expectedChars.length);
+  const distance = editDistance(answerChars, expectedChars);
   return {
     exact: !!expected && answer === expected,
     score: longest ? Math.max(0, Math.round((1 - distance / longest) * 100)) : 0,

@@ -29,4 +29,22 @@ describe('Japanese listening training', () => {
     expect(evaluateJapaneseDictation('あ'.repeat(700), 'あ'.repeat(700)).answer).toHaveLength(500);
     expect(evaluateJapaneseDictation('', '').score).toBe(0);
   });
+
+  it('counts supplementary kanji as single characters when scoring mistakes', () => {
+    expect(evaluateJapaneseDictation('', '𠮷').score).toBe(0);
+    expect(evaluateJapaneseDictation('猫', '𠮷').score).toBe(0);
+    expect(evaluateJapaneseDictation('𠮷田', '𠮷野')).toMatchObject({ exact: false, score: 50 });
+    expect(evaluateJapaneseDictation('𠮷野', '𠮷田').score).toBe(50);
+    expect(evaluateJapaneseDictation('𠮷田', '𠮷田')).toMatchObject({ exact: true, score: 100 });
+  });
+
+  it('keeps whole supplementary kanji at the 500-character limit', () => {
+    const text = 'あ'.repeat(499) + '𠮷';
+    expect(evaluateJapaneseDictation(text + '田', text + '野')).toMatchObject({
+      answer: text,
+      expected: text,
+      exact: true,
+      score: 100,
+    });
+  });
 });
