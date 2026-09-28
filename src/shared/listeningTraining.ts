@@ -9,7 +9,8 @@ export function normalizeJapaneseDictation(value: string): string {
   return value
     .normalize('NFKC')
     .toLocaleLowerCase('ja')
-    .replace(/[\s、。！？!?・「」『』（）()[\]【】〈〉《》…‥ー.,'":;：；]/gu, '');
+    // Keep ー: vowel length changes the word (ビル versus ビール).
+    .replace(/[\s、。！？!?・「」『』（）()[\]【】〈〉《》…‥.,'":;：；]/gu, '');
 }
 
 function editDistance(left: string[], right: string[]): number {

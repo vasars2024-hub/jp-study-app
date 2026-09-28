@@ -297,6 +297,14 @@ describe('videoCoreStudy', () => {
       .toMatchObject({ exact: true, score: 100 });
   });
 
+  it('counts missing or extra long-vowel marks as dictation mistakes', () => {
+    expect(evaluateVideoCoreDictation('ビル', 'ビール')).toMatchObject({ exact: false, score: 67 });
+    expect(evaluateVideoCoreDictation('ビール', 'ビル')).toMatchObject({ exact: false, score: 67 });
+    expect(evaluateVideoCoreDictation('「ﾋﾞｰﾙ！」', 'ビール')).toMatchObject({
+      exact: true, score: 100, answer: 'ビール', expected: 'ビール',
+    });
+  });
+
   it('converts Whisper seconds to exact VideoCore milliseconds on a new track', () => {
     expect(nextVideoCoreWhisperTrackNumber([1, 3, 4])).toBe(5);
     expect(whisperCuesToVideoCoreEvents([

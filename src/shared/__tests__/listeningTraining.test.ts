@@ -17,6 +17,14 @@ describe('Japanese listening training', () => {
     });
   });
 
+  it('counts missing or extra long-vowel marks as dictation mistakes', () => {
+    expect(evaluateJapaneseDictation('ビル', 'ビール')).toMatchObject({ exact: false, score: 67 });
+    expect(evaluateJapaneseDictation('ビール', 'ビル')).toMatchObject({ exact: false, score: 67 });
+    expect(evaluateJapaneseDictation('「ﾋﾞｰﾙ！」', 'ビール')).toMatchObject({
+      exact: true, score: 100, answer: 'ビール', expected: 'ビール',
+    });
+  });
+
   it('bounds oversized input and handles empty prompts', () => {
     expect(evaluateJapaneseDictation('あ'.repeat(700), 'あ'.repeat(700)).answer).toHaveLength(500);
     expect(evaluateJapaneseDictation('', '').score).toBe(0);
