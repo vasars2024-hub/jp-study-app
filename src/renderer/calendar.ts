@@ -168,9 +168,6 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
     }
     const stopKey = ev.recurrenceEndDate && ev.recurrenceEndDate < endKey ? ev.recurrenceEndDate : endKey;
     const cursor = new Date(base);
-    // Fast-forward the cursor to the first occurrence on/after `start` so long
-    // ranges (e.g. a daily event created a year ago) don't require iterating
-    // from the beginning of time.
     const stepDays =
       ev.recurrence === 'daily' ? 1 : ev.recurrence === 'weekly' ? 7 : ev.recurrence === 'custom' ? Math.max(1, ev.recurrenceInterval ?? 1) : 0;
     if (ev.recurrence === 'monthly') {
@@ -189,6 +186,13 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
       continue;
     }
     if (stepDays > 0) {
+      // Skip past occurrences before applying the iteration limit. Count local
+      // calendar dates via UTC components so DST and `start`'s time of day
+      // cannot shift the recurrence or skip an occurrence on the first day.
+      const daysToStart = (Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())
+        - Date.UTC(base.getFullYear(), base.getMonth(), base.getDate())) / 86_400_000;
+      const skipped = Math.max(0, Math.ceil(daysToStart / stepDays));
+      cursor.setDate(cursor.getDate() + skipped * stepDays);
       let guard = 0;
       while (toDateKey(cursor) <= stopKey && guard < 3660) {
         const key = toDateKey(cursor);

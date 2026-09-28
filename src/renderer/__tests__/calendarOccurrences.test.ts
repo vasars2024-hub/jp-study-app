@@ -47,3 +47,37 @@ describe('monthly calendar occurrences', () => {
     expect(expandOccurrences([monthlyEvent('2026-03-31')], day, day)).toEqual([]);
   });
 });
+
+describe('long-running calendar occurrences', () => {
+  it.each([
+    ['daily', undefined, ['2026-01-01', '2026-01-02', '2026-01-03']],
+    ['weekly', undefined, ['2026-01-03']],
+    ['custom', 2, ['2026-01-02']],
+  ] as const)('keeps %s study events visible years after creation', (recurrence, recurrenceInterval, expected) => {
+    const event: CalendarEvent = { ...monthlyEvent('1950-01-07'), recurrence, recurrenceInterval };
+    expect(expandOccurrences([event], new Date(2026, 0, 1, 12), new Date(2026, 0, 3))
+      .map((o) => o.occurrenceDate)).toEqual(expected);
+  });
+
+  it('honors the recurrence end when jumping to a later range', () => {
+    const event: CalendarEvent = { ...monthlyEvent('2000-01-01', '2026-01-02'), recurrence: 'daily' };
+    expect(expandOccurrences([event], new Date(2026, 0, 1), new Date(2026, 0, 5))
+      .map((o) => o.occurrenceDate)).toEqual(['2026-01-01', '2026-01-02']);
+    expect(expandOccurrences([event], new Date(2026, 0, 3), new Date(2026, 0, 5))).toEqual([]);
+  });
+
+  it.each([
+    [2, 7, ['2026-03-07', '2026-03-09']],
+    [9, 31, ['2026-10-31', '2026-11-02']],
+  ] as const)('preserves custom day spacing across clock changes in month %i', (month, day, expected) => {
+    const event: CalendarEvent = { ...monthlyEvent('2000-01-01'), recurrence: 'custom', recurrenceInterval: 2 };
+    expect(expandOccurrences([event], new Date(2026, month, day, 12), new Date(2026, month, day + 3))
+      .map((o) => o.occurrenceDate)).toEqual(expected);
+  });
+
+  it('does not add occurrences before an event starts', () => {
+    const event: CalendarEvent = { ...monthlyEvent('2026-01-03'), recurrence: 'daily' };
+    expect(expandOccurrences([event], new Date(2026, 0, 1), new Date(2026, 0, 4))
+      .map((o) => o.occurrenceDate)).toEqual(['2026-01-03', '2026-01-04']);
+  });
+});
