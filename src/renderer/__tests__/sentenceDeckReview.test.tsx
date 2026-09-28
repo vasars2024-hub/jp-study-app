@@ -93,6 +93,7 @@ describe('ListenMode', () => {
   afterEach(async () => {
     await act(async () => { root?.unmount(); });
     host?.remove();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -186,6 +187,43 @@ describe('ListenMode', () => {
     expect(played).toHaveLength(2);
     expect(played[1]).toBe(played[0]);
   }, 20_000);
+
+  it.each(['initial', 'repeat'] as const)('offers a retry when %s playback fails', async (failure) => {
+    vi.useFakeTimers();
+    seed();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () => { root.render(<ListenMode deck="all" />); });
+    const toggle = host.querySelector<HTMLButtonElement>('[data-listen-action="toggle"]')!;
+
+    if (failure === 'initial') playSpy.mockRejectedValueOnce(new Error('Cannot decode clip'));
+    await act(async () => { toggle.click(); });
+    await flush();
+
+    if (failure === 'repeat') {
+      const repeat = [...host.querySelectorAll('select')].find((el) => [...el.options].some((o) => o.textContent === '3 times'))!;
+      await act(async () => {
+        repeat.value = '2';
+        repeat.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      playSpy.mockRejectedValueOnce(new Error('Cannot replay clip'));
+      await act(async () => { lastAudio()?.onended?.(new Event('ended')); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      await flush();
+    }
+
+    expect(host.querySelector('.flash-audio-error')?.textContent).toBeTruthy();
+    expect(toggle.textContent).toBe('Play');
+    expect(host.querySelector('[data-listen-index]')?.getAttribute('data-listen-index')).toBe('0');
+
+    const attempts = playSpy.mock.calls.length;
+    await act(async () => { toggle.click(); });
+    await flush();
+    expect(playSpy).toHaveBeenCalledTimes(attempts + 1);
+    expect(toggle.textContent).toBe('Pause');
+    expect(host.querySelector('.flash-audio-error')).toBeNull();
+  });
 
   it('says so when the deck has no audio at all', async () => {
     addDeckCards([card({ sentence: '音声なし。' })]);

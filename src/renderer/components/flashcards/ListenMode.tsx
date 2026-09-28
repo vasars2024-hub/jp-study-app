@@ -111,6 +111,12 @@ export default function ListenMode({ onExit, deck = 'all' }: {
     const card = queue[index];
     if (!card) return;
     let alive = true;
+    const playbackFailed = (): void => {
+      if (!alive) return;
+      setError(t('flash.audioPlaybackFailed'));
+      // A rejected play never fires `ended`; leave the learner a working retry.
+      setPlaying(false);
+    };
     cardAudio.stop();
     void clipSource(card).then((src) => {
       if (!alive) return;
@@ -127,14 +133,14 @@ export default function ListenMode({ onExit, deck = 'all' }: {
         playsRef.current += 1;
         setHeard(true);
         if (playsRef.current < repeatsRef.current) {
-          timerRef.current = setTimeout(() => { void audio.play()?.catch(() => undefined); }, gapRef.current * 1000);
+          timerRef.current = setTimeout(() => { void audio.play()?.catch(playbackFailed); }, gapRef.current * 1000);
           return;
         }
         timerRef.current = setTimeout(advance, gapRef.current * 1000);
       };
       const started = audio.play();
       if (started && typeof started.catch === 'function') {
-        started.catch(() => { if (alive) setError(t('flash.audioPlaybackFailed')); });
+        started.catch(playbackFailed);
       }
     });
     return () => {
