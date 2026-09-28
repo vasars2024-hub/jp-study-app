@@ -953,7 +953,7 @@ export default function MiniShell({
                       aria-label={name}
                       aria-pressed={cfg.density === id}
                     >
-                      <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+                      <span aria-hidden="true">{(Array.from(name)[0] ?? '').toUpperCase()}</span>
                     </button>
                   );
                 })}
@@ -976,7 +976,7 @@ export default function MiniShell({
                       aria-label={name}
                       aria-pressed={cfg.tint === id}
                     >
-                      <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+                      <span aria-hidden="true">{(Array.from(name)[0] ?? '').toUpperCase()}</span>
                     </button>
                   );
                 })}
