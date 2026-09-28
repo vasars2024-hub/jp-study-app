@@ -71,6 +71,28 @@ describe('building a match round', () => {
     expect(round.skipped).toBe(0);
   });
 
+  it.each([
+    [
+      { id: 'a', word: 'がくせい', meaning: 'student' },
+      { id: 'b', word: 'か\u3099くせい', meaning: 'pupil' },
+    ],
+    [
+      { id: 'a', word: '喫茶店', meaning: 'café' },
+      { id: 'b', word: 'カフェ', meaning: 'cafe\u0301' },
+    ],
+  ])('excludes visually identical Unicode variants on either side', (first, duplicate) => {
+    const round = buildMatchRound([
+      first, duplicate, { id: 'c', word: '犬', meaning: 'dog' },
+    ], { random: () => 0.99 });
+
+    expect(round.refusal).toBeNull();
+    expect(round.pairs).toBe(2);
+    expect(round.skipped).toBe(1);
+    expect(round.tiles.some((tile) => tile.pairId === 'b')).toBe(false);
+    expect(round.tiles.find((tile) => tile.id === 'a:prompt')?.text).toBe(first.word);
+    expect(round.tiles.find((tile) => tile.id === 'a:answer')?.text).toBe(first.meaning);
+  });
+
   it('says WHY an unusable deck produced no round', () => {
     // The two refusals need different things from the user, so they are
     // distinguished rather than collapsed into one empty state.

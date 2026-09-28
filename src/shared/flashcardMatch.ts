@@ -72,8 +72,8 @@ function shuffle<T>(items: readonly T[], random: () => number): T[] {
  *
  * Both sides are deduplicated, not just the answers: two cards reading 食べる
  * are as unplayable as two meaning "to eat". The comparison is
- * case-insensitive and whitespace-folded, because "To Eat" and "to eat" are the
- * same tile to a person looking at the board.
+ * Unicode-normalized, case-insensitive and whitespace-folded, because composed
+ * and decomposed kana (or "To Eat" and "to eat") look like the same tile.
  */
 export function buildMatchRound(
   cards: readonly MatchSourceCard[],
@@ -90,8 +90,8 @@ export function buildMatchRound(
   for (const card of shuffle(cards, random)) {
     const prompt = matchPromptText(card);
     const answer = matchAnswerText(card);
-    const promptKey = prompt.toLowerCase().replace(/\s+/g, ' ');
-    const answerKey = answer.toLowerCase().replace(/\s+/g, ' ');
+    const promptKey = prompt.normalize('NFC').toLowerCase().replace(/\s+/g, ' ');
+    const answerKey = answer.normalize('NFC').toLowerCase().replace(/\s+/g, ' ');
     if (!prompt || !answer || seenPrompt.has(promptKey) || seenAnswer.has(answerKey)) {
       skipped += 1;
       continue;
