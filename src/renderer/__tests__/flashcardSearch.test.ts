@@ -35,6 +35,25 @@ describe('searchDeckCards', () => {
     expect(searchDeckCards(deck, 'dog').map((c) => c.word)).toEqual(['犬']);
   });
 
+  it.each([
+    ['ガクセイ', 'ｶﾞｸｾｲ'],
+    ['ｶﾞｸｾｲ', 'ガクセイ'],
+    ['がくせい', 'か\u3099くせい'],
+    ['か\u3099くせい', 'がくせい'],
+    ['Ｄｏｇ', 'dog'],
+    ['Dog', 'ＤＯＧ'],
+  ])('finds %s when searching for the equivalent Unicode text %s', (meaning, query) => {
+    const cards = [card({ word: 'entry', meaning }), card({ word: 'unrelated' })];
+    expect(searchDeckCards(cards, query)).toEqual([cards[0]]);
+    expect(cards[0].meaning).toBe(meaning);
+  });
+
+  it('preserves meaningful differences in kana when searching', () => {
+    const cards = [card({ word: 'ビル' }), card({ word: 'ビール' })];
+    expect(searchDeckCards(cards, 'ﾋﾞｰﾙ')).toEqual([cards[1]]);
+    expect(searchDeckCards(cards, 'ヒル')).toEqual([]);
+  });
+
   it('matches sentence and front/back fields', () => {
     expect(searchDeckCards(deck, '毎朝').map((c) => c.word)).toEqual(['走る']);
     expect(searchDeckCards(deck, 'A side').map((c) => c.word)).toEqual(['front-only']);

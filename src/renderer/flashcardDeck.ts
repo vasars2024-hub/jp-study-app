@@ -1641,15 +1641,15 @@ export function reviewSessionCounts(
 /**
  * Substring search across every field a user can read on a card, so typing a
  * deck name, a reading, or a remembered fragment of the mined sentence all
- * narrow the same box. Case-insensitive; an empty or whitespace query is not a
- * filter and returns the input untouched.
+ * narrow the same box. Case- and Unicode-width-insensitive (including composed
+ * dakuten); an empty or whitespace query returns the input untouched.
  */
 export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlashcard[] {
-  const q = query.trim().toLowerCase();
+  const q = query.normalize('NFKC').trim().toLowerCase();
   if (!q) return cards;
   return cards.filter((c) =>
     [c.word, c.reading, c.meaning, c.front, c.back, c.sentence, c.bookTitle].some((field) =>
-      field ? field.toLowerCase().includes(q) : false,
+      field ? field.normalize('NFKC').toLowerCase().includes(q) : false,
     ),
   );
 }
