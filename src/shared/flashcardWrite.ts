@@ -101,10 +101,22 @@ function normalizeJapanese(text: string): string {
 
 /** Split a gloss into its senses. Any one of them, typed alone, is correct. */
 function glossSenses(meaning: string): string[] {
-  return meaning
-    .split(/[;/、]|,(?![^(]*\))/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const senses: string[] = [];
+  let depth = 0;
+  let start = 0;
+  // Separators in usage examples belong to the sense, not to new answers:
+  // "to watch (TV/movies)" must never accept just "movies".
+  for (let i = 0; i < meaning.length; i += 1) {
+    const char = meaning[i];
+    if (char === '(' || char === '（') depth += 1;
+    else if (char === ')' || char === '）') depth = Math.max(0, depth - 1);
+    else if (depth === 0 && /[;/、,]/.test(char)) {
+      senses.push(meaning.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  senses.push(meaning.slice(start).trim());
+  return senses.filter(Boolean);
 }
 
 function levenshtein(a: string, b: string, cap: number): number {

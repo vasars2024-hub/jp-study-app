@@ -102,6 +102,24 @@ describe('gradeWrittenAnswer', () => {
     expect(grade.verdict).toBe('correct');
   });
 
+  it.each(['/', ';', '、', ','])('keeps parenthetical examples containing "%s" inside their sense', (separator) => {
+    const sense = `to watch (TV${separator} movies)`;
+    const many = card({ id: 'm', word: '見る', reading: 'みる', meaning: `to see; ${sense}` });
+    const q = question('jp-to-meaning', many);
+    expect(gradeWrittenAnswer(sense, q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('movies', q).verdict).toBe('wrong');
+    expect(gradeWrittenAnswer('see', q).verdict).toBe('correct');
+  });
+
+  it.each([['(', ')'], ['（', '）']])('keeps nested %s%s examples together while splitting outer senses', (open, close) => {
+    const sense = `to watch ${open}movies, programs ${open}TV${close}${close}`;
+    const many = card({ id: 'm', word: '見る', reading: 'みる', meaning: `${sense}/to see` });
+    const q = question('jp-to-meaning', many);
+    expect(gradeWrittenAnswer(sense, q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('programs TV', q).verdict).toBe('wrong');
+    expect(gradeWrittenAnswer('see', q).verdict).toBe('correct');
+  });
+
   it('ignores the infinitive marker and articles on the English side', () => {
     expect(gradeWrittenAnswer('eat', question('jp-to-meaning')).verdict).toBe('correct');
     const house = card({ id: 'h', word: '家', reading: 'いえ', meaning: 'a house' });
