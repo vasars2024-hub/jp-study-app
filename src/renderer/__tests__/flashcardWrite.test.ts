@@ -126,6 +126,21 @@ describe('gradeWrittenAnswer', () => {
     expect(gradeWrittenAnswer('house', question('jp-to-meaning', house)).verdict).toBe('correct');
   });
 
+  it.each([
+    ["one's own", 'one’s own'],
+    ['one’s own', "one's own"],
+    ['“cat”', 'cat'],
+    ['cat', '‘cat’'],
+  ])('accepts typographic quotes in %s against %s', (typed, meaning) => {
+    const quoted = card({ id: 'q', word: '自分', meaning });
+    expect(gradeWrittenAnswer(typed, question('jp-to-meaning', quoted)).verdict).toBe('correct');
+  });
+
+  it('still rejects a different word inside typographic quotes', () => {
+    const cat = card({ id: 'q', word: '猫', meaning: '“cat”' });
+    expect(gradeWrittenAnswer('“dog”', question('jp-to-meaning', cat)).verdict).toBe('wrong');
+  });
+
   it('calls a one-letter slip in a long English answer close, not wrong', () => {
     const grade = gradeWrittenAnswer('Chinese charater', question('jp-to-meaning', kanji));
     expect(grade.verdict).toBe('close');

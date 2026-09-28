@@ -74,13 +74,14 @@ export interface WriteGrade {
  *
  * NFKC collapses full-width Latin and half-width kana, which a Japanese IME
  * produces constantly; punctuation goes because a trailing period is not a
- * vocabulary error. Case and runs of whitespace go for the same reason.
+ * vocabulary error. Curly quotes follow the same rule as straight quotes.
+ * Case and runs of whitespace go for the same reason.
  */
 function normalize(text: string): string {
   return text
     .normalize('NFKC')
     .toLowerCase()
-    .replace(/[.,!?;:"'`()[\]{}・…、。]/g, '')
+    .replace(/[.,!?;:"'`‘’“”()[\]{}・…、。]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
