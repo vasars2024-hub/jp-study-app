@@ -130,7 +130,7 @@ function withoutParentheticals(sense: string): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-function levenshtein(a: string, b: string, cap: number): number {
+function levenshtein(a: readonly string[], b: readonly string[], cap: number): number {
   if (Math.abs(a.length - b.length) > cap) return cap + 1;
   let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i += 1) {
@@ -153,7 +153,7 @@ function levenshtein(a: string, b: string, cap: number): number {
  * Length-scaled on purpose: one character out of two is a different Japanese
  * word, not a slip, so short answers get no tolerance at all.
  */
-function typoTolerance(expected: string): number {
+function typoTolerance(expected: readonly string[]): number {
   if (expected.length >= 8) return 2;
   if (expected.length >= 4) return 1;
   return 0;
@@ -201,7 +201,7 @@ export function buildWriteQuestion(
       accepted,
       // The reading IS an accepted answer, so it cannot also be the hint.
       hint: '',
-      answerLength: japanese.length,
+      answerLength: [...japanese].length,
     };
   }
 
@@ -214,7 +214,7 @@ export function buildWriteQuestion(
       ...new Set([meaning, ...glossSenses(meaning), ...glossSenses(meaning).map(withoutParentheticals)]),
     ].filter(Boolean),
     hint: reading && reading !== japanese ? reading : '',
-    answerLength: meaning.length,
+    answerLength: [...meaning].length,
   };
 }
 
@@ -302,10 +302,12 @@ export function gradeWrittenAnswer(typed: string, question: WriteQuestion): Writ
     }
   }
 
+  // Count kanji such as 𠮷 once for both the typo budget and edit distance.
+  const attemptChars = [...attempt];
   for (const candidate of question.accepted) {
-    const expected = fold(candidate);
-    if (!expected) continue;
-    if (levenshtein(attempt, expected, typoTolerance(expected)) <= typoTolerance(expected)) {
+    const expected = [...fold(candidate)];
+    if (!expected.length) continue;
+    if (levenshtein(attemptChars, expected, typoTolerance(expected)) <= typoTolerance(expected)) {
       return { verdict: 'close', matched: null, viaReading: false };
     }
   }

@@ -84,6 +84,11 @@ describe('buildWriteRound', () => {
     expect(recognise.hint).toBe('たべる');
   });
 
+  it('counts a supplementary kanji once in the answer length hint', () => {
+    const name = card({ id: 'y', word: '𠮷野家', meaning: 'Yoshinoya' });
+    expect(question('meaning-to-jp', name).answerLength).toBe(3);
+  });
+
   it('uses the sentence when a card has no word', () => {
     const only = card({ id: 'e', sentence: '雨が降る', meaning: 'it rains' });
     const round = buildWriteRound([only], { direction: 'meaning-to-jp', random: stable });
@@ -189,6 +194,18 @@ describe('gradeWrittenAnswer', () => {
     const neko = card({ id: 'n', word: '猫', reading: 'ねこ', meaning: 'cat' });
     const grade = gradeWrittenAnswer('犬', question('meaning-to-jp', neko));
     expect(grade.verdict).toBe('wrong');
+  });
+
+  it('gives a three-character answer no extra typo tolerance for a supplementary kanji', () => {
+    const name = card({ id: 'y', word: '𠮷野家', meaning: 'Yoshinoya' });
+    const q = question('meaning-to-jp', name);
+    expect(gradeWrittenAnswer('𠮷野家', q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('𠮷野屋', q).verdict).toBe('wrong');
+  });
+
+  it('counts replacing a supplementary kanji as one typo in a longer answer', () => {
+    const sentence = card({ id: 'y', sentence: '𠮷野家です', meaning: 'It is Yoshinoya' });
+    expect(gradeWrittenAnswer('吉野家です', question('meaning-to-jp', sentence)).verdict).toBe('close');
   });
 
   it('REFUSAL: an empty or whitespace-only answer is never graded correct', () => {
