@@ -179,7 +179,11 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
       while (toDateKey(cur) <= stopKey && guard < 1200) {
         const key = toDateKey(cur);
         if (key >= startKey && key <= stopKey) out.push({ ...ev, occurrenceDate: key });
-        cur.setMonth(cur.getMonth() + 1);
+        // Clamp to the next month's last day without losing the original day.
+        // Advancing Jan 31 directly with setMonth would skip February entirely.
+        cur.setMonth(cur.getMonth() + 1, 1);
+        const lastDay = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+        cur.setDate(Math.min(base.getDate(), lastDay));
         guard++;
       }
       continue;
