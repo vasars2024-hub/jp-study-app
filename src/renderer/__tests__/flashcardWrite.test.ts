@@ -23,6 +23,21 @@ function question(direction: 'meaning-to-jp' | 'jp-to-meaning', from = taberu): 
   return round.questions[0];
 }
 
+describe('variant words', () => {
+  const watashi = card({ id: 'w', word: '私、僕', reading: 'わたし', meaning: 'I' });
+
+  it('accepts any one variant listed in the word field', () => {
+    const q = question('meaning-to-jp', watashi);
+    expect(gradeWrittenAnswer('僕', q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('私', q).verdict).toBe('correct');
+  });
+
+  it('never splits a sentence used as the fallback prompt', () => {
+    const q = question('meaning-to-jp', card({ id: 's', sentence: 'はい、そうです', meaning: 'yes, it is' }));
+    expect(gradeWrittenAnswer('はい', q).verdict).not.toBe('correct');
+  });
+});
+
 describe('buildWriteRound', () => {
   it('deals one question per usable card, alternating direction by default', () => {
     const round = buildWriteRound([taberu, kanji], { random: stable });

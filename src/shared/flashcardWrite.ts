@@ -187,7 +187,12 @@ export function buildWriteQuestion(
   if (direction === 'meaning-to-jp') {
     // The reading is accepted but never the canonical answer: a learner who
     // types かんじ knows the word, and still ought to be shown 漢字.
-    const accepted = reading && reading !== japanese ? [japanese, reading] : [japanese];
+    // A word field listing variants ("私、僕") accepts any one of them; a
+    // sentence fallback is never split, its commas are just punctuation.
+    const variants = card.word?.trim() ? glossSenses(japanese) : [];
+    const accepted = [
+      ...new Set([japanese, ...variants, ...(reading && reading !== japanese ? [reading] : [])]),
+    ];
     return {
       cardId: card.id,
       direction,
