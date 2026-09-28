@@ -135,6 +135,34 @@ describe('Flashcards overview', () => {
     expect(search, 'the design-system search field').toBeTruthy();
     expect(host.textContent).not.toMatch(/Recent EPUB cards|Dictionary saves, EPUB deck strip/);
   });
+
+  it.each([
+    { key: 'Enter', isComposing: true },
+    { key: 'Escape', isComposing: true },
+    { key: 'Enter', keyCode: 229 },
+    { key: 'Escape', keyCode: 229 },
+  ])('keeps the folder editor open for an IME key: %j', async (key) => {
+    await mount();
+    await act(async () => host.querySelector<HTMLButtonElement>('.lib-folder-new')?.click());
+    const input = host.querySelector<HTMLInputElement>('.lib-folder-input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '日本語');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { ...key, bubbles: true }));
+    });
+    expect(host.querySelector('.lib-folder-input')).toBe(input);
+    expect(input.value).toBe('日本語');
+    expect(JSON.parse(localStorage.getItem('jp-flashcard-deck')!).folders).toEqual([]);
+
+    // After conversion finishes, a separate Enter saves the completed name.
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(host.querySelector('.lib-folder-input')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('jp-flashcard-deck')!).folders).toContain('日本語');
+  });
 });
 
 describe('the review strip before a card is revealed', () => {
