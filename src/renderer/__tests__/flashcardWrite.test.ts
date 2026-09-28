@@ -162,6 +162,12 @@ describe('gradeWrittenAnswer', () => {
     expect(gradeWrittenAnswer(typed, question('jp-to-meaning', quoted)).verdict).toBe('correct');
   });
 
+  it('ignores Japanese corner brackets around a typed answer', () => {
+    const q = question('meaning-to-jp', card({ id: 'k', word: '猫', reading: 'ねこ', meaning: 'cat' }));
+    expect(gradeWrittenAnswer('「猫」', q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('『ねこ』', q).verdict).toBe('correct');
+  });
+
   it('still rejects a different word inside typographic quotes', () => {
     const cat = card({ id: 'q', word: '猫', meaning: '“cat”' });
     expect(gradeWrittenAnswer('“dog”', question('jp-to-meaning', cat)).verdict).toBe('wrong');

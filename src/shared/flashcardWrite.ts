@@ -81,7 +81,7 @@ function normalize(text: string): string {
   return text
     .normalize('NFKC')
     .toLowerCase()
-    .replace(/[.,!?;:"'`‘’“”()[\]{}・…、。〜~]/g, '')
+    .replace(/[.,!?;:"'`‘’“”()[\]{}「」『』【】〈〉《》・…、。〜~]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
