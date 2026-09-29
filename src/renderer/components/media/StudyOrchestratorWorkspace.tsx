@@ -3267,6 +3267,8 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
                   value={command}
                   onChange={(event) => setCommand(event.currentTarget.value)}
                   onKeyDown={(event) => {
+                    // Enter confirms an IME conversion; it must not run the command yet.
+                    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
                     if (event.key === 'Enter') void runCommand();
                   }}
                   placeholder={t('study.command.placeholder')}

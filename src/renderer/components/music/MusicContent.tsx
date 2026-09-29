@@ -870,7 +870,11 @@ export function MusicYoutubeRow({ state }: { state: MusicState }) {
         placeholder={t('music.yt.placeholder')}
         value={state.ytUrl}
         onChange={(e) => state.setYtUrl(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && void state.downloadYt()}
+        onKeyDown={(e) => {
+          // Enter confirms an IME conversion; it must not start the download yet.
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+          if (e.key === 'Enter') void state.downloadYt();
+        }}
         disabled={!!yt}
       />
       <button
