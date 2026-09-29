@@ -3,7 +3,7 @@ import { mediaHubBackupFilename, mediaHubCanApply } from '../mediaHubStoragePane
 
 describe('Media Hub storage panel workflow guards', () => {
   it('uses a deterministic dated filename for the local backup action', () => {
-    expect(mediaHubBackupFilename(Date.UTC(2026, 6, 23))).toBe('media-hub-backup-2026-07-23.json');
+    expect(mediaHubBackupFilename(new Date(2026, 6, 23, 12).getTime())).toBe('media-hub-backup-2026-07-23.json');
   });
 
   it('only enables apply after a non-noop preview exists', () => {

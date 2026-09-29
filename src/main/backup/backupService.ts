@@ -45,6 +45,7 @@ import { isRendererSnapshotText } from './snapshotText';
 import { drainAtomicWrites, flushAllJsonWriters, freezeAtomicWrites, thawAtomicWrites, writeJsonAtomicSync } from '../atomicJson';
 import { logDiagnostic } from '../errorLog';
 import { mt } from '../i18n';
+import { isoDateLocal } from '../../shared/watchLibrary';
 
 export function backupsDir(): string {
   return path.join(app.getPath('userData'), 'backups');
@@ -164,7 +165,7 @@ async function createManualFromDialog(
   event: IpcMainInvokeEvent,
   args: { includeBookFiles?: boolean; renderer?: unknown },
 ): Promise<CreateBackupReply> {
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = isoDateLocal(Date.now());
   const lastDir = readState().lastManual?.path ? path.dirname(readState().lastManual?.path ?? '') : app.getPath('documents');
   const pick = await dialog.showSaveDialog(parentWindow(event) as BrowserWindow, {
     title: mt('backup.dialog.saveTitle'),
