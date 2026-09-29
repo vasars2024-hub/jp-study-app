@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { MediaItem } from '../../../../shared/types';
-import { WATCH_STATUSES, type WatchStatus, type WatchTitlePatch } from '../../../../shared/watchLibrary';
+import { WATCH_STATUSES, isoDateLocal, type WatchStatus, type WatchTitlePatch } from '../../../../shared/watchLibrary';
 import type { MediaEpisodeGuideEntry } from '../../../../shared/mediaMetadataIpc';
 import { buildLibraryEntries, isWatched, providerEpisodeTitle, watchedFraction } from '../../../../shared/mediaLibraryEntries';
 import { confirmDialog, promptDialog, Select, showToast } from '../../ui';
@@ -686,7 +686,7 @@ export default function GumTitlePage({
     const done = title.status === 'completed';
     void edit(done
       ? { status: 'plan' }
-      : { status: 'completed', addWatchDate: { date: new Date().toISOString().slice(0, 10) } },
+      : { status: 'completed', addWatchDate: { date: isoDateLocal(Date.now()) } },
     done ? undefined : t('gum.title.markedWatched', { title: title.title }));
   };
 
@@ -1067,7 +1067,7 @@ export default function GumTitlePage({
                 type="button"
                 className="gum-btn gum-btn--ghost"
                 disabled={busy}
-                onClick={() => void edit({ addWatchDate: { date: new Date().toISOString().slice(0, 10), rewatch: history.length > 0 } }, t('gum.history.logged'))}
+                onClick={() => void edit({ addWatchDate: { date: isoDateLocal(Date.now()), rewatch: history.length > 0 } }, t('gum.history.logged'))}
               >
                 <GumIcon name="plus" size={12} /> {t('gum.history.log')}
               </button>

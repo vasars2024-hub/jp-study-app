@@ -437,6 +437,12 @@ export function isoDateUtc(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+/** `YYYY-MM-DD` of an epoch-ms instant on the machine's local calendar — what "today" means to the learner. */
+export function isoDateLocal(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** The key the matcher compares titles by — the same fold `MediaItem.seriesKey` uses. */
 export function watchTitleKey(title: unknown): string {
   return normalizeMediaTitleKey(title);
