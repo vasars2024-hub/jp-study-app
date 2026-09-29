@@ -137,7 +137,10 @@ const GLOSS_RT_MAX = 48;
 
 function clampGloss(text: string): string {
   if (text.length <= GLOSS_RT_MAX) return text;
-  return `${text.slice(0, GLOSS_RT_MAX - 1).trimEnd()}…`;
+  // Don't cut between the halves of a surrogate pair (supplementary kanji, emoji).
+  const last = text.charCodeAt(GLOSS_RT_MAX - 2);
+  const end = last >= 0xd800 && last <= 0xdbff ? GLOSS_RT_MAX - 2 : GLOSS_RT_MAX - 1;
+  return `${text.slice(0, end).trimEnd()}…`;
 }
 
 /**

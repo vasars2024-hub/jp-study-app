@@ -26,7 +26,10 @@ const PROFILE_GROUP_KEYS = {
 
 function formatProfileDescription(description: string | undefined): string {
   if (!description) return '';
-  return ` — ${description.slice(0, 48)}${description.length > 48 ? '…' : ''}`;
+  if (description.length <= 48) return ` — ${description}`;
+  // Don't cut between the halves of a surrogate pair (supplementary kanji, emoji).
+  const last = description.charCodeAt(47);
+  return ` — ${description.slice(0, last >= 0xd800 && last <= 0xdbff ? 47 : 48)}…`;
 }
 
 function CreateProfileModal({
