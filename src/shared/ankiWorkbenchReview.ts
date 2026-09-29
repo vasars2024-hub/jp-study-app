@@ -113,7 +113,10 @@ const LABEL_MAX = 40;
 function noteLabel(note: AnkiDraftNote | undefined, noteId: string): string {
   const text = note?.fields.find((f) => f.normalized.trim() !== '')?.normalized.trim();
   if (!text) return noteId;
-  return text.length > LABEL_MAX ? `${text.slice(0, LABEL_MAX)}…` : text;
+  if (text.length <= LABEL_MAX) return text;
+  // Don't cut between the halves of a surrogate pair (supplementary kanji, emoji).
+  const last = text.charCodeAt(LABEL_MAX - 1);
+  return `${text.slice(0, last >= 0xd800 && last <= 0xdbff ? LABEL_MAX - 1 : LABEL_MAX)}…`;
 }
 
 function sameTags(a: readonly string[], b: readonly string[]): boolean {

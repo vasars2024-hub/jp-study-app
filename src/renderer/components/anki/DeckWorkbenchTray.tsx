@@ -196,7 +196,10 @@ const DIFF_PREVIEW_ROWS = 5;
 const DIFF_CHARS = 120;
 
 function clip(text: string): string {
-  return text.length > DIFF_CHARS ? `${text.slice(0, DIFF_CHARS)}…` : text;
+  if (text.length <= DIFF_CHARS) return text;
+  // Don't cut between the halves of a surrogate pair (supplementary kanji, emoji).
+  const last = text.charCodeAt(DIFF_CHARS - 1);
+  return `${text.slice(0, last >= 0xd800 && last <= 0xdbff ? DIFF_CHARS - 1 : DIFF_CHARS)}…`;
 }
 
 let nextActionSeq = 0;
