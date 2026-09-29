@@ -157,7 +157,15 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
   return (
     <div className="wgt wgt-habits">
       <div className="wgt-todo-add">
-        <input value={draft} placeholder={t('widgets.habitTracker.addPlaceholder')} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <input
+          value={draft}
+          placeholder={t('widgets.habitTracker.addPlaceholder')}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+            if (e.key === 'Enter') add();
+          }}
+        />
         <button className="wgt-btn-icon" onClick={add} title={t('common.add')} aria-label={t('common.add')}>+</button>
       </div>
       <ul className="wgt-habit-list">
