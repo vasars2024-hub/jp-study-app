@@ -46,6 +46,11 @@ export function checkAchievements(): void {
     state = { lastStreakCelebrated: state.lastStreakCelebrated, lastDailyCharsBucket: 0, dayKey: today };
   }
 
+  // A broken streak re-arms the milestones above it, so rebuilding to 7 days celebrates again.
+  if (summary.streak < state.lastStreakCelebrated) {
+    state.lastStreakCelebrated = STREAK_MILESTONES.filter((m) => m <= summary.streak).pop() ?? 0;
+  }
+
   // Celebrate the highest newly crossed streak milestone (not every step at once).
   let bestStreak = 0;
   for (const m of STREAK_MILESTONES) {
