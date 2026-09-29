@@ -305,6 +305,7 @@ export default function PlaylistEditor({
             value={renameDraft}
             onChange={(e) => setRenameDraft(e.target.value)}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
               if (e.key === 'Enter') commitRename();
               if (e.key === 'Escape') setRenaming(false);
             }}
