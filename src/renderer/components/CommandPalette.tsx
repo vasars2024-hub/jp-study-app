@@ -480,6 +480,8 @@ export default function CommandPalette() {
   );
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // Enter and arrows belong to the IME while choosing a conversion candidate.
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
