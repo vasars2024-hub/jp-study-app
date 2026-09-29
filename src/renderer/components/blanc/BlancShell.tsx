@@ -844,6 +844,8 @@ function BlancReadPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => voi
             aria-label={t('blanc.shell.read.newFolder')}
             onChange={(event) => setNewFolder(event.target.value)}
             onKeyDown={(event) => {
+              // Enter confirms an IME conversion; it must not create the folder yet.
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
               if (event.key === 'Enter') void createFolder();
             }}
           />

@@ -1010,6 +1010,8 @@ export function FrequencyExplorerPanel() {
               placeholder={t('blanc.ready.frequency.placeholder')}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
+                // Enter confirms an IME conversion; it must not look up yet.
+                if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
                 if (event.key === 'Enter') void lookup();
               }}
             />
@@ -1286,6 +1288,8 @@ export function KanjiInspectorPanel() {
               placeholder="一"
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {
+                // Enter confirms an IME conversion; it must not inspect yet.
+                if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
                 if (event.key === 'Enter') void inspect();
               }}
             />
@@ -1393,6 +1397,8 @@ export function BlancYoutubePanel() {
               placeholder="https://www.youtube.com/playlist?list=…"
               onChange={(event) => setUrl(event.target.value)}
               onKeyDown={(event) => {
+                // Enter confirms an IME conversion; it must not add the playlist yet.
+                if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
                 if (event.key === 'Enter') void addPlaylist();
               }}
             />
