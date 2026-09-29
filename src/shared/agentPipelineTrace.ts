@@ -103,7 +103,10 @@ const MAX_VALUE = 60;
 function renderValue(value: unknown): string {
   if (value === null) return 'null';
   if (typeof value === 'string') {
-    return value.length > MAX_VALUE ? `"${value.slice(0, MAX_VALUE)}…"` : `"${value}"`;
+    if (value.length <= MAX_VALUE) return `"${value}"`;
+    // Don't cut between the halves of a surrogate pair.
+    const last = value.charCodeAt(MAX_VALUE - 1);
+    return `"${value.slice(0, last >= 0xd800 && last <= 0xdbff ? MAX_VALUE - 1 : MAX_VALUE)}…"`;
   }
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value)) return `[${value.length}]`;

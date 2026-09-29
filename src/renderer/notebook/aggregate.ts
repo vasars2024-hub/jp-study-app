@@ -193,7 +193,11 @@ export function aggregateNotebook(sources: NotebookSources = {}): NotebookOvervi
       id: `lc-${script.id}`,
       stream: 'transcript',
       title: scriptTitle(script, now, seen),
-      detail: text.length > 240 ? `${text.slice(0, 240)}…` : text,
+      detail:
+        text.length > 240
+          ? // Don't cut between the halves of a surrogate pair.
+            `${text.slice(0, (text.charCodeAt(239) & 0xfc00) === 0xd800 ? 239 : 240)}…`
+          : text,
       folder: 'Live captions',
       ts: script.startedAt,
       origin: 'app',

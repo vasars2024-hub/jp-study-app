@@ -42,7 +42,10 @@ const TITLE_MAX = 64;
 
 function title(sentence: string): string {
   const trimmed = sentence.trim();
-  return trimmed.length <= TITLE_MAX ? trimmed : `${trimmed.slice(0, TITLE_MAX - 1)}…`;
+  if (trimmed.length <= TITLE_MAX) return trimmed;
+  // Don't cut between the halves of a surrogate pair (supplementary kanji, emoji).
+  const last = trimmed.charCodeAt(TITLE_MAX - 2);
+  return `${trimmed.slice(0, last >= 0xd800 && last <= 0xdbff ? TITLE_MAX - 2 : TITLE_MAX - 1)}…`;
 }
 
 /**
