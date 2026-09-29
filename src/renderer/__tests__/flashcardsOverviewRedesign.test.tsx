@@ -66,6 +66,7 @@ afterEach(() => {
   root?.unmount();
   root = null;
   document.body.replaceChildren();
+  document.documentElement.removeAttribute('data-materials');
 });
 
 async function mount(): Promise<void> {
@@ -136,15 +137,18 @@ describe('Flashcards overview', () => {
     expect(host.textContent).not.toMatch(/Recent EPUB cards|Dictionary saves, EPUB deck strip/);
   });
 
-  it.each([
+  it.each(['default', 'aero'].flatMap((material) => [
     { key: 'Enter', isComposing: true },
     { key: 'Escape', isComposing: true },
     { key: 'Enter', keyCode: 229 },
     { key: 'Escape', keyCode: 229 },
-  ])('keeps the folder editor open for an IME key: %j', async (key) => {
+  ].map((key) => ({ material, key }))))('keeps the folder editor open for an IME key: %j', async ({ material, key }) => {
+    document.documentElement.setAttribute('data-materials', material);
     await mount();
-    await act(async () => host.querySelector<HTMLButtonElement>('.lib-folder-new')?.click());
-    const input = host.querySelector<HTMLInputElement>('.lib-folder-input')!;
+    const triggerSelector = material === 'aero' ? '.aero-flash-folder-add' : '.lib-folder-new';
+    const inputSelector = material === 'aero' ? '.aero-flash-folder-edit input' : '.lib-folder-input';
+    await act(async () => host.querySelector<HTMLButtonElement>(triggerSelector)?.click());
+    const input = host.querySelector<HTMLInputElement>(inputSelector)!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '日本語');
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -152,7 +156,7 @@ describe('Flashcards overview', () => {
     await act(async () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { ...key, bubbles: true }));
     });
-    expect(host.querySelector('.lib-folder-input')).toBe(input);
+    expect(host.querySelector(inputSelector)).toBe(input);
     expect(input.value).toBe('日本語');
     expect(JSON.parse(localStorage.getItem('jp-flashcard-deck')!).folders).toEqual([]);
 
@@ -160,7 +164,7 @@ describe('Flashcards overview', () => {
     await act(async () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
-    expect(host.querySelector('.lib-folder-input')).toBeNull();
+    expect(host.querySelector(inputSelector)).toBeNull();
     expect(JSON.parse(localStorage.getItem('jp-flashcard-deck')!).folders).toContain('日本語');
   });
 });

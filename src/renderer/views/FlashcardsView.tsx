@@ -334,6 +334,8 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                       value={newFolderName}
                       onChange={(e) => state.setNewFolderName(e.target.value)}
                       onKeyDown={(e) => {
+                        // Enter/Escape belong to the IME while converting a folder name.
+                        if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                         if (e.key === 'Enter') state.createFolder();
                         if (e.key === 'Escape') {
                           state.setCreatingFolder(false);
