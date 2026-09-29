@@ -166,7 +166,11 @@ export default function UnifiedSearchPanel() {
           value={query}
           placeholder={t('unifiedSearch.placeholder')}
           onChange={(event) => setQuery(event.currentTarget.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submit(); } }}
+          onKeyDown={(event) => {
+            // Enter confirms an IME conversion; it must not search yet.
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+            if (event.key === 'Enter') { event.preventDefault(); submit(); }
+          }}
         />
       </div>
       {(suggestions.favorites.length > 0 || suggestions.recent.length > 0) && (

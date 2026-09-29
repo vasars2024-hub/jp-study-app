@@ -76,6 +76,8 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
+                // Enter confirms an IME conversion; it must not search yet.
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                 if (e.key === 'Enter') void refreshJiten();
               }}
               placeholder={t('novelsView.searchPlaceholder')}
