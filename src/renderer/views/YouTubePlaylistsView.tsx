@@ -91,6 +91,7 @@ function CommitInput({
       }}
       onBlur={commit}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
         if (e.key === 'Enter') {
           e.preventDefault();
           commit();
@@ -779,7 +780,10 @@ export default function YouTubePlaylistsView() {
                     className="gram-search"
                     value={folderName}
                     onChange={(e) => setFolderName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && void addFolder()}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                      if (e.key === 'Enter') void addFolder();
+                    }}
                     placeholder={t('yt.folder.placeholder')}
                   />
                   {/* Icon-only, and `Icon` is aria-hidden — without a label the one control

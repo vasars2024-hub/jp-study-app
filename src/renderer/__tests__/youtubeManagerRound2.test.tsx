@@ -70,6 +70,7 @@ const api = {
   ytList: vi.fn(),
   ytRefreshAll: vi.fn(),
   ytSetPlaylistPrefs: vi.fn(),
+  ytSaveFolder: vi.fn(),
   ytCancelDownloads: vi.fn(async () => []),
   ytPauseDownload: vi.fn(async () => []),
   ytDownloadQueue: vi.fn(async () => [] as YtQueueEntry[]),
@@ -105,6 +106,7 @@ beforeEach(() => {
   for (const fn of Object.values(api)) (fn as ReturnType<typeof vi.fn>).mockClear();
   api.ytRefreshAll.mockResolvedValue({ store: makeStore(), newVideoIds: [], errors: [] });
   api.ytSetPlaylistPrefs.mockImplementation(async () => makeStore());
+  api.ytSaveFolder.mockImplementation(async () => makeStore());
   installResizeObserver();
   installReadingSurfaceApi(api);
 });
@@ -152,6 +154,60 @@ describe('YouTube manager (audit r2)', () => {
       input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     });
     expect(api.ytSetPlaylistPrefs).toHaveBeenCalledWith('p1', { channelTitle: 'My C' });
+  });
+
+  it.each([
+    { isComposing: true },
+    { keyCode: 229 },
+  ])('keeps channel-name drafts during IME confirmation and cancellation (%j)', async (ime) => {
+    const el = await mount(makeStore());
+    await act(async () => {
+      (el.querySelector('.yt-pl-item:not(.yt-plan-item)') as HTMLElement).click();
+    });
+    const input = [...el.querySelectorAll<HTMLInputElement>('.yt-pref input')].find(
+      (i) => i.placeholder === 'Channel name',
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '日本語');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    for (const key of ['Enter', 'Escape']) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...ime });
+      await act(async () => { input.dispatchEvent(event); });
+      expect(event.defaultPrevented).toBe(false);
+      expect(input.value).toBe('日本語');
+      expect(api.ytSetPlaylistPrefs).not.toHaveBeenCalled();
+    }
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(api.ytSetPlaylistPrefs).toHaveBeenCalledExactlyOnceWith('p1', { channelTitle: '日本語' });
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(input.value).toBe('');
+  });
+
+  it.each([
+    { isComposing: true },
+    { keyCode: 229 },
+  ])('creates a folder only after IME confirmation has finished (%j)', async (ime) => {
+    const el = await mount(makeStore());
+    const input = el.querySelector<HTMLInputElement>('.yt-folder-add input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '日本語');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...ime });
+    await act(async () => { input.dispatchEvent(event); });
+    expect(event.defaultPrevented).toBe(false);
+    expect(api.ytSaveFolder).not.toHaveBeenCalled();
+    expect(input.value).toBe('日本語');
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(api.ytSaveFolder).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: '日本語' }));
+    expect(input.value).toBe('');
   });
 
   it('#17 shows the queue with per-item Cancel, and the window stays usable while it runs', async () => {
