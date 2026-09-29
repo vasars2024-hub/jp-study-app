@@ -21,7 +21,11 @@ const EXCERPT_CHARS = 160;
 
 function excerpt(note: string): string {
   const oneLine = note.replace(/\s+/g, ' ').trim();
-  return oneLine.length > EXCERPT_CHARS ? `${oneLine.slice(0, EXCERPT_CHARS)}…` : oneLine;
+  if (oneLine.length <= EXCERPT_CHARS) return oneLine;
+  // Don't cut between the halves of a surrogate pair (supplementary kanji, emoji).
+  const last = oneLine.charCodeAt(EXCERPT_CHARS - 1);
+  const end = last >= 0xd800 && last <= 0xdbff ? EXCERPT_CHARS - 1 : EXCERPT_CHARS;
+  return `${oneLine.slice(0, end)}…`;
 }
 
 function noteRowKey(note: LexiconNote): string {
