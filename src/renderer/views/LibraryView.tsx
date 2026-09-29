@@ -1126,7 +1126,11 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 placeholder={t('library.import.urlPlaceholder')}
                 value={webUrl}
                 onChange={(e) => setWebUrl(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void importFromUrl()}
+                onKeyDown={(e) => {
+                  // Enter confirms an IME conversion; it must not import yet.
+                  if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                  if (e.key === 'Enter') void importFromUrl();
+                }}
                 disabled={webBusy}
               />
               <button className="btn primary" disabled={webBusy || !webUrl.trim()} onClick={() => void importFromUrl()}>

@@ -544,6 +544,8 @@ export function ReadingSiteDetail({
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder={t('reading.fetch.placeholder')}
                 onKeyDown={(e) => {
+                  // Enter confirms an IME conversion; it must not fetch yet.
+                  if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                   if (e.key === 'Enter') void fetchChapter();
                 }}
               />
