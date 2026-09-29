@@ -7289,8 +7289,9 @@ export const zh: Catalog = {
   'aiStudio.starredCount': {
     other: '已加星 {count}',
   },
-  'aiStudio.estimate.preset': 'AI 创造 {items} 个词汇项。每项生成 {cards} 卡 → 约 {total} 张（{items} × {cards}）。',
-  'aiStudio.estimate.presetOneCard': 'AI 创造 {items} 个词汇项。每项生成 {cards} 卡 → 约 {total} 张（{items} × {cards}）。',
+  'aiStudio.estimate.preset': {
+    other: 'AI 创造 {items} 个词汇项。每项生成 {count} 卡 → 约 {total} 张（{items} × {count}）。',
+  },
   'aiStudio.estimate.dictionary': {
     other: '{count} 个词典词 × 各 {cards} 卡 → 约 {total} 卡。',
   },

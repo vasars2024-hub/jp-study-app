@@ -7330,8 +7330,9 @@ export const ja: Catalog = {
   'aiStudio.starredCount': {
     other: 'スター済み {count}',
   },
-  'aiStudio.estimate.preset': 'AI が語彙項目を {items} 件考案します。各項目が {cards} カードになり → およそ {total} 枚（{items} × {cards}）。',
-  'aiStudio.estimate.presetOneCard': 'AI が語彙項目を {items} 件考案します。各項目が {cards} カードになり → およそ {total} 枚（{items} × {cards}）。',
+  'aiStudio.estimate.preset': {
+    other: 'AI が語彙項目を {items} 件考案します。各項目が {count} カードになり → およそ {total} 枚（{items} × {count}）。',
+  },
   'aiStudio.estimate.dictionary': {
     other: '辞書の語 {count} × 各 {cards} カード → およそ {total} カード。',
   },

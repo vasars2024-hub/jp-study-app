@@ -923,9 +923,9 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         </div>
         <p className="muted collapse-lead">
           {generationSource === 'preset'
-            ? t(cardsPerWord === 1 ? 'aiStudio.estimate.presetOneCard' : 'aiStudio.estimate.preset', {
+            ? t('aiStudio.estimate.preset', {
                 items: wordCount,
-                cards: cardsPerWord,
+                count: cardsPerWord,
                 total: estimatedCards,
               })
             : t('aiStudio.estimate.dictionary', {

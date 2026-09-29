@@ -7455,8 +7455,10 @@ export const en: Catalog = {
     one: '{count} starred',
     other: '{count} starred',
   },
-  'aiStudio.estimate.preset': 'AI invents {items} vocabulary items. Each item becomes {cards} cards → approx {total} total ({items} × {cards}).',
-  'aiStudio.estimate.presetOneCard': 'AI invents {items} vocabulary items. Each item becomes {cards} card → approx {total} total ({items} × {cards}).',
+  'aiStudio.estimate.preset': {
+    one: 'AI invents {items} vocabulary items. Each item becomes {count} card → approx {total} total ({items} × {count}).',
+    other: 'AI invents {items} vocabulary items. Each item becomes {count} cards → approx {total} total ({items} × {count}).',
+  },
   'aiStudio.estimate.dictionary': {
     one: '{count} dictionary word × {cards} cards each → approx {total} cards.',
     other: '{count} dictionary words × {cards} cards each → approx {total} cards.',

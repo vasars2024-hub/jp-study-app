@@ -8054,8 +8054,12 @@ export const ru: Catalog = {
     many: '{count} в избранном',
     other: '{count} в избранном',
   },
-  'aiStudio.estimate.preset': 'ИИ придумывает {items} лексических элементов. Каждый даёт {cards} карт → около {total} всего ({items} × {cards}).',
-  'aiStudio.estimate.presetOneCard': 'ИИ придумывает {items} лексических элементов. Каждый даёт {cards} карту → около {total} всего ({items} × {cards}).',
+  'aiStudio.estimate.preset': {
+    one: 'ИИ придумывает {items} лексических элементов. Каждый даёт {count} карту → около {total} всего ({items} × {count}).',
+    few: 'ИИ придумывает {items} лексических элементов. Каждый даёт {count} карты → около {total} всего ({items} × {count}).',
+    many: 'ИИ придумывает {items} лексических элементов. Каждый даёт {count} карт → около {total} всего ({items} × {count}).',
+    other: 'ИИ придумывает {items} лексических элементов. Каждый даёт {count} карты → около {total} всего ({items} × {count}).',
+  },
   'aiStudio.estimate.dictionary': {
     one: '{count} слово словаря × по {cards} карт → около {total} карт.',
     few: '{count} слова словаря × по {cards} карт → около {total} карт.',
