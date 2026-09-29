@@ -23,6 +23,14 @@ function question(direction: 'meaning-to-jp' | 'jp-to-meaning', from = taberu): 
   return round.questions[0];
 }
 
+describe('full-width separators', () => {
+  it.each(['私／僕', '私，僕', '私；僕'])('accepts either variant of %s', (word) => {
+    const q = question('meaning-to-jp', card({ id: 'w', word, meaning: 'I' }));
+    expect(gradeWrittenAnswer('僕', q).verdict).toBe('correct');
+    expect(gradeWrittenAnswer('私', q).verdict).toBe('correct');
+  });
+});
+
 describe('variant words', () => {
   const watashi = card({ id: 'w', word: '私、僕', reading: 'わたし', meaning: 'I' });
 

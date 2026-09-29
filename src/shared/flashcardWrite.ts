@@ -111,7 +111,7 @@ function glossSenses(meaning: string): string[] {
     const char = meaning[i];
     if (char === '(' || char === '（') depth += 1;
     else if (char === ')' || char === '）') depth = Math.max(0, depth - 1);
-    else if (depth === 0 && /[;/、,]/.test(char)) {
+    else if (depth === 0 && /[;/、,；，／]/.test(char)) {
       senses.push(meaning.slice(start, i).trim());
       start = i + 1;
     }
