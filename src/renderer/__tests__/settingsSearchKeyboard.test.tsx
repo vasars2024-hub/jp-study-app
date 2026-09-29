@@ -67,6 +67,7 @@ async function mount() {
     input()?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     focusIn(input() as Element);
   });
+  return navigated;
 }
 
 async function mountWithoutFocus() {
@@ -125,6 +126,49 @@ describe('Settings search: only a user focus opens the suggestion panel', () => 
 });
 
 describe('Settings search — keyboard reachability of the suggestion panel', () => {
+  it.each([
+    { key: 'Enter', isComposing: true },
+    { key: 'ArrowDown', isComposing: true },
+    { key: 'ArrowUp', isComposing: true },
+    { key: 'Escape', isComposing: true },
+    { key: 'Enter', keyCode: 229 },
+    { key: 'ArrowDown', keyCode: 229 },
+    { key: 'ArrowUp', keyCode: 229 },
+    { key: 'Escape', keyCode: 229 },
+  ])('leaves IME candidate keys alone: %j', async (init) => {
+    const navigated = await mount();
+    const el = input() as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, 'theme');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // Start on the second result so either arrow would visibly change selection.
+    await act(async () => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    const selected = () => document.querySelector('.os-set-search-item[aria-selected="true"]');
+    const before = selected();
+    expect(items().length).toBeGreaterThan(1);
+    expect(before).toBe(items()[1]);
+    const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true });
+    await act(async () => { el.dispatchEvent(event); });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(navigated).toEqual([]);
+    expect(el.value).toBe('theme');
+    expect(panel()).not.toBeNull();
+    expect(selected()).toBe(before);
+
+    // Once conversion ends, ordinary Enter still selects and clears the query.
+    await act(async () => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(navigated).toHaveLength(1);
+    expect(el.value).toBe('');
+    expect(panel()).toBeNull();
+  });
+
   // Two cases, deliberately, because they pin different halves and one of them alone does
   // not discriminate. A browser fires focusout THEN focusin, and the focusin cancels the
   // pending close on its own — so a run that dispatches both passes even with the

@@ -119,6 +119,8 @@ const SettingsSearch = forwardRef<
   };
 
   const onKeyDown = (ev: KeyboardEvent) => {
+    // Candidate confirmation, navigation and cancellation belong to the IME.
+    if (ev.nativeEvent.isComposing || ev.nativeEvent.keyCode === 229) return;
     if (!open && (ev.key === 'ArrowDown' || ev.key === 'Enter') && query.trim()) {
       dismissed.current = false;
       setOpen(true);
