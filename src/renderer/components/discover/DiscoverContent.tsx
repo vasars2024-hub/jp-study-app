@@ -575,6 +575,8 @@ export function DiscoveryControls({ state }: { state: DiscoveryState }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
+              // Enter confirms an IME conversion; it must not search yet.
+              if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
               if (e.key === 'Enter') submitQuery();
             }}
             placeholder={t(mediaType === 'manga'
