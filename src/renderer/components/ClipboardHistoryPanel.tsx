@@ -45,6 +45,13 @@ function matchesFilter(e: ClipboardEntry, f: FilterKey): boolean {
 }
 
 const COLLAPSE_LEN = 220;
+
+/** First COLLAPSE_LEN units, never cutting a surrogate pair (supplementary kanji, emoji) in half. */
+function collapsedText(text: string): string {
+  const last = text.charCodeAt(COLLAPSE_LEN - 1);
+  const end = last >= 0xd800 && last <= 0xdbff ? COLLAPSE_LEN - 1 : COLLAPSE_LEN;
+  return text.slice(0, end);
+}
 /**
  * Row pitch of the windowed list (card + gap). The card is laid out to this
  * height; a long or expanded text scrolls inside it (see `.cbh-vlist`).
@@ -66,7 +73,7 @@ function EntryCard({
   const [expanded, setExpanded] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
   const isLong = entry.text.length > COLLAPSE_LEN;
-  const shown = expanded || !isLong ? entry.text : `${entry.text.slice(0, COLLAPSE_LEN)}…`;
+  const shown = expanded || !isLong ? entry.text : `${collapsedText(entry.text)}…`;
 
   const copyAgain = () => void navigator.clipboard.writeText(entry.text);
   const copyPlain = () => void navigator.clipboard.writeText(entry.text.replace(/\s+/g, ' ').trim());
