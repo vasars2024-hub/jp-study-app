@@ -265,7 +265,10 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
           value={draft}
           placeholder={t('widgets.todo.addPlaceholder')}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && add()}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+            if (e.key === 'Enter') add();
+          }}
         />
         <button className="wgt-btn-icon" onClick={add} title={t('common.add')} aria-label={t('common.add')}>+</button>
       </div>
