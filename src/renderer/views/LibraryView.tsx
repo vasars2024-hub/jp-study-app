@@ -1227,6 +1227,8 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                       setFolderErr('');
                     }}
                     onKeyDown={(e) => {
+                      // Enter confirms an IME conversion; it must not create the folder yet.
+                      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                       if (e.key === 'Enter') void createFolder();
                       if (e.key === 'Escape') {
                         setCreating(false);
@@ -1593,6 +1595,8 @@ export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }:
                 setFolderErr('');
               }}
               onKeyDown={(e) => {
+                // Enter confirms an IME conversion; it must not create the folder yet.
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                 if (e.key === 'Enter') void createFolder();
                 if (e.key === 'Escape') {
                   setCreating(false);
