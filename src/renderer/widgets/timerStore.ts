@@ -61,9 +61,11 @@ export function resetTimer(state: TimerState, durationMs = state.durationMs): Ti
   return { ...state, running: false, startedAt: null, baseMs: 0, durationMs, finishedAt: null };
 }
 
-/** A new duration from the widget's settings; applied only while idle so a running clock never jumps. */
+/** Apply settings while idle or finished, preserving running and paused progress. */
 export function withDuration(state: TimerState, durationMs: number): TimerState {
-  if (state.running || state.baseMs > 0 || state.durationMs === durationMs) return state;
+  if (state.running || state.durationMs === durationMs) return state;
+  if (state.finishedAt !== null) return resetTimer(state, durationMs);
+  if (state.baseMs > 0) return state;
   return { ...state, durationMs };
 }
 

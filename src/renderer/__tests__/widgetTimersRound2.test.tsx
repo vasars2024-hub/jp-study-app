@@ -19,6 +19,7 @@ import {
   startTimer,
   tickTimers,
   timerRemainingMs,
+  withDuration,
 } from '../widgets/timerStore';
 import { Countdown } from '../widgets/productivity';
 import { Calculator } from '../widgets/utility';
@@ -91,6 +92,29 @@ describe('widget timers', () => {
     setTimer('b', idleTimer('stopwatch'));
     expect(getTimer('a')?.running).toBe(true);
     expect(getTimer('b')?.running).toBe(false);
+  });
+
+  it('uses updated minutes when restarting a completed countdown', async () => {
+    const done = settleTimer(startTimer(idleTimer('countdown', 60_000), 0), 60_000).state;
+    setTimer('completed', done);
+    const host = await mount(<Countdown settings={{ minutes: 2 }} setSettings={() => undefined} size={{ w: 200, h: 120 }} instanceId="completed" />);
+    expect(host.querySelector('.wgt-pomo-time')?.textContent).toBe('02:00');
+    expect(host.querySelector('.wgt-flash')).toBeNull();
+    const start = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Start');
+    await act(async () => { start?.click(); });
+    const running = getTimer('completed');
+    expect(running?.running).toBe(true);
+    expect(running?.durationMs).toBe(120_000);
+    expect(timerRemainingMs(running!, running!.startedAt! + 60_000)).toBe(60_000);
+  });
+
+  it('preserves running and paused countdown progress when minutes change', () => {
+    const running = startTimer(idleTimer('countdown', 60_000), 0);
+    expect(withDuration(running, 120_000)).toBe(running);
+    const paused = { ...idleTimer('countdown', 60_000), baseMs: 30_000 };
+    expect(withDuration(paused, 120_000)).toBe(paused);
+    const done = settleTimer(running, 60_000).state;
+    expect(withDuration(done, 60_000)).toBe(done);
   });
 });
 
