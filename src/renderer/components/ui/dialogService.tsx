@@ -136,6 +136,8 @@ function PromptDialog({ opts, onDone }: { opts: PromptOptions; onDone: (value: s
         placeholder={opts.placeholder}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
+          // Enter confirms the IME candidate before it submits the prompt.
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
           if (e.key === 'Enter') {
             e.preventDefault();
             e.stopPropagation();
