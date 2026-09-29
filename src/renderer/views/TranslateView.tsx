@@ -306,7 +306,11 @@ export default function TranslateView() {
                     }}
                     onSelect={onSourceSelect}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
+                      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        void run();
+                      }
                     }}
                     placeholder={PLACEHOLDERS[source]}
                   />
@@ -475,7 +479,11 @@ export default function TranslateView() {
                   }}
                   onSelect={onSourceSelect}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
+                    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void run();
+                    }
                   }}
                   placeholder={`${PLACEHOLDERS[source]}  (Ctrl+Enter)`}
                 />
