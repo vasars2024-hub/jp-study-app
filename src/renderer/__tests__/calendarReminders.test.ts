@@ -8,6 +8,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalendarEvent } from '../calendar';
+import { getOverdueReminders } from '../calendar';
+import { LS_KEYS } from '../storage/storage';
 import {
   CALENDAR_REMINDER_STATE_KEY,
   CALENDAR_REMINDER_TICK_MS,
@@ -178,6 +180,34 @@ describe('calendar reminders — the scheduler', () => {
     expect(isPrimaryShellWindow('?popout=calendar')).toBe(false);
     expect(isPrimaryShellWindow('?blanc=1')).toBe(false);
     expect(isPrimaryShellWindow('?desk=1&displayKey=x')).toBe(false);
+  });
+});
+
+describe('calendar — overdue agenda reminders', () => {
+  it.each(['none', 'daily'] as const)('keeps a %s study session visible until its end', (recurrence) => {
+    localStorage.setItem(LS_KEYS.calendarEvents, JSON.stringify([
+      event({ id: 'study', recurrence, date: recurrence === 'daily' ? '2026-09-01' : '2026-09-15' }),
+    ]));
+    const ids = () => getOverdueReminders().map((o) => [o.id, o.occurrenceDate]);
+    vi.setSystemTime(new Date(2026, 8, 15, 9, 44));
+    expect(ids()).toEqual([]);
+    vi.setSystemTime(new Date(2026, 8, 15, 9, 45));
+    expect(ids()).toEqual([['study', '2026-09-15']]);
+    vi.setSystemTime(new Date(2026, 8, 15, 10, 30));
+    expect(ids()).toEqual([['study', '2026-09-15']]);
+    vi.setSystemTime(new Date(2026, 8, 15, 11, 1));
+    expect(ids()).toEqual([]);
+  });
+
+  it('keeps all-day reminders but excludes ended and unreminded events', () => {
+    localStorage.setItem(LS_KEYS.calendarEvents, JSON.stringify([
+      event({ id: 'all-day', allDay: true, reminder: 'at' }),
+      event({ id: 'no-end', endTime: undefined }),
+      event({ id: 'ended', endTime: '10:15' }),
+      event({ id: 'no-reminder', reminder: 'none' }),
+    ]));
+    vi.setSystemTime(new Date(2026, 8, 15, 10, 30));
+    expect(getOverdueReminders().map((o) => o.id)).toEqual(['all-day']);
   });
 });
 

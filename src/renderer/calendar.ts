@@ -268,8 +268,8 @@ export function getTodayOccurrences(): EventOccurrence[] {
 }
 
 /**
- * Reminders whose trigger time has passed for an event that hasn't happened
- * yet. Uses the same trigger rule as the reminder scheduler
+ * Reminders whose trigger time has passed for an event that hasn't ended
+ * yet. Uses the same trigger and end rules as the reminder scheduler
  * (`calendarReminders.ts`), so the Agenda list and the notification can never
  * disagree about when a reminder was due.
  */
@@ -283,7 +283,7 @@ export function getOverdueReminders(withinDays = 14): EventOccurrence[] {
   return occs.filter((o) => {
     const triggerAt = reminderTriggerAt(o);
     if (triggerAt === null) return false;
-    if (eventDateTime(o).getTime() < now.getTime()) return false; // event already happened
+    if (occurrenceEndsAt(o) < now.getTime()) return false;
     return triggerAt <= now.getTime();
   });
 }
