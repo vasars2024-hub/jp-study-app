@@ -21,6 +21,14 @@ const first = () => 0;
 describe('play order', () => {
   const q = ['a', 'b', 'c', 'd', 'e'];
 
+  it.each([{ ids: ['a'] }, { ids: ['a', 'b'] }, { ids: q }])('Previous reaches the last track when the current song is outside queue $ids', ({ ids }) => {
+    const order = linearOrder(ids, 'filtered-out');
+    const previous = stepOrder(order, -1, { repeat: 'off', fromEnded: false });
+    expect(previous.nextId).toBe(ids[ids.length - 1]);
+    expect(previous.order.cursor).toBe(ids.length - 1);
+    expect(stepOrder(order, 1, { repeat: 'off', fromEnded: false }).nextId).toBe(ids[0]);
+  });
+
   it('shuffle keeps the current track first and never repeats until the cycle ends', () => {
     let order = shuffledOrder(q, 'c', first);
     expect(order.ids[0]).toBe('c');

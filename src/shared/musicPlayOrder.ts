@@ -141,7 +141,9 @@ export function stepOrder(order: PlayOrder, dir: 1 | -1, opts: StepOptions): Ste
   const n = order.ids.length;
   if (n === 0) return { order, nextId: null };
   if (!order.shuffled) {
-    const j = order.cursor + dir;
+    // A filtered-out current song has no queue position: enter at the end
+    // on Previous, just as Next enters at the beginning.
+    const j = order.cursor < 0 && dir === -1 ? n - 1 : order.cursor + dir;
     if (j < 0 || j >= n) {
       if (opts.fromEnded && opts.repeat !== 'all') return { order, nextId: null };
       const k = (j + n) % n;
