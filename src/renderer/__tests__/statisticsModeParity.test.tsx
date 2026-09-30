@@ -51,7 +51,7 @@ describe.each(['', 'aero', 'wired'])('Statistics material %s retains the watch c
     expect(watched?.style.height).toBe('100%');
     // Watching must never silently become reading time.
     expect(host.querySelectorAll('.stats-bar-fill:not(.watch)')).toHaveLength(0);
-    expect(host.querySelectorAll('.stats-bar-col')).toHaveLength(14);
+    expect(host.querySelectorAll('.stats-chart:not(.stats-reading-speed .stats-chart) .stats-bar-col')).toHaveLength(14);
   });
 
   it('does not invent watch rows or totals for an empty store', async () => {

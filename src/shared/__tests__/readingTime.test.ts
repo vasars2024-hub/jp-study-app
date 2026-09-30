@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { chapterCharsRemaining, estimateReadingMinutes } from '../readingTime';
+import { chapterCharsRemaining, estimateReadingMinutes, readingCharsPerMinute } from '../readingTime';
+
+describe('measured reading speed', () => {
+  it('uses the ratio of totals and includes the one-minute boundary', () => {
+    expect(readingCharsPerMinute([{ seconds: 60, chars: 500 }])).toBe(500);
+    expect(readingCharsPerMinute([{ seconds: 600, chars: 600 }, { seconds: 60, chars: 6000 }])).toBe(600);
+  });
+
+  it('omits insufficient samples instead of reporting zero speed', () => {
+    for (const day of [
+      { seconds: 59, chars: 500 }, { seconds: 0, chars: 0 },
+      { seconds: 600, chars: 0 }, { seconds: NaN, chars: 500 },
+      { seconds: 60, chars: Infinity },
+    ]) expect(readingCharsPerMinute([day])).toBeNull();
+  });
+});
 
 describe('chapter reading estimate', () => {
   const chapters = [1000, 2000, 3000, 4000].map(chars => ({ chars }));

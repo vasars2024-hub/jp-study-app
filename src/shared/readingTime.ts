@@ -20,6 +20,15 @@ export function estimateReadingMinutes(
   remainingChars: number,
   recent: readonly { seconds: number; chars: number }[],
 ): number | null {
+  const speed = readingCharsPerMinute(recent);
+  if (speed === null || !Number.isFinite(remainingChars)) return null;
+  return Math.ceil(Math.max(0, remainingChars) / speed);
+}
+
+/** Measured characters per minute, weighted by reading time. */
+export function readingCharsPerMinute(
+  recent: readonly { seconds: number; chars: number }[],
+): number | null {
   let seconds = 0;
   let chars = 0;
   for (const day of recent) {
@@ -28,6 +37,6 @@ export function estimateReadingMinutes(
     chars += day.chars;
   }
   // Wait for at least a minute of measured reading before offering an estimate.
-  if (seconds < 60 || chars <= 0 || !Number.isFinite(remainingChars)) return null;
-  return Math.ceil(Math.max(0, remainingChars) * seconds / chars / 60);
+  if (seconds < 60 || chars <= 0) return null;
+  return chars * 60 / seconds;
 }

@@ -60,6 +60,7 @@ import type { NormalizedGrammarPoint } from '../../data/grammar/normalize';
 import type { StudyLang } from '../../../shared/levelScale';
 import { badgeKeyForTier, type LevelEstimate } from '../../../shared/levelEstimate';
 import { useT } from '../../i18n';
+import { readingCharsPerMinute } from '../../../shared/readingTime';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import { useWatchTitles } from '../../useWatchTitles';
 import {
@@ -731,7 +732,37 @@ export function StatsChart({ state }: { state: StatsState }) {
           </span>
         </div>
       )}
+      <ReadingSpeedChart recent={state.summary.recent} />
     </>
+  );
+}
+
+function ReadingSpeedChart({ recent }: { recent: DayStat[] }) {
+  const { t, lang } = useT();
+  const days = recent.map(day => ({ ...day, speed: readingCharsPerMinute([day]) }));
+  const peak = Math.max(1, ...days.map(day => day.speed ?? 0));
+  return (
+    <section className="stats-reading-speed" aria-label={t('stats.readingSpeed.title')}>
+      <h3>{t('stats.readingSpeed.title')}</h3>
+      <p className="muted">{t('stats.readingSpeed.hint')}</p>
+      <div className="stats-chart">
+        {days.map(day => {
+          const label = `${chartDayLabel(day.date, lang)}: ${day.speed === null
+            ? t('stats.readingSpeed.noSample')
+            : t('stats.readingSpeed.value', { speed: formatNumber(Math.round(day.speed)) })}`;
+          return (
+            <div className="stats-bar-col" key={day.date} role="img" aria-label={label} title={label}>
+              <div className="stats-bar-track">
+                <div className="stats-bar-stack">
+                  {day.speed !== null && <div className="stats-bar-fill" style={{ height: `${day.speed / peak * 100}%` }} />}
+                </div>
+              </div>
+              <span className="stats-bar-lbl">{weekdayInitial(day.date, lang)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

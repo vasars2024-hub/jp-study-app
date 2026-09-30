@@ -122,7 +122,8 @@ describe('StatsChart renders its axis in the interface language', () => {
       todaySeconds: 60,
       todayChars: 10,
       todayWatchSeconds: 0,
-      recent: WEEK.map((date) => ({ date, seconds: 60, chars: 10, watchSeconds: 0 })),
+      todayStudySeconds: 0, totalStudySeconds: 0, todayReviews: 0, totalReviews: 0, totalReviewsPassed: 0,
+      recent: WEEK.map((date) => ({ date, seconds: 60, chars: 10, watchSeconds: 0, studySeconds: 0, reviews: 0, reviewsPassed: 0 })),
       books: [],
       shows: [],
     } satisfies StatsSummary;
@@ -133,11 +134,24 @@ describe('StatsChart renders its axis in the interface language', () => {
     await act(async () => {
       root.render(<StatsChart state={state()} />);
     });
-    return [...host.querySelectorAll('.stats-bar-lbl')].map((n) => n.textContent ?? '');
+    return [...host.querySelectorAll(':scope > .stats-chart .stats-bar-lbl')].map((n) => n.textContent ?? '');
   }
 
   it('is English by default', async () => {
     expect(await labels()).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+  });
+
+  it('renders daily reading speed and gaps independently of watched time', async () => {
+    const data = state();
+    data.summary.recent[0] = { ...data.summary.recent[0], seconds: 120, chars: 600, watchSeconds: 3600 };
+    data.summary.recent[1] = { ...data.summary.recent[1], seconds: 59, chars: 600 };
+    await act(async () => root.render(<StatsChart state={data} />));
+    const columns = host.querySelectorAll('.stats-reading-speed .stats-bar-col');
+    expect(columns).toHaveLength(7);
+    expect(columns[0].getAttribute('aria-label')).toContain('300 chars/min');
+    expect(columns[0].getAttribute('title')).toBe(columns[0].getAttribute('aria-label'));
+    expect(columns[1].querySelector('.stats-bar-fill')).toBeNull();
+    expect(columns[1].getAttribute('aria-label')).toContain('Not enough reading data');
   });
 
   it('follows a switch to Japanese', async () => {
@@ -236,9 +250,10 @@ describe('StatsChart names each day for a reader who is not using a mouse', () =
       todaySeconds: 60,
       todayChars: 10,
       todayWatchSeconds: 0,
+      todayStudySeconds: 0, totalStudySeconds: 0, todayReviews: 0, totalReviews: 0, totalReviewsPassed: 0,
       recent: [
-        { date: '2026-09-06', seconds: 600, chars: 4200, watchSeconds: watch ? 900 : 0 },
-        { date: '2026-09-07', seconds: 120, chars: 55, watchSeconds: 0 },
+        { date: '2026-09-06', seconds: 600, chars: 4200, watchSeconds: watch ? 900 : 0, studySeconds: 0, reviews: 0, reviewsPassed: 0 },
+        { date: '2026-09-07', seconds: 120, chars: 55, watchSeconds: 0, studySeconds: 0, reviews: 0, reviewsPassed: 0 },
       ],
       books: [],
       shows: [],
@@ -250,7 +265,7 @@ describe('StatsChart names each day for a reader who is not using a mouse', () =
     await act(async () => {
       root.render(<StatsChart state={chartState(watch)} />);
     });
-    return [...host.querySelectorAll<HTMLElement>('.stats-bar-col')];
+    return [...host.querySelectorAll<HTMLElement>(':scope > .stats-chart .stats-bar-col')];
   }
 
   it('gives every column a role and a name, and the name is the tooltip', async () => {
