@@ -298,6 +298,9 @@ export interface FlashcardsState {
   toggleReviewMixKey: (key: string) => void;
   /** Why "Play in video" could not open the player, or ''. */
   videoNote: string;
+  /** The word of a card the last rating just turned into a leech, or ''. */
+  leechNote: string;
+  dismissLeechNote: () => void;
   playCurrentInVideo: () => Promise<void>;
   audioBusy: boolean;
   audioCancelling: boolean;
@@ -428,6 +431,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewOrder, setReviewOrder] = useState<ReviewOrder>('spread');
   const [reviewMixKeys, setReviewMixKeys] = useState<string[]>([]);
   const [videoNote, setVideoNote] = useState('');
+  const [leechNote, setLeechNote] = useState('');
   /** When a "Listen now" hand-off asked for a listening sitting to start. */
   const pendingListenRef = useRef(0);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -827,6 +831,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   function accept(rating: Exclude<LocalSrsRating, 'again'>): void {
     const card = sessionCards[reviewIndex];
     if (!card || masteredIds.has(card.id)) return;
+    setLeechNote('');
     if (reviewSource === 'epub') rememberForUndo(card.id);
     if (wiredFx) window.dispatchEvent(new CustomEvent('wired:sync-ok'));
     const nextMastered = new Set(masteredIds);
@@ -870,12 +875,16 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   function again(): void {
     const card = sessionCards[reviewIndex];
     if (!card) return;
+    setLeechNote('');
     if (reviewSource === 'epub') rememberForUndo(card.id);
     fireCardFx('resync', 260);
     if (reviewSource === 'epub') {
       const nextDeck = reviewDeckCard(card.id, 'again');
       const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
       setDeck(nextDeck);
+      if (reviewedCard && isLeechCard(reviewedCard) && !isLeechCard(card)) {
+        setLeechNote(reviewedCard.word || reviewedCard.front || '');
+      }
       if (reviewedCard) {
         setSessionCards((cards) => cards.map((candidate) => (
           candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate
@@ -1333,6 +1342,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     reviewMixKeys,
     toggleReviewMixKey,
     videoNote,
+    leechNote,
+    dismissLeechNote: () => setLeechNote(''),
     playCurrentInVideo,
     audioBusy,
     audioCancelling,
@@ -1659,6 +1670,13 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
             </span>
           )}
           {state.audioError && <span className="flash-audio-error" role="status">{state.audioError}</span>}
+          {state.leechNote && (
+            <span className="flash-audio-error" role="status">
+              {t('flash.leechNotice', { word: state.leechNote, n: LEECH_LAPSE_THRESHOLD })}
+              {' '}
+              <button type="button" className="btn small" onClick={state.dismissLeechNote}>{t('flash.leechNoticeDismiss')}</button>
+            </span>
+          )}
         </div>
 
         <div className={`flash-card${cardFx ? ` is-${cardFx}` : ''}`} onClick={flipped ? undefined : state.flip}>

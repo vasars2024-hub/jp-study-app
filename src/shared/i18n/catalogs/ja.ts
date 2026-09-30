@@ -7598,6 +7598,8 @@ export const ja: Catalog = {
   'flash.search.clear': '検索をクリア',
   'flash.search.leeches': '苦手カード: {n}',
   'flash.search.leechesTitle': '{n}回以上忘れたカードを表示',
+  'flash.leechNotice': '苦手カード: 「{word}」を{n}回忘れました。内容の編集や覚え方の追加を検討してください。',
+  'flash.leechNoticeDismiss': '閉じる',
   'flash.search.noMatches': '「{query}」に一致するカードはありません。',
   'flash.search.matchCount': {
     other: '{count}件一致',
