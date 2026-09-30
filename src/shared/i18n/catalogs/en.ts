@@ -8295,6 +8295,7 @@ export const en: Catalog = {
   'companion.achievement.streak': { one: '{count}-day streak', other: '{count}-day streak' },
   'companion.achievement.studyStreak': { one: '{count}-day study streak', other: '{count}-day study streak' },
   'companion.achievement.dailyChars': { one: '{count} character today', other: '{count} characters today' },
+  'companion.achievement.dailyReviews': { one: '{count} card reviewed today', other: '{count} cards reviewed today' },
   'companion.trinket.unlocked': 'New trinket: {name}',
   'companion.trinket.section.title': 'Trinkets',
   'companion.trinket.section.desc':

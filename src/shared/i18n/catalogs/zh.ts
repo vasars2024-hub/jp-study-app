@@ -8087,6 +8087,7 @@ export const zh: Catalog = {
   'companion.achievement.streak': { other: '连续{count}天' },
   'companion.achievement.studyStreak': { other: '连续学习{count}天' },
   'companion.achievement.dailyChars': { other: '今天已读{count}字' },
+  'companion.achievement.dailyReviews': { other: '今天已复习{count}张卡片' },
   'companion.trinket.unlocked': '新纪念品：{name}',
   'companion.trinket.section.title': '纪念品',
   'companion.trinket.section.desc':

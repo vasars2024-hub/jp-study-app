@@ -1,7 +1,7 @@
 /**
  * Study milestone detector — emits companion events for streaks & daily goals (L5).
  */
-import { getSummary, READING_RECORDED_EVENT } from '../stats';
+import { getSummary, READING_RECORDED_EVENT, REVIEW_RECORDED_EVENT } from '../stats';
 import { emitCompanionEvent } from './companionEvents';
 import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
 import { t } from '../i18n';
@@ -11,6 +11,7 @@ const KEY = 'jp-os-achievements-v1';
 interface AchState {
   lastStreakCelebrated: number;
   lastDailyCharsBucket: number;
+  lastDailyReviewsBucket: number;
   dayKey: string;
 }
 
@@ -21,11 +22,16 @@ function dayKey(d = new Date()): string {
 function load(): AchState {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...{ lastStreakCelebrated: 0, lastDailyCharsBucket: 0, dayKey: dayKey() }, ...JSON.parse(raw) };
+    if (raw) {
+      return {
+        ...{ lastStreakCelebrated: 0, lastDailyCharsBucket: 0, lastDailyReviewsBucket: 0, dayKey: dayKey() },
+        ...JSON.parse(raw),
+      };
+    }
   } catch {
     /* ignore */
   }
-  return { lastStreakCelebrated: 0, lastDailyCharsBucket: 0, dayKey: dayKey() };
+  return { lastStreakCelebrated: 0, lastDailyCharsBucket: 0, lastDailyReviewsBucket: 0, dayKey: dayKey() };
 }
 
 function save(s: AchState): void {
@@ -37,13 +43,19 @@ function save(s: AchState): void {
 }
 
 const CHAR_BUCKETS = [500, 2000, 5000, 15000, 40000];
+const REVIEW_BUCKETS = [50, 100, 250, 500];
 
 export function checkAchievements(): void {
   const summary = getSummary();
   let state = load();
   const today = dayKey();
   if (state.dayKey !== today) {
-    state = { lastStreakCelebrated: state.lastStreakCelebrated, lastDailyCharsBucket: 0, dayKey: today };
+    state = {
+      lastStreakCelebrated: state.lastStreakCelebrated,
+      lastDailyCharsBucket: 0,
+      lastDailyReviewsBucket: 0,
+      dayKey: today,
+    };
   }
 
   // A broken streak re-arms the milestones above it, so rebuilding to 7 days celebrates again.
@@ -72,6 +84,16 @@ export function checkAchievements(): void {
     emitCompanionEvent('achievement', t('companion.achievement.dailyChars', { count: bestChars }));
   }
 
+  // Flashcard-only days earn a daily celebration too.
+  let bestReviews = 0;
+  for (const b of REVIEW_BUCKETS) {
+    if (summary.todayReviews >= b && state.lastDailyReviewsBucket < b) bestReviews = b;
+  }
+  if (bestReviews > 0) {
+    state.lastDailyReviewsBucket = bestReviews;
+    emitCompanionEvent('achievement', t('companion.achievement.dailyReviews', { count: bestReviews }));
+  }
+
   // Additive keepsakes — never blocks or alters the streak celebration above.
   for (const trinket of unlockTrinketsForStreak(summary.streak)) {
     window.dispatchEvent(
@@ -92,6 +114,7 @@ export function startAchievementWatcher(): () => void {
   started = true;
   const onRead = () => checkAchievements();
   window.addEventListener(READING_RECORDED_EVENT, onRead);
+  window.addEventListener(REVIEW_RECORDED_EVENT, onRead);
   // Initial check (e.g. already mid-streak today)
   try {
     checkAchievements();
@@ -100,6 +123,7 @@ export function startAchievementWatcher(): () => void {
   }
   return () => {
     window.removeEventListener(READING_RECORDED_EVENT, onRead);
+    window.removeEventListener(REVIEW_RECORDED_EVENT, onRead);
     started = false;
   };
 }

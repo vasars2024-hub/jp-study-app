@@ -8132,6 +8132,7 @@ export const ja: Catalog = {
   'companion.achievement.streak': { other: '{count}日連続' },
   'companion.achievement.studyStreak': { other: '{count}日連続学習' },
   'companion.achievement.dailyChars': { other: '今日の読書：{count}文字' },
+  'companion.achievement.dailyReviews': { other: '今日の復習：{count}枚' },
   'companion.trinket.unlocked': '新しいトリンケット: {name}',
   'companion.trinket.section.title': 'トリンケット',
   'companion.trinket.section.desc':

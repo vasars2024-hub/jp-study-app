@@ -8947,6 +8947,9 @@ export const ru: Catalog = {
   'companion.achievement.dailyChars': {
     one: '{count} символ сегодня', few: '{count} символа сегодня', many: '{count} символов сегодня', other: '{count} символа сегодня',
   },
+  'companion.achievement.dailyReviews': {
+    one: '{count} карточка повторена сегодня', few: '{count} карточки повторены сегодня', many: '{count} карточек повторено сегодня', other: '{count} карточки повторено сегодня',
+  },
   'companion.trinket.unlocked': 'Новая вещица: {name}',
   'companion.trinket.section.title': 'Вещицы',
   'companion.trinket.section.desc':
