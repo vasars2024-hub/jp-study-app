@@ -1,3 +1,5 @@
+import { evaluateJapaneseDictation } from './listeningTraining';
+
 export interface VideoCoreStudyCue {
   index: number;
   trackNumber: number;
@@ -1395,46 +1397,11 @@ export function clampStudyPlaybackRate(value: number): number {
   return Math.max(0.25, Math.min(3, value));
 }
 
-function normalizeJapaneseDictation(value: string): string {
-  return value
-    .normalize('NFKC')
-    .toLocaleLowerCase('ja')
-    // Keep ー: vowel length changes the word (ビル versus ビール).
-    .replace(/[\s、。！？!?・「」『』“”‘’〝〞〟（）()[\]【】〈〉《》…‥.,'":;：；]/gu, '');
-}
-
-function editDistance(left: string[], right: string[]): number {
-  if (!left.length) return right.length;
-  if (!right.length) return left.length;
-  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let row = 0; row < left.length; row += 1) {
-    const current = [row + 1];
-    for (let column = 0; column < right.length; column += 1) {
-      current[column + 1] = Math.min(
-        current[column] + 1,
-        previous[column + 1] + 1,
-        previous[column] + (left[row] === right[column] ? 0 : 1),
-      );
-    }
-    previous = current;
-  }
-  return previous[right.length];
-}
-
 export function evaluateVideoCoreDictation(
   answerValue: string,
   expectedValue: string,
 ): VideoCoreDictationEvaluation {
-  const answer = normalizeJapaneseDictation(answerValue).slice(0, 500);
-  const expected = normalizeJapaneseDictation(expectedValue).slice(0, 500);
-  const longest = Math.max(answer.length, expected.length);
-  const distance = editDistance([...answer], [...expected]);
-  return {
-    exact: !!expected && answer === expected,
-    score: longest ? Math.max(0, Math.round((1 - distance / longest) * 100)) : 0,
-    answer,
-    expected,
-  };
+  return evaluateJapaneseDictation(answerValue, expectedValue);
 }
 
 export function nextVideoCoreWhisperTrackNumber(

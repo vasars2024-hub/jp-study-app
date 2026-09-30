@@ -17,6 +17,10 @@ describe('Japanese listening training', () => {
     },
   );
 
+  it('scores a supplementary kanji as one character in the video overlay too', () => {
+    expect(evaluateVideoCoreDictation('𠮷野', '吉野')).toMatchObject({ exact: false, score: 50 });
+  });
+
   it('ignores spacing, punctuation, and width differences', () => {
     expect(normalizeJapaneseDictation('「今日は いい天気！」')).toBe('今日はいい天気');
     expect(evaluateJapaneseDictation('今日はいい天気', '今日は、いい天気。').exact).toBe(true);
