@@ -82,6 +82,7 @@ import {
   type DeckFlashcard,
   type DeckFolderFilter,
   type BookGroup,
+  UNKNOWN_BOOK_TITLE,
 } from '../../flashcardDeck';
 import {
   type LocalSrsState,
@@ -2086,7 +2087,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
         const key = `${group.bookId}::${group.bookTitle}`;
         return (
           <option key={key} value={key}>
-            {group.bookTitle} ({reviewSourceCount(key)})
+            {group.bookTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : group.bookTitle} ({reviewSourceCount(key)})
           </option>
         );
       }),
@@ -2398,7 +2399,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                         aria-pressed={on}
                         onClick={() => state.toggleReviewMixKey(key)}
                       >
-                        {t('flash.mix.deck', { name: group.bookTitle, count: reviewMixCounts.get(key) ?? 0 })}
+                        {t('flash.mix.deck', { name: group.bookTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : group.bookTitle, count: reviewMixCounts.get(key) ?? 0 })}
                       </button>
                     );
                   })}
@@ -2688,7 +2689,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                               }
                             }}
                           >
-                            {group.bookTitle}
+                            {group.bookTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : group.bookTitle}
                           </span>
                           <span className="muted flash-group-count">{t('flash.cardsCount', { count: group.cards.length })}</span>
                           <span className="muted flash-group-known">

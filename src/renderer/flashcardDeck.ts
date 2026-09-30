@@ -1666,6 +1666,9 @@ export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlas
   );
 }
 
+/** Grouping sentinel for cards with no source title; show t('flash.unknownSource') at render time. */
+export const UNKNOWN_BOOK_TITLE = 'Unknown source';
+
 export interface BookGroup {
   bookId: string;
   bookTitle: string;

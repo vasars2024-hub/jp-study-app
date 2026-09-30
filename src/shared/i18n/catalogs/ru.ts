@@ -6879,6 +6879,7 @@ export const ru: Catalog = {
   'calendar.today': 'Сегодня',
   'calendar.jumpToDate': 'Перейти к дате',
   'calendar.moreCount': 'Ещё {count}',
+  'calendar.restDay': 'День отдыха',
   'calendar.monthGrid': 'Сетка месяца — стрелки перемещают по дням, Enter добавляет событие в выбранный день',
   'calendar.noEventsToday': 'В этот день событий нет.',
   'calendar.addEvent': '+ Добавить событие',
@@ -8392,7 +8393,8 @@ export const ru: Catalog = {
     other: '{count} выучено',
   },
   'flash.options': 'Параметры',
-  'flash.deleteDeck': 'Удалить колоду',
+  'flash.unknownSource': 'Неизвестный источник',
+  'flash.deleteDeck':'Удалить колоду',
   'flash.deck.levelAria': 'Оценочный уровень колоды {level}',
   'flash.deleteConfirm':
     'Удалить все карточки «{title}» из флеш-карточек? Это действие нельзя отменить.',

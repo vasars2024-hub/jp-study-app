@@ -20623,6 +20623,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
   font-size: 12px;
   color: var(--muted);
 }
+.cal-rest-tag {
+  margin-inline-start: 6px;
+  font-size: 10px;
+  font-style: italic;
+}
 .cal-month-events {
   display: flex;
   flex-direction: column;

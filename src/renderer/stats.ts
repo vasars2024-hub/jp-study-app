@@ -614,7 +614,11 @@ export function setRestDayEnabled(enabled: boolean): void {
  * A rest taken yesterday holds the streak while today is still unstudied, the same way a
  * plain streak may end yesterday.
  */
-export function computeStreak(days: Record<string, DayEntry>, restDays = false): number {
+export function computeStreakDetail(
+  days: Record<string, DayEntry>,
+  restDays = false,
+): { streak: number; restDates: string[] } {
+  const restDates: string[] = [];
   let streak = 0;
   let steps = 0;
   let lastRest = -Infinity;
@@ -632,13 +636,23 @@ export function computeStreak(days: Record<string, DayEntry>, restDays = false):
       before.setDate(before.getDate() - 1);
       if (!dayIsActive(days[dayKey(before)])) break;
       lastRest = steps;
+      restDates.push(dayKey(cursor));
     } else {
       break;
     }
     cursor.setDate(cursor.getDate() - 1);
     steps += 1;
   }
-  return streak;
+  return { streak, restDates };
+}
+
+export function computeStreak(days: Record<string, DayEntry>, restDays = false): number {
+  return computeStreakDetail(days, restDays).streak;
+}
+
+/** Dates (YYYY-MM-DD) the weekly rest day is currently spending to keep the streak alive. */
+export function getStreakRestDates(): Set<string> {
+  return new Set(computeStreakDetail(load().days, getRestDayEnabled()).restDates);
 }
 
 export function getSummary(): StatsSummary {

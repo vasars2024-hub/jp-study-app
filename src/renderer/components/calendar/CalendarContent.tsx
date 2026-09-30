@@ -38,6 +38,7 @@ import {
 } from '../../calendar';
 import { loadDesktopPrefs, onDesktopPrefsChanged } from '../../desktopPrefs';
 import { useT } from '../../i18n';
+import { getStreakRestDates } from '../../stats';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda';
@@ -575,6 +576,7 @@ function MonthGrid({ state }: { state: CalendarState }) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
   const keys = useMemo(() => monthCells.map(toKey), [monthCells]);
+  const restDates = useMemo(() => getStreakRestDates(), [monthCells]);
   // The cursor's own day when it is on screen, else the first cell: a grid whose
   // active descendant is a day from the month you navigated away from reads as
   // broken, and `aria-activedescendant` pointing at a missing id announces nothing.
@@ -645,6 +647,7 @@ function MonthGrid({ state }: { state: CalendarState }) {
             const inMonth = d.getMonth() === cursor.getMonth();
             const isToday = key === toKey(today);
             const dayEvents = occsByDay.get(key) ?? [];
+            const isRest = restDates.has(key);
             return (
               <div
                 key={col}
@@ -654,14 +657,18 @@ function MonthGrid({ state }: { state: CalendarState }) {
                 // The date, spelled out, plus the count — "3" alone is not a label.
                 aria-label={`${d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}${
                   dayEvents.length ? `, ${t('calendar.moreCount', { count: dayEvents.length })}` : ''
-                }`}
+                }${isRest ? `, ${t('calendar.restDay')}` : ''}`}
                 className={`cal-month-cell ${inMonth ? '' : 'out'} ${isToday ? 'today' : ''}${
+                  isRest ? ' rest' : ''}${
                   key === currentKey ? ' is-active' : ''
                 }`}
                 onClick={() => setActiveKey(key)}
                 onDoubleClick={() => openNew(key)}
               >
-                <div className="cal-month-daynum">{d.getDate()}</div>
+                <div className="cal-month-daynum">
+                  {d.getDate()}
+                  {isRest && <span className="cal-rest-tag">{t('calendar.restDay')}</span>}
+                </div>
                 <div className="cal-month-events">
                   {dayEvents.slice(0, 3).map((ev) => (
                     <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
