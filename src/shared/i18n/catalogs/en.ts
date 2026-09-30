@@ -5064,6 +5064,7 @@ export const en: Catalog = {
   'grammar.examples.own.removeShort': 'Remove',
   'grammar.examples.own.add': 'Add your own examples',
   'grammar.deckSentences.label': 'From your deck',
+  'grammar.captureSentences.label': 'From your reading captures',
   'grammar.examples.own.importTitle': 'Example sentences for {pattern}',
   'grammar.examples.own.importDesc': 'Sentences with a translation (and a reading if you like). A row with a pattern column goes to that grammar point instead; sentences the point already has are skipped. Saved on this computer.',
   'grammar.examples.own.colTranslation': 'Translation',

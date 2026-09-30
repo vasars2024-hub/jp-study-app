@@ -5066,6 +5066,7 @@ export const zh: Catalog = {
   'grammar.examples.own.removeShort': '删除',
   'grammar.examples.own.add': '添加自己的例句',
   'grammar.deckSentences.label': '来自你的牌组',
+  'grammar.captureSentences.label': '来自你的阅读捕获',
   'grammar.examples.own.importTitle': '{pattern} 的例句',
   'grammar.examples.own.importDesc': '例句和译文（读音可选）。带 pattern 列的行会加到对应的语法点；已有的例句会跳过。保存在这台电脑上。',
   'grammar.examples.own.colTranslation': '译文',

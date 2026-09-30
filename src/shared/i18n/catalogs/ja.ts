@@ -5090,6 +5090,7 @@ export const ja: Catalog = {
   'grammar.examples.own.removeShort': '削除',
   'grammar.examples.own.add': '自分の例文を追加',
   'grammar.deckSentences.label': 'あなたのデッキから',
+  'grammar.captureSentences.label': '読書キャプチャから',
   'grammar.examples.own.importTitle': '{pattern} の例文',
   'grammar.examples.own.importDesc': '例文と訳（読みは任意）です。pattern 列のある行はその文法項目に入ります。既にある例文は飛ばします。このパソコンに保存されます。',
   'grammar.examples.own.colTranslation': '訳',

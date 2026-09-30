@@ -1,3 +1,5 @@
+import type { ReadingLensHistoryEntry } from '../../../shared/readingLensHistory';
+
 export interface DeckSentenceCard {
   id: string;
   sentence?: string;
@@ -34,4 +36,19 @@ export function findDeckSentences(
     if (hits.length >= limit) break;
   }
   return hits;
+}
+
+/** Search captured sentences, rather than displaying an entire OCR passage. */
+export function findCaptureSentences(
+  captures: readonly Pick<ReadingLensHistoryEntry, 'captureId' | 'text'>[],
+  query: string,
+  limit = 5,
+): DeckSentenceHit[] {
+  return findDeckSentences(captures.flatMap((capture) =>
+    (capture.text.match(/[^。！？!?\r\n]+[。！？!?]?/g) ?? []).map((sentence, index) => ({
+      id: `${capture.captureId}:${index}`,
+      sentence,
+      word: '',
+    })),
+  ), query, limit);
 }

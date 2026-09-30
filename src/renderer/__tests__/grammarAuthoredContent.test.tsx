@@ -6,7 +6,7 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTHORED_CONTENT,
   GRAMMAR,
@@ -182,6 +182,7 @@ afterEach(() => {
   host?.remove();
   host = null;
   root = null;
+  vi.unstubAllGlobals();
 });
 
 function render(point: GrammarPoint) {
@@ -194,6 +195,24 @@ function render(point: GrammarPoint) {
 }
 
 describe('GrammarDetail', () => {
+  it('loads matching reading captures even when the learner has no deck cards', async () => {
+    const lensHistoryList = vi.fn().mockResolvedValue([
+      { captureId: 'capture', text: '今日は暑い。水を飲む。' },
+    ]);
+    vi.stubGlobal('api', { lensHistoryList });
+    const point: GrammarPoint = {
+      id: 'capture-point', lang: 'ja', level: 'N5', title: '水を', meaning: 'test',
+      structure: '水を', explanation: 'test', examples: [],
+    };
+    const el = render(point);
+    await act(async () => { await Promise.resolve(); });
+    expect(lensHistoryList).toHaveBeenCalledOnce();
+    expect(el.querySelector('.gram-examples-captures')?.textContent).toBe('水を飲む。');
+    act(() => root!.render(<GrammarDetail point={{ ...point, title: '読書' }} />));
+    expect(el.querySelector('.gram-examples-captures')).toBeNull();
+    expect(lensHistoryList).toHaveBeenCalledOnce();
+  });
+
   it('hides a structure that repeats the title and an explanation that repeats the gloss', () => {
     const el = render({
       id: 'h', lang: 'ja', level: 'N3', title: 'といったら', meaning: 'extremely', structure: 'といったら',

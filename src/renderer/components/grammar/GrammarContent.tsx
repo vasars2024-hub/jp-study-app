@@ -42,7 +42,8 @@ import {
   useUserExamples,
   type ExampleImportRow,
 } from '../../data/grammar/userExamples';
-import { findDeckSentences } from '../../data/grammar/deckSentences';
+import { findCaptureSentences, findDeckSentences } from '../../data/grammar/deckSentences';
+import { READING_LENS_HISTORY_LIMIT, type ReadingLensHistoryEntry } from '../../../shared/readingLensHistory';
 import { FLASHCARD_DECK_EVENT, loadDeck } from '../../flashcardDeck';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
@@ -94,6 +95,15 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
   const [importOpen, setImportOpen] = useState(false);
   const [keptNote, setKeptNote] = useState('');
   const [deckRev, setDeckRev] = useState(0);
+  const [captures, setCaptures] = useState<ReadingLensHistoryEntry[]>([]);
+  useEffect(() => {
+    let active = true;
+    // History is bounded and loaded asynchronously, once per detail mount.
+    window.api?.lensHistoryList?.({ limit: READING_LENS_HISTORY_LIMIT })
+      .then((entries) => { if (active) setCaptures(entries); })
+      .catch(() => { /* Optional examples must not block the grammar lesson. */ });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     const bump = () => setDeckRev((n) => n + 1);
     window.addEventListener(FLASHCARD_DECK_EVENT, bump);
@@ -103,6 +113,10 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
     () => findDeckSentences(loadDeck(), exampleQuery(point)),
     // deckRev re-runs the search when the deck changes.
     [point, deckRev],
+  );
+  const captureSentences = useMemo(
+    () => findCaptureSentences(captures, exampleQuery(point)),
+    [captures, point],
   );
   const commitExamples = useCallback(
     (rows: ExampleImportRow[]) => {
@@ -313,6 +327,20 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
                   </span>
                   <span className="gram-ex-en" lang={contentLangOf(point.lang)}>
                     {hit.word}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {captureSentences.length > 0 && (
+          <>
+            <h4 className="gram-more-status muted">{t('grammar.captureSentences.label')}</h4>
+            <ul className="gram-examples gram-examples-captures">
+              {captureSentences.map((hit) => (
+                <li key={hit.id}>
+                  <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                    {hit.sentence}
                   </span>
                 </li>
               ))}
