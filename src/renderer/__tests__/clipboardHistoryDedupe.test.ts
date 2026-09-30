@@ -11,6 +11,7 @@ vi.mock('../flashcardAutoEnrich', () => ({ enrichNewCards: vi.fn() }));
 
 import {
   loadClipboardHistory,
+  onClipboardHistoryChanged,
   recordClipboardEntry,
   saveClipboardSettings,
   togglePin,
@@ -72,5 +73,43 @@ describe('consecutive clipboard copies with pinned entries', () => {
     saveClipboardSettings({ dedupeConsecutive: false });
     recordClipboardEntry('犬', { type: 'sentence' });
     expect(loadClipboardHistory()).toHaveLength(4);
+  });
+});
+
+describe('reducing the clipboard history limit', () => {
+  it('immediately keeps the newest copies and older pins and notifies the panel', () => {
+    const pinned = recordClipboardEntry('saved vocabulary')!;
+    togglePin(pinned.id);
+    for (let index = 0; index < 15; index += 1) {
+      recordClipboardEntry(`word ${index}`);
+    }
+    const changed = vi.fn();
+    const unsubscribe = onClipboardHistoryChanged(changed);
+    try {
+      saveClipboardSettings({ maxSize: 10 });
+
+      const history = loadClipboardHistory();
+      expect(history.map((entry) => entry.text)).toEqual([
+        ...Array.from({ length: 9 }, (_, index) => `word ${14 - index}`),
+        'saved vocabulary',
+      ]);
+      expect(history.at(-1)).toMatchObject({ id: pinned.id, pinned: true });
+      expect(changed).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('preserves every pin even when pins exceed the new limit', () => {
+    for (let index = 0; index < 12; index += 1) {
+      togglePin(recordClipboardEntry(`saved word ${index}`)!.id);
+    }
+    recordClipboardEntry('temporary copy');
+
+    saveClipboardSettings({ maxSize: 10 });
+
+    const history = loadClipboardHistory();
+    expect(history).toHaveLength(12);
+    expect(history.every((entry) => entry.pinned)).toBe(true);
   });
 });

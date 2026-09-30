@@ -119,7 +119,8 @@ export function loadClipboardSettings(): ClipboardSettings {
 }
 
 export function saveClipboardSettings(patch: Partial<ClipboardSettings>): ClipboardSettings {
-  const merged = { ...loadClipboardSettings(), ...patch };
+  const previous = loadClipboardSettings();
+  const merged = { ...previous, ...patch };
   const next = { ...merged, maxSize: clampClipboardMaxSize(merged.maxSize, DEFAULT_SETTINGS.maxSize) };
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
@@ -129,6 +130,9 @@ export function saveClipboardSettings(patch: Partial<ClipboardSettings>): Clipbo
   // Bust monitor settings cache
   cachedMonitorEnabled = next.monitoringEnabled;
   cachedMonitorAt = Date.now();
+  if (next.maxSize < previous.maxSize) {
+    writeList(applyCap(readList(), next.maxSize));
+  }
   window.dispatchEvent(new CustomEvent(SETTINGS_EVENT));
   return next;
 }
@@ -145,8 +149,7 @@ export function onClipboardSettingsChanged(cb: () => void): () => void {
   return () => window.removeEventListener(SETTINGS_EVENT, h);
 }
 
-function applyCap(list: ClipboardEntry[]): ClipboardEntry[] {
-  const { maxSize } = loadClipboardSettings();
+function applyCap(list: ClipboardEntry[], maxSize = loadClipboardSettings().maxSize): ClipboardEntry[] {
   const pinned = list.filter((e) => e.pinned);
   let remaining = Math.max(0, maxSize - pinned.length);
   return list.filter((e) => e.pinned || remaining-- > 0);
