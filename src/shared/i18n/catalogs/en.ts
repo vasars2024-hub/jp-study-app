@@ -13951,6 +13951,8 @@ export const en: Catalog = {
   'stats.menu.file': 'File',
   'stats.menu.view': 'View',
   'stats.menu.refresh': 'Refresh',
+  'stats.menu.restDayOn': 'Weekly rest day: on',
+  'stats.menu.restDayOff': 'Weekly rest day: off',
   'stats.commands': 'Statistics commands',
   'stats.activityMonitor': 'Reading activity monitor',
   'stats.summaryAria': 'Reading summary',

@@ -157,6 +157,7 @@ export function onStatsChanged(refresh: () => void): () => void {
     STUDY_RECORDED_EVENT,
     STATS_RESET_EVENT,
     STUDY_LANG_EVENT,
+    REST_DAY_CHANGED_EVENT,
   ];
   const onStorage = (event: StorageEvent): void => {
     if (event.storageArea && event.storageArea !== localStorage) return;
@@ -578,19 +579,62 @@ function dayIsActive(entry: DayEntry | undefined): boolean {
   );
 }
 
-/** Consecutive days (ending today or yesterday) with reading, watching or reviewing. */
-function computeStreak(days: Record<string, DayEntry>): number {
+const REST_DAY_KEY = 'jp-study-streak-rest-day';
+/** Fired on window when the rest-day allowance is switched, so open surfaces recount the streak. */
+export const REST_DAY_CHANGED_EVENT = 'jp-study-rest-day-changed';
+
+/** Whether one missed day per week is forgiven by the streak. Opt-in, off by default. */
+export function getRestDayEnabled(): boolean {
+  try {
+    return localStorage.getItem(REST_DAY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setRestDayEnabled(enabled: boolean): void {
+  try {
+    if (enabled) localStorage.setItem(REST_DAY_KEY, '1');
+    else localStorage.removeItem(REST_DAY_KEY);
+  } catch {
+    /* storage unavailable — the allowance just won't persist */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(REST_DAY_CHANGED_EVENT));
+  } catch {
+    /* non-browser context (tests) — ignore */
+  }
+}
+
+/**
+ * Consecutive days (ending today or yesterday) with reading, watching or reviewing.
+ *
+ * With `restDays`, a single missed day bridges the streak when the day before it was active,
+ * at most once in any seven days. The rest day itself is not counted as a day studied.
+ */
+export function computeStreak(days: Record<string, DayEntry>, restDays = false): number {
   let streak = 0;
+  let steps = 0;
+  let lastRest = -Infinity;
   const cursor = new Date();
   // Allow the streak to "end" yesterday if nothing's been studied yet today.
-  if (!dayIsActive(days[dayKey(cursor)])) cursor.setDate(cursor.getDate() - 1);
+  if (!dayIsActive(days[dayKey(cursor)])) {
+    cursor.setDate(cursor.getDate() - 1);
+    steps += 1;
+  }
   for (;;) {
     if (dayIsActive(days[dayKey(cursor)])) {
       streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
+    } else if (restDays && steps - lastRest >= 7 && streak > 0) {
+      const before = new Date(cursor);
+      before.setDate(before.getDate() - 1);
+      if (!dayIsActive(days[dayKey(before)])) break;
+      lastRest = steps;
     } else {
       break;
     }
+    cursor.setDate(cursor.getDate() - 1);
+    steps += 1;
   }
   return streak;
 }
@@ -649,7 +693,7 @@ export function getSummary(): StatsSummary {
     totalChars,
     totalWatchSeconds,
     daysActive: dayKeys.filter((k) => dayIsActive(data.days[k])).length,
-    streak: computeStreak(data.days),
+    streak: computeStreak(data.days, getRestDayEnabled()),
     todaySeconds: today.seconds,
     todayChars: today.chars,
     todayWatchSeconds: today.watchSeconds ?? 0,
@@ -690,7 +734,7 @@ export function getSyncPayload(): StatsSyncPayload {
   return {
     dayKey: key,
     todayChars: today.chars,
-    streak: computeStreak(data.days),
+    streak: computeStreak(data.days, getRestDayEnabled()),
   };
 }
 

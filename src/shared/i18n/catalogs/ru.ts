@@ -14500,6 +14500,8 @@ export const ru: Catalog = {
   'stats.menu.file': 'Файл',
   'stats.menu.view': 'Вид',
   'stats.menu.refresh': 'Обновить',
+  'stats.menu.restDayOn': 'Еженедельный день отдыха: вкл.',
+  'stats.menu.restDayOff': 'Еженедельный день отдыха: выкл.',
   'stats.commands': 'Команды статистики',
   'stats.activityMonitor': 'Монитор активности чтения',
   'stats.summaryAria': 'Сводка по чтению',

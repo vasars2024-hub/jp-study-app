@@ -13123,6 +13123,8 @@ export const zh: Catalog = {
   'stats.menu.file': '文件',
   'stats.menu.view': '视图',
   'stats.menu.refresh': '刷新',
+  'stats.menu.restDayOn': '每周休息日：开',
+  'stats.menu.restDayOff': '每周休息日：关',
   'stats.commands': '统计操作',
   'stats.activityMonitor': '阅读活动监视器',
   'stats.summaryAria': '阅读概要',

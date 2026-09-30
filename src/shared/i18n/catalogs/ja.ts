@@ -13261,6 +13261,8 @@ export const ja: Catalog = {
   'stats.menu.file': 'ファイル',
   'stats.menu.view': '表示',
   'stats.menu.refresh': '更新',
+  'stats.menu.restDayOn': '週1回の休息日: オン',
+  'stats.menu.restDayOff': '週1回の休息日: オフ',
   'stats.commands': '統計の操作',
   'stats.activityMonitor': '読書アクティビティモニター',
   'stats.summaryAria': '読書の概要',

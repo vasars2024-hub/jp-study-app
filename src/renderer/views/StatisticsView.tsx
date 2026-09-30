@@ -10,7 +10,7 @@ import {
   useAeroMaterials,
 } from '../components/ui';
 import Icon from '../components/Icons';
-import { formatDuration, formatNumber } from '../stats';
+import { formatDuration, formatNumber, getRestDayEnabled, setRestDayEnabled } from '../stats';
 import {
   StatsBooks,
   StatsCards,
@@ -38,6 +38,7 @@ export default function StatisticsView() {
   const dataToolsRef = useRef<HTMLDetailsElement>(null);
   const [dataToolsOpen, setDataToolsOpen] = useState(false);
   useDismissableDisclosure(dataToolsRef, dataToolsOpen);
+  const [restDay, setRestDay] = useState(getRestDayEnabled);
 
   const menus: MenuBarMenu[] = [
     {
@@ -52,6 +53,14 @@ export default function StatisticsView() {
       label: t('stats.menu.view'),
       items: [
         { id: 'refresh', label: t('stats.menu.refresh'), onSelect: refresh },
+        {
+          id: 'rest-day',
+          label: t(restDay ? 'stats.menu.restDayOn' : 'stats.menu.restDayOff'),
+          onSelect: () => {
+            setRestDayEnabled(!restDay);
+            setRestDay(!restDay);
+          },
+        },
       ],
     },
   ];
