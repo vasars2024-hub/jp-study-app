@@ -57,6 +57,8 @@ export const en: Catalog = {
   'common.enterValue': 'Enter a value',
   'common.tryAgain': 'Try again',
   'common.close': 'Close',
+  'fieldHint.explain': 'Explain: {title}',
+  'fieldHint.closeExplanation': 'Close explanation',
   'common.open': 'Open',
 
   'app.title': 'Gum',

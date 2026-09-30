@@ -53,6 +53,8 @@ export const ja: Catalog = {
   'common.enterValue': '値を入力',
   'common.tryAgain': '再試行',
   'common.close': '閉じる',
+  'fieldHint.explain': '説明: {title}',
+  'fieldHint.closeExplanation': '説明を閉じる',
   'common.open': '開く',
 
   'app.title': 'Gum',

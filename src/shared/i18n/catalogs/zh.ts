@@ -53,6 +53,8 @@ export const zh: Catalog = {
   'common.enterValue': '请输入',
   'common.tryAgain': '重试',
   'common.close': '关闭',
+  'fieldHint.explain': '说明:{title}',
+  'fieldHint.closeExplanation': '关闭说明',
   'common.open': '打开',
 
   'app.title': 'Gum',

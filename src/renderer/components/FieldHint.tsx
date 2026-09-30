@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import Icon from './Icons';
+import { useT } from '../i18n';
 
 type Props = {
   title: string;
@@ -8,6 +9,7 @@ type Props = {
 
 /** Compact ? button that opens a short explanation popover. */
 export default function FieldHint({ title, children }: Props): JSX.Element {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
@@ -27,7 +29,7 @@ export default function FieldHint({ title, children }: Props): JSX.Element {
         className="field-hint-btn"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={`Explain: ${title}`}
+        aria-label={t('fieldHint.explain', { title })}
         onClick={() => setOpen((v) => !v)}
       >
         ?
@@ -37,7 +39,7 @@ export default function FieldHint({ title, children }: Props): JSX.Element {
           <button
             type="button"
             className="field-hint-backdrop"
-            aria-label="Close explanation"
+            aria-label={t('fieldHint.closeExplanation')}
             onClick={() => setOpen(false)}
           />
           <div
@@ -51,7 +53,7 @@ export default function FieldHint({ title, children }: Props): JSX.Element {
               <button
                 type="button"
                 className="field-hint-close"
-                aria-label="Close"
+                aria-label={t('common.close')}
                 onClick={() => setOpen(false)}
               >
                 <Icon name="close" size={14} />

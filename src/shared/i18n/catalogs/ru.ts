@@ -56,6 +56,8 @@ export const ru: Catalog = {
   'common.enterValue': 'Введите значение',
   'common.tryAgain': 'Повторить',
   'common.close': 'Закрыть',
+  'fieldHint.explain': 'Пояснение: {title}',
+  'fieldHint.closeExplanation': 'Закрыть пояснение',
   'common.open': 'Открыть',
 
   'app.title': 'Gum',
