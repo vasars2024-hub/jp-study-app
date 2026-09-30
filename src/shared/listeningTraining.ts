@@ -13,6 +13,12 @@ export function normalizeJapaneseDictation(value: string): string {
     .replace(/[\s、。！？!?・「」『』“”‘’〝〞〟（）()[\]【】〈〉《》…‥.,'":;：；]/gu, '');
 }
 
+// Comparison-only fold: an answer typed in hiragana matches a katakana subtitle
+// (びーる vs ビール) while the displayed answer keeps the learner's own script.
+function foldKana(chars: string[]): string[] {
+  return chars.map((ch) => (/[ァ-ヶ]/u.test(ch) ? String.fromCharCode(ch.charCodeAt(0) - 0x60) : ch));
+}
+
 function editDistance(left: string[], right: string[]): number {
   if (!left.length) return right.length;
   if (!right.length) return left.length;
@@ -42,9 +48,11 @@ export function evaluateJapaneseDictation(
   const answer = answerChars.join('');
   const expected = expectedChars.join('');
   const longest = Math.max(answerChars.length, expectedChars.length);
-  const distance = editDistance(answerChars, expectedChars);
+  const foldedAnswer = foldKana(answerChars);
+  const foldedExpected = foldKana(expectedChars);
+  const distance = editDistance(foldedAnswer, foldedExpected);
   return {
-    exact: !!expected && answer === expected,
+    exact: !!expected && foldedAnswer.join('') === foldedExpected.join(''),
     score: longest ? Math.max(0, Math.round((1 - distance / longest) * 100)) : 0,
     answer,
     expected,

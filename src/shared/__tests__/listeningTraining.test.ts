@@ -41,6 +41,13 @@ describe('Japanese listening training', () => {
     });
   });
 
+  it('treats hiragana and katakana spellings of the same kana as equal', () => {
+    expect(evaluateJapaneseDictation('びーる', 'ビール')).toMatchObject({
+      exact: true, score: 100, answer: 'びーる', expected: 'ビール',
+    });
+    expect(evaluateJapaneseDictation('びる', 'ビール').exact).toBe(false);
+  });
+
   it('bounds oversized input and handles empty prompts', () => {
     expect(evaluateJapaneseDictation('あ'.repeat(700), 'あ'.repeat(700)).answer).toHaveLength(500);
     expect(evaluateJapaneseDictation('', '').score).toBe(0);
