@@ -274,7 +274,7 @@ export function mergeUnifiedSearchResults(
   for (const provider of providers) {
     for (const result of provider.results) {
       const idKey = `id:${result.providerResultId}`;
-      const titleKey = unifiedSearchTitleKey(result.title);
+      const titleKey = result.unknownSource ? '' : unifiedSearchTitleKey(result.title);
       const keys = [idKey, ...(titleKey ? [`title:${titleKey}`] : [])];
       const existing = keys.map((key) => byKey.get(key)).find((index) => index !== undefined);
       if (existing === undefined) {

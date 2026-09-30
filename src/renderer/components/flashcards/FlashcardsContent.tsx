@@ -1212,7 +1212,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   async function removeBookDeck(bookId: string, bookTitle: string): Promise<void> {
     const ok = await confirmDialog({
       title: t('flash.deleteDeck'),
-      message: t('flash.deleteConfirm', { title: bookTitle }),
+      message: t('flash.deleteConfirm', { title: bookTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : bookTitle }),
       confirmLabel: t('common.remove'),
       danger: true,
     });
@@ -1228,7 +1228,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const next = await promptDialog({
       title: t('flash.renameBook'),
       message: t('flash.renameBook.prompt'),
-      defaultValue: bookTitle,
+      defaultValue: bookTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : bookTitle,
     });
     if (next == null) return;
     setDeck(renameBookGroup(bookId, bookTitle, next));
@@ -1459,7 +1459,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
       : t('flash.session.deck');
     void handOffToAgent(
       studySessionAgentContext(
-        deckName,
+        deckName === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : deckName,
         t('flash.session.summary', { reviewed, total }),
         sessionStartedAt,
       ),
@@ -1566,7 +1566,7 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
             <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
             {t('flash.exit')}
           </button>
-          {reviewTitle && <span className="flash-review-source muted">{reviewTitle}</span>}
+          {reviewTitle && <span className="flash-review-source muted">{reviewTitle === UNKNOWN_BOOK_TITLE ? t('flash.unknownSource') : reviewTitle}</span>}
           <div className="flash-progress">
             <div className="flash-progress-bar">
               <span style={{ width: `${pct}%` }} />

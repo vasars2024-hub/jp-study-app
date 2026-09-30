@@ -17,6 +17,7 @@ import type { UnifiedSearchMergedResult } from '../../../unifiedSearchMergedAdap
 import type { MediaTrackingStatus } from '../../../../shared/mediaTracking';
 import { mergeUnifiedSearchResults } from '../../../unifiedSearchBackends';
 import { Select } from '../../ui';
+import type { UnifiedSearchResult } from '../../../../shared/unifiedSearch';
 
 /**
  * The built-in sources carry an English name in the stored document; these three
@@ -53,6 +54,7 @@ const TRACKING_STATUS_KEY: Record<MediaTrackingStatus, string> = {
  */
 export default function UnifiedSearchPanel() {
   const { t, lang } = useT();
+  const resultTitle = (result: UnifiedSearchResult) => result.unknownSource ? t('flash.unknownSource') : result.title;
   const { state, search, cancel, clear } = useUnifiedSearchSession();
   const providerName = (id: string, name: string) => (BUILT_IN_NAME_KEY[id] ? t(BUILT_IN_NAME_KEY[id]) : name);
   const [query, setQuery] = useState('');
@@ -281,7 +283,7 @@ export default function UnifiedSearchPanel() {
                 {partition.results.map((result) => (
                   <li key={result.identityId} className="unified-search-result" data-identity-id={result.identityId}>
                     <div className="unified-search-result-copy">
-                      <strong>{result.title}</strong>
+                      <strong>{resultTitle(result)}</strong>
                       <span className="muted">
                         {[result.contentType, result.language, result.availability, result.year].filter((value) => value !== null).join(' · ')}
                       </span>
@@ -295,7 +297,7 @@ export default function UnifiedSearchPanel() {
                         </span>
                       )}
                     </div>
-                    <div className="sp-seg" role="group" aria-label={t('unifiedSearch.tracking.actionsFor', { title: result.title })}>
+                    <div className="sp-seg" role="group" aria-label={t('unifiedSearch.tracking.actionsFor', { title: resultTitle(result) })}>
                       <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'planned' })}>{t('unifiedSearch.tracking.plan')}</button>
                       <button type="button" className="btn" onClick={() => mutateTracking(result, { type: 'status/set', status: 'on-hold' })}>{t('unifiedSearch.tracking.pause')}</button>
                       {result.trackingProgress?.kind === 'episodic' && (
@@ -331,7 +333,7 @@ export default function UnifiedSearchPanel() {
               <li key={row.key} className="unified-search-result" data-provider-id={row.result.providerId}>
                 {row.result.coverUrl && <img className="unified-search-result-cover" src={row.result.coverUrl} alt="" loading="lazy" />}
                 <div className="unified-search-result-copy">
-                  <strong>{row.result.title}</strong>
+                  <strong>{resultTitle(row.result)}</strong>
                   {row.result.japaneseTitle && <span className="muted">{row.result.japaneseTitle}</span>}
                   <span className="unified-search-source-badges" aria-label={t('unifiedSearch.foundIn', { sources: row.sources.map((source) => source.providerName).join(', ') })}>
                     {row.sources.map((source) => (
@@ -363,7 +365,7 @@ export default function UnifiedSearchPanel() {
                     <li key={result.id} className="unified-search-result" data-provider-id={provider.providerId}>
                       {result.coverUrl && <img className="unified-search-result-cover" src={result.coverUrl} alt="" loading="lazy" />}
                       <div className="unified-search-result-copy">
-                        <strong>{result.title}</strong>
+                        <strong>{resultTitle(result)}</strong>
                         <span className="muted">
                           {[result.mediaType, result.language, result.availability].filter(Boolean).join(' · ')}
                         </span>

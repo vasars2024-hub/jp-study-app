@@ -39,6 +39,8 @@ export interface UnifiedSearchResult {
   providerId: string;
   providerResultId: string;
   title: string;
+  /** Local cards without a source title; the title is a grouping sentinel only. */
+  unknownSource?: boolean;
   alternativeTitles: string[];
   japaneseTitle: string | null;
   romajiTitle: string | null;
@@ -288,6 +290,7 @@ function normalizeResult(value: unknown, index: number, providerIds: Set<string>
   const resultId = id(value.id, `${prefix}.id`, issues) || `${providerId}-${index + 1}`;
   return {
     id: resultId, providerId, providerResultId, title,
+    ...(value.unknownSource === true ? { unknownSource: true } : {}),
     alternativeTitles: list(value.alternativeTitles, 50, 300),
     japaneseTitle: text(value.japaneseTitle, '', 300, `${prefix}.japaneseTitle`, issues) || null,
     romajiTitle: text(value.romajiTitle, '', 300, `${prefix}.romajiTitle`, issues) || null,

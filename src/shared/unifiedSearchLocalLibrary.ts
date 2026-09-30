@@ -23,6 +23,7 @@ export interface LocalLibraryEntry {
   /** Stable local identifier; becomes the result's `providerResultId`. */
   id: string;
   title: string;
+  unknownSource?: boolean;
   alternativeTitles?: readonly string[];
   japaneseTitle?: string | null;
   romajiTitle?: string | null;
@@ -69,7 +70,7 @@ function anyIncludesQuery(values: readonly string[] | undefined, query: string):
  */
 export function localLibraryMatchScore(entry: LocalLibraryEntry, normalizedQuery: string): number | null {
   if (normalizedQuery === '') return null;
-  const title = normalizeText(entry.title);
+  const title = entry.unknownSource ? '' : normalizeText(entry.title);
   if (title.startsWith(normalizedQuery)) return 0;
   if (title.includes(normalizedQuery)) return 1;
   if (
@@ -116,6 +117,7 @@ export function localLibraryEntryToResult(
     providerId,
     providerResultId: entry.id,
     title: entry.title,
+    ...(entry.unknownSource ? { unknownSource: true } : {}),
     alternativeTitles: [...(entry.alternativeTitles ?? [])],
     japaneseTitle: entry.japaneseTitle ?? null,
     romajiTitle: entry.romajiTitle ?? null,

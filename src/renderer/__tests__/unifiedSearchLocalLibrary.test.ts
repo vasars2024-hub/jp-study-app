@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { mergeUnifiedSearchResults } from '../unifiedSearchBackends';
+import { searchLocalLibraryEntries } from '../../shared/unifiedSearchLocalLibrary';
 import type { DeckFlashcard } from '../flashcardDeck';
 import {
   OFFLINE_LOCAL_LIBRARY_CAPABILITIES,
@@ -147,4 +149,24 @@ describe('richer offline local-library sources', () => {
       { sourceId: 'flashcard-deck', status: 'unavailable', error: 'deck database is corrupt' },
     ]);
   });
+});
+
+it('keeps an absent source label out of search while preserving real titles and mined words', async () => {
+  const cards = [card({}), card({ id: 'named', bookId: 'named', bookTitle: 'Unknown source' })];
+  const entries = deckToLocalLibraryEntries(cards);
+  expect(searchLocalLibraryEntries(entries, 'unknown source').map((entry) => entry.id))
+    .toEqual(['deck:named::Unknown source']);
+  const results = await createDeckLibraryExecutor(() => cards)({
+    query: 'magic',
+    step: { providerId: 'local-library', providerName: 'Library', providerKind: 'local-library', priority: 0, groupIds: [] },
+    signal: new AbortController().signal,
+  });
+  expect(results).toHaveLength(2);
+  expect(results.find((result) => result.providerResultId === 'deck:unknown::Unknown source'))
+    .toMatchObject({ unknownSource: true });
+  expect(results.find((result) => result.providerResultId === 'deck:named::Unknown source')?.unknownSource)
+    .toBeUndefined();
+  expect(mergeUnifiedSearchResults([{
+    providerId: 'local-library', providerName: 'Library', status: 'succeeded', results, error: null,
+  }])).toHaveLength(2);
 });

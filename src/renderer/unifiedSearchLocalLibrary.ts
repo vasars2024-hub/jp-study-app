@@ -55,6 +55,7 @@ export function deckToLocalLibraryEntries(cards: readonly DeckFlashcard[]): Loca
       return {
         id: `deck:${key}`,
         title: group.bookTitle,
+        ...(group.cards.every((card) => !card.bookTitle) ? { unknownSource: true } : {}),
         mediaType: 'novel',
         keywords,
       } satisfies LocalLibraryEntry;
