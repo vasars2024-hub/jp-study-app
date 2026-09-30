@@ -83,7 +83,11 @@ function readList(): ClipboardEntry[] {
   try {
     const raw = localStorage.getItem(KEY);
     const list = raw ? (JSON.parse(raw) as ClipboardEntry[]) : [];
-    return Array.isArray(list) ? list.filter((e) => e && typeof e.id === 'string') : [];
+    // Older histories grouped pins first. Recording/deduplication needs copy
+    // order; the panel applies its own pinned-first display order.
+    return Array.isArray(list)
+      ? list.filter((e) => e && typeof e.id === 'string').sort((a, b) => b.createdAt - a.createdAt)
+      : [];
   } catch {
     return [];
   }
@@ -144,8 +148,8 @@ export function onClipboardSettingsChanged(cb: () => void): () => void {
 function applyCap(list: ClipboardEntry[]): ClipboardEntry[] {
   const { maxSize } = loadClipboardSettings();
   const pinned = list.filter((e) => e.pinned);
-  const rest = list.filter((e) => !e.pinned);
-  return [...pinned, ...rest.slice(0, Math.max(0, maxSize - pinned.length))];
+  let remaining = Math.max(0, maxSize - pinned.length);
+  return list.filter((e) => e.pinned || remaining-- > 0);
 }
 
 export interface RecordClipboardOptions {
