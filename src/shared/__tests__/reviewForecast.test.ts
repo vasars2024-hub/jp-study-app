@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import {
   FORECAST_DAYS,
   dayLabel,
@@ -172,6 +173,33 @@ describe('dayLabel', () => {
 });
 
 describe('localDueForecast', () => {
+  it.each([
+    { month: 2, day: 8, hour: 0, minute: 30, expected: [0, 1] },
+    { month: 10, day: 1, hour: 23, minute: 30, expected: [1, 0] },
+  ])('uses calendar days across a clock change ($month)', ({ month, day, hour, minute, expected }) => {
+    // Start Node in a known zone: changing TZ inside a Vitest worker is not
+    // reliable on every platform. Exercise the actual module in that process.
+    const script = `
+      const ts = require('typescript');
+      const source = require('fs').readFileSync('src/shared/reviewForecast.ts', 'utf8');
+      const code = ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+      }).outputText;
+      const api = {};
+      new Function('exports', code)(api);
+      const now = new Date(2026, ${month}, ${day}, 12).getTime();
+      const dueAt = new Date(2026, ${month}, ${day + (hour === 0 ? 1 : 0)}, ${hour}, ${minute}).getTime();
+      const result = api.localDueForecast([{ srs: { dueAt } }], 2, now);
+      process.stdout.write(JSON.stringify(result));
+    `;
+    const result = JSON.parse(execFileSync(process.execPath, ['-e', script], {
+      env: { ...process.env, TZ: 'America/New_York' }, encoding: 'utf8',
+    }));
+    expect(result.days.map((entry: { due: number }) => entry.due)).toEqual(expected);
+    expect(result.overdue).toBe(0);
+    expect(result.beyond).toBe(0);
+  });
+
   // Midday, so "later today" is unambiguous in the local zone the function uses.
   const NOW = new Date(2026, 7, 29, 12).getTime();
   const DAY_MS = 24 * 60 * 60 * 1000;

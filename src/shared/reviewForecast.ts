@@ -216,9 +216,14 @@ export function localDueForecast(
 ): LocalDueForecast {
   const span = Math.max(1, Math.floor(days));
   const buckets = Array.from({ length: span }, (_, offsetDays) => ({ offsetDays, due: 0 }));
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
   const dayMs = 24 * 60 * 60 * 1000;
+  // Compare local calendar dates, not elapsed 24-hour periods: a day can
+  // contain 23 or 25 hours when daylight saving time changes.
+  const calendarDay = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / dayMs;
+  };
+  const today = calendarDay(now);
 
   let overdue = 0;
   let beyond = 0;
@@ -231,7 +236,7 @@ export function localDueForecast(
       overdue += 1;
       continue;
     }
-    const offset = Math.floor((dueAt - startOfToday.getTime()) / dayMs);
+    const offset = calendarDay(dueAt) - today;
     if (offset < 0) overdue += 1;
     else if (offset < span) buckets[offset].due += 1;
     else beyond += 1;
