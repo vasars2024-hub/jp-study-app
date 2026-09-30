@@ -4,15 +4,25 @@ import { getTokenizer, tokenizeSync } from '../tokenizer';
 
 vi.mock('../tokenizer', () => ({ getTokenizer: vi.fn(), tokenizeSync: vi.fn() }));
 
+// A longest-match stand-in for kuromoji: the answer and the subtitle are
+// tokenized separately, so the fake has to read each text it is given.
+const LEXICON: Record<string, string | undefined> = {
+  今日: 'キョウ', は: 'ハ', いい: 'イイ', 天気: 'テンキ', 猫: 'ネコ', ABC: '*', です: undefined,
+};
+function fakeTokenize(text: string): ReturnType<typeof tokenizeSync> {
+  const tokens: { surface: string; reading?: string }[] = [];
+  for (let i = 0; i < text.length;) {
+    const surface = Object.keys(LEXICON).find((word) => text.startsWith(word, i)) ?? text[i];
+    tokens.push({ surface, reading: LEXICON[surface] });
+    i += surface.length;
+  }
+  return tokens as ReturnType<typeof tokenizeSync>;
+}
+
 describe('reading-aware dictation', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(tokenizeSync).mockReturnValue([
-      { surface: '今日', reading: 'キョウ' },
-      { surface: 'は', reading: 'ハ' },
-      { surface: 'いい', reading: 'イイ' },
-      { surface: '天気', reading: 'テンキ' },
-    ] as ReturnType<typeof tokenizeSync>);
+    vi.mocked(tokenizeSync).mockImplementation(fakeTokenize);
   });
 
   it('accepts a kana transcription while displaying the original kanji subtitle', async () => {
@@ -27,15 +37,20 @@ describe('reading-aware dictation', () => {
     expect(result.score).toBe(89);
   });
 
-  it('keeps the better literal score for answers containing kanji', async () => {
-    expect(await evaluateDictation('今日は天気', '今日はいい天気')).toMatchObject({ score: 71 });
+  it('accepts an answer the IME only partly converted to kanji', async () => {
+    expect(await evaluateDictation('今日はいいてんき', '今日はいい天気')).toEqual({
+      exact: true, score: 100, answer: '今日はいいてんき', expected: '今日はいい天気',
+    });
+    expect(await evaluateDictation('きょうはいい天気', '今日はいい天気')).toMatchObject({ exact: true });
+  });
+
+  it('still penalizes a missing word in an answer containing kanji', async () => {
+    const result = await evaluateDictation('今日は天気', '今日はいい天気');
+    expect(result.exact).toBe(false);
+    expect(result.score).toBe(78);
   });
 
   it('preserves unknown words when a token has no reading', async () => {
-    vi.mocked(tokenizeSync).mockReturnValue([
-      { surface: '猫', reading: 'ネコ' }, { surface: 'ABC', reading: '*' },
-      { surface: 'です' },
-    ] as ReturnType<typeof tokenizeSync>);
     expect(await evaluateDictation('ねこABCです', '猫ABCです')).toMatchObject({ exact: true });
   });
 
