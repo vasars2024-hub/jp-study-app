@@ -2497,6 +2497,7 @@ export const ja: Catalog = {
   'novel.reader.jumpToChapter': '章に移動',
   'novel.reader.jumpToChapterEllipsis': '章に移動…',
   'novel.reader.chapters': '章',
+  'novel.reader.minutesLeft': { other: 'この章は残り約{count}分' },
   'novel.reader.readingPdf': 'PDF を読み込み中… {progress}%',
   'novel.reader.openingBook': '本を開いています…',
   'novel.reader.importingArticle': '記事を読み込み中…',

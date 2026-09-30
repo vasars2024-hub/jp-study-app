@@ -2485,6 +2485,7 @@ export const zh: Catalog = {
   'novel.reader.jumpToChapter': '跳转到章节',
   'novel.reader.jumpToChapterEllipsis': '跳转到章节…',
   'novel.reader.chapters': '章节',
+  'novel.reader.minutesLeft': { other: '本章还剩约{count}分钟' },
   'novel.reader.readingPdf': '正在读取 PDF… {progress}%',
   'novel.reader.openingBook': '正在打开书籍…',
   'novel.reader.importingArticle': '正在导入文章…',

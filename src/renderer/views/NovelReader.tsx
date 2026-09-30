@@ -47,7 +47,8 @@ import {
   type ReaderSettings,
 } from '../readerSettings';
 import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bookmarks';
-import { recordReading } from '../stats';
+import { getSummary, onStatsChanged, recordReading } from '../stats';
+import { chapterCharsRemaining, estimateReadingMinutes } from '../../shared/readingTime';
 import { scrollIntoViewReliably } from '../utils/reliableScroll';
 import { loadEpub, type LoadedEpub } from '../epubLoader';
 import { loadPdf } from '../pdfLoader';
@@ -1639,6 +1640,15 @@ export default function NovelReader({ item, onClose }: Props) {
   }, [onClose]);
 
   // ----- reading time + characters → statistics -----
+  const [recentReading, setRecentReading] = useState(() => getSummary().recent);
+  useEffect(() => onStatsChanged(() => setRecentReading(getSummary().recent)), []);
+  const chapterMinutesLeft = loaded
+    ? estimateReadingMinutes(
+      chapterCharsRemaining(loaded.chapters, loaded.toc, part, localFracRef.current),
+      recentReading,
+    )
+    : null;
+
   useEffect(() => {
     const flush = () => {
       const now = Date.now();
@@ -3478,6 +3488,9 @@ export default function NovelReader({ item, onClose }: Props) {
           <span className="reader-pagecount muted">
             {page + 1}/{pageCount}
           </span>
+        )}
+        {chapterMinutesLeft !== null && (
+          <span className="muted">{t('novel.reader.minutesLeft', { count: chapterMinutesLeft })}</span>
         )}
         <span className="reader-pct muted">{Math.round((seek ?? progress) * 100)}%</span>
       </ContextualSurface>

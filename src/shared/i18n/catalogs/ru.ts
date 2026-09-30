@@ -2706,6 +2706,12 @@ export const ru: Catalog = {
   'novel.reader.jumpToChapter': 'Перейти к главе',
   'novel.reader.jumpToChapterEllipsis': 'Перейти к главе…',
   'novel.reader.chapters': 'Главы',
+  'novel.reader.minutesLeft': {
+    one: 'До конца главы ~{count} мин',
+    few: 'До конца главы ~{count} мин',
+    many: 'До конца главы ~{count} мин',
+    other: 'До конца главы ~{count} мин',
+  },
   'novel.reader.readingPdf': 'Чтение PDF… {progress}%',
   'novel.reader.openingBook': 'Открываем книгу…',
   'novel.reader.importingArticle': 'Импортируем статью…',

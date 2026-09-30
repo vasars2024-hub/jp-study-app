@@ -2664,6 +2664,7 @@ export const en: Catalog = {
   'novel.reader.jumpToChapter': 'Jump to chapter',
   'novel.reader.jumpToChapterEllipsis': 'Jump to chapter…',
   'novel.reader.chapters': 'Chapters',
+  'novel.reader.minutesLeft': { one: '~{count} min left in chapter', other: '~{count} min left in chapter' },
   'novel.reader.readingPdf': 'Reading PDF… {progress}%',
   'novel.reader.openingBook': 'Opening book…',
   'novel.reader.importingArticle': 'Importing article…',
