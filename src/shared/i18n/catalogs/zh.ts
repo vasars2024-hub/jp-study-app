@@ -7551,6 +7551,8 @@ export const zh: Catalog = {
   'flash.search.placeholder': '搜索卡片…',
   'flash.search.aria': '按单词、读音、释义或来源搜索卡片',
   'flash.search.clear': '清除搜索',
+  'flash.search.leeches': '难记卡片：{n}',
+  'flash.search.leechesTitle': '显示遗忘至少{n}次的卡片',
   'flash.search.noMatches': '没有匹配“{query}”的卡片。',
   'flash.search.matchCount': {
     other: '{count} 条匹配',

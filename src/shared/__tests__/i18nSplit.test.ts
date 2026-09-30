@@ -19,7 +19,8 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
       sourceFiles(full, out);
-    } else if (/\.tsx?$/.test(entry.name)) {
+    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+      // Colocated `*.test.ts` files are tests too, and never reach a bundle.
       out.push(full);
     }
   }

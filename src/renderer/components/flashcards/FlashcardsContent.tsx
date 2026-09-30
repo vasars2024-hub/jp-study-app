@@ -58,6 +58,9 @@ import {
   filterDeckByBook,
   filterDeckByBooks,
   groupDeckByBook,
+  isLeechCard,
+  LEECH_LAPSE_THRESHOLD,
+  LEECH_QUERY,
   loadDeck,
   loadDeckFolders,
   onDeckChanged,
@@ -2070,6 +2073,13 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   // once and every one of them exits back to the same place.
   const [practice, setPractice] = useState<PracticeMode>('none');
 
+  // Counted over the same folder the find box narrows, so the number on the
+  // button is the number of cards it shows.
+  const leechCount = useMemo(
+    () => filterDeckCards(epubCards, folderFilter).filter(isLeechCard).length,
+    [epubCards, folderFilter],
+  );
+
   // The source picker's options, built once per deck/folder/filter change: typing
   // in the find box re-renders this view, and the picker does not depend on it.
   const reviewSourceOptions = useMemo(
@@ -2309,6 +2319,16 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             placeholder={t('flash.search.placeholder')}
             aria-label={t('flash.search.aria')}
           />
+          {overviewTab === 'epub' && !search && leechCount > 0 && (
+            <button
+              type="button"
+              className="btn small flash-search-leeches"
+              title={t('flash.search.leechesTitle', { n: LEECH_LAPSE_THRESHOLD })}
+              onClick={() => state.setSearch(LEECH_QUERY)}
+            >
+              {t('flash.search.leeches', { n: leechCount })}
+            </button>
+          )}
           {search && (
             <>
               <span className="flash-search-count muted" role="status">

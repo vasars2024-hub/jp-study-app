@@ -611,6 +611,8 @@ export function setRestDayEnabled(enabled: boolean): void {
  *
  * With `restDays`, a single missed day bridges the streak when the day before it was active,
  * at most once in any seven days. The rest day itself is not counted as a day studied.
+ * A rest taken yesterday holds the streak while today is still unstudied, the same way a
+ * plain streak may end yesterday.
  */
 export function computeStreak(days: Record<string, DayEntry>, restDays = false): number {
   let streak = 0;
@@ -625,7 +627,7 @@ export function computeStreak(days: Record<string, DayEntry>, restDays = false):
   for (;;) {
     if (dayIsActive(days[dayKey(cursor)])) {
       streak += 1;
-    } else if (restDays && steps - lastRest >= 7 && streak > 0) {
+    } else if (restDays && steps - lastRest >= 7 && (streak > 0 || steps === 1)) {
       const before = new Date(cursor);
       before.setDate(before.getDate() - 1);
       if (!dayIsActive(days[dayKey(before)])) break;

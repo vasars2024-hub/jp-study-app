@@ -740,6 +740,8 @@ export function StatsChart({ state }: { state: StatsState }) {
 function ReadingSpeedChart({ recent }: { recent: DayStat[] }) {
   const { t, lang } = useT();
   const days = recent.map(day => ({ ...day, speed: readingCharsPerMinute([day]) }));
+  // A learner who only watched or reviewed has no pace to plot.
+  if (days.every(day => day.speed === null)) return null;
   const peak = Math.max(1, ...days.map(day => day.speed ?? 0));
   return (
     <section className="stats-reading-speed" aria-label={t('stats.readingSpeed.title')}>

@@ -35,7 +35,13 @@ describe('computeStreak rest day', () => {
     expect(computeStreak(daysWith([0, 3, 4]), true)).toBe(1);
   });
 
+  it('holds the streak when yesterday was the rest day and today is not studied yet', () => {
+    expect(computeStreak(daysWith([2, 3]), true)).toBe(2);
+    expect(computeStreak(daysWith([2, 3]))).toBe(0);
+  });
+
   it('does not invent a streak from nothing', () => {
-    expect(computeStreak(daysWith([2, 3]), true)).toBe(0);
+    expect(computeStreak(daysWith([3, 4]), true)).toBe(0);
+    expect(computeStreak(daysWith([]), true)).toBe(0);
   });
 });

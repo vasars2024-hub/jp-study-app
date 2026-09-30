@@ -39,6 +39,10 @@ export default function StatisticsView() {
   const [dataToolsOpen, setDataToolsOpen] = useState(false);
   useDismissableDisclosure(dataToolsRef, dataToolsOpen);
   const [restDay, setRestDay] = useState(getRestDayEnabled);
+  const toggleRestDay = () => {
+    setRestDayEnabled(!restDay);
+    setRestDay(!restDay);
+  };
 
   const menus: MenuBarMenu[] = [
     {
@@ -56,10 +60,7 @@ export default function StatisticsView() {
         {
           id: 'rest-day',
           label: t(restDay ? 'stats.menu.restDayOn' : 'stats.menu.restDayOff'),
-          onSelect: () => {
-            setRestDayEnabled(!restDay);
-            setRestDay(!restDay);
-          },
+          onSelect: toggleRestDay,
         },
       ],
     },
@@ -225,6 +226,10 @@ export default function StatisticsView() {
             >
               <Icon name="chart-bar" size={13} />
               {t('stats.last14Days')}
+            </button>
+            {/* The menu bar only renders under Aero/Wired chrome, so the switch needs a home here too. */}
+            <button type="button" className="btn stats-rest-day" aria-pressed={restDay} onClick={toggleRestDay}>
+              {t(restDay ? 'stats.menu.restDayOn' : 'stats.menu.restDayOff')}
             </button>
             <details
               className="stats-data-tools"

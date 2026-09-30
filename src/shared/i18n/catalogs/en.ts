@@ -7734,6 +7734,8 @@ export const en: Catalog = {
   'flash.search.placeholder': 'Search cards…',
   'flash.search.aria': 'Search flashcards by word, reading, meaning, or source',
   'flash.search.clear': 'Clear search',
+  'flash.search.leeches': 'Leeches: {n}',
+  'flash.search.leechesTitle': 'Show the cards you have forgotten at least {n} times',
   'flash.search.noMatches': 'No cards match “{query}”.',
   'flash.search.matchCount': {
     one: '{count} match',

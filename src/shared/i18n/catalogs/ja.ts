@@ -7592,6 +7592,8 @@ export const ja: Catalog = {
   'flash.search.placeholder': 'カードを検索…',
   'flash.search.aria': '単語・読み・意味・出典でフラッシュカードを検索',
   'flash.search.clear': '検索をクリア',
+  'flash.search.leeches': '苦手カード: {n}',
+  'flash.search.leechesTitle': '{n}回以上忘れたカードを表示',
   'flash.search.noMatches': '「{query}」に一致するカードはありません。',
   'flash.search.matchCount': {
     other: '{count}件一致',

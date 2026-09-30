@@ -8368,6 +8368,8 @@ export const ru: Catalog = {
   'flash.search.placeholder': 'Поиск карточек…',
   'flash.search.aria': 'Поиск карточек по слову, чтению, значению или источнику',
   'flash.search.clear': 'Очистить поиск',
+  'flash.search.leeches': 'Трудные карточки: {n}',
+  'flash.search.leechesTitle': 'Показать карточки, забытые не менее {n} раз',
   'flash.search.noMatches': 'Нет карточек, соответствующих «{query}».',
   'flash.search.matchCount': {
     one: '{count} совпадение',

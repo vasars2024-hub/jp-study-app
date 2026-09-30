@@ -109,6 +109,8 @@ afterEach(async () => {
   root = null;
 });
 
+const ACTIVITY_COLUMNS = '.stats-chart:not(.stats-reading-speed .stats-chart) .stats-bar-col';
+
 describe('files-app gate 8 — statistics render in the Files app', () => {
   it('renders the capture\'s stable key: a 14-day recent window', async () => {
     const { FilesStatisticsPanel } = await import(
@@ -116,7 +118,8 @@ describe('files-app gate 8 — statistics render in the Files app', () => {
     );
     const el = await mount(<FilesStatisticsPanel />);
     expect(CAPTURED.recentDays).toBe(14);
-    expect(el.querySelectorAll('.stats-bar-col').length).toBe(CAPTURED.recentDays);
+    // The activity chart only: the reading-speed chart below it repeats the window.
+    expect(el.querySelectorAll(ACTIVITY_COLUMNS).length).toBe(CAPTURED.recentDays);
   });
 
   it('control: the window is READ, not fixed — a 7-day summary renders 7 columns', async () => {
@@ -125,7 +128,7 @@ describe('files-app gate 8 — statistics render in the Files app', () => {
     );
     recentDays = 7;
     const el = await mount(<FilesStatisticsPanel />);
-    expect(el.querySelectorAll('.stats-bar-col').length).toBe(7);
+    expect(el.querySelectorAll(ACTIVITY_COLUMNS).length).toBe(7);
   });
 
   it('the volatile totals are compared for SHAPE, as the capture instructs', async () => {
