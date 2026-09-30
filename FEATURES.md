@@ -135,6 +135,7 @@ Status: UNVERIFIED as gameplay. i18n coverage **is** tested
 | MyAnimeList sync | `src/main/malSync.ts` | Settings → Media tracking | **UNVERIFIED, and known-unproven** — audit U5: 44 passing tests, zero real bytes to MyAnimeList. Needs the user's own account |
 | YouTube playlists | `src/renderer/views/YouTubePlaylistsView.tsx` | Start → YouTube | UNVERIFIED |
 | Music widget / visualizer | `src/renderer/components/FocusMusicBar.tsx` | Start → Music | UNVERIFIED |
+| Soundscape mixer (14 generated ambience layers, 6 generated music styles, scenes, saved mixes, sleep timer) | `src/renderer/widgets/soundscape.tsx`, engine `src/renderer/soundscape/soundscapeEngine.ts` | Widgets → Music → Soundscape | TESTED — model and widget are covered by the suite, and every layer and style was rendered offline in Electron and measured (audible, no clipping, no errors). **Nobody has listened to it yet**, so how good it sounds is unjudged |
 | Transcription queue | `src/main/transcriptionJobs.ts:340` | Media, automatic | **BROKEN on defaults** — see §7 |
 
 ---

@@ -143,7 +143,7 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
   {
     id: 'music',
     label: 'Music widget & likes',
-    description: 'Liked songs, playlists, sort, music widget lyrics toggle, lyrics search prefs.',
+    description: 'Liked songs, playlists, sort, music widget lyrics toggle, lyrics search prefs, soundscape mixes.',
     category: 'Media',
     lsKeys: [
       'jp-music-liked',
@@ -154,6 +154,7 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
       'jp-os-music-widget',
       'jp-lyrics-settings',
       'jp-media-collapsed',
+      'jp-soundscape-v1',
     ],
     clearable: true,
     clearConfirm: 'Clear music likes and widget settings?',

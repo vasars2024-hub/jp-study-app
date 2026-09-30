@@ -26,6 +26,7 @@ import {
   ReadingRecentlyFinishedWidget,
 } from './readingLists';
 import { MiniPlayer } from './music';
+import { SoundscapeWidget } from './soundscape';
 import { ContinueWatchingWidget } from './continueWatching';
 import { Calculator } from './utility';
 import { LevelProgressWidget } from './levels';
@@ -78,6 +79,8 @@ export const WIDGETS: WidgetDef[] = [
 
   // ---- Music ----
   { type: 'mini-player', titleKey: 'widgets.title.mini-player', category: 'Music', descKey: 'widgets.desc.mini-player', defaultSize: { w: 300, h: 200 }, minSize: { w: 240, h: 180 }, component: MiniPlayer },
+  // The list scrolls, so the minimum only has to fit the transport, the scene picker and a couple of rows.
+  { type: 'soundscape', titleKey: 'widgets.title.soundscape', category: 'Music', descKey: 'widgets.desc.soundscape', defaultSize: { w: 320, h: 480 }, minSize: { w: 260, h: 240 }, component: SoundscapeWidget },
 
   // ---- Utility ----
   { type: 'calculator', titleKey: 'widgets.title.calculator', category: 'Utility', descKey: 'widgets.desc.calculator', defaultSize: { w: 240, h: 300 }, minSize: { w: 200, h: 260 }, component: Calculator },

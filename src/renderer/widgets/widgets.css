@@ -30,3 +30,84 @@
   justify-content: flex-start;
   gap: 6px;
 }
+
+/* Soundscape: transport and scene picker stay put; the layer list scrolls. */
+.wgt-sound {
+  gap: 6px;
+  min-height: 0;
+}
+.wgt-sound .wgt-row {
+  flex: 0 0 auto;
+}
+.wgt-sound .ui-select {
+  min-width: 0;
+  flex: 1;
+}
+.wgt-sound .ui-input {
+  min-width: 0;
+  flex: 1;
+}
+.wgt-sound .wgt-btn-icon:disabled,
+.wgt-sound .wgt-btn:disabled {
+  opacity: var(--alpha-disabled);
+  cursor: default;
+}
+.wgt-sound-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+.wgt-sound-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wgt-sound-heading {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wgt-sound-row {
+  display: grid;
+  grid-template-columns: minmax(0, 46%) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.wgt-sound-name {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.wgt-sound-name:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.wgt-sound-row.is-on .wgt-sound-name {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+/* A layer that is off keeps its slider reachable but visibly parked. */
+.wgt-sound-row:not(.is-on) .ui-slider {
+  opacity: 0.55;
+}
+.wgt-sound-foot {
+  justify-content: space-between;
+}
+.wgt-sound-duck {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
