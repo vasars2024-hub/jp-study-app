@@ -742,6 +742,17 @@
   width: min(24rem, 60vw);
 }
 
+#media-workspace .study-dictation-diff {
+  flex-basis: 100%;
+  font-family: var(--subtitle-font-stack);
+}
+
+#media-workspace .study-dictation-diff mark {
+  background: none;
+  color: inherit;
+  text-decoration: underline wavy currentColor;
+}
+
 #media-workspace .study-dictation-missed {
   flex-basis: 100%;
   font-size: 0.85em;

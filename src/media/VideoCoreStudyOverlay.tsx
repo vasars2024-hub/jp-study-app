@@ -110,6 +110,7 @@ import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import { formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import { pretokenizeInIdle } from '../renderer/tokenizer';
 import { evaluateDictation } from '../renderer/evaluateDictation';
+import { evaluateJapaneseDictation, markMissedDictation } from '../shared/listeningTraining';
 import {
   mediaCaptionCues,
   normalizeMediaCaptionTracks,
@@ -2967,6 +2968,14 @@ export default function VideoCoreStudyOverlay({
             {dictationResult.exact
               ? t('mediaWorkspace.study.exactMatch')
               : t('mediaWorkspace.study.matchScore', { score: dictationResult.score })}
+          </span>
+        )}
+        {dictationRevealed && dictationResult && !dictationResult.exact
+          && evaluateJapaneseDictation(dictationInput, plainText).score === dictationResult.score && (
+          <span className="study-dictation-diff" lang="ja">
+            {markMissedDictation(dictationInput, plainText).map((mark, index) => (
+              mark.missed ? <mark key={index}>{mark.text}</mark> : <span key={index}>{mark.text}</span>
+            ))}
           </span>
         )}
         {missedLines.length > 0 && (

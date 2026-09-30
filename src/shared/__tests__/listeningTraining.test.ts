@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateVideoCoreDictation } from '../videoCoreStudy';
+import { markMissedDictation } from '../listeningTraining';
+
+describe('markMissedDictation', () => {
+  it('marks the characters of the expected line the answer lacks', () => {
+    expect(markMissedDictation('きょうはてんき', 'きょうはいいてんき')).toEqual([
+      { text: 'きょうは', missed: false },
+      { text: 'いい', missed: true },
+      { text: 'てんき', missed: false },
+    ]);
+  });
+});
 import {
   evaluateJapaneseDictation,
   normalizeJapaneseDictation,

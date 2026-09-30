@@ -58,3 +58,47 @@ export function evaluateJapaneseDictation(
     expected,
   };
 }
+
+export interface DictationMark {
+  text: string;
+  /** True when the answer has no matching character for this run of the expected line. */
+  missed: boolean;
+}
+
+/** Aligns the answer to the expected line and returns the expected line in runs, marking what was not heard. */
+export function markMissedDictation(answerValue: string, expectedValue: string): DictationMark[] {
+  const answer = foldKana([...normalizeJapaneseDictation(answerValue)].slice(0, 500));
+  const expectedChars = [...normalizeJapaneseDictation(expectedValue)].slice(0, 500);
+  const expected = foldKana(expectedChars);
+  // Longest common subsequence; expected characters outside it are the missed ones.
+  const width = expected.length + 1;
+  const table = new Uint16Array((answer.length + 1) * width);
+  for (let row = answer.length - 1; row >= 0; row -= 1) {
+    for (let column = expected.length - 1; column >= 0; column -= 1) {
+      table[row * width + column] = answer[row] === expected[column]
+        ? table[(row + 1) * width + column + 1] + 1
+        : Math.max(table[(row + 1) * width + column], table[row * width + column + 1]);
+    }
+  }
+  const marks: DictationMark[] = [];
+  const push = (text: string, missed: boolean): void => {
+    const last = marks[marks.length - 1];
+    if (last && last.missed === missed) last.text += text;
+    else marks.push({ text, missed });
+  };
+  let row = 0;
+  let column = 0;
+  while (column < expected.length) {
+    if (row < answer.length && answer[row] === expected[column]) {
+      push(expectedChars[column], false);
+      row += 1;
+      column += 1;
+    } else if (row < answer.length && table[(row + 1) * width + column] >= table[row * width + column + 1]) {
+      row += 1;
+    } else {
+      push(expectedChars[column], true);
+      column += 1;
+    }
+  }
+  return marks;
+}
