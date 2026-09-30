@@ -6913,6 +6913,7 @@ export const ru: Catalog = {
   'calendar.modal.startTime': 'Время начала',
   'calendar.modal.endTime': 'Время окончания',
   'calendar.modal.endBeforeStart': 'Время окончания должно быть позже времени начала.',
+  'calendar.modal.repeatEndBeforeStart': 'Дата окончания повтора не может быть раньше даты события.',
   'calendar.modal.dateRequired': 'Выберите дату события.',
   'calendar.modal.untitled': 'Событие без названия',
   'calendar.modal.deleteConfirm.title': 'Удалить событие',

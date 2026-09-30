@@ -111,9 +111,13 @@ export function EventModal({
   const endsBeforeStart =
     !form.allDay && Boolean(form.startTime) && Boolean(form.endTime) && form.endTime < form.startTime;
   const missingDate = !form.date;
+  // ISO date keys compare correctly as strings. An end before the first
+  // occurrence leaves zero occurrences, so the event would vanish from every view.
+  const repeatEndsBeforeStart =
+    form.recurrence !== 'none' && Boolean(form.recurrenceEndDate) && Boolean(form.date) && form.recurrenceEndDate < form.date;
 
   const save = () => {
-    if (!form.title.trim() || missingDate || endsBeforeStart) return;
+    if (!form.title.trim() || missingDate || endsBeforeStart || repeatEndsBeforeStart) return;
     const payload: Omit<CalendarEvent, 'id' | 'createdAt'> = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
@@ -299,8 +303,18 @@ export function EventModal({
           {form.recurrence !== 'none' && (
             <label className="cal-field">
               <span>{t('calendar.modal.repeatUntil')}</span>
-              <input type="date" value={form.recurrenceEndDate} onChange={(e) => set('recurrenceEndDate', e.target.value)} />
+              <input
+                type="date"
+                value={form.recurrenceEndDate}
+                min={form.date || undefined}
+                onChange={(e) => set('recurrenceEndDate', e.target.value)}
+                aria-invalid={repeatEndsBeforeStart || undefined}
+                aria-describedby={repeatEndsBeforeStart ? 'cal-repeat-error' : undefined}
+              />
             </label>
+          )}
+          {repeatEndsBeforeStart && (
+            <p id="cal-repeat-error" className="cal-field-error" role="alert">{t('calendar.modal.repeatEndBeforeStart')}</p>
           )}
         </div>
 
@@ -310,7 +324,7 @@ export function EventModal({
           )}
           <div className="cal-modal-spacer" />
           <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim() || missingDate || endsBeforeStart}>
+          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim() || missingDate || endsBeforeStart || repeatEndsBeforeStart}>
             {isEditing ? t('common.save') : t('calendar.modal.create')}
           </button>
         </div>
