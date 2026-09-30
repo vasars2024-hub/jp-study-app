@@ -1,3 +1,4 @@
+import { isoDateLocal } from '../../../../shared/watchLibrary';
 import type { EpisodeRow } from '../../../../shared/scraperResults';
 import type {
   ScraperExportFormat,
@@ -111,7 +112,7 @@ export function exportFileStem(template: string, series: string, now = new Date(
     .replace(/^-+|-+$/g, '') || 'anime-export';
   return template
     .replace(/\{series\}/g, slug)
-    .replace(/\{date\}/g, now.toISOString().slice(0, 10))
+    .replace(/\{date\}/g, isoDateLocal(now.getTime()))
     .replace(/[^a-z0-9._-]+/gi, '-')
     .replace(/^-+|-+$/g, '') || 'anime-export';
 }

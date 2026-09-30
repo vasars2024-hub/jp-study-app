@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonSync, writeJsonAtomicSync } from './atomicJson';
 import { mt } from './i18n';
+import { isoDateLocal } from '../shared/watchLibrary';
 import type {
   DictEntry,
   DictResult,
@@ -1552,7 +1553,7 @@ export function registerDictionaryIpc(): void {
     const { dialog } = await import('electron');
     const picked = await dialog.showSaveDialog({
       title: mt('dialog.saveNotes.title'),
-      defaultPath: `lexicon-notes-${new Date().toISOString().slice(0, 10)}.csv`,
+      defaultPath: `lexicon-notes-${isoDateLocal(Date.now())}.csv`,
       filters: [{ name: mt('dialog.format.csv'), extensions: ['csv'] }],
     });
     if (picked.canceled || !picked.filePath) {
