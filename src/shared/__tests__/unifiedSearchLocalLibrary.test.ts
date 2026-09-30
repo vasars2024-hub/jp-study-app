@@ -60,6 +60,32 @@ describe('searchLocalLibraryEntries', () => {
     expect(searchLocalLibraryEntries(LIBRARY, '')).toEqual([]);
   });
 
+  it.each([
+    ['ガッコウ', 'ｶﾞｯｺｳ'],
+    ['ｶﾞｯｺｳ', 'ガッコウ'],
+    ['ガッコウ', 'カ\u3099ッコウ'],
+    ['ＪＬＰＴ　Ｎ２', 'jlpt n2'],
+    ['JLPT N2', 'ｊｌｐｔ　ｎ２'],
+  ])('finds %s with the equivalent query %s without changing its display title', (title, query) => {
+    const book = entry('book', { title });
+    const results = searchLocalLibraryEntries([book, entry('other')], query);
+    expect(results).toEqual([book]);
+    expect(localLibraryEntryToResult(results[0], 'local').title).toBe(title);
+  });
+
+  it('normalizes every searchable field while retaining title-first ranking', () => {
+    const books = [
+      entry('keyword', { keywords: ['ｶﾞｯｺｳ'] }),
+      entry('author', { authorsOrStudios: ['ｶﾞｯｺｳ'] }),
+      entry('alternate', { alternativeTitles: ['ｶﾞｯｺｳ'] }),
+      entry('romaji', { romajiTitle: 'ｶﾞｯｺｳ' }),
+      entry('japanese', { japaneseTitle: 'ｶﾞｯｺｳ' }),
+      entry('title', { title: 'ｶﾞｯｺｳ' }),
+    ];
+    expect(searchLocalLibraryEntries(books, 'ガッコウ').map((book) => book.id))
+      .toEqual(['title', 'alternate', 'romaji', 'japanese', 'author', 'keyword']);
+  });
+
   it('caps results at the requested limit deterministically', () => {
     const many = Array.from({ length: 10 }, (_, i) => entry(`e${i}`, { title: `Frieren ${i}` }));
     const results = searchLocalLibraryEntries(many, 'frieren', 3);

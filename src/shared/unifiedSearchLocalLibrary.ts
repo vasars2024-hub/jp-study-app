@@ -50,7 +50,7 @@ export interface LocalLibraryExecutorOptions {
 const DEFAULT_LIMIT = 50;
 
 function normalizeText(value: string): string {
-  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function includesQuery(value: string | null | undefined, query: string): boolean {
