@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import { evaluateVideoCoreDictation } from '../videoCoreStudy';
 import {
   evaluateJapaneseDictation,
   normalizeJapaneseDictation,
 } from '../listeningTraining';
 
 describe('Japanese listening training', () => {
+  it.each(['“ビール”', '‘ビール’', '〝ビール〟'])(
+    'ignores typographic quotation marks in answers and subtitles: %s',
+    (quoted) => {
+      for (const evaluate of [evaluateJapaneseDictation, evaluateVideoCoreDictation]) {
+        expect(evaluate('ビール', quoted)).toMatchObject({ exact: true, score: 100 });
+        expect(evaluate(quoted, 'ビール')).toMatchObject({ exact: true, score: 100 });
+        expect(evaluate('ビル', quoted)).toMatchObject({ exact: false, score: 67 });
+      }
+    },
+  );
+
   it('ignores spacing, punctuation, and width differences', () => {
     expect(normalizeJapaneseDictation('「今日は いい天気！」')).toBe('今日はいい天気');
     expect(evaluateJapaneseDictation('今日はいい天気', '今日は、いい天気。').exact).toBe(true);

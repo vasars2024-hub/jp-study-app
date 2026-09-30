@@ -1400,7 +1400,7 @@ function normalizeJapaneseDictation(value: string): string {
     .normalize('NFKC')
     .toLocaleLowerCase('ja')
     // Keep ー: vowel length changes the word (ビル versus ビール).
-    .replace(/[\s、。！？!?・「」『』（）()[\]【】〈〉《》…‥.,'":;：；]/gu, '');
+    .replace(/[\s、。！？!?・「」『』“”‘’〝〞〟（）()[\]【】〈〉《》…‥.,'":;：；]/gu, '');
 }
 
 function editDistance(left: string[], right: string[]): number {
