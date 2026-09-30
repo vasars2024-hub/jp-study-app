@@ -252,13 +252,13 @@ export function reminderTriggerAt(o: EventOccurrence): number | null {
   return occurrenceStartsAt(o) - REMINDER_MINUTES[o.reminder] * 60_000;
 }
 
-/** Upcoming occurrences from now, soonest first — powers the Agenda view and the Home Workspace widget. */
+/** Ongoing and upcoming occurrences, soonest first — powers the Agenda view and the Home Workspace widget. */
 export function getUpcomingOccurrences(limit = 20, withinDays = 60): EventOccurrence[] {
   const now = new Date();
   const end = new Date(now);
   end.setDate(end.getDate() + withinDays);
   const occs = expandOccurrences(readList(), now, end);
-  return occs.filter((o) => eventDateTime(o).getTime() >= now.getTime() - 60_000).slice(0, limit);
+  return occs.filter((o) => occurrenceEndsAt(o) >= now.getTime() - 60_000).slice(0, limit);
 }
 
 /** Today's occurrences only. */

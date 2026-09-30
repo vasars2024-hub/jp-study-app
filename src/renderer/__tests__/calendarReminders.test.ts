@@ -8,7 +8,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalendarEvent } from '../calendar';
-import { getOverdueReminders } from '../calendar';
+import { getOverdueReminders, getUpcomingOccurrences } from '../calendar';
 import { LS_KEYS } from '../storage/storage';
 import {
   CALENDAR_REMINDER_STATE_KEY,
@@ -208,6 +208,30 @@ describe('calendar — overdue agenda reminders', () => {
     ]));
     vi.setSystemTime(new Date(2026, 8, 15, 10, 30));
     expect(getOverdueReminders().map((o) => o.id)).toEqual(['all-day']);
+  });
+});
+
+describe('calendar — upcoming occurrences', () => {
+  it.each(['none', 'daily'] as const)('keeps ongoing %s sessions in the widget until they finish', (recurrence) => {
+    localStorage.setItem(LS_KEYS.calendarEvents, JSON.stringify([
+      event({ id: 'study', recurrence, date: recurrence === 'daily' ? '2026-09-01' : '2026-09-15', reminder: 'none' }),
+    ]));
+    vi.setSystemTime(new Date(2026, 8, 15, 10, 30));
+    expect(getUpcomingOccurrences(4, 0).map((o) => [o.id, o.occurrenceDate]))
+      .toEqual([['study', '2026-09-15']]);
+    vi.setSystemTime(new Date(2026, 8, 15, 11, 2));
+    expect(getUpcomingOccurrences(4, 0)).toEqual([]);
+  });
+
+  it('filters finished events before limiting, retaining all-day and future events', () => {
+    localStorage.setItem(LS_KEYS.calendarEvents, JSON.stringify([
+      event({ id: 'finished', startTime: '08:00', endTime: '09:00' }),
+      event({ id: 'no-end', endTime: undefined }),
+      event({ id: 'all-day', allDay: true, startTime: undefined }),
+      event({ id: 'future', startTime: '12:00', endTime: '13:00' }),
+    ]));
+    vi.setSystemTime(new Date(2026, 8, 15, 10, 30));
+    expect(getUpcomingOccurrences(2, 0).map((o) => o.id)).toEqual(['all-day', 'future']);
   });
 });
 
