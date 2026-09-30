@@ -9,6 +9,7 @@ import {
 import { mergeBuddyRoutines } from './buddyRoutines';
 import { writeLocalStorageJson } from '../localStorageWrite';
 import { migrateLegacyCompanionStorage } from './companionLegacyIds';
+import { RETIRED_WALL_PRESET_IDS } from './wallCatalog';
 
 const KEY = 'jp-os-environment-v1';
 const EVENT = 'jp-os-environment-changed';
@@ -56,6 +57,32 @@ function sanitizePlaylist(raw: unknown): WallpaperPlaylist | null {
   };
 }
 
+/**
+ * Drop playlist items that point at a removed built-in wall, the rules that
+ * pinned those items, and any playlist the removal left empty.
+ *
+ * Without this a saved playlist keeps listing the wall under its old label while
+ * `getWallPreset` silently paints Crimson Veil for the unknown id.
+ */
+export function stripRetiredWalls<R extends { itemId: string }>(
+  playlists: WallpaperPlaylist[],
+  rules: R[],
+): { playlists: WallpaperPlaylist[]; rules: R[] } {
+  const removed = new Set<string>();
+  const kept: WallpaperPlaylist[] = [];
+  for (const playlist of playlists) {
+    const items = playlist.items.filter((item) => {
+      const retired = item.kind === 'preset' && RETIRED_WALL_PRESET_IDS.has(item.ref);
+      if (retired) removed.add(item.id);
+      return !retired;
+    });
+    if (items.length === playlist.items.length) kept.push(playlist);
+    else if (items.length > 0) kept.push({ ...playlist, items });
+  }
+  if (removed.size === 0) return { playlists, rules };
+  return { playlists: kept, rules: rules.filter((rule) => !removed.has(rule.itemId)) };
+}
+
 interface WallpaperItemLoose {
   id: string;
   kind?: string;
@@ -69,7 +96,9 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
   const playlistsRaw = Array.isArray(partial.playlists)
     ? partial.playlists.map(sanitizePlaylist).filter(Boolean) as WallpaperPlaylist[]
     : [];
-  let playlists = playlistsRaw.length ? playlistsRaw : [buildDefaultDayCyclePlaylist()];
+  const savedRules = Array.isArray(partial.rules) ? partial.rules : [];
+  const stripped = stripRetiredWalls(playlistsRaw, savedRules);
+  let playlists = stripped.playlists.length ? stripped.playlists : [buildDefaultDayCyclePlaylist()];
   // Merge new default day-cycle items (e.g. exam/study walls) into older saves.
   playlists = playlists.map((p) => {
     if (p.id !== DAY_CYCLE_PLAYLIST_ID) return p;
@@ -84,10 +113,7 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
       ? partial.activePlaylistId
       : playlists[0]?.id ?? DAY_CYCLE_PLAYLIST_ID;
 
-  let rules =
-    Array.isArray(partial.rules) && partial.rules.length
-      ? partial.rules
-      : buildDefaultRules();
+  let rules = stripped.rules.length ? stripped.rules : buildDefaultRules();
   // Ensure L5 calendar rules exist even for older saved rule lists.
   const hasCal = rules.some((r) => r.when && (r.when as { type?: string }).type === 'calendarCategory');
   if (!hasCal) {

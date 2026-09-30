@@ -2,49 +2,78 @@
  * Secret OS (Aero) environment — wallpaper and living-layer state scoped to Aero mode.
  * Study OS environment is backed up on entry and restored on exit.
  */
-import { loadEnvironment, onEnvironmentChanged, saveEnvironment } from './environment/environmentStore';
+import {
+  loadEnvironment,
+  onEnvironmentChanged,
+  saveEnvironment,
+  stripRetiredWalls,
+} from './environment/environmentStore';
 import { presetPatch } from './environment/environmentPresets';
-import type { EnvironmentSettings, WallpaperPlaylist } from './environment/types';
+import type { EnvironmentSettings, RotationRule, WallpaperPlaylist } from './environment/types';
 import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
 import { migrateLegacyCompanionStorage } from './environment/companionLegacyIds';
 import { AERO_THEME_ID } from './theme/frutiger-aero';
 import { DEFAULT_THEME_ID, loadThemeId, onThemeChanged } from './theme/engine';
-import {
-  buildNostalgicDefaultRule,
-  buildNostalgicWallpaperPlaylist,
-  SECRET_AERO_PLAYLIST_ID,
-} from './environment/nostalgicWallpaperPack';
 
 const AERO_ENV_KEY = 'jp-aero-environment-v1';
 const STUDY_ENV_BACKUP_KEY = 'jp-study-environment-backup-v1';
 const AERO_RESTORE_THEME_KEY = 'jp-aero-restore-theme-v1';
 
+export const SECRET_AERO_PLAYLIST_ID = 'secret-aero-default-wallpaper';
 const SECRET_AERO_DEFAULT_RULE_ID = 'secret-aero-default';
+const SECRET_AERO_DEFAULT_ITEM_ID = 'secret-midday';
 
-function buildSecretAeroDefaultRule(): EnvironmentSettings['rules'][number] {
-  return buildNostalgicDefaultRule();
+/** Pins Secret OS to its first wall; `fromHour === toHour` matches all day. */
+function buildSecretAeroDefaultRule(): RotationRule {
+  return {
+    id: SECRET_AERO_DEFAULT_RULE_ID,
+    when: { type: 'timeOfDay', fromHour: 0, toHour: 0 },
+    itemId: SECRET_AERO_DEFAULT_ITEM_ID,
+    priority: 100,
+  };
 }
 
+/**
+ * Secret OS starts on the built-in light walls. The five illustrated Aero scenes
+ * it used to seed were removed; nothing bundled replaces them.
+ */
 export function buildSecretAeroWallpaperPlaylist(): WallpaperPlaylist {
-  return buildNostalgicWallpaperPlaylist();
+  return {
+    id: SECRET_AERO_PLAYLIST_ID,
+    name: 'Secret OS Default',
+    transition: 'crossfade',
+    transitionMs: 900,
+    items: [
+      { id: SECRET_AERO_DEFAULT_ITEM_ID, kind: 'preset', ref: 'midday', label: 'Midday', tags: ['secret', 'day'], durationSec: 0 },
+      { id: 'secret-snow', kind: 'preset', ref: 'snow', label: 'Snow', tags: ['secret', 'day'], durationSec: 0 },
+    ],
+  };
 }
 
-export const SECRET_AERO_WALLPAPER_PLAYLIST = buildSecretAeroWallpaperPlaylist();
-
-/** Keep bundled wallpaper URL fresh after Vite rebuilds / Electron packaging. */
+/**
+ * Make sure Secret OS has a usable playlist without undoing the owner's edits.
+ *
+ * This used to REPLACE the playlist on every Aero entry and cold boot, so a wall
+ * removed in Settings came straight back. It now seeds the playlist only when it
+ * is missing or empty, and keeps the pin rule only while its wall still exists.
+ */
 export function refreshSecretWallpaperRefs(env: EnvironmentSettings): EnvironmentSettings {
-  const fresh = buildSecretAeroWallpaperPlaylist();
-  const playlists = [...env.playlists];
+  // A snapshot saved before the Aero scenes were removed still lists them.
+  const clean = stripRetiredWalls(env.playlists ?? [], env.rules ?? []);
+  const playlists = [...clean.playlists];
   const idx = playlists.findIndex((p) => p.id === SECRET_AERO_PLAYLIST_ID);
-  if (idx >= 0) playlists[idx] = fresh;
-  else playlists.push(fresh);
+  const seeded = idx < 0 || playlists[idx].items.length === 0;
+  if (idx < 0) playlists.push(buildSecretAeroWallpaperPlaylist());
+  else if (seeded) playlists[idx] = buildSecretAeroWallpaperPlaylist();
+  const secret = playlists.find((p) => p.id === SECRET_AERO_PLAYLIST_ID);
+  const otherRules = clean.rules.filter((rule) => rule.id !== SECRET_AERO_DEFAULT_RULE_ID);
+  const existing = clean.rules.find((rule) => rule.id === SECRET_AERO_DEFAULT_RULE_ID);
+  const pin = seeded ? buildSecretAeroDefaultRule() : existing;
+  const pinStillValid = !!pin && !!secret?.items.some((item) => item.id === pin.itemId);
   return {
     ...env,
     playlists,
-    rules: [
-      buildSecretAeroDefaultRule(),
-      ...env.rules.filter((rule) => rule.id !== SECRET_AERO_DEFAULT_RULE_ID),
-    ],
+    rules: pinStillValid && pin ? [pin, ...otherRules] : otherRules,
   };
 }
 

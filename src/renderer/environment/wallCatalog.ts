@@ -1,5 +1,3 @@
-import { NOSTALGIC_WALL_PRESETS } from './nostalgicWallpaperPack';
-
 /** Shared wallpaper presets for the desktop shell and living-layer rotation. */
 
 export interface WallPreset {
@@ -72,21 +70,25 @@ const CORE_WALL_PRESETS: WallPreset[] = [
   },
 ];
 
-/**
- * Every preset the app can RESOLVE, including ones no longer offered in a picker.
- * The Aero pack stays here on purpose: `getWallPreset` falls back to
- * `CORE_WALL_PRESETS[0]` for an unknown id, so dropping the nostalgia presets from
- * this list would silently repaint the whole Secret OS (Aero) rotation — whose
- * playlist references them by id — as Crimson Veil.
- */
-export const WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS, ...NOSTALGIC_WALL_PRESETS];
+/** Every preset the app can resolve. */
+export const WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS];
+
+/** Presets a user may choose in a picker. */
+export const SELECTABLE_WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS];
 
 /**
- * Presets a user may CHOOSE. v1.0 audit §1.1: the five Aero scenery walls were
- * cut from the selection list. They remain resolvable above so saved state and
- * the Aero playlist keep working — this is the selection set, not the truth set.
+ * Preset ids that shipped once and were removed (the five Aero scenery walls).
+ * Saved playlists can still reference them; `getWallPreset` would paint those
+ * as Crimson Veil under their old label, so the environment store drops the
+ * items on load instead (see `stripRetiredWalls`).
  */
-export const SELECTABLE_WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS];
+export const RETIRED_WALL_PRESET_IDS: ReadonlySet<string> = new Set([
+  'aero-hillside-companion',
+  'aero-coastal-morning',
+  'aero-lagoon-night',
+  'aero-rain-garden',
+  'aero-study-room',
+]);
 
 export function getWallPreset(id: string | undefined): WallPreset {
   return WALL_PRESETS.find((p) => p.id === id) ?? CORE_WALL_PRESETS[0];

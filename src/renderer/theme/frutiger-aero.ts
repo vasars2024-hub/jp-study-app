@@ -9,7 +9,6 @@
 
 import { registerTheme, type Theme } from './engine';
 import { AERO_PROOF_SOUND_PACK_ID } from '../audio/aeroProofPack';
-import { NOSTALGIC_WALLPAPER_PACK_ID } from '../environment/nostalgicWallpaperPack';
 import { AERO_ICON_PACK_ID, registerAeroIconPack } from './aeroIconPack';
 
 export const AERO_THEME_ID = 'frutiger-aero';
@@ -25,7 +24,6 @@ export const FRUTIGER_AERO_THEME: Theme = {
   assetPack: {
     id: 'frutiger-aero-assets',
     sounds: AERO_PROOF_SOUND_PACK_ID,
-    wallpapers: NOSTALGIC_WALLPAPER_PACK_ID,
     icons: AERO_ICON_PACK_ID,
   },
   swatch: { bg: '#bfe6ff', text: '#123a52', border: '#a9d4ef' },
