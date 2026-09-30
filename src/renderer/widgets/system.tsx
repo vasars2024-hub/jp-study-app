@@ -8,6 +8,7 @@ import {
 } from '../lookupHistory';
 import { loadClipboardHistory, onClipboardHistoryChanged, type ClipboardEntry } from '../clipboardHistory';
 import { useT } from '../i18n';
+import Icon from '../components/Icons';
 import './widgets.css';
 
 interface Metrics {
@@ -184,7 +185,7 @@ export function RecentLookupsWidget(_props: WidgetProps) {
       <div className="wgt-recent-head wgt-recent-actions">
         {list.length > 0 && (
           <button type="button" className="wgt-btn-icon sm" title={t('widgets.recentLookups.clear')} aria-label={t('widgets.recentLookups.clear')} onClick={() => clearLookupHistory()}>
-            ×
+            <Icon name="close" size={14} />
           </button>
         )}
       </div>
@@ -218,7 +219,7 @@ export function ClipboardWidget(_props: WidgetProps) {
     <div className="wgt wgt-clip">
       <div className="wgt-recent-head wgt-recent-actions">
         <button type="button" className="wgt-btn-icon sm" title={t('widgets.clipboardWidget.open')} aria-label={t('widgets.clipboardWidget.open')} onClick={openFull}>
-          ⤢
+          <Icon name="external" size={14} />
         </button>
       </div>
       {recent.length === 0 ? (
