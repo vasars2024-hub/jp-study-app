@@ -19,6 +19,8 @@ import {
   formatDuration,
   formatNumber,
   getSummary,
+  getRestDayEnabled,
+  setRestDayEnabled,
   onStatsChanged,
   resetStats,
   type DayStat,
@@ -590,10 +592,11 @@ export function WordKnowledge() {
  * wide, so the watch channel either fills a whole row or takes none. Discovery of the
  * feature happens in the player and the Today widget, not by staring at zeroes here.
  */
-export function StatsCards({ state }: { state: StatsState }) {
+export function StatsCards({ state, showRestDayToggle = false }: { state: StatsState; showRestDayToggle?: boolean }) {
   const { t } = useT();
   const s = state.summary;
   const watched = s.totalWatchSeconds > 0;
+  const restDay = showRestDayToggle && getRestDayEnabled();
 
   return (
     <div className="stats-cards">
@@ -603,6 +606,16 @@ export function StatsCards({ state }: { state: StatsState }) {
           {s.streak}
         </span>
         <span className="stats-card-lbl">{t('stats.card.dayStreak')}</span>
+        {showRestDayToggle && (
+          <button
+            type="button"
+            className="btn small stats-rest-day"
+            aria-pressed={restDay}
+            onClick={() => setRestDayEnabled(!getRestDayEnabled())}
+          >
+            {t(restDay ? 'stats.menu.restDayOn' : 'stats.menu.restDayOff')}
+          </button>
+        )}
       </div>
       <div className="stats-card">
         <span className="stats-card-val">{formatDuration(s.todaySeconds)}</span>

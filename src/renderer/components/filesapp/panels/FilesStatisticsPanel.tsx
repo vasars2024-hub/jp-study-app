@@ -62,7 +62,7 @@ export function FilesStatisticsPanel({ focusCardId = null }: FilesStatisticsPane
         }
       >
         {hasData ? (
-          <StatsCards state={state} />
+          <StatsCards state={state} showRestDayToggle />
         ) : (
           // An empty store is stated, never dressed as a zeroed dashboard.
           <p className="fa-panel-note">{t('stats.empty.desc')}</p>

@@ -42,6 +42,8 @@ function summary() {
 
 vi.mock('../stats', () => ({
   getSummary: () => summary(),
+  getRestDayEnabled: () => false,
+  setRestDayEnabled: () => undefined,
   resetStats: () => undefined,
   formatDuration: (s: number) => `${Math.round(s)}s`,
   formatNumber: (n: number) => String(n),

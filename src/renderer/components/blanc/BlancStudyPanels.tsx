@@ -920,7 +920,7 @@ export function BlancStatisticsPanel() {
           </button>
         </div>
         {state.hasData ? (
-          <StatsCards state={state} />
+          <StatsCards state={state} showRestDayToggle />
         ) : (
           <p className="blanc-note">
             {t('blanc.study.stats.empty')}

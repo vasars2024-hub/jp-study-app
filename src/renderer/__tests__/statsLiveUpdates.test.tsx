@@ -2,8 +2,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useStats } from '../components/stats/StatsContent';
-import { onStatsChanged, recordReading, recordWatching, resetStats, statsKey } from '../stats';
+import { StatsCards, useStats } from '../components/stats/StatsContent';
+import { getRestDayEnabled, onStatsChanged, recordReading, recordWatching, resetStats, statsKey } from '../stats';
 import { setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
 
 vi.mock('../ankiSync', () => ({ syncKnowledgeFromAnki: vi.fn() }));
@@ -14,6 +14,11 @@ let root: Root;
 function Snapshot() {
   const { summary } = useStats();
   return <output>{JSON.stringify(summary)}</output>;
+}
+
+function Cards() {
+  const state = useStats();
+  return <StatsCards state={state} showRestDayToggle />;
 }
 
 const summaries = () => [...host.querySelectorAll('output')].map(node => JSON.parse(node.textContent!));
@@ -39,6 +44,29 @@ async function mount() {
 }
 
 describe('mounted statistics follow the study store', () => {
+  it('changes the rest-day setting and recounts the streak in both open card panels', async () => {
+    localStorage.setItem(statsKey(), JSON.stringify({
+      days: {
+        '2026-09-07': { seconds: 60, chars: 10 },
+        '2026-09-05': { seconds: 60, chars: 10 },
+      },
+      books: {}, shows: {},
+    }));
+    await act(async () => { root.render(<><Cards /><Cards /></>); });
+    const buttons = () => [...host.querySelectorAll<HTMLButtonElement>('.stats-rest-day')];
+    const streaks = () => [...host.querySelectorAll('.stats-cards > .stats-card:first-child .stats-card-val')]
+      .map(node => node.textContent);
+    expect(buttons().map(button => button.getAttribute('aria-pressed'))).toEqual(['false', 'false']);
+    expect(streaks()).toEqual(['1', '1']);
+    await act(async () => { buttons()[0].click(); });
+    expect(getRestDayEnabled()).toBe(true);
+    expect(buttons().map(button => button.getAttribute('aria-pressed'))).toEqual(['true', 'true']);
+    expect(streaks()).toEqual(['2', '2']);
+    await act(async () => { buttons()[1].click(); });
+    expect(getRestDayEnabled()).toBe(false);
+    expect(streaks()).toEqual(['1', '1']);
+  });
+
   it('updates all hosts after reading, watching and resetting, without mixing channels', async () => {
     await mount();
     await act(async () => {
