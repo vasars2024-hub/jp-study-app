@@ -64,7 +64,6 @@ import {
   dismissVideoCoreComprehensionSuggestion,
   dismissVideoCoreShadowingSuggestion,
   dismissVideoCoreTimingRepair,
-  evaluateVideoCoreDictation,
   isCueEndTransition,
   nextVideoCoreWhisperTrackNumber,
   normalizeVideoCoreStudyPreferences,
@@ -110,6 +109,7 @@ import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import { formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import { pretokenizeInIdle } from '../renderer/tokenizer';
+import { evaluateDictation } from '../renderer/evaluateDictation';
 import {
   mediaCaptionCues,
   normalizeMediaCaptionTracks,
@@ -527,6 +527,9 @@ export default function VideoCoreStudyOverlay({
   }, []);
 
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
+  const dictationRequestRef = React.useRef(0);
+  React.useEffect(() => () => { dictationRequestRef.current += 1; },
+    [plainText, dictationInput, activeCue?.index, activeCue?.trackNumber]);
   // Tokenize the whole track in idle time, so a line is ready when it appears instead of
   // costing 4-53 ms on the main thread at that moment (profiled 2026-09-23). The cue line
   // tokenizes exactly this text when no grammar annotation splits it.
@@ -2172,7 +2175,10 @@ export default function VideoCoreStudyOverlay({
 
   const checkDictation = React.useCallback((): void => {
     if (!plainText) return;
-    setDictationResult(evaluateVideoCoreDictation(dictationInput, plainText));
+    const request = ++dictationRequestRef.current;
+    void evaluateDictation(dictationInput, plainText).then((result) => {
+      if (request === dictationRequestRef.current) setDictationResult(result);
+    });
   }, [dictationInput, plainText]);
 
   const clearShadowRecording = React.useCallback((): void => {

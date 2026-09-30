@@ -73,9 +73,9 @@ import {
   startMediaStudySession,
 } from '../../mediaStudyStore';
 import {
-  evaluateJapaneseDictation,
   type DictationEvaluation,
 } from '../../../shared/listeningTraining';
+import { evaluateDictation } from '../../evaluateDictation';
 import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { findSubtitleMatches, wrapSubtitleMatch } from '../../../shared/subtitleSearch';
 import { youtubeDownloadDisabledReason } from '../../../shared/mediaVideoActionReason';
@@ -474,6 +474,8 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const [dictationMode, setDictationMode] = useState(initialPlayerPreferences.dictationMode);
   const [dictationInput, setDictationInput] = useState('');
   const [dictationResult, setDictationResult] = useState<DictationEvaluation | null>(null);
+  const dictationRequestRef = useRef(0);
+  useEffect(() => () => { dictationRequestRef.current += 1; }, [active, dictationInput]);
   const [dictationRevealed, setDictationRevealed] = useState(false);
   const [shadowingMode, setShadowingMode] = useState(initialPlayerPreferences.shadowingMode);
   const [shadowRecording, setShadowRecording] = useState(false);
@@ -696,14 +698,17 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
 
   const checkDictation = useCallback(() => {
     if (!active) return;
-    setDictationResult(evaluateJapaneseDictation(dictationInput, active.text));
+    const request = ++dictationRequestRef.current;
+    void evaluateDictation(dictationInput, active.text).then((result) => {
+      if (request === dictationRequestRef.current) setDictationResult(result);
+    });
   }, [active, dictationInput]);
 
   const revealDictation = useCallback(() => {
     if (!active) return;
     setDictationRevealed(true);
-    setDictationResult(evaluateJapaneseDictation(dictationInput, active.text));
-  }, [active, dictationInput]);
+    checkDictation();
+  }, [active, checkDictation]);
 
   const clearShadowRecording = useCallback(() => {
     shadowGenerationRef.current += 1;
