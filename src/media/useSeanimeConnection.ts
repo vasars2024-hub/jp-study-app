@@ -37,7 +37,7 @@ export function useSeanimeStatus(): SeanimeStatus | null {
   const [status, setStatus] = useState<SeanimeStatus | null>(null);
 
   useEffect(() => {
-    // Same guard as SeanimeDevPanel: under Vite HMR the renderer can reload while an
+    // Under Vite HMR the renderer can reload while an
     // older main process is still live, and an unguarded invoke becomes an unhandled
     // rejection in the app's error boundary.
     if (typeof window.api?.seanimeStatus !== 'function') return;

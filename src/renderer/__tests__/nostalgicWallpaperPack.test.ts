@@ -46,7 +46,7 @@ describe('default nostalgic wallpaper pack', () => {
     }
   });
 
-  it('binds the pack to Secret Aero and selects the character scene by default', async () => {
+  it('binds the pack to Secret Aero and selects the hillside scene by default', async () => {
     const { FRUTIGER_AERO_THEME } = await import('../theme/frutiger-aero');
     const playlist = buildNostalgicWallpaperPlaylist();
     const rule = buildNostalgicDefaultRule();

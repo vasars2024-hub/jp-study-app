@@ -53,7 +53,6 @@ const BlancLockscreen = lazy(() =>
 import ToastHost from './components/ToastHost';
 import { useFilesWatchAutoImport } from './components/filesapp/filesWatchAutoImport';
 import { getAssignment, onDesktopChanged } from './desktopState';
-import SeanimeDevPanel from './components/SeanimeDevPanel';
 import MediaWorkspaceHost from '../media/MediaWorkspaceHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { registerCommandHandler } from './keyboardShortcuts';
@@ -911,9 +910,7 @@ export default function App() {
       <SecretHistoryTrigger />
       <GlobalDictionaryOverlay />
       <ToastHost />
-      {/* Phase-1 Seanime proof. Self-hides unless the sidecar flag is armed. */}
-      <SeanimeDevPanel />
-      {/* Phase-2 MEDIA workspace (adopted library/lists). Same self-hiding rule. */}
+      {/* Phase-2 MEDIA workspace (adopted library/lists). Self-hides unless the sidecar is enabled. */}
       <MediaWorkspaceHost />
       {/*
         First-boot guided tour (Phase 9.5 / audit T1). Self-hides once completed

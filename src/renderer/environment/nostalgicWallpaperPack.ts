@@ -48,10 +48,10 @@ function background(name: NostalgicAssetName, fallback: string): string {
 export const NOSTALGIC_WALLPAPERS: readonly WallpaperDefinition[] = [
   {
     id: DEFAULT_NOSTALGIC_WALLPAPER_ID,
-    label: 'Hillside Companion',
+    label: 'Sunlit Hillside',
     kind: 'static',
     category: 'nature',
-    tags: ['aero', 'day', 'character', 'readable-icons'],
+    tags: ['aero', 'day', 'scenery', 'readable-icons'],
     css: background('aero-hillside-companion', FALLBACKS.day),
     thumbnail: assetUrl('aero-hillside-companion'),
     packId: NOSTALGIC_WALLPAPER_PACK_ID,
