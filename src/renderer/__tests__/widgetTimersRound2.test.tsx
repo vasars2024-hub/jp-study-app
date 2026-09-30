@@ -21,7 +21,7 @@ import {
   timerRemainingMs,
   withDuration,
 } from '../widgets/timerStore';
-import { Countdown } from '../widgets/productivity';
+import { Countdown, Pomodoro } from '../widgets/productivity';
 import { Calculator } from '../widgets/utility';
 
 let root: Root | null = null;
@@ -37,6 +37,7 @@ afterEach(() => {
   root = null;
   document.body.replaceChildren();
   resetTimerStoreForTests();
+  vi.useRealTimers();
 });
 
 async function mount(node: React.ReactNode): Promise<HTMLElement> {
@@ -50,6 +51,37 @@ async function mount(node: React.ReactNode): Promise<HTMLElement> {
 }
 
 describe('widget timers', () => {
+  it.each(['countdown', 'pomodoro'] as const)('finishes an expired %s when Pause beats the next ticker callback', async (kind) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const chime = vi.fn();
+    setTimerFinishedHandler(chime);
+    const Widget = kind === 'countdown' ? Countdown : Pomodoro;
+    const host = await mount(<Widget settings={{ minutes: 1, workMin: 1, breakMin: 5 }} setSettings={() => undefined} size={{ w: 200, h: 120 }} instanceId="expired" />);
+    const click = async (label: string) => {
+      const button = [...host.querySelectorAll('button')].find((b) => b.textContent === label);
+      expect(button).toBeDefined();
+      await act(async () => { button!.click(); });
+    };
+    await click('Start');
+    const running = getTimer('expired')!;
+    // Move the wall clock without firing the 250 ms completion ticker.
+    vi.setSystemTime(running.startedAt! + running.durationMs + 1);
+    await click('Pause');
+    expect(chime).toHaveBeenCalledExactlyOnceWith(kind);
+    expect(getTimer('expired')?.running).toBe(false);
+    if (kind === 'pomodoro') {
+      expect(getTimer('expired')?.phase).toBe('break');
+      expect(host.querySelector('.wgt-pomo-time')?.textContent).toBe('05:00');
+    } else {
+      expect(getTimer('expired')?.finishedAt).not.toBeNull();
+      await click('Start');
+      expect(host.querySelector('.wgt-pomo-time')?.textContent).toBe('01:00');
+    }
+    await act(async () => { vi.advanceTimersByTime(250); });
+    expect(chime).toHaveBeenCalledTimes(1);
+  });
+
   it('are wall-clock based and settle once when time is up', () => {
     const running = startTimer(idleTimer('countdown', 60_000), 1_000);
     expect(timerRemainingMs(running, 31_000)).toBe(30_000);

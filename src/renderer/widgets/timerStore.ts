@@ -276,8 +276,12 @@ export function useWidgetTimer(
     setNow(Date.now());
   }, [key, kind, dur]);
   const pause = useCallback(() => {
-    setTimer(key, pauseTimer(getTimer(key) ?? idleTimer(kind, dur), Date.now()));
-    setNow(Date.now());
+    const pausedAt = Date.now();
+    // A click can arrive after the deadline but before the completion ticker.
+    // Settle first so pausing cannot suppress the chime or the next phase.
+    tickTimers(pausedAt);
+    setTimer(key, pauseTimer(getTimer(key) ?? idleTimer(kind, dur), pausedAt));
+    setNow(pausedAt);
   }, [key, kind, dur]);
   const reset = useCallback(() => {
     setTimer(key, resetTimer(getTimer(key) ?? idleTimer(kind, dur), dur));
