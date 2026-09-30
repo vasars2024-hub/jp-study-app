@@ -506,13 +506,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     () => searchDeckCards(filterDeckCards(epubCards, folderFilter), search),
     [epubCards, folderFilter, search],
   );
-  const filteredSaved = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return saved;
-    return saved.filter((w) =>
-      [w.word, w.reading, w.meaning].some((field) => field?.toLowerCase().includes(q)),
-    );
-  }, [saved, search]);
+  // Search the underlying cards so width normalization and SRS queries work
+  // the same way on both tabs, before projecting away the scheduling fields.
+  const filteredSaved = useMemo(() => search ? loadSaved(search) : saved, [saved, search]);
   const bookGroups = useMemo(() => groupDeckByBook(filteredDeck), [filteredDeck]);
   const epubReviewBooks = useMemo(() => groupDeckByBook(epubCards), [epubCards]);
   const epubReviewPool = useMemo(

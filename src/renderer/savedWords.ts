@@ -19,6 +19,7 @@ import {
   loadDeck,
   onDeckChanged,
   removeDeckCards,
+  searchDeckCards,
   type DeckFlashcard,
 } from './flashcardDeck';
 
@@ -112,11 +113,10 @@ export function migrateSavedWordsToDeck(lang: StudyLang = getStudyLang()): numbe
   }
 }
 
-export function loadSaved(): SavedWord[] {
+export function loadSaved(query = ''): SavedWord[] {
   const lang = getStudyLang();
   migrateSavedWordsToDeck(lang);
-  return loadDeck()
-    .filter((card) => isSavedCard(card, lang))
+  return searchDeckCards(loadDeck().filter((card) => isSavedCard(card, lang)), query)
     .map((card) => ({
       word: card.word,
       reading: card.reading,

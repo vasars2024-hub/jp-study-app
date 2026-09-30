@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../storage/db', () => ({ kvGet: async () => undefined, kvSet: async () => undefined }));
 
-import { loadDeck, resetDeckMemoryForTests, reviewDeckCard } from '../flashcardDeck';
+import { addDeckCardsTracked, loadDeck, resetDeckMemoryForTests, reviewDeckCard } from '../flashcardDeck';
 import {
   addSaved,
   loadSaved,
@@ -53,5 +53,32 @@ describe('saved words on the deck', () => {
     addSaved({ word: '魚', reading: '', meaning: 'fish', addedAt: 0 });
     removeSaved('魚');
     expect(loadSaved()).toHaveLength(0);
+  });
+
+  it.each([
+    ['ガクセイ', 'ｶﾞｸｾｲ'],
+    ['ｶﾞｸｾｲ', 'ガクセイ'],
+    ['がくせい', 'か\u3099くせい'],
+    ['Ｄｏｇ', 'dog'],
+    ['Dog', 'ＤＯＧ'],
+  ])('searches dictionary saves using the same Unicode normalization: %s / %s', (meaning, query) => {
+    addSaved({ word: '単語', reading: '', meaning, addedAt: 0 });
+    expect(loadSaved(query).map((word) => word.word)).toEqual(['単語']);
+    expect(loadSaved(query)[0].meaning).toBe(meaning);
+    expect(loadSaved('missing')).toEqual([]);
+    expect(loadSaved('　')).toEqual(loadSaved());
+  });
+
+  it('honours leech searches while keeping dictionary and study-language boundaries', () => {
+    addSaved({ word: '猫', reading: 'ねこ', meaning: 'cat', addedAt: 0 });
+    addSaved({ word: '犬', reading: 'いぬ', meaning: 'dog', addedAt: 0 });
+    const cat = loadSavedCards().find((card) => card.word === '猫')!;
+    for (let i = 0; i < 8; i++) reviewDeckCard(cat.id, 'again');
+    const leech = loadDeck().find((card) => card.id === cat.id)!;
+    addDeckCardsTracked([
+      { ...leech, word: '鳥', source: 'epub' },
+      { ...leech, word: 'cat', studyLang: 'en' },
+    ]);
+    expect(loadSaved(' ＩＳ：ＬＥＥＣＨ ').map((word) => word.word)).toEqual(['猫']);
   });
 });
