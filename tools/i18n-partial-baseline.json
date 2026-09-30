@@ -17,7 +17,6 @@
   "renderer/components/reading/ReadingListPastePreview.tsx": 1,
   "renderer/components/scraper/result/ResultPanels.tsx": 1,
   "renderer/components/scraper/settings/ScraperSettingsDrawer.tsx": 1,
-  "renderer/components/SeanimeDevPanel.tsx": 1,
   "renderer/components/settings/pages/VerifiedSitesManager.tsx": 1,
   "renderer/components/visualizer/VisualizerContent.tsx": 1,
   "renderer/views/AnkiView.tsx": 1
