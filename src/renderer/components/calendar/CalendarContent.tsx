@@ -110,9 +110,10 @@ export function EventModal({
   // inverted (D162).
   const endsBeforeStart =
     !form.allDay && Boolean(form.startTime) && Boolean(form.endTime) && form.endTime < form.startTime;
+  const missingDate = !form.date;
 
   const save = () => {
-    if (!form.title.trim() || endsBeforeStart) return;
+    if (!form.title.trim() || missingDate || endsBeforeStart) return;
     const payload: Omit<CalendarEvent, 'id' | 'createdAt'> = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
@@ -197,13 +198,24 @@ export function EventModal({
           <div className="cal-field-row">
             <label className="cal-field">
               <span>{t('calendar.modal.date')}</span>
-              <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
+              <input
+                type="date"
+                required
+                value={form.date}
+                onChange={(e) => set('date', e.target.value)}
+                aria-invalid={missingDate || undefined}
+                aria-describedby={missingDate ? 'cal-date-error' : undefined}
+              />
             </label>
             <label className="cal-field cal-check">
               <input type="checkbox" checked={form.allDay} onChange={(e) => set('allDay', e.target.checked)} />
               <span>{t('calendar.allDay')}</span>
             </label>
           </div>
+
+          {missingDate && (
+            <p id="cal-date-error" className="cal-field-error" role="alert">{t('calendar.modal.dateRequired')}</p>
+          )}
 
           {!form.allDay && (
             <div className="cal-field-row">
@@ -298,7 +310,7 @@ export function EventModal({
           )}
           <div className="cal-modal-spacer" />
           <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
-          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim() || endsBeforeStart}>
+          <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim() || missingDate || endsBeforeStart}>
             {isEditing ? t('common.save') : t('calendar.modal.create')}
           </button>
         </div>

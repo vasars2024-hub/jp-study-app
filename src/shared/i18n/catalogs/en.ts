@@ -6349,6 +6349,7 @@ export const en: Catalog = {
   'calendar.modal.startTime': 'Start time',
   'calendar.modal.endTime': 'End time',
   'calendar.modal.endBeforeStart': 'End time must be after the start time.',
+  'calendar.modal.dateRequired': 'Choose a date for this event.',
   'calendar.modal.untitled': 'Untitled event',
   'calendar.modal.deleteConfirm.title': 'Delete event',
   'calendar.modal.deleteConfirm.message': 'Delete “{name}”? This cannot be undone.',

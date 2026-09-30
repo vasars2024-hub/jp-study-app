@@ -176,6 +176,42 @@ describe('D162 — the editor accepted an end time before the start', () => {
   });
 });
 
+describe('calendar events require a date', () => {
+  it.each([false, true])('keeps the draft open after clearing the date (editing: %s)', (editing) => {
+    const existing = { id: 'dated-event', title: 'Kanji review', date: TODAY };
+    if (editing) seed([existing]);
+    const onClose = vi.fn();
+    const scope = mount(createElement(EventModal, {
+      initial: editing ? existing : { title: 'Kanji review', date: TODAY }, onClose,
+    }));
+    const date = scope.querySelector('input[type="date"]') as HTMLInputElement;
+    const save = scope.querySelector('.cal-modal-actions .primary') as HTMLButtonElement;
+    const setDate = (value: string) => act(() => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(date, value);
+      date.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+
+    setDate('');
+    expect(save.disabled).toBe(true);
+    expect(date.getAttribute('aria-invalid')).toBe('true');
+    const error = scope.querySelector('#cal-date-error');
+    expect(error?.textContent).toBe('calendar.modal.dateRequired');
+    expect(error?.getAttribute('role')).toBe('alert');
+    expect(date.getAttribute('aria-describedby')).toBe(error?.id);
+    act(() => save.click());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(readStore()).toEqual(editing ? [existing] : []);
+
+    setDate(TOMORROW);
+    expect(save.disabled).toBe(false);
+    expect(scope.querySelector('#cal-date-error')).toBeNull();
+    act(() => save.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(readStore()).toHaveLength(1);
+    expect(readStore()[0]).toMatchObject({ title: 'Kanji review', date: TOMORROW });
+  });
+});
+
 /* ------------------------------------------------------------------ D163 */
 
 describe('D163 — deleting an event asked nothing and could not be undone', () => {

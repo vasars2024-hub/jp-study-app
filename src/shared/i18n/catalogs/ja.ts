@@ -6320,6 +6320,7 @@ export const ja: Catalog = {
   'calendar.modal.startTime': '開始時刻',
   'calendar.modal.endTime': '終了時刻',
   'calendar.modal.endBeforeStart': '終了時刻は開始時刻より後にしてください。',
+  'calendar.modal.dateRequired': '予定の日付を選択してください。',
   'calendar.modal.untitled': '無題の予定',
   'calendar.modal.deleteConfirm.title': '予定を削除',
   'calendar.modal.deleteConfirm.message': '「{name}」を削除しますか？この操作は元に戻せません。',

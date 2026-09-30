@@ -6283,6 +6283,7 @@ export const zh: Catalog = {
   'calendar.modal.startTime': '开始时间',
   'calendar.modal.endTime': '结束时间',
   'calendar.modal.endBeforeStart': '结束时间必须晚于开始时间。',
+  'calendar.modal.dateRequired': '请选择活动日期。',
   'calendar.modal.untitled': '未命名事件',
   'calendar.modal.deleteConfirm.title': '删除事件',
   'calendar.modal.deleteConfirm.message': '确定删除“{name}”吗？此操作无法撤销。',

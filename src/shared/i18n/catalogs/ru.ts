@@ -6913,6 +6913,7 @@ export const ru: Catalog = {
   'calendar.modal.startTime': 'Время начала',
   'calendar.modal.endTime': 'Время окончания',
   'calendar.modal.endBeforeStart': 'Время окончания должно быть позже времени начала.',
+  'calendar.modal.dateRequired': 'Выберите дату события.',
   'calendar.modal.untitled': 'Событие без названия',
   'calendar.modal.deleteConfirm.title': 'Удалить событие',
   'calendar.modal.deleteConfirm.message': 'Удалить «{name}»? Это действие нельзя отменить.',
