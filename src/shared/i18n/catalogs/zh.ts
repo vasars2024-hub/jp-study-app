@@ -8084,6 +8084,9 @@ export const zh: Catalog = {
   'companion.host.tooltip.hint': '点击：运行例程',
   'companion.host.menu.runRoutine': '运行例程',
 
+  'companion.achievement.streak': { other: '连续{count}天' },
+  'companion.achievement.studyStreak': { other: '连续学习{count}天' },
+  'companion.achievement.dailyChars': { other: '今天已读{count}字' },
   'companion.trinket.unlocked': '新纪念品：{name}',
   'companion.trinket.section.title': '纪念品',
   'companion.trinket.section.desc':

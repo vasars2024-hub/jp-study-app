@@ -8129,6 +8129,9 @@ export const ja: Catalog = {
   'companion.host.tooltip.hint': 'クリック: ルーチンを実行',
   'companion.host.menu.runRoutine': 'ルーチンを実行',
 
+  'companion.achievement.streak': { other: '{count}日連続' },
+  'companion.achievement.studyStreak': { other: '{count}日連続学習' },
+  'companion.achievement.dailyChars': { other: '今日の読書：{count}文字' },
   'companion.trinket.unlocked': '新しいトリンケット: {name}',
   'companion.trinket.section.title': 'トリンケット',
   'companion.trinket.section.desc':

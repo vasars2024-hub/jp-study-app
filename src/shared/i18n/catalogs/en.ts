@@ -8292,6 +8292,9 @@ export const en: Catalog = {
 
   // Companion trinkets (Phase 5 · M12) — small cosmetic keepsakes tied to the
   // reading streak. Additive only: nothing above is ever locked or taken away.
+  'companion.achievement.streak': { one: '{count}-day streak', other: '{count}-day streak' },
+  'companion.achievement.studyStreak': { one: '{count}-day study streak', other: '{count}-day study streak' },
+  'companion.achievement.dailyChars': { one: '{count} character today', other: '{count} characters today' },
   'companion.trinket.unlocked': 'New trinket: {name}',
   'companion.trinket.section.title': 'Trinkets',
   'companion.trinket.section.desc':

@@ -1,7 +1,7 @@
 /**
  * Study milestone detector — emits companion events for streaks & daily goals (L5).
  */
-import { formatNumber, getSummary, READING_RECORDED_EVENT } from '../stats';
+import { getSummary, READING_RECORDED_EVENT } from '../stats';
 import { emitCompanionEvent } from './companionEvents';
 import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
 import { t } from '../i18n';
@@ -58,8 +58,8 @@ export function checkAchievements(): void {
   }
   if (bestStreak > 0) {
     state.lastStreakCelebrated = bestStreak;
-    emitCompanionEvent('streak', `${bestStreak}-day streak`);
-    emitCompanionEvent('achievement', `${bestStreak}-day study streak`);
+    emitCompanionEvent('streak', t('companion.achievement.streak', { count: bestStreak }));
+    emitCompanionEvent('achievement', t('companion.achievement.studyStreak', { count: bestStreak }));
   }
 
   // Same for daily character volume — highest new bucket only.
@@ -69,7 +69,7 @@ export function checkAchievements(): void {
   }
   if (bestChars > 0) {
     state.lastDailyCharsBucket = bestChars;
-    emitCompanionEvent('achievement', `${formatNumber(bestChars)} characters today`);
+    emitCompanionEvent('achievement', t('companion.achievement.dailyChars', { count: bestChars }));
   }
 
   // Additive keepsakes — never blocks or alters the streak celebration above.

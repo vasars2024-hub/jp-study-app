@@ -8938,6 +8938,15 @@ export const ru: Catalog = {
   'companion.host.tooltip.hint': 'Клик: запустить сценарий',
   'companion.host.menu.runRoutine': 'Запустить сценарий',
 
+  'companion.achievement.streak': {
+    one: '{count} день подряд', few: '{count} дня подряд', many: '{count} дней подряд', other: '{count} дня подряд',
+  },
+  'companion.achievement.studyStreak': {
+    one: '{count} день учёбы подряд', few: '{count} дня учёбы подряд', many: '{count} дней учёбы подряд', other: '{count} дня учёбы подряд',
+  },
+  'companion.achievement.dailyChars': {
+    one: '{count} символ сегодня', few: '{count} символа сегодня', many: '{count} символов сегодня', other: '{count} символа сегодня',
+  },
   'companion.trinket.unlocked': 'Новая вещица: {name}',
   'companion.trinket.section.title': 'Вещицы',
   'companion.trinket.section.desc':
