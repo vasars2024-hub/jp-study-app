@@ -5501,6 +5501,7 @@ export const ru: Catalog = {
   'grammar.examples.own.remove': 'Удалить этот пример',
   'grammar.examples.own.removeShort': 'Удалить',
   'grammar.examples.own.add': 'Добавить свои примеры',
+  'grammar.deckSentences.label': 'Из вашей колоды',
   'grammar.examples.own.importTitle': 'Примеры для {pattern}',
   'grammar.examples.own.importDesc': 'Предложения с переводом (и, если хотите, чтением). Строка со столбцом pattern попадёт в эту конструкцию; уже имеющиеся примеры пропускаются. Хранится на этом компьютере.',
   'grammar.examples.own.colTranslation': 'Перевод',

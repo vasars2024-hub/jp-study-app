@@ -8,7 +8,7 @@
  * presentations — nothing in this file may import `AppChrome`/`MenuBar`/
  * `StatusBar`, because Blanc composes it directly.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   GRAMMAR,
   GUIDES,
@@ -42,6 +42,8 @@ import {
   useUserExamples,
   type ExampleImportRow,
 } from '../../data/grammar/userExamples';
+import { findDeckSentences } from '../../data/grammar/deckSentences';
+import { FLASHCARD_DECK_EVENT, loadDeck } from '../../flashcardDeck';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 type CatFilter = 'All' | GuideCategory;
@@ -91,6 +93,17 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
   const ownExamples = useUserExamples(point.id);
   const [importOpen, setImportOpen] = useState(false);
   const [keptNote, setKeptNote] = useState('');
+  const [deckRev, setDeckRev] = useState(0);
+  useEffect(() => {
+    const bump = () => setDeckRev((n) => n + 1);
+    window.addEventListener(FLASHCARD_DECK_EVENT, bump);
+    return () => window.removeEventListener(FLASHCARD_DECK_EVENT, bump);
+  }, []);
+  const deckSentences = useMemo(
+    () => findDeckSentences(loadDeck(), exampleQuery(point)),
+    // deckRev re-runs the search when the deck changes.
+    [point, deckRev],
+  );
   const commitExamples = useCallback(
     (rows: ExampleImportRow[]) => {
       const { byPoint, unmatched } = assignExampleRows(rows, point, GRAMMAR);
@@ -287,6 +300,23 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
               </button>
               {keptNote && <span className="gram-more-status muted" role="status">{keptNote}</span>}
             </div>
+          </>
+        )}
+        {deckSentences.length > 0 && (
+          <>
+            <h4 className="gram-more-status muted">{t('grammar.deckSentences.label')}</h4>
+            <ul className="gram-examples gram-examples-deck">
+              {deckSentences.map((hit) => (
+                <li key={hit.id}>
+                  <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                    {hit.sentence}
+                  </span>
+                  <span className="gram-ex-en" lang={contentLangOf(point.lang)}>
+                    {hit.word}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </>
         )}
         {(point.examples.some((ex) => ex.source === 'tatoeba') ||
