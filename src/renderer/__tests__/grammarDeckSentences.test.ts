@@ -14,6 +14,11 @@ describe('findDeckSentences', () => {
     const hits = findDeckSentences(cards, 'ないではいられない');
     expect(hits.map((h) => h.id)).toEqual(['a']);
   });
+  it('finds conjugated uses through the stem and reports the matched span', () => {
+    const hits = findDeckSentences([{ id: 'x', word: '食べる', sentence: '全部食べてしまった。' }], 'てしまう');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].sentence.slice(hits[0].matchStart, hits[0].matchEnd)).toBe('てしま');
+  });
   it('ignores one-character fragments', () => {
     expect(findDeckSentences(cards, 'を')).toEqual([]);
   });

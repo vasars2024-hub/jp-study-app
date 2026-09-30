@@ -42,7 +42,7 @@ import {
   useUserExamples,
   type ExampleImportRow,
 } from '../../data/grammar/userExamples';
-import { findCaptureSentences, findDeckSentences } from '../../data/grammar/deckSentences';
+import { findCaptureSentences, findDeckSentences, type DeckSentenceHit } from '../../data/grammar/deckSentences';
 import { READING_LENS_HISTORY_LIMIT, type ReadingLensHistoryEntry } from '../../../shared/readingLensHistory';
 import { FLASHCARD_DECK_EVENT, loadDeck } from '../../flashcardDeck';
 
@@ -83,6 +83,16 @@ function matchesGuide(g: Guide, q: string): boolean {
   const body = g.sections.map((s) => `${s.heading} ${s.body.join(' ')}`).join(' ');
   const hay = `${g.title} ${g.summary} ${g.category} ${body}`.toLowerCase();
   return hay.includes(q);
+}
+
+function MatchedSentence({ hit }: { hit: DeckSentenceHit }) {
+  return (
+    <>
+      {hit.sentence.slice(0, hit.matchStart)}
+      <mark>{hit.sentence.slice(hit.matchStart, hit.matchEnd)}</mark>
+      {hit.sentence.slice(hit.matchEnd)}
+    </>
+  );
 }
 
 export function GrammarDetail({ point }: { point: GrammarPoint }) {
@@ -323,7 +333,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
               {deckSentences.map((hit) => (
                 <li key={hit.id}>
                   <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
-                    {hit.sentence}
+                    <MatchedSentence hit={hit} />
                   </span>
                   <span className="gram-ex-en" lang={contentLangOf(point.lang)}>
                     {hit.word}
@@ -340,7 +350,7 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
               {captureSentences.map((hit) => (
                 <li key={hit.id}>
                   <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
-                    {hit.sentence}
+                    <MatchedSentence hit={hit} />
                   </span>
                 </li>
               ))}
