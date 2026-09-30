@@ -20,6 +20,21 @@ const deck: DeckFlashcard[] = [
   card({ word: 'front-only', front: 'Q side', back: 'A side', bookTitle: 'Botchan' }),
 ];
 
+describe('searchDeckCards is:leech', () => {
+  const srs = (lapses: number) =>
+    ({ lapses, intervalDays: 1, due: 0 }) as unknown as DeckFlashcard['srs'];
+  const cards = [
+    card({ word: 'a', srs: srs(8) }),
+    card({ word: 'b', srs: srs(7) }),
+    card({ word: 'c' }),
+  ];
+
+  it('keeps only cards at or past the lapse threshold', () => {
+    expect(searchDeckCards(cards, 'is:leech').map((c) => c.word)).toEqual(['a']);
+    expect(searchDeckCards(cards, '  IS:Leech ').map((c) => c.word)).toEqual(['a']);
+  });
+});
+
 describe('searchDeckCards', () => {
   it('returns every card for an empty or whitespace query', () => {
     expect(searchDeckCards(deck, '')).toHaveLength(4);

@@ -1644,9 +1644,18 @@ export function reviewSessionCounts(
  * narrow the same box. Case- and Unicode-width-insensitive (including composed
  * dakuten); an empty or whitespace query returns the input untouched.
  */
+/** Lapses at which a card counts as a leech (Anki's default threshold). */
+export const LEECH_LAPSE_THRESHOLD = 8;
+
+export function isLeechCard(card: Pick<DeckFlashcard, 'srs'>): boolean {
+  return (card.srs?.lapses ?? 0) >= LEECH_LAPSE_THRESHOLD;
+}
+
+/** Typing `is:leech` in the find box narrows the deck to cards that keep failing. */
 export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlashcard[] {
   const q = query.normalize('NFKC').trim().toLowerCase();
   if (!q) return cards;
+  if (q === 'is:leech') return cards.filter(isLeechCard);
   return cards.filter((c) =>
     [c.word, c.reading, c.meaning, c.front, c.back, c.sentence, c.bookTitle].some((field) =>
       field ? field.normalize('NFKC').toLowerCase().includes(q) : false,
