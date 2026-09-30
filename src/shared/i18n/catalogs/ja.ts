@@ -4279,6 +4279,7 @@ export const ja: Catalog = {
   'sentenceAnalysis.failed': '解析に失敗しました。',
   'ui.menubar.aria': 'アプリケーションメニュー',
   'ui.splitPane.aria': 'ペインのサイズを変更',
+  'ui.breadcrumb.aria': 'パンくずリスト',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'settings.nav.help': 'ヘルプ',
   'settings.nav.help.desc': 'ガイドツアーとキーボードショートカット',

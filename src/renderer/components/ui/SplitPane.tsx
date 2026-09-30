@@ -12,6 +12,7 @@
  * coarse steps), Home/End snap to min/max, Enter or double-click resets.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useT } from '../../i18n';
 
 export interface SplitPaneProps {
   /** 'row' = panes side by side (default); 'column' = stacked. */
@@ -51,6 +52,7 @@ export function SplitPane({
   className = '',
   children,
 }: SplitPaneProps) {
+  const { t } = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(() => loadSize(storageKey, initial));
   const raf = useRef(0);
@@ -164,7 +166,7 @@ export function SplitPane({
         aria-valuenow={size}
         aria-valuemin={min}
         aria-valuemax={max ?? undefined}
-        aria-label="Resize panes"
+        aria-label={t('ui.splitPane.aria')}
         onPointerDown={onDividerPointerDown}
         onKeyDown={onDividerKey}
         onDoubleClick={reset}

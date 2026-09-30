@@ -4635,6 +4635,7 @@ export const ru: Catalog = {
   'sentenceAnalysis.failed': 'Не удалось выполнить анализ.',
   'ui.menubar.aria': 'Меню приложения',
   'ui.splitPane.aria': 'Изменить размер панелей',
+  'ui.breadcrumb.aria': 'Навигационная цепочка',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'settings.nav.help': 'Справка',
   'settings.nav.help.desc': 'Обучающий тур и горячие клавиши',

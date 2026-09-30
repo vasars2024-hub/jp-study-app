@@ -4217,6 +4217,7 @@ export const en: Catalog = {
   'sentenceAnalysis.failed': 'Analysis failed.',
   'ui.menubar.aria': 'Application menu',
   'ui.splitPane.aria': 'Resize panes',
+  'ui.breadcrumb.aria': 'Breadcrumb',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'settings.nav.help': 'Help',
   'settings.nav.help.desc': 'Guided tour and keyboard shortcuts',

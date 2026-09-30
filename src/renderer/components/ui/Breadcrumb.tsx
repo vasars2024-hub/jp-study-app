@@ -1,5 +1,6 @@
 /** Breadcrumb — navigational trail. Phase 1 · M5b. */
 import { Fragment, type ReactNode } from 'react';
+import { useT } from '../../i18n';
 
 export interface Crumb {
   id: string;
@@ -15,8 +16,9 @@ export interface BreadcrumbProps {
 }
 
 export function Breadcrumb({ items, separator = '›', className = '', ...rest }: BreadcrumbProps) {
+  const { t } = useT();
   return (
-    <nav className={['ui-breadcrumb', className].filter(Boolean).join(' ')} aria-label="Breadcrumb" {...rest}>
+    <nav className={['ui-breadcrumb', className].filter(Boolean).join(' ')} aria-label={t('ui.breadcrumb.aria')} {...rest}>
       {items.map((c, i) => {
         const isLast = i === items.length - 1;
         return (

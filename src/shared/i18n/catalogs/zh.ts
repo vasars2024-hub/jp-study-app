@@ -4258,6 +4258,7 @@ export const zh: Catalog = {
   'sentenceAnalysis.failed': '分析失败。',
   'ui.menubar.aria': '应用程序菜单',
   'ui.splitPane.aria': '调整窗格大小',
+  'ui.breadcrumb.aria': '面包屑导航',
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'settings.nav.help': '帮助',
   'settings.nav.help.desc': '引导教程与键盘快捷键',
