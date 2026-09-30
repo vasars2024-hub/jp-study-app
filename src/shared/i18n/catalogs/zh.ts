@@ -9724,6 +9724,7 @@ export const zh: Catalog = {
   'mediaWorkspace.study.reveal': '显示答案',
   'mediaWorkspace.study.exactMatch': '完全匹配',
   'mediaWorkspace.study.matchScore': '匹配 {score}%',
+  'mediaWorkspace.study.missedLines': { other: '未听清的句子:{count}' },
   'mediaWorkspace.study.shadowRecommendation': '跟读建议',
   'mediaWorkspace.study.shadowWorth': '这一句适合跟读练习',
   'mediaWorkspace.study.replayedTimes': '本次会话已重播 {count} 次，可直接在播放器中练习。',

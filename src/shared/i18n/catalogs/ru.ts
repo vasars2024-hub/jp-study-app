@@ -10687,6 +10687,12 @@ export const ru: Catalog = {
   'mediaWorkspace.study.reveal': 'Показать',
   'mediaWorkspace.study.exactMatch': 'Точное совпадение',
   'mediaWorkspace.study.matchScore': 'Совпадение: {score}%',
+  'mediaWorkspace.study.missedLines': {
+    one: 'Пропущена {count} строка',
+    few: 'Пропущено {count} строки',
+    many: 'Пропущено {count} строк',
+    other: 'Пропущено {count} строки',
+  },
   'mediaWorkspace.study.shadowRecommendation': 'Рекомендация шэдоуинга',
   'mediaWorkspace.study.shadowWorth': 'Эту реплику стоит потренировать шэдоуингом',
   'mediaWorkspace.study.replayedTimes': 'Вы повторили её {count} раз за сеанс. Потренируйтесь прямо в проигрывателе.',

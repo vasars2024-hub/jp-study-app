@@ -10378,6 +10378,7 @@ export const en: Catalog = {
   'mediaWorkspace.study.reveal': 'Reveal',
   'mediaWorkspace.study.exactMatch': 'Exact match',
   'mediaWorkspace.study.matchScore': '{score}% match',
+  'mediaWorkspace.study.missedLines': { one: '{count} missed line', other: '{count} missed lines' },
   'mediaWorkspace.study.shadowRecommendation': 'Shadowing recommendation',
   'mediaWorkspace.study.shadowWorth': 'This line may be worth shadowing',
   'mediaWorkspace.study.replayedTimes': 'You replayed it {count} times in this session. Practice it without leaving the player.',

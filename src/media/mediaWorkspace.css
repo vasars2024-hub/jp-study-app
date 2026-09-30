@@ -728,6 +728,7 @@
 
 #media-workspace .study-dictation {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
   justify-content: center;
   align-items: center;
@@ -739,6 +740,30 @@
      it on screen, so this is a subtitle text path like the cue itself. */
   font-family: var(--subtitle-font-stack);
   width: min(24rem, 60vw);
+}
+
+#media-workspace .study-dictation-missed {
+  flex-basis: 100%;
+  font-size: 0.85em;
+}
+
+#media-workspace .study-dictation-missed ul {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+#media-workspace .study-dictation-missed li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+#media-workspace .study-dictation-missed li button {
+  font-family: var(--subtitle-font-stack);
+  text-align: left;
 }
 
 #media-workspace .study-dictation .is-correct {

@@ -158,6 +158,9 @@ import { useLineLevel } from '../renderer/lineLevel';
 import { recordStudyTime } from '../renderer/stats';
 import { openSentenceDeckDialog } from '../renderer/components/sentenceDeck/SentenceDeckDialog';
 
+/** A dictation answer scoring under this percentage goes on the session's missed-lines list. */
+const DICTATION_MISSED_BELOW = 80;
+
 /** Dictation or shadowing: the player is being used to practise, not to watch. */
 function practiceModeActive(prefs: { dictationMode?: boolean; shadowingMode?: boolean }): boolean {
   return prefs.dictationMode === true || prefs.shadowingMode === true;
@@ -394,6 +397,10 @@ export default function VideoCoreStudyOverlay({
   const [dictationResult, setDictationResult] =
     React.useState<VideoCoreDictationEvaluation | null>(null);
   const [dictationRevealed, setDictationRevealed] = React.useState(false);
+  /** Lines answered below `DICTATION_MISSED_BELOW` this session, so the learner can go back and replay them. */
+  const [missedLines, setMissedLines] = React.useState<
+    Array<{ key: string; cue: VideoCoreActiveCue; score: number }>
+  >([]);
   const [abStartSec, setAbStartSec] = React.useState<number | null>(null);
   const [abEndSec, setAbEndSec] = React.useState<number | null>(null);
   const [abLoop, setAbLoop] = React.useState(false);
@@ -2176,10 +2183,20 @@ export default function VideoCoreStudyOverlay({
   const checkDictation = React.useCallback((): void => {
     if (!plainText) return;
     const request = ++dictationRequestRef.current;
+    const cue = activeCue;
     void evaluateDictation(dictationInput, plainText).then((result) => {
-      if (request === dictationRequestRef.current) setDictationResult(result);
+      if (request !== dictationRequestRef.current) return;
+      setDictationResult(result);
+      if (!cue) return;
+      const key = `${cue.trackNumber}:${cue.index}`;
+      setMissedLines((prev) => {
+        const rest = prev.filter((line) => line.key !== key);
+        return result.score < DICTATION_MISSED_BELOW
+          ? [...rest, { key, cue, score: result.score }].sort((a, b) => a.cue.startMs - b.cue.startMs)
+          : rest;
+      });
     });
-  }, [dictationInput, plainText]);
+  }, [activeCue, dictationInput, plainText]);
 
   const clearShadowRecording = React.useCallback((): void => {
     shadowGenerationRef.current += 1;
@@ -2951,6 +2968,21 @@ export default function VideoCoreStudyOverlay({
               ? t('mediaWorkspace.study.exactMatch')
               : t('mediaWorkspace.study.matchScore', { score: dictationResult.score })}
           </span>
+        )}
+        {missedLines.length > 0 && (
+          <details className="study-dictation-missed">
+            <summary>{t('mediaWorkspace.study.missedLines', { count: missedLines.length })}</summary>
+            <ul>
+              {missedLines.map((line) => (
+                <li key={line.key}>
+                  <button type="button" onClick={() => seekCue(line.cue)}>
+                    {stripAssCueText(line.cue.text)}
+                  </button>
+                  <span>{t('mediaWorkspace.study.matchScore', { score: line.score })}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </div>
     ) : null,

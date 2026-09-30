@@ -9773,6 +9773,7 @@ export const ja: Catalog = {
   'mediaWorkspace.study.reveal': '答えを見る',
   'mediaWorkspace.study.exactMatch': '完全一致',
   'mediaWorkspace.study.matchScore': '{score}%一致',
+  'mediaWorkspace.study.missedLines': { other: '聞き取れなかった行: {count}' },
   'mediaWorkspace.study.shadowRecommendation': 'シャドーイングのおすすめ',
   'mediaWorkspace.study.shadowWorth': 'このセリフをシャドーイングしてみましょう',
   'mediaWorkspace.study.replayedTimes': 'このセッションで{count}回再生しました。プレイヤーを離れずに練習できます。',
