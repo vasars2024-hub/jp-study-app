@@ -10,6 +10,7 @@ import {
   resolveColumns,
   rowMatches,
   sortRows,
+  sortedResolutions,
 } from '../components/scraper/result/columns';
 import { bestSubtitle, type EpisodeRow } from '../../shared/scraperResults';
 import { SCRAPER_COLUMN_IDS } from '../../shared/scraperShell';
@@ -187,5 +188,11 @@ describe('bestSubtitle', () => {
 
   it('returns null when there is nothing at all', () => {
     expect(bestSubtitle([], ['ja'])).toBeNull();
+  });
+});
+
+describe('resolution ordering', () => {
+  it('lists filter options by pixel height, not text order', () => {
+    expect(sortedResolutions(['720p', '1080p', '480p', '2160p', '720p'])).toEqual(['2160p', '1080p', '720p', '480p']);
   });
 });

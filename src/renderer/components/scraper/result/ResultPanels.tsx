@@ -39,6 +39,7 @@ import {
   unitMs,
 } from '../localize';
 import { useNarrow } from './useNarrow';
+import { sortedResolutions } from './columns';
 import { openMediaWorkspace, reachMediaWorkspace } from '../../../mediaWorkspaceBridge';
 
 function downloadText(filename: string, content: string, type = 'text/plain') {
@@ -207,7 +208,7 @@ export function StreamResultPanel({
   const [resolution, setResolution] = useState('all');
   const [notice, setNotice] = useState('');
   const resolutions = useMemo(
-    () => [...new Set(streams.map((stream) => stream.resolution))].sort().reverse(),
+    () => sortedResolutions(streams.map((stream) => stream.resolution)),
     [streams],
   );
   const visible = useMemo(
@@ -456,7 +457,7 @@ export function TorrentResultPanel({ torrents }: { torrents: TorrentRow[] }) {
   const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
   const [sending, setSending] = useState(false);
   const resolutions = useMemo(
-    () => [...new Set(torrents.map((torrent) => torrent.resolution))].sort().reverse(),
+    () => sortedResolutions(torrents.map((torrent) => torrent.resolution)),
     [torrents],
   );
   const visible = useMemo(

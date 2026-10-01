@@ -27,6 +27,16 @@ export interface ScraperColumn {
   sortValue?: (row: EpisodeRow) => string | number;
 }
 
+/** Pixel height of a "1080p"-style label; 0 when unlabelled. Text order would put 720p above 1080p. */
+export function resolutionHeight(label: string): number {
+  return Number.parseInt(label, 10) || 0;
+}
+
+/** Distinct resolution labels, tallest first, for a filter dropdown. */
+export function sortedResolutions(labels: readonly string[]): string[] {
+  return [...new Set(labels)].sort((a, b) => resolutionHeight(b) - resolutionHeight(a) || a.localeCompare(b));
+}
+
 export const SCRAPER_COLUMNS: ScraperColumn[] = [
   { id: 'select', labelKey: '', track: '34px', align: 'center', sortable: false, locked: true },
   { id: 'index', labelKey: '#', track: '52px', align: 'end', sortable: true, locked: true, sortValue: (r) => r.number },
@@ -34,7 +44,7 @@ export const SCRAPER_COLUMNS: ScraperColumn[] = [
   { id: 'type', labelKey: 'scrApp.r2.col.type', track: '96px', sortable: true, sortValue: (r) => r.kind },
   { id: 'language', labelKey: 'scrApp.r2.col.language', track: '96px', sortable: true, sortValue: (r) => r.audio },
   { id: 'subtitles', labelKey: 'scrApp.r2.col.subtitles', track: '104px', sortable: true, sortValue: (r) => r.subtitles.map((s) => s.language).join(',') },
-  { id: 'resolution', labelKey: 'scrApp.r2.col.resolution', track: '104px', sortable: true, sortValue: (r) => r.resolution },
+  { id: 'resolution', labelKey: 'scrApp.r2.col.resolution', track: '104px', sortable: true, sortValue: (r) => resolutionHeight(r.resolution) },
   { id: 'source', labelKey: 'scrApp.r2.col.source', track: 'minmax(90px, 0.7fr)', sortable: true, sortValue: (r) => r.sourceLabel },
   { id: 'size', labelKey: 'scrApp.r2.col.size', track: '96px', align: 'end', sortable: true, sortValue: (r) => r.sizeBytes },
   { id: 'duration', labelKey: 'scrApp.r2.col.duration', track: '92px', align: 'end', sortable: true, sortValue: (r) => r.durationSec },
