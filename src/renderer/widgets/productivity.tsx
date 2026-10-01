@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { WidgetProps } from './types';
 import { readSetting } from './types';
 import { useNow } from './hooks';
@@ -252,17 +252,20 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
   const { t } = useT();
   const items = readSetting<Todo[]>(settings, 'items', []);
   const [draft, setDraft] = useState('');
+  const draftRef = useRef<HTMLInputElement>(null);
   const write = (next: Todo[]) => setSettings({ items: next });
   const add = () => {
     const text = draft.trim();
     if (!text) return;
     write([...items, { id: `t${Date.now()}`, text, done: false }]);
     setDraft('');
+    draftRef.current?.focus();
   };
   return (
     <div className="wgt wgt-todo">
       <div className="wgt-todo-add">
         <input
+          ref={draftRef}
           value={draft}
           placeholder={t('widgets.todo.addPlaceholder')}
           onChange={(e) => setDraft(e.target.value)}

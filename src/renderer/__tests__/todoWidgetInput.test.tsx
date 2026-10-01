@@ -53,12 +53,16 @@ describe('to-do widget Japanese input', () => {
     expect(input.value).toBe('');
   });
 
-  it('still adds a task with the add button', async () => {
+  it('returns focus to the empty input after adding a task with the button', async () => {
     const { host, input, setSettings } = await mountDraft();
-    await act(async () => { host.querySelector('button')!.click(); });
+    const button = host.querySelector('button')!;
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    await act(async () => { button.click(); });
     expect(setSettings).toHaveBeenCalledExactlyOnceWith({
       items: [{ id: expect.any(String), text: '漢字を復習', done: false }],
     });
     expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
   });
 });
