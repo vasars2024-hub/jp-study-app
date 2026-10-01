@@ -3,7 +3,7 @@
 // the profile, or the calendar day changes. The rules live in
 // `shared/dailyGoal.ts`.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   adjustDailyGoalTarget,
   dailyGoalProgress,
@@ -80,10 +80,16 @@ export function useDailyGoal(): DailyGoalState {
     ready: false,
   }));
 
+  // Recounts overlap (a review and a stats flush land back to back); only the
+  // newest one may write, or a slow older read would put stale progress back.
+  const latestRecount = useRef(0);
+
   const recount = useCallback(() => {
+    const run = ++latestRecount.current;
     void loadReviewLog()
       .catch(() => [])
       .then((entries) => {
+        if (run !== latestRecount.current) return;
         setState({
           targets: getDailyGoalTargets(),
           progress: dailyGoalProgress(entries, studySecondsToday()),
@@ -106,6 +112,7 @@ export function useDailyGoal(): DailyGoalState {
     window.addEventListener(DAILY_GOAL_EVENT, recount);
     window.addEventListener('storage', onStorage);
     return () => {
+      latestRecount.current += 1;
       offLog();
       offStats();
       offProfile();
