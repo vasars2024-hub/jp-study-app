@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { LogLine } from '../../shared/scraperResults';
+import { isoDateLocal } from '../../shared/watchLibrary';
 import {
   DEFAULT_SCRAPER_LOGGING_SETTINGS,
   type ScraperLoggingSettings,
@@ -101,7 +102,7 @@ function logFileFor(day: string, index: number): string {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDateLocal(Date.now());
 }
 
 /**

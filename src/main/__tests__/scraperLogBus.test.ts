@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // needs no `await import` after the mock is registered — and every top-level
 // await in this file costs a TS1378 diagnostic under the repo's module target.
 import { DEFAULT_SCRAPER_LOGGING_SETTINGS } from '../../shared/scraperOutputSettings';
+import { isoDateLocal } from '../../shared/watchLibrary';
 
 // The log bus touches no Electron API, but stats does — both are exercised here
 // so the stub lives once.
@@ -248,8 +249,8 @@ describe('logging disk sink', () => {
     const path = await import('node:path');
     const dir = path.join(root, 'logs');
     await fsp.mkdir(dir, { recursive: true });
-    const old = new Date(Date.now() - 40 * 86_400_000).toISOString().slice(0, 10);
-    const fresh = new Date().toISOString().slice(0, 10);
+    const old = isoDateLocal(Date.now() - 40 * 86_400_000);
+    const fresh = isoDateLocal(Date.now());
     await fsp.writeFile(path.join(dir, `scraper-${old}.log`), 'old\n');
     await fsp.writeFile(path.join(dir, `scraper-${fresh}.log`), 'fresh\n');
 
@@ -268,7 +269,7 @@ describe('logging disk sink', () => {
     const path = await import('node:path');
     const dir = path.join(root, 'logs');
     await fsp.mkdir(dir, { recursive: true });
-    const old = new Date(Date.now() - 40 * 86_400_000).toISOString().slice(0, 10);
+    const old = isoDateLocal(Date.now() - 40 * 86_400_000);
     const target = path.join(dir, `scraper-${old}.log`);
     await fsp.writeFile(target, 'written just now\n');
     configureScraperLogging(logging({ persistToDisk: true, retentionDays: 7 }));
