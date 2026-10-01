@@ -217,8 +217,9 @@ export function WordOfTheDay() {
       </div>
     );
   }
-  // Deterministic pick that rotates once per calendar day.
-  const dayNum = Math.floor(Date.now() / 86400000);
+  // Deterministic pick that rotates at local midnight, not UTC midnight.
+  const today = new Date();
+  const dayNum = Math.round(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 86400000);
   const w = saved[dayNum % saved.length];
   return (
     <div className="wgt wgt-wotd">
