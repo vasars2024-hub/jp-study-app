@@ -464,22 +464,23 @@ function songMenuItems(
   state: MusicState,
   song: MediaItem,
   t: (key: string, vars?: Record<string, string | number>) => string,
+  moves: Map<string, { up?: number; down?: number }>,
 ): MenuItem[] {
   const playlist = state.activePlaylist;
   if (playlist) {
-    const at = playlist.trackIds.indexOf(song.id);
+    const { up, down } = moves.get(song.id) ?? {};
     return [
       {
         id: 'up',
         label: t('musicUi.playlists.moveUp'),
-        disabled: at <= 0,
-        onSelect: () => moveTrackInPlaylist(playlist.id, song.id, at - 1),
+        disabled: up === undefined,
+        onSelect: () => up !== undefined && moveTrackInPlaylist(playlist.id, song.id, up),
       },
       {
         id: 'down',
         label: t('musicUi.playlists.moveDown'),
-        disabled: at < 0 || at >= playlist.trackIds.length - 1,
-        onSelect: () => moveTrackInPlaylist(playlist.id, song.id, at + 1),
+        disabled: down === undefined,
+        onSelect: () => down !== undefined && moveTrackInPlaylist(playlist.id, song.id, down),
       },
       { separator: true, label: '' },
       {
@@ -522,6 +523,19 @@ export function MusicSongList({ state }: { state: MusicState }) {
   const { t } = useT();
   const { ps, metaMap, likedTick, toggleFolder, play, activePlaylist } = state;
   const [menu, setMenu] = useState<{ x: number; y: number; song: MediaItem } | null>(null);
+  // Move past the adjacent visible song, skipping missing or filtered tracks.
+  // Build the destinations once for the virtual list and its context menu.
+  const moves = useMemo(() => {
+    const result = new Map<string, { up?: number; down?: number }>();
+    if (!activePlaylist) return result;
+    const positions = new Map(activePlaylist.trackIds.map((id, index) => [id, index]));
+    const ids = state.rows.flatMap((row) => row.kind === 'song' ? [row.song.id] : []);
+    ids.forEach((id, index) => result.set(id, {
+      up: positions.get(ids[index - 1]),
+      down: positions.get(ids[index + 1]),
+    }));
+    return result;
+  }, [activePlaylist, state.rows]);
 
   const openMenu = useCallback((song: MediaItem, x: number, y: number) => setMenu({ song, x, y }), []);
   const onMenuKey = useCallback(
@@ -580,7 +594,7 @@ export function MusicSongList({ state }: { state: MusicState }) {
       if (!activePlaylist) return songButton;
       // Inside a playlist the order is the user's, so moving and removing sit on the row
       // itself (the same commands are on the row's menu for the keyboard).
-      const at = activePlaylist.trackIds.indexOf(s.id);
+      const { up, down } = moves.get(s.id) ?? {};
       return (
         <div className="music-playlist-row">
           {songButton}
@@ -589,8 +603,8 @@ export function MusicSongList({ state }: { state: MusicState }) {
               type="button"
               aria-label={t('musicUi.playlists.moveUp')}
               title={t('musicUi.playlists.moveUp')}
-              disabled={at <= 0}
-              onClick={() => moveTrackInPlaylist(activePlaylist.id, s.id, at - 1)}
+              disabled={up === undefined}
+              onClick={() => up !== undefined && moveTrackInPlaylist(activePlaylist.id, s.id, up)}
             >
               <Icon name="chevron" size={12} style={{ transform: 'rotate(-90deg)' }} />
             </button>
@@ -598,8 +612,8 @@ export function MusicSongList({ state }: { state: MusicState }) {
               type="button"
               aria-label={t('musicUi.playlists.moveDown')}
               title={t('musicUi.playlists.moveDown')}
-              disabled={at < 0 || at >= activePlaylist.trackIds.length - 1}
-              onClick={() => moveTrackInPlaylist(activePlaylist.id, s.id, at + 1)}
+              disabled={down === undefined}
+              onClick={() => down !== undefined && moveTrackInPlaylist(activePlaylist.id, s.id, down)}
             >
               <Icon name="chevron" size={12} style={{ transform: 'rotate(90deg)' }} />
             </button>
@@ -617,7 +631,7 @@ export function MusicSongList({ state }: { state: MusicState }) {
       // `likedTick` is a deliberate dependency: hearting a song must re-render
       // its row even though the row data itself did not change.
     },
-    [ps.current?.id, metaMap, toggleFolder, play, likedTick, t, activePlaylist, openMenu, onMenuKey],
+    [ps.current?.id, metaMap, toggleFolder, play, likedTick, t, activePlaylist, moves, openMenu, onMenuKey],
   );
 
   return (
@@ -644,7 +658,7 @@ export function MusicSongList({ state }: { state: MusicState }) {
           open
           x={menu.x}
           y={menu.y}
-          items={songMenuItems(state, menu.song, t)}
+          items={songMenuItems(state, menu.song, t, moves)}
           onClose={() => setMenu(null)}
         />
       ) : null}

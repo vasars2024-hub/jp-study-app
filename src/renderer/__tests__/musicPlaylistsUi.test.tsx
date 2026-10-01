@@ -157,6 +157,30 @@ describe('music playlists in the Music window', () => {
     expect(store.getPlaylist(p.id)?.trackIds).toEqual(['c']);
   });
 
+  it('moves past missing tracks in one click and disables moves at visible boundaries', async () => {
+    const p = store.createPlaylist('Mix', 'x', ['missing-first', 'a', 'missing-middle', 'c', 'missing-last']);
+    await mount();
+    await act(async () => {
+      select().value = p.id;
+      select().dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(titles()).toEqual(['Alpha', 'Charlie']);
+    expect(button('Move up').disabled).toBe(true);
+    expect(host.querySelectorAll<HTMLButtonElement>('button[aria-label="Move down"]')[1].disabled).toBe(true);
+    await act(async () => button('Move down').click());
+    expect(titles()).toEqual(['Charlie', 'Alpha']);
+    expect(store.getPlaylist(p.id)?.trackIds).toEqual(['missing-first', 'missing-middle', 'c', 'a', 'missing-last']);
+
+    // The context menu uses the same visible boundaries and destinations.
+    const row = host.querySelectorAll<HTMLButtonElement>('.music-song')[1];
+    await act(async () => row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })));
+    const menuItems = Array.from(document.querySelectorAll<HTMLButtonElement>('.ui-menu__item'));
+    expect(menuItems.find((b) => b.textContent?.includes('Move down'))?.disabled).toBe(true);
+    await act(async () => menuItems.find((b) => b.textContent?.includes('Move up'))!.click());
+    expect(titles()).toEqual(['Alpha', 'Charlie']);
+    expect(store.getPlaylist(p.id)?.trackIds).toContain('missing-middle');
+  });
+
   it('adds a song from its menu in the library view', async () => {
     const p = store.createPlaylist('Mix', 'x');
     await mount();
