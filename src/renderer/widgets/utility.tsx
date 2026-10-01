@@ -6,22 +6,33 @@ import { useT } from '../i18n';
 // shunting-yard parser (no eval, no globals).
 const KEYS = ['C', '(', ')', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', '0', '.', '=', ''];
 
-function evaluate(expr: string): string {
+export function evaluate(expr: string): string {
   const tokens = expr.match(/\d+\.?\d*|[+\-*/()]/g);
   if (!tokens) return '';
   const out: (number | string)[] = [];
   const ops: string[] = [];
-  const prec: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2 };
+  // 'u' is a prefix minus ("-5", "2*-3", "(-4)"), which binds tighter than * and /.
+  const prec: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2, u: 3 };
   const apply = () => {
     const op = ops.pop();
     const b = out.pop();
+    if (op === 'u') {
+      if (typeof b !== 'number') throw new Error('bad');
+      out.push(-b);
+      return;
+    }
     const a = out.pop();
     if (op === undefined || typeof a !== 'number' || typeof b !== 'number') throw new Error('bad');
     out.push(op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : a / b);
   };
+  let prev = '';
   for (const tk of tokens) {
+    const prefix = prev === '' || prev === '(' || '+-*/'.includes(prev);
+    prev = tk;
     if (/^\d/.test(tk)) out.push(parseFloat(tk));
     else if (tk === '(') ops.push(tk);
+    else if (prefix && tk === '-') ops.push('u');
+    else if (prefix && tk === '+') continue;
     else if (tk === ')') {
       while (ops.length && ops[ops.length - 1] !== '(') apply();
       ops.pop();
