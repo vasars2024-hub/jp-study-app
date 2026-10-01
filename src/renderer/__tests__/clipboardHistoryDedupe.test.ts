@@ -107,6 +107,28 @@ describe('consecutive clipboard copies with pinned entries', () => {
 });
 
 describe('reducing the clipboard history limit', () => {
+  it('reapplies the limit when excess pins are unpinned and keeps all remaining pins', () => {
+    const ids = Array.from({ length: 12 }, (_, index) => {
+      const entry = recordClipboardEntry(`saved word ${index}`)!;
+      togglePin(entry.id);
+      return entry.id;
+    });
+    saveClipboardSettings({ maxSize: 10 });
+
+    const afterFirst = togglePin(ids[0]);
+    expect(afterFirst).toHaveLength(11);
+    expect(afterFirst.every((entry) => entry.pinned)).toBe(true);
+    expect(afterFirst.some((entry) => entry.id === ids[0])).toBe(false);
+    expect(loadClipboardHistory()).toEqual(afterFirst);
+
+    expect(togglePin(ids[1])).toHaveLength(10);
+    // With room available, unpinning retains the copy in history.
+    const withinLimit = togglePin(ids[2]);
+    expect(withinLimit).toHaveLength(10);
+    expect(withinLimit.find((entry) => entry.id === ids[2])?.pinned).toBe(false);
+    expect(loadClipboardHistory()).toEqual(withinLimit);
+  });
+
   it('immediately keeps the newest copies and older pins and notifies the panel', () => {
     const pinned = recordClipboardEntry('saved vocabulary')!;
     togglePin(pinned.id);

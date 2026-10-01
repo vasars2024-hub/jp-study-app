@@ -196,7 +196,9 @@ export function recordReaderCopy(
 }
 
 export function togglePin(id: string): ClipboardEntry[] {
-  const list = readList().map((e) => (e.id === id ? { ...e, pinned: !e.pinned } : e));
+  // Pins can exceed the cap. Once unpinned, an entry uses the same retention
+  // budget as other copies, without waiting for another clipboard change.
+  const list = applyCap(readList().map((e) => (e.id === id ? { ...e, pinned: !e.pinned } : e)));
   writeList(list);
   return list;
 }
