@@ -6,6 +6,7 @@ import {
   CATEGORY_COLORS,
   getUpcomingOccurrences,
   onCalendarChanged,
+  parseDateKey,
   type EventOccurrence,
 } from '../calendar';
 import { useT } from '../i18n';
@@ -149,7 +150,7 @@ export function CalendarWidget() {
               <span className="wgt-cal-dot" style={{ background: ev.color || CATEGORY_COLORS[ev.category] }} />
               <span className="wgt-cal-ev-title">{ev.title}</span>
               <span className="muted wgt-cal-ev-date">
-                {new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}
+                {parseDateKey(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}
               </span>
             </li>
           ))}
