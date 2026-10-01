@@ -73,6 +73,16 @@ export function surfaceInSentence(sentence: string, word: string): string | null
   return null;
 }
 
+/** Read the actual cloze surface, whose conjugation can differ from the card. */
+function readingOfSurface(surface: string): string {
+  if (getStudyLang() !== 'ja' || !tokenizerReady()) return '';
+  try {
+    return tokenizeSync(surface).map((token) => token.reading || token.surface).join('');
+  } catch {
+    return '';
+  }
+}
+
 /** The level slot whose tier matches, if the user bound a list to it. */
 function wordsForLevel(level: LevelTier): string[] | null {
   const slot = slotsForLang(getStudyLang()).find((s) => s.tier === level);
@@ -126,7 +136,7 @@ export function loadArenaContent(level: LevelTier, material = 'auto'): ArenaCont
       const cards = listCards(list);
       const extras = packExtrasFromLists([list]);
       const vocab = buildVocabPool(cards, null, level, lemmaOf);
-      const cloze = buildClozePool(cards, surfaceInSentence);
+      const cloze = buildClozePool(cards, surfaceInSentence, readingOfSurface);
       const onlyList = packFor(studyLang, undefined);
       const pack: GamePack = {
         ...onlyList,
@@ -141,7 +151,7 @@ export function loadArenaContent(level: LevelTier, material = 'auto'): ArenaCont
   const folder = material.startsWith('folder:') ? material.slice(7) : undefined;
   const cards = deckCards(folder);
   const vocab = buildVocabPool(cards, folder ? null : wordsForLevel(level), level, lemmaOf);
-  const cloze = buildClozePool(cards, surfaceInSentence);
+  const cloze = buildClozePool(cards, surfaceInSentence, readingOfSurface);
   const sentences = buildSentencePool(cards);
   return {
     vocab,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildGameRound, evaluateRound } from '../../renderer/games/engine';
 import {
   CLOZE_BLANK,
   buildClozePool,
@@ -79,6 +80,25 @@ describe('cloze generation', () => {
     const item = clozeFromCard(mined, resolve);
     expect(item!.masked).toBe(`昨日パンを${CLOZE_BLANK}。`);
     expect(item!.answer).toBe('食べました');
+  });
+
+  it('grades the reading of the blanked surface instead of the dictionary form', () => {
+    const mined = card({ sentence: '昨日パンを食べました。' });
+    const surfaceIn = () => '食べ'; // The tokenizer leaves auxiliaries in context.
+    const cloze = buildClozePool([mined], surfaceIn, (surface) => surface === '食べ' ? 'タベ' : '');
+    expect(cloze[0].masked).toBe(`昨日パンを${CLOZE_BLANK}ました。`);
+    for (const game of ['cloze-blitz', 'listening-flash'] as const) {
+      const round = buildGameRound(game, 2, 'en', 0, { vocab: [], cloze, sentences: [] });
+      expect(evaluateRound(round, 'たべ').correct).toBe(true);
+      expect(evaluateRound(round, '食べ').correct).toBe(true);
+      expect(evaluateRound(round, 'たべる').correct).toBe(false);
+    }
+  });
+
+  it('does not offer a stale reading when a surface reading is unavailable', () => {
+    const mined = card({ sentence: '昨日パンを食べました。' });
+    expect(clozeFromCard(mined, () => '食べ')!.reading).toBe('');
+    expect(clozeFromCard(card(), undefined, () => 'unneeded')!.reading).toBe('たべる');
   });
 
   it('blanks only the first occurrence, keeping the rest as context', () => {

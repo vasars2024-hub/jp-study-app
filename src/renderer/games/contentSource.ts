@@ -128,6 +128,7 @@ export function clozeFromCard(
   card: SourceCard,
   surfaceIn: (sentence: string, word: string) => string | null = (sentence, word) =>
     sentence.includes(word) ? word : null,
+  readingOf?: (surface: string) => string,
 ): ClozeItem | null {
   if (!isUsableCard(card)) return null;
   const sentence = clean(card.sentence);
@@ -142,7 +143,9 @@ export function clozeFromCard(
   return {
     masked,
     answer: surface,
-    reading: clean(card.reading),
+    // The card's reading belongs to its dictionary form, not an inflected
+    // surface (e.g. 食べ / たべ rather than 食べる / たべる).
+    reading: surface === word ? clean(card.reading) : clean(readingOf?.(surface)),
     hint: clean(card.meaning),
     sentence,
   };
@@ -152,11 +155,12 @@ export function clozeFromCard(
 export function buildClozePool(
   cards: readonly SourceCard[],
   surfaceIn?: (sentence: string, word: string) => string | null,
+  readingOf?: (surface: string) => string,
 ): ClozeItem[] {
   const out: ClozeItem[] = [];
   const seen = new Set<string>();
   for (const card of cards) {
-    const item = clozeFromCard(card, surfaceIn);
+    const item = clozeFromCard(card, surfaceIn, readingOf);
     if (!item || seen.has(item.sentence)) continue;
     seen.add(item.sentence);
     out.push(item);
