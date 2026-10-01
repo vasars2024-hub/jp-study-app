@@ -281,6 +281,9 @@ export function startClipboardMonitor(intervalMs = 4500): () => void {
     monitorBusy = true;
     try {
       const t = (await window.api.clipboardReadText()).trim();
+      // The setting can change while IPC is pending. Recheck before retaining
+      // either the entry or lastSeen, including changes made in another window.
+      if (!loadClipboardSettings().monitoringEnabled) return;
       if (!t || t === lastSeen) return;
       lastSeen = t;
       recordClipboardEntry(t, { type: 'manual' });

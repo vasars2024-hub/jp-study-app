@@ -14,6 +14,8 @@ import {
   onClipboardHistoryChanged,
   recordClipboardEntry,
   saveClipboardSettings,
+  startClipboardMonitor,
+  stopClipboardMonitor,
   togglePin,
 } from '../clipboardHistory';
 
@@ -22,7 +24,35 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-29T12:00:00Z'));
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  stopClipboardMonitor();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe('clipboard monitoring consent', () => {
+  it('discards a pending read when monitoring is disabled, and can capture it after re-enabling', async () => {
+    let resolveRead!: (text: string) => void;
+    const clipboardReadText = vi.fn()
+      .mockImplementationOnce(() => new Promise<string>((resolve) => { resolveRead = resolve; }))
+      .mockResolvedValue('pending clipboard text');
+    vi.stubGlobal('api', { clipboardReadText });
+    saveClipboardSettings({ monitoringEnabled: true });
+    startClipboardMonitor();
+    expect(clipboardReadText).toHaveBeenCalledTimes(1);
+
+    saveClipboardSettings({ monitoringEnabled: false });
+    resolveRead('pending clipboard text');
+    await Promise.resolve();
+    expect(loadClipboardHistory()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(4500);
+    expect(clipboardReadText).toHaveBeenCalledTimes(1);
+
+    saveClipboardSettings({ monitoringEnabled: true });
+    await vi.advanceTimersByTimeAsync(4500);
+    expect(loadClipboardHistory().map((entry) => entry.text)).toEqual(['pending clipboard text']);
+  });
+});
 
 describe('consecutive clipboard copies with pinned entries', () => {
   it('deduplicates the newest copy even with an older pin and equal timestamps', () => {
