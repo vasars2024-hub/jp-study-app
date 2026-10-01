@@ -78,6 +78,23 @@ afterEach(() => {
 
 /* ------------------------------------------------------------------ D161 */
 
+describe('custom repeat intervals', () => {
+  it('shows and saves whole days when a fractional interval is entered', () => {
+    const el = mount(createElement(EventModal, {
+      initial: { title: 'Review', date: TODAY, recurrence: 'custom' }, onClose: vi.fn(),
+    }));
+    const input = el.querySelector<HTMLInputElement>('input[type="number"]')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2.5');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(input.value).toBe('2');
+    const save = Array.from(el.querySelectorAll('button')).find((button) => button.textContent === 'calendar.modal.create')!;
+    act(() => save.click());
+    expect(JSON.parse(localStorage.getItem(STORE_KEY)!)[0].recurrenceInterval).toBe(2);
+  });
+});
+
 describe('D161 — the Agenda listed every event later today twice', () => {
   /** A probe that renders nothing and just exposes the hook's agenda lists. */
   function agenda(): CalendarState {

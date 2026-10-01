@@ -155,6 +155,11 @@ export interface EventOccurrence extends CalendarEvent {
   occurrenceDate: string;
 }
 
+/** Custom repeats use whole calendar days, including when loading older events. */
+export function normalizeRecurrenceInterval(value: number = 1): number {
+  return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
+}
+
 /** Expand recurring events into concrete occurrences within [start, end] (inclusive, date-only). */
 export function expandOccurrences(events: CalendarEvent[], start: Date, end: Date): EventOccurrence[] {
   const startKey = toDateKey(start);
@@ -169,7 +174,7 @@ export function expandOccurrences(events: CalendarEvent[], start: Date, end: Dat
     const stopKey = ev.recurrenceEndDate && ev.recurrenceEndDate < endKey ? ev.recurrenceEndDate : endKey;
     const cursor = new Date(base);
     const stepDays =
-      ev.recurrence === 'daily' ? 1 : ev.recurrence === 'weekly' ? 7 : ev.recurrence === 'custom' ? Math.max(1, ev.recurrenceInterval ?? 1) : 0;
+      ev.recurrence === 'daily' ? 1 : ev.recurrence === 'weekly' ? 7 : ev.recurrence === 'custom' ? normalizeRecurrenceInterval(ev.recurrenceInterval) : 0;
     if (ev.recurrence === 'monthly') {
       const cur = new Date(base);
       let guard = 0;

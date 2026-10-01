@@ -49,6 +49,16 @@ describe('monthly calendar occurrences', () => {
 });
 
 describe('long-running calendar occurrences', () => {
+  it('keeps fractional custom intervals consistent across overlapping views', () => {
+    const event: CalendarEvent = { ...monthlyEvent('2026-01-01'), recurrence: 'custom', recurrenceInterval: 2.5 };
+    const full = expandOccurrences([event], new Date(2026, 0, 1), new Date(2026, 0, 9));
+    const later = expandOccurrences([event], new Date(2026, 0, 4), new Date(2026, 0, 9));
+    expect(full.map((o) => o.occurrenceDate)).toEqual([
+      '2026-01-01', '2026-01-03', '2026-01-05', '2026-01-07', '2026-01-09',
+    ]);
+    expect(later).toEqual(full.filter((o) => o.occurrenceDate >= '2026-01-04'));
+  });
+
   it.each([
     ['daily', undefined, ['2026-01-01', '2026-01-02', '2026-01-03']],
     ['weekly', undefined, ['2026-01-03']],

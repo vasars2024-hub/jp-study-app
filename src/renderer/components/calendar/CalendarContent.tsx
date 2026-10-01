@@ -22,6 +22,7 @@ import {
   getTodayOccurrences,
   getUpcomingOccurrences,
   loadEvents,
+  normalizeRecurrenceInterval,
   onCalendarChanged,
   REMINDER_LABEL_KEYS,
   REMINDER_OFFSETS,
@@ -131,7 +132,7 @@ export function EventModal({
       reminder: form.reminder,
       recurrence: form.recurrence,
       recurrenceInterval:
-        form.recurrence === 'custom' ? Math.max(1, form.recurrenceInterval) : undefined,
+        form.recurrence === 'custom' ? normalizeRecurrenceInterval(form.recurrenceInterval) : undefined,
       recurrenceEndDate: form.recurrenceEndDate || undefined,
     };
     if (isEditing) updateEvent(form.id, payload);
@@ -295,7 +296,7 @@ export function EventModal({
                   min={1}
                   max={365}
                   value={form.recurrenceInterval}
-                  onChange={(e) => set('recurrenceInterval', Math.max(1, Number(e.target.value) || 1))}
+                  onChange={(e) => set('recurrenceInterval', normalizeRecurrenceInterval(Number(e.target.value)))}
                 />
               </label>
             )}
