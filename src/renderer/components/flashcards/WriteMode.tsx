@@ -90,6 +90,7 @@ export default function WriteMode({ onExit, deck = 'all' }: {
   function retry(): void {
     setGrade(null);
     setTyped('');
+    setRevealed(false);
   }
 
   if (!round) return null;

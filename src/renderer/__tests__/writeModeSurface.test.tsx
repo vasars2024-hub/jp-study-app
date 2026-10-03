@@ -119,6 +119,27 @@ describe('WriteMode', () => {
     expect(buttons().map((b) => b.textContent)).toContain('flash.write.retype');
   });
 
+  it('hides a revealed answer again when retrying a near miss', () => {
+    deck = [greeting];
+    mount();
+    type('おはようございす');
+    click('flash.write.check');
+    click('flash.write.reveal');
+    expect(host.textContent).toContain(`flash.write.wrong(answer=${greeting.word})`);
+
+    click('flash.write.retype');
+    expect(host.querySelector('input')?.value).toBe('');
+    expect(document.activeElement).toBe(host.querySelector('input'));
+    expect(host.textContent).not.toContain(greeting.word);
+
+    type('おはようございす');
+    click('flash.write.check');
+    expect(host.textContent).toContain('flash.write.close');
+    expect(host.textContent).not.toContain(greeting.word);
+    click('flash.write.reveal');
+    expect(host.textContent).toContain(`flash.write.wrong(answer=${greeting.word})`);
+  });
+
   it('counts an override separately from a correct answer', () => {
     deck = [greeting];
     mount();
