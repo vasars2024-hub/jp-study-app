@@ -7,7 +7,7 @@ import { useT } from '../i18n';
 const KEYS = ['C', '(', ')', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', '0', '.', '=', ''];
 
 export function evaluate(expr: string): string {
-  const tokens = expr.match(/\d+\.?\d*|[+\-*/()]/g);
+  const tokens = expr.match(/\d+\.?\d*|\.\d+|[+\-*/()]/g);
   if (!tokens) return '';
   const out: (number | string)[] = [];
   const ops: string[] = [];
@@ -29,7 +29,7 @@ export function evaluate(expr: string): string {
   for (const tk of tokens) {
     const prefix = prev === '' || prev === '(' || '+-*/'.includes(prev);
     prev = tk;
-    if (/^\d/.test(tk)) out.push(parseFloat(tk));
+    if (/^[\d.]/.test(tk)) out.push(parseFloat(tk));
     else if (tk === '(') ops.push(tk);
     else if (prefix && tk === '-') ops.push('u');
     else if (prefix && tk === '+') continue;
