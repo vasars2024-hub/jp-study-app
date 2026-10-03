@@ -136,13 +136,13 @@ export function buildSearchIndex(
 ): SearchEntry[] {
   return songs.map((song) => {
     const meta = metaOf(song);
-    return { song, haystack: `${meta.title} ${meta.artist} ${song.fileName}`.toLowerCase() };
+    return { song, haystack: `${meta.title} ${meta.artist} ${song.fileName}`.normalize('NFKC').toLowerCase() };
   });
 }
 
 /** Cheap per-keystroke step: just a substring scan over the pre-lowercased cache. */
 export function searchSongs(index: SearchEntry[], query: string): MediaItem[] {
-  const q = query.trim().toLowerCase();
+  const q = query.normalize('NFKC').trim().toLowerCase();
   if (!q) return index.map((e) => e.song);
   return index.filter((e) => e.haystack.includes(q)).map((e) => e.song);
 }
