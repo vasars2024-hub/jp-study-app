@@ -100,7 +100,9 @@ export function CalendarWidget() {
   const [upcoming, setUpcoming] = useState<EventOccurrence[]>(() => getUpcomingOccurrences(4));
   useEffect(() => onCalendarChanged(() => setUpcoming(getUpcomingOccurrences(4))), []);
 
-  const today = new Date();
+  const today = useNow(60_000);
+  // Sessions can finish without a calendar edit; refresh the upcoming list too.
+  useEffect(() => setUpcoming(getUpcomingOccurrences(4)), [today]);
   const cells = useMemo(() => {
     const first = new Date(view.y, view.m, 1);
     const startDow = first.getDay();
