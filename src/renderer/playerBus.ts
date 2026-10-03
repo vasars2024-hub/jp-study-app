@@ -346,13 +346,15 @@ async function playItemById(id: string, itemHint?: MediaItem): Promise<string | 
   listening.flush();
 
   switchingTrack = true;
-  trackToken++;
+  const requestToken = ++trackToken;
   audio.pause();
   state.playing = false;
   state.time = 0;
   state.duration = 0;
 
   const opened = await window.api.openMedia(id);
+  // A newer selection or Stop supersedes this load while main opens the file.
+  if (requestToken !== trackToken || !isLeader()) return null;
   if (!opened) {
     switchingTrack = false;
     return t('musicUi.error.fileMissing');
