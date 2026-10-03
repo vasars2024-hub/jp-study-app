@@ -305,11 +305,11 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   const activeSource = source !== ALL_SOURCES && !sources.includes(source) ? ALL_SOURCES : source;
 
   const visibleRows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = query.normalize('NFKC').trim().toLowerCase();
     const matched = rows.filter((row) => {
       if (activeSource !== ALL_SOURCES && row.source !== activeSource) return false;
       if (!needle) return true;
-      return `${row.title}\n${row.sourceLabel}\n${row.text}`.toLowerCase().includes(needle);
+      return `${row.title}\n${row.sourceLabel}\n${row.text}`.normalize('NFKC').toLowerCase().includes(needle);
     });
     // A copy: `rows` is the identity list and sorting it in place would reorder
     // the memo every consumer downstream reads.

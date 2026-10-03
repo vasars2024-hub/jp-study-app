@@ -97,6 +97,34 @@ afterEach(() => {
 });
 
 describe('Captures index', () => {
+  it.each([
+    ['コーヒーを飲む。', 'ｺｰﾋｰ'],
+    ['ｶﾞｯｺｳへ行く。', 'ガッコウ'],
+    ['Read NHK today.', '　ｎｈｋ　'],
+    ['ＮＨＫを読む。', 'nhk'],
+  ])('finds capture text %s with width-equivalent query %s', async (text, query) => {
+    const h = await mount([
+      entry('match', 'screen', 'Study passage', text, 2),
+      entry('other', 'clipboard', 'Other passage', '関係のない文章。', 1),
+    ]);
+
+    await search(h, query);
+
+    expect(titles(h)).toEqual(['Study passage']);
+    expect(h.container.textContent).toContain(text);
+  });
+
+  it('matches width-equivalent source titles', async () => {
+    const h = await mount([
+      entry('match', 'screen', 'ＮＨＫニュース', '今日の出来事。', 2),
+      entry('other', 'clipboard', 'Other passage', '関係のない文章。', 1),
+    ]);
+
+    await search(h, 'nhk');
+
+    expect(titles(h)).toEqual(['ＮＨＫニュース']);
+  });
+
   it('narrows the list on a search and leaves the reader where it was', async () => {
     const h = await mount(ENTRIES);
     expect(titles(h)).toHaveLength(3);
