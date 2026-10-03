@@ -162,6 +162,14 @@ export function useNotebook(): NotebookState {
       .sort((a, b) => b.count - a.count);
   }, [inView]);
 
+  // A live deletion can remove the selected folder and its sidebar button.
+  // Clear that hidden filter so the remaining notes are still reachable.
+  useEffect(() => {
+    if (folder !== 'all' && !folders.some((f) => f.id === folder)) {
+      setFolder('all');
+    }
+  }, [folder, folders]);
+
   // Switching views can strand a filter on a stream/folder the new view does
   // not contain, which reads as an empty notebook rather than a stale filter.
   // The overview can own 400 rows plus provenance chains. Treat the replacement

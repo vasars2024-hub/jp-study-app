@@ -53,6 +53,34 @@ function titles(): string[] {
 }
 
 describe('an open Notebook and its timeline', () => {
+  it('clears a vanished folder filter while preserving filters for folders that still have notes', async () => {
+    const first = appendNotebookEvent({ stream: 'translations', title: 'first note', folder: 'Practice' });
+    const last = appendNotebookEvent({ stream: 'translations', title: 'last note', folder: 'Practice' });
+    appendNotebookEvent({ stream: 'translations', title: 'other note', folder: 'Other notes' });
+    await act(async () => {
+      root.render(<Probe />);
+      await vi.runAllTimersAsync();
+    });
+    act(() => latest!.setFolder('Practice'));
+    expect(latest!.visible.map((entry) => entry.title)).toEqual(expect.arrayContaining(['first note', 'last note']));
+    expect(latest!.visible).toHaveLength(2);
+
+    await act(async () => {
+      removeNotebookEntry(first.id);
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(latest!.folder).toBe('Practice');
+    expect(latest!.visible.map((entry) => entry.title)).toEqual(['last note']);
+
+    await act(async () => {
+      removeNotebookEntry(last.id);
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(latest!.folders.map((folder) => folder.id)).not.toContain('Practice');
+    expect(latest!.folder).toBe('all');
+    expect(latest!.visible.map((entry) => entry.title)).toEqual(['other note']);
+  });
+
   it('drops a note deleted elsewhere and shows one appended elsewhere, without a refocus', async () => {
     const note = appendNotebookEvent({ stream: 'translations', title: 'kept for later' });
     await act(async () => {
