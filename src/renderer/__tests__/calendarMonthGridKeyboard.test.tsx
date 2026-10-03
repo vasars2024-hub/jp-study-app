@@ -24,7 +24,7 @@ vi.mock('../i18n', () => ({
   useT: () => ({ t: (key: string) => key, lang: 'en' }),
 }));
 
-import { CalendarBody, EventModal, toKey, type CalendarState } from '../components/calendar/CalendarContent';
+import { CalendarBody, EventModal, toKey, useCalendar, type CalendarState } from '../components/calendar/CalendarContent';
 
 /** 2026-09 laid out from Sunday 2026-08-30, i.e. what `useCalendar` produces. */
 const FIRST_CELL = new Date(2026, 7, 30);
@@ -74,6 +74,30 @@ afterEach(() => {
   host?.remove();
   root = null;
   host = null;
+});
+
+describe('Calendar month navigation', () => {
+  it.each([
+    ['2026-01-31', 1, '2026-02-28'],
+    ['2028-01-31', 1, '2028-02-29'],
+    ['2026-03-31', -1, '2026-02-28'],
+    ['2026-05-31', -1, '2026-04-30'],
+    ['2026-12-15', 1, '2027-01-15'],
+    ['2026-01-15', -1, '2025-12-15'],
+  ] as const)('moves from %s by %i month without skipping a month', (date, direction, expected) => {
+    let state: CalendarState;
+    function Harness() {
+      state = useCalendar();
+      return null;
+    }
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(createElement(Harness)));
+    act(() => state.jump(date));
+    act(() => state.shift(direction));
+    expect(toKey(state!.cursor)).toBe(expected);
+  });
 });
 
 describe('Calendar month grid — keyboard', () => {

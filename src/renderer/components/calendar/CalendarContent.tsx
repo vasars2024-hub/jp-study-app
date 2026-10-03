@@ -364,8 +364,12 @@ export function useCalendar() {
 
   const shift = (dir: 1 | -1) => {
     const d = new Date(cursor);
-    if (mode === 'month') d.setMonth(d.getMonth() + dir);
-    else if (mode === 'week') d.setDate(d.getDate() + dir * 7);
+    if (mode === 'month') {
+      // Move from day one so dates such as January 31 cannot overflow February.
+      d.setMonth(d.getMonth() + dir, 1);
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(cursor.getDate(), lastDay));
+    } else if (mode === 'week') d.setDate(d.getDate() + dir * 7);
     else d.setDate(d.getDate() + dir);
     setCursor(d);
   };
