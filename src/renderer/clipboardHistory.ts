@@ -247,7 +247,11 @@ export function sendEntriesToFlashcards(entries: ClipboardEntry[], source: Flash
       word: e.dictMeta?.expression ?? e.text.slice(0, 120),
       reading: e.dictMeta?.reading ?? '',
       meaning: e.dictMeta?.meaning ?? '',
-      sentence: e.type === 'sentence' || e.type === 'paragraph' ? e.text : undefined,
+      // Plain clipboard copies also need their full text when the word preview
+      // is shortened, otherwise sending a passage to the deck loses its ending.
+      sentence: e.type === 'sentence' || e.type === 'paragraph' || (!e.dictMeta && e.text.length > 120)
+        ? e.text
+        : undefined,
       source,
       bookTitle: e.readerMeta?.book,
     })),
