@@ -127,7 +127,14 @@ export function CalendarWidget() {
     d === today.getDate() && view.m === today.getMonth() && view.y === today.getFullYear();
   const openFull = () => window.dispatchEvent(new CustomEvent('os:open', { detail: 'calendar' }));
   return (
-    <div className="wgt wgt-cal" onClick={openFull} role="button" tabIndex={0} title={t('widgets.calendarWidget.openTitle')}>
+    <div className="wgt wgt-cal" onClick={openFull} role="button" tabIndex={0} title={t('widgets.calendarWidget.openTitle')}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!e.repeat) openFull();
+        }
+      }}>
       <div className="wgt-cal-head">
         <button className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title={t('widgets.calendarWidget.prevMonth')} aria-label={t('widgets.calendarWidget.prevMonth')}>‹</button>
         <span>{monthLabel}</span>
