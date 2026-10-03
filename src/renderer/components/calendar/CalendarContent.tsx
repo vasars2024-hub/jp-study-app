@@ -428,7 +428,8 @@ export function useCalendar() {
   // list, where including today is correct.
   const agendaUpcoming = useMemo(() => {
     const todayKey = toDateKey(new Date());
-    return getUpcomingOccurrences(30).filter((o) => o.occurrenceDate > todayKey);
+    // Apply the cap after excluding today so a busy day cannot hide future sessions.
+    return getUpcomingOccurrences(Infinity).filter((o) => o.occurrenceDate > todayKey).slice(0, 30);
   }, [events]);
   const agendaOverdue = useMemo(() => getOverdueReminders(), [events]);
 

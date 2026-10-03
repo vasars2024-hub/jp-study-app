@@ -25,6 +25,7 @@ vi.mock('../i18n', () => ({
 }));
 
 import { CalendarBody, EventModal, toKey, useCalendar, type CalendarState } from '../components/calendar/CalendarContent';
+import { LS_KEYS } from '../storage/storage';
 
 /** 2026-09 laid out from Sunday 2026-08-30, i.e. what `useCalendar` produces. */
 const FIRST_CELL = new Date(2026, 7, 30);
@@ -77,6 +78,43 @@ afterEach(() => {
 });
 
 describe('Calendar month navigation', () => {
+  it('keeps future agenda events visible when today fills the upcoming limit', () => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const events = Array.from({ length: 70 }, (_, i) => ({
+      id: `agenda-${i}`,
+      title: `Study session ${i}`,
+      date: toKey(i < 30 ? today : tomorrow),
+      allDay: true,
+      color: '#fff',
+      category: 'study',
+      reminder: 'none',
+      recurrence: 'none',
+      createdAt: 0,
+    }));
+    const previous = localStorage.getItem(LS_KEYS.calendarEvents);
+    localStorage.setItem(LS_KEYS.calendarEvents, JSON.stringify(events));
+    try {
+      let state: CalendarState;
+      function Harness() {
+        state = useCalendar();
+        return null;
+      }
+      host = document.createElement('div');
+      document.body.appendChild(host);
+      root = createRoot(host);
+      act(() => root!.render(createElement(Harness)));
+      expect(state!.agendaToday).toHaveLength(30);
+      expect(state!.agendaUpcoming.map((event) => event.id)).toEqual(
+        events.slice(30, 60).map((event) => event.id),
+      );
+    } finally {
+      if (previous === null) localStorage.removeItem(LS_KEYS.calendarEvents);
+      else localStorage.setItem(LS_KEYS.calendarEvents, previous);
+    }
+  });
+
   it.each([
     ['2026-01-31', 1, '2026-02-28'],
     ['2028-01-31', 1, '2028-02-29'],
