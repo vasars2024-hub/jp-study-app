@@ -77,6 +77,7 @@ export default function ListenMode({ onExit, deck = 'all' }: {
     const audio = audioRef.current;
     if (audio) {
       audio.onended = null;
+      audio.onerror = null;
       try { audio.pause(); } catch { /* detached */ }
     }
   }, []);
@@ -128,6 +129,8 @@ export default function ListenMode({ onExit, deck = 'all' }: {
       setError('');
       const audio = audioRef.current ?? new Audio();
       audioRef.current = audio;
+      // Decode/network errors can arrive after play() has already resolved.
+      audio.onerror = playbackFailed;
       audio.src = src;
       audio.onended = () => {
         playsRef.current += 1;

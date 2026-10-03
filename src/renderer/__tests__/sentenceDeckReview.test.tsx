@@ -188,7 +188,7 @@ describe('ListenMode', () => {
     expect(played[1]).toBe(played[0]);
   }, 20_000);
 
-  it.each(['initial', 'repeat'] as const)('offers a retry when %s playback fails', async (failure) => {
+  it.each(['initial', 'repeat', 'media error'] as const)('offers a retry when %s playback fails', async (failure) => {
     vi.useFakeTimers();
     seed();
     host = document.createElement('div');
@@ -211,6 +211,10 @@ describe('ListenMode', () => {
       await act(async () => { lastAudio()?.onended?.(new Event('ended')); });
       await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
       await flush();
+    }
+
+    if (failure === 'media error') {
+      await act(async () => { lastAudio()?.dispatchEvent(new Event('error')); });
     }
 
     expect(host.querySelector('.flash-audio-error')?.textContent).toBeTruthy();
