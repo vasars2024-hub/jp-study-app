@@ -22,6 +22,15 @@ describe('findDeckSentences', () => {
   it('ignores one-character fragments', () => {
     expect(findDeckSentences(cards, 'を')).toEqual([]);
   });
+  it.each(['食べちゃった。', '飲んじゃった。', '飲んでしまった。', '食べちゃいます。'])('finds completion examples: %s', (sentence) => {
+    const hits = findDeckSentences([{ id: 'casual', word: '', sentence }], 'てしまう');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].id).toBe('casual');
+    expect(sentence.slice(hits[0].matchStart, hits[0].matchEnd)).toMatch(/^(ちゃ|じゃ|でしま)/);
+  });
+  it('does not mistake nouns containing contraction prefixes for completion grammar', () => {
+    expect(findDeckSentences([{ id: 'noun', word: '', sentence: 'おもちゃとじゃがいも。' }], 'てしまう')).toEqual([]);
+  });
   it('honours the limit', () => {
     expect(findDeckSentences(cards, '水を', 2)).toHaveLength(2);
     expect(findDeckSentences(cards, '水を', 1)).toHaveLength(1);

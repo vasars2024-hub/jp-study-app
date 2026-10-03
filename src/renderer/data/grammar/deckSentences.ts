@@ -23,6 +23,14 @@ const U_ROW_ENDING = /[うくぐすつぬぶむる]$/;
  * like 食べてしまった are still found. The stem must keep two characters.
  */
 function needleVariants(needle: string): string[] {
+  if (needle === 'てしまう' || needle === 'でしまう') {
+    // Include voiced te-forms and casual contractions, but not bare ちゃ/じゃ:
+    // those would also match unrelated words such as おもちゃ and じゃがいも.
+    return ['てしまう', 'でしまう', 'てしま', 'でしま',
+      ...['ちゃ', 'じゃ'].flatMap((stem) =>
+        ['う', 'った', 'って', 'わ', 'い', 'え', 'お'].map((ending) => stem + ending)),
+    ];
+  }
   const stem = needle.slice(0, -1);
   return U_ROW_ENDING.test(needle) && stem.length >= 2 ? [needle, stem] : [needle];
 }

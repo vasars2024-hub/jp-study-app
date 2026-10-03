@@ -45,6 +45,7 @@ import {
 import { findCaptureSentences, findDeckSentences, type DeckSentenceHit } from '../../data/grammar/deckSentences';
 import { READING_LENS_HISTORY_LIMIT, type ReadingLensHistoryEntry } from '../../../shared/readingLensHistory';
 import { FLASHCARD_DECK_EVENT, loadDeck } from '../../flashcardDeck';
+import { requestFlashcardsFocus } from '../../openIntents';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 type CatFilter = 'All' | GuideCategory;
@@ -332,9 +333,10 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
             <ul className="gram-examples gram-examples-deck">
               {deckSentences.map((hit) => (
                 <li key={hit.id}>
-                  <span className="gram-ex-jp" lang={contentLangOf(point.lang)}>
+                  <button type="button" className="gram-more-btn gram-ex-jp" lang={contentLangOf(point.lang)}
+                    onClick={() => requestFlashcardsFocus({ folder: null, cardId: hit.id })}>
                     <MatchedSentence hit={hit} />
-                  </span>
+                  </button>
                   <span className="gram-ex-en" lang={contentLangOf(point.lang)}>
                     {hit.word}
                   </span>

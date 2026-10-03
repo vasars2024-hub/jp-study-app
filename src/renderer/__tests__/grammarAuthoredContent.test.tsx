@@ -21,6 +21,8 @@ import {
 } from '../data/grammar';
 import { grammarTitleKey, sortGrammarPoints } from '../data/grammar/practiceFilters';
 import { GrammarDetail } from '../components/grammar/GrammarContent';
+import * as flashcardDeck from '../flashcardDeck';
+import * as openIntents from '../openIntents';
 
 const SUPPLEMENTS: GrammarPoint[] = [
   ...GRAMMAR_MODULES['n4-supplement'],
@@ -183,6 +185,7 @@ afterEach(() => {
   host = null;
   root = null;
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function render(point: GrammarPoint) {
@@ -195,6 +198,22 @@ function render(point: GrammarPoint) {
 }
 
 describe('GrammarDetail', () => {
+  it('highlights a contracted deck example and opens its source card', () => {
+    vi.spyOn(flashcardDeck, 'loadDeck').mockReturnValue([
+      { id: 'source-card', word: '食べる', sentence: '食べちゃった。' } as flashcardDeck.DeckFlashcard,
+    ]);
+    const open = vi.spyOn(openIntents, 'requestFlashcardsFocus').mockImplementation(() => {});
+    const el = render({
+      id: 'completion', lang: 'ja', level: 'N4', title: '〜てしまう', meaning: 'completion',
+      structure: 'てしまう', explanation: 'completion', examples: [],
+    });
+    const button = el.querySelector<HTMLButtonElement>('.gram-examples-deck button')!;
+    expect(button.textContent).toBe('食べちゃった。');
+    expect(button.querySelector('mark')?.textContent).toBe('ちゃった');
+    act(() => button.click());
+    expect(open).toHaveBeenCalledWith({ folder: null, cardId: 'source-card' });
+  });
+
   it('loads matching reading captures even when the learner has no deck cards', async () => {
     const lensHistoryList = vi.fn().mockResolvedValue([
       { captureId: 'capture', text: '今日は暑い。水を飲む。' },
