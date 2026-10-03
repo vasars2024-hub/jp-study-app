@@ -30,6 +30,7 @@ vi.mock('../components/ui', () => ({
 vi.mock('../i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
 
 import TranslateView from '../views/TranslateView';
+import { useTranslate, type TranslateController } from '../components/translate/TranslateContent';
 
 let root: Root | null = null;
 
@@ -44,18 +45,51 @@ afterEach(async () => {
   document.body.replaceChildren();
 });
 
-async function mount(): Promise<HTMLElement> {
+async function mount(content: ReactNode = <TranslateView />): Promise<HTMLElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const created = createRoot(host);
   root = created;
-  await act(async () => created.render(<TranslateView />));
+  await act(async () => created.render(content));
   return host;
 }
 
 const glyphOf = (el: Element | null): string | null => el?.querySelector('svg path')?.getAttribute('d') ?? null;
 
 describe('Translate — the direction control is a swap', () => {
+  it('keeps an untranslated draft in the source pane when swapping either way', async () => {
+    let controller!: TranslateController;
+    function Harness() { controller = useTranslate(); return null; }
+    await mount(<Harness />);
+    await act(async () => controller.setInput('今日はいい天気です。'));
+    const { source, target } = controller;
+
+    await act(async () => controller.swap());
+    expect([controller.source, controller.target]).toEqual([target, source]);
+    expect(controller.input).toBe('今日はいい天気です。');
+    expect(controller.output).toBe('');
+
+    await act(async () => controller.swap());
+    expect([controller.source, controller.target]).toEqual([source, target]);
+    expect(controller.input).toBe('今日はいい天気です。');
+    expect(controller.output).toBe('');
+  });
+
+  it('still exchanges both panes when a translation is available', async () => {
+    let controller!: TranslateController;
+    function Harness() { controller = useTranslate(); return null; }
+    await mount(<Harness />);
+    await act(async () => controller.rerunEntry({
+      id: 'saved', ts: 1, origin: 'app', sourceLang: 'ja', targetLang: 'en',
+      sourceText: '猫', resultText: 'cat',
+    }));
+
+    await act(async () => controller.swap());
+    expect([controller.source, controller.target]).toEqual(['en', 'ja']);
+    expect(controller.input).toBe('cat');
+    expect(controller.output).toBe('猫');
+  });
+
   it('draws the swap glyph between the rows and exchanges them on click', async () => {
     const host = await mount();
     const swap = host.querySelector('.tr-swap');

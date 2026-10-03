@@ -140,8 +140,11 @@ export function useTranslate(): TranslateController {
     setTarget(source);
     setTranslateSource(target);
     setTranslateTarget(source);
-    setInput(output);
-    setOutput(input);
+    // Until a result exists, keep the learner's draft ready to translate.
+    if (output) {
+      setInput(output);
+      setOutput(input);
+    }
     setTranslatedInput('');
   }
 
