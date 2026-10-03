@@ -211,15 +211,14 @@ export function useResources() {
       try {
         await window.api.toolsUpdate(id, { note: noteDraft });
       } catch (error) {
-        // Same silence, and here it costs the note itself: the editor closes and
-        // the draft is dropped either way, so a swallowed failure looks exactly
-        // like a save.
+        // Keep the editor and draft intact so the learner can retry the save.
         showToast({
           message: t('resources.myTools.noteSaveFailed', {
             reason: error instanceof Error ? error.message : String(error),
           }),
           kind: 'error',
         });
+        return;
       }
       setEditingTool(null);
       setNoteDraft('');
