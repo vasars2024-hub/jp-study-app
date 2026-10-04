@@ -20,6 +20,9 @@ vi.mock('../storage/db', () => ({
 }));
 
 import { appendNotebookEvent, removeNotebookEntry } from '../notebookTimeline';
+import { addDeckCards, removeDeckCard } from '../flashcardDeck';
+import * as notebookSources from '../notebook/aggregate';
+import type { LibraryItem } from '../../shared/types';
 import { useNotebook, type NotebookState } from '../components/notebook/NotebookContent';
 
 let host: HTMLDivElement;
@@ -46,6 +49,7 @@ afterEach(() => {
   latest = null;
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function titles(): string[] {
@@ -53,6 +57,30 @@ function titles(): string[] {
 }
 
 describe('an open Notebook and its timeline', () => {
+  it('updates card lineage while a library refresh is still pending', async () => {
+    vi.spyOn(notebookSources, 'loadNotebookSources')
+      .mockResolvedValueOnce({ library: [{ id: 'book', title: 'Reading practice', kind: 'book', createdAt: 1 } as LibraryItem] })
+      .mockImplementation(() => new Promise(() => undefined));
+    await act(async () => { root.render(<Probe />); });
+    const cardCount = () => latest!.lineage.byBookId.get('book')?.find((node) => node.stage === 'cards')?.count ?? 0;
+    expect(cardCount()).toBe(0);
+
+    let cardId = '';
+    await act(async () => {
+      const [card] = addDeckCards([{ word: '猫', reading: 'ねこ', meaning: 'cat', source: 'epub', bookId: 'book' }]);
+      cardId = card.id;
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(notebookSources.loadNotebookSources).toHaveBeenCalledTimes(2);
+    expect(cardCount()).toBe(1);
+
+    await act(async () => {
+      removeDeckCard(cardId);
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(cardCount()).toBe(0);
+  });
+
   it('clears a vanished folder filter while preserving filters for folders that still have notes', async () => {
     const first = appendNotebookEvent({ stream: 'translations', title: 'first note', folder: 'Practice' });
     const last = appendNotebookEvent({ stream: 'translations', title: 'last note', folder: 'Practice' });

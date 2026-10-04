@@ -128,7 +128,8 @@ export function useNotebook(): NotebookState {
         deck: loadDeck(),
         annotations: collectAllAnnotationsMap(),
       }),
-    [sources],
+    // Local deck/annotation changes must not wait for the IPC refresh to finish.
+    [sources, tick],
   );
 
   const viewStreams = useMemo(() => streamsForView(view, STREAM_KEYS), [view]);
