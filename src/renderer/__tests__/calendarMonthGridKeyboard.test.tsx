@@ -24,7 +24,7 @@ vi.mock('../i18n', () => ({
   useT: () => ({ t: (key: string) => key, lang: 'en' }),
 }));
 
-import { CalendarBody, EventModal, toKey, useCalendar, type CalendarState } from '../components/calendar/CalendarContent';
+import { CalendarBody, CalendarNav, EventModal, toKey, useCalendar, type CalendarState } from '../components/calendar/CalendarContent';
 import { LS_KEYS } from '../storage/storage';
 
 /** 2026-09 laid out from Sunday 2026-08-30, i.e. what `useCalendar` produces. */
@@ -78,6 +78,41 @@ afterEach(() => {
 });
 
 describe('Calendar month navigation', () => {
+  it('keeps the date picker aligned with navigation without resetting a cleared draft', () => {
+    let state: CalendarState;
+    function Harness() {
+      state = useCalendar();
+      return createElement(CalendarNav, { state });
+    }
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(createElement(Harness)));
+    const date = host.querySelector<HTMLInputElement>('input[type="date"]')!;
+    const setDate = (value: string) => act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(date, value);
+      date.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    setDate('2026-01-31');
+    act(() => host!.querySelector<HTMLButtonElement>('[aria-label="calendar.next"]')!.click());
+    expect(date.value).toBe('2026-02-28');
+    act(() => host!.querySelector<HTMLButtonElement>('[aria-label="calendar.prev"]')!.click());
+    expect(date.value).toBe('2026-01-28');
+
+    setDate('');
+    act(() => state.setMode('week'));
+    expect(date.value).toBe('');
+    expect(toKey(state!.cursor)).toBe('2026-01-28');
+    act(() => state.shift(1));
+    expect(date.value).toBe('2026-02-04');
+    act(() => state.setMode('day'));
+    act(() => state.shift(-1));
+    expect(date.value).toBe('2026-02-03');
+    act(() => state.goToday());
+    expect(date.value).toBe(toKey(new Date()));
+  });
+
   it('keeps future agenda events visible when today fills the upcoming limit', () => {
     const today = new Date();
     const tomorrow = new Date(today);

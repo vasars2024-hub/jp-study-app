@@ -354,6 +354,8 @@ export function useCalendar() {
   const [mode, setMode] = useState<ViewMode>('month');
   const [cursor, setCursor] = useState(() => new Date());
   const [jumpVal, setJumpVal] = useState(toKey(new Date()));
+  // Follow navigation, but leave an unfinished date alone until the cursor moves.
+  useEffect(() => setJumpVal(toKey(cursor)), [cursor]);
   const [modal, setModal] = useState<Partial<EventForm> | null>(null);
   const [weekStartPref, setWeekStartPref] = useState(() => loadDesktopPrefs().weekStart);
   useEffect(() => onDesktopPrefsChanged((prefs) => setWeekStartPref(prefs.weekStart)), []);
