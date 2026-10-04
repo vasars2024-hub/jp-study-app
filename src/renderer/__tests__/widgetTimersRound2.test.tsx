@@ -6,7 +6,7 @@
  * - a finished countdown chimes, even while collapsed;
  * - the calculator's invalid-expression state is translated, not the literal "Error".
  */
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -51,6 +51,35 @@ async function mount(node: React.ReactNode): Promise<HTMLElement> {
 }
 
 describe('widget timers', () => {
+  it.each([
+    ['workMin', 0, 90],
+    ['breakMin', 1, 60],
+    ['minutes', 0, 999],
+  ] as const)('caps typed %s at the displayed maximum', async (setting, inputIndex, maximum) => {
+    const Widget = setting === 'minutes' ? Countdown : Pomodoro;
+    function TimerWithSettings() {
+      const [settings, setSettings] = useState<Record<string, unknown>>({});
+      return <Widget settings={settings} setSettings={(patch) => setSettings((prev) => ({ ...prev, ...patch }))}
+        size={{ w: 200, h: 240 }} instanceId="bounded" />;
+    }
+    const host = await mount(<TimerWithSettings />);
+    const input = host.querySelectorAll('input')[inputIndex];
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '10000');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(input.value).toBe(String(maximum));
+    if (setting === 'breakMin') {
+      // Complete focus to verify the capped setting reaches the next phase.
+      await act(async () => {
+        const focus = getTimer('bounded')!;
+        setTimer('bounded', startTimer(focus, 0));
+        tickTimers(focus.durationMs);
+      });
+    }
+    expect(getTimer('bounded')?.durationMs).toBe(maximum * 60_000);
+  });
+
   it.each(['countdown', 'pomodoro'] as const)('finishes an expired %s when Pause beats the next ticker callback', async (kind) => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);

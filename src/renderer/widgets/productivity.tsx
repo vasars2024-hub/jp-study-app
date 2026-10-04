@@ -201,11 +201,11 @@ export function Pomodoro({ settings, setSettings, instanceId }: WidgetProps) {
       <div className="wgt-row wgt-pomo-cfg">
         <label>{t('widgets.pomodoro.focus')}
           <input type="number" min={1} max={90} value={workMin}
-            onChange={(e) => setSettings({ workMin: Math.max(1, Number(e.target.value) || 25) })} />
+            onChange={(e) => setSettings({ workMin: Math.min(90, Math.max(1, Number(e.target.value) || 25)) })} />
         </label>
         <label>{t('widgets.pomodoro.break')}
           <input type="number" min={1} max={60} value={breakMin}
-            onChange={(e) => setSettings({ breakMin: Math.max(1, Number(e.target.value) || 5) })} />
+            onChange={(e) => setSettings({ breakMin: Math.min(60, Math.max(1, Number(e.target.value) || 5)) })} />
         </label>
       </div>
     </div>
@@ -244,7 +244,7 @@ export function Countdown({ settings, setSettings, instanceId }: WidgetProps) {
         <button className="wgt-btn" onClick={timer.reset}>{t('common.reset')}</button>
         <label className="wgt-inline-cfg">{t('widgets.countdown.minLabel')}
           <input type="number" min={1} max={999} value={minutes}
-            onChange={(e) => setSettings({ minutes: Math.max(1, Number(e.target.value) || 10) })} />
+            onChange={(e) => setSettings({ minutes: Math.min(999, Math.max(1, Number(e.target.value) || 10)) })} />
         </label>
       </div>
     </div>
