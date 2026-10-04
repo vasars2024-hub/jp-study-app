@@ -89,9 +89,11 @@ export function useTranslate(): TranslateController {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<TranslationHistoryEntry[]>(() => loadTranslationHistory());
   const startedRef = useRef(false);
+  const requestRef = useRef(0);
   const offModelRef = useRef<(() => void) | null>(null);
 
   useEffect(() => () => {
+    requestRef.current += 1;
     offModelRef.current?.();
     offModelRef.current = null;
   }, []);
@@ -151,6 +153,7 @@ export function useTranslate(): TranslateController {
   const run = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
+    const request = ++requestRef.current;
     setError('');
     setOutput('');
     setTranslatedInput('');
@@ -161,6 +164,7 @@ export function useTranslate(): TranslateController {
     // Drops only this view's subscription, not the popup's or the reader's.
     offModelRef.current?.();
     offModelRef.current = onModelProgress((p) => {
+      if (request !== requestRef.current) return;
       if (p.status === 'progress' && typeof p.progress === 'number') {
         const f = typeof p.file === 'string' ? p.file.split('/').pop() : 'model';
         setMsg(t('translate.msg.loadingFile', { file: f, pct: Math.round(p.progress) }));
@@ -169,10 +173,12 @@ export function useTranslate(): TranslateController {
 
     try {
       const result = await translateTo(text, source, target, (prog) => {
+        if (request !== requestRef.current) return;
         startedRef.current = true;
         setState('translating');
         setMsg(t('translate.msg.translating', { pct: Math.round(prog * 100) }));
       });
+      if (request !== requestRef.current) return;
       setOutput(result);
       setTranslatedInput(text);
       setState('done');
@@ -193,11 +199,14 @@ export function useTranslate(): TranslateController {
         href: 'translate',
       });
     } catch (e) {
+      if (request !== requestRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setState('error');
     } finally {
-      offModelRef.current?.();
-      offModelRef.current = null;
+      if (request === requestRef.current) {
+        offModelRef.current?.();
+        offModelRef.current = null;
+      }
     }
   }, [input, source, target, t]);
 
@@ -230,8 +239,12 @@ export function useTranslate(): TranslateController {
   }
 
   function clear() {
+    requestRef.current += 1;
+    offModelRef.current?.();
+    offModelRef.current = null;
     setInput('');
     setOutput('');
+    setTranslatedInput('');
     setError('');
     setMsg('');
     setState('idle');
