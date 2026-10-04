@@ -275,12 +275,21 @@ export default function ClipboardHistoryPanel() {
       });
   }, [entries, query, filter]);
 
+  // Bulk actions apply to the current results, including after history eviction.
+  useEffect(() => {
+    const visibleIds = new Set(filtered.map((entry) => entry.id));
+    setSelected((previous) => {
+      const next = new Set([...previous].filter((id) => visibleIds.has(id)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [filtered]);
+
   const toggleSelectAll = () => {
     setSelected((s) => (s.size === filtered.length ? new Set() : new Set(filtered.map((e) => e.id))));
   };
 
   const bulkDelete = () => {
-    deleteEntries(selected);
+    deleteEntries(new Set(filtered.filter((entry) => selected.has(entry.id)).map((entry) => entry.id)));
     setSelected(new Set());
   };
   const bulkCopy = () => {

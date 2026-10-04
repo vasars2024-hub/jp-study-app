@@ -26,6 +26,8 @@ import ClipboardHistoryPanel from '../components/ClipboardHistoryPanel';
 import {
   CLIPBOARD_MAX_SIZE_MAX,
   clampClipboardMaxSize,
+  deleteEntry,
+  loadClipboardHistory,
   loadClipboardSettings,
   saveClipboardSettings,
 } from '../clipboardHistory';
@@ -62,6 +64,47 @@ afterEach(() => {
 });
 
 describe('clipboard history panel', () => {
+  it('deletes only selected search results and preserves copies hidden by the query', () => {
+    seed(3);
+    open();
+    act(() => host!.querySelector<HTMLInputElement>('.cbh-selall input')!.click());
+    const search = host!.querySelector<HTMLInputElement>('.cbh-search')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'entry 1');
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(host!.querySelector<HTMLInputElement>('.cbh-selall input')!.checked).toBe(true);
+    act(() => host!.querySelector<HTMLButtonElement>('.cbh-bulk-actions .danger')!.click());
+    expect(loadClipboardHistory().map((entry) => entry.id)).toEqual(['cb-0', 'cb-2']);
+  });
+
+  it('clears selections hidden by a type filter so Select all selects the new results', () => {
+    seed(1);
+    const entries = loadClipboardHistory();
+    localStorage.setItem('jp-clipboard-history', JSON.stringify([
+      ...entries, { id: 'word', text: '猫', type: 'word', createdAt: Date.now() - 1 },
+    ]));
+    open();
+    act(() => host!.querySelector<HTMLInputElement>('.cbh-check')!.click());
+    act(() => Array.from(host!.querySelectorAll<HTMLButtonElement>('.cbh-filter'))
+      .find((button) => button.textContent === 'clipboard.filter.words')!.click());
+    expect(host!.querySelector('.cbh-bulk-actions')).toBeNull();
+    expect(host!.querySelector<HTMLInputElement>('.cbh-selall input')!.checked).toBe(false);
+    act(() => host!.querySelector<HTMLInputElement>('.cbh-selall input')!.click());
+    expect(host!.querySelector<HTMLInputElement>('.cbh-check')!.checked).toBe(true);
+    act(() => host!.querySelector<HTMLButtonElement>('.cbh-bulk-actions .danger')!.click());
+    expect(loadClipboardHistory().map((entry) => entry.id)).toEqual(['cb-0']);
+  });
+
+  it('drops selections when a selected copy is removed from history', () => {
+    seed(2);
+    open();
+    act(() => host!.querySelector<HTMLInputElement>('.cbh-check')!.click());
+    act(() => deleteEntry('cb-0'));
+    expect(host!.querySelector('.cbh-bulk-actions')).toBeNull();
+    expect(host!.querySelector<HTMLInputElement>('.cbh-selall input')!.checked).toBe(false);
+  });
+
   it('mounts a window of a 2,000-entry history, not every card', () => {
     seed(2_000);
     open();
