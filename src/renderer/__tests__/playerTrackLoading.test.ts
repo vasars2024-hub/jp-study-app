@@ -28,6 +28,7 @@ Object.defineProperty(window, 'api', {
 });
 vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
 vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
+vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
 
 let bus: typeof import('../playerBus');
 beforeAll(async () => { bus = await import('../playerBus'); });
@@ -69,5 +70,28 @@ describe('pending music track loads', () => {
     resolveTrack('second');
     await second;
     expect(bus.getState().current?.id).toBe('second');
+  });
+
+  it('updates the controls and other windows when a missing file stops playback', async () => {
+    const first = bus.playItem(track('first'));
+    resolveTrack('first');
+    await first;
+    const audio = bus.getLeaderAudioElement()!;
+    audio.dispatchEvent(new Event('loadedmetadata'));
+    audio.dispatchEvent(new Event('play'));
+    expect(bus.getState().playing).toBe(true);
+
+    const listener = vi.fn();
+    const unsubscribe = bus.subscribe(listener);
+    vi.mocked(window.api.playerPublish).mockClear();
+    try {
+      const missing = bus.playItem(track('missing'));
+      pending.get('missing')!(null);
+      expect(await missing).toBe('musicUi.error.fileMissing');
+      expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({ playing: false }));
+      expect(window.api.playerPublish).toHaveBeenLastCalledWith(expect.objectContaining({ playing: false }));
+    } finally {
+      unsubscribe();
+    }
   });
 });

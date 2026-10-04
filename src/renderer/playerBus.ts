@@ -357,6 +357,7 @@ async function playItemById(id: string, itemHint?: MediaItem): Promise<string | 
   if (requestToken !== trackToken || !isLeader()) return null;
   if (!opened) {
     switchingTrack = false;
+    notify();
     return t('musicUi.error.fileMissing');
   }
 
