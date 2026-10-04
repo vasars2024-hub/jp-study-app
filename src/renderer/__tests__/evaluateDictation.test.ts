@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { evaluateDictation } from '../evaluateDictation';
 import { getTokenizer, tokenizeSync } from '../tokenizer';
+import { markMissedDictation } from '../../shared/listeningTraining';
 
 vi.mock('../tokenizer', () => ({ getTokenizer: vi.fn(), tokenizeSync: vi.fn() }));
 
@@ -28,6 +29,7 @@ describe('reading-aware dictation', () => {
   it('accepts a kana transcription while displaying the original kanji subtitle', async () => {
     expect(await evaluateDictation('きょうはいいてんき', '今日はいい天気')).toEqual({
       exact: true, score: 100, answer: 'きょうはいいてんき', expected: '今日はいい天気',
+      comparison: { answer: 'きょうはいいてんき', expected: 'キョウハイイテンキ' },
     });
   });
 
@@ -40,6 +42,7 @@ describe('reading-aware dictation', () => {
   it('accepts an answer the IME only partly converted to kanji', async () => {
     expect(await evaluateDictation('今日はいいてんき', '今日はいい天気')).toEqual({
       exact: true, score: 100, answer: '今日はいいてんき', expected: '今日はいい天気',
+      comparison: { answer: 'キョウハイイてんき', expected: 'キョウハイイテンキ' },
     });
     expect(await evaluateDictation('きょうはいい天気', '今日はいい天気')).toMatchObject({ exact: true });
   });
@@ -48,6 +51,28 @@ describe('reading-aware dictation', () => {
     const result = await evaluateDictation('今日は天気', '今日はいい天気');
     expect(result.exact).toBe(false);
     expect(result.score).toBe(78);
+  });
+
+  it.each(['きょうはいいでんき', '今日はいいでんき'])(
+    'highlights only the missed kana in %s using the scored comparison', async (answer) => {
+      const result = await evaluateDictation(answer, '今日はいい天気');
+      expect(result.score).toBe(89);
+      expect(result.expected).toBe('今日はいい天気');
+      expect(result.comparison).toBeDefined();
+      expect(markMissedDictation(result.comparison!.answer, result.comparison!.expected)).toEqual([
+        { text: 'キョウハイイ', missed: false },
+        { text: 'テ', missed: true },
+        { text: 'ンキ', missed: false },
+      ]);
+    },
+  );
+
+  it('keeps the literal comparison when its score wins', async () => {
+    const result = await evaluateDictation('今日はいい天', '今日はいい天気');
+    expect(result.comparison).toBeUndefined();
+    expect(markMissedDictation(result.answer, result.expected)).toEqual([
+      { text: '今日はいい天', missed: false }, { text: '気', missed: true },
+    ]);
   });
 
   it('preserves unknown words when a token has no reading', async () => {

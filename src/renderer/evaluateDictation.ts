@@ -21,7 +21,10 @@ export async function evaluateDictation(answer: string, expected: string) {
     const spoken = evaluateJapaneseDictation(toReading(answer), reading);
     const phonetic = spoken.score > kana.score ? spoken : kana;
     return phonetic.score > literal.score
-      ? { ...literal, exact: phonetic.exact, score: phonetic.score }
+      ? {
+        ...literal, exact: phonetic.exact, score: phonetic.score,
+        comparison: { answer: phonetic.answer, expected: phonetic.expected },
+      }
       : literal;
   } catch {
     // Dictionary assets can be unavailable; literal checking still works.

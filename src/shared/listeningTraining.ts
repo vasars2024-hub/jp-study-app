@@ -3,6 +3,8 @@ export interface DictationEvaluation {
   score: number;
   answer: string;
   expected: string;
+  /** Reading-based text used for scoring when it beats the literal comparison. */
+  comparison?: { answer: string; expected: string };
 }
 
 export function normalizeJapaneseDictation(value: string): string {

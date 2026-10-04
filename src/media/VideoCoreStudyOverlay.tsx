@@ -99,7 +99,6 @@ import {
   type VideoCoreComprehensionEvent,
   type VideoCoreComprehensionSignal,
   type VideoCoreCueReplaySignal,
-  type VideoCoreDictationEvaluation,
   type VideoCoreStudyPreferences,
   type VideoCoreTimingSignal,
   nextVideoFit,
@@ -110,7 +109,7 @@ import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import { formatWatchLoopTimestamp } from '../shared/seanimeWatchLoop';
 import { pretokenizeInIdle } from '../renderer/tokenizer';
 import { evaluateDictation } from '../renderer/evaluateDictation';
-import { evaluateJapaneseDictation, markMissedDictation } from '../shared/listeningTraining';
+import { markMissedDictation, type DictationEvaluation } from '../shared/listeningTraining';
 import {
   mediaCaptionCues,
   normalizeMediaCaptionTracks,
@@ -396,7 +395,7 @@ export default function VideoCoreStudyOverlay({
   const [popup, setPopup] = React.useState<CuePopup | null>(null);
   const [dictationInput, setDictationInput] = React.useState('');
   const [dictationResult, setDictationResult] =
-    React.useState<VideoCoreDictationEvaluation | null>(null);
+    React.useState<DictationEvaluation | null>(null);
   const [dictationRevealed, setDictationRevealed] = React.useState(false);
   /** Lines answered below `DICTATION_MISSED_BELOW` this session, so the learner can go back and replay them. */
   const [missedLines, setMissedLines] = React.useState<
@@ -2970,10 +2969,12 @@ export default function VideoCoreStudyOverlay({
               : t('mediaWorkspace.study.matchScore', { score: dictationResult.score })}
           </span>
         )}
-        {dictationRevealed && dictationResult && !dictationResult.exact
-          && evaluateJapaneseDictation(dictationInput, plainText).score === dictationResult.score && (
+        {dictationRevealed && dictationResult && !dictationResult.exact && (
           <span className="study-dictation-diff" lang="ja">
-            {markMissedDictation(dictationInput, plainText).map((mark, index) => (
+            {markMissedDictation(
+              dictationResult.comparison?.answer ?? dictationResult.answer,
+              dictationResult.comparison?.expected ?? dictationResult.expected,
+            ).map((mark, index) => (
               mark.missed ? <mark key={index}>{mark.text}</mark> : <span key={index}>{mark.text}</span>
             ))}
           </span>
