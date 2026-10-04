@@ -262,7 +262,15 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
   const items = readSetting<Todo[]>(settings, 'items', []);
   const [draft, setDraft] = useState('');
   const draftRef = useRef<HTMLInputElement>(null);
+  const removeRefs = useRef(new Map<string, HTMLButtonElement>());
   const write = (next: Todo[]) => setSettings({ items: next });
+  const remove = (id: string) => {
+    const index = items.findIndex((item) => item.id === id);
+    const neighbor = items[index + 1] ?? items[index - 1];
+    const focusTarget = neighbor ? removeRefs.current.get(neighbor.id) : draftRef.current;
+    focusTarget?.focus();
+    write(items.filter((item) => item.id !== id));
+  };
   const add = () => {
     const text = draft.trim();
     if (!text) return;
@@ -297,7 +305,9 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
               />
               <span>{it.text}</span>
             </label>
-            <button className="wgt-btn-icon" title={t('common.remove')} aria-label={t('common.remove')} onClick={() => write(items.filter((x) => x.id !== it.id))}>×</button>
+            <button className="wgt-btn-icon" title={t('common.remove')} aria-label={t('common.remove')}
+              ref={(node) => { if (node) removeRefs.current.set(it.id, node); else removeRefs.current.delete(it.id); }}
+              onClick={() => remove(it.id)}>×</button>
           </li>
         ))}
       </ul>

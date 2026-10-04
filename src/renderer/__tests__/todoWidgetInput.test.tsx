@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { TodoList } from '../widgets/productivity';
@@ -33,6 +33,32 @@ async function mountDraft() {
 }
 
 describe('to-do widget Japanese input', () => {
+  it('keeps focus on the next task, previous task, then input as tasks are removed', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    function Harness() {
+      const [settings, setSettings] = useState({ items: [
+        { id: 'a', text: 'Read', done: false },
+        { id: 'b', text: 'Review', done: false },
+        { id: 'c', text: 'Listen', done: true },
+      ] });
+      return <TodoList settings={settings} setSettings={(patch) => setSettings((prev) => ({ ...prev, ...patch }))} size={{ w: 240, h: 200 }} />;
+    }
+    await act(async () => { root?.render(<Harness />); });
+    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('li button'));
+    buttons[1].focus();
+    await act(async () => { buttons[1].click(); });
+    expect(document.activeElement).toBe(buttons[2]);
+    expect(host.querySelectorAll('li')).toHaveLength(2);
+    await act(async () => { buttons[2].click(); });
+    expect(document.activeElement).toBe(buttons[0]);
+    expect(host.querySelectorAll('li')).toHaveLength(1);
+    await act(async () => { buttons[0].click(); });
+    expect(document.activeElement).toBe(host.querySelector('input'));
+    expect(host.querySelectorAll('li button')).toHaveLength(0);
+  });
+
   it.each([
     { isComposing: true },
     { keyCode: 229 },
