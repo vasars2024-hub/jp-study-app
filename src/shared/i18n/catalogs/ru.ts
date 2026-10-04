@@ -8378,6 +8378,8 @@ export const ru: Catalog = {
   'flash.search.leeches': 'Трудные карточки: {n}',
   'flash.search.leechesTitle': 'Показать карточки, забытые не менее {n} раз',
   'flash.leechNotice': 'Трудная карточка: «{word}» забыта {n} раз. Подумайте, стоит ли изменить её или добавить мнемонику.',
+  'flash.leechEditMeaning': '???????? ????????',
+  'flash.leechEditMeaningPrompt': '???????? ???????? ??? ???????? ????????? ??? ?{word}?.',
   'flash.leechNoticeDismiss': 'Закрыть',
   'flash.search.noMatches': 'Нет карточек, соответствующих «{query}».',
   'flash.search.matchCount': {

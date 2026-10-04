@@ -301,6 +301,7 @@ export interface FlashcardsState {
   /** The word of a card the last rating just turned into a leech, or ''. */
   leechNote: string;
   dismissLeechNote: () => void;
+  editLeechMeaning: () => Promise<void>;
   playCurrentInVideo: () => Promise<void>;
   audioBusy: boolean;
   audioCancelling: boolean;
@@ -432,6 +433,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewMixKeys, setReviewMixKeys] = useState<string[]>([]);
   const [videoNote, setVideoNote] = useState('');
   const [leechNote, setLeechNote] = useState('');
+  const leechCardId = useRef('');
   /** When a "Listen now" hand-off asked for a listening sitting to start. */
   const pendingListenRef = useRef(0);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -690,6 +692,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     initialMastered: Set<string> = new Set(),
   ): void {
     if (!cards.length) return;
+    setLeechNote('');
     const ordered = orderReviewCards(cards, initialMastered);
     setReviewSource(source);
     // Stamped once per sitting: it is what gives a study-session hand-off a
@@ -741,6 +744,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     // keep talking over the deck overview.
     cardAudio.stop();
     setMode('overview');
+    setLeechNote('');
     setSessionCards([]);
     setReviewIndex(0);
     setMasteredIds(new Set());
@@ -815,10 +819,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     undoStackRef.current.pop();
     setUndoDepth(undoStackRef.current.length);
     if (!undone) return;
+    setLeechNote('');
     setDeck(undone.cards);
     const restored = undone.cards.find((c) => c.id === snapshot.cardId);
     setSessionCards(snapshot.sessionCards.map((c) => (
-      c.id === snapshot.cardId ? { ...c, srs: restored?.srs } : c
+      c.id === snapshot.cardId ? { ...c, srs: restored?.srs, meaning: restored?.meaning || restored?.back || '' } : c
     )));
     setReviewIndex(snapshot.reviewIndex);
     setMasteredIds(snapshot.masteredIds);
@@ -883,6 +888,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
       setDeck(nextDeck);
       if (reviewedCard && isLeechCard(reviewedCard) && !isLeechCard(card)) {
+        leechCardId.current = reviewedCard.id;
         setLeechNote(reviewedCard.word || reviewedCard.front || '');
       }
       if (reviewedCard) {
@@ -912,6 +918,22 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       });
     }
     setFlipped(false);
+  }
+
+  async function editLeechMeaning(): Promise<void> {
+    const card = loadDeck().find((candidate) => candidate.id === leechCardId.current);
+    if (!card) return;
+    const meaning = await promptDialog({
+      title: t('flash.leechEditMeaning'),
+      message: t('flash.leechEditMeaningPrompt', { word: card.word || card.front || '' }),
+      defaultValue: card.meaning || card.back || '',
+    });
+    if (meaning == null || !meaning.trim()) return;
+    setDeck(updateDeckCard(card.id, { meaning: meaning.trim() }));
+    setSessionCards((cards) => cards.map((candidate) => (
+      candidate.id === card.id ? { ...candidate, meaning: meaning.trim() } : candidate
+    )));
+    setLeechNote('');
   }
 
   async function resolveAudio(card: ReviewCard): Promise<string | null> {
@@ -1344,6 +1366,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     videoNote,
     leechNote,
     dismissLeechNote: () => setLeechNote(''),
+    editLeechMeaning,
     playCurrentInVideo,
     audioBusy,
     audioCancelling,
@@ -1673,6 +1696,8 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           {state.leechNote && (
             <span className="flash-audio-error" role="status">
               {t('flash.leechNotice', { word: state.leechNote, n: LEECH_LAPSE_THRESHOLD })}
+              {' '}
+              <button type="button" className="btn small" onClick={() => void state.editLeechMeaning()}>{t('flash.leechEditMeaning')}</button>
               {' '}
               <button type="button" className="btn small" onClick={state.dismissLeechNote}>{t('flash.leechNoticeDismiss')}</button>
             </span>

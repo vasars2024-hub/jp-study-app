@@ -13,7 +13,14 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FlashcardsState } from '../components/flashcards/FlashcardsContent';
+
+const promptMeaning = vi.hoisted(() => vi.fn());
+vi.mock('../components/ui/dialogService', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../components/ui/dialogService')>(),
+  promptDialog: promptMeaning,
+}));
 
 /** Every bridge call resolves empty; the few whose callers read a shape get that shape. */
 const API_SHAPES: Record<string, unknown> = {
@@ -80,6 +87,48 @@ async function mount(): Promise<void> {
 }
 
 describe('Flashcards overview', () => {
+  it.each(['a clearer meaning with a mnemonic', null, '   '])('edits the flagged leech after review advances: %s', async (answer) => {
+    const { useFlashcards, FlashcardReviewMode } = await import('../components/flashcards/FlashcardsContent');
+    const { loadDeck, LEECH_LAPSE_THRESHOLD } = await import('../flashcardDeck');
+    localStorage.setItem('jp-flashcard-deck', JSON.stringify({ folders: [], cards: CARDS.map((card) => ({
+      ...card,
+      srs: { version: 1, dueAt: 0, intervalDays: 1, ease: 2.5, repetitions: 1,
+        lapses: LEECH_LAPSE_THRESHOLD - 1, lastReviewedAt: 1, lastRating: 'good' },
+    })) }));
+    let state!: FlashcardsState;
+    function Harness() {
+      state = useFlashcards();
+      return state.mode === 'review' ? <FlashcardReviewMode state={state} /> : null;
+    }
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root?.render(<Harness />));
+    await act(async () => state.startEpubReview());
+    const flagged = state.current!;
+    await act(async () => state.again());
+    expect(state.current?.id).not.toBe(flagged.id);
+    expect(state.leechNote).toBe(flagged.word);
+    const schedule = loadDeck().find((card) => card.id === flagged.id)?.srs;
+    promptMeaning.mockResolvedValueOnce(answer);
+    const edit = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Edit meaning');
+    expect(edit).toBeTruthy();
+    await act(async () => edit!.click());
+    expect(promptMeaning).toHaveBeenLastCalledWith(expect.objectContaining({ defaultValue: flagged.meaning }));
+    const expected = answer?.trim() || flagged.meaning;
+    expect(loadDeck().find((card) => card.id === flagged.id)?.meaning).toBe(expected);
+    expect(state.sessionCards.find((card) => card.id === flagged.id)?.meaning).toBe(expected);
+    expect(loadDeck().find((card) => card.id === flagged.id)?.srs).toEqual(schedule);
+    expect(loadDeck().filter((card) => card.id !== flagged.id).map((card) => card.meaning))
+      .toEqual(CARDS.filter((card) => card.id !== flagged.id).map((card) => card.meaning));
+    expect(state.leechNote).toBe(answer?.trim() ? '' : flagged.word);
+    await act(async () => state.undoRating());
+    expect(state.leechNote).toBe('');
+    expect(state.current?.id).toBe(flagged.id);
+    expect(state.current?.meaning).toBe(expected);
+    expect(loadDeck().find((card) => card.id === flagged.id)?.meaning).toBe(expected);
+  });
+
   it('practice is five tiles of one shape, named by their action and described', async () => {
     await mount();
     const practice = host.querySelector('section.flash-practice');

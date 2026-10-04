@@ -7744,6 +7744,8 @@ export const en: Catalog = {
   'flash.search.leeches': 'Leeches: {n}',
   'flash.search.leechesTitle': 'Show the cards you have forgotten at least {n} times',
   'flash.leechNotice': 'Leech: {word} has now been forgotten {n} times. Consider editing it or adding a mnemonic.',
+  'flash.leechEditMeaning': 'Edit meaning',
+  'flash.leechEditMeaningPrompt': 'Revise the meaning or add a mnemonic for {word}.',
   'flash.leechNoticeDismiss': 'Dismiss',
   'flash.search.noMatches': 'No cards match “{query}”.',
   'flash.search.matchCount': {
